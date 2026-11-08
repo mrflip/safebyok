@@ -239,15 +239,15 @@ export const leaseFriend = objCheck(({ fn }) => ({
   /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
   lock:            fn<() => unknown>(),
   /** The record this device has cached, or null for none. */
-  tryPeekLease:    fn<() => Promise<Outcome<unknown>>>(),
+  peekLease:       fn<() => Promise<unknown>>(),
   /** Cache a lease's record on this device, in place of any it held. */
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
   /** Forget the lease this device has cached. */
+  forgetLease:     fn<() => Promise<void>>(),
+  /** Forget the lease this device has cached, telling the host of a refused erase. */
   tryForgetLease:  fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
   tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),
-  /** Tell the host of a cached row of another epoch or life that outlived its erase. */
-  tellUnerased:    fn<(refusal: VaultError) => unknown>(),
 }), { refusalkind: 'bad_option', extras: 'strip' })
 
 /** All a lease or a proving hears of its vault, once {@link leaseFriend} has checked it. */

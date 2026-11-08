@@ -48,18 +48,18 @@ export const FriendLeaseMillis = 24 * 60 * 60_000
 /** A fake of a vault as a lease hears it: a {@link LeaseFriend} with a spy for `lock` and each deviceDB verb, over one slot. */
 export type FakeLeaseFriend = LeaseFriend & {
   lock:            Mock<() => void>
-  tryPeekLease:    Mock<LeaseFriend['tryPeekLease']>
+  peekLease:       Mock<LeaseFriend['peekLease']>
   tryCacheLease:   Mock<LeaseFriend['tryCacheLease']>
+  forgetLease:     Mock<LeaseFriend['forgetLease']>
   tryForgetLease:  Mock<LeaseFriend['tryForgetLease']>
   tellBadNews:     Mock<LeaseFriend['tellBadNews']>
-  tellUnerased:    Mock<LeaseFriend['tellUnerased']>
   /** The record the slot holds, null for none. Set it to seed one, whatever it is. */
   cached:          unknown
   /** Every call the logger heard, oldest first. */
   logged:          LoggedCall[]
 }
 
-/** A {@link FakeLeaseFriend} of {@link WorldStamp}, as `overrides` changes it, caching nothing yet, its verbs answering good. Script a refusal with the spy's `mockResolvedValueOnce(bad(err))`. */
+/** A {@link FakeLeaseFriend} of {@link WorldStamp}, as `overrides` changes it, caching nothing yet, its verbs answering good. Script a refusal with the spy's `mockRejectedValueOnce(err)`, or `mockResolvedValueOnce(bad(err))` for a `try` verb. */
 export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp & Pick<LeaseFriend, 'leaseMillis'>> = {}): FakeLeaseFriend => {
   const { logger, calls } = spyLogger()
   const friend: FakeLeaseFriend = {
@@ -71,11 +71,14 @@ export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp & Pick<LeaseFrie
     cached:          null,
     lock:            vi.fn<() => void>(),
     tellBadNews:     vi.fn(),
-    tellUnerased:    vi.fn(),
-    tryPeekLease:    vi.fn(() => Promise.resolve(good(friend.cached))),
+    peekLease:       vi.fn(() => Promise.resolve(friend.cached)),
     tryCacheLease:   vi.fn((record: LeaseRecord) => {
       friend.cached = record
       return Promise.resolve(good(record))
+    }),
+    forgetLease:     vi.fn(() => {
+      friend.cached = null
+      return Promise.resolve()
     }),
     tryForgetLease:  vi.fn(() => {
       friend.cached = null

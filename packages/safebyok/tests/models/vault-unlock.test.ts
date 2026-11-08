@@ -89,7 +89,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     await unlockTyping(vault, byPassphrase(Passphrase))
     expect(vault.isUnlocked).to.be.true
     expect(await vault.unsealStampedString(sealed, Stamp)).to.eq('sk-test')
-    expect(deviceDB.tryForget).toHaveBeenCalledOnce()
+    expect(deviceDB.forget).toHaveBeenCalledOnce()
     expect(deviceDB.tryStow).toHaveBeenCalledTimes(2)
     expect(deviceDB.cachedNow()).not.to.be.null
   })
@@ -269,7 +269,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     await TH.expectRefusal(again.sealStampedString('sk-test', Stamp), 'damaged_lease')
     expect(again.isLocked).to.be.true
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    expect(deviceDB.tryForget).toHaveBeenCalledOnce()
+    expect(deviceDB.forget).toHaveBeenCalledOnce()
   })
 
   it("tells a row that is no lease as bad news and asks for the proof, leaving it to be cached over", async () => {

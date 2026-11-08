@@ -90,11 +90,20 @@ describe("A lease renewed through a gate change", () => {
 describe("A refused erase of the row: lease_unerased", () => {
   const Refusal = new VaultError('storage_unavailable', 'the disk is full')
 
+  it("is announced by the friend's tryForgetLease, which answers it as a bad Outcome", async () => {
+    const onLifecycle = vi.fn()
+    const { vault, deviceDB, friend } = await makeBornVaultAndFriend(byPassphrase(Passphrase), { onLifecycle })
+    deviceDB.forget.mockRejectedValueOnce(Refusal)
+    await TH.expectBad(friend.tryForgetLease(), 'storage_unavailable')
+    await TH.eventually(() => onLifecycle.mock.calls.length > 0)
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_unerased', refusal: Refusal, vault, where: 'undeleted' }))
+  })
+
   it("is heard by the host's onLifecycle, leaving the vault locked and enabled; a rejection of it goes to the platform and no further", async () => {
     const reported = stubReportError()
     const onLifecycle = vi.fn(() => Promise.reject(new Error('the host broke')))
     const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onLifecycle })
-    deviceDB.tryForget.mockResolvedValueOnce(TH.bad(Refusal))
+    deviceDB.forget.mockRejectedValueOnce(Refusal)
     vault.lock()
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => reported.mock.calls.length === 1)
@@ -106,23 +115,23 @@ describe("A refused erase of the row: lease_unerased", () => {
   describe("with no onLifecycle and no reportError", () => {
     it("still vacates the vault", async () => {
       const { vault, deviceDB } = await makeBornVault()
-      deviceDB.tryForget.mockResolvedValue(TH.bad(Refusal))
+      deviceDB.forget.mockRejectedValue(Refusal)
       vault.lock()
       await TH.eventually(() => ! vault.isEnabled)
-      expect(deviceDB.tryForget).toHaveBeenCalledTimes(2)
+      expect(deviceDB.forget).toHaveBeenCalledTimes(2)
     })
   })
 
   it("with no onLifecycle reports it and vacates the vault; the vacate's own refusal finds that done", async () => {
     const reported = stubReportError()
     const { vault, listing, deviceDB } = await makeBornVault()
-    deviceDB.tryForget.mockResolvedValue(TH.bad(Refusal))
+    deviceDB.forget.mockRejectedValue(Refusal)
     vault.lock()
     await TH.eventually(() => reported.mock.calls.length === 2)
     expect(reported).toHaveBeenCalledWith(Refusal)
     expect(vault.isEnabled).to.be.false
     expect(listing.at(vault.scope)).to.be.null
-    expect(deviceDB.tryForget).toHaveBeenCalledTimes(2)
+    expect(deviceDB.forget).toHaveBeenCalledTimes(2)
   })
 })
 
@@ -151,7 +160,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(boxListing.at(box.scope)).to.be.null
     expect(box.whisper).to.equal(ENCRYPTED)
     expect(deviceDB.cachedNow()).not.to.be.null
-    expect(deviceDB.tryForget).not.toHaveBeenCalled()
+    expect(deviceDB.forget).not.toHaveBeenCalled()
     expect(deviceDB.peek).not.toHaveBeenCalled()
   })
 
@@ -179,7 +188,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp))
     expect(vault.lock().sweep().vacate()).to.equal(vault)
     expect(box.lock().sweep().vacate()).to.equal(box)
-    expect(deviceDB.tryForget).not.toHaveBeenCalled()
+    expect(deviceDB.forget).not.toHaveBeenCalled()
   })
 
   it("past a discard vault.boxListing answers the listing it held, its verbs refusing", async () => {

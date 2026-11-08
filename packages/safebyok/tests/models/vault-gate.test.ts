@@ -364,7 +364,7 @@ describe("vault.delVaultPrompt()", () => {
   it("tells of a refused erase and lets the tombstone stand", async () => {
     const onLifecycle = vi.fn()
     const { vault, storedNow, deviceDB } = await makeBornVault({ passphraseClear: Passphrase }, { onLifecycle })
-    deviceDB.tryForget.mockImplementation(() => Promise.resolve({ ok: false, err: new VaultError('storage_unavailable', 'the disk is full') }))
+    deviceDB.forget.mockRejectedValue(new VaultError('storage_unavailable', 'the disk is full'))
     await delTyping(vault)
     expect(storedNow()).to.include({ am: 'x' })
     await TH.eventually(() => onLifecycle.mock.calls.length > 0)

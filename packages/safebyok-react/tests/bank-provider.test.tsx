@@ -280,7 +280,7 @@ describe("BankProvider's handlers", () => {
   afterEach(() => { vi.unstubAllGlobals() })
 
   const Refusal = new VaultError('storage_unavailable', 'the disk is full')
-  const refuseErase = (deviceDB: MemoryDeviceDB) => vi.spyOn(deviceDB, 'tryForget').mockResolvedValue(TH.bad(Refusal))
+  const refuseErase = (deviceDB: MemoryDeviceDB) => vi.spyOn(deviceDB, 'forget').mockRejectedValue(Refusal)
 
   it.each([
     ['onBadNews', { onBadNews: 'not a function' }],
@@ -373,14 +373,14 @@ describe("BankProvider's handlers", () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const next = vi.fn()
-    const erasing = TH.held<ReturnType<typeof TH.bad>>()
+    const erasing = TH.held()
     const previous = vi.fn()
     const { props, rerender, deviceDB } = await unlockedProvided({ onLifecycle: previous })
-    vi.spyOn(deviceDB, 'tryForget').mockReturnValue(erasing.promise)
+    vi.spyOn(deviceDB, 'forget').mockImplementation(async () => { await erasing.promise; throw Refusal })
     fireEvent.click(screen.getByText('Lock'))
     rerender({ ...props, user_id: 'u2', onLifecycle: next })
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
-    erasing.resolve(TH.bad(Refusal))
+    erasing.resolve(undefined)
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
     await waitFor(() => { expect(previous).toHaveBeenCalledWith(expect.objectContaining({ kind: 'vacated', unerased: 1 })) })
     expect(previous.mock.calls.map(([event]) => (event as { kind: string }).kind).filter((kind) => kind !== 'helloed')).to.deep.equal(['lease_unerased', 'vacated'])

@@ -201,11 +201,11 @@ only as `box_key_wrapped`.
 the `LeaseFriend`'s `tryCacheLease` (made in `Vault.#makeFriend`) → `DeviceDB.stow`
 (`storage/device-db.ts`; `IdbDeviceDB`'s structured clone into IndexedDB, or `MemoryDeviceDB`'s
 `structuredClone` into a Map); read back, from
-`vault.ensureUnlocked`, by `Lease.buildFromCache` (`tryPeekLease` → `DeviceDB.peek`), which checks the row with
+`vault.ensureUnlocked`, by `Lease.buildFromCache` (`peekLease` → `DeviceDB.peek`), which checks the row with
 `leaseRecord` and builds a Lease around it. Dropped from memory by `lease.evict`: in `lease.vacate`, at a sweep
 (`sweepContents`), and when the lease proves damaged (`Lease.#vaultKey`). A lease built for a renewal that a lock crossed is neither attached nor stowed, and goes out of scope. Erased
-from the store by `DeviceDB.forget`: through `lease.vacate` or `Lease.forget` (`tryForgetLease`) from the
-vault's `#vacateLease`, at `vault.lock()`, at a vacate and at a tombstone; through `forgetOutdated`, in
+from the store by `DeviceDB.forget`: through `lease.vacate` or `Lease.forget` (`forgetLease`) from the
+vault's `#vacateLease`, at `vault.lock()`, at a vacate and at a tombstone; through `tryForgetLease`, in
 `Lease.buildFromCache`, for a row of another epoch or stamp; and row by row from `bank.vacate`
 (`#eraseOwnLeases`). `bank.autolock` erases a row by `vault.lock()`. The Bank's scan, `DeviceDB.listLeases`,
 answers rows without one. Only `peek` and `listRawLeases`, which no Vault or Bank calls, answer a `lease_key`, to
@@ -372,7 +372,7 @@ in `Proving.#wayinKey`; the leaseKey only in `Lease.#record` and the row cached 
 Lease the vault holds, and `Lease.buildFromCache` checks what `DeviceDB.peek` hands back and builds a Lease around
 it. A `Box` reaches the Lease only through the public `vault.sealStampedString` and `unsealStampedString`, which hand
 the lease a whisper's text and a stamp and hand back a sealed whisper or text, never a key. The `LeaseFriend` whose
-`tryPeekLease` answers the cached row, as an Outcome, with its leaseKey handle is held in `Lease.#friend` and made
+`peekLease` answers the cached row with its leaseKey handle is held in `Lease.#friend` and made
 in `Vault.#leaseFriend`; no public `Vault` method takes a proving, as a gating's run (`RunForGatingkind`) comes to
 `#unlockByProof` and `#landGate` by `Vault.#gatingFriend`, private in the vault and the gating; nothing public on a
 `Vault` or a `Lease` hands the friend out, and a test catches it with a spy on `Proving.prototype.buildLease`.

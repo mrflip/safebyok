@@ -114,11 +114,11 @@ describe("proving.buildLease(friend): the vault is taken at the grant", () => {
 describe("the friend a vault hands its leases", () => {
   it("calls the deviceDB under the vault's own scope", async () => {
     const { vault, deviceDB, friend } = await makeBornVaultAndFriend()
-    await friend.tryPeekLease()
-    await friend.tryForgetLease()
+    await friend.peekLease()
+    await friend.forgetLease()
     const asked = { ...vault.scope, vault_tok: vault.vault_tok }
     expect(deviceDB.peek).toHaveBeenCalledWith(asked)
-    expect(deviceDB.tryForget).toHaveBeenCalledWith(asked)
+    expect(deviceDB.forget).toHaveBeenCalledWith(asked)
   })
 })
 

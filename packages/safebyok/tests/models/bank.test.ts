@@ -262,7 +262,7 @@ describe("DefaultOnLifecycle", () => {
     [{ kind: 'lease_unerased', refusal: Refusal, where: 'lock' },      'error', true,  'reports a lock\'s refused erase at error and to the platform, and vacates the vault'],
     [{ kind: 'lease_unerased', refusal: Refusal, where: 'vacate' },    'error', true,  'reports a vacate\'s refused erase at error and to the platform'],
     [{ kind: 'lease_unerased', refusal: Refusal, where: 'tombstone' }, 'warn',  false, 'warns of a tombstone\'s refused erase, vacating nothing'],
-    [{ kind: 'lease_unerased', refusal: Refusal, where: 'outdated' },  'warn',  false, 'warns of an outdated row\'s refused erase, vacating nothing'],
+    [{ kind: 'lease_unerased', refusal: Refusal, where: 'undeleted' },  'warn',  false, 'warns of an outdated row\'s refused erase, vacating nothing'],
     // a vacate:
     [{ kind: 'vacated', cause: Revoked, unerased: 0 },                 'error', false, 'reports a vacate for a revoked identity at error and to the platform'],
     [{ kind: 'vacated', cause: bankDisabled(), unerased: 1 },          null,    false, 'says nothing of a sign-out'],
@@ -545,8 +545,8 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     await makeBankWithVault(world, { logger })
     expect(warn.mock.calls).to.have.length(1)
     const [cached] = world.leaseRows() as [{ gate_epoch: number }]
-    vi.spyOn(world.deviceDB, 'tryPeek').mockResolvedValueOnce(TH.good({ ...cached, gate_epoch: cached.gate_epoch + 1 } as never))
-    vi.spyOn(world.deviceDB, 'tryForget').mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'the store is down')))
+    vi.spyOn(world.deviceDB, 'peek').mockResolvedValueOnce({ ...cached, gate_epoch: cached.gate_epoch + 1 } as never)
+    vi.spyOn(world.deviceDB, 'forget').mockRejectedValueOnce(new VaultError('storage_unavailable', 'the store is down'))
     const page = world.bankOn({ logger })
     await page.hello()
     const unlocked = await page.vaultAt(VaultScopeGiven)?.ensureUnlocked()
@@ -562,7 +562,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     const [news, revoked] = [new VaultError('storage_unavailable', 'the device store is down'), new VaultError('identity_revoked', 'the host says no')]
     for (const peekRefusal of [news, revoked]) {
       vault.lock()
-      vi.spyOn(world.deviceDB, 'tryPeek').mockResolvedValueOnce({ ok: false, err: peekRefusal })
+      vi.spyOn(world.deviceDB, 'peek').mockRejectedValueOnce(peekRefusal)
       await vault.ensureUnlocked()
       expect(onBadNews).toHaveBeenLastCalledWith({ news: peekRefusal, bank })
       expect(vault.isEnabled).to.be.true

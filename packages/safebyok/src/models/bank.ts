@@ -344,7 +344,7 @@ const reportAtError = (refusal: VaultError, bank: Bank): void => {
 // A lock or a vacate meant the lease gone; a tombstone's erase and an outdated row's are tried again by the next lease cached.
 /** The default's answer to a cached lease that outlived its erase. */
 const heedUnerased = ({ refusal, vault, where, bank }: Extract<BankEvent, { kind: 'lease_unerased' }>): void => {
-  if (where === 'tombstone' || where === 'outdated') {
+  if (where === 'tombstone' || where === 'undeleted') {
     bank.logger.warn(refusal.message, { call: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
     return
   }

@@ -179,7 +179,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   /** SLOPDOC: Drops any lease held and erases the row cached on this device, announcing a refused erase at `where`. */
-  async #vacateLease(where: Exclude<EraseSite, 'outdated'>): Promise<void> {
+  async #vacateLease(where: Exclude<EraseSite, 'undeleted'>): Promise<void> {
     // The lease goes first, so a refused erase leaves none; the erase starts before any await, landing in call order.
     const held = this.#lease
     this.#lease = null
@@ -242,11 +242,15 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       logger,
       leaseMillis,
       lock:            () => { this.lock() },
-      tryPeekLease:    () => deviceDB.tryPeek(asked),
+      peekLease:       () => deviceDB.peek(asked),
       tryCacheLease:   (record) => deviceDB.tryStow(record),
-      tryForgetLease:  () => deviceDB.tryForget(asked),
+      forgetLease:     () => deviceDB.forget(asked),
+      tryForgetLease:  async (): Promise<Outcome<void>> => {
+        const outcome = await deviceDB.tryForget(asked)
+        if (! outcome.ok) { this.#bankFriend.announce({ kind: 'lease_unerased', refusal: outcome.err, vault: this, where: 'undeleted' }) }
+        return outcome
+      },
       tellBadNews:     (badnews) => { this.#bankFriend.tellBadNews(badnews) },
-      tellUnerased:    (refusal) => { this.#bankFriend.announce({ kind: 'lease_unerased', refusal, vault: this, where: 'outdated' }) },
     }
   }
 

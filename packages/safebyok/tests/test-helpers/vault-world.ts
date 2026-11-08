@@ -108,7 +108,7 @@ const makeDeviceDB = () => {
     memoryDB,
     peek:      vi.spyOn(memoryDB, 'peek'),
     tryStow:   vi.spyOn(memoryDB, 'tryStow'),
-    tryForget: vi.spyOn(memoryDB, 'tryForget'),
+    forget:    vi.spyOn(memoryDB, 'forget'),
     cachedNow: (): unknown => [...rows.values()][0]?.row ?? null,
     layCached: (record: unknown) => {
       const [ckey, filed] = [...rows][0] ?? ['no-row', { scopepath: ['no', 'row', 'here'] }]
@@ -209,9 +209,9 @@ export const makeBornVault = async (typing: Typing = byPassphrase(Passphrase), w
 }
 
 /** A vault as {@link makeBornVault} makes it, and the friend its birth built its lease on and the lease it holds, caught by a spy, as nothing of a vault hands them out. */
-export const makeBornVaultAndFriend = async () => {
+export const makeBornVaultAndFriend = async (...args: Parameters<typeof makeBornVault>) => {
   const buildLease = vi.spyOn(Proving.prototype, 'buildLease')
-  const born = await makeBornVault()
+  const born = await makeBornVault(...args)
   const [friend] = buildLease.mock.calls[0]!
   const lease = await buildLease.mock.results[0]!.value as Lease
   buildLease.mockRestore()
