@@ -58,3 +58,9 @@ export const valOf = <ValT>(outcome: Outcome<ValT>): ValT => {
   if (! outcome.ok) { throw outcome.err }
   return outcome.val
 }
+
+/** `outcome` itself when it is good, or what `refusal` makes of its `err` thrown. */
+export const demandGood = <ValT>(outcome: Outcome<ValT>, refusal: (err: VaultError) => VaultError = (err) => err): GoodOutcome<ValT> => {
+  if (! outcome.ok) { throw refusal(outcome.err) }
+  return outcome
+}

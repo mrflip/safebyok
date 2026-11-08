@@ -4,7 +4,7 @@ import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
 import { isVaultError } from '../refusals/errors'
-import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
+import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { damagedLease, leaseNotInForce, unopenedWhisper } from '../refusals/throwers'
 import type { Wayinkind } from '../shapes/shapes-enums'
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, LeaseFormat, leaseFriend, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from '../shapes/shapes-gateish'
@@ -176,13 +176,15 @@ export class Lease implements LeaseStamp {
   async #vaultKey(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
     const { lease_key, vault_key_lease_wrapped } = this.#demandRecord()
     const ctx = cipherCtx([this.#vaultStamp, this.#leaseStamp], 'vault_key_lease_wrapped')
-    const opened = await outcomeOf(() => unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] }), damagedLease)
-    if (! opened.ok) {
+    // Only this WebCrypto call is trapped: its rejection is how a damaged lease is learned.
+    try {
+      return await unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
+    } catch {
       // Locking drops the vault's lease and forgets its row by scope; this one is evicted too, should the vault hold another.
       this.#friend.lock()
       this.evict()
+      throw damagedLease()
     }
-    return valOf(opened)
   }
   // --
 

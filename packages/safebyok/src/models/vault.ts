@@ -1,7 +1,7 @@
 import type { Modelkind } from '../helpers/consts'
 import { consistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
-import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
+import { type Outcome, demandGood, outcomeOf } from '../refusals/outcome'
 import type { Gatingkind } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
@@ -284,7 +284,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.demandHelloable()
     const hello = await outcomeOf(() => this.#bringUp())
     this.#bankFriend.announce({ kind: 'helloed', outcome: hello, vault: this })
-    valOf(hello)
+    demandGood(hello)
     return this
   }
 

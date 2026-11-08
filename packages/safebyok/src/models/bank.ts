@@ -6,7 +6,7 @@ import { VaultError, isVaultError } from '../refusals/errors'
 import { tattoo } from '../helpers/helpers'
 import { type VaultLogger, parseLogger } from '../helpers/logger'
 import { DefaultStrengthChecker, type GuardedStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
-import { type Outcome, good, outcomeOf, valOf } from '../refusals/outcome'
+import { type Outcome, demandGood, good, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
 import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bankedVaultScope } from '../shapes/shapes-core'
@@ -136,7 +136,7 @@ export class Bank {
     this.#lastHello = hello
     this.#remakeSnapshot()
     this.#announce({ kind: 'helloed', outcome: hello, vault: null })
-    valOf(hello)
+    demandGood(hello)
   }
 
   tryHello(): Promise<Outcome<void>> { return outcomeOf(() => this.hello()) }
@@ -299,7 +299,7 @@ export class Bank {
   #demandReady(): void {
     this.demandEnabled()
     if (this.#lastHello === null) { throw helloFirst() }
-    valOf(this.#lastHello)
+    demandGood(this.#lastHello)
   }
   // --
 

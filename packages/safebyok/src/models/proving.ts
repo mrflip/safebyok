@@ -4,7 +4,6 @@ import { PassphraseKeyBytes, type Modelkind, type PassphraseSaltBytes, brandGuar
 import { deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn } from '../helpers/helpers'
-import { outcomeOf, valOf } from '../refusals/outcome'
 import type { Wayinkind } from '../shapes/shapes-enums'
 import type { KeyDeriver } from '../deriver/basederiver'
 import * as CX from '../shapes/shapes-core'
@@ -115,7 +114,12 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   protected async checkOpens(wrongProof: () => VaultError): Promise<void> {
     const { vault_key_wayin_wrapped } = this.#demandWayin()
     const ctx = this.#wayinCtx()
-    valOf(await outcomeOf(() => unwrapKeyUnder(this.#wayinKey, vault_key_wayin_wrapped, ctx, CheckUsage), wrongProof))
+    // Only this WebCrypto call is trapped: its rejection is how a wrong proof is learned.
+    try {
+      await unwrapKeyUnder(this.#wayinKey, vault_key_wayin_wrapped, ctx, CheckUsage)
+    } catch {
+      throw wrongProof()
+    }
   }
   // --
 
