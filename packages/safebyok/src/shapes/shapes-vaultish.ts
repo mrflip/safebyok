@@ -130,19 +130,21 @@ export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 
 // --
 
-// == [The listing's world]: listingWorld, ListingWorld, ListingOpts, answersEachVerb, brandedVaultDB, listingOpts
+// == [The listing's world]: listingWorld, ListingWorld, ListingOpts, answersEachVerb, brandedVaultDB, bankPanic, listingOpts
 
 /** The check of the world a listing lives in, the bank for vaults and the vault for boxes, as far as the base reaches into it. Checks only. */
-export const listingWorld = objCheck(({ fn, bool }) => ({ isLocked: bool, ensureTimely: fn(), takeWorld: fn(), tellBadNews: fn(), panic: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
+export const listingWorld = objCheck(({ fn, bool }) => ({ isLocked: bool, ensureTimely: fn(), takeWorld: fn(), tellBadNews: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
 
 /** The world a listing lives in, as far as the base reaches into it: the bank for vaults, the vault for boxes. */
-export type ListingWorld = Pick<Bank | Vault, 'isLocked' | 'ensureTimely' | 'takeWorld' | 'tellBadNews' | 'panic'>
+export type ListingWorld = Pick<Bank | Vault, 'isLocked' | 'ensureTimely' | 'takeWorld' | 'tellBadNews'>
 
 /** The options a listing is made with, after its world. */
 export type ListingOpts = {
   vaultDB:               VaultDB
   /** The refresh horizon of each thing the listing makes: how long after its last refresh the record in hand stays timely. */
   maxMillisSinceRefresh: number
+  /** The bank's panic, handed down to the listing as it is made, naming the vault it lies in, if one. */
+  panic:                 BankPanic
 }
 
 /** True for an object answering each of {@link VaultDBVerbnames} with a function. */
@@ -153,10 +155,14 @@ const answersEachVerb = (val: object): boolean => (
 /** The check of a vaultDB as a model is handed one: branded, from whichever copy of safebyok, and answering each verb with a function. */
 export const brandedVaultDB = Checker(({ custom }) => custom<VaultDB>((val) => isVaultDB(val) && answersEachVerb(val), Phrases.VaultDBExpected), 'bad_option')
 
+/** The check of the bank's panic as a listing or a vault is handed it, by the brand the bank gave it. */
+export const bankPanic = Checker(({ custom }) => custom<BankPanic>(isGuarded, Phrases.GuardedExpected), 'bad_option')
+
 /** The check of a listing's options. Checks only. */
 export const listingOpts = objCheck(() => ({
   vaultDB:               brandedVaultDB,
   maxMillisSinceRefresh: horizonMillis,
+  panic:                 bankPanic,
 }), 'bad_option')
 
 // --
@@ -306,11 +312,10 @@ export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDevice
 export const vaultWorld = Checker(({ custom, bankScope }) => listingWorld.extend({
   ...GX.provingWorld.shape, scope: bankScope, logger: GX.guardedLogger, leaseMillis: GX.leaseMillis, deviceDB: brandedDeviceDB, boxRefreshMillis: horizonMillis,
   askUser: custom<AskUser>(isGuarded, Phrases.GuardedExpected),
-  panic:   custom<BankPanic>(isGuarded, Phrases.GuardedExpected),
 }), 'bad_option', [CX])
 
 /** The bank, as far as its vaults reach into it. */
-export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 'scope' | 'logger' | 'leaseMillis' | 'deviceDB' | 'askUser' | 'panic' | 'boxRefreshMillis'>
+export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 'scope' | 'logger' | 'leaseMillis' | 'deviceDB' | 'askUser' | 'boxRefreshMillis'>
 
 // --
 
@@ -406,7 +411,7 @@ export type PanicHandler = (panic: Panic) => unknown
 /** `onPanic` as a bank keeps it, wrapped by `guardOnPanic`. Never throws. */
 export type GuardedPanicHandler = (panic: Panic) => Promise<void>
 
-/** How a vault or a listing panics through its bank, which names itself to the host. Never throws. */
+/** How a vault or a listing panics through its bank, which names itself to the host: handed to each as it is made. Never throws. */
 export type BankPanic = (panic: Omit<Panic, 'bank'>) => Promise<void>
 
 /** `made` until a `hello` answers; `ready` once one lands; `refused` once one refuses or the bank is swept or vacated, the snapshot's `err` saying why. */

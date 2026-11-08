@@ -46,7 +46,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** The listing of `vault`'s boxes, its watch not started. */
   boxListingOf(vault: Vault): BoxListing {
-    return new BoxListing(vault, { vaultDB: this.vaultDB, maxMillisSinceRefresh: this.world.boxRefreshMillis })
+    return new BoxListing(vault, { vaultDB: this.vaultDB, maxMillisSinceRefresh: this.world.boxRefreshMillis, panic: this.panic })
   }
 
   /** The scope of `duck`, held to this bank: no listing answers for another's. */
@@ -76,6 +76,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   async list(): Promise<void> {
     this.demandEnabled()
     const answer = await this.vaultDB.tryListVaults(this.world.scope)
+    this.demandEnabled()
     if (! answer.ok) {
       this.panicIfRevoked(answer.err)
       throw answer.err
@@ -171,7 +172,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>): Vault {
-    return new Vault(this.world, this, central)
+    return new Vault(this.world, this, central, this.panic)
   }
 
   protected nothingStoredError(scope: VaultScope): VaultError { return absentVaultError(scope) }

@@ -19,6 +19,7 @@
 
 import { afterEach, beforeEach, vi } from 'vitest'
 import { _cheat_clock } from '../../src/helpers/clock'
+import { brandGuarded } from '../../src/helpers/consts'
 import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
@@ -27,7 +28,7 @@ import * as CX from '../../src/shapes/shapes-core'
 import type { Boxscope } from '../../src/shapes/shapes-core'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
-import { type BoxDna, type BoxWorld, type Fetched, type ListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
+import { type BankPanic, type BoxDna, type BoxWorld, type Fetched, type ListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
 import { type BoxQuery, type BoxRow, type BoxTombstone, type DelOpts, type IfAbsentOpts, type PutOpts, type ReqParams, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -143,6 +144,8 @@ export type ModelsWorld = {
   badnews: readonly VaultError[]
   /** The refusals the listing panicked with, oldest first. A live array. */
   panics:  readonly VaultError[]
+  /** The bank's panic, as the listing is handed it, logging each refusal in `panics`. */
+  panic:   BankPanic
   /** The vaultDB's own box rows, by boxlabel: the one vault's boxes. */
   stored: Map<string, unknown>
 
@@ -308,7 +311,6 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     get isLocked() { return isLocked },
     subscribe:    (listener) => { worldListeners.add(listener); return () => { worldListeners.delete(listener) } },
     tellBadNews:  (news) => { badnews.push(...news) },
-    panic:        ({ refusal }) => { panics.push(refusal); return Promise.resolve() },
     demandUnlocked: () => { if (isLocked) { throw Refuse.lockedError() } return standIn() },
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
@@ -355,6 +357,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   return {
     world, vaultDB, calls, badnews, panics, stored, watches,
     worldWith: (overrides) => ({ ...world, get isLocked() { return isLocked }, ...overrides }),
+    panic:      brandGuarded(({ refusal }: Parameters<BankPanic>[0]) => { panics.push(refusal); return Promise.resolve() }),
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
     clearCalls: () => { calls.length = 0; badnews.length = 0; panics.length = 0 },
 
@@ -458,11 +461,11 @@ const nullOrTestableOf = (box: Box | null): TestableBox | null => (box === null 
 
 /** A {@link BoxListing} over the world's vault and vaultDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces its world or any of its options; the horizon is ten minutes. */
 export const boxListingOf = (mw: ModelsWorld, overrides: BoxListingOverrides = {}): TestableBoxListing => {
-  const { world = mw.world, vaultDB = mw.vaultDB, maxMillisSinceRefresh = 10 * 60_000 } = overrides
-  return new TestableBoxListing(world, { vaultDB, maxMillisSinceRefresh })
+  const { world = mw.world, vaultDB = mw.vaultDB, maxMillisSinceRefresh = 10 * 60_000, panic = mw.panic } = overrides
+  return new TestableBoxListing(world, { vaultDB, maxMillisSinceRefresh, panic })
 }
 
-/** What {@link boxListingOf} may be told in place of the world's own: the box listing's world, vaultDB or horizon. */
+/** What {@link boxListingOf} may be told in place of the world's own: the box listing's world, vaultDB, horizon or panic. */
 export type BoxListingOverrides = Partial<ListingOpts & { world: BoxWorld }>
 // --
 

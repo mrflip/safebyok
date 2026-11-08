@@ -46,9 +46,12 @@ tripwire for the core's own wiring rather than a lock: `Bank`'s constructor wrap
 (`models/proving.ts`), whose `deriveKeyBytes` replaces a throw with `keyDeriverThrew`; `strengthChecker` by
 `guardStrengthChecker` (`helpers/passphrase-strength.ts`), which hands a throw to `HostErrorSanitizer.refusalFor`
 (`refusals/host-error-sanitizer.ts`), the one function that stands a refusal in for a foreign throw, reading nothing
-of it; and `requestCleartext` by `guardRequestCleartext` (`models/bank.ts`), the `askUser` a gating calls, which
-answers false for a throw and drops it, for `Gating.#askHost` to refuse as `requestCleartextThrew`. `onPanic`, which
-hears a refusal and no secret, is wrapped there too, by `guardOnPanic`. The `DeviceDB` (`storage/device-db.ts`, `storage/memory-device-db.ts`) stores the leaseKey
+of it; and `requestCleartext` by `guardRequestCleartext` (`models/bank.ts`), which answers false for a throw and drops it,
+for `Gating.#askHost` to refuse as `requestCleartextThrew`; `Bank.askUser`, which a gating calls, is that wrap. A
+disabled bank asks no one: every `Gating.launch` follows, in the same tick, a check that its vault or vault listing is
+enabled, and a sweep or a vacate disables both before it returns. `onPanic` is wrapped there too, by `guardOnPanic`; it hears a
+`Panic`, a bag of the refusal, the live `Bank`, and the live `Vault` it concerns, if one, and no secret material: neither
+instance hands out a key (G9). The `DeviceDB` (`storage/device-db.ts`, `storage/memory-device-db.ts`) stores the leaseKey
 opaque, and what a store throws is replaced at `storeFailed` (`refusals/throwers.ts`, from the catch in each `DeviceDB` verb),
 which keeps nothing of it (G8).
 

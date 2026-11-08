@@ -8,7 +8,7 @@ import type { IfAbsent } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import type { DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingOpts, ListingWorld, SlotFate, SparseBase, Thing } from '../shapes/shapes-vaultish'
+import type { BankPanic, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingOpts, ListingWorld, SlotFate, SparseBase, Thing } from '../shapes/shapes-vaultish'
 import { disabledError, otherVaultTokAtBirth, putAnsweredNothing } from '../refusals/throwers'
 import * as Phrases from '../helpers/phrases'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
@@ -17,12 +17,14 @@ import type { Storable } from './storable'
 
 /** SLOPDOC: The live instances of one kind of thing, by scope, each made once and held, as its tombstone once gone. */
 export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>> {
-  // == [Props]: world, maxMillisSinceRefresh, vaultDB, #things, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
+  // == [Props]: world, maxMillisSinceRefresh, vaultDB, panic, #things, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
 
   readonly world: ListingWorld
   /** The refresh horizon of each thing made here. */
   readonly maxMillisSinceRefresh: number
   protected readonly vaultDB: VaultDB
+  /** The bank's panic, as this listing was handed it. */
+  protected readonly panic: BankPanic
 
   readonly #things    = new Map<string, ThingT>()
   readonly #listeners = new Set<() => void>()
@@ -55,9 +57,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   constructor(world: ListingWorld, opts: ListingOpts) {
     VX.listingWorld.parse(world)
-    const { vaultDB, maxMillisSinceRefresh } = VX.listingOpts.parse(opts)
+    const { vaultDB, maxMillisSinceRefresh, panic } = VX.listingOpts.parse(opts)
     this.world = world
     this.vaultDB = vaultDB
+    this.panic = panic
     this.maxMillisSinceRefresh = maxMillisSinceRefresh
   }
 
@@ -287,7 +290,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** A refusal of the vaultDB's on its way to a caller: 'identity_revoked' is a panic, heard before the caller hears the refusal. */
   protected panicIfRevoked(refusal: VaultError): void {
-    if (isVaultError(refusal, 'identity_revoked')) { void this.world.panic({ refusal }) }
+    if (isVaultError(refusal, 'identity_revoked')) { void this.panic({ refusal }) }
   }
   // --
 

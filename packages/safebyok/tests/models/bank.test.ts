@@ -189,7 +189,7 @@ describe("the host's functions, as a bank holds them", () => {
     const requestCleartext = vi.fn()
     const onPanic = vi.fn()
     const bank = makeBankWorld().bankOn({ requestCleartext, onPanic })
-    for (const held of [bank.askUser, bank.panic, bank.keyDeriver, bank.strengthChecker]) { expect(isGuarded(held)).to.be.true }
+    for (const held of [bank.askUser, bank.keyDeriver, bank.strengthChecker]) { expect(isGuarded(held)).to.be.true }
     expect(Object.values(bank)).to.not.include.members([requestCleartext, onPanic, testDeriver, anyStrengthChecker])
   })
 
@@ -374,20 +374,48 @@ describe("'identity_revoked', panic and bad news", () => {
     vi.unstubAllGlobals()
   })
 
-  it("vacates once for a burst of panics, the first reaching the host and those past its disable the platform", async () => {
+  it("names no vault where a revocation refuses a vault's boxes' listing, as it concerns the user", async () => {
+    const onPanic = vi.fn()
+    const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onPanic })
+    const revoked = new VaultError('identity_revoked', 'signed out')
+    vi.spyOn(world.vaultDB, 'tryListBoxes').mockResolvedValue({ ok: false, err: revoked, world: null } as never)
+    await TH.expectRefusal(vault.boxListing.list(), 'identity_revoked')
+    expect(onPanic).toHaveBeenCalledExactlyOnceWith({ refusal: revoked, bank })
+  })
+
+  it("refuses as disabled a listing of the vaults answered after a sweep, so a revocation in it neither panics nor vacates", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const onPanic = vi.fn(DefaultOnPanic)
-    const { world, bank } = await makeBankWithVault(makeBankWorld(), { onPanic })
-    const revoked = new VaultError('identity_revoked', 'signed out')
-    void bank.panic({ refusal: revoked })
-    void bank.panic({ refusal: revoked })
-    await TH.eventually(() => ! bank.isEnabled)
-    await bank.panic({ refusal: revoked })
-    expect(onPanic).toHaveBeenCalledOnce()
-    expect(reported).toHaveBeenCalledTimes(3)
+    const world = makeBankWorld()
+    await makeBankWithVault(world)
+    const bank = world.bankOn({ onPanic })
+    world.vaultDB._cheat_refuseGets('identity_revoked')
+    const answer = TH.holdNextAnswer(world.vaultDB, 'tryListVaults')
+    const hello = bank.tryHello()
+    await answer.reached
+    bank.sweep()
+    answer.release()
+    await TH.expectBad(hello, 'disabled')
+    expect([onPanic, reported].map((spied) => spied.mock.calls.length)).to.deep.equal([0, 0])
+    expect(bank.snapshot.err).to.include({ refusalkind: 'disabled' })
+    await TH.wakeupAtNextTick()
+    expect(world.leaseRows()).to.have.lengthOf(1)
+    vi.unstubAllGlobals()
+  })
+
+  it("vacates once for a burst of revocations, the first reaching the host and the rest refused as disabled before they panic", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const onPanic = vi.fn(DefaultOnPanic)
+    const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onPanic })
+    const other = await bank.ensureVault(OtherScopeGiven)
+    world.vaultDB._cheat_refuseGets('identity_revoked')
+    const fetched = await Promise.all([vault.tryFetch(), other.tryFetch()])
+    expect(fetched.map((outcome) => (outcome.ok ? null : outcome.err.refusalkind))).to.deep.equal(['identity_revoked', 'disabled'])
+    expect(onPanic).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ refusal: bank.snapshot.err }))
+    expect(reported).toHaveBeenCalledOnce()
     await TH.eventually(() => world.leaseRows().length === 0)
-    expect(bank.snapshot.err).to.eq(revoked)
     vi.unstubAllGlobals()
   })
 

@@ -265,7 +265,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect((world.leaseRows()[0] as { user_id: string }).user_id).to.eq('u2')
   })
 
-  it("tells the host's onPanic of a lease its vacate cannot erase, though the bank is disabled, a repeat doing nothing and a panic past it going to the platform", async () => {
+  it("tells the host's onPanic of a lease its vacate cannot erase, though the bank is disabled, a repeat doing nothing", async () => {
     const world = makeBankWorld()
     const refusal = new VaultError('storage_unavailable', 'no store')
     const onPanic = vi.fn()
@@ -282,8 +282,6 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(reported).not.toHaveBeenCalled()
     await bank.vacate()
     expect(tryForget).toHaveBeenCalledOnce()
-    await bank.panic({ refusal })
-    expect(reported).toHaveBeenCalledExactlyOnceWith(refusal)
     expect(onPanic).toHaveBeenCalledOnce()
     vi.unstubAllGlobals()
   })
@@ -331,15 +329,13 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const listing = TH.holdNextCall(world.deviceDB, 'tryListLeases')
     const vacating = bank.vacate()
     await listing.reached
-    const [panicked, news] = [new VaultError('storage_unavailable', 'a panic past the disable'), new VaultError('damaged_row', 'news past the disable')]
-    await bank.panic({ refusal: panicked })
+    const news = new VaultError('damaged_row', 'news past the disable')
     bank.tellBadNews([news])
     expect([requestCleartext, onPanic, onBadNews].map((handler) => handler.mock.calls.length)).to.deep.equal([0, 0, 0])
     listing.release()
     await vacating
     expect(onPanic).toHaveBeenCalledExactlyOnceWith({ refusal, bank })
     expect([requestCleartext, onBadNews].map((handler) => handler.mock.calls.length)).to.deep.equal([0, 0])
-    expect(reported).toHaveBeenCalledWith(panicked)
     await TH.eventually(() => reported.mock.calls.some(([err]) => err === refusal))
     expect(vault.isEnabled).to.be.false
     expect(spy.calls.map(({ message }) => message)).to.include(news.message)

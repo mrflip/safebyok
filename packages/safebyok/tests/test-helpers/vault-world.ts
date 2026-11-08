@@ -7,7 +7,7 @@ import type { Lease } from '../../src/models/lease'
 import type { VaultScope } from '../../src/shapes/shapes-core'
 import type * as GX from '../../src/shapes/shapes-gateish'
 import { type AskUser, type RequestCleartext, passphraseCleartext } from '../../src/shapes/shapes-gateish'
-import type { BoxWorld, ListingOpts, PanicHandler, VaultWorld } from '../../src/shapes/shapes-vaultish'
+import type { BankPanic, BoxWorld, ListingOpts, PanicHandler, VaultWorld } from '../../src/shapes/shapes-vaultish'
 import type { VaultTombstone, VaultRecord } from '../../src/shapes/shapes-storage'
 import { DefaultOnPanic, guardOnPanic, guardRequestCleartext } from '../../src/models/bank'
 import type { Vault } from '../../src/models/vault'
@@ -141,8 +141,6 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     deviceDB:     deviceDB.memoryDB,
     requestCleartext: nothing,
     askUser:      guardRequestCleartext((gating) => fakeBank.requestCleartext(gating)),
-    // The fake stands in for the bank a panic names.
-    panic:        brandGuarded((panic) => hostPanic({ ...panic, bank: fakeBank as unknown as Bank })),
     boxRefreshMillis: 10 * 60_000,
     ...overrides,
   }
@@ -150,7 +148,9 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
   const vaultrows = vaultDB._cheat_vaultRowsOf(Dna)
   if (stored0 !== null) { vaultrows.set(Dna.vaultlabel, stored0) }
   const storedNow = (): VaultRecord | null => (vaultrows.get(Dna.vaultlabel) ?? null) as VaultRecord | null
-  const opts: ListingOpts = { vaultDB, maxMillisSinceRefresh: 10 * 60_000 }
+  // The fake stands in for the bank a panic names.
+  const panic: BankPanic = brandGuarded((told) => hostPanic({ ...told, bank: fakeBank as unknown as Bank }))
+  const opts: ListingOpts = { vaultDB, maxMillisSinceRefresh: 10 * 60_000, panic }
   const makeListing = (): VaultListing => {
     const made = new VaultListing(fakeBank, opts)
     madeListings.push(made)
@@ -238,7 +238,6 @@ export const boxWorldOf = (vault: Vault): BoxWorld => ({
   ensureTimely: (opts) => vault.ensureTimely(opts),
   takeWorld:    () => undefined,
   tellBadNews:  (badnews) => { vault.tellBadNews(badnews) },
-  panic:        (panic) => vault.panic(panic),
   demandUnlocked:   () => vault.demandUnlocked(),
   subscribe:        (listener) => vault.subscribe(listener),
   sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),
