@@ -75,8 +75,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   /** SLOPDOC: Opens a new gating's dialog on this bank and resolves with the vault its run answers. */
   static async launch<KindT extends Gatingkind>(gatingkind: KindT, args: LaunchArgs<KindT>): Promise<Vault> {
-    const { scope } = GX.gatingLaunchArgs.parse({ gatingkind, scope: args.scope, friend: args.friend })
-    const { askUser } = args.listing.world
+    const { scope, askUser } = GX.gatingLaunchArgs.parse({ gatingkind, scope: args.scope, friend: args.friend, askUser: args.askUser })
     const gating = new Gating(gatingkind, { ...args, scope })
     args.listing.holdGating(gating as unknown as AnyGating)
     void gating.#askHost(askUser)

@@ -43,8 +43,8 @@ React's own documentation, are in [notes/expose_improves_security.md](https://gi
 
 ## Signing out
 
-Call `bank.vacate()` when the user signs out, before you clear their `user_id`: it erases the bank's cached leases on
-this device, so the next person to use it starts fresh. `BankProvider` doesn't vacate when `user_id` turns `null`,
+Call `bank.vacate()` when the user signs out, before you clear their `user_id`: it erases the bank's cached leases and
+its bank row on this device, so the next person to use it starts fresh. `BankProvider` doesn't vacate when `user_id` turns `null`,
 since auth may blink to `null` while it refreshes a token or reconnects, after a laptop wakes for instance. When a
 different user signs in, it vacates the last user's bank itself.
 

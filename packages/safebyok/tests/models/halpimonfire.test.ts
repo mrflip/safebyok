@@ -184,7 +184,7 @@ describe("A gate change after its record is stored", () => {
   it("a refused tryStow during replacePassphrasePrompt resolves, unlocked, and tells onBadNews", async () => {
     const onBadNews = vi.fn()
     const { fakeBank, opts, deviceDB, demandStored } = await makeBornVault()
-    const vault = await new VaultListing(hearingBadNews(fakeBank, onBadNews), opts).build(demandStored())
+    const vault = await new VaultListing(fakeBank, hearingBadNews(opts, onBadNews)).build(demandStored())
     await unlockTyping(vault, byPassphrase(Passphrase))
     const refusal = new VaultError('storage_unavailable', "the disk is full")
     deviceDB.tryStow.mockResolvedValueOnce(TH.bad(refusal))

@@ -11,7 +11,7 @@ import { WorldVault, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tom
 
 const held = useModelsWorld()
 
-const good = (): BoxListingOpts => ({ scope: WorldVault.scope, vaultDB: held.mw.vaultDB, maxMillisSinceRefresh: 1000, panic: held.mw.panic })
+const good = (): BoxListingOpts => ({ scope: WorldVault.scope, vaultDB: held.mw.vaultDB, maxMillisSinceRefresh: 1000, bankFriend: held.mw.bankFriend })
 
 const dna = () => boxDnaOf(held.mw.boxscope('anthropic_api_key'))
 
@@ -38,7 +38,7 @@ describe("BoxListing", () => {
       ['a negative horizon',          () => [held.mw.world, { ...good(), maxMillisSinceRefresh: -1 }]],
       ['a world among its options',   () => [held.mw.world, { ...good(), world: held.mw.world }]],
       ['no scope',                    () => [held.mw.world, { ...good(), scope: undefined }]],
-      ['a world that cannot tell bad news', () => [{ ...held.mw.world, tellBadNews: 'tell me' }, good()]],
+      ['a bankFriend that cannot tell bad news', () => [held.mw.world, { ...good(), bankFriend: { ...held.mw.bankFriend, tellBadNews: 'tell me' } }]],
     ]
     for (const [blurb, args] of bads) {
       it(`refuses ${blurb}`, () => {

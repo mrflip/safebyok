@@ -13,7 +13,7 @@ import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bank
 import type { LeaseDated } from '../shapes/shapes-storage'
 import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BadNewsHandler, BankOpts, BankPanic, BankSnapshot, BankStage, GuardedPanicHandler, Panic, PanicHandler, VacateStory } from '../shapes/shapes-vaultish'
+import type { BadNewsHandler, BankOpts, BankSnapshot, BankStage, GuardedPanicHandler, Panic, PanicHandler, VacateStory } from '../shapes/shapes-vaultish'
 import type { DeviceDB } from '../storage/device-db'
 import { bankDisabled, helloFirst, insecureContext } from '../refusals/throwers'
 import { DefaultLeaseMillis, type Vault } from './vault'
@@ -26,7 +26,7 @@ export const DefaultRefreshMillis = 5 * MinuteMillis
 // --
 
 export class Bank {
-  // == [Props]: applabel, user_id, scope, device_id, keyDeriver, deviceDB, logger, askUser, strengthChecker, leaseMillis, boxRefreshMillis, #panic, #hostHandlers, #listeners, #vaultListing, #endCause, #vacating, #lastHello, #snapshot, #getSnapshot, #subscribe
+  // == [Props]: applabel, user_id, scope, device_id, keyDeriver, deviceDB, logger, strengthChecker, leaseMillis, boxRefreshMillis, #hostHandlers, #tellBadNews, #listeners, #vaultListing, #endCause, #vacating, #lastHello, #snapshot, #getSnapshot, #subscribe
 
   declare readonly applabel: string
   declare readonly user_id:  string
@@ -35,18 +35,16 @@ export class Bank {
   readonly keyDeriver:       GuardedKeyDeriver
   readonly deviceDB:         DeviceDB
   readonly logger:           VaultLogger
-  /** The host's dialog. */
-  readonly askUser:          AskUser
   readonly strengthChecker:  GuardedStrengthChecker
   readonly leaseMillis:      number
   /** The refresh horizon of each vault's boxes. */
   readonly boxRefreshMillis: number
 
-  /** Tells the host what it must act on for safety, naming this bank: the friend its listings and vaults panic through. */
-  readonly #panic: BankPanic
-
   /** The host's `onPanic`, guarded, and its `onBadNews`, called while the bank is enabled and by its vacate's scrub. */
   readonly #hostHandlers: Handlers
+
+  /** Tell bad news no caller waits on to the host, its every listing and box coming straight here: the friend they tell it through. */
+  readonly #tellBadNews = brandGuarded((badnews: readonly VaultError[]): void => { tellBadNewsTo(this.#handlers.onBadNews, this, badnews) })
   readonly #listeners = new Set<() => void>()
   readonly #vaultListing: VaultListing
   /** Why a sweep or a vacate disabled the bank, its snapshot's refusal from then on; null while it is enabled. */
@@ -94,15 +92,15 @@ export class Bank {
     this.deviceDB = deviceDB
     // A disabled bank calls none of the host's functions, but in its vacate's scrub: the page may belong to the next user by then.
     this.#hostHandlers = { onPanic: guardOnPanic(onPanic), onBadNews }
-    this.#panic = brandGuarded((panic: Omit<Panic, 'bank'>) => this.#handlers.onPanic({ ...panic, bank: this }))
+    const panic = brandGuarded((told: Omit<Panic, 'bank'>) => this.#handlers.onPanic({ ...told, bank: this }))
     // A disabled bank asks no one: every Gating.launch follows an enabled check in the same tick.
-    this.askUser = guardRequestCleartext(requestCleartext)
+    const askUser = guardRequestCleartext(requestCleartext)
     this.logger = parseLogger(logger)
     this.strengthChecker = guardStrengthChecker(strengthChecker)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.boxRefreshMillis = millisOf(boxRefreshMinutes, DefaultRefreshMillis)
     const maxMillisSinceRefresh = millisOf(vaultRefreshMinutes, DefaultRefreshMillis)
-    this.#vaultListing = new VaultListing(this, { vaultDB, maxMillisSinceRefresh, panic: this.#panic })
+    this.#vaultListing = new VaultListing(this, { vaultDB, maxMillisSinceRefresh, bankFriend: { panic, tellBadNews: this.#tellBadNews, askUser } })
     this.#vaultListing.subscribe(this.#remakeSnapshot)
     this.#snapshot = this.#makeSnapshot()
     if (isTestDeriver(keyDeriver)) { this.logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
@@ -155,7 +153,7 @@ export class Bank {
   async autolock(): Promise<void> {
     const cutoff = nowMillis() - this.leaseMillis
     const listed = await this.#listOwnLeases()
-    if (! listed.ok) { this.tellBadNews([listed.err]); return }
+    if (! listed.ok) { this.#tellBadNews([listed.err]); return }
     const oldRows = listed.val.filter((row) => row.proved_at < cutoff)
     for (const row of oldRows) {
       const listed = this.#vaultListing.at(row)
@@ -212,7 +210,7 @@ export class Bank {
   async #eraseOwnLeases(): Promise<void> {
     const { onBadNews } = this.#hostHandlers
     const listed = await this.#listOwnLeases()
-    if (! listed.ok) { this.#tellBadNewsTo(onBadNews, [listed.err]); return }
+    if (! listed.ok) { tellBadNewsTo(onBadNews, this, [listed.err]); return }
     await Promise.all(listed.val.map(async (row) => { this.#panicIfRefused(await this.deviceDB.tryForget(row)) }))
   }
 
@@ -243,26 +241,6 @@ export class Bank {
   }
 
   tryEnsureVault(scope: BankedVaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(scope)) }
-  // --
-
-  // == [Bad news]: tellBadNews, tellBadNewsTo
-
-  /** Tell bad news no caller waits on to the host, its every listing and box coming straight here. A handler's failure reaches only the platform. */
-  tellBadNews(badnews: readonly VaultError[]): void { this.#tellBadNewsTo(this.#handlers.onBadNews, badnews) }
-
-  /** Tell each news to `onBadNews`, awaiting none; a handler's failure reaches only the platform. */
-  #tellBadNewsTo(onBadNews: BadNewsHandler, badnews: readonly VaultError[]): void {
-    for (const news of badnews) {
-      // Any answer is heard out, a thenable among them: none is awaited.
-      void (async () => {
-        try {
-          await onBadNews({ news, bank: this })
-        } catch (err) {
-          reportToPlatform(err)
-        }
-      })()
-    }
-  }
   // --
 
   // == [Snapshot]: remakeSnapshot, makeSnapshot
@@ -316,7 +294,7 @@ export class Bank {
   get modelkind(): 'bank' { return 'bank' satisfies Modelkind }
 }
 
-// == [Host functions]: HostChecks, DefaultOnBadNews, reportPanic, DefaultOnPanic, guardRequestCleartext, guardOnPanic, Handlers, DefaultHandlers
+// == [Host functions]: HostChecks, DefaultOnBadNews, tellBadNewsTo, reportPanic, DefaultOnPanic, guardRequestCleartext, guardOnPanic, Handlers, DefaultHandlers
 
 const HostChecks = Checkers('bad_option', ({ fn }) => ({
   requestCleartext: fn<RequestCleartext>(),
@@ -326,6 +304,21 @@ const HostChecks = Checkers('bad_option', ({ fn }) => ({
 /** The `onBadNews` a bank has when given none: each news to the bank's logger. */
 export const DefaultOnBadNews: BadNewsHandler = ({ news, bank }) => {
   bank.logger.warn(news.message, { call: 'Bank.onBadNews', refusalkind: news.refusalkind })
+}
+
+/** Tell `onBadNews` each of `badnews` that reached `bank`, awaiting none: the handler's throw or rejection reaches only the platform. */
+export const tellBadNewsTo = (onBadNews: BadNewsHandler, bank: Bank, badnews: readonly VaultError[]): void => {
+  VX.tellBadNewsToInput.parse({ onBadNews, bank, badnews })
+  for (const news of badnews) {
+    // Any answer is heard out, a thenable among them: none is awaited.
+    void (async () => {
+      try {
+        await onBadNews({ news, bank })
+      } catch (err) {
+        reportToPlatform(err)
+      }
+    })()
+  }
 }
 
 // The logger too, as a platform with no reportError (Node, SSR) would hear nothing of a panic.

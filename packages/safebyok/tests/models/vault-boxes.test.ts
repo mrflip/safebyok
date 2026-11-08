@@ -1,7 +1,7 @@
 /** A vault's box verbs from the host's side, on real seals: hello, getBox, delBox, and a damaged record set aside. */
 
 import { omit } from 'es-toolkit'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { Sidecar, Whisper, boxlabel, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, delTyping, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
@@ -116,24 +116,24 @@ describe("the box verbs refuse a vault locked, or gone", () => {
 
 describe("a box verb the vaultDB refuses over its vault's row", () => {
   it("a vault found gone delivers no box: the tombstone reaches the vault as its world, and no bad news is told", async () => {
-    const { vault, restoreRow, demandStored, tryGetBox, fakeBank: world } = await makeWorldWithBox()
+    const { vault, restoreRow, demandStored, tryGetBox, badnews } = await makeWorldWithBox()
     restoreRow({ ...omit(demandStored(), ['gate']), am: 'x', revision_seq: 5, revision_tok: 'rev-gone-5' })
-    const tellBadNews = vi.spyOn(world, 'tellBadNews')
+    const toldBefore = badnews.length
     tryGetBox.mockClear()
     await TH.expectRefusal(vault.fetchBox(boxlabel))
     expect(tryGetBox).toHaveBeenCalledOnce()
     expect(vault.isPresent).to.be.false
-    expect(tellBadNews).not.toHaveBeenCalled()
+    expect(badnews).to.have.lengthOf(toldBefore)
   })
 
   it("a vault of another life delivers no box, and no bad news is told", async () => {
-    const { vault, restoreRow, tryGetBox, fakeBank: world } = await makeWorldWithBox()
+    const { vault, restoreRow, tryGetBox, badnews } = await makeWorldWithBox()
     restoreRow({ ...await storedVaultRecord(), revision_seq: 5, revision_tok: 'rev-other-5' })
-    const tellBadNews = vi.spyOn(world, 'tellBadNews')
+    const toldBefore = badnews.length
     tryGetBox.mockClear()
     await TH.expectRefusal(vault.fetchBox(boxlabel))
     expect(tryGetBox).toHaveBeenCalledOnce()
-    expect(tellBadNews).not.toHaveBeenCalled()
+    expect(badnews).to.have.lengthOf(toldBefore)
   })
 })
 

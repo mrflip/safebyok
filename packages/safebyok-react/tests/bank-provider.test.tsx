@@ -302,6 +302,31 @@ describe("BankProvider's handlers", () => {
     expect(onBadNews.mock.calls.map(([{ news }]) => news.refusalkind)).to.deep.equal(['storage_unavailable'])
   })
 
+  it("reports an onBadNews that throws to the platform, never to the render", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const world = TH.makeBankWorld()
+    vi.spyOn(world.vaultDB, 'listVaults').mockRejectedValue(Refusal)
+    const thrown = new Error('the handler broke')
+    provided({ onBadNews: () => { throw thrown } }, world)
+    await waitFor(() => { expect(reported).toHaveBeenCalledWith(thrown) })
+    expect(shown('bank')).to.not.eq('none')
+    vi.unstubAllGlobals()
+  })
+
+  it("tells a refused hello to the onBadNews last rendered", async () => {
+    const world = TH.makeBankWorld()
+    const held: { refuse?: (err: unknown) => void } = {}
+    vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(new Promise((_resolve, reject) => { held.refuse = reject }))
+    const [first, last] = [vi.fn<BadNewsHandler>(), vi.fn<BadNewsHandler>()]
+    const { props, rerender } = provided({ onBadNews: first }, world)
+    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
+    rerender({ ...props, onBadNews: last })
+    held.refuse?.(Refusal)
+    await waitFor(() => { expect(last).toHaveBeenCalledOnce() })
+    expect(first).not.toHaveBeenCalled()
+  })
+
   it("tells neither onBadNews nor the logger of a hello that a sign-out crossed", async () => {
     const world = TH.makeBankWorld()
     const held: { refuse?: (err: unknown) => void } = {}

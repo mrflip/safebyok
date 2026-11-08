@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { makeLeaseKey, makeVaultKey } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
 import { PasskeySaltBytes } from '../../src/helpers/consts'
+import { guardRequestCleartext } from '../../src/models/bank'
 import { parseLogger } from '../../src/helpers/logger'
 import * as GX from '../../src/shapes/shapes-gateish'
 import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
@@ -32,10 +33,15 @@ describe("guardedLogger", () => {
 describe("gatingLaunchArgs", () => {
   const friend = { unlockByProof: () => undefined, landGate: () => undefined }
   const scope  = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
+  const askUser = guardRequestCleartext(() => undefined)
 
-  it("takes a kind, a scope and the friend's two verbs, and refuses a friend short of one", () => {
-    expect(GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend }).gatingkind).to.eq('add_passkey')
-    TH.expectSyncRefusal(() => GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend: { landGate: friend.landGate } }))
+  it("takes a kind, a scope, the friend's two verbs and the bank's dialog, and refuses a friend short of one", () => {
+    expect(GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend, askUser }).gatingkind).to.eq('add_passkey')
+    TH.expectSyncRefusal(() => GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend: { landGate: friend.landGate }, askUser }))
+  })
+
+  it("refuses a dialog the bank did not wrap", () => {
+    TH.expectSyncRefusal(() => GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend, askUser: () => Promise.resolve(true) }), 'bad_option')
   })
 })
 

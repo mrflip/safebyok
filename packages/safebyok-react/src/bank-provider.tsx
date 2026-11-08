@@ -1,18 +1,23 @@
 import { createContext, useCallback, useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
-import { Bank, DefaultOnBadNews, DefaultOnPanic, type Vault } from 'safebyok'
+import { Bank, DefaultOnBadNews, DefaultOnPanic, tellBadNewsTo, type Vault, type VaultError } from 'safebyok'
 import { GatingModal } from './gating-modal'
 import { useDeviceId, useGatingDialog, useWarnOfIgnoredOpts } from './provider-hooks'
 import { providerProps, type BankProviderProps, type Handlers, type HeldBankOpts } from './shapes/shapes-provider'
 
 // == [Context]: ContextValue, BankContext, Bankless, useProvided
 
-/** What the provider hands down: the signed-in user's bank, and the Vault objects a hook has called `tryHello` on. */
-export type ContextValue = { bank: Bank | null, helloedVaults: WeakSet<Vault> }
+/** What the provider hands down: the signed-in user's bank, the Vault objects a hook has called `tryHello` on, and how to tell the host's `onBadNews`. */
+export type ContextValue = { bank: Bank | null, helloedVaults: WeakSet<Vault>, tellBadNews: TellBadNews }
+
+/** Tell the host's `onBadNews` each refusal no caller waits on, while the bank is enabled. Never throws. */
+export type TellBadNews = (badnews: readonly VaultError[]) => void
 
 const BankContext = createContext<ContextValue | null>(null)
 
+const tellNobody: TellBadNews = () => { /* no bank, no news */ }
+
 /** What a provider hands down while it holds no bank. */
-const Bankless: ContextValue = Object.freeze({ bank: null, helloedVaults: new WeakSet<Vault>() })
+const Bankless: ContextValue = Object.freeze({ bank: null, helloedVaults: new WeakSet<Vault>(), tellBadNews: tellNobody })
 
 /** What the nearest BankProvider hands down, or a throw naming `hookname` where there is none. */
 export const useProvided = (hookname: string): ContextValue => {
@@ -45,11 +50,15 @@ const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Han
       onBadNews:        (badnews) => latest().onBadNews(badnews),
       requestCleartext: (gating) => latest().requestCleartext(gating),
     })
+    // Hears nothing past the bank's sweep or vacate, as the bank calls none of the host's handlers then.
+    const tellBadNews: TellBadNews = (badnews) => {
+      if (bank.isEnabled) { tellBadNewsTo((told) => latest().onBadNews(told), bank, badnews) }
+    }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the bank lives only between this effect and its cleanup, and render must hand it down
-    setContextValue({ bank, helloedVaults: new WeakSet<Vault>() })
+    setContextValue({ bank, helloedVaults: new WeakSet<Vault>(), tellBadNews })
     onMade(bank)
     // A refused hello lands in the bank's snapshot too. One that a sweep crossed is no news: the bank has ended.
-    void bank.tryHello().then((said) => { if (! said.ok && bank.isEnabled) { bank.tellBadNews([said.err]) } })
+    void bank.tryHello().then((said) => { if (! said.ok) { tellBadNews([said.err]) } })
     return () => {
       // `sweep()` settles the open gating, and `onSwept` closes the dialog over it.
       bank.sweep()

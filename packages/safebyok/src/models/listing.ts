@@ -8,7 +8,7 @@ import type { IfAbsent } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BankPanic, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingOpts, ListingWorld, SlotFate, SparseBase, Thing } from '../shapes/shapes-vaultish'
+import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingOpts, ListingWorld, SlotFate, SparseBase, Thing } from '../shapes/shapes-vaultish'
 import { disabledError, otherVaultTokAtBirth, putAnsweredNothing } from '../refusals/throwers'
 import * as Phrases from '../helpers/phrases'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
@@ -17,14 +17,14 @@ import type { Storable } from './storable'
 
 /** SLOPDOC: The live instances of one kind of thing, by scope, each made once and held, as its tombstone once gone. */
 export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>> {
-  // == [Props]: world, maxMillisSinceRefresh, vaultDB, panic, #things, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
+  // == [Props]: world, maxMillisSinceRefresh, vaultDB, bankFriend, #things, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
 
   readonly world: ListingWorld
   /** The refresh horizon of each thing made here. */
   readonly maxMillisSinceRefresh: number
   protected readonly vaultDB: VaultDB
-  /** The bank's panic, as this listing was handed it. */
-  protected readonly panic: BankPanic
+  /** The bank's private calls, as this listing was handed them. */
+  protected readonly bankFriend: BankFriend
 
   readonly #things    = new Map<string, ThingT>()
   readonly #listeners = new Set<() => void>()
@@ -57,10 +57,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   constructor(world: ListingWorld, opts: ListingOpts) {
     VX.listingWorld.parse(world)
-    const { vaultDB, maxMillisSinceRefresh, panic } = VX.listingOpts.parse(opts)
+    const { vaultDB, maxMillisSinceRefresh, bankFriend } = VX.listingOpts.parse(opts)
     this.world = world
     this.vaultDB = vaultDB
-    this.panic = panic
+    this.bankFriend = bankFriend
     this.maxMillisSinceRefresh = maxMillisSinceRefresh
   }
 
@@ -107,7 +107,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Start the watch. */
   async hello(): Promise<void> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
     this.demandEnabled()
-    this.#unwatch ??= this.watchRows(this.#onNotice, (news) => { this.world.tellBadNews([news]) })
+    this.#unwatch ??= this.watchRows(this.#onNotice, (news) => { this.bankFriend.tellBadNews([news]) })
   }
 
   /** End the watch. The instances stay as they are. */
@@ -202,7 +202,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
         this.#demandRecordOfScope(stored, this.scopeOf(answer.req_params))
         return this.buildOrReceive(stored)
       })
-      if (! delivered.ok) { this.world.tellBadNews([delivered.err]) }
+      if (! delivered.ok) { this.bankFriend.tellBadNews([delivered.err]) }
     }
     this.panicIfRevoked(answer.err)
     throw answer.err
@@ -221,7 +221,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.demandEnabled()
     const held = this.at(scope)
     if (held === null) { return null }
-    this.world.tellBadNews(held.receive(null).badnews)
+    this.bankFriend.tellBadNews(held.receive(null).badnews)
     this.#remakeSnapshot()
     return held
   }
@@ -235,7 +235,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const fate = (held === null) ? 'replace' : this.fateOver(held, record)
     if ((held !== null) && (fate === 'lose')) { return held }
     const thing = ((fate === 'replace') ? null : held) ?? this.#makeThingOf(sparse)
-    this.world.tellBadNews(thing.receive(record).badnews)
+    this.bankFriend.tellBadNews(thing.receive(record).badnews)
     if (thing !== held) {
       this.#hold(thing)
       held?.vacate()
@@ -263,7 +263,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
         if (world !== null) { this.world.takeWorld(world) }
         return this.#isEnabled ? this.buildOrReceive(val) : null
       })
-      if (! ok) { this.world.tellBadNews([err]) }
+      if (! ok) { this.bankFriend.tellBadNews([err]) }
     })()
   }
   // --
@@ -290,7 +290,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** A refusal of the vaultDB's on its way to a caller: 'identity_revoked' is a panic, heard before the caller hears the refusal. */
   protected panicIfRevoked(refusal: VaultError): void {
-    if (isVaultError(refusal, 'identity_revoked')) { void this.panic({ refusal }) }
+    if (isVaultError(refusal, 'identity_revoked')) { void this.bankFriend.panic({ refusal }) }
   }
   // --
 

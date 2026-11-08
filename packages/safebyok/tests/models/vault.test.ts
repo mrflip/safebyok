@@ -76,15 +76,16 @@ describe("VaultListing.build of a record, and its constructor", () => {
     const duck = { tryPeek: vi.fn(), tryStow: vi.fn(), tryForget: vi.fn() }
     const err = TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, deviceDB: duck as never }, opts))
     expect(err.message).to.include(Phrases.DeviceDBExpected)
-    TH.expectSyncRefusal(() => new VaultListing(fakeBank, { ...opts, panic: vi.fn() as never }))
-    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, askUser: vi.fn() as never }, opts))
+    TH.expectSyncRefusal(() => new VaultListing(fakeBank, { ...opts, bankFriend: { ...opts.bankFriend, panic: vi.fn() as never } }))
+    TH.expectSyncRefusal(() => new VaultListing(fakeBank, { ...opts, bankFriend: { ...opts.bankFriend, askUser: vi.fn() as never } }))
     TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, logger: TH.quietLogger }, opts))
     TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, keyDeriver: TH.testDeriver as never }, opts))
   })
 
   it("refuses a panic the bank did not brand, where a vault is made", async () => {
-    const { vault, fakeBank, listing } = await makeBornVault(byPassphrase(Passphrase))
+    const { vault, fakeBank, listing, opts } = await makeBornVault(byPassphrase(Passphrase))
     TH.expectSyncRefusal(() => new Vault(fakeBank, listing, vault.fullRecord, vi.fn() as never), 'bad_option')
+    TH.expectSyncRefusal(() => new Vault(fakeBank, listing, vault.fullRecord, { ...opts.bankFriend, panic: vi.fn() as never }), 'bad_option')
   })
 })
 

@@ -308,7 +308,8 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     await bank.vacate()
     expect(await world.deviceDB.listRawBanks()).to.deep.equal([kept])
     expect(tryForget.mock.invocationCallOrder[0]).to.be.below(tryForgetBank.mock.invocationCallOrder[0]!)
-    expect((await world.deviceDB.ensureBank(BankScopeGiven)).device_id).to.not.eq(made.device_id)
+    const remade = await world.deviceDB.ensureBank(BankScopeGiven)
+    expect(remade.device_id).to.not.eq(made.device_id)
   })
 
   it("leaves the bank's row at a sweep", async () => {
@@ -363,8 +364,9 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const listing = TH.holdNextCall(world.deviceDB, 'tryListLeases')
     const vacating = bank.vacate()
     await listing.reached
-    const news = new VaultError('damaged_row', 'news past the disable')
-    bank.tellBadNews([news])
+    const news = new VaultError('storage_unavailable', 'news past the disable')
+    vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValueOnce({ ok: false, err: news })
+    await bank.autolock()
     expect([requestCleartext, onPanic, onBadNews].map((handler) => handler.mock.calls.length)).to.deep.equal([0, 0, 0])
     listing.release()
     await vacating

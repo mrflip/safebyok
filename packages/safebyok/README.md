@@ -103,6 +103,9 @@ Easy to get wrong:
     DefaultOnPanic(panic)
   }
   ```
+* **The bank alone tells your `onBadNews`**: it offers no `tellBadNews` of its own. To hand a
+  refusal from your code to a handler as the bank does, call `tellBadNewsTo(onBadNews, bank, [err])`,
+  which awaits nothing and sends the handler's throw to the platform.
 * **When the signed-in user changes, vacate the bank and make another.** A bank and everything it
   hands out keep the `user_id` they were made with for life; safebyok never moves them to a new
   one, and does not notice the change for you. On sign-out, or a sign-in as someone else, call

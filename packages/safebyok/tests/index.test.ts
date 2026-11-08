@@ -27,6 +27,10 @@ describe("safebyok", () => {
     expectTypeOf<Front.Box['scope']>().toEqualTypeOf<Front.Boxscope>()
     expectTypeOf<Front.Bank['scope']>().toEqualTypeOf<Front.BankScope>()
     expectTypeOf<Front.VaultError['meta']>().toEqualTypeOf<Front.RefusalMeta | undefined>()
+    expectTypeOf<ConstructorParameters<typeof Front.Vault>[3]>().toEqualTypeOf<Front.BankFriend>()
+    expectTypeOf<Front.BankFriend['panic']>().toEqualTypeOf<Front.BankPanic>()
+    expectTypeOf<Front.BankFriend['askUser']>().toEqualTypeOf<Front.AskUser>()
+    expectTypeOf<Parameters<typeof Front.tellBadNewsTo>[0]>().toEqualTypeOf<Front.BadNewsHandler>()
   })
 
   it("exports the patterns and limits an input checks a label or a user_id by", () => {

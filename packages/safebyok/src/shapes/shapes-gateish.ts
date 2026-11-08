@@ -306,7 +306,7 @@ export const gatingFriend = objCheck(({ fn }) => ({
 export type GatingFriend = Z.infer<typeof gatingFriend>
 
 /** The check of what launches a gating. */
-export const gatingLaunchArgs = objCheck(() => ({ gatingkind, scope: vaultScope, friend: gatingFriend }), { refusalkind: 'bad_option', extras: 'strip' })
+export const gatingLaunchArgs = objCheck(({ custom }) => ({ gatingkind, scope: vaultScope, friend: gatingFriend, askUser: custom<AskUser>(isGuarded, Phrases.GuardedExpected) }), { refusalkind: 'bad_option', extras: 'strip' })
 
 export type ClearsForGatingkind = {
   build_vault:        Z.input<typeof vaultBuildClears>
@@ -364,8 +364,8 @@ export type Run<KindT extends EX.Gatingkind> = (provings: ProvingsForGatingkind[
 
 export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
 
-/** All a gating is launched with; `prior`, the revision a birth lands after, is read at launch. */
-export type LaunchArgs<KindT extends EX.Gatingkind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], prior: KindT extends 'build_vault' ? Revision : null, friend: GatingFriend }
+/** All a gating is launched with; `prior`, the revision a birth lands after, is read at launch, and `askUser` is the bank's. */
+export type LaunchArgs<KindT extends EX.Gatingkind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], prior: KindT extends 'build_vault' ? Revision : null, friend: GatingFriend, askUser: AskUser }
 
 export type Asked<KindT extends EX.Gatingkind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], listing: VaultListing, world: VaultWorld }
 

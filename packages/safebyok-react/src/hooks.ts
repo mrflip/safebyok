@@ -34,7 +34,7 @@ export const useVault = (vaultlabel: string): VaultHeld => useVaultFor('useVault
 
 /** The signed-in user's vault under `vaultlabel` and where it stands. `hookname` is the hook a missing-provider error names. */
 const useVaultFor = (hookname: string, vaultlabel: string): VaultHeld => {
-  const { bank, helloedVaults } = useProvided(hookname)
+  const { bank, helloedVaults, tellBadNews } = useProvided(hookname)
   const snapshot = useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, bank?.getSnapshot ?? getNothing, getNothing)
   const held = useMemo(() => {
     if (bank === null || snapshot?.stage !== 'ready') { return WaitingHeld }
@@ -45,8 +45,8 @@ const useVaultFor = (hookname: string, vaultlabel: string): VaultHeld => {
   useEffect(() => {
     if (bank === null || vault === null || helloedVaults.has(vault)) { return }
     helloedVaults.add(vault)
-    void vault.tryHello().then((said) => { if (! said.ok) { bank.tellBadNews([said.err]) } })
-  }, [bank, vault, helloedVaults])
+    void vault.tryHello().then((said) => { if (! said.ok) { tellBadNews([said.err]) } })
+  }, [bank, vault, helloedVaults, tellBadNews])
   return held
 }
 

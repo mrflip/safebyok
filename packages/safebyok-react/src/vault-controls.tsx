@@ -1,16 +1,18 @@
-import { isVaultError, type Bank, type Outcome } from 'safebyok'
+import { isVaultError, type Outcome } from 'safebyok'
+import { type TellBadNews, useProvided } from './bank-provider'
 import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from './hooks'
 import { Messages } from './messages'
 
 /** Whether the signed-in user's vault under `vaultlabel` is locked, with a Lock or Unlock button, or a Create vault button while it is unborn. */
 export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
   const bank = useBank()
+  const { tellBadNews } = useProvided('VaultLockControl')
   const { stage, vault } = useVault(vaultlabel)
   const snapshot = useVaultSnapshot(vaultlabel)
   if (stage === 'unborn') { return <CreateVaultButton vaultlabel={vaultlabel} /> }
   if ((bank === null) || (vault === null) || (snapshot === null)) { return null }
   // `vault.tryEnsureUnlocked()` on the vault in hand, never `bank.ensureVault`: an Unlock never builds a vault.
-  const unlock = async () => { tellUnlessDeclined(bank, await vault.tryEnsureUnlocked()) }
+  const unlock = async () => { tellUnlessDeclined(tellBadNews, await vault.tryEnsureUnlocked()) }
   const { isLocked } = snapshot
   return (
     <span className="vault-lock-control" data-locked={isLocked}>
@@ -25,11 +27,12 @@ export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
 /** A button that builds the signed-in user's vault under `vaultlabel`. */
 export const CreateVaultButton = ({ vaultlabel }: VaultControlProps) => {
   const bank = useBank()
+  const { tellBadNews } = useProvided('CreateVaultButton')
   // `bank.ensureVault` refuses until `bank.hello()` has landed.
   const isReady = (useBankSnapshot()?.stage === 'ready')
   const create = async () => {
     if ((bank === null) || (! isReady)) { return }
-    tellUnlessDeclined(bank, await bank.tryEnsureVault({ vaultlabel }))
+    tellUnlessDeclined(tellBadNews, await bank.tryEnsureVault({ vaultlabel }))
   }
   return (
     <button type="button" className="create-vault-button" disabled={! isReady} onClick={() => { void create() }}>
@@ -41,8 +44,8 @@ export const CreateVaultButton = ({ vaultlabel }: VaultControlProps) => {
 /** What a VaultLockControl or a CreateVaultButton is handed: the vaultlabel of the vault it acts on. */
 export type VaultControlProps = { vaultlabel: string }
 
-/** Hand a refusal to the bank's bad news, unless the user declined the dialog. */
-const tellUnlessDeclined = (bank: Bank, outcome: Outcome<unknown>): void => {
+/** Hand a refusal to the host's `onBadNews`, unless the user declined the dialog. */
+const tellUnlessDeclined = (tellBadNews: TellBadNews, outcome: Outcome<unknown>): void => {
   if (outcome.ok || isVaultError(outcome.err, 'declined')) { return }
-  bank.tellBadNews([outcome.err])
+  tellBadNews([outcome.err])
 }

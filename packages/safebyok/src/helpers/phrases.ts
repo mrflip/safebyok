@@ -54,7 +54,7 @@ export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when i
 export const StoreInVaultScope = "A vault's stores go in the second bag, its options, not in the scope naming the vault"
 // --
 
-// == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, VaultDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, VaultErrorExpected
+// == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, VaultDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, BankExpected, VaultErrorExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
@@ -82,6 +82,9 @@ export const CtxStampExpected = "Expected a flat object of strings and numbers, 
 
 /** The listing a storable is made in. */
 export const ListingExpected = "Expected a Listing"
+
+/** Anything but a Bank, where one is named. */
+export const BankExpected = "Expected a Bank"
 
 /** Anything but a VaultError, where bad news is told. */
 export const VaultErrorExpected = "Expected a VaultError"

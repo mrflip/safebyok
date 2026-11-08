@@ -40,14 +40,16 @@ strength checker's wrap. A change to one of them is a change to these guarantees
 | `packages/safebyok/src/helpers/passphrase-strength.ts` | `guardStrengthChecker`, whose wrap hears the new passphrase as an argument, parses the host checker's verdict inside the wrap, and hands a throw to `HostErrorSanitizer.refusalFor` (G1, G8, G9) |
 
 Beside them, three host functions hear the passphrase, and each is wrapped once, in `Bank`'s constructor, so that
-past it the core holds the wrap and never the host's function; a proving's and a vault's world refuse a function
-without the wrap's brand (`isGuarded`, `helpers/consts.ts`). The brand is a `Symbol.for` that anyone may wear, a
+past it the core holds the wrap and never the host's function; a proving's world, a bank's friend and a gating's launch
+refuse a function without the wrap's brand (`isGuarded`, `helpers/consts.ts`). The brand is a `Symbol.for` that anyone may wear, a
 tripwire for the core's own wiring rather than a lock: `Bank`'s constructor wraps every host function regardless. `keyDeriver` is wrapped by `guardKeyDeriver`
 (`models/proving.ts`), whose `deriveKeyBytes` replaces a throw with `keyDeriverThrew`; `strengthChecker` by
 `guardStrengthChecker` (`helpers/passphrase-strength.ts`), which hands a throw to `HostErrorSanitizer.refusalFor`
 (`refusals/host-error-sanitizer.ts`), the one function that stands a refusal in for a foreign throw, reading nothing
 of it; and `requestCleartext` by `guardRequestCleartext` (`models/bank.ts`), which answers false for a throw and drops it,
-for `Gating.#askHost` to refuse as `requestCleartextThrew`; `Bank.askUser`, which a gating calls, is that wrap. A
+for `Gating.#askHost` to refuse as `requestCleartextThrew`. That wrap travels in the `BankFriend` the bank hands its
+vault listing, which holds it protected and hands it to each vault, which holds it private, and it reaches a gating only
+in its launch args; no public member of a bank or a vault answers it. A
 disabled bank asks no one: every `Gating.launch` follows, in the same tick, a check that its vault or vault listing is
 enabled, and a sweep or a vacate disables both before it returns. `onPanic` is wrapped there too, by `guardOnPanic`; it hears a
 `Panic`, a bag of the refusal, the live `Bank`, and the live `Vault` it concerns, if one, and no secret material: neither

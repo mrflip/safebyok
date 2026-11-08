@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { DefaultLogger, setDefaultLogger } from '../../src/helpers/logger'
 import { ForeverMillis, isGuarded } from '../../src/helpers/consts'
-import { type Bank, DefaultOnPanic, guardOnPanic, guardRequestCleartext } from '../../src/models/bank'
+import { type Bank, DefaultOnPanic, guardOnPanic, guardRequestCleartext, tellBadNewsTo } from '../../src/models/bank'
 import { DefaultLeaseMillis, type Vault } from '../../src/models/vault'
 import type { BadNews, Panic } from '../../src/shapes/shapes-vaultish'
 import type { AnyGating } from '../../src/shapes/shapes-gateish'
@@ -16,6 +16,12 @@ import { anyStrengthChecker, testDeriver } from '../test-helpers/builders'
 
 useBankWorlds()
 const nothing = (): void => undefined
+
+/** `news`, told as bad news by `bank`: its autolock, whose listing of the cached leases `world`'s deviceDB refuses with it. */
+const tellByAutolock = async (world: ReturnType<typeof makeBankWorld>, bank: Bank, news: VaultError): Promise<void> => {
+  vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValueOnce({ ok: false, err: news })
+  await bank.autolock()
+}
 
 
 describe("bank.hello", () => {
@@ -189,7 +195,7 @@ describe("the host's functions, as a bank holds them", () => {
     const requestCleartext = vi.fn()
     const onPanic = vi.fn()
     const bank = makeBankWorld().bankOn({ requestCleartext, onPanic })
-    for (const held of [bank.askUser, bank.keyDeriver, bank.strengthChecker]) { expect(isGuarded(held)).to.be.true }
+    for (const held of [bank.keyDeriver, bank.strengthChecker]) { expect(isGuarded(held)).to.be.true }
     expect(Object.values(bank)).to.not.include.members([requestCleartext, onPanic, testDeriver, anyStrengthChecker])
   })
 
@@ -435,7 +441,7 @@ describe("'identity_revoked', panic and bad news", () => {
     const spy = TH.spyLogger()
     const { bank, vault } = await makeBankWithVault(world, { logger: spy.logger })
     const news = new VaultError('damaged_row', 'something stored is damaged')
-    bank.tellBadNews([news])
+    await tellByAutolock(world, bank, news)
     expect(spy.calls.map(({ message }) => message)).to.include(news.message)
     expect(vault.isEnabled).to.be.true
   })
@@ -445,8 +451,9 @@ describe("'identity_revoked', panic and bad news", () => {
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(nothing)
     try {
       const silent = { log: nothing, warn: nothing, error: nothing }
-      const { bank } = await makeBankWithVault(makeBankWorld(), { logger: silent })
-      bank.tellBadNews([new VaultError('damaged_row', 'something stored is damaged')])
+      const world = makeBankWorld()
+      const { bank } = await makeBankWithVault(world, { logger: silent })
+      await tellByAutolock(world, bank, new VaultError('damaged_row', 'something stored is damaged'))
       expect(consoleWarn).not.toHaveBeenCalled()
     } finally {
       consoleWarn.mockRestore()
@@ -458,9 +465,10 @@ describe("'identity_revoked', panic and bad news", () => {
     const spy = TH.spyLogger()
     setDefaultLogger(spy.logger)
     try {
-      const { bank } = await makeBankWithVault(makeBankWorld(), { logger: DefaultLogger })
+      const world = makeBankWorld()
+      const { bank } = await makeBankWithVault(world, { logger: DefaultLogger })
       const news = new VaultError('damaged_row', 'something stored is damaged')
-      bank.tellBadNews([news])
+      await tellByAutolock(world, bank, news)
       expect(spy.calls.map(({ message }) => message)).to.include(news.message)
     } finally {
       setDefaultLogger(undefined)
@@ -493,31 +501,43 @@ describe("'identity_revoked', panic and bad news", () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not be erased'), expect.objectContaining({ call: 'Lease.buildFromCache' }), undefined)
   })
 
-  it("hears a vault's bad news, a box's way, the same as its own, a revocation told so vacating nothing, and news past a sweep going to the logger", async () => {
+  it("hears a vault's bad news the same as its own, a revocation told so vacating nothing, and news past a sweep going to the logger", async () => {
     const onBadNews = vi.fn()
     const spy = TH.spyLogger()
-    const { bank, vault } = await makeBankWithVault(makeBankWorld(), { onBadNews, logger: spy.logger })
-    const news = new VaultError('damaged_row', 'something stored is damaged')
-    vault.tellBadNews([news])
-    expect(onBadNews.mock.calls).to.deep.equal([[{ news, bank }]])
-    expect(vault.isEnabled).to.be.true
-    const revoked = new VaultError('identity_revoked', 'the host says no')
-    vault.tellBadNews([revoked])
-    expect(onBadNews).toHaveBeenCalledWith({ news: revoked, bank })
-    expect(vault.isEnabled).to.be.true
+    const world = makeBankWorld()
+    const { bank, vault } = await makeBankWithVault(world, { onBadNews, logger: spy.logger })
+    const [news, revoked] = [new VaultError('storage_unavailable', 'the device store is down'), new VaultError('identity_revoked', 'the host says no')]
+    for (const peekRefusal of [news, revoked]) {
+      vault.lock()
+      vi.spyOn(world.deviceDB, 'tryPeek').mockResolvedValueOnce({ ok: false, err: peekRefusal })
+      await vault.ensureUnlocked()
+      expect(onBadNews).toHaveBeenLastCalledWith({ news: peekRefusal, bank })
+      expect(vault.isEnabled).to.be.true
+    }
     bank.sweep()
-    const later = new VaultError('damaged_row', 'news for a bank let go')
-    bank.tellBadNews([later, revoked])
+    const later = new VaultError('storage_unavailable', 'news for a bank let go')
+    await tellByAutolock(world, bank, later)
     expect(onBadNews).toHaveBeenCalledTimes(2)
-    expect(spy.calls.map(({ message }) => message)).to.include.members([later.message, revoked.message])
+    expect(spy.calls.map(({ message }) => message)).to.include(later.message)
+  })
+})
+
+describe("tellBadNewsTo", () => {
+  it("tells the handler each news with the bank it reached", async () => {
+    const bank = makeBankWorld().bankOn()
+    const onBadNews = vi.fn()
+    const news = [new VaultError('storage_unavailable', "Down."), new VaultError('absent_box', "Gone.")]
+    tellBadNewsTo(onBadNews, bank, news)
+    await TH.eventually(() => onBadNews.mock.calls.length === 2)
+    expect(onBadNews.mock.calls).to.deep.equal(news.map((told) => [{ news: told, bank }]))
   })
 
   it("reports a handler that throws to the platform and goes on, the rest of the news told", () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const told: string[] = []
-    const bank = makeBankWorld().bankOn({ onBadNews: ({ news }) => { told.push(news.refusalkind); throw new Error("The handler is broken.") } })
-    bank.tellBadNews([new VaultError('storage_unavailable', "Down."), new VaultError('absent_box', "Gone.")])
+    const bank = makeBankWorld().bankOn()
+    tellBadNewsTo(({ news }) => { told.push(news.refusalkind); throw new Error("The handler is broken.") }, bank, [new VaultError('storage_unavailable', "Down."), new VaultError('absent_box', "Gone.")])
     expect(told).to.deep.equal(['storage_unavailable', 'absent_box'])
     expect(reported).toHaveBeenCalledTimes(2)
     vi.unstubAllGlobals()
@@ -526,11 +546,21 @@ describe("'identity_revoked', panic and bad news", () => {
   it("reports a handler whose promise rejects to the platform, with no unhandled rejection", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
-    const bank = makeBankWorld().bankOn({ onBadNews: () => Promise.reject(new Error("Rejected.")) })
-    bank.tellBadNews([new VaultError('storage_unavailable', "Down.")])
+    const bank = makeBankWorld().bankOn()
+    tellBadNewsTo(() => Promise.reject(new Error("Rejected.")), bank, [new VaultError('storage_unavailable', "Down.")])
     await TH.eventually(() => reported.mock.calls.length === 1)
     expect(reported.mock.calls[0]?.[0]).to.have.property('message', "Rejected.")
     vi.unstubAllGlobals()
+  })
+
+  it("refuses a handler that is no function, no bank, or news that is no VaultError, telling nobody", () => {
+    const bank = makeBankWorld().bankOn()
+    const onBadNews = vi.fn()
+    const news = new VaultError('storage_unavailable', "Down.")
+    TH.expectSyncRefusal(() => { tellBadNewsTo('tell me' as never, bank, [news]) }, 'bad_option')
+    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, {} as never, [news]) }, 'bad_option')
+    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, bank, [new Error("Down.") as never]) }, 'bad_option')
+    expect(onBadNews).not.toHaveBeenCalled()
   })
 })
 
