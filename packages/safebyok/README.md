@@ -84,25 +84,34 @@ Easy to get wrong:
 * `bank.vacate()` is sign-out: it disables the bank, then erases this bank's leases on this device
   and its bank row in the deviceDB, leaving the vaultDB alone, and settles once each erase has been
   tried. The next `deviceDB.ensureBank` for that user mints a new `device_id`. Await it before the
-  page goes: a lease or bank row it cannot erase reaches your `onPanic`, and a refused listing of
-  the leases your `onBadNews`.
+  page goes: a lease it cannot erase reaches your `onLifecycle` as `lease_unerased`, and
+  `vacated` follows once the erase settles, counting them. A refused listing of the leases, or a
+  bank row it cannot forget, reaches your `onBadNews`.
 * **A bank swept or vacated is spent.** From the moment you call either, `bank.isEnabled` is false
   for good, `hello`, `ensureVault` and `vaultAt` refuse `disabled`, and the bank calls none of your
-  functions: a panic's refusal goes to the platform, and bad news to the bank's logger. The one
-  exception is the erase of a vacate, which still tells your `onPanic` and `onBadNews` what it could
-  not do.
-* **`onPanic` hears what you must act on for safety**: a revoked identity, or a lease that outlived
-  its erase. With no `onPanic`, `DefaultOnPanic` logs it at error, reports it to the platform and vacates: the bank
-  on an `identity_revoked`, whose snapshot then shows that refusal, else the vault named. Make another
-  bank once the user signs in again. An `onPanic` of your own decides for itself; to keep the
-  vacate, call the default from it:
+  functions: what it would tell them goes to `DefaultOnLifecycle` and `DefaultOnBadNews`. The one
+  exception is the erase of a vacate, which still tells your `onLifecycle` and `onBadNews` what it
+  could not do.
+* **A revoked identity vacates the bank**, whatever your handlers do: `identity_revoked`, raised by
+  your storage adapter, ends the bank, whose snapshot then shows that refusal, and your
+  `onLifecycle` hears `vacated` with it as the `cause`. Make another bank once the user signs in
+  again.
+* **`onLifecycle` hears what happens in the bank's life**, each event a `BankEvent` told by its
+  `kind`: `helloed` with the outcome of each `bank.hello()` and `vault.hello()`; `lease_unerased`
+  for a cached lease that outlived its erase, with `where` it happened and the vault, if one; and
+  `vacated`. With no `onLifecycle`, `DefaultOnLifecycle` logs a lease left by a lock or a vacate at
+  error, reports it to the platform and vacates the vault; reports a vacate's cause other than
+  `disabled` the same way; and warns of the rest that went wrong. An `onLifecycle` of your own
+  decides for itself; to keep the default's policy beside your own, call it:
 
   ```ts
-  const onPanic: PanicHandler = (panic) => {
-    myTelemetry.panic(panic.refusal.refusalkind)
-    DefaultOnPanic(panic)
+  const onLifecycle: LifecycleHandler = (event) => {
+    myTelemetry.lifecycle(event.kind)
+    DefaultOnLifecycle(event)
   }
   ```
+* **`onBadNews` is the error report**: each refusal no caller waits on, often several around one
+  event in the bank's life. With none, `DefaultOnBadNews` warns of each through the bank's logger.
 * **The bank alone tells your `onBadNews`**: it offers no `tellBadNews` of its own. To hand a
   refusal from your code to a handler as the bank does, call `tellBadNewsTo(onBadNews, bank, [err])`,
   which awaits nothing and sends the handler's throw to the platform.
