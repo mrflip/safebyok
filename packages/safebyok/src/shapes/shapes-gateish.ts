@@ -246,6 +246,8 @@ export const leaseFriend = objCheck(({ fn }) => ({
   tryForgetLease:  fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
   tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),
+  /** Tell the host of a cached row of another epoch or life that outlived its erase. */
+  tellUnerased:    fn<(refusal: VaultError) => unknown>(),
 }), { refusalkind: 'bad_option', extras: 'strip' })
 
 /** All a lease or a proving hears of its vault, once {@link leaseFriend} has checked it. */

@@ -196,10 +196,10 @@ describe("BankProvider's props", () => {
 
   it("says nothing of handlers written inline at each render", async () => {
     const spy = TH.spyLogger()
-    const { props, rerender } = provided({ logger: spy.logger, onBadNews: () => undefined, onPanic: () => undefined })
+    const { props, rerender } = provided({ logger: spy.logger, onBadNews: () => undefined, onLifecycle: () => undefined })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    rerender({ ...props, onBadNews: () => undefined, onPanic: () => undefined })
-    rerender({ ...props, onBadNews: () => undefined, onPanic: () => undefined })
+    rerender({ ...props, onBadNews: () => undefined, onLifecycle: () => undefined })
+    rerender({ ...props, onBadNews: () => undefined, onLifecycle: () => undefined })
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(TH.seenBanks).to.have.lengthOf(1)
     expect(spy.calls).to.deep.equal([])
@@ -284,7 +284,7 @@ describe("BankProvider's handlers", () => {
 
   it.each([
     ['onBadNews', { onBadNews: 'not a function' }],
-    ['onPanic', { onPanic: 'not a function' }],
+    ['onLifecycle', { onLifecycle: 'not a function' }],
     ['requestCleartext', { requestCleartext: 'not a function' }],
   ])("throws %s given as no function to the nearest error boundary", async (_name, misuse) => {
     const props = { ...TH.providerPropsOf(TH.makeBankWorld()), ...misuse } as unknown as Props
@@ -343,22 +343,22 @@ describe("BankProvider's handlers", () => {
     expect(spy.calls).to.deep.equal([])
   })
 
-  it("calls an onPanic written inline at each render as it was last rendered", async () => {
+  it("calls an onLifecycle written inline at each render as it was last rendered", async () => {
     vi.stubGlobal('reportError', vi.fn())
     const first = vi.fn()
     const last = vi.fn()
-    const { props, rerender, deviceDB } = await unlockedProvided({ onPanic: first })
-    rerender({ ...props, onPanic: () => undefined })
-    rerender({ ...props, onPanic: last })
+    const { props, rerender, deviceDB } = await unlockedProvided({ onLifecycle: first })
+    rerender({ ...props, onLifecycle: () => undefined })
+    rerender({ ...props, onLifecycle: last })
     refuseErase(deviceDB)
     fireEvent.click(screen.getByText('Lock'))
-    await waitFor(() => { expect(last).toHaveBeenCalledWith(expect.objectContaining({ refusal: Refusal })) })
+    await waitFor(() => { expect(last).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_unerased', refusal: Refusal })) })
     expect(first).not.toHaveBeenCalled()
     expect(TH.seenBanks).to.have.lengthOf(1)
     expect(shown('vault')).to.eq('present locked')
   })
 
-  it("leaves a vault whose lease survived its erase to be vacated when the host has no onPanic, as the core does", async () => {
+  it("leaves a vault whose lease survived its erase to be vacated when the host has no onLifecycle, as the core does", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const { deviceDB } = await unlockedProvided()
@@ -368,20 +368,22 @@ describe("BankProvider's handlers", () => {
     await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
   })
 
-  it("tells the next user's onPanic nothing of the bank it let go, whose vacate tells the last user's onPanic of the lease it cannot erase", async () => {
+  it("tells the next user's onLifecycle nothing of the bank it let go, whose vacate tells the last user's onLifecycle of the lease it cannot erase", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const next = vi.fn()
     const erasing = TH.held<ReturnType<typeof TH.bad>>()
     const previous = vi.fn()
-    const { props, rerender, deviceDB } = await unlockedProvided({ onPanic: previous })
+    const { props, rerender, deviceDB } = await unlockedProvided({ onLifecycle: previous })
     vi.spyOn(deviceDB, 'tryForget').mockReturnValue(erasing.promise)
     fireEvent.click(screen.getByText('Lock'))
-    rerender({ ...props, user_id: 'u2', onPanic: next })
+    rerender({ ...props, user_id: 'u2', onLifecycle: next })
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     erasing.resolve(TH.bad(Refusal))
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
-    await waitFor(() => { expect(previous).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ refusal: Refusal })) })
+    await waitFor(() => { expect(previous).toHaveBeenCalledWith(expect.objectContaining({ kind: 'vacated', unerased: 1 })) })
+    expect(previous.mock.calls.map(([event]) => (event as { kind: string }).kind)).to.deep.equal(['lease_unerased', 'vacated'])
+    expect(previous).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_unerased', refusal: Refusal, where: 'vacate' }))
     expect(next).not.toHaveBeenCalled()
   })
 })

@@ -7,10 +7,10 @@ import type { Lease } from '../../src/models/lease'
 import type { VaultScope } from '../../src/shapes/shapes-core'
 import type * as GX from '../../src/shapes/shapes-gateish'
 import { type RequestCleartext, passphraseCleartext } from '../../src/shapes/shapes-gateish'
-import type { BankFriend, BankPanic, BoxWorld, ListingOpts, PanicHandler, VaultWorld } from '../../src/shapes/shapes-vaultish'
+import type { BankAnnouncement, BankFriend, BoxWorld, LifecycleHandler, ListingOpts, VaultWorld } from '../../src/shapes/shapes-vaultish'
 import type { VaultError } from '../../src/refusals/errors'
 import type { VaultTombstone, VaultRecord } from '../../src/shapes/shapes-storage'
-import { DefaultOnPanic, guardOnPanic, guardRequestCleartext } from '../../src/models/bank'
+import { DefaultOnLifecycle, guardOnLifecycle, guardRequestCleartext } from '../../src/models/bank'
 import type { Vault } from '../../src/models/vault'
 import type { Bank } from '../../src/models/bank'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
@@ -122,15 +122,15 @@ export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>
 export type FakeBank = { -readonly [K in keyof VaultWorld]: VaultWorld[K] } & { requestCleartext: RequestCleartext }
 
 /** What a test may say of a {@link makeVaultWorld} world: its members, and the host's own functions, which it wraps as a bank does. */
-export type VaultWorldGiven = Partial<Omit<FakeBank, keyof ProvingWorldGiven>> & ProvingWorldGiven & { onPanic?: PanicHandler | undefined }
+export type VaultWorldGiven = Partial<Omit<FakeBank, keyof ProvingWorldGiven>> & ProvingWorldGiven & { onLifecycle?: LifecycleHandler | undefined }
 
 /** A vault listing over a vaultDB of one row, `stored0` to begin with, and the deviceDB and clock it shares with every other session `anotherSession` opens on this device. `worldOverrides` says otherwise of the world. */
 export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverrides: VaultWorldGiven = {}) => {
-  const { onPanic = DefaultOnPanic, keyDeriver, strengthChecker, device_id = '00000000-0000-4000-8000-000000000001', ...overrides } = worldOverrides
+  const { onLifecycle = DefaultOnLifecycle, keyDeriver, strengthChecker, device_id = '00000000-0000-4000-8000-000000000001', ...overrides } = worldOverrides
   let now = T0
   _cheat_clock(() => now)
   const deviceDB = makeDeviceDB()
-  const hostPanic = guardOnPanic(onPanic)
+  const hostLifecycle = guardOnLifecycle(onLifecycle)
   const fakeBank: FakeBank = {
     isLocked:     false,
     ensureTimely: () => Promise.resolve(),
@@ -148,12 +148,13 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
   const vaultrows = vaultDB._cheat_vaultRowsOf(Dna)
   if (stored0 !== null) { vaultrows.set(Dna.vaultlabel, stored0) }
   const storedNow = (): VaultRecord | null => (vaultrows.get(Dna.vaultlabel) ?? null) as VaultRecord | null
-  // The fake stands in for the bank a panic names.
-  const panic: BankPanic = brandGuarded((told) => hostPanic({ ...told, bank: fakeBank as unknown as Bank }))
+  // The fake stands in for the bank an event names.
+  const announce = brandGuarded((announcement: BankAnnouncement): void => { void hostLifecycle({ ...announcement, bank: fakeBank as unknown as Bank }) })
   /** The bad news the listings and vaults told, oldest first. A live array. */
   const badnews: VaultError[] = []
   const bankFriend: BankFriend = {
-    panic,
+    panic:       brandGuarded(nothing),
+    announce,
     tellBadNews: brandGuarded((told: readonly VaultError[]) => { badnews.push(...told) }),
     askUser:     guardRequestCleartext((gating) => fakeBank.requestCleartext(gating)),
   }

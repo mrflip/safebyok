@@ -288,9 +288,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Panic]: panicIfRevoked
 
-  /** A refusal of the vaultDB's on its way to a caller: 'identity_revoked' is a panic, heard before the caller hears the refusal. */
+  /** A refusal of the vaultDB's on its way to a caller: 'identity_revoked' vacates the bank before the caller hears the refusal. */
   protected panicIfRevoked(refusal: VaultError): void {
-    if (isVaultError(refusal, 'identity_revoked')) { void this.bankFriend.panic({ refusal }) }
+    if (isVaultError(refusal, 'identity_revoked')) { this.bankFriend.panic(refusal) }
   }
   // --
 

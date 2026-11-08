@@ -208,14 +208,13 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     })
   }
 
-  it("warns of a forget refused, quoting only the refusalkind, and still answers null", async () => {
+  it("tells its friend of a forget refused, logging nothing itself, and still answers null", async () => {
     const { friend } = await grantedWorld()
-    friend.tryForgetLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
+    const refusal = new VaultError('unexpected_error', 'the store is down')
+    friend.tryForgetLease.mockResolvedValueOnce(bad(refusal))
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch + 1)).to.be.null
-    expect(friend.logged).to.have.length(1)
-    expect(friend.logged[0]!.level).to.eq('warn')
-    expect(friend.logged[0]!.story).to.have.all.keys('call', 'refusalkind')
-    expect(friend.logged[0]!.story).to.have.property('call', 'Lease.buildFromCache')
+    expect(friend.tellUnerased).toHaveBeenCalledExactlyOnceWith(refusal)
+    expect(friend.logged).to.deep.equal([])
   })
 
   const MalformedCases = [

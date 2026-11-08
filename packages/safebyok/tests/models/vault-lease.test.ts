@@ -87,23 +87,23 @@ describe("A lease renewed through a gate change", () => {
   })
 })
 
-describe("A refused erase of the row: the panic", () => {
+describe("A refused erase of the row: lease_unerased", () => {
   const Refusal = new VaultError('storage_unavailable', 'the disk is full')
 
-  it("hears the host's onPanic, leaving the vault locked and enabled; a rejection of it goes to the platform and no further", async () => {
+  it("is heard by the host's onLifecycle, leaving the vault locked and enabled; a rejection of it goes to the platform and no further", async () => {
     const reported = stubReportError()
-    const onPanic = vi.fn(() => Promise.reject(new Error('the host panicked')))
-    const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onPanic })
+    const onLifecycle = vi.fn(() => Promise.reject(new Error('the host broke')))
+    const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onLifecycle })
     deviceDB.tryForget.mockResolvedValueOnce(TH.bad(Refusal))
     vault.lock()
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => reported.mock.calls.length === 1)
-    expect(onPanic).toHaveBeenCalledWith(expect.objectContaining({ refusal: Refusal, vault }))
+    expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_unerased', refusal: Refusal, vault, where: 'lock' }))
     expect(vault.isEnabled).to.be.true
     expect(deviceDB.cachedNow()).not.to.be.null
   })
 
-  describe("with no onPanic and no reportError", () => {
+  describe("with no onLifecycle and no reportError", () => {
     it("still vacates the vault", async () => {
       const { vault, deviceDB } = await makeBornVault()
       deviceDB.tryForget.mockResolvedValue(TH.bad(Refusal))
@@ -113,7 +113,7 @@ describe("A refused erase of the row: the panic", () => {
     })
   })
 
-  it("with no onPanic reports it and vacates the vault; the vacate's own refusal finds that done", async () => {
+  it("with no onLifecycle reports it and vacates the vault; the vacate's own refusal finds that done", async () => {
     const reported = stubReportError()
     const { vault, listing, deviceDB } = await makeBornVault()
     deviceDB.tryForget.mockResolvedValue(TH.bad(Refusal))
