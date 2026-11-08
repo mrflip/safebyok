@@ -78,7 +78,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     const { scope, askUser } = GX.gatingLaunchArgs.parse({ gatingkind, scope: args.scope, friend: args.friend, askUser: args.askUser })
     const gating = new Gating(gatingkind, { ...args, scope })
     args.listing.holdGating(gating as unknown as AnyGating)
-    void gating.#askHost(askUser)
+    if (askUser !== null) { void gating.#askHost(askUser) }
     return valOf(await gating.#settled)
   }
 

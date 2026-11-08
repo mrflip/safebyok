@@ -9,7 +9,7 @@ import type { PassphraseAdvice } from '../modal'
 export interface BankProviderProps extends Omit<BankOpts, 'user_id' | 'device_id' | 'requestCleartext'> {
   /** The signed-in user, or null while nobody is. Call `bank.vacate()` at sign-out: a null leaves the leases. */
   user_id:             string | null
-  /** What asks the user for a passphrase or passkey. Defaults to the provider's own dialogs. */
+  /** What asks the user for a passphrase or passkey, in place of the provider's own dialogs, which follow the bank's snapshot. */
   requestCleartext?:   RequestCleartext | undefined
   /** What a password manager files a vault's passphrase under. */
   passphraseUsername?: string | undefined
@@ -37,5 +37,5 @@ true satisfies AssertEqual<BankProviderProps, CheckerInput<typeof providerProps>
 export type HeldBankOpts = Omit<BankOpts, 'user_id' | 'device_id' | 'onLifecycle' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
 
 /** The functions a held bank calls back, each as it was last rendered. */
-export type Handlers = { onLifecycle: LifecycleHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext }
+export type Handlers = { onLifecycle: LifecycleHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext | undefined }
 // --

@@ -268,7 +268,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Snapshot]: remakeSnapshot
+  // == [Snapshot]: remakeSnapshot, tellListeners
 
   /** Make the listing's snapshot again, of the present instances' own; when one differs, replace it and call every listener. */
   #remakeSnapshot(): void {
@@ -276,6 +276,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const isSame = next.length === this.#snapshot.length && next.every((snapshot, idx) => snapshot === this.#snapshot[idx])
     if (isSame) { return }
     this.#snapshot = Object.freeze(next)
+    this.tellListeners()
+  }
+
+  /** Tell every listener, for a subclass whose change a snapshot's fields cannot show. */
+  protected tellListeners(): void {
     for (const listener of this.#listeners) {
       try {
         listener()

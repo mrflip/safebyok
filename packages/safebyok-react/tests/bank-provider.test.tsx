@@ -389,6 +389,16 @@ describe("BankProvider's handlers", () => {
   })
 })
 
+/** The one bank a provider has made. */
+const onlyBank = (): Bank => {
+  const [bank] = TH.seenBanks
+  if (bank === undefined) { throw new Error('no bank seen') }
+  return bank
+}
+
+/** The passphrase field on screen. */
+const passphraseFieldOf = (): HTMLInputElement => screen.getByLabelText(Messages.passphraseField)
+
 describe("BankProvider's dialog", () => {
   it("builds the vault from a click: unborn, then present and unlocked", async () => {
     provided()
@@ -412,14 +422,91 @@ describe("BankProvider's dialog", () => {
     expect(dialogShown()).to.be.false
   })
 
-  it("shows no dialog once the user's gesture is spent, and the ask is declined", async () => {
+  it("opens the dialog for the gating the bank holds", async () => {
+    provided()
+    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    fireEvent.click(screen.getByText('Open'))
+    await waitFor(() => { expect(screen.queryByText(Messages.chooseTitle)).to.not.be.null })
+    expect(onlyBank().snapshot.openGating).to.not.be.null
+  })
+
+  it("shows the dialog with the user's gesture spent, as its own click supplies the next", async () => {
     provided()
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     TH.withoutGesture()
     fireEvent.click(screen.getByText('Open'))
-    await act(async () => { await TH.wakeupAtNextTick() })
+    await waitFor(() => { expect(screen.queryByText(Messages.chooseTitle)).to.not.be.null })
+  })
+
+  it("asks the vault's passkey within the dialog's own click, the user's gesture otherwise spent", async () => {
+    const authenticator = TH.installFakeAuthenticator()
+    const world = TH.makeBankWorld()
+    const { vault } = await TH.makeBankWithVault(world)
+    await TH.addPasskeyTo(world, vault, await createPasskey(TH.PasskeyMaking))
+    provided({}, world)
+    await waitFor(() => { expect(shown('vault')).to.eq('present locked') })
+    TH.withoutGesture()
+    fireEvent.click(screen.getByText('Open'))
+    const press = await screen.findByText(Messages.passkeyButton)
+    fireEvent.click(press)
+    expect(authenticator.calls.get).to.have.lengthOf(1)
+    await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
     expect(dialogShown()).to.be.false
+  })
+
+  it("closes the dialog on Cancel, declining its gating", async () => {
+    provided()
+    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    fireEvent.click(screen.getByText('Open'))
+    await waitFor(() => { expect(dialogShown()).to.be.true })
+    const gating = onlyBank().snapshot.openGating
+    fireEvent.click(screen.getByText(Messages.cancelButton))
+    await waitFor(() => { expect(dialogShown()).to.be.false })
+    expect(gating?.isOpen).to.be.false
+    expect(onlyBank().snapshot.openGating).to.be.null
     expect(shown('vault')).to.eq('unborn none')
+  })
+
+  it("closes the dialog at a sweep of the bank", async () => {
+    provided()
+    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    fireEvent.click(screen.getByText('Open'))
+    await waitFor(() => { expect(dialogShown()).to.be.true })
+    act(() => { onlyBank().sweep() })
+    expect(dialogShown()).to.be.false
+  })
+
+  it("closes the dialog at a vacate of the bank", async () => {
+    provided()
+    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    fireEvent.click(screen.getByText('Open'))
+    await waitFor(() => { expect(dialogShown()).to.be.true })
+    await act(async () => { await onlyBank().vacate() })
+    expect(dialogShown()).to.be.false
+  })
+
+  it("replaces a settled gating's dialog with the next one's, nothing typed carried over", async () => {
+    const world = TH.makeBankWorld()
+    await TH.makeBankWithVault(world)
+    provided({}, world)
+    await waitFor(() => { expect(shown('vault')).to.eq('present locked') })
+    fireEvent.click(screen.getByText('Open'))
+    await waitFor(() => { expect(dialogShown()).to.be.true })
+    const bank = onlyBank()
+    const first = bank.snapshot.openGating
+    fireEvent.change(passphraseFieldOf(), { target: { value: 'half typed' } })
+    const vault = bank.vaultAt({ vaultlabel: 'main' })!
+    await act(async () => {
+      first?.decline()
+      void vault.tryEnsureUnlocked()
+      await vi.waitFor(() => { expect(bank.snapshot.openGating).to.not.equal(first); expect(bank.snapshot.openGating).to.not.be.null })
+    })
+    await waitFor(() => { expect(dialogShown()).to.be.true })
+    expect(passphraseFieldOf().value).to.eq('')
+    expect(bank.snapshot.openGating).to.not.equal(first)
+    TH.submitPassphrase(TH.Passphrase)
+    await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
+    expect(dialogShown()).to.be.false
   })
 
   it("closes the dialog once its gating settles elsewhere, as at a lock", async () => {
@@ -476,6 +563,26 @@ describe("BankProvider's dialog", () => {
     await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
     expect(handed.map(({ gatingkind }) => gatingkind)).to.deep.equal(['build_vault'])
     expect(first).not.toHaveBeenCalled()
+  })
+
+  it("keeps to its own dialog when requestCleartext arrives after the first render", async () => {
+    const requestCleartext = vi.fn()
+    const { props, rerender } = provided()
+    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    rerender({ ...props, requestCleartext })
+    fireEvent.click(screen.getByText('Open'))
+    await waitFor(() => { expect(dialogShown()).to.be.true })
+    expect(requestCleartext).not.toHaveBeenCalled()
+  })
+
+  it("keeps to the host's dialog when requestCleartext is dropped after the first render", async () => {
+    const { props, rerender } = provided({ requestCleartext: () => undefined })
+    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    rerender({ ...props, requestCleartext: undefined })
+    fireEvent.click(screen.getByText('Open'))
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(dialogShown()).to.be.false
+    expect(shown('vault')).to.eq('unborn none')
   })
 
   it("asks nobody when requestCleartext answers nothing", async () => {

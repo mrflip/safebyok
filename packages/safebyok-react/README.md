@@ -41,6 +41,17 @@ write, say so. `BoxFields.of` answers the same instance for a box wherever it is
 also does this once right after the field first appears, so expose the box after its field mounts. The details, with
 React's own documentation, are in [notes/expose_improves_security.md](https://github.com/mrflip/safebyok/blob/main/notes/expose_improves_security.md#what-minimize-the-surface-would-cost).
 
+## Dialogs
+
+`BankProvider` shows its own dialog for each gating the bank holds open: the dialog follows `openGating` in the bank's
+snapshot, and closes when the gating settles, whether by the user's answer, a lock, a sweep or a vacate. Its passkey
+button asks the passkey from the user's click on it, so a gating opened from a timer or a fetch shows the dialog all the
+same, and the user's click supplies the gesture the browser needs.
+
+Pass `requestCleartext` to use a dialog of your own: the provider then renders none. It is called with each gating, and
+as last rendered, so an inline arrow is fine. Pass it from the first render, as whether the host's dialog asks is fixed
+when the bank is made.
+
 ## Signing out
 
 Call `bank.vacate()` when the user signs out, before you clear their `user_id`: it erases the bank's cached leases and

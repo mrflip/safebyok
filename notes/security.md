@@ -41,6 +41,11 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-08 (gating_snapshot, branch `20261108-gating_snapshot`): **`BankSnapshot` carries `openGating: AnyGating | null`, the live `Gating` object the bank holds open,
+  so any subscriber to a frozen snapshot is handed it and can call `gating.attempt` and `gating.decline`.** In `packages/safebyok/src/models/bank.ts`, the field is the
+  bank's `VaultListing.#openGating`; a host's `requestCleartext` was already handed this same object. A `Gating` (`models/gating.ts`) holds no clear between attempts:
+  clears are arguments, spent or zeroed by `spendClears`, and its `toJSON` serializes only its scope and kind. `requestCleartext` is now optional: with none,
+  `Gating.launch` calls no host function, and the gating waits in the snapshot until someone calls `attempt` or `decline`.
 * 2026-11-08 (bank_disable, branch `20261108-bank_disable`): **`bank.vacate()` disables the bank, then erases every lease row of the bank's applabel
   and user_id; it drops no IndexedDB database.** In `packages/safebyok/src/models/bank.ts`, `vacate()` first disables the bank, synchronously:
   `bank.isEnabled` is false for good, every `hello`, `ensureVault` or `vaultAt` refuses `disabled` from that instant, and the snapshot reads `refused`
@@ -626,7 +631,10 @@ added or folded into through the subagent, and no other entry changes.
   `applabel` at the page's own domain; the user entry is `passphraseUsername` (default "u1 (main vault)"), never the host's sign-in name.
 * 2026-10-24 (primitives sprint, thread 10, react, branch `20261024-react`): **every gating kind is asked through the provider's own dialog.**
   `change_passphrase`, `put_passkey`, `del_passkey` and `del_vault` join `unlock_vault` and `initialize_gate` in `GatingModal`, each proven
-  by the current passphrase and shown only while the user's gesture is in hand (`navigator.userActivation`), as before. A refusal the core
+  by the current passphrase and shown only while the user's gesture is in hand (`navigator.userActivation`), as before. Amended 2026-11-08 (gating_snapshot, branch `20261108-gating_snapshot`): `BankProvider` no longer
+  checks `navigator.userActivation.isActive` before it shows the dialog (the old `hasUserGesture`, which declined a gating at once with no live gesture); the dialog shows
+  whenever a gating is open, and `askPasskey` and `createPasskey` are called synchronously inside the click on the dialog's button, so that click supplies WebAuthn's user
+  activation. A programmatic `ensureUnlocked` with no gesture now shows a dialog, where it was declined unasked. A refusal the core
   leaves the gating open for (`correctableKindVals`; amended 2026-10-28 (validator_names): `CorrectableKindVals` when this was written) shows in place and nothing retries. Misuse, or a non-`VaultError`, reaches React's
   `onCaughtError` through `forBoundary`, which drops any `cause` (it may quote what the user typed); the report's source is named `GatingModal`.
 * 2026-10-24 (primitives sprint, thread 10, react, branch `20261024-react`): **a declined gating's refusal is worded by kind.**

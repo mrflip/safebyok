@@ -98,7 +98,7 @@ export class Bank {
     // A revoked identity vacates the bank whatever the host's onLifecycle does; the host hears of it as the scrub's `vacated`.
     const panic = brandGuarded((refusal: VaultError): void => { void this.vacate({ cause: refusal }) })
     // A disabled bank asks no one: every Gating.launch follows an enabled check in the same tick.
-    const askUser = guardRequestCleartext(requestCleartext)
+    const askUser = requestCleartext === undefined ? null : guardRequestCleartext(requestCleartext)
     this.logger = parseLogger(logger)
     this.strengthChecker = guardStrengthChecker(strengthChecker)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
@@ -262,7 +262,7 @@ export class Bank {
   readonly #remakeSnapshot = (): void => {
     const next = this.#makeSnapshot()
     const prior = this.#snapshot
-    if ((next.stage === prior.stage) && (next.err === prior.err) && (next.vaults === prior.vaults)) { return }
+    if ((next.stage === prior.stage) && (next.err === prior.err) && (next.vaults === prior.vaults) && (next.openGating === prior.openGating)) { return }
     this.#snapshot = next
     for (const listener of this.#listeners) {
       try {
@@ -276,7 +276,7 @@ export class Bank {
   #makeSnapshot(): BankSnapshot {
     const hello = this.#lastHello
     const [stage, err] = this.#endCause ? ['refused' as const, this.#endCause] : [stageOf(hello), hello?.err ?? null]
-    return Object.freeze({ ...this.scope, stage, err, device_id: this.device_id, vaults: this.#vaultListing.snapshot })
+    return Object.freeze({ ...this.scope, stage, err, device_id: this.device_id, vaults: this.#vaultListing.snapshot, openGating: this.#vaultListing.openGating })
   }
   // --
 
