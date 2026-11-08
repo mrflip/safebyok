@@ -76,6 +76,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   async list(): Promise<void> {
     this.demandEnabled()
     const answer = await this.vaultDB.tryListVaults(this.world.scope)
+    this.demandEnabled()
     if (! answer.ok) {
       this.panicIfRevoked(answer.err)
       throw answer.err

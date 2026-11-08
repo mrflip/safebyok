@@ -398,6 +398,25 @@ describe("'identity_revoked', panic and bad news", () => {
     vi.unstubAllGlobals()
   })
 
+  it("refuses as disabled a listing of the vaults answered after a sweep, so a revocation in it neither panics nor vacates", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const onPanic = vi.fn(DefaultOnPanic)
+    const world = makeBankWorld()
+    const bank = world.bankOn({ onPanic })
+    const listLeases = vi.spyOn(world.deviceDB, 'tryListLeases')
+    world.vaultDB._cheat_refuseGets('identity_revoked')
+    const answer = TH.holdNextAnswer(world.vaultDB, 'tryListVaults')
+    const hello = bank.tryHello()
+    await answer.reached
+    bank.sweep()
+    answer.release()
+    await TH.expectBad(hello, 'disabled')
+    expect([onPanic, reported, listLeases].map((spied) => spied.mock.calls.length)).to.deep.equal([0, 0, 0])
+    expect(bank.snapshot.err).to.include({ refusalkind: 'disabled' })
+    vi.unstubAllGlobals()
+  })
+
   it("vacates once for a burst of panics, the first reaching the host and those past its disable the platform", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
