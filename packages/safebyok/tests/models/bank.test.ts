@@ -3,9 +3,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { DefaultLogger, setDefaultLogger } from '../../src/helpers/logger'
 import { ForeverMillis, isGuarded } from '../../src/helpers/consts'
-import { type Bank, DefaultOnPanic, guardOnPanic, guardRequestCleartext, tellBadNewsTo } from '../../src/models/bank'
+import { type Bank, DefaultOnLifecycle, guardOnLifecycle, guardRequestCleartext, tellBadNewsTo } from '../../src/models/bank'
 import { DefaultLeaseMillis, type Vault } from '../../src/models/vault'
-import type { BadNews, Panic } from '../../src/shapes/shapes-vaultish'
+import type { BadNews, BankEvent } from '../../src/shapes/shapes-vaultish'
+import { bankDisabled } from '../../src/refusals/throwers'
 import type { AnyGating } from '../../src/shapes/shapes-gateish'
 import { VaultError } from '../../src/refusals/errors'
 import type { Outcome } from '../../src/refusals/outcome'
@@ -41,6 +42,36 @@ describe("bank.hello", () => {
     await bank.hello()
     expect(bank.getSnapshot()).to.equal(snapshot)
     expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it("tells onLifecycle each hello's outcome, a bank's naming no vault and a vault's naming it", async () => {
+    const world = makeBankWorld()
+    await makeBankWithVault(world)
+    const onLifecycle = vi.fn()
+    const bank = world.bankOn({ onLifecycle })
+    world.vaultDB._cheat_refuseGets('storage_unavailable')
+    const refusal = await TH.expectRefusal(bank.hello(), 'storage_unavailable')
+    expect(onLifecycle).toHaveBeenLastCalledWith({ kind: 'helloed', outcome: { ok: false, err: refusal }, vault: null, bank })
+    world.vaultDB._cheat_refuseGets(null)
+    await bank.hello()
+    expect(onLifecycle).toHaveBeenLastCalledWith({ kind: 'helloed', outcome: { ok: true, val: undefined }, vault: null, bank })
+    const vault = bank.vaultAt(VaultScopeGiven)
+    await vault?.hello()
+    expect(onLifecycle).toHaveBeenLastCalledWith({ kind: 'helloed', outcome: { ok: true, val: undefined }, vault, bank })
+    expect(onLifecycle).toHaveBeenCalledTimes(3)
+  })
+
+  it("tells the host nothing of a hello a sweep crosses", async () => {
+    const onLifecycle = vi.fn()
+    const world = makeBankWorld()
+    const bank = world.bankOn({ onLifecycle })
+    const answer = TH.holdNextAnswer(world.vaultDB, 'tryListVaults')
+    const hello = bank.tryHello()
+    await answer.reached
+    bank.sweep()
+    answer.release()
+    await TH.expectBad(hello, 'disabled')
+    expect(onLifecycle).not.toHaveBeenCalled()
   })
 
   it("lists every vault and tombstone the vaultDB holds, locked, with no prompt, the tombstone in its slot but not its snapshot", async () => {
@@ -193,10 +224,10 @@ describe("bank.hello", () => {
 describe("the host's functions, as a bank holds them", () => {
   it("holds each wrapped and branded, never the host's own on a prop", () => {
     const requestCleartext = vi.fn()
-    const onPanic = vi.fn()
-    const bank = makeBankWorld().bankOn({ requestCleartext, onPanic })
+    const onLifecycle = vi.fn()
+    const bank = makeBankWorld().bankOn({ requestCleartext, onLifecycle })
     for (const held of [bank.keyDeriver, bank.strengthChecker]) { expect(isGuarded(held)).to.be.true }
-    expect(Object.values(bank)).to.not.include.members([requestCleartext, onPanic, testDeriver, anyStrengthChecker])
+    expect(Object.values(bank)).to.not.include.members([requestCleartext, onLifecycle, testDeriver, anyStrengthChecker])
   })
 
   it("asks the dialog, answering true once it closes and false when it throws, keeping nothing of the throw", async () => {
@@ -207,47 +238,65 @@ describe("the host's functions, as a bank holds them", () => {
     expect(await guardRequestCleartext(() => { throw new Error(Passphrase) })(gating)).to.be.false
   })
 
-  it("tells onPanic, sending a throw from it to the platform", async () => {
+  it("tells onLifecycle, sending a throw from it to the platform", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
-    const refusal = new VaultError('storage_unavailable', 'no store')
-    const thrown = new Error('panic handler broke')
-    await guardOnPanic(() => { throw thrown })({ refusal, bank: {} as Bank })
+    const cause = new VaultError('identity_revoked', 'signed out')
+    const thrown = new Error('lifecycle handler broke')
+    await guardOnLifecycle(() => { throw thrown })({ kind: 'vacated', cause, unerased: 0, bank: {} as Bank })
     expect(reported).toHaveBeenCalledWith(thrown)
     vi.unstubAllGlobals()
   })
 
-  it("has DefaultOnPanic tell the platform the refusal, then vacate the bank on a revoked identity, else the vault, if any, never both", () => {
-    const reported = vi.fn()
-    vi.stubGlobal('reportError', reported)
-    const [refusal, revoked] = [new VaultError('storage_unavailable', 'no store'), new VaultError('identity_revoked', 'signed out')]
-    const [vacate, bankVacate] = [vi.fn(), vi.fn()]
-    const bank = { vacate: bankVacate, logger: TH.spyLogger().logger } as unknown as Bank
-    const vault = { vacate } as unknown as Vault
-    DefaultOnPanic({ refusal, bank, vault })
-    DefaultOnPanic({ refusal, bank })
-    expect(bankVacate).not.toHaveBeenCalled()
-    DefaultOnPanic({ refusal: revoked, bank, vault })
-    expect(reported).toHaveBeenCalledTimes(3)
-    expect(vacate).toHaveBeenCalledOnce()
-    expect(bankVacate).toHaveBeenCalledExactlyOnceWith({ cause: revoked })
-    vi.unstubAllGlobals()
+  it("refuses a requestCleartext or an onLifecycle that is no function", () => {
+    TH.expectSyncRefusal(() => guardRequestCleartext('ask' as never), 'bad_option')
+    TH.expectSyncRefusal(() => guardOnLifecycle('call me' as never), 'bad_option')
   })
+})
 
-  it("has DefaultOnPanic log the refusal at error through the bank's logger, its kind and nothing more, where the platform has no reportError", () => {
+describe("DefaultOnLifecycle", () => {
+  const Refusal = new VaultError('storage_unavailable', 'no store', { cause: new Error(Passphrase) })
+  const Revoked = new VaultError('identity_revoked', 'signed out')
+  const LifecycleCases = [
+    // a cached lease that outlived its erase:
+    [{ kind: 'lease_unerased', refusal: Refusal, where: 'lock' },      'error', true,  'reports a lock\'s refused erase at error and to the platform, and vacates the vault'],
+    [{ kind: 'lease_unerased', refusal: Refusal, where: 'vacate' },    'error', true,  'reports a vacate\'s refused erase at error and to the platform'],
+    [{ kind: 'lease_unerased', refusal: Refusal, where: 'tombstone' }, 'warn',  false, 'warns of a tombstone\'s refused erase, vacating nothing'],
+    [{ kind: 'lease_unerased', refusal: Refusal, where: 'outdated' },  'warn',  false, 'warns of an outdated row\'s refused erase, vacating nothing'],
+    // a vacate:
+    [{ kind: 'vacated', cause: Revoked, unerased: 0 },                 'error', false, 'reports a vacate for a revoked identity at error and to the platform'],
+    [{ kind: 'vacated', cause: bankDisabled(), unerased: 1 },          null,    false, 'says nothing of a sign-out'],
+    // a hello:
+    [{ kind: 'helloed', outcome: { ok: false, err: Refusal } },         'warn',  false, 'warns of a refused hello'],
+    [{ kind: 'helloed', outcome: { ok: true, val: undefined } },        null,    false, 'says nothing of a hello that lands'],
+    [{ kind: 'helloed', outcome: { ok: false, err: bankDisabled() } },  null,    false, 'says nothing of a hello the bank\'s end refused'],
+  ] as const
+
+  for (const [told, level, isVacating, blurb] of LifecycleCases) {
+    it(blurb, () => {
+      const reported = vi.fn()
+      vi.stubGlobal('reportError', reported)
+      const spy = TH.spyLogger()
+      const [vacate, bankVacate] = [vi.fn(), vi.fn()]
+      const bank = { vacate: bankVacate, logger: spy.logger } as unknown as Bank
+      const vault = { vacate } as unknown as Vault
+      DefaultOnLifecycle({ ...told, ...(told.kind !== 'vacated' && { vault }), bank } as BankEvent)
+      expect(spy.calls.map((call) => call.level)).to.deep.equal(level === null ? [] : [level])
+      expect(reported.mock.calls.length).to.eq(level === 'error' ? 1 : 0)
+      expect(vacate.mock.calls.length).to.eq(isVacating ? 1 : 0)
+      expect(bankVacate).not.toHaveBeenCalled()
+      vi.unstubAllGlobals()
+    })
+  }
+
+  it("logs a refusal at error through the bank's logger, its kind and nothing more, where the platform has no reportError", () => {
     vi.stubGlobal('reportError', undefined)
     const spy = TH.spyLogger()
     const bank = { vacate: vi.fn(), logger: spy.logger } as unknown as Bank
-    const refusal = new VaultError('storage_unavailable', 'no store', { cause: new Error(Passphrase) })
-    DefaultOnPanic({ refusal, bank })
-    expect(spy.calls).to.deep.equal([{ level: 'error', message: refusal.message, story: { call: 'Bank.onPanic', refusalkind: 'storage_unavailable' }, err: undefined }])
+    DefaultOnLifecycle({ kind: 'lease_unerased', refusal: Refusal, vault: null, where: 'vacate', bank })
+    expect(spy.calls).to.deep.equal([{ level: 'error', message: Refusal.message, story: { call: 'Bank.onLifecycle', refusalkind: 'storage_unavailable' }, err: undefined }])
     expect(JSON.stringify(spy.calls)).not.to.include(Passphrase)
     vi.unstubAllGlobals()
-  })
-
-  it("refuses a requestCleartext or an onPanic that is no function", () => {
-    TH.expectSyncRefusal(() => guardRequestCleartext('ask' as never), 'bad_option')
-    TH.expectSyncRefusal(() => guardOnPanic('call me' as never), 'bad_option')
   })
 })
 
@@ -299,7 +348,7 @@ describe("bank.ensureVault", () => {
     ['keyDeriver',      { keyDeriver: 3 }],
     ['strengthChecker', { strengthChecker: 3 }],
     ['logger',          { logger: 3 }],
-    ['onPanic',         { onPanic: 3 }],
+    ['onLifecycle',     { onLifecycle: 3 }],
   ])("refuses at Bank.make a %s that is none, naming it", (fieldname, overrides) => {
     const refusal = TH.expectSyncRefusal(() => makeBankWorld().bankOn(overrides as never))
     expect(refusal.message.startsWith(`${fieldname}: `)).to.be.true
@@ -347,8 +396,8 @@ describe("bank.ensureVault", () => {
   })
 })
 
-describe("'identity_revoked', panic and bad news", () => {
-  it("panics on a refused hello, DefaultOnPanic vacating the bank, which shows the revocation, its caller hearing it, and no lease left", async () => {
+describe("'identity_revoked', the lifecycle and bad news", () => {
+  it("vacates the bank on a refused hello, which shows the revocation, its caller hearing it, the default reporting it, and no lease left", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     const onBadNews = vi.fn()
@@ -357,9 +406,10 @@ describe("'identity_revoked', panic and bad news", () => {
     const fresh = world.bankOn({ onBadNews })
     world.vaultDB._cheat_refuseGets('identity_revoked')
     const refusal = await TH.expectRefusal(fresh.hello(), 'identity_revoked')
-    expect(reported).toHaveBeenCalledWith(refusal)
-    expect(onBadNews).not.toHaveBeenCalled()
     await TH.eventually(() => world.leaseRows().length === 0)
+    await TH.eventually(() => reported.mock.calls.length > 0)
+    expect(reported).toHaveBeenCalledExactlyOnceWith(refusal)
+    expect(onBadNews).not.toHaveBeenCalled()
     await TH.eventually(() => ! fresh.isEnabled)
     expect(fresh.snapshot).to.include({ stage: 'refused', err: refusal })
     await TH.expectRefusal(fresh.hello(), 'disabled')
@@ -376,37 +426,38 @@ describe("'identity_revoked', panic and bad news", () => {
     expect(bank.snapshot).to.include({ stage: 'refused', err: refusal })
   })
 
-  it.each([
-    ['leaves the bank enabled', false, (): void => undefined],
-    ['vacates the bank by calling DefaultOnPanic', true, (panic: Panic): void => { DefaultOnPanic(panic) }],
-  ] as const)("hears a revocation in the host's onPanic, which %s", async (_label, isVacating, hostPanic) => {
-    const onPanic = vi.fn(hostPanic)
-    const reported = vi.fn()
-    vi.stubGlobal('reportError', reported)
-    const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onPanic })
+  it("vacates the bank on a revocation whatever the host's onLifecycle does, which hears it as vacated once the scrub settles", async () => {
+    const onLifecycle = vi.fn()
+    const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle })
+    onLifecycle.mockClear()
     world.vaultDB._cheat_refuseGets('identity_revoked')
     const refusal = await TH.expectRefusal(vault.fetch(), 'identity_revoked')
-    expect(onPanic).toHaveBeenCalledExactlyOnceWith({ refusal, bank })
-    expect(bank.snapshot.stage).to.eq(isVacating ? 'refused' : 'ready')
-    vi.unstubAllGlobals()
+    expect(bank.snapshot).to.include({ stage: 'refused', err: refusal })
+    expect(onLifecycle).not.toHaveBeenCalled()
+    await TH.eventually(() => onLifecycle.mock.calls.length > 0)
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: refusal, unerased: 0, bank })
+    expect(world.leaseRows()).to.deep.equal([])
   })
 
-  it("names no vault where a revocation refuses a vault's boxes' listing, as it concerns the user", async () => {
-    const onPanic = vi.fn()
-    const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onPanic })
+  it("vacates the bank where a revocation refuses a vault's boxes' listing", async () => {
+    const onLifecycle = vi.fn()
+    const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle })
+    onLifecycle.mockClear()
     const revoked = new VaultError('identity_revoked', 'signed out')
     vi.spyOn(world.vaultDB, 'tryListBoxes').mockResolvedValue({ ok: false, err: revoked, world: null } as never)
     await TH.expectRefusal(vault.boxListing.list(), 'identity_revoked')
-    expect(onPanic).toHaveBeenCalledExactlyOnceWith({ refusal: revoked, bank })
+    expect(bank.isEnabled).to.be.false
+    await TH.eventually(() => onLifecycle.mock.calls.length > 0)
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: revoked, unerased: 0, bank })
   })
 
-  it("refuses as disabled a listing of the vaults answered after a sweep, so a revocation in it neither panics nor vacates", async () => {
+  it("refuses as disabled a listing of the vaults answered after a sweep, so a revocation in it neither reaches the host nor vacates", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
-    const onPanic = vi.fn(DefaultOnPanic)
+    const onLifecycle = vi.fn(DefaultOnLifecycle)
     const world = makeBankWorld()
     await makeBankWithVault(world)
-    const bank = world.bankOn({ onPanic })
+    const bank = world.bankOn({ onLifecycle })
     world.vaultDB._cheat_refuseGets('identity_revoked')
     const answer = TH.holdNextAnswer(world.vaultDB, 'tryListVaults')
     const hello = bank.tryHello()
@@ -414,25 +465,27 @@ describe("'identity_revoked', panic and bad news", () => {
     bank.sweep()
     answer.release()
     await TH.expectBad(hello, 'disabled')
-    expect([onPanic, reported].map((spied) => spied.mock.calls.length)).to.deep.equal([0, 0])
+    expect([onLifecycle, reported].map((spied) => spied.mock.calls.length)).to.deep.equal([0, 0])
     expect(bank.snapshot.err).to.include({ refusalkind: 'disabled' })
     await TH.wakeupAtNextTick()
     expect(world.leaseRows()).to.have.lengthOf(1)
     vi.unstubAllGlobals()
   })
 
-  it("vacates once for a burst of revocations, the first reaching the host and the rest refused as disabled before they panic", async () => {
+  it("vacates once for a burst of revocations, the first its cause and the rest refused as disabled before they vacate", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
-    const onPanic = vi.fn(DefaultOnPanic)
-    const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onPanic })
+    const onLifecycle = vi.fn(DefaultOnLifecycle)
+    const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle })
     const other = await bank.ensureVault(OtherScopeGiven)
+    onLifecycle.mockClear()
     world.vaultDB._cheat_refuseGets('identity_revoked')
     const fetched = await Promise.all([vault.tryFetch(), other.tryFetch()])
     expect(fetched.map((outcome) => (outcome.ok ? null : outcome.err.refusalkind))).to.deep.equal(['identity_revoked', 'disabled'])
-    expect(onPanic).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ refusal: bank.snapshot.err }))
+    await TH.eventually(() => onLifecycle.mock.calls.length > 0)
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'vacated', cause: bank.snapshot.err }))
     expect(reported).toHaveBeenCalledOnce()
-    await TH.eventually(() => world.leaseRows().length === 0)
+    expect(world.leaseRows()).to.deep.equal([])
     vi.unstubAllGlobals()
   })
 
@@ -498,7 +551,7 @@ describe("'identity_revoked', panic and bad news", () => {
     await page.hello()
     const unlocked = await page.vaultAt(VaultScopeGiven)?.ensureUnlocked()
     expect(unlocked?.isUnlocked).to.be.true
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not be erased'), expect.objectContaining({ call: 'Lease.buildFromCache' }), undefined)
+    expect(warn).toHaveBeenCalledWith('the store is down', expect.objectContaining({ call: 'Bank.onLifecycle' }), undefined)
   })
 
   it("hears a vault's bad news the same as its own, a revocation told so vacating nothing, and news past a sweep going to the logger", async () => {

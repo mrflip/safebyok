@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Vault, VaultError, type Box, type BoxSnapshot, type RequestCleartext, type Whisper, type BoxExposure } from 'safebyok'
+import { Vault, VaultError, type Box, type BoxSnapshot, type RequestCleartext, type Whisper, type BoxExposure, type LifecycleHandler } from 'safebyok'
 import { MemoryVaultDB, type VaultQuery } from 'safebyok/storage'
 import { BankProvider } from '../src/bank-provider'
 import { useBank, useBankSnapshot, useBox, useBoxIsShowing, useBoxSnapshot, useBoxExposure, useBoxes, useVault, useVaultSnapshot, useWhisper } from '../src/hooks'
@@ -18,6 +18,12 @@ class BoxRefusingVaultDB extends MemoryVaultDB {
     if (this.refusing) { throw new VaultError('storage_unavailable', 'refused by the test') }
     return super.doListBoxes(asked)
   }
+}
+
+/** What useVault answers for the vault `main`: its stage, and the cause's kind once spent. */
+const ShowsHeld = () => {
+  const held = useVault('main')
+  return <span data-testid="held">{held.stage === 'spent' ? `spent ${held.cause.refusalkind}` : held.stage}</span>
 }
 
 /** Calls `hook` as it renders, and renders nothing. */
@@ -56,6 +62,31 @@ describe("useVault and useVaultSnapshot", () => {
     expect(shown('vault')).to.eq('waiting none')
   })
 
+  it("read waiting while the bank's hello is still on its way", async () => {
+    const world = TH.makeBankWorld()
+    const listing = TH.held<never>()
+    vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(listing.promise)
+    render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsHeld /></BankProvider>)
+    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(shown('vault')).to.eq('waiting none')
+    expect(screen.getByTestId('held').textContent).to.eq('waiting')
+  })
+
+  it("read spent once the bank is vacated, carrying the cause, and useVaultSnapshot null", async () => {
+    const world = TH.makeBankWorld()
+    const seeding = world.bankOn()
+    await seeding.hello()
+    await seeding.ensureVault(TH.VaultScopeGiven)
+    seeding.sweep()
+    render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsHeld /></BankProvider>)
+    await waitFor(() => { expect(screen.getByTestId('held').textContent).to.eq('present') })
+    const cause = new VaultError('identity_revoked', 'signed out')
+    await act(async () => { await TH.seenBanks[0]?.vacate({ cause }) })
+    expect(screen.getByTestId('held').textContent).to.eq('spent identity_revoked')
+    expect(shown('vault')).to.eq('spent none')
+  })
+
   it("read a vault deleted elsewhere as unborn", async () => {
     const world = TH.makeBankWorld()
     const { vault } = await TH.makeBankWithVault(world)
@@ -86,7 +117,7 @@ describe("useVault and useVaultSnapshot", () => {
     expect(hello).toHaveBeenCalledOnce()
   })
 
-  it("tell a refused vault hello to the host's onBadNews", async () => {
+  it("leave a refused vault hello to the bank, which tells the host's onLifecycle", async () => {
     const world = TH.makeBankWorld()
     const vaultDB = new BoxRefusingVaultDB()
     const seeding = world.bankOn({ vaultDB })
@@ -94,9 +125,10 @@ describe("useVault and useVaultSnapshot", () => {
     await seeding.ensureVault(TH.VaultScopeGiven)
     seeding.sweep()
     vaultDB.refusing = true
-    const news: VaultError[] = []
-    render(<BankProvider {...TH.providerPropsOf(world, { vaultDB, onBadNews: ({ news: told }) => { news.push(told) } })}><TH.ShowsVault /></BankProvider>)
-    await waitFor(() => { expect(news.map(({ refusalkind }) => refusalkind)).to.include('storage_unavailable') })
+    const helloes: VaultError[] = []
+    const onLifecycle: LifecycleHandler = (event) => { if (event.kind === 'helloed' && event.vault !== null && ! event.outcome.ok) { helloes.push(event.outcome.err) } }
+    render(<BankProvider {...TH.providerPropsOf(world, { vaultDB, onLifecycle })}><TH.ShowsVault /></BankProvider>)
+    await waitFor(() => { expect(helloes.map(({ refusalkind }) => refusalkind)).to.deep.equal(['storage_unavailable']) })
   })
 })
 

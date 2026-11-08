@@ -1,15 +1,14 @@
 import type { Modelkind } from '../helpers/consts'
 import { consistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
-import { VaultError } from '../refusals/errors'
-import { type Outcome, outcomeOf } from '../refusals/outcome'
+import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import type { Gatingkind } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
 import type { AskUser, GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BankFriend, BoxPut, BoxPutOpts, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
+import type { BankFriend, BoxPut, BoxPutOpts, EraseSite, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
@@ -171,23 +170,23 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // == [The lease]: lock, vacateLease, unlockByProof, attachLease, renewLease
 
   /** Lock the vault and its boxes before returning, and erase the row cached on this device.
-   * A refused erase panics and does not throw. A no-op on a vault discarded. */
+   * A refused erase is announced as `lease_unerased` and does not throw. A no-op on a vault discarded. */
   override lock(): this {
     if (! this.isEnabled) { return this }
-    void this.#vacateLease()
+    void this.#vacateLease('lock')
     this.listing.declineGatingAtLock(this)
     return this
   }
 
-  /** SLOPDOC: Drops any lease held and erases the row cached on this device. */
-  async #vacateLease(onRefused: (refusal: VaultError) => unknown = (refusal) => this.#bankFriend.panic({ refusal, vault: this })): Promise<void> {
+  /** SLOPDOC: Drops any lease held and erases the row cached on this device, announcing a refused erase at `where`. */
+  async #vacateLease(where: Exclude<EraseSite, 'outdated'>): Promise<void> {
     // The lease goes first, so a refused erase leaves none; the erase starts before any await, landing in call order.
     const held = this.#lease
     this.#lease = null
     const vacating = held?.tryVacate() ?? Lease.tryForget(this.#leaseFriend())
     this.settle()
     const vacated = await vacating
-    if (! vacated.ok) { await onRefused(vacated.err) }
+    if (! vacated.ok) { this.#bankFriend.announce({ kind: 'lease_unerased', refusal: vacated.err, vault: this, where }) }
   }
 
   /** The lease `proved` earns, attached. A lock landing during the unlock does not hold: the proof says this user may have the vault unlocked. */
@@ -251,6 +250,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       tryCacheLease:   (record) => deviceDB.tryStow(record),
       tryForgetLease:  () => deviceDB.tryForget(asked),
       tellBadNews:     (badnews) => { this.#bankFriend.tellBadNews(badnews) },
+      tellUnerased:    (refusal) => { this.#bankFriend.announce({ kind: 'lease_unerased', refusal, vault: this, where: 'outdated' }) },
     }
   }
 
@@ -277,14 +277,21 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   takeWorld(world: unknown): void { this.receive(SX.vaultRow.refusingAs('damaged_row').parse(world)) }
   // --
 
-  // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, tryDelDamagedBox, each with its try form
+  // == [Box verbs]: hello, bringUp, getBox, fetchBox, putBox, delBox, tryDelDamagedBox, each with its try form
 
   /** List this vault's boxes and start their watch. */
   async hello(): Promise<this> {
     this.demandEnabled()
+    const hello = await outcomeOf(() => this.#bringUp())
+    this.#bankFriend.announce({ kind: 'helloed', outcome: hello, vault: this })
+    valOf(hello)
+    return this
+  }
+
+  /** The boxes' watch started and their listing fetched. */
+  async #bringUp(): Promise<void> {
     await this.boxListing.hello()
     await this.boxListing.list()
-    return this
   }
 
   tryHello(): Promise<Outcome<this>> { return outcomeOf(() => this.hello()) }
@@ -385,11 +392,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // == [Protected, overriding Storable's]: adopt, sweepContents, vacateContents, isFullRecord, lifeTokPathOf, makeSnapshot
 
   /** Take in `central`. A tombstone locks the vault, erases the cached row and vacates the boxes, the vault keeping its slot.
-   * A refused erase is bad news, and the tombstone stands. */
+   * A refused erase is announced as `lease_unerased`, and the tombstone stands. */
   protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {
     super.adopt(central)
     if (this.isPresent) { return }
-    void this.#vacateLease((refusal) => { this.#bankFriend.tellBadNews([refusal]) })
+    void this.#vacateLease('tombstone')
     this.#boxListing?.vacate()
   }
 
@@ -403,7 +410,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Locked, the row cached erased, and the boxes vacated. */
   protected override vacateContents(): void {
-    void this.#vacateLease()
+    void this.#vacateLease('vacate')
     this.#boxListing?.vacate()
     this.listing.declineGatingAtDiscard(this)
   }

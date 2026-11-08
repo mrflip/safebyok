@@ -51,9 +51,10 @@ for `Gating.#askHost` to refuse as `requestCleartextThrew`. That wrap travels in
 vault listing, which holds it protected and hands it to each vault, which holds it private, and it reaches a gating only
 in its launch args; no public member of a bank or a vault answers it. A
 disabled bank asks no one: every `Gating.launch` follows, in the same tick, a check that its vault or vault listing is
-enabled, and a sweep or a vacate disables both before it returns. `onPanic` is wrapped there too, by `guardOnPanic`; it hears a
-`Panic`, a bag of the refusal, the live `Bank`, and the live `Vault` it concerns, if one, and no secret material: neither
-instance hands out a key (G9). The `DeviceDB` (`storage/device-db.ts`, `storage/memory-device-db.ts`) stores the leaseKey
+enabled, and a sweep or a vacate disables both before it returns. `onLifecycle` is wrapped there too, by `guardOnLifecycle`; it hears a
+`BankEvent`, a bag of what happened (a refusal, an outcome or a count), the live `Bank`, and the live `Vault` it concerns, if one,
+and no secret material: neither instance hands out a key (G9). A revoked identity vacates the bank in the core, whatever that
+handler does. The `DeviceDB` (`storage/device-db.ts`, `storage/memory-device-db.ts`) stores the leaseKey
 opaque, and what a store throws is replaced at `storeFailed` (`refusals/throwers.ts`, from the catch in each `DeviceDB` verb),
 which keeps nothing of it (G8).
 

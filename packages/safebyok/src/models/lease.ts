@@ -210,9 +210,9 @@ export class Lease implements LeaseStamp {
 /** True once a row was proved longer ago than the autolock duration: due for locking, as `bank.autolock` judges it. */
 const isPastAutolock = ({ proved_at }: LeaseStamp, { leaseMillis }: LeaseFriend): boolean => nowMillis() - proved_at > leaseMillis
 
-/** Forget a cached record no use to this vault, warning of a refusal: tried once, never again (notes/wontfix.md). */
+/** Forget a cached record no use to this vault, telling of a refusal: tried once, never again (notes/wontfix.md). */
 const forgetOutdated = async (friend: LeaseFriend): Promise<void> => {
   const del = await friend.tryForgetLease()
-  if (! del.ok) { friend.logger.warn("This device's lease could not be erased: the next lease is written over it.", { call: 'Lease.buildFromCache', refusalkind: del.err.refusalkind }) }
+  if (! del.ok) { friend.tellUnerased(del.err) }
 }
 // --
