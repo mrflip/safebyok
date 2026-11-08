@@ -52,6 +52,7 @@ export type FakeLeaseFriend = LeaseFriend & {
   tryCacheLease:   Mock<LeaseFriend['tryCacheLease']>
   tryForgetLease:  Mock<LeaseFriend['tryForgetLease']>
   tellBadNews:     Mock<LeaseFriend['tellBadNews']>
+  tellUnerased:    Mock<LeaseFriend['tellUnerased']>
   /** The record the slot holds, null for none. Set it to seed one, whatever it is. */
   cached:          unknown
   /** Every call the logger heard, oldest first. */
@@ -70,6 +71,7 @@ export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp & Pick<LeaseFrie
     cached:          null,
     lock:            vi.fn<() => void>(),
     tellBadNews:     vi.fn(),
+    tellUnerased:    vi.fn(),
     tryPeekLease:    vi.fn(() => Promise.resolve(good(friend.cached))),
     tryCacheLease:   vi.fn((record: LeaseRecord) => {
       friend.cached = record

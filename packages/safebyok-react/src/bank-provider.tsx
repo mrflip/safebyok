@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
-import { Bank, DefaultOnBadNews, DefaultOnPanic, tellBadNewsTo, type Vault, type VaultError } from 'safebyok'
+import { Bank, DefaultOnBadNews, DefaultOnLifecycle, tellBadNewsTo, type Vault, type VaultError } from 'safebyok'
 import { GatingModal } from './gating-modal'
 import { useDeviceId, useGatingDialog, useWarnOfIgnoredOpts } from './provider-hooks'
 import { providerProps, type BankProviderProps, type Handlers, type HeldBankOpts } from './shapes/shapes-provider'
@@ -46,7 +46,7 @@ const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Han
     if (user_id === null || device_id === null) { return }
     const bank = Bank.make({
       ...madeFrom, user_id, device_id,
-      onPanic:          (panic) => latest().onPanic(panic),
+      onLifecycle:      (event) => latest().onLifecycle(event),
       onBadNews:        (badnews) => latest().onBadNews(badnews),
       requestCleartext: (gating) => latest().requestCleartext(gating),
     })
@@ -57,8 +57,8 @@ const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Han
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the bank lives only between this effect and its cleanup, and render must hand it down
     setContextValue({ bank, helloedVaults: new WeakSet<Vault>(), tellBadNews })
     onMade(bank)
-    // A refused hello lands in the bank's snapshot too. One that a sweep crossed is no news: the bank has ended.
-    void bank.tryHello().then((said) => { if (! said.ok) { tellBadNews([said.err]) } })
+    // The bank tells onLifecycle of the hello and its snapshot of a refusal.
+    void bank.tryHello()
     return () => {
       // `sweep()` settles the open gating, and `onSwept` closes the dialog over it.
       bank.sweep()
@@ -101,8 +101,8 @@ export const BankProvider = (props: BankProviderProps) => {
 /** Hold one user's bank once the device is named, and show the dialog for its gatings. */
 const UserBankProvider = (props: BankProviderProps & { device_id: string | null, onMade: (bank: Bank) => void }) => {
   const dialog = useGatingDialog()
-  const { passphraseUsername, passphraseAdvice, passkeyRpId, children, device_id, onMade, onPanic = DefaultOnPanic, onBadNews = DefaultOnBadNews, requestCleartext = dialog.ask, ...bankish } = props
-  const contextValue = useHeldBank(bankish, device_id, { onPanic, onBadNews, requestCleartext }, dialog.endAny, onMade)
+  const { passphraseUsername, passphraseAdvice, passkeyRpId, children, device_id, onMade, onLifecycle = DefaultOnLifecycle, onBadNews = DefaultOnBadNews, requestCleartext = dialog.ask, ...bankish } = props
+  const contextValue = useHeldBank(bankish, device_id, { onLifecycle, onBadNews, requestCleartext }, dialog.endAny, onMade)
   const { showing } = dialog
 
   return (

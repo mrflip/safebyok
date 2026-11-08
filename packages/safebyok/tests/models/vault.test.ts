@@ -77,6 +77,7 @@ describe("VaultListing.build of a record, and its constructor", () => {
     const err = TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, deviceDB: duck as never }, opts))
     expect(err.message).to.include(Phrases.DeviceDBExpected)
     TH.expectSyncRefusal(() => new VaultListing(fakeBank, { ...opts, bankFriend: { ...opts.bankFriend, panic: vi.fn() as never } }))
+    TH.expectSyncRefusal(() => new VaultListing(fakeBank, { ...opts, bankFriend: { ...opts.bankFriend, announce: vi.fn() as never } }))
     TH.expectSyncRefusal(() => new VaultListing(fakeBank, { ...opts, bankFriend: { ...opts.bankFriend, askUser: vi.fn() as never } }))
     TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, logger: TH.quietLogger }, opts))
     TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, keyDeriver: TH.testDeriver as never }, opts))

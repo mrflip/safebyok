@@ -13,6 +13,7 @@ import type { Listing } from '../models/listing'
 import type { Storable } from '../models/storable'
 import type { Vault } from '../models/vault'
 import type { DeviceDB } from '../storage/device-db'
+import type { Outcome } from '../refusals/outcome'
 import { type Answer, type VaultDB, VaultDBVerbnames } from '../storage/vault-db'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
@@ -140,8 +141,10 @@ export type ListingWorld = Pick<Bank | Vault, 'isLocked' | 'ensureTimely' | 'tak
 
 /** The bank's private calls, handed down to each listing and vault as it is made. */
 export interface BankFriend {
-  /** Panic through the bank, which names itself to the host. */
+  /** Vacate the bank for a revoked identity. */
   readonly panic:       BankPanic
+  /** Tell the host's `onLifecycle` what happened, through the bank, which names itself. Never throws. */
+  readonly announce:    BankAnnounce
   /** Tell the host's `onBadNews` each news no caller waits on. Never throws. */
   readonly tellBadNews: (badnews: readonly VaultError[]) => void
   /** Show the host's dialog, wrapped by `guardRequestCleartext`. */
@@ -171,6 +174,7 @@ export const bankPanic = Checker(({ custom }) => custom<BankPanic>(isGuarded, Ph
 /** The check of the bank's private calls as a listing or a vault is handed them, each by the brand the bank gave it. */
 export const bankFriend = objCheck(({ custom }) => ({
   panic:       bankPanic,
+  announce:    custom<BankAnnounce>(isGuarded, Phrases.GuardedExpected),
   tellBadNews: custom<BankFriend['tellBadNews']>(isGuarded, Phrases.GuardedExpected),
   askUser:     custom<AskUser>(isGuarded, Phrases.GuardedExpected),
 }), 'bad_option')
@@ -341,7 +345,7 @@ export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 's
 
 // --
 
-// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, Panic, PanicHandler, GuardedPanicHandler, BankPanic, BankStage, BankSnapshot
+// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, EraseSite, BankAnnouncement, BankEvent, LifecycleHandler, GuardedLifecycleHandler, BankAnnounce, BankPanic, BankStage, BankSnapshot
 
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
   positiveMinutes: union([num.positive(), lit(Infinity)], Phrases.PositiveMinutesShape),
@@ -363,7 +367,7 @@ export const bankOpts = objCheck(({ fn, custom, applabel, user_id, device_id }) 
   vaultRefreshMinutes: refreshMinutes.optional(),
   boxRefreshMinutes:   refreshMinutes.optional(),
   onBadNews:           fn<BadNewsHandler>().optional(),
-  onPanic:             fn<PanicHandler>().optional(),
+  onLifecycle:         fn<LifecycleHandler>().optional(),
 }), { refusalkind: 'bad_option' }, [CX])
 
 /** What a host hands `Bank.make`: who the bank is for, where it stores, and the functions it calls back. */
@@ -394,8 +398,8 @@ export interface BankOpts {
   boxRefreshMinutes?:   number | undefined
   /** Hears each refusal no caller waits on while the bank is enabled and in its vacate's erase; else `DefaultOnBadNews`, the bank's logger. */
   onBadNews?:           BadNewsHandler | undefined
-  /** Hears what you must act on for safety, and no secret material, while the bank is enabled and in its vacate's erase; `DefaultOnPanic` when left out. */
-  onPanic?:             PanicHandler | undefined
+  /** Hears what happened in the bank's life, and no secret material, while the bank is enabled and in its vacate's erase; `DefaultOnLifecycle` when left out. */
+  onLifecycle?:         LifecycleHandler | undefined
 }
 
 true satisfies Z.core.util.AssertEqual<BankOpts, Z.input<typeof bankOpts>>
@@ -427,21 +431,29 @@ export const tellBadNewsToInput = objCheck(({ fn, custom, arr }) => ({
   badnews:   arr(custom<VaultError>(isVaultError, Phrases.VaultErrorExpected)),
 }), 'bad_option')
 
-/** What `onPanic` hears: a refusal you must act on for safety, the bank it reached, and the vault it concerns, if one. */
-export interface Panic {
-  readonly refusal: VaultError
-  readonly bank:    Bank
-  readonly vault?:  Vault | undefined
-}
+/** Where a cached lease outlived its erase: a vault's lock, tombstone or vacate, the bank's vacate, or a row of another epoch or life met at an unlock. */
+export type EraseSite = 'lock' | 'tombstone' | 'vacate' | 'outdated'
 
-/** `Bank.make`'s `onPanic`: hears what you must act on for safety, as a revoked identity or a cached lease that outlived its erase. */
-export type PanicHandler = (panic: Panic) => unknown
+/** What a bank's listings and vaults announce through it: a {@link BankEvent} before the bank names itself. */
+export type BankAnnouncement =
+  | { readonly kind: 'lease_unerased', readonly refusal: VaultError, readonly vault: Vault | null, readonly where: EraseSite }
+  | { readonly kind: 'vacated', readonly cause: VaultError, readonly unerased: number }
+  | { readonly kind: 'helloed', readonly outcome: Outcome<void>, readonly vault: Vault | null }
 
-/** `onPanic` as a bank keeps it, wrapped by `guardOnPanic`. Never throws. */
-export type GuardedPanicHandler = (panic: Panic) => Promise<void>
+/** What `onLifecycle` hears: what happened in the bank's life, told by its `kind`, and the bank it happened to. */
+export type BankEvent = { readonly bank: Bank } & BankAnnouncement
 
-/** How a vault or a listing panics through its bank, which names itself to the host: handed to each as it is made. Never throws. */
-export type BankPanic = (panic: Omit<Panic, 'bank'>) => Promise<void>
+/** `Bank.make`'s `onLifecycle`: hears what happened in the bank's life, as a hello, a vacate or a cached lease that outlived its erase. */
+export type LifecycleHandler = (event: BankEvent) => unknown
+
+/** `onLifecycle` as a bank keeps it, wrapped by `guardOnLifecycle`. Never throws. */
+export type GuardedLifecycleHandler = (event: BankEvent) => Promise<void>
+
+/** How a vault or a listing tells the host's `onLifecycle` through its bank: handed to each as it is made. Never throws. */
+export type BankAnnounce = (announcement: BankAnnouncement) => void
+
+/** How a listing vacates its bank for a revoked identity: handed to each as it is made. Never throws. */
+export type BankPanic = (refusal: VaultError) => void
 
 /** `made` until a `hello` answers; `ready` once one lands; `refused` once one refuses or the bank is swept or vacated, the snapshot's `err` saying why. */
 export type BankStage = 'made' | 'ready' | 'refused'

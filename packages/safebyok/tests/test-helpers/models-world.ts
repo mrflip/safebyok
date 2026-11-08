@@ -29,7 +29,7 @@ import * as CX from '../../src/shapes/shapes-core'
 import type { Boxscope } from '../../src/shapes/shapes-core'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
-import { type BankFriend, type BankPanic, type BoxDna, type BoxWorld, type Fetched, type BoxListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
+import { type BankAnnouncement, type BankFriend, type BoxDna, type BoxWorld, type Fetched, type BoxListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
 import { type BoxQuery, type BoxRow, type BoxTombstone, type DelOpts, type IfAbsentOpts, type PutOpts, type ReqParams, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -145,7 +145,9 @@ export type ModelsWorld = {
   badnews: readonly VaultError[]
   /** The refusals the listing panicked with, oldest first. A live array. */
   panics:  readonly VaultError[]
-  /** The bank's private calls, as the listing is handed them: its panic logs each refusal in `panics`, its bad news in `badnews`. */
+  /** What the listing announced, oldest first. A live array. */
+  announced: readonly BankAnnouncement[]
+  /** The bank's private calls, as the listing is handed them: its panic logs each refusal in `panics`, its announcements in `announced`, its bad news in `badnews`. */
   bankFriend: BankFriend
   /** The vaultDB's own box rows, by boxlabel: the one vault's boxes. */
   stored: Map<string, unknown>
@@ -290,6 +292,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const calls: ModelsCall[] = []
   const badnews: VaultError[] = []
   const panics: VaultError[] = []
+  const announced: BankAnnouncement[] = []
   const watches: ModelsWatch[] = []
   const vaultDB = new TestableVaultDB(calls, watches)
   vaultDB._cheat_vaultRowsOf(WorldVault.scope).set(WorldVault.scope.vaultlabel, worldVaultRow())
@@ -354,15 +357,16 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   }
 
   return {
-    world, vaultDB, calls, badnews, panics, stored, watches,
+    world, vaultDB, calls, badnews, panics, announced, stored, watches,
     worldWith: (overrides) => ({ ...world, get isLocked() { return isLocked }, ...overrides }),
     bankFriend: {
-      panic:       brandGuarded(({ refusal }: Parameters<BankPanic>[0]) => { panics.push(refusal); return Promise.resolve() }),
+      panic:       brandGuarded((refusal: VaultError) => { panics.push(refusal) }),
+      announce:    brandGuarded((announcement: BankAnnouncement) => { announced.push(announcement) }),
       tellBadNews: brandGuarded((told: readonly VaultError[]) => { badnews.push(...told) }),
       askUser:     guardRequestCleartext(() => undefined),
     },
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
-    clearCalls: () => { calls.length = 0; badnews.length = 0; panics.length = 0 },
+    clearCalls: () => { calls.length = 0; badnews.length = 0; panics.length = 0; announced.length = 0 },
 
     now:      clockNow,
     setNow,

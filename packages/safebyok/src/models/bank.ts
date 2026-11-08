@@ -13,7 +13,7 @@ import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bank
 import type { LeaseDated } from '../shapes/shapes-storage'
 import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BadNewsHandler, BankOpts, BankSnapshot, BankStage, GuardedPanicHandler, Panic, PanicHandler, VacateStory } from '../shapes/shapes-vaultish'
+import type { BadNewsHandler, BankAnnouncement, BankEvent, BankOpts, BankSnapshot, BankStage, GuardedLifecycleHandler, LifecycleHandler, VacateStory } from '../shapes/shapes-vaultish'
 import type { DeviceDB } from '../storage/device-db'
 import { bankDisabled, helloFirst, insecureContext } from '../refusals/throwers'
 import { DefaultLeaseMillis, type Vault } from './vault'
@@ -40,11 +40,14 @@ export class Bank {
   /** The refresh horizon of each vault's boxes. */
   readonly boxRefreshMillis: number
 
-  /** The host's `onPanic`, guarded, and its `onBadNews`, called while the bank is enabled and by its vacate's scrub. */
+  /** The host's `onLifecycle`, guarded, and its `onBadNews`, called while the bank is enabled and by its vacate's scrub. */
   readonly #hostHandlers: Handlers
 
   /** Tell bad news no caller waits on to the host, its every listing and box coming straight here: the friend they tell it through. */
   readonly #tellBadNews = brandGuarded((badnews: readonly VaultError[]): void => { tellBadNewsTo(this.#handlers.onBadNews, this, badnews) })
+  // Not awaited: an announcement is news of what happened, and nothing waits on the host's answer.
+  /** Tell the host's `onLifecycle` what happened, its every listing and vault coming straight here: the friend they announce through. */
+  readonly #announce = brandGuarded((announcement: BankAnnouncement): void => { void this.#handlers.onLifecycle({ ...announcement, bank: this }) })
   readonly #listeners = new Set<() => void>()
   readonly #vaultListing: VaultListing
   /** Why a sweep or a vacate disabled the bank, its snapshot's refusal from then on; null while it is enabled. */
@@ -84,15 +87,16 @@ export class Bank {
 
   constructor(opts: BankOpts) {
     checkSecureContext()
-    const { applabel, user_id, device_id, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews = DefaultOnBadNews, onPanic = DefaultOnPanic } = VX.bankOpts.parse(opts)
+    const { applabel, user_id, device_id, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews = DefaultOnBadNews, onLifecycle = DefaultOnLifecycle } = VX.bankOpts.parse(opts)
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope)
     this.device_id = device_id
     this.keyDeriver = guardKeyDeriver(keyDeriver)
     this.deviceDB = deviceDB
     // A disabled bank calls none of the host's functions, but in its vacate's scrub: the page may belong to the next user by then.
-    this.#hostHandlers = { onPanic: guardOnPanic(onPanic), onBadNews }
-    const panic = brandGuarded((told: Omit<Panic, 'bank'>) => this.#handlers.onPanic({ ...told, bank: this }))
+    this.#hostHandlers = { onLifecycle: guardOnLifecycle(onLifecycle), onBadNews }
+    // A revoked identity vacates the bank whatever the host's onLifecycle does; the host hears of it as the scrub's `vacated`.
+    const panic = brandGuarded((refusal: VaultError): void => { void this.vacate({ cause: refusal }) })
     // A disabled bank asks no one: every Gating.launch follows an enabled check in the same tick.
     const askUser = guardRequestCleartext(requestCleartext)
     this.logger = parseLogger(logger)
@@ -100,7 +104,7 @@ export class Bank {
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.boxRefreshMillis = millisOf(boxRefreshMinutes, DefaultRefreshMillis)
     const maxMillisSinceRefresh = millisOf(vaultRefreshMinutes, DefaultRefreshMillis)
-    this.#vaultListing = new VaultListing(this, { vaultDB, maxMillisSinceRefresh, bankFriend: { panic, tellBadNews: this.#tellBadNews, askUser } })
+    this.#vaultListing = new VaultListing(this, { vaultDB, maxMillisSinceRefresh, bankFriend: { panic, announce: this.#announce, tellBadNews: this.#tellBadNews, askUser } })
     this.#vaultListing.subscribe(this.#remakeSnapshot)
     this.#snapshot = this.#makeSnapshot()
     if (isTestDeriver(keyDeriver)) { this.logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
@@ -131,6 +135,7 @@ export class Bank {
     const hello = await outcomeOf(() => this.#bringUp())
     this.#lastHello = hello
     this.#remakeSnapshot()
+    this.#announce({ kind: 'helloed', outcome: hello, vault: null })
     valOf(hello)
   }
 
@@ -145,7 +150,7 @@ export class Bank {
   }
   // --
 
-  // == [Ending]: autolock, lock, vacate, sweep, letGo, listOwnLeases, scrub, eraseOwnLeases, forgetOwnBank, panicIfRefused
+  // == [Ending]: autolock, lock, vacate, sweep, letGo, listOwnLeases, scrub, eraseOwnLeases, forgetOwnBank, tellHost
 
   /** Lock each listed vault with a cached lease past autolock, erasing it. Call it after `hello` and on your own timer.
    * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.buildFromCache` leaves such a row for it.
@@ -173,7 +178,7 @@ export class Bank {
     this.#letGo(cause, () => { this.#vaultListing.vacate() })
     // The scrub alone holds the host's handlers past the disable: a lease that outlives sign-out is the one the host most needs to hear of.
     // A vacate after a sweep still scrubs, as sign-out may come after the page's cleanup.
-    this.#vacating ??= this.#scrub()
+    this.#vacating ??= this.#scrub(cause)
     return this.#vacating
   }
 
@@ -198,29 +203,37 @@ export class Bank {
   }
 
   // A fresh device holds no bank row: the next bank of this scope gets a new device_id.
-  /** A vacate's scrub of this device: every lease row of this bank, then its bank row. */
-  async #scrub(): Promise<void> {
-    await this.#eraseOwnLeases()
+  /** A vacate's scrub of this device: every lease row of this bank, then its bank row, then `vacated` told. */
+  async #scrub(cause: VaultError): Promise<void> {
+    const unerased = await this.#eraseOwnLeases()
     await this.#forgetOwnBank()
+    this.#tellHost({ kind: 'vacated', cause, unerased })
   }
 
   /** A vacate's erase of every row of this bank, listed or not, as a fresh page told 'identity_revoked' has listed
-   * none.
+   * none; answers how many it could not erase.
    */
-  async #eraseOwnLeases(): Promise<void> {
-    const { onBadNews } = this.#hostHandlers
+  async #eraseOwnLeases(): Promise<number> {
     const listed = await this.#listOwnLeases()
-    if (! listed.ok) { tellBadNewsTo(onBadNews, this, [listed.err]); return }
-    await Promise.all(listed.val.map(async (row) => { this.#panicIfRefused(await this.deviceDB.tryForget(row)) }))
+    if (! listed.ok) { tellBadNewsTo(this.#hostHandlers.onBadNews, this, [listed.err]); return 0 }
+    const erased = await Promise.all(listed.val.map(async (row) => {
+      const forgot = await this.deviceDB.tryForget(row)
+      if (! forgot.ok) { this.#tellHost({ kind: 'lease_unerased', refusal: forgot.err, vault: null, where: 'vacate' }) }
+      return forgot.ok
+    }))
+    return erased.filter((isErased) => ! isErased).length
   }
 
-  /** A vacate's erase of this bank's row in the deviceDB. */
-  async #forgetOwnBank(): Promise<void> { this.#panicIfRefused(await this.deviceDB.tryForgetBank(this.scope)) }
+  /** A vacate's erase of this bank's row in the deviceDB, a refusal told as bad news. */
+  async #forgetOwnBank(): Promise<void> {
+    const forgot = await this.deviceDB.tryForgetBank(this.scope)
+    if (! forgot.ok) { tellBadNewsTo(this.#hostHandlers.onBadNews, this, [forgot.err]) }
+  }
 
-  /** The scrub's report of a refused erase, to the host's own `onPanic`. */
-  #panicIfRefused(erased: Outcome<void>): void {
-    // Not awaited: a host's onPanic that awaits bank.vacate() is handed this scrub, and each would wait on the other.
-    if (! erased.ok) { void this.#hostHandlers.onPanic({ refusal: erased.err, bank: this }) }
+  /** The scrub's word to the host's own `onLifecycle`, past the disable. */
+  #tellHost(announcement: BankAnnouncement): void {
+    // Not awaited: a host's onLifecycle that awaits bank.vacate() is handed this scrub, and each would wait on the other.
+    void this.#hostHandlers.onLifecycle({ ...announcement, bank: this })
   }
   // --
 
@@ -294,11 +307,11 @@ export class Bank {
   get modelkind(): 'bank' { return 'bank' satisfies Modelkind }
 }
 
-// == [Host functions]: HostChecks, DefaultOnBadNews, tellBadNewsTo, reportPanic, DefaultOnPanic, guardRequestCleartext, guardOnPanic, Handlers, DefaultHandlers
+// == [Host functions]: HostChecks, DefaultOnBadNews, tellBadNewsTo, reportAtError, heedUnerased, DefaultOnLifecycle, guardRequestCleartext, guardOnLifecycle, Handlers, DefaultHandlers
 
 const HostChecks = Checkers('bad_option', ({ fn }) => ({
   requestCleartext: fn<RequestCleartext>(),
-  onPanic:          fn<PanicHandler>(),
+  onLifecycle:      fn<LifecycleHandler>(),
 }))
 
 /** The `onBadNews` a bank has when given none: each news to the bank's logger. */
@@ -321,20 +334,40 @@ export const tellBadNewsTo = (onBadNews: BadNewsHandler, bank: Bank, badnews: re
   }
 }
 
-// The logger too, as a platform with no reportError (Node, SSR) would hear nothing of a panic.
+// The logger too, as a platform with no reportError (Node, SSR) would hear nothing of it.
 /** `refusal` to `bank`'s logger at error, and to the platform. */
-const reportPanic = (refusal: VaultError, bank: Bank): void => {
-  bank.logger.error(refusal.message, { call: 'Bank.onPanic', refusalkind: refusal.refusalkind })
+const reportAtError = (refusal: VaultError, bank: Bank): void => {
+  bank.logger.error(refusal.message, { call: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
   reportToPlatform(refusal)
 }
 
-/** The `onPanic` a bank has when given none: the refusal to the bank's logger and the platform, then the bank vacated on 'identity_revoked', else the vault, if one. */
-export const DefaultOnPanic: PanicHandler = ({ refusal, bank, vault }) => {
-  reportPanic(refusal, bank)
-  if (isVaultError(refusal, 'identity_revoked')) {
-    void bank.vacate({ cause: refusal })
-  } else {
-    vault?.vacate()
+// A lock or a vacate meant the lease gone; a tombstone's erase and an outdated row's are tried again by the next lease cached.
+/** The default's answer to a cached lease that outlived its erase. */
+const heedUnerased = ({ refusal, vault, where, bank }: Extract<BankEvent, { kind: 'lease_unerased' }>): void => {
+  if (where === 'tombstone' || where === 'outdated') {
+    bank.logger.warn(refusal.message, { call: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
+    return
+  }
+  reportAtError(refusal, bank)
+  vault?.vacate()
+}
+
+/** The `onLifecycle` a bank has when given none: a lease that outlived a lock or a vacate, and a vacate with a cause, to the logger at error and the platform, the vault vacated; a hello refused but by the bank's end to the logger. */
+export const DefaultOnLifecycle: LifecycleHandler = (event) => {
+  switch (event.kind) {
+  case 'lease_unerased': {
+    heedUnerased(event)
+    break
+  }
+  case 'vacated': {
+    if (! isVaultError(event.cause, 'disabled')) { reportAtError(event.cause, event.bank) }
+    break
+  }
+  case 'helloed': {
+    const { outcome, bank } = event
+    if (! outcome.ok && outcome.err.refusalkind !== 'disabled') { bank.logger.warn(outcome.err.message, { call: 'Bank.onLifecycle', refusalkind: outcome.err.refusalkind }) }
+    break
+  }
   }
 }
 
@@ -352,27 +385,27 @@ export const guardRequestCleartext = (requestCleartext: RequestCleartext): AskUs
   })
 }
 
-/** `onPanic` held to its contract: the one way the core tells the host what it must act on for safety. */
-export const guardOnPanic = (onPanic: PanicHandler): GuardedPanicHandler => {
-  const host = HostChecks.onPanic.parse(onPanic, { where: 'onPanic' })
-  return brandGuarded(async (panic: Panic): Promise<void> => {
+/** `onLifecycle` held to its contract: the one way the core tells the host what happened in the bank's life. */
+export const guardOnLifecycle = (onLifecycle: LifecycleHandler): GuardedLifecycleHandler => {
+  const host = HostChecks.onLifecycle.parse(onLifecycle, { where: 'onLifecycle' })
+  return brandGuarded(async (event: BankEvent): Promise<void> => {
     try {
-      await host(panic)
+      await host(event)
     } catch (err) {
       reportToPlatform(err)
     }
   })
 }
 
-/** What a bank tells of a panic and of bad news: the host's `onPanic`, guarded, and its `onBadNews`, or what a disabled bank reports. */
+/** What a bank tells of its life and of bad news: the host's `onLifecycle`, guarded, and its `onBadNews`, or the defaults a disabled bank tells. */
 interface Handlers {
-  readonly onPanic:   GuardedPanicHandler
-  readonly onBadNews: BadNewsHandler
+  readonly onLifecycle: GuardedLifecycleHandler
+  readonly onBadNews:   BadNewsHandler
 }
 
-// Not DefaultOnPanic: past the disable it would vacate nothing, or start a scrub on a swept bank.
-/** A disabled bank's reports: each panic's refusal to the logger and the platform, and bad news to `DefaultOnBadNews`. */
-const DefaultHandlers: Handlers = { onPanic: guardOnPanic(({ refusal, bank }) => { reportPanic(refusal, bank) }), onBadNews: DefaultOnBadNews }
+// The defaults vacate only a vault, which a disabled bank has already let go: past the disable they only report.
+/** A disabled bank's reports: `DefaultOnLifecycle` and `DefaultOnBadNews`. */
+const DefaultHandlers: Handlers = { onLifecycle: guardOnLifecycle(DefaultOnLifecycle), onBadNews: DefaultOnBadNews }
 // --
 
 // == [Helpers]: millisOf, stageOf, checkSecureContext
