@@ -75,7 +75,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Construction]: constructor, launchBirth
 
-  /** The vault `listing` holds for `central`, panicking through `panic`, the bank's. */
+  /** A vault as its listing holds it. */
   constructor(world: VaultWorld, listing: VaultListing, central: Fetched<VaultRecord, VaultSparse>, panic: BankPanic) {
     super(world, listing, central)
     this.#bankPanic = VX.bankPanic.parse(panic)
@@ -168,7 +168,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
   // --
 
-  // == [The lease]: lockState, lock, vacateLease, panic, unlockByProof, attachLease, renewLease
+  // == [The lease]: lockState, lock, vacateLease, unlockByProof, attachLease, renewLease
 
   lockState(): LockState { return this.#lease === null ? 'locked' : 'unlocked' }
 
@@ -182,7 +182,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   /** SLOPDOC: Drops any lease held and erases the row cached on this device. */
-  async #vacateLease(onRefused: (refusal: VaultError) => unknown = (refusal) => this.#panic(refusal)): Promise<void> {
+  async #vacateLease(onRefused: (refusal: VaultError) => unknown = (refusal) => this.#bankPanic({ refusal, vault: this })): Promise<void> {
     // The lease goes first, so a refused erase leaves none; the erase starts before any await, landing in call order.
     const held = this.#lease
     this.#lease = null
@@ -190,11 +190,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.settle()
     const vacated = await vacating
     if (! vacated.ok) { await onRefused(vacated.err) }
-  }
-
-  /** Tell the host that a cached lease survived a lock. */
-  async #panic(refusal: VaultError): Promise<void> {
-    await this.#bankPanic({ refusal, vault: this })
   }
 
   /** The lease `proved` earns, attached. A lock landing during the unlock does not hold: the proof says this user may have the vault unlocked. */
@@ -285,7 +280,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Tell bad news of this vault's boxes where its own goes. */
   tellBadNews(badnews: readonly VaultError[]): void { this.world.tellBadNews(badnews) }
-
   // --
 
   // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, tryDelDamagedBox, each with its try form

@@ -1,7 +1,7 @@
 /** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
 import { nowMillis } from '../helpers/clock'
-import { type Modelkind, brandGuarded } from '../helpers/consts'
+import type { Modelkind } from '../helpers/consts'
 import { makeLifeTok } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
@@ -10,7 +10,7 @@ import { type VaultScope, vaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import { type DelTombstone, type Fetched, type ListingOpts, type Panic, type SlotFate, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
+import { type DelTombstone, type Fetched, type ListingOpts, type SlotFate, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import type { Answer, Notice } from '../storage/vault-db'
 import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
@@ -46,9 +46,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** The listing of `vault`'s boxes, its watch not started. */
   boxListingOf(vault: Vault): BoxListing {
-    // A box listing's world is its vault only as a Pick: the vault is named here, where it is one.
-    const panic = brandGuarded(({ refusal }: Omit<Panic, 'bank'>) => this.panic({ refusal, vault }))
-    return new BoxListing(vault, { vaultDB: this.vaultDB, maxMillisSinceRefresh: this.world.boxRefreshMillis, panic })
+    return new BoxListing(vault, { vaultDB: this.vaultDB, maxMillisSinceRefresh: this.world.boxRefreshMillis, panic: this.panic })
   }
 
   /** The scope of `duck`, held to this bank: no listing answers for another's. */

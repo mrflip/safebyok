@@ -372,7 +372,7 @@ export interface BankOpts {
   boxRefreshMinutes?:   number | undefined
   /** Hears each refusal no caller waits on while the bank is enabled and in its vacate's erase; else `DefaultOnBadNews`, the bank's logger. */
   onBadNews?:           BadNewsHandler | undefined
-  /** Hears what you must act on for safety, and no secret material, while the bank is enabled and in its vacate's erase; else `DefaultOnPanic`. */
+  /** Hears what you must act on for safety, and no secret material, while the bank is enabled and in its vacate's erase; `DefaultOnPanic` when left out. */
   onPanic?:             PanicHandler | undefined
 }
 
@@ -419,7 +419,7 @@ export type BankStage = 'made' | 'ready' | 'refused'
 
 /** A bank as a host renders it: its scope, how far its `hello` got, and its vaults. */
 export interface BankSnapshot extends BankScope {
-  /** How far the bank's `hello` got: `made`, `ready` or `refused`. */
+  /** How far the bank's `hello` got, `made`, `ready` or `refused`, and `refused` from a sweep or a vacate on. */
   readonly stage:     BankStage
   /** Why the last `hello` refused, or why the bank is disabled, or null. */
   readonly err:       VaultError | null

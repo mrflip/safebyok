@@ -23,7 +23,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The refresh horizon of each thing made here. */
   readonly maxMillisSinceRefresh: number
   protected readonly vaultDB: VaultDB
-  /** The bank's panic, as this listing was handed it: a box listing's names the vault the boxes lie in. */
+  /** The bank's panic, as this listing was handed it. */
   protected readonly panic: BankPanic
 
   readonly #things    = new Map<string, ThingT>()

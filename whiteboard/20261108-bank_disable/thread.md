@@ -189,3 +189,31 @@ the Coach ruled on a first round (kept on the local branch `review_fixes-v1`).
 * **Races (rows)**:
   * ~~A vault or box listing in flight across a sweep can still panic~~: closed by the check after each list's
     await.
+
+# Opus review fixes (2026-11-08)
+
+On `20261108-pr_squash`, all approved by the Coach. Each removes code or simplifies it.
+
+* **Blocking, fixed:**
+  * The scrub no longer awaits the host's `onPanic` (`void`, as bad news already was), so a host `onPanic` that awaits
+    `bank.vacate()` no longer deadlocks against it. Test: such an `onPanic` settles.
+  * `#listOwnLeases()` answers an Outcome and takes no handlers: `autolock` tells its own bad news after its await,
+    through `tellBadNews`, and the scrub through `#hostHandlers`. An autolock in flight across a sweep tells the logger.
+* **Cut:** `hello`'s crossing branch; the `handlers` parameter of `#eraseOwnLeases`; the `askUser` switch (every
+  `Gating.launch` follows an enabled check in the same tick); the `GuardedPanicHandler` export; `boxListingOf`'s
+  closure (a revocation names no vault); `Vault.#panic`, inlined.
+* **Changed:** past the disable, panics only report to the platform (`DefaultHandlers`); `DefaultOnPanic` is if/else,
+  the bank on `identity_revoked`, else the vault.
+* **A crossed `hello`** now refuses with the listing's `LetGoInstance` message, not `BankLetGo`; the snapshot's `err` is
+  still the bank's. A sweep landing just as `#bringUp`'s last step settles leaves that hello reading ok, harmlessly:
+  the snapshot prefers `#endCause`, and `#demandReady` checks enabled first.
+
+## Accusations (recorded, not fixed)
+
+Both reach only `reportToPlatform` now that the defaults past the disable report and nothing more.
+
+* **Against `Listing.deliver`:** it awaits `outcomeOf` around synchronous work (listing.ts, the `dbhas` branch before
+  `panicIfRevoked`), which opens a microtask window between its `demandEnabled()` and the panic. A sweep landing in
+  that window lets a revocation panic a disabled bank.
+* **Against `Vault.boxListing` and `Storable.hydrate`:** the lazy getter builds a fresh, enabled `BoxListing` on a
+  disabled vault, and `hydrate`'s fast path (`#isWhole && #isRefreshedWithin`) skips `demandEnabled`.
