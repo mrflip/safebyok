@@ -135,6 +135,7 @@ export class Bank {
     const hello = await outcomeOf(() => this.#bringUp())
     this.#lastHello = hello
     this.#remakeSnapshot()
+    this.#announce({ kind: 'helloed', outcome: hello, vault: null })
     valOf(hello)
   }
 
@@ -351,7 +352,7 @@ const heedUnerased = ({ refusal, vault, where, bank }: Extract<BankEvent, { kind
   vault?.vacate()
 }
 
-/** The `onLifecycle` a bank has when given none: a lease that outlived a lock or a vacate, and a vacate with a cause, to the logger at error and the platform, the vault vacated. */
+/** The `onLifecycle` a bank has when given none: a lease that outlived a lock or a vacate, and a vacate with a cause, to the logger at error and the platform, the vault vacated; a hello refused but by the bank's end to the logger. */
 export const DefaultOnLifecycle: LifecycleHandler = (event) => {
   switch (event.kind) {
   case 'lease_unerased': {
@@ -360,6 +361,11 @@ export const DefaultOnLifecycle: LifecycleHandler = (event) => {
   }
   case 'vacated': {
     if (! isVaultError(event.cause, 'disabled')) { reportAtError(event.cause, event.bank) }
+    break
+  }
+  case 'helloed': {
+    const { outcome, bank } = event
+    if (! outcome.ok && outcome.err.refusalkind !== 'disabled') { bank.logger.warn(outcome.err.message, { call: 'Bank.onLifecycle', refusalkind: outcome.err.refusalkind }) }
     break
   }
   }

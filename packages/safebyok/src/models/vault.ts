@@ -1,7 +1,7 @@
 import type { Modelkind } from '../helpers/consts'
 import { consistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
-import { type Outcome, outcomeOf } from '../refusals/outcome'
+import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import type { Gatingkind } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
@@ -277,14 +277,21 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   takeWorld(world: unknown): void { this.receive(SX.vaultRow.refusingAs('damaged_row').parse(world)) }
   // --
 
-  // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, tryDelDamagedBox, each with its try form
+  // == [Box verbs]: hello, bringUp, getBox, fetchBox, putBox, delBox, tryDelDamagedBox, each with its try form
 
   /** List this vault's boxes and start their watch. */
   async hello(): Promise<this> {
     this.demandEnabled()
+    const hello = await outcomeOf(() => this.#bringUp())
+    this.#bankFriend.announce({ kind: 'helloed', outcome: hello, vault: this })
+    valOf(hello)
+    return this
+  }
+
+  /** The boxes' watch started and their listing fetched. */
+  async #bringUp(): Promise<void> {
     await this.boxListing.hello()
     await this.boxListing.list()
-    return this
   }
 
   tryHello(): Promise<Outcome<this>> { return outcomeOf(() => this.hello()) }

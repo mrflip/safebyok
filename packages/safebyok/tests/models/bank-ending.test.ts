@@ -199,6 +199,7 @@ describe("bank.autolock", () => {
   it("leaves a refused erase to the vault's own lock, which onLifecycle hears", async () => {
     const onLifecycle = vi.fn()
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle })
+    onLifecycle.mockClear()
     const refusal = new VaultError('storage_unavailable', 'no store')
     vi.spyOn(world.deviceDB, 'tryForget').mockResolvedValue({ ok: false, err: refusal })
     world.advance(AutolockMillis + 1)
@@ -362,6 +363,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const world = makeBankWorld()
     const { bank, vault } = await makeBankWithVault(world, { requestCleartext, onLifecycle, onBadNews, logger: spy.logger })
     requestCleartext.mockClear()
+    onLifecycle.mockClear()
     const refusal = new VaultError('storage_unavailable', 'no store')
     vi.spyOn(world.deviceDB, 'tryForget').mockResolvedValue({ ok: false, err: refusal })
     const listing = TH.holdNextCall(world.deviceDB, 'tryListLeases')
