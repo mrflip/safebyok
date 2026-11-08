@@ -18,7 +18,7 @@ const ShownGrabber = ({ grab }: { grab: (isShown: () => boolean) => void }) => {
   return null
 }
 
-/** The useWhenShown @example: a button whose handler awaits `unlocking`, then tells `onDone` once it shows. */
+/** A button whose handler awaits `unlocking`, then tells `onDone` once it shows. */
 const Unlocker = ({ unlocking, onDone }: { unlocking: () => Promise<undefined>, onDone: (unlocked: boolean) => void }) => {
   const { whenShown } = useWhenShown()
   const submit = async () => {
@@ -28,7 +28,7 @@ const Unlocker = ({ unlocking, onDone }: { unlocking: () => Promise<undefined>, 
   return <button type="button" onClick={() => { void submit() }}>Unlock</button>
 }
 
-/** The second useWhenShown @example: a button whose handler awaits `asking`'s answer, then hands it to `onAnswer` if it shows, and zeroes it if not. */
+/** A button whose handler awaits `asking`'s answer, then hands it to `onAnswer` if it shows, and zeroes it if not. */
 const Asker = ({ asking, onAnswer }: { asking: () => Promise<Uint8Array>, onAnswer: (answer: Uint8Array) => void }) => {
   const { isShown } = useWhenShown()
   const press = async () => {
@@ -238,7 +238,7 @@ describe("useWhenShown", () => {
     expect(heard).to.deep.equal([])
   })
 
-  it("lets a handler tell its host once its await settles, while the component shows, as its example has it", async () => {
+  it("lets a handler tell its host once its await settles, while the component shows", async () => {
     const unlocking = TH.held()
     const heard: boolean[] = []
     render(<Unlocker unlocking={() => unlocking.promise} onDone={(unlocked) => { heard.push(unlocked) }} />)

@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { useRevealToggle } from '../src/hooks/reveal-toggle'
 
-/** Its example: an input, and the button that reveals it. */
+/** An input, and the button that reveals it. */
 const Revealed = () => {
   const reveal = useRevealToggle('Show', 'Hide')
   return <><input id="secret_field" aria-label="secret" type={reveal.fieldType} />{reveal.button('secret_field')}</>
@@ -35,7 +35,6 @@ describe("useRevealToggle", () => {
   })
 
   it("goes back to hidden when its field hides, and stays hidden when it shows again", () => {
-    // useRevealToggle @example 2
     const { rerender } = render(<RevealedWhile isFieldShowing />)
     const field = screen.getByLabelText<HTMLInputElement>('secret')
     fireEvent.click(screen.getByRole('button', { name: 'Show' }))
