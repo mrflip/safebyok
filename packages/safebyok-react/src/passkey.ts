@@ -42,7 +42,8 @@ const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, int, byt
       passkeyHeader: discrim('wayinkind', [passphraseHeader, passkeyHeader]).nullable(),
       opts:          obj({ rpId: named.optional(), timeout }).strict(),
     }),
-    // Only what attemptOnce itself touches: the attempt judges the rest of the answer.
+    // The attempt checks the rest of the answer.
+    /** The part of a passkey answer attemptOnce itself touches. */
     attemptOnceAnswer:  obj({ prfBytes: bytes() }),
     attemptOnceAttempt: fn(),
   }

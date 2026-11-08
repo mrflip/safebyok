@@ -34,11 +34,14 @@ const useGatingDialog = () => {
   /** One showing of the dialog: its round, the gating it answers, and how it closes. */
   type Showing = { round: number, gating: AnyGating, close: () => void }
 
-  // The dialog showing now, if any. The ref is what the callbacks read, so that a dialog's answer
-  // reaches its own ask and no newer one's; the state renders it.
+  /** The dialog showing now, if any, as rendered. */
   const [showing, setShowing] = useState<Showing | null>(null)
+  // The callbacks read the ref, current between renders: an old dialog's late answer then ends only
+  // its own showing, never a newer one.
+  /** The dialog showing now, if any, as the callbacks read it. */
   const showingRef = useRef<Showing | null>(null)
-  // Counts the dialog's showings, so that each is a fresh dialog with nothing kept from the last.
+  // Each showing's round keys a fresh dialog, with nothing kept from the last.
+  /** The count of the dialog's showings. */
   const showingRounds = useRef(0)
 
   /** Close `ending` if it is still the dialog showing, and resolve the `ask` call that showed it. */
@@ -83,6 +86,7 @@ const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void
   // Activity shown again) makes a fresh one.
   useEffect(() => {
     // Once swept, the bank calls none of the host's handlers: the page may be the next user's by then.
+    /** Whether this effect still holds its bank. */
     const kept = { held: true }
     let bank: Bank | null = null
     const makeBank = async () => {

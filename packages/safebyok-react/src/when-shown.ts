@@ -17,8 +17,8 @@ export type WhenShown = <ValT>(goOn: () => ValT) => Promise<Awaited<ValT>>
  */
 export const useWhenShown = (): { whenShown: WhenShown, isShown: () => boolean } => {
   const shown = useRef(false)
-  // Each handler waiting for the component to show again. A component gone keeps them, never
-  // called, until it is collected with them.
+  // An unmounted component never calls its waiting handlers: they are garbage-collected with it.
+  /** Each handler waiting for the component to show again. */
   const waiting = useRef<(() => void)[]>([])
   // A layout effect, set and cleared in the commit itself: a click can land before React runs
   // passive effects, and an answer can settle between a commit that unmounts the component and

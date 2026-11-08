@@ -38,7 +38,8 @@ const DialogForGatingkind: { [KindT in Gatingkind]: ComponentType<KindModalProps
 
 /** What stands in for a gatingkind this package has no dialog for: it answers 'declined' as it mounts. */
 const NoDialog = ({ onDone }: Pick<GatingModalProps, 'onDone'>) => {
-  // An onDone written inline is new at each render, and is still told only once.
+  // An onDone written inline is new at each render, and so re-runs the effect.
+  /** True once `onDone` has been called. */
   const answered = useRef(false)
   useEffect(() => {
     if (answered.current) { return }

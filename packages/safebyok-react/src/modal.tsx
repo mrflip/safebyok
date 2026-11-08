@@ -316,7 +316,7 @@ const checkerAdvice = async (gating: AnyGating, typed: string): Promise<string |
 export const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, gating: AnyGating, creating: boolean, fail: (err: unknown) => void) => {
   const [said, setSaid] = useState<string | null>(null)
   const asked = useRef(0)
-  // The mode as of the last commit, which an answer on its way is checked against.
+  /** The mode as of the last commit, which an answer on its way is checked against. */
   const creatingNow = useRef(creating)
   // A change of mode forgets what was said (React's "adjusting state while rendering"), and makes
   // any answer or failure still on its way stale from the same commit.
@@ -331,7 +331,7 @@ export const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, gating
     asked.current += 1
     if (typed === '') { setSaid(null); return }
     const askedNow = asked.current
-    // Only the latest call, in the mode it was asked in, is heard.
+    /** True for the latest call, while the mode is the one it was asked in. */
     const latest = () => askedNow === asked.current && creating === creatingNow.current
     try {
       // A JavaScript host's undefined is nothing to say, as null is.

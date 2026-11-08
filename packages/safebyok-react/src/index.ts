@@ -1,6 +1,4 @@
-// safebyok-react's public surface: the provider that makes the signed-in user's bank, the hooks that
-// read it and its boxes, the dialogs it asks the user through, the fields a user types a whisper
-// into, and the controls an account menu builds, locks and unlocks a vault with.
+/** `safebyok-react`: the provider of the signed-in user's bank, hooks over its vaults and boxes, the dialogs that ask the user, whisper fields, and vault controls. */
 export { BankProvider } from './bank-provider'
 export type { BankProviderProps } from './shapes/shapes-provider'
 export { useBank, useBankSnapshot, useVault, useVaultSnapshot } from './hooks'
