@@ -1,6 +1,6 @@
 # Thread outcome_tour: outcomeOf and valOf where a throw or an outcome is made to be unmade (2026-11-08)
 
-Branch `20261108-outcome_tour`, cut from local `20261108-coach_tip` (878c43cfe: three commits with no PR of their own, which show on this PR). PR base `main`. Justify green: core 2589 tests, whole repo green, size budgets met.
+Branch `20261108-outcome_tour`, PR #605, cut from local `20261108-coach_tip` (878c43cfe: three commits with no PR of their own, which show on this PR). PR base `main`. Justify green: core 2589 tests, whole repo green, size budgets met.
 
 * **Built**: `demandGood(outcome, refusal?)` in `packages/safebyok/src/refusals/outcome.ts` beside `valOf`, internal (exported from no entry point), with three tests in `tests/refusals/outcome.test.ts`. Six sites changed (table in the PR).
 * **Decisions taken**:
