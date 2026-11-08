@@ -6,13 +6,7 @@ import { useBoxIsShowing } from '../hooks/hooks'
 import { useRevealToggle } from '../hooks/reveal-toggle'
 import type { BoxWhisperFieldProps } from '../shapes'
 
-/** A field showing the text at dotted `path` in the whisper of `box`, blank and read-only while it will not show.
- *
- * @example
- *   <BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />
- *   <button onClick={async () => { await vault.ensureUnlocked(); await box.expose() }}>Edit</button>
- *   <button onClick={() => BoxFields.of(box).save()}>Save</button>
- */
+/** A field showing the text at dotted `path` in the whisper of `box`, blank and read-only while it will not show. */
 export const BoxWhisperField = ({ box, path, readOnly, ...passed }: BoxWhisperFieldProps) => {
   const isShowing = useBoxIsShowing(box)
   const reveal = useRevealToggle(Messages.showWhisper, Messages.hideWhisper, isShowing)
