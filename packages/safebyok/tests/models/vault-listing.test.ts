@@ -80,10 +80,10 @@ describe("a tombstone over a live vault", () => {
     expect(vault.boxListing).to.eq(boxes)
   })
 
-  it("tells a refused erase as bad news, not a panic, and the tombstone stands", async () => {
-    const onPanic = vi.fn()
+  it("announces a refused erase at its tombstone, not as bad news, and the tombstone stands", async () => {
+    const onLifecycle = vi.fn()
     const onBadNews = vi.fn()
-    const { fakeBank, opts, deviceDB, demandStored, restoreRow, listing: born } = makeVaultWorld(null, { onPanic })
+    const { fakeBank, opts, deviceDB, demandStored, restoreRow, listing: born } = makeVaultWorld(null, { onLifecycle })
     await buildTyping(born, Dna, byPassphrase(Passphrase))
     const listing = new VaultListing(fakeBank, hearingBadNews(opts, onBadNews))
     const vault = await listing.build(demandStored())
@@ -93,8 +93,8 @@ describe("a tombstone over a live vault", () => {
     await listing.fetch(Dna, { ifAbsent: 'nil' })
     await erased()
     expect(vault.isPresent).to.be.false
-    expect(onBadNews).toHaveBeenCalledWith(refusal)
-    expect(onPanic).not.toHaveBeenCalled()
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_unerased', refusal, vault, where: 'tombstone' }))
+    expect(onBadNews).not.toHaveBeenCalledWith(refusal)
     listing.goodbye()
   })
 })
@@ -352,14 +352,14 @@ describe("the entrypoints, handed rubble", () => {
 })
 
 describe("lock() with an erase that throws synchronously", () => {
-  it("reads locked, does not throw, and panics", async () => {
-    const onPanic = vi.fn()
-    const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onPanic })
+  it("reads locked, does not throw, and announces the refused erase", async () => {
+    const onLifecycle = vi.fn()
+    const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onLifecycle })
     deviceDB.tryForget.mockImplementationOnce(() => { throw new Error('the duck is broken') })
     expect(() => vault.lock()).to.not.throw()
     expect(vault.isLocked).to.be.true
     await erased()
-    expect(onPanic).toHaveBeenCalledOnce()
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_unerased', vault, where: 'lock' }))
   })
 })
 

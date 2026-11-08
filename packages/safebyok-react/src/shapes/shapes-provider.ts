@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { BadNewsHandler, BankOpts, PanicHandler, RequestCleartext } from 'safebyok'
+import type { BadNewsHandler, BankOpts, LifecycleHandler, RequestCleartext } from 'safebyok'
 import { Checker, bankOpts, type AssertEqual, type CheckerInput } from 'safebyok/storage'
 import type { PassphraseAdvice } from '../modal'
 
@@ -34,8 +34,8 @@ export const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ de
 true satisfies AssertEqual<BankProviderProps, CheckerInput<typeof providerProps>>
 
 /** The options a held bank is made from: Bank.make's, but `device_id` and the handlers, for a `user_id` that may be null. */
-export type HeldBankOpts = Omit<BankOpts, 'user_id' | 'device_id' | 'onPanic' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
+export type HeldBankOpts = Omit<BankOpts, 'user_id' | 'device_id' | 'onLifecycle' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
 
 /** The functions a held bank calls back, each as it was last rendered. */
-export type Handlers = { onPanic: PanicHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext }
+export type Handlers = { onLifecycle: LifecycleHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext }
 // --
