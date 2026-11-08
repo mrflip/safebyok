@@ -1,22 +1,9 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import type { WhenShown } from '../shapes'
 
-/** The component's {@link WhenShown}, and `isShown`, whether it shows now.
- *
- * @example
- *   const { whenShown } = useWhenShown()
- *   const submit = async () => {
- *     await gating.attemptPassphrase(passphrase)
- *     await whenShown(() => { onDone(true) })
- *   }
- * @example
- *   const passkey = await askPasskey(gate)
- *   if (! isShown()) { passkey.prfBytes.fill(0); return }   // never kept for the dialog to show again
- */
 export const useWhenShown = (): { whenShown: WhenShown, isShown: () => boolean } => {
   const shown = useRef(false)
-  // An unmounted component never calls its waiting handlers: they are garbage-collected with it.
-  /** Each handler waiting for the component to show again. */
+  // No cleanup of `waiting`: an unmounted component never calls its handlers, which are garbage-collected with it.
   const waiting = useRef<(() => void)[]>([])
   // A layout effect sets and clears `shown` in the commit itself: a click can land before React runs
   // passive effects, and an answer can settle between a commit that unmounts the component and
