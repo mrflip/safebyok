@@ -1,88 +1,94 @@
 # Thread 1: Bank gets a one-way `isEnabled`, and a disabled bank calls no host handler (2026-11-08)
 
 Branch `20261108-bank_disable`, cut from `d268287a0` (the Coach's unpushed wip on
-`20261108-handler_defaults`). Local only: not pushed, no PR, by the Coach's word. Justify: core
-2484 tests pass, along with every other package except `safebyok-react`. Its lint has 4 errors
-that were already in the base wip. Its `bank-provider.test.tsx` has 3 failing tests, and this
-thread causes them (see *For the Coach*).
+`20261108-handler_defaults`). Local only: not pushed, no PR, by the Coach's word. Justify: every
+package's tests, typecheck, build and size pass (core 2492). The one red item is `safebyok-react`
+lint, whose 4 errors were already in the base wip.
 
-* **Built**, in `packages/safebyok`:
-  * `Bank` (`src/models/bank.ts`) gets `#isEnabled`, a public `get isEnabled()` and a public
-    `demandEnabled()`. These follow the listing's pattern and refuse with
-    `bankDisabled()` (`'disabled'`, `Phrases.BankLetGo`).
-  * The constructor now builds the one `#vaultListing`, and `#makeListing` is gone.
-  * `sweep()` and `vacate()` both go through `#disable(discard)`, which is one-way. A repeat is a
-    no-op, except that `vacate` always erases the bank's own cached leases.
-  * `hello` calls `demandEnabled` first. If a sweep or a vacate crosses a hello, the hello does
-    not overwrite the disabled bank's snapshot.
-  * Through `isEnabled`, the bank chooses its handlers. `panic`, `askUser` and `#hearBadNews`
-    call the host's `onPanic`, `requestCleartext` and `onBadNews` only while the bank is
-    enabled. After that they fall back to the core's defaults:
-    * `DefaultPanic` is `guardOnPanic(DefaultOnPanic)`, which reports to the platform;
-    * `askUser` resolves `true`, as if the dialog closed unshown, so the gating settles
-      `declined`;
-    * bad news goes to `DefaultOnBadNews`, which hands it to the bank's logger.
-  * `BankStage` and `BankSnapshot.err` doc blocks now cover the disabled bank. The README has a
-    new bullet, "A bank swept or vacated is spent". The changeset is
-    `.changeset/20261108-bank_disable.md` (minor).
-  * Tests:
-    * `bank.test.ts`: handlers after a sweep and after a vacate; news after a revocation goes to
-      the logger.
-    * `bank-ending.test.ts`:
-      * the `bank.isEnabled` describe;
-      * vacate after sweep still erases;
-      * a box put that a vacate crosses refuses `disabled`;
-      * a vacate panic goes to the platform, not `onPanic`.
-    * `proof.test.ts`: sign-out followed by a next bank; one StrictMode test where a fresh bank
-      picks up the cached lease.
-    * The sweep-then-hello tests are deleted.
+* **Built**, in `packages/safebyok` (`src/models/bank.ts` unless named):
+  * **One-way end.** `#isEnabled`, `get isEnabled()` and `demandEnabled()` refuse
+    `bankDisabled()` (`'disabled'`, `BankLetGo`). A sweep or a vacate sets `#endCause` at once
+    (`#letGo`), so `hello`, `ensureVault` and `vaultAt` refuse from the call on. `#isEnabled`
+    clears on a sweep at once, and on a vacate after its scrub.
+  * **The vacate scrubs, then disables** (ruling A). `vacate(cause?)` lets the listing go,
+    erases every cached lease row of this bank with the host's handlers live, then clears
+    `#isEnabled`. It answers a promise memoized in `#vacating`: a repeat answers the first. A
+    vacate after a sweep still erases.
+  * **Handlers are chosen per call.** `panic`, `askUser` and `#hearBadNews` call the host's
+    functions while `#isEnabled`, and after that `DefaultPanic`, `true` (the gating settles
+    `declined`) and `DefaultOnBadNews`.
+  * **A hello crossed by a sweep or a vacate** refuses `BankLetGo`, unless it refused on its
+    own, and leaves the snapshot alone.
+  * **A revoked identity is a panic** (rulings 1-7). `listing.ts` `tellIfRevoked` became
+    `panicIfRevoked`, calling `world.panic({ refusal })`. It is a rename only at its call in
+    `deliver`. The caller still gets the refusal. `ListingWorld` gains `panic`. `Vault` relays its
+    boxes' panic. `Panic` gains `bank`, and the exported `BankPanic` is how a vault or a listing
+    panics through the bank. `#hearBadNews` no longer vacates. `DefaultOnPanic` vacates the bank
+    on `identity_revoked`, and still reports to the platform.
+  * **The snapshot** reads `refused` with `#endCause` from the end on: `disabled`, or the
+    revocation. `#lastHello` holds only real outcomes, and the fabricated
+    `bad(bankDisabled())` is gone.
+  * **Docs:**
+    * README: "`onPanic` hears what you must act on for safety", with the
+      `DefaultOnPanic(panic)` pattern.
+    * Changeset: `.changeset/20261108-bank_disable.md`, minor.
+    * VOCABULARY: the stage entry.
+    * `notes/security.md`: an entry and its amendment, both from sonnet subagents.
+  * **React:** the three-line patch to `safebyok-react/tests/bank-provider.test.tsx`.
+  * **Tests:**
+    * `bank.test.ts`: the panic describe, a host `onPanic` with and without the default, a
+      burst;
+    * `bank-ending.test.ts`: the scrub, a hello crossed at its last step;
+    * `listing.test.ts`: a box listing panics.
+    * The fake worlds gain `panic`.
 
-* **Lifecycle, as verified**:
-  * **`identity_revoked` still reaches the host.** `#hearBadNews` chooses `onBadNews` before it
-    vacates, so the revocation is the last news the host hears. Later news goes to the logger.
-  * **Vacate is terminal.** This matches the README's existing "vacate, then `Bank.make`".
-  * **In-flight work refuses.** The listing's `deliver`, `buildOrReceive`, `fetch`, `put` and
-    `delOver` already call `demandEnabled`. Work that a vacate crosses therefore refuses
-    `disabled` ("expire in flames"), with no new reporting.
-  * A bank has no delete, so "deleted" does not apply to it.
+* **Decisions taken**:
+  * **Liveness is `#endCause === null`.** I dropped the `Listing.isEnabled` getter that the
+    first build added.
+  * **`DefaultOnPanic` does not await the bank's vacate.** A panic from the scrub's own erase
+    would otherwise wait on itself.
+  * **`Vault.panic` relays without naming the vault.** A revocation concerns the bank.
+  * **`vacate(cause?)` is public and checked** (`VX.vacateCause`), because `DefaultOnPanic`
+    needs it.
 
-* **Decisions taken** (the simplest option each time):
-  * **Handler choice happens when the call is made.** A disabled bank never calls a host
-    function, even one wrapped before the disable. I rejected swapping the stored handlers,
-    because the wraps are branded `Guarded` and the vault world holds them.
-  * **A disabled bank's snapshot is stage `refused` with err `disabled`.** Before, a swept bank
-    reverted to `made`. `refused` with the reason is truthful, and it needs no new stage.
-  * **`ensureVault` and `vaultAt` refuse `disabled`** (`BankLetGo`) through the unchanged
-    `#demandReady`, because `#lastHello` holds the bank's refusal.
-  * **A vacate on a bank already swept still erases its cached leases.** A sign-out that runs
-    after React's cleanup must still erase.
+* **Set aside, with the reason**:
+  * Disabling before the scrub. That was the first build, and ruling A reversed it.
+  * **Dropping the IndexedDB deviceDB on vacate.** Both databases (`<dbName>:device-vN`,
+    `<dbName>:bank-vN`) are shared by every app and user on the origin.
+    * `deleteDatabase` is blocked by any open connection, this tab's own included: idb-keyval
+      caches its connection and offers no close. Sign-out could hang.
+    * The deviceDB is host-pluggable.
+    * Erasing this bank's lease rows is the closest simple option to a fresh device.
+  * **Forgetting the bank row (`device_id`).** It needs a new DeviceDB verb in memory, in IDB and
+    in the battery, and the provider would have to stop caching it. Follow-up.
 
-* **Deviations**:
-  * A lease that the vacate fails to erase is now reported to the platform (`DefaultOnPanic`),
-    never to the host's `onPanic`. This applies both to the bank's own erase and to a vault's
-    vacate erase, because the bank is already disabled when they run. I set aside the
-    alternative of handing those erases the host's `onPanic`: it would have needed a second
-    path around the rule.
+* **Path to a PR** (dry runs only):
+  * `d268287a0` is one commit on `origin/main` (unmoved). It has a core half (handler
+    defaults, about 80 lines) and a react half (`bank-provider.tsx`, about 190 lines, still
+    "unchecked").
+  * **Rebase onto main:** 6 files conflict, so the whole core half comes along. Main's
+    provider then needs about 10 lines of bridge: it throws the `Panic` object, and it always
+    passes a handler, so the defaults never vacate.
+  * **The wip first, as is:** this branch applies with no conflict, onto `d268287a0` and onto the
+    Coach's newer `c8ae21155`. But it waits on the react half.
+  * **Recommended:** split the wip's core half into a PR of its own, and stack this one on it.
 
 * **Discoveries**:
-  * **The React provider needs a follow-up** (out of this thread's scope). Three assertions in
-    `packages/safebyok-react/tests/bank-provider.test.tsx` (lines 41, 51 and 72) expect a swept
-    bank to read `made`. The fix is to replace each `?.snapshot.stage).to.eq('made')` with
-    `?.isEnabled).to.eq(false)`. With that change all 31 tests pass. I tried it and then
-    restored the file, so the branch does not touch the react package.
-  * **The provider is keyed on applabel and `user_id`.** After an `identity_revoked`, the same
-    user signing in again would keep a dead bank. The provider has to remake the bank when
-    `isEnabled` turns false.
+  * **Panics during the scrub reach the host's `onPanic`.** Only panics after it fall back. A
+    host `onPanic` calling the default may run twice in a burst, and the repeat vacate does
+    nothing.
+  * **The provider will need:**
+    * to remake only on new props: remaking on `identity_revoked` loops make, panic, vacate;
+    * to await `vacate()`;
+    * to delete `makeBank`'s `isEnabled` wrap;
+    * to fix `useVault`, which waits forever on a disabled bank.
 
-* **Race (a row, not a fix)**: an unlock already in flight when a vacate runs can store its lease
-  in the deviceDB after the vacate's erase. The lease outlives the sign-out until the next
-  vacate.
+* **Races (rows)**:
+  * An unlock in flight across a vacate can cache its lease after the scrub.
+  * A vault's erase panic may land after the disable, and go to the default.
 
 * **For the Coach**:
-  * **Vacate erase panics go to the platform.** I recommend keeping this: the host may already
-    belong to the next user.
-  * **Disabled snapshot reads `refused/disabled`**, not `made`. I recommend keeping it.
-  * **Vacate after sweep still erases.** I recommend keeping it.
-  * **The react tests and the provider remake belong to the provider thread.** Apply the
-    three-line test patch above with this thread, or on the provider thread.
-  * **In-flight unlock lease race**: recorded only.
+  * The security.md autolock entry still calls clearing unlisted rows "not yet designed".
+  * `device_id` forget, as above.
+  * `isEnabled` stays true during the scrub, while `demandEnabled` already refuses.
+  * A host `onPanic` that swallows a revocation leaves the user's leases cached. That is by design.
