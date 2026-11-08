@@ -3,9 +3,9 @@ import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Bank, MemoryDeviceDB, VaultError, type AnyGating, type BadNewsHandler, type LifecycleHandler } from 'safebyok'
 import { BankProvider } from '../src/provider/bank-provider'
-import type { BankProviderProps } from '../src/shapes/shapes-provider'
 import { Messages } from '../src/helpers/messages'
 import { createPasskey } from '../src/helpers/passkey'
+import type { BankProviderProps } from '../src/shapes'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()

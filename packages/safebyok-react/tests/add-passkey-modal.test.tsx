@@ -2,8 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Gating, type Bank } from 'safebyok'
 import { AddPasskeyModal } from '../src/modals/add-passkey-modal'
-import type { DialogAnswer } from '../src/modals/modal-kit'
 import { Messages } from '../src/helpers/messages'
+import type { DialogAnswer } from '../src/shapes'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()

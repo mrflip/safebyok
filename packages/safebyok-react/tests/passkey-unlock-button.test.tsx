@@ -5,7 +5,7 @@ import { Messages } from '../src/helpers/messages'
 import { createPasskey } from '../src/helpers/passkey'
 import { PasskeyUnlockButton } from '../src/components/passkey-unlock-button'
 import { PassphraseModal } from '../src/modals/passphrase-modal'
-import type { DialogAnswer } from '../src/modals/modal-kit'
+import type { DialogAnswer } from '../src/shapes'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()

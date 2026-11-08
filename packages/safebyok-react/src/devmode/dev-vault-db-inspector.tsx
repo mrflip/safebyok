@@ -3,10 +3,8 @@ import type { VaultDB } from 'safebyok'
 import { boxSparse, nextRevisionOf, revisionOf } from 'safebyok/storage'
 import type { BankListed, BankScope, BoxesListed, BoxSparse, DamagedBox, DamagedVault, VaultRecord, VaultRow } from 'safebyok/storage'
 import { useBank } from '../hooks/hooks'
+import type { DevVaultDBInspectorProps, VaultRowLinesProps } from '../shapes'
 import { LastCallLine, jsonOf, timeOf, useLastCall, useListing } from './last-call'
-
-/** What a DevVaultDBInspector is handed: the vaultDB whose rows it shows. */
-export type DevVaultDBInspectorProps = { vaultDB: VaultDB }
 
 /** A table of the signed-in user's rows in `vaultDB` as its verbs answer them, with a raw button for each get and del it offers. */
 export const DevVaultDBInspector = ({ vaultDB }: DevVaultDBInspectorProps) => {
@@ -81,15 +79,6 @@ const BankRowsTable = ({ vaultDB, scope }: { vaultDB: VaultDB, scope: BankScope 
       <LastCallLine lastCall={lastCall} />
     </>
   )
-}
-
-/** What a vault row's lines are handed: the row, its boxes as listed, and what each button calls. */
-type VaultRowLinesProps = {
-  vaultRow:   VaultRow | DamagedVault
-  boxes:      BoxesListed | null
-  onGetVault: () => Promise<void>
-  onGetBox:   (boxRow: BoxSparse | DamagedBox) => Promise<void>
-  onDelBox:   (boxRow: BoxSparse | DamagedBox) => Promise<void>
 }
 
 /** A vault row's line, then a line for each of its box rows, damaged ones last. */

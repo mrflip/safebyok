@@ -4,16 +4,14 @@ import { attemptRefusalFlavor } from '../helpers/attempt-refusals'
 import { Doing, Locale, Messages } from '../helpers/messages'
 import { useRevealToggle } from '../hooks/reveal-toggle'
 import { useWhenShown } from '../hooks/when-shown'
-import { Boundary, forBoundary, type BoundarySource } from '../provider/boundary'
+import { Boundary, forBoundary } from '../provider/boundary'
+import type { BoundarySource, DialogAnswer, Gripe, ModalFormProps, PassphraseAdvice } from '../shapes'
 
 // The parts every gating's dialog is built of: its one answer, kept above the boundary that shows a
 // calm notice; the form, with a dialog's semantics; the passphrase field and the advice beside it;
 // and what a form does with each refusal its attempt meets.
 
 // == [Answer]: DialogAnswer, answerOf, useAnswerOnce, AnsweringOnce, DialogTrouble, cancelOnEscape
-
-/** How a dialog closed: 'unlocked', 'deleted' or 'declined'. */
-export type DialogAnswer = 'unlocked' | 'deleted' | 'declined'
 
 /** The answer for `gating` settled with `outcome`. */
 const answerOf = (gating: AnyGating, outcome: Outcome<Vault>): DialogAnswer => {
@@ -91,9 +89,6 @@ const DialogTrouble = ({ doing, onDone }: { doing: string, onDone: (answer: Dial
 
 // == [Form]: Gripe, useAttempts, ModalForm, holdsFocus, unlockedFor
 
-/** What a dialog's live region says, and whether it is about the passkey or a mismatch. */
-export type Gripe = { text: string, fromPasskey: boolean, mismatched?: true }
-
 /** A form's state around its attempts: the gripe it shows, and what one submit's attempt does with its outcome. */
 export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer) => void) => {
   const [gripe, setGripe] = useState<Gripe | null>(null)
@@ -125,29 +120,6 @@ export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer)
   }
 
   return { gripe, setGripe, meet, fail, attempt, whenShown, isShown }
-}
-
-/** What a {@link ModalForm} is handed. */
-type ModalFormProps = {
-  /** The heading, which names the dialog. */
-  title:      string
-  /** The paragraph under it, which describes the dialog. */
-  blurb:      string
-  /** The submit button's word. */
-  submitWord: string
-  /** What to say in the live region, or null for nothing. */
-  gripe:      Gripe | null
-  /** The live region's id, from {@link useConfirmation}. */
-  gripeId?:   string | undefined
-  /** A quiet line under the live region: how long an unlock lasts. */
-  footnote?:  string | undefined
-  formRef?:   Ref<HTMLFormElement> | undefined
-  /** The dialog's one answer: Cancel and Escape answer 'declined'. */
-  done:       (answer: DialogAnswer) => void
-  /** Called at each submit. The form's default is already prevented. */
-  onSubmit:   () => void
-  /** The fields, between the blurb and the live region. */
-  children:   ReactNode
 }
 
 /** A gating's form with a dialog's semantics, unstyled under `modal` class names. */
@@ -299,9 +271,6 @@ export const ConfirmField = ({ ref, gripeId, fieldlabel, gripe, onChange }: {
     onChange={onChange}
   />
 )
-
-/** What a host says of a passphrase as the user chooses it, or null for nothing. It hears the passphrase in plain text, so keep it on the device. */
-export type PassphraseAdvice = (passphrase: string) => string | null | Promise<string | null>
 
 /** The refusal for a host's `passphraseAdvice` that threw, leaving out what it threw. */
 const adviceFailed = (thrown: unknown) => HostErrorSanitizer.refusalFor(thrown, 'unexpected_error', "The passphraseAdvice handed to the dialog threw rather than answering. What it threw is left out of this report, as it may quote the passphrase: have it answer a sentence or null, and catch its own failures.")

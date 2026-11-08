@@ -1,9 +1,10 @@
 import { useRef } from 'react'
-import type { Gating, PasskeyAnswer } from 'safebyok'
+import type { PasskeyAnswer } from 'safebyok'
 import { Messages } from '../helpers/messages'
 import { attemptOnce, createPasskey } from '../helpers/passkey'
 import { useRoundFor } from '../hooks/round-for'
-import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts, type DialogAnswer } from './modal-kit'
+import type { AddPasskeyModalProps } from '../shapes'
+import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts } from './modal-kit'
 
 /** The dialog for an `add_passkey` gating, which makes a passkey and adds it to the vault once the user proves its passphrase. */
 export const AddPasskeyModal = (props: AddPasskeyModalProps) => (
@@ -11,18 +12,6 @@ export const AddPasskeyModal = (props: AddPasskeyModalProps) => (
     {(done) => <AddPasskeyForm {...props} onDone={done} />}
   </AnsweringOnce>
 )
-
-/** What AddPasskeyModal is handed. */
-export type AddPasskeyModalProps = {
-  /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
-  gating:              Gating<'add_passkey'>
-  /** Called once with 'unlocked' when the passkey is added, and with 'declined' otherwise. */
-  onDone:              (answer: DialogAnswer) => void
-  /** What a password manager files the passphrase under, and what the authenticator lists the passkey under. */
-  passphraseUsername?: string | undefined
-  /** The relying party the passkey is made under, if not the page's own domain. */
-  passkeyRpId?:        string | undefined
-}
 
 /** The dialog itself, inside AddPasskeyModal's boundary. */
 const AddPasskeyForm = ({ gating, onDone: done, passphraseUsername, passkeyRpId }: AddPasskeyModalProps) => {

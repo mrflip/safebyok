@@ -1,7 +1,8 @@
 import { isVaultError, type Outcome } from 'safebyok'
 import { Messages } from '../helpers/messages'
 import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from '../hooks/hooks'
-import { type TellBadNews, useProvided } from '../provider/bank-provider'
+import { useProvided } from '../provider/bank-provider'
+import type { TellBadNews, VaultControlProps } from '../shapes'
 
 /** Whether the signed-in user's vault under `vaultlabel` is locked, with a Lock or Unlock button, or a Create vault button while it is unborn. */
 export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
@@ -40,9 +41,6 @@ export const CreateVaultButton = ({ vaultlabel }: VaultControlProps) => {
     </button>
   )
 }
-
-/** What a VaultLockControl or a CreateVaultButton is handed: the vaultlabel of the vault it acts on. */
-export type VaultControlProps = { vaultlabel: string }
 
 /** Hand a refusal to the host's `onBadNews`, unless the user declined the dialog. */
 const tellUnlessDeclined = (tellBadNews: TellBadNews, outcome: Outcome<unknown>): void => {

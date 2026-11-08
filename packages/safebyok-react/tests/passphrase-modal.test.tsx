@@ -2,8 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ForeverMillis, MinuteMillis } from 'safebyok'
 import { PassphraseModal } from '../src/modals/passphrase-modal'
-import type { DialogAnswer } from '../src/modals/modal-kit'
 import { Messages } from '../src/helpers/messages'
+import type { DialogAnswer } from '../src/shapes'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()

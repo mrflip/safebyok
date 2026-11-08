@@ -1,8 +1,8 @@
 import { useRef } from 'react'
-import type { Gating } from 'safebyok'
 import { Messages } from '../helpers/messages'
 import { useRoundFor } from '../hooks/round-for'
-import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts, type DialogAnswer } from './modal-kit'
+import type { DelVaultModalProps } from '../shapes'
+import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts } from './modal-kit'
 
 /** The dialog for a `del_vault` gating, which deletes the vault once the user proves its passphrase. */
 export const DelVaultModal = (props: DelVaultModalProps) => (
@@ -10,16 +10,6 @@ export const DelVaultModal = (props: DelVaultModalProps) => (
     {(done) => <DelVaultForm {...props} onDone={done} />}
   </AnsweringOnce>
 )
-
-/** What DelVaultModal is handed. */
-export type DelVaultModalProps = {
-  /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
-  gating:              Gating<'del_vault'>
-  /** Called once with 'deleted' when the vault is deleted, and with 'declined' otherwise. */
-  onDone:              (answer: DialogAnswer) => void
-  /** What a password manager files the passphrase under. */
-  passphraseUsername?: string | undefined
-}
 
 /** The dialog itself, inside DelVaultModal's boundary. */
 const DelVaultForm = ({ gating, onDone: done, passphraseUsername }: DelVaultModalProps) => {

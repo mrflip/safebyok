@@ -6,9 +6,8 @@ import { Component, createElement, use, type ReactElement, type ReactNode } from
 import { onTestFinished, vi } from 'vitest'
 import { MemoryDeviceDB, type AnyGating, type Bank, type BankOpts, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok'
 import { Passphrase, VaultScopeGiven, anyStrengthChecker, passkeyOf, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok/testing'
-import type { BankProviderProps } from '../src/shapes/shapes-provider'
-import type { PassphraseGating } from '../src/modals/passphrase-modal'
 import { fromB64, toB64 } from 'safebyok/utils'
+import type { BankProviderProps, PassphraseGating } from '../src/shapes'
 
 export * from 'safebyok/testing'
 export * from './test-helpers-react'

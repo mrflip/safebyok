@@ -1,9 +1,9 @@
 import { useRef } from 'react'
-import type { Gating } from 'safebyok'
 import { PasskeyUnlockButton, offersPasskey } from '../components/passkey-unlock-button'
 import { Messages } from '../helpers/messages'
 import { useRoundFor } from '../hooks/round-for'
-import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, holdsFocus, unlockedFor, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal-kit'
+import type { PassphraseModalProps } from '../shapes'
+import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, holdsFocus, unlockedFor, useAdvice, useAttempts, useConfirmation } from './modal-kit'
 
 /** The passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
 export const PassphraseModal = (props: PassphraseModalProps) => (
@@ -11,25 +11,6 @@ export const PassphraseModal = (props: PassphraseModalProps) => (
     {(done) => <PassphraseForm {...props} onDone={done} />}
   </AnsweringOnce>
 )
-
-/** The gatings the passphrase dialog answers: a vault's build, and an unlock. */
-export type PassphraseGating = Gating<'build_vault'> | Gating<'unlock_vault'>
-
-/** What PassphraseModal is handed. */
-export type PassphraseModalProps = {
-  /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
-  gating:              PassphraseGating
-  /** Called once with 'unlocked' when an attempt succeeds, and with 'declined' otherwise. */
-  onDone:              (answer: DialogAnswer) => void
-  /** The bank's `leaseMillis`, for the line saying how long an unlock lasts. */
-  leaseMillis?:        number | undefined
-  /** What a password manager files the passphrase under. */
-  passphraseUsername?: string | undefined
-  /** What to say beside the field as the user chooses a passphrase. */
-  passphraseAdvice?:   PassphraseAdvice | undefined
-  /** The relying party the vault's passkey was made under, if not the page's own domain. */
-  passkeyRpId?:        string | undefined
-}
 
 /** The dialog itself, inside PassphraseModal's boundary. */
 const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername, passphraseAdvice, passkeyRpId }: PassphraseModalProps) => {

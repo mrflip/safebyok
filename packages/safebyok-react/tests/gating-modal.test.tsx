@@ -2,8 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { AnyGating, Bank } from 'safebyok'
 import { GatingModal } from '../src/provider/gating-modal'
-import type { DialogAnswer } from '../src/modals/modal-kit'
 import { Messages } from '../src/helpers/messages'
+import type { DialogAnswer } from '../src/shapes'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()

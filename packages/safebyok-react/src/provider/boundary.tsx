@@ -1,14 +1,6 @@
-import { Component, type ReactNode } from 'react'
+import { Component } from 'react'
 import { HostErrorSanitizer, VaultError, isVaultError } from 'safebyok'
-
-/** What a {@link Boundary} is handed: what to show once something broke, and whom to tell. */
-export type BoundaryProps = {
-  /** Shown in the children's place once one of them has thrown while rendering. */
-  fallback:  ReactNode
-  /** Called once, when the boundary first catches. */
-  onCaught?: (() => void) | undefined
-  children:  ReactNode
-}
+import type { BoundaryProps, BoundarySource } from '../shapes'
 
 /** The error boundary a safebyok-react component keeps at its own edge. */
 export class Boundary extends Component<BoundaryProps, { caught: boolean }> {
@@ -20,9 +12,6 @@ export class Boundary extends Component<BoundaryProps, { caught: boolean }> {
 
   override render() { return this.state.caught ? this.props.fallback : this.props.children }
 }
-
-/** The safebyok-react component a {@link forBoundary} report comes from, which its message names. */
-export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'DelVaultModal' | 'AddPasskeyModal' | 'RevokePasskeyModal' | 'PasskeyUnlockButton'
 
 const LeftOut = "It is left out of this report, as it may quote what the user typed"
 

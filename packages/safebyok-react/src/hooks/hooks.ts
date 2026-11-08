@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type BoxSnapshot, type Vault, type VaultError, type VaultSnapshot, type Whisper, type BoxExposure } from 'safebyok'
+import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type BoxSnapshot, type VaultSnapshot, type Whisper, type BoxExposure } from 'safebyok'
 import { useProvided } from '../provider/bank-provider'
+import type { VaultHeld } from '../shapes'
 
 // == [Bank hooks]: useBank, useBankSnapshot, subscribeToNothing, getNothing
 
@@ -19,12 +20,6 @@ export const useBankSnapshot = (): BankSnapshot | null => {
 // --
 
 // == [Vault hooks]: VaultStage, VaultHeld, useVault, useVaultFor, useVaultSnapshot, WaitingHeld, UnbornHeld
-
-/** Where the vault a hook names stands: `waiting`, `unborn`, `present`, or `spent` once its bank is swept or vacated. */
-export type VaultStage = 'waiting' | 'unborn' | 'present' | 'spent'
-
-/** What {@link useVault} answers: the vault's stage, its Vault object while it is `present`, and why its bank ended once `spent`. */
-export type VaultHeld = { stage: 'waiting' | 'unborn', vault: null } | { stage: 'present', vault: Vault } | { stage: 'spent', vault: null, cause: VaultError }
 
 const WaitingHeld: VaultHeld = Object.freeze({ stage: 'waiting', vault: null })
 const UnbornHeld: VaultHeld = Object.freeze({ stage: 'unborn', vault: null })

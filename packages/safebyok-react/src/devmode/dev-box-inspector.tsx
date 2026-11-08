@@ -4,10 +4,8 @@ import { WhisperField } from '../components/whisper-field'
 import { Messages } from '../helpers/messages'
 import { useBankSnapshot, useBox, useBoxes, useBoxSnapshot, useBoxExposure, useVault, useVaultSnapshot, useWhisper } from '../hooks/hooks'
 import { useRevealToggle } from '../hooks/reveal-toggle'
+import type { DevBoxInspectorProps } from '../shapes'
 import { LastCallLine, isLabel, jsonOf, useLastCall } from './last-call'
-
-/** What a DevBoxInspector is handed: the vaultlabel and boxlabel it opens on. */
-export type DevBoxInspectorProps = { defaultVaultlabel?: string, defaultBoxlabel?: string }
 
 /** A vaultlabel and a boxlabel to pick, and a button for each verb the shared Box and its Vault offer. */
 export const DevBoxInspector = ({ defaultVaultlabel = 'main', defaultBoxlabel = '' }: DevBoxInspectorProps) => {
