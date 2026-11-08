@@ -181,9 +181,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (! vacated.ok) { await onRefused(vacated.err) }
   }
 
-  /** Tell the host that a cached lease survived a lock, vacating this vault when it has no `onPanic` to hear it. */
+  /** Tell the host that a cached lease survived a lock. */
   async #panic(refusal: VaultError): Promise<void> {
-    if (! await this.world.panic(refusal)) { this.vacate() }
+    await this.world.panic({ refusal, vault: this })
   }
 
   /** The lease `proved` earns, attached. A lock landing during the unlock does not hold: the proof says this user may have the vault unlocked. */

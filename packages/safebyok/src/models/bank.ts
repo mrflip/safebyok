@@ -13,7 +13,7 @@ import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bank
 import type { LeaseDated } from '../shapes/shapes-storage'
 import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BadNewsHandler, BankOpts, BankSnapshot, BankStage, Panic, PanicHandler } from '../shapes/shapes-vaultish'
+import type { BadNewsHandler, BankOpts, BankSnapshot, BankStage, GuardedPanicHandler, Panic, PanicHandler } from '../shapes/shapes-vaultish'
 import type { DeviceDB } from '../storage/device-db'
 import { helloFirst, insecureContext } from '../refusals/throwers'
 import { DefaultLeaseMillis, type Vault } from './vault'
@@ -40,12 +40,12 @@ export class Bank {
   readonly strengthChecker:  GuardedStrengthChecker
   readonly leaseMillis:      number
   /** Tells the host of a refused erase of a cached lease, and no secret material. */
-  readonly panic:            Panic
+  readonly panic:            GuardedPanicHandler
   /** The refresh horizon of each vault's boxes. */
   readonly boxRefreshMillis: number
 
   readonly #makeListing: () => VaultListing
-  readonly #onBadNews:   BadNewsHandler | undefined
+  readonly #onBadNews:   BadNewsHandler
   readonly #listeners = new Set<() => void>()
   #vaultListing:         VaultListing
   /** The outcome of the last `hello`, null with none since the bank was made, swept or vacated. */
@@ -81,7 +81,7 @@ export class Bank {
 
   constructor(opts: BankOpts) {
     checkSecureContext()
-    const { applabel, user_id, device_id, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = VX.bankOpts.parse(opts)
+    const { applabel, user_id, device_id, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews = DefaultOnBadNews, onPanic = DefaultOnPanic } = VX.bankOpts.parse(opts)
     this.scope = bankScope.parse({ applabel, user_id })
     tattoo(this, this.scope)
     this.device_id = device_id
@@ -205,7 +205,7 @@ export class Bank {
   async #eraseLease(row: LeaseDated): Promise<void> {
     const forgotten = await this.deviceDB.tryForget(row)
     // As a vault's own panic tells it, but with no vault to vacate.
-    if (! forgotten.ok) { await this.panic(forgotten.err) }
+    if (! forgotten.ok) { await this.panic({ refusal: forgotten.err }) }
   }
   // --
 
@@ -244,12 +244,10 @@ export class Bank {
     }
   }
 
-  /** Every news goes to the host's `onBadNews`, else the logger; 'identity_revoked' vacates the bank first. */
+  /** Every news goes to the bank's `onBadNews`; 'identity_revoked' vacates the bank first. */
   #hearBadNews(news: VaultError): unknown {
     if (isVaultError(news, 'identity_revoked')) { this.vacate() }
-    if (this.#onBadNews !== undefined) { return this.#onBadNews(news) }
-    this.logger.warn(news.message, { call: 'Bank.onBadNews', refusalkind: news.refusalkind })
-    return undefined
+    return this.#onBadNews({ news, bank: this })
   }
   // --
 
@@ -290,12 +288,23 @@ export class Bank {
   get modelkind(): 'bank' { return 'bank' satisfies Modelkind }
 }
 
-// == [Host functions]: HostChecks, guardRequestCleartext, guardOnPanic
+// == [Host functions]: HostChecks, DefaultOnBadNews, DefaultOnPanic, guardRequestCleartext, guardOnPanic
 
 const HostChecks = Checkers('bad_option', ({ fn }) => ({
   requestCleartext: fn<RequestCleartext>(),
-  onPanic:          fn<PanicHandler>().optional(),
+  onPanic:          fn<PanicHandler>(),
 }))
+
+/** The `onBadNews` a bank has when given none: each news to the bank's logger. */
+export const DefaultOnBadNews: BadNewsHandler = ({ news, bank }) => {
+  bank.logger.warn(news.message, { call: 'Bank.onBadNews', refusalkind: news.refusalkind })
+}
+
+/** The `onPanic` a bank has when given none: the refusal to the platform, and the vault vacated. */
+export const DefaultOnPanic: PanicHandler = ({ refusal, vault }) => {
+  reportToPlatform(refusal)
+  vault?.vacate()
+}
 
 // What the dialog throws is dropped: it may quote what the user typed.
 /** `requestCleartext` held to its contract: the one way a gating asks the user. */
@@ -312,19 +321,14 @@ export const guardRequestCleartext = (requestCleartext: RequestCleartext): AskUs
 }
 
 /** `onPanic` held to its contract: the one way a bank or a vault tells the host of a cached lease that survived its erase. */
-export const guardOnPanic = (onPanic: PanicHandler | undefined): Panic => {
+export const guardOnPanic = (onPanic: PanicHandler): GuardedPanicHandler => {
   const host = HostChecks.onPanic.parse(onPanic, { where: 'onPanic' })
-  return brandGuarded(async (refusal: VaultError): Promise<boolean> => {
-    if (host === undefined) {
-      reportToPlatform(refusal)
-      return false
-    }
+  return brandGuarded(async (panic: Panic): Promise<void> => {
     try {
-      await host(refusal)
+      await host(panic)
     } catch (err) {
       reportToPlatform(err)
     }
-    return true
   })
 }
 // --

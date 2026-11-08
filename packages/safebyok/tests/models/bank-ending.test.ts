@@ -178,7 +178,7 @@ describe("bank.autolock", () => {
     const refusal = new VaultError('storage_unavailable', 'no store')
     vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValueOnce({ ok: false, err: refusal })
     await bank.autolock()
-    expect(onBadNews).toHaveBeenCalledWith(refusal)
+    expect(onBadNews).toHaveBeenCalledWith({ news: refusal, bank })
   })
 
   it("leaves a refused erase to the vault's own lock, whose panic onPanic hears", async () => {
@@ -190,7 +190,7 @@ describe("bank.autolock", () => {
     await bank.autolock()
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => onPanic.mock.calls.length === 1)
-    expect(onPanic).toHaveBeenCalledWith(refusal)
+    expect(onPanic).toHaveBeenCalledWith({ refusal, vault })
   })
 
   it("finds nothing past an autolock of Infinity", async () => {
@@ -258,7 +258,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     vi.spyOn(world.deviceDB, 'tryForget').mockResolvedValue({ ok: false, err: refusal })
     bank.vacate()
     await TH.eventually(() => onPanic.mock.calls.length === 1)
-    expect(onPanic).toHaveBeenCalledWith(refusal)
+    expect(onPanic).toHaveBeenCalledWith({ refusal })
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     onPanic.mockRejectedValueOnce(new Error('panic handler broke'))

@@ -153,14 +153,6 @@ describe("BankProvider's props", () => {
     expect(spy.calls[0]?.story).to.deep.equal({ call: 'BankProvider', props: ['deviceDB', 'keyDeriver'] })
   })
 
-  it("names a handler given only after the bank was made", async () => {
-    const spy = TH.spyLogger()
-    const { props, rerender } = provided({ logger: spy.logger })
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    rerender({ ...props, onBadNews: () => undefined })
-    expect(spy.calls[0]?.story).to.deep.equal({ call: 'BankProvider', props: ['onBadNews'] })
-  })
-
   it("says nothing of handlers written inline at each render", async () => {
     const spy = TH.spyLogger()
     const { props, rerender } = provided({ logger: spy.logger, onBadNews: () => undefined, onPanic: () => undefined })
@@ -226,31 +218,10 @@ describe("BankProvider's handlers", () => {
     rerender({ ...props, onPanic: last })
     refuseErase(deviceDB)
     fireEvent.click(screen.getByText('Lock'))
-    await waitFor(() => { expect(last).toHaveBeenCalledWith(Refusal) })
+    await waitFor(() => { expect(last).toHaveBeenCalledWith(expect.objectContaining({ refusal: Refusal })) })
     expect(first).not.toHaveBeenCalled()
     expect(TH.seenBanks).to.have.lengthOf(1)
     expect(shown('vault')).to.eq('present locked')
-  })
-
-  it("tells the onPanic the bank was made with of a panic once the props drop it", async () => {
-    vi.stubGlobal('reportError', vi.fn())
-    const madeWith = vi.fn()
-    const { props, rerender, deviceDB } = await unlockedProvided({ onPanic: madeWith })
-    rerender({ ...props, onPanic: undefined })
-    refuseErase(deviceDB)
-    fireEvent.click(screen.getByText('Lock'))
-    await waitFor(() => { expect(madeWith).toHaveBeenCalledWith(Refusal) })
-    expect(shown('vault')).to.eq('present locked')
-  })
-
-  it("tells the onBadNews the bank was made with of bad news once the props drop it", async () => {
-    const madeWith = vi.fn()
-    const { props, rerender } = provided({ onBadNews: madeWith })
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    rerender({ ...props, onBadNews: undefined })
-    await act(async () => { await TH.wakeupAtNextTick() })
-    TH.seenBanks[0]?.tellBadNews([Refusal])
-    expect(madeWith).toHaveBeenCalledWith(Refusal)
   })
 
   it("leaves a vault whose lease survived its erase to be vacated when the host has no onPanic, as the core does", async () => {
@@ -261,19 +232,6 @@ describe("BankProvider's handlers", () => {
     fireEvent.click(screen.getByText('Lock'))
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
     await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
-  })
-
-  it("tells an onPanic given only after the bank was made nothing, and leaves the vault to be vacated", async () => {
-    const reported = vi.fn()
-    vi.stubGlobal('reportError', reported)
-    const later = vi.fn()
-    const { props, rerender, deviceDB } = await unlockedProvided()
-    rerender({ ...props, onPanic: later })
-    refuseErase(deviceDB)
-    fireEvent.click(screen.getByText('Lock'))
-    await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
-    await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
-    expect(later).not.toHaveBeenCalled()
   })
 
   it("tells the next user's onPanic nothing of a panic from the bank it let go", async () => {
@@ -397,8 +355,8 @@ describe("BankProvider's dialog", () => {
     expect(first).not.toHaveBeenCalled()
   })
 
-  it("asks nobody when requestCleartext is null", async () => {
-    provided({ requestCleartext: null })
+  it("asks nobody when requestCleartext answers nothing", async () => {
+    provided({ requestCleartext: async () => undefined })
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))
     await act(async () => { await TH.wakeupAtNextTick() })

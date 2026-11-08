@@ -6,7 +6,7 @@ import type { VaultError } from '../../src/refusals/errors'
 import type { Box } from '../../src/models/box'
 import type { Gatingkind } from '../../src/shapes/shapes-enums'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
-import type { BankSnapshot, BoxSnapshot, VaultSnapshot } from '../../src/shapes/shapes-vaultish'
+import type { BadNews, BankSnapshot, BoxSnapshot, VaultSnapshot } from '../../src/shapes/shapes-vaultish'
 import type { Whisper } from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, VaultScopeGiven, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
@@ -17,7 +17,7 @@ useBankWorlds()
 
 /** What nobody asked to hear, which a host's `onBadNews` is told: a proof that left it to the logger would pass over it. */
 const badNews: VaultError[] = []
-const onBadNews = (news: VaultError): void => { badNews.push(news) }
+const onBadNews = ({ news }: BadNews): void => { badNews.push(news) }
 const expectNoBadNews = (): void => { expect(badNews.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal([]) }
 afterEach(expectNoBadNews)
 

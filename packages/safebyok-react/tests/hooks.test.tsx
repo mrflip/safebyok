@@ -95,7 +95,7 @@ describe("useVault and useVaultSnapshot", () => {
     seeding.sweep()
     vaultDB.refusing = true
     const news: VaultError[] = []
-    render(<BankProvider {...TH.providerPropsOf(world, { vaultDB, onBadNews: (told) => { news.push(told) } })}><TH.ShowsVault /></BankProvider>)
+    render(<BankProvider {...TH.providerPropsOf(world, { vaultDB, onBadNews: ({ news: told }) => { news.push(told) } })}><TH.ShowsVault /></BankProvider>)
     await waitFor(() => { expect(news.map(({ refusalkind }) => refusalkind)).to.include('storage_unavailable') })
   })
 })

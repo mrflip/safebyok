@@ -8,7 +8,7 @@ import type * as GX from '../../src/shapes/shapes-gateish'
 import { type AskUser, type RequestCleartext, passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import type { BoxWorld, ListingOpts, PanicHandler, VaultWorld } from '../../src/shapes/shapes-vaultish'
 import type { VaultTombstone, VaultRecord } from '../../src/shapes/shapes-storage'
-import { guardOnPanic, guardRequestCleartext } from '../../src/models/bank'
+import { DefaultOnPanic, guardOnPanic, guardRequestCleartext } from '../../src/models/bank'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { Outcome } from '../../src/refusals/outcome'
@@ -122,7 +122,7 @@ export type VaultWorldGiven = Partial<Omit<FakeBank, keyof ProvingWorldGiven>> &
 
 /** A vault listing over a vaultDB of one row, `stored0` to begin with, and the deviceDB and clock it shares with every other session `anotherSession` opens on this device. `worldOverrides` says otherwise of the world. */
 export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverrides: VaultWorldGiven = {}) => {
-  const { onPanic, keyDeriver, strengthChecker, device_id = '00000000-0000-4000-8000-000000000001', ...overrides } = worldOverrides
+  const { onPanic = DefaultOnPanic, keyDeriver, strengthChecker, device_id = '00000000-0000-4000-8000-000000000001', ...overrides } = worldOverrides
   let now = T0
   _cheat_clock(() => now)
   const deviceDB = makeDeviceDB()
