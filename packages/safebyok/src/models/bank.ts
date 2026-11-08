@@ -130,9 +130,10 @@ export class Bank {
   async hello(): Promise<void> {
     this.demandEnabled()
     const hello = await outcomeOf(() => this.#bringUp())
-    if (! this.isEnabled) {
-      // A hello that a sweep or a vacate crosses leaves the snapshot as it is, and refuses as the bank's unless it refused on its own.
-      throw (hello.ok || isVaultError(hello.err, 'disabled')) ? bankDisabled() : hello.err
+    const endCause = this.#endCause
+    if (endCause) {
+      // A hello that a sweep or a vacate crosses leaves the snapshot as it is, and refuses with the snapshot's cause unless it refused on its own.
+      throw (hello.ok || isVaultError(hello.err, 'disabled')) ? endCause : hello.err
     }
     this.#lastHello = hello
     this.#remakeSnapshot()
@@ -171,14 +172,14 @@ export class Bank {
     return this
   }
 
-  /** Sign out on this device: disable the bank, settling once every lease of this bank cached here is erased. Never rejects. */
-  vacate(story: VacateStory = {}): Promise<void> {
+  /** Sign out on this device: disable the bank, settling once every lease of this bank cached here is erased. */
+  async vacate(story: VacateStory = {}): Promise<void> {
     const { cause = bankDisabled() } = VX.vacateStory.parse(story)
     this.#letGo(cause, () => { this.#vaultListing.vacate() })
     // The scrub alone holds the host's handlers past the disable: a lease that outlives sign-out is the one the host most needs to hear of.
     // A vacate after a sweep still scrubs, as sign-out may come after the page's cleanup.
     this.#vacating ??= this.#eraseOwnLeases(this.#hostHandlers)
-    return this.#vacating
+    await this.#vacating
   }
 
   /** Cleanup while the page lives: disable the bank, leaving each cached lease for the next bank. Never throws. */

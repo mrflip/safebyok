@@ -334,21 +334,27 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     vi.unstubAllGlobals()
   })
 
-  it("answers a repeat with the first vacate's promise, scanning the cached leases once", async () => {
+  it("settles a repeat with the first vacate's scrub, scanning the cached leases once", async () => {
     const { world, bank } = await makeBankWithVault()
     const tryListLeases = vi.spyOn(world.deviceDB, 'tryListLeases')
-    const vacating = bank.vacate()
-    expect(bank.vacate({ cause: new VaultError('identity_revoked', 'signed out') })).to.equal(vacating)
-    await vacating
-    expect(bank.vacate()).to.equal(vacating)
+    const listing = TH.holdNextCall(world.deviceDB, 'tryListLeases')
+    const settled: string[] = []
+    const vacating = (async () => { await bank.vacate(); settled.push('first') })()
+    const repeat = (async () => { await bank.vacate({ cause: new VaultError('identity_revoked', 'signed out') }); settled.push('repeat') })()
+    await listing.reached
+    await TH.wakeupAtNextTick()
+    expect(settled).to.deep.equal([])
+    listing.release()
+    await Promise.all([vacating, repeat])
+    await bank.vacate()
     expect(tryListLeases).toHaveBeenCalledOnce()
     expect(bank.snapshot.err).to.include({ refusalkind: 'disabled' })
   })
 
-  it("refuses a story whose cause is no VaultError, or that has a field it does not take, and stays enabled", () => {
+  it("rejects a story whose cause is no VaultError, or that has a field it does not take, and stays enabled", async () => {
     const bank = makeBankWorld().bankOn()
-    TH.expectSyncRefusal(() => bank.vacate({ cause: new Error('signed out') as VaultError }), 'bad_option')
-    TH.expectSyncRefusal(() => bank.vacate({ reason: 'signed out' } as never), 'bad_option')
+    await TH.expectRefusal(bank.vacate({ cause: new Error('signed out') as VaultError }), 'bad_option')
+    await TH.expectRefusal(bank.vacate({ reason: 'signed out' } as never), 'bad_option')
     expect(bank.isEnabled).to.be.true
   })
 
@@ -420,6 +426,15 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(refusal.message).to.eq(Phrases.BankLetGo)
     expect(bank.snapshot.stage).to.eq('refused')
     expect(bank.snapshot.err).to.include({ refusalkind: 'disabled' })
+  })
+
+  it("refuses a hello that a vacate with a cause crosses with that cause, as the snapshot shows it", async () => {
+    const bank = makeBankWorld().bankOn()
+    const cause = new VaultError('identity_revoked', 'signed out')
+    const hello = bank.tryHello()
+    await bank.vacate({ cause })
+    expect(await TH.expectBad(hello, 'identity_revoked')).to.equal(cause)
+    expect(bank.snapshot).to.include({ stage: 'refused', err: cause })
   })
 
   it("refuses a hello whose last step lands just as a sweep does", async () => {
