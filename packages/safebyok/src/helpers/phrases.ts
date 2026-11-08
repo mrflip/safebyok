@@ -464,9 +464,11 @@ export const suppliedSpecChanged = (label: string): string => `A key deriver lab
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver (from safebyok/browser), or another vetted Argon2id deriver."
 // --
 
-// == [The models' bank]: BankHelloFirst, vaultStoredDamaged
+// == [The models' bank]: BankHelloFirst, BankLetGo, vaultStoredDamaged
 
 export const BankHelloFirst = "This bank isn't ready: call bank.hello() and wait for it first."
+
+export const BankLetGo = "This bank was let go, by a sweep or a vacate, so it answers nothing more: make another with Bank.make."
 
 /** Bad news of a vault row `listVaults` set aside. */
 export const vaultStoredDamaged = (vaultlabel: string): string => `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.`

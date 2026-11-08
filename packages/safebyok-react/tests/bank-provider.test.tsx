@@ -38,7 +38,7 @@ describe("BankProvider's bank", () => {
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     const [first, second] = TH.seenBanks
     expect(TH.seenBanks).to.have.lengthOf(2)
-    expect(first?.snapshot.stage).to.eq('made')
+    expect(first?.isEnabled).to.eq(false)
     expect(second?.user_id).to.eq('u2')
   })
 
@@ -48,7 +48,7 @@ describe("BankProvider's bank", () => {
     rerender({ ...props, applabel: 'globex' })
     await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(2) })
     expect(TH.seenBanks.map(({ applabel }) => applabel)).to.deep.equal(['acme', 'globex'])
-    expect(TH.seenBanks[0]?.snapshot.stage).to.eq('made')
+    expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
   })
 
   it("makes each bank with the device_id its deviceDB keeps for the bank's scope", async () => {
@@ -69,7 +69,7 @@ describe("BankProvider's bank", () => {
     const { unmount } = provided()
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
     unmount()
-    expect(TH.seenBanks[0]?.snapshot.stage).to.eq('made')
+    expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
   })
 
   it("ends with one bank, ready, under StrictMode", async () => {

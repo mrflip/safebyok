@@ -394,14 +394,14 @@ export type PanicHandler = (panic: Panic) => unknown
 /** `onPanic` as a bank keeps it, wrapped by `guardOnPanic`. Never throws. */
 export type GuardedPanicHandler = (panic: Panic) => Promise<void>
 
-/** `made` until a `hello` answers, and again past a sweep or a vacate; `ready` once one lands; `refused` once one refuses, the snapshot's `err` saying why. */
+/** `made` until a `hello` answers; `ready` once one lands; `refused` once one refuses or the bank is swept or vacated, the snapshot's `err` saying why. */
 export type BankStage = 'made' | 'ready' | 'refused'
 
 /** A bank as a host renders it: its scope, how far its `hello` got, and its vaults. */
 export interface BankSnapshot extends BankScope {
   /** How far the bank's `hello` got: `made`, `ready` or `refused`. */
   readonly stage:     BankStage
-  /** Why the last `hello` refused, or null. */
+  /** Why the last `hello` refused, or why the bank is disabled, or null. */
   readonly err:       VaultError | null
   /** Your id for this device, as `Bank.make` was given it. */
   readonly device_id: string
