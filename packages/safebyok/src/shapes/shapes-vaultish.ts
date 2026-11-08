@@ -314,7 +314,7 @@ export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 's
 
 // --
 
-// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, vacateCause, BadNews, BadNewsHandler, Panic, PanicHandler, GuardedPanicHandler, BankPanic, BankStage, BankSnapshot
+// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, Panic, PanicHandler, GuardedPanicHandler, BankPanic, BankStage, BankSnapshot
 
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
   positiveMinutes: union([num.positive(), lit(Infinity)], Phrases.PositiveMinutesShape),
@@ -365,16 +365,24 @@ export interface BankOpts {
   vaultRefreshMinutes?: number | undefined
   /** How recently a box's record must have been fetched to be trusted, in minutes; 5 when left out. */
   boxRefreshMinutes?:   number | undefined
-  /** Hears each refusal no caller waits on; `DefaultOnBadNews`, the bank's logger, when left out. */
+  /** Hears each refusal no caller waits on while the bank is enabled and in its vacate's erase; else `DefaultOnBadNews`, the bank's logger. */
   onBadNews?:           BadNewsHandler | undefined
-  /** Hears what you must act on for safety, and no secret material; `DefaultOnPanic` when left out. */
+  /** Hears what you must act on for safety, and no secret material, while the bank is enabled and in its vacate's erase; `DefaultOnPanic` when left out. */
   onPanic?:             PanicHandler | undefined
 }
 
 true satisfies Z.core.util.AssertEqual<BankOpts, Z.input<typeof bankOpts>>
 
-/** The check of what `bank.vacate` may be given: the refusal that called for it, or nothing. */
-export const vacateCause = Checker(({ vaultError }) => vaultError.optional(), 'bad_option', [Checks])
+/** The check of what `bank.vacate` may be told. */
+export const vacateStory = objCheck(({ vaultError }) => ({ cause: vaultError.optional() }), 'bad_option', [Checks])
+
+/** What `bank.vacate` may be told: the refusal that called for it, which its snapshot then shows. */
+export interface VacateStory {
+  /** The refusal that called for the vacate; `disabled` when left out. */
+  cause?: VaultError | undefined
+}
+
+true satisfies Z.core.util.AssertEqual<VacateStory, Z.input<typeof vacateStory>>
 
 /** What `onBadNews` hears: a refusal no caller waits on, and the bank it reached. */
 export interface BadNews {
@@ -406,7 +414,7 @@ export type BankStage = 'made' | 'ready' | 'refused'
 
 /** A bank as a host renders it: its scope, how far its `hello` got, and its vaults. */
 export interface BankSnapshot extends BankScope {
-  /** How far the bank's `hello` got: `made`, `ready` or `refused`. */
+  /** How far the bank's `hello` got, `made`, `ready` or `refused`, and `refused` from a sweep or a vacate on. */
   readonly stage:     BankStage
   /** Why the last `hello` refused, or why the bank is disabled, or null. */
   readonly err:       VaultError | null
