@@ -18,7 +18,7 @@ built. *Open* is a live case that has no thread and needs a ruling.
 Contents:
 
 * **Call chains:** `#straight-chute`, `#sugar-holds-no-logic`, `#no-bouncing`, `#own-your-form`, `#no-call-for-side-effects`
-* **Guards and awaits:** `#ensure-works-demand-refuses`, `#guard-at-the-entrypoint`, `#no-second-ensure`
+* **Guards and awaits:** `#ensure-works-demand-refuses`, `#guard-at-the-entrypoint`, `#chain-guards`, `#no-second-ensure`
 * **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-crash`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`, `#no-repair-in-normal-ops`
 * **Reuse:** `#use-the-helper`, `#one-test-one-place`, `#use-what-you-parse`
 * **Shapes and state:** `#no-fake-values`, `#stable-sentinels`, `#ask-the-host`, `#no-wrapper-without-a-job`, `#say-the-positive`
@@ -776,8 +776,7 @@ const prior = VS.revisionOf(held ?? VS.VoidRevision)
 
 ## A boolean says the positive `#say-the-positive`
 
-Every read of a negative boolean is a double negative, and guards read worst of all: `selfDestructPreventionDisabled`. A name that says
-what a guard doesn't check misleads too: when the vault's check is widened, widen `demandEnabled`, rather than add `demandUsable` beside it.
+Every read of a negative boolean is a double negative, and guards read worst of all: `selfDestructPreventionDisabled`.
 
 **Goofus:**
 
@@ -785,8 +784,7 @@ what a guard doesn't check misleads too: when the vault's check is widened, wide
 #isDisabled = false
 if (! this.#isDisabled) { this.settle() }
 
-demandUsable(): this { return this.demandEnabled().demandPresent() }
-demandBoxesUsable(): this { return this.demandUsable().demandUnlocked() }     // the vault, holding logic about boxes
+demandEnabled(): this { if (this.#isDisabled) { throw disabledError() } return this }
 ```
 
 **Gallant:**
@@ -795,13 +793,27 @@ demandBoxesUsable(): this { return this.demandUsable().demandUnlocked() }     //
 #isEnabled = true
 if (this.#isEnabled) { this.settle() }
 
-override demandEnabled(): this {
-  super.demandEnabled()
-  return this.demandPresent()
-}
+demandEnabled():    this { if (! this.#isEnabled) { throw disabledError() } return this }
 ```
 
-*Status: Fixed.*
+## Guards chain to the caller or the receiver `#chain-guards`
+
+A guard name should either match a direct attribute of the receiver or match (with +able) the step its callers share. The first tests one thing; the second chains those.
+
+**Goofus:**
+
+```ts
+demandUsable(): this { return this.demandEnabled().demandPresent() }          // usable for who knows what?
+demandBoxesUsable(): this { return this.demandUsable().demandUnlocked() }     // the vault, holding logic about boxes
+```
+
+**Gallant:**
+
+```ts
+demandEnabled():    this { if (! this.#isEnabled) { throw disabledError() } return this } // one test, direct
+demandPromptable(): this { return this.demandEnabled().demandPresent() }                  // one recipe, chained
+// demandBoxesUsable -- moved to Box and renamed for its callers                          // belongs near callers, as per its name
+```
 
 ---
 
