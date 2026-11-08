@@ -1,8 +1,8 @@
 import { useRef } from 'react'
 import type { Gating } from 'safebyok'
-import { useRoundFor } from './boundary'
-import { Messages } from './messages'
-import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts, type DialogAnswer } from './modal'
+import { Messages } from '../helpers/messages'
+import { useRoundFor } from '../hooks/round-for'
+import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts, type DialogAnswer } from './modal-kit'
 
 /** The dialog for a `del_vault` gating, which deletes the vault once the user proves its passphrase. */
 export const DelVaultModal = (props: DelVaultModalProps) => (

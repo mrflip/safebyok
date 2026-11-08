@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import type { VaultDB } from 'safebyok'
 import { boxSparse, nextRevisionOf, revisionOf } from 'safebyok/storage'
 import type { BankListed, BankScope, BoxesListed, BoxSparse, DamagedBox, DamagedVault, VaultRecord, VaultRow } from 'safebyok/storage'
-import { useBank } from '../hooks'
+import { useBank } from '../hooks/hooks'
 import { LastCallLine, jsonOf, timeOf, useLastCall, useListing } from './last-call'
 
 /** What a DevVaultDBInspector is handed: the vaultDB whose rows it shows. */

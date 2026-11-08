@@ -1,11 +1,11 @@
 import { useEffect, useRef, type ComponentType } from 'react'
 import type { AnyGating, Gating, Gatingkind } from 'safebyok'
-import { AddPasskeyModal } from './add-passkey-modal'
-import { DelVaultModal } from './del-vault-modal'
-import type { DialogAnswer, PassphraseAdvice } from './modal'
-import { PassphraseModal } from './passphrase-modal'
-import { ReplacePassphraseModal } from './replace-passphrase-modal'
-import { RevokePasskeyModal } from './revoke-passkey-modal'
+import { AddPasskeyModal } from '../modals/add-passkey-modal'
+import { DelVaultModal } from '../modals/del-vault-modal'
+import type { DialogAnswer, PassphraseAdvice } from '../modals/modal-kit'
+import { PassphraseModal } from '../modals/passphrase-modal'
+import { ReplacePassphraseModal } from '../modals/replace-passphrase-modal'
+import { RevokePasskeyModal } from '../modals/revoke-passkey-modal'
 
 /** What GatingModal is handed: any gating, and the props its dialogs share. */
 export type GatingModalProps = {

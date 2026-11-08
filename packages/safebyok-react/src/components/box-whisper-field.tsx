@@ -2,9 +2,9 @@ import { useId, type ComponentPropsWithoutRef } from 'react'
 import type { Box } from 'safebyok'
 import { BoxFields } from 'safebyok/dom'
 import { WhisperFieldAttributes } from 'safebyok/utils'
-import { useBoxIsShowing } from './hooks'
-import { Messages } from './messages'
-import { useRevealToggle } from './reveal-toggle'
+import { Messages } from '../helpers/messages'
+import { useBoxIsShowing } from '../hooks/hooks'
+import { useRevealToggle } from '../hooks/reveal-toggle'
 
 /** A field showing the text at dotted `path` in the whisper of `box`, blank and read-only while it will not show.
  *

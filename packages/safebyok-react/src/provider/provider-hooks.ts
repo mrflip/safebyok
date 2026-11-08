@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Bank, BankOpts } from 'safebyok'
-import type { HeldBankOpts } from './shapes/shapes-provider'
+import type { HeldBankOpts } from '../shapes/shapes-provider'
 
 // == [Device]: useDeviceId
 

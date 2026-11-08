@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Activity, StrictMode, Suspense, useLayoutEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
-import { type WhenShown, useWhenShown } from '../src/when-shown'
+import { type WhenShown, useWhenShown } from '../src/hooks/when-shown'
 import * as TH from './test-helpers'
 
 /** A component that hands its `whenShown` to `grab` at each render. */

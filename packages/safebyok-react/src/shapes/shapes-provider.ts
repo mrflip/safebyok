@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { BadNewsHandler, BankOpts, LifecycleHandler, RequestCleartext } from 'safebyok'
 import { Checker, bankOpts, type AssertEqual, type CheckerInput } from 'safebyok/storage'
-import type { PassphraseAdvice } from '../modal'
+import type { PassphraseAdvice } from '../modals/modal-kit'
 
 // == [Props]: BankProviderProps, providerProps, HeldBankOpts, Handlers
 

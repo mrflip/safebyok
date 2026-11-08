@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Locale, Messages } from '../src/messages'
+import { Locale, Messages } from '../src/helpers/messages'
 
 describe("Messages", () => {
   it("frames each varying sentence whole around its part", () => {

@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import type { AnyGating, Gating } from 'safebyok'
-import { attemptRefusalFlavor } from './attempt-refusals'
-import { Boundary, forBoundary, useRoundFor } from './boundary'
-import { Messages } from './messages'
-import { askPasskey, attemptOnce, passkeysAvailable } from './passkey'
-import { useWhenShown } from './when-shown'
+import { attemptRefusalFlavor } from '../helpers/attempt-refusals'
+import { Messages } from '../helpers/messages'
+import { askPasskey, attemptOnce, passkeysAvailable } from '../helpers/passkey'
+import { useRoundFor } from '../hooks/round-for'
+import { useWhenShown } from '../hooks/when-shown'
+import { Boundary, forBoundary } from '../provider/boundary'
 
 /** A button that unlocks with the vault's passkey, shown only where a passkey can be used.
  *

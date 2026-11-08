@@ -70,7 +70,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
 * **The dialogs' phrases, sent in by the host.** The Coach, 2026-10-24 (on
   [#265](https://github.com/mrflip/safebyok/pull/265), ruling that what the user types to open the
   vault shows as "Vault unlocker"): "TODO: an i18n friendly way to send in phrases displayed".
-  Every word safebyok-react shows is in `src/messages.ts`, English only, each varying sentence a
+  Every word safebyok-react shows is in `src/helpers/messages.ts`, English only, each varying sentence a
   frame around its part; give a host a way to hand in its own (a locale's bag of phrases through
   `BankProvider` and the dialogs, say), so a translation, or a house term in place of "Vault
   unlocker", needs no fork.
@@ -480,7 +480,7 @@ raised the standard bundle (an app loading the Bank) overall, it is not worth it
 ## The react lifecycle
 
 `BankProvider` makes its bank in an effect and hands it down with `setHeld` from that effect,
-under a `react-hooks/set-state-in-effect` suppression (`safebyok-react/src/bank-provider.tsx`);
+under a `react-hooks/set-state-in-effect` suppression (`safebyok-react/src/provider/bank-provider.tsx`);
 `useVault` asks for a vault in an effect of its own (thread 7b, 2026-10-22).
 Thread A5 of the contract sprint ([#199](https://github.com/mrflip/safebyok/pull/199)) moved the
 suppression to `setVault` and closed this section; the Coach (2026-10-19) reopened it: "Leave the

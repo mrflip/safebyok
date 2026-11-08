@@ -1,9 +1,9 @@
 import { useId, useRef, useState } from 'react'
 import type { BoxPutOpts, BoxSnapshot, Whisper } from 'safebyok'
-import { useBankSnapshot, useBox, useBoxes, useBoxSnapshot, useBoxExposure, useVault, useVaultSnapshot, useWhisper } from '../hooks'
-import { Messages } from '../messages'
-import { useRevealToggle } from '../reveal-toggle'
-import { WhisperField } from '../whisper-field'
+import { WhisperField } from '../components/whisper-field'
+import { Messages } from '../helpers/messages'
+import { useBankSnapshot, useBox, useBoxes, useBoxSnapshot, useBoxExposure, useVault, useVaultSnapshot, useWhisper } from '../hooks/hooks'
+import { useRevealToggle } from '../hooks/reveal-toggle'
 import { LastCallLine, isLabel, jsonOf, useLastCall } from './last-call'
 
 /** What a DevBoxInspector is handed: the vaultlabel and boxlabel it opens on. */

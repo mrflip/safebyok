@@ -1,7 +1,7 @@
 import { isVaultError, type Outcome } from 'safebyok'
-import { type TellBadNews, useProvided } from './bank-provider'
-import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from './hooks'
-import { Messages } from './messages'
+import { Messages } from '../helpers/messages'
+import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from '../hooks/hooks'
+import { type TellBadNews, useProvided } from '../provider/bank-provider'
 
 /** Whether the signed-in user's vault under `vaultlabel` is locked, with a Lock or Unlock button, or a Create vault button while it is unborn. */
 export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {

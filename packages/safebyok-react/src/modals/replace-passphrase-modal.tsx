@@ -1,8 +1,8 @@
 import { useRef } from 'react'
 import type { Gating } from 'safebyok'
-import { useRoundFor } from './boundary'
-import { Messages } from './messages'
-import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal'
+import { Messages } from '../helpers/messages'
+import { useRoundFor } from '../hooks/round-for'
+import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal-kit'
 
 /** The dialog for a `replace_passphrase` gating, which proves the passphrase in use and chooses the next. */
 export const ReplacePassphraseModal = (props: ReplacePassphraseModalProps) => (

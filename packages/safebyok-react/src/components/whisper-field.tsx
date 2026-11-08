@@ -1,7 +1,7 @@
 import { useId, type ComponentPropsWithRef } from 'react'
 import { WhisperFieldAttributes } from 'safebyok/utils'
-import { Messages } from './messages'
-import { useRevealToggle } from './reveal-toggle'
+import { Messages } from '../helpers/messages'
+import { useRevealToggle } from '../hooks/reveal-toggle'
 
 /** A field for the user to type or paste a whisper into, hidden as they type, with a Show / Hide button.
  *

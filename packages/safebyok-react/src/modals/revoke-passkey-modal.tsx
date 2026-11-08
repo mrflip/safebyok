@@ -1,8 +1,8 @@
 import { useRef } from 'react'
 import type { Gating } from 'safebyok'
-import { useRoundFor } from './boundary'
-import { Messages } from './messages'
-import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts, type DialogAnswer } from './modal'
+import { Messages } from '../helpers/messages'
+import { useRoundFor } from '../hooks/round-for'
+import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts, type DialogAnswer } from './modal-kit'
 
 /** The dialog for a `revoke_passkey` gating, which removes the vault's passkey once the user proves its passphrase. */
 export const RevokePasskeyModal = (props: RevokePasskeyModalProps) => (

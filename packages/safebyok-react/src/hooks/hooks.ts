@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type BoxSnapshot, type Vault, type VaultError, type VaultSnapshot, type Whisper, type BoxExposure } from 'safebyok'
-import { useProvided } from './bank-provider'
+import { useProvided } from '../provider/bank-provider'
 
 // == [Bank hooks]: useBank, useBankSnapshot, subscribeToNothing, getNothing
 

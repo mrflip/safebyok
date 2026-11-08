@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { BankOpts } from 'safebyok'
-import { ReplacePassphraseModal } from '../src/replace-passphrase-modal'
-import type { DialogAnswer } from '../src/modal'
-import { Messages } from '../src/messages'
+import { ReplacePassphraseModal } from '../src/modals/replace-passphrase-modal'
+import type { DialogAnswer } from '../src/modals/modal-kit'
+import { Messages } from '../src/helpers/messages'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()

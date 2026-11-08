@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Bank, DefaultOnBadNews, DefaultOnLifecycle, tellBadNewsTo, type Vault, type VaultError } from 'safebyok'
+import { providerProps, type BankProviderProps, type Handlers, type HeldBankOpts } from '../shapes/shapes-provider'
 import { GatingModal, type GatingModalProps } from './gating-modal'
 import { useDeviceId, useWarnOfIgnoredOpts } from './provider-hooks'
-import { providerProps, type BankProviderProps, type Handlers, type HeldBankOpts } from './shapes/shapes-provider'
 
 // == [Context]: ContextValue, BankContext, Bankless, useProvided
 

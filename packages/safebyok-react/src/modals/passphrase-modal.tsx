@@ -1,9 +1,9 @@
 import { useRef } from 'react'
 import type { Gating } from 'safebyok'
-import { useRoundFor } from './boundary'
-import { Messages } from './messages'
-import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, holdsFocus, unlockedFor, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal'
-import { PasskeyUnlockButton, offersPasskey } from './passkey-unlock-button'
+import { PasskeyUnlockButton, offersPasskey } from '../components/passkey-unlock-button'
+import { Messages } from '../helpers/messages'
+import { useRoundFor } from '../hooks/round-for'
+import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, holdsFocus, unlockedFor, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal-kit'
 
 /** The passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
 export const PassphraseModal = (props: PassphraseModalProps) => (

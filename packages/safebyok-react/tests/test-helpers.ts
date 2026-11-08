@@ -7,7 +7,7 @@ import { onTestFinished, vi } from 'vitest'
 import { MemoryDeviceDB, type AnyGating, type Bank, type BankOpts, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok'
 import { Passphrase, VaultScopeGiven, anyStrengthChecker, passkeyOf, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok/testing'
 import type { BankProviderProps } from '../src/shapes/shapes-provider'
-import type { PassphraseGating } from '../src/passphrase-modal'
+import type { PassphraseGating } from '../src/modals/passphrase-modal'
 import { fromB64, toB64 } from 'safebyok/utils'
 
 export * from 'safebyok/testing'

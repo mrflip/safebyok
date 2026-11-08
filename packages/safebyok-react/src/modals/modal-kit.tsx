@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import { ForeverMillis, HostErrorSanitizer, MinuteMillis, type AnyGating, type Outcome, type Vault } from 'safebyok'
-import { attemptRefusalFlavor } from './attempt-refusals'
-import { Boundary, forBoundary, type BoundarySource } from './boundary'
-import { Doing, Locale, Messages } from './messages'
-import { useRevealToggle } from './reveal-toggle'
-import { useWhenShown } from './when-shown'
+import { attemptRefusalFlavor } from '../helpers/attempt-refusals'
+import { Doing, Locale, Messages } from '../helpers/messages'
+import { useRevealToggle } from '../hooks/reveal-toggle'
+import { useWhenShown } from '../hooks/when-shown'
+import { Boundary, forBoundary, type BoundarySource } from '../provider/boundary'
 
 // The parts every gating's dialog is built of: its one answer, kept above the boundary that shows a
 // calm notice; the form, with a dialog's semantics; the passphrase field and the advice beside it;
