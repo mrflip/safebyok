@@ -71,17 +71,18 @@ export const BankProvider = (props: BankProviderProps) => {
   const device_id = useDeviceId(deviceDB, applabel, user_id)
   const userkey = JSON.stringify([applabel, user_id])
 
-  // Signing out vacates here, not in the bank's cleanup, which an unmount, a hot reload or a hidden
-  // Activity runs too: only a change of user reruns this effect. The tag keeps the next user's bank safe.
+  // Another user signing in vacates the last one's bank here, not in the bank's cleanup, which an unmount,
+  // a hot reload or a hidden Activity runs too. A null user_id leaves it: auth may blink to null while it
+  // refreshes, so the host vacates at sign-out. The tag keeps the next user's bank safe.
   /** The last bank made, tagged with its user. */
   const lastBank = useRef<{ userkey: string, bank: Bank } | null>(null)
   const onMade = useCallback((bank: Bank) => { lastBank.current = { userkey: JSON.stringify([bank.applabel, bank.user_id]), bank } }, [])
   useEffect(() => {
     const last = lastBank.current
-    if (last === null || last.userkey === userkey) { return }
+    if (user_id === null || last === null || last.userkey === userkey) { return }
     lastBank.current = null
     void last.bank.vacate()
-  }, [userkey])
+  }, [user_id, userkey])
 
   // Keyed by the user, not the device: the host's app remounts when the user changes, so nothing typed
   // carries over to the next one, and stays put while the device_id arrives.

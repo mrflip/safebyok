@@ -234,10 +234,25 @@ const unlockedProvided = async (overrides: Partial<Props> = {}) => {
 }
 
 describe("BankProvider at sign-out", () => {
-  it("vacates the user's bank when they sign out, erasing its cached leases", async () => {
+  it("leaves the user's cached leases when they sign out, for the host to vacate", async () => {
     const { props, rerender, deviceDB } = await unlockedProvided()
     expect(await leaseUsers(deviceDB)).to.deep.equal(['u1'])
     rerender({ ...props, user_id: null })
+    await waitFor(() => { expect(shown('bank')).to.eq('none') })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(await leaseUsers(deviceDB)).to.deep.equal(['u1'])
+  })
+
+  it("keeps the leases when the same user signs in again, and vacates them when another does", async () => {
+    const { props, rerender, deviceDB } = await unlockedProvided()
+    rerender({ ...props, user_id: null })
+    rerender({ ...props, user_id: 'u1' })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(await leaseUsers(deviceDB)).to.deep.equal(['u1'])
+    rerender({ ...props, user_id: null })
+    rerender({ ...props, user_id: 'u2' })
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     await waitFor(async () => { expect(await leaseUsers(deviceDB)).to.deep.equal([]) })
   })
 
