@@ -85,16 +85,16 @@ describe("BankProvider's bank", () => {
     expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
   })
 
-  it("makes a fresh bank for each run of its effect under StrictMode", async () => {
+  // StrictMode runs the effect twice at mount, while the device_id is still on its way: the effect makes
+  // its bank once, when the device_id lands.
+  it("makes one bank under StrictMode, once the device_id lands", async () => {
     const making = vi.spyOn(Bank, 'make')
     render(<StrictMode><BankProvider {...TH.providerPropsOf(TH.makeBankWorld())}><TH.ShowsVault /></BankProvider></StrictMode>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    const [first, last] = making.mock.results.map((made) => made.value as Bank)
-    expect(making.mock.results).to.have.lengthOf(2)
-    expect(first?.isEnabled).to.be.false
-    expect(first?.snapshot.stage).to.eq('refused')
-    expect(last?.isEnabled).to.be.true
-    expect(TH.seenBanks.at(-1)).to.eq(last)
+    const [made] = making.mock.results.map((result) => result.value as Bank)
+    expect(making.mock.results).to.have.lengthOf(1)
+    expect(made?.isEnabled).to.be.true
+    expect(TH.seenBanks.at(-1)).to.eq(made)
   })
 
   it("hands down no bank until its deviceDB answers", async () => {

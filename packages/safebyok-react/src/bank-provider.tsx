@@ -24,8 +24,8 @@ export const useProvided = (hookname: string): ContextValue => {
 
 // == [Holding]: useHeldBank
 
-/** The bank made from the first render's `opts` and held until unmount. */
-const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void): ContextValue => {
+/** The bank made from the first render's `opts` once `device_id` is known, and held until unmount. */
+const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Handlers, onSwept: () => void): ContextValue => {
   const [madeFrom] = useState(opts)
   const [contextValue, setContextValue] = useState<ContextValue>(Bankless)
 
@@ -37,8 +37,10 @@ const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void
   // Activity's shown again) makes a fresh one. A layout effect runs before paint, so no frame shows the
   // provider without its bank.
   useLayoutEffect(() => {
+    const { user_id } = madeFrom
+    if (user_id === null || device_id === null) { return }
     const bank = Bank.make({
-      ...madeFrom,
+      ...madeFrom, user_id, device_id,
       onPanic:          (panic) => latest().onPanic(panic),
       onBadNews:        (badnews) => latest().onBadNews(badnews),
       requestCleartext: (gating) => latest().requestCleartext(gating),
@@ -53,7 +55,7 @@ const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void
       onSwept()
       setContextValue(Bankless)
     }
-  }, [madeFrom, onSwept])
+  }, [madeFrom, device_id, onSwept])
 
   useWarnOfIgnoredOpts(contextValue.bank, madeFrom, opts)
   return contextValue
@@ -64,17 +66,18 @@ const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void
 
 /** Hand the hooks a bank for each `applabel` and signed-in `user_id`, or none while nobody is signed in. */
 export const BankProvider = (props: BankProviderProps) => {
-  const { applabel, user_id, deviceDB, children } = providerProps.parse(props, { where: 'BankProvider' })
+  const { applabel, user_id, deviceDB } = providerProps.parse(props, { where: 'BankProvider' })
   const device_id = useDeviceId(deviceDB, applabel, user_id)
-  if (user_id === null || device_id === null) { return <BankContext.Provider value={Bankless}>{children}</BankContext.Provider> }
-  return <UserBankProvider key={JSON.stringify([applabel, user_id, device_id])} {...props} user_id={user_id} device_id={device_id} />
+  // Keyed by the user, not the device: the host's app remounts when the user changes, so nothing typed
+  // carries over to the next one, and stays put while the device_id arrives.
+  return <UserBankProvider key={JSON.stringify([applabel, user_id])} {...props} device_id={device_id} />
 }
 
-/** Hold one signed-in user's bank from mount to unmount, and show the dialog for its gatings. */
-const UserBankProvider = (props: BankProviderProps & { user_id: string, device_id: string }) => {
+/** Hold one user's bank once the device is named, and show the dialog for its gatings. */
+const UserBankProvider = (props: BankProviderProps & { device_id: string | null }) => {
   const dialog = useGatingDialog()
-  const { passphraseUsername, passphraseAdvice, passkeyRpId, children, onPanic = DefaultOnPanic, onBadNews = DefaultOnBadNews, requestCleartext = dialog.ask, ...bankish } = props
-  const contextValue = useHeldBank(bankish, { onPanic, onBadNews, requestCleartext }, dialog.endAny)
+  const { passphraseUsername, passphraseAdvice, passkeyRpId, children, device_id, onPanic = DefaultOnPanic, onBadNews = DefaultOnBadNews, requestCleartext = dialog.ask, ...bankish } = props
+  const contextValue = useHeldBank(bankish, device_id, { onPanic, onBadNews, requestCleartext }, dialog.endAny)
   const { showing } = dialog
 
   return (

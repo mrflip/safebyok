@@ -30,8 +30,8 @@ export const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ de
   children:           custom<ReactNode>(),
 }), 'bad_option')
 
-/** The options a held bank is made from: Bank.make's, but the handlers. */
-export type HeldBankOpts = Omit<BankOpts, 'onPanic' | 'onBadNews' | 'requestCleartext'>
+/** The options a held bank is made from: Bank.make's, but `device_id` and the handlers, for a `user_id` that may be null. */
+export type HeldBankOpts = Omit<BankOpts, 'user_id' | 'device_id' | 'onPanic' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
 
 /** The functions a held bank calls back, each as it was last rendered. */
 export type Handlers = { onPanic: PanicHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext }
