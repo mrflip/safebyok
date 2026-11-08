@@ -7,7 +7,7 @@ import { VaultListing } from '../../src/models/vault-listing'
 import * as Phrases from '../../src/helpers/phrases'
 import { makeLifeTok } from '../../src/helpers/crypto'
 import type { LeaseRow } from '../../src/shapes/shapes-storage'
-import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
+import type { AnyGating, RequestCleartext } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, BankScopeGiven, OtherScopeGiven, VaultScopeGiven, labelsOf, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, T0, byPassphrase } from '../test-helpers/vault-world'
@@ -285,6 +285,71 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(bank.isEnabled).to.be.false
     await vacating
     expect(onBadNews).toHaveBeenCalledExactlyOnceWith({ news: refusal, bank })
+  })
+
+  it("disables the bank at once, before its scrub: every call refuses, and the snapshot reads refused with the cause", async () => {
+    const { world, bank } = await makeBankWithVault()
+    const listing = TH.holdNextCall(world.deviceDB, 'tryListLeases')
+    const cause = new VaultError('identity_revoked', 'signed out')
+    const vacating = bank.vacate({ cause })
+    expect(bank.isEnabled).to.be.false
+    expect(() => bank.demandEnabled()).to.throw(Phrases.BankLetGo)
+    expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(Phrases.BankLetGo)
+    expect(bank.snapshot).to.include({ stage: 'refused', err: cause })
+    await listing.reached
+    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'disabled')
+    await TH.expectRefusal(bank.hello(), 'disabled')
+    listing.release()
+    await vacating
+    expect(world.leaseRows()).to.deep.equal([])
+  })
+
+  it("tells the host nothing past the disable but its scrub's refusals, a vault's own erase going to the platform", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
+    const [onPanic, onBadNews] = [vi.fn(), vi.fn()]
+    const spy = TH.spyLogger()
+    const world = makeBankWorld()
+    const { bank, vault } = await makeBankWithVault(world, { requestCleartext, onPanic, onBadNews, logger: spy.logger })
+    requestCleartext.mockClear()
+    const refusal = new VaultError('storage_unavailable', 'no store')
+    vi.spyOn(world.deviceDB, 'tryForget').mockResolvedValue({ ok: false, err: refusal })
+    const listing = TH.holdNextCall(world.deviceDB, 'tryListLeases')
+    const vacating = bank.vacate()
+    await listing.reached
+    const [panicked, news] = [new VaultError('storage_unavailable', 'a panic past the disable'), new VaultError('damaged_row', 'news past the disable')]
+    expect(await bank.askUser({} as AnyGating)).to.be.true
+    await bank.panic({ refusal: panicked })
+    bank.tellBadNews([news])
+    expect([requestCleartext, onPanic, onBadNews].map((handler) => handler.mock.calls.length)).to.deep.equal([0, 0, 0])
+    listing.release()
+    await vacating
+    expect(onPanic).toHaveBeenCalledExactlyOnceWith({ refusal, bank })
+    expect([requestCleartext, onBadNews].map((handler) => handler.mock.calls.length)).to.deep.equal([0, 0])
+    expect(reported).toHaveBeenCalledWith(panicked)
+    await TH.eventually(() => reported.mock.calls.some(([err]) => err === refusal))
+    expect(vault.isEnabled).to.be.false
+    expect(spy.calls.map(({ message }) => message)).to.include(news.message)
+    vi.unstubAllGlobals()
+  })
+
+  it("answers a repeat with the first vacate's promise, scanning the cached leases once", async () => {
+    const { world, bank } = await makeBankWithVault()
+    const tryListLeases = vi.spyOn(world.deviceDB, 'tryListLeases')
+    const vacating = bank.vacate()
+    expect(bank.vacate({ cause: new VaultError('identity_revoked', 'signed out') })).to.equal(vacating)
+    await vacating
+    expect(bank.vacate()).to.equal(vacating)
+    expect(tryListLeases).toHaveBeenCalledOnce()
+    expect(bank.snapshot.err).to.include({ refusalkind: 'disabled' })
+  })
+
+  it("refuses a story whose cause is no VaultError, or that has a field it does not take, and stays enabled", () => {
+    const bank = makeBankWorld().bankOn()
+    TH.expectSyncRefusal(() => bank.vacate({ cause: new Error('signed out') as VaultError }), 'bad_option')
+    TH.expectSyncRefusal(() => bank.vacate({ reason: 'signed out' } as never), 'bad_option')
+    expect(bank.isEnabled).to.be.true
   })
 
   it("tells its listeners of a vacate with nothing listed, the stage alone having changed", async () => {
