@@ -68,7 +68,7 @@ describe("VaultLockControl", () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
     const news: VaultError[] = []
-    render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: async () => undefined, onBadNews: ({ news: told }) => { news.push(told) } })}><VaultLockControl vaultlabel="main" /></BankProvider>)
+    render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: () => undefined, onBadNews: ({ news: told }) => { news.push(told) } })}><VaultLockControl vaultlabel="main" /></BankProvider>)
     await waitFor(() => { expect(lockWords()).to.eq('Vault locked') })
     fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
     await TH.wakeupAtNextTick()

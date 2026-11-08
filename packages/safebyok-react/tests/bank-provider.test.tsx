@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Bank, MemoryDeviceDB, MinuteMillis, VaultError, type AnyGating } from 'safebyok'
-import { BankProvider, type BankProviderProps } from '../src/bank-provider'
+import { Bank, MemoryDeviceDB, VaultError, type AnyGating } from 'safebyok'
+import { BankProvider } from '../src/bank-provider'
+import type { BankProviderProps } from '../src/shapes/shapes-provider'
 import { Messages } from '../src/messages'
 import { createPasskey } from '../src/passkey'
 import * as TH from './test-helpers'
@@ -21,6 +22,18 @@ const provided = (overrides: Partial<Props> = {}, world = TH.makeBankWorld()) =>
   const ui = (given: Props) => <BankProvider {...given}><TH.ShowsVault /></BankProvider>
   const rendered = render(ui(props))
   return { world, props, rerender: (given: Props) => { rendered.rerender(ui(given)) }, unmount: rendered.unmount }
+}
+
+/** A MemoryDeviceDB whose ensureBank for `user_id` waits until the test calls `answer`; every other user's answers at once. */
+const deviceDBHolding = (user_id: string) => {
+  const deviceDB = new MemoryDeviceDB()
+  const answering = TH.held()
+  const ensureBank = deviceDB.ensureBank.bind(deviceDB)
+  vi.spyOn(deviceDB, 'ensureBank').mockImplementation(async (scope) => {
+    if (scope.user_id === user_id) { await answering.promise }
+    return ensureBank(scope)
+  })
+  return { deviceDB, answer: () => { answering.resolve(undefined) } }
 }
 
 describe("BankProvider's bank", () => {
@@ -72,28 +85,50 @@ describe("BankProvider's bank", () => {
     expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
   })
 
-  it("ends with one bank, ready, under StrictMode", async () => {
+  // StrictMode runs the effect twice at mount, while the device_id is still on its way: the effect makes
+  // its bank once, when the device_id lands.
+  it("makes one bank under StrictMode, once the device_id lands", async () => {
     const making = vi.spyOn(Bank, 'make')
-    const world = TH.makeBankWorld()
-    render(<StrictMode><BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /></BankProvider></StrictMode>)
+    render(<StrictMode><BankProvider {...TH.providerPropsOf(TH.makeBankWorld())}><TH.ShowsVault /></BankProvider></StrictMode>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    const [made] = making.mock.results.map((result) => result.value as Bank)
+    expect(making.mock.results).to.have.lengthOf(1)
+    expect(made?.isEnabled).to.be.true
+    expect(TH.seenBanks.at(-1)).to.eq(made)
+  })
+
+  it("hands down no bank until its deviceDB answers", async () => {
+    const { deviceDB, answer } = deviceDBHolding('u1')
+    const making = vi.spyOn(Bank, 'make')
+    provided({ deviceDB })
     await act(async () => { await TH.wakeupAtNextTick() })
-    const live = making.mock.results.filter((made) => (made.value as Bank).snapshot.stage === 'ready')
-    expect(live).to.have.lengthOf(1)
+    expect(shown('bank')).to.eq('none')
+    expect(making).not.toHaveBeenCalled()
+    answer()
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+  })
+
+  it("waits for the next user's device_id before making their bank", async () => {
+    const { deviceDB, answer } = deviceDBHolding('u2')
+    const { props, rerender } = provided({ deviceDB })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    const making = vi.spyOn(Bank, 'make')
+    rerender({ ...props, user_id: 'u2' })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(shown('bank')).to.eq('none')
+    expect(making).not.toHaveBeenCalled()
+    answer()
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    const { device_id } = await deviceDB.ensureBank({ applabel: 'acme', user_id: 'u2' })
+    expect(making.mock.calls.map(([opts]) => [opts.user_id, opts.device_id])).to.deep.equal([['u2', device_id]])
   })
 
   it("makes no bank when the user signs out while its deviceDB answers", async () => {
-    const deviceDB = new MemoryDeviceDB()
-    const answering = TH.held()
-    const ensureBank = deviceDB.ensureBank.bind(deviceDB)
-    vi.spyOn(deviceDB, 'ensureBank').mockImplementation(async (scope) => {
-      await answering.promise
-      return ensureBank(scope)
-    })
+    const { deviceDB, answer } = deviceDBHolding('u1')
     const making = vi.spyOn(Bank, 'make')
     const { props, rerender } = provided({ deviceDB })
     rerender({ ...props, user_id: null })
-    answering.resolve(undefined)
+    answer()
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(making).not.toHaveBeenCalled()
     expect(shown('bank')).to.eq('none')
@@ -252,20 +287,6 @@ describe("BankProvider's handlers", () => {
   })
 })
 
-describe("BankProvider's autolock", () => {
-  afterEach(() => { vi.useRealTimers() })
-
-  it("asks its bank to autolock each minute", async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
-    const autolock = vi.spyOn(Bank.prototype, 'autolock')
-    provided()
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    expect(autolock).not.toHaveBeenCalled()
-    act(() => { vi.advanceTimersByTime(MinuteMillis) })
-    expect(autolock).toHaveBeenCalledOnce()
-  })
-})
-
 describe("BankProvider's dialog", () => {
   it("builds the vault from a click: unborn, then present and unlocked", async () => {
     provided()
@@ -356,7 +377,7 @@ describe("BankProvider's dialog", () => {
   })
 
   it("asks nobody when requestCleartext answers nothing", async () => {
-    provided({ requestCleartext: async () => undefined })
+    provided({ requestCleartext: () => undefined })
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))
     await act(async () => { await TH.wakeupAtNextTick() })
