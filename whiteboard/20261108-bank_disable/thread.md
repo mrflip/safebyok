@@ -146,3 +146,39 @@ read true while every call refused is gone.
     harmless, and a refusal of either is told (the vault's to the platform, the scrub's to the host).
   * The scrub's `tryListLeases` may answer before a vault's own `tryForget` lands: the row is listed
     and forgotten twice, harmlessly.
+
+# Review fixes (2026-11-08)
+
+Branch `20261108-review_fixes`, cut from `4bdf559a8`. Local only. Fixes from a review of `origin/main..4bdf559a8`.
+
+* **Held, not built: the swept-bank scrub (review item 1).** The Coach doubts the race. A swept bank's late
+  `identity_revoked` would reach `DefaultOnPanic`, whose `bank.vacate` scrub holds the host's handlers. The rule
+  ("host handlers only if enabled when the vacate began") was built, then reverted before any commit. Traced:
+  * `Listing.deliver` opens with `demandEnabled()`, so a fetch, put or delete answered after a sweep refuses
+    before `panicIfRevoked`.
+  * `VaultListing.list` and `BoxListing.list` check `demandEnabled()` only before their await. A
+    `tryListVaults` (from `bank.hello`) or `tryListBoxes` (from `vault.hello`) in flight across a sweep that
+    answers `identity_revoked` still calls `panicIfRevoked` on the disabled listing. That is the one path found.
+* **Built**, in `packages/safebyok`:
+  * **`vacate` is `async`**, so a bad story rejects. It still disables before its first await. A repeat
+    settles with the first scrub, but is no longer the same promise.
+  * **A hello crossed by a sweep or a vacate refuses with `#endCause`**, so the caller and `snapshot.err`
+    agree: the vacate's `cause`, or `disabled`.
+  * **`bank.panic` and `vault.panic` check their bag** (`VX.bankPanicArgs`, `VX.vaultPanicArgs`, `bad_option`,
+    and the new `Phrases.VaultExpected`). Both stay public: `ListingWorld` and `VaultWorld` are `Pick`s of
+    the public `Bank` and `Vault`, and hiding either would take a friend handle threaded through both
+    listings, `Vault`'s world and the fakes.
+  * **`vault.panic` names its vault.** It takes `{ refusal }` and forwards `vault: this`. This reverses
+    thread 1's "relays without naming the vault": `Panic`'s doc promises the vault.
+  * **Docs:**
+    * the `disabled` comment in `refusals/errors.ts`;
+    * `notes/guarantees.md` on the `askUser` and `onPanic` wraps, wording only: no guarantee found broken;
+    * the two changesets, now telling one `Panic` story: handler_defaults carries the type's change of
+    meaning, and bank_disable no longer says it "gains bank".
+* **Tests:**
+  * `bank-ending.test.ts`: a repeat vacate waits on the held scrub; a bad story rejects; a hello crossed
+    by a vacate with a cause throws that cause.
+  * `bank.test.ts`: a malformed panic is rejected; a box listing's revocation names its vault.
+* **Races (rows)**:
+  * A vault or box listing in flight across a sweep can still panic, as traced above, now waiting on the
+    Coach.
