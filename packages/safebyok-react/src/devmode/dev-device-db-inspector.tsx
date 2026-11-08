@@ -1,11 +1,9 @@
 import { useCallback, useState } from 'react'
 import type { DeviceDB } from 'safebyok'
 import { leaseQuery } from 'safebyok/storage'
-import type { LeaseQuery, LeaseScopepath } from 'safebyok/storage'
+import type { LeaseScopepath } from 'safebyok/storage'
+import type { DevDeviceDBInspectorProps, LeaseRowLineProps, ListedLease } from '../shapes'
 import { LastCallLine, timeOf, useLastCall, useListing } from './last-call'
-
-/** What a DevDeviceDBInspector is handed: the deviceDB whose rows it shows. */
-export type DevDeviceDBInspectorProps = { deviceDB: DeviceDB }
 
 /** A table of the rows `deviceDB` keeps on this device as its verbs answer them, with a button to forget each. */
 export const DevDeviceDBInspector = ({ deviceDB }: DevDeviceDBInspectorProps) => (
@@ -19,9 +17,6 @@ export const DevDeviceDBInspector = ({ deviceDB }: DevDeviceDBInspectorProps) =>
 
 /** The fields each lease row shows in a column of its own; any other a raw row holds goes in the last. */
 const LeaseColumns = ['applabel', 'user_id', 'vaultlabel', 'vault_tok', 'proved_at'] as const
-
-/** A lease row as the table lists it, with the scopepath it is filed under where `listRawLeases` gave one. */
-type ListedLease = { row: Record<string, unknown>, scopepath: LeaseScopepath | null }
 
 /** A raw lease as the table lists it: a row that is no object shows as one with no fields. */
 const listedOfRaw = ({ scopepath, row }: { scopepath: LeaseScopepath, row: unknown }): ListedLease => (
@@ -83,14 +78,6 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
       <LastCallLine lastCall={lastCall} />
     </>
   )
-}
-
-/** What a lease row's line is handed: the row, where it is filed, and what its buttons call, null for a button it lacks. */
-type LeaseRowLineProps = {
-  row:       Record<string, unknown>
-  scopepath: LeaseScopepath | null
-  onForget:  (asked: LeaseQuery) => Promise<void>
-  onDelRaw:  ((scopepath: LeaseScopepath) => Promise<void>) | null
 }
 
 /** A lease row's line: its fields, and a forget where it names a lease, a delRawLease where it is filed. */

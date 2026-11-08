@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import type { AnyGating, Gating } from 'safebyok'
-import { attemptRefusalFlavor } from './attempt-refusals'
-import { Boundary, forBoundary, useRoundFor } from './boundary'
-import { Messages } from './messages'
-import { askPasskey, attemptOnce, passkeysAvailable } from './passkey'
-import { useWhenShown } from './when-shown'
+import type { AnyGating } from 'safebyok'
+import { attemptRefusalFlavor } from '../helpers/attempt-refusals'
+import { Messages } from '../helpers/messages'
+import { askPasskey, attemptOnce, passkeysAvailable } from '../helpers/passkey'
+import { useRoundFor } from '../hooks/round-for'
+import { useWhenShown } from '../hooks/when-shown'
+import { Boundary, forBoundary } from '../provider/boundary'
+import type { PasskeyUnlockButtonProps } from '../shapes'
 
 /** A button that unlocks with the vault's passkey, shown only where a passkey can be used.
  *
@@ -15,20 +17,6 @@ export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
     <PasskeyPress {...props} />
   </Boundary>
 )
-
-/** What PasskeyUnlockButton is handed. */
-export type PasskeyUnlockButtonProps = {
-  /** The gating the passkey answers, as the bank handed it to `requestCleartext`. */
-  gating:      Gating<'unlock_vault'>
-  /** Called with 'unlocked' when the passkey unlocks the vault, and with 'declined' on a refusal that closes the dialog. */
-  onDone:      (answer: 'unlocked' | 'declined') => void
-  /** What the button has to say, or null once what it said last no longer stands. */
-  onGripe:     (gripe: string | null) => void
-  /** The relying party the passkey was made under, if not the page's own domain. */
-  rpId?:       string | undefined
-  /** Whether the button takes the focus when it first shows. */
-  takesFocus?: boolean | undefined
-}
 
 /** True when the passkey button shows for `gating`. */
 export const offersPasskey = (gating: AnyGating): boolean => (

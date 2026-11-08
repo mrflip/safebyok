@@ -2,7 +2,8 @@ import { screen } from '@testing-library/react'
 import { Component, type ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
 import { VaultError } from 'safebyok'
-import { Boundary, forBoundary, useRoundFor } from '../src/boundary'
+import { useRoundFor } from '../src/hooks/round-for'
+import { Boundary, forBoundary } from '../src/provider/boundary'
 import * as TH from './test-helpers'
 
 /** A child that throws `failure.err` while rendering, or shows "fine" when it has no failure. */

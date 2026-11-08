@@ -1,8 +1,8 @@
 import { useRef } from 'react'
-import type { Gating } from 'safebyok'
-import { useRoundFor } from './boundary'
-import { Messages } from './messages'
-import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, useAdvice, useAttempts, useConfirmation, type DialogAnswer, type PassphraseAdvice } from './modal'
+import { Messages } from '../helpers/messages'
+import { useRoundFor } from '../hooks/round-for'
+import type { ReplacePassphraseModalProps } from '../shapes'
+import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, useAdvice, useAttempts, useConfirmation } from './modal-kit'
 
 /** The dialog for a `replace_passphrase` gating, which proves the passphrase in use and chooses the next. */
 export const ReplacePassphraseModal = (props: ReplacePassphraseModalProps) => (
@@ -10,18 +10,6 @@ export const ReplacePassphraseModal = (props: ReplacePassphraseModalProps) => (
     {(done) => <ReplacePassphraseForm {...props} onDone={done} />}
   </AnsweringOnce>
 )
-
-/** What ReplacePassphraseModal is handed. */
-export type ReplacePassphraseModalProps = {
-  /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
-  gating:              Gating<'replace_passphrase'>
-  /** Called once with 'unlocked' when the passphrase is replaced, and with 'declined' otherwise. */
-  onDone:              (answer: DialogAnswer) => void
-  /** What a password manager files the passphrase under. */
-  passphraseUsername?: string | undefined
-  /** What to say beside the new passphrase's field as the user chooses it. */
-  passphraseAdvice?:   PassphraseAdvice | undefined
-}
 
 /** The dialog itself, inside ReplacePassphraseModal's boundary. */
 const ReplacePassphraseForm = ({ gating, onDone: done, passphraseUsername, passphraseAdvice }: ReplacePassphraseModalProps) => {

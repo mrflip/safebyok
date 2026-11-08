@@ -1,10 +1,10 @@
-import { useId, type ComponentPropsWithoutRef } from 'react'
-import type { Box } from 'safebyok'
+import { useId } from 'react'
 import { BoxFields } from 'safebyok/dom'
 import { WhisperFieldAttributes } from 'safebyok/utils'
-import { useBoxIsShowing } from './hooks'
-import { Messages } from './messages'
-import { useRevealToggle } from './reveal-toggle'
+import { Messages } from '../helpers/messages'
+import { useBoxIsShowing } from '../hooks/hooks'
+import { useRevealToggle } from '../hooks/reveal-toggle'
+import type { BoxWhisperFieldProps } from '../shapes'
 
 /** A field showing the text at dotted `path` in the whisper of `box`, blank and read-only while it will not show.
  *
@@ -38,10 +38,4 @@ export const BoxWhisperField = ({ box, path, readOnly, ...passed }: BoxWhisperFi
       {reveal.button(fieldId)}
     </span>
   )
-}
-
-/** What a BoxWhisperField is handed: the box, the dotted path, and input attributes. */
-export type BoxWhisperFieldProps = Omit<ComponentPropsWithoutRef<'input'>, 'type' | 'name' | 'value' | 'defaultValue' | 'onChange' | keyof typeof WhisperFieldAttributes> & {
-  box:  Box
-  path: string
 }

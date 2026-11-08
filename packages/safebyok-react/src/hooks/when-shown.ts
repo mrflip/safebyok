@@ -1,7 +1,5 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
-
-/** A function that calls `goOn` once the component is shown, for an async handler to go on through. */
-export type WhenShown = <ValT>(goOn: () => ValT) => Promise<Awaited<ValT>>
+import type { WhenShown } from '../shapes'
 
 /** The component's {@link WhenShown}, and `isShown`, whether it shows now.
  *

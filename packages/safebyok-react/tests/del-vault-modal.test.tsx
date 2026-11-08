@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { DelVaultModal } from '../src/del-vault-modal'
-import type { DialogAnswer } from '../src/modal'
-import { Messages } from '../src/messages'
+import { DelVaultModal } from '../src/modals/del-vault-modal'
+import { Messages } from '../src/helpers/messages'
+import type { DialogAnswer } from '../src/shapes'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()

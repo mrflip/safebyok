@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { useRevealToggle } from '../src/reveal-toggle'
+import { useRevealToggle } from '../src/hooks/reveal-toggle'
 
 /** Its example: an input, and the button that reveals it. */
 const Revealed = () => {

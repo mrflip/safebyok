@@ -2,8 +2,8 @@
 // whispers only by naming this door.
 /** `safebyok-react/devmode`: panels for a developer to watch and poke the stores and boxes beneath an app. */
 export { DevBoxInspector } from './dev-box-inspector'
-export type { DevBoxInspectorProps } from './dev-box-inspector'
+export type { DevBoxInspectorProps } from '../shapes'
 export { DevDeviceDBInspector } from './dev-device-db-inspector'
-export type { DevDeviceDBInspectorProps } from './dev-device-db-inspector'
+export type { DevDeviceDBInspectorProps } from '../shapes'
 export { DevVaultDBInspector } from './dev-vault-db-inspector'
-export type { DevVaultDBInspectorProps } from './dev-vault-db-inspector'
+export type { DevVaultDBInspectorProps } from '../shapes'

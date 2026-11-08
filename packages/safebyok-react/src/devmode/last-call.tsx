@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { MaxLabelChars, Patterns, isVaultError } from 'safebyok'
-
-/** What a panel's last button answered: the verb it called, whether it refused, and what it said. */
-export type LastCall = { verbname: string, isOk: boolean, said: string }
+import type { LastCall, Listing } from '../shapes'
 
 /** The panel's last call, and `call`, which runs a button's verb and keeps what it answered or refused. */
 export const useLastCall = () => {
@@ -48,9 +46,6 @@ export const timeOf = (millis: number): string => {
   const when = new Date(millis)
   return Number.isNaN(when.getTime()) ? String(millis) : when.toISOString()
 }
-
-/** What a panel's listing holds: the rows last listed, null before the first, and the refusal of the last attempt. */
-export type Listing<ValT> = { val: ValT | null, trouble: string | null }
 
 /** What `list` answers, listed again at each `relist` and at each change `watch` tells of. */
 export const useListing = <ValT,>(list: () => Promise<ValT>, watch: ((onChange: () => void) => () => void) | null = null) => {

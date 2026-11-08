@@ -1,8 +1,8 @@
 import { useRef } from 'react'
-import type { Gating } from 'safebyok'
-import { useRoundFor } from './boundary'
-import { Messages } from './messages'
-import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts, type DialogAnswer } from './modal'
+import { Messages } from '../helpers/messages'
+import { useRoundFor } from '../hooks/round-for'
+import type { RevokePasskeyModalProps } from '../shapes'
+import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts } from './modal-kit'
 
 /** The dialog for a `revoke_passkey` gating, which removes the vault's passkey once the user proves its passphrase. */
 export const RevokePasskeyModal = (props: RevokePasskeyModalProps) => (
@@ -10,16 +10,6 @@ export const RevokePasskeyModal = (props: RevokePasskeyModalProps) => (
     {(done) => <RevokePasskeyForm {...props} onDone={done} />}
   </AnsweringOnce>
 )
-
-/** What RevokePasskeyModal is handed. */
-export type RevokePasskeyModalProps = {
-  /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
-  gating:              Gating<'revoke_passkey'>
-  /** Called once with 'unlocked' when the passkey is removed, and with 'declined' otherwise. */
-  onDone:              (answer: DialogAnswer) => void
-  /** What a password manager files the passphrase under. */
-  passphraseUsername?: string | undefined
-}
 
 /** The dialog itself, inside RevokePasskeyModal's boundary. */
 const RevokePasskeyForm = ({ gating, onDone: done, passphraseUsername }: RevokePasskeyModalProps) => {
