@@ -72,6 +72,16 @@ added or folded into through the subagent, and no other entry changes.
   repeat vacate returns the first one's promise (amended 2026-11-08 (vacate_first): it read that panics during the scrub reached the host and the
   bank disabled only after it). `DefaultOnPanic` does not await the bank's vacate, because a panic raised from the vacate's own erase would otherwise
   wait on itself.
+  amended 2026-11-08 (review_fixes): a listing answered after the bank is swept or vacated refuses `disabled` before it can panic.
+  `VaultListing.list` (`models/vault-listing.ts`) and `BoxListing.list` (`models/box-listing.ts`) call `demandEnabled()` again after their storage
+  await, as `Listing.deliver` (`models/listing.ts`) already did at its start. Before, a `tryListVaults` or `tryListBoxes` in flight across a sweep
+  that answered `identity_revoked` called `panicIfRevoked` on the disabled listing; the panic went to `DefaultOnPanic`, whose `bank.vacate` scrub
+  then called the host's own `onPanic` and `onBadNews` from a bank the host had already let go, possibly with the next user signed in. That path is
+  closed. A rule that the scrub holds the host's handlers only if the bank was enabled when the vacate began was considered and not adopted: the
+  Coach preferred closing the path to adding logic. Also, the bank's panic is no longer a public member (`bank.panic` and `vault.panic` are gone):
+  `Bank.#panic` is handed as a friend to the vault listing in `ListingOpts.panic` (checked by `VX.bankPanic`, the bank's `isGuarded` brand), and on
+  to each `Vault` (the constructor's fourth argument) and each box listing (bound with its vault in `VaultListing.boxListingOf`), so no host code
+  can make the bank call its `onPanic`.
 
 * 2026-11-07 (devicedb_idb, sprint devicedb_idb, thread 2, branch `20261107-idb_devicedb`): **`IdbDeviceDB` keeps each lease row in IndexedDB with
   its `lease_key` a non-extractable CryptoKey held by structured clone, and deletes every older device database unread.** In
