@@ -44,7 +44,7 @@ const BankRowsTable = ({ vaultDB, scope }: { vaultDB: VaultDB, scope: BankScope 
   const { val: rows, trouble, relist } = useListing(list, watch)
   const { lastCall, call } = useLastCall()
 
-  /** Runs a button's verb, then lists the rows again. */
+  /** Run a button's verb, then list the rows again. */
   const callThenRelist = async (verbname: string, work: () => Promise<string>) => {
     await call(verbname, work)
     relist()

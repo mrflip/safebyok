@@ -15,7 +15,7 @@ export const DelVaultModal = (props: DelVaultModalProps) => (
 export type DelVaultModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              Gating<'del_vault'>
-  /** Called once, with the dialog's answer: 'deleted' once the vault is deleted, 'declined' otherwise. */
+  /** Called once with 'deleted' when the vault is deleted, and with 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined
