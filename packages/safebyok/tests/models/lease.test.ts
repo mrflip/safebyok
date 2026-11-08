@@ -20,7 +20,7 @@ const WhisperText = '{"val":"sk-test-0000"}'
 const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ friend: FakeLeaseFriend, lease: Lease }> => {
   const friend = fakeLeaseFriendOf()
   const lease = await makeGrantedLease(friend, opts)
-  await lease.cache()
+  await lease.cacheAsCacheCan()
   return { friend, lease }
 }
 
@@ -33,7 +33,7 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
     expect(Object.keys(record.vault_key_lease_wrapped)).to.have.members(['cipher_iv_b64', 'ciphertext_b64'])
   })
 
-  it("caches nothing of itself: a lease is cached by tryCache", async () => {
+  it("caches nothing of itself: a lease is cached by cacheAsCacheCan", async () => {
     const friend = fakeLeaseFriendOf()
     await makeGrantedLease(friend)
     expect(friend.tryCacheLease).not.toHaveBeenCalled()
@@ -76,11 +76,11 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
   }
 })
 
-describe("lease.cache() and lease.tryCache()", () => {
+describe("lease.cacheAsCacheCan()", () => {
   it("puts the record through tryCacheLease", async () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
-    await lease.cache()
+    await lease.cacheAsCacheCan()
     expect(friend.tryCacheLease).toHaveBeenCalledTimes(1)
     expect(friend.cached).to.deep.include(Stamped)
   })
@@ -89,25 +89,27 @@ describe("lease.cache() and lease.tryCache()", () => {
     const { friend } = await grantedWorld()
     friend.tryCacheLease.mockClear()
     const cached = await Lease.buildFromCache(friend, GrantedAs.gate_epoch)
-    await cached!.cache()
+    await cached!.cacheAsCacheCan()
     expect(friend.tryCacheLease).not.toHaveBeenCalled()
   })
 
-  it("throws what tryCacheLease refuses, leaving the lease in force", async () => {
+  it("tells what tryCacheLease refuses as bad news, leaving the lease in force", async () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
-    friend.tryCacheLease.mockResolvedValue(bad(new VaultError('unexpected_error', 'the disk is full')))
-    await TH.expectRefusal(lease.cache())
-    await TH.expectBad(lease.tryCache())
+    const refusal = new VaultError('unexpected_error', 'the disk is full')
+    friend.tryCacheLease.mockResolvedValue(bad(refusal))
+    await lease.cacheAsCacheCan()
+    expect(friend.tellBadNews).toHaveBeenCalledWith([refusal])
     expect(lease.isPresent).to.be.true
     await lease.sealWith(WhisperText, sealStampOf('b1'))
   })
 
-  it("refuses 'vault_locked' once out of force, so nothing is cached", async () => {
+  it("refuses once out of force, telling no bad news and caching nothing", async () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
     lease.evict()
-    await TH.expectBad(lease.tryCache(), 'vault_locked')
+    await TH.expectRefusal(lease.cacheAsCacheCan(), 'vault_locked')
+    expect(friend.tellBadNews).not.toHaveBeenCalled()
     expect(friend.cached).to.be.null
   })
 })
@@ -166,7 +168,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
   it("finds nothing past an autolock of ForeverMillis, a host's Infinity: a lease cached long ago is in force", async () => {
     const friend = fakeLeaseFriendOf({ leaseMillis: ForeverMillis })
     const lease = await makeGrantedLease(friend)
-    await lease.cache()
+    await lease.cacheAsCacheCan()
     vi.setSystemTime(T0 + (400 * 24 * 60 * 60_000))
     const got = await Lease.buildFromCache(friend, GrantedAs.gate_epoch)
     expect(got?.isPresent).to.be.true
@@ -199,7 +201,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     it(`forgets a cached lease of ${blurb}: it answers null and its row is forgotten, so the vault asks for a proof`, async () => {
       const elsewhere = fakeLeaseFriendOf(stamp)
       const lease = await makeGrantedLease(elsewhere)
-      await lease.cache()
+      await lease.cacheAsCacheCan()
       const friend = fakeLeaseFriendOf()
       friend.cached = elsewhere.cached
       expect(await Lease.buildFromCache(friend, gate_epoch)).to.be.null

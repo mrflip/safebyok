@@ -87,20 +87,13 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Caching]: cache, tryCache, cacheAsCacheCan
-
-  /** Caches this lease on this device. */
-  async cache(): Promise<void> {
-    if (this.#isFromCache) { return }
-    valOf(await this.#friend.tryCacheLease(this.#demandRecord()))
-  }
-
-  tryCache(): Promise<Outcome<void>> { return outcomeOf(() => this.cache()) }
+  // == [Caching]: cacheAsCacheCan
 
   // A refusal costs the next session a proof, not this one its lease.
   /** Caches this lease if it can, telling the host of a refusal as bad news. */
   async cacheAsCacheCan(): Promise<void> {
-    const cached = await this.tryCache()
+    if (this.#isFromCache) { return }
+    const cached = await this.#friend.tryCacheLease(this.#demandRecord())
     if (! cached.ok) { this.#friend.tellBadNews([cached.err]) }
   }
   // --
