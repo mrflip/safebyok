@@ -97,17 +97,17 @@ export type Gripe = { text: string, fromPasskey: boolean, mismatched?: true }
 /** A form's state around its attempts: the gripe it shows, and what one submit's attempt does with its outcome. */
 export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer) => void) => {
   const [gripe, setGripe] = useState<Gripe | null>(null)
-  // Wrapped, so that a failure carrying any value at all still reads as "failed".
+  // The error rides in an object, so a thrown null or undefined still reads as a failure.
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  // A dialog gone meanwhile touches neither its state nor its host's onDone again. One hidden
-  // meanwhile meets the outcome once it shows again.
+  // A dialog unmounted during an attempt touches neither its state nor its host's onDone again. A
+  // dialog hidden during one meets the outcome once it shows again.
   const { whenShown, isShown } = useWhenShown()
   const fail = useCallback((err: unknown) => { setFailure({ err }) }, [])
   if (failure !== null) { throw forBoundary(failure.err, source) }
 
   const meet = (err: unknown) => {
     const flavor = attemptRefusalFlavor(err)
-    // A second submit while the first runs: the first answers for the dialog.
+    // A second submit while the first runs meets 'attempt_in_flight': the first answers for the dialog.
     if (flavor === 'in_flight') { return }
     if (flavor === 'in_place') { setGripe({ text: (err as Error).message, fromPasskey: false }); return }
     if (flavor === 'close') { done('declined'); return }
@@ -195,7 +195,7 @@ const leaseCount = (leaseMillis: number): { count: number, unit: Unit } => {
   return { count: minutes, unit: 'minute' }
 }
 
-// Made at first use, after any polyfill the host imports has run.
+// Each formatter is made at first use, after any polyfill the host imports has run.
 /** One relative-time formatter per locale. */
 const relativeTimes = new Map<string, Intl.RelativeTimeFormat>()
 
@@ -209,7 +209,7 @@ const relativeTimeIn = (locale: string): Intl.RelativeTimeFormat => {
 
 /** What a dialog promises about how long an unlock lasts, from the bank's `leaseMillis`. */
 export const unlockedFor = (leaseMillis: number, creating: boolean): string => {
-  // Never compared for equality: the far future is anything within a minute of it.
+  // Never compared to ForeverMillis for equality: the far future is anything within a minute of it.
   if (leaseMillis >= ForeverMillis - MinuteMillis) { return Messages.staysUnlocked }
   const { count, unit } = leaseCount(leaseMillis)
   const relative = relativeTimeIn(Locale).format(count, unit)
@@ -318,8 +318,8 @@ export const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, gating
   const asked = useRef(0)
   /** The mode as of the last commit, which an answer on its way is checked against. */
   const creatingNow = useRef(creating)
-  // A change of mode forgets what was said (React's "adjusting state while rendering"), and makes
-  // any answer or failure still on its way stale from the same commit.
+  // A change of mode forgets what was said, by React's "adjusting state while rendering". It also
+  // makes any answer or failure still on its way stale from the same commit.
   const [saidWhile, setSaidWhile] = useState(creating)
   if (saidWhile !== creating) {
     setSaidWhile(creating)

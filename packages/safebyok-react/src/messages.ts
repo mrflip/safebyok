@@ -1,5 +1,5 @@
-// Every word safebyok-react shows a user, in one place, each sentence with a varying part one
-// frame, so a translation may reorder it. What the developer reads stays beside the code that says it.
+// Every word safebyok-react shows a user lives here. A sentence with a varying part is one frame, so
+// a translation may reorder it. What the developer reads stays beside the code that says it.
 
 import type { Gatingkind } from 'safebyok'
 
@@ -30,7 +30,7 @@ export const Messages = {
   locksAgainIn:      (relative: string) => `Locks again on this device ${relative}.`,
   staysUnlocked:     'Stays unlocked on this device until you lock it.',
 
-  // The dialogs for a change to the ways in, and for a deletion
+  // The dialogs that replace the passphrase, add or remove the passkey, and delete the vault
   changeTitle:        'Change your vault passphrase',
   changeBlurb:        'Enter the passphrase you use now, then choose a new one. The new one takes its place on every device. A forgotten passphrase cannot be recovered.',
   currentField:       'current passphrase',

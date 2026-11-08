@@ -42,7 +42,7 @@ export const isLabel = (text: string): boolean => (text.length <= MaxLabelChars)
 /** `answer` as indented JSON. */
 export const jsonOf = (answer: unknown): string => JSON.stringify(answer, null, 2)
 
-// A damaged row's time can be any number, and toISOString throws, in render, on one past a Date's range.
+// A damaged row's time can be any number, and toISOString throws, in render, on a number past a Date's range.
 /** `millis` as an ISO time, or as the bare number where it names no time. */
 export const timeOf = (millis: number): string => {
   const when = new Date(millis)

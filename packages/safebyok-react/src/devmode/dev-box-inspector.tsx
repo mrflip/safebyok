@@ -67,7 +67,7 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
   // Kept off React's state, so the text typed never sits in a render.
   const whisperText = useRef('')
   const [extracted, setExtracted] = useState<Whisper | null>(null)
-  // An extracted whisper goes when the vault locks, as React adjusts state to a prop, in render.
+  // An extracted whisper is dropped when the vault locks, by React's adjusting of state to a prop, in render.
   const lockState = vaultSnapshot?.lockState ?? 'locked'
   if ((extracted !== null) && (lockState === 'locked')) { setExtracted(null) }
 

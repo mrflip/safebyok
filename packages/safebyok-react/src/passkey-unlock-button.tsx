@@ -38,10 +38,10 @@ export const offersPasskey = (gating: AnyGating): boolean => (
 /** The button itself, inside PasskeyUnlockButton's boundary. */
 const PasskeyPress = ({ gating, onDone, onGripe, rpId, takesFocus }: PasskeyUnlockButtonProps) => {
   const [asking, setAsking] = useState(false)
-  // Wrapped, so that a rejection carrying any value at all still reads as "failed".
+  // The error rides in an object, so a thrown null or undefined still reads as a failure.
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  // A button gone meanwhile unlocks nothing, and touches neither its state nor its dialog's
-  // callbacks again. One hidden meanwhile goes on once it shows again.
+  // A button unmounted while it asks unlocks nothing, and touches neither its state nor its dialog's
+  // callbacks again. A button hidden while it asks goes on once it shows again.
   const { whenShown, isShown } = useWhenShown()
   if (failure !== null) { throw forBoundary(failure.err, 'PasskeyUnlockButton') }
   if (! offersPasskey(gating)) { return null }

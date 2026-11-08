@@ -56,8 +56,8 @@ const useGatingDialog = () => {
   /** Close the dialog showing now, if any. */
   const endAny = useCallback(() => { if (showingRef.current !== null) { endShowing(showingRef.current) } }, [endShowing])
 
-  // A bank opens one gating at a time, but the last one's dialog may not have answered yet: it is
-  // ended here, so its ask resolves rather than waiting on a dialog that will never mount again.
+  // A bank opens one gating at a time, but the last gating's dialog may not have answered yet.
+  // Ending it resolves its `ask` call, which would otherwise wait on a dialog that never mounts again.
   /** Show the dialog for `gating`, if the user's gesture is still active, and resolve once it closes. */
   const ask = useCallback((gating: AnyGating) => new Promise<void>((close) => {
     if (! hasUserGesture()) { close(); return }
@@ -82,8 +82,8 @@ const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void
   const heardBadNews = useEffectEvent((badnews: BadNews) => handlers.onBadNews(badnews))
   const asked = useEffectEvent((gating: AnyGating) => handlers.requestCleartext(gating))
 
-  // The effect owns the bank, making it and sweeping it, so a re-run effect (StrictMode's, a hidden
-  // Activity shown again) makes a fresh one.
+  // The effect owns the bank: it makes it and sweeps it. A re-run effect (StrictMode's, or a hidden
+  // Activity's shown again) makes a fresh one.
   useEffect(() => {
     // Once swept, the bank calls none of the host's handlers: the page may be the next user's by then.
     /** Whether this effect still holds its bank. */
@@ -102,7 +102,7 @@ const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void
         })
         bank = made
         setHeld({ bank: made, helloedVaults: new WeakSet<Vault>() })
-        // A refused hello lands in the bank's snapshot, which useBankSnapshot renders.
+        // A refused `tryHello` lands in the bank's snapshot, which useBankSnapshot renders.
         void made.tryHello()
       } catch (err) {
         if (kept.held) { setRefused({ err }) }
@@ -111,14 +111,14 @@ const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void
     void makeBank()
     return () => {
       kept.held = false
-      // A sweep settles the open gating, and the dialog over it closes.
+      // `sweep()` settles the open gating, and `onSwept` closes the dialog over it.
       bank?.sweep()
       onSwept()
       setHeld(NoneHeld)
     }
   }, [madeFrom, onSwept])
 
-  // An option the bank was made with that has changed since is ignored, and said so once.
+  // An option changed since the bank was made is ignored. The bank's logger warns of it once.
   useEffect(() => {
     if (held.bank === null || toldOfIgnored.current) { return }
     const changed = changedKeys(madeFrom, opts)

@@ -29,12 +29,12 @@ const ReplacePassphraseForm = ({ gating, onDone: done, passphraseUsername, passp
   const anteRef = useRef<HTMLInputElement>(null)
   const nextRef = useRef<HTMLInputElement>(null)
   const { ref: confirmRef, gripeId, differs } = useConfirmation(setGripe)
-  // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on but safebyok's own refusal.
+  // The host's advice hears the passphrase, so what it throws may quote it: `fail` gets safebyok's own refusal instead.
   const advice = useAdvice(passphraseAdvice, gating, true, fail)
 
   const submit = () => {
     const nextPassphraseClear = nextRef.current?.value ?? ''
-    // A new passphrase mistyped would be the vault's: refused here, before any key is derived.
+    // A new passphrase mistyped would become the vault's, so a mismatch stops here, before any key is derived.
     if (differs(nextPassphraseClear)) { return }
     void attempt(() => gating.attempt({ antePassphraseClear: anteRef.current?.value ?? '', nextPassphraseClear }), 'unlocked')
   }

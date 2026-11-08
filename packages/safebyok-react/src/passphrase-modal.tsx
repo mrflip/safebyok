@@ -38,13 +38,13 @@ const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername,
   const formRef = useRef<HTMLFormElement>(null)
   const { ref: confirmRef, gripeId, differs } = useConfirmation(setGripe)
   const creating = gating.gatingkind === 'build_vault'
-  // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on but safebyok's own refusal.
+  // The host's advice hears the passphrase, so what it throws may quote it: `fail` gets safebyok's own refusal instead.
   const advice = useAdvice(passphraseAdvice, gating, creating, fail)
   const passkeyGating = gating.gatingkind === 'unlock_vault' && offersPasskey(gating) ? gating : null
 
   const submit = () => {
     const typed = fieldRef.current?.value ?? ''
-    // A first passphrase mistyped would be the vault's: refused here, before any key is derived.
+    // A first passphrase mistyped would become the vault's, so a mismatch stops here, before any key is derived.
     if (creating && differs(typed)) { return }
     void attempt(() => gating.attempt({ passphraseClear: typed }), 'unlocked')
   }
@@ -58,7 +58,7 @@ const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername,
   /** Show the passkey button's gripe until the next submit or press. */
   const passkeyGripe = (text: string | null) => {
     setGripe(text === null ? null : { text, fromPasskey: true })
-    // A passkey button that took itself away took the focus with it: back to the passphrase.
+    // A passkey button that took itself away took the focus with it, so the focus goes back to the passphrase field.
     if (text !== null && ! holdsFocus(formRef.current)) { fieldRef.current?.focus() }
   }
 

@@ -88,7 +88,7 @@ export const useBoxIsShowing = (box: Box | null): boolean => (
   useSyncExternalStore(box?.subscribe ?? subscribeToNothing, () => box?.isShowing ?? false, () => false)
 )
 
-// Symbol.for, so the core's own check of a bag knows this one.
+// Marked with `Whispered`, a Symbol.for symbol, so the core's own check of a bag recognizes this bag.
 const NoBoxBag: WhisperedBag = Object.freeze({ [Whispered]: 'encrypted' })
 const getNoBoxBag = (): Whisper => NoBoxBag
 

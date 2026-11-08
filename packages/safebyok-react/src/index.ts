@@ -18,7 +18,7 @@ export type { ReplacePassphraseModalProps } from './replace-passphrase-modal'
 export { DelVaultModal } from './del-vault-modal'
 export type { DelVaultModalProps } from './del-vault-modal'
 
-// Passkeys: the dialogs that add and remove one, the button that unlocks with it, and the WebAuthn calls beneath them.
+// Passkeys: the dialogs that add and remove the vault's passkey, the button that unlocks with it, and the WebAuthn calls beneath them.
 export { AddPasskeyModal } from './add-passkey-modal'
 export type { AddPasskeyModalProps } from './add-passkey-modal'
 export { RevokePasskeyModal } from './revoke-passkey-modal'
