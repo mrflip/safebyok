@@ -48,6 +48,17 @@ its bank row on this device, so the next person to use it starts fresh. `BankPro
 since auth may blink to `null` while it refreshes a token or reconnects, after a laptop wakes for instance. When a
 different user signs in, it vacates the last user's bank itself.
 
+Once a bank is vacated, by your sign-out or by a revoked identity, `useVault` answers `{ stage: 'spent', vault: null,
+cause }` for each of its vaults, `cause` saying why the bank ended, and `useVaultSnapshot` answers null. Show a signed-out
+state there rather than a spinner: the bank never becomes ready again.
+
+## Hearing the bank
+
+`BankProvider` takes `Bank.make`'s `onLifecycle` and `onBadNews`, and calls each as last rendered, so an inline arrow
+is fine. `onLifecycle` hears each hello the provider and the hooks make, as a `helloed` event with its outcome, and the
+other events of the bank's life. `onBadNews` hears the refusals no caller waits on, a failed unlock from
+`VaultLockControl` among them. Leave either out for its default, described in the safebyok README.
+
 ## React version
 
 safebyok-react needs React 19.2 or later, for `useEffectEvent`. `BoxFields` gives React a `ref` function that returns a cleanup. React 19 runs that

@@ -638,7 +638,7 @@ the scope.
   A model of a closed family is told by its string `modelkind`, a getter on the class
   (`hasModelkind(val, 'wayin')`), not by a brand or `instanceof`.
 * **A host's function is wrapped once, on its way in.** Each function a host hands `Bank.make`
-  (`requestCleartext`, the key deriver, the strength checker, `onPanic`, ...) is wrapped at `Bank`'s
+  (`requestCleartext`, the key deriver, the strength checker, `onLifecycle`, ...) is wrapped at `Bank`'s
   constructor into a checked, branded thing that checks what the function answers (*Validation*).
   Past it nothing calls the bare function; a parameter takes the branded thing.
 * **A browser checks what a server sends.** A server is not trusted, so a browser checks each
