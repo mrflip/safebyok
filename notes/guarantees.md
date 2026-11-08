@@ -102,7 +102,7 @@ Three layers hold key material, and the words for each matter.
   `crypto.ts` is the only module that calls `crypto.subtle`.
 * **IndexedDB** keeps a `CryptoKey` by structured clone: the handle survives a page load, its
   material still inside the browser, never as bytes JavaScript sees. The one key safebyok stores
-  this way is the leaseKey (`lease.cache`, through a `DeviceDB`'s `stow`). The core's `IdbDeviceDB`
+  this way is the leaseKey (`lease.cacheAsCacheCan`, through a `DeviceDB`'s `stow`). The core's `IdbDeviceDB`
   (`storage/idb-device-db.ts`, on `safebyok/browser`) rests the lease row, its `lease_key` handle among it, in
   the database `${dbName}:device-v001-001-001` by IndexedDB's structured clone, never as bytes; its `MemoryDeviceDB`
   (`storage/memory-device-db.ts`) keeps the row by `structuredClone` in a Map for the page's life. No other key is ever written anywhere: not to
@@ -198,12 +198,12 @@ only as `box_key_wrapped`.
 **leaseKey.** Never naked, never bytes. Made: `makeLeaseKey` in `Lease.buildGranted`, called by
 `Proving.buildLease`, from the vault's `#unlockByProof` and `#renewLease`. Carried, as the `lease_key` of a
 `LeaseRecord`: `Lease.#record`, the Lease the vault holds in `#lease` (`#attachLease`) → `lease.cacheAsCacheCan` →
-`lease.cache` → the `LeaseFriend`'s `tryCacheLease` (made in `Vault.#makeFriend`) → `DeviceDB.stow`
+the `LeaseFriend`'s `tryCacheLease` (made in `Vault.#makeFriend`) → `DeviceDB.stow`
 (`storage/device-db.ts`; `IdbDeviceDB`'s structured clone into IndexedDB, or `MemoryDeviceDB`'s
 `structuredClone` into a Map); read back, from
 `vault.ensureUnlocked`, by `Lease.buildFromCache` (`tryPeekLease` → `DeviceDB.peek`), which checks the row with
 `leaseRecord` and builds a Lease around it. Dropped from memory by `lease.evict`: in `lease.vacate`, at a sweep
-(`sweepContents`), when the lease proves damaged (`Lease.#vaultKey`), and when a lock crosses a renewal. Erased
+(`sweepContents`), and when the lease proves damaged (`Lease.#vaultKey`). A lease built for a renewal that a lock crossed is neither attached nor stowed, and goes out of scope. Erased
 from the store by `DeviceDB.forget`: through `lease.vacate` or `Lease.forget` (`tryForgetLease`) from the
 vault's `#vacateLease`, at `vault.lock()`, at a vacate and at a tombstone; through `forgetOutdated`, in
 `Lease.buildFromCache`, for a row of another epoch or stamp; and row by row from `bank.vacate`
@@ -274,7 +274,7 @@ naked vaultKey anywhere at rest, and no cache of one in memory. Kept by: `models
 
 **G4. The leaseKey never has bytes.** It is generated non-extractable (`makeLeaseKey`) and exists
 only as a `CryptoKey` handle: a local in `Lease.buildGranted`; `Lease.#record` in memory, for the lease's life;
-and the `lease_key` of a `LeaseRow` cached by `lease.cache` through a `DeviceDB`'s `stow` (the core's
+and the `lease_key` of a `LeaseRow` cached by `lease.cacheAsCacheCan` through a `DeviceDB`'s `stow` (the core's
 `IdbDeviceDB` keeps it by IndexedDB's structured clone, its `MemoryDeviceDB` by `structuredClone`) and read back by
 `Lease.buildFromCache` (`DeviceDB.peek`). A lease is dropped from memory at `lock()`, at a sweep, at a vacate, at a
 tombstone, and when it proves damaged (`Lease.#vaultKey`), and its row is erased at `lock()`, at a vacate and at a
