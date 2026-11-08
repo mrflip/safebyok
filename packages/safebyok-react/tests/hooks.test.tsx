@@ -20,6 +20,12 @@ class BoxRefusingVaultDB extends MemoryVaultDB {
   }
 }
 
+/** What useVault answers for the vault `main`: its stage, and the cause's kind once spent. */
+const ShowsHeld = () => {
+  const held = useVault('main')
+  return <span data-testid="held">{held.stage === 'spent' ? `spent ${held.cause.refusalkind}` : held.stage}</span>
+}
+
 /** Calls `hook` as it renders, and renders nothing. */
 const Calls = ({ hook }: { hook: () => unknown }) => { hook(); return null }
 
@@ -54,6 +60,31 @@ describe("useVault and useVaultSnapshot", () => {
     render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /></BankProvider>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 refused') })
     expect(shown('vault')).to.eq('waiting none')
+  })
+
+  it("read waiting while the bank's hello is still on its way", async () => {
+    const world = TH.makeBankWorld()
+    const listing = TH.held<never>()
+    vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(listing.promise)
+    render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsHeld /></BankProvider>)
+    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(shown('vault')).to.eq('waiting none')
+    expect(screen.getByTestId('held').textContent).to.eq('waiting')
+  })
+
+  it("read spent once the bank is vacated, carrying the cause, and useVaultSnapshot null", async () => {
+    const world = TH.makeBankWorld()
+    const seeding = world.bankOn()
+    await seeding.hello()
+    await seeding.ensureVault(TH.VaultScopeGiven)
+    seeding.sweep()
+    render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsHeld /></BankProvider>)
+    await waitFor(() => { expect(screen.getByTestId('held').textContent).to.eq('present') })
+    const cause = new VaultError('identity_revoked', 'signed out')
+    await act(async () => { await TH.seenBanks[0]?.vacate({ cause }) })
+    expect(screen.getByTestId('held').textContent).to.eq('spent identity_revoked')
+    expect(shown('vault')).to.eq('spent none')
   })
 
   it("read a vault deleted elsewhere as unborn", async () => {
