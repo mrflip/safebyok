@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type BoxSnapshot, type Vault, type VaultSnapshot, type Whisper, type BoxExposure } from 'safebyok'
+import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type BoxSnapshot, type Vault, type VaultError, type VaultSnapshot, type Whisper, type BoxExposure } from 'safebyok'
 import { useProvided } from './bank-provider'
 
 // == [Bank hooks]: useBank, useBankSnapshot, subscribeToNothing, getNothing
@@ -20,11 +20,11 @@ export const useBankSnapshot = (): BankSnapshot | null => {
 
 // == [Vault hooks]: VaultStage, VaultHeld, useVault, useVaultFor, useVaultSnapshot, WaitingHeld, UnbornHeld
 
-/** Where the vault a hook names stands: `waiting`, `unborn` or `present`. */
-export type VaultStage = 'waiting' | 'unborn' | 'present'
+/** Where the vault a hook names stands: `waiting`, `unborn`, `present`, or `spent` once its bank is swept or vacated. */
+export type VaultStage = 'waiting' | 'unborn' | 'present' | 'spent'
 
-/** What {@link useVault} answers: the vault's stage, and its Vault object while it is `present`. */
-export type VaultHeld = { stage: 'waiting' | 'unborn', vault: null } | { stage: 'present', vault: Vault }
+/** What {@link useVault} answers: the vault's stage, its Vault object while it is `present`, and why its bank ended once `spent`. */
+export type VaultHeld = { stage: 'waiting' | 'unborn', vault: null } | { stage: 'present', vault: Vault } | { stage: 'spent', vault: null, cause: VaultError }
 
 const WaitingHeld: VaultHeld = Object.freeze({ stage: 'waiting', vault: null })
 const UnbornHeld: VaultHeld = Object.freeze({ stage: 'unborn', vault: null })
@@ -36,8 +36,11 @@ export const useVault = (vaultlabel: string): VaultHeld => useVaultFor('useVault
 const useVaultFor = (hookname: string, vaultlabel: string): VaultHeld => {
   const { bank, helloedVaults } = useProvided(hookname)
   const snapshot = useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, bank?.getSnapshot ?? getNothing, getNothing)
-  const held = useMemo(() => {
-    if (bank === null || snapshot?.stage !== 'ready') { return WaitingHeld }
+  const held = useMemo((): VaultHeld => {
+    if (bank === null || snapshot === null) { return WaitingHeld }
+    // A sweep or a vacate remakes the snapshot, its err the bank's end cause, so this memo hears the bank end.
+    if ((! bank.isEnabled) && (snapshot.err !== null)) { return { stage: 'spent', vault: null, cause: snapshot.err } }
+    if (snapshot.stage !== 'ready') { return WaitingHeld }
     const vault = bank.vaultAt({ vaultlabel })
     return vault?.isPresent === true ? { stage: 'present' as const, vault } : UnbornHeld
   }, [bank, snapshot, vaultlabel])
