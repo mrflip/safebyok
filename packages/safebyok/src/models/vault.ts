@@ -322,14 +322,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Tombstones the box listed at `boxlabel` and answers it, or null where none is stored; {@link BoxListing.del} has the refusals.
    * A damaged box, one that failed validation when read back, reads as missing here: {@link tryDelDamagedBox} removes it. */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
-    const timely = VX.timelyOpts.parse(opts)
-    const boxes = this.boxListing
-    const scope = boxes.scopeOf({ ...this.scope, boxlabel })
-    this.demandUnlocked()
-    const held = boxes.at(scope)
-    if (held !== null) { return held.del(timely) }
-    await this.ensureTimely(timely.maxWorldMillis); this.demandUnlocked()
-    return boxes.del(SX.sentinelBoxOf(scope, this.vault_tok))
+    const box = await this.boxListing.deletable({ ...this.scope, boxlabel }).del(opts)
+    return SX.isRowAt(box, SX.VoidRevision) ? null : box
   }
 
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
