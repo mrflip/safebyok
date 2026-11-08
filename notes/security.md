@@ -44,7 +44,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-11-08 (bank_disable, branch `20261108-bank_disable`): **`bank.vacate()` disables the bank, then erases every lease row of the bank's applabel
   and user_id; it drops no IndexedDB database.** In `packages/safebyok/src/models/bank.ts`, `vacate()` first disables the bank, synchronously:
   `bank.isEnabled` is false for good, every `hello`, `ensureVault` or `vaultAt` refuses `disabled` from that instant, and the snapshot reads `refused`
-  with the cause. A disabled bank calls none of the host's functions (`onPanic`, `onBadNews`, `requestCleartext`): a panic goes to the platform
+  with the cause. A disabled bank calls none of the host's functions (`onPanic` (amended 2026-11-08 (lifecycle_callback): now `onLifecycle`, see the last amendment of this entry), `onBadNews`, `requestCleartext`): a panic goes to the platform
   (`DefaultOnPanic`), news to the bank's logger (`DefaultOnBadNews`), and a request for the passphrase is declined with no dialog (amended 2026-11-08 (review_fixes): a panic
   past the disable only reports its refusal to the platform, not through `DefaultOnPanic`; and `Bank.askUser` is plain `guardRequestCleartext(requestCleartext)` with no
   switch, a disabled bank asking no one by construction, see the amendment below). The one exception is
@@ -67,7 +67,7 @@ added or folded into through the subagent, and no other entry changes.
   still receives the refusal; before, it went to `onBadNews` and the bank vacated itself unconditionally. `DefaultOnPanic` (the handler used when the
   host gives none) reports the refusal to the platform and, on `identity_revoked`, calls `bank.vacate({ cause: refusal })` (amended 2026-11-08 (review_fixes): if/else, never both: it reports to the platform, then on `identity_revoked` vacates the bank, otherwise vacates the vault the panic names, if one), the same vacate as sign-out;
   the bank's snapshot then reads stage `refused` with that refusal as `err`. A host that supplies its own `onPanic` decides for itself: the vacate on
-  revocation happens only if it calls `DefaultOnPanic(panic)` from its handler, which the README shows. This is a deliberate trust in the host (the host
+  revocation happens only if it calls `DefaultOnPanic(panic)` from its handler, which the README shows (amended 2026-11-08 (lifecycle_callback): no longer so; the core vacates the bank on `identity_revoked` whatever the host gave, and `onPanic` and `DefaultOnPanic` are gone, see the last amendment of this entry). This is a deliberate trust in the host (the host
   is not our threat model), and the safe behaviour is the default; a host `onPanic` that swallows the panic leaves a revoked user's cached leases on the
   device until something else vacates or locks. `bank.vacate` memoizes its promise, so a burst of panics vacates once and lists the cached leases once:
   a panic raised by the bank's own erase reaches the host's `onPanic`, and every other panic after the vacate began goes to `DefaultOnPanic`, whose
@@ -112,6 +112,22 @@ added or folded into through the subagent, and no other entry changes.
   or ask the user for the passphrase through the host's own `requestCleartext`. The guard that runs a host's `onBadNews` and sends its throw or rejection to the platform is now the exported
   `tellBadNewsTo(onBadNews, bank, badnews)`, which validates its input. safebyok-react's provider hands descendants a `tellBadNews` bound to the bank and the host's latest `onBadNews`, and
   it does nothing once `bank.isEnabled` is false, so a descendant of a vacated bank reaches neither the host's `onBadNews` nor the bank's logger through it.
+  amended 2026-11-08 (lifecycle_callback, branch `20261108-lifecycle_callback`): `onLifecycle` replaces `onPanic`, and the core vacates the bank on a revoked identity whatever the host gave.
+  (1) The vacate on `identity_revoked` is a guarantee, no longer an overridable default. `onPanic`, `PanicHandler`, `Panic`, `DefaultOnPanic` and `guardOnPanic` are gone. The bank's private `panic` friend
+  (in `BankFriend`, reached from `Listing.panicIfRevoked`) calls `bank.vacate({ cause })` synchronously, at the moment `DefaultOnPanic` did; a host with its own handler, which before kept a revoked bank
+  alive, can no longer. A vacate still memoizes, so a burst of revocations vacates once.
+  (2) The host's `onLifecycle` is wrapped once, in `Bank`'s constructor, by `guardOnLifecycle` (validated as a function; its throw or rejection goes to the platform), and hears a `BankEvent`, each with the live `Bank`:
+  `lease_unerased` (a refusal, the vault or null, and `where`: lock, tombstone, vacate or outdated), `vacated` (`cause`, and the count `unerased`), or `helloed` (the `Outcome<void>` of `bank.hello` or
+  `vault.hello`, and the vault or null). It carries no secret material: the refusals are VaultErrors whose device-store causes are already replaced by `storeFailed`, and neither Bank nor Vault hands out a key.
+  (3) The four sites that met a refused lease erase are one `lease_unerased` event, and the default decides severity: `DefaultOnLifecycle` logs a lock's or a vacate's refused erase at error, reports it to the platform
+  and vacates the vault (as `DefaultOnPanic` did), and warns through the logger of a tombstone's or an outdated row's, as before. The outdated-row erase in `Lease.buildFromCache` (`forgetOutdated`) tells a new
+  `LeaseFriend.tellUnerased` instead of writing to the logger itself.
+  (4) Handlers are heard while the bank is enabled, and after a sweep or a vacate only from the vacate's own scrub, which tells `lease_unerased` per refused row and then `vacated` once it settles, neither awaited,
+  so a host handler that awaits `bank.vacate()` cannot deadlock. A disabled bank routes every other event to `DefaultOnLifecycle`, whose only action, a vault's vacate, is a no-op on a vault already let go.
+  A bank row the scrub cannot forget is now told as bad news (`onBadNews`), not as a panic (it replaces the bank_followups sentence that sent a refused forget to `onPanic`). Where this entry says a disabled
+  bank's panic goes to a handler that only reports to the platform, or that `DefaultOnPanic` logs each panic, read `DefaultOnLifecycle`, whose error log is `{ call: 'Bank.onLifecycle', refusalkind }` with the message only.
+  (5) `BankFriend` gains `announce`, branded by `brandGuarded` and checked by `isGuarded` like `panic`, `tellBadNews` and `askUser`; it is protected in TypeScript only, on `Listing.bankFriend`, as the others are,
+  so a host holding a vault listing can reach it at runtime and make the bank tell its `onLifecycle` an event the bank did not see.
 
 * 2026-11-07 (devicedb_idb, sprint devicedb_idb, thread 7, at the Coach's direction, branch `20261107-brands`): **Every brand in the core is a `Symbol.for('@safebyok/<name>')` key that
   anyone may wear, and `isVaultError` now recognises a `VaultError` of another copy of safebyok by its brand.** In `packages/safebyok/src/helpers/consts.ts`, a brand is
@@ -161,7 +177,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-11-06 (host_branding, PR #552): **`Bank`'s constructor wraps each host function once and holds only the wrap, branded `IsGuarded`; a `keyDeriver.load()` that throws now
   refuses `unexpected_error` with the host's thrown error as `cause`; a `device_id` is a UUID.** In `packages/safebyok/src/models/bank.ts` the bank holds
   `keyDeriver` through `guardKeyDeriver` (`src/models/proving.ts`), `strengthChecker` through `guardStrengthChecker` (`src/helpers/passphrase-strength.ts`),
-  `requestCleartext` as `askUser` through `guardRequestCleartext`, and `onPanic` as `panic` through `guardOnPanic`; `VX.vaultWorld` and `GX.provingWorld` demand the brand
+  `requestCleartext` as `askUser` through `guardRequestCleartext`, and `onPanic` as `panic` through `guardOnPanic` (amended 2026-11-08 (lifecycle_callback): `onLifecycle` through `guardOnLifecycle`; see the top entry); `VX.vaultWorld` and `GX.provingWorld` demand the brand
   (`isGuarded`) of each, so a vault or proving cannot be handed a bare host function. The brand (`src/helpers/consts.ts`, `brandGuarded`) is a fixed, non-enumerable data property
   keyed by `Symbol.for('@safebyok/guarded')`, set by `brand()` on a wrap that `brandGuarded` then freezes (amended 2026-11-07 (thread 7): it was a module-private `Symbol('safebyok.guarded')`, and a getter was said where a data property is meant; anyone may now wear the brand, which is a tripwire in the world shapes and not a lock, `Bank`'s constructor wrapping every host function regardless; see the 2026-11-07 thread 7 entry at the top): a plain object, a JSON copy or a spread copy of a wrap does not carry it unless forged, and the wrap is
   frozen. The two functions that hear the passphrase keep their throws replaced
@@ -297,7 +313,7 @@ added or folded into through the subagent, and no other entry changes.
   `lock()` is a panic.** `vault.#vacateLease` reads locked at once, but where the deviceDB refuses the erase the row stands: with a host
   `onPanic` the vault stays locked and enabled, the row in place, and the next `ensureUnlocked` on this device takes it up with no proof;
   with none, the refusal goes to the platform's `reportError` where there is one, and the vault is vacated, which tries the erase once
-  more. Amended 2026-11-03 (vault_slot, branch `20261103-vault_slot`): `#vacateLease`
+  more (amended 2026-11-08 (lifecycle_callback): the refusal is a `lease_unerased` event with `where: 'lock'` to the bank's `onLifecycle`; `DefaultOnLifecycle` logs it at error, reports it to the platform and vacates the vault, and a host's own `onLifecycle` replaces that, so the vault stays locked and enabled with the row in place, as it did with a host `onPanic`). Amended 2026-11-03 (vault_slot, branch `20261103-vault_slot`): `#vacateLease`
   (`packages/safebyok/src/models/vault.ts`) evicts and nulls the lease before it calls the deviceDB's erase, and turns a synchronous
   throw from a duck's `tryVacate` into a refusal, so `lock()` cannot fail open: it reads locked and does not throw, and the refused
   erase goes to the panic path above.
