@@ -41,6 +41,18 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-08 (bank_disable, branch `20261108-bank_disable`): **`bank.vacate()` lets the listing go, erases every lease row of the bank's applabel and
+  user_id, and only then disables the bank; it drops no IndexedDB database.** In `packages/safebyok/src/models/bank.ts`, `vacate()` first lets the vault
+  listing go, so calls in flight and every later `hello`, `ensureVault` or `vaultAt` refuse `disabled` and the snapshot reads `refused`. The scrub then
+  erases the bank's lease rows on the device, listed or not, with the host's handlers live: a refused listing of the leases reaches `onBadNews`, a
+  lease that cannot be forgotten reaches `onPanic`. Only then is `bank.isEnabled` false for good, and a disabled bank calls none of the host's functions
+  (`onPanic`, `onBadNews`, `requestCleartext`): a panic goes to the platform, news to the bank's logger, and a request for the passphrase is declined with
+  no dialog. `vacate()` returns a promise that settles when the scrub is done. Not done: dropping the deviceDB's databases (`IdbDeviceDB` keeps one
+  database each for leases and bank rows, holding every app's and user's rows on the origin, and a pluggable deviceDB has none to drop); and forgetting
+  this bank's own `{ applabel, user_id, device_id }` row, so the same user's next sign-in on this device gets the same `device_id` (it needs a new
+  DeviceDB verb and the React provider to stop handing on a cached `device_id`). Known race: an unlock in flight when `vacate()` runs can cache its lease
+  after the scrub, and that lease stays until the next vacate.
+
 * 2026-11-07 (devicedb_idb, sprint devicedb_idb, thread 2, branch `20261107-idb_devicedb`): **`IdbDeviceDB` keeps each lease row in IndexedDB with
   its `lease_key` a non-extractable CryptoKey held by structured clone, and deletes every older device database unread.** In
   `packages/safebyok/src/storage/idb-device-db.ts` (exported from `safebyok/browser`), the database `${dbName}:device-v1` has one object store keyed

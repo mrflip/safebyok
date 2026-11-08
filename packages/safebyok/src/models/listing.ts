@@ -291,7 +291,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Guards]: demandEnabled, demandRecordOfScope
+  // == [Guards]: isEnabled, demandEnabled, demandRecordOfScope
+
+  /** True until a sweep or a vacate lets this listing go, and never again. */
+  get isEnabled(): boolean { return this.#isEnabled }
 
   /** Demands that this listing be enabled: not past a sweep or a vacate. */
   demandEnabled(): this {

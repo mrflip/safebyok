@@ -48,7 +48,7 @@ export class Bank {
   readonly #onBadNews:    BadNewsHandler
   readonly #listeners = new Set<() => void>()
   readonly #vaultListing: VaultListing
-  /** Cleared by a sweep or a vacate, and never set again. */
+  /** Cleared by a sweep, or once a vacate's scrub is done, and never set again. Until then the host's functions are called. */
   #isEnabled = true
   /** The outcome of the last `hello`, null with none yet, and the bank's own refusal once it is disabled. */
   #lastHello:             Outcome<void> | null = null
@@ -127,8 +127,11 @@ export class Bank {
   async hello(): Promise<void> {
     this.demandEnabled()
     const hello = await outcomeOf(() => this.#bringUp())
-    // A hello that a sweep or a vacate crosses leaves the disabled bank's snapshot as it is.
-    if (this.#isEnabled) { this.#lastHello = hello }
+    if (! this.#isLive()) {
+      // A hello that a sweep or a vacate crosses leaves the snapshot as it is, and refuses as the bank's unless it refused on its own.
+      throw (hello.ok || isVaultError(hello.err, 'disabled')) ? bankDisabled() : hello.err
+    }
+    this.#lastHello = hello
     this.#remakeSnapshot()
     valOf(hello)
   }
@@ -144,7 +147,7 @@ export class Bank {
   }
   // --
 
-  // == [Ending]: autolock, lock, vacate, sweep, disable, listOwnLeases, eraseOwnLeases, eraseLease
+  // == [Ending]: autolock, lock, vacate, sweep, letGo, listOwnLeases, eraseOwnLeases, eraseLease
 
   /** Lock each listed vault with a cached lease past autolock, erasing it. Call it after `hello` and on your own timer.
    * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.buildFromCache` leaves such a row for it.
@@ -165,25 +168,28 @@ export class Bank {
     return this
   }
 
-  /** Sign out on this device: disable the bank and erase every lease of it cached here, the vaultDB untouched. Never throws. */
-  vacate(): this {
-    this.#disable((listing) => { listing.vacate() })
-    // Erased on a bank already swept too: sign-out may come after the cleanup.
-    void this.#eraseOwnLeases()
-    return this
+  /** Sign out on this device: erase every lease of this bank cached here, then disable the bank, the vaultDB untouched. Never rejects. */
+  async vacate(): Promise<void> {
+    this.#letGo(() => { this.#vaultListing.vacate() })
+    // The scrub runs with the host's handlers live: a lease that outlives sign-out is the one the host most needs to hear of.
+    // It runs on a bank already swept too, as sign-out may come after the cleanup.
+    await this.#eraseOwnLeases()
+    this.#isEnabled = false
   }
 
   /** Cleanup while the page lives: disable the bank, leaving each cached lease for the next bank. Never throws. */
-  sweep(): this { return this.#disable((listing) => { listing.sweep() }) }
-
-  /** Disable the bank for good, discarding its listing by `discard`; a repeat is a no-op. */
-  #disable(discard: (listing: VaultListing) => void): this {
-    if (! this.#isEnabled) { return this }
+  sweep(): this {
+    this.#letGo(() => { this.#vaultListing.sweep() })
     this.#isEnabled = false
-    this.#lastHello = bad(bankDisabled())
-    discard(this.#vaultListing)
-    this.#remakeSnapshot()
     return this
+  }
+
+  /** The bank's snapshot refused and its listing let go by `discard`, for good; a repeat is a no-op. */
+  #letGo(discard: () => void): void {
+    if (! this.#vaultListing.isEnabled) { return }
+    this.#lastHello = bad(bankDisabled())
+    discard()
+    this.#remakeSnapshot()
   }
 
   /** This bank's rows among the cached leases, oldest first; a refused listing is bad news, and finds none. */
@@ -248,9 +254,8 @@ export class Bank {
 
   /** Every news goes to the bank's `onBadNews`, or `DefaultOnBadNews` once disabled; 'identity_revoked' vacates the bank. */
   #hearBadNews(news: VaultError): unknown {
-    // Chosen before the vacate: the news that disables the bank is the last its host hears.
     const onBadNews = this.#isEnabled ? this.#onBadNews : DefaultOnBadNews
-    if (isVaultError(news, 'identity_revoked')) { this.vacate() }
+    if (isVaultError(news, 'identity_revoked')) { void this.vacate() }
     return onBadNews({ news, bank: this })
   }
   // --
@@ -278,20 +283,24 @@ export class Bank {
   }
   // --
 
-  // == [Guards]: isEnabled, demandEnabled, isOwnLease, demandReady
+  // == [Guards]: isEnabled, demandEnabled, isLive, isOwnLease, demandReady
 
-  /** True from `Bank.make` until a sweep or a vacate, and never again. */
+  /** True from `Bank.make` until a sweep, or a vacate's scrub, is done, and never again. */
   get isEnabled(): boolean { return this.#isEnabled }
 
-  /** Demands that this bank be enabled: not past a sweep or a vacate. */
+  /** Demands that this bank be enabled, and not amid a vacate. */
   demandEnabled(): this {
-    if (! this.#isEnabled) { throw bankDisabled() }
+    if (! this.#isLive()) { throw bankDisabled() }
     return this
   }
+
+  // A vacate lets the listing go at once, but disables the bank only once its scrub is done.
+  #isLive(): boolean { return this.#isEnabled && this.#vaultListing.isEnabled }
 
   #isOwnLease({ applabel, user_id }: LeaseDated): boolean { return (applabel === this.applabel) && (user_id === this.user_id) }
 
   #demandReady(): void {
+    this.demandEnabled()
     if (this.#lastHello === null) { throw helloFirst() }
     valOf(this.#lastHello)
   }
