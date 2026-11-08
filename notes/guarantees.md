@@ -47,7 +47,10 @@ tripwire for the core's own wiring rather than a lock: `Bank`'s constructor wrap
 `guardStrengthChecker` (`helpers/passphrase-strength.ts`), which hands a throw to `HostErrorSanitizer.refusalFor`
 (`refusals/host-error-sanitizer.ts`), the one function that stands a refusal in for a foreign throw, reading nothing
 of it; and `requestCleartext` by `guardRequestCleartext` (`models/bank.ts`), which answers false for a throw and drops it,
-for `Gating.#askHost` to refuse as `requestCleartextThrew`. That wrap travels in the `BankFriend` the bank hands its
+for `Gating.#askHost` to refuse as `requestCleartextThrew`. A host may leave `requestCleartext` out: the friend's
+`askUser` is then null, no host function is called, and the gating waits, open, for its `attempt` or `decline`. Either
+way the bank's snapshot holds the live gating as `openGating`, for a dialog to answer; a gating holds no clear between
+attempts (G1), and its `toJSON` shows only its scope and kind. That wrap travels in the `BankFriend` the bank hands its
 vault listing, which holds it protected and hands it to each vault, which holds it private, and it reaches a gating only
 in its launch args; no public member of a bank or a vault answers it. A
 disabled bank asks no one: every `Gating.launch` follows, in the same tick, a check that its vault or vault listing is
@@ -229,8 +232,8 @@ argument or a local: the gating's `attempt` hands the clears to `#attemptOnce`, 
 `gating.checkStrength` hands one to `Proving.checkStrength` as the user types. No class, record, snapshot or
 closure that outlives the call holds it: no gate, vault or `run` hears a passphrase. The one comparison of two
 passphrases is `antePassphraseClear === nextPassphraseClear` in `ProveForGatingkind`'s `replace_passphrase`, both
-typed by the same user (`samePassphrase`). Three host functions hear it: the dialog that collects it, the
-`strengthChecker` and the `keyDeriver`. *Caveat:* a JavaScript string cannot be zeroed, so copies
+typed by the same user (`samePassphrase`). Three host functions hear it: the dialog that collects it, be it
+`requestCleartext` or one rendered from the bank's `openGating`, the `strengthChecker` and the `keyDeriver`. *Caveat:* a JavaScript string cannot be zeroed, so copies
 live until collected, and `safebyok-react`'s dialog, on the old core until the package moves, holds what was typed
 in component state until it closes. Kept by: `models/gating.ts` (chains), `models/proving.ts`. Checked by: `rg` for
 a field or record holding one finds none; `tests/models/vault-gate.test.ts`, *leaves the dialog open on a wrong

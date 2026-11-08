@@ -9,7 +9,7 @@ import { RevokePasskeyModal } from './revoke-passkey-modal'
 
 /** What GatingModal is handed: any gating, and the props its dialogs share. */
 export type GatingModalProps = {
-  /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
+  /** The gating the dialog answers, from `requestCleartext` or the bank's snapshot. */
   gating:              AnyGating
   /** Called once with 'unlocked' or 'deleted' when an attempt succeeds, and with 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void

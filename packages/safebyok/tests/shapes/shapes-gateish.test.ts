@@ -40,6 +40,10 @@ describe("gatingLaunchArgs", () => {
     TH.expectSyncRefusal(() => GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend: { landGate: friend.landGate }, askUser }))
   })
 
+  it("takes null where the host gave no dialog", () => {
+    expect(GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend, askUser: null }).askUser).to.be.null
+  })
+
   it("refuses a dialog the bank did not wrap", () => {
     TH.expectSyncRefusal(() => GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend, askUser: () => Promise.resolve(true) }), 'bad_option')
   })

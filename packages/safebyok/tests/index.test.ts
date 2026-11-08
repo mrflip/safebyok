@@ -34,7 +34,7 @@ describe("safebyok", () => {
     expectTypeOf<Parameters<Front.LifecycleHandler>[0]>().toEqualTypeOf<Front.BankEvent>()
     expectTypeOf<Front.BankOpts['onLifecycle']>().toEqualTypeOf<Front.LifecycleHandler | undefined>()
     expectTypeOf<Extract<Front.BankEvent, { kind: 'lease_unerased' }>['where']>().toEqualTypeOf<Front.EraseSite>()
-    expectTypeOf<Front.BankFriend['askUser']>().toEqualTypeOf<Front.AskUser>()
+    expectTypeOf<Front.BankFriend['askUser']>().toEqualTypeOf<Front.AskUser | null>()
     expectTypeOf<Parameters<typeof Front.tellBadNewsTo>[0]>().toEqualTypeOf<Front.BadNewsHandler>()
   })
 

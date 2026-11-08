@@ -16,8 +16,9 @@ run on until they move here; its long README describes that design, not this one
   passphrase is forgotten and which has no working passkey. A replaced passphrase or revoked passkey
   stops opening the vault, but the vaultKey never changes, so a copy of the old record still opens.
 * **State is framework-agnostic.** `Bank`, `Vault`, `Box` and `vault.boxListing` each have
-  `subscribe` and `getSnapshot`, detached, as `useSyncExternalStore` wants them. A snapshot is
-  plain data, keeps its identity until something changes, and never holds a whisper.
+  `subscribe` and `getSnapshot`, detached, as `useSyncExternalStore` wants them. A snapshot keeps
+  its identity until something changes, and never holds a whisper. It is plain data, but for the
+  bank's `openGating`, the live gating a dialog answers.
 * **The core speaks only to interfaces**: a `VaultDB` for what syncs, a `DeviceDB` for what stays
   on this device, and a `KeyDeriver`. Each adapter is its own package. The core uses no Node
   built-ins, so it runs wherever the host does.
@@ -40,8 +41,9 @@ it names are the old design's (`putWayin`, `getWhisper`): for calls, trust the t
   anew, it is a new life: a new `vault_tok` and a new `Vault` instance.
 * **bank**: a signed-in user's vaults and what they share. One per signed-in user.
 * **wayin**: a way in: one passphrase, and at most one passkey. Together they are the **gate**.
-* **gating**: one request for the user's passphrase or passkey, handed to the host's
-  `requestCleartext`, the one place UI meets the vault.
+* **gating**: one request for the user's passphrase or passkey, the one place UI meets the vault.
+  The bank's snapshot holds it as `openGating`, and hands it to the host's `requestCleartext` if
+  there is one.
 * **lease**: what lets this device unlock again without asking, until `autolockMinutes` passes.
 
 ## A host
@@ -73,6 +75,19 @@ const whisper = await box.extractWhisper() // hands it over, and keeps nothing
 vault.lock()                 // every subscriber is told before this returns
 await vault.ensureUnlocked() // no lease now: asks, unlock_vault
 ```
+
+**Rendering the dialog from the snapshot.** Leave `requestCleartext` out, and a gating calls none
+of your functions: it waits, open, in `bank.snapshot.openGating` until its `attempt` or `decline`
+settles it. Render your dialog while that is not null. The bank notifies its subscribers as a
+gating opens and as it settles, whether by the user's answer, a lock, a sweep or a vacate, so the
+dialog closes by itself.
+
+```ts
+const { openGating } = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
+// Render a dialog while openGating is not null. Its Cancel calls openGating.decline().
+```
+
+A passkey prompt needs a live user gesture: ask it from the click on a button in your dialog.
 
 Easy to get wrong:
 

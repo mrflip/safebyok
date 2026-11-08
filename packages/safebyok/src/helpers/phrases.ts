@@ -234,7 +234,7 @@ export const VaultChangedInStorage = "The vault changed in storage since this de
 // == [Vault: lifecycle]: VaultLocked, GateMoved, GatingLanded
 
 /** Why a call that needs the vault unlocked does nothing while it is locked. */
-export const VaultLocked = "The vault is locked, so nothing was read or written: call ensureUnlocked(), which asks the user through requestCleartext, and call again."
+export const VaultLocked = "The vault is locked, so nothing was read or written: call ensureUnlocked(), which asks the user, and call again."
 
 /** Why a call stops when a wayin changed, here or on another device, as it worked. */
 export const GateMoved = "A vault unlocker changed while this call was under way -- the passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on."

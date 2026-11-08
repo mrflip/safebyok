@@ -121,16 +121,20 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 
-  // == [The one gating open]: holdGating, releaseGating, declineGatingAtLock, declineGatingAtDiscard, sweep, vacate
+  // == [The one gating open]: holdGating, releaseGating, declineGatingAtLock, declineGatingAtDiscard, sweep, vacate, declineGatingOfGoneListing
 
   /** Claims the one gating this bank may have open. */
   holdGating(gating: AnyGating): void {
     if (this.#openGating !== null) { throw alreadyAsking() }
     this.#openGating = gating
+    this.tellListeners()
   }
 
   /** The open gating has settled. */
-  releaseGating(): void { this.#openGating = null }
+  releaseGating(): void {
+    this.#openGating = null
+    this.tellListeners()
+  }
 
   /** The open gating hears a lock of `vault`, if it asks for that vault: a birth's does not. */
   declineGatingAtLock(vault: Vault): void {
@@ -144,14 +148,20 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** Sweep this listing's vaults, and decline the open gating whatever vault it asks for. */
   override sweep(): this {
-    this.#openGating?.declineAtDiscard()
-    return super.sweep()
+    super.sweep()
+    this.#declineGatingOfGoneListing()
+    return this
   }
 
   override vacate(): this {
-    this.#openGating?.declineAtDiscard()
-    return super.vacate()
+    super.vacate()
+    this.#declineGatingOfGoneListing()
+    return this
   }
+
+  // Past the disable: the decline tells the listeners, who must meet the listing already disabled.
+  /** The open gating, whatever vault it asks for, settles with the listing going away. */
+  #declineGatingOfGoneListing(): void { this.#openGating?.declineAtDiscard() }
   // --
 
   // == [Defined by the vault listing]: vaultTokOfWorld, fateOver, scopepathOf, makeThing, nothingStoredError, tryGetRow, tryPutRow, tryDelRow, watchRows, isOwnRow

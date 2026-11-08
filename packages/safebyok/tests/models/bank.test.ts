@@ -339,8 +339,8 @@ describe("bank.ensureVault", () => {
     await asking
   })
 
-  it("can never ask with no dialog, as Bank.make refuses without a requestCleartext", () => {
-    const refusal = TH.expectSyncRefusal(() => makeBankWorld().bankOn({ requestCleartext: undefined as never }))
+  it("refuses a null requestCleartext, which is no function and no leaving out", () => {
+    const refusal = TH.expectSyncRefusal(() => makeBankWorld().bankOn({ requestCleartext: null as never }), 'bad_option')
     expect(refusal.message).to.match(/^requestCleartext: /)
   })
 
@@ -639,3 +639,161 @@ describe("the snapshot and its subscription", () => {
     expect(bank.toJSON()).to.equal(bank.snapshot)
   })
 })
+
+/** A bank with no `requestCleartext`, past its hello, with the vault of `Dna` locked to it and `ensureUnlocked` waiting on its gating. */
+const bankWaitingOnUnlock = async () => {
+  const { world } = await makeBankWithVault()
+  const bank = world.bankOnAnotherDevice({ requestCleartext: undefined })
+  await bank.hello()
+  const vault = bank.vaultAt(VaultScopeGiven)!
+  const unlocking = vault.ensureUnlocked()
+  const gating = await vi.waitFor(() => bank.snapshot.openGating ?? fail("no gating yet"), { interval: 1 })
+  return { world, bank, vault, unlocking, gating }
+}
+
+const fail = (message: string): never => { throw new Error(message) }
+
+describe("the snapshot's open gating", () => {
+  it("answers null with no gating open", async () => {
+    const { bank } = await makeBankWithVault()
+    expect(bank.snapshot.openGating).to.be.null
+  })
+
+  it("answers the live gating while it waits, in a frozen snapshot", async () => {
+    const { bank, gating, unlocking } = await bankWaitingOnUnlock()
+    expect(bank.snapshot.openGating).to.equal(bank.vaultListing.openGating)
+    expect(gating.isOpen).to.be.true
+    expect(Object.isFrozen(bank.snapshot)).to.be.true
+    gating.decline()
+    await TH.expectRefusal(unlocking, 'declined')
+  })
+
+  it("serializes an open gating as its scope and kind, holding no secret", async () => {
+    const { bank, gating, unlocking } = await bankWaitingOnUnlock()
+    const text = JSON.stringify(bank.snapshot)
+    const { openGating } = JSON.parse(text) as { openGating: unknown }
+    expect(openGating).to.deep.equal({ ...VaultScopeGiven, ...BankScopeGiven, gatingkind: 'unlock_vault' })
+    gating.decline()
+    await TH.expectRefusal(unlocking, 'declined')
+  })
+
+  it("tells a subscriber when a gating opens and again when it settles", async () => {
+    const { bank, gating, unlocking } = await bankWaitingOnUnlock()
+    const seen: unknown[] = []
+    bank.subscribe(() => { seen.push(bank.snapshot.openGating) })
+    gating.decline()
+    await TH.expectRefusal(unlocking, 'declined')
+    expect(seen).to.deep.equal([null])
+    const bornOver = bank.vaultAt(VaultScopeGiven)!
+    const again = bornOver.ensureUnlocked()
+    await vi.waitFor(() => bank.snapshot.openGating ?? fail("no gating yet"), { interval: 1 })
+    expect(seen).to.have.lengthOf(2)
+    bank.snapshot.openGating?.decline()
+    await TH.expectRefusal(again, 'declined')
+    expect(seen).to.have.lengthOf(3)
+  })
+
+  it("keeps the snapshot's reference while the gating stays the same", async () => {
+    const { bank, gating, unlocking } = await bankWaitingOnUnlock()
+    const before = bank.snapshot
+    expect(bank.snapshot).to.equal(before)
+    expect(bank.snapshot.openGating).to.equal(gating)
+    gating.decline()
+    await TH.expectRefusal(unlocking, 'declined')
+    expect(bank.snapshot).to.not.equal(before)
+  })
+
+  it("drops a gating settled by an attempt", async () => {
+    const { bank, gating, unlocking } = await bankWaitingOnUnlock()
+    await TH.expectGood(gating.attempt(byPassphrase(Passphrase)))
+    await unlocking
+    expect(bank.snapshot.openGating).to.be.null
+  })
+
+  const Enders: readonly (readonly [string, (made: { bank: Bank, vault: Vault }) => void])[] = [
+    ["a lock of its vault",   ({ vault }) => { vault.lock() }],
+    ["a lock of the bank",    ({ bank })  => { bank.lock() }],
+    ["a sweep of its vault",  ({ vault }) => { vault.sweep() }],
+    ["a vacate of its vault", ({ vault }) => { vault.vacate() }],
+    ["a sweep of the bank",   ({ bank })  => { bank.sweep() }],
+    ["a vacate of the bank",  ({ bank })  => { void bank.vacate() }],
+  ]
+
+  it.each(Enders)("drops the gating at %s, before the call returns", async (_label, end) => {
+    const { bank, vault, gating, unlocking } = await bankWaitingOnUnlock()
+    end({ bank, vault })
+    expect(bank.snapshot.openGating).to.be.null
+    await TH.expectRefusal(unlocking)
+    expect(gating.isOpen).to.be.false
+  })
+
+  it("drops a birth's gating at a sweep, whose listeners meet the bank and its listing already disabled", async () => {
+    const world = makeBankWorld()
+    const bank = world.bankOn({ requestCleartext: undefined })
+    await bank.hello()
+    const asking = bank.ensureVault(VaultScopeGiven)
+    const heard: { isBankEnabled: boolean, isListingRefusing: boolean }[] = []
+    bank.subscribe(() => {
+      if (bank.snapshot.openGating === null) { heard.push({ isBankEnabled: bank.isEnabled, isListingRefusing: isRefusing(() => bank.vaultListing.demandEnabled()) }) }
+    })
+    bank.sweep()
+    await TH.expectRefusal(asking)
+    expect(heard[0]).to.deep.equal({ isBankEnabled: false, isListingRefusing: true })
+  })
+
+  it("keeps an attempt that crosses a sweep in the snapshot until it settles, past the disable", async () => {
+    const { world } = await makeBankWithVault()
+    const held = heldDeriver()
+    const bank = world.bankOnAnotherDevice({ requestCleartext: undefined, keyDeriver: held.deriver })
+    await bank.hello()
+    const unlocking = (bank.vaultAt(VaultScopeGiven)!).ensureUnlocked()
+    const gating = await vi.waitFor(() => bank.snapshot.openGating ?? fail("no gating yet"), { interval: 1 })
+    const attempting = gating.attempt(byPassphrase(Passphrase))
+    await vi.waitFor(() => held.isAsked() || fail("not derived yet"), { interval: 1 })
+    bank.sweep()
+    expect(bank.snapshot.openGating).to.equal(gating)
+    held.answer()
+    await TH.expectRefusal(unlocking)
+    await attempting
+    expect(bank.snapshot.openGating).to.be.null
+  })
+
+  it("waits with no host dialog until an attempt settles it", async () => {
+    const { bank, gating, unlocking } = await bankWaitingOnUnlock()
+    await TH.wakeupAtNextTick()
+    expect(gating.isOpen).to.be.true
+    await TH.expectGood(gating.attempt(byPassphrase(Passphrase)))
+    const vault = await unlocking
+    expect(vault.isUnlocked).to.be.true
+    expect(bank.snapshot.openGating).to.be.null
+  })
+
+  it("waits with no host dialog until a decline settles it", async () => {
+    const { gating, unlocking } = await bankWaitingOnUnlock()
+    gating.decline()
+    await TH.expectRefusal(unlocking, 'declined')
+    await TH.expectBad(gating.whenSettled, 'declined')
+  })
+})
+
+const isRefusing = (call: () => unknown): boolean => {
+  try {
+    call()
+    return false
+  } catch {
+    return true
+  }
+}
+
+/** A key deriver that holds each derivation until the test calls `answer`. */
+const heldDeriver = () => {
+  let isAsked = false
+  let release = nothing
+  const released = new Promise<void>((resolve) => { release = resolve })
+  const deriver = { ...testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => {
+    isAsked = true
+    await released
+    return testDeriver.deriveKeyBytes(passphrase, saltBytes)
+  } }
+  return { deriver, isAsked: () => isAsked, answer: () => { release() } }
+}
