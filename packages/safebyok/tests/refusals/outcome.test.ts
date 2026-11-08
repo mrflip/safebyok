@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { type GoodOutcome, type Outcome, storageTroubleOf, bad, demandGood, good, outcomeOf, valOf } from '../../src/refusals/outcome'
 import * as Refusals from '../../src/refusals/throwers'
@@ -113,25 +113,15 @@ describe("valOf", () => {
 })
 
 describe("demandGood", () => {
-  it("hands back a good outcome as it came, and never makes a refusal of it", () => {
+  it("hands back a good outcome as it came", () => {
     const outcome = good('vault record')
-    const refusal = vi.fn((err: VaultError) => err)
-    expect(demandGood(outcome, refusal)).to.eq(outcome)
-    expect(refusal).not.toHaveBeenCalled()
+    expect(demandGood(outcome)).to.eq(outcome)
     expectTypeOf(demandGood(good(7))).toEqualTypeOf<GoodOutcome<number>>()
   })
 
   it("throws a bad outcome's err as it came", () => {
     const refusal = new VaultError('stale_write', 'Read it again.')
     expect(() => demandGood(bad(refusal))).to.throw(refusal)
-  })
-
-  it("throws what the refusal makes of a bad outcome's err", () => {
-    const refusal = new VaultError('stale_write', 'Read it again.')
-    const other = new VaultError('vault_locked', 'Unlock it first.')
-    const refusing = vi.fn((_err: VaultError) => other)
-    expect(() => demandGood(bad(refusal), refusing)).to.throw(other)
-    expect(refusing).toHaveBeenCalledExactlyOnceWith(refusal)
   })
 })
 
