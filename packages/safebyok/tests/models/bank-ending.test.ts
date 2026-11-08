@@ -214,7 +214,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(await bank.ensureVault(VaultScopeGiven)).to.equal(vault)
   })
 
-  it("vacates every listed vault and every lease of the bank on this device, leaving the vaultDB, the bank not ready, and a hello lists them afresh", async () => {
+  it("vacates every listed vault and every lease of the bank on this device, leaving the vaultDB, and disables the bank for good", async () => {
     const world = makeBankWorld()
     const { bank, vault } = await makeBankWithVault(world)
     const elsewhere = world.bankOn({ user_id: 'u2' })
@@ -226,14 +226,16 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     bank.vacate()
     expect(vault.isEnabled).to.be.false
     expect(() => vault.demandEnabled()).to.throw(VaultError)
-    expect(bank.snapshot).to.include({ stage: 'made', err: null })
+    expect(bank.snapshot.stage).to.eq('refused')
+    expect(bank.snapshot.err).to.include({ refusalkind: 'disabled' })
     expect(bank.snapshot.vaults).to.deep.equal([])
     expect(seen).toHaveBeenCalled()
     await TH.eventually(() => world.leaseRows().length === 1)
-    await bank.hello()
-    const relisted = bank.vaultAt(VaultScopeGiven)
+    await TH.expectRefusal(bank.hello(), 'disabled')
+    const next = world.bankOn()
+    await next.hello()
+    const relisted = next.vaultAt(VaultScopeGiven)
     expect(relisted?.isPresent).to.be.true
-    expect(relisted).not.to.equal(vault)
     expect(relisted?.isLocked).to.be.true
   })
 
@@ -248,25 +250,22 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect((world.leaseRows()[0] as { user_id: string }).user_id).to.eq('u2')
   })
 
-  it("panics at a lease it cannot erase: onPanic hears it, a rejection of it goes to the platform, and without one the refusal does", async () => {
+  it("tells the platform and not onPanic of a lease its vacate cannot erase, and tries again on a repeat", async () => {
     const world = makeBankWorld()
     const refusal = new VaultError('storage_unavailable', 'no store')
     const onPanic = vi.fn()
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
     const bank = world.bankOn({ onPanic })
     const row = { ...BankScopeGiven, vaultlabel: 'unlisted', vault_tok: makeLifeTok(), proved_at: T0 }
     vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValue({ ok: true, val: [row] })
     vi.spyOn(world.deviceDB, 'tryForget').mockResolvedValue({ ok: false, err: refusal })
     bank.vacate()
-    await TH.eventually(() => onPanic.mock.calls.length === 1)
-    expect(onPanic).toHaveBeenCalledWith({ refusal })
-    const reported = vi.fn()
-    vi.stubGlobal('reportError', reported)
-    onPanic.mockRejectedValueOnce(new Error('panic handler broke'))
-    bank.vacate()
     await TH.eventually(() => reported.mock.calls.length === 1)
-    world.bankOn().vacate()
+    bank.vacate()
     await TH.eventually(() => reported.mock.calls.length === 2)
     expect(reported).toHaveBeenLastCalledWith(refusal)
+    expect(onPanic).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })
 
@@ -278,10 +277,10 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     bank.subscribe(seen)
     bank.vacate()
     expect(seen).toHaveBeenCalledOnce()
-    expect(bank.snapshot.stage).to.eq('made')
+    expect(bank.snapshot.stage).to.eq('refused')
   })
 
-  it("declines a birth's open gating, so no lease lands past the vacate and the next ask is free to open", async () => {
+  it("declines a birth's open gating, so no lease lands past the vacate", async () => {
     const world = makeBankWorld()
     let closeDialog: () => void = vi.fn()
     const bank = world.bankOn({ requestCleartext: async (gating) => {
@@ -306,36 +305,42 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(stages).to.not.include('ready')
   })
 
-  it("sweeps its vaults and leaves their cached leases; refuses until the next hello, which builds a fresh listing and picks the lease up, nobody asked", async () => {
+  it("sweeps its vaults and leaves their cached leases for the next bank, which picks one up with nobody asked", async () => {
     const world = makeBankWorld()
     const { bank, vault } = await makeBankWithVault(world)
     bank.sweep()
-    expect(bank.snapshot).to.include({ stage: 'made' })
+    expect(bank.snapshot.stage).to.eq('refused')
     expect(bank.snapshot.vaults).to.deep.equal([])
     expect(vault.isEnabled).to.be.false
     expect(vault.isUnlocked).to.be.false
     expect(world.leaseRows()).to.have.lengthOf(1)
-    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven))
-    const seen = vi.fn()
-    bank.subscribe(seen)
-    await bank.hello()
-    expect(seen).toHaveBeenCalled()
-    expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
-    const again = await bank.ensureVault(VaultScopeGiven)
-    expect(again).not.to.equal(vault)
+    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'disabled')
+    await TH.expectRefusal(bank.hello(), 'disabled')
+    const next = world.bankOn()
+    await next.hello()
+    expect(labelsOf(next.snapshot)).to.deep.equal([Dna.vaultlabel])
+    const again = await next.ensureVault(VaultScopeGiven)
     await again.ensureUnlocked()
     expect(again.isUnlocked).to.be.true
   })
 
-  it("does not let a hello crossing a sweep touch the bank's stage: its own caller hears the refusal", async () => {
+  it("leaves the stage to a sweep that a hello crosses, the hello's own caller hearing the refusal", async () => {
     const world = makeBankWorld()
     const bank = world.bankOn()
     const hello = bank.tryHello()
     bank.sweep()
-    await TH.expectBad(hello)
-    expect(bank.snapshot.stage).to.eq('made')
-    await bank.hello()
-    expect(bank.snapshot.stage).to.eq('ready')
+    await TH.expectBad(hello, 'disabled')
+    expect(bank.snapshot.stage).to.eq('refused')
+    expect(bank.snapshot.err).to.include({ refusalkind: 'disabled' })
+  })
+
+  it("erases the bank's cached leases at a vacate after a sweep, as a sign-out after the page's cleanup", async () => {
+    const world = makeBankWorld()
+    const { bank } = await makeBankWithVault(world)
+    bank.sweep()
+    expect(world.leaseRows()).to.have.lengthOf(1)
+    bank.vacate()
+    await TH.eventually(() => world.leaseRows().length === 0)
   })
 
   it("never throws on a repeat", async () => {
@@ -343,6 +348,31 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(bank.lock().lock()).to.equal(bank)
     expect(bank.vacate().vacate()).to.equal(bank)
     expect(bank.sweep().sweep()).to.equal(bank)
+    expect(bank.lock()).to.equal(bank)
+  })
+})
+
+describe("bank.isEnabled", () => {
+  type Ending = Awaited<ReturnType<typeof makeBankWithVault>>
+
+  it.each([
+    ['a sweep', ({ bank }: Ending) => { bank.sweep() }],
+    ['a vacate', ({ bank }: Ending) => { bank.vacate() }],
+    ['a revocation', async ({ world, vault }: Ending) => {
+      world.vaultDB._cheat_refuseGets('identity_revoked')
+      await TH.expectRefusal(vault.fetch(), 'identity_revoked')
+      world.vaultDB._cheat_refuseGets(null)
+    }],
+  ] as const)("is true from Bank.make until %s, and never again", async (_label, ending) => {
+    const made = await makeBankWithVault(makeBankWorld())
+    expect(made.bank.isEnabled).to.be.true
+    expect(made.bank.demandEnabled()).to.equal(made.bank)
+    await ending(made)
+    expect(made.bank.isEnabled).to.be.false
+    await TH.expectBad(made.bank.tryHello(), 'disabled')
+    made.bank.sweep().vacate()
+    expect(made.bank.isEnabled).to.be.false
+    expect(() => made.bank.demandEnabled()).to.throw(Phrases.BankLetGo)
   })
 })
 
@@ -356,18 +386,28 @@ describe("a bank past a vacate", () => {
       await TH.expectRefusal(vault.fetch(), 'identity_revoked')
       world.vaultDB._cheat_refuseGets(null)
     }],
-  ] as const)("refuses ensureVault and vaultAt with BankHelloFirst and opens no gating, after %s, and a hello answers the stored vault with nobody asked", async (_label, vacating) => {
+  ] as const)("refuses ensureVault, vaultAt and hello, and opens no gating, after %s, and the next bank answers the stored vault with nobody asked", async (_label, vacating) => {
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
-    const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { requestCleartext })
+    const world = makeBankWorld()
+    const { bank, vault } = await makeBankWithVault(world, { requestCleartext })
     requestCleartext.mockClear()
     await vacating({ world, bank, vault })
-    await expect(bank.ensureVault(VaultScopeGiven)).rejects.toThrow(Phrases.BankHelloFirst)
-    expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(Phrases.BankHelloFirst)
+    await expect(bank.ensureVault(VaultScopeGiven)).rejects.toThrow(Phrases.BankLetGo)
+    expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(Phrases.BankLetGo)
+    await expect(bank.hello()).rejects.toThrow(Phrases.BankLetGo)
     expect(bank.vaultListing.openGating).to.be.null
     expect(requestCleartext).not.toHaveBeenCalled()
-    await bank.hello()
-    const relisted = await bank.ensureVault(VaultScopeGiven)
+    const next = world.bankOn({ requestCleartext })
+    await next.hello()
+    const relisted = await next.ensureVault(VaultScopeGiven)
     expect(relisted.vault_tok).to.equal(vault.vault_tok)
     expect(requestCleartext).not.toHaveBeenCalled()
+  })
+
+  it("refuses a box put that the vacate crosses", async () => {
+    const { bank, vault } = await makeBankWithVault(makeBankWorld())
+    const putting = vault.putBox({ boxlabel: 'crossed', whisper: { apiKey: 'sk-test-fake' } })
+    bank.vacate()
+    await TH.expectRefusal(putting, 'disabled')
   })
 })
