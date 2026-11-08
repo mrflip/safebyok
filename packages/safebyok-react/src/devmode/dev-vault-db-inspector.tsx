@@ -21,10 +21,8 @@ export const DevVaultDBInspector = ({ vaultDB }: DevVaultDBInspectorProps) => {
 
 // == [Rows]: BankRows, listBankRows, BankRowsTable, VaultRowLines, delBoxRow
 
-/** The bank's vault rows, and the box rows of each live vault by its vaultlabel. */
 type BankRows = { listed: BankListed, boxesOf: ReadonlyMap<string, BoxesListed> }
 
-/** The rows `listVaults` answers for `scope`, and those `listBoxes` answers for each live vault among them. */
 const listBankRows = async (vaultDB: VaultDB, scope: BankScope): Promise<BankRows> => {
   const { val: listed } = await vaultDB.listVaults(scope)
   const live = listed.vaults.filter((row): row is VaultRecord => row.am === 'a')
@@ -35,14 +33,12 @@ const listBankRows = async (vaultDB: VaultDB, scope: BankScope): Promise<BankRow
   return { listed, boxesOf: new Map(boxesListed) }
 }
 
-/** The rows of the bank at `scope`, listed again at each change the vaultDB's watch tells of. */
 const BankRowsTable = ({ vaultDB, scope }: { vaultDB: VaultDB, scope: BankScope }) => {
   const list = useCallback(() => listBankRows(vaultDB, scope), [vaultDB, scope])
   const watch = useCallback((onChange: () => void) => vaultDB.watch(scope, onChange), [vaultDB, scope])
   const { val: rows, trouble, relist } = useListing(list, watch)
   const { lastCall, call } = useLastCall()
 
-  /** Run a button's verb, then list the rows again. */
   const callThenRelist = async (verbname: string, work: () => Promise<string>) => {
     await call(verbname, work)
     relist()
@@ -81,7 +77,6 @@ const BankRowsTable = ({ vaultDB, scope }: { vaultDB: VaultDB, scope: BankScope 
   )
 }
 
-/** A vault row's line, then a line for each of its box rows, damaged ones last. */
 const VaultRowLines = ({ vaultRow, boxes, onGetVault, onGetBox, onDelBox }: VaultRowLinesProps) => {
   const boxRows: readonly (BoxSparse | DamagedBox)[] = boxes === null ? [] : [...boxes.boxes, ...boxes.damaged_rows]
   return (
@@ -105,7 +100,6 @@ const VaultRowLines = ({ vaultRow, boxes, onGetVault, onGetBox, onDelBox }: Vaul
   )
 }
 
-/** Delete `boxRow` by `delBox` at the revision listed, whether it is a live row, a tombstone or a damaged row. */
 const delBoxRow = (vaultDB: VaultDB, boxRow: BoxSparse | DamagedBox) => {
   const sparse = boxSparse.parse(boxRow)
   return vaultDB.delBox({ ...sparse, ...nextRevisionOf(sparse, Date.now()), am: 'x' }, { prior: revisionOf(sparse) })
