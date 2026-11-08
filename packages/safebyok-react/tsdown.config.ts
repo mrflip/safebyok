@@ -19,6 +19,9 @@ export default defineConfig({
   dts:        true,
   sourcemap:  true,
   clean:      true,
+  // A checker's declared type names zod's, through safebyok's validators. zod is safebyok's peer, so
+  // a host that has the core has it: it stays external, as safebyok does.
+  deps:       { neverBundle: [/^zod(\/|$)/] },
   exports:    { devExports: '@safebyok/source' },
   publint:    { level: 'warning' },
   attw:       { profile: 'strict', level: 'error' },
