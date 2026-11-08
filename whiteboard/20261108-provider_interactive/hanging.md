@@ -1,0 +1,47 @@
+# Hanging: bank-provider.tsx interactive session
+
+Questions and issues either of us noticed, banked so we don't side quest. One bullet each; who raised it in brackets.
+
+## Open
+
+* Are we telling the bank to vacate on the right cycle? [Coach]
+* Tests and other changes, held off during this session. [Coach]
+  * tests/test-helpers.ts and tests/bank-provider.test.tsx import `BankProviderProps` from `../src/bank-provider`; it now lives in `src/shapes/shapes-provider.ts`.
+  * `@typescript-eslint/require-await` on `requestCleartext` at tests/bank-provider.test.tsx:359 and tests/vault-controls.test.tsx:71. These were there before this session.
+* passkey.ts has a checker of its own (`PasskeyChecks`), not moved into `src/shapes/`. [agent]
+* Finish removing autolock from the provider (not from the core): from any docs or notes that say the provider runs it, then enter it in the todo and security notes, etc. [Coach]
+  * The provider's timer was removed 2026-11-08. The core keeps `Bank.autolock()` and `autolockMinutes`. The right timescale is hours or days, which a page timer can't serve.
+* Handlers take a winding road [Coach, parked]: they come off the props into a `handlers` bag, then into `panicked` (and kin) by `useEffectEvent`, then are remixed into handlers on the fly in the `Bank.make` call, and for all we know the bank wraps them again (it does: `guardOnPanic`, and its own `DefaultOnPanic` / `DefaultOnBadNews` defaults). React is needed to call `useEffectEvent`, but the bank can provide the default handler itself, if that doesn't affect the lifecycle.
+* Does `bank.tryHello()` tell bad news (through `onBadNews`) as well as landing its refusal in the snapshot? [Coach, fingerpaint in bank-provider.tsx]
+* `setRefused`: what it's for, and whether the provider should hold it. [Coach, next] It now lives only in `useDeviceId` (provider-hooks.ts), for a refused `ensureBank`; a throw from `Bank.make` in the effect reaches the error boundary by itself.
+* `bank.isEnabled` doesn't exist in the core yet: true from `Bank.make` until `sweep()`, then false forever, and `vacate()` must not clear it (its own `identity_revoked` news goes out after). The three uses in `makeBank` are the file's only tsc errors. [agent]
+* `eslint-disable-next-line react-hooks/set-state-in-effect` in `useHeldBank`, on `setContextValue`: report it in the PR's open questions. [agent]
+* `useDeviceId` in `BankProvider` reads `deviceDB` from live props, not the first render's: a host making a new deviceDB each render reruns `ensureBank` on each of its re-renders. The ignored-props warning doesn't cover it. [agent]
+* Building blocks for hosts who compose their own providers: an optional `device_id` prop on BankProvider (skip the fetch when the host has one), or exporting `useDeviceId` / `useHeldBank`. Adding an export later is cheap and removing one breaks semver, so wait for a host to ask; the core plus `useSyncExternalStore` is already the full-control escape hatch. [Coach]
+* `hello` awaits the strength checker's `load()`, but only choosing a passphrase needs it: every sign-in waits on the zxcvbn dictionary (memoized per page, so only the first). Option: the guarded checker awaits its own `load` at first check, and `hello` only starts it. Cost: a broken dictionary fails at first check, not at `hello`. [agent]
+* After `identity_revoked` the bank is disabled for good (20261108-bank_disable), and the provider must make a new one: today the same user keeps the dead bank until `user_id` passes through null. [agent, from the worker and the review]
+* Once 20261108-bank_disable lands, `makeBank`'s `isEnabled` wrap duplicates the core: delete `makeBank`, and call `Bank.make` in the effect. [agent]
+* `#lastHello` in bank.ts holds a made-up `bad(bankDisabled())` outcome that no hello produced, and one error instance is rethrown to every later caller (with the sweep's stack). Investigate: branch on `#isEnabled` instead? Left for now. [review of 20261108-bank_disable]
+* Does our `DefaultOnPanic` log everything it gets at error level? [Coach]
+* After a panic's vacate, should the provider remake the bank for the same `user_id`? "Who are we to disagree" says yes, but if the session really is stale, the new bank's `hello` hits `identity_revoked` again: a make, panic, vacate loop against the host's server. Remake only on new props (`user_id`, `device_id`, or a future host "session" signal)? [Coach, agent]
+* On a disabled bank, `useVault` reports `'waiting'` forever (its snapshot never reaches `ready`). It should say the bank has ended. [agent]
+* Add buttons to one of the Backdoor (devmode inspector) panels that simulate these: a revoked identity (panic and vacate), a sweep, a failed lease erase. [Coach]
+* A demo that uses this to make a "doppler-lite" (a secrets manager in miniature). [Coach]
+* The gating dialog is imperative because `requestCleartext`'s contract is ("resolve when the user is done"). A more React-native design: the bank's snapshot exposes the open gating, the provider's dialog renders it, and cancel calls `gating.decline()`; `requestCleartext` stays for hosts with their own dialog. A core and contract redesign. [agent]
+* The device is named before the user and the bank: `device_id` should come down with, or before, `user_id`, as a thing the app provides, and we give it a tool to get one (today's `useDeviceId` / `ensureBank`). The bank's real identity is then `(device_id, applabel, user_id)`, which we could form into a `bank_id`. [Coach]
+* `helloedVaults` is React-side bookkeeping riding beside the bank in the context value. If the core kept "this Vault object has had its `tryHello`", the context could be just `Bank | null`. [agent]
+* `BankProviderProps` is written by hand beside `providerProps`. STYLE.md *Validation* wants the type to come from the schema (`z.infer`) or be held to it. Cost: the per-field doc comments a host sees on hover. [agent]
+* dev-device-db-inspector.tsx:14 holds a future note ("The bank rows … will sit beside its leases, as a table of their own"): route it to human/ or here, then delete it? [agent, Opus pass]
+* bank-provider.tsx: "A swept bank's panic goes to the platform, as a handler's throw does." Unverified against the core's handling of a throw from `onPanic`. [agent, Opus pass]
+* passphrase-modal messages: `passphrasesDiffer` ": nothing is attempted" and `passphraseFirst` ": the browser is not asked" describe behaviour, not the message. Keep them for translators, or cut? [agent, Opus pass]
+
+## Settled
+
+* `hasUserGesture` doc block after the comment pass reads "…still in hand, true where the browser does not say": the comma is awkward ("or true where…"?). [agent] Settled by the Opus pass (applied 2026-11-08): reworded, and each item ruled on.
+* The comment pass's "couldn't tell" list (Sonnet, commit 7ea88e982). [agent]
+  * The `onDone` props in six dialog files ("'unlocked' once …, 'declined' otherwise"): `#option-values-get-a-list`?
+  * Possibly `#one-verb-one-fact`: `ask` in `useGatingDialog`, `ModalFormProps.gripeId`, `passkeyGripe`, `useBoxIsShowing`.
+  * Possibly purpose tails: `jsonOf` and `timeOf` ("for the panel to show whole"), and `useRoundFor`.
+  * Possibly `#purpose-not-machinery`: `holdsFocus` and `callThenRelist`.
+* Under StrictMode's double effect, the provider makes two banks in dev (the first swept at once), so a test key deriver's `TestDeriverNotice` warning logs twice, and `ensureBank` runs twice. That's React's connect-disconnect-connect, by design. [agent] Settled 2026-11-08: the bank effect waits for the device_id, so StrictMode's mount-time double run makes nothing, and one bank is made.
+* Signing in remounts the host's children: the `Bankless` branch and the keyed `UserBankProvider` are different elements. Since `device_id` moved up into `BankProvider`, that remount comes after the IDB call, not at the sign-in render; children render under `Bankless` meanwhile. Must a sign-in from nobody remount at all? (A user switch should, so nothing leaks between users.) [agent] Settled 2026-11-08: a regression (a signed-in page load mounted the host's app twice), caught by the react tests. UserBankProvider is now keyed by user only and always rendered, and the bank effect waits for the device_id.
