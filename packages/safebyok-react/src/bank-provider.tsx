@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useEffectEvent, useState } from 'react'
+import { createContext, useContext, useEffectEvent, useLayoutEffect, useState } from 'react'
 import { Bank, DefaultOnBadNews, DefaultOnPanic, type BankOpts, type Vault } from 'safebyok'
 import { GatingModal } from './gating-modal'
 import { useDeviceId, useGatingDialog, useWarnOfIgnoredOpts } from './provider-hooks'
@@ -51,8 +51,9 @@ const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void
   const latest = useEffectEvent(() => handlers)
 
   // The effect owns the bank: it makes it and sweeps it. A re-run effect (StrictMode's, or a hidden
-  // Activity's shown again) makes a fresh one.
-  useEffect(() => {
+  // Activity's shown again) makes a fresh one. A layout effect runs before paint, so no frame shows the
+  // provider without its bank.
+  useLayoutEffect(() => {
     const bank = makeBank({
       ...madeFrom,
       onPanic:          (panic) => latest().onPanic(panic),
@@ -83,7 +84,7 @@ export const BankProvider = (props: BankProviderProps) => {
   const { applabel, user_id, deviceDB, children } = providerProps.parse(props, { where: 'BankProvider' })
   const device_id = useDeviceId(deviceDB, applabel, user_id)
   if (user_id === null || device_id === null) { return <BankContext.Provider value={Bankless}>{children}</BankContext.Provider> }
-  return <UserBankProvider key={JSON.stringify([applabel, user_id])} {...props} user_id={user_id} device_id={device_id} />
+  return <UserBankProvider key={JSON.stringify([applabel, user_id, device_id])} {...props} user_id={user_id} device_id={device_id} />
 }
 
 /** Hold one signed-in user's bank from mount to unmount, and show the dialog for its gatings. */
