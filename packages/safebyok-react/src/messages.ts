@@ -1,12 +1,12 @@
-// Every word safebyok-react shows a user, in one place, each sentence with a varying part one
-// frame, so a translation may reorder it. What the developer reads stays beside the code that says it.
+// Every word safebyok-react shows a user lives here. A sentence with a varying part is one frame, so
+// a translation may reorder it. What the developer reads stays beside the code that says it.
 
 import type { Gatingkind } from 'safebyok'
 
 /** The locale the dialog formats its relative times in, and the language of every message here. */
 export const Locale = 'en'
 
-/** The words themselves. */
+/** The words safebyok-react shows a user, each under its name. */
 export const Messages = {
   // The passphrase dialog
   chooseTitle:       'Choose a vault passphrase',
@@ -24,13 +24,13 @@ export const Messages = {
   createButton:      'Create vault',
   unlockButton:      'Unlock',
   cancelButton:      'Cancel',
-  /** The window, while the dialog creates the vault: `relative` is a phrase such as 'in 7 days'. */
+  /** How long the unlock lasts, said while the dialog creates the vault: `relative` is a phrase such as 'in 7 days'. */
   locksIn:           (relative: string) => `Locks on this device ${relative}.`,
-  /** The window, on an ordinary unlock: `relative` is a phrase such as 'in 7 days'. */
+  /** How long the unlock lasts, said on an ordinary unlock: `relative` is a phrase such as 'in 7 days'. */
   locksAgainIn:      (relative: string) => `Locks again on this device ${relative}.`,
   staysUnlocked:     'Stays unlocked on this device until you lock it.',
 
-  // The dialogs for a change to the ways in, and for a deletion
+  // The dialogs that replace the passphrase, add or remove the passkey, and delete the vault
   changeTitle:        'Change your vault passphrase',
   changeBlurb:        'Enter the passphrase you use now, then choose a new one. The new one takes its place on every device. A forgotten passphrase cannot be recovered.',
   currentField:       'current passphrase',
@@ -73,7 +73,7 @@ export const Messages = {
   lockButton:        'Lock',
 } as const
 
-/** What each kind of gating's dialog was doing, as `Messages.troubleWord` says it could not. */
+/** What each kind of gating's dialog was doing when it met trouble. */
 export const Doing: Record<Gatingkind, string> = {
   build_vault:        'create your vault',
   unlock_vault:       'unlock your vault',

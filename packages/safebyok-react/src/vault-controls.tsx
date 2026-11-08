@@ -9,7 +9,7 @@ export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
   const snapshot = useVaultSnapshot(vaultlabel)
   if (stage === 'unborn') { return <CreateVaultButton vaultlabel={vaultlabel} /> }
   if ((bank === null) || (vault === null) || (snapshot === null)) { return null }
-  // The vault in hand, never bank.ensureVault: an Unlock never builds a vault.
+  // `vault.tryEnsureUnlocked()` on the vault in hand, never `bank.ensureVault`: an Unlock never builds a vault.
   const unlock = async () => { tellUnlessDeclined(bank, await vault.tryEnsureUnlocked()) }
   const { isLocked } = snapshot
   return (
@@ -25,7 +25,7 @@ export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
 /** A button that builds the signed-in user's vault under `vaultlabel`. */
 export const CreateVaultButton = ({ vaultlabel }: VaultControlProps) => {
   const bank = useBank()
-  // `bank.ensureVault` refuses until the bank's hello has landed.
+  // `bank.ensureVault` refuses until `bank.hello()` has landed.
   const isReady = (useBankSnapshot()?.stage === 'ready')
   const create = async () => {
     if ((bank === null) || (! isReady)) { return }

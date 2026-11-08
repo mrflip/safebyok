@@ -68,16 +68,16 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
   // Kept off React's state, so the text typed never sits in a render.
   const whisperText = useRef('')
   const [extracted, setExtracted] = useState<Whisper | null>(null)
-  // An extracted whisper goes when the vault locks, as React adjusts state to a prop, in render.
+  // An extracted whisper is dropped when the vault locks, by React's adjusting of state to a prop, in render.
   const isLocked = vaultSnapshot?.isLocked ?? true
   if ((extracted !== null) && isLocked) { setExtracted(null) }
 
-  /** `putBox` of `whisper` under the boxlabel picked, by `opts`, answering the box's snapshot. */
+  /** Call `putBox` with `whisper` under the boxlabel picked and `opts`, and answer the box's snapshot. */
   const putting = async (whisper: Whisper, opts: BoxPutOpts = {}) => {
     const put = await vault?.putBox({ boxlabel, whisper }, opts)
     return jsonOf(put?.snapshot)
   }
-  /** `delBox` of the boxlabel picked, answering the snapshot of the box deleted, or null for none. */
+  /** Call `delBox` for the boxlabel picked, and answer the snapshot of the box deleted, or null for none. */
   const deleting = async () => {
     const gone = await vault?.delBox(boxlabel)
     return jsonOf(gone?.snapshot ?? null)

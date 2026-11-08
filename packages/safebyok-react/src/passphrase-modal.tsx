@@ -19,7 +19,7 @@ export type PassphraseGating = Gating<'build_vault'> | Gating<'unlock_vault'>
 export type PassphraseModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              PassphraseGating
-  /** Called once, with the dialog's answer: 'unlocked' once an attempt is ok, 'declined' otherwise. */
+  /** Called once with 'unlocked' when an attempt succeeds, and with 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** The bank's `leaseMillis`, for the line saying how long an unlock lasts. */
   leaseMillis?:        number | undefined
@@ -31,34 +31,34 @@ export type PassphraseModalProps = {
   passkeyRpId?:        string | undefined
 }
 
-/** The dialog itself, inside PassphraseModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
+/** The dialog itself, inside PassphraseModal's boundary. */
 const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername, passphraseAdvice, passkeyRpId }: PassphraseModalProps) => {
   const { gripe, setGripe, fail, attempt } = useAttempts('PassphraseModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const { ref: confirmRef, gripeId, differs } = useConfirmation(setGripe)
   const creating = gating.gatingkind === 'build_vault'
-  // The host's advice heard the passphrase: what it threw may quote it, so none of it goes on but safebyok's own refusal.
+  // The host's advice hears the passphrase, so what it throws may quote it: `fail` gets safebyok's own refusal instead.
   const advice = useAdvice(passphraseAdvice, gating, creating, fail)
   const passkeyGating = gating.gatingkind === 'unlock_vault' && offersPasskey(gating) ? gating : null
 
   const submit = () => {
     const typed = fieldRef.current?.value ?? ''
-    // A first passphrase mistyped would be the vault's: refused here, before any key is derived.
+    // A first passphrase mistyped would become the vault's, so a mismatch stops here, before any key is derived.
     if (creating && differs(typed)) { return }
     void attempt(() => gating.attempt({ passphraseClear: typed }), 'unlocked')
   }
 
-  /** Each change to the field. */
+  /** Hear each change to the field. */
   const hearPassphrase = (typed: string) => {
     setGripe((prev) => (prev?.fromPasskey === true ? prev : null))
     if (creating) { void advice.hear(typed) }
   }
 
-  /** What the passkey button says, which stays as the user types, till the next submit or press. */
+  /** Show the passkey button's gripe until the next submit or press. */
   const passkeyGripe = (text: string | null) => {
     setGripe(text === null ? null : { text, fromPasskey: true })
-    // A passkey button that took itself away took the focus with it: back to the passphrase.
+    // A passkey button that took itself away took the focus with it, so the focus goes back to the passphrase field.
     if (text !== null && ! holdsFocus(formRef.current)) { fieldRef.current?.focus() }
   }
 

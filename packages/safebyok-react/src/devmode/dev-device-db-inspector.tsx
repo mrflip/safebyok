@@ -43,7 +43,7 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
   const { val: rows, trouble, relist } = useListing<readonly ListedLease[]>(list)
   const { lastCall, call } = useLastCall()
 
-  /** Runs a button's verb, then lists the rows again. */
+  /** Run a button's verb, then list the rows again. */
   const callThenRelist = async (verbname: string, work: () => Promise<string>) => {
     await call(verbname, work)
     relist()
@@ -110,8 +110,8 @@ const LeaseRowLine = ({ row, scopepath, onForget, onDelRaw }: LeaseRowLineProps)
   )
 }
 
-// A raw row holds the lease's key and the vault key wrapped by it: name what each such field
-// holds, never its content.
+// A raw row holds the leaseKey and the vaultKeyLeaseWrapped: show each such field's kind, never its
+// content.
 /** What a cell shows of a row's field: a time, number, word or token as is, and of anything else only its kind. */
 const cellOf = (fieldname: string, val: unknown): string => {
   if (val === undefined) { return '–' }
