@@ -4,7 +4,15 @@ import { Messages } from '../helpers/messages'
 import { useRevealToggle } from '../hooks/reveal-toggle'
 import type { WhisperFieldProps } from '../shapes'
 
-/** A field for the user to type or paste a whisper into, hidden as they type, with a Show / Hide button. */
+/**
+ * A field for the user to type or paste a whisper into, hidden as they type, with a Show / Hide button.
+ * @example <WhisperField onChange={setKeyText} aria-label="Anthropic API key" />
+ * @example <WhisperField onChange={setKeyText} placeholder="sk-ant-…" aria-label="Anthropic API key" />
+ * @example
+ *   <form onSubmit={(evt) => { evt.preventDefault(); void save(new FormData(evt.currentTarget).get('whisper_text')) }}>
+ *     <WhisperField aria-label="Anthropic API key" /> <button>Save</button>
+ *   </form>
+ */
 export const WhisperField = ({ onChange, ...passed }: WhisperFieldProps) => {
   const reveal = useRevealToggle(Messages.showWhisper, Messages.hideWhisper)
   const ownId = useId()

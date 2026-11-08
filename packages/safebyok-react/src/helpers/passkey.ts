@@ -13,7 +13,12 @@ export const passkeysAvailable = (): boolean => (
   typeof PublicKeyCredential === 'function' && typeof navigator === 'object' && 'credentials' in navigator
 )
 
-/** Make a new passkey and return its first answer, or null when the user dismisses the prompt. */
+/**
+ * Make a new passkey and return its first answer, or null when the user dismisses the prompt.
+ * @example
+ *   const passkeyClear = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
+ *   if (passkeyClear !== null) { await gating.attempt({ passphraseClear, passkeyClear }) }   // null: dismissed
+ */
 export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAnswer | null> => {
   const opts = PasskeyChecks.createPasskeyOpts.parse(given, { where: "In createPasskey's options" })
   demandWebAuthn()
@@ -53,7 +58,12 @@ export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAn
   return answerOf(credential_id, prfSaltBytes, answer)
 }
 
-/** Ask the passkey of `passkeyHeader` for its answer, or null when the user dismisses the prompt. */
+/**
+ * Ask the passkey of `passkeyHeader` for its answer, or null when the user dismisses the prompt.
+ * @example
+ *   const passkeyClear = await askPasskey(gating.passkeyHeader)
+ *   if (passkeyClear !== null) { await gating.attempt({ passkeyClear }) }
+ */
 export const askPasskey = async (passkeyHeader: WayinHeader | null, given: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> => {
   const { passkeyHeader: header, opts } = PasskeyChecks.askPasskeyInput.parse({ passkeyHeader, opts: given }, { where: "In askPasskey's arguments" })
   demandWebAuthn()

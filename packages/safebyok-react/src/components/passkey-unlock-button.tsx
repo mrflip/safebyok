@@ -8,7 +8,10 @@ import { useWhenShown } from '../hooks/when-shown'
 import { Boundary, forBoundary } from '../provider/boundary'
 import type { PasskeyUnlockButtonProps } from '../shapes'
 
-/** A button that unlocks with the vault's passkey, shown only where a passkey can be used. */
+/**
+ * A button that unlocks with the vault's passkey, shown only where a passkey can be used.
+ * @example <PasskeyUnlockButton gating={gating} onDone={close} onGripe={setGripe} />
+ */
 export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
   <Boundary key={useRoundFor(props.gating)} fallback={null} onCaught={() => { props.onGripe(Messages.passkeyTrouble) }}>
     <PasskeyPress {...props} />

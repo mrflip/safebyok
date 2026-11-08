@@ -1,6 +1,18 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import type { WhenShown } from '../shapes'
 
+/** The component's {@link WhenShown}, and `isShown`, whether it shows now.
+ *
+ * @example
+ *   const { whenShown } = useWhenShown()
+ *   const submit = async () => {
+ *     await gating.attemptPassphrase(passphrase)
+ *     await whenShown(() => { onDone(true) })
+ *   }
+ * @example
+ *   const passkey = await askPasskey(gate)
+ *   if (! isShown()) { passkey.prfBytes.fill(0); return }   // never kept for the dialog to show again
+ */
 export const useWhenShown = (): { whenShown: WhenShown, isShown: () => boolean } => {
   const shown = useRef(false)
   // No cleanup of `waiting`: an unmounted component never calls its handlers, which are garbage-collected with it.

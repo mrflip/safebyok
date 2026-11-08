@@ -1,5 +1,13 @@
 import { useState } from 'react'
 
+/** A Show / Hide button for a secret field, and the `type` the field takes while shown or hidden.
+ *
+ * @example
+ *   const reveal = useRevealToggle(Messages.showWhisper, Messages.hideWhisper)
+ *   <input id={fieldId} type={reveal.fieldType} />{reveal.button(fieldId)}
+ * @example
+ *   const reveal = useRevealToggle(Messages.showWhisper, Messages.hideWhisper, box.isShowing)
+ */
 export const useRevealToggle = (showWord: string, hideWord: string, isFieldShowing = true) => {
   const [shown, setShown] = useState(false)
   // Reset in render, never by remounting the input: whatever the field shows next must arrive masked.
