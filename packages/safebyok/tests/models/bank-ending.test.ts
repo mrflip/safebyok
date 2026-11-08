@@ -298,6 +298,40 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(onBadNews).toHaveBeenCalledExactlyOnceWith({ news: refusal, bank })
   })
 
+  it("forgets the bank's row in the deviceDB after its leases, so the next ensureBank mints another device_id, another user's row staying", async () => {
+    const world = makeBankWorld()
+    const { bank } = await makeBankWithVault(world)
+    const made = await world.deviceDB.ensureBank(BankScopeGiven)
+    const kept = await world.deviceDB.ensureBank({ ...BankScopeGiven, user_id: 'u2' })
+    const tryForget = vi.spyOn(world.deviceDB, 'tryForget')
+    const tryForgetBank = vi.spyOn(world.deviceDB, 'tryForgetBank')
+    await bank.vacate()
+    expect(await world.deviceDB.listRawBanks()).to.deep.equal([kept])
+    expect(tryForget.mock.invocationCallOrder[0]).to.be.below(tryForgetBank.mock.invocationCallOrder[0]!)
+    expect((await world.deviceDB.ensureBank(BankScopeGiven)).device_id).to.not.eq(made.device_id)
+  })
+
+  it("leaves the bank's row at a sweep", async () => {
+    const world = makeBankWorld()
+    const { bank } = await makeBankWithVault(world)
+    const made = await world.deviceDB.ensureBank(BankScopeGiven)
+    bank.sweep()
+    expect(await world.deviceDB.ensureBank(BankScopeGiven)).to.deep.equal(made)
+  })
+
+  it("tells the host's onPanic of a bank row its vacate cannot forget, and forgets it where the listing of the leases is refused", async () => {
+    const world = makeBankWorld()
+    const [refusal, listRefused] = [new VaultError('storage_unavailable', 'no store'), new VaultError('storage_unavailable', 'no listing')]
+    const onPanic = vi.fn()
+    const onBadNews = vi.fn()
+    const bank = world.bankOn({ onPanic, onBadNews })
+    vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValue({ ok: false, err: listRefused })
+    vi.spyOn(world.deviceDB, 'tryForgetBank').mockResolvedValueOnce({ ok: false, err: refusal })
+    await bank.vacate()
+    expect(onBadNews).toHaveBeenCalledExactlyOnceWith({ news: listRefused, bank })
+    expect(onPanic).toHaveBeenCalledExactlyOnceWith({ refusal, bank })
+  })
+
   it("disables the bank at once, before its scrub: every call refuses, and the snapshot reads refused with the cause", async () => {
     const { world, bank } = await makeBankWithVault()
     const listing = TH.holdNextCall(world.deviceDB, 'tryListLeases')

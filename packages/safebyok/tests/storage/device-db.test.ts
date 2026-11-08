@@ -18,6 +18,7 @@ class BrokenDeviceDB extends DeviceDB {
   protected doListLeases(): never { throw this.thrown }
   protected doDelRawLease(): never { throw this.thrown }
   protected doEnsureBank(): unknown { throw this.thrown }
+  protected doForgetBank(): never { throw this.thrown }
   protected doListBanks(): never { throw this.thrown }
 }
 
@@ -33,6 +34,7 @@ describe("a deviceDB whose store throws", () => {
       ['listLeases', await TH.expectBad(deviceDB.tryListLeases(), 'storage_unavailable')],
       ['delRawLease', await TH.expectBad(deviceDB.tryDelRawLease(['acme', 'u1', 'main']), 'storage_unavailable')],
       ['ensureBank', await TH.expectBad(deviceDB.tryEnsureBank(asked), 'storage_unavailable')],
+      ['forgetBank', await TH.expectBad(deviceDB.tryForgetBank(asked), 'storage_unavailable')],
       ['listRawBanks', await TH.expectBad(deviceDB.tryListRawBanks(), 'storage_unavailable')],
     ] as const
     for (const [verb, err] of refused) {

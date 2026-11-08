@@ -81,16 +81,18 @@ Easy to get wrong:
 * The core sets no timers. Call `bank.autolock()` after `hello` and on a timer of your own.
 * `vault.hello()` lists a vault's boxes and starts their watch. Until then `vault.boxListing` is
   empty, and with no watch nothing from another device arrives until the next `vault.hello()`.
-* `bank.vacate()` is sign-out: it disables the bank, then erases this bank's leases on this device,
-  leaving the vaultDB alone, and settles once each erase has been tried. Await it before the page goes: a
-  lease it cannot erase reaches your `onPanic`, and a refused listing of them your `onBadNews`.
+* `bank.vacate()` is sign-out: it disables the bank, then erases this bank's leases on this device
+  and its bank row in the deviceDB, leaving the vaultDB alone, and settles once each erase has been
+  tried. The next `deviceDB.ensureBank` for that user mints a new `device_id`. Await it before the
+  page goes: a lease or bank row it cannot erase reaches your `onPanic`, and a refused listing of
+  the leases your `onBadNews`.
 * **A bank swept or vacated is spent.** From the moment you call either, `bank.isEnabled` is false
   for good, `hello`, `ensureVault` and `vaultAt` refuse `disabled`, and the bank calls none of your
   functions: a panic's refusal goes to the platform, and bad news to the bank's logger. The one
   exception is the erase of a vacate, which still tells your `onPanic` and `onBadNews` what it could
   not do.
 * **`onPanic` hears what you must act on for safety**: a revoked identity, or a lease that outlived
-  its erase. With no `onPanic`, `DefaultOnPanic` reports it to the platform and vacates: the bank
+  its erase. With no `onPanic`, `DefaultOnPanic` logs it at error, reports it to the platform and vacates: the bank
   on an `identity_revoked`, whose snapshot then shows that refusal, else the vault named. Make another
   bank once the user signs in again. An `onPanic` of your own decides for itself; to keep the
   vacate, call the default from it:

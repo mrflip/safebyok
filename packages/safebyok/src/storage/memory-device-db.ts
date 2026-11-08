@@ -28,7 +28,7 @@ export class MemoryDeviceDB extends DeviceDB {
   _cheat_bankRows(): Map<string, unknown> { return this.#bankrows } // eslint-disable-line unicorn/prefer-private-class-fields
   // --
 
-  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doDelRawLease, doEnsureBank, doListBanks
+  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doDelRawLease, doEnsureBank, doForgetBank, doListBanks
 
   protected doStow(row: LeaseRow): void {
     const scopepath = leaseScopepathOf(row)
@@ -59,6 +59,10 @@ export class MemoryDeviceDB extends DeviceDB {
     if (SX.bankRow.safeParse(stored).success) { return structuredClone(stored) }
     this.#bankrows.set(bankCkeyOf(made), structuredClone(made))
     return structuredClone(made)
+  }
+
+  protected doForgetBank(scope: BankScope): void {
+    this.#bankrows.delete(bankCkeyOf(scope))
   }
 
   protected doListBanks(): unknown[] {

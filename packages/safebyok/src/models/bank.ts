@@ -147,7 +147,7 @@ export class Bank {
   }
   // --
 
-  // == [Ending]: autolock, lock, vacate, sweep, letGo, listOwnLeases, eraseOwnLeases
+  // == [Ending]: autolock, lock, vacate, sweep, letGo, listOwnLeases, scrub, eraseOwnLeases, forgetOwnBank, panicIfRefused
 
   /** Lock each listed vault with a cached lease past autolock, erasing it. Call it after `hello` and on your own timer.
    * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.buildFromCache` leaves such a row for it.
@@ -169,13 +169,13 @@ export class Bank {
     return this
   }
 
-  /** Sign out on this device: disable the bank and erase every lease of this bank cached here, settling once each erase has been tried. */
+  /** Sign out on this device: disable the bank, and erase every lease of this bank cached here and its bank row, settling once each erase has been tried. */
   vacate(story: VacateStory = {}): Promise<void> {
     const { cause = bankDisabled() } = VX.vacateStory.parse(story)
     this.#letGo(cause, () => { this.#vaultListing.vacate() })
     // The scrub alone holds the host's handlers past the disable: a lease that outlives sign-out is the one the host most needs to hear of.
     // A vacate after a sweep still scrubs, as sign-out may come after the page's cleanup.
-    this.#vacating ??= this.#eraseOwnLeases()
+    this.#vacating ??= this.#scrub()
     return this.#vacating
   }
 
@@ -199,18 +199,30 @@ export class Bank {
     return listed.ok ? good(listed.val.filter((row) => this.#isOwnLease(row))) : listed
   }
 
+  // A fresh device holds no bank row: the next bank of this scope gets a new device_id.
+  /** A vacate's scrub of this device: every lease row of this bank, then its bank row. */
+  async #scrub(): Promise<void> {
+    await this.#eraseOwnLeases()
+    await this.#forgetOwnBank()
+  }
+
   /** A vacate's erase of every row of this bank, listed or not, as a fresh page told 'identity_revoked' has listed
    * none.
    */
   async #eraseOwnLeases(): Promise<void> {
-    const { onPanic, onBadNews } = this.#hostHandlers
+    const { onBadNews } = this.#hostHandlers
     const listed = await this.#listOwnLeases()
     if (! listed.ok) { this.#tellBadNewsTo(onBadNews, [listed.err]); return }
-    await Promise.all(listed.val.map(async (row) => {
-      const forgotten = await this.deviceDB.tryForget(row)
-      // Not awaited: a host's onPanic that awaits bank.vacate() is handed this scrub, and each would wait on the other.
-      if (! forgotten.ok) { void onPanic({ refusal: forgotten.err, bank: this }) }
-    }))
+    await Promise.all(listed.val.map(async (row) => { this.#panicIfRefused(await this.deviceDB.tryForget(row)) }))
+  }
+
+  /** A vacate's erase of this bank's row in the deviceDB. */
+  async #forgetOwnBank(): Promise<void> { this.#panicIfRefused(await this.deviceDB.tryForgetBank(this.scope)) }
+
+  /** The scrub's report of a refused erase, to the host's own `onPanic`. */
+  #panicIfRefused(erased: Outcome<void>): void {
+    // Not awaited: a host's onPanic that awaits bank.vacate() is handed this scrub, and each would wait on the other.
+    if (! erased.ok) { void this.#hostHandlers.onPanic({ refusal: erased.err, bank: this }) }
   }
   // --
 
