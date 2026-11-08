@@ -380,3 +380,55 @@ of 8,210 bytes or less, about 3,600 bytes less than (c).
 * Scripts: throwaway, kept outside the repo in the measuring session's scratch directory: `make-payloads.sh` (keys,
   certs, PGP, PNGs), `sizes.test.ts` (records, notices, counts, sealed with the core's own helpers) and `bank.mjs`
   (banks and cost). Each figure above says what it measured, so a rerun can rebuild them.
+
+## A bank hello on Convex: 10 vaults of 100 boxes
+
+What one page load of a jumbo bank costs on Convex: 10 vaults, each holding 100 boxes, with the passphrase-wayin
+vault row (674 bytes) and the medium box (1,355 bytes) as Convex weighs them. The bank is compared as it stands and
+with each listing watching only its own rows: the bank's listing watches the vault rows, and each vault's listing
+watches its box rows. The first answer of each watch is its list, so no `listVaults` or `listBoxes` call is made.
+**Traced** means read from the code at ae1655c22: the core's `bank.hello` and `vault.hello`, and the
+safebyok-convex component's queries.
+
+**Lead.** Today a hello reads every box three times. Listings that each read their own rows read it once: 2.99 times
+fewer bytes and half the calls, about $72 a month instead of $236 for 1,000 users at 10 loads a day. A box write
+costs 11 times less: each subscribed client re-reads one vault, not the whole bank and that vault. A hello is no
+faster: two round trips either way.
+
+| Call, per hello                                                          | Rows it reads              | Today | Own-rows listings | Source |
+| ------------------------------------------------------------------------ | -------------------------- | ----- | ----------------- | ------ |
+| `listVaults`, from the bank's `vaultListing.list()`                     | 10 vault rows              | 1     | 0                 | Traced |
+| `watchRows` over the bank, from `vaultListing.hello()`                  | 10 vault rows, 1,000 boxes | 1     | 0                 | Traced |
+| A watch over the bank's vault rows alone                                 | 10 vault rows              | 0     | 1                 | Computed |
+| `listBoxes`, from each `vault.hello()`'s `boxListing.list()`; it also reads the vault row | 1 vault row, 100 boxes | 10 | 0     | Traced |
+| `watchRows` over one vault, from each `boxListing.hello()`              | 1 vault row, 100 boxes     | 10    | 10                | Traced |
+| Calls                                                                     |                            | 22    | 11                | Computed |
+| Box rows read                                                             |                            | 3,000 | 1,000             | Computed |
+| Bytes read, medium boxes                                                  |                            | 4.09 MB | 1.37 MB         | Computed |
+| Bytes read, mini boxes                                                    |                            | 2.73 MB | 0.91 MB         | Computed |
+
+| Cost, medium boxes, Professional rates                                  | Today            | Own-rows listings | Source   |
+| ------------------------------------------------------------------------ | ---------------- | ----------------- | -------- |
+| One hello                                                                | $0.00086         | $0.00030          | Computed |
+| 300,000 hellos a month (1,000 users, 10 loads a day), gross / net        | $259 / $236      | $89 / $72         | Computed |
+| The same with mini boxes, gross / net                                    | $177 / $154      | $62 / $45         | Computed |
+| The same, every hello a cached result (calls alone), gross / net         | $13 / $0         | $7 / $0           | Computed |
+| A box write, re-read by each subscribed client                           | 1.50 MB, $0.0003 | 0.14 MB, $0.00003 | Computed |
+| Round trips before the boxes are listed                                  | 2, 100 to 600 ms | 2, 100 to 600 ms  | Computed |
+
+* **Assumptions.** Each hello is cold, and reads every byte of the rows it names. No vault holds tombstones. Rates
+  and allowances are those of *Convex cost to poll*: $2 per million calls, $0.20 per GB, and Pro's 25M calls and
+  50 GB included, which net subtracts. Each round trip takes 50 to 300 ms (reference-timings.md, an Estimate).
+* **A box write.** Today it re-runs the bank-wide watch (10 vault rows and 1,000 boxes) and the vault's own watch (1
+  vault row and 100 boxes). With own-rows listings it re-runs the vault's watch alone, plus the bank's 10 vault rows
+  if the write changes its vault row.
+* **One bank-wide watch alone**, the other way to read each row once, makes one call and reads 1.36 MB per hello. But
+  every box write then re-reads the whole bank, 1.36 MB per client: as costly as today's.
+* **Round trips.** Today the bank awaits `listVaults` before any vault's hello starts, and the 10 hellos then run in
+  parallel. Own-rows listings keep that shape: the bank's watch answers first, and then the vault watches start.
+* **What it would take.** safebyok-convex's `watchRows` over a bank reads its boxes too
+  (`component/vaults.ts`). A watch over the vault rows alone needs a scope or query of its own.
+* **A sparse answer saves no I/O.** A listing keeps the sparse box: everything but `sidecar`, `box_key_wrapped` and
+  `whisper_ciphered`. But Convex reads a document whole, so trimming what a query returns saves bandwidth to the
+  client, not billed I/O. Billed I/O shrinks only if the sparse fields are stored apart, and Convex's 1 KB rounding
+  then leaves each sparse row billed as 1 KB.
