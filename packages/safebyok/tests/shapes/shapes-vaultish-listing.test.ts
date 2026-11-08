@@ -171,6 +171,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...opts, bankFriend: { ...mw.bankFriend, announce: () => undefined } },            false, 'refuses an announce the bank did not brand'],
       [{ ...opts, bankFriend: { ...mw.bankFriend, tellBadNews: () => undefined } },         false, 'refuses a tellBadNews the bank did not brand'],
       [{ ...opts, bankFriend: { ...mw.bankFriend, askUser: () => Promise.resolve(true) } }, false, 'refuses an askUser the bank did not brand'],
+      [{ ...opts, bankFriend: { ...mw.bankFriend, askUser: null } },                        true,  'passes a bank with no host dialog'],
       [{ ...opts, bankFriend: undefined },                       false, 'refuses a missing bankFriend'],
       [{ ...opts, world: mw.world },                             false, 'refuses a world, which the listing takes beside its options'],
       [{ ...opts, onBadNews: () => null },                       false, 'refuses an onBadNews, which only a bank takes'],

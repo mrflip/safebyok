@@ -81,7 +81,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it holds one. */
-  static async launchBirth(listing: VaultListing, scope: VaultScope, askUser: AskUser): Promise<Vault> {
+  static async launchBirth(listing: VaultListing, scope: VaultScope, askUser: AskUser | null): Promise<Vault> {
     const checked = listing.scopeOf(scope)
     listing.demandEnabled()
     const held = listing.at(checked)

@@ -20,7 +20,7 @@ import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
 import * as GX from './shapes-gateish'
-import type { AskUser, ProvingWorld, RequestCleartext } from './shapes-gateish'
+import type { AnyGating, AskUser, ProvingWorld, RequestCleartext } from './shapes-gateish'
 import type { StrengthChecker } from '../helpers/passphrase-strength'
 
 // == [Checks]: Checks
@@ -147,8 +147,8 @@ export interface BankFriend {
   readonly announce:    BankAnnounce
   /** Tell the host's `onBadNews` each news no caller waits on. Never throws. */
   readonly tellBadNews: (badnews: readonly VaultError[]) => void
-  /** Show the host's dialog, wrapped by `guardRequestCleartext`. */
-  readonly askUser:     AskUser
+  /** Show the host's dialog, wrapped by `guardRequestCleartext`; null with none. */
+  readonly askUser:     AskUser | null
 }
 
 /** The options a listing is made with, after its world. */
@@ -176,7 +176,7 @@ export const bankFriend = objCheck(({ custom }) => ({
   panic:       bankPanic,
   announce:    custom<BankAnnounce>(isGuarded, Phrases.GuardedExpected),
   tellBadNews: custom<BankFriend['tellBadNews']>(isGuarded, Phrases.GuardedExpected),
-  askUser:     custom<AskUser>(isGuarded, Phrases.GuardedExpected),
+  askUser:     custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
 
 /** The check of a listing's options. Checks only. */
@@ -360,7 +360,7 @@ export const bankOpts = objCheck(({ fn, custom, applabel, user_id, device_id }) 
   vaultDB:             brandedVaultDB,
   deviceDB:            brandedDeviceDB,
   keyDeriver:          custom<KeyDeriver>(),
-  requestCleartext:    custom<RequestCleartext>(),
+  requestCleartext:    custom<RequestCleartext>().optional(),
   strengthChecker:     custom<StrengthChecker>().optional(),
   logger:              custom<VaultLogger>().optional(),
   autolockMinutes:     positiveMinutes.optional(),
@@ -384,8 +384,8 @@ export interface BankOpts {
   deviceDB:             DeviceDB
   /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
   keyDeriver:           KeyDeriver
-  /** Your dialog, called with each gating that needs the user's passphrase or passkey. */
-  requestCleartext:     RequestCleartext
+  /** Your dialog, called with each gating that needs the user's passphrase or passkey; left out, each gating waits in the bank's snapshot for your own `attempt` or `decline`. */
+  requestCleartext?:    RequestCleartext | undefined
   /** Judges each new passphrase before a vault takes it; without one, every new passphrase is too weak (CUSTOMIZATION.md). */
   strengthChecker?:     StrengthChecker | undefined
   /** Where the bank says what it has no caller to throw to; the console when left out. */
@@ -458,16 +458,18 @@ export type BankPanic = (refusal: VaultError) => void
 /** `made` until a `hello` answers; `ready` once one lands; `refused` once one refuses or the bank is swept or vacated, the snapshot's `err` saying why. */
 export type BankStage = 'made' | 'ready' | 'refused'
 
-/** A bank as a host renders it: its scope, how far its `hello` got, and its vaults. */
+/** A bank as a host renders it: its scope, how far its `hello` got, its vaults, and the gating it has open. */
 export interface BankSnapshot extends BankScope {
   /** How far the bank's `hello` got, `made`, `ready` or `refused`, and `refused` from a sweep or a vacate on. */
-  readonly stage:     BankStage
+  readonly stage:      BankStage
   /** Why the last `hello` refused, or why the bank is disabled, or null. */
-  readonly err:       VaultError | null
+  readonly err:        VaultError | null
   /** Your id for this device, as `Bank.make` was given it. */
-  readonly device_id: string
+  readonly device_id:  string
   /** A snapshot of each vault the bank lists. */
-  readonly vaults:    readonly VaultSnapshot[]
+  readonly vaults:     readonly VaultSnapshot[]
+  /** The gating open on this bank, live, for a dialog to answer; null with none. */
+  readonly openGating: AnyGating | null
 }
 
 // --
