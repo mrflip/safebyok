@@ -23,7 +23,10 @@ const renderOverBox = async (boxlabel = 'anthropic') => {
       <BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><DevBoxInspector defaultBoxlabel={boxlabel} /></BankProvider>
     </StrictMode>,
   )
+  // `vault present` comes before the vault's own hello has listed its boxes, and the status says `box not listed` until then:
+  // the boxlabel suggestions name a box once listed, whichever boxlabel the inspector is open on.
   await waitFor(() => { expect(status()).to.match(/^vault present/) })
+  await waitFor(() => { expect(document.querySelector('datalist option[value="anthropic"]')).not.to.eq(null) })
   return { world, vault }
 }
 
