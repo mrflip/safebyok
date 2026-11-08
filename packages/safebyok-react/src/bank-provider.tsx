@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffectEvent, useLayoutEffect, useState } from 'react'
-import { Bank, DefaultOnBadNews, DefaultOnPanic, type BankOpts, type Vault } from 'safebyok'
+import { Bank, DefaultOnBadNews, DefaultOnPanic, type Vault } from 'safebyok'
 import { GatingModal } from './gating-modal'
 import { useDeviceId, useGatingDialog, useWarnOfIgnoredOpts } from './provider-hooks'
 import { providerProps, type BankProviderProps, type Handlers, type HeldBankOpts } from './shapes/shapes-provider'
@@ -22,23 +22,6 @@ export const useProvided = (hookname: string): ContextValue => {
 }
 // --
 
-// == [Making]: makeBank
-
-/** A bank for the user in `opts` on this device, calling none of the host's handlers once it is disabled. */
-const makeBank = (opts: BankOpts): Bank => {
-  const { onPanic = DefaultOnPanic, onBadNews = DefaultOnBadNews, requestCleartext } = opts
-  const bank: Bank = Bank.make({
-    ...opts,
-    // Once disabled, the bank calls none of the host's handlers: the page may be the next user's by then.
-    // A disabled bank's panic goes to the platform, as a handler's throw does.
-    onPanic:          (panic) => { if (! bank.isEnabled) { throw panic.refusal } return onPanic(panic) },
-    onBadNews:        (badnews) => (bank.isEnabled ? onBadNews(badnews) : undefined),
-    requestCleartext: async (gating) => { if (bank.isEnabled) { await requestCleartext(gating) } },
-  })
-  return bank
-}
-// --
-
 // == [Holding]: useHeldBank
 
 /** The bank made from the first render's `opts` and held until unmount. */
@@ -54,7 +37,7 @@ const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void
   // Activity's shown again) makes a fresh one. A layout effect runs before paint, so no frame shows the
   // provider without its bank.
   useLayoutEffect(() => {
-    const bank = makeBank({
+    const bank = Bank.make({
       ...madeFrom,
       onPanic:          (panic) => latest().onPanic(panic),
       onBadNews:        (badnews) => latest().onBadNews(badnews),
@@ -99,7 +82,7 @@ const UserBankProvider = (props: BankProviderProps & { user_id: string, device_i
       {children}
       {showing !== null && (
         <GatingModal
-          key={showing.round}
+          key={dialog.round}
           gating={showing.gating}
           leaseMillis={contextValue.bank?.leaseMillis}
           passphraseUsername={passphraseUsername}
