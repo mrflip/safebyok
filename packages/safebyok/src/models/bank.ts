@@ -304,7 +304,7 @@ export class Bank {
   get modelkind(): 'bank' { return 'bank' satisfies Modelkind }
 }
 
-// == [Host functions]: HostChecks, DefaultOnBadNews, DefaultOnPanic, guardRequestCleartext, guardOnPanic, Handlers, DefaultHandlers
+// == [Host functions]: HostChecks, DefaultOnBadNews, reportPanic, DefaultOnPanic, guardRequestCleartext, guardOnPanic, Handlers, DefaultHandlers
 
 const HostChecks = Checkers('bad_option', ({ fn }) => ({
   requestCleartext: fn<RequestCleartext>(),
@@ -316,9 +316,16 @@ export const DefaultOnBadNews: BadNewsHandler = ({ news, bank }) => {
   bank.logger.warn(news.message, { call: 'Bank.onBadNews', refusalkind: news.refusalkind })
 }
 
-/** The `onPanic` a bank has when given none: the refusal to the platform, then the bank vacated on 'identity_revoked', else the vault, if one. */
-export const DefaultOnPanic: PanicHandler = ({ refusal, bank, vault }) => {
+// The logger too, as a platform with no reportError (Node, SSR) would hear nothing of a panic.
+/** `refusal` to `bank`'s logger at error, and to the platform. */
+const reportPanic = (refusal: VaultError, bank: Bank): void => {
+  bank.logger.error(refusal.message, { call: 'Bank.onPanic', refusalkind: refusal.refusalkind })
   reportToPlatform(refusal)
+}
+
+/** The `onPanic` a bank has when given none: the refusal to the bank's logger and the platform, then the bank vacated on 'identity_revoked', else the vault, if one. */
+export const DefaultOnPanic: PanicHandler = ({ refusal, bank, vault }) => {
+  reportPanic(refusal, bank)
   if (isVaultError(refusal, 'identity_revoked')) {
     void bank.vacate({ cause: refusal })
   } else {
@@ -359,8 +366,8 @@ interface Handlers {
 }
 
 // Not DefaultOnPanic: past the disable it would vacate nothing, or start a scrub on a swept bank.
-/** A disabled bank's reports: each panic's refusal to the platform, and bad news to `DefaultOnBadNews`. */
-const DefaultHandlers: Handlers = { onPanic: guardOnPanic(({ refusal }) => { reportToPlatform(refusal) }), onBadNews: DefaultOnBadNews }
+/** A disabled bank's reports: each panic's refusal to the logger and the platform, and bad news to `DefaultOnBadNews`. */
+const DefaultHandlers: Handlers = { onPanic: guardOnPanic(({ refusal, bank }) => { reportPanic(refusal, bank) }), onBadNews: DefaultOnBadNews }
 // --
 
 // == [Helpers]: millisOf, stageOf, checkSecureContext

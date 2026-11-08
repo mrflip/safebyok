@@ -216,7 +216,7 @@ describe("the host's functions, as a bank holds them", () => {
     vi.stubGlobal('reportError', reported)
     const [refusal, revoked] = [new VaultError('storage_unavailable', 'no store'), new VaultError('identity_revoked', 'signed out')]
     const [vacate, bankVacate] = [vi.fn(), vi.fn()]
-    const bank = { vacate: bankVacate } as unknown as Bank
+    const bank = { vacate: bankVacate, logger: TH.spyLogger().logger } as unknown as Bank
     const vault = { vacate } as unknown as Vault
     DefaultOnPanic({ refusal, bank, vault })
     DefaultOnPanic({ refusal, bank })
@@ -225,6 +225,17 @@ describe("the host's functions, as a bank holds them", () => {
     expect(reported).toHaveBeenCalledTimes(3)
     expect(vacate).toHaveBeenCalledOnce()
     expect(bankVacate).toHaveBeenCalledExactlyOnceWith({ cause: revoked })
+    vi.unstubAllGlobals()
+  })
+
+  it("has DefaultOnPanic log the refusal at error through the bank's logger, its kind and nothing more, where the platform has no reportError", () => {
+    vi.stubGlobal('reportError', undefined)
+    const spy = TH.spyLogger()
+    const bank = { vacate: vi.fn(), logger: spy.logger } as unknown as Bank
+    const refusal = new VaultError('storage_unavailable', 'no store', { cause: new Error(Passphrase) })
+    DefaultOnPanic({ refusal, bank })
+    expect(spy.calls).to.deep.equal([{ level: 'error', message: refusal.message, story: { call: 'Bank.onPanic', refusalkind: 'storage_unavailable' }, err: undefined }])
+    expect(JSON.stringify(spy.calls)).not.to.include(Passphrase)
     vi.unstubAllGlobals()
   })
 
