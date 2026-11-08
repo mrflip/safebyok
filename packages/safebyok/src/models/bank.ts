@@ -92,7 +92,12 @@ export class Bank {
     this.deviceDB = deviceDB
     // A disabled bank calls none of the host's functions, but in its vacate's scrub: the page may belong to the next user by then.
     this.#hostHandlers = { onPanic: guardOnPanic(onPanic), onBadNews }
-    const panic = brandGuarded((told: Omit<Panic, 'bank'>) => this.#handlers.onPanic({ ...told, bank: this }))
+    // The host hears a revocation while the bank is enabled, and then the bank is vacated, whatever the host's onPanic does.
+    const panic = brandGuarded(async (told: Omit<Panic, 'bank'>): Promise<void> => {
+      const heard = this.#handlers.onPanic({ ...told, bank: this })
+      if (isVaultError(told.refusal, 'identity_revoked')) { void this.vacate({ cause: told.refusal }) }
+      await heard
+    })
     // A disabled bank asks no one: every Gating.launch follows an enabled check in the same tick.
     const askUser = guardRequestCleartext(requestCleartext)
     this.logger = parseLogger(logger)
@@ -328,14 +333,10 @@ const reportPanic = (refusal: VaultError, bank: Bank): void => {
   reportToPlatform(refusal)
 }
 
-/** The `onPanic` a bank has when given none: the refusal to the bank's logger and the platform, then the bank vacated on 'identity_revoked', else the vault, if one. */
+/** The `onPanic` a bank has when given none: the refusal to the bank's logger and the platform, then the vault vacated, if one. */
 export const DefaultOnPanic: PanicHandler = ({ refusal, bank, vault }) => {
   reportPanic(refusal, bank)
-  if (isVaultError(refusal, 'identity_revoked')) {
-    void bank.vacate({ cause: refusal })
-  } else {
-    vault?.vacate()
-  }
+  vault?.vacate()
 }
 
 // What the dialog throws is dropped: it may quote what the user typed.
