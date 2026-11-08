@@ -192,7 +192,7 @@ describe("bank.autolock", () => {
     await bank.autolock()
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => onPanic.mock.calls.length === 1)
-    expect(onPanic).toHaveBeenCalledWith({ refusal, vault })
+    expect(onPanic).toHaveBeenCalledWith({ refusal, vault, bank })
   })
 
   it("finds nothing past an autolock of Infinity", async () => {
@@ -252,7 +252,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect((world.leaseRows()[0] as { user_id: string }).user_id).to.eq('u2')
   })
 
-  it("tells onPanic of a lease its vacate cannot erase, and the platform on a repeat, the bank by then disabled", async () => {
+  it("tells onPanic of a lease its vacate cannot erase, a repeat doing nothing and a panic past it going to the platform", async () => {
     const world = makeBankWorld()
     const refusal = new VaultError('storage_unavailable', 'no store')
     const onPanic = vi.fn()
@@ -261,11 +261,13 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const bank = world.bankOn({ onPanic })
     const row = { ...BankScopeGiven, vaultlabel: 'unlisted', vault_tok: makeLifeTok(), proved_at: T0 }
     vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValue({ ok: true, val: [row] })
-    vi.spyOn(world.deviceDB, 'tryForget').mockResolvedValue({ ok: false, err: refusal })
+    const tryForget = vi.spyOn(world.deviceDB, 'tryForget').mockResolvedValue({ ok: false, err: refusal })
     await bank.vacate()
     expect(onPanic).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ refusal }))
     expect(reported).not.toHaveBeenCalled()
     await bank.vacate()
+    expect(tryForget).toHaveBeenCalledOnce()
+    await bank.panic({ refusal })
     expect(reported).toHaveBeenCalledExactlyOnceWith(refusal)
     expect(onPanic).toHaveBeenCalledOnce()
     vi.unstubAllGlobals()

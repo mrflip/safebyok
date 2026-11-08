@@ -52,6 +52,17 @@ added or folded into through the subagent, and no other entry changes.
   this bank's own `{ applabel, user_id, device_id }` row, so the same user's next sign-in on this device gets the same `device_id` (it needs a new
   DeviceDB verb and the React provider to stop handing on a cached `device_id`). Known race: an unlock in flight when `vacate()` runs can cache its lease
   after the scrub, and that lease stays until the next vacate.
+  amended 2026-11-08 (bank_disable): a vaultDB refusal of kind `identity_revoked` is now a panic, not bad news. Where a listing (the bank's list of
+  vaults, or a vault's list of boxes) meets it, it calls the bank's panic, which reaches the host's `onPanic` with `{ refusal, bank }`, and the caller
+  still receives the refusal; before, it went to `onBadNews` and the bank vacated itself unconditionally. `DefaultOnPanic` (the handler used when the
+  host gives none) reports the refusal to the platform and, on `identity_revoked`, calls `bank.vacate(refusal)`, the same scrub-then-disable as sign-out;
+  the bank's snapshot then reads stage `refused` with that refusal as `err`. A host that supplies its own `onPanic` decides for itself: the vacate on
+  revocation happens only if it calls `DefaultOnPanic(panic)` from its handler, which the README shows. This is a deliberate trust in the host (the host
+  is not our threat model), and the safe behaviour is the default; a host `onPanic` that swallows the panic leaves a revoked user's cached leases on the
+  device until something else vacates or locks. `bank.vacate` memoizes its promise, so a burst of panics vacates once and lists the cached leases once:
+  panics arriving during the scrub still reach the host's `onPanic` (the bank disables only after the scrub), and panics after it go to
+  `DefaultOnPanic`, whose repeat vacate does nothing. `DefaultOnPanic` does not await the bank's vacate, because a panic raised from the vacate's own
+  scrub would otherwise wait on itself.
 
 * 2026-11-07 (devicedb_idb, sprint devicedb_idb, thread 2, branch `20261107-idb_devicedb`): **`IdbDeviceDB` keeps each lease row in IndexedDB with
   its `lease_key` a non-extractable CryptoKey held by structured clone, and deletes every older device database unread.** In
