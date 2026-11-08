@@ -37,13 +37,11 @@ export const DevBoxInspector = ({ defaultVaultlabel = 'main', defaultBoxlabel = 
 
 // == [Pickers]: VaultlabelOptions, BoxlabelOptions
 
-/** The vaultlabels the bank lists, as a datalist's options. */
 const VaultlabelOptions = ({ listId }: { listId: string }) => {
   const vaults = useBankSnapshot()?.vaults ?? []
   return <datalist id={listId}>{vaults.map(({ vaultlabel }) => <option key={vaultlabel} value={vaultlabel} />)}</datalist>
 }
 
-/** The boxlabels the vault under `vaultlabel` lists, as a datalist's options. */
 const BoxlabelOptions = ({ listId, vaultlabel }: { listId: string, vaultlabel: string }) => {
   const boxes = useBoxes(vaultlabel) ?? []
   return <datalist id={listId}>{boxes.map(({ boxlabel }) => <option key={boxlabel} value={boxlabel} />)}</datalist>
@@ -52,7 +50,6 @@ const BoxlabelOptions = ({ listId, vaultlabel }: { listId: string, vaultlabel: s
 
 // == [Verbs]: BoxVerbs, boxWordsOf, WhisperShown
 
-/** The buttons for the box under `boxlabel` in the vault under `vaultlabel`, with what each last answered. */
 const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: string }) => {
   const { stage, vault } = useVault(vaultlabel)
   const vaultSnapshot = useVaultSnapshot(vaultlabel)
@@ -66,16 +63,13 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
   // Kept off React's state, so the text typed never sits in a render.
   const whisperText = useRef('')
   const [extracted, setExtracted] = useState<Whisper | null>(null)
-  // An extracted whisper is dropped when the vault locks, by React's adjusting of state to a prop, in render.
   const isLocked = vaultSnapshot?.isLocked ?? true
   if ((extracted !== null) && isLocked) { setExtracted(null) }
 
-  /** Call `putBox` with `whisper` under the boxlabel picked and `opts`, and answer the box's snapshot. */
   const putting = async (whisper: Whisper, opts: BoxPutOpts = {}) => {
     const put = await vault?.putBox({ boxlabel, whisper }, opts)
     return jsonOf(put?.snapshot)
   }
-  /** Call `delBox` for the boxlabel picked, and answer the snapshot of the box deleted, or null for none. */
   const deleting = async () => {
     const gone = await vault?.delBox(boxlabel)
     return jsonOf(gone?.snapshot ?? null)
@@ -126,14 +120,12 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
   )
 }
 
-/** What the status line says of a box: its revision, whether exposed and veiled, or that none is listed. */
 const boxWordsOf = (snapshot: BoxSnapshot | null): string => {
   if (snapshot === null) { return 'not listed' }
   const veiledWords = snapshot.isVeiled ? ', veiled' : ''
   return `revision ${String(snapshot.revision_seq)}, ${snapshot.isExposed ? 'exposed' : 'not exposed'}${veiledWords}`
 }
 
-/** A whisper, behind its own Show button, or the word for why there is none to show. */
 const WhisperShown = ({ caption, whisper, hiddenWord = 'hidden' }: { caption: string, whisper: Whisper | null, hiddenWord?: string | undefined }) => {
   const reveal = useRevealToggle(Messages.showWhisper, Messages.hideWhisper, whisper !== null)
   const ownId = useId()

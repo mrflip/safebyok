@@ -15,15 +15,12 @@ export const DevDeviceDBInspector = ({ deviceDB }: DevDeviceDBInspectorProps) =>
 
 // == [Leases]: LeaseRowsTable, LeaseRowLine, LeaseColumns, ListedLease, listedOfRaw, cellOf
 
-/** The fields each lease row shows in a column of its own; any other a raw row holds goes in the last. */
 const LeaseColumns = ['applabel', 'user_id', 'vaultlabel', 'vault_tok', 'proved_at'] as const
 
-/** A raw lease as the table lists it: a row that is no object shows as one with no fields. */
 const listedOfRaw = ({ scopepath, row }: { scopepath: LeaseScopepath, row: unknown }): ListedLease => (
   { scopepath, row: ((typeof row === 'object') && (row !== null)) ? { ...row } : {} }
 )
 
-/** The lease rows `listLeases` answers, or with damaged rows those `listRawLeases` answers, each with its forget. */
 const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
   const [isRaw, setIsRaw] = useState(false)
   const list = useCallback(async (): Promise<readonly ListedLease[]> => {
@@ -37,7 +34,6 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
   const { val: rows, trouble, relist } = useListing<readonly ListedLease[]>(list)
   const { lastCall, call } = useLastCall()
 
-  /** Run a button's verb, then list the rows again. */
   const callThenRelist = async (verbname: string, work: () => Promise<string>) => {
     await call(verbname, work)
     relist()
@@ -80,7 +76,6 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
   )
 }
 
-/** A lease row's line: its fields, and a forget where it names a lease, a delRawLease where it is filed. */
 const LeaseRowLine = ({ row, scopepath, onForget, onDelRaw }: LeaseRowLineProps) => {
   const asked = leaseQuery.safeParse(row)
   const others = Object.keys(row).filter((fieldname) => ! (LeaseColumns as readonly string[]).includes(fieldname))
@@ -98,7 +93,6 @@ const LeaseRowLine = ({ row, scopepath, onForget, onDelRaw }: LeaseRowLineProps)
 
 // A raw row holds the leaseKey and the vaultKeyLeaseWrapped: show each such field's kind, never its
 // content.
-/** What a cell shows of a row's field: a time, number, word or token as is, and of anything else only its kind. */
 const cellOf = (fieldname: string, val: unknown): string => {
   if (val === undefined) { return '–' }
   if ((fieldname === 'proved_at') && (typeof val === 'number')) { return timeOf(val) }

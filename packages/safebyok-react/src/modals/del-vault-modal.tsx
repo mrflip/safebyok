@@ -11,7 +11,6 @@ export const DelVaultModal = (props: DelVaultModalProps) => (
   </AnsweringOnce>
 )
 
-/** The dialog itself, inside DelVaultModal's boundary. */
 const DelVaultForm = ({ gating, onDone: done, passphraseUsername }: DelVaultModalProps) => {
   const { gripe, setGripe, attempt } = useAttempts('DelVaultModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)

@@ -4,8 +4,8 @@ import { Messages } from '../helpers/messages'
 import { useRevealToggle } from '../hooks/reveal-toggle'
 import type { WhisperFieldProps } from '../shapes'
 
-/** A field for the user to type or paste a whisper into, hidden as they type, with a Show / Hide button.
- *
+/**
+ * A field for the user to type or paste a whisper into, hidden as they type, with a Show / Hide button.
  * @example <WhisperField onChange={setKeyText} aria-label="Anthropic API key" />
  * @example <WhisperField onChange={setKeyText} placeholder="sk-ant-…" aria-label="Anthropic API key" />
  * @example

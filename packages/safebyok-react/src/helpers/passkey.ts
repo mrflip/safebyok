@@ -3,25 +3,18 @@ import { fromB64, toB64 } from 'safebyok/utils'
 import { PasskeyChecks, type AskPasskeyOpts, type CreatePasskeyOpts } from '../shapes'
 import { Messages } from './messages'
 
-// The WebAuthn half of a passkey, which the core leaves to the host. `createPasskey` makes a passkey
-// and asks for its first answer. `askPasskey` asks the vault's passkey again. Nothing here imports React.
-//
-// These passkeys are not logins. Each is a fresh credential under a random user handle, so it never
-// replaces a passkey the host's sign-in uses. Its challenge is random, and no server checks the
-// assertion. What matters is the PRF extension's answer, which only the authenticator gives, and
-// only after the user's fingerprint, face or PIN. Every call asks for user verification, since an
-// authenticator answers differently without it.
-//
-// Where no passkey answer is to be had (the browser has no WebAuthn, the authenticator no PRF, or
-// the browser failed to ask), these refuse `passkey_unavailable`, which a dialog shows in place.
+// These passkeys are not logins: each is a fresh credential under a random user handle, its challenge is random, and
+// no server checks the assertion. What matters is the PRF extension's answer, which only the authenticator gives, and
+// only after the user's fingerprint, face or PIN. Every call asks for user verification, since an authenticator answers
+// differently without it.
 
 /** True when this browser offers WebAuthn at all: whether to show a passkey button. */
 export const passkeysAvailable = (): boolean => (
   typeof PublicKeyCredential === 'function' && typeof navigator === 'object' && 'credentials' in navigator
 )
 
-/** Make a new passkey and return its first answer, or null when the user dismisses the prompt.
- *
+/**
+ * Make a new passkey and return its first answer, or null when the user dismisses the prompt.
  * @example
  *   const passkeyClear = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
  *   if (passkeyClear !== null) { await gating.attempt({ passphraseClear, passkeyClear }) }   // null: dismissed
@@ -65,8 +58,8 @@ export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAn
   return answerOf(credential_id, prfSaltBytes, answer)
 }
 
-/** Ask the passkey of `passkeyHeader` for its answer, or null when the user dismisses the prompt.
- *
+/**
+ * Ask the passkey of `passkeyHeader` for its answer, or null when the user dismisses the prompt.
  * @example
  *   const passkeyClear = await askPasskey(gating.passkeyHeader)
  *   if (passkeyClear !== null) { await gating.attempt({ passkeyClear }) }
@@ -109,7 +102,6 @@ export const attemptOnce = async <ValT>(passkey: PasskeyAnswer, attempt: (passke
   }
 }
 
-/** The bytes of a stored passkey's `credential_id`. */
 const credentialBytesOf = (credential_id: string): Uint8Array<ArrayBuffer> => {
   try {
     return fromB64(credential_id) as Uint8Array<ArrayBuffer>
@@ -118,14 +110,13 @@ const credentialBytesOf = (credential_id: string): Uint8Array<ArrayBuffer> => {
   }
 }
 
-/** The PasskeyAnswer of credential `credential_id`: the PRF `answer` it gave over `saltBytes`. */
 const answerOf = (credential_id: string, saltBytes: Uint8Array, answer: BufferSource): PasskeyAnswer => ({
   credential_id,
   prf_salt_b64: toB64(saltBytes),
   prfBytes:     bytesOf(answer),
 })
 
-/** Copy `source`'s bytes, and zero `source`. The answer's bytes are then the only copy. */
+/** Zero `source` after copying its bytes, so the answer's bytes are the only copy. */
 const bytesOf = (source: BufferSource): Uint8Array<ArrayBuffer> => {
   // ArrayBuffer.isView, not instanceof, holds across realms (an iframe's buffers, say).
   const handed = ArrayBuffer.isView(source) ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength) : new Uint8Array(source)
@@ -134,20 +125,16 @@ const bytesOf = (source: BufferSource): Uint8Array<ArrayBuffer> => {
   return copied
 }
 
-/** `{ [field]: val }`, or nothing when `val` is undefined. */
 const optional = <FieldT extends string, ValT>(field: FieldT, val: ValT | undefined): Partial<Record<FieldT, ValT>> => (
   val === undefined ? {} : { [field]: val } as Record<FieldT, ValT>
 )
 
-/** Refuse in a browser without WebAuthn. */
 const demandWebAuthn = () => {
   if (! passkeysAvailable()) { throw new VaultError('passkey_unavailable', Messages.noWebAuthn) }
 }
 
-/** The refusal for an authenticator that gives no PRF answer. */
 const noPrf = () => new VaultError('passkey_unavailable', Messages.noPrf)
 
-/** The credential a WebAuthn call resolves with, or null when the user dismissed it. */
 const askAuthenticator = async (call: () => Promise<Credential | null>): Promise<PublicKeyCredential | null> => {
   let credential: Credential | null
   try {
