@@ -5,7 +5,7 @@ import { HostErrorSanitizer, VaultError, isVaultError } from 'safebyok'
 export type BoundaryProps = {
   /** Shown in the children's place once one of them has thrown while rendering. */
   fallback:  ReactNode
-  /** Told once, when the boundary first catches: to say so to the user, say. */
+  /** Called once, when the boundary first catches. */
   onCaught?: (() => void) | undefined
   children:  ReactNode
 }
@@ -21,7 +21,7 @@ export class Boundary extends Component<BoundaryProps, { caught: boolean }> {
   override render() { return this.state.caught ? this.props.fallback : this.props.children }
 }
 
-/** A number that changes whenever `thing` does, to key a component that serves one gating. */
+/** A number that changes whenever `thing` does, to key a component with. */
 export const useRoundFor = (thing: object): number => {
   const [served, setServed] = useState({ thing, round: 0 })
   if (served.thing === thing) { return served.round }

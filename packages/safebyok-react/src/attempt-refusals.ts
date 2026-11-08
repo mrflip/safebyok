@@ -3,7 +3,7 @@ import { correctablekindVals, isVaultError } from 'safebyok'
 /** What a dialog does with a refusal a gating's attempt met. */
 export type AttemptRefusalFlavor = 'in_place' | 'close' | 'trouble' | 'in_flight'
 
-/** The refusals a dialog shows in place, asking again: those the core leaves the gating open for. */
+/** The refusal kinds a dialog shows in place: those the core leaves the gating open after. */
 const InPlaceKinds: ReadonlySet<string> = new Set(correctablekindVals)
 
 /** What a dialog does with `err`, a refusal a gating's attempt met. */

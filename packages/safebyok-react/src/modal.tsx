@@ -21,7 +21,7 @@ const answerOf = (gating: AnyGating, outcome: Outcome<Vault>): DialogAnswer => {
   return gating.gatingkind === 'del_vault' ? 'deleted' : 'unlocked'
 }
 
-/** The dialog's one answer to `gating`, calling `onDone` the first time only. */
+/** The dialog's one answer to `gating`: a `done` that calls `onDone` the first time only. */
 const useAnswerOnce = (gating: AnyGating, onDone: (answer: DialogAnswer) => void) => {
   const onDoneRef = useRef(onDone)
   useLayoutEffect(() => { onDoneRef.current = onDone })
@@ -55,7 +55,7 @@ export const AnsweringOnce = ({ gating, onDone, children }: {
   )
 }
 
-/** Escape, from anywhere in a dialog, cancels it, and goes no further. */
+/** Cancel the dialog on Escape from anywhere in it, and stop the key going further. */
 const cancelOnEscape = (onDone: (answer: DialogAnswer) => void) => (evt: KeyboardEvent) => {
   if (evt.key !== 'Escape') { return }
   evt.stopPropagation()
@@ -97,17 +97,17 @@ export type Gripe = { text: string, fromPasskey: boolean, mismatched?: true }
 /** A form's state around its attempts: the gripe it shows, and what one submit's attempt does with its outcome. */
 export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer) => void) => {
   const [gripe, setGripe] = useState<Gripe | null>(null)
-  // Wrapped, so that a failure carrying any value at all still reads as "failed".
+  // The error rides in an object, so a thrown null or undefined still reads as a failure.
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  // A dialog gone meanwhile touches neither its state nor its host's onDone again. One hidden
-  // meanwhile meets the outcome once it shows again.
+  // A dialog unmounted during an attempt touches neither its state nor its host's onDone again. A
+  // dialog hidden during one meets the outcome once it shows again.
   const { whenShown, isShown } = useWhenShown()
   const fail = useCallback((err: unknown) => { setFailure({ err }) }, [])
   if (failure !== null) { throw forBoundary(failure.err, source) }
 
   const meet = (err: unknown) => {
     const flavor = attemptRefusalFlavor(err)
-    // A second submit while the first runs: the first answers for the dialog.
+    // A second submit while the first runs meets 'attempt_in_flight': the first answers for the dialog.
     if (flavor === 'in_flight') { return }
     if (flavor === 'in_place') { setGripe({ text: (err as Error).message, fromPasskey: false }); return }
     if (flavor === 'close') { done('declined'); return }
@@ -137,14 +137,14 @@ type ModalFormProps = {
   submitWord: string
   /** What to say in the live region, or null for nothing. */
   gripe:      Gripe | null
-  /** The live region's id, for a field it describes: a confirmation's, from {@link useConfirmation}. */
+  /** The live region's id, from {@link useConfirmation}. */
   gripeId?:   string | undefined
   /** A quiet line under the live region: how long an unlock lasts. */
   footnote?:  string | undefined
   formRef?:   Ref<HTMLFormElement> | undefined
   /** The dialog's one answer: Cancel and Escape answer 'declined'. */
   done:       (answer: DialogAnswer) => void
-  /** Each submit, its default prevented. */
+  /** Called at each submit. The form's default is already prevented. */
   onSubmit:   () => void
   /** The fields, between the blurb and the live region. */
   children:   ReactNode
@@ -172,7 +172,7 @@ export const ModalForm = ({ title, blurb, submitWord, gripe, gripeId, footnote, 
   )
 }
 
-/** Whether the focus is inside `container`, read in the document or shadow root it lives in. */
+/** True while the focus is inside `container`, shadow roots included. */
 export const holdsFocus = (container: HTMLElement | null): boolean => {
   if (container === null) { return false }
   const root = container.getRootNode()
@@ -187,7 +187,7 @@ const MinutesPerDay = 24 * MinutesPerHour
 
 type Unit = 'day' | 'hour' | 'minute'
 
-/** The lease as a count of whole days, else of whole hours, else of minutes (at least one). */
+/** `leaseMillis` as a count of whole days, else of whole hours, else of minutes (at least one). */
 const leaseCount = (leaseMillis: number): { count: number, unit: Unit } => {
   const minutes = Math.max(1, Math.round(leaseMillis / MinuteMillis))
   if (minutes % MinutesPerDay === 0) { return { count: minutes / MinutesPerDay, unit: 'day' } }
@@ -195,10 +195,12 @@ const leaseCount = (leaseMillis: number): { count: number, unit: Unit } => {
   return { count: minutes, unit: 'minute' }
 }
 
-/** One relative-time formatter per locale, made at first use, after any polyfill the host imports has run. */
+// Each formatter is made at first use, after any polyfill the host imports has run.
+/** One relative-time formatter per locale. */
 const relativeTimes = new Map<string, Intl.RelativeTimeFormat>()
 
-/** The formatter for `locale`: numeric 'always', so that one day reads 'in 1 day' and never 'tomorrow'. */
+// Numeric 'always', so that one day reads 'in 1 day' and never 'tomorrow'.
+/** The formatter for `locale`. */
 const relativeTimeIn = (locale: string): Intl.RelativeTimeFormat => {
   const made = relativeTimes.get(locale) ?? new Intl.RelativeTimeFormat(locale, { numeric: 'always', style: 'long' })
   relativeTimes.set(locale, made)
@@ -207,7 +209,7 @@ const relativeTimeIn = (locale: string): Intl.RelativeTimeFormat => {
 
 /** What a dialog promises about how long an unlock lasts, from the bank's `leaseMillis`. */
 export const unlockedFor = (leaseMillis: number, creating: boolean): string => {
-  // Never compared for equality: the far future is anything within a minute of it.
+  // Never compared to ForeverMillis for equality: the far future is anything within a minute of it.
   if (leaseMillis >= ForeverMillis - MinuteMillis) { return Messages.staysUnlocked }
   const { count, unit } = leaseCount(leaseMillis)
   const relative = relativeTimeIn(Locale).format(count, unit)
@@ -314,10 +316,10 @@ const checkerAdvice = async (gating: AnyGating, typed: string): Promise<string |
 export const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, gating: AnyGating, creating: boolean, fail: (err: unknown) => void) => {
   const [said, setSaid] = useState<string | null>(null)
   const asked = useRef(0)
-  // The mode as of the last commit, which an answer on its way is checked against.
+  /** The mode as of the last commit, which an answer on its way is checked against. */
   const creatingNow = useRef(creating)
-  // A change of mode forgets what was said (React's "adjusting state while rendering"), and makes
-  // any answer or failure still on its way stale from the same commit.
+  // A change of mode forgets what was said, by React's "adjusting state while rendering". It also
+  // makes any answer or failure still on its way stale from the same commit.
   const [saidWhile, setSaidWhile] = useState(creating)
   if (saidWhile !== creating) {
     setSaidWhile(creating)
@@ -329,7 +331,7 @@ export const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, gating
     asked.current += 1
     if (typed === '') { setSaid(null); return }
     const askedNow = asked.current
-    // Only the latest call, in the mode it was asked in, is heard.
+    /** True for the latest call, while the mode is the one it was asked in. */
     const latest = () => askedNow === asked.current && creating === creatingNow.current
     try {
       // A JavaScript host's undefined is nothing to say, as null is.

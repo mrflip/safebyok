@@ -16,15 +16,15 @@ export const AddPasskeyModal = (props: AddPasskeyModalProps) => (
 export type AddPasskeyModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              Gating<'add_passkey'>
-  /** Called once, with the dialog's answer: 'unlocked' once the passkey is added, 'declined' otherwise. */
+  /** Called once with 'unlocked' when the passkey is added, and with 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
-  /** What a password manager files the passphrase under, and the authenticator the passkey. */
+  /** What a password manager files the passphrase under, and what the authenticator lists the passkey under. */
   passphraseUsername?: string | undefined
   /** The relying party the passkey is made under, if not the page's own domain. */
   passkeyRpId?:        string | undefined
 }
 
-/** The dialog itself, inside AddPasskeyModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
+/** The dialog itself, inside AddPasskeyModal's boundary. */
 const AddPasskeyForm = ({ gating, onDone: done, passphraseUsername, passkeyRpId }: AddPasskeyModalProps) => {
   const { gripe, setGripe, meet, attempt, whenShown, isShown } = useAttempts('AddPasskeyModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)

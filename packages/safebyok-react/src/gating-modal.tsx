@@ -11,7 +11,7 @@ import { RevokePasskeyModal } from './revoke-passkey-modal'
 export type GatingModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              AnyGating
-  /** Called once, with the dialog's answer: 'unlocked' or 'deleted' once an attempt is ok, 'declined' otherwise. */
+  /** Called once with 'unlocked' or 'deleted' when an attempt succeeds, and with 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** The bank's `leaseMillis`, for the line saying how long an unlock lasts. */
   leaseMillis?:        number | undefined
@@ -38,7 +38,8 @@ const DialogForGatingkind: { [KindT in Gatingkind]: ComponentType<KindModalProps
 
 /** What stands in for a gatingkind this package has no dialog for: it answers 'declined' as it mounts. */
 const NoDialog = ({ onDone }: Pick<GatingModalProps, 'onDone'>) => {
-  // An onDone written inline is new at each render, and is still told only once.
+  // An onDone written inline is new at each render, and so re-runs the effect.
+  /** True once `onDone` has been called. */
   const answered = useRef(false)
   useEffect(() => {
     if (answered.current) { return }

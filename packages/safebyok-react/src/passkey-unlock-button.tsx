@@ -20,7 +20,7 @@ export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
 export type PasskeyUnlockButtonProps = {
   /** The gating the passkey answers, as the bank handed it to `requestCleartext`. */
   gating:      Gating<'unlock_vault'>
-  /** Called once the gating is answered: 'unlocked', or 'declined' for a refusal that closes the dialog. */
+  /** Called with 'unlocked' when the passkey unlocks the vault, and with 'declined' on a refusal that closes the dialog. */
   onDone:      (answer: 'unlocked' | 'declined') => void
   /** What the button has to say, or null once what it said last no longer stands. */
   onGripe:     (gripe: string | null) => void
@@ -38,15 +38,15 @@ export const offersPasskey = (gating: AnyGating): boolean => (
 /** The button itself, inside PasskeyUnlockButton's boundary. */
 const PasskeyPress = ({ gating, onDone, onGripe, rpId, takesFocus }: PasskeyUnlockButtonProps) => {
   const [asking, setAsking] = useState(false)
-  // Wrapped, so that a rejection carrying any value at all still reads as "failed".
+  // The error rides in an object, so a thrown null or undefined still reads as a failure.
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  // A button gone meanwhile unlocks nothing, and touches neither its state nor its dialog's
-  // callbacks again. One hidden meanwhile goes on once it shows again.
+  // A button unmounted while it asks unlocks nothing, and touches neither its state nor its dialog's
+  // callbacks again. A button hidden while it asks goes on once it shows again.
   const { whenShown, isShown } = useWhenShown()
   if (failure !== null) { throw forBoundary(failure.err, 'PasskeyUnlockButton') }
   if (! offersPasskey(gating)) { return null }
 
-  /** What the attempt, or the authenticator asked before it, refused with. */
+  /** Meet a refusal from the attempt, or from the authenticator asked before it. */
   const heard = (err: unknown) => {
     const flavor = attemptRefusalFlavor(err)
     // Pressed while a passphrase attempt runs: that attempt answers for the dialog.
