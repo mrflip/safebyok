@@ -24,6 +24,18 @@ const provided = (overrides: Partial<Props> = {}, world = TH.makeBankWorld()) =>
   return { world, props, rerender: (given: Props) => { rendered.rerender(ui(given)) }, unmount: rendered.unmount }
 }
 
+/** A MemoryDeviceDB whose ensureBank for `user_id` waits until the test calls `answer`; every other user's answers at once. */
+const deviceDBHolding = (user_id: string) => {
+  const deviceDB = new MemoryDeviceDB()
+  const answering = TH.held()
+  const ensureBank = deviceDB.ensureBank.bind(deviceDB)
+  vi.spyOn(deviceDB, 'ensureBank').mockImplementation(async (scope) => {
+    if (scope.user_id === user_id) { await answering.promise }
+    return ensureBank(scope)
+  })
+  return { deviceDB, answer: () => { answering.resolve(undefined) } }
+}
+
 describe("BankProvider's bank", () => {
   it("holds no bank while nobody is signed in", async () => {
     provided({ user_id: null })
@@ -73,28 +85,50 @@ describe("BankProvider's bank", () => {
     expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
   })
 
-  it("ends with one bank, ready, under StrictMode", async () => {
+  it("makes a fresh bank for each run of its effect under StrictMode", async () => {
     const making = vi.spyOn(Bank, 'make')
-    const world = TH.makeBankWorld()
-    render(<StrictMode><BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /></BankProvider></StrictMode>)
+    render(<StrictMode><BankProvider {...TH.providerPropsOf(TH.makeBankWorld())}><TH.ShowsVault /></BankProvider></StrictMode>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    const [first, last] = making.mock.results.map((made) => made.value as Bank)
+    expect(making.mock.results).to.have.lengthOf(2)
+    expect(first?.isEnabled).to.be.false
+    expect(first?.snapshot.stage).to.eq('refused')
+    expect(last?.isEnabled).to.be.true
+    expect(TH.seenBanks.at(-1)).to.eq(last)
+  })
+
+  it("hands down no bank until its deviceDB answers", async () => {
+    const { deviceDB, answer } = deviceDBHolding('u1')
+    const making = vi.spyOn(Bank, 'make')
+    provided({ deviceDB })
     await act(async () => { await TH.wakeupAtNextTick() })
-    const live = making.mock.results.filter((made) => (made.value as Bank).snapshot.stage === 'ready')
-    expect(live).to.have.lengthOf(1)
+    expect(shown('bank')).to.eq('none')
+    expect(making).not.toHaveBeenCalled()
+    answer()
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+  })
+
+  it("waits for the next user's device_id before making their bank", async () => {
+    const { deviceDB, answer } = deviceDBHolding('u2')
+    const { props, rerender } = provided({ deviceDB })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    const making = vi.spyOn(Bank, 'make')
+    rerender({ ...props, user_id: 'u2' })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(shown('bank')).to.eq('none')
+    expect(making).not.toHaveBeenCalled()
+    answer()
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    const { device_id } = await deviceDB.ensureBank({ applabel: 'acme', user_id: 'u2' })
+    expect(making.mock.calls.map(([opts]) => [opts.user_id, opts.device_id])).to.deep.equal([['u2', device_id]])
   })
 
   it("makes no bank when the user signs out while its deviceDB answers", async () => {
-    const deviceDB = new MemoryDeviceDB()
-    const answering = TH.held()
-    const ensureBank = deviceDB.ensureBank.bind(deviceDB)
-    vi.spyOn(deviceDB, 'ensureBank').mockImplementation(async (scope) => {
-      await answering.promise
-      return ensureBank(scope)
-    })
+    const { deviceDB, answer } = deviceDBHolding('u1')
     const making = vi.spyOn(Bank, 'make')
     const { props, rerender } = provided({ deviceDB })
     rerender({ ...props, user_id: null })
-    answering.resolve(undefined)
+    answer()
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(making).not.toHaveBeenCalled()
     expect(shown('bank')).to.eq('none')
