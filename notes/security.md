@@ -463,6 +463,11 @@ added or folded into through the subagent, and no other entry changes.
   (`^[A-Za-z0-9_-]{22,43}$`, 16 to 32 bytes unpadded) by its text alone, with no decode, and a record whose salt fails is `bad_record`; a passkey's `prf_salt_b64`
   stays non-empty text, judged per wayin as above. A key deriver's spec must ask for 16 to 32 `salt_bytes` (`MinSaltBytes` = 16, `src/helpers/consts.ts`), and fewer is refused at
   setup; the default Argon2id deriver makes 16. The Argon2id spec in `src/deriver/shapes.ts` still allows a minimum of 8 (`MinArgon2SaltBytes`), so a deriver of 8 is refused by the Bank.
+  Amended 2026-11-07 (docblock_trim): a passphrase salt is exactly 16 bytes for every key deriver (`PassphraseSaltBytes`, `src/helpers/consts.ts`; RFC 9106's recommendation for Argon2id),
+  and the range, `MinSaltBytes` and `MinArgon2SaltBytes` above no longer hold. A deriver's `salt_bytes` (in `keyDeriverSpec`, `src/deriver/shapes.ts`, and in the host deriver `guardKeyDeriver`
+  checks through `keyDeriverShape`, `src/shapes/shapes-core.ts`) must be 16; a stored `salt_b64` must be exactly 22 base64url characters, by length and pattern without decoding; a salt that
+  still fails to decode (stray trailing bits) is refused `bad_record` by `saltBytesOf` (`src/models/proving.ts`) before the deriver is asked. The derivers' own per-call salt-length
+  check (`checkSaltFits`) is gone. The pin may be relaxed if a host asks for another length.
   (5) `vault_tok` and `revision_tok` stay plain strings, since a host's storage adapter handles them. Their check refuses an empty one
   with its own sentence ("A token is minted by safebyok, so it can't be empty"), quoting nothing.
 * 2026-10-26 (zod_classic, branch `20261026-zod_classic`, stacked on PR [#273](https://github.com/mrflip/safebyok/pull/273)): **stored records parse
@@ -1656,8 +1661,8 @@ added or folded into through the subagent, and no other entry changes.
   key, so neither is offline-guessable, and it is what a `getBox` by the same signed-in user
   returns. What it changes: this is a refusal's `meta` now holding ciphertext of the winning box
   (never plaintext, never key material in the clear), and it crosses wires: GraphQL's
-  `extensions.meta.box_stored` (amended 2026-10-22 (wire_meta): no longer; over GraphQL it is the `box_stored` of
-  `safebyokPutBox`'s answer in the response `data`, see the 2026-10-22 wire_meta entry) and the Postgres route recipe's
+  `extensions.meta.box_stored` (amended 2026-10-22 (wire_meta): no longer; amended 2026-11-07 (docblock_trim): over GraphQL the winning box travels among the
+  `world` and `dbhas` of `safebyokPutBox`'s answer in the response `data`, see the 2026-10-22 wire_meta entry) and the Postgres route recipe's
   `refusal.box_stored`; the error's
   `cause` still never crosses. A host that logs or reports a whole `VaultError` including `meta`
   now logs that ciphertext. An audit of where refusal meta can leak (logs, error reporters, a host
@@ -2338,8 +2343,8 @@ added or folded into through the subagent, and no other entry changes.
   count and approximate size to the caller already authorized for that vault (the listing already
   shows the count). The base class validates the capacity (whole numbers; `Infinity` becomes
   `Number.MAX_SAFE_INTEGER`) and refuses a `vault_full` without a sound one as `corrupt_record`.
-  It crosses the GraphQL wire as `extensions.meta.capacity` (amended 2026-10-22 (wire_meta): no longer; it is the `capacity`
-  of `safebyokPutBox`'s answer in the response `data`); the Postgres route recipe in the
+  It crosses the GraphQL wire as `extensions.meta.capacity` (amended 2026-10-22 (wire_meta): no longer; amended 2026-11-07 (docblock_trim): it is the `capacity`
+  of the `err.meta` of `safebyokPutBox`'s answer in the response `data`); the Postgres route recipe in the
   README now sends a refusal's `meta` whole, which from a `VaultDB` verb is only `box_stored` (stale
   write) or `capacity` (`vault_full`). The vault still locks
   on `identity_revoked` and `rolled_back` from storage: (amended 2026-10-28 (heed_inline): `RefusalPolicy.heed`
@@ -2406,7 +2411,9 @@ added or folded into through the subagent, and no other entry changes.
   `{ call: 'deriveKeyBytes', refusalkind }`, the `refusalkind` being the thrown `VaultError`'s only when it is one of
   `refusalKindVals` (amended 2026-10-28 (validator_names): `RefusalKindVals` when this was written; `listedKindOf`, `src/errors.ts`; a kind off the list is the thrower's own text), else null; conditions are
   not logged. This is the rule `requestCleartext` (thread 9b, same helper) and the strength checker's guard already follow; the
-  strength checker's `load()`, which hears no passphrase, keeps its `cause`. A deriver's own text is lost to the caller:
+  strength checker's `load()`, which hears no passphrase, keeps its `cause`. Amended 2026-11-07 (docblock_trim): `guardKeyDeriver`'s `deriveKeyBytes`
+  (`src/models/proving.ts`) replaces every throw from the host's deriver, a `VaultError` included, with `keyDeriverThrew()`, no cause (`guarantees.md` G8), so the `refusalkind` kept
+  above, the one logged, and a condition passing through on the sealing paths no longer hold; a brief pass-through of a deriver's own `VaultError` was reverted before release. A deriver's own text is lost to the caller:
   safebyok-fastkey's `bad_option` asking for `'wasm-unsafe-eval'` in the CSP reaches the host as `unexpected_error`, with the
   kind `bad_option` in the log. Still open (a Coach's TODO, "Add sensitive and host flags to refusals"): a strength checker's
   verdict `reason` becomes the `weak_passphrase` message as given, so a checker that quoted the passphrase in its `reason` would
@@ -2506,8 +2513,9 @@ added or folded into through the subagent, and no other entry changes.
   but the unlocked vaultKey stays in memory until the vault locks, expires or is closed. The
   README tells apps to close the vault on sign-out; nothing enforces it. *Superseded 2026-10-16*: a sign-out now locks the vault
   (`identity_revoked`, below).
-* 2026-10-15: a vault's box count is capped on the client (`maxBoxes`, `putBox()`
-  refusing `vault_full`), counted from the handle's last look at storage, so stores of new
+* 2026-10-15: a vault's box count is capped on the vaultDB the host's server hosts (`maxBoxes`, an option of that
+  vaultDB, never of the browser's `GraphQLVaultDB`, which takes `{ client }` alone; `putBox()`
+  refusing `vault_full`; amended 2026-11-07 (docblock_trim): not on the client), counted from the handle's last look at storage, so stores of new
   boxes running at once -- on several devices, or on one handle, since nothing serializes
   them -- can overshoot it. Neither local backend (`idbVaultDB`, `localVaultDB`) enforces a count
   or a size per vault; the Convex component does (next entry).
@@ -2863,7 +2871,8 @@ added or folded into through the subagent, and no other entry changes.
   records remain in the response body of a stale write (a stale update's `vault_props_stored` carries both
   wayins with salts and wrapped vaultKeys), to the signed-in owner of that vault only, since the VaultDB refuses
   any other user's scope; a host that logs response bodies would log them. The GraphQL wire keeps its shape
-  (see the 2026-10-22 wire_meta entry) and is unchanged. Coach's ruling 2026-10-22; code in
+  (see the 2026-10-22 wire_meta entry) and is unchanged (amended 2026-11-07 (docblock_trim): that wire was later replaced, and
+  no answer of it has this main `meta`; see that entry). Coach's ruling 2026-10-22; code in
   `packages/safebyok-postgres/README.md`, "The route recipe", run by
   `packages/safebyok-postgres/tests/route-recipe.test.ts`).
   Amended 2026-10-22 (bank): **a vault's birth writes, so the server's database role needs `SELECT`, `INSERT` and
@@ -3489,7 +3498,7 @@ added or folded into through the subagent, and no other entry changes.
   (`parseKeyDeriverSpec`; amended 2026-10-27 (restyle thread 14, [#287](https://github.com/mrflip/safebyok/pull/287)): it refuses in one fixed sentence listing every field's bounds, reading nothing of the failure, `SpecLimitForField` gone) on any deriver declaring `algorithm: 'argon2id'`, so a spec Argon2id
   cannot run fails at open with a kind, not at the first unlock as a library's plain Error. The
   supplied derivers (the core's and `safebyok-fastkey`'s) refuse a salt of another length than the
-  spec's before deriving (`bad_option`, never quoting the salt): the stored-vault half of that
+  spec's before deriving (`bad_option`, never quoting the salt; amended 2026-11-07 (docblock_trim): that per-call check is gone, the salt's length being pinned at 16 elsewhere, see the 2026-10-26 `brands` entry): the stored-vault half of that
   was already so, a wayin with a salt of the wrong length being passed over as damaged.
 * 2026-10-16: **a `test_` label is warned of, never refused.** `Vault.make` says through the
   logger, once per open, that a key deriver whose label begins `test_` (the published

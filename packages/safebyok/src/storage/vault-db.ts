@@ -1,4 +1,4 @@
-/** The vaultDB: the verbs the models call. A subclass writes the generic `do*` calls. */
+/** The vaultDB: the verbs the models call. A subclass writes only the generic `do*` calls, each one atomic step. */
 
 import type * as Z from 'zod'
 import { IsAdapterVaultDB, IsVaultDB } from '../helpers/consts'
@@ -100,7 +100,9 @@ export interface VaultDB {
   /** For hosts: removes the box rows of tombstoned or vanished vaults, and counts those left. */
   tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
   tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>>
-  /** Tell `onNotice` of rows that change under a bank or a vault, `onBadNews` of a watch ended; returns the stop. */
+  /** Tells `onNotice` of rows that change under a bank or a vault, `onBadNews` of a watch it ends; returns how to stop.
+   * Nothing may count on a notice arriving.
+   */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: VaultError) => void): () => void
 }
 
@@ -117,7 +119,9 @@ true satisfies Z.core.util.AssertEqual<typeof VaultDBVerbnames[number], Exclude<
 
 const noUnwatching = (): void => undefined
 
-/** The base of a vaultDB. Each verb throws its refusal and returns its answer; each `try*` answers either. */
+/** The base of a vaultDB. Each verb throws its refusal and returns its answer; each `try*` answers either.
+ * A subclass writes only the generic `do*` calls, each one atomic step.
+ */
 export abstract class AdapterVaultDB implements VaultDB {
   // == [Props]: #maxRecordBytes, IsVaultDB, IsAdapterVaultDB
 
@@ -407,7 +411,7 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   // == [Watch]: watch
 
-  /** Tell `onNotice` of rows that change under a bank or a vault, and return how to stop. */
+  /** Tells `onNotice` of rows that change under a bank or a vault, and returns how to stop. */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void): () => void {
     return this.doWatch(SX.watchScope.parse(scope), ({ vault, box }) => {
       const world = (vault === undefined) ? null : SX.vaultRow.safeParse(vault)
@@ -432,15 +436,17 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doListBoxes(asked: VaultQuery): Awaitable<BoxesFetched>
   /** The vault row, and the box row under `vault_tok`, read in one step. */
   protected abstract doGetBox(asked: BoxQuery): Awaitable<BoxFetched>
-  /** Store `record` where the row stands at `opts.prior`, atomic on `revision_tok`. */
+  /** Stores `record` where the row stands at `opts.prior`, atomic on `revision_tok`.
+   * It lands over a live row when `ifPresent` is 'repl', or where none stands when `ifAbsent` is 'add'.
+   */
   protected abstract doPutVault(record: VaultRecord, opts: PutOptsGiven): Awaitable<Landing>
   /** Stores `record` as `doPutVault` would, where the vault row also passes its checks live under its `vault_tok`. */
   protected abstract doPutBox(record: BoxRecord, opts: PutOptsGiven): Awaitable<BoxLanding>
-  /** Store `tombstone` over the live or damaged row at `opts.prior`, and tombstone the life's box rows. */
+  /** In one step, stores `tombstone` over the live or damaged row at `opts.prior` and tombstones that life's boxes. */
   protected abstract doDelVault(tombstone: VaultTombstone, opts: DelOpts): Awaitable<Landing>
-  /** Store `tombstone` over the live or damaged box row at `opts.prior`, under a vault live at its `vault_tok`. */
+  /** Stores `tombstone` over the live or damaged box row at `opts.prior`, under a vault live at its `vault_tok`. */
   protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxLanding>
-  /** Remove the box rows of vaults that are void, tombstoned or reborn, and count those left in the bank. */
+  /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
   /** Starts telling `hear` of rows that change, and returns how to stop. A store with no watch never calls it. */
   protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void): () => void { return noUnwatching }

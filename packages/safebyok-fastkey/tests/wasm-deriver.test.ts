@@ -90,7 +90,7 @@ describe("Argon2id's reference test vector", () => {
 })
 
 // Cheap specs, each pressing on a place two implementations could part: memory not a multiple of
-// four lanes' worth, several lanes, the longest salt, and passphrases past ASCII and
+// four lanes' worth, several lanes, and passphrases past ASCII and
 // past one BLAKE2b block.
 const SameBytesCases = [
   // regular usage:
@@ -101,7 +101,6 @@ const SameBytesCases = [
   [{ memory_kib: 37, parallelism: 2, iterations: 1 },    "correct horse battery staple",  'an odd memory, two lanes and a single pass'],
   [{ memory_kib: 8, parallelism: 1, iterations: 1 },     "correct horse battery staple",  "Argon2id's least memory and one pass"],
   [{ memory_kib: 1024, parallelism: 8 },                 "correct horse battery staple",  'eight lanes'],
-  [{ salt_bytes: 32 },                                   "correct horse battery staple",  'the longest salt a spec may ask for'],
   [{},                                                   "pässwörd mit Umlaut und 🔑",    'a passphrase past ASCII, encoded as UTF-8'],
   [{},                                                   "word ".repeat(40),              'a passphrase longer than one BLAKE2b block'],
   [{},                                                   " ",                             'a passphrase of one space, which a deriver takes as it is'],
@@ -152,7 +151,7 @@ describe("argon2idWasmDeriver", () => {
   })
 
   it("refuses a spec Argon2id cannot run, before deriving anything", () => {
-    expect(() => argon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', salt_bytes: 4 }))
+    expect(() => argon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', salt_bytes: 4 } as unknown as KeyDeriverSpec))
       .to.throw(/salt_bytes/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_option'))
   })
 
@@ -171,26 +170,13 @@ describe("argon2idWasmDeriver", () => {
     expect(refusalOf(() => argon2idWasmDeriver(spec))).to.eq(refusalOf(() => argon2idDeriver(spec)))
     expect(refusalOf(() => argon2idWasmDeriver(spec))).to.include('reserved')
   })
-
-  for (const length of [0, 15, 17]) {
-    it(`refuses a salt of ${String(length)} bytes where the spec asks 16, as bad_option and as the core's deriver does, before deriving`, async () => {
-      const wasmMessage = (await rejectionOf(argon2idWasmDeriver(CheapSpec).deriveKeyBytes('pw', saltOf(length))) as VaultError).message
-      const coreMessage = (await rejectionOf(argon2idDeriver(CheapSpec).deriveKeyBytes('pw', saltOf(length))) as VaultError).message
-      expect(wasmMessage).to.eq(coreMessage)
-    })
-  }
-
-  it("refuses a misfit salt of the supplied spec too, with kind 'bad_option'", async () => {
-    const err = await rejectionOf(argon2idWasmWebV1Deriver.deriveKeyBytes('pw', saltOf(8)))
-    expect(isVaultError(err, 'bad_option')).to.be.true
-  })
 })
 
 // The core's parseKeyDeriverSpec is what both factories check with: these hold the two to the
 // same refusals, word for word, rather than restating the bounds.
 const UnworkableSpecs = [
-  [{ salt_bytes: 15 },                    'a salt under 16 bytes'],
-  [{ salt_bytes: 33 },                    'a salt longer than 32 bytes'],
+  [{ salt_bytes: 15 },                    'a salt of 15 bytes'],
+  [{ salt_bytes: 32 },                    'a salt of 32 bytes'],
   [{ memory_kib: 64, parallelism: 9 },    'under 8 KiB for each of nine lanes'],
   [{ memory_kib: 1_048_577 },             'more than 1 GiB'],
   [{ iterations: 0 },                     'no passes over memory'],
@@ -215,7 +201,7 @@ describe("argon2idWasmDeriver's bounds", () => {
   })
 
   it("allows the largest of each bound", () => {
-    const lavish = { ...CheapSpec, memory_kib: 1_048_576, iterations: (2 ** 32) - 1, parallelism: 131_072, salt_bytes: 32 }
+    const lavish = { ...CheapSpec, memory_kib: 1_048_576, iterations: (2 ** 32) - 1, parallelism: 131_072 }
     expect(specOf(argon2idWasmDeriver(lavish))).to.deep.equal(lavish)
   })
 })

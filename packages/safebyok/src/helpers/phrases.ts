@@ -1,7 +1,7 @@
 /** What the checks say when input fails them, every such sentence in one place, and the sentences of bank.ts's and vault.ts's own refusals and a vault's bad news (a refusal they pass on from another module, refusals.ts or gating.ts, keeps its words there): so wording and tone are reviewed together, and so is the rule that none quotes the input.
  * The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts. */
 
-import { ScopepathDelimiter } from './consts'
+import { PassphraseSaltBytes, ScopepathDelimiter } from './consts'
 
 // == [Names]: labelTooLong, LabelShape, DeviceIdShape, UserIdMissing, userIdTooLong, UserIdChars
 
@@ -92,8 +92,8 @@ export const VaultErrorExpected = "Expected a VaultError"
 /** A passphrase handed over as anything but text. */
 export const PassphraseNotText = "A passphrase is the text the user typed, as a string"
 
-/** A passphrase wayin's salt that is not base64url text of `minBytes` to `maxBytes` bytes. */
-export const passphraseSaltShape = (minBytes: number, maxBytes: number): string => `A passphrase salt is base64url text of ${String(minBytes)} to ${String(maxBytes)} bytes`
+/** A passphrase wayin's salt that is not `saltChars` characters of base64url text, for `saltBytes` bytes. */
+export const passphraseSaltShape = (saltBytes: number, saltChars: number): string => `A passphrase salt is base64url text of ${String(saltBytes)} bytes: ${String(saltChars)} characters`
 
 /** zxcvbnStrengthChecker's reason for a new passphrase of fewer than `minChars` characters. */
 export const passphraseTooShort = (minChars: number): string => `A passphrase needs ${String(minChars)} characters or more: a few words together make a strong one, and easy to remember.`
@@ -129,7 +129,7 @@ export const VaultDBShape = "Expected a storage adapter, an instance of the Adap
 export const DeviceDBShape = "Expected a device store, an instance of the DeviceDB class: new MemoryDeviceDB(), or your own class that extends DeviceDB, both imported from 'safebyok'"
 
 /** A `keyDeriver` left out, or no object. */
-export const KeyDeriverShape = "Expected a KeyDeriver: in a browser, argon2idWebV1Deriver from 'safebyok/browser'; elsewhere, your own, with a key_deriver_label, a salt_bytes and a deriveKeyBytes function"
+export const KeyDeriverShape = `Expected a KeyDeriver: in a browser, argon2idWebV1Deriver from 'safebyok/browser'; elsewhere, your own, with a key_deriver_label, a salt_bytes of ${String(PassphraseSaltBytes)} and a deriveKeyBytes function`
 
 /** A `logger` that is no object. */
 export const LoggerShape = "Expected a VaultLogger, with log, warn and error functions: leave it out for the default logger, or pass functions that do nothing to log nowhere"
@@ -138,7 +138,7 @@ export const LoggerShape = "Expected a VaultLogger, with log, warn and error fun
 export const StringStoreShape = "Expected a StringStore, such as memoryStore() or domStore(localStorage, prefix)"
 
 /** A keyDeriverSpec that is no object. */
-export const KeyDeriverSpecShape = "Expected a keyDeriverSpec: algorithm 'argon2id', key_deriver_label, memory_kib, iterations, parallelism, salt_bytes and output_bytes"
+export const KeyDeriverSpecShape = `Expected a keyDeriverSpec: algorithm 'argon2id', key_deriver_label, memory_kib, iterations, parallelism, salt_bytes (${String(PassphraseSaltBytes)}) and output_bytes`
 
 /** An Argon2id spec with less than `minKib` of memory for each of its lanes. */
 export const memoryPerLane = (minKib: number): string => `Expected at least ${String(minKib)} KiB of memory for each lane (parallelism)`
@@ -432,7 +432,7 @@ export const PasskeyHeldAlready = "This vault has a passkey already, and holds o
 export const DelOfOtherLife = "The vault held in this slot is under another vault_tok than this Vault, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, AlreadyAsking, LockedWhileAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, ClearsThrew, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, saltDoesNotFit, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDeclined, AlreadyAsking, LockedWhileAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, ClearsThrew, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
@@ -460,8 +460,6 @@ export const SamePassphrase = "The new passphrase is the one the vault has alrea
 export const reservedDeriverLabel = (prefix: string): string => `Labels beginning ${prefix} are reserved for the specs safebyok supplies, present and future: choose a label of your own, naming your app, say.`
 
 export const suppliedSpecChanged = (label: string): string => `A key deriver labelled ${label} must carry that spec's parameters exactly, or vaults made under it will not open elsewhere: spread the exported spec into yours, or choose a label of your own.`
-
-export const saltDoesNotFit = (expectedCount: number, handedCount: number): string => `This key deriver takes a salt of ${String(expectedCount)} bytes, and was handed one of ${String(handedCount)}: a salt made by another deriver, or a stored salt that has been damaged.`
 
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver (from safebyok/browser), or another vetted Argon2id deriver."
 // --

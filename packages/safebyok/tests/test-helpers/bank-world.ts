@@ -76,7 +76,7 @@ export const makeBankWorld = () => {
     advance:   (millis: number) => { now += millis },
     /** A bank on another device: this world's vaultDB, and a deviceDB of its own. */
     bankOnAnotherDevice: (overrides: Partial<BankOpts> = {}): Bank => bankOn({ device_id: '00000000-0000-4000-8000-0000000000b2', deviceDB: new MemoryDeviceDB(), ...overrides }),
-    leaseRows: (): unknown[] => [...deviceDB._cheat_leaseRows().values()],
+    leaseRows: (): unknown[] => [...deviceDB._cheat_leaseRows().values()].map(({ row }) => row),
   }
 }
 export type BankWorld = ReturnType<typeof makeBankWorld>

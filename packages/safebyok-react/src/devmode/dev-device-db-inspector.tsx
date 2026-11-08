@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import type { DeviceDB } from 'safebyok'
-import { leaseQuery, vaultScope } from 'safebyok/storage'
-import type { LeaseQuery, VaultScope } from 'safebyok/storage'
+import { leaseQuery } from 'safebyok/storage'
+import type { LeaseQuery, LeaseScopepath } from 'safebyok/storage'
 import { LastCallLine, timeOf, useLastCall, useListing } from './last-call'
 
 /** What a DevDeviceDBInspector is handed: the deviceDB whose rows it shows. */
@@ -16,16 +16,31 @@ export const DevDeviceDBInspector = ({ deviceDB }: DevDeviceDBInspectorProps) =>
   </section>
 )
 
-// == [Leases]: LeaseRowsTable, LeaseRowLine, LeaseColumns, cellOf
+// == [Leases]: LeaseRowsTable, LeaseRowLine, LeaseColumns, ListedLease, listedOfRaw, cellOf
 
 /** The fields each lease row shows in a column of its own; any other a raw row holds goes in the last. */
 const LeaseColumns = ['applabel', 'user_id', 'vaultlabel', 'vault_tok', 'proved_at'] as const
 
+/** A lease row as the table lists it, with the scopepath it is filed under where `listRawLeases` gave one. */
+type ListedLease = { row: Record<string, unknown>, scopepath: LeaseScopepath | null }
+
+/** A raw lease as the table lists it: a row that is no object shows as one with no fields. */
+const listedOfRaw = ({ scopepath, row }: { scopepath: LeaseScopepath, row: unknown }): ListedLease => (
+  { scopepath, row: ((typeof row === 'object') && (row !== null)) ? { ...row } : {} }
+)
+
 /** The lease rows `listLeases` answers, or with damaged rows those `listRawLeases` answers, each with its forget. */
 const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
   const [isRaw, setIsRaw] = useState(false)
-  const list = useCallback(() => (isRaw ? deviceDB.listRawLeases() : deviceDB.listLeases()), [deviceDB, isRaw])
-  const { val: rows, trouble, relist } = useListing<readonly Record<string, unknown>[]>(list)
+  const list = useCallback(async (): Promise<readonly ListedLease[]> => {
+    if (! isRaw) {
+      const rows = await deviceDB.listLeases()
+      return rows.map((row) => ({ row, scopepath: null }))
+    }
+    const raws = await deviceDB.listRawLeases()
+    return raws.map((raw) => listedOfRaw(raw))
+  }, [deviceDB, isRaw])
+  const { val: rows, trouble, relist } = useListing<readonly ListedLease[]>(list)
   const { lastCall, call } = useLastCall()
 
   /** Runs a button's verb, then lists the rows again. */
@@ -53,13 +68,14 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
               <tr>{LeaseColumns.map((fieldname) => <th key={fieldname}>{fieldname}</th>)}<th>other fields</th><th>verbs</th></tr>
             </thead>
             <tbody>
-              {rows.map((row, ii) => (
+              {rows.map(({ row, scopepath }, ii) => (
                 <LeaseRowLine
                   // A damaged row may lack the fields that would name it.
                   key={`${String(row['vaultlabel'])}/${String(row['vault_tok'])}/${String(ii)}`}
                   row={row}
+                  scopepath={scopepath}
                   onForget={(asked) => callThenRelist('forget', async () => { await deviceDB.forget(asked); return 'forgotten' })}
-                  onDelRaw={isRaw ? (scope) => callThenRelist('delRawLease', async () => { await deviceDB.delRawLease(scope); return 'deleted' }) : null}
+                  onDelRaw={isRaw ? (filed) => callThenRelist('delRawLease', async () => { await deviceDB.delRawLease(filed); return 'deleted' }) : null}
                 />
               ))}
             </tbody>
@@ -70,17 +86,17 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
   )
 }
 
-/** What a lease row's line is handed: the row, and what its buttons call, null for a button it lacks. */
+/** What a lease row's line is handed: the row, where it is filed, and what its buttons call, null for a button it lacks. */
 type LeaseRowLineProps = {
-  row:      Record<string, unknown>
-  onForget: (asked: LeaseQuery) => Promise<void>
-  onDelRaw: ((scope: VaultScope) => Promise<void>) | null
+  row:       Record<string, unknown>
+  scopepath: LeaseScopepath | null
+  onForget:  (asked: LeaseQuery) => Promise<void>
+  onDelRaw:  ((scopepath: LeaseScopepath) => Promise<void>) | null
 }
 
-/** A lease row's line: its fields, and a forget where it names a lease, a delRawLease where it names a vault. */
-const LeaseRowLine = ({ row, onForget, onDelRaw }: LeaseRowLineProps) => {
+/** A lease row's line: its fields, and a forget where it names a lease, a delRawLease where it is filed. */
+const LeaseRowLine = ({ row, scopepath, onForget, onDelRaw }: LeaseRowLineProps) => {
   const asked = leaseQuery.safeParse(row)
-  const scope = vaultScope.safeParse(row)
   const others = Object.keys(row).filter((fieldname) => ! (LeaseColumns as readonly string[]).includes(fieldname))
   return (
     <tr className="dev-lease-row" data-named={asked.success}>
@@ -88,7 +104,7 @@ const LeaseRowLine = ({ row, onForget, onDelRaw }: LeaseRowLineProps) => {
       <td>{others.map((fieldname) => `${fieldname}: ${cellOf(fieldname, row[fieldname])}`).join(', ')}</td>
       <td>
         {asked.success && <button type="button" onClick={() => { void onForget(asked.data) }}>forget</button>}
-        {(onDelRaw !== null) && scope.success && <button type="button" onClick={() => { void onDelRaw(scope.data) }}>delRawLease</button>}
+        {(onDelRaw !== null) && (scopepath !== null) && <button type="button" onClick={() => { void onDelRaw(scopepath) }}>delRawLease</button>}
       </td>
     </tr>
   )

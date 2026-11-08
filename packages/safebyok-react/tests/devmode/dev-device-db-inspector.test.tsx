@@ -42,7 +42,7 @@ describe("DevDeviceDBInspector", () => {
 
   it("lists a damaged row only with damaged rows, and deletes it by delRawLease", async () => {
     const { world } = await renderOverLease()
-    world.deviceDB._cheat_leaseRows().set(ckeyOf('acme', 'u1', 'mangled'), { applabel: 'acme', user_id: 'u1', vaultlabel: 'mangled' })
+    world.deviceDB._cheat_leaseRows().set(ckeyOf('acme', 'u1', 'mangled'), { scopepath: ['acme', 'u1', 'mangled'], row: { applabel: 'acme', user_id: 'u1', vaultlabel: 'mangled' } })
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
     await waitFor(() => { expect(screen.getAllByRole('row')).to.have.lengthOf(2) })
     includingDamaged()
@@ -54,7 +54,7 @@ describe("DevDeviceDBInspector", () => {
 
   it("shows a damaged row's proved_at that names no time as its number", async () => {
     const { world } = await renderOverLease()
-    world.deviceDB._cheat_leaseRows().set(ckeyOf('acme', 'u1', 'mangled'), { applabel: 'acme', user_id: 'u1', vaultlabel: 'mangled', proved_at: NaN })
+    world.deviceDB._cheat_leaseRows().set(ckeyOf('acme', 'u1', 'mangled'), { scopepath: ['acme', 'u1', 'mangled'], row: { applabel: 'acme', user_id: 'u1', vaultlabel: 'mangled', proved_at: NaN } })
     includingDamaged()
     await waitFor(() => { expect(leaseRow('mangled')).to.exist })
     expect(within(leaseRow('mangled')).getByText('NaN')).to.exist

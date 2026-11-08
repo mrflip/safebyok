@@ -1,7 +1,7 @@
 /** What the vaultDB and the deviceDB store and take, and their helpers. Imported as `SX`. */
 
 import type * as Z from 'zod'
-import { Checkers, objCheck } from '../helpers/validator'
+import { Checker, Checkers, objCheck } from '../helpers/validator'
 import { randomId } from '../helpers/crypto'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
@@ -304,7 +304,7 @@ export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone |
 }
 // --
 
-// == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow, bankRow, BankRow
+// == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow, leaseScopepath, LeaseScopepath, RawLease, bankRow, BankRow
 
 /** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */
 export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_option', ({ epochMillis }) => {
@@ -316,6 +316,18 @@ export type LeaseQuery   = Z.infer<typeof leaseQuery>
 /** A stowed lease as the deviceDB dates it: its query and its `proved_at`. */
 export type LeaseDated   = Z.infer<typeof leaseDated>
 export type LeaseRow     = Z.infer<typeof leaseRow>
+
+// Three strings, and no label rules: `delRawLease` is for reaching a row filed under labels today's checks refuse.
+/** The check of a lease scopepath, as `delRawLease` takes one: three strings. */
+export const leaseScopepath = Checker(({ tuple, str }) => tuple([str, str, str]), 'bad_scope')
+
+/** Where a device store files a vault's lease row: its applabel, user_id and vaultlabel, as stored. */
+export type LeaseScopepath = [applabel: string, user_id: string, vaultlabel: string]
+
+/** A lease row as stored, unchecked, beside the scopepath it is filed under. */
+export type RawLease = { scopepath: LeaseScopepath, row: unknown }
+
+true satisfies Z.core.util.AssertEqual<LeaseScopepath, Z.infer<typeof leaseScopepath>>
 
 /** The bank row: the `device_id` this device goes by in one bank scope. */
 export const bankRow = objCheck(({ applabel, user_id, device_id }) => ({ applabel, user_id, device_id }), 'bad_record', [CX])

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LOCKED, MaxSaltBytes, MinSaltBytes } from '../../src/helpers/consts'
+import { LOCKED, PassphraseSaltBytes } from '../../src/helpers/consts'
 import * as Phrases from '../../src/helpers/phrases'
 import * as CX from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
@@ -247,9 +247,10 @@ describe("vaultScope", () => {
 // 16 bytes are 22 unpadded base64url characters, and 32 are 43.
 const SaltCases = [
   ["A".repeat(22),              true,   'the 22 characters of 16 bytes'],
-  ["-_Az09".repeat(7) + "A",    true,   'base64url characters, 43 of them, as 32 bytes take'],
+  ["-_Az09".repeat(3) + "AAAA", true,   'base64url characters, 22 of them'],
   ["A".repeat(21),              false,  'one character short of 16 bytes'],
-  ["A".repeat(44),              false,  'one character past 32 bytes'],
+  ["A".repeat(23),              false,  'one character past 16 bytes'],
+  ["-_Az09".repeat(7) + "A",    false,  'the 43 characters of 32 bytes'],
   ["A".repeat(21) + "+",        false,  'a standard-base64 character'],
   ["A".repeat(21) + "=",        false,  'padding'],
   ["",                          false,  'no text'],
@@ -262,6 +263,6 @@ describe("CX.salt_b64", () => {
 
   it("refuses with the sentence that says what a passphrase salt is", () => {
     const refusal = TH.expectSyncRefusal(() => CX.salt_b64.parse('short'), 'bad_record')
-    expect(refusal.message).to.include(Phrases.passphraseSaltShape(MinSaltBytes, MaxSaltBytes))
+    expect(refusal.message).to.include(Phrases.passphraseSaltShape(PassphraseSaltBytes, 22))
   })
 })

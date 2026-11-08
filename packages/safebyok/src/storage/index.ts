@@ -33,6 +33,7 @@ export type { BoxQuery, VaultQuery, WatchScope } from '../shapes/shapes-storage'
 export { passphraseWayinRecord, passkeyWayinRecord, gate } from '../shapes/shapes-storage'
 export type { Gate } from '../shapes/shapes-storage'
 export { vaultSparse, vaultRecord, vaultTombstone, vaultRow, foundVaultRow } from '../shapes/shapes-storage'
+export type { Damagekind } from '../shapes/shapes-enums'
 export type { DamagedVault, VaultRecord, VaultRow, VaultSparse, VaultTombstone } from '../shapes/shapes-storage'
 export { boxSparse, boxRecord, boxTombstone, boxRow, foundBoxRow } from '../shapes/shapes-storage'
 export type { BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox } from '../shapes/shapes-storage'
@@ -44,8 +45,8 @@ export type { AdapterVaultDBOpts, Capacity, DelOpts, IfAbsentOpts, MemoryVaultDB
 export { rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
 export { isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, isNewerFormat } from '../shapes/shapes-storage'
 export { sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf } from '../shapes/shapes-storage'
-export { leaseQuery, leaseDated, leaseRow, bankRow } from '../shapes/shapes-storage'
-export type { BankRow, LeaseDated, LeaseQuery, LeaseRow } from '../shapes/shapes-storage'
+export { leaseQuery, leaseDated, leaseRow, leaseScopepath, bankRow } from '../shapes/shapes-storage'
+export type { BankRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 // --
 
 // == [Answers off a wire]: the checks a client of a vaultDB parses each answer with, an absent field arriving as null
@@ -57,7 +58,7 @@ export type { CrossedErr, CrossedReqParams } from '../shapes/shapes-answers'
 
 // == [Validators]: the makers an adapter checks its own options and rows with
 export { Checker, Checkers, objCheck } from '../helpers/validator'
-export type { ObjCheckOpts, Refusing } from '../helpers/validator'
+export type { ConsistencyRefusal, ObjCheckOpts, Refusing, Story } from '../helpers/validator'
 // --
 
 // == [The refusals]: the throwers an adapter raises, and how a refusal reads
@@ -65,7 +66,7 @@ export { sanitizeForeignError, storageUnavailable, unexpectedError } from '../re
 export { vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, storageFull, seqNotNext, storeFailed } from '../refusals/throwers'
 export { storageFailed, identityRevoked } from '../refusals/throwers'
 export { VaultError, isVaultError, refusalkindVals } from '../refusals/errors'
-export type { RefusalMeta, Refusalkind, Thrown, VaultErrorOpts } from '../refusals/errors'
+export type { RefusalFamily, RefusalFamilyForKind, RefusalMeta, Refusalkind, Thrown, VaultErrorOpts } from '../refusals/errors'
 export { outcomeOf, storageTroubleOf } from '../refusals/outcome'
 export type { BadOutcome, GoodOutcome, Outcome } from '../refusals/outcome'
 // --
