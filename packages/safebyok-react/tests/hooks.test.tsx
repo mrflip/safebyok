@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Vault, VaultError, type Box, type BoxSnapshot, type RequestCleartext, type Whisper, type BoxExposure } from 'safebyok'
+import { Vault, VaultError, type Box, type BoxSnapshot, type RequestCleartext, type Whisper, type BoxExposure, type LifecycleHandler } from 'safebyok'
 import { MemoryVaultDB, type VaultQuery } from 'safebyok/storage'
 import { BankProvider } from '../src/bank-provider'
 import { useBank, useBankSnapshot, useBox, useBoxIsShowing, useBoxSnapshot, useBoxExposure, useBoxes, useVault, useVaultSnapshot, useWhisper } from '../src/hooks'
@@ -86,7 +86,7 @@ describe("useVault and useVaultSnapshot", () => {
     expect(hello).toHaveBeenCalledOnce()
   })
 
-  it("tell a refused vault hello to the host's onBadNews", async () => {
+  it("leave a refused vault hello to the bank, which tells the host's onLifecycle", async () => {
     const world = TH.makeBankWorld()
     const vaultDB = new BoxRefusingVaultDB()
     const seeding = world.bankOn({ vaultDB })
@@ -94,9 +94,10 @@ describe("useVault and useVaultSnapshot", () => {
     await seeding.ensureVault(TH.VaultScopeGiven)
     seeding.sweep()
     vaultDB.refusing = true
-    const news: VaultError[] = []
-    render(<BankProvider {...TH.providerPropsOf(world, { vaultDB, onBadNews: ({ news: told }) => { news.push(told) } })}><TH.ShowsVault /></BankProvider>)
-    await waitFor(() => { expect(news.map(({ refusalkind }) => refusalkind)).to.include('storage_unavailable') })
+    const helloes: VaultError[] = []
+    const onLifecycle: LifecycleHandler = (event) => { if (event.kind === 'helloed' && event.vault !== null && ! event.outcome.ok) { helloes.push(event.outcome.err) } }
+    render(<BankProvider {...TH.providerPropsOf(world, { vaultDB, onLifecycle })}><TH.ShowsVault /></BankProvider>)
+    await waitFor(() => { expect(helloes.map(({ refusalkind }) => refusalkind)).to.deep.equal(['storage_unavailable']) })
   })
 })
 

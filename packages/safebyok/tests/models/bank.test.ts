@@ -44,6 +44,36 @@ describe("bank.hello", () => {
     expect(listener).toHaveBeenCalledOnce()
   })
 
+  it("tells onLifecycle each hello's outcome, a bank's naming no vault and a vault's naming it", async () => {
+    const world = makeBankWorld()
+    await makeBankWithVault(world)
+    const onLifecycle = vi.fn()
+    const bank = world.bankOn({ onLifecycle })
+    world.vaultDB._cheat_refuseGets('storage_unavailable')
+    const refusal = await TH.expectRefusal(bank.hello(), 'storage_unavailable')
+    expect(onLifecycle).toHaveBeenLastCalledWith({ kind: 'helloed', outcome: { ok: false, err: refusal }, vault: null, bank })
+    world.vaultDB._cheat_refuseGets(null)
+    await bank.hello()
+    expect(onLifecycle).toHaveBeenLastCalledWith({ kind: 'helloed', outcome: { ok: true, val: undefined }, vault: null, bank })
+    const vault = bank.vaultAt(VaultScopeGiven)
+    await vault?.hello()
+    expect(onLifecycle).toHaveBeenLastCalledWith({ kind: 'helloed', outcome: { ok: true, val: undefined }, vault, bank })
+    expect(onLifecycle).toHaveBeenCalledTimes(3)
+  })
+
+  it("tells the host nothing of a hello a sweep crosses", async () => {
+    const onLifecycle = vi.fn()
+    const world = makeBankWorld()
+    const bank = world.bankOn({ onLifecycle })
+    const answer = TH.holdNextAnswer(world.vaultDB, 'tryListVaults')
+    const hello = bank.tryHello()
+    await answer.reached
+    bank.sweep()
+    answer.release()
+    await TH.expectBad(hello, 'disabled')
+    expect(onLifecycle).not.toHaveBeenCalled()
+  })
+
   it("lists every vault and tombstone the vaultDB holds, locked, with no prompt, the tombstone in its slot but not its snapshot", async () => {
     const world = makeBankWorld()
     const { bank: elsewhere, vault } = await makeBankWithVault(world)
@@ -236,6 +266,10 @@ describe("DefaultOnLifecycle", () => {
     // a vacate:
     [{ kind: 'vacated', cause: Revoked, unerased: 0 },                 'error', false, 'reports a vacate for a revoked identity at error and to the platform'],
     [{ kind: 'vacated', cause: bankDisabled(), unerased: 1 },          null,    false, 'says nothing of a sign-out'],
+    // a hello:
+    [{ kind: 'helloed', outcome: { ok: false, err: Refusal } },         'warn',  false, 'warns of a refused hello'],
+    [{ kind: 'helloed', outcome: { ok: true, val: undefined } },        null,    false, 'says nothing of a hello that lands'],
+    [{ kind: 'helloed', outcome: { ok: false, err: bankDisabled() } },  null,    false, 'says nothing of a hello the bank\'s end refused'],
   ] as const
 
   for (const [told, level, isVacating, blurb] of LifecycleCases) {
@@ -246,7 +280,7 @@ describe("DefaultOnLifecycle", () => {
       const [vacate, bankVacate] = [vi.fn(), vi.fn()]
       const bank = { vacate: bankVacate, logger: spy.logger } as unknown as Bank
       const vault = { vacate } as unknown as Vault
-      DefaultOnLifecycle({ ...told, ...(told.kind === 'lease_unerased' && { vault }), bank } as BankEvent)
+      DefaultOnLifecycle({ ...told, ...(told.kind !== 'vacated' && { vault }), bank } as BankEvent)
       expect(spy.calls.map((call) => call.level)).to.deep.equal(level === null ? [] : [level])
       expect(reported.mock.calls.length).to.eq(level === 'error' ? 1 : 0)
       expect(vacate.mock.calls.length).to.eq(isVacating ? 1 : 0)
@@ -395,6 +429,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
   it("vacates the bank on a revocation whatever the host's onLifecycle does, which hears it as vacated once the scrub settles", async () => {
     const onLifecycle = vi.fn()
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle })
+    onLifecycle.mockClear()
     world.vaultDB._cheat_refuseGets('identity_revoked')
     const refusal = await TH.expectRefusal(vault.fetch(), 'identity_revoked')
     expect(bank.snapshot).to.include({ stage: 'refused', err: refusal })
@@ -407,6 +442,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
   it("vacates the bank where a revocation refuses a vault's boxes' listing", async () => {
     const onLifecycle = vi.fn()
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle })
+    onLifecycle.mockClear()
     const revoked = new VaultError('identity_revoked', 'signed out')
     vi.spyOn(world.vaultDB, 'tryListBoxes').mockResolvedValue({ ok: false, err: revoked, world: null } as never)
     await TH.expectRefusal(vault.boxListing.list(), 'identity_revoked')
@@ -442,6 +478,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     const onLifecycle = vi.fn(DefaultOnLifecycle)
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle })
     const other = await bank.ensureVault(OtherScopeGiven)
+    onLifecycle.mockClear()
     world.vaultDB._cheat_refuseGets('identity_revoked')
     const fetched = await Promise.all([vault.tryFetch(), other.tryFetch()])
     expect(fetched.map((outcome) => (outcome.ok ? null : outcome.err.refusalkind))).to.deep.equal(['identity_revoked', 'disabled'])

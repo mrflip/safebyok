@@ -13,6 +13,7 @@ import type { Listing } from '../models/listing'
 import type { Storable } from '../models/storable'
 import type { Vault } from '../models/vault'
 import type { DeviceDB } from '../storage/device-db'
+import type { Outcome } from '../refusals/outcome'
 import { type Answer, type VaultDB, VaultDBVerbnames } from '../storage/vault-db'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
@@ -437,11 +438,12 @@ export type EraseSite = 'lock' | 'tombstone' | 'vacate' | 'outdated'
 export type BankAnnouncement =
   | { readonly kind: 'lease_unerased', readonly refusal: VaultError, readonly vault: Vault | null, readonly where: EraseSite }
   | { readonly kind: 'vacated', readonly cause: VaultError, readonly unerased: number }
+  | { readonly kind: 'helloed', readonly outcome: Outcome<void>, readonly vault: Vault | null }
 
 /** What `onLifecycle` hears: what happened in the bank's life, told by its `kind`, and the bank it happened to. */
 export type BankEvent = { readonly bank: Bank } & BankAnnouncement
 
-/** `Bank.make`'s `onLifecycle`: hears what happened in the bank's life, as a vacate or a cached lease that outlived its erase. */
+/** `Bank.make`'s `onLifecycle`: hears what happened in the bank's life, as a hello, a vacate or a cached lease that outlived its erase. */
 export type LifecycleHandler = (event: BankEvent) => unknown
 
 /** `onLifecycle` as a bank keeps it, wrapped by `guardOnLifecycle`. Never throws. */

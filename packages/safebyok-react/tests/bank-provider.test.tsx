@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Bank, MemoryDeviceDB, VaultError, type AnyGating, type BadNewsHandler } from 'safebyok'
+import { Bank, MemoryDeviceDB, VaultError, type AnyGating, type BadNewsHandler, type LifecycleHandler } from 'safebyok'
 import { BankProvider } from '../src/bank-provider'
 import type { BankProviderProps } from '../src/shapes/shapes-provider'
 import { Messages } from '../src/messages'
@@ -293,53 +293,54 @@ describe("BankProvider's handlers", () => {
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })
   })
 
-  it("tells onBadNews of a refused hello", async () => {
+  it("tells onLifecycle of a refused hello, and onBadNews nothing", async () => {
     const world = TH.makeBankWorld()
     vi.spyOn(world.vaultDB, 'listVaults').mockRejectedValue(Refusal)
-    const onBadNews = vi.fn<BadNewsHandler>()
-    provided({ onBadNews }, world)
-    await waitFor(() => { expect(onBadNews).toHaveBeenCalled() })
-    expect(onBadNews.mock.calls.map(([{ news }]) => news.refusalkind)).to.deep.equal(['storage_unavailable'])
+    const [onLifecycle, onBadNews] = [vi.fn<LifecycleHandler>(), vi.fn<BadNewsHandler>()]
+    provided({ onLifecycle, onBadNews }, world)
+    await waitFor(() => { expect(onLifecycle).toHaveBeenCalled() })
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'helloed', outcome: { ok: false, err: Refusal }, vault: null }))
+    expect(onBadNews).not.toHaveBeenCalled()
   })
 
-  it("reports an onBadNews that throws to the platform, never to the render", async () => {
+  it("reports an onLifecycle that throws to the platform, never to the render", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const world = TH.makeBankWorld()
     vi.spyOn(world.vaultDB, 'listVaults').mockRejectedValue(Refusal)
     const thrown = new Error('the handler broke')
-    provided({ onBadNews: () => { throw thrown } }, world)
+    provided({ onLifecycle: () => { throw thrown } }, world)
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(thrown) })
     expect(shown('bank')).to.not.eq('none')
     vi.unstubAllGlobals()
   })
 
-  it("tells a refused hello to the onBadNews last rendered", async () => {
+  it("tells a refused hello to the onLifecycle last rendered", async () => {
     const world = TH.makeBankWorld()
     const held: { refuse?: (err: unknown) => void } = {}
     vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(new Promise((_resolve, reject) => { held.refuse = reject }))
-    const [first, last] = [vi.fn<BadNewsHandler>(), vi.fn<BadNewsHandler>()]
-    const { props, rerender } = provided({ onBadNews: first }, world)
+    const [first, last] = [vi.fn<LifecycleHandler>(), vi.fn<LifecycleHandler>()]
+    const { props, rerender } = provided({ onLifecycle: first }, world)
     await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
-    rerender({ ...props, onBadNews: last })
+    rerender({ ...props, onLifecycle: last })
     held.refuse?.(Refusal)
     await waitFor(() => { expect(last).toHaveBeenCalledOnce() })
     expect(first).not.toHaveBeenCalled()
   })
 
-  it("tells neither onBadNews nor the logger of a hello that a sign-out crossed", async () => {
+  it("tells neither onLifecycle, onBadNews nor the logger of a hello that a sign-out crossed", async () => {
     const world = TH.makeBankWorld()
     const held: { refuse?: (err: unknown) => void } = {}
     vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(new Promise((_resolve, reject) => { held.refuse = reject }))
-    const onBadNews = vi.fn()
+    const [onLifecycle, onBadNews] = [vi.fn(), vi.fn()]
     const spy = TH.spyLogger()
-    const { props, rerender } = provided({ onBadNews, logger: spy.logger }, world)
+    const { props, rerender } = provided({ onLifecycle, onBadNews, logger: spy.logger }, world)
     await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
     rerender({ ...props, user_id: null })
     await waitFor(() => { expect(shown('bank')).to.eq('none') })
     held.refuse?.(Refusal)
     await act(async () => { await TH.wakeupAtNextTick() })
-    expect(onBadNews).not.toHaveBeenCalled()
+    expect([onLifecycle, onBadNews].map((handler) => handler.mock.calls.length)).to.deep.equal([0, 0])
     expect(spy.calls).to.deep.equal([])
   })
 
@@ -353,7 +354,7 @@ describe("BankProvider's handlers", () => {
     refuseErase(deviceDB)
     fireEvent.click(screen.getByText('Lock'))
     await waitFor(() => { expect(last).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_unerased', refusal: Refusal })) })
-    expect(first).not.toHaveBeenCalled()
+    expect(first).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_unerased' }))
     expect(TH.seenBanks).to.have.lengthOf(1)
     expect(shown('vault')).to.eq('present locked')
   })
@@ -382,9 +383,9 @@ describe("BankProvider's handlers", () => {
     erasing.resolve(TH.bad(Refusal))
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
     await waitFor(() => { expect(previous).toHaveBeenCalledWith(expect.objectContaining({ kind: 'vacated', unerased: 1 })) })
-    expect(previous.mock.calls.map(([event]) => (event as { kind: string }).kind)).to.deep.equal(['lease_unerased', 'vacated'])
+    expect(previous.mock.calls.map(([event]) => (event as { kind: string }).kind).filter((kind) => kind !== 'helloed')).to.deep.equal(['lease_unerased', 'vacated'])
     expect(previous).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_unerased', refusal: Refusal, where: 'vacate' }))
-    expect(next).not.toHaveBeenCalled()
+    expect(next.mock.calls.map(([event]) => (event as { kind: string }).kind).filter((kind) => kind !== 'helloed')).to.deep.equal([])
   })
 })
 
