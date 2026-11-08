@@ -8,8 +8,9 @@ Nothing open.
 
 ## After this PR
 
-* **Next, stacked in order:** 20261108-bank_followups (running), then the lifecycle callback (lifecycle-callback.md, *Rulings*), then the react types into one shapes file, then the react comment tour. [agent, 2026-11-08]
+* **Next, stacked in order:** 20261108-bank_followups (running), then the lifecycle callback (lifecycle-callback.md, *Rulings*), then the react layout (folders and one shapes file), then the react comment tour. [agent, 2026-11-08]
   * Types: every type into one shapes file, `PassphraseModalProps` too, with `shapes-provider.ts` folded in. A single-use local alias (`SafeNavigator`) stays beside its use. The Coach: prop names are already in the destructure, it saves agents tokens, and the checkers can share props.
+  * Folders, in the same PR as the types (the Coach, 2026-11-08: "it's weird to have visual components sitting next to provider/hooks/shapes"): `provider/` (bank-provider, provider-hooks, gating-modal, boundary), `hooks/` (hooks, when-shown, reveal-toggle), `shapes/`, `helpers/` (messages, passkey, attempt-refusals), `components/` (whisper-field, box-whisper-field, passkey-unlock-button, vault-controls), `modals/` (modal.tsx as modal-kit.tsx, and the five modals), `devmode/` as is. Moved by `git mv`; exports unchanged.
   * Comment tour, every react file but the provider, the hooks and the shapes: "is this comment necessary for a competent React programmer assisted by an agent?", or "would they plausibly undo something important without it?" An export keeps its first-line doc block, since the host reads it on hover.
 
 The start-up reads, the listings and the IndexedDB cache moved to whiteboard/20261108-query_efficiently/query_efficiently.md.
