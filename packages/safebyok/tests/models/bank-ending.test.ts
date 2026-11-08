@@ -252,7 +252,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect((world.leaseRows()[0] as { user_id: string }).user_id).to.eq('u2')
   })
 
-  it("tells onPanic of a lease its vacate cannot erase, a repeat doing nothing and a panic past it going to the platform", async () => {
+  it("tells the host's onPanic of a lease its vacate cannot erase, though the bank is disabled, a repeat doing nothing and a panic past it going to the platform", async () => {
     const world = makeBankWorld()
     const refusal = new VaultError('storage_unavailable', 'no store')
     const onPanic = vi.fn()
@@ -262,8 +262,10 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const row = { ...BankScopeGiven, vaultlabel: 'unlisted', vault_tok: makeLifeTok(), proved_at: T0 }
     vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValue({ ok: true, val: [row] })
     const tryForget = vi.spyOn(world.deviceDB, 'tryForget').mockResolvedValue({ ok: false, err: refusal })
-    await bank.vacate()
-    expect(onPanic).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ refusal }))
+    const vacating = bank.vacate()
+    expect(bank.isEnabled).to.be.false
+    await vacating
+    expect(onPanic).toHaveBeenCalledExactlyOnceWith({ refusal, bank })
     expect(reported).not.toHaveBeenCalled()
     await bank.vacate()
     expect(tryForget).toHaveBeenCalledOnce()
@@ -273,18 +275,16 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     vi.unstubAllGlobals()
   })
 
-  it("tells onBadNews of a cached lease listing its vacate is refused, the bank disabling after", async () => {
+  it("tells the host's onBadNews of a refused listing of the cached leases, though the bank is disabled", async () => {
     const world = makeBankWorld()
     const refusal = new VaultError('storage_unavailable', 'no store')
     const onBadNews = vi.fn()
     const bank = world.bankOn({ onBadNews })
     vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValue({ ok: false, err: refusal })
     const vacating = bank.vacate()
-    expect(bank.isEnabled).to.be.true
-    expect(() => bank.demandEnabled()).to.throw(Phrases.BankLetGo)
-    await vacating
-    expect(onBadNews).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ news: refusal }))
     expect(bank.isEnabled).to.be.false
+    await vacating
+    expect(onBadNews).toHaveBeenCalledExactlyOnceWith({ news: refusal, bank })
   })
 
   it("tells its listeners of a vacate with nothing listed, the stage alone having changed", async () => {
