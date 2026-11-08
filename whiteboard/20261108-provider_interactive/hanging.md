@@ -8,6 +8,9 @@ Questions and issues either of us noticed, banked so we don't side quest. One bu
 
 ## After this PR
 
+* Does the host's `user_id` blink to `null` after a wake? The provider vacates on any change of user, `null` included, so a blink erases the cached leases and the user unlocks again. Check what Convex Auth (`useConvexAuth`), Clerk and Auth0 do while a token refreshes or a socket reconnects after sleep, and whether the demo's auth blinks. The README's *Signing out* asks the host to keep it steady. [agent, 2026-11-08]
+* A hello reads every box three times, and Convex's watch already sends what `listVaults` and `listBoxes` fetch: the adapter drops the watch's first answer. Priced in notes/reference-sizes.md, *A bank hello on Convex* (on #554). For the fate makeover: listings that watch only their own rows, the list taken from the watch's first answer, and sparse rows stored apart. [agent, 2026-11-08]
+
 * passkey.ts has a checker of its own (`PasskeyChecks`), not moved into `src/shapes/`. [agent]
 * Does `bank.tryHello()` tell bad news (through `onBadNews`) as well as landing its refusal in the snapshot? [Coach, fingerpaint in bank-provider.tsx]
 * `setRefused`: what it's for, and whether the provider should hold it. [Coach, next] It now lives only in `useDeviceId` (provider-hooks.ts), for a refused `ensureBank`; a throw from `Bank.make` in the effect reaches the error boundary by itself.

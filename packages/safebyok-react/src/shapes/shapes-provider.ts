@@ -7,7 +7,7 @@ import type { PassphraseAdvice } from '../modal'
 
 /** What BankProvider is handed: the Bank.make options but `device_id`, the signed-in `user_id`, and the dialogs' props. */
 export type BankProviderProps = Omit<BankOpts, 'user_id' | 'device_id' | 'requestCleartext'> & {
-  /** The signed-in user from the host's auth, or null when nobody is: then the provider holds no bank. */
+  /** The signed-in user, or null once they sign out. Keep it steady while auth refreshes: a change vacates the bank. */
   user_id:             string | null
   /** What asks the user for a passphrase or passkey. Defaults to the provider's own dialogs. */
   requestCleartext?:   RequestCleartext | undefined

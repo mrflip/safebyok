@@ -41,8 +41,16 @@ write, say so. `BoxFields.of` answers the same instance for a box wherever it is
 also does this once right after the field first appears, so expose the box after its field mounts. The details, with
 React's own documentation, are in [notes/expose_improves_security.md](https://github.com/mrflip/safebyok/blob/main/notes/expose_improves_security.md#what-minimize-the-surface-would-cost).
 
+## Signing out
+
+`BankProvider` makes a bank for the `user_id` it's handed. When that changes, it vacates the last user's bank:
+the bank's cached leases on this device are erased, and the next user starts fresh. A change to `null` counts as
+signing out. Hand `user_id` from your auth only once it's settled, and keep it steady while your auth refreshes a
+token or reconnects, after a laptop wakes for instance. A `user_id` that blinks to `null` and back makes the user
+unlock their vaults again.
+
 ## React version
 
-safebyok-react needs React 19. `BoxFields` gives React a `ref` function that returns a cleanup. React 19 runs that
+safebyok-react needs React 19.2 or later, for `useEffectEvent`. `BoxFields` gives React a `ref` function that returns a cleanup. React 19 runs that
 cleanup when the field leaves the page; React 18 ignores it. On React 18 the field is never let go, and the box never
 unexposes.
