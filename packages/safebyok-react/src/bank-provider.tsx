@@ -126,20 +126,20 @@ export const BankProvider = (props: BankProviderProps) => {
     const kept = { held: true }
     // A handler dropped since the making falls back to the one the bank was made with, so a bank made
     // with a handler has one for its whole life: the core vacates a vault only for a bank with none.
-    const tellWhileHeld: BadNewsHandler = (news) => {
+    const tellWhileHeld: BadNewsHandler = (badnews) => {
       if (! kept.held) { return }
       const latest = latestProps.current.onBadNews
       const hearing = typeof latest === 'function' ? latest : onBadNews
-      hearing?.(news)
+      hearing?.(badnews)
     }
     const askWhileHeld: RequestCleartext = async (gating) => { if (kept.held) { await askUser(gating) } }
-    // The core reports a panic handler's throw to the platform and counts the panic heard: a let-go
-    // bank's panic goes there, and never to the next user's handler.
-    const panicWhileHeld: PanicHandler = async (refusal) => {
-      if (! kept.held) { throw refusal }
+    // The core reports a panic handler's throw to the platform: a let-go bank's panic goes there, and
+    // never to the next user's handler.
+    const panicWhileHeld: PanicHandler = async (panic) => {
+      if (! kept.held) { throw panic.refusal }
       const latest = latestProps.current.onPanic
       const hearing = typeof latest === 'function' ? latest : onPanic
-      await hearing?.(refusal)
+      await hearing?.(panic)
     }
     const misusedBadNews = misusedHandler(onBadNews)
     const misusedPanic = misusedHandler(onPanic)
