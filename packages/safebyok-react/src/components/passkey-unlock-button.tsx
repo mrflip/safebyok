@@ -8,10 +8,7 @@ import { useWhenShown } from '../hooks/when-shown'
 import { Boundary, forBoundary } from '../provider/boundary'
 import type { PasskeyUnlockButtonProps } from '../shapes'
 
-/** A button that unlocks with the vault's passkey, shown only where a passkey can be used.
- *
- * @example <PasskeyUnlockButton gating={gating} onDone={close} onGripe={setGripe} />
- */
+/** A button that unlocks with the vault's passkey, shown only where a passkey can be used. */
 export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
   <Boundary key={useRoundFor(props.gating)} fallback={null} onCaught={() => { props.onGripe(Messages.passkeyTrouble) }}>
     <PasskeyPress {...props} />
@@ -23,24 +20,19 @@ export const offersPasskey = (gating: AnyGating): boolean => (
   passkeysAvailable() && gating.passkeyHeader?.wayinkind === 'passkey'
 )
 
-/** The button itself, inside PasskeyUnlockButton's boundary. */
 const PasskeyPress = ({ gating, onDone, onGripe, rpId, takesFocus }: PasskeyUnlockButtonProps) => {
   const [asking, setAsking] = useState(false)
   // The error rides in an object, so a thrown null or undefined still reads as a failure.
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  // A button unmounted while it asks unlocks nothing, and touches neither its state nor its dialog's
-  // callbacks again. A button hidden while it asks goes on once it shows again.
   const { whenShown, isShown } = useWhenShown()
   if (failure !== null) { throw forBoundary(failure.err, 'PasskeyUnlockButton') }
   if (! offersPasskey(gating)) { return null }
 
-  /** Meet a refusal from the attempt, or from the authenticator asked before it. */
   const heard = (err: unknown) => {
     const flavor = attemptRefusalFlavor(err)
-    // Pressed while a passphrase attempt runs: that attempt answers for the dialog.
     if (flavor === 'in_flight') { return }
     if (flavor === 'close') { onDone('declined'); return }
-    // Misuse, or no VaultError at all: rethrown in render, for PasskeyUnlockButton's boundary.
+    // Thrown from an event handler it would miss the boundary, so it is rethrown in render.
     if (flavor === 'trouble') { setFailure({ err }); return }
     onGripe((err as Error).message)
   }

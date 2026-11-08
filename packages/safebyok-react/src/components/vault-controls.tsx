@@ -29,7 +29,6 @@ export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
 export const CreateVaultButton = ({ vaultlabel }: VaultControlProps) => {
   const bank = useBank()
   const { tellBadNews } = useProvided('CreateVaultButton')
-  // `bank.ensureVault` refuses until `bank.hello()` has landed.
   const isReady = (useBankSnapshot()?.stage === 'ready')
   const create = async () => {
     if ((bank === null) || (! isReady)) { return }
@@ -42,7 +41,6 @@ export const CreateVaultButton = ({ vaultlabel }: VaultControlProps) => {
   )
 }
 
-/** Hand a refusal to the host's `onBadNews`, unless the user declined the dialog. */
 const tellUnlessDeclined = (tellBadNews: TellBadNews, outcome: Outcome<unknown>): void => {
   if (outcome.ok || isVaultError(outcome.err, 'declined')) { return }
   tellBadNews([outcome.err])
