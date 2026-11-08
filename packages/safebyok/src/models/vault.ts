@@ -9,7 +9,7 @@ import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
 import type { GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BoxPut, BoxPutOpts, Fetched, FetchOpts, Panic, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
+import type { BankPanic, BoxPut, BoxPutOpts, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
@@ -29,7 +29,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 
 /** SLOPDOC: A vault as this device holds it: a storable that ducks as its record, and the world its boxes live in. */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> {
-  // == [Props]: applabel, user_id, vaultlabel, world, listing, #lease, #friend, #boxListing, #gate
+  // == [Props]: applabel, user_id, vaultlabel, world, listing, #bankPanic, #lease, #friend, #boxListing, #gate
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly applabel:   string
@@ -37,6 +37,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   declare readonly vaultlabel: string
   declare readonly world:      VaultWorld
   declare readonly listing:    VaultListing
+
+  /** The bank's panic, as the listing handed it. */
+  readonly #bankPanic: BankPanic
 
   /** The lease this device holds, and null is what locked means. */
   #lease: Lease | null = null
@@ -70,7 +73,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Construction]: launchBirth
+  // == [Construction]: constructor, launchBirth
+
+  /** The vault `listing` holds for `central`, panicking through `panic`, the bank's. */
+  constructor(world: VaultWorld, listing: VaultListing, central: Fetched<VaultRecord, VaultSparse>, panic: BankPanic) {
+    super(world, listing, central)
+    this.#bankPanic = VX.bankPanic.parse(panic)
+  }
 
   /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it holds one. */
   static async launchBirth(listing: VaultListing, scope: VaultScope): Promise<Vault> {
@@ -185,7 +194,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Tell the host that a cached lease survived a lock. */
   async #panic(refusal: VaultError): Promise<void> {
-    await this.world.panic({ refusal, vault: this })
+    await this.#bankPanic({ refusal, vault: this })
   }
 
   /** The lease `proved` earns, attached. A lock landing during the unlock does not hold: the proof says this user may have the vault unlocked. */
@@ -256,7 +265,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   #stampOfLife(): VaultScope & { vault_tok: string } { return { ...this.scope, vault_tok: this.vault_tok } }
   // --
 
-  // == [The boxes' world]: sealStampedString, unsealStampedString, takeWorld, tellBadNews, panic
+  // == [The boxes' world]: sealStampedString, unsealStampedString, takeWorld, tellBadNews
 
   /** `whisperText` sealed under a fresh boxKey under this vault's key, both bound to `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
@@ -277,8 +286,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Tell bad news of this vault's boxes where its own goes. */
   tellBadNews(badnews: readonly VaultError[]): void { this.world.tellBadNews(badnews) }
 
-  /** Panic for this vault's boxes where its own panic goes. */
-  panic(panic: Omit<Panic, 'bank'>): Promise<void> { return this.world.panic(panic) }
   // --
 
   // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, tryDelDamagedBox, each with its try form

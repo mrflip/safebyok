@@ -1,6 +1,7 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import * as Phrases from '../../src/helpers/phrases'
+import { Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
 import { Dna, Passphrase, T0, makeBornVault, makeBornVaultAndFriend, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds, buildTyping, byPassphrase } from '../test-helpers/vault-world'
@@ -75,10 +76,15 @@ describe("VaultListing.build of a record, and its constructor", () => {
     const duck = { tryPeek: vi.fn(), tryStow: vi.fn(), tryForget: vi.fn() }
     const err = TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, deviceDB: duck as never }, opts))
     expect(err.message).to.include(Phrases.DeviceDBExpected)
-    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, panic: vi.fn() as never }, opts))
+    TH.expectSyncRefusal(() => new VaultListing(fakeBank, { ...opts, panic: vi.fn() as never }))
     TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, askUser: vi.fn() as never }, opts))
     TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, logger: TH.quietLogger }, opts))
     TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, keyDeriver: TH.testDeriver as never }, opts))
+  })
+
+  it("refuses a panic the bank did not brand, where a vault is made", async () => {
+    const { vault, fakeBank, listing } = await makeBornVault(byPassphrase(Passphrase))
+    TH.expectSyncRefusal(() => new Vault(fakeBank, listing, vault.fullRecord, vi.fn() as never), 'bad_option')
   })
 })
 
