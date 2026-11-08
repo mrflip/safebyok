@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react'
 import type { BadNewsHandler, BankOpts, PanicHandler, RequestCleartext } from 'safebyok'
-import { Checker, bankOpts } from 'safebyok/storage'
+import { Checker, bankOpts, type AssertEqual, type CheckerInput } from 'safebyok/storage'
 import type { PassphraseAdvice } from '../modal'
 
 // == [Props]: BankProviderProps, providerProps, HeldBankOpts, Handlers
 
 /** What BankProvider is handed: the Bank.make options but `device_id`, the signed-in `user_id`, and the dialogs' props. */
-export type BankProviderProps = Omit<BankOpts, 'user_id' | 'device_id' | 'requestCleartext'> & {
+export interface BankProviderProps extends Omit<BankOpts, 'user_id' | 'device_id' | 'requestCleartext'> {
   /** The signed-in user, or null while nobody is. Call `bank.vacate()` at sign-out: a null leaves the leases. */
   user_id:             string | null
   /** What asks the user for a passphrase or passkey. Defaults to the provider's own dialogs. */
@@ -29,6 +29,9 @@ export const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ de
   passkeyRpId:        str.optional(),
   children:           custom<ReactNode>(),
 }), 'bad_option')
+
+// Hand-written for the doc comment a host sees on each prop, and held to the checker so neither drifts.
+true satisfies AssertEqual<BankProviderProps, CheckerInput<typeof providerProps>>
 
 /** The options a held bank is made from: Bank.make's, but `device_id` and the handlers, for a `user_id` that may be null. */
 export type HeldBankOpts = Omit<BankOpts, 'user_id' | 'device_id' | 'onPanic' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }

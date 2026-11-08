@@ -15,7 +15,7 @@ export const Messages = {
   unlockBlurb:       'Your secrets are encrypted with this passphrase; enter it to continue. A forgotten passphrase cannot be recovered -- you would start a new vault and re-enter your secrets.',
   passphraseField:   'vault passphrase',
   confirmField:      'confirm vault passphrase',
-  /** Said at a submit whose new passphrase and its confirmation differ: nothing is attempted. */
+  /** Said at a submit whose new passphrase and its confirmation differ. */
   passphrasesDiffer: "The new passphrase and its confirmation don't match: type the same one in both.",
   /** What a password manager files a vault's passphrase under, unless the host names it. */
   passphraseUsername: (user_id: string, vaultlabel: string) => `${user_id} (${vaultlabel} vault)`,
@@ -40,7 +40,7 @@ export const Messages = {
   addPasskeyTitle:    'Add a passkey',
   addPasskeyBlurb:    'Enter your vault passphrase. Then your browser asks you to make a passkey -- a fingerprint, a face or a security key -- which unlocks this vault without typing the passphrase.',
   addPasskeyButton:   'Add passkey',
-  /** Said at an add-passkey submit with the passphrase field empty: the browser is not asked. */
+  /** Said at an add-passkey submit with the passphrase field empty. */
   passphraseFirst:    'Enter your vault passphrase first: the passkey is added only once it is proven.',
   revokePasskeyTitle:  'Remove your passkey',
   revokePasskeyBlurb:  'Enter your vault passphrase to remove the passkey. You will unlock with the passphrase alone, on every device.',

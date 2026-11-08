@@ -57,7 +57,7 @@ export type { CrossedErr, CrossedReqParams } from '../shapes/shapes-answers'
 // --
 
 // == [Validators]: the makers an adapter checks its own options and rows with
-export { Checker, Checkers, objCheck } from '../helpers/validator'
+export { Checker, Checkers, objCheck, type AssertEqual, type CheckerInput } from '../helpers/validator'
 export type { ConsistencyRefusal, ObjCheckOpts, Refusing, Story } from '../helpers/validator'
 // --
 

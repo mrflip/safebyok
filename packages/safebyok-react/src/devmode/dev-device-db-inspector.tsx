@@ -11,7 +11,6 @@ export type DevDeviceDBInspectorProps = { deviceDB: DeviceDB }
 export const DevDeviceDBInspector = ({ deviceDB }: DevDeviceDBInspectorProps) => (
   <section className="dev-inspector dev-device-db-inspector" aria-label="DeviceDB inspector">
     <h3>DeviceDB rows</h3>
-    {/* The bank rows the deviceDB keeps will sit beside its leases, as a table of their own. */}
     <LeaseRowsTable deviceDB={deviceDB} />
   </section>
 )

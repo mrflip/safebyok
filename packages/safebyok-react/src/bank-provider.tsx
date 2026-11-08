@@ -48,8 +48,8 @@ const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Han
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the bank lives only between this effect and its cleanup, and render must hand it down
     setContextValue({ bank, helloedVaults: new WeakSet<Vault>() })
     onMade(bank)
-    // A refused `tryHello` lands in the bank's snapshot, which useBankSnapshot renders.
-    void bank.tryHello()
+    // A refused hello lands in the bank's snapshot too. One that a sweep crossed is no news: the bank has ended.
+    void bank.tryHello().then((said) => { if (! said.ok && bank.isEnabled) { bank.tellBadNews([said.err]) } })
     return () => {
       // `sweep()` settles the open gating, and `onSwept` closes the dialog over it.
       bank.sweep()

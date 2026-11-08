@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Bank, MemoryDeviceDB, VaultError, type AnyGating } from 'safebyok'
+import { Bank, MemoryDeviceDB, VaultError, type AnyGating, type BadNewsHandler } from 'safebyok'
 import { BankProvider } from '../src/bank-provider'
 import type { BankProviderProps } from '../src/shapes/shapes-provider'
 import { Messages } from '../src/messages'
@@ -291,6 +291,31 @@ describe("BankProvider's handlers", () => {
     const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
     await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })
+  })
+
+  it("tells onBadNews of a refused hello", async () => {
+    const world = TH.makeBankWorld()
+    vi.spyOn(world.vaultDB, 'listVaults').mockRejectedValue(Refusal)
+    const onBadNews = vi.fn<BadNewsHandler>()
+    provided({ onBadNews }, world)
+    await waitFor(() => { expect(onBadNews).toHaveBeenCalled() })
+    expect(onBadNews.mock.calls.map(([{ news }]) => news.refusalkind)).to.deep.equal(['storage_unavailable'])
+  })
+
+  it("tells neither onBadNews nor the logger of a hello that a sign-out crossed", async () => {
+    const world = TH.makeBankWorld()
+    const held: { refuse?: (err: unknown) => void } = {}
+    vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(new Promise((_resolve, reject) => { held.refuse = reject }))
+    const onBadNews = vi.fn()
+    const spy = TH.spyLogger()
+    const { props, rerender } = provided({ onBadNews, logger: spy.logger }, world)
+    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
+    rerender({ ...props, user_id: null })
+    await waitFor(() => { expect(shown('bank')).to.eq('none') })
+    held.refuse?.(Refusal)
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(onBadNews).not.toHaveBeenCalled()
+    expect(spy.calls).to.deep.equal([])
   })
 
   it("calls an onPanic written inline at each render as it was last rendered", async () => {

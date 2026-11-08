@@ -150,6 +150,12 @@ export const objCheck = <ShapeT extends Z.ZodRawShape, const SourcesT extends re
 /** The kit a builder is handed: `sources` spread in beneath {@link Kit}. */
 const kitWith = <SourcesT extends readonly object[]>(sources?: SourcesT): KitWith<SourcesT> => Object.assign({}, ...(sources ?? []), Kit) as KitWith<SourcesT>
 
+/** True exactly when `A` and `B` are the same type: hold a hand-written shape to its checker with `true satisfies AssertEqual<Shape, CheckerInput<typeof check>>`. */
+export type AssertEqual<A, B> = Z.core.util.AssertEqual<A, B>
+
+/** What a checker accepts: the input type of its schema. */
+export type CheckerInput<SchemaT extends Z.ZodType> = Z.input<SchemaT>
+
 /** A validator a {@link Checkers} call makes, what the call returns under each name, and what a {@link Checker} or {@link objCheck} call returns: its schema, its `parse` also taking a {@link Story}, and for an object, `parseConsistent`. */
 export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
   /** `val`, parsed: the call's kind otherwise, its message framed as `story` asks; a story that is none refuses, whatever `val`. */
