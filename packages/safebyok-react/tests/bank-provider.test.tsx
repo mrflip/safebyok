@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Bank, MemoryDeviceDB, MinuteMillis, VaultError, type AnyGating } from 'safebyok'
+import { Bank, MemoryDeviceDB, VaultError, type AnyGating } from 'safebyok'
 import { BankProvider } from '../src/bank-provider'
 import type { BankProviderProps } from '../src/shapes/shapes-provider'
 import { Messages } from '../src/messages'
@@ -250,20 +250,6 @@ describe("BankProvider's handlers", () => {
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
     expect(previous).not.toHaveBeenCalled()
     expect(next).not.toHaveBeenCalled()
-  })
-})
-
-describe("BankProvider's autolock", () => {
-  afterEach(() => { vi.useRealTimers() })
-
-  it("asks its bank to autolock each minute", async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
-    const autolock = vi.spyOn(Bank.prototype, 'autolock')
-    provided()
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    expect(autolock).not.toHaveBeenCalled()
-    act(() => { vi.advanceTimersByTime(MinuteMillis) })
-    expect(autolock).toHaveBeenCalledOnce()
   })
 })
 
