@@ -269,15 +269,21 @@ export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<Box
 
 // --
 
-// == [The box's world]: boxWorld, BoxWorld
+// == [The box's world]: boxWorld, BoxWorld, boxListingOpts, BoxListingOpts
 
-/** The check of a box listing's world past {@link listingWorld}: the vault's scope and `vault_tok`, its demand, and its seal verbs. Checks only. */
-export const boxWorld = Checker(({ fn, vaultScope, vault_tok }) => listingWorld.extend({
-  scope: vaultScope, vault_tok, demandUnlocked: fn(), subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn(),
+/** The check of a box listing's world past {@link listingWorld}: the vault's `vault_tok`, its demand, and its seal verbs. Checks only. */
+export const boxWorld = Checker(({ fn, vault_tok }) => listingWorld.extend({
+  vault_tok, demandUnlocked: fn(), subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn(),
 }), 'bad_option', [CX])
 
 /** The vault, as far as its boxes reach into it. */
-export type BoxWorld = Pick<Vault, keyof ListingWorld | 'scope' | 'vault_tok' | 'demandUnlocked' | 'subscribe' | 'sealStampedString' | 'unsealStampedString'>
+export type BoxWorld = Pick<Vault, keyof ListingWorld | 'vault_tok' | 'demandUnlocked' | 'subscribe' | 'sealStampedString' | 'unsealStampedString'>
+
+/** The check of a box listing's options: a listing's, and the scope of the vault it lists. Checks only. */
+export const boxListingOpts = Checker(({ vaultScope }) => listingOpts.extend({ scope: vaultScope }), 'bad_option', [CX])
+
+/** The options a box listing is made with, after its world: a listing's, and the scope of the vault it lists. */
+export type BoxListingOpts = ListingOpts & { scope: VaultScope }
 
 // --
 

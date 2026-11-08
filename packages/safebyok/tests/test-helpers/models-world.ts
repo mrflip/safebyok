@@ -28,7 +28,7 @@ import * as CX from '../../src/shapes/shapes-core'
 import type { Boxscope } from '../../src/shapes/shapes-core'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
-import { type BankPanic, type BoxDna, type BoxWorld, type Fetched, type ListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
+import { type BankPanic, type BoxDna, type BoxWorld, type Fetched, type BoxListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
 import { type BoxQuery, type BoxRow, type BoxTombstone, type DelOpts, type IfAbsentOpts, type PutOpts, type ReqParams, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -42,7 +42,7 @@ import { fakeCiphered } from './builders'
 export const T0 = 1_700_000_000_000
 
 /** The vault's scope and `vault_tok` that {@link makeModelsWorld} gives its world, and the builders below give their records. */
-const WorldVault = Object.freeze({ scope: Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }), vault_tok: 'vault-tok-u1' })
+export const WorldVault = Object.freeze({ scope: Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }), vault_tok: 'vault-tok-u1' })
 
 /** The one live vault row of every world, which a box verb demands. */
 export const worldVaultRow = (): VaultRecord => ({
@@ -306,7 +306,6 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const standIn = (): Vault => world as unknown as Vault
 
   const world: BoxWorld = {
-    scope:        WorldVault.scope,
     vault_tok:    WorldVault.vault_tok,
     get isLocked() { return isLocked },
     subscribe:    (listener) => { worldListeners.add(listener); return () => { worldListeners.delete(listener) } },
@@ -461,12 +460,12 @@ const nullOrTestableOf = (box: Box | null): TestableBox | null => (box === null 
 
 /** A {@link BoxListing} over the world's vault and vaultDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces its world or any of its options; the horizon is ten minutes. */
 export const boxListingOf = (mw: ModelsWorld, overrides: BoxListingOverrides = {}): TestableBoxListing => {
-  const { world = mw.world, vaultDB = mw.vaultDB, maxMillisSinceRefresh = 10 * 60_000, panic = mw.panic } = overrides
-  return new TestableBoxListing(world, { vaultDB, maxMillisSinceRefresh, panic })
+  const { world = mw.world, scope = WorldVault.scope, vaultDB = mw.vaultDB, maxMillisSinceRefresh = 10 * 60_000, panic = mw.panic } = overrides
+  return new TestableBoxListing(world, { scope, vaultDB, maxMillisSinceRefresh, panic })
 }
 
-/** What {@link boxListingOf} may be told in place of the world's own: the box listing's world, vaultDB, horizon or panic. */
-export type BoxListingOverrides = Partial<ListingOpts & { world: BoxWorld }>
+/** What {@link boxListingOf} may be told in place of the world's own: the box listing's world, vault scope, vaultDB, horizon or panic. */
+export type BoxListingOverrides = Partial<BoxListingOpts & { world: BoxWorld }>
 // --
 
 // == [Faked seal]: fakeSealBoxListingOf

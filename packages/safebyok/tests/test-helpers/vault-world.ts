@@ -232,7 +232,6 @@ export const makeProving = async ({ vault_tok, registered_at }: { vault_tok: str
 
 /** `vault` as its boxes see it, but that it takes no world. */
 export const boxWorldOf = (vault: Vault): BoxWorld => ({
-  scope:        vault.scope,
   vault_tok:    vault.vault_tok,
   get isLocked() { return vault.isLocked },
   ensureTimely: (opts) => vault.ensureTimely(opts),

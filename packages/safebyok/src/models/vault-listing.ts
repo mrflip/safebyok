@@ -46,7 +46,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** The listing of `vault`'s boxes, its watch not started. */
   boxListingOf(vault: Vault): BoxListing {
-    return new BoxListing(vault, { vaultDB: this.vaultDB, maxMillisSinceRefresh: this.world.boxRefreshMillis, panic: this.panic })
+    return new BoxListing(vault, { scope: vault.scope, vaultDB: this.vaultDB, maxMillisSinceRefresh: this.world.boxRefreshMillis, panic: this.panic })
   }
 
   /** The scope of `duck`, held to this bank: no listing answers for another's. */
