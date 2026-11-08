@@ -202,6 +202,9 @@ gets no review: the review follows the resume that finishes it.
    they plainly would, the decision is yours: make it, move the row to *Your calls* with the call
    and where it lands, and do it. Revisit what is already on *Cleanup* as rows come in, and tick
    off what has landed.
+
+   A Closer Look, offered when the third thread of a sprint files or when the Coach asks for one,
+   is run from `closer-look.md` beside this file: read it, and follow it.
 3. **Tend the documents.** Revise later threads' glosses where a thread's discoveries changed
    them. When a thread files, add a `*Review:*` line under its plan entry from the reviewer's
    report: what it fixed, and each finding it left, with its disposition. A worker may pull a
