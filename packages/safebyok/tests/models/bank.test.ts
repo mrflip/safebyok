@@ -227,7 +227,7 @@ describe("the host's functions, as a bank holds them", () => {
     DefaultOnPanic({ refusal: revoked, bank })
     expect(reported).toHaveBeenCalledTimes(3)
     expect(vacate).toHaveBeenCalledOnce()
-    expect(bankVacate).toHaveBeenCalledExactlyOnceWith(revoked)
+    expect(bankVacate).toHaveBeenCalledExactlyOnceWith({ cause: revoked })
     vi.unstubAllGlobals()
   })
 
@@ -398,7 +398,7 @@ describe("'identity_revoked', panic and bad news", () => {
     vi.unstubAllGlobals()
   })
 
-  it("vacates once for a burst of panics, those amid its scrub reaching the host and those past it the platform", async () => {
+  it("vacates once for a burst of panics, the first reaching the host and those past its disable the platform", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const onPanic = vi.fn(DefaultOnPanic)
@@ -409,7 +409,7 @@ describe("'identity_revoked', panic and bad news", () => {
     void bank.panic({ refusal: revoked })
     await TH.eventually(() => ! bank.isEnabled)
     await bank.panic({ refusal: revoked })
-    expect(onPanic).toHaveBeenCalledTimes(2)
+    expect(onPanic).toHaveBeenCalledOnce()
     expect(reported).toHaveBeenCalledTimes(3)
     expect(listLeases).toHaveBeenCalledOnce()
     expect(bank.snapshot.err).to.eq(revoked)
