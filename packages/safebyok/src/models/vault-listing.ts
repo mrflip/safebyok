@@ -77,7 +77,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     this.demandEnabled()
     const answer = await this.vaultDB.tryListVaults(this.world.scope)
     if (! answer.ok) {
-      this.tellIfRevoked(answer.err)
+      this.panicIfRevoked(answer.err)
       throw answer.err
     }
     const { vaults, damaged_rows } = answer.val

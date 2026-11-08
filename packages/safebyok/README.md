@@ -85,8 +85,19 @@ Easy to get wrong:
   alone. Await it before the page goes: a lease it cannot erase reaches your `onPanic`.
 * **A bank swept or vacated is spent.** `hello`, `ensureVault` and `vaultAt` refuse `disabled` from
   the moment you call either; once a sweep is called, or a vacate's erase is done, `bank.isEnabled`
-  is false for good and the bank calls none of your handlers again. An `identity_revoked` vacates
-  the bank: make another once the user signs in again.
+  is false for good and the bank calls none of your handlers again.
+* **`onPanic` hears what you must act on for safety**: a revoked identity, or a lease that outlived
+  its erase. With no `onPanic`, `DefaultOnPanic` reports it to the platform and vacates: the vault
+  on a lease, the bank on an `identity_revoked`, whose snapshot then shows that refusal. Make another
+  bank once the user signs in again. An `onPanic` of your own decides for itself; to keep the
+  vacate, call the default from it:
+
+  ```ts
+  const onPanic: PanicHandler = (panic) => {
+    myTelemetry.panic(panic.refusal.refusalkind)
+    DefaultOnPanic(panic)
+  }
+  ```
 * **When the signed-in user changes, vacate the bank and make another.** A bank and everything it
   hands out keep the `user_id` they were made with for life; safebyok never moves them to a new
   one, and does not notice the change for you. On sign-out, or a sign-in as someone else, call

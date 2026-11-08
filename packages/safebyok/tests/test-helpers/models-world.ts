@@ -140,6 +140,8 @@ export type ModelsWorld = {
   calls:  readonly ModelsCall[]
   /** The refusals the listing told its world, oldest first. A live array. */
   badnews: readonly VaultError[]
+  /** The refusals the listing panicked with, oldest first. A live array. */
+  panics:  readonly VaultError[]
   /** The vaultDB's own box rows, by boxlabel: the one vault's boxes. */
   stored: Map<string, unknown>
 
@@ -281,6 +283,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
 
   const calls: ModelsCall[] = []
   const badnews: VaultError[] = []
+  const panics: VaultError[] = []
   const watches: ModelsWatch[] = []
   const vaultDB = new TestableVaultDB(calls, watches)
   vaultDB._cheat_vaultRowsOf(WorldVault.scope).set(WorldVault.scope.vaultlabel, worldVaultRow())
@@ -303,6 +306,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     lockState:    () => lockState,
     subscribe:    (listener) => { worldListeners.add(listener); return () => { worldListeners.delete(listener) } },
     tellBadNews:  (news) => { badnews.push(...news) },
+    panic:        ({ refusal }) => { panics.push(refusal); return Promise.resolve() },
     demandUnlocked: () => { if (lockState === 'locked') { throw Refuse.lockedError() } return standIn() },
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
@@ -347,9 +351,9 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   }
 
   return {
-    world, vaultDB, calls, badnews, stored, watches,
+    world, vaultDB, calls, badnews, panics, stored, watches,
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
-    clearCalls: () => { calls.length = 0; badnews.length = 0 },
+    clearCalls: () => { calls.length = 0; badnews.length = 0; panics.length = 0 },
 
     now:      clockNow,
     setNow,
