@@ -1,8 +1,8 @@
-/** The README's three recipes for showing a whisper, each run in its order on real seals: a script, a raw field, and React with the hook played by hand. */
+/** The READMEs' three recipes for showing a whisper, each run in its order on real seals: the core's script, safebyok-react's raw field, and the core's React with the hook played by hand. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { BoxFields } from '../../src/dom/box-fields'
-import { LOCKED, VEILED } from '../../src/helpers/consts'
+import { isWhisperedBag } from '../../src/helpers/consts'
 import type { Box } from '../../src/models/box'
 import type { Vault } from '../../src/models/vault'
 import { makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
@@ -60,7 +60,7 @@ describe("the README's script", () => {
   })
 })
 
-describe("the README's raw field", () => {
+describe("safebyok-react's README's raw field", () => {
   it("shows at an expose, hides at a lock with an edit kept, saves on the button, and unexposes as it unmounts", async () => {
     const { vault, box } = await makeRecipeBox()
     const hook = hookOf(box.subscribe, box.getSnapshot)
@@ -104,7 +104,8 @@ describe("the README's React form", () => {
     expect(hook.painted).to.have.length(2)
 
     vault.lock()
-    expect(hook.current()).to.eq(LOCKED)
+    expect(box.exposure).to.eq('locked')
+    expect(isWhisperedBag(hook.current())).to.be.true
     expect(hook.current()['apiKey']).to.eq(undefined)
     expect(box.isShowing).to.be.false
     await vault.ensureUnlocked()
@@ -114,7 +115,8 @@ describe("the README's React form", () => {
     await box.putExposed()
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-typed' })
     box.veil()
-    expect(hook.current()).to.eq(VEILED)
+    expect(box.exposure).to.eq('veiled')
+    expect(isWhisperedBag(hook.current())).to.be.true
     expect(box.isShowing).to.be.false
     hook.unsubscribe()
   })

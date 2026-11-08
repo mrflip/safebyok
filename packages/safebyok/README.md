@@ -90,10 +90,15 @@ Easy to get wrong:
 ## Showing a whisper
 
 `box.expose()` holds a whisper on the box until `box.unexpose()`, a sweep, a vacate or a delete, and
-`box.whisper` shows it. While it will not show, `box.whisper` answers a frozen bag, whose `Whispered`
-symbol says why: `'encrypted'` (not exposed), `'locked'` or `'veiled'`. A bag has no fields, and a
-put of one refuses. `box.veil()` and `box.unveil()` hide it and show it again; a lock hides it, and
-an unlock shows it again. `box.subscribe` hears of all of this. The lock is the vault's, on
+`box.whisper` shows it. While it will not show, `box.whisper` answers a frozen bag with no fields,
+and a put of one refuses. To learn why it hides, ask `box.exposure`: `'unexposed'`, `'locked'`,
+`'veiled'` or `'showing'` (`useBoxExposure` in safebyok-react). `box.isShowing` and
+`box.isVeiled` answer one question each, and `isWhisperedBag(val)` tells a bag from a whisper. Don't
+compare `box.whisper` with a bag or read its mark: a second copy of safebyok has bags of its own.
+`box.isVeiled` stays true behind a lock, where `box.exposure` is `'locked'`. A box's snapshot
+carries `exposed` and `veiled`, and its vault's snapshot the `lockState`. `box.veil()` and
+`box.unveil()` hide it and show it again, and `box.unexpose()` drops the veil with the whisper; a
+lock hides it, and an unlock shows it again. `box.subscribe` hears of all of this. The lock is the vault's, on
 `vault.getSnapshot()`, not the box's.
 
 **A script.** Fetch the passphrase in `requestCleartext`, with a token the container already holds:
@@ -121,33 +126,6 @@ await vault.ensureUnlocked() // and it is back, edit included
 
 Read it through `box.whisper` each time: a reference you kept outlives a lock.
 
-**A raw field,** on React 19, whose ref cleanup unbinds it. The whisper reaches no prop or state of
-yours, so it is only in the DOM (and on the screen), where React's dev tools do not list it:
-
-```tsx
-import { BoxFields } from 'safebyok/dom'
-
-function ApiKeyField({ box }) {
-  const fields = BoxFields.of(box)
-  const { exposed } = useSyncExternalStore(box.subscribe, box.getSnapshot)
-  return (
-    <>
-      <input ref={fields.bind('apiKey')} type="password" autoComplete="off" spellCheck={false} />
-      {exposed
-        ? <button onClick={() => fields.trySave().then(showOutcome)}>Save</button>
-        : <button onClick={() => box.expose().catch(showRefusal)}>Show</button>}
-    </>
-  )
-}
-```
-
-The field goes blank at a lock or a veil, and an edit comes back with the value. Nothing is stored
-until `fields.save()`. Both buttons refuse while the vault is locked, so `showOutcome` and
-`showRefusal`, yours to write, say so. When the last field unmounts the box unexposes, so the whisper lasts no
-longer than its field: expose after it mounts. `BoxFields.of` answers the same instance for a box
-wherever it is called. Without React, `const unbind = BoxFields.of(box).bind('apiKey')(el)` binds
-any element with a `value`.
-
 **React that looks like React.** The hook needs no library code:
 
 ```tsx
@@ -168,6 +146,9 @@ function ApiKeyForm({ box }) {
 While it will not show, `box.whisper` is a bag with no fields, so the input is blank. Never replace
 the prop or edit it in place here: `box.patchWhisper` makes the new object, and tells the hook. It
 merges deeply, and an array replaces.
+
+There are important considerations to building a form safely, and we have provided helpers to do so. See the
+[safebyok-react README](../safebyok-react/README.md) for details and react version compatibility.
 
 ## Not done yet
 

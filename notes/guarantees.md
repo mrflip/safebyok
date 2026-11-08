@@ -41,7 +41,8 @@ strength checker's wrap. A change to one of them is a change to these guarantees
 
 Beside them, three host functions hear the passphrase, and each is wrapped once, in `Bank`'s constructor, so that
 past it the core holds the wrap and never the host's function; a proving's and a vault's world refuse a function
-without the wrap's brand (`isGuarded`, `helpers/consts.ts`). `keyDeriver` is wrapped by `guardKeyDeriver`
+without the wrap's brand (`isGuarded`, `helpers/consts.ts`). The brand is a `Symbol.for` that anyone may wear, a
+tripwire for the core's own wiring rather than a lock: `Bank`'s constructor wraps every host function regardless. `keyDeriver` is wrapped by `guardKeyDeriver`
 (`models/proving.ts`), whose `deriveKeyBytes` replaces a throw with `keyDeriverThrew`; `strengthChecker` by
 `guardStrengthChecker` (`helpers/passphrase-strength.ts`), which hands a throw to `HostErrorSanitizer.refusalFor`
 (`refusals/host-error-sanitizer.ts`), the one function that stands a refusal in for a foreign throw, reading nothing

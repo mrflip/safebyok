@@ -51,6 +51,16 @@ export const lockStateVals = ['unlocked', 'locked'] as const
 export type LockState = typeof lockStateVals[number]
 // --
 
+// == [The whisper]: boxExposureVals, BoxExposure
+
+// A string, not a bag: each copy of safebyok freezes its own bags, so comparing `box.whisper` with one fails across copies.
+/** Where a box's whisper stands, as `box.exposure` answers it: `showing`, or why it hides.
+ * `locked` means the whisper is exposed but hidden while the vault is locked; it is not the vault's lock, for which ask the vault (an unexposed box in a locked vault answers `unexposed`).
+ */
+export const boxExposureVals = ['unexposed', 'locked', 'veiled', 'showing'] as const
+export type BoxExposure = typeof boxExposureVals[number]
+// --
+
 // == [Wayins and gatings]: wayinkindVals, Wayinkind, gatingkindVals, Gatingkind, correctablekindVals
 
 /** The kinds of wayin, each with a record shape and a slot of the gate of its own: a `passphrase` the user types, or a `passkey` the user touches. */

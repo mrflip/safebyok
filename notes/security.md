@@ -41,6 +41,19 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-07 (devicedb_idb, sprint devicedb_idb, thread 7, at the Coach's direction, branch `20261107-brands`): **Every brand in the core is a `Symbol.for('@safebyok/<name>')` key that
+  anyone may wear, and `isVaultError` now recognises a `VaultError` of another copy of safebyok by its brand.** In `packages/safebyok/src/helpers/consts.ts`, a brand is
+  attached by a class getter or by `brand(obj, Brand, val = true)` (non-enumerable, non-writable, non-configurable) and read through `brandOf(val, Brand)` or a guard built on it
+  (`isVaultDB`, `isDeviceDB`, `isGuarded`, `isVaultError`, `isWhisperedBag`). `IsGuarded` is `Symbol.for('@safebyok/guarded')`, no longer module-private, and `NOVEL`
+  (`models/proving.ts`) is `Symbol.for('@safebyok/novel')`; `IsGuarded` is a tripwire in the bank's world shapes (`shapes-vaultish.ts`, `shapes-gateish.ts`), not a lock, since `Bank`'s
+  constructor wraps every host function unconditionally, so a forged brand changes nothing a host could not already do. `isVaultError` (`refusals/errors.ts`) no longer tests
+  `instanceof VaultError`: it reads `brandOf(err, IsVaultError) === true` (a getter on `VaultError`) plus the `refusalkind` check, so a `VaultError` from a second copy (ESM beside CJS, or one an
+  adapter bundles) is told as one, while one rebuilt from JSON or `structuredClone` still is not. The sites that pass a host function's throw through when `isVaultError` is true
+  (`passphrase-strength.ts`'s guard, `guardKeyDeriver`'s load in `proving.ts`, `checkedClears` in `gating.ts`) would pass a forged object carrying the brand. The Whispered bags
+  (`ENCRYPTED`, `LOCKED`, `VEILED`) stay own, enumerable `Symbol.for('@safebyok/whispered')` keys on frozen literals, so a spread copy still carries the mark to the put that refuses it.
+  Models are told by `hasModelkind` (a `modelkind` getter), not `instanceof`, in `gate.ts`'s Wayin check and `buildWayin`'s source check in `proving.ts`; a non-Proving that passed fails at
+  the private `#unwrapVaultKey` with a `TypeError`. The logger's `WeakSet`/`WeakMap` guard (`helpers/logger.ts`) is unchanged.
+
 * 2026-11-07 (devicedb_idb, sprint devicedb_idb, thread 2, branch `20261107-idb_devicedb`): **`IdbDeviceDB` keeps each lease row in IndexedDB with
   its `lease_key` a non-extractable CryptoKey held by structured clone, and deletes every older device database unread.** In
   `packages/safebyok/src/storage/idb-device-db.ts` (exported from `safebyok/browser`), the database `${dbName}:device-v1` has one object store keyed
@@ -77,9 +90,9 @@ added or folded into through the subagent, and no other entry changes.
   refuses `unexpected_error` with the host's thrown error as `cause`; a `device_id` is a UUID.** In `packages/safebyok/src/models/bank.ts` the bank holds
   `keyDeriver` through `guardKeyDeriver` (`src/models/proving.ts`), `strengthChecker` through `guardStrengthChecker` (`src/helpers/passphrase-strength.ts`),
   `requestCleartext` as `askUser` through `guardRequestCleartext`, and `onPanic` as `panic` through `guardOnPanic`; `VX.vaultWorld` and `GX.provingWorld` demand the brand
-  (`isGuarded`) of each, so a vault or proving cannot be handed a bare host function. The brand (`src/helpers/consts.ts`, `brandGuarded`) is a frozen, non-enumerable getter
-  keyed by a module-private `Symbol('safebyok.guarded')` that `src/index.ts` does not export: a plain object, a JSON copy or a spread copy of a wrap does not carry it, and the wrap is
-  frozen. (Unlike the exported `Symbol.for` mark of a whisper bag, this one is not shared across module copies.) The two functions that hear the passphrase keep their throws replaced
+  (`isGuarded`) of each, so a vault or proving cannot be handed a bare host function. The brand (`src/helpers/consts.ts`, `brandGuarded`) is a fixed, non-enumerable data property
+  keyed by `Symbol.for('@safebyok/guarded')`, set by `brand()` on a wrap that `brandGuarded` then freezes (amended 2026-11-07 (thread 7): it was a module-private `Symbol('safebyok.guarded')`, and a getter was said where a data property is meant; anyone may now wear the brand, which is a tripwire in the world shapes and not a lock, `Bank`'s constructor wrapping every host function regardless; see the 2026-11-07 thread 7 entry at the top): a plain object, a JSON copy or a spread copy of a wrap does not carry it unless forged, and the wrap is
+  frozen. The two functions that hear the passphrase keep their throws replaced
   with nothing of the throw kept (`guarantees.md` G1, G8): the deriver's `deriveKeyBytes` throws `keyDeriverThrew()`, and the checker's verdict is parsed inside the wrap, a throw handed to `HostErrorSanitizer.refusalFor`;
   `requestCleartext`'s throw is dropped (the wrap answers false), and `onPanic`'s goes to `reportToPlatform`. What the deriver hands back is still checked, and zeroed, only in `passphraseKeyOf`, not in the wrap.
   New: `keyDeriver.load()` was unguarded, its throw reaching `hello`'s outcome as the host threw it; the wrap now refuses it `unexpected_error` through `keyDeriverLoadFailed`
@@ -1182,7 +1195,7 @@ added or folded into through the subagent, and no other entry changes.
   creates a vault).
 * 2026-10-19 (thread a_fixes); amended 2026-10-19 (a_sec2, #206): **one test for a refusal, and a
   refusal from another copy of safebyok is a foreign throw.** `isVaultError(err, refusalkind?)`
-  (`packages/safebyok/src/errors.ts`) is `err instanceof VaultError` plus the kind check, the one
+  (`packages/safebyok/src/errors.ts`) is `err instanceof VaultError` plus the kind check (amended 2026-11-07 (thread 7): in the new core `isVaultError`, in `packages/safebyok/src/refusals/errors.ts`, reads the `IsVaultError` brand, not `instanceof`, so a `VaultError` of a second copy is recognised and its `identity_revoked` is told as bad news, contrary to the "foreign throw" account below; see the 2026-11-07 thread 7 entry at the top), the one
   declared test for a refusal. Every site that branches on a refusal uses it: `outcomeOf`
   (`src/outcome.ts`), `storageTroubleOf` (`src/outcome.ts`; amended 2026-10-28 (db_hooks): it was the `VaultDB` base's in `src/vault-db.ts`, and is now applied once per adapter hook call by the base's hook table, `VaultDB.#hooks`), the vault's
   bad-news hearing (`#hearBadNews`), `RefusalPolicy.decide` (`identity_revoked` and `rolled_back`

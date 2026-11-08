@@ -392,7 +392,7 @@ a refusal with a `kind` the caller can branch on.
 
 **A constructor validates its arguments**, in a parse as its first line, even when the `make` or
 `build` that calls it parsed them already: it is an entry point of its own. An instance among them
-(a listing) is checked by a custom instanceOf checker rather than a description of its shape, and a
+(a listing) is checked by its `modelkind` (`hasModelkind`), not a description of its shape, and a
 VaultDB or DeviceDB, which may come from another copy of the package, by its brand.
 
 **For preconditions, one line is the norm.** A function pulls what it needs out of what it was
@@ -621,6 +621,15 @@ the scope.
   DeviceDB extends our base class, and any VaultDB, a client too, is known by its `Symbol.for` brand:
   a duck check passes anything with the right method names, and `instanceof` fails the second copy
   of safebyok an adapter package may bundle.
+* **A brand is a `Symbol.for('@safebyok/<name>')` key, never a `Symbol()`**, so every copy of the
+  package shares it, and a host may wear one on purpose. It is attached by a class getter
+  (`get [IsVaultError](): true`) or by `brand(obj, Brand, val)`, and read only through
+  `brandOf(val, Brand)` or a guard built on it (`isVaultError`, `isGuarded`), never as `val[Brand]`.
+  A host's docs point it to a guard or a getter, never a brand or a sentinel's identity: `isWhisperedBag`
+  and `box.exposure`, not `Whispered` or `box.whisper === LOCKED`.
+  A symbol key is UpperCamel (`IsGuarded`, `Whispered`); a sentinel is ALLCAP (`NOVEL`, `ENCRYPTED`).
+  A model of a closed family is told by its string `modelkind`, a getter on the class
+  (`hasModelkind(val, 'wayin')`), not by a brand or `instanceof`.
 * **A host's function is wrapped once, on its way in.** Each function a host hands `Bank.make`
   (`requestCleartext`, the key deriver, the strength checker, `onPanic`, ...) is wrapped at `Bank`'s
   constructor into a checked, branded thing that checks what the function answers (*Validation*).

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { Whispered, type Bank, type BankSnapshot, type Box, type BoxSnapshot, type Vault, type VaultSnapshot, type Whisper, type WhisperedBag } from 'safebyok'
+import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type BoxSnapshot, type Vault, type VaultSnapshot, type Whisper, type BoxExposure } from 'safebyok'
 import { useProvided } from './bank-provider'
 
 // == [Bank hooks]: useBank, useBankSnapshot, subscribeToNothing, getNothing
@@ -57,7 +57,7 @@ export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
 }
 // --
 
-// == [Box hooks]: useBoxes, useBox, useBoxSnapshot, useBoxIsShowing, useWhisper, NoBoxBag
+// == [Box hooks]: useBoxes, useBox, useBoxSnapshot, useBoxIsShowing, useBoxExposure, useWhisper
 
 /** The snapshots of the boxes in the signed-in user's vault under `vaultlabel`, or null while it is not `present`. */
 export const useBoxes = (vaultlabel: string): readonly BoxSnapshot[] | null => {
@@ -88,13 +88,18 @@ export const useBoxIsShowing = (box: Box | null): boolean => (
   useSyncExternalStore(box?.subscribe ?? subscribeToNothing, () => box?.isShowing ?? false, () => false)
 )
 
-// Symbol.for, so the core's own check of a bag knows this one.
-const NoBoxBag: WhisperedBag = Object.freeze({ [Whispered]: 'encrypted' })
-const getNoBoxBag = (): Whisper => NoBoxBag
+const getUnexposed = (): BoxExposure => 'unexposed'
+
+/** Where `box`'s whisper stands, read live: `showing`, or why it hides; `unexposed` for no box. */
+export const useBoxExposure = (box: Box | null): BoxExposure => (
+  useSyncExternalStore(box?.subscribe ?? subscribeToNothing, () => box?.exposure ?? 'unexposed', getUnexposed)
+)
+
+const getEncrypted = (): Whisper => ENCRYPTED
 
 /** The live whisper `box` shows, a bag with no fields while it will not show or there is no box. */
 export const useWhisper = (box: Box | null): Whisper => {
-  const whisperOf = useCallback(() => box?.whisper ?? NoBoxBag, [box])
-  return useSyncExternalStore(box?.subscribe ?? subscribeToNothing, whisperOf, getNoBoxBag)
+  const whisperOf = useCallback(() => box?.whisper ?? ENCRYPTED, [box])
+  return useSyncExternalStore(box?.subscribe ?? subscribeToNothing, whisperOf, getEncrypted)
 }
 // --

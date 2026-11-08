@@ -72,6 +72,23 @@ describe("safebyok", () => {
     expect(Front.ForeverMillis).to.be.above(100 * 365 * 24 * 60 * Front.MinuteMillis)
   })
 
+  it("exports where a box's whisper stands", () => {
+    expect(Front.boxExposureVals).to.deep.equal(['unexposed', 'locked', 'veiled', 'showing'])
+    expectTypeOf<Front.Box['exposure']>().toEqualTypeOf<Front.BoxExposure>()
+  })
+
+  it("exports the bags box.whisper answers while it will not show", () => {
+    for (const bag of [Front.ENCRYPTED, Front.LOCKED, Front.VEILED]) { expect(Front.isWhisperedBag(bag)).to.be.true }
+    expect(Front.isWhisperedBag({ apiKey: 'sk-test-0000' })).to.be.false
+  })
+
+  it("exports the brand helpers and the VaultError brand", () => {
+    const refusal = new Front.VaultError('vault_locked', 'Unlock the vault first.')
+    expect(Front.brandOf(refusal, Front.IsVaultError)).to.be.true
+    const Mine = Symbol.for('@example/mine')
+    expect(Front.brandOf(Front.brand({}, Mine), Mine)).to.be.true
+  })
+
   it("exports HostErrorSanitizer, whose refusalFor makes a VaultError that carries nothing of what was thrown", () => {
     const foreign = new Error('the passphrase was hunter2')
     const refusal = Front.HostErrorSanitizer.refusalFor(foreign, 'storage_unavailable', "The vault's storage failed: try again shortly.")

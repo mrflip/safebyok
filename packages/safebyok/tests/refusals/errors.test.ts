@@ -189,11 +189,26 @@ describe("isVaultError", () => {
     expect(prompted).to.deep.equal(['passphrase'])
   })
 
-  it("is false for a VaultError of another copy of safebyok", async () => {
+  it("is true for a VaultError of another copy of safebyok", async () => {
     vi.resetModules()
     const Other = await import('../../src/refusals/errors')
     expect(Other.VaultError).to.not.eq(VaultError)
-    expect(isVaultError(new Other.VaultError('identity_revoked', 'Sign in again to reach this vault.'))).to.be.false
+    expect(isVaultError(new Other.VaultError('identity_revoked', 'Sign in again to reach this vault.'))).to.be.true
+    expect(isVaultError(new Other.VaultError('identity_revoked', 'Sign in again to reach this vault.'), 'identity_revoked')).to.be.true
+    expect(isVaultError(new Other.VaultError('identity_revoked', 'Sign in again to reach this vault.'), 'vault_locked')).to.be.false
+  })
+
+  it("is true for an error whose class wears the brand every copy of safebyok shares", () => {
+    const proto = Object.defineProperty(Object.create(Error.prototype) as object, Symbol.for('@safebyok/vaulterror'), { get: () => true })
+    const stranger = Object.assign(Object.create(proto) as object, { refusalkind: 'vault_locked' })
+    expect(isVaultError(stranger)).to.be.true
+    expect(isVaultError(stranger, 'vault_locked')).to.be.true
+    expect(isVaultError(stranger, 'absent_box')).to.be.false
+  })
+
+  it("is false for a copy of a VaultError's own fields", () => {
+    const refusal = new VaultError('vault_locked', 'Unlock the vault first.')
+    expect(isVaultError(Object.assign({}, refusal))).to.be.false
   })
 
   // As a client rebuilds one from a server's JSON: an Error that names itself, with a kind.
@@ -202,9 +217,11 @@ describe("isVaultError", () => {
     readonly refusalkind = 'identity_revoked'
   }
   const sent = new VaultError('identity_revoked', 'Sign in again to reach this vault.')
+  const sentAsJson = JSON.stringify(sent)
   const ImpostorCases = [
     [new LookalikeError('Sign in at another site.'),                                                         'an Error that names itself a VaultError and claims a kind, as a client rebuilds one from a server'],
     [JSON.parse('{"name":"VaultError","refusalkind":"identity_revoked","family":"bad_news","message":"Signed out."}') as unknown, 'a VaultError as JSON, as a server sends one'],
+    [JSON.parse(sentAsJson) as unknown,                                                                      'a VaultError through JSON and back, as no symbol survives it'],
     [structuredClone(sent),                                                                                 'a VaultError through structuredClone, as postMessage hands one over'],
     [{ name: 'VaultError', refusalkind: 'identity_revoked', family: 'bad_news', message: 'Signed out.' },     'a plain object shaped like one'],
   ] as const
