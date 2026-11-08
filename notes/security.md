@@ -41,6 +41,29 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-08 (bank_disable, branch `20261108-bank_disable`): **`bank.vacate()` lets the listing go, erases every lease row of the bank's applabel and
+  user_id, and only then disables the bank; it drops no IndexedDB database.** In `packages/safebyok/src/models/bank.ts`, `vacate()` first lets the vault
+  listing go, so calls in flight and every later `hello`, `ensureVault` or `vaultAt` refuse `disabled` and the snapshot reads `refused`. The scrub then
+  erases the bank's lease rows on the device, listed or not, with the host's handlers live: a refused listing of the leases reaches `onBadNews`, a
+  lease that cannot be forgotten reaches `onPanic`. Only then is `bank.isEnabled` false for good, and a disabled bank calls none of the host's functions
+  (`onPanic`, `onBadNews`, `requestCleartext`): a panic goes to the platform, news to the bank's logger, and a request for the passphrase is declined with
+  no dialog. `vacate()` returns a promise that settles when the scrub is done. Not done: dropping the deviceDB's databases (`IdbDeviceDB` keeps one
+  database each for leases and bank rows, holding every app's and user's rows on the origin, and a pluggable deviceDB has none to drop); and forgetting
+  this bank's own `{ applabel, user_id, device_id }` row, so the same user's next sign-in on this device gets the same `device_id` (it needs a new
+  DeviceDB verb and the React provider to stop handing on a cached `device_id`). Known race: an unlock in flight when `vacate()` runs can cache its lease
+  after the scrub, and that lease stays until the next vacate.
+  amended 2026-11-08 (bank_disable): a vaultDB refusal of kind `identity_revoked` is now a panic, not bad news. Where a listing (the bank's list of
+  vaults, or a vault's list of boxes) meets it, it calls the bank's panic, which reaches the host's `onPanic` with `{ refusal, bank }`, and the caller
+  still receives the refusal; before, it went to `onBadNews` and the bank vacated itself unconditionally. `DefaultOnPanic` (the handler used when the
+  host gives none) reports the refusal to the platform and, on `identity_revoked`, calls `bank.vacate(refusal)`, the same scrub-then-disable as sign-out;
+  the bank's snapshot then reads stage `refused` with that refusal as `err`. A host that supplies its own `onPanic` decides for itself: the vacate on
+  revocation happens only if it calls `DefaultOnPanic(panic)` from its handler, which the README shows. This is a deliberate trust in the host (the host
+  is not our threat model), and the safe behaviour is the default; a host `onPanic` that swallows the panic leaves a revoked user's cached leases on the
+  device until something else vacates or locks. `bank.vacate` memoizes its promise, so a burst of panics vacates once and lists the cached leases once:
+  panics arriving during the scrub still reach the host's `onPanic` (the bank disables only after the scrub), and panics after it go to
+  `DefaultOnPanic`, whose repeat vacate does nothing. `DefaultOnPanic` does not await the bank's vacate, because a panic raised from the vacate's own
+  scrub would otherwise wait on itself.
+
 * 2026-11-07 (devicedb_idb, sprint devicedb_idb, thread 7, at the Coach's direction, branch `20261107-brands`): **Every brand in the core is a `Symbol.for('@safebyok/<name>')` key that
   anyone may wear, and `isVaultError` now recognises a `VaultError` of another copy of safebyok by its brand.** In `packages/safebyok/src/helpers/consts.ts`, a brand is
   attached by a class getter or by `brand(obj, Brand, val = true)` (non-enumerable, non-writable, non-configurable) and read through `brandOf(val, Brand)` or a guard built on it

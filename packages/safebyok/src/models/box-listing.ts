@@ -51,7 +51,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     const answer = await this.vaultDB.tryListBoxes({ ...this.world.scope, vault_tok: this.world.vault_tok })
     if (answer.world !== null) { this.world.takeWorld(answer.world) }
     if (! answer.ok) {
-      this.tellIfRevoked(answer.err)
+      this.panicIfRevoked(answer.err)
       throw answer.err
     }
     const { boxes, damaged_rows } = answer.val

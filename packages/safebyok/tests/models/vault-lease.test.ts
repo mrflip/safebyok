@@ -98,7 +98,7 @@ describe("A refused erase of the row: the panic", () => {
     vault.lock()
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => reported.mock.calls.length === 1)
-    expect(onPanic).toHaveBeenCalledWith({ refusal: Refusal, vault })
+    expect(onPanic).toHaveBeenCalledWith(expect.objectContaining({ refusal: Refusal, vault }))
     expect(vault.isEnabled).to.be.true
     expect(deviceDB.cachedNow()).not.to.be.null
   })

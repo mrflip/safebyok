@@ -201,7 +201,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       })
       if (! delivered.ok) { this.world.tellBadNews([delivered.err]) }
     }
-    this.tellIfRevoked(answer.err)
+    this.panicIfRevoked(answer.err)
     throw answer.err
   }
 
@@ -283,11 +283,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Bad news]: tellIfRevoked
+  // == [Panic]: panicIfRevoked
 
-  /** A refusal of the vaultDB's on its way to a caller: 'identity_revoked' is news to the bank as well, heard before the caller hears it. */
-  protected tellIfRevoked(refusal: VaultError): void {
-    if (isVaultError(refusal, 'identity_revoked')) { this.world.tellBadNews([refusal]) }
+  /** A refusal of the vaultDB's on its way to a caller: 'identity_revoked' is a panic, heard before the caller hears the refusal. */
+  protected panicIfRevoked(refusal: VaultError): void {
+    if (isVaultError(refusal, 'identity_revoked')) { void this.world.panic({ refusal }) }
   }
   // --
 

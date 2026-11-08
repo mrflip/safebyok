@@ -1,6 +1,7 @@
 /** The test world of a vault listing in `src/models/`: a {@link MemoryVaultDB} of one vault row, a {@link MemoryDeviceDB} with its lease verbs spied on, and a clock the test moves. */
 
 import { afterEach, vi } from 'vitest'
+import { brandGuarded } from '../../src/helpers/consts'
 import { _cheat_clock } from '../../src/helpers/clock'
 import type { Lease } from '../../src/models/lease'
 import type { VaultScope } from '../../src/shapes/shapes-core'
@@ -10,6 +11,7 @@ import type { BoxWorld, ListingOpts, PanicHandler, VaultWorld } from '../../src/
 import type { VaultTombstone, VaultRecord } from '../../src/shapes/shapes-storage'
 import { DefaultOnPanic, guardOnPanic, guardRequestCleartext } from '../../src/models/bank'
 import type { Vault } from '../../src/models/vault'
+import type { Bank } from '../../src/models/bank'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { Outcome } from '../../src/refusals/outcome'
 import { VaultListing } from '../../src/models/vault-listing'
@@ -126,6 +128,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
   let now = T0
   _cheat_clock(() => now)
   const deviceDB = makeDeviceDB()
+  const hostPanic = guardOnPanic(onPanic)
   const fakeBank: FakeBank = {
     isLocked:     false,
     ensureTimely: () => Promise.resolve(),
@@ -138,7 +141,8 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     deviceDB:     deviceDB.memoryDB,
     requestCleartext: nothing,
     askUser:      guardRequestCleartext((gating) => fakeBank.requestCleartext(gating)),
-    panic:        guardOnPanic(onPanic),
+    // The fake stands in for the bank a panic names.
+    panic:        brandGuarded((panic) => hostPanic({ ...panic, bank: fakeBank as unknown as Bank })),
     boxRefreshMillis: 10 * 60_000,
     ...overrides,
   }
@@ -234,6 +238,7 @@ export const boxWorldOf = (vault: Vault): BoxWorld => ({
   ensureTimely: (opts) => vault.ensureTimely(opts),
   takeWorld:    () => undefined,
   tellBadNews:  (badnews) => { vault.tellBadNews(badnews) },
+  panic:        (panic) => vault.panic(panic),
   demandUnlocked:   () => vault.demandUnlocked(),
   subscribe:        (listener) => vault.subscribe(listener),
   sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),

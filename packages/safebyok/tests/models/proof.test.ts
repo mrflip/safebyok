@@ -342,7 +342,7 @@ describe("the proof", () => {
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
 
-    bank.vacate()
+    await bank.vacate()
     bankUi.expectRenders(['refused: main locked', 'refused: no vaults'])
     expect(bank.isEnabled).to.be.false
     await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'disabled')
