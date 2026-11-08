@@ -1,6 +1,26 @@
 # A lifecycle callback: what it could take off our critical paths
 
-An Opus survey, read-only, of #597 (2026-11-08). The Coach asked: "see what we can offload into this that we are doing now in a critical loop". Not yet ruled on. Line numbers are at #597's tip.
+An Opus survey, read-only, of #597 (2026-11-08). The Coach asked: "see what we can offload into this that we are doing now in a critical loop". Line numbers are at #597's tip.
+
+## Rulings (the Coach, 2026-11-08)
+
+* **Row 4, yes:** the core's panic friend vacates on `identity_revoked` itself, whatever `onPanic` the host gave. It's a guarantee, no longer an overridable default.
+* **Row 3, yes for `onPanic` only:** `onLifecycle` replaces `onPanic`. **`onBadNews` stays apart.** It's a pipeline to the error-reporting system, frequent and of many kinds, often several around one lifecycle event. A host leaves it logging and out of the way while it writes its lifecycle handler. (The Coach left this to me; settled so.) The breaking change is `onPanic`, `PanicHandler`, `Panic` and `DefaultOnPanic`.
+* **Row 1, yes:** one `lease_unerased` event.
+* **Row 2, yes:** a `helloed` event announced by the core, which removes the provider's and `useVault`'s `.then` chains.
+* **Rows 5 and 6, no:** the user switch and autolock keep their guarantees.
+* **The event shape, yes,** without `bad_news`:
+
+```ts
+type BankEvent = { bank: Bank } & (
+  | { kind: 'lease_unerased', refusal: VaultError, vault: Vault | null, where: 'lock' | 'tombstone' | 'vacate' | 'outdated' }
+  | { kind: 'vacated',        cause: VaultError, unerased: number }
+  | { kind: 'helloed',        outcome: Outcome<void>, vault: Vault | null })
+```
+
+* **Order:** after 20261108-bank_followups, which winds up as briefed; this thread repairs what it no longer needs. Then the react types move and the comment tour, on top.
+
+## The survey
 
 | # | Where, and what it decides today | Event, and the default we'd ship | What it removes | Risk |
 |---|---|---|---|---|

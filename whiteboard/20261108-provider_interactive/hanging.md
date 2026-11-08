@@ -8,6 +8,10 @@ Nothing open.
 
 ## After this PR
 
+* **Next, stacked in order:** 20261108-bank_followups (running), then the lifecycle callback (lifecycle-callback.md, *Rulings*), then the react types into one shapes file, then the react comment tour. [agent, 2026-11-08]
+  * Types: every type into one shapes file, `PassphraseModalProps` too, with `shapes-provider.ts` folded in. A single-use local alias (`SafeNavigator`) stays beside its use. The Coach: prop names are already in the destructure, it saves agents tokens, and the checkers can share props.
+  * Comment tour, every react file but the provider, the hooks and the shapes: "is this comment necessary for a competent React programmer assisted by an agent?", or "would they plausibly undo something important without it?" An export keeps its first-line doc block, since the host reads it on hover.
+
 The start-up reads, the listings and the IndexedDB cache moved to whiteboard/20261108-query_efficiently/query_efficiently.md.
 
 * passkey.ts has a checker of its own (`PasskeyChecks`), not moved into `src/shapes/`. [agent]
@@ -26,6 +30,6 @@ The start-up reads, the listings and the IndexedDB cache moved to whiteboard/202
 * Lease caching does an Outcome-to-throw-to-Outcome round trip for one caller. `tryStow` answers an Outcome, `lease.cache` throws it (`valOf`), `lease.tryCache` catches it (`outcomeOf`), and `cacheAsCacheCan` tells bad news; its only caller is `Vault.#attachLease` (vault.ts:202). Collapse to one method and stop `cache`/`tryCache` being public. Decide explicitly what a vacated lease's `#demandRecord()` throw becomes (today: bad news `vault_locked`). [Coach, agent]
 * `bank.tellBadNews`, `vault.tellBadNews` and `bank.askUser` are public and unchecked, as `panic` was: hide them as friend calls too? [review of 20261108-bank_disable] The Coach said yes (2026-11-08); building on 20261108-bank_followups, React getting its own route to the host's `onBadNews`.
 * One `onEvent` for the bank's handlers, and the bank's events in React's event loop (a hook that subscribes): weigh after this PR. [Coach]
-  * The Coach (2026-11-08): what was meant is a callback the host hands us, through which we announce lifecycle events (a bank made, helloed, swept or vacated, a panic, a user switch), taking the policy that follows out of our hands. The host then decides what follows: vacating at sign-out, remaking after a panic, minting a new device_id. The Coach said yes (2026-11-08): survey what it can take off our critical paths (an Opus survey is running).
+  * The Coach (2026-11-08): what was meant is a callback the host hands us, through which we announce lifecycle events (a bank made, helloed, swept or vacated, a panic, a user switch), taking the policy that follows out of our hands. The host then decides what follows: vacating at sign-out, remaking after a panic, minting a new device_id. Surveyed and ruled 2026-11-08: lifecycle-callback.md. `onLifecycle` replaces `onPanic`, `onBadNews` stays apart; its own thread after 20261108-bank_followups.
 * A vault names itself in a panic as `{ modelkind, applabel, user_id, vaultlabel }`. Give the box listing `applabel`, `user_id` and `vaultlabel` at birth, which will probably shrink it. [Coach] (`boxListingOf` is gone: the box listing is handed `this.panic`.) The Coach said do it (2026-11-08); building on 20261108-bank_followups.
 * `fateOver` / `buildOrReceive` / `deliver` / `reconcileCentral` / `takeWorld` are already too complex and due for a makeover. Code nominated for machinery there goes on the list of accusations; other code shouldn't do work to cover for them. [Coach]
