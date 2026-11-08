@@ -2,7 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Bank, MemoryDeviceDB, MinuteMillis, VaultError, type AnyGating } from 'safebyok'
-import { BankProvider, type BankProviderProps } from '../src/bank-provider'
+import { BankProvider } from '../src/bank-provider'
+import type { BankProviderProps } from '../src/shapes/shapes-provider'
 import { Messages } from '../src/messages'
 import { createPasskey } from '../src/passkey'
 import * as TH from './test-helpers'
@@ -356,7 +357,7 @@ describe("BankProvider's dialog", () => {
   })
 
   it("asks nobody when requestCleartext answers nothing", async () => {
-    provided({ requestCleartext: async () => undefined })
+    provided({ requestCleartext: () => undefined })
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))
     await act(async () => { await TH.wakeupAtNextTick() })
