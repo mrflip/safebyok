@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { MaxLabelChars, Patterns, isVaultError } from 'safebyok'
 import type { LastCall, Listing } from '../shapes'
 
-/** The panel's last call, and `call`, which runs a button's verb and keeps what it answered or refused. */
 export const useLastCall = () => {
   const [lastCall, setLastCall] = useState<LastCall | null>(null)
   const call = useCallback(async (verbname: string, work: () => Promise<string> | string) => {
@@ -15,7 +14,6 @@ export const useLastCall = () => {
   return { lastCall, call }
 }
 
-/** The line that shows what the panel's last button answered, or nothing before the first. */
 export const LastCallLine = ({ lastCall }: { lastCall: LastCall | null }) => {
   if (lastCall === null) { return null }
   return (
@@ -28,31 +26,25 @@ export const LastCallLine = ({ lastCall }: { lastCall: LastCall | null }) => {
 
 // Only a VaultError's words are shown: the core keeps secret material out of them, and another
 // error may carry anything.
-/** What a panel shows of `err`: a refusal's kind and message, or only the name of anything else thrown. */
 export const refusalTextOf = (err: unknown): string => {
   if (isVaultError(err)) { return `${err.refusalkind}: ${err.message}` }
   return (err instanceof Error) ? err.name : typeof err
 }
 
-/** True for `text` the core takes as a vaultlabel or a boxlabel. */
 export const isLabel = (text: string): boolean => (text.length <= MaxLabelChars) && Patterns.label.test(text)
 
-/** `answer` as indented JSON. */
 export const jsonOf = (answer: unknown): string => JSON.stringify(answer, null, 2)
 
 // A damaged row's time can be any number, and toISOString throws, in render, on a number past a Date's range.
-/** `millis` as an ISO time, or as the bare number where it names no time. */
 export const timeOf = (millis: number): string => {
   const when = new Date(millis)
   return Number.isNaN(when.getTime()) ? String(millis) : when.toISOString()
 }
 
-/** What `list` answers, listed again at each `relist` and at each change `watch` tells of. */
 export const useListing = <ValT,>(list: () => Promise<ValT>, watch: ((onChange: () => void) => () => void) | null = null) => {
   const [listing, setListing] = useState<Listing<ValT>>({ val: null, trouble: null })
   const [relists, setRelists] = useState(0)
   useEffect(() => {
-    // A listing that settles after a later one began, or after the effect ends, is dropped.
     let round = 0
     let isOver = false
     const listAgain = () => {
