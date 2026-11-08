@@ -218,7 +218,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doDelDamagedBox, doTidyGone, doWatch
 
   protected async doListVaults({ applabel, user_id }: BankScope): Promise<RowOfVault[]> {
     return await this.#query(ListVaultsSql, [applabel, user_id]) as RowOfVault[]
@@ -288,11 +288,19 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   }
 
   protected async doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): Promise<BoxLanding> {
+    return await this.#delBoxWhere(tombstone, (ante) => DB.isLiveRow(ante) && DB.isRowAt(ante, prior))
+  }
+
+  protected async doDelDamagedBox(tombstone: BoxTombstone, boxprops: unknown): Promise<BoxLanding> {
+    return await this.#delBoxWhere(tombstone, (ante) => DB.isDamagedBoxMatch(ante, boxprops))
+  }
+
+  /** Stores `tombstone` where `isDeletable` holds of the row that stands, under a vault live at its `vault_tok`. */
+  async #delBoxWhere(tombstone: BoxTombstone, isDeletable: (ante: unknown) => boolean): Promise<BoxLanding> {
     return await this.#transact(async (tx) => {
       const vault = await lockedVaultRowOf(tx, tombstone)
       const ante = await boxRowOf(tx, tombstone, tombstone.boxlabel)
-      const isDeletable = (DB.isLiveRow(ante) && DB.isRowAt(ante, prior)) || DB.isDamagedBoxAt(ante, tombstone, prior)
-      const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
+      const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable(ante)
       if (landed) {
         await storeBoxRow(tx, tombstone, tombstone.boxlabel, tombstone)
         await notify(tx, tombstone, [noticeTextOf(vault as VaultRecord, tombstone)])  // isCheckedLiveVault has checked it

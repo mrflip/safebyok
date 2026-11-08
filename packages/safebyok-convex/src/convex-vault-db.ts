@@ -78,7 +78,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doDelDamagedBox, doTidyGone, doWatch
 
   protected async doListVaults(scope: BankScope): Promise<RowOfVault[]> {
     return await reaching('doListVaults', () => this.#client.query(this.#api.listVaults, { scope }))
@@ -114,6 +114,10 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 
   protected async doDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<BoxLanding> {
     return await reaching('doDelBox', () => this.#client.mutation(this.#api.delBox, { tombstone, opts }))
+  }
+
+  protected async doDelDamagedBox(tombstone: BoxTombstone, boxprops: unknown): Promise<BoxLanding> {
+    return await reaching('doDelDamagedBox', () => this.#client.mutation(this.#api.delDamagedBox, { tombstone, boxprops }))
   }
 
   protected async doTidyGone(scope: BankScope): Promise<Tidied> {
@@ -219,7 +223,7 @@ const isConvexClient = (candidate: unknown): candidate is ConvexVaultClient => {
 }
 
 /** The functions a vault calls, by name. */
-const SafebyokFnnames = ['listVaults', 'getVault', 'listBoxes', 'getBox', 'putVault', 'putBox', 'delVault', 'delBox', 'tidyGone', 'watchRows'] as const
+const SafebyokFnnames = ['listVaults', 'getVault', 'listBoxes', 'getBox', 'putVault', 'putBox', 'delVault', 'delBox', 'delDamagedBox', 'tidyGone', 'watchRows'] as const
 
 // Each function must name itself as `<module>:<function>`. The whole generated `api` answers any
 // property, so `api.getVault` exists, but names no module, and Convex refuses to name it.

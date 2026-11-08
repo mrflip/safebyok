@@ -98,7 +98,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doDelDamagedBox, doTidyGone, doWatch
 
   protected doListVaults(scope: BankScope): RowOfVault[] {
     return Array.from(this._cheat_vaultRowsOf(scope), ([vaultlabel, vault]) => ({ vaultlabel, vault: structuredClone(vault) }))
@@ -147,11 +147,19 @@ export class MemoryVaultDB extends AdapterVaultDB {
   }
 
   protected doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): BoxLanding {
+    return this.#delBoxWhere(tombstone, (ante) => SX.isLiveRow(ante) && SX.isRowAt(ante, prior))
+  }
+
+  protected doDelDamagedBox(tombstone: BoxTombstone, boxprops: unknown): BoxLanding {
+    return this.#delBoxWhere(tombstone, (ante) => SX.isDamagedBoxMatch(ante, boxprops))
+  }
+
+  /** Stores `tombstone` where `isDeletable` holds of the row that stands, under a vault live at its `vault_tok`. */
+  #delBoxWhere(tombstone: BoxTombstone, isDeletable: (ante: unknown) => boolean): BoxLanding {
     const vault = this.#vaultRowOf(tombstone)
     const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
     const ante = boxrows.get(tombstone.boxlabel) ?? null
-    const isDeletable = (SX.isLiveRow(ante) && SX.isRowAt(ante, prior)) || SX.isDamagedBoxAt(ante, tombstone, prior)
-    const landed = SX.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
+    const landed = SX.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable(ante)
     if (landed) { this.#storeBoxRow(boxrows, vault, tombstone) }
     return { landed, ante: structuredClone(ante), vault: structuredClone(vault) }
   }

@@ -183,9 +183,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** A tombstone over `sparse`'s own revision, and its answer delivered. */
   protected async delOver(sparse: SparseT): Promise<ThingT | null> {
     this.demandEnabled()
-    const prior = SX.revisionOf(sparse)
-    const tombstone = { ...sparse, ...SX.nextRevisionOf(prior, nowMillis()), am: 'x' as const }
-    return this.deliver(await this.tryDelRow(tombstone, { prior }))
+    return this.deliver(await this.tryDelRow(this.tombstoneOver(sparse), { prior: SX.revisionOf(sparse) }))
+  }
+
+  /** A tombstone one revision past `sparse`. */
+  protected tombstoneOver(sparse: SparseT): DelTombstone<SparseT> {
+    return { ...sparse, ...SX.nextRevisionOf(SX.revisionOf(sparse), nowMillis()), am: 'x' as const }
   }
   // --
 

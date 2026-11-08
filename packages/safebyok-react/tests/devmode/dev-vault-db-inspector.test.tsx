@@ -41,7 +41,7 @@ describe("DevVaultDBInspector", () => {
     await waitFor(() => { expect(lastCall()).to.include('totalCount') })
   })
 
-  it("lists a damaged box row, and deletes it by delBox", async () => {
+  it("lists a damaged box row, and deletes it by delDamagedBox", async () => {
     const { world, vault } = await renderOverBox()
     world.vaultDB._cheat_boxRowsOf(vault.scope, vault.snapshot.vault_tok).set('mangled', { am: 'a', fmt: 'nonsense' })
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))

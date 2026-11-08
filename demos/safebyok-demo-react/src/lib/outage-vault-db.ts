@@ -38,7 +38,7 @@ export class OutageVaultDB extends IdbVaultDB {
   }
   // --
 
-  // == [The generic calls, refused while offline]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone
+  // == [The generic calls, refused while offline]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doDelDamagedBox, doTidyGone
 
   protected override async doListVaults(scope: BankScope): Promise<RowOfVault[]> {
     this.#demandOnline()
@@ -78,6 +78,11 @@ export class OutageVaultDB extends IdbVaultDB {
   protected override async doDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<BoxLanding> {
     this.#demandOnline()
     return await super.doDelBox(tombstone, opts)
+  }
+
+  protected override async doDelDamagedBox(tombstone: BoxTombstone, boxprops: unknown): Promise<BoxLanding> {
+    this.#demandOnline()
+    return await super.doDelDamagedBox(tombstone, boxprops)
   }
 
   protected override async doTidyGone(scope: BankScope): Promise<Tidied> {

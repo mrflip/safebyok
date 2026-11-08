@@ -251,6 +251,13 @@ export class TestableVaultDB extends MemoryVaultDB {
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryDelBox']>>) : super.tryDelBox(tombstone, opts)
   }
 
+  override async tryDelDamagedBox(tombstone: BoxTombstone, boxprops: unknown) {
+    const call: DelCall = { scope: CX.boxscope.parse(tombstone), priorRevisionTok: tombstone.revision_tok }
+    this.#calls.push({ verb: 'del', ...call })
+    const { scripted, answer } = this.scripts.del.take(call)
+    return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryDelDamagedBox']>>) : super.tryDelDamagedBox(tombstone, boxprops)
+  }
+
   override watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: VaultError) => void): () => void {
     const watch: ModelsWatch = { onNotice, onBadNews, active: true }
     this.#calls.push({ verb: 'watch', onNotice })

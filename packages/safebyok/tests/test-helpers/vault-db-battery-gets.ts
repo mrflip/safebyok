@@ -105,7 +105,7 @@ export const describeGets = ({ fresh, storeWith, rowsOf, twinOf }: BatteryWorld)
       expect(act).to.eq('got')
       expect(world).to.deep.equal(vault)
       expect(val.boxes).to.have.deep.members([SX.boxSparse.parse(box), SX.boxSparse.parse(boxTombstoneOf(other))])
-      expect(val.damaged_rows.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'rubble', am: 'd' }])
+      expect(val.damaged_rows.map(({ boxlabel, am, boxprops }) => ({ boxlabel, am, boxprops }))).to.deep.equal([{ boxlabel: 'rubble', am: 'd', boxprops: 12 }])
     })
 
     it("tells a box row of a later fmt from any other it sets aside", async () => {

@@ -6,7 +6,7 @@ import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as TH from '../test-helpers'
 
 /** The calls a MemoryVaultDB makes of its storage, any of which the next may be. */
-const StorageCalls = ['doListVaults', 'doGetVault', 'doListBoxes', 'doGetBox', 'doPutVault', 'doPutBox', 'doDelVault', 'doDelBox', 'doTidyGone'] as const
+const StorageCalls = ['doListVaults', 'doGetVault', 'doListBoxes', 'doGetBox', 'doPutVault', 'doPutBox', 'doDelVault', 'doDelBox', 'doDelDamagedBox', 'doTidyGone'] as const
 
 const memoryRowsOf = (vaultDB: MemoryVaultDB): TH.VaultDBRowCheats => ({
   plantVaultRow: (scope, row) => { vaultDB._cheat_vaultRowsOf(scope).set(scope.vaultlabel, row) },

@@ -102,7 +102,7 @@ export const putBox = mutation({
 })
 // --
 
-// == [Dels]: delVault, delBox
+// == [Dels]: delVault, delBox, delDamagedBox, storeBoxTombstoneWhere
 
 /** Store a vault's tombstone over its live or damaged row at `opts.prior`, answering the landing. */
 export const delVault = mutation({
@@ -122,27 +122,36 @@ export const delVault = mutation({
   },
 })
 
-/** Store a box's tombstone over its live or damaged row at `opts.prior`, answering the landing. */
+/** Store a box's tombstone over its live row at `opts.prior`, answering the landing. */
 export const delBox = mutation({
   args:    CVX.delBoxArgs,
   returns: CVX.boxLanding,
-  handler: async (ctx, { tombstone, opts: { prior } }) => {
-    const vaultDoc = await findVaultDoc(ctx.db, tombstone)
-    const vault = vaultDoc?.vault ?? null
-    const life = lifeOf(tombstone)
-    const anteDoc = await findBoxDoc(ctx.db, life, tombstone.boxlabel)
-    const ante = anteDoc?.box ?? null
-    const isDeletable = (DB.isLiveRow(ante) && DB.isRowAt(ante, prior)) || DB.isDamagedBoxAt(ante, tombstone, prior)
-    const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
-    if (landed) {
-      const boxDoc = { ...life, boxlabel: tombstone.boxlabel, box: tombstone }
-      await storeBoxDoc(ctx.db, anteDoc, boxDoc)
-      // The tombstone takes the row's place, and counts as the row did.
-      await Tallies.forget(ctx.db, life, { box_count: 0, box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) })
-    }
-    return { landed, ante, vault }
-  },
+  handler: async (ctx, { tombstone, opts: { prior } }) => await storeBoxTombstoneWhere(ctx, tombstone, (ante) => DB.isLiveRow(ante) && DB.isRowAt(ante, prior)),
 })
+
+/** Store a box's tombstone over the damaged row that stands exactly as `boxprops`, answering the landing. */
+export const delDamagedBox = mutation({
+  args:    CVX.delDamagedBoxArgs,
+  returns: CVX.boxLanding,
+  handler: async (ctx, { tombstone, boxprops }) => await storeBoxTombstoneWhere(ctx, tombstone, (ante) => DB.isDamagedBoxMatch(ante, boxprops)),
+})
+
+/** Stores `tombstone` where `isDeletable` holds of the row that stands, under a vault live at its `vault_tok`. */
+const storeBoxTombstoneWhere = async (ctx: { db: DatabaseWriter }, tombstone: DB.BoxTombstone, isDeletable: (ante: unknown) => boolean) => {
+  const vaultDoc = await findVaultDoc(ctx.db, tombstone)
+  const vault = vaultDoc?.vault ?? null
+  const life = lifeOf(tombstone)
+  const anteDoc = await findBoxDoc(ctx.db, life, tombstone.boxlabel)
+  const ante = anteDoc?.box ?? null
+  const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable(ante)
+  if (landed) {
+    const boxDoc = { ...life, boxlabel: tombstone.boxlabel, box: tombstone }
+    await storeBoxDoc(ctx.db, anteDoc, boxDoc)
+    // The tombstone takes the row's place, and counts as the row did.
+    await Tallies.forget(ctx.db, life, { box_count: 0, box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) })
+  }
+  return { landed, ante, vault }
+}
 // --
 
 // == [Upkeep]: tidyGone, watchRows

@@ -299,6 +299,17 @@ describe("vault.tryDelDamagedBox", () => {
     expect(vault.boxListing.at({ ...vault.scope, boxlabel })).not.to.be.null
   })
 
+  it("refuses a row whose only fault is extra fields, the row and its listing standing", async () => {
+    const { openNextSession, boxrows } = await makeWorldWithBox()
+    const padded = { ...boxrows.get(boxlabel) as object, boxlabel: 'padded', extra: 1 }
+    boxrows.set('padded', padded)
+    const next = await openNextSession()
+    await next.hello()
+    await TH.expectBad(next.tryDelDamagedBox('padded'), 'damaged_row')
+    expect(boxrows.get('padded')).to.deep.equal(padded)
+    expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['padded'])
+  })
+
   it("refuses a boxlabel nothing is listed under as 'absent_box', storing nothing", async () => {
     const { vault, boxrows } = await makeWorld()
     await TH.expectBad(vault.tryDelDamagedBox(boxlabel), 'absent_box')

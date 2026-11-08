@@ -122,6 +122,7 @@ const AnswerChecks = [
   ['safebyokAddPasskey',        DB.addPasskeyAnswer],
   ['safebyokRevokePasskey',     DB.revokePasskeyAnswer],
   ['safebyokDelBox',            DB.delBoxAnswer],
+  ['safebyokDelDamagedBox',     DB.delBoxAnswer],
   ['safebyokDelVault',          DB.delVaultAnswer],
   ['safebyokTidyGone',          DB.tidyGoneAnswer],
   ['safebyokWatch',             DB.crossedNotice],
@@ -140,6 +141,7 @@ const InputChecks = [
   ['safebyokRevokePasskey',     'params',    DB.revokePasskeyParams],
   ['safebyokDelBox',            'tombstone', DB.boxTombstone],
   ['safebyokDelBox',            'opts',      DB.delOpts],
+  ['safebyokDelDamagedBox',     'tombstone', DB.boxTombstone],
   ['safebyokDelVault',          'tombstone', DB.vaultTombstone],
   ['safebyokDelVault',          'opts',      DB.delOpts],
 ] as const

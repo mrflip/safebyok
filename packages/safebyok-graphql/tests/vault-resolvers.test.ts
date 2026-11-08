@@ -89,6 +89,7 @@ describe("vaultResolvers", () => {
       [VaultOperations.addPasskey, { params: gateParamsOf(record, { passkey_wayin: TH.passkeyWayin }) }, DB.addPasskeyAnswer],
       [VaultOperations.revokePasskey, { params: gateParamsOf(record, { passkey_wayin: null }) }, DB.revokePasskeyAnswer],
       [VaultOperations.delBox, { tombstone: TH.boxTombstoneOf(box), opts }, DB.delBoxAnswer],
+      [VaultOperations.delDamagedBox, { tombstone: TH.boxTombstoneOf(box), boxprops: { garbage: true } }, DB.delBoxAnswer],
       [VaultOperations.delVault, { tombstone: TH.vaultTombstoneOf(record), opts }, DB.delVaultAnswer],
       [VaultOperations.tidyGone, TH.bankScope, DB.tidyGoneAnswer],
     ]
@@ -269,7 +270,7 @@ describe("VaultSchemaSdl", () => {
   it("builds alone, every root field it adds named safebyok...", () => {
     const rootFields = [schema.getQueryType(), schema.getMutationType(), schema.getSubscriptionType()]
       .flatMap((root) => (isObjectType(root) ? Object.keys(root.getFields()) : []))
-    expect(rootFields).to.have.lengthOf(13)
+    expect(rootFields).to.have.lengthOf(14)
     for (const fieldname of rootFields) { expect(fieldname).to.match(/^safebyok[A-Z]/) }
   })
 

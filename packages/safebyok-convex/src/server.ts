@@ -35,7 +35,7 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
  *
  * @example
  *   // convex/safebyok.ts
- *   export const { listVaults, getVault, listBoxes, getBox, putVault, putBox, delVault, delBox, tidyGone, watchRows } =
+ *   export const { listVaults, getVault, listBoxes, getBox, putVault, putBox, delVault, delBox, delDamagedBox, tidyGone, watchRows } =
  *     new SafebyokComponent(components.safebyok).api({
  *       getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
  *     })
@@ -125,6 +125,14 @@ export class SafebyokComponent {
         handler: async (ctx, args) => {
           await demandCaller(ctx, args.tombstone.user_id)
           return await ctx.runMutation(vaults.delBox, args)
+        },
+      }),
+      delDamagedBox: publicMutation({
+        args:    CVX.delDamagedBoxArgs,
+        returns: CVX.boxLanding,
+        handler: async (ctx, args) => {
+          await demandCaller(ctx, args.tombstone.user_id)
+          return await ctx.runMutation(vaults.delDamagedBox, args)
         },
       }),
       tidyGone: publicMutation({

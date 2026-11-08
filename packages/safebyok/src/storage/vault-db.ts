@@ -91,9 +91,12 @@ export interface VaultDB {
   /** Takes the passkey wayin off the vault row; one holding none answers as stored. */
   revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>>
   tryRevokePasskey(params: RevokePasskeyParams): Promise<Answer<VaultRecord, 'revoked'>>
-  /** Deletes a box at `prior`: its live row, or the damaged row `damaged_rows` lists. */
+  /** Deletes a box's live row at `prior`. */
   delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>>
   tryDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<Answer<BoxTombstone, DelAct>>
+  /** Deletes the damaged box row at `tombstone`'s address that stands exactly as `boxprops`, the row `damaged_rows` carries. */
+  delDamagedBox(tombstone: BoxTombstone, boxprops: unknown): Promise<GoodAnswer<BoxTombstone, DelAct>>
+  tryDelDamagedBox(tombstone: BoxTombstone, boxprops: unknown): Promise<Answer<BoxTombstone, DelAct>>
   /** Deletes a vault at `prior`, its live row or the damaged row `damaged_rows` lists, with the boxes of its life. */
   delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>>
   tryDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Answer<VaultTombstone, DelAct>>
@@ -111,7 +114,7 @@ export const VaultDBVerbnames = [
   'listVaults', 'tryListVaults', 'getVault', 'tryGetVault', 'listBoxes', 'tryListBoxes', 'getBox', 'tryGetBox',
   'putVault', 'tryPutVault', 'putBox', 'tryPutBox',
   'replacePassphrase', 'tryReplacePassphrase', 'addPasskey', 'tryAddPasskey', 'revokePasskey', 'tryRevokePasskey',
-  'delBox', 'tryDelBox', 'delVault', 'tryDelVault', 'tidyGone', 'tryTidyGone', 'watch',
+  'delBox', 'tryDelBox', 'delDamagedBox', 'tryDelDamagedBox', 'delVault', 'tryDelVault', 'tidyGone', 'tryTidyGone', 'watch',
 ] as const satisfies readonly (keyof VaultDB)[]
 
 true satisfies Z.core.util.AssertEqual<typeof VaultDBVerbnames[number], Exclude<keyof VaultDB, typeof IsVaultDB>>
@@ -325,9 +328,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
   // --
 
-  // == [Dels]: delBox, tryDelBox, #answerDelBoxVoid, #answerDelBoxGone, #answerDelBoxRecord, delVault, tryDelVault, #answerDelVaultVoid, #answerDelVaultGone, #answerDelVaultRecord, tidyGone, tryTidyGone
+  // == [Dels]: delBox, tryDelBox, delDamagedBox, tryDelDamagedBox, #answerDelBoxUnlanded, #answerDelBoxVoid, #answerDelBoxGone, #answerDelBoxRecord, delVault, tryDelVault, #answerDelVaultVoid, #answerDelVaultGone, #answerDelVaultRecord, tidyGone, tryTidyGone
 
-  /** Deletes a box at `prior`: its live row, or the damaged row `damaged_rows` lists. */
+  /** Deletes a box's live row at `prior`. */
   async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> {
     const req_params = SX.reqParamsOf({ ...tombstone, ...opts })
     try {
@@ -337,14 +340,33 @@ export abstract class AdapterVaultDB implements VaultDB {
       const { landed, ante, vault } = await this.doDelBox(boxTombstone, delOpts)
       const world = liveVaultOf(vault, boxTombstone)
       if (landed) { return { ok: true, req_params, act: 'deleted', val: boxTombstone, world } }
-      const found = SX.foundBoxRow.parse(ante)
-      if (found === null) { return this.#answerDelBoxVoid(boxTombstone, world, req_params) }
-      if (found.am === 'x') { return this.#answerDelBoxGone(found, world, req_params) }
-      return this.#answerDelBoxRecord(found, world)
+      return this.#answerDelBoxUnlanded(boxTombstone, ante, world, req_params)
     } catch (err) { throw refusalOf(err, 'delBox', req_params) }
   }
 
   async tryDelBox(tombstone: BoxTombstone, opts: DelOpts) { return answerOf(() => this.delBox(tombstone, opts)) }
+
+  /** Deletes the damaged box row at `tombstone`'s address that stands exactly as `boxprops`, the row `damaged_rows` carries. */
+  async delDamagedBox(tombstone: BoxTombstone, boxprops: unknown): Promise<GoodAnswer<BoxTombstone, DelAct>> {
+    const req_params = SX.reqParamsOf(tombstone)
+    try {
+      const boxTombstone = SX.boxTombstone.parse(tombstone)
+      const { landed, ante, vault } = await this.doDelDamagedBox(boxTombstone, boxprops)
+      const world = liveVaultOf(vault, boxTombstone)
+      if (landed) { return { ok: true, req_params, act: 'deleted', val: boxTombstone, world } }
+      return this.#answerDelBoxUnlanded(boxTombstone, ante, world, req_params)
+    } catch (err) { throw refusalOf(err, 'delDamagedBox', req_params) }
+  }
+
+  async tryDelDamagedBox(tombstone: BoxTombstone, boxprops: unknown) { return answerOf(() => this.delDamagedBox(tombstone, boxprops)) }
+
+  /** What a box delete that did not land answers, by the row that stands. */
+  #answerDelBoxUnlanded(boxTombstone: BoxTombstone, ante: unknown, world: VaultRecord, req_params: ReqParams): GoodAnswer<BoxTombstone, DelAct> {
+    const found = SX.foundBoxRow.parse(ante)
+    if (found === null) { return this.#answerDelBoxVoid(boxTombstone, world, req_params) }
+    if (found.am === 'x') { return this.#answerDelBoxGone(found, world, req_params) }
+    return this.#answerDelBoxRecord(found, world)
+  }
 
   /** The `void` answer: the box label's sentinel. */
   #answerDelBoxVoid(boxTombstone: BoxTombstone, world: VaultRecord, req_params: ReqParams): GoodAnswer<BoxTombstone, 'void'> {
@@ -426,7 +448,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
   // --
 
-  // == [Protected, for a subclass to write]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Protected, for a subclass to write]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doDelDamagedBox, doTidyGone, doWatch
 
   /** Every vault row of the bank, full or tombstone. */
   protected abstract doListVaults(scope: BankScope): Awaitable<RowOfVault[]>
@@ -444,8 +466,10 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doPutBox(record: BoxRecord, opts: PutOptsGiven): Awaitable<BoxLanding>
   /** In one step, stores `tombstone` over the live or damaged row at `opts.prior` and tombstones that life's boxes. */
   protected abstract doDelVault(tombstone: VaultTombstone, opts: DelOpts): Awaitable<Landing>
-  /** Stores `tombstone` over the live or damaged box row at `opts.prior`, under a vault live at its `vault_tok`. */
+  /** Stores `tombstone` over the live box row at `opts.prior`, under a vault live at its `vault_tok`. */
   protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxLanding>
+  /** Stores `tombstone` over the row `isDamagedBoxMatch` finds to be `boxprops`, under a vault live at its `vault_tok`. */
+  protected abstract doDelDamagedBox(tombstone: BoxTombstone, boxprops: unknown): Awaitable<BoxLanding>
   /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
   /** Starts telling `hear` of rows that change, and returns how to stop. A store with no watch never calls it. */

@@ -50,7 +50,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doDelDamagedBox, doTidyGone, doWatch
 
   protected async doListVaults(scope: BankScope): Promise<RowOfVault[]> {
     const filed = await DB.inOneStep(this.#shelf, 'readonly', (store) => filedIn(store, vaultsRangeOf(scope)))
@@ -122,10 +122,18 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   }
 
   protected async doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): Promise<BoxLanding> {
+    return await this.#delBoxWhere(tombstone, (ante) => DB.isLiveRow(ante) && DB.isRowAt(ante, prior))
+  }
+
+  protected async doDelDamagedBox(tombstone: BoxTombstone, boxprops: unknown): Promise<BoxLanding> {
+    return await this.#delBoxWhere(tombstone, (ante) => DB.isDamagedBoxMatch(ante, boxprops))
+  }
+
+  /** Stores `tombstone` where `isDeletable` holds of the row that stands, under a vault live at its `vault_tok`. */
+  async #delBoxWhere(tombstone: BoxTombstone, isDeletable: (ante: unknown) => boolean): Promise<BoxLanding> {
     const landing = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [vault, ante] = await Promise.all([DB.rowAt(store, vaultScopepathOf(tombstone)), DB.rowAt(store, boxScopepathOf(tombstone))])
-      const isDeletable = (DB.isLiveRow(ante) && DB.isRowAt(ante, prior)) || DB.isDamagedBoxAt(ante, tombstone, prior)
-      const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
+      const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable(ante)
       if (landed) { store.put(tombstone, boxScopepathOf(tombstone)) }
       return { landed, ante, vault }
     })

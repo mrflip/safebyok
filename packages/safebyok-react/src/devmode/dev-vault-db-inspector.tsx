@@ -102,6 +102,7 @@ const VaultRowLines = ({ vaultRow, boxes, onGetVault, onGetBox, onDelBox }: Vaul
 
 const delBoxRow = (vaultDB: VaultDB, boxRow: BoxSparse | DamagedBox) => {
   const sparse = boxSparse.parse(boxRow)
-  return vaultDB.delBox({ ...sparse, ...nextRevisionOf(sparse, Date.now()), am: 'x' }, { prior: revisionOf(sparse) })
+  const tombstone = { ...sparse, ...nextRevisionOf(sparse, Date.now()), am: 'x' as const }
+  return ('boxprops' in boxRow) ? vaultDB.delDamagedBox(tombstone, boxRow.boxprops) : vaultDB.delBox(tombstone, { prior: revisionOf(sparse) })
 }
 // --

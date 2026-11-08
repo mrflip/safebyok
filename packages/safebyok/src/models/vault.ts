@@ -10,7 +10,7 @@ import type { AskUser, GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedW
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, BoxPut, BoxPutOpts, EraseSite, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
-import { absentDamagedBoxError, alreadyHeldError, deletedVaultError, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
+import { alreadyHeldError, deletedVaultError, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
@@ -329,18 +329,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
 
   /** Delete the damaged box listed at `boxlabel`, the only verb that does. Refuses 'absent_box' for a healthy box or none listed. */
-  tryDelDamagedBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> {
-    return outcomeOf(async () => { // this method does not offer a throwing (delDamagedBox) form
-      const timely = VX.timelyOpts.parse(opts)
-      const boxes = this.boxListing
-      const scope = boxes.scopeOf({ ...this.scope, boxlabel })
-      this.demandUnlocked()
-      await this.ensureTimely(timely.maxWorldMillis); this.demandUnlocked()
-      const damaged = boxes.damagedAt(scope)
-      if (damaged === null) { throw absentDamagedBoxError(scope) }
-      return boxes.del(damaged)
-    })
-  }
+  tryDelDamagedBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return this.boxListing.tryDelDamaged({ ...this.scope, boxlabel }, opts) }
   // --
 
   // == [Guards]: isLocked, isUnlocked, demandUnlocked, demandLease, demandPromptable, demandAttachable, demandHelloable, demandPresent, ensureTimely

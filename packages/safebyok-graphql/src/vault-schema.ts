@@ -341,6 +341,7 @@ type Mutation {
   safebyokAddPasskey(params: SafebyokAddPasskeyInput!): SafebyokVaultAnswer!
   safebyokRevokePasskey(params: SafebyokRevokePasskeyInput!): SafebyokVaultAnswer!
   safebyokDelBox(tombstone: SafebyokBoxTombstoneInput!, opts: SafebyokDelOptsInput!): SafebyokBoxAnswer!
+  safebyokDelDamagedBox(tombstone: SafebyokBoxTombstoneInput!, boxprops: SafebyokJson!): SafebyokBoxAnswer!
   safebyokDelVault(tombstone: SafebyokVaultTombstoneInput!, opts: SafebyokDelOptsInput!): SafebyokVaultAnswer!
   safebyokTidyGone(applabel: String!, user_id: String!): SafebyokTidiedAnswer!
 }

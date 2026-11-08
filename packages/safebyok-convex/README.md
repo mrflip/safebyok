@@ -37,7 +37,7 @@ From a module of your own, `convex/safebyok.ts`, under these names:
 import { SafebyokComponent } from 'safebyok-convex/server'
 import { components } from './_generated/api'
 
-export const { listVaults, getVault, listBoxes, getBox, putVault, putBox, delVault, delBox, tidyGone, watchRows } =
+export const { listVaults, getVault, listBoxes, getBox, putVault, putBox, delVault, delBox, delDamagedBox, tidyGone, watchRows } =
   new SafebyokComponent(components.safebyok).api({
     getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
   })

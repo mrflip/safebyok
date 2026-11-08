@@ -117,6 +117,11 @@ ${vaultAnswerFragments}`,
 }
 ${boxAnswerFragments}`,
 
+  delDamagedBox: `mutation SafebyokDelDamagedBox($tombstone: SafebyokBoxTombstoneInput!, $boxprops: SafebyokJson!) {
+  safebyokDelDamagedBox(tombstone: $tombstone, boxprops: $boxprops) { ...SafebyokBoxAnswerFields }
+}
+${boxAnswerFragments}`,
+
   delVault: `mutation SafebyokDelVault($tombstone: SafebyokVaultTombstoneInput!, $opts: SafebyokDelOptsInput!) {
   safebyokDelVault(tombstone: $tombstone, opts: $opts) { ...SafebyokVaultAnswerFields }
 }

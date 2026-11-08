@@ -3,6 +3,7 @@
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
 import { randomId } from '../helpers/crypto'
+import { stableJsonify } from '../helpers/stable-jsonify'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type Boxscope, type VaultScope, sidecar } from './shapes-core'
@@ -92,9 +93,9 @@ export type VaultRow       = VaultRecord | VaultTombstone
 export type DamagedVault   = VaultSparse & Readonly<{ damagekind: EX.Damagekind }>
 // --
 
-// == [Box forms]: boxSparse, boxRecord, boxTombstone, boxRow, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox
+// == [Box forms]: boxSparse, boxRecord, boxTombstone, boxRow, boxRowDuckish, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox
 
-export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_option', ({ lit, discrim, box_tok, box_key_wrapped, whisper_ciphered }) => {
+export const { boxSparse, boxRecord, boxTombstone, boxRow, boxRowDuckish } = Checkers('bad_option', ({ lit, discrim, box_tok, box_key_wrapped, whisper_ciphered }) => {
   const boxSparse = CX.boxscope.unwrap().extend({
     fmt: lit(BoxFormat),
     ...sparseBase.shape,
@@ -115,14 +116,15 @@ export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_opti
   }).strict()
   const boxTombstone = boxSparse.extend({ am: lit('x') }).strict()
   const boxRow       = discrim('am', [boxRecord, boxTombstone])
-  return { boxSparse, boxRecord, boxTombstone, boxRow }
+  const boxRowDuckish = discrim('am', [boxRecord.strip(), boxTombstone.strip()])
+  return { boxSparse, boxRecord, boxTombstone, boxRow, boxRowDuckish }
 }, [CX])
 
 export type BoxSparse    = Readonly<Z.infer<typeof boxSparse>>
 export type BoxRecord    = Readonly<Z.infer<typeof boxRecord>>
 export type BoxTombstone = Readonly<Z.infer<typeof boxTombstone>>
 export type BoxRow       = BoxRecord | BoxTombstone
-export type DamagedBox   = BoxSparse & Readonly<{ damagekind: EX.Damagekind }>
+export type DamagedBox   = BoxSparse & Readonly<{ damagekind: EX.Damagekind, boxprops: unknown }>
 // --
 
 // == [Rows found]: foundVaultRow, foundBoxRow
@@ -209,7 +211,7 @@ export const capacity = objCheck(({ obj, union, int, uint, lit }) => {
 export type Capacity = Z.infer<typeof capacity>
 // --
 
-// == [Row helpers]: rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, isNewerFormat, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf
+// == [Row helpers]: rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, isNewerFormat, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxMatch, boxTombstoneOf
 
 export const { rowPeek, fmtPeek } = Checkers('bad_option', ({ obj, num, vault_tok }) => ({
   rowPeek: obj({ ...revision.shape, am, vault_tok }),
@@ -282,7 +284,7 @@ const damagekindOf = (raw: unknown, ownFormat: number): EX.Damagekind => (isNewe
 export const damagedVaultOf = (scope: VaultScope, raw: unknown): DamagedVault => ({ ...sentinelVaultOf(scope), ...peekOf(raw), am: 'd', damagekind: damagekindOf(raw, VaultFormat) })
 
 /** A box row that failed validation, in the one shape: `am` 'd', with sentinels where the row cannot be read. */
-export const damagedBoxOf = (scope: Boxscope, vault_tok: string, raw: unknown): DamagedBox => ({ ...sentinelBoxOf(scope, vault_tok), ...peekOf(raw), vault_tok, am: 'd', damagekind: damagekindOf(raw, BoxFormat) })
+export const damagedBoxOf = (scope: Boxscope, vault_tok: string, raw: unknown): DamagedBox => ({ ...sentinelBoxOf(scope, vault_tok), ...peekOf(raw), vault_tok, am: 'd', damagekind: damagekindOf(raw, BoxFormat), boxprops: raw })
 
 /** True when `raw` fails a vault row's checks, and `tombstone` over `prior` names it as `damaged_rows` lists it: `am` 'd' at its revision and `vault_tok`, or their sentinels. */
 export const isDamagedVaultAt = (raw: unknown, tombstone: VaultTombstone, prior: Revision): boolean => {
@@ -291,9 +293,9 @@ export const isDamagedVaultAt = (raw: unknown, tombstone: VaultTombstone, prior:
   return (listed.vault_tok === tombstone.vault_tok) && isRowAt(listed, prior)
 }
 
-/** True when `raw` fails a box row's checks, and `prior` names it as `damaged_rows` lists it. */
-export const isDamagedBoxAt = (raw: unknown, tombstone: BoxTombstone, prior: Revision): boolean => (
-  (raw !== null) && (! boxRow.safeParse(raw).success) && isRowAt(damagedBoxOf(tombstone, tombstone.vault_tok, raw), prior)
+/** True when `boxprops` is exactly the stored `raw`, and is damaged in a format this copy of safebyok reads. */
+export const isDamagedBoxMatch = (raw: unknown, boxprops: unknown): boolean => (
+  (raw !== null) && (! boxRowDuckish.safeParse(boxprops).success) && (! isNewerFormat(boxprops, BoxFormat)) && (stableJsonify(raw) === stableJsonify(boxprops))
 )
 
 /** The tombstone a vault's deletion leaves for a box row, or null for a row already one or past reading. */

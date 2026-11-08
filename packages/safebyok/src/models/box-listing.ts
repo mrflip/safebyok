@@ -3,12 +3,12 @@
 import { VaultError } from '../refusals/errors'
 import type { Modelkind } from '../helpers/consts'
 import { tattoo } from '../helpers/helpers'
-import { absentBoxError, notListedBoxError } from '../refusals/throwers'
+import { absentBoxError, absentDamagedBoxError, notListedBoxError } from '../refusals/throwers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxCreateOpts, type BoxDna, type BoxListingOpts, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, boxDna } from '../shapes/shapes-vaultish'
+import { type BoxCreateOpts, type BoxDna, type BoxListingOpts, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, type TimelyOpts, boxDna } from '../shapes/shapes-vaultish'
 import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow, BoxRecord, BoxSparse } from '../shapes/shapes-storage'
 import type { Notice } from '../storage/vault-db'
 import { Box } from './box'
@@ -28,7 +28,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** The rows the vaultDB's listing set aside as damaged. */
   #damagedRows: readonly DamagedBox[] = Object.freeze([])
 
-  /** The rows of this vault found damaged, set aside until `del` names one. */
+  /** The rows of this vault found damaged, set aside until {@link delDamaged} deletes one. */
   get damaged_rows(): readonly DamagedBox[] { return this.#damagedRows }
   // --
 
@@ -52,7 +52,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   recordOf(duck: unknown): BoxRecord { return SX.boxRecord.parseConsistent(duck, this.scope) }
   // --
 
-  // == [Methods]: list, damagedAt, del, get, tryGet, puttable, create, tryCreate, shellFor
+  // == [Methods]: list, damagedAt, delDamaged, tryDelDamaged, get, tryGet, puttable, create, tryCreate, shellFor
 
   /** Hold every box the vaultDB lists for this vault, sparse, and set its damaged rows aside. */
   async list(): Promise<void> {
@@ -76,13 +76,22 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return this.#damagedRows.find((damaged) => damaged.boxlabel === boxlabel) ?? null
   }
 
-  /** Delete the box `duck` names, and stop setting its row aside as damaged. */
-  override async del(duck: BoxSparse | Box): Promise<Box | null> {
-    const thing = await super.del(duck)
-    const { boxlabel } = this.scopeOf(duck)
-    this.#damagedRows = Object.freeze(this.#damagedRows.filter((damaged) => damaged.boxlabel !== boxlabel))
-    return thing
+  /** Deletes the damaged row listed under `scoped`, and stops setting it aside. */
+  async delDamaged(scoped: unknown, opts: TimelyOpts = {}): Promise<Box | null> {
+    const timely = VX.timelyOpts.parse(opts)
+    const scope = this.scopeOf(scoped)
+    this.world.demandUnlocked()
+    await this.ensureTimelyWorld(timely.maxWorldMillis); this.world.demandUnlocked()
+    const damaged = this.damagedAt(scope)
+    if (damaged === null) { throw absentDamagedBoxError(scope) }
+    this.demandEnabled()
+    const tombstone = this.tombstoneOver(this.sparseOf(damaged))
+    const box = await this.deliver(await this.vaultDB.tryDelDamagedBox(tombstone, damaged.boxprops))
+    this.#damagedRows = Object.freeze(this.#damagedRows.filter((listed) => listed !== damaged))
+    return box
   }
+
+  tryDelDamaged(scoped: unknown, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delDamaged(scoped, opts)) }
 
   /** The box under `scoped`, no older than `opts` allows, or null under `ifAbsent: 'nil'`. */
   async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {

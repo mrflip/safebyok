@@ -13,7 +13,7 @@ import type { ReqParams } from './shapes-storage'
 // == [Crossed parts]: crossedErr, crossedReqParams, damagedVault, damagedBox, CrossedErr, CrossedReqParams
 
 // A failed check here is a wire out of step with this copy of safebyok, never a damaged row: 'unexpected_error'.
-export const { crossedErr, crossedReqParams, damagedVault, damagedBox } = Checkers('unexpected_error', ({ obj, arr, str, int, lit, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok, revision_tok }) => {
+export const { crossedErr, crossedReqParams, damagedVault, damagedBox } = Checkers('unexpected_error', ({ obj, arr, str, int, lit, oneof, unk, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok, revision_tok }) => {
   const crossedErr = obj({
     refusalkind: oneof(refusalkindVals),
     message:     str,
@@ -37,7 +37,7 @@ export const { crossedErr, crossedReqParams, damagedVault, damagedBox } = Checke
   }).strict()
   // A damaged row's label is the one it is stored under, which may fail a label's check: a reason it is listed.
   const damagedVault = SX.vaultSparse.extend({ vaultlabel: str, am: lit('d'), damagekind: oneof(EX.damagekindVals) }).strict()
-  const damagedBox   = SX.boxSparse.extend({ boxlabel: str, am: lit('d'), damagekind: oneof(EX.damagekindVals) }).strict()
+  const damagedBox   = SX.boxSparse.extend({ boxlabel: str, am: lit('d'), damagekind: oneof(EX.damagekindVals), boxprops: unk }).strict()
   return { crossedErr, crossedReqParams, damagedVault, damagedBox }
 }, [CX])
 

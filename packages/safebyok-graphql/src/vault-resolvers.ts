@@ -23,6 +23,7 @@ export type VaultFieldArgs = {
   safebyokAddPasskey:        { params: DB.AddPasskeyParams }
   safebyokRevokePasskey:     { params: DB.RevokePasskeyParams }
   safebyokDelBox:            { tombstone: DB.BoxTombstone, opts: DB.DelOpts }
+  safebyokDelDamagedBox:     { tombstone: DB.BoxTombstone, boxprops: unknown }
   safebyokDelVault:          { tombstone: DB.VaultTombstone, opts: DB.DelOpts }
   safebyokTidyGone:          DB.BankScope
   safebyokWatch:             DB.BankScope & { vaultlabel?: string | null }
@@ -73,6 +74,7 @@ export type VaultResolvers<ContextT> = {
     safebyokAddPasskey:        VaultFieldResolver<ContextT, 'safebyokAddPasskey'>
     safebyokRevokePasskey:     VaultFieldResolver<ContextT, 'safebyokRevokePasskey'>
     safebyokDelBox:            VaultFieldResolver<ContextT, 'safebyokDelBox'>
+    safebyokDelDamagedBox:     VaultFieldResolver<ContextT, 'safebyokDelDamagedBox'>
     safebyokDelVault:          VaultFieldResolver<ContextT, 'safebyokDelVault'>
     safebyokTidyGone:          VaultFieldResolver<ContextT, 'safebyokTidyGone'>
   }
@@ -157,6 +159,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
       safebyokAddPasskey:        async (_parent, { params }, context) => await served(context, params.user_id, params, async () => await vaultDB.tryAddPasskey(params)),
       safebyokRevokePasskey:     async (_parent, { params }, context) => await served(context, params.user_id, params, async () => await vaultDB.tryRevokePasskey(params)),
       safebyokDelBox:            async (_parent, { tombstone, opts }, context) => await served(context, tombstone.user_id, { ...tombstone, ...opts }, async () => await vaultDB.tryDelBox(tombstone, opts)),
+      safebyokDelDamagedBox:     async (_parent, { tombstone, boxprops }, context) => await served(context, tombstone.user_id, tombstone, async () => await vaultDB.tryDelDamagedBox(tombstone, boxprops)),
       safebyokDelVault:          async (_parent, { tombstone, opts }, context) => await served(context, tombstone.user_id, { ...tombstone, ...opts }, async () => await vaultDB.tryDelVault(tombstone, opts)),
       safebyokTidyGone:          async (_parent, scope, context) => await served(context, scope.user_id, scope, async () => await vaultDB.tryTidyGone(scope)),
     },

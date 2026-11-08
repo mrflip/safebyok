@@ -8,6 +8,9 @@ import type { BatteryWorld } from './vault-db-battery'
 
 /** Registers the dels' and tidyGone's cases over `world`. */
 export const describeDels = ({ storeWith, rowsOf }: BatteryWorld): void => {
+  /** A tombstone addressed as a listing names a row past peeking. */
+  const sentinelTombstone = SX.boxTombstone.parse({ ...SX.sentinelBoxOf(boxscope, 'life1'), ...SX.nextRevisionOf(SX.VoidRevision, Now) })
+
   /** The box row `openai` under the life `vault_tok` of the vault, as stored. */
   const storedBoxOf = async (vaultDB: VaultDB, vault_tok = 'life1'): Promise<unknown> => {
     const boxrows = await rowsOf(vaultDB).boxRowsOf(vaultScope, vault_tok)
@@ -109,15 +112,69 @@ export const describeDels = ({ storeWith, rowsOf }: BatteryWorld): void => {
       expect(await storedBoxOf(vaultDB)).to.include({ am: 'x' })
     })
 
-    it("delBox deletes rubble at the sentinels, and refuses any other prior", async () => {
+    it("delBox refuses a damaged row, whichever prior it names, and leaves the row standing", async () => {
       const { vaultDB, box } = await storeWith({ box: true })
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { garbage: true })
-      const tombstone = SX.boxTombstone.parse({ ...SX.sentinelBoxOf(boxscope, 'life1'), ...SX.nextRevisionOf(SX.VoidRevision, Now) })
-      const missed = await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })
-      expect(missed).to.deep.include({ ok: false, act: 'damaged_row' })
-      const named = await vaultDB.tryDelBox(tombstone, { prior: SX.VoidRevision })
-      expect(named).to.deep.include({ ok: true, act: 'deleted' })
+      expect(await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'damaged_row' })
+      expect(await vaultDB.tryDelBox(sentinelTombstone, { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'damaged_row' })
+      expect(await storedBoxOf(vaultDB)).to.deep.equal({ garbage: true })
+    })
+  })
+
+  describe("delDamagedBox", () => {
+    it("writes the tombstone over the row that stands exactly as the props given", async () => {
+      const { vaultDB, vault } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { garbage: true })
+      expect(await vaultDB.delDamagedBox(sentinelTombstone, { garbage: true })).to.deep.include({ act: 'deleted', val: sentinelTombstone, world: vault })
       expect(await storedBoxOf(vaultDB)).to.include({ am: 'x', revision_seq: 0 })
+    })
+
+    it("matches a row whatever the order of its fields", async () => {
+      const { vaultDB } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { one: 1, two: { three: 3, four: 4 } })
+      expect(await vaultDB.tryDelDamagedBox(sentinelTombstone, { two: { four: 4, three: 3 }, one: 1 })).to.deep.include({ ok: true, act: 'deleted' })
+    })
+
+    it.each([
+      ['props that differ from the row that stands', () => ({ garbage: true }),                         { garbage: false }],
+      ['a row whose only fault is extra fields',     (box: object) => ({ ...box, extra: 1 }),            null],
+      ['a row of a newer format',                    (box: object) => ({ ...box, fmt: SX.BoxFormat + 1 }), null],
+    ])("refuses %s, and leaves the row standing", async (_tag, rowOf, sent) => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      const row = rowOf(box)
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', row)
+      expect(await vaultDB.tryDelDamagedBox(sentinelTombstone, sent ?? row)).to.deep.include({ ok: false, act: 'damaged_row' })
+      expect(await storedBoxOf(vaultDB)).to.deep.equal(row)
+    })
+
+    it("refuses a live row sent as its own props, as a stale write", async () => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      expect(await vaultDB.tryDelDamagedBox(sentinelTombstone, box)).to.deep.include({ ok: false, act: 'stale_write' })
+      expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
+    })
+
+    it("answers void over a void row, and gone over a tombstone", async () => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      expect(await vaultDB.delDamagedBox({ ...sentinelTombstone, boxlabel: 'never' }, { garbage: true })).to.deep.include({ act: 'void' })
+      await vaultDB.delBox(boxTombstoneOf(box), { prior: priorOf(box) })
+      expect(await vaultDB.delDamagedBox(sentinelTombstone, { garbage: true })).to.deep.include({ act: 'gone' })
+    })
+
+    it("stores nothing under a vault no longer live", async () => {
+      const { vaultDB, vault } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { garbage: true })
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vaultTombstoneOf(vault), am: 'x' })
+      expect(await vaultDB.tryDelDamagedBox(sentinelTombstone, { garbage: true })).to.deep.include({ ok: false, act: 'vault_gone' })
+      expect(await storedBoxOf(vaultDB)).to.deep.equal({ garbage: true })
+    })
+
+    it("tells a refusal nothing of the row or the props", async () => {
+      const { vaultDB } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { garbage: 'planted-in-the-row' })
+      const refused = await vaultDB.tryDelDamagedBox(sentinelTombstone, { garbage: 'planted-in-the-props' })
+      expect(refused).to.include({ ok: false, act: 'damaged_row' })
+      const { err } = refused as Extract<typeof refused, { ok: false }>
+      expect(JSON.stringify({ ...refused, err: err.message, meta: err.meta, cause: String(err.cause) })).not.to.include('planted-in')
     })
   })
 

@@ -18,7 +18,7 @@ const dna = () => boxDnaOf(held.mw.boxscope('anthropic_api_key'))
 const Label = 'anthropic_api_key'
 
 /** Every verb a listing calls on its vaultDB, with no brand: a duck. */
-const vaultDBDuck = () => Object.fromEntries(['tryGetVault', 'tryPutVault', 'tryDelVault', 'tryListBoxes', 'tryGetBox', 'tryPutBox', 'tryDelBox', 'watch'].map((verb) => [verb, () => null]))
+const vaultDBDuck = () => Object.fromEntries(['tryGetVault', 'tryPutVault', 'tryDelVault', 'tryListBoxes', 'tryGetBox', 'tryPutBox', 'tryDelBox', 'tryDelDamagedBox', 'watch'].map((verb) => [verb, () => null]))
 
 describe("BoxListing", () => {
   describe("new BoxListing(world, opts)", () => {

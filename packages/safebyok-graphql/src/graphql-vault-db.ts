@@ -154,14 +154,24 @@ export class GraphQLVaultDB implements VaultDB {
   }
   // --
 
-  // == [Dels]: delBox, tryDelBox, delVault, tryDelVault, tidyGone, tryTidyGone
+  // == [Dels]: delBox, tryDelBox, delDamagedBox, tryDelDamagedBox, delVault, tryDelVault, tidyGone, tryTidyGone
 
-  /** Deletes a box at `prior`: its live row, or the damaged row `damaged_rows` lists. */
+  /** Deletes a box's live row at `prior`. */
   async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> { return goodAnswerOf(await this.tryDelBox(tombstone, opts)) }
 
   async tryDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<Answer<BoxTombstone, DelAct>> {
     return await answerOf('delBox', DB.reqParamsOf({ ...tombstone, ...opts }), async () => {
       const answer = await this.#told(VaultOperations.delBox, 'safebyokDelBox', { tombstone: DB.boxTombstone.parse(tombstone), opts: DB.delOpts.parse(opts) })
+      return DB.delBoxAnswer.parse(rowAnswerOf(answer))
+    })
+  }
+
+  /** Deletes the damaged box row at `tombstone`'s address that stands exactly as `boxprops`, the row `damaged_rows` carries. */
+  async delDamagedBox(tombstone: BoxTombstone, boxprops: unknown): Promise<GoodAnswer<BoxTombstone, DelAct>> { return goodAnswerOf(await this.tryDelDamagedBox(tombstone, boxprops)) }
+
+  async tryDelDamagedBox(tombstone: BoxTombstone, boxprops: unknown): Promise<Answer<BoxTombstone, DelAct>> {
+    return await answerOf('delDamagedBox', DB.reqParamsOf(tombstone), async () => {
+      const answer = await this.#told(VaultOperations.delDamagedBox, 'safebyokDelDamagedBox', { tombstone: DB.boxTombstone.parse(tombstone), boxprops })
       return DB.delBoxAnswer.parse(rowAnswerOf(answer))
     })
   }

@@ -97,6 +97,7 @@ export const putVaultArgs   = { record: vaultRecord, opts: putOptsGiven }
 export const putBoxArgs     = { record: boxRecord, opts: putOptsGiven, maxBoxes: v.optional(v.number()) }
 export const delVaultArgs   = { tombstone: vaultTombstone, opts: delOpts }
 export const delBoxArgs     = { tombstone: boxTombstone, opts: delOpts }
+export const delDamagedBoxArgs = { tombstone: boxTombstone, boxprops: v.any() }
 export const tidyGoneArgs   = { scope: bankScope }
 export const watchRowsArgs  = { scope: watchScope }
 // --

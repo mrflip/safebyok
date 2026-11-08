@@ -385,15 +385,15 @@ describe("a damaged row", () => {
   })
 
   it("leaves when the customer names its box row, its neighbours and vault standing", async () => {
-    const { vault, opts, anotherSession, demandStored } = await makeBornVault()
+    const { vault, opts } = await makeBornVault()
     const vaultDB = opts.vaultDB as MemoryVaultDB
     await vault.boxListing.create(BoxDna)
     const boxrows = vaultDB._cheat_boxRowsOf(Dna, vault.vault_tok)
     const scope = omit(BoxDna, ['whisper', 'sidecar'])
     for (const raw of [{ garbage: true }, { ...boxrows.get(BoxDna.boxlabel) as object, whisper_ciphered: 'chewed' }]) {
       boxrows.set(BoxDna.boxlabel, raw)
-      const session = await anotherSession().build(demandStored())
-      await session.boxListing.del(SX.damagedBoxOf(scope, vault.vault_tok, raw))
+      await vault.boxListing.list()
+      await vault.boxListing.delDamaged(scope)
       expect(boxrows.get(BoxDna.boxlabel)).to.include({ am: 'x' })
     }
     expect(vault.isPresent).to.be.true
