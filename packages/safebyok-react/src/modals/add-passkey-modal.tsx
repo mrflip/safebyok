@@ -13,11 +13,9 @@ export const AddPasskeyModal = (props: AddPasskeyModalProps) => (
   </AnsweringOnce>
 )
 
-/** The dialog itself, inside AddPasskeyModal's boundary. */
 const AddPasskeyForm = ({ gating, onDone: done, passphraseUsername, passkeyRpId }: AddPasskeyModalProps) => {
   const { gripe, setGripe, meet, attempt, whenShown, isShown } = useAttempts('AddPasskeyModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)
-  // The browser asks for one passkey at a time: a second submit while it asks changes nothing.
   const asking = useRef(false)
   const username = passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)
 

@@ -11,7 +11,6 @@ export const RevokePasskeyModal = (props: RevokePasskeyModalProps) => (
   </AnsweringOnce>
 )
 
-/** The dialog itself, inside RevokePasskeyModal's boundary. */
 const RevokePasskeyForm = ({ gating, onDone: done, passphraseUsername }: RevokePasskeyModalProps) => {
   const { gripe, setGripe, attempt } = useAttempts('RevokePasskeyModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)

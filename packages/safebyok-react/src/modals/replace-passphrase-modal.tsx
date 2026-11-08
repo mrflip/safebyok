@@ -11,23 +11,19 @@ export const ReplacePassphraseModal = (props: ReplacePassphraseModalProps) => (
   </AnsweringOnce>
 )
 
-/** The dialog itself, inside ReplacePassphraseModal's boundary. */
 const ReplacePassphraseForm = ({ gating, onDone: done, passphraseUsername, passphraseAdvice }: ReplacePassphraseModalProps) => {
   const { gripe, setGripe, fail, attempt } = useAttempts('ReplacePassphraseModal', done)
   const anteRef = useRef<HTMLInputElement>(null)
   const nextRef = useRef<HTMLInputElement>(null)
   const { ref: confirmRef, gripeId, differs } = useConfirmation(setGripe)
-  // The host's advice hears the passphrase, so what it throws may quote it: `fail` gets safebyok's own refusal instead.
   const advice = useAdvice(passphraseAdvice, gating, true, fail)
 
   const submit = () => {
     const nextPassphraseClear = nextRef.current?.value ?? ''
-    // A new passphrase mistyped would become the vault's, so a mismatch stops here, before any key is derived.
     if (differs(nextPassphraseClear)) { return }
     void attempt(() => gating.attempt({ antePassphraseClear: anteRef.current?.value ?? '', nextPassphraseClear }), 'unlocked')
   }
 
-  /** Forget the gripe about what was typed before, at each change to a field. */
   const forgetGripe = () => { setGripe(null) }
 
   return (
