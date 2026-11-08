@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Bank, MinuteMillis, type RequestCleartext, type VaultError } from 'safebyok'
-import { BankProvider } from '../src/bank-provider'
-import { CreateVaultButton, VaultLockControl } from '../src/vault-controls'
+import { BankProvider } from '../src/provider/bank-provider'
+import { CreateVaultButton, VaultLockControl } from '../src/components/vault-controls'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()

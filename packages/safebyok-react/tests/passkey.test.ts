@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PasskeySaltBytes, PrfAnswerBytes, VaultError, type WayinHeader } from 'safebyok'
 import { fromB64 } from 'safebyok/utils'
-import { Messages } from '../src/messages'
-import { askPasskey, attemptOnce, createPasskey, passkeysAvailable } from '../src/passkey'
+import { Messages } from '../src/helpers/messages'
+import { askPasskey, attemptOnce, createPasskey, passkeysAvailable } from '../src/helpers/passkey'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()

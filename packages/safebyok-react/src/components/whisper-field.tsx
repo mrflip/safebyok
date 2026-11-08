@@ -1,7 +1,8 @@
-import { useId, type ComponentPropsWithRef } from 'react'
+import { useId } from 'react'
 import { WhisperFieldAttributes } from 'safebyok/utils'
-import { Messages } from './messages'
-import { useRevealToggle } from './reveal-toggle'
+import { Messages } from '../helpers/messages'
+import { useRevealToggle } from '../hooks/reveal-toggle'
+import type { WhisperFieldProps } from '../shapes'
 
 /** A field for the user to type or paste a whisper into, hidden as they type, with a Show / Hide button.
  *
@@ -32,10 +33,4 @@ export const WhisperField = ({ onChange, ...passed }: WhisperFieldProps) => {
       {reveal.button(fieldId)}
     </span>
   )
-}
-
-/** What a WhisperField is handed: where each change goes, and any input attribute but a value. */
-export type WhisperFieldProps = Omit<ComponentPropsWithRef<'input'>, 'type' | 'name' | 'value' | 'defaultValue' | 'onChange' | keyof typeof WhisperFieldAttributes> & {
-  /** Hears the whole text after each change. */
-  onChange?: ((whisperText: string) => void) | undefined
 }

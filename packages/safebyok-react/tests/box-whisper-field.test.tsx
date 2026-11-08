@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { Box, Vault } from 'safebyok'
 import { BoxFields } from 'safebyok/dom'
 import { WhisperFieldAttributes } from 'safebyok/utils'
-import { BoxWhisperField } from '../src/box-whisper-field'
+import { BoxWhisperField } from '../src/components/box-whisper-field'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()

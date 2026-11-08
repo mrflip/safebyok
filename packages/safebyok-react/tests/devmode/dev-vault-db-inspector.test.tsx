@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { BankProvider } from '../../src/bank-provider'
+import { BankProvider } from '../../src/provider/bank-provider'
 import { DevVaultDBInspector } from '../../src/devmode'
 import * as TH from '../test-helpers'
 

@@ -149,8 +149,8 @@ For each secret: the code that holds its naked value (the string, the bytes, or 
 handle), and the code that operates on it as a non-extractable handle without ever holding its
 bytes. Everything not listed never sees the value. Private methods are named with their `#`.
 
-**Passphrase.** Naked: the host's dialog (`safebyok-react`'s `passphrase-modal.tsx` and
-`gating-modal.tsx`, on the old core until the package moves, hold what was typed in component state) →
+**Passphrase.** Naked: the host's dialog (`safebyok-react`'s `modals/passphrase-modal.tsx` and
+`provider/gating-modal.tsx`, on the old core until the package moves, hold what was typed in component state) →
 `gating.attempt` → `#attemptOnce`, inside the gating's `outcomeOf` → its kind's prove (`ProveForGatingkind`,
 `models/gating.ts`) → `checkedClears` (`GX.vaultBuildClears`, `vaultUnlockClears`, `passphraseReplaceClears`,
 `passkeyAddClears`, `passkeyRevokeClears`, `vaultDelClears`: shape only, `passphraseCleartext`), and for

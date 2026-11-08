@@ -5,7 +5,7 @@
  */
 import { Activity, useEffect, type ReactNode } from 'react'
 import type { Bank, VaultSnapshot } from 'safebyok'
-import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from '../src/hooks'
+import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from '../src/hooks/hooks'
 
 /**
  * `shown` inside an Activity in `mode`, for `rerender` to hide and show again.

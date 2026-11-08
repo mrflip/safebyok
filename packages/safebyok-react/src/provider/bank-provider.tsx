@@ -1,16 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Bank, DefaultOnBadNews, DefaultOnLifecycle, tellBadNewsTo, type Vault, type VaultError } from 'safebyok'
-import { GatingModal, type GatingModalProps } from './gating-modal'
+import { Bank, DefaultOnBadNews, DefaultOnLifecycle, tellBadNewsTo, type Vault } from 'safebyok'
+import { providerProps } from '../shapes'
+import type { BankProviderProps, ContextValue, GatingModalProps, Handlers, HeldBankOpts, TellBadNews } from '../shapes'
+import { GatingModal } from './gating-modal'
 import { useDeviceId, useWarnOfIgnoredOpts } from './provider-hooks'
-import { providerProps, type BankProviderProps, type Handlers, type HeldBankOpts } from './shapes/shapes-provider'
 
 // == [Context]: ContextValue, BankContext, Bankless, useProvided
-
-/** What the provider hands down: the signed-in user's bank, the Vault objects a hook has called `tryHello` on, and how to tell the host's `onBadNews`. */
-export type ContextValue = { bank: Bank | null, helloedVaults: WeakSet<Vault>, tellBadNews: TellBadNews }
-
-/** Tell the host's `onBadNews` each refusal no caller waits on, while the bank is enabled. Never throws. */
-export type TellBadNews = (badnews: readonly VaultError[]) => void
 
 const BankContext = createContext<ContextValue | null>(null)
 

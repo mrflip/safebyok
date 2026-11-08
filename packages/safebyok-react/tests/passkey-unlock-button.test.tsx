@@ -1,11 +1,11 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Gating, VaultError } from 'safebyok'
-import { Messages } from '../src/messages'
-import { createPasskey } from '../src/passkey'
-import { PasskeyUnlockButton } from '../src/passkey-unlock-button'
-import { PassphraseModal } from '../src/passphrase-modal'
-import type { DialogAnswer } from '../src/modal'
+import { Messages } from '../src/helpers/messages'
+import { createPasskey } from '../src/helpers/passkey'
+import { PasskeyUnlockButton } from '../src/components/passkey-unlock-button'
+import { PassphraseModal } from '../src/modals/passphrase-modal'
+import type { DialogAnswer } from '../src/shapes'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()

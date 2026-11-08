@@ -1,6 +1,6 @@
 import { PasskeySaltBytes, VaultError, type PasskeyAnswer, type WayinHeader } from 'safebyok'
-import { Checkers } from 'safebyok/storage'
 import { fromB64, toB64 } from 'safebyok/utils'
+import { PasskeyChecks, type AskPasskeyOpts, type CreatePasskeyOpts } from '../shapes'
 import { Messages } from './messages'
 
 // The WebAuthn half of a passkey, which the core leaves to the host. `createPasskey` makes a passkey
@@ -15,61 +15,10 @@ import { Messages } from './messages'
 // Where no passkey answer is to be had (the browser has no WebAuthn, the authenticator no PRF, or
 // the browser failed to ask), these refuse `passkey_unavailable`, which a dialog shows in place.
 
-/** True for base64url text. */
-const isB64 = (text: string): boolean => {
-  try {
-    fromB64(text)
-    return true
-  } catch {
-    return false
-  }
-}
-
-// A passkey header's salt is checked here as base64url, as the core checks it when it reads the vault.
-// The core checks its credential_id only as text, so one that is not base64url refuses later, as a
-// damaged record (credentialBytesOf).
-const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, int, bytes, fn }) => {
-  const timeout = int.positive().optional()
-  const named = str.min(1)
-  const passphraseHeader = obj({ wayinkind: lit('passphrase') })
-  const passkeyHeader = obj({ wayinkind: lit('passkey'), credential_id: named, prf_salt_b64: named.refine(isB64, 'Expected base64url text') })
-  return {
-    createPasskeyOpts: obj({
-      rp:   obj({ name: named, id: named.optional() }).strict(),
-      user: obj({ name: named, displayName: str }).strict(),
-      timeout,
-    }).strict(),
-    askPasskeyInput: obj({
-      passkeyHeader: discrim('wayinkind', [passphraseHeader, passkeyHeader]).nullable(),
-      opts:          obj({ rpId: named.optional(), timeout }).strict(),
-    }),
-    // The attempt checks the rest of the answer.
-    /** The part of a passkey answer attemptOnce itself touches. */
-    attemptOnceAnswer:  obj({ prfBytes: bytes() }),
-    attemptOnceAttempt: fn(),
-  }
-})
-
 /** True when this browser offers WebAuthn at all: whether to show a passkey button. */
 export const passkeysAvailable = (): boolean => (
   typeof PublicKeyCredential === 'function' && typeof navigator === 'object' && 'credentials' in navigator
 )
-
-/** What `createPasskey` asks of the host: how the authenticator shows the new passkey. */
-export type CreatePasskeyOpts = {
-  /** The relying party: the `name` the authenticator shows, and the `id` domain the passkey answers to. */
-  rp:       { name: string, id?: string | undefined }
-  /** How the authenticator lists the passkey: an account `name` and a `displayName`. */
-  user:     { name: string, displayName: string }
-  /** How long the browser waits for the user, in milliseconds. Defaults to the browser's own. */
-  timeout?: number | undefined
-}
-
-/** What `askPasskey` may be told: the relying party's `rpId`, if the passkey was made under one, and a `timeout`. */
-export type AskPasskeyOpts = {
-  rpId?:    string | undefined
-  timeout?: number | undefined
-}
 
 /** Make a new passkey and return its first answer, or null when the user dismisses the prompt.
  *
