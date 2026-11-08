@@ -36,6 +36,12 @@ const deviceDBHolding = (user_id: string) => {
   return { deviceDB, answer: () => { answering.resolve(undefined) } }
 }
 
+/** The users whose leases `deviceDB` caches. */
+const leaseUsers = async (deviceDB: MemoryDeviceDB) => {
+  const rows = await deviceDB.listLeases()
+  return rows.map(({ user_id }) => user_id)
+}
+
 describe("BankProvider's bank", () => {
   it("holds no bank while nobody is signed in", async () => {
     provided({ user_id: null })
@@ -227,6 +233,34 @@ const unlockedProvided = async (overrides: Partial<Props> = {}) => {
   return { ...made, deviceDB }
 }
 
+describe("BankProvider at sign-out", () => {
+  it("vacates the user's bank when they sign out, erasing its cached leases", async () => {
+    const { props, rerender, deviceDB } = await unlockedProvided()
+    expect(await leaseUsers(deviceDB)).to.deep.equal(['u1'])
+    rerender({ ...props, user_id: null })
+    await waitFor(async () => { expect(await leaseUsers(deviceDB)).to.deep.equal([]) })
+  })
+
+  it("vacates the last user's bank at a switch, and not the next user's", async () => {
+    const { props, rerender, deviceDB } = await unlockedProvided()
+    rerender({ ...props, user_id: 'u2' })
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    await waitFor(async () => { expect(await leaseUsers(deviceDB)).to.deep.equal([]) })
+    expect(TH.seenBanks.map(({ user_id, isEnabled }) => [user_id, isEnabled])).to.deep.equal([['u1', false], ['u2', true]])
+  })
+
+  it("leaves the cached leases at an unmount, and through StrictMode's double effects", async () => {
+    const { props, unmount, deviceDB } = await unlockedProvided()
+    unmount()
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(await leaseUsers(deviceDB)).to.deep.equal(['u1'])
+    render(<StrictMode><BankProvider {...props}><TH.ShowsVault /></BankProvider></StrictMode>)
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(await leaseUsers(deviceDB)).to.deep.equal(['u1'])
+  })
+})
+
 describe("BankProvider's handlers", () => {
   afterEach(() => { vi.unstubAllGlobals() })
 
@@ -269,7 +303,7 @@ describe("BankProvider's handlers", () => {
     await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
   })
 
-  it("tells the next user's onPanic nothing of a panic from the bank it let go", async () => {
+  it("tells the next user's onPanic nothing of the bank it let go, whose vacate tells the last user's onPanic of the lease it cannot erase", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const next = vi.fn()
@@ -282,7 +316,7 @@ describe("BankProvider's handlers", () => {
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     erasing.resolve(TH.bad(Refusal))
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
-    expect(previous).not.toHaveBeenCalled()
+    await waitFor(() => { expect(previous).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ refusal: Refusal })) })
     expect(next).not.toHaveBeenCalled()
   })
 })

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffectEvent, useLayoutEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { Bank, DefaultOnBadNews, DefaultOnPanic, type Vault } from 'safebyok'
 import { GatingModal } from './gating-modal'
 import { useDeviceId, useGatingDialog, useWarnOfIgnoredOpts } from './provider-hooks'
@@ -25,7 +25,7 @@ export const useProvided = (hookname: string): ContextValue => {
 // == [Holding]: useHeldBank
 
 /** The bank made from the first render's `opts` once `device_id` is known, and held until unmount. */
-const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Handlers, onSwept: () => void): ContextValue => {
+const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Handlers, onSwept: () => void, onMade: (bank: Bank) => void): ContextValue => {
   const [madeFrom] = useState(opts)
   const [contextValue, setContextValue] = useState<ContextValue>(Bankless)
 
@@ -47,6 +47,7 @@ const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Han
     })
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the bank lives only between this effect and its cleanup, and render must hand it down
     setContextValue({ bank, helloedVaults: new WeakSet<Vault>() })
+    onMade(bank)
     // A refused `tryHello` lands in the bank's snapshot, which useBankSnapshot renders.
     void bank.tryHello()
     return () => {
@@ -55,7 +56,7 @@ const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Han
       onSwept()
       setContextValue(Bankless)
     }
-  }, [madeFrom, device_id, onSwept])
+  }, [madeFrom, device_id, onSwept, onMade])
 
   useWarnOfIgnoredOpts(contextValue.bank, madeFrom, opts)
   return contextValue
@@ -68,16 +69,30 @@ const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Han
 export const BankProvider = (props: BankProviderProps) => {
   const { applabel, user_id, deviceDB } = providerProps.parse(props, { where: 'BankProvider' })
   const device_id = useDeviceId(deviceDB, applabel, user_id)
+  const userkey = JSON.stringify([applabel, user_id])
+
+  // Signing out vacates here, not in the bank's cleanup, which an unmount, a hot reload or a hidden
+  // Activity runs too: only a change of user reruns this effect. The tag keeps the next user's bank safe.
+  /** The last bank made, tagged with its user. */
+  const lastBank = useRef<{ userkey: string, bank: Bank } | null>(null)
+  const onMade = useCallback((bank: Bank) => { lastBank.current = { userkey: JSON.stringify([bank.applabel, bank.user_id]), bank } }, [])
+  useEffect(() => {
+    const last = lastBank.current
+    if (last === null || last.userkey === userkey) { return }
+    lastBank.current = null
+    void last.bank.vacate()
+  }, [userkey])
+
   // Keyed by the user, not the device: the host's app remounts when the user changes, so nothing typed
   // carries over to the next one, and stays put while the device_id arrives.
-  return <UserBankProvider key={JSON.stringify([applabel, user_id])} {...props} device_id={device_id} />
+  return <UserBankProvider key={userkey} {...props} device_id={device_id} onMade={onMade} />
 }
 
 /** Hold one user's bank once the device is named, and show the dialog for its gatings. */
-const UserBankProvider = (props: BankProviderProps & { device_id: string | null }) => {
+const UserBankProvider = (props: BankProviderProps & { device_id: string | null, onMade: (bank: Bank) => void }) => {
   const dialog = useGatingDialog()
-  const { passphraseUsername, passphraseAdvice, passkeyRpId, children, device_id, onPanic = DefaultOnPanic, onBadNews = DefaultOnBadNews, requestCleartext = dialog.ask, ...bankish } = props
-  const contextValue = useHeldBank(bankish, device_id, { onPanic, onBadNews, requestCleartext }, dialog.endAny)
+  const { passphraseUsername, passphraseAdvice, passkeyRpId, children, device_id, onMade, onPanic = DefaultOnPanic, onBadNews = DefaultOnBadNews, requestCleartext = dialog.ask, ...bankish } = props
+  const contextValue = useHeldBank(bankish, device_id, { onPanic, onBadNews, requestCleartext }, dialog.endAny, onMade)
   const { showing } = dialog
 
   return (

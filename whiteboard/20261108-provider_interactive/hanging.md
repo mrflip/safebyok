@@ -4,7 +4,6 @@ Questions and issues either of us noticed, banked so we don't side quest. One bu
 
 ## For this PR
 
-* Are we telling the bank to vacate on the right cycle? [Coach] Decided 2026-11-08: a signed-out user's bank is vacated by default. How (the parent keeps the last user's bank and vacates it when the user changes) is still to confirm and build.
 * `eslint-disable-next-line react-hooks/set-state-in-effect` in `useHeldBank`, on `setContextValue`: report it in the PR's open questions. [agent]
 
 ## After this PR
