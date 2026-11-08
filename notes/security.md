@@ -41,6 +41,78 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-08 (bank_disable, branch `20261108-bank_disable`): **`bank.vacate()` disables the bank, then erases every lease row of the bank's applabel
+  and user_id; it drops no IndexedDB database.** In `packages/safebyok/src/models/bank.ts`, `vacate()` first disables the bank, synchronously:
+  `bank.isEnabled` is false for good, every `hello`, `ensureVault` or `vaultAt` refuses `disabled` from that instant, and the snapshot reads `refused`
+  with the cause. A disabled bank calls none of the host's functions (`onPanic`, `onBadNews`, `requestCleartext`): a panic goes to the platform
+  (`DefaultOnPanic`), news to the bank's logger (`DefaultOnBadNews`), and a request for the passphrase is declined with no dialog (amended 2026-11-08 (review_fixes): a panic
+  past the disable only reports its refusal to the platform, not through `DefaultOnPanic`; and `Bank.askUser` is plain `guardRequestCleartext(requestCleartext)` with no
+  switch, a disabled bank asking no one by construction, see the amendment below). The one exception is
+  the bank's own erase: `vacate()` then erases every cached lease row of the bank on the deviceDB, listed or not, and that erase alone holds the
+  host's `onPanic` (guarded) and `onBadNews`, taken at the vacate; a refused `tryForget` reaches the host's `onPanic` and a refused `tryListLeases`
+  reaches the host's `onBadNews`. Each listed vault's own lease erase, started by the same vacate, reports a refusal to `DefaultOnPanic`, not the
+  host (amended 2026-11-08 (review_fixes): it reports to the platform alone, as the bank is disabled by then): the bank's erase covers the same row, so a row a vault failed to erase is listed and retried by the bank's erase, whose failure does reach
+  the host. `vacate()` returns the erase's promise, which settles when it is done and never rejects; a repeat returns the first vacate's promise, and a
+  vacate after a sweep still erases, as sign-out may come after the page's cleanup. Not done: dropping the deviceDB's databases (`IdbDeviceDB` keeps one
+  database each for leases and bank rows, holding every app's and user's rows on the origin, and a pluggable deviceDB has none to drop); and forgetting
+  this bank's own `{ applabel, user_id, device_id }` row, so the same user's next sign-in on this device gets the same `device_id` (amended 2026-11-08 (bank_followups): done, see
+  the amendment at the end of this entry; the React provider's cached `device_id` is not part of it). Known race: an unlock in flight when `vacate()` runs can cache its lease
+  after the erase, and that lease stays until the next vacate.
+  amended 2026-11-08 (vacate_first): the order was reversed by the Coach's ruling. It read: `vacate()` let the vault listing go, so calls refused
+  `disabled`, then erased the bank's lease rows with the host's `onPanic` and `onBadNews` live, and only then disabled the bank, so `isEnabled` stayed
+  true through the erase and a vault's own lease erase could reach the host. Now the bank disables first and there is no window where it reads enabled
+  while its calls refuse, and the host's handlers are live for the bank's erase alone, as above.
+  amended 2026-11-08 (bank_disable): a vaultDB refusal of kind `identity_revoked` is now a panic, not bad news. Where a listing (the bank's list of
+  vaults, or a vault's list of boxes) meets it, it calls the bank's panic, which reaches the host's `onPanic` with `{ refusal, bank }`, and the caller
+  still receives the refusal; before, it went to `onBadNews` and the bank vacated itself unconditionally. `DefaultOnPanic` (the handler used when the
+  host gives none) reports the refusal to the platform and, on `identity_revoked`, calls `bank.vacate({ cause: refusal })` (amended 2026-11-08 (review_fixes): if/else, never both: it reports to the platform, then on `identity_revoked` vacates the bank, otherwise vacates the vault the panic names, if one), the same vacate as sign-out;
+  the bank's snapshot then reads stage `refused` with that refusal as `err`. A host that supplies its own `onPanic` decides for itself: the vacate on
+  revocation happens only if it calls `DefaultOnPanic(panic)` from its handler, which the README shows. This is a deliberate trust in the host (the host
+  is not our threat model), and the safe behaviour is the default; a host `onPanic` that swallows the panic leaves a revoked user's cached leases on the
+  device until something else vacates or locks. `bank.vacate` memoizes its promise, so a burst of panics vacates once and lists the cached leases once:
+  a panic raised by the bank's own erase reaches the host's `onPanic`, and every other panic after the vacate began goes to `DefaultOnPanic`, whose
+  repeat vacate returns the first one's promise (amended 2026-11-08 (vacate_first): it read that panics during the scrub reached the host and the
+  bank disabled only after it; amended 2026-11-08 (review_fixes): every other panic past the disable now only reports its refusal to the platform, so
+  none starts a second vacate). `DefaultOnPanic` does not await the bank's vacate, because a panic raised from the vacate's own erase would otherwise
+  wait on itself (amended 2026-11-08 (review_fixes): the scrub itself now calls the host's `onPanic` with `void` and does not await it, so a host
+  `onPanic` that awaits `bank.vacate()` cannot deadlock against the scrub).
+  amended 2026-11-08 (review_fixes): a listing answered after the bank is swept or vacated refuses `disabled` before it can panic.
+  `VaultListing.list` (`models/vault-listing.ts`) and `BoxListing.list` (`models/box-listing.ts`) call `demandEnabled()` again after their storage
+  await, as `Listing.deliver` (`models/listing.ts`) already did at its start. Before, a `tryListVaults` or `tryListBoxes` in flight across a sweep
+  that answered `identity_revoked` called `panicIfRevoked` on the disabled listing; the panic went to `DefaultOnPanic`, whose `bank.vacate` scrub
+  then called the host's own `onPanic` and `onBadNews` from a bank the host had already let go, possibly with the next user signed in. That path is
+  closed. A rule that the scrub holds the host's handlers only if the bank was enabled when the vacate began was considered and not adopted: the
+  Coach preferred closing the path to adding logic. Also, the bank's panic is no longer a public member (`bank.panic` and `vault.panic` are gone):
+  `Bank.#panic` is handed as a friend to the vault listing in `ListingOpts.panic` (checked by `VX.bankPanic`, the bank's `isGuarded` brand), and on
+  to each `Vault` (the constructor's fourth argument) and each box listing (bound with its vault in `VaultListing.boxListingOf`), so no host code
+  can make the bank call its `onPanic`.
+  amended 2026-11-08 (review_fixes): the disabled bank's handlers and the `askUser` switch. Past the disable, a panic goes to a handler that only reports its
+  refusal to the platform (`reportToPlatform`) and bad news goes to `DefaultOnBadNews` (the bank's logger); `DefaultOnPanic` is no longer reached from a disabled
+  bank, so no panic can start a second vacate, or a scrub on a swept bank. `Bank.askUser` was a second branded wrap that called the host's dialog while the bank
+  was enabled and answered true without calling the host once disabled; it is now `guardRequestCleartext(requestCleartext)` alone. A disabled bank still asks no
+  one, by construction: every `Gating.launch` follows, in the same tick, a check that its vault or vault listing is enabled, and a sweep or a vacate disables both
+  synchronously before it returns. The vacate's scrub is the only thing past the disable that reaches the host's handlers: it tells the host's `onPanic` of a
+  lease it cannot erase and `onBadNews` of a refused listing. `autolock` picks its handlers after its await, so an autolock whose lease listing is refused after a
+  sweep or vacate tells the bank's logger, not the host's `onBadNews`. A box listing's `identity_revoked` panic names no vault (`{ refusal, bank }`), as a
+  revocation concerns the user.
+  amended 2026-11-08 (bank_followups): three changes, each to a sentence above.
+  (1) The vacate's scrub also forgets this bank's own row in the deviceDB, `{ applabel, user_id, device_id }`, no secret, after it erases the leases (`DeviceDB.forgetBank(scope)` /
+  `tryForgetBank`, the `doForgetBank` hook of `MemoryDeviceDB` and `IdbDeviceDB`), whether or not the lease listing was refused. The next `ensureBank` for that scope mints a fresh
+  `device_id`, so a device after sign-out is not linkable to its earlier wayins by `device_id`; a vault of that user and device built before the vacate still carries the old one in
+  the clear. A refused forget reaches the host's `onPanic` as a refused lease erase does (the scrub's only other reach into the host's handlers), and a store's throw is replaced at
+  `storeFailed` like every `DeviceDB` verb's. `vacate` stays synchronous and disables first. The known race is unchanged: an unlock in flight can still cache a lease after the erase, and
+  a `device_id` minted by an `ensureBank` in flight across the vacate is not forgotten.
+  (2) `DefaultOnPanic` and a disabled bank's panic handler now also log each panic, `bank.logger.error(refusal.message, { call: 'Bank.onPanic', refusalkind })`, beside `reportError` to the
+  platform, so that a platform with no `reportError` hears of it. The log carries the refusal's message and kind only, never its `cause` (a test checks that a `cause` carrying a passphrase
+  is not logged); the logger is the host's, so the message goes wherever the host sends it.
+  (3) `bank.tellBadNews`, `vault.tellBadNews` and `bank.askUser` are no longer public members, as `bank.panic` was not. The bank hands its vault listing a `BankFriend`
+  `{ panic, tellBadNews, askUser }`, each function branded by `brandGuarded` and checked by `isGuarded` (`VX.bankFriend`), replacing `ListingOpts.panic` and its `VX.bankPanic`; the listing holds
+  it in a TypeScript-`protected` field (reachable at runtime, as `vaultDB` and the panic were), hands it to each `Vault` (a `#private` field) and each box listing, and a gating gets `askUser` in
+  its launch args (`gatingLaunchArgs`). The brand is a tripwire, as above, not a lock: a host holding a vault listing can still reach the friend at runtime and so make the bank run its `onBadNews`
+  or ask the user for the passphrase through the host's own `requestCleartext`. The guard that runs a host's `onBadNews` and sends its throw or rejection to the platform is now the exported
+  `tellBadNewsTo(onBadNews, bank, badnews)`, which validates its input. safebyok-react's provider hands descendants a `tellBadNews` bound to the bank and the host's latest `onBadNews`, and
+  it does nothing once `bank.isEnabled` is false, so a descendant of a vacated bank reaches neither the host's `onBadNews` nor the bank's logger through it.
+
 * 2026-11-07 (devicedb_idb, sprint devicedb_idb, thread 7, at the Coach's direction, branch `20261107-brands`): **Every brand in the core is a `Symbol.for('@safebyok/<name>')` key that
   anyone may wear, and `isVaultError` now recognises a `VaultError` of another copy of safebyok by its brand.** In `packages/safebyok/src/helpers/consts.ts`, a brand is
   attached by a class getter or by `brand(obj, Brand, val = true)` (non-enumerable, non-writable, non-configurable) and read through `brandOf(val, Brand)` or a guard built on it

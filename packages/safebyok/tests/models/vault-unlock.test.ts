@@ -187,7 +187,7 @@ describe("The vault holds a lease: by unlock, or by the cache", () => {
     const onBadNews = vi.fn()
     const { fakeBank, opts, deviceDB, demandStored } = await makeBornVault()
     const record = demandStored()
-    const listing = new VaultListing(hearingBadNews(fakeBank, onBadNews), opts)
+    const listing = new VaultListing(fakeBank, hearingBadNews(opts, onBadNews))
     const vault = await listing.build(record)
     deviceDB.tryStow.mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'the disk is full')))
     vault.lock()
@@ -277,7 +277,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     const { fakeBank, opts, demandStored, deviceDB } = await makeBornVault()
     const cached = deviceDB.cachedNow() as Record<string, unknown>
     deviceDB.layCached({ ...cached, lease_key: 'no key at all' })
-    const listing = new VaultListing(hearingBadNews(fakeBank, onBadNews), opts)
+    const listing = new VaultListing(fakeBank, hearingBadNews(opts, onBadNews))
     const again = await listing.build(demandStored())
     await TH.expectRefusal(again.ensureUnlocked(), 'declined')
     expect(onBadNews.mock.calls[0]?.[0]).to.deep.include({ refusalkind: 'damaged_lease' })

@@ -19,15 +19,17 @@
 
 import { afterEach, beforeEach, vi } from 'vitest'
 import { _cheat_clock } from '../../src/helpers/clock'
+import { brandGuarded } from '../../src/helpers/consts'
 import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
+import { guardRequestCleartext } from '../../src/models/bank'
 import type { Vault } from '../../src/models/vault'
 import * as CX from '../../src/shapes/shapes-core'
 import type { Boxscope } from '../../src/shapes/shapes-core'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
-import { type BoxDna, type BoxWorld, type Fetched, type ListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
+import { type BankFriend, type BankPanic, type BoxDna, type BoxWorld, type Fetched, type BoxListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
 import { type BoxQuery, type BoxRow, type BoxTombstone, type DelOpts, type IfAbsentOpts, type PutOpts, type ReqParams, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -41,7 +43,7 @@ import { fakeCiphered } from './builders'
 export const T0 = 1_700_000_000_000
 
 /** The vault's scope and `vault_tok` that {@link makeModelsWorld} gives its world, and the builders below give their records. */
-const WorldVault = Object.freeze({ scope: Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }), vault_tok: 'vault-tok-u1' })
+export const WorldVault = Object.freeze({ scope: Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }), vault_tok: 'vault-tok-u1' })
 
 /** The one live vault row of every world, which a box verb demands. */
 export const worldVaultRow = (): VaultRecord => ({
@@ -139,8 +141,12 @@ export type ModelsWorld = {
   vaultDB: TestableVaultDB
   /** Every call made to the world and the vaultDB, in order, oldest first. A live array. */
   calls:  readonly ModelsCall[]
-  /** The refusals the listing told its world, oldest first. A live array. */
+  /** The refusals the listing told as bad news, oldest first. A live array. */
   badnews: readonly VaultError[]
+  /** The refusals the listing panicked with, oldest first. A live array. */
+  panics:  readonly VaultError[]
+  /** The bank's private calls, as the listing is handed them: its panic logs each refusal in `panics`, its bad news in `badnews`. */
+  bankFriend: BankFriend
   /** The vaultDB's own box rows, by boxlabel: the one vault's boxes. */
   stored: Map<string, unknown>
 
@@ -283,6 +289,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
 
   const calls: ModelsCall[] = []
   const badnews: VaultError[] = []
+  const panics: VaultError[] = []
   const watches: ModelsWatch[] = []
   const vaultDB = new TestableVaultDB(calls, watches)
   vaultDB._cheat_vaultRowsOf(WorldVault.scope).set(WorldVault.scope.vaultlabel, worldVaultRow())
@@ -300,11 +307,9 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const standIn = (): Vault => world as unknown as Vault
 
   const world: BoxWorld = {
-    scope:        WorldVault.scope,
     vault_tok:    WorldVault.vault_tok,
     get isLocked() { return isLocked },
     subscribe:    (listener) => { worldListeners.add(listener); return () => { worldListeners.delete(listener) } },
-    tellBadNews:  (news) => { badnews.push(...news) },
     demandUnlocked: () => { if (isLocked) { throw Refuse.lockedError() } return standIn() },
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
@@ -349,10 +354,15 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   }
 
   return {
-    world, vaultDB, calls, badnews, stored, watches,
+    world, vaultDB, calls, badnews, panics, stored, watches,
     worldWith: (overrides) => ({ ...world, get isLocked() { return isLocked }, ...overrides }),
+    bankFriend: {
+      panic:       brandGuarded(({ refusal }: Parameters<BankPanic>[0]) => { panics.push(refusal); return Promise.resolve() }),
+      tellBadNews: brandGuarded((told: readonly VaultError[]) => { badnews.push(...told) }),
+      askUser:     guardRequestCleartext(() => undefined),
+    },
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
-    clearCalls: () => { calls.length = 0; badnews.length = 0 },
+    clearCalls: () => { calls.length = 0; badnews.length = 0; panics.length = 0 },
 
     now:      clockNow,
     setNow,
@@ -454,12 +464,12 @@ const nullOrTestableOf = (box: Box | null): TestableBox | null => (box === null 
 
 /** A {@link BoxListing} over the world's vault and vaultDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces its world or any of its options; the horizon is ten minutes. */
 export const boxListingOf = (mw: ModelsWorld, overrides: BoxListingOverrides = {}): TestableBoxListing => {
-  const { world = mw.world, vaultDB = mw.vaultDB, maxMillisSinceRefresh = 10 * 60_000 } = overrides
-  return new TestableBoxListing(world, { vaultDB, maxMillisSinceRefresh })
+  const { world = mw.world, scope = WorldVault.scope, vaultDB = mw.vaultDB, maxMillisSinceRefresh = 10 * 60_000, bankFriend = mw.bankFriend } = overrides
+  return new TestableBoxListing(world, { scope, vaultDB, maxMillisSinceRefresh, bankFriend })
 }
 
-/** What {@link boxListingOf} may be told in place of the world's own: the box listing's world, vaultDB or horizon. */
-export type BoxListingOverrides = Partial<ListingOpts & { world: BoxWorld }>
+/** What {@link boxListingOf} may be told in place of the world's own: the box listing's world, vault scope, vaultDB, horizon or the bank's friend. */
+export type BoxListingOverrides = Partial<BoxListingOpts & { world: BoxWorld }>
 // --
 
 // == [Faked seal]: fakeSealBoxListingOf

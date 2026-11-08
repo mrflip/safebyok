@@ -4,14 +4,14 @@ import { describe, expect, it } from 'vitest'
 import { BoxListing } from '../../src/models/box-listing'
 import * as SX from '../../src/shapes/shapes-storage'
 import { LOCKED } from '../../src/helpers/consts'
-import type { ListingOpts } from '../../src/shapes/shapes-vaultish'
+import type { BoxListingOpts } from '../../src/shapes/shapes-vaultish'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
-import { boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
+import { WorldVault, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
 const held = useModelsWorld()
 
-const good = (): ListingOpts => ({ vaultDB: held.mw.vaultDB, maxMillisSinceRefresh: 1000 })
+const good = (): BoxListingOpts => ({ scope: WorldVault.scope, vaultDB: held.mw.vaultDB, maxMillisSinceRefresh: 1000, bankFriend: held.mw.bankFriend })
 
 const dna = () => boxDnaOf(held.mw.boxscope('anthropic_api_key'))
 
@@ -37,7 +37,8 @@ describe("BoxListing", () => {
       ['no horizon',                  () => [held.mw.world, { ...good(), maxMillisSinceRefresh: undefined }]],
       ['a negative horizon',          () => [held.mw.world, { ...good(), maxMillisSinceRefresh: -1 }]],
       ['a world among its options',   () => [held.mw.world, { ...good(), world: held.mw.world }]],
-      ['a world that cannot tell bad news', () => [{ ...held.mw.world, tellBadNews: 'tell me' }, good()]],
+      ['no scope',                    () => [held.mw.world, { ...good(), scope: undefined }]],
+      ['a bankFriend that cannot tell bad news', () => [held.mw.world, { ...good(), bankFriend: { ...held.mw.bankFriend, tellBadNews: 'tell me' } }]],
     ]
     for (const [blurb, args] of bads) {
       it(`refuses ${blurb}`, () => {
@@ -249,17 +250,21 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
     expect(err.meta?.fieldnames).to.deep.equal(['whisper'])
   })
 
-  const BadWorldCases = [
-    [() => ({ ...held.mw.world, vault_tok: undefined }),       'no vault_tok',                            'vault_tok'],
-    [() => ({ ...held.mw.world, scope: { vaultlabel: 'v' } }), 'a scope missing its applabel and user_id', 'scope.applabel'],
-  ] as const
+  it("refuses a world with no vault_tok, naming vault_tok", () => {
+    const err = TH.expectSyncRefusal(() => new BoxListing({ ...held.mw.world, vault_tok: undefined } as never, good()))
+    expect(err.meta?.fieldnames).to.include('vault_tok')
+  })
 
-  for (const [worldOf, blurb, fieldname] of BadWorldCases) {
-    it(`refuses a world with ${blurb}, naming ${fieldname}`, () => {
-      const err = TH.expectSyncRefusal(() => new BoxListing(worldOf() as never, good()))
-      expect(err.meta?.fieldnames).to.include(fieldname)
-    })
-  }
+  it("refuses a scope missing its applabel and user_id, naming scope.applabel", () => {
+    const err = TH.expectSyncRefusal(() => new BoxListing(held.mw.world, { ...good(), scope: { vaultlabel: 'v' } } as never))
+    expect(err.meta?.fieldnames).to.include('scope.applabel')
+  })
+
+  it("shows the scope of the vault it lists, as a vault shows its own", () => {
+    const listing = boxListingOf(held.mw)
+    expect(listing.scope).to.deep.equal(WorldVault.scope)
+    expect(listing).to.include(WorldVault.scope)
+  })
 
   it("refuses at() a scope that fails its check", () => {
     const listing = boxListingOf(held.mw)

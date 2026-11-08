@@ -420,6 +420,49 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
       })
     })
 
+    describe("forgetBank(scope)", () => {
+      it("erases the bank row, so that the next ensureBank mints a fresh device_id", async () => {
+        const deviceDB = await fresh()
+        const made = await deviceDB.ensureBank(bankScope)
+        await deviceDB.forgetBank(bankScope)
+        expect(await deviceDB.listRawBanks()).to.deep.equal([])
+        const again = await deviceDB.ensureBank(bankScope)
+        expect(CX.device_id.safeParse(again.device_id).success).to.be.true
+        expect(again.device_id).to.not.eq(made.device_id)
+      })
+
+      it("leaves every other bank row and the leases", async () => {
+        const deviceDB = await fresh()
+        await deviceDB.stow(await leaseRowOf())
+        const kept = await deviceDB.ensureBank({ ...bankScope, user_id: 'u2' })
+        await deviceDB.ensureBank(bankScope)
+        await deviceDB.forgetBank({ ...vaultScope, vault_tok: 'tok_one' } as never)
+        expect(await deviceDB.listRawBanks()).to.deep.equal([kept])
+        expect(await deviceDB.listLeases()).to.have.lengthOf(1)
+      })
+
+      it("does nothing where no bank row is stored", async () => {
+        const deviceDB = await fresh()
+        await expectGood(deviceDB.tryForgetBank(bankScope))
+        expect(await deviceDB.listRawBanks()).to.deep.equal([])
+      })
+
+      it.skipIf(noRows)("erases a stored row that fails its check", async () => {
+        const deviceDB = await fresh()
+        await rowsOf(deviceDB).plantBankRow(bankScope, { ...bankScope, device_id: 'not-a-uuid' })
+        await deviceDB.forgetBank(bankScope)
+        expect(await rowsOf(deviceDB).bankRowsOf()).to.deep.equal([])
+      })
+
+      it("refuses a malformed scope", async () => {
+        const deviceDB = await fresh()
+        const made = await deviceDB.ensureBank(bankScope)
+        await expectRefusal(deviceDB.forgetBank({ ...bankScope, applabel: 'No Good!' }), 'bad_scope')
+        await expectBad(deviceDB.tryForgetBank({ applabel: 'acme' } as never), 'bad_scope')
+        expect(await deviceDB.listRawBanks()).to.deep.equal([made])
+      })
+    })
+
     describe("listRawBanks()", () => {
       it.skipIf(noRows)("answers a stored row that fails its check beside the sound ones", async () => {
         const deviceDB = await fresh()
@@ -440,7 +483,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         const row = await leaseRowOf()
         const verbs = [
           () => deviceDB.tryStow(row), () => deviceDB.tryPeek(asked), () => deviceDB.tryForget(asked), () => deviceDB.tryListLeases(), () => deviceDB.tryListRawLeases(), () => deviceDB.tryDelRawLease(scopepathOf(vaultScope)),
-          () => deviceDB.tryEnsureBank(bankScope), () => deviceDB.tryListRawBanks(),
+          () => deviceDB.tryEnsureBank(bankScope), () => deviceDB.tryForgetBank(bankScope), () => deviceDB.tryListRawBanks(),
         ]
         for (const verb of verbs) {
           await failNextCall(deviceDB)

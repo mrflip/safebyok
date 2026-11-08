@@ -39,11 +39,11 @@ export const refusalTextOf = (err: unknown): string => {
 /** True for `text` the core takes as a vaultlabel or a boxlabel. */
 export const isLabel = (text: string): boolean => (text.length <= MaxLabelChars) && Patterns.label.test(text)
 
-/** `answer` as indented JSON, for the panel to show whole. */
+/** `answer` as indented JSON. */
 export const jsonOf = (answer: unknown): string => JSON.stringify(answer, null, 2)
 
-// A damaged row's time can be any number, and toISOString throws, in render, on one past a Date's range.
-/** `millis` as an ISO time, for a person to read, or as the bare number where it names no time. */
+// A damaged row's time can be any number, and toISOString throws, in render, on a number past a Date's range.
+/** `millis` as an ISO time, or as the bare number where it names no time. */
 export const timeOf = (millis: number): string => {
   const when = new Date(millis)
   return Number.isNaN(when.getTime()) ? String(millis) : when.toISOString()

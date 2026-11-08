@@ -85,7 +85,7 @@ export abstract class DeviceDB {
   tryDelRawLease(scopepath: LeaseScopepath): Promise<Outcome<void>> { return outcomeOf(() => this.delRawLease(scopepath)) }
   // --
 
-  // == [Bank verbs]: ensureBank, tryEnsureBank, listRawBanks, tryListRawBanks
+  // == [Bank verbs]: ensureBank, tryEnsureBank, forgetBank, tryForgetBank, listRawBanks, tryListRawBanks
 
   /** The bank row of this bank scope, made with a fresh random `device_id` on the first call. */
   async ensureBank(scope: BankScope): Promise<BankRow> {
@@ -98,6 +98,16 @@ export abstract class DeviceDB {
 
   tryEnsureBank(scope: BankScope): Promise<Outcome<BankRow>> { return outcomeOf(() => this.ensureBank(scope)) }
 
+  /** Erases the bank row of this bank scope, so that the next `ensureBank` mints a fresh `device_id`. */
+  async forgetBank(scope: BankScope): Promise<void> {
+    try {
+      const { applabel, user_id } = CX.bankScope.parse(scope)
+      await this.doForgetBank({ applabel, user_id })
+    } catch (err) { throw refusalOf(err, 'forgetBank') }
+  }
+
+  tryForgetBank(scope: BankScope): Promise<Outcome<void>> { return outcomeOf(() => this.forgetBank(scope)) }
+
   /** Every bank row stored on this device as a bag, unchecked, damaged rows among them. */
   async listRawBanks(): Promise<Record<string, unknown>[]> {
     try {
@@ -109,7 +119,7 @@ export abstract class DeviceDB {
   tryListRawBanks(): Promise<Outcome<Record<string, unknown>[]>> { return outcomeOf(() => this.listRawBanks()) }
   // --
 
-  // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases, doDelRawLease, doEnsureBank, doListBanks
+  // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases, doDelRawLease, doEnsureBank, doForgetBank, doListBanks
 
   // A store starts each call's work in the order called, or a `forget` made after a `stow` may not erase it.
   /** Stores `row` as the lease of its vault scope, over any row there. */
@@ -124,6 +134,8 @@ export abstract class DeviceDB {
   protected abstract doDelRawLease(scopepath: LeaseScopepath): Awaitable<void>
   /** The bank row stored at `made`'s bank scope where it passes its check, else `made`, stored over it, in one step. */
   protected abstract doEnsureBank(made: BankRow): Awaitable<unknown>
+  /** Removes whatever row is stored at this bank scope, in one step. */
+  protected abstract doForgetBank(scope: BankScope): Awaitable<void>
   /** Every bank row stored, in any order. */
   protected abstract doListBanks(): Awaitable<unknown[]>
   // --

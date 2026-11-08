@@ -3,19 +3,19 @@ import { Checkers } from 'safebyok/storage'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { Messages } from './messages'
 
-// The WebAuthn half of a passkey, which the core leaves to the host: `createPasskey` makes one and
-// asks its first answer, `askPasskey` asks the vault's passkey again. Nothing here imports React.
+// The WebAuthn half of a passkey, which the core leaves to the host. `createPasskey` makes a passkey
+// and asks for its first answer. `askPasskey` asks the vault's passkey again. Nothing here imports React.
 //
 // These passkeys are not logins. Each is a fresh credential under a random user handle, so it never
-// replaces a passkey the host's sign-in uses; its challenge is random and no server checks the
+// replaces a passkey the host's sign-in uses. Its challenge is random, and no server checks the
 // assertion. What matters is the PRF extension's answer, which only the authenticator gives, and
-// only after the user's fingerprint, face or PIN: every call asks for user verification, since an
+// only after the user's fingerprint, face or PIN. Every call asks for user verification, since an
 // authenticator answers differently without it.
 //
 // Where no passkey answer is to be had (the browser has no WebAuthn, the authenticator no PRF, or
 // the browser failed to ask), these refuse `passkey_unavailable`, which a dialog shows in place.
 
-/** True for base64url text, as a passkey's salt is stored. */
+/** True for base64url text. */
 const isB64 = (text: string): boolean => {
   try {
     fromB64(text)
@@ -25,8 +25,9 @@ const isB64 = (text: string): boolean => {
   }
 }
 
-// A passkey header's salt is judged here, as the core judged it as it read the vault; its credential
-// id the core judged only as text, so one that is not base64url is a damaged record (credentialBytesOf).
+// A passkey header's salt is checked here as base64url, as the core checks it when it reads the vault.
+// The core checks its credential_id only as text, so one that is not base64url refuses later, as a
+// damaged record (credentialBytesOf).
 const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, int, bytes, fn }) => {
   const timeout = int.positive().optional()
   const named = str.min(1)
@@ -42,7 +43,8 @@ const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, int, byt
       passkeyHeader: discrim('wayinkind', [passphraseHeader, passkeyHeader]).nullable(),
       opts:          obj({ rpId: named.optional(), timeout }).strict(),
     }),
-    // Only what attemptOnce itself touches: the attempt judges the rest of the answer.
+    // The attempt checks the rest of the answer.
+    /** The part of a passkey answer attemptOnce itself touches. */
     attemptOnceAnswer:  obj({ prfBytes: bytes() }),
     attemptOnceAttempt: fn(),
   }
@@ -59,7 +61,7 @@ export type CreatePasskeyOpts = {
   rp:       { name: string, id?: string | undefined }
   /** How the authenticator lists the passkey: an account `name` and a `displayName`. */
   user:     { name: string, displayName: string }
-  /** How long the browser waits for the user, in milliseconds; the browser's default otherwise. */
+  /** How long the browser waits for the user, in milliseconds. Defaults to the browser's own. */
   timeout?: number | undefined
 }
 
@@ -141,7 +143,7 @@ export const askPasskey = async (passkeyHeader: WayinHeader | null, given: AskPa
   const answer = asked.getClientExtensionResults().prf?.results?.first
   if (answer === undefined) { throw noPrf() }
   const passkeyClear = answerOf(credential_id, saltBytes, answer)
-  // A browser answers only for the credential it was offered; one that does not has nothing to unlock.
+  // A browser answers only for the credential it was offered. An answer for another has nothing to unlock.
   if (toB64(new Uint8Array(asked.rawId)) !== credential_id) { passkeyClear.prfBytes.fill(0); throw new VaultError('passkey_unavailable', Messages.passkeyAskFailed) }
   return passkeyClear
 }
@@ -149,7 +151,7 @@ export const askPasskey = async (passkeyHeader: WayinHeader | null, given: AskPa
 /** Hand `passkey` to `attempt`, then zero its bytes whatever the attempt did. */
 export const attemptOnce = async <ValT>(passkey: PasskeyAnswer, attempt: (passkey: PasskeyAnswer) => Promise<ValT>): Promise<ValT> => {
   PasskeyChecks.attemptOnceAnswer.parse(passkey, { where: "In attemptOnce's passkey" })
-  // Judged inside the try: an answer refused for its attempt is zeroed all the same.
+  // `attempt` is checked inside the try, so an answer refused for its attempt is zeroed all the same.
   try {
     PasskeyChecks.attemptOnceAttempt.parse(attempt, { where: "In attemptOnce's attempt" })
     return await attempt(passkey)
@@ -158,7 +160,7 @@ export const attemptOnce = async <ValT>(passkey: PasskeyAnswer, attempt: (passke
   }
 }
 
-/** The bytes of a stored passkey's `credential_id`, which the core checks only for being text. */
+/** The bytes of a stored passkey's `credential_id`. */
 const credentialBytesOf = (credential_id: string): Uint8Array<ArrayBuffer> => {
   try {
     return fromB64(credential_id) as Uint8Array<ArrayBuffer>
@@ -167,14 +169,14 @@ const credentialBytesOf = (credential_id: string): Uint8Array<ArrayBuffer> => {
   }
 }
 
-/** A PasskeyAnswer of the credential `credential_id`, answering `answer` over `saltBytes`. */
+/** The PasskeyAnswer of credential `credential_id`: the PRF `answer` it gave over `saltBytes`. */
 const answerOf = (credential_id: string, saltBytes: Uint8Array, answer: BufferSource): PasskeyAnswer => ({
   credential_id,
   prf_salt_b64: toB64(saltBytes),
   prfBytes:     bytesOf(answer),
 })
 
-/** A copy of `source`'s bytes, `source` zeroed once copied, so the answer's bytes are the one copy. */
+/** Copy `source`'s bytes, and zero `source`. The answer's bytes are then the only copy. */
 const bytesOf = (source: BufferSource): Uint8Array<ArrayBuffer> => {
   // ArrayBuffer.isView, not instanceof, holds across realms (an iframe's buffers, say).
   const handed = ArrayBuffer.isView(source) ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength) : new Uint8Array(source)

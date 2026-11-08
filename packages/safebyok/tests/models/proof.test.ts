@@ -6,7 +6,7 @@ import type { VaultError } from '../../src/refusals/errors'
 import type { Box } from '../../src/models/box'
 import type { Gatingkind } from '../../src/shapes/shapes-enums'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
-import type { BankSnapshot, BoxSnapshot, VaultSnapshot } from '../../src/shapes/shapes-vaultish'
+import type { BadNews, BankSnapshot, BoxSnapshot, VaultSnapshot } from '../../src/shapes/shapes-vaultish'
 import type { Whisper } from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, VaultScopeGiven, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
@@ -17,7 +17,7 @@ useBankWorlds()
 
 /** What nobody asked to hear, which a host's `onBadNews` is told: a proof that left it to the logger would pass over it. */
 const badNews: VaultError[] = []
-const onBadNews = (news: VaultError): void => { badNews.push(news) }
+const onBadNews = ({ news }: BadNews): void => { badNews.push(news) }
 const expectNoBadNews = (): void => { expect(badNews.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal([]) }
 afterEach(expectNoBadNews)
 
@@ -337,24 +337,27 @@ describe("the proof", () => {
     await TH.eventually(() => world.leaseRows().length === 0)
   })
 
-  it("signing out: bank.vacate empties the screen and this device, and the next hello lists the vault again, locked", async () => {
+  it("signing out: bank.vacate empties the screen and this device, and the next bank lists the vault again, locked", async () => {
     const { world, bank, vault, dialog } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
 
-    bank.vacate()
-    bankUi.expectRenders(['made: main locked', 'made: no vaults'])
-    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven))
+    await bank.vacate()
+    bankUi.expectRenders(['refused: main locked', 'refused: no vaults'])
+    expect(bank.isEnabled).to.be.false
+    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'disabled')
+    await TH.expectRefusal(bank.hello(), 'disabled')
     expect(world.leaseRows()).to.have.lengthOf(0)
     await TH.expectRefusal(vault.ensureUnlocked())
 
-    await bank.hello()
-    bankUi.expectRenders(['made: main locked', 'ready: main locked'])
-    const again = await bank.ensureVault(VaultScopeGiven)
+    const next = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
+    await next.hello()
+    const again = await next.ensureVault(VaultScopeGiven)
     expect(again).not.to.eq(vault)
+    expect(again.isLocked).to.be.true
     await again.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
-    bankUi.expectRenders(['ready: main unlocked'])
+    expectNoBadNews()
   })
 
   it("the store goes out of reach: an unlocked vault keeps its lease, a refused hello paints refused, and the next one recovers", async () => {
@@ -435,37 +438,24 @@ describe("the proof", () => {
     await TH.expectRefusal(vault.ensureUnlocked())
   })
 
-  it("React StrictMode: effect, cleanup, effect paints no refusal", async () => {
-    const world = makeBankWorld()
-    const bank = world.bankOn({ onBadNews })
-    const bankUi = mountComponent(bank, bankStatus)
-    bankUi.expectRenders(['made: no vaults'])
-
-    // The effect calls hello, its cleanup sweeps, and the effect runs again, as StrictMode does on mount.
-    const firstEffect = bank.tryHello()
-    bank.sweep()
-    const secondEffect = bank.tryHello()
-    await Promise.all([firstEffect, secondEffect])
-
-    bankUi.expectRenders(['made: no vaults', 'ready: no vaults'])
-    await TH.expectBad(firstEffect)
-    expect(await secondEffect).to.include({ ok: true })
-  })
-
-  it("React StrictMode over a vault already cached: the second effect's listing holds it, and picks up the lease with nobody asked", async () => {
+  it("React StrictMode over a vault already cached: the second effect's fresh bank picks up the lease with nobody asked", async () => {
     const { world, dialog } = await buildHost()
-    const bank = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
-    const bankUi = mountComponent(bank, bankStatus)
-    bankUi.expectRenders(['made: no vaults'])
+    const opts = { requestCleartext: dialog.requestCleartext, onBadNews }
 
-    const firstEffect = bank.tryHello()
-    bank.sweep()
-    await Promise.all([firstEffect, bank.hello()])
+    // The effect makes a bank and calls hello, its cleanup sweeps it, and the effect runs again, as StrictMode does on mount.
+    const first = world.bankOn(opts)
+    const firstEffect = first.tryHello()
+    first.sweep()
+    const second = world.bankOn(opts)
+    const bankUi = mountComponent(second, bankStatus)
+    await Promise.all([firstEffect, second.hello()])
+    await TH.expectBad(firstEffect)
     bankUi.expectRenders(['made: no vaults', 'made: main locked', 'ready: main locked'])
 
-    const vault = await bank.ensureVault(VaultScopeGiven)
+    const vault = await second.ensureVault(VaultScopeGiven)
     await vault.ensureUnlocked()
     expect(dialog.shown).to.deep.equal([])
     bankUi.expectRenders(['ready: main unlocked'])
+    expectNoBadNews()
   })
 })

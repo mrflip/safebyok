@@ -18,9 +18,9 @@ const BoxDna     = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, si
 /** A vault as `born` makes it, with a box created in it, stored in the vaultDB every session and device here shares: `boxIn(vault)` fetches that box as `vault`'s world sees it. */
 const makeVaultWithBox = async (born: ReturnType<typeof makeBornVault> = makeBornVault()) => {
   const world = await born
-  const box = await new TestableBoxListing(boxWorldOf(world.vault), world.opts).create(BoxDna)
+  const box = await new TestableBoxListing(boxWorldOf(world.vault), { ...world.opts, scope: world.vault.scope }).create(BoxDna)
   const boxIn = async (vault: Vault) => {
-    const found = await new TestableBoxListing(boxWorldOf(vault), world.opts).fetch(box.scope)
+    const found = await new TestableBoxListing(boxWorldOf(vault), { ...world.opts, scope: vault.scope }).fetch(box.scope)
     if (found === null) { throw new Error('no box stored') }
     return found
   }

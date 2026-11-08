@@ -8,7 +8,7 @@ export type { BoxesFetched, BoxFetched, BoxLanding, Heard, Landing, RowOfBox, Ro
 export { VaultDBVerbnames } from './vault-db'
 export { IsAdapterVaultDB, IsVaultDB, isAdapterVaultDB, isVaultDB } from '../helpers/consts'
 export { DeviceDB } from './device-db'
-export { brandedDeviceDB } from '../shapes/shapes-vaultish'
+export { bankOpts, brandedDeviceDB } from '../shapes/shapes-vaultish'
 export { MemoryVaultDB } from './memory-vault-db'
 export { MemoryDeviceDB } from './memory-device-db'
 export type { Awaitable } from '../helpers/helpers'
@@ -57,7 +57,7 @@ export type { CrossedErr, CrossedReqParams } from '../shapes/shapes-answers'
 // --
 
 // == [Validators]: the makers an adapter checks its own options and rows with
-export { Checker, Checkers, objCheck } from '../helpers/validator'
+export { Checker, Checkers, objCheck, type AssertEqual, type CheckerInput } from '../helpers/validator'
 export type { ConsistencyRefusal, ObjCheckOpts, Refusing, Story } from '../helpers/validator'
 // --
 

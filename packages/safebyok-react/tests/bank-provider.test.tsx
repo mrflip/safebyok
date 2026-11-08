@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Bank, MemoryDeviceDB, MinuteMillis, VaultError, type AnyGating } from 'safebyok'
-import { BankProvider, type BankProviderProps } from '../src/bank-provider'
+import { Bank, MemoryDeviceDB, VaultError, type AnyGating, type BadNewsHandler } from 'safebyok'
+import { BankProvider } from '../src/bank-provider'
+import type { BankProviderProps } from '../src/shapes/shapes-provider'
 import { Messages } from '../src/messages'
 import { createPasskey } from '../src/passkey'
 import * as TH from './test-helpers'
@@ -23,6 +24,24 @@ const provided = (overrides: Partial<Props> = {}, world = TH.makeBankWorld()) =>
   return { world, props, rerender: (given: Props) => { rendered.rerender(ui(given)) }, unmount: rendered.unmount }
 }
 
+/** A MemoryDeviceDB whose ensureBank for `user_id` waits until the test calls `answer`; every other user's answers at once. */
+const deviceDBHolding = (user_id: string) => {
+  const deviceDB = new MemoryDeviceDB()
+  const answering = TH.held()
+  const ensureBank = deviceDB.ensureBank.bind(deviceDB)
+  vi.spyOn(deviceDB, 'ensureBank').mockImplementation(async (scope) => {
+    if (scope.user_id === user_id) { await answering.promise }
+    return ensureBank(scope)
+  })
+  return { deviceDB, answer: () => { answering.resolve(undefined) } }
+}
+
+/** The users whose leases `deviceDB` caches. */
+const leaseUsers = async (deviceDB: MemoryDeviceDB) => {
+  const rows = await deviceDB.listLeases()
+  return rows.map(({ user_id }) => user_id)
+}
+
 describe("BankProvider's bank", () => {
   it("holds no bank while nobody is signed in", async () => {
     provided({ user_id: null })
@@ -38,7 +57,7 @@ describe("BankProvider's bank", () => {
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     const [first, second] = TH.seenBanks
     expect(TH.seenBanks).to.have.lengthOf(2)
-    expect(first?.snapshot.stage).to.eq('made')
+    expect(first?.isEnabled).to.eq(false)
     expect(second?.user_id).to.eq('u2')
   })
 
@@ -48,7 +67,7 @@ describe("BankProvider's bank", () => {
     rerender({ ...props, applabel: 'globex' })
     await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(2) })
     expect(TH.seenBanks.map(({ applabel }) => applabel)).to.deep.equal(['acme', 'globex'])
-    expect(TH.seenBanks[0]?.snapshot.stage).to.eq('made')
+    expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
   })
 
   it("makes each bank with the device_id its deviceDB keeps for the bank's scope", async () => {
@@ -69,31 +88,53 @@ describe("BankProvider's bank", () => {
     const { unmount } = provided()
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
     unmount()
-    expect(TH.seenBanks[0]?.snapshot.stage).to.eq('made')
+    expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
   })
 
-  it("ends with one bank, ready, under StrictMode", async () => {
+  // StrictMode runs the effect twice at mount, while the device_id is still on its way: the effect makes
+  // its bank once, when the device_id lands.
+  it("makes one bank under StrictMode, once the device_id lands", async () => {
     const making = vi.spyOn(Bank, 'make')
-    const world = TH.makeBankWorld()
-    render(<StrictMode><BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /></BankProvider></StrictMode>)
+    render(<StrictMode><BankProvider {...TH.providerPropsOf(TH.makeBankWorld())}><TH.ShowsVault /></BankProvider></StrictMode>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    const [made] = making.mock.results.map((result) => result.value as Bank)
+    expect(making.mock.results).to.have.lengthOf(1)
+    expect(made?.isEnabled).to.be.true
+    expect(TH.seenBanks.at(-1)).to.eq(made)
+  })
+
+  it("hands down no bank until its deviceDB answers", async () => {
+    const { deviceDB, answer } = deviceDBHolding('u1')
+    const making = vi.spyOn(Bank, 'make')
+    provided({ deviceDB })
     await act(async () => { await TH.wakeupAtNextTick() })
-    const live = making.mock.results.filter((made) => (made.value as Bank).snapshot.stage === 'ready')
-    expect(live).to.have.lengthOf(1)
+    expect(shown('bank')).to.eq('none')
+    expect(making).not.toHaveBeenCalled()
+    answer()
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+  })
+
+  it("waits for the next user's device_id before making their bank", async () => {
+    const { deviceDB, answer } = deviceDBHolding('u2')
+    const { props, rerender } = provided({ deviceDB })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    const making = vi.spyOn(Bank, 'make')
+    rerender({ ...props, user_id: 'u2' })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(shown('bank')).to.eq('none')
+    expect(making).not.toHaveBeenCalled()
+    answer()
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    const { device_id } = await deviceDB.ensureBank({ applabel: 'acme', user_id: 'u2' })
+    expect(making.mock.calls.map(([opts]) => [opts.user_id, opts.device_id])).to.deep.equal([['u2', device_id]])
   })
 
   it("makes no bank when the user signs out while its deviceDB answers", async () => {
-    const deviceDB = new MemoryDeviceDB()
-    const answering = TH.held()
-    const ensureBank = deviceDB.ensureBank.bind(deviceDB)
-    vi.spyOn(deviceDB, 'ensureBank').mockImplementation(async (scope) => {
-      await answering.promise
-      return ensureBank(scope)
-    })
+    const { deviceDB, answer } = deviceDBHolding('u1')
     const making = vi.spyOn(Bank, 'make')
     const { props, rerender } = provided({ deviceDB })
     rerender({ ...props, user_id: null })
-    answering.resolve(undefined)
+    answer()
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(making).not.toHaveBeenCalled()
     expect(shown('bank')).to.eq('none')
@@ -153,14 +194,6 @@ describe("BankProvider's props", () => {
     expect(spy.calls[0]?.story).to.deep.equal({ call: 'BankProvider', props: ['deviceDB', 'keyDeriver'] })
   })
 
-  it("names a handler given only after the bank was made", async () => {
-    const spy = TH.spyLogger()
-    const { props, rerender } = provided({ logger: spy.logger })
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    rerender({ ...props, onBadNews: () => undefined })
-    expect(spy.calls[0]?.story).to.deep.equal({ call: 'BankProvider', props: ['onBadNews'] })
-  })
-
   it("says nothing of handlers written inline at each render", async () => {
     const spy = TH.spyLogger()
     const { props, rerender } = provided({ logger: spy.logger, onBadNews: () => undefined, onPanic: () => undefined })
@@ -200,6 +233,49 @@ const unlockedProvided = async (overrides: Partial<Props> = {}) => {
   return { ...made, deviceDB }
 }
 
+describe("BankProvider at sign-out", () => {
+  it("leaves the user's cached leases when they sign out, for the host to vacate", async () => {
+    const { props, rerender, deviceDB } = await unlockedProvided()
+    expect(await leaseUsers(deviceDB)).to.deep.equal(['u1'])
+    rerender({ ...props, user_id: null })
+    await waitFor(() => { expect(shown('bank')).to.eq('none') })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(await leaseUsers(deviceDB)).to.deep.equal(['u1'])
+  })
+
+  it("keeps the leases when the same user signs in again, and vacates them when another does", async () => {
+    const { props, rerender, deviceDB } = await unlockedProvided()
+    rerender({ ...props, user_id: null })
+    rerender({ ...props, user_id: 'u1' })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(await leaseUsers(deviceDB)).to.deep.equal(['u1'])
+    rerender({ ...props, user_id: null })
+    rerender({ ...props, user_id: 'u2' })
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    await waitFor(async () => { expect(await leaseUsers(deviceDB)).to.deep.equal([]) })
+  })
+
+  it("vacates the last user's bank at a switch, and not the next user's", async () => {
+    const { props, rerender, deviceDB } = await unlockedProvided()
+    rerender({ ...props, user_id: 'u2' })
+    await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
+    await waitFor(async () => { expect(await leaseUsers(deviceDB)).to.deep.equal([]) })
+    expect(TH.seenBanks.map(({ user_id, isEnabled }) => [user_id, isEnabled])).to.deep.equal([['u1', false], ['u2', true]])
+  })
+
+  it("leaves the cached leases at an unmount, and through StrictMode's double effects", async () => {
+    const { props, unmount, deviceDB } = await unlockedProvided()
+    unmount()
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(await leaseUsers(deviceDB)).to.deep.equal(['u1'])
+    render(<StrictMode><BankProvider {...props}><TH.ShowsVault /></BankProvider></StrictMode>)
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(await leaseUsers(deviceDB)).to.deep.equal(['u1'])
+  })
+})
+
 describe("BankProvider's handlers", () => {
   afterEach(() => { vi.unstubAllGlobals() })
 
@@ -217,6 +293,56 @@ describe("BankProvider's handlers", () => {
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })
   })
 
+  it("tells onBadNews of a refused hello", async () => {
+    const world = TH.makeBankWorld()
+    vi.spyOn(world.vaultDB, 'listVaults').mockRejectedValue(Refusal)
+    const onBadNews = vi.fn<BadNewsHandler>()
+    provided({ onBadNews }, world)
+    await waitFor(() => { expect(onBadNews).toHaveBeenCalled() })
+    expect(onBadNews.mock.calls.map(([{ news }]) => news.refusalkind)).to.deep.equal(['storage_unavailable'])
+  })
+
+  it("reports an onBadNews that throws to the platform, never to the render", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const world = TH.makeBankWorld()
+    vi.spyOn(world.vaultDB, 'listVaults').mockRejectedValue(Refusal)
+    const thrown = new Error('the handler broke')
+    provided({ onBadNews: () => { throw thrown } }, world)
+    await waitFor(() => { expect(reported).toHaveBeenCalledWith(thrown) })
+    expect(shown('bank')).to.not.eq('none')
+    vi.unstubAllGlobals()
+  })
+
+  it("tells a refused hello to the onBadNews last rendered", async () => {
+    const world = TH.makeBankWorld()
+    const held: { refuse?: (err: unknown) => void } = {}
+    vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(new Promise((_resolve, reject) => { held.refuse = reject }))
+    const [first, last] = [vi.fn<BadNewsHandler>(), vi.fn<BadNewsHandler>()]
+    const { props, rerender } = provided({ onBadNews: first }, world)
+    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
+    rerender({ ...props, onBadNews: last })
+    held.refuse?.(Refusal)
+    await waitFor(() => { expect(last).toHaveBeenCalledOnce() })
+    expect(first).not.toHaveBeenCalled()
+  })
+
+  it("tells neither onBadNews nor the logger of a hello that a sign-out crossed", async () => {
+    const world = TH.makeBankWorld()
+    const held: { refuse?: (err: unknown) => void } = {}
+    vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(new Promise((_resolve, reject) => { held.refuse = reject }))
+    const onBadNews = vi.fn()
+    const spy = TH.spyLogger()
+    const { props, rerender } = provided({ onBadNews, logger: spy.logger }, world)
+    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
+    rerender({ ...props, user_id: null })
+    await waitFor(() => { expect(shown('bank')).to.eq('none') })
+    held.refuse?.(Refusal)
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(onBadNews).not.toHaveBeenCalled()
+    expect(spy.calls).to.deep.equal([])
+  })
+
   it("calls an onPanic written inline at each render as it was last rendered", async () => {
     vi.stubGlobal('reportError', vi.fn())
     const first = vi.fn()
@@ -226,31 +352,10 @@ describe("BankProvider's handlers", () => {
     rerender({ ...props, onPanic: last })
     refuseErase(deviceDB)
     fireEvent.click(screen.getByText('Lock'))
-    await waitFor(() => { expect(last).toHaveBeenCalledWith(Refusal) })
+    await waitFor(() => { expect(last).toHaveBeenCalledWith(expect.objectContaining({ refusal: Refusal })) })
     expect(first).not.toHaveBeenCalled()
     expect(TH.seenBanks).to.have.lengthOf(1)
     expect(shown('vault')).to.eq('present locked')
-  })
-
-  it("tells the onPanic the bank was made with of a panic once the props drop it", async () => {
-    vi.stubGlobal('reportError', vi.fn())
-    const madeWith = vi.fn()
-    const { props, rerender, deviceDB } = await unlockedProvided({ onPanic: madeWith })
-    rerender({ ...props, onPanic: undefined })
-    refuseErase(deviceDB)
-    fireEvent.click(screen.getByText('Lock'))
-    await waitFor(() => { expect(madeWith).toHaveBeenCalledWith(Refusal) })
-    expect(shown('vault')).to.eq('present locked')
-  })
-
-  it("tells the onBadNews the bank was made with of bad news once the props drop it", async () => {
-    const madeWith = vi.fn()
-    const { props, rerender } = provided({ onBadNews: madeWith })
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    rerender({ ...props, onBadNews: undefined })
-    await act(async () => { await TH.wakeupAtNextTick() })
-    TH.seenBanks[0]?.tellBadNews([Refusal])
-    expect(madeWith).toHaveBeenCalledWith(Refusal)
   })
 
   it("leaves a vault whose lease survived its erase to be vacated when the host has no onPanic, as the core does", async () => {
@@ -263,20 +368,7 @@ describe("BankProvider's handlers", () => {
     await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
   })
 
-  it("tells an onPanic given only after the bank was made nothing, and leaves the vault to be vacated", async () => {
-    const reported = vi.fn()
-    vi.stubGlobal('reportError', reported)
-    const later = vi.fn()
-    const { props, rerender, deviceDB } = await unlockedProvided()
-    rerender({ ...props, onPanic: later })
-    refuseErase(deviceDB)
-    fireEvent.click(screen.getByText('Lock'))
-    await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
-    await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
-    expect(later).not.toHaveBeenCalled()
-  })
-
-  it("tells the next user's onPanic nothing of a panic from the bank it let go", async () => {
+  it("tells the next user's onPanic nothing of the bank it let go, whose vacate tells the last user's onPanic of the lease it cannot erase", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const next = vi.fn()
@@ -289,22 +381,8 @@ describe("BankProvider's handlers", () => {
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     erasing.resolve(TH.bad(Refusal))
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
-    expect(previous).not.toHaveBeenCalled()
+    await waitFor(() => { expect(previous).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ refusal: Refusal })) })
     expect(next).not.toHaveBeenCalled()
-  })
-})
-
-describe("BankProvider's autolock", () => {
-  afterEach(() => { vi.useRealTimers() })
-
-  it("asks its bank to autolock each minute", async () => {
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
-    const autolock = vi.spyOn(Bank.prototype, 'autolock')
-    provided()
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    expect(autolock).not.toHaveBeenCalled()
-    act(() => { vi.advanceTimersByTime(MinuteMillis) })
-    expect(autolock).toHaveBeenCalledOnce()
   })
 })
 
@@ -397,8 +475,8 @@ describe("BankProvider's dialog", () => {
     expect(first).not.toHaveBeenCalled()
   })
 
-  it("asks nobody when requestCleartext is null", async () => {
-    provided({ requestCleartext: null })
+  it("asks nobody when requestCleartext answers nothing", async () => {
+    provided({ requestCleartext: () => undefined })
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))
     await act(async () => { await TH.wakeupAtNextTick() })

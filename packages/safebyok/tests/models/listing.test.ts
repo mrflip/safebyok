@@ -65,6 +65,15 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(held.mw.badnews).to.deep.equal([ended])
     })
 
+    it("panics with a vaultDB's 'identity_revoked' before its caller hears it, telling it as no bad news", async () => {
+      const listing = boxListingOf(held.mw)
+      const revoked = new VaultError('identity_revoked', "Signed out.")
+      vi.spyOn(held.mw.vaultDB, 'tryListBoxes').mockResolvedValueOnce({ ok: false, err: revoked, world: null } as never)
+      await expect(listing.list()).rejects.toBe(revoked)
+      expect(held.mw.panics).to.deep.equal([revoked])
+      expect(held.mw.badnews).to.deep.equal([])
+    })
+
     it("starts one watch however often it is called", async () => {
       const listing = boxListingOf(held.mw)
       await listing.hello()

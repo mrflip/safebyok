@@ -81,7 +81,31 @@ Easy to get wrong:
 * The core sets no timers. Call `bank.autolock()` after `hello` and on a timer of your own.
 * `vault.hello()` lists a vault's boxes and starts their watch. Until then `vault.boxListing` is
   empty, and with no watch nothing from another device arrives until the next `vault.hello()`.
-* `bank.vacate()` is sign-out: it erases this device's leases and leaves the vaultDB alone.
+* `bank.vacate()` is sign-out: it disables the bank, then erases this bank's leases on this device
+  and its bank row in the deviceDB, leaving the vaultDB alone, and settles once each erase has been
+  tried. The next `deviceDB.ensureBank` for that user mints a new `device_id`. Await it before the
+  page goes: a lease or bank row it cannot erase reaches your `onPanic`, and a refused listing of
+  the leases your `onBadNews`.
+* **A bank swept or vacated is spent.** From the moment you call either, `bank.isEnabled` is false
+  for good, `hello`, `ensureVault` and `vaultAt` refuse `disabled`, and the bank calls none of your
+  functions: a panic's refusal goes to the platform, and bad news to the bank's logger. The one
+  exception is the erase of a vacate, which still tells your `onPanic` and `onBadNews` what it could
+  not do.
+* **`onPanic` hears what you must act on for safety**: a revoked identity, or a lease that outlived
+  its erase. With no `onPanic`, `DefaultOnPanic` logs it at error, reports it to the platform and vacates: the bank
+  on an `identity_revoked`, whose snapshot then shows that refusal, else the vault named. Make another
+  bank once the user signs in again. An `onPanic` of your own decides for itself; to keep the
+  vacate, call the default from it:
+
+  ```ts
+  const onPanic: PanicHandler = (panic) => {
+    myTelemetry.panic(panic.refusal.refusalkind)
+    DefaultOnPanic(panic)
+  }
+  ```
+* **The bank alone tells your `onBadNews`**: it offers no `tellBadNews` of its own. To hand a
+  refusal from your code to a handler as the bank does, call `tellBadNewsTo(onBadNews, bank, [err])`,
+  which awaits nothing and sends the handler's throw to the platform.
 * **When the signed-in user changes, vacate the bank and make another.** A bank and everything it
   hands out keep the `user_id` they were made with for life; safebyok never moves them to a new
   one, and does not notice the change for you. On sign-out, or a sign-in as someone else, call

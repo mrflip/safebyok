@@ -130,19 +130,31 @@ export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 
 // --
 
-// == [The listing's world]: listingWorld, ListingWorld, ListingOpts, answersEachVerb, brandedVaultDB, listingOpts
+// == [The listing's world]: listingWorld, ListingWorld, BankFriend, ListingOpts, answersEachVerb, brandedVaultDB, bankPanic, bankFriend, listingOpts
 
 /** The check of the world a listing lives in, the bank for vaults and the vault for boxes, as far as the base reaches into it. Checks only. */
-export const listingWorld = objCheck(({ fn, bool }) => ({ isLocked: bool, ensureTimely: fn(), takeWorld: fn(), tellBadNews: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
+export const listingWorld = objCheck(({ fn, bool }) => ({ isLocked: bool, ensureTimely: fn(), takeWorld: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
 
 /** The world a listing lives in, as far as the base reaches into it: the bank for vaults, the vault for boxes. */
-export type ListingWorld = Pick<Bank | Vault, 'isLocked' | 'ensureTimely' | 'takeWorld' | 'tellBadNews'>
+export type ListingWorld = Pick<Bank | Vault, 'isLocked' | 'ensureTimely' | 'takeWorld'>
+
+/** The bank's private calls, handed down to each listing and vault as it is made. */
+export interface BankFriend {
+  /** Panic through the bank, which names itself to the host. */
+  readonly panic:       BankPanic
+  /** Tell the host's `onBadNews` each news no caller waits on. Never throws. */
+  readonly tellBadNews: (badnews: readonly VaultError[]) => void
+  /** Show the host's dialog, wrapped by `guardRequestCleartext`. */
+  readonly askUser:     AskUser
+}
 
 /** The options a listing is made with, after its world. */
 export type ListingOpts = {
   vaultDB:               VaultDB
   /** The refresh horizon of each thing the listing makes: how long after its last refresh the record in hand stays timely. */
   maxMillisSinceRefresh: number
+  /** The bank's private calls, handed down to the listing as it is made. */
+  bankFriend:            BankFriend
 }
 
 /** True for an object answering each of {@link VaultDBVerbnames} with a function. */
@@ -153,10 +165,21 @@ const answersEachVerb = (val: object): boolean => (
 /** The check of a vaultDB as a model is handed one: branded, from whichever copy of safebyok, and answering each verb with a function. */
 export const brandedVaultDB = Checker(({ custom }) => custom<VaultDB>((val) => isVaultDB(val) && answersEachVerb(val), Phrases.VaultDBExpected), 'bad_option')
 
+/** The check of the bank's panic as a listing or a vault is handed it, by the brand the bank gave it. */
+export const bankPanic = Checker(({ custom }) => custom<BankPanic>(isGuarded, Phrases.GuardedExpected), 'bad_option')
+
+/** The check of the bank's private calls as a listing or a vault is handed them, each by the brand the bank gave it. */
+export const bankFriend = objCheck(({ custom }) => ({
+  panic:       bankPanic,
+  tellBadNews: custom<BankFriend['tellBadNews']>(isGuarded, Phrases.GuardedExpected),
+  askUser:     custom<AskUser>(isGuarded, Phrases.GuardedExpected),
+}), 'bad_option')
+
 /** The check of a listing's options. Checks only. */
 export const listingOpts = objCheck(() => ({
   vaultDB:               brandedVaultDB,
   maxMillisSinceRefresh: horizonMillis,
+  bankFriend,
 }), 'bad_option')
 
 // --
@@ -263,15 +286,21 @@ export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<Box
 
 // --
 
-// == [The box's world]: boxWorld, BoxWorld
+// == [The box's world]: boxWorld, BoxWorld, boxListingOpts, BoxListingOpts
 
-/** The check of a box listing's world past {@link listingWorld}: the vault's scope and `vault_tok`, its demand, and its seal verbs. Checks only. */
-export const boxWorld = Checker(({ fn, vaultScope, vault_tok }) => listingWorld.extend({
-  scope: vaultScope, vault_tok, demandUnlocked: fn(), subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn(),
+/** The check of a box listing's world past {@link listingWorld}: the vault's `vault_tok`, its demand, and its seal verbs. Checks only. */
+export const boxWorld = Checker(({ fn, vault_tok }) => listingWorld.extend({
+  vault_tok, demandUnlocked: fn(), subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn(),
 }), 'bad_option', [CX])
 
 /** The vault, as far as its boxes reach into it. */
-export type BoxWorld = Pick<Vault, keyof ListingWorld | 'scope' | 'vault_tok' | 'demandUnlocked' | 'subscribe' | 'sealStampedString' | 'unsealStampedString'>
+export type BoxWorld = Pick<Vault, keyof ListingWorld | 'vault_tok' | 'demandUnlocked' | 'subscribe' | 'sealStampedString' | 'unsealStampedString'>
+
+/** The check of a box listing's options: a listing's, and the scope of the vault it lists. Checks only. */
+export const boxListingOpts = Checker(({ vaultScope }) => listingOpts.extend({ scope: vaultScope }), 'bad_option', [CX])
+
+/** The options a box listing is made with, after its world: a listing's, and the scope of the vault it lists. */
+export type BoxListingOpts = ListingOpts & { scope: VaultScope }
 
 // --
 
@@ -303,18 +332,16 @@ export interface VaultSnapshot extends VaultScope {
 export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDeviceDB, Phrases.DeviceDBExpected), 'bad_option')
 
 /** The check of a vault listing's world past {@link listingWorld}: what a vault's gate, lease and boxes need of the bank. Checks only. */
-export const vaultWorld = Checker(({ custom, bankScope }) => listingWorld.extend({
+export const vaultWorld = Checker(({ bankScope }) => listingWorld.extend({
   ...GX.provingWorld.shape, scope: bankScope, logger: GX.guardedLogger, leaseMillis: GX.leaseMillis, deviceDB: brandedDeviceDB, boxRefreshMillis: horizonMillis,
-  askUser: custom<AskUser>(isGuarded, Phrases.GuardedExpected),
-  panic:   custom<Panic>(isGuarded, Phrases.GuardedExpected),
 }), 'bad_option', [CX])
 
 /** The bank, as far as its vaults reach into it. */
-export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 'scope' | 'logger' | 'leaseMillis' | 'deviceDB' | 'askUser' | 'panic' | 'boxRefreshMillis'>
+export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 'scope' | 'logger' | 'leaseMillis' | 'deviceDB' | 'boxRefreshMillis'>
 
 // --
 
-// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, BadNewsHandler, PanicHandler, Panic, BankStage, BankSnapshot
+// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, Panic, PanicHandler, GuardedPanicHandler, BankPanic, BankStage, BankSnapshot
 
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
   positiveMinutes: union([num.positive(), lit(Infinity)], Phrases.PositiveMinutesShape),
@@ -336,7 +363,7 @@ export const bankOpts = objCheck(({ fn, custom, applabel, user_id, device_id }) 
   vaultRefreshMinutes: refreshMinutes.optional(),
   boxRefreshMinutes:   refreshMinutes.optional(),
   onBadNews:           fn<BadNewsHandler>().optional(),
-  onPanic:             custom<PanicHandler>().optional(),
+  onPanic:             fn<PanicHandler>().optional(),
 }), { refusalkind: 'bad_option' }, [CX])
 
 /** What a host hands `Bank.make`: who the bank is for, where it stores, and the functions it calls back. */
@@ -365,31 +392,65 @@ export interface BankOpts {
   vaultRefreshMinutes?: number | undefined
   /** How recently a box's record must have been fetched to be trusted, in minutes; 5 when left out. */
   boxRefreshMinutes?:   number | undefined
-  /** Hears each refusal no caller waits on. */
+  /** Hears each refusal no caller waits on while the bank is enabled and in its vacate's erase; else `DefaultOnBadNews`, the bank's logger. */
   onBadNews?:           BadNewsHandler | undefined
-  /** Hears a refused erase of a cached lease, and no secret material; without it, the refusal goes to the platform and the vault is vacated. */
+  /** Hears what you must act on for safety, and no secret material, while the bank is enabled and in its vacate's erase; `DefaultOnPanic` when left out. */
   onPanic?:             PanicHandler | undefined
 }
 
 true satisfies Z.core.util.AssertEqual<BankOpts, Z.input<typeof bankOpts>>
 
+/** The check of what `bank.vacate` may be told. */
+export const vacateStory = objCheck(({ vaultError }) => ({ cause: vaultError.optional() }), 'bad_option', [Checks])
+
+/** What `bank.vacate` may be told: the refusal that called for it, which its snapshot then shows. */
+export interface VacateStory {
+  /** The refusal that called for the vacate; `disabled` when left out. */
+  cause?: VaultError | undefined
+}
+
+true satisfies Z.core.util.AssertEqual<VacateStory, Z.input<typeof vacateStory>>
+
+/** What `onBadNews` hears: a refusal no caller waits on, and the bank it reached. */
+export interface BadNews {
+  readonly news: VaultError
+  readonly bank: Bank
+}
+
 /** `Bank.make`'s `onBadNews`: hears each refusal no caller waits on. */
-export type BadNewsHandler = (news: VaultError) => unknown
+export type BadNewsHandler = (badnews: BadNews) => unknown
 
-/** `Bank.make`'s `onPanic`: hears a cached lease that survived its erase. */
-export type PanicHandler = (refusal: VaultError) => unknown
+/** The check of what `tellBadNewsTo` is handed: a handler, the bank the news reached, and the news. */
+export const tellBadNewsToInput = objCheck(({ fn, custom, arr }) => ({
+  onBadNews: fn<BadNewsHandler>(),
+  bank:      custom<Bank>((val) => hasModelkind(val, 'bank'), Phrases.BankExpected),
+  badnews:   arr(custom<VaultError>(isVaultError, Phrases.VaultErrorExpected)),
+}), 'bad_option')
 
-/** `onPanic` as a bank keeps it, wrapped by `guardOnPanic`: false when the host gave none. Never throws. */
-export type Panic = (refusal: VaultError) => Promise<boolean>
+/** What `onPanic` hears: a refusal you must act on for safety, the bank it reached, and the vault it concerns, if one. */
+export interface Panic {
+  readonly refusal: VaultError
+  readonly bank:    Bank
+  readonly vault?:  Vault | undefined
+}
 
-/** `made` until a `hello` answers, and again past a sweep or a vacate; `ready` once one lands; `refused` once one refuses, the snapshot's `err` saying why. */
+/** `Bank.make`'s `onPanic`: hears what you must act on for safety, as a revoked identity or a cached lease that outlived its erase. */
+export type PanicHandler = (panic: Panic) => unknown
+
+/** `onPanic` as a bank keeps it, wrapped by `guardOnPanic`. Never throws. */
+export type GuardedPanicHandler = (panic: Panic) => Promise<void>
+
+/** How a vault or a listing panics through its bank, which names itself to the host: handed to each as it is made. Never throws. */
+export type BankPanic = (panic: Omit<Panic, 'bank'>) => Promise<void>
+
+/** `made` until a `hello` answers; `ready` once one lands; `refused` once one refuses or the bank is swept or vacated, the snapshot's `err` saying why. */
 export type BankStage = 'made' | 'ready' | 'refused'
 
 /** A bank as a host renders it: its scope, how far its `hello` got, and its vaults. */
 export interface BankSnapshot extends BankScope {
-  /** How far the bank's `hello` got: `made`, `ready` or `refused`. */
+  /** How far the bank's `hello` got, `made`, `ready` or `refused`, and `refused` from a sweep or a vacate on. */
   readonly stage:     BankStage
-  /** Why the last `hello` refused, or null. */
+  /** Why the last `hello` refused, or why the bank is disabled, or null. */
   readonly err:       VaultError | null
   /** Your id for this device, as `Bank.make` was given it. */
   readonly device_id: string

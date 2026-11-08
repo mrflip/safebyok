@@ -59,6 +59,10 @@ In order. A later item that depends on an earlier one says so.
   own, after the react_new sprint. Meanwhile the React layer works around it: `useVault` never
   asks, and the first click that needs the vault creates it.
 
+* **A bank's hello could load far more efficiently.** Today it reads every box three times, and whole. The plan, and
+  what each step saves, is in whiteboard/20261108-query_efficiently/query_efficiently.md. Priced in
+  notes/reference-sizes.md, *A bank hello on Convex*. After the fate makeover.
+
 ## Side quests
 
 Straightforward, likely to be done, not needed yet. Each is a thread cut from `main`.

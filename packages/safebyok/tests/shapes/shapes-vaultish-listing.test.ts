@@ -156,18 +156,21 @@ describe("The checks of the world and the listing", () => {
       [{ ...mw.world, ensureTimely: 5 },         false, 'refuses a world whose ensureTimely is no function'],
       [{ ...mw.world, isLocked: undefined },     false, 'refuses a world with no isLocked'],
       [{ ...mw.world, isLocked: 'locked' },      false, 'refuses a world whose isLocked is no boolean'],
-      [{ ...mw.world, tellBadNews: undefined },  false, 'refuses a world that cannot tellBadNews'],
     ])
   })
 
   describe("VX.listingOpts", () => {
-    const opts = { vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000 }
+    const opts = { vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000, bankFriend: mw.bankFriend }
     holdsCases(VX.listingOpts, [
-      [opts,                                                     true,  'passes the test vaultDB and a horizon'],
+      [opts,                                                     true,  'passes the test vaultDB, a horizon and the calls the bank branded'],
       [{ ...opts, maxMillisSinceRefresh: Infinity },             true,  'passes a horizon of Infinity'],
       [{ ...opts, vaultDB: { tryPutBox: () => null } },          false, 'refuses a vaultDB with no tryGetBox'],
       [{ ...opts, maxMillisSinceRefresh: -1 },                   false, 'refuses a negative horizon'],
       [{ ...opts, maxMillisSinceRefresh: undefined },            false, 'refuses a missing horizon'],
+      [{ ...opts, bankFriend: { ...mw.bankFriend, panic: () => Promise.resolve() } },        false, 'refuses a panic the bank did not brand'],
+      [{ ...opts, bankFriend: { ...mw.bankFriend, tellBadNews: () => undefined } },         false, 'refuses a tellBadNews the bank did not brand'],
+      [{ ...opts, bankFriend: { ...mw.bankFriend, askUser: () => Promise.resolve(true) } }, false, 'refuses an askUser the bank did not brand'],
+      [{ ...opts, bankFriend: undefined },                       false, 'refuses a missing bankFriend'],
       [{ ...opts, world: mw.world },                             false, 'refuses a world, which the listing takes beside its options'],
       [{ ...opts, onBadNews: () => null },                       false, 'refuses an onBadNews, which only a bank takes'],
       [{ ...opts, extra: 1 },                                    false, 'refuses an option it does not take, being strict'],

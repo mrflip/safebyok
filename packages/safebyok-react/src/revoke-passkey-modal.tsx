@@ -15,7 +15,7 @@ export const RevokePasskeyModal = (props: RevokePasskeyModalProps) => (
 export type RevokePasskeyModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              Gating<'revoke_passkey'>
-  /** Called once, with the dialog's answer: 'unlocked' once the passkey is removed, 'declined' otherwise. */
+  /** Called once with 'unlocked' when the passkey is removed, and with 'declined' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined

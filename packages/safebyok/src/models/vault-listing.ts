@@ -40,13 +40,13 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   /** SLOPDOC: A new vault for `scope`, asked of the user, stored and unlocked; or, locked, the slot's winner. */
-  buildVault(scope: VaultScope): Promise<Vault> { return Vault.launchBirth(this, scope) }
+  buildVault(scope: VaultScope): Promise<Vault> { return Vault.launchBirth(this, scope, this.bankFriend.askUser) }
 
   tryBuildVault(scope: VaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.buildVault(scope)) }
 
   /** The listing of `vault`'s boxes, its watch not started. */
   boxListingOf(vault: Vault): BoxListing {
-    return new BoxListing(vault, { vaultDB: this.vaultDB, maxMillisSinceRefresh: this.world.boxRefreshMillis })
+    return new BoxListing(vault, { scope: vault.scope, vaultDB: this.vaultDB, maxMillisSinceRefresh: this.world.boxRefreshMillis, bankFriend: this.bankFriend })
   }
 
   /** The scope of `duck`, held to this bank: no listing answers for another's. */
@@ -76,12 +76,13 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   async list(): Promise<void> {
     this.demandEnabled()
     const answer = await this.vaultDB.tryListVaults(this.world.scope)
+    this.demandEnabled()
     if (! answer.ok) {
-      this.tellIfRevoked(answer.err)
+      this.panicIfRevoked(answer.err)
       throw answer.err
     }
     const { vaults, damaged_rows } = answer.val
-    this.world.tellBadNews(damaged_rows.map((damaged) => vaultStoredDamaged(damaged)))
+    this.bankFriend.tellBadNews(damaged_rows.map((damaged) => vaultStoredDamaged(damaged)))
     await Promise.all(vaults.map((record) => this.build(record)))
   }
   // --
@@ -171,7 +172,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>): Vault {
-    return new Vault(this.world, this, central)
+    return new Vault(this.world, this, central, this.bankFriend)
   }
 
   protected nothingStoredError(scope: VaultScope): VaultError { return absentVaultError(scope) }

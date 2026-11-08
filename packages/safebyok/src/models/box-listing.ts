@@ -2,12 +2,13 @@
 
 import { VaultError } from '../refusals/errors'
 import type { Modelkind } from '../helpers/consts'
+import { tattoo } from '../helpers/helpers'
 import { absentBoxError, notListedBoxError } from '../refusals/throwers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import { type Boxscope, boxscope } from '../shapes/shapes-core'
+import { type Boxscope, type VaultScope, boxscope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxCreateOpts, type BoxDna, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, type ListingOpts, boxDna } from '../shapes/shapes-vaultish'
+import { type BoxCreateOpts, type BoxDna, type BoxListingOpts, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, boxDna } from '../shapes/shapes-vaultish'
 import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow, BoxRecord, BoxSparse } from '../shapes/shapes-storage'
 import type { Notice } from '../storage/vault-db'
 import { Box } from './box'
@@ -15,9 +16,14 @@ import { Listing } from './listing'
 
 /** One vault's boxes, by boxlabel. */
 export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnapshot, Box> {
-  // == [Props]: world, #damagedRows, damaged_rows
+  // == [Props]: applabel, user_id, vaultlabel, scope, world, #damagedRows, damaged_rows
 
-  declare readonly world: BoxWorld
+  /** The scope of the vault listed, tattooed on by the constructor. */
+  declare readonly applabel:   string
+  declare readonly user_id:    string
+  declare readonly vaultlabel: string
+  readonly scope:              VaultScope
+  declare readonly world:      BoxWorld
 
   /** The rows the vaultDB's listing set aside as damaged. */
   #damagedRows: readonly DamagedBox[] = Object.freeze([])
@@ -28,19 +34,22 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Construction]: constructor, scopeOf, sparseOf, recordOf
 
-  /** The listing of the boxes of `world`, the vault they lie in. */
-  constructor(world: BoxWorld, opts: ListingOpts) {
+  /** The listing of the boxes of `world`, the vault under `opts.scope` they lie in. */
+  constructor(world: BoxWorld, opts: BoxListingOpts) {
     VX.boxWorld.parse(world)
-    super(world, opts)
+    const { scope, ...listingOpts } = VX.boxListingOpts.parse(opts)
+    super(world, listingOpts)
+    this.scope = Object.freeze(scope)
+    tattoo(this, this.scope)
     Object.freeze(this)
   }
 
   /** The scope of `duck`, held to this vault: no listing answers for another's. */
-  scopeOf(duck: unknown):  Boxscope  { return boxscope.parseConsistent(duck, this.world.scope) }
+  scopeOf(duck: unknown):  Boxscope  { return boxscope.parseConsistent(duck, this.scope) }
 
   sparseOf(duck: unknown): BoxSparse { return SX.boxSparse.parse(duck) }
 
-  recordOf(duck: unknown): BoxRecord { return SX.boxRecord.parseConsistent(duck, this.world.scope) }
+  recordOf(duck: unknown): BoxRecord { return SX.boxRecord.parseConsistent(duck, this.scope) }
   // --
 
   // == [Methods]: list, damagedAt, del, get, tryGet, puttable, create, tryCreate, shellFor
@@ -48,10 +57,11 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** Hold every box the vaultDB lists for this vault, sparse, and set its damaged rows aside. */
   async list(): Promise<void> {
     this.demandEnabled()
-    const answer = await this.vaultDB.tryListBoxes({ ...this.world.scope, vault_tok: this.world.vault_tok })
+    const answer = await this.vaultDB.tryListBoxes({ ...this.scope, vault_tok: this.world.vault_tok })
+    this.demandEnabled()
     if (answer.world !== null) { this.world.takeWorld(answer.world) }
     if (! answer.ok) {
-      this.tellIfRevoked(answer.err)
+      this.panicIfRevoked(answer.err)
       throw answer.err
     }
     const { boxes, damaged_rows } = answer.val
@@ -126,7 +136,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   protected tryDelRow(tombstone: DelTombstone<BoxSparse>, opts: DelOpts) { return this.vaultDB.tryDelBox(tombstone, opts) }
 
-  protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.vaultDB.watch(this.world.scope, onNotice, onBadNews) }
+  protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.vaultDB.watch(this.scope, onNotice, onBadNews) }
 
   /** A box row of this life of the vault: one under another `vault_tok` is no row. */
   protected isOwnRow(row: VaultRow | BoxRow): row is BoxRow { return ('boxlabel' in row) && (row.vault_tok === this.world.vault_tok) }

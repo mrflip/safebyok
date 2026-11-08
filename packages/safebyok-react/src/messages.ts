@@ -1,12 +1,12 @@
-// Every word safebyok-react shows a user, in one place, each sentence with a varying part one
-// frame, so a translation may reorder it. What the developer reads stays beside the code that says it.
+// Every word safebyok-react shows a user lives here. A sentence with a varying part is one frame, so
+// a translation may reorder it. What the developer reads stays beside the code that says it.
 
 import type { Gatingkind } from 'safebyok'
 
 /** The locale the dialog formats its relative times in, and the language of every message here. */
 export const Locale = 'en'
 
-/** The words themselves. */
+/** The words safebyok-react shows a user, each under its name. */
 export const Messages = {
   // The passphrase dialog
   chooseTitle:       'Choose a vault passphrase',
@@ -15,7 +15,7 @@ export const Messages = {
   unlockBlurb:       'Your secrets are encrypted with this passphrase; enter it to continue. A forgotten passphrase cannot be recovered -- you would start a new vault and re-enter your secrets.',
   passphraseField:   'vault passphrase',
   confirmField:      'confirm vault passphrase',
-  /** Said at a submit whose new passphrase and its confirmation differ: nothing is attempted. */
+  /** Said at a submit whose new passphrase and its confirmation differ. */
   passphrasesDiffer: "The new passphrase and its confirmation don't match: type the same one in both.",
   /** What a password manager files a vault's passphrase under, unless the host names it. */
   passphraseUsername: (user_id: string, vaultlabel: string) => `${user_id} (${vaultlabel} vault)`,
@@ -24,13 +24,13 @@ export const Messages = {
   createButton:      'Create vault',
   unlockButton:      'Unlock',
   cancelButton:      'Cancel',
-  /** The window, while the dialog creates the vault: `relative` is a phrase such as 'in 7 days'. */
+  /** How long the unlock lasts, said while the dialog creates the vault: `relative` is a phrase such as 'in 7 days'. */
   locksIn:           (relative: string) => `Locks on this device ${relative}.`,
-  /** The window, on an ordinary unlock: `relative` is a phrase such as 'in 7 days'. */
+  /** How long the unlock lasts, said on an ordinary unlock: `relative` is a phrase such as 'in 7 days'. */
   locksAgainIn:      (relative: string) => `Locks again on this device ${relative}.`,
   staysUnlocked:     'Stays unlocked on this device until you lock it.',
 
-  // The dialogs for a change to the ways in, and for a deletion
+  // The dialogs that replace the passphrase, add or remove the passkey, and delete the vault
   changeTitle:        'Change your vault passphrase',
   changeBlurb:        'Enter the passphrase you use now, then choose a new one. The new one takes its place on every device. A forgotten passphrase cannot be recovered.',
   currentField:       'current passphrase',
@@ -40,7 +40,7 @@ export const Messages = {
   addPasskeyTitle:    'Add a passkey',
   addPasskeyBlurb:    'Enter your vault passphrase. Then your browser asks you to make a passkey -- a fingerprint, a face or a security key -- which unlocks this vault without typing the passphrase.',
   addPasskeyButton:   'Add passkey',
-  /** Said at an add-passkey submit with the passphrase field empty: the browser is not asked. */
+  /** Said at an add-passkey submit with the passphrase field empty. */
   passphraseFirst:    'Enter your vault passphrase first: the passkey is added only once it is proven.',
   revokePasskeyTitle:  'Remove your passkey',
   revokePasskeyBlurb:  'Enter your vault passphrase to remove the passkey. You will unlock with the passphrase alone, on every device.',
@@ -73,7 +73,7 @@ export const Messages = {
   lockButton:        'Lock',
 } as const
 
-/** What each kind of gating's dialog was doing, as `Messages.troubleWord` says it could not. */
+/** What each kind of gating's dialog was doing when it met trouble. */
 export const Doing: Record<Gatingkind, string> = {
   build_vault:        'create your vault',
   unlock_vault:       'unlock your vault',

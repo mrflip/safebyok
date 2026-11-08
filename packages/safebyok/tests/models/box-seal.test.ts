@@ -15,7 +15,7 @@ const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sideca
 const sealWorld = async () => {
   const vaultWorld = makeVaultWorld()
   const vault = await buildTyping(vaultWorld.listing, Dna, { passphraseClear: Passphrase })
-  const boxesOf = () => new TestableBoxListing(boxWorldOf(vault), vaultWorld.opts)
+  const boxesOf = () => new TestableBoxListing(boxWorldOf(vault), { ...vaultWorld.opts, scope: vault.scope })
   return { ...vaultWorld, vault, boxesOf, boxes: boxesOf() }
 }
 

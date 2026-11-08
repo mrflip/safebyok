@@ -1,15 +1,18 @@
 /** The test world of a vault listing in `src/models/`: a {@link MemoryVaultDB} of one vault row, a {@link MemoryDeviceDB} with its lease verbs spied on, and a clock the test moves. */
 
 import { afterEach, vi } from 'vitest'
+import { brandGuarded } from '../../src/helpers/consts'
 import { _cheat_clock } from '../../src/helpers/clock'
 import type { Lease } from '../../src/models/lease'
 import type { VaultScope } from '../../src/shapes/shapes-core'
 import type * as GX from '../../src/shapes/shapes-gateish'
-import { type AskUser, type RequestCleartext, passphraseCleartext } from '../../src/shapes/shapes-gateish'
-import type { BoxWorld, ListingOpts, PanicHandler, VaultWorld } from '../../src/shapes/shapes-vaultish'
+import { type RequestCleartext, passphraseCleartext } from '../../src/shapes/shapes-gateish'
+import type { BankFriend, BankPanic, BoxWorld, ListingOpts, PanicHandler, VaultWorld } from '../../src/shapes/shapes-vaultish'
+import type { VaultError } from '../../src/refusals/errors'
 import type { VaultTombstone, VaultRecord } from '../../src/shapes/shapes-storage'
-import { guardOnPanic, guardRequestCleartext } from '../../src/models/bank'
+import { DefaultOnPanic, guardOnPanic, guardRequestCleartext } from '../../src/models/bank'
 import type { Vault } from '../../src/models/vault'
+import type { Bank } from '../../src/models/bank'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { Outcome } from '../../src/refusals/outcome'
 import { VaultListing } from '../../src/models/vault-listing'
@@ -43,20 +46,21 @@ export type Typing = Typed | Promise<Typed>
 type Typed = Partial<Record<'passphraseClear' | 'antePassphraseClear' | 'nextPassphraseClear', string>> & { passkeyClear?: GX.PasskeyAnswer | null }
 
 /** What `ask` answers under a dialog shown once: it attempts `typing` and closes. A correctable refusal, which leaves the gating to decline as the dialog closes, is thrown as itself. */
-const askTyping = async <ValT>(world: { askUser: AskUser }, typing: Typing, ask: () => Promise<ValT>): Promise<ValT> => {
-  const { askUser: asBefore } = world
+const askTyping = async <ValT>(world: VaultWorld, typing: Typing, ask: () => Promise<ValT>): Promise<ValT> => {
+  // The world is the fake bank, whose friend's askUser shows its requestCleartext as it stands.
+  const fake = world as FakeBank
+  const { requestCleartext: asBefore } = fake
   let heard: Outcome<unknown> | null = null
-  const dialog: RequestCleartext = async (gating) => {
+  fake.requestCleartext = async (gating) => {
     heard = await gating.attempt(await typing)
   }
-  world.askUser = guardRequestCleartext(dialog)
   try {
     return await ask()
   } catch (err) {
     const attempted = heard as Outcome<unknown> | null
     throw attempted?.ok === false ? attempted.err : err
   } finally {
-    world.askUser = asBefore
+    fake.requestCleartext = asBefore
   }
 }
 
@@ -114,7 +118,7 @@ const makeDeviceDB = () => {
 }
 export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>
 
-/** The bank a vault listing's test world fakes: a {@link VaultWorld} whose members a test may replace, and the host's dialog its `askUser` asks, which a test may swap. */
+/** The bank a vault listing's test world fakes: a {@link VaultWorld} whose members a test may replace, and the host's dialog its friend's `askUser` asks, which a test may swap. */
 export type FakeBank = { -readonly [K in keyof VaultWorld]: VaultWorld[K] } & { requestCleartext: RequestCleartext }
 
 /** What a test may say of a {@link makeVaultWorld} world: its members, and the host's own functions, which it wraps as a bank does. */
@@ -122,23 +126,21 @@ export type VaultWorldGiven = Partial<Omit<FakeBank, keyof ProvingWorldGiven>> &
 
 /** A vault listing over a vaultDB of one row, `stored0` to begin with, and the deviceDB and clock it shares with every other session `anotherSession` opens on this device. `worldOverrides` says otherwise of the world. */
 export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverrides: VaultWorldGiven = {}) => {
-  const { onPanic, keyDeriver, strengthChecker, device_id = '00000000-0000-4000-8000-000000000001', ...overrides } = worldOverrides
+  const { onPanic = DefaultOnPanic, keyDeriver, strengthChecker, device_id = '00000000-0000-4000-8000-000000000001', ...overrides } = worldOverrides
   let now = T0
   _cheat_clock(() => now)
   const deviceDB = makeDeviceDB()
+  const hostPanic = guardOnPanic(onPanic)
   const fakeBank: FakeBank = {
     isLocked:     false,
     ensureTimely: () => Promise.resolve(),
     takeWorld:    nothing,
-    tellBadNews:  nothing,
     scope:        { applabel: Dna.applabel, user_id: Dna.user_id },
     logger:       parseLogger(quietLogger),
     ...provingWorldOf({ keyDeriver, strengthChecker, device_id }),
     leaseMillis:  LeaseMillis,
     deviceDB:     deviceDB.memoryDB,
     requestCleartext: nothing,
-    askUser:      guardRequestCleartext((gating) => fakeBank.requestCleartext(gating)),
-    panic:        guardOnPanic(onPanic),
     boxRefreshMillis: 10 * 60_000,
     ...overrides,
   }
@@ -146,7 +148,16 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
   const vaultrows = vaultDB._cheat_vaultRowsOf(Dna)
   if (stored0 !== null) { vaultrows.set(Dna.vaultlabel, stored0) }
   const storedNow = (): VaultRecord | null => (vaultrows.get(Dna.vaultlabel) ?? null) as VaultRecord | null
-  const opts: ListingOpts = { vaultDB, maxMillisSinceRefresh: 10 * 60_000 }
+  // The fake stands in for the bank a panic names.
+  const panic: BankPanic = brandGuarded((told) => hostPanic({ ...told, bank: fakeBank as unknown as Bank }))
+  /** The bad news the listings and vaults told, oldest first. A live array. */
+  const badnews: VaultError[] = []
+  const bankFriend: BankFriend = {
+    panic,
+    tellBadNews: brandGuarded((told: readonly VaultError[]) => { badnews.push(...told) }),
+    askUser:     guardRequestCleartext((gating) => fakeBank.requestCleartext(gating)),
+  }
+  const opts: ListingOpts = { vaultDB, maxMillisSinceRefresh: 10 * 60_000, bankFriend }
   const makeListing = (): VaultListing => {
     const made = new VaultListing(fakeBank, opts)
     madeListings.push(made)
@@ -167,7 +178,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     return stored
   }
   return {
-    listing, fakeBank, opts, vaultDB, deviceDB, storeBehindOurBack, restoreRow, demandStored, storedNow,
+    listing, fakeBank, opts, badnews, vaultDB, deviceDB, storeBehindOurBack, restoreRow, demandStored, storedNow,
     /** A new listing over the same vaultDB, deviceDB and clock: the next session on this device. */
     anotherSession: makeListing,
     /** Move the clock on by `millis`; no timer fires. */
@@ -176,10 +187,10 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
 }
 export type VaultTestWorld = ReturnType<typeof makeVaultWorld>
 
-/** `world`, but that `onBadNews` hears its bad news, each news by itself, as a bank's host does. */
-export const hearingBadNews = (world: FakeBank, onBadNews: (news: unknown) => unknown): FakeBank => ({
-  ...world,
-  tellBadNews: (badnews) => { for (const news of badnews) { onBadNews(news) } },
+/** `opts`, but that `onBadNews` hears the bad news its listing tells, each news by itself, as a bank's host does. */
+export const hearingBadNews = (opts: ListingOpts, onBadNews: (news: unknown) => unknown): ListingOpts => ({
+  ...opts,
+  bankFriend: { ...opts.bankFriend, tellBadNews: brandGuarded((badnews: readonly VaultError[]) => { for (const news of badnews) { onBadNews(news) } }) },
 })
 
 /** The record of a vault created of `Dna`, gated under `passphrase`, as a vaultDB holds it. */
@@ -228,12 +239,10 @@ export const makeProving = async ({ vault_tok, registered_at }: { vault_tok: str
 
 /** `vault` as its boxes see it, but that it takes no world. */
 export const boxWorldOf = (vault: Vault): BoxWorld => ({
-  scope:        vault.scope,
   vault_tok:    vault.vault_tok,
   get isLocked() { return vault.isLocked },
   ensureTimely: (opts) => vault.ensureTimely(opts),
   takeWorld:    () => undefined,
-  tellBadNews:  (badnews) => { vault.tellBadNews(badnews) },
   demandUnlocked:   () => vault.demandUnlocked(),
   subscribe:        (listener) => vault.subscribe(listener),
   sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),

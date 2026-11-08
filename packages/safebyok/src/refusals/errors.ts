@@ -67,7 +67,7 @@ export const refusalkindVals = [
   'vault_empty',         // a vaultDB call named a vault_tok no row holds, and no live row stands there: nothing of this life
   'damaged_row',         // a row read from storage failed its checks, on the way out, and is set aside
   'gate_issue',          // a vaultDB gate verb whose params disagree with the stored row: its registered_at
-  'disabled',            // a call on an object let go by a sweep, a vacate or a delete: it answers nothing more, and the bank has a fresh one
+  'disabled',            // a call on a bank, a listing or a thing of theirs no longer enabled, since a sweep, a vacate or a delete: it answers nothing more
 ] as const
 export type Refusalkind = typeof refusalkindVals[number]
 
