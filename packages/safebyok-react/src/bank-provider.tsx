@@ -61,7 +61,7 @@ type Handlers = { onPanic: PanicHandler, onBadNews: BadNewsHandler, requestClear
 /** How often the provider asks its bank to lock each vault whose autolock has passed. */
 const AutolockEveryMillis = MinuteMillis
 
-/** Whether the user's gesture is still in hand, so a dialog may be shown: true where the browser does not say. */
+/** Whether the user's gesture is still in hand, true where the browser does not say. */
 const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
 
 /** The fields of `now` and `was` whose values differ. */

@@ -32,7 +32,7 @@ const UnbornHeld: VaultHeld = Object.freeze({ stage: 'unborn', vault: null })
 /** The signed-in user's vault under `vaultlabel` and where it stands. */
 export const useVault = (vaultlabel: string): VaultHeld => useVaultFor('useVault', vaultlabel)
 
-/** {@link useVault}'s work, for `hookname`: the vault the bank lists once ready, said hello to once. */
+/** The signed-in user's vault under `vaultlabel` and where it stands. `hookname` is the hook a missing-provider error names. */
 const useVaultFor = (hookname: string, vaultlabel: string): VaultHeld => {
   const { bank, helloedVaults } = useProvided(hookname)
   const snapshot = useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, bank?.getSnapshot ?? getNothing, getNothing)

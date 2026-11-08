@@ -24,7 +24,7 @@ export type AddPasskeyModalProps = {
   passkeyRpId?:        string | undefined
 }
 
-/** The dialog itself, inside AddPasskeyModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
+/** The dialog itself, inside AddPasskeyModal's boundary. */
 const AddPasskeyForm = ({ gating, onDone: done, passphraseUsername, passkeyRpId }: AddPasskeyModalProps) => {
   const { gripe, setGripe, meet, attempt, whenShown, isShown } = useAttempts('AddPasskeyModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)

@@ -55,7 +55,7 @@ export const AnsweringOnce = ({ gating, onDone, children }: {
   )
 }
 
-/** Escape, from anywhere in a dialog, cancels it, and goes no further. */
+/** Cancel the dialog on Escape from anywhere in it, and stop the key going further. */
 const cancelOnEscape = (onDone: (answer: DialogAnswer) => void) => (evt: KeyboardEvent) => {
   if (evt.key !== 'Escape') { return }
   evt.stopPropagation()
@@ -144,7 +144,7 @@ type ModalFormProps = {
   formRef?:   Ref<HTMLFormElement> | undefined
   /** The dialog's one answer: Cancel and Escape answer 'declined'. */
   done:       (answer: DialogAnswer) => void
-  /** Each submit, its default prevented. */
+  /** Called at each submit. The form's default is already prevented. */
   onSubmit:   () => void
   /** The fields, between the blurb and the live region. */
   children:   ReactNode
@@ -195,10 +195,12 @@ const leaseCount = (leaseMillis: number): { count: number, unit: Unit } => {
   return { count: minutes, unit: 'minute' }
 }
 
-/** One relative-time formatter per locale, made at first use, after any polyfill the host imports has run. */
+// Made at first use, after any polyfill the host imports has run.
+/** One relative-time formatter per locale. */
 const relativeTimes = new Map<string, Intl.RelativeTimeFormat>()
 
-/** The formatter for `locale`: numeric 'always', so that one day reads 'in 1 day' and never 'tomorrow'. */
+// Numeric 'always', so that one day reads 'in 1 day' and never 'tomorrow'.
+/** The formatter for `locale`. */
 const relativeTimeIn = (locale: string): Intl.RelativeTimeFormat => {
   const made = relativeTimes.get(locale) ?? new Intl.RelativeTimeFormat(locale, { numeric: 'always', style: 'long' })
   relativeTimes.set(locale, made)

@@ -39,7 +39,7 @@ const ReplacePassphraseForm = ({ gating, onDone: done, passphraseUsername, passp
     void attempt(() => gating.attempt({ antePassphraseClear: anteRef.current?.value ?? '', nextPassphraseClear }), 'unlocked')
   }
 
-  /** Each change to a field: a gripe about what was typed before goes. */
+  /** Forget the gripe about what was typed before, at each change to a field. */
   const forgetGripe = () => { setGripe(null) }
 
   return (

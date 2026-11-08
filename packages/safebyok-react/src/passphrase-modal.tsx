@@ -31,7 +31,7 @@ export type PassphraseModalProps = {
   passkeyRpId?:        string | undefined
 }
 
-/** The dialog itself, inside PassphraseModal's boundary: its `onDone` is the one answer, `AnsweringOnce`'s. */
+/** The dialog itself, inside PassphraseModal's boundary. */
 const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername, passphraseAdvice, passkeyRpId }: PassphraseModalProps) => {
   const { gripe, setGripe, fail, attempt } = useAttempts('PassphraseModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)
@@ -49,7 +49,7 @@ const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername,
     void attempt(() => gating.attempt({ passphraseClear: typed }), 'unlocked')
   }
 
-  /** Each change to the field. */
+  /** Hear each change to the field. */
   const hearPassphrase = (typed: string) => {
     setGripe((prev) => (prev?.fromPasskey === true ? prev : null))
     if (creating) { void advice.hear(typed) }

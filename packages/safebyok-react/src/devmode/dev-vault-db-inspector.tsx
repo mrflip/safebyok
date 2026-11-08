@@ -116,7 +116,7 @@ const VaultRowLines = ({ vaultRow, boxes, onGetVault, onGetBox, onDelBox }: Vaul
   )
 }
 
-/** `delBox` of `boxRow` at the revision listed: its live row, its tombstone, or its damaged row. */
+/** Delete `boxRow` by `delBox` at the revision listed, whether it is a live row, a tombstone or a damaged row. */
 const delBoxRow = (vaultDB: VaultDB, boxRow: BoxSparse | DamagedBox) => {
   const sparse = boxSparse.parse(boxRow)
   return vaultDB.delBox({ ...sparse, ...nextRevisionOf(sparse, Date.now()), am: 'x' }, { prior: revisionOf(sparse) })

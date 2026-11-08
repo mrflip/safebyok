@@ -73,7 +73,7 @@ export const Messages = {
   lockButton:        'Lock',
 } as const
 
-/** What each kind of gating's dialog was doing, as `Messages.troubleWord` says it could not. */
+/** What each kind of gating's dialog was doing when it met trouble. */
 export const Doing: Record<Gatingkind, string> = {
   build_vault:        'create your vault',
   unlock_vault:       'unlock your vault',

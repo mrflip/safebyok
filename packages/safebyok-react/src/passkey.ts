@@ -15,7 +15,7 @@ import { Messages } from './messages'
 // Where no passkey answer is to be had (the browser has no WebAuthn, the authenticator no PRF, or
 // the browser failed to ask), these refuse `passkey_unavailable`, which a dialog shows in place.
 
-/** True for base64url text, as a passkey's salt is stored. */
+/** True for base64url text. */
 const isB64 = (text: string): boolean => {
   try {
     fromB64(text)
@@ -59,7 +59,7 @@ export type CreatePasskeyOpts = {
   rp:       { name: string, id?: string | undefined }
   /** How the authenticator lists the passkey: an account `name` and a `displayName`. */
   user:     { name: string, displayName: string }
-  /** How long the browser waits for the user, in milliseconds; the browser's default otherwise. */
+  /** How long the browser waits for the user, in milliseconds. Defaults to the browser's own. */
   timeout?: number | undefined
 }
 
@@ -158,7 +158,7 @@ export const attemptOnce = async <ValT>(passkey: PasskeyAnswer, attempt: (passke
   }
 }
 
-/** The bytes of a stored passkey's `credential_id`, which the core checks only for being text. */
+/** The bytes of a stored passkey's `credential_id`. */
 const credentialBytesOf = (credential_id: string): Uint8Array<ArrayBuffer> => {
   try {
     return fromB64(credential_id) as Uint8Array<ArrayBuffer>
@@ -174,7 +174,7 @@ const answerOf = (credential_id: string, saltBytes: Uint8Array, answer: BufferSo
   prfBytes:     bytesOf(answer),
 })
 
-/** A copy of `source`'s bytes, `source` zeroed once copied, so the answer's bytes are the one copy. */
+/** Copy `source`'s bytes, and zero `source`. The answer's bytes are then the only copy. */
 const bytesOf = (source: BufferSource): Uint8Array<ArrayBuffer> => {
   // ArrayBuffer.isView, not instanceof, holds across realms (an iframe's buffers, say).
   const handed = ArrayBuffer.isView(source) ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength) : new Uint8Array(source)
