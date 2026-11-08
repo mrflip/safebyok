@@ -3,7 +3,7 @@
 "safebyok-react": minor
 ---
 
-**The bank's handlers hear a bag, and their defaults are exported.** `onBadNews` hears `{ news, bank }` where it heard the refusal alone, and `onPanic` hears `{ refusal, vault }` where it heard the refusal alone. Left out, they are `DefaultOnBadNews`, which tells the bank's logger, and `DefaultOnPanic`, which reports to the platform; both are exported, so a host's own handler can call them. The exported `BadNews` type is new, and `GuardedPanicHandler` is how a bank keeps its `onPanic`.
+**The bank's handlers hear a bag, and their defaults are exported.** `onBadNews` hears a `BadNews`, `{ news, bank }`, where it heard the refusal alone, and `onPanic` hears a `Panic`, `{ refusal, bank, vault }`, where it heard the refusal alone: `vault` is the vault the refusal concerns, left out when there is none. Left out, they are `DefaultOnBadNews`, which tells the bank's logger, and `DefaultOnPanic`, which reports to the platform; both are exported, so a host's own handler can call them. The exported `BadNews` type is new. **The exported `Panic` type changed meaning**: it was the guarded handler, `(refusal) => Promise<boolean>`, and is now the bag `onPanic` hears; a host that named it for the handler names `GuardedPanicHandler`, `(panic: Panic) => Promise<void>`, instead, and a host that builds a `Panic` by hand gives it the `bank`.
 
 **BankProvider no longer runs autolock.** It set a one-minute timer to call `bank.autolock()`; the right cadence is hours or days, and the host's to choose. Call `bank.autolock()` on a schedule of your own, as the core README says.
 
