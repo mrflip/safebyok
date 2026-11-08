@@ -92,3 +92,57 @@ lint, whose 4 errors were already in the base wip.
   * `device_id` forget, as above.
   * `isEnabled` stays true during the scrub, while `demandEnabled` already refuses.
   * A host `onPanic` that swallows a revocation leaves the user's leases cached. That is by design.
+
+# Thread 2: vacate disables first, its scrub alone holding the host's handlers (2026-11-08)
+
+Branch `20261108-vacate_first`, cut from `3ad242978` on `20261108-handler_defaults`. Local only.
+The Coach rejected ruling A's order ("isEnabled should be one of the first things to come down";
+"I do not like the idea of bank itself having a janky lifecycle"): the window where `isEnabled`
+read true while every call refused is gone.
+
+* **Built**, in `packages/safebyok/src/models/bank.ts` unless named:
+  * **`vacate(story?: VacateStory)`**, `{ cause?: VaultError }`, checked by `VX.vacateStory`
+    (an `objCheck`, strict, `bad_option`). `VacateStory` is exported from the main entry.
+    `DefaultOnPanic` calls `void bank.vacate({ cause: refusal })`.
+  * **Disable first.** `vacate` lets go at once (`#letGo`): `isEnabled` false, every call refusing,
+    the snapshot `refused` with the cause. Then it starts the scrub and answers its promise.
+  * **One field for the end.** `#isEnabled` and `#isLive` are gone: `isEnabled` is
+    `#endCause === null`, so a sweep and a vacate both disable in the one assignment.
+  * **The host's handlers are a pair** (`#hostHandlers`: the guarded `onPanic`, the raw
+    `onBadNews`). `get #handlers()` answers them while enabled, else `DefaultHandlers`. `panic`,
+    `tellBadNews` and `autolock`'s listing go through `#handlers`; `vacate` hands
+    `#hostHandlers` to `#eraseOwnLeases`, the one exception. `askUser` keeps its own switch.
+  * **`#vacating`** is the only lifecycle state vacate adds: a repeat answers the first promise,
+    and the guard is "vacated", not "disabled", so a vacate after a sweep still scrubs.
+  * **Docs:** `onPanic` and `onBadNews` in `BankOpts`, the README's two bullets, the changeset,
+    and the `notes/security.md` entry (amended by a sonnet subagent, marked `vacate_first`).
+  * **Tests** (`bank-ending.test.ts` unless named): disabled at once with calls refusing and the
+    cause in the snapshot; nothing past the disable reaches the host but the scrub's refused
+    `tryForget`; a refused `tryListLeases` reaches the host's `onBadNews`; a repeat answers the
+    same promise and lists once; a bad story refuses `bad_option`; `bank.test.ts`: `DefaultOnPanic`
+    passes `{ cause }`, and a burst now reaches the host once.
+
+* **Decisions taken**:
+  * **No `.catch(...)` on the scrub**, though the Coach's sketch had one: lint refuses promise
+    chaining (`unicorn/prefer-await`), and nothing in it can reject (`tryListLeases`, `tryForget`
+    answer Outcomes, the guarded `onPanic` reports its own throws, bad news is not awaited). No
+    `eslint-disable`.
+  * **`askUser` stays out of the pair:** the scrub never asks the user.
+
+* **Discoveries**:
+  * **A vault's own lease erase now falls to the default** (item 4). `#vaultListing.vacate()`
+    vacates each vault, whose `#vacateLease` panics through `bank.panic`, already disabled, so a
+    refused erase goes to `DefaultOnPanic` (the platform; its `vault.vacate()` is a no-op). The
+    scrub covers that row: the vault's `tryForget` is called before the scrub's `tryListLeases`,
+    so a row it failed to erase is listed and retried, and a second refusal reaches the host's
+    `onPanic`. If the listing is refused, the host hears that through `onBadNews` instead. No
+    second exception added.
+  * **A host `onPanic` that calls `DefaultOnPanic` hears a burst once**: the first call disables
+    the bank synchronously, so the rest go to the default.
+
+* **Races (rows)**:
+  * An unlock in flight across a vacate can cache its lease after the scrub (unchanged).
+  * A vault's erase and the scrub may forget the same row at once; a forget of a row gone is
+    harmless, and a refusal of either is told (the vault's to the platform, the scrub's to the host).
+  * The scrub's `tryListLeases` may answer before a vault's own `tryForget` lands: the row is listed
+    and forgotten twice, harmlessly.
