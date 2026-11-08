@@ -428,7 +428,11 @@ faster: two round trips either way.
   parallel. Own-rows listings keep that shape: the bank's watch answers first, and then the vault watches start.
 * **What it would take.** safebyok-convex's `watchRows` over a bank reads its boxes too
   (`component/vaults.ts`). A watch over the vault rows alone needs a scope or query of its own.
-* **A sparse answer saves no I/O.** A listing keeps the sparse box: everything but `sidecar`, `box_key_wrapped` and
-  `whisper_ciphered`. But Convex reads a document whole, so trimming what a query returns saves bandwidth to the
-  client, not billed I/O. Billed I/O shrinks only if the sparse fields are stored apart, and Convex's 1 KB rounding
-  then leaves each sparse row billed as 1 KB.
+* **A sparse answer saves no I/O; sparse rows stored apart do.** A listing keeps the sparse box: everything but
+  `sidecar`, `box_key_wrapped` and `whisper_ciphered`. Own-rows listings above still read whole boxes, since Convex
+  reads a document whole, and trimming what a query returns saves bandwidth to the client, not billed I/O. Billed
+  I/O shrinks if each box's sparse fields are a row of their own, which the listings watch, and only `getBox` reads
+  the rest. A medium box's sparse row is about 790 bytes as Convex weighs it: the 75%-label tombstone (524) plus
+  the 268 bytes of label columns Convex adds to a medium box (Estimate). Per hello that reads 0.80 MB, about $38 a
+  month net, and a box write 0.08 MB per client. Convex's 1 KB rounding would raise that to 1.04 MB and $53. The
+  gain grows with the box: a large box (5,005 bytes) keeps a sparse row of about 790, about 6 times less.
