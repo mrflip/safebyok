@@ -1,4 +1,3 @@
-/** `safebyok-react`: the provider of the signed-in user's bank, hooks over its vaults and boxes, the dialogs that ask the user, whisper fields, and vault controls. */
 export { BankProvider } from './provider/bank-provider'
 export type { BankProviderProps } from './shapes'
 export { useBank, useBankSnapshot, useVault, useVaultSnapshot } from './hooks/hooks'
@@ -18,7 +17,6 @@ export type { ReplacePassphraseModalProps } from './shapes'
 export { DelVaultModal } from './modals/del-vault-modal'
 export type { DelVaultModalProps } from './shapes'
 
-// Passkeys: the dialogs that add and remove the vault's passkey, the button that unlocks with it, and the WebAuthn calls beneath them.
 export { AddPasskeyModal } from './modals/add-passkey-modal'
 export type { AddPasskeyModalProps } from './shapes'
 export { RevokePasskeyModal } from './modals/revoke-passkey-modal'
