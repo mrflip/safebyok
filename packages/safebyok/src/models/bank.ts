@@ -27,7 +27,7 @@ export const DefaultRefreshMillis = 5 * MinuteMillis
 // --
 
 export class Bank {
-  // == [Props]: applabel, user_id, scope, device_id, keyDeriver, deviceDB, logger, askUser, strengthChecker, leaseMillis, panic, boxRefreshMillis, #hostHandlers, #listeners, #vaultListing, #endCause, #vacating, #lastHello, #snapshot, #getSnapshot, #subscribe
+  // == [Props]: applabel, user_id, scope, device_id, keyDeriver, deviceDB, logger, askUser, strengthChecker, leaseMillis, boxRefreshMillis, #panic, #hostHandlers, #listeners, #vaultListing, #endCause, #vacating, #lastHello, #snapshot, #getSnapshot, #subscribe
 
   declare readonly applabel: string
   declare readonly user_id:  string
@@ -40,10 +40,11 @@ export class Bank {
   readonly askUser:          AskUser
   readonly strengthChecker:  GuardedStrengthChecker
   readonly leaseMillis:      number
-  /** Tells the host what it must act on for safety, naming this bank, and no secret material. */
-  readonly panic:            BankPanic
   /** The refresh horizon of each vault's boxes. */
   readonly boxRefreshMillis: number
+
+  /** Tells the host what it must act on for safety, naming this bank: the friend its listings and vaults panic through. */
+  readonly #panic: BankPanic
 
   /** The host's `onPanic`, guarded, and its `onBadNews`, called while the bank is enabled and by its vacate's scrub. */
   readonly #hostHandlers: Handlers
@@ -95,14 +96,14 @@ export class Bank {
     // A disabled bank calls none of the host's functions, but in its vacate's scrub: the page may belong to the next user by then.
     this.#hostHandlers = { onPanic: guardOnPanic(onPanic), onBadNews }
     const hostAskUser = guardRequestCleartext(requestCleartext)
-    this.panic = brandGuarded((panic: Omit<Panic, 'bank'>) => this.#handlers.onPanic({ ...panic, bank: this }))
+    this.#panic = brandGuarded((panic: Omit<Panic, 'bank'>) => this.#handlers.onPanic({ ...panic, bank: this }))
     this.askUser = brandGuarded((gating: AnyGating) => (this.isEnabled ? hostAskUser(gating) : Promise.resolve(true)))
     this.logger = parseLogger(logger)
     this.strengthChecker = guardStrengthChecker(strengthChecker)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.boxRefreshMillis = millisOf(boxRefreshMinutes, DefaultRefreshMillis)
     const maxMillisSinceRefresh = millisOf(vaultRefreshMinutes, DefaultRefreshMillis)
-    this.#vaultListing = new VaultListing(this, { vaultDB, maxMillisSinceRefresh })
+    this.#vaultListing = new VaultListing(this, { vaultDB, maxMillisSinceRefresh, panic: this.#panic })
     this.#vaultListing.subscribe(this.#remakeSnapshot)
     this.#snapshot = this.#makeSnapshot()
     if (isTestDeriver(keyDeriver)) { this.logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
@@ -171,7 +172,7 @@ export class Bank {
     return this
   }
 
-  /** Sign out on this device: disable the bank, settling once every lease of this bank cached here is erased. Never rejects. */
+  /** Sign out on this device: disable the bank, settling once every lease of this bank cached here is erased. */
   vacate(story: VacateStory = {}): Promise<void> {
     const { cause = bankDisabled() } = VX.vacateStory.parse(story)
     this.#letGo(cause, () => { this.#vaultListing.vacate() })

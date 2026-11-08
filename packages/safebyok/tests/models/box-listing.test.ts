@@ -11,7 +11,7 @@ import { boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRec
 
 const held = useModelsWorld()
 
-const good = (): ListingOpts => ({ vaultDB: held.mw.vaultDB, maxMillisSinceRefresh: 1000 })
+const good = (): ListingOpts => ({ vaultDB: held.mw.vaultDB, maxMillisSinceRefresh: 1000, panic: held.mw.panic })
 
 const dna = () => boxDnaOf(held.mw.boxscope('anthropic_api_key'))
 

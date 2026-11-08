@@ -49,6 +49,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   async list(): Promise<void> {
     this.demandEnabled()
     const answer = await this.vaultDB.tryListBoxes({ ...this.world.scope, vault_tok: this.world.vault_tok })
+    this.demandEnabled()
     if (answer.world !== null) { this.world.takeWorld(answer.world) }
     if (! answer.ok) {
       this.panicIfRevoked(answer.err)
