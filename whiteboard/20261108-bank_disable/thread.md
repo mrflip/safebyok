@@ -146,3 +146,46 @@ read true while every call refused is gone.
     harmless, and a refusal of either is told (the vault's to the platform, the scrub's to the host).
   * The scrub's `tryListLeases` may answer before a vault's own `tryForget` lands: the row is listed
     and forgotten twice, harmlessly.
+
+# Review fixes (2026-11-08)
+
+Branch `20261108-review_fixes`, cut from `4bdf559a8`. Local only. Fixes from a review of `origin/main..4bdf559a8`, as
+the Coach ruled on a first round (kept on the local branch `review_fixes-v1`).
+
+* **Held: the swept-bank scrub rule (review item 1).** The Coach doubted the race, so it was traced instead:
+  * `Listing.deliver` opens with `demandEnabled()`, so a fetch, put or delete answered after a sweep refuses
+    before `panicIfRevoked`.
+  * `VaultListing.list` and `BoxListing.list` checked only before their await. Each now checks again after it,
+    as `deliver` does. A list answered after a sweep refuses `disabled` and never panics, so no late panic
+    reaches `DefaultOnPanic`'s vacate.
+* **Built**, in `packages/safebyok`:
+  * **The bank's panic is a friend, not a member.** `Bank.#panic` is handed to the vault listing in
+    `ListingOpts.panic` (`VX.bankPanic`, which checks the bank's brand). The listing hands it on:
+    * to each `Vault`, as its constructor's fourth argument;
+    * to each box listing, through `boxListingOf`.
+    `panic` is gone from `ListingWorld` and `VaultWorld`, and `Vault.panic` is gone. A test reaches a panic
+    only through a real refusal.
+  * **Each panics to the bank itself.** A vault names itself. A vault listing names no vault. A box listing's
+    panic names its vault. That panic is bound in `VaultListing.boxListingOf`, where the vault is a `Vault`:
+    a box listing's world is only a `Pick` of one.
+  * **`vacate` stays a plain method** returning the scrub's promise; a repeat returns the first one. A bad
+    story throws at the call. The doc block no longer says "Never rejects".
+  * **The `disabled` comment** speaks of a bank, listing or thing no longer enabled.
+  * **Docs:**
+    * `notes/guarantees.md` on the `askUser` and `onPanic` wraps, wording only: no guarantee found broken;
+    * the two changesets, telling one `Panic` story, and saying `bank.panic` is no longer public.
+* **Reverted by ruling:** the hello throwing `#endCause` (item 8), the async vacate (item 5), and the panic
+  checks (item 2's first form).
+* **Tests:**
+  * `bank.test.ts`:
+    * a box listing's revocation reaches `onPanic` with `{ refusal, bank, vault }`;
+    * a `tryListVaults` answering `identity_revoked` after a sweep refuses `disabled`, with no panic and no
+      vacate;
+    * a burst of revocations from two vaults reaches the host once.
+  * Tests that called `bank.panic` directly lost those legs; real paths cover them:
+    * the scrub, in `bank-ending.test.ts`;
+    * a vault's own erase going to the platform.
+  * A vault made with an unbranded panic refuses.
+* **Races (rows)**:
+  * ~~A vault or box listing in flight across a sweep can still panic~~: closed by the check after each list's
+    await.
