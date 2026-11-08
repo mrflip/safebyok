@@ -33,11 +33,11 @@ describe("A lease renewed through a gate change", () => {
     const sealed = await vault.sealStampedString('sk-test', Stamp)
     const epoch0 = vault.gate.gate_epoch
     vault.becomeNotifiable()
-    const states: string[] = []
-    vault.subscribe(() => { states.push(vault.lockState()) })
+    const lockings: boolean[] = []
+    vault.subscribe(() => { lockings.push(vault.isLocked) })
     await replaceTyping(vault, Passphrase, NewPassphrase)
     expect(vault.isUnlocked).to.be.true
-    expect(states).to.not.include('locked')
+    expect(lockings).to.not.include(true)
     expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
     expect(deviceDB.cachedNow()).to.deep.include({ gate_epoch: epoch0 + 1 })
     expect(await vault.unsealStampedString(sealed, Stamp)).to.eq('sk-test')
@@ -215,7 +215,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     })
     await TH.expectRefusal(box.expose())
     expect(box.whisper).to.eq(ENCRYPTED)
-    expect(box.snapshot.exposed).to.be.false
+    expect(box.snapshot.isExposed).to.be.false
   })
 
   it("a sweep crossing ensureUnlocked's peek at the cached lease refuses, nobody asked", async () => {

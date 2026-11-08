@@ -50,16 +50,18 @@ const mountComponent = <SnapshotT>({ subscribe, getSnapshot }: Store<SnapshotT>,
   }
 }
 
+const lockWordOf = (isLocked: boolean): string => (isLocked ? 'locked' : 'unlocked')
+
 const bankStatus = ({ stage, vaults }: BankSnapshot): string => {
-  const rows = vaults.map(({ vaultlabel, lockState }) => `${vaultlabel} ${lockState}`)
+  const rows = vaults.map(({ vaultlabel, isLocked }) => `${vaultlabel} ${lockWordOf(isLocked)}`)
   return `${stage}: ${rows.join(', ') || 'no vaults'}`
 }
 
-const vaultStatus = ({ vaultlabel, present, lockState }: VaultSnapshot): string => `${vaultlabel} ${present ? lockState : 'deleted'}`
+const vaultStatus = ({ vaultlabel, isPresent, isLocked }: VaultSnapshot): string => `${vaultlabel} ${isPresent ? lockWordOf(isLocked) : 'deleted'}`
 
 const boxList = (boxes: readonly BoxSnapshot[]): string => boxes.map(({ boxlabel }) => boxlabel).join(', ') || 'no boxes'
 
-const boxRow = ({ boxlabel, present, sidecar }: BoxSnapshot): string => `${boxlabel} ${present ? JSON.stringify(sidecar) : 'deleted'}`
+const boxRow = ({ boxlabel, isPresent, sidecar }: BoxSnapshot): string => `${boxlabel} ${isPresent ? JSON.stringify(sidecar) : 'deleted'}`
 
 /** The store of the component that shows the whisper itself: `box.whisper` is its snapshot, as the box's snapshot never holds it. */
 const whisperStoreOf = (box: Box): Store<Whisper> => ({ subscribe: box.subscribe, getSnapshot: () => box.whisper })

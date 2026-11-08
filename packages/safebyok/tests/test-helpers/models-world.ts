@@ -23,7 +23,6 @@ import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
 import type { Vault } from '../../src/models/vault'
-import type { LockState } from '../../src/shapes/shapes-enums'
 import * as CX from '../../src/shapes/shapes-core'
 import type { Boxscope } from '../../src/shapes/shapes-core'
 import * as SX from '../../src/shapes/shapes-storage'
@@ -122,8 +121,8 @@ export const FakeWhisperCiphered = fakeCiphered('fake-whisper-ciphered')
 export type ModelsWorldOpts = {
   /** The clock's first reading; {@link T0}. */
   now?:         number
-  /** Whether the vault starts `unlocked`, as it does by default, or `locked`. */
-  lockState?:   LockState
+  /** Whether the vault starts locked; false, unlocked. */
+  isLocked?:    boolean
   /** Whether to install vitest's fake timers, in step with the clock; true. */
   fakeTimers?:  boolean
 }
@@ -135,6 +134,8 @@ export type ModelsWorldOpts = {
 export type ModelsWorld = {
   /** The vault, as the listing is given it. */
   world:  BoxWorld
+  /** The world with `overrides` laid over it, its lock still read live, as a spread of it would not. */
+  worldWith(overrides: Partial<BoxWorld>): BoxWorld
   vaultDB: TestableVaultDB
   /** Every call made to the world and the vaultDB, in order, oldest first. A live array. */
   calls:  readonly ModelsCall[]
@@ -157,7 +158,8 @@ export type ModelsWorld = {
   setNow(ms: number): void
   /** Move the clock on by `ms` and, under fake timers, fire every timer that falls due, each with the clock at its due time. */
   advance(ms: number): Promise<void>
-  setLockState(lockState: LockState): void
+  /** Lock or unlock the vault, telling the world's subscribers. */
+  setLocked(isLocked: boolean): void
   /** End the watches and put real timers back. Call it in `afterEach`. */
   dispose(): void
 
@@ -274,7 +276,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   // The clock under real timers. Under fake ones the clock is the faked `Date`, which moves to each timer's due time as it fires.
   let now = opts.now ?? T0
   const clockNow = (): number => (fakeTimers ? Date.now() : now)
-  let lockState: LockState = opts.lockState ?? 'unlocked'
+  let isLocked = opts.isLocked ?? false
   const worldListeners = new Set<() => void>()
   if (fakeTimers) { vi.useFakeTimers({ now }) }
   _cheat_clock(clockNow)
@@ -292,7 +294,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   // The fake seal: the text sealed, by the stamp it was sealed under.
   const sealedTexts = new Map<string, string>()
   const demandFakeUnlocked = (): void => {
-    if (lockState === 'locked') { throw Refuse.unlockFirst() }
+    if (isLocked) { throw Refuse.unlockFirst() }
   }
   // The fake stands in for the vault, which `demandUnlocked` and `ensureTimely` answer; no box reads the answer.
   const standIn = (): Vault => world as unknown as Vault
@@ -300,10 +302,10 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const world: BoxWorld = {
     scope:        WorldVault.scope,
     vault_tok:    WorldVault.vault_tok,
-    lockState:    () => lockState,
+    get isLocked() { return isLocked },
     subscribe:    (listener) => { worldListeners.add(listener); return () => { worldListeners.delete(listener) } },
     tellBadNews:  (news) => { badnews.push(...news) },
-    demandUnlocked: () => { if (lockState === 'locked') { throw Refuse.lockedError() } return standIn() },
+    demandUnlocked: () => { if (isLocked) { throw Refuse.lockedError() } return standIn() },
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
       demandFakeUnlocked()
@@ -348,6 +350,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
 
   return {
     world, vaultDB, calls, badnews, stored, watches,
+    worldWith: (overrides) => ({ ...world, get isLocked() { return isLocked }, ...overrides }),
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
     clearCalls: () => { calls.length = 0; badnews.length = 0 },
 
@@ -356,9 +359,9 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     advance:  async (ms) => {
       if (fakeTimers) { await vi.advanceTimersByTimeAsync(ms) } else { now += ms }
     },
-    setLockState: (next) => {
-      if (next === lockState) { return }
-      lockState = next
+    setLocked: (next) => {
+      if (next === isLocked) { return }
+      isLocked = next
       for (const listener of worldListeners) { listener() }
     },
     dispose,
@@ -463,7 +466,7 @@ export type BoxListingOverrides = Partial<ListingOpts & { world: BoxWorld }>
 
 /** A {@link boxListingOf} whose sealed parts are fake bags named for the revision, `duringSeal` running after the real seal.
  *
- * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLockState('locked') })   // the vault locks during each seal
+ * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLocked(true) })   // the vault locks during each seal
  */
 export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: BoxListingOverrides = {}, duringSeal: () => void = () => undefined): TestableBoxListing => {
   const sealStampedString: BoxWorld['sealStampedString'] = async (whisperText, stamp) => {
@@ -471,7 +474,7 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: BoxListingOverr
     duringSeal()
     return { box_key_wrapped: fakeCiphered(`boxkey-${String(stamp['revision_tok'])}`), whisper_ciphered: fakeCiphered(`whisper-${String(stamp['revision_tok'])}`) }
   }
-  return boxListingOf(mw, { world: { ...mw.world, sealStampedString }, ...overrides })
+  return boxListingOf(mw, { world: mw.worldWith({ sealStampedString }), ...overrides })
 }
 // --
 

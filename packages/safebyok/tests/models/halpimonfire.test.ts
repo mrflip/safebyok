@@ -18,7 +18,7 @@ useVaultWorlds()
 describe("a lock() landing during a put", () => {
   it("during the seal refuses 'vault_locked', putting nothing: put checks the lock at both ends of the seal", async () => {
     const lock = { during: false }
-    const listing = fakeSealBoxListingOf(held.mw, {}, () => { if (lock.during) { held.mw.setLockState('locked') } })
+    const listing = fakeSealBoxListingOf(held.mw, {}, () => { if (lock.during) { held.mw.setLocked(true) } })
     const record = fullBoxRecord()
     held.mw.seedStore(record)
     const box = await listing.build(record)
@@ -32,7 +32,7 @@ describe("a lock() landing during a put", () => {
     held.mw.seedStore(record)
     const box = await boxListingOf(held.mw).build(record)
     held.mw.willPut(({ record: sent }) => {
-      held.mw.setLockState('locked')
+      held.mw.setLocked(true)
       return held.mw.answerOf(box.scope, sent)
     })
     await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
@@ -84,7 +84,7 @@ const boxCrossingUnseal = async (crossing: (box: TestableBox) => unknown) => {
     crossing(box)
     return whisperText
   }
-  const listing = boxListingOf(held.mw, { world: { ...held.mw.world, unsealStampedString } })
+  const listing = boxListingOf(held.mw, { world: held.mw.worldWith({ unsealStampedString }) })
   const box = await listing.create(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
   return box
 }
@@ -98,9 +98,9 @@ describe("An ending that lands while box.expose unseals", () => {
   })
 
   it("a lock() refuses 'vault_locked', and leaves nothing exposed", async () => {
-    const box = await boxCrossingUnseal(() => { held.mw.setLockState('locked') })
+    const box = await boxCrossingUnseal(() => { held.mw.setLocked(true) })
     await TH.expectRefusal(box.expose(), 'vault_locked')
-    held.mw.setLockState('unlocked')
+    held.mw.setLocked(false)
     expect(box.whisper).to.eq(ENCRYPTED)
   })
 })

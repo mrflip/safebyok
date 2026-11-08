@@ -68,7 +68,7 @@ describe("extractSavedApiKey", () => {
 describe("ensureApiKeyBoxExposed", () => {
   it("builds the vault and an exposed, empty box where there is none", async () => {
     const box = await ensureApiKeyBoxExposed(await makeBank(), Boxlabel)
-    expect(box.snapshot.exposed).to.be.true
+    expect(box.snapshot.isExposed).to.be.true
     expect(box.whisper).to.deep.equal({})
   })
 
@@ -78,7 +78,7 @@ describe("ensureApiKeyBoxExposed", () => {
     await vault.ensureUnlocked()
     await putWhisper(vault, { apiKey: FakeApiKey })
     const box = await ensureApiKeyBoxExposed(bank, Boxlabel)
-    expect(box.snapshot.exposed).to.be.true
+    expect(box.snapshot.isExposed).to.be.true
     expect(box.whisper).to.deep.equal({ apiKey: FakeApiKey })
   })
 })

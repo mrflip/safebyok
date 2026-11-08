@@ -36,7 +36,7 @@ const veiledOf = async (): Promise<TestableBox> => {
 }
 
 const locking = (box: TestableBox): TestableBox => {
-  held.mw.setLockState('locked')
+  held.mw.setLocked(true)
   return box
 }
 
@@ -56,8 +56,8 @@ const Operations = {
   unveil:   (box: TestableBox) => box.unveil(),
   unexpose: (box: TestableBox) => box.unexpose(),
   expose:   (box: TestableBox) => box.expose(),
-  lock:     (box: TestableBox) => { held.mw.setLockState('locked'); return box },
-  unlock:   (box: TestableBox) => { held.mw.setLockState('unlocked'); return box },
+  lock:     (box: TestableBox) => { held.mw.setLocked(true); return box },
+  unlock:   (box: TestableBox) => { held.mw.setLocked(false); return box },
 }
 
 const Shows = { value: Exposed, encrypted: ENCRYPTED, locked: LOCKED, veiled: VEILED } as const
@@ -134,7 +134,7 @@ describe("box.isVeiled", () => {
   it("is false once unexposed", async () => {
     const box = await veiledOf()
     expect(box.unexpose().isVeiled).to.be.false
-    expect(box.getSnapshot().veiled).to.be.false
+    expect(box.getSnapshot().isVeiled).to.be.false
   })
 
   it("is true for an unexposed box veiled", async () => {
@@ -151,17 +151,17 @@ describe("the veil from behind a lock", () => {
   it("a veil while locked shows veiled once unlocked", async () => {
     const box = locking(await showingOf())
     box.veil()
-    expect(box.getSnapshot().veiled).to.be.true
-    held.mw.setLockState('unlocked')
+    expect(box.getSnapshot().isVeiled).to.be.true
+    held.mw.setLocked(false)
     expect(box.whisper).to.eq(VEILED)
   })
 
   it("an unveil while locked shows the value once unlocked, and does not throw", async () => {
     const box = locking(await veiledOf())
     box.unveil()
-    expect(box.getSnapshot().veiled).to.be.false
+    expect(box.getSnapshot().isVeiled).to.be.false
     expect(box.whisper).to.eq(LOCKED)
-    held.mw.setLockState('unlocked')
+    held.mw.setLocked(false)
     expect(box.whisper).to.deep.equal(Exposed)
   })
 
@@ -176,7 +176,7 @@ describe("the veil from behind a lock", () => {
     const box = await veiledOf()
     await box.expose()
     expect(box.whisper).to.deep.equal(Exposed)
-    expect(box.getSnapshot()).to.deep.include({ exposed: true, veiled: false })
+    expect(box.getSnapshot()).to.deep.include({ isExposed: true, isVeiled: false })
   })
 
   it("an unveil with nothing exposed says so, in plain words", async () => {
@@ -217,7 +217,7 @@ describe("the endings of a box exposed", () => {
       const box = await veiledOf()
       end(box)
       expect(box.isVeiled).to.be.false
-      expect(box.getSnapshot().veiled).to.be.false
+      expect(box.getSnapshot().isVeiled).to.be.false
     })
   }
 
@@ -227,14 +227,14 @@ describe("the endings of a box exposed", () => {
     expect(box.isPresent).to.be.false
     expect(box.whisper).to.eq(ENCRYPTED)
     expect(box.isVeiled).to.be.false
-    expect(box.getSnapshot()).to.deep.include({ exposed: false, veiled: false })
+    expect(box.getSnapshot()).to.deep.include({ isExposed: false, isVeiled: false })
   })
 
   it("a delete clears the value and the veil", async () => {
     const box = await veiledOf()
     await box.del()
     expect(box.isVeiled).to.be.false
-    expect(box.getSnapshot().veiled).to.be.false
+    expect(box.getSnapshot().isVeiled).to.be.false
   })
 
   it("a delete clears the value", async () => {
@@ -242,7 +242,7 @@ describe("the endings of a box exposed", () => {
     await box.del()
     expect(box.isPresent).to.be.false
     expect(box.whisper).to.eq(ENCRYPTED)
-    expect(box.getSnapshot().exposed).to.be.false
+    expect(box.getSnapshot().isExposed).to.be.false
   })
 })
 // --
@@ -283,7 +283,7 @@ describe("box.putExposed", () => {
       held.mw.clearCalls()
       await TH.expectRefusal(box.putExposed(), 'vault_locked')
       expect(held.mw.callsOf('put')).to.deep.equal([])
-      held.mw.setLockState('unlocked')
+      held.mw.setLocked(false)
     }
   })
 
@@ -306,15 +306,15 @@ describe("box.putExposed", () => {
 })
 // --
 
-// == [Hearing of a lock]: subscribe, getSnapshot, lockState
+// == [Hearing of a lock]: subscribe, getSnapshot, isLocked
 
 describe("box.subscribe and box.getSnapshot, through a lock", () => {
-  it("reads lockState live, and holds none of it on the box", async () => {
+  it("reads isLocked live, and holds none of it on the box", async () => {
     const box = await unexposedOf()
-    expect(box.lockState()).to.eq('unlocked')
-    held.mw.setLockState('locked')
-    expect(box.lockState()).to.eq('locked')
-    expect(Object.keys(box)).to.not.include('lockState')
+    expect(box.isLocked).to.be.false
+    held.mw.setLocked(true)
+    expect(box.isLocked).to.be.true
+    expect(Object.keys(box)).to.not.include('isLocked')
   })
 
   it("works detached, as useSyncExternalStore takes them, telling a lock once and keeping the snapshot", async () => {
@@ -323,22 +323,22 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     const listener = vi.fn()
     const unsubscribe = subscribe(listener)
     const before = getSnapshot()
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     expect(listener).toHaveBeenCalledTimes(1)
     expect(box.whisper).to.eq(LOCKED)
     expect(getSnapshot()).to.eq(before)
     unsubscribe()
-    held.mw.setLockState('unlocked')
+    held.mw.setLocked(false)
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
   it("keeps the snapshot through a lock and an unlock, which are the vault's to show", async () => {
     const box = await unexposedOf()
     const before = box.getSnapshot()
-    expect(before).to.not.have.property('lockState')
-    held.mw.setLockState('locked')
+    expect(before).to.not.have.property('isLocked')
+    held.mw.setLocked(true)
     expect(box.getSnapshot()).to.eq(before)
-    held.mw.setLockState('unlocked')
+    held.mw.setLocked(false)
     expect(box.getSnapshot()).to.eq(before)
   })
 
@@ -348,7 +348,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     const unsubscribe = box.subscribe(listener)
     unsubscribe()
     await box.expose()
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     expect(listener).not.toHaveBeenCalled()
   })
 
@@ -359,7 +359,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     const unsubscribeOne = one.subscribe(listener)
     other.subscribe(listener)
     unsubscribeOne()
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
@@ -375,7 +375,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     expect(box.whisper).to.eq(box.whisper)
     box.veil()
     expect(box.whisper).to.eq(box.whisper)
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     expect(box.whisper).to.eq(box.whisper)
   })
 })

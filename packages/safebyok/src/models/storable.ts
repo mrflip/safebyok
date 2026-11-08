@@ -296,7 +296,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** False past a sweep or a vacate, and from then on. */
   get isEnabled(): boolean { return this.#isEnabled }
 
-  get isLocked(): boolean { return this.listing.lockState() === 'locked' }
+  /** Whether its world is locked, read live: for a box, its vault's lock. */
+  get isLocked(): boolean { return this.listing.isLocked }
 
   /** Whether the record in hand was refreshed within the thing's horizon: never before storage has answered. */
   get isTimely(): boolean { return this.#isRefreshedWithin(this.listing.maxMillisSinceRefresh) }

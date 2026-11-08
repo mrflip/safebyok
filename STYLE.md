@@ -124,12 +124,19 @@ rule. `VaultScope` and `BankScope` keep their two words. The exception stops at 
 scopepath is a `boxScopepath` (`BoxScopepath`), like every other `fooScopepath`.
 
 **Never `type` to mean "kind"**, not even inside an identifier. `type` is reserved for a datatype;
-a menu choice is a `kind` (`scopepathkind`) or a `flavor`. **`state` names nothing public**: a
-React app already means its own component state by it. Name a status for what it is about: a
-thing's stage in its life is its `stage`.
+a menu choice is a `kind` (`scopepathkind`) or a `flavor`.
 
-**`isFoo` is a boolean. A function returning a predicate ends in `Pred`**:
-`withinVaultScopepathPred(scope)`.
+**A boolean is `isFoo`, an enumeration a plain noun, and `state` is a smell** (the Coach,
+2026-11-07: "Is for booleans and word for enum, state is a smell"). A boolean is `isFoo` on an
+instance and in a snapshot alike: `box.isVeiled` and the snapshot's `isVeiled`, never a bare
+adjective (`veiled`). An enumeration is named for what it tells, a plain noun: `box.exposure`,
+typed `BoxExposure`. **A two-valued enumeration is a boolean**: `isLocked`, never a `lockState` of
+`'locked' | 'unlocked'`. **`state` names nothing public**: a React app already means its own
+component state by it, and the word says only that something changes. Name a status for what it is
+about: a thing's stage in its life is its `stage`. A stored field keeps its stored spelling
+(below).
+
+**A function returning a predicate ends in `Pred`**: `withinVaultScopepathPred(scope)`.
 
 **A boolean says the positive**: `isEnabled`, never `isDisabled`. Each read of a negative one is a double negative
 (`selfDestructPreventionDisabled`).

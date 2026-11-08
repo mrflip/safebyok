@@ -108,7 +108,7 @@ const typingPassphrase: RequestCleartext = async (gating) => { await gating.atte
 /** What a page shows of a box's snapshot: its revision and whether it is exposed. */
 const boxWords = (snapshot: BoxSnapshot | null): string => {
   if (snapshot === null) { return 'none' }
-  return `revision ${String(snapshot.revision_seq)}, ${snapshot.exposed ? 'exposed' : 'sealed'}`
+  return `revision ${String(snapshot.revision_seq)}, ${snapshot.isExposed ? 'exposed' : 'sealed'}`
 }
 
 /** What a page shows of a whisper: its apiKey, and where it stands. */
@@ -160,7 +160,7 @@ const VeilPage = () => {
   const { vault } = useVault('main')
   const box = useBox('main', 'anthropic')
   const isShowing = useBoxIsShowing(box)
-  const isVeiled = useBoxSnapshot(box)?.veiled ?? false
+  const isVeiled = useBoxSnapshot(box)?.isVeiled ?? false
   const exposure = useBoxExposure(box)
   const expose = async () => {
     if ((vault === null) || (box === null)) { return }

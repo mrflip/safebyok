@@ -39,7 +39,7 @@ function TokenField({ box }) {
     input.current.value = whisper.Credentials.SessionToken    // and again for every other field
   }
   useEffect(() => box.subscribe(() => {
-    if (box.lockState() === 'locked') { input.current.value = '' }   // an unsaved edit is gone
+    if (box.isLocked) { input.current.value = '' }   // an unsaved edit is gone
   }), [box])
   const save = async () => {
     const whisper = await box.extractWhisper()                // a put replaces: fetch what the form lacks
@@ -107,8 +107,7 @@ const MASK = '••••••••'
 const maskDeep = (val) => (isPlainObject(val) ? mapValues(val, maskDeep) : MASK)
 
 function useAwsForm(box: Box) {
-  const lockState = useSyncExternalStore(box.subscribe, () => box.lockState())
-  const isLocked  = (lockState === 'locked')
+  const isLocked = useSyncExternalStore(box.subscribe, () => box.isLocked)
   const [real, setReal] = useState<AwsWhisper | null>(null)   // the secret, in React state
 
   useEffect(() => {

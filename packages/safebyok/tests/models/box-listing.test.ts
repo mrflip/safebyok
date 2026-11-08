@@ -140,7 +140,7 @@ describe("boxListing.get(scoped, opts)", () => {
   it("answers the box stored while the vault is locked", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(fullBoxRecord())
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     const box = await listing.get(held.mw.boxscope(Label))
     expect(box?.boxlabel).to.eq(Label)
     expect(box?.isPresent).to.be.true
@@ -202,7 +202,7 @@ describe("boxListing.puttable(scoped, opts)", () => {
 
   it("demands nothing of the vault, as only the put it prepares has side effects: that put refuses 'vault_locked'", async () => {
     const listing = boxListingOf(held.mw)
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     const shell = listing.puttable(held.mw.boxscope(Label))
     await TH.expectRefusal(shell.put({ whisper: { apiKey: 'sk-test-0000' } }), 'vault_locked')
     expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
@@ -229,7 +229,7 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
   for (const [inputOf, blurb] of BadDnaCases) {
     it(`refuses creating ${blurb} while the vault is locked, holding nothing and calling nothing`, async () => {
       const listing = boxListingOf(held.mw)
-      held.mw.setLockState('locked')
+      held.mw.setLocked(true)
       await TH.expectRefusal(listing.create(inputOf() as never))
       expect(listing.things).to.deep.equal([])
       expect(held.mw.calls).to.deep.equal([])
@@ -238,7 +238,7 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
 
   it("refuses a sound dna created while the vault is locked as 'vault_locked', the dna checked first", async () => {
     const listing = boxListingOf(held.mw)
-    held.mw.setLockState('locked')
+    held.mw.setLocked(true)
     await TH.expectRefusal(listing.create(dna()), 'vault_locked')
     expect(listing.snapshot).to.deep.equal([])
   })

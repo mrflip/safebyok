@@ -154,7 +154,8 @@ describe("The checks of the world and the listing", () => {
       [{},                                       false, 'refuses an empty object'],
       [{ ...mw.world, takeWorld: undefined },    false, 'refuses a world that cannot takeWorld'],
       [{ ...mw.world, ensureTimely: 5 },         false, 'refuses a world whose ensureTimely is no function'],
-      [{ ...mw.world, lockState: undefined },    false, 'refuses a world with no lockState'],
+      [{ ...mw.world, isLocked: undefined },     false, 'refuses a world with no isLocked'],
+      [{ ...mw.world, isLocked: 'locked' },      false, 'refuses a world whose isLocked is no boolean'],
       [{ ...mw.world, tellBadNews: undefined },  false, 'refuses a world that cannot tellBadNews'],
     ])
   })

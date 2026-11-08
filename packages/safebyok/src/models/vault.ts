@@ -3,7 +3,7 @@ import { consistent } from '../helpers/validator'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import type { Gatingkind, LockState } from '../shapes/shapes-enums'
+import type { Gatingkind } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
@@ -159,9 +159,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
   // --
 
-  // == [The lease]: lockState, lock, vacateLease, panic, unlockByProof, attachLease, renewLease
-
-  lockState(): LockState { return this.#lease === null ? 'locked' : 'unlocked' }
+  // == [The lease]: lock, vacateLease, panic, unlockByProof, attachLease, renewLease
 
   /** Lock the vault and its boxes before returning, and erase the row cached on this device.
    * A refused erase panics and does not throw. A no-op on a vault discarded. */
@@ -346,7 +344,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // == [Guards]: isLocked, isUnlocked, demandUnlocked, demandLease, demandAttachable, demandEnabled, demandPresent, ensureAttachable, ensureTimely
 
   /** The vault's own lock, not its world's: the bank has none. */
-  override get isLocked(): boolean { return this.lockState() === 'locked' }
+  override get isLocked(): boolean { return this.#lease === null }
 
   get isUnlocked(): boolean { return this.#lease !== null }
 
@@ -425,8 +423,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       revision_seq:  this.revision_seq,
       registered_at: this.registered_at,
       written_at:    this.written_at,
-      present:       this.isPresent,
-      lockState:     this.lockState(),
+      isPresent:     this.isPresent,
+      isLocked:      this.isLocked,
     })
   }
   // --

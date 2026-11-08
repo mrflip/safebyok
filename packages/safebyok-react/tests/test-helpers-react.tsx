@@ -4,7 +4,7 @@
  * (`import * as TH from './test-helpers'`), never by this file's name.
  */
 import { Activity, useEffect, type ReactNode } from 'react'
-import type { Bank } from 'safebyok'
+import type { Bank, VaultSnapshot } from 'safebyok'
 import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from '../src/hooks'
 
 /**
@@ -15,6 +15,12 @@ import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from '../src/hoo
  *   rerender(TH.inActivity('hidden', dialog))
  */
 export const inActivity = (mode: 'visible' | 'hidden', shown: ReactNode) => <Activity mode={mode}>{shown}</Activity>
+
+/** `locked` or `unlocked` for a vault's snapshot, `none` for none. */
+export const lockWordOf = (snapshot: VaultSnapshot | null): string => {
+  if (snapshot === null) { return 'none' }
+  return snapshot.isLocked ? 'locked' : 'unlocked'
+}
 
 /** The banks a {@link ShowsVault} has seen, in the order it saw them, each once. */
 export const seenBanks: Bank[] = []
@@ -39,7 +45,7 @@ export const ShowsVault = ({ vaultlabel = 'main' }: { vaultlabel?: string }) => 
   return (
     <div>
       <p data-testid="bank">{bankSnapshot === null ? 'none' : `${bankSnapshot.user_id} ${bankSnapshot.stage}`}</p>
-      <p data-testid="vault">{`${stage} ${vaultSnapshot?.lockState ?? 'none'}`}</p>
+      <p data-testid="vault">{`${stage} ${lockWordOf(vaultSnapshot)}`}</p>
       <button type="button" onClick={() => { void open() }}>Open</button>
       <button type="button" onClick={() => { vault?.lock() }}>Lock</button>
     </div>

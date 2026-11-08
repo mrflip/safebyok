@@ -49,7 +49,7 @@ describe("VaultLockControl", () => {
     expect(asked).to.deep.equal(['unlock_vault'])
     fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
     await waitFor(() => { expect(lockWords()).to.eq('Vault locked') })
-    expect(screen.getByText('Vault locked').parentElement?.dataset['lockState']).to.eq('locked')
+    expect(screen.getByText('Vault locked').parentElement?.dataset['locked']).to.eq('true')
   })
 
   it("unlocks the vault in hand, never asking the bank to ensure one", async () => {

@@ -66,17 +66,17 @@ describe("safebyok-react's README's raw field", () => {
     const hook = hookOf(box.subscribe, box.getSnapshot)
     const input = { value: '' }
     const unmount = BoxFields.of(box).bind('apiKey')(input)
-    expect(hook.current().exposed).to.be.false
+    expect(hook.current().isExposed).to.be.false
     expect(input.value).to.eq('')
 
     await box.expose()
-    expect(hook.current().exposed).to.be.true
+    expect(hook.current().isExposed).to.be.true
     expect(input.value).to.eq(Stored.apiKey)
 
     input.value = 'sk-test-edited'
     vault.lock()
     expect(input.value).to.eq('')
-    expect(vault.getSnapshot().lockState).to.eq('locked')
+    expect(vault.getSnapshot().isLocked).to.be.true
     await vault.ensureUnlocked()
     expect(input.value).to.eq('sk-test-edited')
     expect(await box.extractWhisper()).to.deep.equal(Stored)
@@ -86,7 +86,7 @@ describe("safebyok-react's README's raw field", () => {
 
     unmount?.()
     expect(input.value).to.eq('')
-    expect(hook.current().exposed).to.be.false
+    expect(hook.current().isExposed).to.be.false
     expect(box.whisper['apiKey']).to.eq(undefined)
   })
 })

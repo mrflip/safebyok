@@ -69,9 +69,9 @@ export class BoxFields {
   /** Read each bound field over the whisper exposed, and seal it in one put. */
   async save(opts: BoxPutOpts = {}): Promise<Box> {
     if (this.#fields.size === 0) { throw noFieldsBound() }
-    const { exposed, veiled } = this.box.snapshot
-    if (! exposed) { throw notExposedError() }
-    if (veiled) { throw savingVeiledFields() }
+    const { isExposed, isVeiled } = this.box.snapshot
+    if (! isExposed) { throw notExposedError() }
+    if (isVeiled) { throw savingVeiledFields() }
     this.#readFields()
     return this.box.putExposed({}, opts)
   }
@@ -110,7 +110,7 @@ export class BoxFields {
       }
       return
     }
-    if (this.box.snapshot.exposed) { this.#readFields() }
+    if (this.box.snapshot.isExposed) { this.#readFields() }
     for (const field of this.#fields) {
       field.el.value = ''
       field.shown = null

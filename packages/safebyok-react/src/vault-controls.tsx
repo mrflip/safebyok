@@ -2,7 +2,7 @@ import { isVaultError, type Bank, type Outcome } from 'safebyok'
 import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from './hooks'
 import { Messages } from './messages'
 
-/** The lock state of the signed-in user's vault under `vaultlabel` with a Lock or Unlock button, or a Create vault button while it is unborn. */
+/** Whether the signed-in user's vault under `vaultlabel` is locked, with a Lock or Unlock button, or a Create vault button while it is unborn. */
 export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
   const bank = useBank()
   const { stage, vault } = useVault(vaultlabel)
@@ -11,9 +11,9 @@ export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
   if ((bank === null) || (vault === null) || (snapshot === null)) { return null }
   // The vault in hand, never bank.ensureVault: an Unlock never builds a vault.
   const unlock = async () => { tellUnlessDeclined(bank, await vault.tryEnsureUnlocked()) }
-  const isLocked = (snapshot.lockState === 'locked')
+  const { isLocked } = snapshot
   return (
-    <span className="vault-lock-control" data-lock-state={snapshot.lockState}>
+    <span className="vault-lock-control" data-locked={isLocked}>
       <span>{isLocked ? Messages.vaultLocked : Messages.vaultUnlocked}</span>
       {isLocked
         ? <button type="button" onClick={() => { void unlock() }}>{Messages.unlockButton}</button>

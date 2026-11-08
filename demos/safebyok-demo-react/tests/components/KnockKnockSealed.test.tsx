@@ -18,7 +18,7 @@ const renderFlow = () => TH.renderInBank(<><KnockKnockSealed /><TH.VaultProbe />
 /** Shows whether the flow's box is `exposed`, or `sealed` (as it is when absent). */
 const ExposureProbe = () => {
   const box = useBox(ApiKeyVaultlabel, SealedApiKeyBoxlabel)
-  const isExposed = box?.snapshot.exposed ?? false
+  const isExposed = box?.snapshot.isExposed ?? false
   return <span data-testid="exposure">{isExposed ? 'exposed' : 'sealed'}</span>
 }
 
