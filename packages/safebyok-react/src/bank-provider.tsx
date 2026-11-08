@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Bank, MinuteMillis, type AnyGating, type BadNewsHandler, type BankOpts, type PanicHandler, type RequestCleartext, type Vault } from 'safebyok'
-import { brandedDeviceDB } from 'safebyok/storage'
+import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'
+import { Bank, DefaultOnBadNews, DefaultOnPanic, MinuteMillis, type AnyGating, type BadNews, type BadNewsHandler, type BankOpts, type Panic, type PanicHandler, type RequestCleartext, type Vault } from 'safebyok'
+import { Checker, bankOpts } from 'safebyok/storage'
 import { GatingModal } from './gating-modal'
 import type { PassphraseAdvice } from './modal'
 
@@ -22,25 +22,14 @@ export const useProvided = (hookname: string): Provided => {
 }
 // --
 
-// == [BankProvider]: BankProviderProps, BankProvider, hasUserGesture, AutolockEveryMillis, misusedHandler, fixedPropsOf
-
-/** How often the provider asks its bank to lock each vault whose autolock has passed. */
-const AutolockEveryMillis = MinuteMillis
-
-/** Whether the user's gesture is still in hand, so a dialog may be shown: true where the browser does not say. */
-const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
-
-// The types say a handler is a function or none, so a misused one is typed as the handler it is not:
-// Bank.make refuses it.
-/** A handler prop that is not a function, for Bank.make to refuse; undefined for a function. */
-const misusedHandler = <HandlerT,>(given: HandlerT | null | undefined): HandlerT | undefined => (typeof given === 'function' ? undefined : given as HandlerT | undefined)
+// == [Props]: BankProviderProps, providerProps, HeldBankOpts, Handlers
 
 /** What BankProvider is handed: the Bank.make options but the device's, the signed-in `user_id`, and the dialogs' props. */
 export type BankProviderProps = Omit<BankOpts, 'user_id' | 'device_id' | 'requestCleartext'> & {
   /** The signed-in user from the host's auth, or null when nobody is: then the provider holds no bank. */
   user_id:             string | null
-  /** What asks the user for a passphrase or passkey: the provider's own dialogs when left out, none when null. */
-  requestCleartext?:   RequestCleartext | null | undefined
+  /** What asks the user for a passphrase or passkey: the provider's own dialogs when left out. */
+  requestCleartext?:   RequestCleartext | undefined
   /** What a password manager files a vault's passphrase under. */
   passphraseUsername?: string | undefined
   /** What to say beside the field as the user chooses a passphrase. */
@@ -50,25 +39,38 @@ export type BankProviderProps = Omit<BankOpts, 'user_id' | 'device_id' | 'reques
   children:            ReactNode
 }
 
-/** The props the provider reads only as it makes its bank, as `props` has them; a handler counts only as there or not. */
-const fixedPropsOf = (props: BankProviderProps) => {
-  const { vaultDB, deviceDB, keyDeriver, strengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews, onPanic } = props
-  // `satisfies` fails the build if a Bank.make option is ever added and not compared here.
-  return { vaultDB, deviceDB, keyDeriver, strengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews: typeof onBadNews === 'function', onPanic: typeof onPanic === 'function' } satisfies Record<keyof Omit<BankOpts, 'applabel' | 'user_id' | 'device_id' | 'requestCleartext'>, unknown>
-}
+/** BankProvider's props: Bank.make's options but the device's, beside the signed-in user and the dialogs' props. */
+const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ device_id: true }).extend({
+  user_id:            bankOpts.shape.user_id.nullable(),
+  requestCleartext:   fn<RequestCleartext>().optional(),
+  passphraseUsername: str.optional(),
+  passphraseAdvice:   custom<PassphraseAdvice>().optional(),
+  passkeyRpId:        str.optional(),
+  children:           custom<ReactNode>(),
+}), 'bad_option')
 
-/** Make the signed-in user's bank, once per `applabel` and `user_id`, say hello, and hand it down to the hooks. */
-export const BankProvider = (props: BankProviderProps) => {
-  const { applabel, user_id, passphraseUsername, passphraseAdvice, passkeyRpId, children } = props
+/** The options a held bank is made from: Bank.make's, but the device's and the handlers. */
+type HeldBankOpts = Omit<BankOpts, 'device_id' | 'onPanic' | 'onBadNews' | 'requestCleartext'>
+
+/** The functions a held bank calls back, each as it was last rendered. */
+type Handlers = { onPanic: PanicHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext }
+// --
+
+// == [Hooks]: AutolockEveryMillis, hasUserGesture, changedKeys, useGatingDialog, useHeldBank
+
+/** How often the provider asks its bank to lock each vault whose autolock has passed. */
+const AutolockEveryMillis = MinuteMillis
+
+/** Whether the user's gesture is still in hand, so a dialog may be shown: true where the browser does not say. */
+const hasUserGesture = (): boolean => (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive !== false
+
+/** The fields of `now` and `was` whose values differ. */
+const changedKeys = (was: Record<string, unknown>, now: Record<string, unknown>): string[] => Object.keys({ ...was, ...now }).filter((ckey) => ! Object.is(was[ckey], now[ckey]))
+
+/** The provider's own dialog: the one gating it shows, how to ask the user by it, and how to end it. */
+const useGatingDialog = () => {
   /** One showing of the dialog: which one, the gating it answers, and how it closes. */
   type Showing = { round: number, gating: AnyGating, close: () => void }
-  /** The props the provider reads only as it makes its bank. */
-  type FixedProps = ReturnType<typeof fixedPropsOf>
-
-  // The props as of the last commit. The bank is made from them, and calls the host's handlers
-  // through them, so a handler written inline is called as it was last rendered.
-  const latestProps = useRef(props)
-  useEffect(() => { latestProps.current = props })
 
   // The dialog showing now, if any. The ref is what the callbacks read, so that a dialog's answer
   // reaches its own ask and no newer one's; the state renders it.
@@ -86,82 +88,54 @@ export const BankProvider = (props: BankProviderProps) => {
     ending.close()
   }, [])
 
-  // The provider's own requestCleartext: the dialog for the gating's kind, shown only while the
-  // user's gesture is in hand. A bank opens one gating at a time, but the last one's dialog may
-  // not have answered yet: it is ended here, so its ask resolves rather than waiting on a dialog
-  // that will never mount again.
-  const askByDialog = useCallback((gating: AnyGating) => new Promise<void>((close) => {
+  /** Close the dialog showing now, if any. */
+  const endAny = useCallback(() => { if (showingRef.current !== null) { endShowing(showingRef.current) } }, [endShowing])
+
+  // A bank opens one gating at a time, but the last one's dialog may not have answered yet: it is
+  // ended here, so its ask resolves rather than waiting on a dialog that will never mount again.
+  /** Show the dialog for `gating`'s kind while the user's gesture is in hand; resolves as it closes. */
+  const ask = useCallback((gating: AnyGating) => new Promise<void>((close) => {
     if (! hasUserGesture()) { close(); return }
-    if (showingRef.current !== null) { endShowing(showingRef.current) }
+    endAny()
     showingRounds.current += 1
     const next = { round: showingRounds.current, gating, close: () => { close() } }
     showingRef.current = next
     setShowing(next)
-  }), [endShowing])
+  }), [endAny])
 
-  const askUser = useCallback(async (gating: AnyGating) => {
-    const hosts = latestProps.current.requestCleartext
-    if (hosts === undefined) { await askByDialog(gating); return }
-    if (hosts !== null) { await hosts(gating) }
-  }, [askByDialog])
+  return { showing, ask, endShowing, endAny }
+}
 
-  // The props the held bank was made with, and whether a later change to any was warned of yet.
-  const madeWith = useRef<FixedProps | null>(null)
+/** The bank made from the first render's `opts`, held from mount to unmount, calling each handler as last rendered. */
+const useHeldBank = (opts: HeldBankOpts, handlers: Handlers, onSwept: () => void): Provided => {
+  const madeFrom = useRef(opts).current
+  const [held, setHeld] = useState<Provided>(NoneHeld)
+  const [refused, setRefused] = useState<{ err: unknown } | null>(null)
   const toldOfIgnored = useRef(false)
 
-  // A refusal met as the bank was made, which the render throws to the nearest error boundary.
-  const [refused, setRefused] = useState<{ err: unknown } | null>(null)
+  const panicked = useEffectEvent((panic: Panic) => handlers.onPanic(panic))
+  const heardBadNews = useEffectEvent((badnews: BadNews) => handlers.onBadNews(badnews))
+  const asked = useEffectEvent((gating: AnyGating) => handlers.requestCleartext(gating))
 
-  // The bank the provider holds now, the signed-in user's, made and swept by the effect below.
-  const [held, setHeld] = useState<Provided>(NoneHeld)
-  // Handed down only while it is of this scope: in the render where the user_id or applabel changes,
-  // before the effect sweeps the last bank, the hooks see no bank rather than the last scope's.
-  const provided = held.bank !== null && held.bank.user_id === user_id && held.bank.applabel === applabel ? held : NoneHeld
-
+  // The effect owns the bank, making it and sweeping it, so a re-run effect (StrictMode's, a hidden
+  // Activity shown again) makes a fresh one.
   useEffect(() => {
-    if (user_id === null) { return }
-    const making = latestProps.current
-    const { requestCleartext, onBadNews, onPanic, passphraseUsername: _username, passphraseAdvice: _advice, passkeyRpId: _rpId, children: _children, user_id: _user_id, applabel: _applabel, ...passedOpts } = making
-    // Once swept, the bank tells and asks no one: the handler now may be the next user's.
+    // Once swept, the bank calls none of the host's handlers: the page may be the next user's by then.
     const kept = { held: true }
-    // A handler dropped since the making falls back to the one the bank was made with, so a bank made
-    // with a handler has one for its whole life: the core vacates a vault only for a bank with none.
-    const tellWhileHeld: BadNewsHandler = (news) => {
-      if (! kept.held) { return }
-      const latest = latestProps.current.onBadNews
-      const hearing = typeof latest === 'function' ? latest : onBadNews
-      hearing?.(news)
-    }
-    const askWhileHeld: RequestCleartext = async (gating) => { if (kept.held) { await askUser(gating) } }
-    // The core reports a panic handler's throw to the platform and counts the panic heard: a let-go
-    // bank's panic goes there, and never to the next user's handler.
-    const panicWhileHeld: PanicHandler = async (refusal) => {
-      if (! kept.held) { throw refusal }
-      const latest = latestProps.current.onPanic
-      const hearing = typeof latest === 'function' ? latest : onPanic
-      await hearing?.(refusal)
-    }
-    const misusedBadNews = misusedHandler(onBadNews)
-    const misusedPanic = misusedHandler(onPanic)
-    const misusedAsker = requestCleartext === null ? undefined : misusedHandler(requestCleartext)
     let bank: Bank | null = null
     let autolocking: ReturnType<typeof setInterval> | undefined
-    // A refusal from the deviceDB or Bank.make is thrown from the next render to the error boundary.
     const makeBank = async () => {
       try {
-        const deviceDB = brandedDeviceDB.parse(making.deviceDB, { where: 'deviceDB' })
-        const { device_id } = await deviceDB.ensureBank({ applabel, user_id })
-        // Swept while the deviceDB answered: a sign-out, a new user, or StrictMode's second effect.
+        const { device_id } = await madeFrom.deviceDB.ensureBank({ applabel: madeFrom.applabel, user_id: madeFrom.user_id })
         if (! kept.held) { return }
-        // Each prop Bank.make does not take is handed on as it came, for Bank.make to refuse.
         const made = Bank.make({
-          ...passedOpts, applabel, user_id, device_id,
-          onBadNews:        typeof onBadNews === 'function' ? tellWhileHeld : misusedBadNews,
-          onPanic:          typeof onPanic === 'function' ? panicWhileHeld : misusedPanic,
-          requestCleartext: misusedAsker ?? askWhileHeld,
+          ...madeFrom, device_id,
+          // A swept bank's panic goes to the platform, as a handler's throw does.
+          onPanic:          (panic) => { if (! kept.held) { throw panic.refusal } return panicked(panic) },
+          onBadNews:        (badnews) => (kept.held ? heardBadNews(badnews) : undefined),
+          requestCleartext: async (gating) => { if (kept.held) { await asked(gating) } },
         })
         bank = made
-        madeWith.current = fixedPropsOf(making)
         setHeld({ bank: made, helloedVaults: new WeakSet<Vault>() })
         // A refused hello lands in the bank's snapshot, which useBankSnapshot renders.
         void made.tryHello()
@@ -172,44 +146,58 @@ export const BankProvider = (props: BankProviderProps) => {
       }
     }
     void makeBank()
-    // The effect owns the bank, making it and sweeping it, so a re-run effect (StrictMode's, a hidden
-    // Activity shown again) makes a fresh one; the render reads the bank the effect holds now.
     return () => {
       kept.held = false
       clearInterval(autolocking)
       // A sweep settles the open gating, and the dialog over it closes.
       bank?.sweep()
-      if (showingRef.current !== null) { endShowing(showingRef.current) }
+      onSwept()
       setHeld(NoneHeld)
     }
-  }, [applabel, user_id, askUser, endShowing])
+  }, [madeFrom, onSwept])
 
-  // A prop the bank was made with that has changed since is ignored, and said so once.
+  // An option the bank was made with that has changed since is ignored, and said so once.
   useEffect(() => {
-    const { bank } = provided
-    const made = madeWith.current
-    if (bank === null || made === null || toldOfIgnored.current) { return }
-    const now = fixedPropsOf(latestProps.current)
-    const changed = (Object.keys(made) as (keyof FixedProps)[]).filter((ckey) => ! Object.is(made[ckey], now[ckey]))
+    if (held.bank === null || toldOfIgnored.current) { return }
+    const changed = changedKeys(madeFrom, opts)
     if (changed.length === 0) { return }
     toldOfIgnored.current = true
-    bank.logger.warn(`BankProvider ignored a change to its ${changed.join(' and ')}: it makes its bank once per applabel and user_id, from the props it has then. Define each prop once, outside the component, or memoize it; to make a fresh bank, give the <BankProvider> a new key.`, { call: 'BankProvider', props: changed })
+    held.bank.logger.warn(`BankProvider ignored a change to its ${changed.join(' and ')}: it makes its bank once per applabel and user_id, from the props it has then. Define each prop once, outside the component, or memoize it.`, { call: 'BankProvider', props: changed })
   })
 
   if (refused !== null) { throw refused.err }
+  return held
+}
+// --
+
+// == [BankProvider]: BankProvider, UserBankProvider
+
+/** Hand the hooks the signed-in user's bank, made once per `applabel` and `user_id`, and no bank while nobody is signed in. */
+export const BankProvider = (props: BankProviderProps) => {
+  const { applabel, user_id, children } = providerProps.parse(props, { where: 'BankProvider' })
+  if (user_id === null) { return <BankContext.Provider value={NoneHeld}>{children}</BankContext.Provider> }
+  return <UserBankProvider key={JSON.stringify([applabel, user_id])} {...props} user_id={user_id} />
+}
+
+/** Hold one signed-in user's bank from mount to unmount, with the dialog its gatings ask by. */
+const UserBankProvider = (props: BankProviderProps & { user_id: string }) => {
+  const dialog = useGatingDialog()
+  const { passphraseUsername, passphraseAdvice, passkeyRpId, children, onPanic = DefaultOnPanic, onBadNews = DefaultOnBadNews, requestCleartext = dialog.ask, ...bankish } = props
+  const held = useHeldBank(bankish, { onPanic, onBadNews, requestCleartext }, dialog.endAny)
+  const { showing } = dialog
 
   return (
-    <BankContext.Provider value={provided}>
+    <BankContext.Provider value={held}>
       {children}
       {showing !== null && (
         <GatingModal
           key={showing.round}
           gating={showing.gating}
-          leaseMillis={provided.bank?.leaseMillis}
+          leaseMillis={held.bank?.leaseMillis}
           passphraseUsername={passphraseUsername}
           passphraseAdvice={passphraseAdvice}
           passkeyRpId={passkeyRpId}
-          onDone={() => { endShowing(showing) }}
+          onDone={() => { dialog.endShowing(showing) }}
         />
       )}
     </BankContext.Provider>
