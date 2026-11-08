@@ -252,6 +252,18 @@ describe("the host's functions, as a bank holds them", () => {
     vi.unstubAllGlobals()
   })
 
+  it("rejects a panic that is no refusal, names no vault where it names one, or has a field it does not take, telling no one", async () => {
+    const onPanic = vi.fn()
+    const { bank, vault } = await makeBankWithVault(makeBankWorld(), { onPanic })
+    const refusal = new VaultError('storage_unavailable', 'no store')
+    await TH.expectRefusal(bank.panic({ refusal: new Error('no store') as VaultError }), 'bad_option')
+    await TH.expectRefusal(bank.panic({ refusal, vault: {} as Vault }), 'bad_option')
+    await TH.expectRefusal(bank.panic({ refusal, bank } as never), 'bad_option')
+    await TH.expectRefusal(vault.panic({ refusal: 'no store' } as never), 'bad_option')
+    await TH.expectRefusal(vault.panic({ refusal, vault } as never), 'bad_option')
+    expect(onPanic).not.toHaveBeenCalled()
+  })
+
   it("refuses a requestCleartext or an onPanic that is no function", () => {
     TH.expectSyncRefusal(() => guardRequestCleartext('ask' as never), 'bad_option')
     TH.expectSyncRefusal(() => guardOnPanic('call me' as never), 'bad_option')
@@ -396,6 +408,15 @@ describe("'identity_revoked', panic and bad news", () => {
     expect(onPanic).toHaveBeenCalledExactlyOnceWith({ refusal, bank })
     expect(bank.snapshot.stage).to.eq(isVacating ? 'refused' : 'ready')
     vi.unstubAllGlobals()
+  })
+
+  it("names the vault whose boxes' listing a revocation refuses", async () => {
+    const onPanic = vi.fn()
+    const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onPanic })
+    const revoked = new VaultError('identity_revoked', 'signed out')
+    vi.spyOn(world.vaultDB, 'tryListBoxes').mockResolvedValue({ ok: false, err: revoked, world: null } as never)
+    await TH.expectRefusal(vault.boxListing.list(), 'identity_revoked')
+    expect(onPanic).toHaveBeenCalledExactlyOnceWith({ refusal: revoked, bank, vault })
   })
 
   it("vacates once for a burst of panics, the first reaching the host and those past its disable the platform", async () => {

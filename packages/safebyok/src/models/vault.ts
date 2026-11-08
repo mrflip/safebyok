@@ -277,8 +277,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Tell bad news of this vault's boxes where its own goes. */
   tellBadNews(badnews: readonly VaultError[]): void { this.world.tellBadNews(badnews) }
 
-  /** Panic for this vault's boxes where its own panic goes. */
-  panic(panic: Omit<Panic, 'bank'>): Promise<void> { return this.world.panic(panic) }
+  /** Panic for this vault's boxes where its own panic goes, naming this vault. */
+  async panic(panic: Pick<Panic, 'refusal'>): Promise<void> { await this.world.panic({ ...VX.vaultPanicArgs.parse(panic), vault: this }) }
   // --
 
   // == [Box verbs]: hello, getBox, fetchBox, putBox, delBox, tryDelDamagedBox, each with its try form

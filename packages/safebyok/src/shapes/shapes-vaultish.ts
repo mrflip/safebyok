@@ -314,7 +314,7 @@ export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 's
 
 // --
 
-// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, Panic, PanicHandler, GuardedPanicHandler, BankPanic, BankStage, BankSnapshot
+// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, vacateStory, VacateStory, bankPanicArgs, vaultPanicArgs, BadNews, BadNewsHandler, Panic, PanicHandler, GuardedPanicHandler, BankPanic, BankStage, BankSnapshot
 
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
   positiveMinutes: union([num.positive(), lit(Infinity)], Phrases.PositiveMinutesShape),
@@ -384,6 +384,13 @@ export interface VacateStory {
 
 true satisfies Z.core.util.AssertEqual<VacateStory, Z.input<typeof vacateStory>>
 
+/** The checks of what `bank.panic` and `vault.panic` may be told: a refusal, and to the bank the vault it concerns, if one. */
+export const { bankPanicArgs, vaultPanicArgs } = Checkers('bad_option', ({ obj, custom, vaultError }) => {
+  const vaultPanicArgs = obj({ refusal: vaultError }).strict()
+  const bankPanicArgs  = vaultPanicArgs.extend({ vault: custom<Vault>((val) => hasModelkind(val, 'vault'), Phrases.VaultExpected).optional() })
+  return { bankPanicArgs, vaultPanicArgs }
+}, [Checks])
+
 /** What `onBadNews` hears: a refusal no caller waits on, and the bank it reached. */
 export interface BadNews {
   readonly news: VaultError
@@ -406,7 +413,7 @@ export type PanicHandler = (panic: Panic) => unknown
 /** `onPanic` as a bank keeps it, wrapped by `guardOnPanic`. Never throws. */
 export type GuardedPanicHandler = (panic: Panic) => Promise<void>
 
-/** How a vault or a listing panics through its bank, which names itself to the host. Never throws. */
+/** How a vault or a listing panics through its bank, which names itself to the host. */
 export type BankPanic = (panic: Omit<Panic, 'bank'>) => Promise<void>
 
 /** `made` until a `hello` answers; `ready` once one lands; `refused` once one refuses or the bank is swept or vacated, the snapshot's `err` saying why. */

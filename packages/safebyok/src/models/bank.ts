@@ -95,7 +95,7 @@ export class Bank {
     // A disabled bank calls none of the host's functions, but in its vacate's scrub: the page may belong to the next user by then.
     this.#hostHandlers = { onPanic: guardOnPanic(onPanic), onBadNews }
     const hostAskUser = guardRequestCleartext(requestCleartext)
-    this.panic = brandGuarded((panic: Omit<Panic, 'bank'>) => this.#handlers.onPanic({ ...panic, bank: this }))
+    this.panic = brandGuarded(async (panic: Omit<Panic, 'bank'>) => this.#handlers.onPanic({ ...VX.bankPanicArgs.parse(panic), bank: this }))
     this.askUser = brandGuarded((gating: AnyGating) => (this.isEnabled ? hostAskUser(gating) : Promise.resolve(true)))
     this.logger = parseLogger(logger)
     this.strengthChecker = guardStrengthChecker(strengthChecker)
