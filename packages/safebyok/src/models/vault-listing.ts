@@ -120,7 +120,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** SLOPDOC: Deletes the vault `ante` names over its own revision; its boxes cascade in the vaultDB. */
   override async del(ante: VaultSparse | Vault): Promise<Vault | null> {
     const held = this.at(this.scopeOf(ante))
-    if ((held !== null) && (ante.am !== 'd') && (held.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
+    if ((held !== null) && (held.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
     return this.delOver(this.sparseOf(ante))
   }
   // --

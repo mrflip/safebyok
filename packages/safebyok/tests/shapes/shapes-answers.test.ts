@@ -67,7 +67,7 @@ describe("AX's answer checks", () => {
   it("take a damaged row only under damaged_rows", async () => {
     const vaultDB = await storeWithBox()
     const listed = crossed(await vaultDB.tryListVaults(bankScope)) as { val: { vaults: unknown[], damaged_rows: unknown[] } }
-    const damaged = SX.damagedVaultOf({ ...vaultScope, vaultlabel: 'other' }, { vault_tok: 'life1' })
+    const damaged = SX.damagedVaultOf({ ...vaultScope, vaultlabel: 'other' })
     expect(() => AX.listVaultsAnswer.parse({ ...listed, val: { ...listed.val, damaged_rows: [damaged] } })).not.to.throw()
     expect(() => AX.listVaultsAnswer.parse({ ...listed, val: { ...listed.val, vaults: [...listed.val.vaults, damaged] } })).to.throw(VaultError)
   })
@@ -75,7 +75,7 @@ describe("AX's answer checks", () => {
   it("takes a damaged row under the label it is stored under", async () => {
     const vaultDB = await storeWithBox()
     const listed = crossed(await vaultDB.tryListVaults(bankScope)) as { val: { vaults: unknown[], damaged_rows: unknown[] } }
-    const misnamed = SX.damagedVaultOf({ ...vaultScope, vaultlabel: 'Not A Label' }, { vault_tok: 'life1' })
+    const misnamed = SX.damagedVaultOf({ ...vaultScope, vaultlabel: 'Not A Label' })
     const parsed = AX.listVaultsAnswer.parse({ ...listed, val: { ...listed.val, damaged_rows: [misnamed] } })
     expect(parsed.ok && parsed.val.damaged_rows).to.deep.eq([misnamed])
   })

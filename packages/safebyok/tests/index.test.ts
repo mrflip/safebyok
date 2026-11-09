@@ -67,8 +67,7 @@ describe("safebyok", () => {
     expectTypeOf<Front.Bank['isLocked']>().toEqualTypeOf<boolean>()
     expectTypeOf<Front.VaultSnapshot['isLocked']>().toEqualTypeOf<boolean>()
     expectTypeOf<Front.BankSnapshot['stage']>().toEqualTypeOf<Front.BankStage>()
-    expectTypeOf<Front.DamagedBox['damagekind']>().toEqualTypeOf<Front.Damagekind>()
-    expectTypeOf<Front.DamagedBox>().toExtend<Front.BoxSparse>()
+    expectTypeOf<Front.DamagedBox>().toEqualTypeOf<Readonly<{ applabel: string, user_id: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>>()
   })
 
   it("exports the byte counts and the minute a passkey call and an autolock setting need", () => {

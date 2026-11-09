@@ -503,7 +503,10 @@ export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed, s
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed, so the bank could not derive a key from a passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For a deriver that fetches its code, check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
 // --
 
-// == [Refusals: vaultDB and deviceDB]: VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, boxTooLarge, VaultFull, StorageFull, SeqNotNext, storeFailed, storeThrew
+// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, boxTooLarge, VaultFull, StorageFull, SeqNotNext, storeFailed, storeThrew
+
+/** A well-formed row out of storage, whose own `fieldnames` are not the address it was asked for at. */
+export const rowOfOtherAddress = (fieldnames: readonly string[]): string => `The vault's storage answered with a row naming another ${fieldnames.join(' and ')} than the one asked for: the database or its storage adapter has filed it under the wrong address.`
 
 /** No row stored for this life of the vault, where one was. */
 export const VaultEmpty = "Nothing is stored for this life of the vault: read the vault again by its scope."
@@ -548,10 +551,13 @@ export const storeFailed = (call: string, named: string): string => `This device
 export const storeThrew = (thrownName: string): string => ` It threw ${thrownName}.`
 // --
 
-// == [Refusals: storage backends]: storageFailed, IdentityRevoked, NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed, fetchFailed, WatchEnded
+// == [Refusals: storage backends]: storageFailed, StorageIssue, IdentityRevoked, NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed, fetchFailed, WatchEnded
 
 /** A vault's storage backend failing in `call`, `named` the sentence naming what it threw, or blank. */
 export const storageFailed = (call: string, named: string): string => `The vault's storage could not be reached, or failed, in ${call}: try again shortly.${named}`
+
+/** A row out of storage that is not an object at all. */
+export const StorageIssue = "The vault's storage answered with a row that is not an object, which nothing safebyok writes could be. Trying again is unlikely to help: the database or its storage adapter needs someone to look at it."
 
 /** A storage backend that no longer serves the user the call names. */
 export const IdentityRevoked = "The vault's storage no longer serves this user: they signed out, or another user signed in. Open the vault again for the user signed in."

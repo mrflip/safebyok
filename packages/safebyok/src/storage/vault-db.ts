@@ -5,6 +5,7 @@ import { IsAdapterVaultDB, IsVaultDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
 import { nowMillis } from '../helpers/clock'
 import * as Phrases from '../helpers/phrases'
+import { verifyConsistent } from '../helpers/validator'
 import type { VaultError } from '../refusals/errors'
 import { type BadOutcome, type GoodOutcome, outcomeOf, storageTroubleOf } from '../refusals/outcome'
 import * as SX from '../shapes/shapes-storage'
@@ -174,8 +175,9 @@ export abstract class AdapterVaultDB implements VaultDB {
       const rows = await this.doListVaults(bankScope)
       const val: BankListed = { vaults: [], damaged_rows: [] }
       for (const { vaultlabel, vault } of rows) {
-        const parsed = SX.vaultRow.safeParse(vault)
-        if (parsed.success) { val.vaults.push(parsed.data) } else { val.damaged_rows.push(SX.damagedVaultOf({ ...bankScope, vaultlabel }, vault)) }
+        const address = { ...bankScope, vaultlabel }
+        const listed = listedRowOf(SX.vaultRow, vault, address)
+        if (listed === null) { val.damaged_rows.push(SX.damagedVaultOf(address)) } else { val.vaults.push(listed) }
       }
       return { ok: true, req_params, act: (rows.length > 0) ? 'got' : 'gotvoid', val, world: bankScope }
     } catch (err) { throw refusalOf(err, 'listVaults', req_params) }
@@ -190,7 +192,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const vaultScope = CX.vaultScope.parse(scope)
       const { ifAbsent } = SX.ifAbsentOpts.parse(opts)
-      const found = SX.foundVaultRow.parse(await this.doGetVault(vaultScope))
+      const found = foundVaultRowOf(await this.doGetVault(vaultScope), vaultScope)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(vaultScope)) }
       if (found === null) { return { ok: true, req_params, act: 'gotvoid', val: null, world: SX.sentinelVaultOf(vaultScope), dbhas: null } }
       if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.vaultGone(found) }
@@ -224,7 +226,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const { ifAbsent } = SX.ifAbsentOpts.parse(opts)
       const { vault, box } = await this.doGetBox(boxQuery)
       const world = liveVaultOf(vault, boxQuery)
-      const found = SX.foundBoxRow.parse(box)
+      const found = foundBoxRowOf(box, boxQuery)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.absentBox(world, null) }
       if (found === null) { return { ok: true, req_params, act: 'gotvoid', val: null, world, dbhas: null } }
       if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.absentBox(world, found) }
@@ -249,7 +251,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const { landed, ante } = await this.doPutVault(vaultRecord, putOpts)
       if (landed) { return { ok: true, req_params, act: landingActOf(ante), val: vaultRecord, world: vaultRecord } }
       const { ifAbsent, ifPresent } = putOpts
-      const found = SX.foundVaultRow.parse(ante)
+      const found = foundVaultRowOf(ante, vaultRecord)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok)) }
       if (found === null) { throw Refuse.staleWrite(SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok), null) }
       if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.vaultGone(found) }
@@ -275,7 +277,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const world = liveVaultOf(vault, boxRecord)
       if (landed) { return { ok: true, req_params, act: landingActOf(ante), val: boxRecord, world } }
       const { ifAbsent, ifPresent } = putOpts
-      const found = SX.foundBoxRow.parse(ante)
+      const found = foundBoxRowOf(ante, boxRecord)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.absentBox(world, null) }
       if (found === null) { throw Refuse.staleWrite(world, null) }
       if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.absentBox(world, found) }
@@ -367,7 +369,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const { landed, ante, vault } = await this.doDelBox(boxTombstone, delOpts)
       const world = liveVaultOf(vault, boxTombstone)
       if (landed) { return { ok: true, req_params, act: 'deleted', val: boxTombstone, world } }
-      const found = SX.foundBoxRow.parse(ante)
+      const found = foundBoxRowOf(ante, boxTombstone)
       if (found === null) { return this.#answerDelBoxVoid(boxTombstone, world, req_params) }
       if (found.am === 'x') { return this.#answerDelBoxGone(found, world, req_params) }
       return this.#answerDelBoxRecord(found, world)
@@ -401,7 +403,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       demandNextSeq(vaultTombstone, delOpts.prior)
       const { landed, ante } = await this.doDelVault(vaultTombstone, delOpts)
       if (landed) { return { ok: true, req_params, act: 'deleted', val: vaultTombstone, world: vaultTombstone } }
-      const found = SX.foundVaultRow.parse(ante)
+      const found = foundVaultRowOf(ante, vaultTombstone)
       if (found === null) { return this.#answerDelVaultVoid(vaultTombstone, req_params) }
       if (found.vault_tok !== vaultTombstone.vault_tok) { return this.#answerDelVaultVoid(vaultTombstone, req_params) }
       if (found.am === 'x') { return this.#answerDelVaultGone(found, req_params) }
@@ -484,7 +486,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // --
 }
 
-// == [Helpers]: refusalOf, liveVaultOf, movedGateOf, listedBoxesOf, demandNextSeq, landingActOf, jsonBytes
+// == [Helpers]: refusalOf, RowOfOtherAddress, isRowFound, foundVaultRowOf, foundBoxRowOf, listedRowOf, liveVaultOf, movedGateOf, listedBoxesOf, demandNextSeq, landingActOf, jsonBytes
 
 /** The refusal a verb's throw stands for: a refusal as it came, else `storage_unavailable`. */
 const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultError => {
@@ -492,9 +494,41 @@ const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultE
   return Object.assign(refusal, { meta: { ...refusal.meta, call, req_params } })
 }
 
+const RowOfOtherAddress = { kind: 'storage_issue', message: Phrases.rowOfOtherAddress } as const
+
+const demandRowObject = (raw: unknown): void => {
+  if (! CX.isPlainBag(raw)) { throw Refuse.storageIssue() }
+}
+
+/** Whether a store answered a row at all: null is its word for none. */
+const isRowFound = (raw: unknown): boolean => {
+  if (raw === null) { return false }
+  demandRowObject(raw)
+  return true
+}
+
+// Held to its scope and not its vault_tok: a vault row of another life is an answer the verbs have words for.
+/** The vault row a store answered for `asked`'s scope, null for none. */
+const foundVaultRowOf = (raw: unknown, asked: VaultScope): VaultRow | null => (
+  isRowFound(raw) ? SX.storedVaultRow.parseConsistent(raw, CX.vaultScope.parse(asked), RowOfOtherAddress) : null
+)
+
+/** The box row a store answered for `asked`'s scope and `vault_tok`, null for none. */
+const foundBoxRowOf = (raw: unknown, asked: BoxQuery): BoxRow | null => (
+  isRowFound(raw) ? SX.storedBoxRow.parseConsistent(raw, SX.boxQuery.parse(asked), RowOfOtherAddress) : null
+)
+
+/** A listing's row, held to the `address` it is listed at; null for one that is to be set aside as damaged. */
+const listedRowOf = <RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknown, address: object): RowT | null => {
+  const parsed = rowCheck.safeParse(raw)
+  if (parsed.success) { return verifyConsistent(parsed.data, address, RowOfOtherAddress) }
+  demandRowObject(raw)
+  return null
+}
+
 /** The vault row a store answered, where it is live in the life `asked` names. */
 const liveVaultOf = (raw: unknown, asked: VaultQuery): VaultRecord => {
-  const found = SX.foundVaultRow.parse(raw)
+  const found = foundVaultRowOf(raw, asked)
   if (found === null) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(asked, asked.vault_tok)) }
   if ((found.am === 'a') && (found.vault_tok !== asked.vault_tok)) { throw Refuse.vaultMismatch(found) }
   if (found.vault_tok !== asked.vault_tok) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(asked, asked.vault_tok)) }
@@ -512,8 +546,9 @@ const movedGateOf = (stored: VaultRecord, wayin: Partial<Gate>): VaultRecord => 
 const listedBoxesOf = ({ vault_tok, ...scope }: VaultQuery, rows: RowOfBox[]): BoxesListed => {
   const listed: BoxesListed = { boxes: [], damaged_rows: [] }
   for (const { boxlabel, box } of rows) {
-    const parsed = SX.boxRow.safeParse(box)
-    if (parsed.success) { listed.boxes.push(SX.boxSparse.parse(parsed.data)) } else { listed.damaged_rows.push(SX.damagedBoxOf({ ...scope, boxlabel }, vault_tok, box)) }
+    const address = { ...scope, boxlabel, vault_tok }
+    const found = listedRowOf(SX.boxRow, box, address)
+    if (found === null) { listed.damaged_rows.push(SX.damagedBoxOf(address, vault_tok)) } else { listed.boxes.push(SX.boxSparse.parse(found)) }
   }
   return listed
 }

@@ -127,6 +127,7 @@ const FamilyCases = [
   ["camped",              "condition", 'a put told not to replace a live record takes up the one stored'],
   ["vault_empty",         "condition", 'a vault_tok of a life no row holds is a fact of syncing: read the vault by its scope'],
   ["damaged_row",         "bad_news",  'a row read from storage failing its checks is set aside and told of'],
+  ["storage_issue",       "bad_news",  'a row no working store could answer, no object at all or of another address, is past retrying'],
   ["gate_issue",          "misuse",    'gate params at odds with the stored row are a bug in the caller'],
   ["disabled",            "misuse",    'calling an object let go by a sweep, a vacate or a delete is a bug: ask the bank for it again'],
 ] as const

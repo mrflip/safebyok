@@ -133,6 +133,12 @@ describe("Refusals.storageFailed", () => {
   })
 })
 
+describe("Refusals.storageIssue", () => {
+  it("is the kind whose phrase it carries", () => {
+    expect(Refusals.storageIssue()).to.include({ refusalkind: 'storage_issue', message: Phrases.StorageIssue })
+  })
+})
+
 describe("Refusals.identityRevoked", () => {
   it("says to open the vault again", () => {
     const err = Refusals.identityRevoked()
