@@ -190,7 +190,7 @@ export const LeaseScopepathShape = `A lease's scopepath is 'lease', an applabel,
 export const BoxScopepathShape = `A box's scopepath is 'box', an applabel, a user_id, a vaultlabel and a boxlabel, joined on ${ScopepathDelimiter}`
 // --
 
-// == [Bank and vault]: VaultScopeAdvice, otherScope, VaultGoneWhileOpening, OtherStoresThanHeld, VaultBehindWhileOpening, VaultObjectGone, VaultBehind
+// == [Bank and vault]: VaultScopeAdvice, otherScope, VaultGoneWhileOpening, OtherStoresThanEnlisted, VaultBehindWhileOpening, VaultObjectGone, VaultBehind
 
 /** The advice a refusal of the scope naming a vault ends with: what that scope takes, and what else names a vault. */
 export const VaultScopeAdvice = "That scope holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
@@ -201,8 +201,8 @@ export const otherScope = (fieldnames: readonly string[]): string => `This names
 /** Why a vault let go while the bank was opening it hands out no Vault object. */
 export const VaultGoneWhileOpening = "The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault)."
 
-/** Why options naming other stores than the vault the bank holds was born from refuse. */
-export const OtherStoresThanHeld = "The bank already holds this vault, born from other stores than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Stores are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault)."
+/** Why options naming other stores than the vault the bank has enlisted was born from refuse. */
+export const OtherStoresThanEnlisted = "The bank already has this vault enlisted, born from other stores than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Stores are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault)."
 
 /** Why the bank will not open a vault that storage offers older than this device has seen. */
 export const VaultBehindWhileOpening = "This device has already seen a newer copy of this vault than storage offers now, so it won't open this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask for the vault again; otherwise the app's support should look at its storage."
@@ -289,13 +289,13 @@ export const BoxStoredDamaged = "A box in this vault is stored damaged, so it ca
 export const WayinStoredDamaged = "One of this vault's unlockers is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other vault unlocker, if the vault has one, still opens it. A damaged passkey is mended by adding the passkey again; a damaged passphrase only by removing the vault and making it again."
 // --
 
-// == [Storables]: PartialLoad, AlreadyHeld, BoxPatchAdvice, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, SavingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: PartialLoad, AlreadyEnlisted, BoxPatchAdvice, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, SavingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
 /** Why a birth makes nothing of a dna for a scope the listing already holds alive. */
-export const AlreadyHeld = "This listing already holds an instance under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
+export const AlreadyEnlisted = "This listing already has an instance enlisted under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
 
 /** Why a put that storage answered with no record refuses: only a broken adapter answers that. */
 export const PutAnsweredNothing = "A put was answered with no record, which a vaultDB never does: the storage adapter needs a developer's look."
@@ -322,22 +322,22 @@ export const SavingVeiledFields = "This box's whisper is veiled, so its fields h
 /** Why saving a box's fields is refused with none to read. */
 export const NoFieldsBound = "This box has no field bound, so there is nothing to save: bind one with BoxFields.of(box).bind(path), or call box.putExposed()."
 
-/** Why a record storage holds under the revision_seq held, but another revision_tok, is not taken in. */
+/** Why a record storage holds under the revision_seq held, but another revision_tok, is not adopted. */
 export const OneRevisionTwoToks = "Storage and this device disagree about one revision of a record: storage holds that revision_seq under another revision_tok, as if two puts landed as one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
 
-/** Why a record storage holds deleted at the revision held alive, or the other way round, is not taken in. */
+/** Why a record storage holds deleted at the revision held alive, or the other way round, is not adopted. */
 export const OneRevisionTwoFates = "Storage and this device disagree about one revision of a record: one of them holds it alive and the other holds it deleted, or storage holds nothing for it. This device kept its own copy and did not take in what storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
 
-/** Why a record storage holds under the revision held, but of another life of the thing, is not taken in. */
+/** Why a record storage holds under the revision held, but of another life of the thing, is not adopted. */
 export const OneRevisionTwoLives = "Storage and this device disagree about one revision of a record: storage holds it as another life of the thing, as if the thing were deleted and made anew within one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
 
-/** Why a record under another vault_tok than the instance holds is not taken in. */
+/** Why a record under another vault_tok than the instance holds is not adopted. */
 export const OtherVaultTok = "Storage holds this record under another vault_tok than this device holds it under: the vault was deleted and made anew, or storage mixed the records of two vaults. This device kept its own copy and did not take in the one storage sent. Load the vault again from storage, and its boxes with it: safebyok does not yet remake what it holds of a vault made anew."
 
 /** Why a record under another vault_tok than the vault its listing lies in is not made into an instance. */
 export const OtherVaultTokAtBirth = "Storage gave a record under another vault_tok than the vault this listing lies in, so no instance was made of it: the vault was deleted and made anew, or storage mixed the records of two vaults. Load the vault again from storage, and its boxes with it."
 
-/** Why a record delivered under one scope that names another is not taken in. */
+/** Why a record delivered under one scope that names another is not adopted. */
 export const RecordOfOtherScope = "Storage answered with a record whose scope is not the one the answer says it is for, so nothing was made or changed of it: a bug in the storage adapter, which should answer each call with the record stored under the scope asked."
 
 /** Why a pair of shapes no row of the reconcile table names is refused: a bug. */
@@ -434,7 +434,7 @@ export const PasskeyHeldAlready = "This vault has a passkey already, and holds o
 export const DelOfOtherLife = "The vault held in this slot is under another vault_tok than this Vault, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDismissed, AlreadyAsking, AttemptInFlight, GatingSettled, RequestCleartextThrew, ClearsThrew, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDismissed, AlreadyAsking, AttemptInFlight, GatingConcluded, RequestCleartextThrew, ClearsThrew, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
@@ -447,7 +447,7 @@ export const AlreadyAsking = "A prompt is already open on this bank, so this one
 
 export const AttemptInFlight = "An attempt is already under way on this prompt, so this one was not tried: disable the submit button until it answers."
 
-export const GatingSettled = "This prompt has ended -- it was answered, dismissed, or refused for good -- so this attempt did nothing: ask again if the user still wants the vault."
+export const GatingConcluded = "This prompt has ended -- it was answered, dismissed, or refused for good -- so this attempt did nothing: ask again if the user still wants the vault."
 
 export const RequestCleartextThrew = "The requestCleartext handed to Bank.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
 

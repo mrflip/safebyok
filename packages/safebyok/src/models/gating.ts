@@ -12,15 +12,15 @@ import * as VX from '../shapes/shapes-vaultish'
 import type { VaultWorld } from '../shapes/shapes-vaultish'
 import * as SX from '../shapes/shapes-storage'
 import type { VaultRecord } from '../shapes/shapes-storage'
-import { proofMissing, attemptInFlight, clearsThrew, gatingDismissed, gatingSettled, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
+import { proofMissing, attemptInFlight, clearsThrew, gatingDismissed, gatingConcluded, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import { Gate } from './gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Vault } from './vault'
 import type { VaultListing } from './vault-listing'
 
-/** One ask of the user, one open per bank. It holds the clears only for the length of an attempt, and settles once: launch answers with that outcome. */
+/** One ask of the user, one open per bank. It holds the clears only for the length of an attempt, and concludes once: launch answers with that outcome. */
 export class Gating<KindT extends Gatingkind = Gatingkind> {
-  // == [Props]: gatingkind, gatingTok, applabel, user_id, vaultlabel, vault, passkeyHeader, #listing, #launchArgs, #run, #prove, #settled, #settle, #outcome, #isAttempting, #isLastAttempt
+  // == [Props]: gatingkind, gatingTok, applabel, user_id, vaultlabel, vault, passkeyHeader, #listing, #launchArgs, #run, #prove, #concluded, #conclude, #outcome, #isAttempting, #isLastAttempt
 
   declare readonly gatingkind:    KindT
   /** Unique to this gating, for a dialog to key on: the next gating's form starts empty, whatever was typed in this one. */
@@ -36,20 +36,20 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   readonly #launchArgs: LaunchArgs<KindT>
   readonly #run:        Run<KindT>
   readonly #prove:      Prove<KindT>
-  readonly #settled:    Promise<Outcome<Vault>>
-  #settle:        (outcome: Outcome<Vault>) => void = () => undefined
+  readonly #concluded:    Promise<Outcome<Vault>>
+  #conclude:        (outcome: Outcome<Vault>) => void = () => undefined
   #outcome:       Outcome<Vault> | null = null
   #isAttempting  = false
   #isLastAttempt = false
   // --
 
-  // == [Getters]: isOpen, whenSettled, scope, toJSON
+  // == [Getters]: isOpen, whenConcluded, scope, toJSON
 
-  /** True until this gating settles. */
+  /** True until this gating concludes. */
   get isOpen(): boolean { return this.#outcome === null }
 
-  /** The outcome once settled, a promise that never rejects: a dialog closes on it, as the package cannot close a host's dialog. */
-  get whenSettled(): Promise<Outcome<Vault>> { return this.#settled }
+  /** The outcome once concluded, a promise that never rejects: a dialog closes on it, as the package cannot close a host's dialog. */
+  get whenConcluded(): Promise<Outcome<Vault>> { return this.#concluded }
 
   get #scope(): VaultScope {
     const { applabel, user_id, vaultlabel } = this
@@ -74,7 +74,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     this.#launchArgs = launchArgs
     this.#run = RunForGatingkind[gatingkind]
     this.#prove = ProveForGatingkind[gatingkind]
-    this.#settled = new Promise((resolve) => { this.#settle = resolve })
+    this.#concluded = new Promise((resolve) => { this.#conclude = resolve })
     Object.freeze(this)
   }
 
@@ -84,7 +84,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     const gating = new Gating(gatingkind, { ...args, scope })
     args.listing.holdGating(gating as unknown as AnyGating)
     if (askUser !== null) { void gating.#askHost(askUser) }
-    return valOf(await gating.#settled)
+    return valOf(await gating.#concluded)
   }
 
   async #askHost(askUser: AskUser): Promise<void> {
@@ -112,7 +112,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   }
 
   #refusalOfAttempt(): VaultError | null {
-    if (this.#outcome !== null) { return gatingSettled() }
+    if (this.#outcome !== null) { return gatingConcluded() }
     return this.#isAttempting ? attemptInFlight() : null
   }
 
@@ -123,31 +123,31 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     // A correctable refusal, short of the last attempt, leaves the clears unspent for the next.
     if (outcome.ok || (! isCorrectable(outcome.err)) || this.#isLastAttempt) {
       spendClears(clears)
-      this.#settleOnce(outcome)
+      this.#concludeOnce(outcome)
     }
     return outcome
   }
   // --
 
-  // == [Settling]: dismiss, endAsking, settleOnce
+  // == [Concluding]: dismiss, endAsking, concludeOnce
 
-  /** Ends the asking with nothing proved: the gating settles 'dismissed', or an attempt under way runs on and its outcome settles it. */
+  /** Ends the asking with nothing proved: the gating concludes 'dismissed', or an attempt under way runs on and its outcome concludes it. */
   dismiss(): void { this.#endAsking(gatingDismissed()) }
 
-  /** No more attempts: `refusal` settles the gating, or else the attempt under way does, whatever it answers. */
+  /** No more attempts: `refusal` concludes the gating, or else the attempt under way does, whatever it answers. */
   #endAsking(refusal: VaultError): void {
     if (this.#isAttempting) {
       this.#isLastAttempt = true
       return
     }
-    this.#settleOnce(bad(refusal))
+    this.#concludeOnce(bad(refusal))
   }
 
-  #settleOnce(outcome: Outcome<Vault>): void {
+  #concludeOnce(outcome: Outcome<Vault>): void {
     if (this.#outcome !== null) { return }
     this.#outcome = outcome
     this.#listing.releaseGating()
-    this.#settle(outcome)
+    this.#conclude(outcome)
   }
   // --
 

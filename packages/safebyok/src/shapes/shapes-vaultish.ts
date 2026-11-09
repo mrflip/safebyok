@@ -63,19 +63,19 @@ export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched
 
 // --
 
-// == [Reconciling]: reconciled, settled, Reconciled, Settled
+// == [Reconciling]: reconciled, aligned, Reconciled, Aligned
 
-/** The checks of what reconciling passes: `reconciled`, what `reconcileCentral` hands back; and `settled`, what `settle` and `receive` hand back. Checks only. */
-export const { reconciled, settled } = Checkers('unexpected_error', ({ obj, arr, oneof, vaultError }) => ({
+/** The checks of what reconciling passes: `reconciled`, what `reconcileCentral` hands back; and `aligned`, what `align` and `receive` hand back. Checks only. */
+export const { reconciled, aligned } = Checkers('unexpected_error', ({ obj, arr, oneof, vaultError }) => ({
   reconciled:    obj({ central: SX.sparseBase, policy: oneof(EX.centralPolicyVals) }),
-  settled:       obj({ badnews: arr(vaultError).readonly() }).readonly(),
+  aligned:       obj({ badnews: arr(vaultError).readonly() }).readonly(),
 }), [Checks])
 
 /** Return type of `reconcileCentral`: the central that results, and the policy that chose it. {@link reconciled} checks what the base knows of one. */
 export type Reconciled<RecordT, SparseT> = Readonly<{ central: Fetched<RecordT, SparseT>, policy: EX.CentralPolicy }>
 
-/** Return type of `settle` and `receive`: `badnews`, the refusals to tell the host once. */
-export type Settled = Z.infer<typeof settled>
+/** Return type of `align` and `receive`: `badnews`, the refusals to tell the host once. */
+export type Aligned = Z.infer<typeof aligned>
 
 // --
 
@@ -135,10 +135,10 @@ export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 // == [The listing's world]: listingWorld, ListingWorld, BankFriend, ListingOpts, answersEachVerb, brandedVaultDB, bankPanic, bankFriend, listingOpts
 
 /** The check of the world a listing lives in, the bank for vaults and the vault for boxes, as far as the base reaches into it. Checks only. */
-export const listingWorld = objCheck(({ fn, bool }) => ({ isLocked: bool, ensureTimely: fn(), takeWorld: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
+export const listingWorld = objCheck(({ fn, bool }) => ({ isLocked: bool, ensureTimely: fn(), receiveWorld: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
 
 /** The world a listing lives in, as far as the base reaches into it: the bank for vaults, the vault for boxes. */
-export type ListingWorld = Pick<Bank | Vault, 'isLocked' | 'ensureTimely' | 'takeWorld'>
+export type ListingWorld = Pick<Bank | Vault, 'isLocked' | 'ensureTimely' | 'receiveWorld'>
 
 /** The bank's private calls, handed down to each listing and vault as it is made. */
 export interface BankFriend {
@@ -202,7 +202,7 @@ export const storableArgs = objCheck(({ custom }) => ({
 
 // == [Given to a listing]: Thing, ListingAnswer, DelTombstone, SlotFate, ListingOf
 
-/** A vault or box as a listing holds it. */
+/** A vault or box as a listing enlists it. */
 export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
 
 /** The answer of a vaultDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
@@ -211,7 +211,7 @@ export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> |
 /** The tombstone `listing.del` hands the vaultDB: gone, at the revision after the one it goes over. */
 export type DelTombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
 
-/** The fate of a record meeting the thing in its slot: `receive` takes it in, `lose` drops it unheard, and `replace` gives the slot a new instance of it. */
+/** The fate of a record meeting the thing in its slot: `receive` judges it, `lose` drops it unheard, and `replace` gives the slot a new instance of it. */
 export type SlotFate = 'receive' | 'lose' | 'replace'
 
 /** The listing a storable is made in, as it sees it: its own kind of thing, whatever snapshot the concrete class makes. */

@@ -169,7 +169,7 @@ bytes by an inline `reduce`) → `PasskeyProving.buildNovel`, `buildStored` → 
 (`subtle.importKey` as HKDF input, then `subtle.deriveKey`), none of which zeroes them. `spendClears`
 (`models/gating.ts`) reaches the `passkeyClear.prfBytes` of whatever the attempt was handed, checked or not, a view
 or a bare `ArrayBuffer`, and `fill(0)`s it: in `gating.attempt` for an attempt refused at the door, and in
-`#attemptOnce` for one that settles its gating. In `safebyok-react`, `PasskeyUnlockButton` and `GatingModal`'s
+`#attemptOnce` for one that concludes its gating. In `safebyok-react`, `PasskeyUnlockButton` and `GatingModal`'s
 `put_passkey` form hand it on at once or zero it untried (`useWhenShown`'s `isShown`), and `attemptOnce` zeroes it
 after its attempt.
 
@@ -244,7 +244,7 @@ ante, a weak next or the same passphrase, storing nothing, and the next attempt 
 output is a view over the deriver's own buffer, imported non-extractable with `wrapKey`/
 `unwrapKey` only, and zeroed in a `finally`, imported or refused (`passphraseKeyOf`,
 `importWrappingKeyBytes`). No proving zeroes a passkey's PRF bytes: `spendClears` (`models/gating.ts`) does, for
-an attempt refused at the door (while another runs, or after the gating is settled) or one that settles its
+an attempt refused at the door (while another runs, or after the gating is concluded) or one that concludes its
 gating, a proving derived from them or not. So an answer is single-use, and one handed in again is refused
 `bad_option` by its all-zero bytes (`passkeyAnswer`, `shapes-gateish.ts`). Only a refusal the user can correct,
 `wrong_passkey` among them, past the derivation too, short of the last attempt, leaves them unspent, for the host to
@@ -257,7 +257,7 @@ method returns it or a vaultKey (`models/proving.ts`). Bytes refused before impo
 32 bytes, 32 zero bytes, and shared memory. Checked by: `tests/models/proving.test.ts` (among them *the ctx a wayin is
 wrapped under* and *a passkey proving's key*), `tests/helpers/crypto.test.ts` (*deriveWrappingKey*),
 `tests/models/gating.test.ts` (*gating.attempt*, among them *refuses a second while one runs 'attempt_in_flight',
-spending what it was handed, and the first goes on*, *settles a malformed attempt, spends what came with it, and the
+spending what it was handed, and the first goes on*, *concludes a malformed attempt, spends what came with it, and the
 refusal holds no passphrase* and *spends an answer from another realm, whose bytes are no instance of this realm's
 Uint8Array*).
 

@@ -59,7 +59,7 @@ export function nextMicrotask(): Promise<void> { return new Promise(queueMicrota
 
 // == [Stores]: Awaitable, ckeyOf
 
-/** What a store's generic call answers: a store over a synchronous backend need not make a promise. */
+/** What an adapter's generic call answers: an adapter over synchronous storage need not make a promise. */
 export type Awaitable<ValT> = ValT | Promise<ValT>
 
 /** The ckey of `parts`, whichever characters they hold: JSON, so no two lists of parts meet. */

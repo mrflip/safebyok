@@ -8,7 +8,7 @@ import { reportToPlatform } from '../refusals/report-error'
 import { disabledError, lockedError, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoadError, shapeUnreconciled } from '../refusals/throwers'
 import type { Age, Am, RecordShape } from '../shapes/shapes-enums'
 import * as VX from '../shapes/shapes-vaultish'
-import type { Fetched, FetchOpts, ListingOf, ListingWorld, Reconciled, Settled, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
+import type { Fetched, FetchOpts, ListingOf, ListingWorld, Reconciled, Aligned, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
 import type { Revision } from '../shapes/shapes-storage'
 
 // == [Revisions]: cmpRevisions
@@ -48,7 +48,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The latest record this device knows storage holds: full, sparse or a tombstone, void on a new instance. */
   #central: Fetched<RecordT, SparseT>
-  /** Made when `snapshot` is first asked for, and again by each `settle` once one exists. */
+  /** Made when `snapshot` is first asked for, and again by each `align` once one exists. */
   #snapshot: SnapshotT | null = null
   /** When storage last answered with a record not older than central that left the record in hand whole; null until it has. */
   #refreshedAt: number | null = null
@@ -119,7 +119,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.#scope = Object.freeze(listing.scopeOf(central))
     this.#central = Object.freeze(central)
     this.assignInitialProps(central)
-    this.settle()
+    this.align()
     Object.seal(this)
   }
 
@@ -182,15 +182,15 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Receiving]: receive, tombstoneFor
 
-  /** SLOPDOC: Takes in what storage said: judges it against the record in hand, adopts and settles what it takes. */
-  receive(rcvd: Fetched<RecordT, SparseT> | null): Settled {
+  /** SLOPDOC: Receives what storage said: judges it against the record in hand, then adopts and aligns it. */
+  receive(rcvd: Fetched<RecordT, SparseT> | null): Aligned {
     if (! this.#isEnabled) { return { badnews: [] } }
     const answer = rcvd ?? this.tombstoneFor(this.#central)
     const { central, policy } = this.reconcileCentral(answer, this.classifyRecordShape(answer))
-    const isTaken = central !== this.#central
-    if (isTaken) { this.adopt(central) }
+    const isAdopting = central !== this.#central
+    if (isAdopting) { this.adopt(central) }
     if ((policy !== 'older') && this.#isWhole) { this.#refreshedAt = nowMillis() }
-    return isTaken ? this.settle() : { badnews: [] }
+    return isAdopting ? this.align() : { badnews: [] }
   }
 
   /** A tombstone made here, from the sparse props held, under `revision`, written now. */
@@ -238,10 +238,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Settling]: settle, becomeNotifiable, replaceSnapshot, tellListeners
+  // == [Aligning]: align, becomeNotifiable, replaceSnapshot, tellListeners
 
   /** SLOPDOC: Brings the snapshot up to the state just adopted, notifying the subscribers where it changed. */
-  settle(): Settled {
+  align(): Aligned {
     this.#replaceSnapshot()
     return { badnews: [] }
   }
@@ -277,11 +277,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Tell the listeners the lock has moved. A no-op past a discard; never throws. */
   lock(): this {
-    if (this.#isEnabled) { this.settle() }
+    if (this.#isEnabled) { this.align() }
     return this
   }
 
-  /** Drop what this instance holds of secrets, leave what this device has cached, and answer nothing from here on, unlisted. A repeat is a no-op. Never throws. */
+  /** Drop what this instance holds of secrets, leave what this device has cached, and answer nothing from here on, delisted. A repeat is a no-op. Never throws. */
   sweep(): this { return this.#disable(() => { this.sweepContents() }) }
 
   /** As `sweep`, and what this device has cached of it goes too. Storage is untouched. A repeat is a no-op. Never throws. */
@@ -292,8 +292,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     if (! this.#isEnabled) { return this }
     this.#isEnabled = false
     dropContents()
-    this.listing.unlist(this)
-    this.settle()
+    this.listing.delist(this)
+    this.align()
     return this
   }
   // --
@@ -359,8 +359,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Protected, for a subclass to override]: adopt, sweepContents, vacateContents, demandPresent, isFullRecord, lifeTokPathOf, makeSnapshot
 
-  // Every adopt is followed by a settle, which the snapshot is made from: an adopt left unsettled would leave it behind.
-  /** Assign the props of `central`, judged against the central held until now, then hold it, frozen; the snapshot waits for `settle`. */
+  // Every adopt is followed by an align, which the snapshot is made from: an adopt left unaligned would leave it behind.
+  /** Assign the props of `central`, judged against the central held until now, then hold it, frozen; the snapshot waits for `align`. */
   protected adopt(central: Fetched<RecordT, SparseT>): void {
     this.assign(central)
     this.#central = Object.freeze(central)

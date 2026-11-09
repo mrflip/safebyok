@@ -27,7 +27,7 @@ const expectChangeUnlocked = async ({ vault, deviceDB, demandStored }: Awaited<R
 }
 
 describe("A lease renewed through a gate change", () => {
-  it("renewed: a lease held is attached under the epoch that landed, its row cached, and the vault never reads locked on the way", async () => {
+  it("renewed: a lease held is attached under the epoch that landed, its row cached, and the vault never reports locked on the way", async () => {
     const { vault, deviceDB, demandStored } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
     const epoch0 = vault.gate.gate_epoch
@@ -145,7 +145,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test' })
   })
 
-  it("sweep leaves the row, drops the lease, disables and unlists all the way down", async () => {
+  it("sweep leaves the row, drops the lease, disables and delists all the way down", async () => {
     const { vault, listing, box, deviceDB } = await makeVaultWithBox()
     const { boxListing } = vault
     await box.expose()
@@ -161,7 +161,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(deviceDB.peek).not.toHaveBeenCalled()
   })
 
-  it("vacate erases the row too, disables and unlists all the way down, and leaves the vaultDB untouched", async () => {
+  it("vacate erases the row too, disables and delists all the way down, and leaves the vaultDB untouched", async () => {
     const { vault, listing, box, deviceDB, demandStored } = await makeVaultWithBox()
     const stored = demandStored()
     vault.vacate()

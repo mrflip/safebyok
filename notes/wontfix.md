@@ -64,7 +64,7 @@ not as a settled ruling, and check it against the current design before relying 
   delete again. That is unpleasant, and could leave them thinking the vault is gone from their other
   devices when it is not. The verb does refuse, so a host can say so. The Coach: "Still: WONTFIX."
 * 2026-11-03 (unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *The lease*): **a `lock()` during
-  the cache's `Lease.buildFromCache` loses.** The vault reads unlocked on the lease built from the cache, the lock's erase
+  the cache's `Lease.buildFromCache` loses.** The vault reports unlocked on the lease built from the cache, the lock's erase
   stands, and the next session asks for a proof. The next `lock()` ends that session.
 * 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
   since moved here):
@@ -76,7 +76,7 @@ not as a settled ruling, and check it against the current design before relying 
   "one I worry about"; and, 2026-11-03: "This is why the panic button exists, there is no fix we can apply if the
   system somehow is operational enough to read leases, decrypt data and everything else but delete data."
 * 2026-11-03 (the Coach, unrace): **a refused erase with no `onPanic` can bring a false prompt.** `Vault.#panic`
-  unlists the vault, so `ensureVault` then asks for a passphrase for a vault that exists. The Coach: "If the
+  delists the vault, so `ensureVault` then asks for a passphrase for a vault that exists. The Coach: "If the
   host has no on panic they've given their opinion, wontfix."
 * 2026-11-03 (the Coach, unrace): **a delete whose erase is refused, with no `onPanic`, still lands.** The vault
   is tombstoned in the vaultDB and the delete is answered, whatever the erase of the cached lease did. The same

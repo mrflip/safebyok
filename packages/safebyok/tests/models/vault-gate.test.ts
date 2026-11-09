@@ -14,12 +14,12 @@ useVaultWorlds()
 
 type Born = Awaited<ReturnType<typeof makeBornVault>>
 
-/** Leaves the world's dialog up until the gating settles, and shows the gating to the test. */
+/** Leaves the world's dialog up until the gating concludes, and shows the gating to the test. */
 const dialogOf = (world: Born) => {
   const shown: unknown[] = []
   world.fakeBank.requestCleartext = (gating) => {
     shown.push(gating)
-    return gating.whenSettled
+    return gating.whenConcluded
   }
   return {
     shown,
@@ -202,7 +202,7 @@ describe("vault.addPasskeyPrompt()", () => {
     expect(shown).to.have.lengthOf(0)
   })
 
-  it("leaves a wrong passphrase's answer unspent for the next attempt, and spends it as the gating settles", async () => {
+  it("leaves a wrong passphrase's answer unspent for the next attempt, and spends it as the gating concludes", async () => {
     const born = await makeBornVault()
     const { vault } = born
     const { gatingAt } = dialogOf(born)
@@ -336,7 +336,7 @@ describe("vault.delVaultPrompt()", () => {
     expect(storedNow()).to.include({ am: 'x' })
   })
 
-  it("settles an asking on the listing's goodbye: nothing outlives the listing, a delete's dialog neither", async () => {
+  it("concludes an asking on the listing's goodbye: nothing outlives the listing, a delete's dialog neither", async () => {
     const born = await makeBornVault()
     const { vault, listing, storedNow } = born
     const ante = storedNow()

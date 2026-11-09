@@ -27,7 +27,7 @@ describe("a lock() landing during a put", () => {
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("during the put lands the record anyway: the put is past the window, and the box reads locked after", async () => {
+  it("during the put lands the record anyway: the put is past the window, and the box reports locked after", async () => {
     const record = fullBoxRecord()
     held.mw.seedStore(record)
     const box = await boxListingOf(held.mw).build(record)

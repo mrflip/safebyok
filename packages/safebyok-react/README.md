@@ -44,7 +44,7 @@ React's own documentation, are in [notes/expose_improves_security.md](https://gi
 ## Dialogs
 
 `BankProvider` shows its own dialog for each gating the bank holds open: the dialog follows `openGating` in the bank's
-snapshot, and closes when the gating settles, whether by the user's answer, a sweep or a vacate; a lock leaves it up. Its passkey
+snapshot, and closes when the gating concludes, whether by the user's answer, a sweep or a vacate; a lock leaves it up. Its passkey
 button asks the passkey from the user's click on it, so a gating opened from a timer or a fetch shows the dialog all the
 same, and the user's click supplies the gesture the browser needs.
 

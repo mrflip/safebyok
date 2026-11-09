@@ -158,7 +158,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     await TH.expectBad(hydrating.vault.tryHydrate({ maxMillisSinceRefresh: 0 }))
   })
 
-  it("replaces it: the old vacated and unlisted, its row erased, a new vault in the slot, locked", async () => {
+  it("replaces it: the old vacated and delisted, its row erased, a new vault in the slot, locked", async () => {
     const { vault, listing, deviceDB, restoreRow } = await makeBornVault()
     const other = await otherLifeAt(5)
     restoreRow(other)
@@ -351,7 +351,7 @@ describe("the entrypoints, handed rubble", () => {
 })
 
 describe("lock() with an erase that throws synchronously", () => {
-  it("reads locked, does not throw, and announces the refused erase", async () => {
+  it("reports locked, does not throw, and announces the refused erase", async () => {
     const onLifecycle = vi.fn()
     const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onLifecycle })
     deviceDB.forget.mockImplementationOnce(() => { throw new Error('the duck is broken') })

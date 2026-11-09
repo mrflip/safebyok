@@ -74,7 +74,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     await TH.expectRefusal(vault.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), {}))
   })
 
-  it("locks at `lock()`, reading locked before it returns and erasing the row; seal and unseal refuse; then 'dismissed' with no proof and a dialog closed unanswered, the proof's own refusal with a wrong one, and it unlocks with the right one", async () => {
+  it("locks at `lock()`, reporting locked before it returns and erasing the row; seal and unseal refuse; then 'dismissed' with no proof and a dialog closed unanswered, the proof's own refusal with a wrong one, and it unlocks with the right one", async () => {
     const { vault, deviceDB } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
     expect(vault.lock()).to.equal(vault)
@@ -144,7 +144,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
 
 describe("The vault holds a lease: by unlock, or by the cache", () => {
 
-  it("holds the lease, reading unlocked, and caches its row, in place of the lease it displaces", async () => {
+  it("holds the lease, reporting unlocked, and caches its row, in place of the lease it displaces", async () => {
     const { vault, deviceDB, advance } = await makeBornVault()
     const bornRow = deviceDB.cachedNow() as { proved_at: number }
     advance(1)

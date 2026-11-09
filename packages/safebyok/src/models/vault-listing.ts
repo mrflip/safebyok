@@ -91,9 +91,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 
-  // == [The gate's commits]: replacePassphrase, addPasskey, revokePasskey, del
+  // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, del
 
-  /** Lay a new passphrase wayin on the row, deliver what it stores to the vault held, and answer that record. Nothing locks: the vaultKey does not change. */
+  /** Lay a new passphrase wayin on the row, deliver what it stores to the vault enlisted, and answer that record. Nothing locks: the vaultKey does not change. */
   async replacePassphrase(params: ReplacePassphraseParams): Promise<SX.VaultRecord> {
     this.demandEnabled()
     return this.#deliverStored(await this.vaultDB.tryReplacePassphrase(params))
@@ -111,7 +111,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return this.#deliverStored(await this.vaultDB.tryRevokePasskey(params))
   }
 
-  /** The record a gate verb stored: the vault held may hold a newer one by the time its answer is delivered. */
+  /** The record a gate verb stored: the vault enlisted may hold a newer one by the time its answer is delivered. */
   async #deliverStored(answer: Answer<SX.VaultRecord, string>): Promise<SX.VaultRecord> {
     await this.deliver(answer)
     return valOf(answer)
@@ -119,8 +119,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** SLOPDOC: Deletes the vault `ante` names over its own revision; its boxes cascade in the vaultDB. */
   override async del(ante: VaultSparse | Vault): Promise<Vault | null> {
-    const held = this.at(this.scopeOf(ante))
-    if ((held !== null) && (held.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
+    const enlisted = this.at(this.scopeOf(ante))
+    if ((enlisted !== null) && (enlisted.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
     return this.delOver(this.sparseOf(ante))
   }
   // --
@@ -134,13 +134,13 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     this.tellListeners()
   }
 
-  /** The open gating has settled. */
+  /** The open gating has concluded. */
   releaseGating(): void {
     this.#openGating = null
     this.tellListeners()
   }
 
-  /** `vault` is going away: the open gating settles, if it asks for that vault, whatever its kind. */
+  /** `vault` is going away: the open gating concludes, if it asks for that vault, whatever its kind. */
   dismissGatingAtDiscard(vault: Vault): void {
     if (this.#openGating?.vault === vault) { this.#openGating.dismiss() }
   }
@@ -160,7 +160,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   // Past the disable: the dismiss tells the listeners, who must meet the listing already disabled.
-  /** The open gating, whatever vault it asks for, settles with the listing going away. */
+  /** The open gating, whatever vault it asks for, concludes with the listing going away. */
   #dismissGatingOfGoneListing(): void { this.#openGating?.dismiss() }
   // --
 
@@ -168,12 +168,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   protected vaultTokOfWorld(): null { return null }
 
-  /** An older record loses to the vault held. A newer one replaces it where it is of another `vault_tok`, or alive over a tombstone. */
-  protected override fateOver(held: Vault, record: Fetched<VaultRecord, VaultSparse>): SlotFate {
-    const age = cmpRevisions(held, record)
+  /** An older record loses to the vault enlisted. A newer one replaces it where it is of another `vault_tok`, or alive over a tombstone. */
+  protected override fateOver(enlisted: Vault, record: Fetched<VaultRecord, VaultSparse>): SlotFate {
+    const age = cmpRevisions(enlisted, record)
     if (age === 'older') { return 'lose' }
-    const isOtherLife = record.vault_tok !== held.vault_tok
-    const isRebirth = (! held.isPresent) && (! VX.isTombstone(record))
+    const isOtherLife = record.vault_tok !== enlisted.vault_tok
+    const isRebirth = (! enlisted.isPresent) && (! VX.isTombstone(record))
     return ((age === 'newer') && (isOtherLife || isRebirth)) ? 'replace' : 'receive'
   }
 

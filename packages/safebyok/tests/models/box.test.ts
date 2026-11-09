@@ -98,7 +98,7 @@ describe("Box sidecar, locked or not", () => {
     expect(listener).toHaveBeenCalledTimes(1)
     expect(box.getSnapshot()).to.eq(before)
     expect(box.getSnapshot().sidecar).to.deep.equal({ note: 'a test box' })
-    box.settle()
+    box.align()
     expect(box.getSnapshot()).to.eq(before)
     expect(listener).toHaveBeenCalledTimes(1)
   })
@@ -257,7 +257,7 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
   ] as const
 
   for (const [rcvdOf, blurb] of ConfirmingCases) {
-    it(`notes success on ${blurb} that only confirms the full central held`, async () => {
+    it(`notes success on ${blurb} that only confirms the full central is set`, async () => {
       const box = await boxListingOf(held.mw, { maxMillisSinceRefresh: 1000 }).build(fullBoxRecord())
       held.mw.setNow(T0 + 1000)
       expect(box.isTimely).to.be.false

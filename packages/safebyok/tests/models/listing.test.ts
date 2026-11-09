@@ -109,7 +109,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const box = listing.at(scopeOf())
       expect(box?.isFull).to.be.true
       expect(listing.snapshot).to.have.lengthOf(1)
-      expect(held.mw.callsOf('takeWorld')).to.deep.equal([{ verb: 'takeWorld', world: 'a world' }])
+      expect(held.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'a world' }])
       expect(held.mw.callsOf('get')).to.deep.equal([])
     })
 

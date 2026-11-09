@@ -16,7 +16,7 @@ describe("makeScratchDir", () => {
     writeFileSync(path.join(scratch, 'left-behind.txt'), 'gone soon\n')
   })
 
-  it("removes it, and what was left in it, once the test that made it finishes", () => {
+  it("removes it, and what was left in it, once the test that made it returns", () => {
     expect(made).to.have.lengthOf(1)
     expect(existsSync(made[0] ?? '')).to.be.false
   })

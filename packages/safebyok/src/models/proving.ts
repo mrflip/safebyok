@@ -256,7 +256,7 @@ const isSafelyAllZero = (bytes: Uint8Array): boolean => {
   return seen === 0
 }
 
-// The record's check settles the salt's characters and length, but not whether they decode: stray bits in the last character.
+// The record's check validates the salt's characters and length, but not whether they decode: stray bits in the last character.
 const saltBytesOf = (salt_b64: string): Uint8Array => {
   const saltBytes = fromB64OrNull(salt_b64)
   if (saltBytes === null) { throw undecodedSalt() }

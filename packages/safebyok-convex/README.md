@@ -97,8 +97,7 @@ Three tables, inside the component:
 
 `user_id` leads every index, so one user's rows are one range of each. Rows are stored as the core
 writes them: encrypted, each whisper, each box's boxKey and the vaultKey once for each way in; in
-the open, the labels, tokens, times, salts and sidecars. `tidyGone` removes the rows the core has
-finished with, and the tallies of ended lives.
+the open, the labels, tokens, times, salts and sidecars. `tidyGone` removes the rows it considers expired, and the tallies of ended lives.
 
 **Upgrading.** Until 1.0 there is no migration. A release that changes these tables says so in its
 changelog; Convex will not deploy a schema the stored rows do not match, so clear the component's

@@ -27,7 +27,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       held.mw.willGet(held.mw.refusalOf(box.scope, err, 'a world'))
       const outcome = await listing.tryFetch(box.scope)
       expect(outcome.err).to.eq(err)
-      expect(held.mw.callsOf('takeWorld')).to.deep.equal([{ verb: 'takeWorld', world: 'a world' }])
+      expect(held.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'a world' }])
       expect(box.revision_seq).to.eq(1)
     })
 
@@ -43,7 +43,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       held.mw.seedStore(fullBoxRecord())
       held.mw.willGet(held.mw.answerOf(scopeOf(), fullBoxRecord(), 'the world now'))
       await boxListingOf(held.mw).fetch(scopeOf())
-      expect(held.mw.callsOf('takeWorld')).to.deep.equal([{ verb: 'takeWorld', world: 'the world now' }])
+      expect(held.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'the world now' }])
     })
     it("refuses a fetch of a scope that is no scope, before the world or storage is called", async () => {
       const listing = boxListingOf(held.mw)
@@ -72,7 +72,7 @@ describe("Listing's pipeline: what every answer takes", () => {
         return held.mw.refusalOf(scopeOf(), new VaultError('storage_unavailable', "Storage is down."), 'a world')
       })
       await TH.expectRefusal(listing.fetch(scopeOf()))
-      expect(held.mw.callsOf('takeWorld')).to.deep.equal([])
+      expect(held.mw.callsOf('receiveWorld')).to.deep.equal([])
     })
   })
 
@@ -212,7 +212,7 @@ describe("listing: a notice without its vault row", () => {
     await listing.hello()
     held.mw.clearCalls()
     await held.mw.notify(fullBoxRecord({ boxlabel: 'noticed' }), null)
-    expect(held.mw.callsOf('takeWorld')).to.deep.equal([])
+    expect(held.mw.callsOf('receiveWorld')).to.deep.equal([])
     expect(held.mw.badnews).to.deep.equal([])
     expect(listing.at(scopeOf('noticed'))?.isPresent).to.be.true
   })
@@ -262,7 +262,7 @@ describe("listing: a record of another vault_tok meets no instance held", () => 
     await expect(listing.create(dnaOf('draft_box'))).resolves.to.be.instanceOf(Box)
   })
 
-  it("compares a record held under another vault_tok by reconcileCentral, so an instance held keeps refusing as it did", async () => {
+  it("compares a record listed under another vault_tok by reconcileCentral, so a listed instance keeps refusing as it did", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ vault_tok: OtherVault, revision_seq: 2, revision_tok: 'rev-a2' })))

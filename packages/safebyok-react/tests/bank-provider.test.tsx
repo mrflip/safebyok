@@ -485,7 +485,7 @@ describe("BankProvider's dialog", () => {
     expect(dialogShown()).to.be.false
   })
 
-  it("replaces a settled gating's dialog with the next one's, nothing typed carried over", async () => {
+  it("replaces a concluded gating's dialog with the next one's, nothing typed carried over", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
     provided({}, world)

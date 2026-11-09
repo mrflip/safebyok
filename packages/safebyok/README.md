@@ -78,8 +78,8 @@ await vault.ensureUnlocked() // no lease now: asks, unlock_vault
 
 **Rendering the dialog from the snapshot.** Leave `requestCleartext` out, and a gating calls none
 of your functions: it waits, open, in `bank.snapshot.openGating` until its `attempt` or `dismiss`
-settles it. Render your dialog while that is not null. The bank notifies its subscribers as a
-gating opens and as it settles, whether by the user's answer, a sweep or a vacate, so the
+concludes it. Render your dialog while that is not null. The bank notifies its subscribers as a
+gating opens and as it concludes, whether by the user's answer, a sweep or a vacate, so the
 dialog closes by itself. A lock leaves it open.
 
 ```ts

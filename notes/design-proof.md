@@ -16,9 +16,9 @@ bank.hello()                                         a forced reset; a host may 
    │  └─ each vault or gone_vault, by scope: vaultListing.build(record) → #buildOrReceive
    │       none held                                 → build, held
    │       older than the one held                   → it loses
-   │       new vault_tok, or alive over a tombstone  → build, held; old_vault.vacate, unlist
+   │       new vault_tok, or alive over a tombstone  → build, enlisted; old_vault.vacate, delist
    │       same life                                 → vault.receive(record)
-   │       a tombstone of its own vault_tok          → the vault stays in its slot and takes it in (locked, row erased, boxes vacated)
+   │       a tombstone of its own vault_tok          → the vault stays in its slot and adopts it (locked, row erased, boxes vacated)
    ├─ bank.#cacheDeviceRecord                        a damaged record written over → bad news
    ├─ vaultListing.hello()                           subscribe to VaultDB
    └─ vaultListing.demandEnabled()                   a sweep crossing hello refuses here
@@ -103,13 +103,13 @@ can shake its dialog and let the user enter again. Nothing retries.
 ```text
 box.send(patch)
 ├─ await ensureReadyToSend(timely)                   hydrates; locked → refused
-├─ ante   = box.central, the record held
-├─ record = await #edit(patch, ante)                 laid over ante, returned, held nowhere
+├─ ante   = box.central, the record property
+├─ record = await #edit(patch, ante)                 laid over ante, returned, captured nowhere
 ├─ demandReadyToSend
 └─ listing.put(record, ante, { ifPresent })          over ante's revision, not whatever is held by then
    ├─ tryPutRow(record, { prior, ifPresent })
    │    moved → 'stale_write': the stored record delivered, then thrown
-   └─ deliver → receive → adopt, settle              send resolves at the end of receive
+   └─ deliver → receive → adopt, align              send resolves at the end of receive
 ```
 
 With nothing kept between `#edit` and the put, `#staged`, `#memoizedNextRevision` and `reconcileStaged`
@@ -170,14 +170,14 @@ vault.#attachLease(lease)                            private: called by lease.at
 ├─ caching     = lease.tryCache()
 ├─ displaced   = this.#lease
 ├─ this.#lease = lease                               displaced.evict(), where another
-├─ settle                                            reads unlocked; listeners run; snapshot re-made
-├─ boxListing.settleThings
+├─ align                                            reports unlocked; listeners run; snapshot re-made
+├─ boxListing.alignThings
 └─ await caching                                     refused → bad news; the lease is still held
 
 vault.#vacateLease(onRefused = #panic)               private: called by lock and vacate, and by adopt of a tombstone
 ├─ #dropLease                                        lease.evict(); this.#lease = null
-├─ vacating = friend.tryUncacheLease()               always, held or not: a vault reading locked still erases
-├─ settle                                            reads locked; listeners run; snapshot re-made
+├─ vacating = friend.tryUncacheLease()               always, held or not: a vault reporting locked still erases
+├─ align                                            reports locked; listeners run; snapshot re-made
 └─ await vacating                                    refused → panic; from adopt, bad news
 ```
 
@@ -187,7 +187,7 @@ locked already, so that `lock()` changed no state.
 
 **A `lock()` after the attach** is an ordinary lock of an unlocked vault: it vacates the lease, which removes
 it from the cache. This requires of the new deviceDB that calls land in the order they were made, so
-that the vacate lands after the put. The put is called before `settle`, because a listener may call
+that the vacate lands after the put. The put is called before `align`, because a listener may call
 `lock()`. So `await caching` needs no compare, and no second vacate.
 
 **A `lock()` crossing a gate change** does not hold, as at an unlock: the proof says this user may have
@@ -195,11 +195,11 @@ the vault unlocked. The three gate changes end in one private `#landGate`, which
 full term under the epoch that landed.
 
 **`sweep`, `vacate` and `delete`** leave a one-way state: every `demandReadyToX` refuses from then on, so
-anything worth guarding stops working. A swept or vacated thing is also unlisted, a deleted vault stays, tombstoned, while its box listing and boxes go, and the refusals are for whoever
+anything worth guarding stops working. A swept or vacated thing is also delisted, a deleted vault stays, tombstoned, while its box listing and boxes go, and the refusals are for whoever
 still holds a reference. `#attachLease` demands it too. It is the last step, so refusing there leaves only a
 lease to vacate. That vacate can erase a row a sweep left, which costs a passphrase next session, a normal state.
 
-**The cache:** a `lock()` during `Lease.peek`'s read loses too: the vault reads unlocked, the lock's
+**The cache:** a `lock()` during `Lease.peek`'s read loses too: the vault reports unlocked, the lock's
 vacate stands, and the next session asks. A row for `notes/wontfix.md`.
 
 Another tab's `lock()` is not syndicated.
@@ -207,10 +207,10 @@ Another tab's `lock()` is not syndicated.
 ## The discards
 
 ```text
-lock     vacate the lease; lock children; settle
-sweep    drop the lease private property, leaving the cached; disable watches; disable all calls; sweep children; unlist children
-vacate   disable; vacate the lease and forget its cache; vacate children (disables, unlists them); settle its gating
-delete   lock; vaultDB.del(vault; the store cascades its boxes, transactionally); forget cached lease; box listing vacates (boxes disable, unlist); only the vault stays, tombstoned
+lock     vacate the lease; lock children; align
+sweep    drop the lease private property, leaving the cached; disable watches; disable all calls; sweep children; delist children
+vacate   disable; vacate the lease and forget its cache; vacate children (disables, delists them); conclude its gating
+delete   lock; vaultDB.del(vault; storage cascades its boxes, transactionally); forget cached lease; box listing vacates (boxes disable, delist); only the vault stays, tombstoned
 autolock bank: deviceDB.leasesProvedBefore(cutoff), an index range scan; lock each listed vault of the row, which erases it
 ```
 
@@ -228,11 +228,11 @@ the gate lands and unlocks. A valid request goes through if it was authorized at
 start of its critical section.
 
 **A `dismiss()` and the dialog.** The package cannot close a host's dialog, so a gating says when to:
-`gating.whenSettled`, a promise a dialog closes on. A Cancel, a sweep or a vacate dismisses:
+`gating.whenConcluded`, a promise a dialog closes on. A Cancel, a sweep or a vacate dismisses:
 
 ```text
-no attempt under way    settles it 'dismissed': the verb refuses, the dialog closes; a later attempt refuses 'gating_landed'
-an attempt under way    the attempt runs through and its outcome settles the gating, so a wrong passphrase
+no attempt under way    concludes it 'dismissed': the verb refuses, the dialog closes; a later attempt refuses 'gating_landed'
+an attempt under way    the attempt runs through and its outcome concludes the gating, so a wrong passphrase
                         crossed by a dismiss answers 'wrong_passphrase'; a re-entry refuses
 ```
 
@@ -240,17 +240,17 @@ an attempt under way    the attempt runs through and its outcome settles the gat
 
 Each method states what holds when it ends, whatever crossed it.
 
-At all times, a lease held and reading unlocked are the same fact: `isLocked` is `#lease === null`, not a
+At all times, a lease held and reporting unlocked are the same fact: `isLocked` is `#lease === null`, not a
 second field.
 
 | Method           | When it returns                                                                                                                                                                           | When it throws                                                                                       |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `lock`           | vacate the lease; lock children; settle
-| `sweep`          | drop the lease private property, leaving the cached; disable watches; disable all calls; sweep children; unlist children
-| `vacate`         | disable; vacate the lease and forget its cache; vacate children (disables, unlists them); settle its gating
-| `del`            | lock; vaultDB.del(vault; the store cascades its boxes, transactionally); forget cached lease; box listing vacates (boxes disable, unlist); only the vault stays, tombstoned
-| `send`           | The record held is what it put, or newer; snapshot and cache settled                                                                                                                      | Nothing stored; on `stale_write`, the stored record taken in                                         |
-| `attachLease`    | Held and in force; its put called; settled                                                                                                                                                 | Past sweep: the lease vacated, no put                                                                |
+| `lock`           | vacate the lease; lock children; align
+| `sweep`          | drop the lease private property, leaving the cached; disable watches; disable all calls; sweep children; delist children
+| `vacate`         | disable; vacate the lease and forget its cache; vacate children (disables, delists them); conclude its gating
+| `del`            | lock; vaultDB.del(vault; storage cascades its boxes, transactionally); forget cached lease; box listing vacates (boxes disable, delist); only the vault stays, tombstoned
+| `send`           | The record held is what it put, or newer; snapshot and cache aligned                                                                                                                      | Nothing stored; on `stale_write`, the stored record taken in                                         |
+| `attachLease`    | Held and in force; its put called; aligned                                                                                                                                                 | Past sweep: the lease vacated, no put                                                                |
 | `ensureVault`    | A Vault held, the only one of its scope. Landed: unlocked, or locked by a `lock()` after the attach. Another won: locked                                                                  | Nothing stored; held only what the answer delivered                                                  |
 | `ensureUnlocked` | Unlocked, a lease in force at its attach                                                                                                                                                  | `dismissed`: no lease held, none cached by this call                                       |
 | A gate change    | The record holds the next gate, its epoch one up. Unlocked under that epoch, a fresh lease of full term, whatever lock came before or crossed                                                 | Nothing stored, unless the answer was lost; the lease as it was                                      |
@@ -269,7 +269,7 @@ bank.ensureVault(bag)
       ├─ no requestCleartext                         → 'bad_option', nobody asked
       ├─ listing.holdGating                          one open on this bank → 'already_asking'
       ├─ void #askHost → requestCleartext(gating)    ← host opens the dialog
-      └─ await #settled
+      └─ await #concluded
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear, passkeyClear? })           a second while one runs: attempt_in_flight
 │                                                    passkeyClear spent after, unless correctable (G2)
@@ -293,8 +293,8 @@ gating.attempt({ passphraseClear, passkeyClear? })           a second while one 
       ├─ lease = passphraseProving.buildLease(vault.#leaseFriend())    refused → the vault stays stored and held, locked
       └─ lease.attach()                              cached after it
 
-run returns → gating settles ok → bank.ensureVault resolves    provings dropped with their keys
-host closes dialog → requestCleartext resolves → settle is a no-op
+run returns → gating concludes ok → bank.ensureVault resolves    provings dropped with their keys
+host closes dialog → requestCleartext resolves → conclude is a no-op
 ```
 
 `prior` is what crosses the dialog: it decides whether to ask, and the put needs it. It is always a value:
@@ -302,7 +302,7 @@ the tombstone's revision, or `VS.NeverStored` (*Required of the parts not yet dr
 Its staleness is safe: over a live row the put declines, and that answer is the "another won"
 line above; over a newer tombstone it refuses 'stale_write'. A refused put holds only what its answer delivered, nothing on the device. `BirthLockSeq`,
 `[UnlockAtBirth]` and `#closeSeqs` have no job. `run` tells a birth from another's by comparing the
-record it sent with the one it got, before attaching a lease. The new Vault reads locked between the
+record it sent with the one it got, before attaching a lease. The new Vault reports locked between the
 put and the attach, with no listener yet to see it. A Bank's `lock` during the put or that await is past
 the enter key, so the birth runs through, unlocked.
 
@@ -319,7 +319,7 @@ vault.ensureUnlocked()
 └─ Gating.launch('unlock_vault', { listing, scope, vault, run })
    ├─ a gating open on this bank → refuses already_asking
    ├─ void #askHost → requestCleartext(gating)
-   └─ await #settled
+   └─ await #concluded
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear }) or attempt({ passkeyClear })
 ├─ await vault.ensureTimely(Promptly)                at most one fetch; a vault found gone refuses here
@@ -332,7 +332,7 @@ gating.attempt({ passphraseClear }) or attempt({ passkeyClear })
    ├─ lease = proved.buildLease(vault.#leaseFriend())   the proved gate's epoch, whatever arrived since
    └─ lease.attach()                                 cached after it
 
-run returns → gating settles ok → ensureUnlocked resolves
+run returns → gating concludes ok → ensureUnlocked resolves
 ```
 
 ## Changing the gate
@@ -361,7 +361,7 @@ vault.#landGate(proved, commit)
   proves against `ante`'s gate. The params spread `ante`, not the live vault, so its revision is the prior. Whatever the
   watch delivers during the attempt therefore refuses the put: a passkey revoked elsewhere is not brought back, and a
   passphrase replaced elsewhere is not overwritten.
-* **A write landing after the timeliness request.** The put refuses 'stale_write'. The gating settles with
+* **A write landing after the timeliness request.** The put refuses 'stale_write'. The gating concludes with
   that refusal, and the vault has by then taken in the stored record. Nothing retries; a host may call
   the verb again.
 * **No device locks on it.** Another device's session keeps its lease to its lock or next `bank.autolock`; its cached
@@ -454,11 +454,11 @@ gating.attempt({ passphraseClear })                  no lock check: a lock does 
       │    moved → 'stale_write', nothing stored
       └─ deliver → receive → adopt(tombstone)
          ├─ vault.#vacateLease(bad news)             deviceDB refused → bad news; the tombstone stands
-         └─ boxListing.vacate()                      boxes disabled and unlisted, nothing deleted; the vault stays in its slot, tombstoned
+         └─ boxListing.vacate()                      boxes disabled and delisted, nothing deleted; the vault stays in its slot, tombstoned
 ```
 
 The lock comes first because it is synchronous and safe: from there no box opens under a lease while
-the tombstone goes out. It is also a normal state, so a delete refused leaves a Vault reading locked and
+the tombstone goes out. It is also a normal state, so a delete refused leaves a Vault reporting locked and
 nothing half done, and the cost is one passphrase, as the lock's vacate forgets the cached lease. The box listing's vacate
 comes last, as it cannot be walked back. The proof is drawn to match the gate changes; it opens nothing here, as no
 lease follows. Another device hears the tombstone, and its Vault goes the same way. A rebirth is a new
@@ -466,7 +466,7 @@ Vault.
 
 The vaultDB owns the cascade: removing a vault tombstones its box rows by scope and `vault_tok`, so no
 client walks them. The `vault_tok` keeps a late or repeated cascade off a rebirth's boxes, which share the
-scope and not the token. The tombstone and the cascade share a transaction in every store we implement. A repeat:
+scope and not the token. The tombstone and the cascade share a transaction in every adapter we implement. A repeat:
 
 ```text
 the vaultDB's del(scope, vault_tok, revision)
@@ -488,7 +488,7 @@ A Box operation naming a stale or missing vault_tok will fail `vault_mismatch` (
 
 * A store's conditional put is atomic on `revision_tok`.
 * The deviceDB's calls land in the order they were made (*The lease*).
-* `lock()` removes the cached lease even on a vault already reading locked.
+* `lock()` removes the cached lease even on a vault already reporting locked.
 * The deviceDB has `cache`, `peek` and `vacate`, by scope and `vault_tok`: `vacate` and `del_vault` both need a removal.
 * Every put validates `prior.revision_tok` and `prior.revision_seq` against the row, and that the record's `revision_seq`
   is `prior.revision_seq` plus one. A birth over no row sends `VS.NeverStored`, a known `revision_tok` and a `revision_seq` of -1: a
@@ -512,6 +512,6 @@ A Box operation naming a stale or missing vault_tok will fail `vault_mismatch` (
 
 Eyebrow raisers from the Coach's replies in the sprint's Closer Look (`whiteboard/20261103-unrace/unrace-closerlook.md`).
 
-* **The gating family:** `ProveForGatingkind`, its kind-keyed type maps and the casts they force, and `#settled`, `#outcome` and their flags. "same family of design smells around gating". See `whiteboard/20261102-newdesign/unrace-gating-prompt.md`.
-* **The cache and the erase on one control path:** `lease.tryCache()` before the settle, the erase before the first await. "that sounds dangerous".
+* **The gating family:** `ProveForGatingkind`, its kind-keyed type maps and the casts they force, and `#concluded`, `#outcome` and their flags. "same family of design smells around gating". See `whiteboard/20261102-newdesign/unrace-gating-prompt.md`.
+* **The cache and the erase on one control path:** `lease.tryCache()` before the align, the erase before the first await. "that sounds dangerous".
 * **Clears:** `spendClears` and `checkedClears` reach into the host's objects, and who owns a passkey answer's PRF bytes is open. "I assumed that the buffer exhaustion was best practice".

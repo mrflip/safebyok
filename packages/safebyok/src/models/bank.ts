@@ -127,7 +127,7 @@ export class Bank {
   }
   // --
 
-  // == [The world of its vaults]: isLocked, ensureTimely, takeWorld
+  // == [The world of its vaults]: isLocked, ensureTimely, receiveWorld
 
   /** False: a bank has no lock, and each vault keeps its own. */
   get isLocked(): boolean { return false }
@@ -136,7 +136,7 @@ export class Bank {
   ensureTimely(): Promise<void> { return Promise.resolve() }
 
   /** Does nothing: no world sits above a bank. */
-  takeWorld(): void { /* no world sits above a bank */ }
+  receiveWorld(): void { /* no world sits above a bank */ }
   // --
 
   // == [Starting]: hello, tryHello, bringUp

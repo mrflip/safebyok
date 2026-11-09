@@ -45,9 +45,9 @@ describe("BoxListing", () => {
       expect(listing.snapshot[0]).to.include({ boxlabel: 'anthropic_api_key' })
     })
 
-    it("goes straight through: ensureTimely, put, takeWorld, and no get", async () => {
+    it("goes straight through: ensureTimely, put, receiveWorld, and no get", async () => {
       await boxListingOf(held.mw).create(dna())
-      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely', 'put', 'takeWorld'])
+      expect(held.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely', 'put', 'receiveWorld'])
     })
 
     it("leaves a void box in the slot where the put is refused with no record, out of the snapshot, and the scope free for another create", async () => {

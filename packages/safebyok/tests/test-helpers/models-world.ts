@@ -10,7 +10,7 @@
  * in `afterEach`, as vitest's `restoreMocks` does not put real timers back: {@link useModelsWorld}
  * makes a new world before each test and disposes it after.
  *
- * The seal. The fake vault's seal verbs refuse 'vault_locked' while it reads locked, and
+ * The seal. The fake vault's seal verbs refuse 'vault_locked' while it reports locked, and
  * otherwise keep each whisper's text by the stamp it was sealed under and give it back for that
  * stamp alone: its sealed parts are the constants
  * {@link FakeBoxKeyWrapped} and {@link FakeWhisperCiphered}. A record it never sealed, as the
@@ -97,7 +97,7 @@ export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' |
 /** One call made to the world or the vaultDB, in {@link ModelsWorld.calls}. `priorRevisionTok` is null for a birth. */
 export type ModelsCall =
   | { verb: 'ensureTimely', maxMillis: number | undefined }
-  | { verb: 'takeWorld',    world: unknown }
+  | { verb: 'receiveWorld',    world: unknown }
   | { verb: 'get',          scope: Boxscope }
   | { verb: 'put',          record: BoxRecord, priorRevisionTok: string | null, ifAbsent: PutOpts['ifAbsent'], ifPresent: PutOpts['ifPresent'] }
   | { verb: 'del',          scope: Boxscope, priorRevisionTok: string | null }
@@ -338,7 +338,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       if (whisperText === undefined) { throw Refuse.unopenedWhisper() }
       return whisperText
     },
-    takeWorld:    (taken) => { calls.push({ verb: 'takeWorld', world: taken }) },
+    receiveWorld:    (taken) => { calls.push({ verb: 'receiveWorld', world: taken }) },
     ensureTimely: async (maxMillis) => {
       calls.push({ verb: 'ensureTimely', maxMillis })
       const { scripted, answer } = ensureTimelyScript.take(maxMillis)

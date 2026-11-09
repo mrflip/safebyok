@@ -123,12 +123,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Discard the whisper held on the instance, and its veil, from any state. */
   unexpose(): this {
     this.#dropExposed()
-    this.settle()
+    this.align()
     return this
   }
 
-  // Apart from unexpose, as a discard settles only once its box is unlisted, and a receive settles once its adopt is done.
-  /** Drop the whisper exposed and its veil; the caller settles. */
+  // Apart from unexpose, as a discard aligns only once its box is delisted, and a receive aligns once its adopt is done.
+  /** Drop the whisper exposed and its veil; the caller aligns. */
   #dropExposed(): void {
     this.#exposed = null
     this.#isVeiled = false
@@ -137,7 +137,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Hide the whisper exposed, keeping it, from any state. */
   veil(): this {
     this.#isVeiled = true
-    this.settle()
+    this.align()
     return this
   }
 
@@ -147,7 +147,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   unveil(): this {
     if (this.#exposed === null) { throw notExposedError() }
     this.#isVeiled = false
-    this.settle()
+    this.align()
     return this
   }
 
@@ -164,7 +164,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   #replaceExposed(exposed: Whisper): void {
     const ante = this.snapshot
     this.#exposed = exposed
-    this.settle()
+    this.align()
     if (this.snapshot === ante) { this.tellListeners() }
   }
 

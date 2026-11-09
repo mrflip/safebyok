@@ -62,7 +62,7 @@ export const unexpectedError = (thrown: Thrown): VaultError => (
 /** An `insecure_context` refusal: the page is not a secure context. */
 export const insecureContext = (): VaultError => new VaultError('insecure_context', Phrases.InsecureContext)
 
-/** A `bad_option` refusal: the bank is not ready until `bank.hello()` finishes. */
+/** A `bad_option` refusal: the bank is not ready until `bank.hello()` returns. */
 export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases.BankHelloFirst)
 
 /** A `disabled` refusal: this bank was let go by a sweep or a vacate. */
@@ -99,13 +99,13 @@ export const putAnsweredNothing = (): VaultError => new VaultError('record_confl
 export const otherVaultTokAtBirth = (): VaultError => new VaultError('record_conflict', Phrases.OtherVaultTokAtBirth)
 // --
 
-// == [Storable Throwers]: partialLoadError, alreadyHeldError, disabledError, absentBoxError, notListedBoxError, absentVaultError, deletedVaultError, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
+// == [Storable Throwers]: partialLoadError, alreadyEnlistedError, disabledError, absentBoxError, notListedBoxError, absentVaultError, deletedVaultError, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
 
 /** A `bad_option` refusal: the record in hand is not full, and needs hydrating first. */
 export const partialLoadError = () => new VaultError('bad_option', Phrases.PartialLoad)
 
 /** A `bad_option` refusal: the listing already holds an instance under the dna's scope. */
-export const alreadyHeldError    = () => new VaultError('bad_option', Phrases.AlreadyHeld)
+export const alreadyEnlistedError    = () => new VaultError('bad_option', Phrases.AlreadyEnlisted)
 
 /** A `disabled` refusal: this object was let go by a sweep, a vacate or a delete. */
 export const disabledError    = () => new VaultError('disabled', Phrases.LetGoInstance)
@@ -162,7 +162,7 @@ export const unopenedWhisper = (): VaultError => new VaultError('damaged_box', P
 export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --
 
-// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gatingDismissed, gatingSettled, attemptInFlight, proofMissing
+// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gatingDismissed, gatingConcluded, attemptInFlight, proofMissing
 
 /** An `already_asking` refusal: a prompt is already open on this bank. */
 export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
@@ -180,7 +180,7 @@ export const samePassphrase = (): VaultError => new VaultError('same_passphrase'
 export const gatingDismissed = (): VaultError => new VaultError('dismissed', Phrases.GatingDismissed)
 
 /** A `gating_landed` refusal: an attempt reached a prompt that has already ended. */
-export const gatingSettled = (): VaultError => new VaultError('gating_landed', Phrases.GatingSettled)
+export const gatingConcluded = (): VaultError => new VaultError('gating_landed', Phrases.GatingConcluded)
 
 /** An `attempt_in_flight` refusal: another attempt on this prompt is still running. */
 export const attemptInFlight = (): VaultError => new VaultError('attempt_in_flight', Phrases.AttemptInFlight)

@@ -95,7 +95,7 @@ export const makeBoxKey = (): Promise<CryptoKey> => (
 )
 
 /** A fresh leaseKey, non-extractable so that it cannot leave the device even through the code that made it.
- * It persists only by structured clone (IndexedDB), never as bytes.
+ * It is stored only by structured clone (IndexedDB), never as bytes.
  */
 export const makeLeaseKey = (): Promise<CryptoKey> => (
   crypto.subtle.generateKey(AesGcm, false, ['wrapKey', 'unwrapKey'])

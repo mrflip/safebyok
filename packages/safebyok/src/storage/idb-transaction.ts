@@ -42,7 +42,7 @@ const abortOf = (transaction: IDBTransaction): Promise<Error | null> => new Prom
   transaction.addEventListener('abort', () => { resolve(transaction.error ?? new DOMException(Phrases.TransactionAborted, 'AbortError')) })
 })
 
-/** Abort `transaction`, where it has not already finished. */
+/** Abort `transaction`, where it has not already committed. */
 const abandon = (transaction: IDBTransaction): void => {
   try {
     transaction.abort()

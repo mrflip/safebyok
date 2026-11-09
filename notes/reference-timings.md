@@ -83,7 +83,7 @@ Copied from `unrace-progress.md` at the sprint's end; names as they stood when r
 * A second `attempt` with the same answer while the first runs zeroes the bytes in use, so the first answers `bad_option` (thread 10's review).
 * A tombstone or sparse record landing during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).
 * A `del_vault`'s `lock()` with a refused erase and no `onPanic` vacates the vault during the delete, and `listing.del` still lands (thread 11).
-* A tombstone or discard between the commit and the lease in `#landGate` settles the gating as failed though the row moved (thread 11's review).
+* A tombstone or discard between the commit and the lease in `#landGate` concludes the gating as failed though the row moved (thread 11's review).
 * A gate verb refused `vault_gone` or `vault_mismatch` doesn't deliver, so the Vault reads present until its next fetch, box answer or notice (thread 11's review).
 * Crossing `hello`s: the last to answer sets the stage (thread 12).
 * A record changed between `getBank` and the watch's start isn't heard until the next fetch (thread 12).

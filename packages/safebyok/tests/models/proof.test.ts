@@ -288,7 +288,7 @@ describe("the proof", () => {
     bankUi.expectRenders([])
     expect(world.leaseRows()).to.have.lengthOf(1)
 
-    // Past it, the lease is erased and the vault reads locked; the bank stays ready.
+    // Past it, the lease is erased and the vault reports locked; the bank stays ready.
     world.advance(2)
     await bank.autolock()
     bankUi.expectRenders(['ready: main locked'])

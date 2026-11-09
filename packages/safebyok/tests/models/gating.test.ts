@@ -1,4 +1,4 @@
-/** A real gating, real provings, and the in-memory stores: `build_vault` and `unlock_vault` from the dialog's first sight of a gating to its settling. */
+/** A real gating, real provings, and the in-memory stores: `build_vault` and `unlock_vault` from the dialog's first sight of a gating to its concluding. */
 
 import { runInNewContext } from 'node:vm'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
@@ -17,13 +17,13 @@ const Wrong = 'not the passphrase at all'
 
 const strengthChecker = (passphrase: string) => (passphrase === 'weak' ? { strong: false as const, reason: "too short" } : { strong: true as const })
 
-/** A dialog that shows each gating to the test, and stays up until it settles. */
+/** A dialog that shows each gating to the test, and stays up until it concludes. */
 const makeDialog = () => {
   const shown: AnyGating[] = []
   return {
     requestCleartext: (gating: AnyGating) => {
       shown.push(gating)
-      return gating.whenSettled
+      return gating.whenConcluded
     },
     /** The `nth` gating shown, once it has been. */
     gatingAt: <KindT extends Gatingkind>(nth = 0) => vi.waitFor(() => {
@@ -119,7 +119,7 @@ describe("a birth through a gating", () => {
     gating.dismiss()
   })
 
-  it("holds nothing where the put is refused: the gating settles the refusal, nothing stored, held or cached", async () => {
+  it("holds nothing where the put is refused: the gating concludes the refusal, nothing stored, held or cached", async () => {
     const { listing, opts, gatingAt, storedNow, deviceDB } = birthWorld()
     const refusal = new VaultError('storage_unavailable', "the disk is full")
     vi.spyOn(opts.vaultDB, 'tryPutVault').mockResolvedValueOnce(TH.bad(refusal) as never)
@@ -194,7 +194,7 @@ describe("a birth through a gating", () => {
 })
 
 describe("one gating open per bank", () => {
-  it("refuses a second launch, with no join, and the first goes on; settled, the next launches", async () => {
+  it("refuses a second launch, with no join, and the first goes on; concluded, the next launches", async () => {
     const { listing, gatingAt } = birthWorld()
     const first = TH.expectRefusal(listing.buildVault(Dna), 'dismissed')
     const gating = await gatingAt<'build_vault'>()
@@ -221,24 +221,24 @@ describe("one gating open per bank", () => {
 })
 
 describe("the dialog ending", () => {
-  it("settles 'dismissed' on dismiss, holding nothing, and whenSettled hears it", async () => {
+  it("concludes 'dismissed' on dismiss, holding nothing, and whenConcluded hears it", async () => {
     const { listing, gatingAt, storedNow } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna), 'dismissed')
     const gating = await gatingAt<'build_vault'>()
     gating.dismiss()
     await launched
-    await TH.expectBad(gating.whenSettled, 'dismissed')
+    await TH.expectBad(gating.whenConcluded, 'dismissed')
     expect(gating.isOpen).to.be.false
     expect(listing.things).to.have.lengthOf(0)
     expect(storedNow()).to.be.null
   })
 
-  it("settles 'dismissed' where requestCleartext returns with no attempt under way", async () => {
+  it("concludes 'dismissed' where requestCleartext returns with no attempt under way", async () => {
     const { listing } = makeVaultWorld(null, { requestCleartext: () => undefined })
     await TH.expectRefusal(listing.buildVault(Dna), 'dismissed')
   })
 
-  it("settles a sanitized refusal where requestCleartext throws: what it threw is not kept", async () => {
+  it("concludes a sanitized refusal where requestCleartext throws: what it threw is not kept", async () => {
     const { listing } = makeVaultWorld(null, { requestCleartext: () => { throw new Error(Passphrase) } })
     const err = await TH.expectRefusal(listing.buildVault(Dna))
     expect(err.message).to.not.include(Passphrase)
@@ -254,7 +254,7 @@ describe("gating.attempt", () => {
     expect(landed.isUnlocked).to.be.true
   })
 
-  it("refuses another kind's clears, settling the gating, storing nothing, and the refusal holds no passphrase", async () => {
+  it("refuses another kind's clears, concluding the gating, storing nothing, and the refusal holds no passphrase", async () => {
     const { listing, gatingAt, storedNow } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna))
     const gating = await gatingAt<'build_vault'>()
@@ -278,7 +278,7 @@ describe("gating.attempt", () => {
     expect(landed.isUnlocked).to.be.true
   })
 
-  it("refuses once settled, spending what it was handed", async () => {
+  it("refuses once concluded, spending what it was handed", async () => {
     const { listing, gatingAt } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna), 'dismissed')
     const gating = await gatingAt<'build_vault'>()
@@ -289,7 +289,7 @@ describe("gating.attempt", () => {
     expect(passkeyClear.prfBytes.every((byte) => byte === 0)).to.be.true
   })
 
-  it("settles a malformed attempt, spends what came with it, and the refusal holds no passphrase", async () => {
+  it("concludes a malformed attempt, spends what came with it, and the refusal holds no passphrase", async () => {
     const { listing, gatingAt, storedNow } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna))
     const gating = await gatingAt<'build_vault'>()
@@ -380,7 +380,7 @@ describe("an unlock through a gating", () => {
     expect(passkeyClear.prfBytes.every((byte) => byte === 0)).to.be.true
   })
 
-  it("settles a passkey at a gate with no passkey wayin, spending the answer", async () => {
+  it("concludes a passkey at a gate with no passkey wayin, spending the answer", async () => {
     const { vault, gatingAt } = await lockedVault()
     const unlocking = TH.expectRefusal(vault.ensureUnlocked(), 'absent_wayin')
     const gating = await gatingAt<'unlock_vault'>()
@@ -405,7 +405,7 @@ describe("an unlock through a gating", () => {
     expect(JSON.stringify(err)).to.not.include(Passphrase)
   })
 
-  it("settles a refusal where the vault was deleted behind the dialog", async () => {
+  it("concludes a refusal where the vault was deleted behind the dialog", async () => {
     const { vault, gatingAt } = await lockedVault()
     const unlocking = TH.expectRefusal(vault.ensureUnlocked())
     const gating = await gatingAt<'unlock_vault'>()
@@ -428,7 +428,7 @@ describe("what ends a gating", () => {
     expect(vault.isUnlocked).to.be.true
   })
 
-  it("settles as the attempt under way answers when dismissed, a wrong passphrase getting no re-entry", async () => {
+  it("concludes as the attempt under way answers when dismissed, a wrong passphrase getting no re-entry", async () => {
     const { vault, gatingAt } = await lockedVault()
     const unlocking = TH.expectRefusal(vault.ensureUnlocked(), 'wrong_passphrase')
     const gating = await gatingAt<'unlock_vault'>()
@@ -440,7 +440,7 @@ describe("what ends a gating", () => {
     expect(vault.isUnlocked).to.be.false
   })
 
-  it("does nothing to a birth: the dialog stays up, and a lock of another vault does not settle it", async () => {
+  it("does nothing to a birth: the dialog stays up, and a lock of another vault does not conclude it", async () => {
     const { vault, fakeBank } = await makeBornVault()
     const dialog = makeDialog()
     fakeBank.requestCleartext = dialog.requestCleartext
@@ -453,7 +453,7 @@ describe("what ends a gating", () => {
     expect(born.isUnlocked).to.be.true
   })
 
-  it("settles an open birth on a sweep: nothing outlives the listing", async () => {
+  it("concludes an open birth on a sweep: nothing outlives the listing", async () => {
     const { listing, gatingAt } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna))
     const gating = await gatingAt<'build_vault'>()
@@ -462,7 +462,7 @@ describe("what ends a gating", () => {
     expect(gating.isOpen).to.be.false
   })
 
-  it("settles an open unlock where the vault alone is vacated", async () => {
+  it("concludes an open unlock where the vault alone is vacated", async () => {
     const { vault, gatingAt } = await lockedVault()
     const unlocking = TH.expectRefusal(vault.ensureUnlocked())
     await gatingAt<'unlock_vault'>()
@@ -472,7 +472,7 @@ describe("what ends a gating", () => {
 })
 
 describe("a dismiss crossing an attempt", () => {
-  it("aborts nothing: the attempt runs on and its landing settles the gating", async () => {
+  it("aborts nothing: the attempt runs on and its landing concludes the gating", async () => {
     const { vault, gatingAt } = await lockedVault()
     const unlocking = vault.ensureUnlocked()
     const gating = await gatingAt<'unlock_vault'>()
@@ -484,7 +484,7 @@ describe("a dismiss crossing an attempt", () => {
     expect(vault.isUnlocked).to.be.true
   })
 
-  it("settles with the attempt's correctable refusal: the dialog is gone, so nothing is left to re-enter", async () => {
+  it("concludes with the attempt's correctable refusal: the dialog is gone, so nothing is left to re-enter", async () => {
     const { vault, gatingAt } = await lockedVault()
     const unlocking = TH.expectRefusal(vault.ensureUnlocked(), 'wrong_passphrase')
     const gating = await gatingAt<'unlock_vault'>()

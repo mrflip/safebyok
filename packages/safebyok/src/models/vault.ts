@@ -10,7 +10,7 @@ import type { AskUser, GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedW
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, BoxPut, BoxPutOpts, EraseSite, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
-import { alreadyHeldError, deletedVaultError, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
+import { alreadyEnlistedError, deletedVaultError, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
@@ -58,7 +58,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The full record in hand, what a gate change spreads into its params. */
   get fullRecord(): VaultRecord { return this.demandFullProps() }
 
-  // Made on first read, not at settle: the base constructor settles before this class's fields exist.
+  // Made on first read, not at align: the base constructor aligns before this class's fields exist.
   /** The Gate of the record in hand, the same while the record's `gate` is the same object, so a record received remakes it. */
   get gate(): Gate {
     const full = this.demandFullProps()
@@ -75,7 +75,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Construction]: constructor, launchBirth
 
-  /** A vault as its listing holds it. */
+  /** A vault as its listing enlists it. */
   constructor(world: VaultWorld, listing: VaultListing, central: Fetched<VaultRecord, VaultSparse>, bankFriend: BankFriend) {
     super(world, listing, central)
     this.#bankFriend = VX.bankFriend.parse(bankFriend)
@@ -85,9 +85,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   static async launchBirth(listing: VaultListing, scope: VaultScope, askUser: AskUser | null): Promise<Vault> {
     const checked = listing.scopeOf(scope)
     listing.demandEnabled()
-    const held = listing.at(checked)
-    if (held?.isPresent === true) { throw alreadyHeldError() }
-    const prior = SX.revisionOf(held ?? SX.VoidRevision)
+    const enlisted = listing.at(checked)
+    if (enlisted?.isPresent === true) { throw alreadyEnlistedError() }
+    const prior = SX.revisionOf(enlisted ?? SX.VoidRevision)
     return Gating.launch('build_vault', { listing, scope: checked, vault: null, prior, friend: Vault.#gatingFriend, askUser })
   }
   // --
@@ -140,9 +140,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   override del(): Promise<this> { return this.delVaultPrompt() }
 
   // The old lease stays in force for the moments between: the vaultKey did not change.
-  /** Run the commit, then lease the vault for a full term under the epoch it landed. */
-  async #landGate(proved: Proving, commit: () => Promise<SX.VaultRecord>): Promise<this> {
-    const stored = await commit()
+  /** Put the gate, then lease the vault for a full term under the epoch it landed. */
+  async #landGate(proved: Proving, putGate: () => Promise<SX.VaultRecord>): Promise<this> {
+    const stored = await putGate()
     return this.#unlockByProof(proved, stored.gate.gate_epoch)
   }
   // --
@@ -189,7 +189,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const held = this.#lease
     this.#lease = null
     const vacating = held?.tryVacate() ?? Lease.tryForget(this.#leaseFriend())
-    this.settle()
+    this.align()
     const vacated = await vacating
     if (! vacated.ok) { this.#bankFriend.announce({ kind: 'lease_unerased', refusal: vacated.err, vault: this, where }) }
   }
@@ -206,7 +206,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.demandAttachable()
     this.#lease = lease
     await lease.cacheAsCacheCan()
-    this.settle()
+    this.align()
   }
   // --
 
@@ -215,7 +215,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The private verbs a gating's run calls past the enter key, as no public method of a vault takes a proving (G9). */
   static readonly #gatingFriend: GatingFriend = {
     unlockByProof: (vault, proved) => vault.#unlockByProof(proved),
-    landGate:      (vault, proved, commit) => vault.#landGate(proved, commit),
+    landGate:      (vault, proved, putGate) => vault.#landGate(proved, putGate),
   }
 
   get #launchArgs(): LaunchArgs<Exclude<Gatingkind, 'build_vault'>> {
@@ -256,7 +256,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   #stampOfLife(): VaultScope & { vault_tok: string } { return { ...this.scope, vault_tok: this.vault_tok } }
   // --
 
-  // == [The boxes' world]: sealStampedString, unsealStampedString, takeWorld
+  // == [The boxes' world]: sealStampedString, unsealStampedString, receiveWorld
 
   /** `whisperText` sealed under a fresh boxKey under this vault's key, both bound to `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
@@ -272,7 +272,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
   // `receive` refuses `otherVaultTok` for a row of another life: the one consistency guard on this path.
-  takeWorld(world: unknown): void { this.receive(SX.vaultRow.refusingAs('damaged_row').parse(world)) }
+  receiveWorld(world: unknown): void { this.receive(SX.vaultRow.refusingAs('damaged_row').parse(world)) }
   // --
 
   // == [Box verbs]: hello, bringUp, getBox, fetchBox, putBox, delBox, each with its try form
@@ -370,7 +370,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Protected, overriding Storable's]: adopt, sweepContents, vacateContents, isFullRecord, lifeTokPathOf, makeSnapshot
 
-  /** Take in `central`. A tombstone locks the vault, erases the cached row and vacates the boxes, the vault keeping its slot.
+  /** Adopt `central`. A tombstone locks the vault, erases the cached row and vacates the boxes, the vault keeping its slot.
    * A refused erase is announced as `lease_unerased`, and the tombstone stands.
    */
   protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {

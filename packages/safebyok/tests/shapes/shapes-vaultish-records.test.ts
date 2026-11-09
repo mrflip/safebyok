@@ -140,8 +140,8 @@ describe("The checks of what reconciling passes", () => {
     ])
   })
 
-  describe("VX.settled", () => {
-    holdsCases(VX.settled, [
+  describe("VX.aligned", () => {
+    holdsCases(VX.aligned, [
       [{ badnews: [] },                                       true,  'passes no bad news'],
       [{ badnews: [new VaultError('stale_write', 'x')] },     true,  'passes bad news of VaultErrors'],
       [{ badnews: [new Error('plain')] },                     false, 'refuses bad news that is no VaultError'],

@@ -305,8 +305,8 @@ export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplac
 export const gatingFriend = objCheck(({ fn }) => ({
   /** Unlock the vault with what a proving proved. */
   unlockByProof: fn<(vault: Vault, proved: Proving) => Promise<Vault>>(),
-  /** Store a changed gate by `commit`, then lease the vault under the epoch it landed. */
-  landGate:      fn<(vault: Vault, proved: Proving, commit: () => Promise<VaultRecord>) => Promise<Vault>>(),
+  /** Store a changed gate by `putGate`, then lease the vault under the epoch it landed. */
+  landGate:      fn<(vault: Vault, proved: Proving, putGate: () => Promise<VaultRecord>) => Promise<Vault>>(),
 }), { refusalkind: 'bad_option', extras: 'strip' })
 
 /** What a gating's run hears of its vault's private verbs, once {@link gatingFriend} has checked it. */
@@ -350,7 +350,7 @@ export type VaultBuildProvings = { passphraseProving: PassphraseProving, passkey
 /** What an unlock_vault attempt proves: either wayin will do. */
 export type VaultUnlockProvings = { proved: Proving }
 
-/** The record an attempt read and the passphrase proved against it: all a revoke_passkey or a del_vault needs, and a commit's `ante`. */
+/** The record an attempt read and the passphrase proved against it: all a revoke_passkey or a del_vault needs, and a gate verb's `ante`. */
 export type AnteProvings = { ante: VaultRecord, proved: PassphraseProving }
 
 /** What a replace_passphrase attempt proves: the ante passphrase against the record it read, and the next, unproved. */

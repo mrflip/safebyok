@@ -26,8 +26,8 @@ const useAnswerOnce = (gating: AnyGating, onDone: (answer: DialogAnswer) => void
   const { whenShown } = useWhenShown()
   useEffect(() => {
     let current = true
-    // A sweep or a vacate settles the gating with no attempt: the dialog closes on it.
-    void gating.whenSettled.then((outcome) => whenShown(() => { if (current) { done(answerOf(gating, outcome)) } }))
+    // A sweep or a vacate concludes the gating with no attempt: the dialog closes on it.
+    void gating.whenConcluded.then((outcome) => whenShown(() => { if (current) { done(answerOf(gating, outcome)) } }))
     return () => { current = false }
   }, [gating, done, whenShown])
   return done

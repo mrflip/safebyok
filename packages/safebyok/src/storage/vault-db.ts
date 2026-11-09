@@ -35,7 +35,7 @@ export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
 /** The count of box rows left after `tidyGone`. */
 export type Tidied      = { totalCount: number }
 
-/** A row that changed, as a watch hears it, with its vault row where the store sent one. */
+/** A row that changed, as a watch hears it, with its vault row where storage sent one. */
 export type Notice = { act: 'got' | 'gone', val: VaultRow | BoxRow, world: VaultRow | null }
 
 const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<GoodAnswer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
@@ -47,7 +47,7 @@ const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<
 }
 // --
 
-// == [What a store answers]: Landing, BoxLanding, RowOfVault, RowOfBox, BoxesFetched, BoxFetched, Heard
+// == [What storage answers]: Landing, BoxLanding, RowOfVault, RowOfBox, BoxesFetched, BoxFetched, Heard
 
 /** Whether a conditional write landed, and `ante`, the row it replaced or that stood in its way. */
 export type Landing = { landed: boolean, ante: unknown }
@@ -55,16 +55,16 @@ export type Landing = { landed: boolean, ante: unknown }
 /** A box write's {@link Landing}, with the vault row as read in the same step. */
 export type BoxLanding = Landing & { vault: unknown }
 
-/** A vault row as a store hands it up, unchecked, under its vaultlabel. */
+/** A vault row as storage hands it up, unchecked, under its vaultlabel. */
 export type RowOfVault = { vaultlabel: string, vault: unknown }
-/** A box row as a store hands it up, unchecked, under its boxlabel. */
+/** A box row as storage hands it up, unchecked, under its boxlabel. */
 export type RowOfBox   = { boxlabel: string, box: unknown }
-/** A vault's rows as a store hands them up, unchecked: the vault row and its box rows. */
+/** A vault's rows as storage hands them up, unchecked: the vault row and its box rows. */
 export type BoxesFetched = { vault: unknown, boxes: RowOfBox[] }
-/** A box row and its vault row as a store hands them up, unchecked. */
+/** A box row and its vault row as storage hands them up, unchecked. */
 export type BoxFetched   = { vault: unknown, box: unknown }
 // A box's notice may come without its vault row: the vault changes slowly, and arrives in its own notices.
-/** A change reported by a store's watch: a vault row, a box row, or both. */
+/** A change reported by storage's watch: a vault row, a box row, or both. */
 export type Heard = { vault?: unknown, box?: unknown }
 // --
 
@@ -153,7 +153,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** True: the brand a model knows a vaultDB by, from whichever copy of safebyok. */
   get [IsVaultDB](): true { return true }
 
-  /** True: the brand an adapter's store answers to, and a client of one does not. */
+  /** True: the brand an adapter answers to, and a client of one does not. */
   get [IsAdapterVaultDB](): true { return true }
   // --
 
@@ -481,7 +481,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxLanding>
   /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
-  /** Starts telling `hear` of rows that change, and returns how to stop. A store with no watch never calls it. */
+  /** Starts telling `hear` of rows that change, and returns how to stop. Storage with no watch never calls it. */
   protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void): () => void { return noUnwatching }
   // --
 }
@@ -500,7 +500,7 @@ const demandRowObject = (raw: unknown): void => {
   if (! CX.isPlainBag(raw)) { throw Refuse.storageIssue() }
 }
 
-/** Whether a store answered a row at all: null is its word for none. */
+/** Whether storage answered a row at all: null is its word for none. */
 const isRowFound = (raw: unknown): boolean => {
   if (raw === null) { return false }
   demandRowObject(raw)
@@ -508,12 +508,12 @@ const isRowFound = (raw: unknown): boolean => {
 }
 
 // Held to its scope and not its vault_tok: a vault row of another life is an answer the verbs have words for.
-/** The vault row a store answered for `asked`'s scope, null for none. */
+/** The vault row storage answered for `asked`'s scope, null for none. */
 const foundVaultRowOf = (raw: unknown, asked: VaultScope): VaultRow | null => (
   isRowFound(raw) ? SX.storedVaultRow.parseConsistent(raw, CX.vaultScope.parse(asked), RowOfOtherAddress) : null
 )
 
-/** The box row a store answered for `asked`'s scope and `vault_tok`, null for none. */
+/** The box row storage answered for `asked`'s scope and `vault_tok`, null for none. */
 const foundBoxRowOf = (raw: unknown, asked: BoxQuery): BoxRow | null => (
   isRowFound(raw) ? SX.storedBoxRow.parseConsistent(raw, SX.boxQuery.parse(asked), RowOfOtherAddress) : null
 )
@@ -526,7 +526,7 @@ const listedRowOf = <RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknow
   return null
 }
 
-/** The vault row a store answered, where it is live in the life `asked` names. */
+/** The vault row storage answered, where it is live in the life `asked` names. */
 const liveVaultOf = (raw: unknown, asked: VaultQuery): VaultRecord => {
   const found = foundVaultRowOf(raw, asked)
   if (found === null) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(asked, asked.vault_tok)) }
@@ -557,7 +557,7 @@ const demandNextSeq = ({ revision_seq }: Revision, prior: Revision): void => {
   if (revision_seq !== (prior.revision_seq + 1)) { throw Refuse.seqNotNext() }
 }
 
-// A peek is enough: the store judged `ante` against its row check before the put landed.
+// A peek is enough: storage judged `ante` against its row check before the put landed.
 const landingActOf = (ante: unknown): 'born' | 'reborn' | 'replaced' => {
   if (ante === null) { return 'born' }
   return SX.isTombstoneRow(ante) ? 'reborn' : 'replaced'

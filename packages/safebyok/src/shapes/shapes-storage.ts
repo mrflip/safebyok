@@ -137,7 +137,7 @@ export type DamagedBox   = Readonly<{ applabel: string, user_id: string, vaultla
 
 // == [Rows found]: foundVaultRow, foundBoxRow, storedVaultRow, storedBoxRow
 
-/** A vault row or box row as a store answers it, null for none where the check says `found`: one failing its checks refuses 'damaged_row'. */
+/** A vault row or box row as storage answers it, null for none where the check says `found`: one failing its checks refuses 'damaged_row'. */
 export const { foundVaultRow, foundBoxRow, storedVaultRow, storedBoxRow } = Checkers('damaged_row', () => ({
   foundVaultRow:  vaultRow.nullable(),
   foundBoxRow:    boxRow.nullable(),
@@ -247,7 +247,7 @@ const peekOf = (raw: unknown) => {
   return parsed.success ? parsed.data : null
 }
 
-/** True when `raw`, a stored row or null for a void one, stands at `prior`. A store's conditional put is atomic on this. */
+/** True when `raw`, a stored row or null for a void one, stands at `prior`. Storage's conditional put is atomic on this. */
 export const isRowAt = (raw: unknown, prior: Revision): boolean => {
   if (raw === null) { return (prior.revision_tok === VoidRevisionTok) && (prior.revision_seq === VoidRevisionSeq) }
   const peek = peekOf(raw)

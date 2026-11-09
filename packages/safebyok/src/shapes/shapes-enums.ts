@@ -21,7 +21,7 @@ export type RecordShape = typeof recordShapeVals[number]
 export const ageVals = ['older', 'same', 'newer'] as const
 export type Age = typeof ageVals[number]
 
-/** Every policy `reconcileCentral` may choose: `older` and `same` end the receive with central as it was; `fill` takes the record over the one in hand; `adopt` takes the one received; `gone` takes its tombstone. */
+/** Every policy `reconcileCentral` may choose: `older` and `same` make no change; `fill`, `adopt` replace the #central record; `gone` becomes a tombstone. */
 export const centralPolicyVals = ['older', 'same', 'fill', 'adopt', 'gone'] as const
 export type CentralPolicy = typeof centralPolicyVals[number]
 // --

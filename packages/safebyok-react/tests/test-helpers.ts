@@ -96,7 +96,7 @@ export const addPasskeyTo = async (world: BankWorld, vault: Vault, passkeyClear?
 /** What a test hands `createPasskey`: a relying party and a user, as a host would name them. */
 export const PasskeyMaking = { rp: { name: 'Acme' }, user: { name: 'u1 (main vault)', displayName: 'u1' } }
 
-/** The gating `raise` opens on a fresh bank over `world`'s vaultDB, on another device, held open until it settles or the test calls `close`, as a host's requestCleartext holds it while its dialog shows; and `raising`, the outcome of `raise`.
+/** The gating `raise` opens on a fresh bank over `world`'s vaultDB, on another device, held open until it concludes or the test calls `close`, as a host's requestCleartext holds it while its dialog shows; and `raising`, the outcome of `raise`.
  *
  * @example
  *   await TH.makeBankWithVault(world)
@@ -107,7 +107,7 @@ export const heldGatingOf = async (world: BankWorld, raise: (bank: Bank) => Prom
   const closing = held()
   const requestCleartext: RequestCleartext = async (gating) => {
     handed.resolve(gating)
-    await Promise.race([gating.whenSettled, closing.promise])
+    await Promise.race([gating.whenConcluded, closing.promise])
   }
   const bank = world.bankOnAnotherDevice({ requestCleartext, ...overrides })
   await bank.hello()

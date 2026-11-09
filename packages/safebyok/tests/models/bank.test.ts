@@ -677,7 +677,7 @@ describe("the snapshot's open gating", () => {
     await TH.expectRefusal(unlocking, 'dismissed')
   })
 
-  it("tells a subscriber when a gating opens and again when it settles", async () => {
+  it("tells a subscriber when a gating opens and again when it concludes", async () => {
     const { bank, gating, unlocking } = await bankWaitingOnUnlock()
     const seen: unknown[] = []
     bank.subscribe(() => { seen.push(bank.snapshot.openGating) })
@@ -703,7 +703,7 @@ describe("the snapshot's open gating", () => {
     expect(bank.snapshot).to.not.equal(before)
   })
 
-  it("drops a gating settled by an attempt", async () => {
+  it("drops a gating concluded by an attempt", async () => {
     const { bank, gating, unlocking } = await bankWaitingOnUnlock()
     await TH.expectGood(gating.attempt(byPassphrase(Passphrase)))
     await unlocking
@@ -750,7 +750,7 @@ describe("the snapshot's open gating", () => {
     expect(heard[0]).to.deep.equal({ isBankEnabled: false, isListingRefusing: true })
   })
 
-  it("keeps an attempt that crosses a sweep in the snapshot until it settles, past the disable", async () => {
+  it("keeps an attempt that crosses a sweep in the snapshot until it concludes, past the disable", async () => {
     const { world } = await makeBankWithVault()
     const held = heldDeriver()
     const bank = world.bankOnAnotherDevice({ requestCleartext: undefined, keyDeriver: held.deriver })
@@ -767,7 +767,7 @@ describe("the snapshot's open gating", () => {
     expect(bank.snapshot.openGating).to.be.null
   })
 
-  it("waits with no host dialog until an attempt settles it", async () => {
+  it("waits with no host dialog until an attempt concludes it", async () => {
     const { bank, gating, unlocking } = await bankWaitingOnUnlock()
     await TH.wakeupAtNextTick()
     expect(gating.isOpen).to.be.true
@@ -777,11 +777,11 @@ describe("the snapshot's open gating", () => {
     expect(bank.snapshot.openGating).to.be.null
   })
 
-  it("waits with no host dialog until a dismiss settles it", async () => {
+  it("waits with no host dialog until a dismiss concludes it", async () => {
     const { gating, unlocking } = await bankWaitingOnUnlock()
     gating.dismiss()
     await TH.expectRefusal(unlocking, 'dismissed')
-    await TH.expectBad(gating.whenSettled, 'dismissed')
+    await TH.expectBad(gating.whenConcluded, 'dismissed')
   })
 })
 

@@ -98,7 +98,7 @@ describe("Locking, and the sessions after it on this device", () => {
 })
 
 describe("The lock, with a box in hand", () => {
-  it("locks the vault: the exposed whisper reads LOCKED, the unseal refuses 'vault_locked', and the cached lease is erased, so the next session asks for the passphrase", async () => {
+  it("locks the vault: the exposed whisper reports LOCKED, the unseal refuses 'vault_locked', and the cached lease is erased, so the next session asks for the passphrase", async () => {
     const { vault, box, deviceDB, openNextSession } = await makeVaultWithBox()
     await box.expose()
     expect(box.whisper).to.deep.equal(Whisper)

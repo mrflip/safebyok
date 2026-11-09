@@ -192,10 +192,10 @@ describe("Storable snapshot and subscription", () => {
       expect(getSnapshot()).to.eq(box.snapshot)
     })
 
-    it("keeps the same object until a settle changes it, and the old one stays as it was", async () => {
+    it("keeps the same object until an align changes it, and the old one stays as it was", async () => {
       const box = await builtBoxOf()
       const first = box.getSnapshot()
-      box.settle()
+      box.align()
       expect(box.getSnapshot()).to.eq(first)
       box.receive(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', sidecar: { note: 'two' } }))
       const second = box.getSnapshot()
@@ -206,7 +206,7 @@ describe("Storable snapshot and subscription", () => {
       expect(box.getSnapshot()).to.eq(second)
     })
 
-    it("is made on the first call, so that a settle before it has none to replace and tells nobody", () => {
+    it("is made on the first call, so that an align before it has none to replace and tells nobody", () => {
       const { mw } = held
       const box = new TestableBox(mw.world, boxListingOf(mw), mw.fullBoxRecord())
       const listener = vi.fn()
@@ -230,13 +230,13 @@ describe("Storable snapshot and subscription", () => {
     })
   })
 
-  describe("settle", () => {
-    it("changes nothing when there is nothing to settle", async () => {
+  describe("align", () => {
+    it("changes nothing when there is nothing to align", async () => {
       const box = await builtBoxOf()
       const first = box.getSnapshot()
       const listener = vi.fn()
       box.subscribe(listener)
-      expect(box.settle()).to.deep.equal({ badnews: [] })
+      expect(box.align()).to.deep.equal({ badnews: [] })
       expect(listener.mock.calls).to.have.lengthOf(0)
       expect(box.getSnapshot()).to.eq(first)
     })

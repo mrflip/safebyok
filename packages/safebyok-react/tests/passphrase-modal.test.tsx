@@ -89,7 +89,7 @@ describe("PassphraseModal, unlocking a vault", () => {
     })
   }
 
-  it("answers dismissed once its gating settles with no attempt, as at a sweep", async () => {
+  it("answers dismissed once its gating concludes with no attempt, as at a sweep", async () => {
     const { bank, answers } = await shownFor(TH.unlocking, { built: true })
     act(() => { bank.sweep() })
     await waitFor(() => { expect(answers).to.deep.equal(['dismissed']) })

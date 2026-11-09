@@ -32,7 +32,7 @@ const OlderRev   = { revision_seq: 1, revision_tok: 'rev-o1', written_at: T0 - 1
 const SameRev    = { revision_seq: 2, revision_tok: 'rev-c2', written_at: T0 + 2000 }
 const NewerRev   = { revision_seq: 3, revision_tok: 'rev-n3', written_at: T0 + 3000 }
 
-/** The central held, by shape, at revision 2 under 'rev-c2'. */
+/** The central set, by shape, at revision 2 under 'rev-c2'. */
 const Centrals: Readonly<Record<RecordShape, () => Rec>> = {
   full:   () => fullBoxRecord(CentralRev),
   sparse: () => sparseBoxRecord(CentralRev),
@@ -46,7 +46,7 @@ const rcvdOf = (shape: RecordShape, rev: Partial<BoxSparse>): Rec => {
   return tombstoneBoxRecord(rev)
 }
 
-/** A box holding `central`, not held by the listing and not yet timely. */
+/** A box given `central`, not yet listed and not yet timely. */
 const boxOf = (central: Rec): SpiedBox => (
   new SpiedBox(held.mw.world, boxListingOf(held.mw), central)
 )
