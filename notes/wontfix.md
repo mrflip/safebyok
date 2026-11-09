@@ -90,9 +90,6 @@ not as a settled ruling, and check it against the current design before relying 
   locks on it: another device's session keeps its lease to its `lock()` or next `bank.autolock`, and its cached lease, of the
   older `gate_epoch`, is forgotten at its next session.
 * 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
-  since moved here): **a damaged row stays until the customer names it for
-  deletion.** It still counts toward `maxBoxes`. Ruled: the customer clears it with their own store's tools; not built yet.
-* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
   since moved here): **cross-tab complications, all of them.** Tab A's `lock()` or
   vacate leaves tab B unlocked, and nothing tells it.
 * 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
@@ -137,3 +134,8 @@ not as a settled ruling, and check it against the current design before relying 
   and nothing chains a revision to its prior. The Coach: there is no certainty the device is right and the server wrong or vice versa; a device
   that writes on top saw a working state, storage saw one, and a record that deciphers was sealed under a working key. Today a fetch below
   the revision held is ignored as `older`; after a reload the older copy is taken as found.
+* 2026-11-09 (the Coach, after designing it in `whiteboard/20261108-del_damaged/del_damaged-spec.md`: "I predict too many bug reports about
+  non-bugs"; replaces the 2026-11-03 row that a damaged row stays until the customer names it): **the library does not delete a row that
+  fails its check.** A damaged box row stays listed in `damaged_rows`, reads as `damaged_row`, and still counts toward `maxBoxes`; a damaged vault
+  row is told as bad news and stops a `delVault` that meets it. The customer clears either with their own store's tools. The spec is the design
+  to start from if that changes.
