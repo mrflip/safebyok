@@ -1,132 +1,110 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
-import { ForeverMillis, MinuteMillis, type AnyGating, type Outcome, type Vault } from 'safebyok'
-import { attemptRefusalFlavor } from '../helpers/attempt-refusals'
+import { useActionState, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
+import { useFormStatus } from 'react-dom'
+import { ForeverMillis, MinuteMillis, type AnyGating } from 'safebyok'
+import { gripeOfRefusal } from '../helpers/attempt-refusals'
 import { Doing, Locale, Messages } from '../helpers/messages'
 import { useRevealToggle } from '../hooks/reveal-toggle'
-import { useWhenShown } from '../hooks/when-shown'
 import { Boundary, forBoundary } from '../provider/boundary'
-import type { BoundarySource, DialogAnswer, Gripe, ModalFormProps } from '../shapes'
+import type { BoundarySource, Gripe, ModalFormProps, PassphraseFieldname } from '../shapes'
 
-// == [Answer]: DialogAnswer, answerOf, useAnswerOnce, AnsweringOnce, DialogTrouble, cancelOnEscape
+// == [Dialog]: showWhileMounted, GatingDialog, DialogBoundary, DialogTrouble
 
-const answerOf = (gating: AnyGating, outcome: Outcome<Vault>): DialogAnswer => {
-  if (! outcome.ok) { return 'dismissed' }
-  return gating.gatingkind === 'del_vault' ? 'deleted' : 'unlocked'
+// The element is the modal for as long as it is mounted: the browser gives the focus to its first control, keeps Tab
+// inside it, and leaves the page behind inert.
+const showWhileMounted = (dialog: HTMLDialogElement) => {
+  dialog.showModal()
+  return () => { dialog.close() }
 }
 
-const useAnswerOnce = (gating: AnyGating, onDone: (answer: DialogAnswer) => void) => {
-  const onDoneRef = useRef(onDone)
-  useLayoutEffect(() => { onDoneRef.current = onDone })
-  const answered = useRef(false)
-  const done = useCallback((answer: DialogAnswer) => {
-    if (answered.current) { return }
-    answered.current = true
-    onDoneRef.current(answer)
-  }, [])
-  const { whenShown } = useWhenShown()
-  useEffect(() => {
-    let current = true
-    // A sweep or a vacate concludes the gating with no attempt: the dialog closes on it.
-    void gating.whenConcluded.then((outcome) => whenShown(() => { if (current) { done(answerOf(gating, outcome)) } }))
-    return () => { current = false }
-  }, [gating, done, whenShown])
-  return done
-}
+const GatingDialog = ({ gating, role, labelledBy, describedBy, children }: {
+  gating:      AnyGating
+  role?:       'alertdialog' | undefined
+  labelledBy:  string
+  describedBy: string
+  children:    ReactNode
+}) => (
+  // The browser would close the dialog at Escape: the gating decides that, here as everywhere.
+  <dialog
+    ref={showWhileMounted}
+    className="modal"
+    role={role}
+    aria-labelledby={labelledBy}
+    aria-describedby={describedBy}
+    onCancel={(evt) => { evt.preventDefault(); gating.dismiss() }}
+  >
+    {children}
+  </dialog>
+)
 
-export const AnsweringOnce = ({ gating, onDone, children }: {
-  gating:   AnyGating
-  onDone:   (answer: DialogAnswer) => void
-  children: (done: (answer: DialogAnswer) => void) => ReactNode
-}) => {
-  const done = useAnswerOnce(gating, onDone)
-  return (
-    <Boundary fallback={<DialogTrouble doing={Doing[gating.gatingkind]} onDone={done} />}>
-      {children(done)}
-    </Boundary>
-  )
-}
+/** What a dialog's form is rendered inside: anything thrown by it shows as trouble, and dismisses the gating when closed. */
+export const DialogBoundary = ({ gating, children }: { gating: AnyGating, children: ReactNode }) => (
+  <Boundary fallback={<DialogTrouble gating={gating} />}>{children}</Boundary>
+)
 
-const cancelOnEscape = (onDone: (answer: DialogAnswer) => void) => (evt: KeyboardEvent) => {
-  if (evt.key !== 'Escape') { return }
-  evt.stopPropagation()
-  onDone('dismissed')
-}
-
-const DialogTrouble = ({ doing, onDone }: { doing: string, onDone: (answer: DialogAnswer) => void }) => {
+const DialogTrouble = ({ gating }: { gating: AnyGating }) => {
   const titleId = useId()
   const wordId = useId()
   return (
-    <div className="modal-scrim">
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape closes a dialog from anywhere inside it, as the WAI-ARIA dialog pattern has it */}
-      <div
-        className="modal"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={wordId}
-        onKeyDown={cancelOnEscape(onDone)}
-      >
-        <h3 id={titleId}>{Messages.troubleTitle}</h3>
-        <p className="gripe" id={wordId}>{Messages.troubleWord(doing)}</p>
-        <div className="row">
-          {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the field that had focus is gone; the WAI-ARIA dialog pattern moves focus to the dialog's one control */}
-          <button type="button" autoFocus onClick={() => { onDone('dismissed') }}>{Messages.closeButton}</button>
-        </div>
+    <GatingDialog gating={gating} role="alertdialog" labelledBy={titleId} describedBy={wordId}>
+      <h3 id={titleId}>{Messages.troubleTitle}</h3>
+      <p className="gripe" id={wordId}>{Messages.troubleWord(Doing[gating.gatingkind])}</p>
+      <div className="row">
+        <button type="button" onClick={() => { gating.dismiss() }}>{Messages.closeButton}</button>
       </div>
-    </div>
+    </GatingDialog>
   )
 }
 // --
 
-// == [Form]: Gripe, useAttempts, ModalForm, holdsFocus, unlockedFor
+// == [Form]: textOf, useAttemptAction, SubmitButton, ModalForm, holdsFocus, unlockedFor
 
-export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer) => void) => {
-  const [gripe, setGripe] = useState<Gripe | null>(null)
-  // The error rides in an object, so a thrown null or undefined still reads as a failure.
-  const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  const { whenShown, isShown } = useWhenShown()
-  const fail = useCallback((err: unknown) => { setFailure({ err }) }, [])
-  if (failure !== null) { throw forBoundary(failure.err, source) }
-
-  const meet = (err: unknown) => {
-    const flavor = attemptRefusalFlavor(err)
-    if (flavor === 'in_flight') { return }
-    if (flavor === 'in_place') { setGripe({ text: (err as Error).message, fromPasskey: false }); return }
-    if (flavor === 'close') { done('dismissed'); return }
-    // Thrown from an event handler, it would miss every boundary.
-    fail(err)
-  }
-
-  const attempt = async (tried: () => Promise<Outcome<Vault>>, answer: DialogAnswer) => {
-    setGripe(null)
-    const { ok, err } = await tried()
-    await whenShown(() => {
-      if (ok) { done(answer); return }
-      meet(err)
-    })
-  }
-
-  return { gripe, setGripe, meet, fail, attempt, whenShown, isShown }
+/** The text typed in the field named `fieldname`, or '' with none. */
+export const textOf = (form: FormData, fieldname: PassphraseFieldname): string => {
+  const typed = form.get(fieldname)
+  return typeof typed === 'string' ? typed : ''
 }
 
-export const ModalForm = ({ title, blurb, submitWord, gripe, gripeId, footnote, formRef, done, onSubmit, children }: ModalFormProps) => {
+/** The form action for a gating's attempts, and the gripe to show of the last. `tried` answers null when there was nothing to try. */
+export const useAttemptAction = (
+  gating:   AnyGating,
+  source:   BoundarySource,
+  tried:    (form: FormData) => Promise<{ ok: boolean, err?: unknown } | null>,
+  fieldFor: (refusalkind: string) => RefObject<HTMLInputElement | null>,
+) => {
+  const gripeId = useId()
+  const [gripe, action, isPending] = useActionState(async (_last: Gripe | null, form: FormData): Promise<Gripe | null> => {
+    const outcome = await tried(form)
+    if (outcome === null || outcome.ok) { return null }
+    const gripeNow = gripeOfRefusal(gating, outcome.err, source)
+    // The submit button, disabled while the attempt ran, has dropped the focus.
+    if (gripeNow !== null) { fieldFor(gripeNow.refusalkind).current?.focus() }
+    return gripeNow
+  }, null)
+  return { gripe: isPending ? null : gripe, gripeId, action }
+}
+
+const SubmitButton = ({ word, pendingWord, isSubmittable }: { word: string, pendingWord: string, isSubmittable: boolean }) => {
+  const { pending } = useFormStatus()
+  return <button type="submit" disabled={pending || (! isSubmittable)}>{pending ? pendingWord : word}</button>
+}
+
+export const ModalForm = ({ gating, title, blurb, submitWord, pendingWord, isSubmittable = true, gripeText, gripeId, footnote, formRef, action, onReset, children }: ModalFormProps) => {
   const titleId = useId()
   const blurbId = useId()
   return (
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Escape closes a dialog from anywhere inside it, as the WAI-ARIA dialog pattern has it
-    <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={blurbId} onKeyDown={cancelOnEscape(done)}>
-      <form ref={formRef} className="modal" onSubmit={(evt) => { evt.preventDefault(); onSubmit() }}>
+    <GatingDialog gating={gating} labelledBy={titleId} describedBy={blurbId}>
+      <form ref={formRef} action={action} onReset={onReset}>
         <h3 id={titleId}>{title}</h3>
         <p className="quiet" id={blurbId}>{blurb}</p>
         {children}
-        <div role="alert" id={gripeId}>{gripe !== null && <p className="gripe">{gripe.text}</p>}</div>
+        <div role="alert" id={gripeId}>{gripeText !== null && <p className="gripe">{gripeText}</p>}</div>
         {footnote !== undefined && <p className="quiet">{footnote}</p>}
         <div className="row">
-          <button type="submit">{submitWord}</button>
-          <button type="button" onClick={() => { done('dismissed') }}>{Messages.cancelButton}</button>
+          <SubmitButton word={submitWord} pendingWord={pendingWord} isSubmittable={isSubmittable} />
+          <button type="button" onClick={() => { gating.dismiss() }}>{Messages.cancelButton}</button>
         </div>
       </form>
-    </div>
+    </GatingDialog>
   )
 }
 
@@ -169,26 +147,30 @@ export const unlockedFor = (leaseMillis: number, creating: boolean): string => {
 }
 // --
 
-// == [Passphrase field]: UsernameField, PassphraseField, useConfirmation, ConfirmField, useAdvice, checkerAdvice
+// == [Passphrase field]: UsernameField, PassphraseField, useChosenPassphrase, ChosenPassphraseFields
 
 export const UsernameField = ({ username }: { username: string }) => (
   // The inline display wins over a host's stylesheet, which can override [hidden].
   <input type="text" name="username" autoComplete="username" value={username} readOnly hidden style={{ display: 'none' }} />
 )
 
-export const PassphraseField = ({ ref, credential, fieldlabel, takesFocus, advice, invalidBy, onChange }: {
+export const PassphraseField = ({ ref, fieldname, fieldlabel, advice, invalidBy, onChange }: {
   ref:        Ref<HTMLInputElement>
-  credential: 'new-password' | 'current-password'
+  fieldname:  PassphraseFieldname
   fieldlabel: string
-  takesFocus: boolean
   advice?:    string | null | undefined
   invalidBy?: string | undefined
-  onChange:   (typed: string) => void
+  onChange?:  ((typed: string) => void) | undefined
 }) => {
-  const reveal = useRevealToggle(Messages.showPassphrase, Messages.hidePassphrase)
+  const { pending } = useFormStatus()
+  // Masked again at each submit, so that a password manager sees a password field.
+  const reveal = useRevealToggle(Messages.showPassphrase, Messages.hidePassphrase, ! pending)
+  const [isCapsOn, setIsCapsOn] = useState(false)
+  const watchCaps = (evt: KeyboardEvent) => { setIsCapsOn(evt.getModifierState('CapsLock')) }
   const fieldId = useId()
   const adviceId = useId()
   const describedBy = [advice === undefined ? undefined : adviceId, invalidBy].filter((id) => id !== undefined).join(' ')
+  const credential = fieldname === 'current-password' ? 'current-password' : 'new-password'
   return (
     <>
       <span className="passphrase-field">
@@ -196,86 +178,106 @@ export const PassphraseField = ({ ref, credential, fieldlabel, takesFocus, advic
           id={fieldId}
           ref={ref}
           type={reveal.fieldType}
-          name={credential}
+          name={fieldname}
           autoComplete={credential}
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck="false"
-          // eslint-disable-next-line jsx-a11y/no-autofocus -- moving focus to the dialog's first field on open is the WAI-ARIA dialog pattern; the rule aims at page-load autofocus
-          autoFocus={takesFocus}
+          required
           aria-label={fieldlabel}
           aria-describedby={describedBy === '' ? undefined : describedBy}
           aria-invalid={invalidBy === undefined ? undefined : true}
           placeholder={fieldlabel}
-          onChange={(evt) => { onChange(evt.target.value) }}
+          onChange={(evt) => { onChange?.(evt.target.value) }}
+          onKeyDown={watchCaps}
+          onKeyUp={watchCaps}
+          onBlur={() => { setIsCapsOn(false) }}
         />
         {reveal.button(fieldId)}
       </span>
       {/* Mounted with the field, so that each word put in it is announced, politely. */}
       {advice !== undefined && <p className="quiet" id={adviceId} role="status">{advice}</p>}
+      <div role="status">{isCapsOn && <p className="quiet">{Messages.capsLockOn}</p>}</div>
     </>
   )
 }
 
-const MismatchGripe: Gripe = { text: Messages.passphrasesDiffer, fromPasskey: false, mismatched: true }
-
-export const useConfirmation = (setGripe: (gripe: Gripe) => void) => {
-  const ref = useRef<HTMLInputElement>(null)
-  const gripeId = useId()
-  const differs = (chosen: string): boolean => {
-    if ((ref.current?.value ?? '') === chosen) { return false }
-    setGripe(MismatchGripe)
-    return true
-  }
-  return { ref, gripeId, differs }
-}
-
-export const ConfirmField = ({ ref, gripeId, fieldlabel, gripe, onChange }: {
-  ref:        Ref<HTMLInputElement>
-  gripeId:    string
-  fieldlabel: string
-  gripe:      Gripe | null
-  onChange:   (typed: string) => void
-}) => (
-  <PassphraseField
-    ref={ref}
-    credential="new-password"
-    fieldlabel={fieldlabel}
-    takesFocus={false}
-    invalidBy={gripe?.mismatched === true ? gripeId : undefined}
-    onChange={onChange}
-  />
-)
-
-const checkerAdvice = async (gating: AnyGating, typed: string): Promise<string | null> => {
-  const verdict = await gating.checkStrength(typed)
-  return verdict.strong ? null : verdict.reason
-}
-
-export const useAdvice = (gating: AnyGating, creating: boolean, fail: (err: unknown) => void) => {
-  const [said, setSaid] = useState<string | null>(null)
+/** The live state of a form choosing a passphrase: its strength and its confirmation, as verdicts only, never the text. */
+export const useChosenPassphrase = (gating: AnyGating, source: BoundarySource) => {
+  const chosenRef = useRef<HTMLInputElement>(null)
+  const confirmRef = useRef<HTMLInputElement>(null)
+  const [advice, setAdvice] = useState<string | null>(null)
+  const [isStrong, setIsStrong] = useState(false)
+  const [confirmation, setConfirmation] = useState<'untyped' | 'differs' | 'matches'>('untyped')
+  // The error rides in an object, so a thrown null or undefined still reads as a failure.
+  const [failure, setFailure] = useState<{ err: unknown } | null>(null)
   const asked = useRef(0)
-  const creatingNow = useRef(creating)
-  const [saidWhile, setSaidWhile] = useState(creating)
-  if (saidWhile !== creating) {
-    setSaidWhile(creating)
-    setSaid(null)
+  if (failure !== null) { throw forBoundary(failure.err, source) }
+
+  const compare = () => {
+    const confirming = confirmRef.current?.value ?? ''
+    if (confirming === '') { setConfirmation('untyped'); return }
+    setConfirmation(confirming === chosenRef.current?.value ? 'matches' : 'differs')
   }
-  // A layout effect, so an answer or failure still on its way turns stale from the same commit as the change of mode.
-  useLayoutEffect(() => { creatingNow.current = creating }, [creating])
-  const { whenShown } = useWhenShown()
-  const hear = async (typed: string) => {
+
+  // The submit button stays disabled until the verdict is on the text now in the field.
+  const hearChosen = async (typed: string) => {
+    compare()
     asked.current += 1
-    if (typed === '') { setSaid(null); return }
     const askedNow = asked.current
-    const latest = () => askedNow === asked.current && creating === creatingNow.current
+    setIsStrong(false)
+    if (typed === '') { setAdvice(null); return }
     try {
-      const answer = await checkerAdvice(gating, typed)
-      await whenShown(() => { if (latest()) { setSaid(answer) } })
+      const verdict = await gating.checkStrength(typed)
+      if (askedNow !== asked.current) { return }
+      setAdvice(verdict.strong ? null : verdict.reason)
+      setIsStrong(verdict.strong)
     } catch (err) {
-      await whenShown(() => { if (latest()) { fail(err) } })
+      if (askedNow === asked.current) { setFailure({ err }) }
     }
   }
-  return { said, hear }
+
+  // React empties the fields after each attempt, and tells nobody's onChange.
+  const forget = () => {
+    asked.current += 1
+    setAdvice(null)
+    setIsStrong(false)
+    setConfirmation('untyped')
+  }
+
+  return { chosenRef, confirmRef, advice, confirmation, isSubmittable: isStrong && confirmation === 'matches', hearChosen, compare, forget }
+}
+
+export const ChosenPassphraseFields = ({ chosen, chosenRef, confirmRef, chosenLabel, confirmLabel, chosenInvalidBy }: {
+  chosen:           Omit<ReturnType<typeof useChosenPassphrase>, 'chosenRef' | 'confirmRef'>
+  chosenRef:        Ref<HTMLInputElement>
+  confirmRef:       Ref<HTMLInputElement>
+  chosenLabel:      string
+  confirmLabel:     string
+  chosenInvalidBy?: string | undefined
+}) => {
+  const matchId = useId()
+  return (
+    <>
+      <PassphraseField
+        ref={chosenRef}
+        fieldname="new-password"
+        fieldlabel={chosenLabel}
+        advice={chosen.advice}
+        invalidBy={chosenInvalidBy}
+        onChange={(typed) => { void chosen.hearChosen(typed) }}
+      />
+      <PassphraseField
+        ref={confirmRef}
+        fieldname="confirm-password"
+        fieldlabel={confirmLabel}
+        invalidBy={chosen.confirmation === 'differs' ? matchId : undefined}
+        onChange={chosen.compare}
+      />
+      <div role="status" id={matchId}>
+        {chosen.confirmation !== 'untyped' && <p className="quiet">{chosen.confirmation === 'matches' ? Messages.passphrasesMatch : Messages.passphrasesDiffer}</p>}
+      </div>
+    </>
+  )
 }
 // --

@@ -139,3 +139,5 @@ not as a settled ruling, and check it against the current design before relying 
   fails its check.** A damaged box row stays listed in `damaged_rows`, reads as `damaged_row`, and still counts toward `maxBoxes`; a damaged vault
   row is told as bad news and stops a `delVault` that meets it. The customer clears either with their own datastore's tools. The spec is the design
   to start from if that changes.
+
+* 2026-11-09 (the Coach, on the React forms thread: "the specific UI annoyance of clearing all three passwords is a wontfix by the library authors"): **a dialog's fields empty after each attempt.** React resets an uncontrolled form when its action ends, so a wrong current passphrase in the change-passphrase dialog clears all three fields, and a dismissed passkey prompt in the add-passkey dialog clears the passphrase typed before it. Keeping them would mean leaving React's form actions for hand-written submit handling. Pull requests accepted.

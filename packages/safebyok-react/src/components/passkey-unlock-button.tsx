@@ -1,15 +1,15 @@
-import { useState } from 'react'
+import { useTransition } from 'react'
+import { useFormStatus } from 'react-dom'
 import type { AnyGating } from 'safebyok'
-import { attemptRefusalFlavor } from '../helpers/attempt-refusals'
+import { gripeOfRefusal } from '../helpers/attempt-refusals'
 import { Messages } from '../helpers/messages'
 import { askPasskey, attemptOnce, passkeysAvailable } from '../helpers/passkey'
-import { useWhenShown } from '../hooks/when-shown'
-import { Boundary, forBoundary } from '../provider/boundary'
+import { Boundary } from '../provider/boundary'
 import type { PasskeyUnlockButtonProps } from '../shapes'
 
 /**
  * A button that unlocks with the vault's passkey, shown only where a passkey can be used.
- * @example <PasskeyUnlockButton gating={gating} onDone={close} onGripe={setGripe} />
+ * @example <PasskeyUnlockButton gating={gating} onGripe={setGripe} />
  */
 export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
   <Boundary key={props.gating.gatingTok} fallback={null} onCaught={() => { props.onGripe(Messages.passkeyTrouble) }}>
@@ -22,52 +22,39 @@ export const offersPasskey = (gating: AnyGating): boolean => (
   passkeysAvailable() && gating.passkeyHeader?.wayinkind === 'passkey'
 )
 
-const PasskeyPress = ({ gating, onDone, onGripe, rpId, takesFocus }: PasskeyUnlockButtonProps) => {
-  const [asking, setAsking] = useState(false)
-  // The error rides in an object, so a thrown null or undefined still reads as a failure.
-  const [failure, setFailure] = useState<{ err: unknown } | null>(null)
-  const { whenShown, isShown } = useWhenShown()
-  if (failure !== null) { throw forBoundary(failure.err, 'PasskeyUnlockButton') }
+const PasskeyPress = ({ gating, onGripe, rpId, takesFocus }: PasskeyUnlockButtonProps) => {
+  const [isAsking, startAsking] = useTransition()
+  // False outside a form, as for a host's own dialog.
+  const { pending: isFormPending } = useFormStatus()
   if (! offersPasskey(gating)) { return null }
 
-  const heard = (err: unknown) => {
-    const flavor = attemptRefusalFlavor(err)
-    if (flavor === 'in_flight') { return }
-    if (flavor === 'close') { onDone('dismissed'); return }
-    // Thrown from an event handler it would miss the boundary, so it is rethrown in render.
-    if (flavor === 'trouble') { setFailure({ err }); return }
-    onGripe((err as Error).message)
+  const hear = (err: unknown) => {
+    const gripe = gripeOfRefusal(gating, err, 'PasskeyUnlockButton')
+    if (gripe !== null) { onGripe(gripe.text) }
   }
 
-  const press = async () => {
-    if (asking) { return }
-    setAsking(true)
-    onGripe(null)
+  const askAndAttempt = async () => {
     try {
-      const passkeyClear = await askPasskey(gating.passkeyHeader, { rpId })
-      // An answer is as good as the passphrase, so it is tried now or never: one that comes back
-      // while the button is hidden is zeroed untried, never kept for it to show again.
-      if (passkeyClear !== null && ! isShown()) { passkeyClear.prfBytes.fill(0) }
-      if (passkeyClear === null || ! isShown()) { await whenShown(() => { setAsking(false) }); return }
-      const { ok, err } = await attemptOnce(passkeyClear, (passkey) => gating.attempt({ passkeyClear: passkey }))
-      await whenShown(() => {
-        setAsking(false)
-        if (ok) { onDone('unlocked'); return }
-        heard(err)
-      })
+      const answer = await askPasskey(gating.passkeyHeader, { rpId })
+      if (answer === null) { return }
+      const { ok, err } = await attemptOnce(answer, (passkeyClear) => gating.attempt({ passkeyClear }))
+      if (! ok) { hear(err) }
     } catch (err) {
-      await whenShown(() => {
-        setAsking(false)
-        heard(err)
-      })
+      hear(err)
     }
   }
 
+  // Inside the transition, what hear throws reaches the Boundary above.
+  const press = () => {
+    if (isAsking || isFormPending) { return }
+    onGripe(null)
+    startAsking(askAndAttempt)
+  }
+
   return (
-    // aria-disabled, not disabled: a disabled button drops the focus, and the dialog's Escape with it,
-    // to the page's body, where the browser returns it once its prompt is dismissed.
+    // aria-disabled, not disabled: a disabled button drops the focus, and the user's place in the dialog with it.
     // eslint-disable-next-line jsx-a11y/no-autofocus -- only where a dialog makes the passkey its first choice: the WAI-ARIA dialog pattern moves focus to a dialog's first control
-    <button type="button" autoFocus={takesFocus} aria-disabled={asking} onClick={() => { void press() }}>
+    <button type="button" autoFocus={takesFocus} aria-disabled={isAsking || isFormPending} onClick={press}>
       {Messages.passkeyButton}
     </button>
   )

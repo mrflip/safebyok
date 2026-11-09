@@ -1,9 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { AnyGating, Bank } from 'safebyok'
 import { GatingModal } from '../src/provider/gating-modal'
 import { Messages } from '../src/helpers/messages'
-import type { DialogAnswer } from '../src/shapes'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
@@ -11,7 +10,7 @@ TH.sweepBankWorlds()
 /** What the vault is before the gating is raised: absent, built, or built and with a passkey. */
 type Before = 'absent' | 'built' | 'passkeyed'
 
-/** The gating `raise` opens, shown in a GatingModal (as `shown` makes it out to be) whose answers the test reads. */
+/** The gating `raise` opens, shown in a GatingModal (as `shown` makes it out to be). */
 const shownFor = async (raise: (bank: Bank) => ReturnType<typeof TH.building>, before: Before, shown = (gating: AnyGating) => gating) => {
   const world = TH.makeBankWorld()
   if (before !== 'absent') {
@@ -19,13 +18,12 @@ const shownFor = async (raise: (bank: Bank) => ReturnType<typeof TH.building>, b
     if (before === 'passkeyed') { await TH.addPasskeyTo(world, vault) }
   }
   const opened = await TH.openGatingOf(world, raise)
-  const answers: DialogAnswer[] = []
-  render(<GatingModal gating={shown(opened.gating)} onDone={(answer) => { answers.push(answer); opened.close() }} />)
-  return { ...opened, answers }
+  render(<GatingModal gating={shown(opened.gating)} />)
+  return opened
 }
 
 /** `gating`, made out to be of a gatingkind this package has no dialog for, as one a newer core raises. */
-const forged = (gating: AnyGating): AnyGating => Object.create(gating, { gatingkind: { value: 'forged_kind' } }) as AnyGating
+const forged = (gating: AnyGating): AnyGating => Object.create(gating, { gatingkind: { value: 'forged_kind' }, dismiss: { value: () => { gating.dismiss() } } }) as AnyGating
 
 describe("GatingModal", () => {
   const DialogCases = [
@@ -44,24 +42,9 @@ describe("GatingModal", () => {
     })
   }
 
-  it("answers dismissed at once for a gatingkind with no dialog, and the gating is dismissed", async () => {
-    const { raising, answers } = await shownFor(TH.unlocking, 'built', forged)
-    await waitFor(() => { expect(answers).to.deep.equal(['dismissed']) })
-    expect(screen.queryByRole('dialog')).to.be.null
+  it("dismisses at once a gating whose gatingkind has no dialog", async () => {
+    const { raising } = await shownFor(TH.unlocking, 'built', forged)
     expect(await raising).to.include({ ok: false })
-  })
-
-  it("answers once for a gatingkind with no dialog, though its onDone is new at each render", async () => {
-    const world = TH.makeBankWorld()
-    await TH.makeBankWithVault(world)
-    const opened = await TH.openGatingOf(world, TH.unlocking)
-    const answers: DialogAnswer[] = []
-    const ui = () => <GatingModal gating={forged(opened.gating)} onDone={(answer) => { answers.push(answer) }} />
-    const { rerender } = render(ui())
-    rerender(ui())
-    rerender(ui())
-    opened.close()
-    await opened.raising
-    expect(answers).to.deep.equal(['dismissed'])
+    expect(screen.queryByRole('dialog')).to.be.null
   })
 })

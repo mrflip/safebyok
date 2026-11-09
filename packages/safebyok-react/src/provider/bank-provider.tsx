@@ -96,7 +96,7 @@ const OpenGatingDialog = ({ bank, ...dialogProps }: Pick<GatingModalProps, 'pass
   const { openGating } = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
   if (openGating === null) { return null }
   // No key: each dialog keys its form by its gating's `gatingTok`.
-  return <GatingModal gating={openGating} leaseMillis={bank.leaseMillis} {...dialogProps} onDone={() => { openGating.dismiss() }} />
+  return <GatingModal gating={openGating} leaseMillis={bank.leaseMillis} {...dialogProps} />
 }
 
 /** Keep one user's bank once the device is named, and show the dialog for its gatings. */

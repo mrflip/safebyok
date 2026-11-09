@@ -1,9 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import { ForeverMillis, MinuteMillis } from 'safebyok'
+import { describe, expect, it, vi } from 'vitest'
+import { ForeverMillis, Gating, MinuteMillis, VaultError } from 'safebyok'
 import { PassphraseModal } from '../src/modals/passphrase-modal'
 import { Messages } from '../src/helpers/messages'
-import type { DialogAnswer } from '../src/shapes'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
@@ -13,80 +12,178 @@ const WeekMillis = 7 * 24 * 60 * MinuteMillis
 /** A strength checker that finds a passphrase under 12 characters weak. */
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
-/** The gating `raise` opens, shown in a PassphraseModal whose answers the test reads, closed by the first. */
+/** The gating `raise` opens, shown in a PassphraseModal. */
 const shownFor = async (raise: typeof TH.building, opts: { built?: boolean, bankOpts?: Parameters<typeof TH.openGatingOf>[2], leaseMillis?: number } = {}) => {
   const world = TH.makeBankWorld()
   if (opts.built === true) { await TH.makeBankWithVault(world) }
   const opened = await TH.openGatingOf(world, raise, opts.bankOpts)
-  const answers: DialogAnswer[] = []
-  const onDone = (answer: DialogAnswer) => { answers.push(answer); opened.close() }
-  render(<PassphraseModal gating={TH.passphraseGatingOf(opened.gating)} onDone={onDone} leaseMillis={opts.leaseMillis} />)
-  return { ...opened, answers }
+  return { ...opened, ...render(<PassphraseModal gating={TH.passphraseGatingOf(opened.gating)} leaseMillis={opts.leaseMillis} />) }
 }
 
 const alertText = () => screen.getByRole('alert').textContent
 
+const field = (placeholder: string) => screen.getByPlaceholderText<HTMLInputElement>(placeholder)
+const typeIn = (placeholder: string, typed: string) => { fireEvent.change(field(placeholder), { target: { value: typed } }) }
+const submitButton = (word: string) => screen.getByText<HTMLButtonElement>(word)
+
 describe("PassphraseModal, building a vault", () => {
-  it("chooses the first passphrase, filed under the user and the vault, and answers unlocked", async () => {
-    const { raising, answers } = await shownFor(TH.building)
+  it("chooses the first passphrase, filed under the user and the vault", async () => {
+    const { raising } = await shownFor(TH.building)
     expect(screen.getByText(Messages.chooseTitle)).to.exist
     expect(screen.getByDisplayValue('u1 (main vault)')).to.exist
-    TH.submitNewPassphrase(TH.Passphrase)
-    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
+    await TH.submitNewPassphrase(TH.Passphrase)
     expect(await raising).to.include({ ok: true })
   })
 
-  it("refuses a confirmation that differs, attempting nothing, and lets the user try again", async () => {
-    const { gating, raising, answers } = await shownFor(TH.building)
-    TH.submitNewPassphrase(TH.Passphrase, 'correct horse battery stapel')
-    expect(alertText()).to.eq(Messages.passphrasesDiffer)
-    expect(gating.isOpen).to.be.true
-    TH.submitNewPassphrase(TH.Passphrase)
-    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
-    expect(await raising).to.include({ ok: true })
+  it("names its two fields apart, for a password manager", async () => {
+    await shownFor(TH.building)
+    expect(field('vault passphrase').name).to.eq('new-password')
+    expect(field('confirm vault passphrase').name).to.eq('confirm-password')
+    expect(field('confirm vault passphrase').autocomplete).to.eq('new-password')
   })
 
-  it("shows the strength checker's reason as the user types, and a weak passphrase's refusal in place", async () => {
-    const { gating, answers } = await shownFor(TH.building, { bankOpts: { strengthChecker: underTwelveWeak } })
-    fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'short' } })
-    await waitFor(() => { expect(screen.queryByText('Make it longer.')).to.not.be.null })
-    TH.submitNewPassphrase('short')
-    await waitFor(() => { expect(alertText()).to.eq('Make it longer.') })
+  it("says live whether the confirmation matches, marking it invalid while it differs", async () => {
+    await shownFor(TH.building)
+    typeIn('vault passphrase', TH.Passphrase)
+    expect(screen.queryByText(Messages.passphrasesDiffer)).to.be.null
+    typeIn('confirm vault passphrase', 'correct horse')
+    expect(screen.getByText(Messages.passphrasesDiffer)).to.exist
+    expect(field('confirm vault passphrase').getAttribute('aria-invalid')).to.eq('true')
+    typeIn('confirm vault passphrase', TH.Passphrase)
+    expect(screen.getByText(Messages.passphrasesMatch)).to.exist
+    expect(field('confirm vault passphrase').getAttribute('aria-invalid')).to.be.null
+  })
+
+  it("keeps the button disabled until the passphrase is strong and confirmed, showing the checker's reason", async () => {
+    await shownFor(TH.building, { bankOpts: { strengthChecker: underTwelveWeak } })
+    expect(submitButton(Messages.createButton).disabled).to.be.true
+    typeIn('vault passphrase', 'short')
+    typeIn('confirm vault passphrase', 'short')
+    await screen.findByText('Make it longer.')
+    expect(submitButton(Messages.createButton).disabled).to.be.true
+    typeIn('vault passphrase', TH.Passphrase)
+    typeIn('confirm vault passphrase', TH.Passphrase)
+    await waitFor(() => { expect(submitButton(Messages.createButton).disabled).to.be.false })
+    expect(screen.queryByText('Make it longer.')).to.be.null
+  })
+
+  it("holds the button disabled from each keystroke until the verdict on it is in", async () => {
+    const answering = TH.makePending()
+    let isHeld = false
+    const heldChecker = async (typed: string) => {
+      if (isHeld) { await answering.promise }
+      return underTwelveWeak(typed)
+    }
+    await shownFor(TH.building, { bankOpts: { strengthChecker: heldChecker } })
+    typeIn('vault passphrase', TH.Passphrase)
+    typeIn('confirm vault passphrase', TH.Passphrase)
+    await waitFor(() => { expect(submitButton(Messages.createButton).disabled).to.be.false })
+    isHeld = true
+    typeIn('vault passphrase', 'short')
+    typeIn('confirm vault passphrase', 'short')
+    expect(submitButton(Messages.createButton).disabled).to.be.true
+    await act(async () => { answering.resolve(undefined); await TH.wakeupAtNextTick() })
+    expect(submitButton(Messages.createButton).disabled).to.be.true
+  })
+
+  it("forgets both verdicts once React has emptied the fields after a refused attempt", async () => {
+    const { gating } = await shownFor(TH.building)
+    vi.spyOn(Gating.prototype, 'attempt').mockResolvedValue({ ok: false, err: new VaultError('weak_passphrase', 'Too guessable.') } as never)
+    await TH.submitNewPassphrase(TH.Passphrase)
+    await screen.findByText('Too guessable.')
+    expect(field('vault passphrase').value).to.eq('')
+    expect(screen.queryByText(Messages.passphrasesMatch)).to.be.null
+    expect(submitButton(Messages.createButton).disabled).to.be.true
     expect(gating.isOpen).to.be.true
-    expect(answers).to.deep.equal([])
   })
 })
 
 describe("PassphraseModal, unlocking a vault", () => {
-  it("shows a wrong passphrase in place, the gating still open, and answers unlocked on the right one", async () => {
-    const { gating, raising, answers } = await shownFor(TH.unlocking, { built: true })
+  it("shows a wrong passphrase in place, the gating still open, and concludes on the right one", async () => {
+    const { gating, raising } = await shownFor(TH.unlocking, { built: true })
     expect(screen.getByText(Messages.unlockTitle)).to.exist
     TH.submitPassphrase('not the passphrase')
     await waitFor(() => { expect(alertText()).to.not.eq('') })
     expect(gating.isOpen).to.be.true
     TH.submitPassphrase(TH.Passphrase)
-    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
     expect(await raising).to.include({ ok: true })
+  })
+
+  it("after a wrong passphrase empties the field, marks it invalid and gives it the focus", async () => {
+    await shownFor(TH.unlocking, { built: true })
+    TH.submitPassphrase('not the passphrase')
+    await waitFor(() => { expect(alertText()).to.not.eq('') })
+    const typedIn = field('vault passphrase')
+    expect(typedIn.value).to.eq('')
+    expect(typedIn.getAttribute('aria-invalid')).to.eq('true')
+    expect(document.activeElement).to.equal(typedIn)
+  })
+
+  it("says what it is doing and takes no second submit while an attempt runs", async () => {
+    await shownFor(TH.unlocking, { built: true })
+    const running = TH.makePending()
+    const attempts = vi.spyOn(Gating.prototype, 'attempt').mockImplementation(async () => {
+      await running.promise
+      return { ok: false, err: new VaultError('wrong_passphrase', 'Not that one.') } as never
+    })
+    TH.submitPassphrase(TH.Passphrase)
+    const pending = await screen.findByText(Messages.unlockingButton)
+    expect((pending as HTMLButtonElement).disabled).to.be.true
+    fireEvent.click(pending)
+    await act(async () => { running.resolve(undefined); await TH.wakeupAtNextTick() })
+    await screen.findByText('Not that one.')
+    expect(attempts).toHaveBeenCalledTimes(1)
+    expect(submitButton(Messages.unlockButton).disabled).to.be.false
+  })
+
+  it("masks a shown passphrase again at submit", async () => {
+    await shownFor(TH.unlocking, { built: true })
+    fireEvent.click(screen.getByText(Messages.showPassphrase))
+    expect(field('vault passphrase').type).to.eq('text')
+    TH.submitPassphrase('not the passphrase')
+    await waitFor(() => { expect(field('vault passphrase').type).to.eq('password') })
+  })
+
+  it("refuses an empty submit, attempting nothing", async () => {
+    await shownFor(TH.unlocking, { built: true })
+    const attempts = vi.spyOn(Gating.prototype, 'attempt')
+    fireEvent.click(submitButton(Messages.unlockButton))
+    await act(async () => { await TH.wakeupAtNextTick() })
+    expect(attempts).not.toHaveBeenCalled()
+  })
+
+  it("warns while Caps Lock is on, until the field loses the focus", async () => {
+    await shownFor(TH.unlocking, { built: true })
+    fireEvent.keyDown(field('vault passphrase'), { key: 'A', modifierCapsLock: true })
+    expect(screen.getByText(Messages.capsLockOn)).to.exist
+    fireEvent.keyUp(field('vault passphrase'), { key: 'A', modifierCapsLock: false })
+    expect(screen.queryByText(Messages.capsLockOn)).to.be.null
+    fireEvent.keyDown(field('vault passphrase'), { key: 'A', modifierCapsLock: true })
+    fireEvent.blur(field('vault passphrase'))
+    expect(screen.queryByText(Messages.capsLockOn)).to.be.null
   })
 
   const CloseCases = [
     ['Cancel', () => { fireEvent.click(screen.getByText(Messages.cancelButton)) }],
-    ['Escape', () => { fireEvent.keyDown(screen.getByPlaceholderText('vault passphrase'), { key: 'Escape' }) }],
+    ['Escape', () => { fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true })) }],
   ] as const
 
   for (const [how, closeIt] of CloseCases) {
-    it(`answers dismissed on ${how}, and the gating is dismissed`, async () => {
-      const { raising, answers } = await shownFor(TH.unlocking, { built: true })
+    it(`dismisses the gating on ${how}, the dialog staying up until the gating's owner takes it down`, async () => {
+      const { raising } = await shownFor(TH.unlocking, { built: true })
       closeIt()
-      expect(answers).to.deep.equal(['dismissed'])
       expect(await raising).to.include({ ok: false })
+      expect(screen.getByRole<HTMLDialogElement>('dialog').open).to.be.true
     })
   }
 
-  it("answers dismissed once its gating concludes with no attempt, as at a sweep", async () => {
-    const { bank, answers } = await shownFor(TH.unlocking, { built: true })
-    act(() => { bank.sweep() })
-    await waitFor(() => { expect(answers).to.deep.equal(['dismissed']) })
+  it("opens as a modal, and shuts when unmounted", async () => {
+    const showModal = vi.spyOn(HTMLDialogElement.prototype, 'showModal')
+    const shut = vi.spyOn(HTMLDialogElement.prototype, 'close')
+    const { unmount } = await shownFor(TH.unlocking, { built: true })
+    expect(showModal).toHaveBeenCalledTimes(1)
+    unmount()
+    expect(shut).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -96,7 +193,7 @@ describe("PassphraseModal over a later gating", () => {
     await TH.makeBankWithVault(world)
     const first = await TH.openGatingOf(world, TH.unlocking)
     const second = await TH.openGatingOf(world, TH.unlocking)
-    const ui = (gating: typeof first.gating) => <PassphraseModal gating={TH.passphraseGatingOf(gating)} onDone={() => undefined} />
+    const ui = (gating: typeof first.gating) => <PassphraseModal gating={TH.passphraseGatingOf(gating)} />
     const { rerender } = render(ui(first.gating))
     fireEvent.change(screen.getByLabelText(Messages.passphraseField), { target: { value: TH.Passphrase } })
     rerender(ui(second.gating))

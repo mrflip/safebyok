@@ -3,57 +3,46 @@ import type { PasskeyAnswer } from 'safebyok'
 import { Messages } from '../helpers/messages'
 import { attemptOnce, createPasskey } from '../helpers/passkey'
 import type { AddPasskeyModalProps } from '../shapes'
-import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts } from './modal-kit'
+import { DialogBoundary, ModalForm, PassphraseField, UsernameField, textOf, useAttemptAction } from './modal-kit'
 
 /** The dialog for an `add_passkey` gating, which makes a passkey and adds it to the vault once the user proves its passphrase. */
 export const AddPasskeyModal = (props: AddPasskeyModalProps) => (
-  <AnsweringOnce key={props.gating.gatingTok} gating={props.gating} onDone={props.onDone}>
-    {(done) => <AddPasskeyForm {...props} onDone={done} />}
-  </AnsweringOnce>
+  <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
+    <AddPasskeyForm {...props} />
+  </DialogBoundary>
 )
 
-const AddPasskeyForm = ({ gating, onDone: done, passphraseUsername, passkeyRpId }: AddPasskeyModalProps) => {
-  const { gripe, setGripe, meet, attempt, whenShown, isShown } = useAttempts('AddPasskeyModal', done)
+const AddPasskeyForm = ({ gating, passphraseUsername, passkeyRpId }: AddPasskeyModalProps) => {
   const fieldRef = useRef<HTMLInputElement>(null)
-  const asking = useRef(false)
   const username = passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)
 
-  const addPasskey = async () => {
-    const passphraseClear = fieldRef.current?.value ?? ''
-    // The passkey is made before the passphrase is proven: with none typed, it would be left unused.
-    if (passphraseClear === '') { setGripe({ text: Messages.passphraseFirst, fromPasskey: false }); fieldRef.current?.focus(); return }
-    setGripe(null)
+  const addPasskey = async (form: FormData) => {
+    const passphraseClear = textOf(form, 'current-password')
     let made: PasskeyAnswer | null
     try {
       made = await createPasskey({ rp: { name: gating.applabel, id: passkeyRpId }, user: { name: username, displayName: username } })
     } catch (err) {
-      await whenShown(() => { meet(err) })
-      return
+      return { ok: false, err }
     }
-    if (made === null) { return }
-    // An answer is as good as the passphrase, so it is tried now or never: one that comes back
-    // while the dialog is hidden is zeroed untried, never kept for it to show again.
-    if (! isShown()) { made.prfBytes.fill(0); return }
-    await attempt(() => attemptOnce(made, (passkeyClear) => gating.attempt({ passphraseClear, passkeyClear })), 'unlocked')
+    if (made === null) { return null }
+    return attemptOnce(made, (passkeyClear) => gating.attempt({ passphraseClear, passkeyClear }))
   }
 
-  const submit = () => {
-    if (asking.current) { return }
-    asking.current = true
-    void addPasskey().finally(() => { asking.current = false })
-  }
+  const { gripe, gripeId, action } = useAttemptAction(gating, 'AddPasskeyModal', addPasskey, () => fieldRef)
 
   return (
     <ModalForm
+      gating={gating}
       title={Messages.addPasskeyTitle}
       blurb={Messages.addPasskeyBlurb}
       submitWord={Messages.addPasskeyButton}
-      gripe={gripe}
-      done={done}
-      onSubmit={submit}
+      pendingWord={Messages.addingPasskeyButton}
+      gripeText={gripe?.text ?? null}
+      gripeId={gripeId}
+      action={action}
     >
       <UsernameField username={username} />
-      <PassphraseField ref={fieldRef} credential="current-password" fieldlabel={Messages.passphraseField} takesFocus onChange={() => { setGripe(null) }} />
+      <PassphraseField ref={fieldRef} fieldname="current-password" fieldlabel={Messages.passphraseField} invalidBy={gripe === null ? undefined : gripeId} />
     </ModalForm>
   )
 }

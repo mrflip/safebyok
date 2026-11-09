@@ -1,9 +1,9 @@
 /** safebyok-react's test helpers: everything `safebyok/testing` has, a provider over a bank world, a render that hears what React reports, a promise pending until the test settles it, and a way to have Suspense hide what it renders.
  * Those that need JSX are in `test-helpers-react.tsx`, which it re-exports. Star-import it as `TH` (`import * as TH from './test-helpers'`).
  */
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
-import { onTestFinished, vi } from 'vitest'
+import { expect, onTestFinished, vi } from 'vitest'
 import { MemoryDeviceDB, type AnyGating, type Bank, type BankOpts, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok'
 import { Passphrase, VaultScopeGiven, anyStrengthChecker, passkeyOf, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
@@ -172,19 +172,25 @@ export const submitPassphrase = (passphrase: string) => {
   fireEvent.click(screen.getByText('Unlock'))
 }
 
-/** Types a first passphrase and its confirmation, `confirming` if given, and presses Create vault. */
-export const submitNewPassphrase = (passphrase: string, confirming: string = passphrase) => {
-  fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
-  fireEvent.change(screen.getByPlaceholderText('confirm vault passphrase'), { target: { value: confirming } })
-  fireEvent.click(screen.getByText('Create vault'))
+/** Presses the button that says `word` once the strength checker and the confirmation have enabled it. */
+const pressOnceEnabled = async (word: string) => {
+  await waitFor(() => { expect(screen.getByText<HTMLButtonElement>(word).disabled).to.be.false })
+  fireEvent.click(screen.getByText(word))
 }
 
-/** Types the passphrase in use, a new one and its confirmation, `confirming` if given, and presses Change passphrase. */
-export const submitReplacement = (antePassphrase: string, nextPassphrase: string, confirming: string = nextPassphrase) => {
+/** Types a first passphrase and its confirmation, and presses Create vault once it can be. */
+export const submitNewPassphrase = async (passphrase: string) => {
+  fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
+  fireEvent.change(screen.getByPlaceholderText('confirm vault passphrase'), { target: { value: passphrase } })
+  await pressOnceEnabled('Create vault')
+}
+
+/** Types the passphrase in use, a new one and its confirmation, and presses Change passphrase once it can be. */
+export const submitReplacement = async (antePassphrase: string, nextPassphrase: string) => {
   fireEvent.change(screen.getByPlaceholderText('current passphrase'), { target: { value: antePassphrase } })
   fireEvent.change(screen.getByPlaceholderText('new passphrase'), { target: { value: nextPassphrase } })
-  fireEvent.change(screen.getByPlaceholderText('confirm new passphrase'), { target: { value: confirming } })
-  fireEvent.click(screen.getByText('Change passphrase'))
+  fireEvent.change(screen.getByPlaceholderText('confirm new passphrase'), { target: { value: nextPassphrase } })
+  await pressOnceEnabled('Change passphrase')
 }
 
 /** Types the passphrase in the deletion dialog and presses Delete vault. */

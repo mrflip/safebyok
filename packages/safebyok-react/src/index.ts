@@ -9,7 +9,6 @@ export { CreateVaultButton, VaultLockControl } from './components/vault-controls
 export type { VaultControlProps } from './shapes'
 export { GatingModal } from './provider/gating-modal'
 export type { GatingModalProps } from './shapes'
-export type { DialogAnswer } from './shapes'
 export { PassphraseModal } from './modals/passphrase-modal'
 export type { PassphraseGating, PassphraseModalProps } from './shapes'
 export { ReplacePassphraseModal } from './modals/replace-passphrase-modal'

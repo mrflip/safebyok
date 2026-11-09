@@ -1,34 +1,37 @@
 import { useRef } from 'react'
 import { Messages } from '../helpers/messages'
 import type { RevokePasskeyModalProps } from '../shapes'
-import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts } from './modal-kit'
+import { DialogBoundary, ModalForm, PassphraseField, UsernameField, textOf, useAttemptAction } from './modal-kit'
 
 /** The dialog for a `revoke_passkey` gating, which removes the vault's passkey once the user proves its passphrase. */
 export const RevokePasskeyModal = (props: RevokePasskeyModalProps) => (
-  <AnsweringOnce key={props.gating.gatingTok} gating={props.gating} onDone={props.onDone}>
-    {(done) => <RevokePasskeyForm {...props} onDone={done} />}
-  </AnsweringOnce>
+  <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
+    <RevokePasskeyForm {...props} />
+  </DialogBoundary>
 )
 
-const RevokePasskeyForm = ({ gating, onDone: done, passphraseUsername }: RevokePasskeyModalProps) => {
-  const { gripe, setGripe, attempt } = useAttempts('RevokePasskeyModal', done)
+const RevokePasskeyForm = ({ gating, passphraseUsername }: RevokePasskeyModalProps) => {
   const fieldRef = useRef<HTMLInputElement>(null)
-
-  const submit = () => {
-    void attempt(() => gating.attempt({ passphraseClear: fieldRef.current?.value ?? '' }), 'unlocked')
-  }
+  const { gripe, gripeId, action } = useAttemptAction(
+    gating,
+    'RevokePasskeyModal',
+    (form) => gating.attempt({ passphraseClear: textOf(form, 'current-password') }),
+    () => fieldRef,
+  )
 
   return (
     <ModalForm
+      gating={gating}
       title={Messages.revokePasskeyTitle}
       blurb={Messages.revokePasskeyBlurb}
       submitWord={Messages.revokePasskeyButton}
-      gripe={gripe}
-      done={done}
-      onSubmit={submit}
+      pendingWord={Messages.removingButton}
+      gripeText={gripe?.text ?? null}
+      gripeId={gripeId}
+      action={action}
     >
       <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)} />
-      <PassphraseField ref={fieldRef} credential="current-password" fieldlabel={Messages.passphraseField} takesFocus onChange={() => { setGripe(null) }} />
+      <PassphraseField ref={fieldRef} fieldname="current-password" fieldlabel={Messages.passphraseField} invalidBy={gripe === null ? undefined : gripeId} />
     </ModalForm>
   )
 }
