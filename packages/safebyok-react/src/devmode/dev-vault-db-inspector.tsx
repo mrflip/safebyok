@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import type { VaultDB } from 'safebyok'
-import { boxSparse, nextRevisionOf, revisionOf } from 'safebyok/storage'
+import { nextRevisionOf, revisionOf } from 'safebyok/storage'
 import type { BankListed, BankScope, BoxesListed, BoxSparse, DamagedBox, DamagedVault, VaultRecord, VaultRow } from 'safebyok/storage'
 import { useBank } from '../hooks/hooks'
 import type { DevVaultDBInspectorProps, VaultRowLinesProps } from '../shapes'
@@ -92,7 +92,7 @@ const VaultRowLines = ({ vaultRow, boxes, onGetVault, onGetBox, onDelBox }: Vaul
           <td>{boxRow.am}</td><td>{boxRow.revision_seq}</td><td>{timeOf(boxRow.written_at)}</td>
           <td>
             <button type="button" onClick={() => { void onGetBox(boxRow) }}>getBox</button>
-            <button type="button" onClick={() => { void onDelBox(boxRow) }}>delBox</button>
+            {boxRow.am !== 'd' && <button type="button" onClick={() => { void onDelBox(boxRow) }}>delBox</button>}
           </td>
         </tr>
       ))}
@@ -100,8 +100,7 @@ const VaultRowLines = ({ vaultRow, boxes, onGetVault, onGetBox, onDelBox }: Vaul
   )
 }
 
-const delBoxRow = (vaultDB: VaultDB, boxRow: BoxSparse | DamagedBox) => {
-  const sparse = boxSparse.parse(boxRow)
-  return vaultDB.delBox({ ...sparse, ...nextRevisionOf(sparse, Date.now()), am: 'x' }, { prior: revisionOf(sparse) })
-}
+const delBoxRow = (vaultDB: VaultDB, boxRow: BoxSparse) => (
+  vaultDB.delBox({ ...boxRow, ...nextRevisionOf(boxRow, Date.now()), am: 'x' }, { prior: revisionOf(boxRow) })
+)
 // --

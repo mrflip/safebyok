@@ -267,8 +267,8 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
       const ante = await lockedVaultRowOf(tx, tombstone)
       const isOurs = DB.isLiveRowUnder(ante, tombstone.vault_tok)
       const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
-      const landed = (isOurs && DB.isRowAt(ante, prior)) || DB.isDamagedVaultAt(ante, tombstone, prior)
-      // A live row of this life, or damage, that the tombstone does not name stops the del whole; any other row lets a repeat sweep the boxes.
+      const landed = isOurs && DB.isRowAt(ante, prior)
+      // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
       if ((! landed) && (isOurs || isDamaged)) { return { landed, ante } }
       if (landed) { await storeVaultRow(tx, tombstone, ante) }
       // Past the stop above, a row that is not ours is a tombstone, another life's row, or none; only a tombstone of this life tells its boxes.
@@ -291,7 +291,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return await this.#transact(async (tx) => {
       const vault = await lockedVaultRowOf(tx, tombstone)
       const ante = await boxRowOf(tx, tombstone, tombstone.boxlabel)
-      const isDeletable = (DB.isLiveRow(ante) && DB.isRowAt(ante, prior)) || DB.isDamagedBoxAt(ante, tombstone, prior)
+      const isDeletable = DB.isLiveRow(ante) && DB.isRowAt(ante, prior)
       const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
       if (landed) {
         await storeBoxRow(tx, tombstone, tombstone.boxlabel, tombstone)

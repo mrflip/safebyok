@@ -310,6 +310,6 @@ export type VaultRowLinesProps = {
   boxes:      BoxesListed | null
   onGetVault: () => Promise<void>
   onGetBox:   (boxRow: BoxSparse | DamagedBox) => Promise<void>
-  onDelBox:   (boxRow: BoxSparse | DamagedBox) => Promise<void>
+  onDelBox:   (boxRow: BoxSparse) => Promise<void>
 }
 // --

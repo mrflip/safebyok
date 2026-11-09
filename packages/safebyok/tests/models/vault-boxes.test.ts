@@ -2,7 +2,6 @@
 
 import { omit } from 'es-toolkit'
 import { describe, expect, it } from 'vitest'
-import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { Sidecar, Whisper, boxlabel, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, delTyping, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
@@ -254,8 +253,6 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     await vault.hello()
     expect(vault.boxListing.at(held.scope)).to.be.null
     expect(held.isEnabled).to.be.false
-    expect(await vault.tryDelDamagedBox(boxlabel)).to.deep.include({ ok: true })
-    expect(boxrows.get(boxlabel)).to.have.property('am', 'x')
   })
 
   it("refuses a birth over it as 'damaged_row', the row standing", async () => {
@@ -265,50 +262,16 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     expect(boxrows.get('rubble')).to.deep.equal({ garbage: true })
   })
 
-  it("is not deleted by tryDelBox when it names a revision: 'damaged_row', the row and its listing standing, tryDelDamagedBox then deleting it", async () => {
+  it("is not deleted by tryDelBox, past reading or with its peek: 'damaged_row', the rows and the listing standing", async () => {
     const { openNextSession, boxrows } = await makeWorldWithBox()
+    boxrows.set('rubble', { garbage: true })
     boxrows.set('revised', { ...boxrows.get(boxlabel) as object, boxlabel: 'revised', whisper_ciphered: 'garbled' })
     const next = await openNextSession()
     await next.hello()
+    await TH.expectBad(next.tryDelBox('rubble'), 'damaged_row')
     await TH.expectBad(next.tryDelBox('revised'), 'damaged_row')
+    expect(boxrows.get('rubble')).to.deep.equal({ garbage: true })
     expect(boxrows.get('revised')).to.have.property('am', 'a')
-    expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['revised'])
-    await TH.expectGood(next.tryDelDamagedBox('revised'))
-    expect(boxrows.get('revised')).to.have.property('am', 'x')
-    expect(next.boxListing.damaged_rows).to.deep.equal([])
-  })
-
-  it("is deleted by tryDelDamagedBox: the tombstone lands, the entry clears, a birth then goes over it", async () => {
-    const { openNextSession, boxrows } = await makeWorldWithRubble()
-    const next = await openNextSession()
-    await next.hello()
-    expect(await next.tryDelDamagedBox('rubble')).to.deep.include({ ok: true })
-    expect(boxrows.get('rubble')).to.have.property('am', 'x')
-    expect(next.boxListing.damaged_rows).to.deep.equal([])
-    const reborn = await next.putBox({ boxlabel: 'rubble', whisper: Whisper })
-    expect(await reborn.extractWhisper()).to.deep.equal(Whisper)
-  })
-})
-
-describe("vault.tryDelDamagedBox", () => {
-  it("refuses a healthy box as 'absent_box', leaving the box alone", async () => {
-    const { vault, boxrows } = await makeWorldWithBox()
-    const err = await TH.expectBad(vault.tryDelDamagedBox(boxlabel), 'absent_box')
-    expect(err.message).to.equal(Phrases.damagedBoxAbsent(boxlabel))
-    expect(boxrows.get(boxlabel)).to.have.property('am', 'a')
-    expect(vault.boxListing.at({ ...vault.scope, boxlabel })).not.to.be.null
-  })
-
-  it("refuses a boxlabel nothing is listed under as 'absent_box', storing nothing", async () => {
-    const { vault, boxrows } = await makeWorld()
-    await TH.expectBad(vault.tryDelDamagedBox(boxlabel), 'absent_box')
-    expect(boxrows.has(boxlabel)).to.be.false
-  })
-
-  it("never throws: a boxlabel that fails its check, and a locked vault, answer a bad Outcome", async () => {
-    const { vault } = await makeWorld()
-    await TH.expectBad(vault.tryDelDamagedBox('Not A Label'))
-    vault.lock()
-    await TH.expectBad(vault.tryDelDamagedBox(boxlabel), 'vault_locked')
+    expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.have.members(['rubble', 'revised'])
   })
 })
