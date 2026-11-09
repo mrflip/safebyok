@@ -14,7 +14,7 @@ Branch `20261109-validated_writes`, PR [#612](https://github.com/mrflip/safebyok
   * The snapshot file holds `JSON.stringify` output with a trailing newline, one file per row per format number. A bump leaves the old file in place.
 * **Discoveries**:
   * No test changed meaning. Nothing in any adapter's suite asserted the old peek landing, so the defect had no test either way; the new battery cases are the only coverage.
-  * The new cases against the old source: 25 failed. `putBox` landed over all four flaws. `putVault` landed only over a tombstone-peeking flaw, as no host call passes `ifPresent: 'repl'`, so a live-peeking flawed vault was already refused. `delBox` over a tombstone-peeking flaw was already refused too; `delVault` and `tidyGone` landed.
+  * The 30 new cases against the old source: 25 failed (12 shape cases for the missing exports, 13 in the battery). `putBox` landed over all four flaws. `putVault` landed only over a tombstone-peeking flaw, as no host call passes `ifPresent: 'repl'`, so a live-peeking flawed vault was already refused. `delBox` and `delVault` landed over three flaws each, and refused the tombstone-peeking one already; `tidyGone` wrongly swept in both cases.
   * `Zod.toJSONSchema` hides two things in the row shapes: `prfSalt`'s `refine` (the decoded salt's length, in the vault row's passkey wayin), shown as a plain `minLength: 1` string; and `sidecar`, a `custom` check shown as `{}`. A change to either passes the snapshot. Brands disappear too, harmlessly.
 * **For the Coach**:
   * `VaultListing.del` (`models/vault-listing.ts:119`) still carries `(ante.am !== 'd')`, a sibling of the branch yanked from `Listing.del`. Outside this thread's named scope; left.
