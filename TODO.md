@@ -23,13 +23,13 @@ DeviceDB intelligently handles versioning of cached objects on LWW among records
 * **The vaultDB closest to the database owns validation and consistency.** The Coach, 2026-10-22
   (the primitives sprint, on keeping both a checked and an unchecked form of each get): "the vaultdb closest to the database should
   handle validation and consistency checks. I don't mind if graphql does checks as well. But
-  every vaultDB relies on the consistency guarantees of its backing store -- in the case that
+  every vaultDB relies on the consistency guarantees of its backing storage -- in the case that
   you're a facade on another vaultDB this is particularly easy." Today the base class checks every
   record each verb hands up, whichever layer it is: a facade (`GraphQLVaultDB`, the demo's outage
   adapter) re-checks what the vaultDB behind it already checked; the GraphQL server calls the hosted
   vaultDB's `try*` verbs, and its client checks the answers again in the browser. Settle
   where the one check lives (the adapter next to the storage, with the others trusting it), and
-  strip the rest, once the stores' verbs have settled.
+  strip the rest, once the VaultDBs' verbs have settled.
 
 ## Sand in the sandals
 
@@ -85,12 +85,12 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   stay in-process so `pnpm justify` needs no Docker.
 * **A schema snapshot test for `format`.** Ruled 2026-10-16
   ([#115](https://github.com/mrflip/safebyok/pull/115)): any change to what a stored record may
-  hold -- a field, a shape, or a range a check accepts -- bumps `format`. A test renders each
+  contain -- a field, a shape, or a range a check accepts -- bumps `format`. A test renders each
   stored schema with Zod's own `toJSONSchema`, keyed by its `format` literal, and fails with
   "bump `format`" when a schema changes under the same literal, so a loosened check (`.min(1)`
   to `.min(0)`) cannot ship unmarked.
 
-* **`ShelfVaultDB`, a base for key-value stores.** Declined for the store-base sprint, ruled
+* **`ShelfVaultDB`, a base for key-value databases.** Declined for the store-base sprint, ruled
   2026-10-16 ("agree, add as a TODO"; thread 5b, [#137](https://github.com/mrflip/safebyok/pull/137)).
   A connector over a list/get/put shelf writes one atomic step, and the base writes every verb on
   top of it, folding `localVaultDB` and `idbVaultDB` into it. It needs a short promise chain we
@@ -107,7 +107,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   prompt that builds a route for the host's own framework.
 * **An agent skill set** for integrating safebyok (the Coach, 2026-10-22): skills a host's coding
   agent loads to wire a bank, a VaultDB and the dialogs into an app.
-* **`bank.hello()` checks that the device store answers**, not only that the strength checker
+* **`bank.hello()` checks that the DeviceDB answers**, not only that the strength checker
   loads (the Coach, on #258: "scheduling is up to you").
 * **The demo triggers the bank when Auth.js gets an identity** (the Coach, on #259): show the
   `BankProvider` keyed on the session's user, made once the identity is known.
@@ -123,7 +123,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   passphrase (`vault.del()`).
 
 * **After the restyle (#273 to #283): two later changes.** Each changes a signature or a
-  refusal, so each waited for its own PR. `Box.seal` still takes the two epochs from its caller,
+  refusal, so each waited for its own PR. `Box.seal` still accepts the two epochs from its caller,
   unchecked; reading them from the vault's own record drops the argument. A `damaged_wayin` refusal's meta and a Wayin's JSON still carry the older wayin
   summary with `vault_tok`, where the snapshot shows each way in as its sparse shape.
 * **The names' byte-size refusals are unreachable.** Since the restyle (#273) names are short
@@ -217,9 +217,9 @@ decides; every step before it refuses `vault_locked`; a stale write refuses `sta
 `vault_locked`. The core README's *Locking* and the Contract tab's *A lock landing mid-call* say
 it per call. What it leaves open, from the scenarios `softlock_gone` (2026-10-19) listed:
 
-* **The device store throws when a lock erases the lease** (`lock()` refuses `storage_blocked` or
+* **The DeviceDB throws when a lock revokes the lease** (`lock()` refuses `storage_blocked` or
   `storage_unavailable`, the vault locked in memory): the lease on disk survives, and the next
-  birth on this device takes it up. Decide whether a lease a lock failed to erase is marked, or
+  birth on this device takes it up. Decide whether a lease a lock failed to revoke is marked, or
   the next birth asks first.
 * **A sign-out with an unlock in flight in another tab**: harmless today, a lease being scoped by
   user id.
@@ -238,8 +238,8 @@ surface is 1.0.
 
 ### A passkey made for a refused `putWayin`
 
-From the contract sprint's B4 (`put_wayin`): `vault.putWayin(passphrase, answer)` takes a passkey's
-answer made before the call, so the core holds no UI and calls no host code inside the change. A
+From the contract sprint's B4 (`put_wayin`): `vault.putWayin(passphrase, answer)` accepts a passkey's
+answer made before the call, so the core has no UI and calls no host code inside the change. A
 passphrase the vault then refuses -- a typo -- leaves that new passkey on the authenticator, a way
 into nothing, and each retry makes another. The earlier `addPasskey(passphrase, makePasskey)` asked
 the authenticator only once the proof held, at the cost of host code inside the call. Decide, once
@@ -344,7 +344,7 @@ question. The fix, small: do not judge `outlived` against vault props this handl
 From the contract sprint's `a_sec2` ([#203](https://github.com/mrflip/safebyok/pull/203)'s second
 review): a device learns that another deleted the vault, or changed its ways in, only when it next
 reads, so until then it may stay unlocked on vault props that are no longer stored (it fails safe at
-that read: the key is dropped and the lease erased). `a_sec2` closed the one window where that
+that read: the key is dropped and the lease revoked). `a_sec2` closed the one window where that
 could outlast a read, a first unlock creating the vault as it is deleted. The Coach (2026-10-19):
 "cross device invalidation should be done by a proper mechanism that is coming, where each device
 authenticates a token when it joins or creates a vault." Not to be built piecemeal ahead of it: the
@@ -355,7 +355,7 @@ design question is the token, what storage checks it against, and how a deletion
 From [#163](https://github.com/mrflip/safebyok/pull/163) (thread 5 and its review): a box has
 no format version to read ahead of, so it has no newer-format state. A box in any format but
 today's lists as damaged, and an app on an older safebyok shows a box written by a newer one as
-damaged, where the user may delete it or store over it (only on the user's own action, never by
+damaged, where the user may delete it or put over it (only on the user's own action, never by
 the vault). The Coach: "Yes add to TODO: version number on box." Give boxes a "newer, don't
 touch" state like the vault's `newer_format`: the format tag read as a version, so that a newer
 box lists as one to leave alone and an older, unreadable one still lists as damaged.
@@ -377,18 +377,18 @@ both are contracts a host's server and browser share.
 
 ### Whether `damaged_lease` calls `lock()`
 
-The Coach (2026-10-22): a lease that will not unwrap is dropped and erased as `lock()` drops and
-erases it, without calling `lock()`. Decide whether it calls `lock()` itself (ending a pending
-gating, settling `lockLanded`), taking care that the lock does not recurse into the call that
+The Coach (2026-10-22): a lease that will not unwrap is dropped and revoked as `lock()` drops and
+revokes it, without calling `lock()`. Decide whether it calls `lock()` itself (ending a pending
+gating, concluding `lockLanded`), taking care that the lock does not recurse into the call that
 met the damage.
 
 ### "Whisper unchanged" in `putBox`
 
-The Coach (2026-10-22): a store that keeps the whisper reads and opens the box first
+The Coach (2026-10-22): a put that keeps the whisper reads and opens the box first
 (`putBox({ boxlabel, sidecar })`, a whisper left out). Decide whether an active sentinel, or a
 tighter entry point for a sidecar-only change, says so more plainly than an argument left out.
 
-### Who holds the lease's expiry
+### Who keeps the lease's expiry
 
 The Coach (2026-10-22): only the passphrase proving, or a parent object, holding the lease's
 expiry, rather than the Vault object's timer. Thread 8 of the primitives sprint weighed it and
@@ -399,7 +399,7 @@ kept the Vault object's; decide once the gating's chains settle.
 The Coach (on #261: "figure out how to give that policy"): a host may want the user asked at
 every call. `leaseHours` keeps its floor above zero, and a `renewMinutes` as long as the lease
 refuses `bad_option`; today the host calls `lock()` once done. Decide how a host says "ask every
-time", and what a lease of no length means for the device store.
+time", and what a lease of no length means for the DeviceDB.
 
 ### What "rollback" means
 
@@ -408,13 +408,13 @@ things surrounding the very muddy meaning of rollback." The watermark, the devic
 rule in VAULTDB.md (#279), the vault epoch and `stale_write` each guard a different "going
 backwards". Settle one definition, say which mechanism guards which case, and name each for it.
 
-### An edit is never saved to the device cache
+### An edit is never put to the device cache
 
-The Coach (2026-10-30, the storable sprint, thread 9): "yes, TODO". The models' listing saves an
-instance to the device cache in its `settle(thing)`, which runs on each delivery and each `build`;
-`Storable.edit` settles the instance alone and tells the listing nothing, so a staged edit not yet
-sent lives only in memory, and a reload revives the instance from the copy saved before the edit:
-the edit is lost. The design question: whether `edit` hands the thing to the listing's `settle` (the
+The Coach (2026-10-30, the storable sprint, thread 9): "yes, TODO". The models' listing puts an
+instance to the device cache in its `align(thing)`, which runs on each delivery and each `build`;
+`Storable.edit` aligns the instance alone and tells the listing nothing, so a staged edit not yet
+sent lives only in memory, and a reload revives the instance from the copy put before the edit:
+the edit is lost. The design question: whether `edit` hands the thing to the listing's `align` (the
 staged record holds the whisper sealed, never in the clear, so the copy is safe to keep), and what a
 revived staged edit means once its revision may have been passed by another device meanwhile.
 
@@ -436,15 +436,15 @@ The Coach (2026-11-07, on the devicedb_verbs thread): "I've got concerns about t
 (or I can put it more cheerfully: I believe that an extended key structure can ameliorate some
 problems) but I'll leave that for later". Today a lease row is keyed by its scope (applabel,
 user id, vaultlabel) alone, and its `vault_tok` is a field checked against the query: `peek`
-checks it in the base, and `forget` leaves the check to the store, one atomic step with its
+checks it in the base, and `forget` leaves the check to the DeviceDB, one atomic step with its
 delete. A key that also held the `vault_tok` would make `forget` a delete at a key, with no check
 to run. The design question: which fields the key holds, and what it ameliorates beyond that.
 
 ### The demo's move to the new core must not share a `dbName` with the old
 
-The new core's device store wipes, unread, every older database of its `dbName`, and `${dbName}:device_db`
-is the old core's live one. A demo that runs the old and the new device store under one `dbName` would
-have the new store delete the old one's database from under it: give the new core a `dbName` of its own
+The new core's DeviceDB wipes, unread, every older database of its `dbName`, and `${dbName}:device_db`
+is the old core's live one. A demo that runs the old and the new DeviceDB under one `dbName` would
+have the new DeviceDB delete the old one's database from under it: give the new core a `dbName` of its own
 (or finish the move in one step) when the demo moves over.
 
 ## Potential Optimizations

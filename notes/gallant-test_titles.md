@@ -52,7 +52,7 @@ list those rather than split them.
 |---|---|
 | "lets a listener go, and tells none after" | "stops telling a listener once it unsubscribes" |
 | [vault.revokePasskey()] "answers at once with no passkey held: nobody asked, nothing moved" | "is a no-op with no passkey held" |
-| [settle] "notifies nobody when it changes nothing, and keeps the snapshot" | "changes nothing when there is nothing to settle" |
+| [align] "notifies nobody when it changes nothing, and keeps the snapshot" | "changes nothing when there is nothing to settle" |
 | "refuses 'bad_option' fed a put's ifAbsent, and 'disabled' once vacated" | two tests: "refuses a put's ifAbsent" and "refuses once vacated" |
 
 ## The invariant, not the trace `#invariant-not-trace`
@@ -64,7 +64,7 @@ not the steps in order. Where the sequence itself is the assertion, say so plain
 |---|---|
 | [storable.hydrate(opts)] "waits on the world's ensureTimely before it fetches" | "never fetches under a stale world" |
 | [box.put(patch)] "fetches the full record of a box held sparse before its seal" | "never seals over a sparse record" |
-| [listing.create(dna)] "refreshes the world once, puts once, and fetches nothing, then takes the world" | "goes straight through: ensureTimely, put, takeWorld, and no get" |
+| [listing.create(dna)] "refreshes the world once, puts once, and fetches nothing, then takes the world" | "goes straight through: ensureTimely, put, receiveWorld, and no get" |
 
 ## Conditions move up `#conditions-move-up`
 
