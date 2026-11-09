@@ -70,7 +70,9 @@ export const answerReplacementDialog = async (antePassphrase: string, nextPassph
   fireEvent.change(field, { target: { value: antePassphrase } })
   fireEvent.change(screen.getByPlaceholderText('new passphrase'), { target: { value: nextPassphrase } })
   fireEvent.change(screen.getByPlaceholderText('confirm new passphrase'), { target: { value: nextPassphrase } })
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Change passphrase' }))
+  const button = within(screen.getByRole('dialog')).getByRole<HTMLButtonElement>('button', { name: 'Change passphrase' })
+  await waitFor(() => { if (button.disabled) { throw new Error('the strength check has not answered') } })
+  fireEvent.click(button)
 }
 
 /** Answers the dialog that deletes the vault once it shows: types `passphrase` and presses Delete vault. */
