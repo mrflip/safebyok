@@ -275,10 +275,10 @@ const isPutAllowedOver = (rowCheck: Z.ZodType<{ am: EX.Am } | null>, ante: unkno
   return found.success && isRowAt(ante, prior) && ((found.data?.am === 'a') ? (ifPresent === 'repl') : (ifAbsent === 'add'))
 }
 
-/** True when a vault row's put under `opts` may land over `ante`, the row stored there or null. */
+/** True when a vault row's put under `opts` may be written over `ante`, the row stored there or null. */
 export const isVaultPutAllowed = (ante: unknown, opts: PutOptsGiven): boolean => isPutAllowedOver(foundVaultRow, ante, opts)
 
-/** True when a box row's put under `opts` may land over `ante`, the row stored there or null. */
+/** True when a box row's put under `opts` may be written over `ante`, the row stored there or null. */
 export const isBoxPutAllowed = (ante: unknown, opts: PutOptsGiven): boolean => isPutAllowedOver(foundBoxRow, ante, opts)
 
 /** True when `raw` is no row, a tombstone, or a row of another life, so the boxes under `vault_tok` belong to nothing. A row failing its checks might be theirs, and is false. */
@@ -330,11 +330,11 @@ export type LeaseQuery   = Z.infer<typeof leaseQuery>
 export type LeaseDated   = Z.infer<typeof leaseDated>
 export type LeaseRow     = Z.infer<typeof leaseRow>
 
-// Three strings, and no label rules: `delRawLease` is for reaching a row filed under labels today's checks refuse.
-/** The check of a lease scopepath, as `delRawLease` takes one: three strings. */
+// Three strings, and no label rules: `forgetRawLease` is for reaching a row filed under labels today's checks refuse.
+/** The check of a lease scopepath, as `forgetRawLease` takes one: three strings. */
 export const leaseScopepath = Checker(({ tuple, str }) => tuple([str, str, str]), 'bad_scope')
 
-/** Where a device store files a vault's lease row: its applabel, user_id and vaultlabel, as stored. */
+/** Where a device database files a vault's lease row: its applabel, user_id and vaultlabel, as stored. */
 export type LeaseScopepath = [applabel: string, user_id: string, vaultlabel: string]
 
 /** A lease row as stored, unchecked, beside the scopepath it is filed under. */

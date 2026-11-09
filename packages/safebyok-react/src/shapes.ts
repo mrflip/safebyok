@@ -30,7 +30,7 @@ export const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ de
   children:           custom<ReactNode>(),
 }), 'bad_option')
 
-// Hand-written for the doc comment a host sees on each prop, and held to the checker so neither drifts.
+// Hand-written for the doc comment a host sees on each prop, and matched to the checker so neither drifts.
 true satisfies AssertEqual<BankProviderProps, CheckerInput<typeof providerProps>>
 
 /** The options a held bank is made from: Bank.make's, but `device_id` and the handlers, for a `user_id` that may be null. */
@@ -289,7 +289,7 @@ export type LeaseRowLineProps = {
   row:       Record<string, unknown>
   scopepath: LeaseScopepath | null
   onForget:  (asked: LeaseQuery) => Promise<void>
-  onDelRaw:  ((scopepath: LeaseScopepath) => Promise<void>) | null
+  onForgetRaw:  ((scopepath: LeaseScopepath) => Promise<void>) | null
 }
 
 /** What a vault row's lines are handed: the row, its boxes as listed, and what each button calls. */

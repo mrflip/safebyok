@@ -1,7 +1,7 @@
 /** The vaultDB over Postgres. */
 
 import * as DB from 'safebyok/storage'
-import type { AdapterVaultDBOpts, Awaitable, BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven, RowOfBox, RowOfVault, Tidied, VaultError, VaultQuery, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
+import type { AdapterVaultDBOpts, Awaitable, BankScope, BoxesFetched, BoxFetched, BoxWritten, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelOpts, Heard, Written, PutOptsGiven, RowOfBox, RowOfVault, Tidied, VaultError, VaultQuery, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
 
 // == [The driver]: PostgresQueryable, PostgresClient, PostgresListen, PostgresVaultDBOpts
 
@@ -82,7 +82,7 @@ const CipheredFields: ReadonlySet<string> = new Set(['box_key_wrapped', 'whisper
 // Postgres refuses a notification of 8000 bytes or more.
 const NoticeMaxBytes = 7999
 
-/** What a notice tells its listeners: where the write landed, and the rows where they fit. */
+/** What a notice tells its listeners: where the row was written, and the rows where they fit. */
 type Told = VaultScope & { vault_tok?: string | undefined, boxlabel?: string | undefined, heard?: Heard | undefined }
 
 const toldWhere = DB.objCheck(({ applabel, user_id, vaultlabel, str }) => ({
@@ -233,43 +233,43 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return fetched ?? { vault: null, box: null }
   }
 
-  protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Landing> {
+  protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Written> {
     return await this.#transact(async (tx) => {
       const ante = await lockedVaultRowOf(tx, record)
-      if (! DB.isVaultPutAllowed(ante, opts)) { return { landed: false, ante } }
-      if (! await storeVaultRow(tx, record, ante)) { return { landed: false, ante: await vaultRowOf(tx, record) } }
+      if (! DB.isVaultPutAllowed(ante, opts)) { return { isWritten: false, ante } }
+      if (! await storeVaultRow(tx, record, ante)) { return { isWritten: false, ante: await vaultRowOf(tx, record) } }
       await notify(tx, record, [noticeTextOf(record)])
-      return { landed: true, ante }
+      return { isWritten: true, ante }
     })
   }
 
-  protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxLanding> {
+  protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxWritten> {
     return await this.#transact(async (tx) => {
       const vault = await lockedVaultRowOf(tx, record)
       const ante = await boxRowOf(tx, record, record.boxlabel)
-      const landed = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
-      if (landed) {
+      const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
+      if (isWritten) {
         await this.#demandRoom(tx, record, ante)
         await storeBoxRow(tx, record, record.boxlabel, record)
         await notify(tx, record, [noticeTextOf(vault as VaultRecord, record)])  // isLiveVaultRecord has checked it
       }
-      return { landed, ante, vault }
+      return { isWritten, ante, vault }
     })
   }
 
-  protected async doDelVault(tombstone: VaultTombstone, { prior }: DelOpts): Promise<Landing> {
+  protected async doDelVault(tombstone: VaultTombstone, { prior }: DelOpts): Promise<Written> {
     return await this.#transact(async (tx) => {
       const ante = await lockedVaultRowOf(tx, tombstone)
       const isOurs = DB.isLiveVaultRecord(ante, tombstone.vault_tok)
       const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
-      const landed = isOurs && DB.isRowAt(ante, prior)
+      const isWritten = isOurs && DB.isRowAt(ante, prior)
       // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
-      if ((! landed) && (isOurs || isDamaged)) { return { landed, ante } }
-      if (landed) { await storeVaultRow(tx, tombstone, ante) }
+      if ((! isWritten) && (isOurs || isDamaged)) { return { isWritten, ante } }
+      if (isWritten) { await storeVaultRow(tx, tombstone, ante) }
       // Past the stop above, a row that is not ours is a tombstone, another life's row, or none; only a tombstone of this life tells its boxes.
-      const vault = landed ? tombstone : ante as VaultRow | null
+      const vault = isWritten ? tombstone : ante as VaultRow | null
       const world = (vault?.vault_tok === tombstone.vault_tok) ? vault : null
-      const texts = landed ? [noticeTextOf(tombstone)] : []
+      const texts = isWritten ? [noticeTextOf(tombstone)] : []
       const boxes = await boxesOfLife(tx, tombstone, tombstone.vault_tok)
       for (const { boxlabel, box } of boxes) {
         const boxTombstone = DB.boxTombstoneOf(box, tombstone.written_at)
@@ -278,21 +278,21 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
         if (world !== null) { texts.push(noticeTextOf(world, boxTombstone)) }
       }
       await notify(tx, tombstone, texts)
-      return { landed, ante }
+      return { isWritten, ante }
     })
   }
 
-  protected async doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): Promise<BoxLanding> {
+  protected async doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): Promise<BoxWritten> {
     return await this.#transact(async (tx) => {
       const vault = await lockedVaultRowOf(tx, tombstone)
       const ante = await boxRowOf(tx, tombstone, tombstone.boxlabel)
       const isDeletable = DB.isLiveBoxRecord(ante, tombstone.vault_tok) && DB.isRowAt(ante, prior)
-      const landed = DB.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
-      if (landed) {
+      const isWritten = DB.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
+      if (isWritten) {
         await storeBoxRow(tx, tombstone, tombstone.boxlabel, tombstone)
         await notify(tx, tombstone, [noticeTextOf(vault as VaultRecord, tombstone)])  // isLiveVaultRecord has checked it
       }
-      return { landed, ante, vault }
+      return { isWritten, ante, vault }
     })
   }
 
@@ -391,7 +391,7 @@ const lockedVaultRowOf = async (tx: PostgresQueryable, { applabel, user_id, vaul
   firstOf(await rowsFrom(tx, LockVaultSql, [applabel, user_id, vaultlabel]), 'vault')
 )
 
-/** Store `row` over `ante`, answering false where `ante` is null and another device's birth landed first. */
+/** Store `row` over `ante`, answering false where `ante` is null and another device's birth was written first. */
 const storeVaultRow = async (tx: PostgresQueryable, row: VaultRecord | VaultTombstone, ante: unknown): Promise<boolean> => {
   const params = [row.applabel, row.user_id, row.vaultlabel, JSON.stringify(row)]
   if (ante !== null) { await tx.query(StoreVaultSql, params); return true }

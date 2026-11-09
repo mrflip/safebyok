@@ -40,7 +40,7 @@ describe("DevDeviceDBInspector", () => {
     expect(world.leaseRows()).to.deep.equal([])
   })
 
-  it("lists a damaged row only with damaged rows, and deletes it by delRawLease", async () => {
+  it("lists a damaged row only with damaged rows, and deletes it by forgetRawLease", async () => {
     const { world } = await renderOverLease()
     world.deviceDB._cheat_leaseRows().set(ckeyOf('acme', 'u1', 'mangled'), { scopepath: ['acme', 'u1', 'mangled'], row: { applabel: 'acme', user_id: 'u1', vaultlabel: 'mangled' } })
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
@@ -48,7 +48,7 @@ describe("DevDeviceDBInspector", () => {
     includingDamaged()
     await waitFor(() => { expect(leaseRow('mangled')).to.exist })
     expect(within(leaseRow('mangled')).queryByRole('button', { name: 'forget' })).to.be.null
-    fireEvent.click(within(leaseRow('mangled')).getByRole('button', { name: 'delRawLease' }))
+    fireEvent.click(within(leaseRow('mangled')).getByRole('button', { name: 'forgetRawLease' }))
     await waitFor(() => { expect(screen.queryByText('mangled')).to.be.null })
   })
 

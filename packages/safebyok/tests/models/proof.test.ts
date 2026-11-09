@@ -167,7 +167,7 @@ describe("the proof", () => {
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main locked'])
 
-    // Unlock: the lock erased the cached lease, so the user is asked, and the wrong passphrase leaves the dialog open.
+    // Unlock: the lock forgotten the cached lease, so the user is asked, and the wrong passphrase leaves the dialog open.
     dialog.typing = [byPassphrase('not the passphrase'), byPassphrase(Passphrase)]
     await vault.ensureUnlocked()
     expect(dialog.refusals.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal(['wrong_passphrase'])
@@ -288,7 +288,7 @@ describe("the proof", () => {
     bankUi.expectRenders([])
     expect(world.leaseRows()).to.have.lengthOf(1)
 
-    // Past it, the lease is erased and the vault reports locked; the bank stays ready.
+    // Past it, the lease is forgotten and the vault reports locked; the bank stays ready.
     world.advance(2)
     await bank.autolock()
     bankUi.expectRenders(['ready: main locked'])
@@ -312,7 +312,7 @@ describe("the proof", () => {
     expect(world.leaseRows()).to.have.lengthOf(1)
     expect(world.leaseRows()[0]).to.not.deep.equal(expiredRow)
 
-    // Its host calling autolock after hello erases the row before anyone asks.
+    // Its host calling autolock after hello forgets the row before anyone asks.
     world.advance(AutolockMillis + 1)
     const laterPage = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
     const laterUi = mountComponent(laterPage, bankStatus)
@@ -430,7 +430,7 @@ describe("the proof", () => {
     await vault.ensureUnlocked()
     bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
 
-    // It deletes the vault: this device locks, erases its lease, and the vault leaves the list.
+    // It deletes the vault: this device locks, forgets its lease, and the vault leaves the list.
     phone.typing = byPassphrase(NewPassphrase)
     await phoneVault.delVaultPrompt()
     await ticks(1)

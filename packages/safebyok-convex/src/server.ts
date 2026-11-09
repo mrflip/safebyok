@@ -97,7 +97,7 @@ export class SafebyokComponent {
       }),
       putVault: publicMutation({
         args:    CVX.putVaultArgs,
-        returns: CVX.landing,
+        returns: CVX.written,
         handler: async (ctx, args) => {
           await demandCaller(ctx, args.record.user_id)
           return await ctx.runMutation(vaults.putVault, args)
@@ -113,7 +113,7 @@ export class SafebyokComponent {
       }),
       delVault: publicMutation({
         args:    CVX.delVaultArgs,
-        returns: CVX.landing,
+        returns: CVX.written,
         handler: async (ctx, args) => {
           await demandCaller(ctx, args.tombstone.user_id)
           return await ctx.runMutation(vaults.delVault, args)
@@ -121,7 +121,7 @@ export class SafebyokComponent {
       }),
       delBox: publicMutation({
         args:    CVX.delBoxArgs,
-        returns: CVX.boxLanding,
+        returns: CVX.boxWritten,
         handler: async (ctx, args) => {
           await demandCaller(ctx, args.tombstone.user_id)
           return await ctx.runMutation(vaults.delBox, args)

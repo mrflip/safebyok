@@ -19,7 +19,7 @@ const AutolockMillis = AutolockMinutes * 60_000
 const oldLeaseRow = (world: ReturnType<typeof makeBankWorld>, vaultlabel: string): LeaseRow => ({ ...(world.leaseRows()[0] as LeaseRow), vaultlabel, vault_tok: makeLifeTok(), proved_at: T0 - (2 * AutolockMillis) })
 
 describe("bank.autolock", () => {
-  it("locks a listed vault past its autolock, which erases its lease, leaving a younger one", async () => {
+  it("locks a listed vault past its autolock, which forgets its lease, leaving a younger one", async () => {
     const { world, bank, vault } = await makeBankWithVault()
     await bank.autolock()
     expect(vault.isUnlocked).to.be.true
@@ -77,7 +77,7 @@ describe("bank.autolock", () => {
     expect(world.leaseRows()).to.have.lengthOf(1)
   })
 
-  it("past autolock, a lease held stays held: ensureUnlocked looks at no row, erases nothing and asks nothing", async () => {
+  it("past autolock, a lease held stays held: ensureUnlocked looks at no row, forgets nothing and asks nothing", async () => {
     const world = makeBankWorld()
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const { vault } = await makeBankWithVault(world, { requestCleartext })
@@ -108,7 +108,7 @@ describe("bank.autolock", () => {
     await TH.eventually(() => world.leaseRows().length === 0)
   })
 
-  it("called by a host after hello on a fresh page, erases an old lease through the vault just listed, and that vault asks again", async () => {
+  it("called by a host after hello on a fresh page, forgets an old lease through the vault just listed, and that vault asks again", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     world.advance(AutolockMillis + 1)
@@ -123,7 +123,7 @@ describe("bank.autolock", () => {
     expect(requestCleartext).toHaveBeenCalledOnce()
   })
 
-  it("relies on vault.lock() erasing the row cached for a vault already locked", async () => {
+  it("relies on vault.lock() forgetting the row cached for a vault already locked", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     const fresh = world.bankOn()
@@ -196,7 +196,7 @@ describe("bank.autolock", () => {
     expect(onBadNews).not.toHaveBeenCalled()
   })
 
-  it("leaves a refused erase to the vault's own lock, which onLifecycle hears", async () => {
+  it("leaves a refused forget to the vault's own lock, which onLifecycle hears", async () => {
     const onLifecycle = vi.fn()
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle })
     onLifecycle.mockClear()
@@ -220,7 +220,7 @@ describe("bank.autolock", () => {
 })
 
 describe("bank.lock, bank.vacate, bank.sweep", () => {
-  it("locks every listed vault and erases its lease, the bank unchanged", async () => {
+  it("locks every listed vault and forgets its lease, the bank unchanged", async () => {
     const { world, bank, vault } = await makeBankWithVault()
     const other = await bank.ensureVault(OtherScopeGiven)
     bank.lock()
@@ -255,7 +255,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(relisted?.isLocked).to.be.true
   })
 
-  it("erases a fresh page's rows of its own bank with nothing listed, another user's staying", async () => {
+  it("forgets a fresh page's rows of its own bank with nothing listed, another user's staying", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     const elsewhere = world.bankOn({ user_id: 'u2' })
@@ -266,7 +266,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect((world.leaseRows()[0] as { user_id: string }).user_id).to.eq('u2')
   })
 
-  it("tells the host's onLifecycle of a lease its vacate cannot erase and then of the vacate, though the bank is disabled, a repeat doing nothing", async () => {
+  it("tells the host's onLifecycle of a lease its vacate cannot forget and then of the vacate, though the bank is disabled, a repeat doing nothing", async () => {
     const world = makeBankWorld()
     const refusal = new VaultError('storage_unavailable', 'no store')
     const onLifecycle = vi.fn()
@@ -354,7 +354,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(world.leaseRows()).to.deep.equal([])
   })
 
-  it("tells the host nothing past the disable but its scrub's refusals, a vault's own erase going to the platform", async () => {
+  it("tells the host nothing past the disable but its scrub's refusals, a vault's own forget going to the platform", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
@@ -386,7 +386,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     vi.unstubAllGlobals()
   })
 
-  it("settles a repeat during its erase and after it, scanning the cached leases once, the first cause standing", async () => {
+  it("settles a repeat during its forget and after it, scanning the cached leases once, the first cause standing", async () => {
     const { world, bank } = await makeBankWithVault()
     const tryListLeases = vi.spyOn(world.deviceDB, 'tryListLeases')
     const vacating = bank.vacate()
@@ -396,7 +396,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(bank.snapshot.err).to.include({ refusalkind: 'disabled' })
   })
 
-  it("settles where the host's onLifecycle awaits a vacate of the bank its erase is telling", async () => {
+  it("settles where the host's onLifecycle awaits a vacate of the bank its forget is telling", async () => {
     const world = makeBankWorld()
     const refusal = new VaultError('storage_unavailable', 'no store')
     const onLifecycle = vi.fn(async ({ bank }: { bank: Bank }) => { await bank.vacate() })
@@ -485,7 +485,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(bank.snapshot.err).to.include({ refusalkind: 'disabled', message: Phrases.BankLetGo })
   })
 
-  it("erases the bank's cached leases at a vacate after a sweep, as a sign-out after the page's cleanup", async () => {
+  it("forgets the bank's cached leases at a vacate after a sweep, as a sign-out after the page's cleanup", async () => {
     const world = makeBankWorld()
     const { bank } = await makeBankWithVault(world)
     bank.sweep()

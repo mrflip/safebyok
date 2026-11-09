@@ -1,10 +1,10 @@
 // Kept off the front door (`safebyok`) so a host's autocomplete never meets the adapter's contract, and an adapter's imports name one door.
 /** `safebyok/storage`: what a storage adapter is written against, the AdapterVaultDB and the DeviceDB. */
 
-// == [The stores]: AdapterVaultDB, VaultDB, DeviceDB, their brands, and the two in memory
+// == [The databases]: AdapterVaultDB, VaultDB, DeviceDB, their brands, and the two in memory
 export { AdapterVaultDB } from './vault-db'
 export type { Answer, BadAnswer, BankListed, BoxesListed, DelAct, GoodAnswer, GotAct, ListAct, Notice, PutAct, Tidied } from './vault-db'
-export type { BoxesFetched, BoxFetched, BoxLanding, Heard, Landing, RowOfBox, RowOfVault, VaultDB } from './vault-db'
+export type { BoxesFetched, BoxFetched, BoxWritten, Heard, Written, RowOfBox, RowOfVault, VaultDB } from './vault-db'
 export { VaultDBVerbnames } from './vault-db'
 export { IsAdapterVaultDB, IsVaultDB, isAdapterVaultDB, isVaultDB } from '../helpers/consts'
 export { DeviceDB } from './device-db'
@@ -15,7 +15,7 @@ export type { Awaitable } from '../helpers/helpers'
 export { ckeyOf } from '../helpers/helpers'
 // --
 
-// == [IndexedDB]: the one transaction an IndexedDB store takes per call, the row at a scopepath within it, and the versioned shelf
+// == [IndexedDB]: the one transaction an IndexedDB datastore takes per call, the row at a scopepath within it, and the versioned shelf
 export { inOneStep, rowAt } from './idb-transaction'
 export { versionedShelfOf } from './idb-shelf'
 export type { VersionedShelfSpec } from './idb-shelf'
@@ -62,7 +62,7 @@ export type { ConsistencyRefusal, ObjCheckOpts, Refusing, Story } from '../helpe
 
 // == [The refusals]: the throwers an adapter raises, and how a refusal reads
 export { sanitizeForeignError, storageUnavailable, unexpectedError } from '../refusals/throwers'
-export { vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, storageFull, seqNotNext, storeFailed } from '../refusals/throwers'
+export { vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, storageFull, seqNotNext, deviceDBFailed } from '../refusals/throwers'
 export { storageFailed, identityRevoked } from '../refusals/throwers'
 export { VaultError, isVaultError, refusalkindVals } from '../refusals/errors'
 export { IsVaultError, brand, brandOf } from '../helpers/consts'
@@ -72,5 +72,5 @@ export type { BadOutcome, GoodOutcome, Outcome } from '../refusals/outcome'
 // --
 
 // == [The phrases]: the sentences an adapter's own refusals say, kept with the core's so the wording is reviewed in one place
-export { NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed, fetchFailed, WatchEnded } from '../helpers/phrases'
+export { NoBrowserDatastore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserDatastoreFailed, SchemaNotServed, fetchFailed, WatchEnded } from '../helpers/phrases'
 // --

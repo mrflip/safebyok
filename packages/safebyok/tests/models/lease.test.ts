@@ -273,10 +273,10 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
   }
 })
 
-describe("lease.vacate(), lease.evict() and isPresent", () => {
+describe("lease.revoke(), lease.evict() and isPresent", () => {
   it("vacate forgets the cached record and leaves the lease forgotten and out of force", async () => {
     const { friend, lease } = await grantedWorld()
-    await lease.vacate()
+    await lease.revoke()
     expect(friend.forgetLease).toHaveBeenCalledTimes(1)
     expect(friend.cached).to.be.null
     expect(lease.isPresent).to.be.false
@@ -284,23 +284,23 @@ describe("lease.vacate(), lease.evict() and isPresent", () => {
 
   it("is idempotent: a second vacate forgets nothing more", async () => {
     const { friend, lease } = await grantedWorld()
-    await lease.vacate()
-    await lease.vacate()
+    await lease.revoke()
+    await lease.revoke()
     expect(friend.forgetLease).toHaveBeenCalledTimes(1)
   })
 
-  it("throws what forgetLease refuses, the lease out of force all the same; tryVacate answers it as a bad Outcome", async () => {
+  it("throws what forgetLease refuses, the lease out of force all the same; tryRevoke answers it as a bad Outcome", async () => {
     const { friend, lease } = await grantedWorld()
     friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the store is down'))
-    await TH.expectRefusal(lease.vacate())
+    await TH.expectRefusal(lease.revoke())
     expect(lease.isPresent).to.be.false
     const other = await grantedWorld()
     other.friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the store is down'))
-    await TH.expectBad(other.lease.tryVacate())
+    await TH.expectBad(other.lease.tryRevoke())
     expect(other.lease.isPresent).to.be.false
   })
 
-  it("Lease.forget erases a record with no lease held, on each call, and starts before it answers, so erases land in call order", async () => {
+  it("Lease.forget forgets a record with no lease held, on each call, and starts before it answers, so forgets land in call order", async () => {
     const friend = fakeLeaseFriendOf()
     friend.cached = 'a row of an earlier session'
     const forgetting = Lease.tryForget(friend)
@@ -337,7 +337,7 @@ describe("lease.vacate(), lease.evict() and isPresent", () => {
     const { lease } = await grantedWorld()
     const stamp = sealStampOf('b1')
     const sealed = await lease.sealWith(WhisperText, stamp)
-    await lease.vacate()
+    await lease.revoke()
     await TH.expectRefusal(lease.sealWith(WhisperText, stamp), 'vault_locked')
     await TH.expectRefusal(lease.unsealWith(sealed, stamp), 'vault_locked')
   })

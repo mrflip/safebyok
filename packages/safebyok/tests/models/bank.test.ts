@@ -258,11 +258,11 @@ describe("DefaultOnLifecycle", () => {
   const Refusal = new VaultError('storage_unavailable', 'no store', { cause: new Error(Passphrase) })
   const Revoked = new VaultError('identity_revoked', 'signed out')
   const LifecycleCases = [
-    // a cached lease that outlived its erase:
-    [{ kind: 'lease_unerased', refusal: Refusal, where: 'lock' },      'error', true,  'reports a lock\'s refused erase at error and to the platform, and vacates the vault'],
-    [{ kind: 'lease_unerased', refusal: Refusal, where: 'vacate' },    'error', true,  'reports a vacate\'s refused erase at error and to the platform'],
-    [{ kind: 'lease_unerased', refusal: Refusal, where: 'tombstone' }, 'warn',  false, 'warns of a tombstone\'s refused erase, vacating nothing'],
-    [{ kind: 'lease_unerased', refusal: Refusal, where: 'undeleted' },  'warn',  false, 'warns of an outdated row\'s refused erase, vacating nothing'],
+    // a cached lease that outlived its forget:
+    [{ kind: 'lease_unerased', refusal: Refusal, where: 'lock' },      'error', true,  'reports a lock\'s refused forget at error and to the platform, and vacates the vault'],
+    [{ kind: 'lease_unerased', refusal: Refusal, where: 'vacate' },    'error', true,  'reports a vacate\'s refused forget at error and to the platform'],
+    [{ kind: 'lease_unerased', refusal: Refusal, where: 'tombstone' }, 'warn',  false, 'warns of a tombstone\'s refused forget, vacating nothing'],
+    [{ kind: 'lease_unerased', refusal: Refusal, where: 'undeleted' },  'warn',  false, 'warns of an outdated row\'s refused forget, vacating nothing'],
     // a vacate:
     [{ kind: 'vacated', cause: Revoked, unerased: 0 },                 'error', false, 'reports a vacate for a revoked identity at error and to the platform'],
     [{ kind: 'vacated', cause: bankDisabled(), unerased: 1 },          null,    false, 'says nothing of a sign-out'],
@@ -538,7 +538,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     expect(attempted?.err?.message).to.include('CUSTOMIZATION.md')
   })
 
-  it("keeps to its call when the host's logger throws, in Bank.make and past a cached lease row it cannot erase", async () => {
+  it("keeps to its call when the host's logger throws, in Bank.make and past a cached lease row it cannot forget", async () => {
     const world = makeBankWorld()
     const warn = vi.fn(() => { throw new Error('the logger broke') })
     const logger = { log: warn, warn, error: warn }

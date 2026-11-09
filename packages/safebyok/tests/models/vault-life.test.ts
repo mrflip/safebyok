@@ -52,7 +52,7 @@ describe("Birth: a vault born with its gate seals its first box under the birth 
 })
 
 describe("Locking, and the sessions after it on this device", () => {
-  it("erases the kept lease at lock(), so the next session asks for the passphrase: its box refuses 'vault_locked', a wrong passphrase refuses 'wrong_passphrase', and the right one opens the whisper the first session sealed", async () => {
+  it("forgets the kept lease at lock(), so the next session asks for the passphrase: its box refuses 'vault_locked', a wrong passphrase refuses 'wrong_passphrase', and the right one opens the whisper the first session sealed", async () => {
     const { vault, boxIn, openNextSession, deviceDB } = await makeVaultWithBox()
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
@@ -66,7 +66,7 @@ describe("Locking, and the sessions after it on this device", () => {
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("leaves the cached lease at a sweep, so the next session's ensureUnlocked takes it up and opens the box without asking; a lock() there erases it, and the session after asks for the passphrase again", async () => {
+  it("leaves the cached lease at a sweep, so the next session's ensureUnlocked takes it up and opens the box without asking; a lock() there forgets it, and the session after asks for the passphrase again", async () => {
     const { listing, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox()
     listing.sweep()
     const second = await openNextSession()
@@ -98,7 +98,7 @@ describe("Locking, and the sessions after it on this device", () => {
 })
 
 describe("The lock, with a box in hand", () => {
-  it("locks the vault: the exposed whisper reports LOCKED, the unseal refuses 'vault_locked', and the cached lease is erased, so the next session asks for the passphrase", async () => {
+  it("locks the vault: the exposed whisper shows LOCKED, the unseal refuses 'vault_locked', and the cached lease is forgotten, so the next session asks for the passphrase", async () => {
     const { vault, box, deviceDB, openNextSession } = await makeVaultWithBox()
     await box.expose()
     expect(box.whisper).to.deep.equal(Whisper)

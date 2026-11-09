@@ -7,15 +7,15 @@ import { fakeLeaseFriendOf, makeGrantedLease, useFakeClock } from '../test-helpe
 
 useFakeClock()
 
-describe("forgetting a lease whose erase is refused", () => {
-  it("whiteboard/20261030-newvault/newvault-spec.md:73, 'forget() drops the keys and erases the record': a vacate whose forgetLease is refused throws with the lease already forgotten, and a second vacate resolves without erasing, so the record lies on", async () => {
+describe("forgetting a lease whose forget is refused", () => {
+  it("whiteboard/20261030-newvault/newvault-spec.md:73, 'forget() drops the keys and forgets the record': a vacate whose forgetLease is refused throws with the lease already forgotten, and a second vacate resolves without forgetting, so the record lies on", async () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
     await lease.cacheAsCacheCan()
     friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the store is down'))
-    await TH.expectRefusal(lease.vacate())
+    await TH.expectRefusal(lease.revoke())
     expect(lease.isPresent).to.be.false
-    await lease.vacate()
+    await lease.revoke()
     expect(friend.forgetLease).toHaveBeenCalledTimes(1)
     expect(friend.cached).to.not.be.null
   })

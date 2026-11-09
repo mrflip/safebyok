@@ -45,7 +45,7 @@ describe("cmpRevisions(ante, post)", () => {
     })
   }
 
-  it("refuses the same seq under another tok: two puts landed as one revision", () => {
+  it("refuses the same seq under another tok: two puts written as one revision", () => {
     TH.expectSyncRefusal(() => cmpRevisions(ante, { revision_seq: 2, revision_tok: 'rev-other' }))
   })
 })

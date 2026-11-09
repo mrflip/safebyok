@@ -51,7 +51,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return new BoxListing(vault, { scope: vault.scope, vaultDB: this.vaultDB, maxMillisSinceRefresh: this.world.boxRefreshMillis, bankFriend: this.bankFriend })
   }
 
-  /** The scope of `duck`, held to this bank: no listing answers for another's. */
+  /** The scope of `duck`, which must be this bank's: no listing answers for another's. */
   scopeOf(duck: unknown):  VaultScope  { return vaultScope.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
 
   /** Parse `duck` as a {@link VaultSparse}. */
@@ -93,7 +93,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, del
 
-  /** Lay a new passphrase wayin on the row, deliver what it stores to the vault enlisted, and answer that record. Nothing locks: the vaultKey does not change. */
+  /** Lay a new passphrase wayin on the row, deliver what it stores to the vault listed, and answer that record. Nothing locks: the vaultKey does not change. */
   async replacePassphrase(params: ReplacePassphraseParams): Promise<SX.VaultRecord> {
     this.demandEnabled()
     return this.#deliverStored(await this.vaultDB.tryReplacePassphrase(params))
@@ -111,7 +111,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return this.#deliverStored(await this.vaultDB.tryRevokePasskey(params))
   }
 
-  /** The record a gate verb stored: the vault enlisted may hold a newer one by the time its answer is delivered. */
+  /** The record a gate verb stored: the vault listed may hold a newer one by the time its answer is delivered. */
   async #deliverStored(answer: Answer<SX.VaultRecord, string>): Promise<SX.VaultRecord> {
     await this.deliver(answer)
     return valOf(answer)
@@ -119,8 +119,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** SLOPDOC: Deletes the vault `ante` names over its own revision; its boxes cascade in the vaultDB. */
   override async del(ante: VaultSparse | Vault): Promise<Vault | null> {
-    const enlisted = this.at(this.scopeOf(ante))
-    if ((enlisted !== null) && (enlisted.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
+    const listed = this.at(this.scopeOf(ante))
+    if ((listed !== null) && (listed.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
     return this.delOver(this.sparseOf(ante))
   }
   // --
@@ -168,12 +168,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   protected vaultTokOfWorld(): null { return null }
 
-  /** An older record loses to the vault enlisted. A newer one replaces it where it is of another `vault_tok`, or alive over a tombstone. */
-  protected override fateOver(enlisted: Vault, record: Fetched<VaultRecord, VaultSparse>): SlotFate {
-    const age = cmpRevisions(enlisted, record)
+  /** An older record loses to the vault listed. A newer one replaces it where it is of another `vault_tok`, or alive over a tombstone. */
+  protected override fateOver(listed: Vault, record: Fetched<VaultRecord, VaultSparse>): SlotFate {
+    const age = cmpRevisions(listed, record)
     if (age === 'older') { return 'lose' }
-    const isOtherLife = record.vault_tok !== enlisted.vault_tok
-    const isRebirth = (! enlisted.isPresent) && (! VX.isTombstone(record))
+    const isOtherLife = record.vault_tok !== listed.vault_tok
+    const isRebirth = (! listed.isPresent) && (! VX.isTombstone(record))
     return ((age === 'newer') && (isOtherLife || isRebirth)) ? 'replace' : 'receive'
   }
 

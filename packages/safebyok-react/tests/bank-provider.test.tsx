@@ -359,7 +359,7 @@ describe("BankProvider's handlers", () => {
     expect(shown('vault')).to.eq('present locked')
   })
 
-  it("leaves a vault whose lease survived its erase to be vacated when the host has no onLifecycle, as the core does", async () => {
+  it("leaves a vault whose lease survived its forget to be vacated when the host has no onLifecycle, as the core does", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const { deviceDB } = await unlockedProvided()
@@ -369,18 +369,18 @@ describe("BankProvider's handlers", () => {
     await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
   })
 
-  it("tells the next user's onLifecycle nothing of the bank it let go, whose vacate tells the last user's onLifecycle of the lease it cannot erase", async () => {
+  it("tells the next user's onLifecycle nothing of the bank it let go, whose vacate tells the last user's onLifecycle of the lease it cannot forget", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const next = vi.fn()
-    const erasing = TH.held()
+    const forgetting = TH.held()
     const previous = vi.fn()
     const { props, rerender, deviceDB } = await unlockedProvided({ onLifecycle: previous })
-    vi.spyOn(deviceDB, 'forget').mockImplementation(async () => { await erasing.promise; throw Refusal })
+    vi.spyOn(deviceDB, 'forget').mockImplementation(async () => { await forgetting.promise; throw Refusal })
     fireEvent.click(screen.getByText('Lock'))
     rerender({ ...props, user_id: 'u2', onLifecycle: next })
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
-    erasing.resolve(undefined)
+    forgetting.resolve(undefined)
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
     await waitFor(() => { expect(previous).toHaveBeenCalledWith(expect.objectContaining({ kind: 'vacated', unerased: 1 })) })
     expect(previous.mock.calls.map(([event]) => (event as { kind: string }).kind).filter((kind) => kind !== 'helloed')).to.deep.equal(['lease_unerased', 'vacated'])

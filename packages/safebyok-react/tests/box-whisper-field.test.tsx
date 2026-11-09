@@ -72,7 +72,7 @@ describe("BoxWhisperField", () => {
     render(<BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />)
     await exposing(box)
     fireEvent.change(theField(), { target: { value: 'sk-ant-fake-edited' } })
-    await act(async () => { await BoxFields.of(box).save() })
+    await act(async () => { await BoxFields.of(box).put() })
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-ant-fake-edited', Credentials: { SessionToken: 'fake-session-token' } })
   })
 

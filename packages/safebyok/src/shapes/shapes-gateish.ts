@@ -192,7 +192,7 @@ export type Novel = typeof NOVEL
 export const LeaseFormat = 7001
 
 /** True when `val` is a leaseKey as `makeLeaseKey` makes one: a non-extractable AES-GCM CryptoKey whose usages are within `wrapKey` and `unwrapKey`, among them `unwrapKey`.
- * A device store hands back what it kept by structured clone, so a key that is extractable, of
+ * A device database hands back what it kept by structured clone, so a key that is extractable, of
  * another algorithm, or for another use was not written by this package: its record reads as none.
  *
  * @example isLeaseKey(await makeVaultKey())  // false: extractable
@@ -248,7 +248,7 @@ export const leaseFriend = objCheck(({ fn }) => ({
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
   /** Forget the lease this device has cached. */
   forgetLease:     fn<() => Promise<void>>(),
-  /** Forget the lease this device has cached, telling the host of a refused erase. */
+  /** Forget the lease this device has cached, telling the host of a refused forget. */
   tryForgetLease:  fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
   tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),

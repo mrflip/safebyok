@@ -202,7 +202,7 @@ export const storableArgs = objCheck(({ custom }) => ({
 
 // == [Given to a listing]: Thing, ListingAnswer, DelTombstone, SlotFate, ListingOf
 
-/** A vault or box as a listing enlists it. */
+/** A vault or box in a listing. */
 export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
 
 /** The answer of a vaultDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
@@ -326,7 +326,7 @@ export interface VaultSnapshot extends VaultScope {
   readonly written_at:    number
   /** True unless the vault is deleted or damaged. */
   readonly isPresent:     boolean
-  /** True unless this device holds a lease in force. */
+  /** True unless this device has a lease granted and in force. */
   readonly isLocked:      boolean
 }
 
@@ -382,9 +382,9 @@ export interface BankOpts {
   user_id:              string
   /** Your id for this device, a random UUID you keep per device. */
   device_id:            string
-  /** The store the vaults are synchronized through, from a storage adapter. */
+  /** The VaultDB the vaults are synchronized through, from a storage adapter. */
   vaultDB:              VaultDB
-  /** The store on this device that caches each vault's lease. */
+  /** The device database that caches each vault's lease. */
   deviceDB:             DeviceDB
   /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
   keyDeriver:           KeyDeriver
@@ -400,9 +400,9 @@ export interface BankOpts {
   vaultRefreshMinutes?: number | undefined
   /** How recently a box's record must have been fetched to be trusted, in minutes; 5 when left out. */
   boxRefreshMinutes?:   number | undefined
-  /** Hears each refusal no caller waits on while the bank is enabled and in its vacate's erase; else `DefaultOnBadNews`, the bank's logger. */
+  /** Hears each refusal no caller waits on while the bank is enabled and in its vacate's forget; else `DefaultOnBadNews`, the bank's logger. */
   onBadNews?:           BadNewsHandler | undefined
-  /** Hears what happened in the bank's life, and no secret material, while the bank is enabled and in its vacate's erase; `DefaultOnLifecycle` when left out. */
+  /** Hears what happened in the bank's life, and no secret material, while the bank is enabled and in its vacate's forget; `DefaultOnLifecycle` when left out. */
   onLifecycle?:         LifecycleHandler | undefined
 }
 
@@ -435,7 +435,7 @@ export const tellBadNewsToInput = objCheck(({ fn, custom, arr }) => ({
   badnews:   arr(custom<VaultError>(isVaultError, Phrases.VaultErrorExpected)),
 }), 'bad_option')
 
-/** Where a cached lease outlived its erase: a vault's lock, tombstone or vacate, the bank's vacate, or a row of another epoch or life met at an unlock. */
+/** Where a cached lease outlived its forget: a vault's lock, tombstone or vacate, the bank's vacate, or a row of another epoch or life met at an unlock. */
 export type EraseSite = 'lock' | 'tombstone' | 'vacate' | 'undeleted'
 
 /** What a bank's listings and vaults announce through it: a {@link BankEvent} before the bank names itself. */
@@ -447,7 +447,7 @@ export type BankAnnouncement =
 /** What `onLifecycle` hears: what happened in the bank's life, told by its `kind`, and the bank it happened to. */
 export type BankEvent = { readonly bank: Bank } & BankAnnouncement
 
-/** `Bank.make`'s `onLifecycle`: hears what happened in the bank's life, as a hello, a vacate or a cached lease that outlived its erase. */
+/** `Bank.make`'s `onLifecycle`: hears what happened in the bank's life, as a hello, a vacate or a cached lease that outlived its forget. */
 export type LifecycleHandler = (event: BankEvent) => unknown
 
 /** `onLifecycle` as a bank keeps it, wrapped by `guardOnLifecycle`. Never throws. */

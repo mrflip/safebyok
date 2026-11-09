@@ -17,7 +17,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `box_too_large`, `vault_full`,
  *   `stale_write`, `record_conflict`, `storage_unavailable`,
- *   `vault_gone`, `vault_mismatch`, `gating_landed`, `attempt_in_flight`, `already_asking`, `dismissed`,
+ *   `vault_gone`, `vault_mismatch`, `gating_concluded`, `attempt_in_flight`, `already_asking`, `dismissed`,
  *   `same_passphrase`, `camped`, `vault_empty`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_box`, `damaged_lease`, `newer_format`,
@@ -57,8 +57,8 @@ export const refusalkindVals = [
   'storage_issue',       // the storage backend answered with a row no working store could: no object at all, or naming another address than the one asked: the database is so broken we just can't, and a retry is unlikely to help
   'vault_gone',          // the vault a call was working on is no longer stored: deleted, here or elsewhere
   'vault_mismatch',      // a live vault stands where the call's vault stood, under another vault_tok than the call holds
-  'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- it was answered or dismissed -- so it unlocked nothing
-  'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
+  'gating_concluded',    // a proof under way was for a prompt that ended meanwhile -- it was answered or dismissed -- so it unlocked nothing
+  'damaged_lease',       // this device's lease would not open under its leaseKey: it was forgotten, and the vault locked
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
   'already_asking',      // a gating is open on this bank, so a second one was not launched: one dialog at a time, and no join
   'dismissed',           // the dialog was dismissed with no attempt under way, so nothing was done
@@ -101,7 +101,7 @@ export const RefusalFamilyForKind = {
   storage_issue:       'bad_news',
   vault_gone:          'condition',
   vault_mismatch:      'condition',
-  gating_landed:       'condition',
+  gating_concluded:    'condition',
   damaged_lease:       'bad_news',
   attempt_in_flight:   'condition',
   already_asking:      'condition',

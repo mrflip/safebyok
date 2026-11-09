@@ -18,7 +18,7 @@ bank.hello()                                         a forced reset; a host may 
    │       older than the one held                   → it loses
    │       new vault_tok, or alive over a tombstone  → build, enlisted; old_vault.vacate, delist
    │       same life                                 → vault.receive(record)
-   │       a tombstone of its own vault_tok          → the vault stays in its slot and adopts it (locked, row erased, boxes vacated)
+   │       a tombstone of its own vault_tok          → the vault stays in its slot and adopts it (locked, row forgotten, boxes vacated)
    ├─ bank.#cacheDeviceRecord                        a damaged record written over → bad news
    ├─ vaultListing.hello()                           subscribe to VaultDB
    └─ vaultListing.demandEnabled()                   a sweep crossing hello refuses here
@@ -135,8 +135,8 @@ shows a change only once it has landed.
 * No timers on a Storable or a lease: a JS timer on a page that may be suspended at any moment says nothing. Refresh
   timers belong to the listing or the bank. Autolock is a best-effort reminder, not a guarantee: `bank.autolock`, called by a host as it likes, after hello and on its own timer, and `Lease.peek` declining to load a row past it at the door, leaving it
 * A lease records `proved_at` and the kind of proving. `bank.autolock` finds cached leases through a deviceDB index range
-  scan, so a fresh page needs no instance, and locks each listed vault of the row's own `vault_tok`, which erases the row.
-  It shouts: a refused scan is bad news, and a lock whose erase is refused panics
+  scan, so a fresh page needs no instance, and locks each listed vault of the row's own `vault_tok`, which forgets the row.
+  It shouts: a refused scan is bad news, and a lock whose forget is refused panics
 * The device caches only leases and the device record, not vault or box records, and no refresh timer runs
 * The goal: when lock is called, nothing crosses it. We get there with simple code that can be analyzed in context, so a
   crossing is raised in one sentence (`whiteboard/20261102-newdesign/reference-timings.md`), not fine-tuned
@@ -174,9 +174,9 @@ vault.#attachLease(lease)                            private: called by lease.at
 ├─ boxListing.alignThings
 └─ await caching                                     refused → bad news; the lease is still held
 
-vault.#vacateLease(onRefused = #panic)               private: called by lock and vacate, and by adopt of a tombstone
+vault.#revokeLease(onRefused = #panic)               private: called by lock and vacate, and by adopt of a tombstone
 ├─ #dropLease                                        lease.evict(); this.#lease = null
-├─ vacating = friend.tryUncacheLease()               always, held or not: a vault reporting locked still erases
+├─ vacating = friend.tryUncacheLease()               always, held or not: a vault reporting locked still forgets
 ├─ align                                            reports locked; listeners run; snapshot re-made
 └─ await vacating                                    refused → panic; from adopt, bad news
 ```
@@ -197,7 +197,7 @@ full term under the epoch that landed.
 **`sweep`, `vacate` and `delete`** leave a one-way state: every `demandReadyToX` refuses from then on, so
 anything worth guarding stops working. A swept or vacated thing is also delisted, a deleted vault stays, tombstoned, while its box listing and boxes go, and the refusals are for whoever
 still holds a reference. `#attachLease` demands it too. It is the last step, so refusing there leaves only a
-lease to vacate. That vacate can erase a row a sweep left, which costs a passphrase next session, a normal state.
+lease to vacate. That vacate can forget a row a sweep left, which costs a passphrase next session, a normal state.
 
 **The cache:** a `lock()` during `Lease.peek`'s read loses too: the vault reports unlocked, the lock's
 vacate stands, and the next session asks. A row for `notes/wontfix.md`.
@@ -211,7 +211,7 @@ lock     vacate the lease; lock children; align
 sweep    drop the lease private property, leaving the cached; disable watches; disable all calls; sweep children; delist children
 vacate   disable; vacate the lease and forget its cache; vacate children (disables, delists them); conclude its gating
 delete   lock; vaultDB.del(vault; storage cascades its boxes, transactionally); forget cached lease; box listing vacates (boxes disable, delist); only the vault stays, tombstoned
-autolock bank: deviceDB.leasesProvedBefore(cutoff), an index range scan; lock each listed vault of the row, which erases it
+autolock bank: deviceDB.leasesProvedBefore(cutoff), an index range scan; lock each listed vault of the row, which forgets it
 ```
 
 **A `lock()` whose vacate is refused panics**: it is not bad news. The call
@@ -220,7 +220,7 @@ host's async `onPanic` with the refusal, and no secret material; a rejection of 
 further. With no `onPanic`, the refusal is reported by `reportToPlatform`, and the Vault is vacated as the refusal
 arrives, with no timer. Disabled calls stop the reopening in this tab, even if the deviceDB still refuses. A
 second refusal panics again and finds the vacate done, a no-op, so this needs no counter; a vacate marks itself
-done before its erase.
+done before its forget.
 
 **A `lock()` and the dialog.** A lock leaves an open gating open: it says the vault is locked, and
 the dialog is still the user's to answer. An unlock it was asking for still unlocks, and a change of
@@ -231,7 +231,7 @@ start of its critical section.
 `gating.whenConcluded`, a promise a dialog closes on. A Cancel, a sweep or a vacate dismisses:
 
 ```text
-no attempt under way    concludes it 'dismissed': the verb refuses, the dialog closes; a later attempt refuses 'gating_landed'
+no attempt under way    concludes it 'dismissed': the verb refuses, the dialog closes; a later attempt refuses 'gating_concluded'
 an attempt under way    the attempt runs through and its outcome concludes the gating, so a wrong passphrase
                         crossed by a dismiss answers 'wrong_passphrase'; a re-entry refuses
 ```
@@ -240,7 +240,7 @@ an attempt under way    the attempt runs through and its outcome concludes the g
 
 Each method states what holds when it ends, whatever crossed it.
 
-At all times, a lease held and reporting unlocked are the same fact: `isLocked` is `#lease === null`, not a
+At all times, a lease granted and reporting unlocked are the same fact: `isLocked` is `#lease === null`, not a
 second field.
 
 | Method           | When it returns                                                                                                                                                                           | When it throws                                                                                       |
@@ -453,7 +453,7 @@ gating.attempt({ passphraseClear })                  no lock check: a lock does 
       ├─ vaultDB: a tombstone, its boxes cascading   ← the commit
       │    moved → 'stale_write', nothing stored
       └─ deliver → receive → adopt(tombstone)
-         ├─ vault.#vacateLease(bad news)             deviceDB refused → bad news; the tombstone stands
+         ├─ vault.#revokeLease(bad news)             deviceDB refused → bad news; the tombstone stands
          └─ boxListing.vacate()                      boxes disabled and delisted, nothing deleted; the vault stays in its slot, tombstoned
 ```
 
@@ -513,5 +513,5 @@ A Box operation naming a stale or missing vault_tok will fail `vault_mismatch` (
 Eyebrow raisers from the Coach's replies in the sprint's Closer Look (`whiteboard/20261103-unrace/unrace-closerlook.md`).
 
 * **The gating family:** `ProveForGatingkind`, its kind-keyed type maps and the casts they force, and `#concluded`, `#outcome` and their flags. "same family of design smells around gating". See `whiteboard/20261102-newdesign/unrace-gating-prompt.md`.
-* **The cache and the erase on one control path:** `lease.tryCache()` before the align, the erase before the first await. "that sounds dangerous".
+* **The cache and the forget on one control path:** `lease.tryCache()` before the align, the forget before the first await. "that sounds dangerous".
 * **Clears:** `spendClears` and `checkedClears` reach into the host's objects, and who owns a passkey answer's PRF bytes is open. "I assumed that the buffer exhaustion was best practice".

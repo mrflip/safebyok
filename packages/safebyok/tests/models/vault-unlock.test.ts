@@ -74,7 +74,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     await TH.expectRefusal(vault.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), {}))
   })
 
-  it("locks at `lock()`, reporting locked before it returns and erasing the row; seal and unseal refuse; then 'dismissed' with no proof and a dialog closed unanswered, the proof's own refusal with a wrong one, and it unlocks with the right one", async () => {
+  it("locks at `lock()`, reporting locked before it returns and forgetting the row; seal and unseal refuse; then 'dismissed' with no proof and a dialog closed unanswered, the proof's own refusal with a wrong one, and it unlocks with the right one", async () => {
     const { vault, deviceDB } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
     expect(vault.lock()).to.equal(vault)
@@ -260,7 +260,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     expect(deviceDB.cachedNow()).to.not.be.null
   })
 
-  it("locks the vault where a cached lease will not open at its first seal, erasing the row", async () => {
+  it("locks the vault where a cached lease will not open at its first seal, forgetting the row", async () => {
     const { demandStored, anotherSession, deviceDB } = await makeBornVault()
     const cached = deviceDB.cachedNow() as Record<string, unknown>
     deviceDB.layCached({ ...cached, lease_key: await makeLeaseKey() })
@@ -298,7 +298,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     expect(await vaultRoundTrip(vault, again)).to.eq('sk-test')
   })
 
-  it("erases the row at a lock() of a vault that holds no lease: the next session asks for the proof", async () => {
+  it("forgets the row at a lock() of a vault that holds no lease: the next session asks for the proof", async () => {
     const { demandStored, anotherSession, deviceDB } = await makeBornVault()
     const record = demandStored()
     const idle = await anotherSession().build(record)

@@ -53,8 +53,8 @@ export class Lease implements LeaseStamp {
   }
 
   /** The lease cached for `gate_epoch`, or null so the vault asks for a proof. A row of another epoch or stamp is forgotten;
-   * one past autolock stays, not loaded, for a later proof to write over or `bank.autolock` to erase.
-   * A store that refuses, or a row that will not read, is bad news and null, the row left standing.
+   * one past autolock stays, not loaded, for a later proof to write over or `bank.autolock` to forget.
+   * A device database that refuses, or a row that will not read, is bad news and null, the row left standing.
    */
   static async buildFromCache(friend: LeaseFriend, gate_epoch: number): Promise<Lease | null> {
     const { gate_epoch: epoch } = leaseFromCacheArgs.parse({ friend, gate_epoch })
@@ -103,19 +103,19 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Ending one]: vacate, tryVacate, forget, tryForget, evict
+  // == [Ending one]: revoke, tryRevoke, forget, tryForget, evict
 
   /** Drop the keys and forget the cached record, so this device is locked. */
-  async vacate(): Promise<void> {
+  async revoke(): Promise<void> {
     if (this.#record === null) { return }
     this.evict()
     await this.#friend.forgetLease()
   }
 
-  /** Non-throwing form of {@link vacate}. */
-  tryVacate(): Promise<Outcome<void>> { return outcomeOf(() => this.vacate()) }
+  /** Non-throwing form of {@link revoke}. */
+  tryRevoke(): Promise<Outcome<void>> { return outcomeOf(() => this.revoke()) }
 
-  /** Forget the cached record with no lease held to {@link vacate}: one may stand from an earlier session. */
+  /** Forget the cached record with no lease granted to {@link revoke}: one may stand from an earlier session. */
   static async forget(friend: LeaseFriend): Promise<void> {
     await leaseFriend.parse(friend).forgetLease()
   }

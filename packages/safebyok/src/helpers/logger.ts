@@ -91,7 +91,7 @@ const forwarding = (): VaultLogger => {
   return forwarder
 }
 
-/** The logger every storage adapter, vault, provider and store uses when given none of its own.
+/** The logger every storage adapter, vault, provider and datastore uses when given none of its own.
  * It hands each call on, as it is made, to the logger last handed {@link setDefaultLogger}, or
  * else to the console, each line tagged 'safebyok:'. Pass it to Bank.make or BankProvider to have
  * the vault use the default whatever its storage adapter was given.

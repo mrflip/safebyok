@@ -33,7 +33,7 @@ export const KnockKnockFields = () => {
 
   const save = () => perform(async () => {
     if (box === null) { return }
-    await BoxFields.of(box).save()
+    await BoxFields.of(box).put()
     setIsSaved(true)
   })
 

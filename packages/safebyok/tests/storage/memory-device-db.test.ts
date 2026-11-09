@@ -7,7 +7,7 @@ import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import * as TH from '../test-helpers'
 
 /** The calls a MemoryDeviceDB makes of its storage, any of which the next may be. */
-const StorageCalls = ['doStow', 'doPeek', 'doForget', 'doListLeases', 'doDelRawLease', 'doEnsureBank', 'doForgetBank', 'doListBanks'] as const
+const StorageCalls = ['doStow', 'doPeek', 'doForget', 'doListLeases', 'doForgetRawLease', 'doEnsureBank', 'doForgetBank', 'doListBanks'] as const
 
 const memoryRowsOf = (deviceDB: MemoryDeviceDB): TH.DeviceDBRowCheats => ({
   plantLeaseRow: ({ applabel, user_id, vaultlabel }, row) => { deviceDB._cheat_leaseRows().set(ckeyOf(applabel, user_id, vaultlabel), { scopepath: [applabel, user_id, vaultlabel], row }) },

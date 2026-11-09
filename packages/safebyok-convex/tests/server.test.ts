@@ -58,7 +58,7 @@ describe("SafebyokComponent.api, for the user a call names", () => {
     const asOwner = backend.withIdentity({ subject: 'u1' })
     expect(await asOwner.query(api.safebyok.getVault, { scope: TH.vaultScope })).to.deep.equal(vault)
     expect(await asOwner.query(api.safebyok.getBox, { asked: { ...vaultQuery, boxlabel: box.boxlabel } })).to.deep.equal({ vault, box })
-    expect(await asOwner.mutation(api.safebyok.putVault, { record: vault, opts: birth })).to.deep.equal({ landed: false, ante: vault })
+    expect(await asOwner.mutation(api.safebyok.putVault, { record: vault, opts: birth })).to.deep.equal({ isWritten: false, ante: vault })
   })
 })
 

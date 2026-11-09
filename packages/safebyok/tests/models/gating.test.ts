@@ -44,7 +44,7 @@ const birthWorld = (worldOverrides: VaultWorldGiven = {}) => {
   return { ...dialog, ...makeVaultWorld(null, { requestCleartext: dialog.requestCleartext, ...worldOverrides }) }
 }
 
-/** A vault born under {@link Passphrase}, locked, its cached lease erased, in a world with a dialog. */
+/** A vault born under {@link Passphrase}, locked, its cached lease forgotten, in a world with a dialog. */
 const lockedVault = async (born = makeBornVault()) => {
   const world = await born
   const dialog = makeDialog()

@@ -144,7 +144,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
     })
 
     describe("forget(asked)", () => {
-      it("erases the row stowed under that vault_tok", async () => {
+      it("forgets the row stowed under that vault_tok", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         await deviceDB.forget(asked)
@@ -269,14 +269,14 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
       })
     })
 
-    describe("delRawLease(scopepath)", () => {
+    describe("forgetRawLease(scopepath)", () => {
       it.skipIf(noRows)("deletes a stored row that fails its check, by the scopepath listRawLeases showed it under", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         await rowsOf(deviceDB).plantLeaseRow(vaultScopeOf('damaged'), { proved_at: 5 })
         const listed = await deviceDB.listRawLeases()
         const damaged = listed.find(({ row }) => bagOf(row)['proved_at'] === 5)
-        await deviceDB.delRawLease(damaged!.scopepath)
+        await deviceDB.forgetRawLease(damaged!.scopepath)
         expect(await deviceDB.listRawLeases()).to.have.lengthOf(1)
         expect(await deviceDB.peek(asked)).to.not.be.null
       })
@@ -289,7 +289,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         const listed = await deviceDB.listRawLeases()
         const doomed = listed.find(({ scopepath }) => scopepath[2] === badLabel.vaultlabel)
         expect(doomed?.scopepath).to.deep.equal(scopepathOf(badLabel))
-        await deviceDB.delRawLease(doomed!.scopepath)
+        await deviceDB.forgetRawLease(doomed!.scopepath)
         const left = await deviceDB.listRawLeases()
         expect(left.map(({ scopepath }) => scopepath)).to.deep.equal([scopepathOf(vaultScope)])
         expect(await deviceDB.listLeases()).to.have.lengthOf(1)
@@ -303,7 +303,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         const listed = await deviceDB.listRawLeases()
         const doomed = listed.find(({ scopepath }) => scopepath[2] === stripped.vaultlabel)
         expect(doomed?.scopepath).to.deep.equal(scopepathOf(stripped))
-        await deviceDB.delRawLease(doomed!.scopepath)
+        await deviceDB.forgetRawLease(doomed!.scopepath)
         const left = await deviceDB.listRawLeases()
         expect(left.map(({ scopepath }) => scopepath)).to.deep.equal([scopepathOf(vaultScope)])
         expect(await deviceDB.listLeases()).to.have.lengthOf(1)
@@ -312,7 +312,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
       it("deletes a lease row whatever its vault_tok", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
-        await deviceDB.delRawLease(scopepathOf(vaultScope))
+        await deviceDB.forgetRawLease(scopepathOf(vaultScope))
         expect(await deviceDB.peek(asked)).to.be.null
         expect(await deviceDB.listRawLeases()).to.deep.equal([])
       })
@@ -321,17 +321,17 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         const absent = scopepathOf(vaultScopeOf('absent'))
-        await deviceDB.delRawLease(absent)
-        const deleted = await deviceDB.tryDelRawLease(absent)
+        await deviceDB.forgetRawLease(absent)
+        const deleted = await deviceDB.tryForgetRawLease(absent)
         expect(deleted.ok).to.be.true
         expect(await deviceDB.listRawLeases()).to.have.lengthOf(1)
       })
 
       it("refuses what is not three strings", async () => {
         const deviceDB = await fresh()
-        await expectRefusal(deviceDB.delRawLease(vaultScope as never))
-        await expectBad(deviceDB.tryDelRawLease(['acme', 'u1'] as never))
-        await expectBad(deviceDB.tryDelRawLease(['acme', 'u1', 5] as never))
+        await expectRefusal(deviceDB.forgetRawLease(vaultScope as never))
+        await expectBad(deviceDB.tryForgetRawLease(['acme', 'u1'] as never))
+        await expectBad(deviceDB.tryForgetRawLease(['acme', 'u1', 5] as never))
       })
     })
 
@@ -392,7 +392,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.listRawLeases()).to.have.lengthOf(1)
         expect(await deviceDB.listLeases()).to.have.lengthOf(1)
         expect(await deviceDB.listRawBanks()).to.have.lengthOf(1)
-        await deviceDB.delRawLease(scopepathOf(vaultScope))
+        await deviceDB.forgetRawLease(scopepathOf(vaultScope))
         expect(await deviceDB.listRawBanks()).to.have.lengthOf(1)
       })
 
@@ -421,7 +421,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
     })
 
     describe("forgetBank(scope)", () => {
-      it("erases the bank row, so that the next ensureBank mints a fresh device_id", async () => {
+      it("forgets the bank row, so that the next ensureBank mints a fresh device_id", async () => {
         const deviceDB = await fresh()
         const made = await deviceDB.ensureBank(bankScope)
         await deviceDB.forgetBank(bankScope)
@@ -447,7 +447,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.listRawBanks()).to.deep.equal([])
       })
 
-      it.skipIf(noRows)("erases a stored row that fails its check", async () => {
+      it.skipIf(noRows)("forgets a stored row that fails its check", async () => {
         const deviceDB = await fresh()
         await rowsOf(deviceDB).plantBankRow(bankScope, { ...bankScope, device_id: 'not-a-uuid' })
         await deviceDB.forgetBank(bankScope)
@@ -482,7 +482,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         const deviceDB = await fresh()
         const row = await leaseRowOf()
         const verbs = [
-          () => deviceDB.tryStow(row), () => deviceDB.tryPeek(asked), () => deviceDB.tryForget(asked), () => deviceDB.tryListLeases(), () => deviceDB.tryListRawLeases(), () => deviceDB.tryDelRawLease(scopepathOf(vaultScope)),
+          () => deviceDB.tryStow(row), () => deviceDB.tryPeek(asked), () => deviceDB.tryForget(asked), () => deviceDB.tryListLeases(), () => deviceDB.tryListRawLeases(), () => deviceDB.tryForgetRawLease(scopepathOf(vaultScope)),
           () => deviceDB.tryEnsureBank(bankScope), () => deviceDB.tryForgetBank(bankScope), () => deviceDB.tryListRawBanks(),
         ]
         for (const verb of verbs) {

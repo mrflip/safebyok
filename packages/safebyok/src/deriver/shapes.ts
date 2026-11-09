@@ -18,7 +18,7 @@ export const TestLabelPrefix = 'test_'
 
 // == [The spec]: keyDeriverSpec, KeyDeriverSpec, Argon2idWebV1, SuppliedSpecs
 
-/** The label and Argon2id settings of a key deriver, each held to its bounds. */
+/** The label and Argon2id settings of a key deriver, each within its bounds. */
 export const { keyDeriverSpec } = Checkers('bad_option', ({ obj, str, int, lit }) => ({
   keyDeriverSpec: obj({
     algorithm:         lit('argon2id'),

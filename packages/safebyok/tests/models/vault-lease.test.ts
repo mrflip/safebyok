@@ -1,4 +1,4 @@
-/** A vault's lease through a gate change, a refused erase of its row, and the discards down the chain. */
+/** A vault's lease through a gate change, a refused forget of its row, and the discards down the chain. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
@@ -84,7 +84,7 @@ describe("A lease renewed through a gate change", () => {
   })
 })
 
-describe("A refused erase of the row: lease_unerased", () => {
+describe("A refused forget of the row: lease_unerased", () => {
   const Refusal = new VaultError('storage_unavailable', 'the disk is full')
 
   it("is announced by the friend's tryForgetLease, which answers it as a bad Outcome", async () => {
@@ -161,7 +161,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(deviceDB.peek).not.toHaveBeenCalled()
   })
 
-  it("vacate erases the row too, disables and delists all the way down, and leaves the vaultDB untouched", async () => {
+  it("vacate forgets the row too, disables and delists all the way down, and leaves the vaultDB untouched", async () => {
     const { vault, listing, box, deviceDB, demandStored } = await makeVaultWithBox()
     const stored = demandStored()
     vault.vacate()

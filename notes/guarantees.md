@@ -202,12 +202,12 @@ the `LeaseFriend`'s `tryCacheLease` (made in `Vault.#makeFriend`) → `DeviceDB.
 (`storage/device-db.ts`; `IdbDeviceDB`'s structured clone into IndexedDB, or `MemoryDeviceDB`'s
 `structuredClone` into a Map); read back, from
 `vault.ensureUnlocked`, by `Lease.buildFromCache` (`peekLease` → `DeviceDB.peek`), which checks the row with
-`leaseRecord` and builds a Lease around it. Dropped from memory by `lease.evict`: in `lease.vacate`, at a sweep
-(`sweepContents`), and when the lease proves damaged (`Lease.#vaultKey`). Erased
-from the store by `DeviceDB.forget`: through `lease.vacate` or `Lease.forget` (`forgetLease`) from the
-vault's `#vacateLease`, at `vault.lock()`, at a vacate and at a tombstone; through `tryForgetLease`, in
+`leaseRecord` and builds a Lease around it. Dropped from memory by `lease.evict`: in `lease.revoke`, at a sweep
+(`sweepContents`), and when the lease proves damaged (`Lease.#vaultKey`). Forgotten
+from the device database by `DeviceDB.forget`: through `lease.revoke` or `Lease.forget` (`forgetLease`) from the
+vault's `#revokeLease`, at `vault.lock()`, at a vacate and at a tombstone; through `tryForgetLease`, in
 `Lease.buildFromCache`, for a row of another epoch or stamp; and row by row from `bank.vacate`
-(`#eraseOwnLeases`). `bank.autolock` erases a row by `vault.lock()`. The Bank's scan, `DeviceDB.listLeases`,
+(`#forgetOwnLeases`). `bank.autolock` forgets a row by `vault.lock()`. The Bank's scan, `DeviceDB.listLeases`,
 answers rows without one. Only `peek` and `listRawLeases`, which no Vault or Bank calls, answer a `lease_key`, to
 whoever holds the deviceDB (G9). Neither the Vault nor the Bank holds a record.
 Operates: `Lease.#vaultKey` (`unwrapKeyUnder`) alone.
@@ -277,11 +277,11 @@ only as a `CryptoKey` handle: a local in `Lease.buildGranted`; `Lease.#record` i
 and the `lease_key` of a `LeaseRow` cached by `lease.cacheAsCacheCan` through a `DeviceDB`'s `stow` (the core's
 `IdbDeviceDB` keeps it by IndexedDB's structured clone, its `MemoryDeviceDB` by `structuredClone`) and read back by
 `Lease.buildFromCache` (`DeviceDB.peek`). A lease is dropped from memory at `lock()`, at a sweep, at a vacate, at a
-tombstone, and when it proves damaged (`Lease.#vaultKey`), and its row is erased at `lock()`, at a vacate and at a
-tombstone, among the sites the leaseKey's access chain names, **save one exception**: a lease row that fails its check is neither listed by `listLeases` nor forgotten by `forget`, and stays until a later `stow` over its scope or a host's `delRawLease`, by the scopepath `listRawLeases` answers beside it, which reaches a row filed under labels today's checks refuse (notes/wontfix.md). No lease is dropped at a time, and **autolock is a best-effort reminder process, not a
-guarantee**: a lease held in a page stays held until something locks it. Two things answer to the autolock duration, against a row cached on
-this device proved longer ago than it. `bank.autolock`, which only the host calls, locks each listed vault of such a row, and `lock()` erases it. `Lease.buildFromCache`, at the
-door, declines to load such a row, leaves it and throws nothing, so `ensureUnlocked` sees what it sees with no row and asks for a proof. **An expired row stays on disk**, the leaseKey handle and wrapped vaultKey in it, until the next proof's lease is written over it or a host's `bank.autolock` locks it; a host that never calls `bank.autolock` keeps it until then. `Lease.buildFromCache` never reaches a lease already held, and `bank.autolock` reaches one only by its row: it misses a lease the deviceDB refused to cache, or whose row another page has erased or written over. Both go by the device's clock, as `Date.now()` reads it: a clock set back puts them off, and reopens an expired row still on disk. A record read back whose key is extractable, of another
+tombstone, and when it proves damaged (`Lease.#vaultKey`), and its row is forgotten at `lock()`, at a vacate and at a
+tombstone, among the sites the leaseKey's access chain names, **save one exception**: a lease row that fails its check is neither listed by `listLeases` nor forgotten by `forget`, and stays until a later `stow` over its scope or a host's `forgetRawLease`, by the scopepath `listRawLeases` answers beside it, which reaches a row filed under labels today's checks refuse (notes/wontfix.md). No lease is dropped at a time, and **autolock is a best-effort reminder process, not a
+guarantee**: a lease granted in a page stays granted until something locks it. Two things answer to the autolock duration, against a row cached on
+this device proved longer ago than it. `bank.autolock`, which only the host calls, locks each listed vault of such a row, and `lock()` forgets it. `Lease.buildFromCache`, at the
+door, declines to load such a row, leaves it and throws nothing, so `ensureUnlocked` sees what it sees with no row and asks for a proof. **An expired row stays on disk**, the leaseKey handle and wrapped vaultKey in it, until the next proof's lease is written over it or a host's `bank.autolock` locks it; a host that never calls `bank.autolock` keeps it until then. `Lease.buildFromCache` never reaches a lease already held, and `bank.autolock` reaches one only by its row: it misses a lease the deviceDB refused to cache, or whose row another page has forgotten or written over. Both go by the device's clock, as `Date.now()` reads it: a clock set back puts them off, and reopens an expired row still on disk. A record read back whose key is extractable, of another
 algorithm, or for another use reads as `damaged_lease` (`isLeaseKey`, `shapes-gateish.ts`). *Caveat:*
 non-extractable stops export, not use. Whoever holds the handle in this page can unwrap the
 vaultKey, extractable. So the `DeviceDB`, which is host-pluggable and is handed every lease

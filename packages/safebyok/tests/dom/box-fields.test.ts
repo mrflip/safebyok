@@ -1,4 +1,4 @@
-/** A box's fields: `fields.bind` following the whisper through a lock and a veil, reading edits on the way into hiding, `fields.save`, and the last unbind. */
+/** A box's fields: `fields.bind` following the whisper through a lock and a veil, reading edits on the way into hiding, `fields.put`, and the last unbind. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { BoxFields } from '../../src/dom/box-fields'
@@ -135,14 +135,14 @@ describe("fields.bind: into hiding and back", () => {
     })
   }
 
-  it("leaves a number a number when its text was not edited, through a hiding and a save", async () => {
+  it("leaves a number a number when its text was not edited, through a hiding and a put", async () => {
     const box = await unexposedOf()
 
     await box.expose()
     const el = elOf()
     BoxFields.of(box).bind('org.seats')(el)
     box.veil().unveil()
-    await BoxFields.of(box).save()
+    await BoxFields.of(box).put()
     expect(await box.extractWhisper()).to.deep.equal(Stored)
   })
 
@@ -174,7 +174,7 @@ describe("fields.bind: into hiding and back", () => {
     const el = elOf()
     BoxFields.of(box).bind('__proto__.polluted')(el)
     el.value = 'edited'
-    await BoxFields.of(box).save()
+    await BoxFields.of(box).put()
     expect(({} as { polluted?: string }).polluted).to.eq(undefined)
     expect(await box.extractWhisper()).to.deep.equal(Stored)
   })
@@ -207,7 +207,7 @@ describe("fields.bind: into hiding and back", () => {
   })
 })
 
-describe("fields.save", () => {
+describe("fields.put", () => {
   it("merges each edited field over the value, and seals one put", async () => {
     const box = await unexposedOf()
 
@@ -219,7 +219,7 @@ describe("fields.save", () => {
     keyEl.value = 'sk-saved'
     nameEl.value = 'zenith'
     const tryPutBox = vi.spyOn(held.mw.vaultDB, 'tryPutBox')
-    expect(await BoxFields.of(box).save()).to.eq(box)
+    expect(await BoxFields.of(box).put()).to.eq(box)
     expect(tryPutBox).toHaveBeenCalledOnce()
     const merged = { ...Stored, apiKey: 'sk-saved', org: { name: 'zenith', seats: 3 } }
     expect(await box.extractWhisper()).to.deep.equal(merged)
@@ -234,12 +234,12 @@ describe("fields.save", () => {
     const exposed = box.whisper
     const el = elOf()
     BoxFields.of(box).bind('apiKey')(el)
-    await BoxFields.of(box).save()
+    await BoxFields.of(box).put()
     expect(box.whisper).to.eq(exposed)
     const told = vi.fn()
     box.subscribe(told)
     el.value = 'sk-saved'
-    await BoxFields.of(box).save()
+    await BoxFields.of(box).put()
     expect(box.whisper).not.to.eq(exposed)
     expect(exposed).to.deep.equal(Stored)
     expect(told).toHaveBeenCalled()
@@ -252,31 +252,31 @@ describe("fields.save", () => {
     const el = elOf()
     BoxFields.of(box).bind('apiKey')(el)
     el.value = 'sk-unsaved'
-    await TH.expectRefusal(BoxFields.of(box).save({ ifPresent: 'nonesuch' as 'repl' }), 'bad_option')
+    await TH.expectRefusal(BoxFields.of(box).put({ ifPresent: 'nonesuch' as 'repl' }), 'bad_option')
     expect(box.whisper).to.deep.include({ apiKey: 'sk-unsaved' })
   })
 
   it("refuses with no field bound, with none exposed, while veiled, and while locked", async () => {
     const box = await unexposedOf()
 
-    const noFields = await TH.expectRefusal(BoxFields.of(box).save(), 'bad_option')
+    const noFields = await TH.expectRefusal(BoxFields.of(box).put(), 'bad_option')
     expect(noFields.message).to.eq(Phrases.NoFieldsBound)
     BoxFields.of(box).bind('apiKey')(elOf())
-    const notExposed = await TH.expectRefusal(BoxFields.of(box).save(), 'bad_option')
+    const notExposed = await TH.expectRefusal(BoxFields.of(box).put(), 'bad_option')
     expect(notExposed.message).to.eq(Phrases.NotExposed)
     await box.expose()
     box.veil()
-    const veiled = await TH.expectRefusal(BoxFields.of(box).save(), 'bad_option')
-    expect(veiled.message).to.eq(Phrases.SavingVeiledFields)
+    const veiled = await TH.expectRefusal(BoxFields.of(box).put(), 'bad_option')
+    expect(veiled.message).to.eq(Phrases.PuttingVeiledFields)
     box.unveil()
     held.mw.setLocked(true)
-    await TH.expectRefusal(BoxFields.of(box).save(), 'vault_locked')
+    await TH.expectRefusal(BoxFields.of(box).put(), 'vault_locked')
   })
 
   it("has a try form answering an outcome", async () => {
     const box = await unexposedOf()
 
-    const outcome = await BoxFields.of(box).trySave()
+    const outcome = await BoxFields.of(box).tryPut()
     expect(outcome.ok).to.be.false
   })
 })

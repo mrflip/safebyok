@@ -65,7 +65,7 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
                   row={row}
                   scopepath={scopepath}
                   onForget={(asked) => callThenRelist('forget', async () => { await deviceDB.forget(asked); return 'forgotten' })}
-                  onDelRaw={isRaw ? (filed) => callThenRelist('delRawLease', async () => { await deviceDB.delRawLease(filed); return 'deleted' }) : null}
+                  onForgetRaw={isRaw ? (filed) => callThenRelist('forgetRawLease', async () => { await deviceDB.forgetRawLease(filed); return 'deleted' }) : null}
                 />
               ))}
             </tbody>
@@ -76,7 +76,7 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
   )
 }
 
-const LeaseRowLine = ({ row, scopepath, onForget, onDelRaw }: LeaseRowLineProps) => {
+const LeaseRowLine = ({ row, scopepath, onForget, onForgetRaw }: LeaseRowLineProps) => {
   const asked = leaseQuery.safeParse(row)
   const others = Object.keys(row).filter((fieldname) => ! (LeaseColumns as readonly string[]).includes(fieldname))
   return (
@@ -85,7 +85,7 @@ const LeaseRowLine = ({ row, scopepath, onForget, onDelRaw }: LeaseRowLineProps)
       <td>{others.map((fieldname) => `${fieldname}: ${cellOf(fieldname, row[fieldname])}`).join(', ')}</td>
       <td>
         {asked.success && <button type="button" onClick={() => { void onForget(asked.data) }}>forget</button>}
-        {(onDelRaw !== null) && (scopepath !== null) && <button type="button" onClick={() => { void onDelRaw(scopepath) }}>delRawLease</button>}
+        {(onForgetRaw !== null) && (scopepath !== null) && <button type="button" onClick={() => { void onForgetRaw(scopepath) }}>forgetRawLease</button>}
       </td>
     </tr>
   )

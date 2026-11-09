@@ -80,7 +80,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return this.#wrapVaultKey(vaultKey)
   }
 
-  /** SLOPDOC: A lease on `friend`'s vault under the vaultKey its wayin holds; held and cached only once attached. */
+  /** SLOPDOC: A lease on `friend`'s vault under the vaultKey its wayin holds; granted and cached only once attached. */
   async buildLease(friend: LeaseFriend, gate_epoch: number = this.gate_epoch): Promise<Lease> {
     const checked = provingLeaseArgs.parse({ friend, gate_epoch })
     if (! consistent(checked.friend, this.stamp)) { throw leaseOfOtherVault() }
@@ -203,7 +203,7 @@ const mintPasskeyHeader = ({ device_id }: ProvingWorld, { credential_id, prf_sal
 
 // == [The key deriver]: GuardedKeyDeriver, guardKeyDeriver, deriveKeyBytes
 
-/** A key deriver as a bank keeps it: the host's, held to its interface by {@link guardKeyDeriver}. */
+/** A key deriver as a bank keeps it: the host's, made to honor its interface by {@link guardKeyDeriver}. */
 export type GuardedKeyDeriver = Readonly<{
   key_deriver_label: string
   salt_bytes:        typeof PassphraseSaltBytes
@@ -214,7 +214,7 @@ export type GuardedKeyDeriver = Readonly<{
 // Its interface and its salt length are checked, never its other choices (#the-host-is-not-our-threat-model): what its key bytes must be is
 // checked where they land, in passphraseKeyOf. A failed `load` keeps its throw as the cause, as it heard nothing;
 // a VaultError `load` throws passes as it came.
-/** `hostDeriver` held to its interface: the one way a proving asks it for key bytes. */
+/** `hostDeriver`, made to honor its interface: the one way a proving asks it for key bytes. */
 export const guardKeyDeriver = (hostDeriver: KeyDeriver): GuardedKeyDeriver => {
   const { key_deriver_label, salt_bytes } = CX.keyDeriverShape.parse(hostDeriver, { where: 'keyDeriver' })
   const load = async (): Promise<void> => {

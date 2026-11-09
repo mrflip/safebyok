@@ -1,7 +1,7 @@
 import { IdbVaultDB } from 'safebyok-indexeddb'
 import { storageUnavailable } from 'safebyok/storage'
 import type {
-  BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Landing, PutOptsGiven,
+  BankScope, BoxesFetched, BoxFetched, BoxWritten, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Written, PutOptsGiven,
   RowOfVault, Tidied, VaultQuery, VaultRecord, VaultScope, VaultTombstone,
 } from 'safebyok/storage'
 
@@ -60,22 +60,22 @@ export class OutageVaultDB extends IdbVaultDB {
     return await super.doGetBox(asked)
   }
 
-  protected override async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Landing> {
+  protected override async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Written> {
     this.#demandOnline()
     return await super.doPutVault(record, opts)
   }
 
-  protected override async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxLanding> {
+  protected override async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxWritten> {
     this.#demandOnline()
     return await super.doPutBox(record, opts)
   }
 
-  protected override async doDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Landing> {
+  protected override async doDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Written> {
     this.#demandOnline()
     return await super.doDelVault(tombstone, opts)
   }
 
-  protected override async doDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<BoxLanding> {
+  protected override async doDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<BoxWritten> {
     this.#demandOnline()
     return await super.doDelBox(tombstone, opts)
   }

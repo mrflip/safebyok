@@ -44,7 +44,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     Object.freeze(this)
   }
 
-  /** The scope of `duck`, held to this vault: no listing answers for another's. */
+  /** The scope of `duck`, which must be this vault's: no listing answers for another's. */
   scopeOf(duck: unknown):  Boxscope  { return boxscope.parseConsistent(duck, this.scope) }
 
   /** Parse `duck` as a {@link BoxSparse}. */
@@ -68,31 +68,31 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     }
     const { boxes, damaged_rows } = answer.val
     this.#damagedRows = Object.freeze(damaged_rows)
-    for (const { boxlabel } of damaged_rows) { this.things.find((enlisted) => enlisted.boxlabel === boxlabel)?.vacate() }
+    for (const { boxlabel } of damaged_rows) { this.things.find((listed) => listed.boxlabel === boxlabel)?.vacate() }
     await Promise.all(boxes.map((box) => this.build(box)))
   }
 
   /** The box under `scoped`, no older than `opts` allows, or null under `ifAbsent: 'nil'`. */
   async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
-    const enlisted = this.at(scoped)
-    if (enlisted === null) { return this.fetch(scoped, opts) }
+    const listed = this.at(scoped)
+    if (listed === null) { return this.fetch(scoped, opts) }
     const { ifAbsent, ...timely } = VX.fetchOpts.parse(opts)
-    return this.handleIfAbsent(await enlisted.hydrate(timely), scoped, ifAbsent)
+    return this.handleIfAbsent(await listed.hydrate(timely), scoped, ifAbsent)
   }
 
   /** Non-throwing form of {@link get}. */
   tryGet(scoped: Boxscope, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.get(scoped, opts)) }
 
-  /** The box a put of `scoped` goes through: the one enlisted, or a void one made for an empty slot. */
+  /** The box a put of `scoped` goes through: the one listed, or a void one made for an empty slot. */
   puttable(scoped: unknown, opts: BoxPutOpts = {}): Box {
     const { ifAbsent } = VX.boxPutOpts.parse(opts)
     const scope = this.scopeOf(scoped)
-    const enlisted = this.at(scope)
-    if ((enlisted === null) && (ifAbsent === 'fail')) { throw notListedBoxError(scope) }
-    return enlisted ?? this.#shellFor(scope)
+    const listed = this.at(scope)
+    if ((listed === null) && (ifAbsent === 'fail')) { throw notListedBoxError(scope) }
+    return listed ?? this.#shellFor(scope)
   }
 
-  /** The box a delete of `scoped` goes through: the one enlisted, or a void one made for an empty slot. */
+  /** The box a delete of `scoped` goes through: the one listed, or a void one made for an empty slot. */
   deletable(scoped: unknown): Box { return this.puttable(scoped) }
 
   /** Seals a new box and stores it where no live record stands, answering the box listed. */
@@ -105,7 +105,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** Non-throwing form of {@link create}. */
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
-  /** A void box enlisted under `scope`. */
+  /** A void box listed under `scope`. */
   #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.sentinelBoxOf(scope, this.world.vault_tok)) }
   // --
 

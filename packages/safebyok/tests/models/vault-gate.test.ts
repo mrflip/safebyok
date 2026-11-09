@@ -295,7 +295,7 @@ describe("a gate change on other sessions", () => {
 })
 
 describe("vault.delVaultPrompt()", () => {
-  it("locks the vault, stores a tombstone with its boxes cascaded, erases the row cached, and stays in its slot tombstoned", async () => {
+  it("locks the vault, stores a tombstone with its boxes cascaded, forgets the row cached, and stays in its slot tombstoned", async () => {
     const { vault, listing, storedNow, deviceDB } = await makeBornVault()
     const boxes = vault.boxListing
     expect(await delTyping(vault)).to.equal(vault)
@@ -363,7 +363,7 @@ describe("vault.delVaultPrompt()", () => {
     expect(vault.revision_seq).to.eq(demandStored().revision_seq)
   })
 
-  it("tells of a refused erase and lets the tombstone stand", async () => {
+  it("tells of a refused forget and lets the tombstone stand", async () => {
     const onLifecycle = vi.fn()
     const { vault, storedNow, deviceDB } = await makeBornVault({ passphraseClear: Passphrase }, { onLifecycle })
     deviceDB.forget.mockRejectedValue(new VaultError('storage_unavailable', 'the disk is full'))

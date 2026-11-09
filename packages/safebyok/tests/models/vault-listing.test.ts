@@ -23,14 +23,14 @@ const tombstoneOver = (record: VaultRecord) => ({ ...omit(record, ['gate']), am:
 /** A vault of another life, stored at `revision_seq`. */
 const otherLifeAt = async (revision_seq: number): Promise<VaultRecord> => ({ ...await storedVaultRecord(), revision_seq, revision_tok: `rev-other-${String(revision_seq)}` })
 
-/** Past the erase each end state sets going. */
-const erased = () => new Promise((yes) => { setTimeout(yes, 0) })
+/** Past the forget each end state sets going. */
+const forgotten = () => new Promise((yes) => { setTimeout(yes, 0) })
 
-/** A born vault deleted, past its erase, and the revision of its tombstone. */
+/** A born vault deleted, past its forget, and the revision of its tombstone. */
 const deleted = async () => {
   const world = await makeBornVault()
   await delTyping(world.vault)
-  await erased()
+  await forgotten()
   return { ...world, tombstone: SX.revisionOf(world.demandStored()) }
 }
 
@@ -38,7 +38,7 @@ const deleted = async () => {
 const birthOver = async (prior: SX.Revision): Promise<VaultRecord> => ({ ...await storedVaultRecord(), ...SX.nextRevisionOf(prior, Date.now()) })
 
 const expectLandedGone = async (vault: Vault, { listing, deviceDB }: Pick<Awaited<ReturnType<typeof makeBornVault>>, 'listing' | 'deviceDB'>) => {
-  await erased()
+  await forgotten()
   expect(listing.at(Dna)).to.eq(vault)
   expect(vault.isPresent).to.be.false
   expect(vault.isLocked).to.be.true
@@ -65,7 +65,7 @@ describe("listing.stampOfBirth and listing.recordOfBirth", () => {
 })
 
 describe("a tombstone over a live vault", () => {
-  it("reaches a local delete's end state when a fetch finds it: locked, row erased, boxes vacated, the vault in its slot", async () => {
+  it("reaches a local delete's end state when a fetch finds it: locked, row forgotten, boxes vacated, the vault in its slot", async () => {
     const world = await makeBornVault()
     const { vault, listing, demandStored, restoreRow } = world
     const boxes = vault.boxListing
@@ -79,7 +79,7 @@ describe("a tombstone over a live vault", () => {
     expect(vault.boxListing).to.eq(boxes)
   })
 
-  it("announces a refused erase at its tombstone, not as bad news, and the tombstone stands", async () => {
+  it("announces a refused forget at its tombstone, not as bad news, and the tombstone stands", async () => {
     const onLifecycle = vi.fn()
     const onBadNews = vi.fn()
     const { fakeBank, opts, deviceDB, demandStored, restoreRow, listing: born } = makeVaultWorld(null, { onLifecycle })
@@ -90,7 +90,7 @@ describe("a tombstone over a live vault", () => {
     deviceDB.forget.mockRejectedValueOnce(refusal)
     restoreRow(tombstoneOver(demandStored()))
     await listing.fetch(Dna, { ifAbsent: 'nil' })
-    await erased()
+    await forgotten()
     expect(vault.isPresent).to.be.false
     expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_unerased', refusal, vault, where: 'tombstone' }))
     expect(onBadNews).not.toHaveBeenCalledWith(refusal)
@@ -109,7 +109,7 @@ describe("a box notice carrying the vault's tombstone as its world", () => {
     const boxes = vault.boxListing
     await boxes.hello()
     await delTyping(bornVault)
-    await erased()
+    await forgotten()
     expect(vault.isPresent).to.be.false
     await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])))
     expect(onBadNews).not.toHaveBeenCalled()
@@ -158,7 +158,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     await TH.expectBad(hydrating.vault.tryHydrate({ maxMillisSinceRefresh: 0 }))
   })
 
-  it("replaces it: the old vacated and delisted, its row erased, a new vault in the slot, locked", async () => {
+  it("replaces it: the old vacated and delisted, its row forgotten, a new vault in the slot, locked", async () => {
     const { vault, listing, deviceDB, restoreRow } = await makeBornVault()
     const other = await otherLifeAt(5)
     restoreRow(other)
@@ -169,7 +169,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     expect(listing.at(Dna)).to.eq(rebuilt)
     expect(listing.things).to.deep.equal([rebuilt])
     expect(vault.isEnabled).to.be.false
-    await erased()
+    await forgotten()
     expect(deviceDB.cachedNow()).to.be.null
   })
 
@@ -350,14 +350,14 @@ describe("the entrypoints, handed rubble", () => {
   })
 })
 
-describe("lock() with an erase that throws synchronously", () => {
-  it("reports locked, does not throw, and announces the refused erase", async () => {
+describe("lock() with an forget that throws synchronously", () => {
+  it("reports locked, does not throw, and announces the refused forget", async () => {
     const onLifecycle = vi.fn()
     const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onLifecycle })
     deviceDB.forget.mockImplementationOnce(() => { throw new Error('the duck is broken') })
     expect(() => vault.lock()).to.not.throw()
     expect(vault.isLocked).to.be.true
-    await erased()
+    await forgotten()
     expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_unerased', vault, where: 'lock' }))
   })
 })

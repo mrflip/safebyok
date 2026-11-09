@@ -77,7 +77,7 @@ export type Merged<SourcesT extends readonly object[]> =
  * and makes it so (`SX.vaultRow.refusingAs('damaged_row')`), rather than listing its fields twice.
  *
  * A validator of an object also has `parseConsistent(val, other, refusal?)`: it parses `val`,
- * holds the result to `other` as {@link verifyConsistent} does, and returns the result. Where they
+ * checks the result against `other` as {@link verifyConsistent} does, and returns the result. Where they
  * disagree it refuses `kind`, or the `refusal` given: its `kind`, its `message`, or both. A
  * `refusal` can also carry a `where` and `advice`, which frame a failed parse as `parse`'s do.
  *
@@ -150,7 +150,7 @@ export const objCheck = <ShapeT extends Z.ZodRawShape, const SourcesT extends re
 /** The kit a builder is handed: `sources` spread in beneath {@link Kit}. */
 const kitWith = <SourcesT extends readonly object[]>(sources?: SourcesT): KitWith<SourcesT> => Object.assign({}, ...(sources ?? []), Kit) as KitWith<SourcesT>
 
-/** True exactly when `A` and `B` are the same type: hold a hand-written shape to its checker with `true satisfies AssertEqual<Shape, CheckerInput<typeof check>>`. */
+/** True exactly when `A` and `B` are the same type: match a hand-written shape to its checker with `true satisfies AssertEqual<Shape, CheckerInput<typeof check>>`. */
 export type AssertEqual<A, B> = Z.core.util.AssertEqual<A, B>
 
 /** What a checker accepts: the input type of its schema. */

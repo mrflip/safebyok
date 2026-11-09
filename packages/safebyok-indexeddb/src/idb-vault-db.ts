@@ -3,7 +3,7 @@
 import type { UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type {
-  AdapterVaultDBOpts, BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven,
+  AdapterVaultDBOpts, BankScope, BoxesFetched, BoxFetched, BoxWritten, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Written, PutOptsGiven,
   RowOfVault, Tidied, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope,
 } from 'safebyok/storage'
 import { bankBoxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, shelfOf, vaultlabelOf, vaultScopepathOf, vaultsRangeOf } from './shelf'
@@ -70,39 +70,39 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
     })
   }
 
-  protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Landing> {
-    const landing = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+  protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Written> {
+    const written = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const ante = await DB.rowAt(store, vaultScopepathOf(record))
-      const landed = DB.isVaultPutAllowed(ante, opts)
-      if (landed) { store.put(record, vaultScopepathOf(record)) }
-      return { landed, ante }
+      const isWritten = DB.isVaultPutAllowed(ante, opts)
+      if (isWritten) { store.put(record, vaultScopepathOf(record)) }
+      return { isWritten, ante }
     })
-    if (landing.landed) { this.#ring([{ scope: record, heard: { vault: record } }]) }
-    return landing
+    if (written.isWritten) { this.#ring([{ scope: record, heard: { vault: record } }]) }
+    return written
   }
 
-  protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxLanding> {
-    const landing = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+  protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxWritten> {
+    const written = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [vault, ante] = await Promise.all([DB.rowAt(store, vaultScopepathOf(record)), DB.rowAt(store, boxScopepathOf(record))])
-      const landed = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
-      if (landed) { store.put(record, boxScopepathOf(record)) }
-      return { landed, ante, vault }
+      const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
+      if (isWritten) { store.put(record, boxScopepathOf(record)) }
+      return { isWritten, ante, vault }
     })
-    if (landing.landed) { this.#ring([{ scope: record, heard: { vault: landing.vault, box: record } }]) }
-    return landing
+    if (written.isWritten) { this.#ring([{ scope: record, heard: { vault: written.vault, box: record } }]) }
+    return written
   }
 
-  protected async doDelVault(tombstone: VaultTombstone, { prior }: DelOpts): Promise<Landing> {
-    const { landing, rungs } = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+  protected async doDelVault(tombstone: VaultTombstone, { prior }: DelOpts): Promise<Written> {
+    const { written, rungs } = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const ante = await DB.rowAt(store, vaultScopepathOf(tombstone))
       const isOurs = DB.isLiveVaultRecord(ante, tombstone.vault_tok)
       const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
-      const landed = isOurs && DB.isRowAt(ante, prior)
+      const isWritten = isOurs && DB.isRowAt(ante, prior)
       // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
-      if ((! landed) && (isOurs || isDamaged)) { return { landing: { landed, ante }, rungs: [] } }
-      if (landed) { store.put(tombstone, vaultScopepathOf(tombstone)) }
-      const vault = landed ? tombstone : ante
-      const rungs: Rung[] = landed ? [{ scope: tombstone, heard: { vault } }] : []
+      if ((! isWritten) && (isOurs || isDamaged)) { return { written: { isWritten, ante }, rungs: [] } }
+      if (isWritten) { store.put(tombstone, vaultScopepathOf(tombstone)) }
+      const vault = isWritten ? tombstone : ante
+      const rungs: Rung[] = isWritten ? [{ scope: tombstone, heard: { vault } }] : []
       const boxes = await filedIn(store, lifeRangeOf(tombstone))
       for (const { scopepath, row } of boxes) {
         const boxTombstone = DB.boxTombstoneOf(row, tombstone.written_at)
@@ -110,22 +110,22 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
         store.put(boxTombstone, scopepath)
         rungs.push({ scope: tombstone, heard: { vault, box: boxTombstone } })
       }
-      return { landing: { landed, ante }, rungs }
+      return { written: { isWritten, ante }, rungs }
     })
     this.#ring(rungs)
-    return landing
+    return written
   }
 
-  protected async doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): Promise<BoxLanding> {
-    const landing = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+  protected async doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): Promise<BoxWritten> {
+    const written = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [vault, ante] = await Promise.all([DB.rowAt(store, vaultScopepathOf(tombstone)), DB.rowAt(store, boxScopepathOf(tombstone))])
       const isDeletable = DB.isLiveBoxRecord(ante, tombstone.vault_tok) && DB.isRowAt(ante, prior)
-      const landed = DB.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
-      if (landed) { store.put(tombstone, boxScopepathOf(tombstone)) }
-      return { landed, ante, vault }
+      const isWritten = DB.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
+      if (isWritten) { store.put(tombstone, boxScopepathOf(tombstone)) }
+      return { isWritten, ante, vault }
     })
-    if (landing.landed) { this.#ring([{ scope: tombstone, heard: { vault: landing.vault, box: tombstone } }]) }
-    return landing
+    if (written.isWritten) { this.#ring([{ scope: tombstone, heard: { vault: written.vault, box: tombstone } }]) }
+    return written
   }
 
   protected async doTidyGone(scope: BankScope): Promise<Tidied> {

@@ -96,16 +96,16 @@ Easy to get wrong:
 * The core sets no timers. Call `bank.autolock()` after `hello` and on a timer of your own.
 * `vault.hello()` lists a vault's boxes and starts their watch. Until then `vault.boxListing` is
   empty, and with no watch nothing from another device arrives until the next `vault.hello()`.
-* `bank.vacate()` is sign-out: it disables the bank, then erases this bank's leases on this device
-  and its bank row in the deviceDB, leaving the vaultDB alone, and settles once each erase has been
+* `bank.vacate()` is sign-out: it disables the bank, then forgets this bank's leases on this device
+  and its bank row in the deviceDB, leaving the vaultDB alone, and settles once each forget has been
   tried. The next `deviceDB.ensureBank` for that user mints a new `device_id`. Await it before the
-  page goes: a lease it cannot erase reaches your `onLifecycle` as `lease_unerased`, and
-  `vacated` follows once the erase settles, counting them. A refused listing of the leases, or a
+  page goes: a lease it cannot forget reaches your `onLifecycle` as `lease_unerased`, and
+  `vacated` follows once the forget settles, counting them. A refused listing of the leases, or a
   bank row it cannot forget, reaches your `onBadNews`.
 * **A bank swept or vacated is spent.** From the moment you call either, `bank.isEnabled` is false
   for good, `hello`, `ensureVault` and `vaultAt` refuse `disabled`, and the bank calls none of your
   functions: what it would tell them goes to `DefaultOnLifecycle` and `DefaultOnBadNews`. The one
-  exception is the erase of a vacate, which still tells your `onLifecycle` and `onBadNews` what it
+  exception is the forget of a vacate, which still tells your `onLifecycle` and `onBadNews` what it
   could not do.
 * **A revoked identity vacates the bank**, whatever your handlers do: `identity_revoked`, raised by
   your storage adapter, ends the bank, whose snapshot then shows that refusal, and your
@@ -113,7 +113,7 @@ Easy to get wrong:
   again.
 * **`onLifecycle` hears what happens in the bank's life**, each event a `BankEvent` told by its
   `kind`: `helloed` with the outcome of each `bank.hello()` and `vault.hello()`; `lease_unerased`
-  for a cached lease that outlived its erase, with `where` it happened and the vault, if one; and
+  for a cached lease that outlived its forget, with `where` it happened and the vault, if one; and
   `vacated`. With no `onLifecycle`, `DefaultOnLifecycle` logs a lease left by a lock or a vacate at
   error, reports it to the platform and vacates the vault; reports a vacate's cause other than
   `disabled` the same way; and warns of the rest that went wrong. An `onLifecycle` of your own

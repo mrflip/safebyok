@@ -81,7 +81,7 @@ describe("safebyok-react's README's raw field", () => {
     expect(input.value).to.eq('sk-test-edited')
     expect(await box.extractWhisper()).to.deep.equal(Stored)
 
-    await BoxFields.of(box).save()
+    await BoxFields.of(box).put()
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-edited' })
 
     unmount?.()

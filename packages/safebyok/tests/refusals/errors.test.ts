@@ -117,7 +117,7 @@ const FamilyCases = [
   ["storage_unavailable", "condition", 'unreachable storage is tried again shortly'],
   ["vault_gone",          "condition", 'a vault deleted while a call worked on it is a fact of syncing'],
   ["vault_mismatch",      "condition", 'a vault deleted or made anew on another device is a fact of syncing'],
-  ["gating_landed",       "condition", 'a gating ended while its attempt ran is the user moving on, not a fault'],
+  ["gating_concluded",    "condition", 'a gating ended while its attempt ran is the user moving on, not a fault'],
   ["damaged_lease",       "bad_news",  'a lease damaged on this device is told to the user, who unlocks again'],
   ["attempt_in_flight",   "condition", 'a second submit while the first attempt runs is the user being quick, not a fault'],
   ["already_asking",      "condition", 'a second launch while a dialog is up is the host deduping late, not a fault'],

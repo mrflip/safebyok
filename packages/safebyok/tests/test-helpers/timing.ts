@@ -164,7 +164,7 @@ export const holdNextCall = <Target extends object>(target: Target, verb: AsyncV
  *   const written = TH.holdNextAnswer(deviceDB, 'tryPutLease')
  *   const unlocking = TH.tryUnlock(vault, 'pw')   // the lease is in the store; the unlock has not heard
  *   await written.reached
- *   await vault.lock()                     // its erase lands after the write
+ *   await vault.lock()                     // its forget lands after the write
  *   written.release()
  */
 export const holdNextAnswer = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {

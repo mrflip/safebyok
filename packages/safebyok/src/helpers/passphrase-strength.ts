@@ -42,7 +42,7 @@ export type StrengthChecker = {
   load?: (() => void | Promise<void>) | undefined
 }
 
-/** A strength checker as a bank keeps it: the host's, held to its contract by {@link guardStrengthChecker}. */
+/** A strength checker as a bank keeps it: the host's, made to honor its contract by {@link guardStrengthChecker}. */
 export type GuardedStrengthChecker = {
   (passphrase: string, scope: VaultScope): Promise<PassphraseVerdict>
   readonly load: () => Promise<void>
@@ -67,7 +67,7 @@ const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "
 
 // A blank passphrase is weak before the host's checker hears it. A throw is replaced, as the checker heard the passphrase;
 // a failed `load` keeps its throw as the cause, as it heard nothing; a VaultError it throws passes as it came.
-/** `hostChecker` held to its contract: the one way a vault, or a dialog checking as the user types, asks it. */
+/** `hostChecker`, made to honor its contract: the one way a vault, or a dialog checking as the user types, asks it. */
 export const guardStrengthChecker = (hostChecker: StrengthChecker): GuardedStrengthChecker => {
   const host = GX.strengthChecker.parse(hostChecker, { where: 'strengthChecker' })
   const check = async (passphrase: string, scope: VaultScope): Promise<PassphraseVerdict> => {

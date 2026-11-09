@@ -168,7 +168,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     if (this.snapshot === ante) { this.tellListeners() }
   }
 
-  /** The whisper of `record`, opened through the vault's seal verbs and held to `CX.whisper`. */
+  /** The whisper of `record`, opened through the vault's seal verbs and checked by `CX.whisper`. */
   async #unseal(record: BoxRecord): Promise<Whisper> {
     const { sidecar, box_key_wrapped, whisper_ciphered } = record
     const stamp = boxStampOf(SX.boxSparse.parse(record), sidecar)

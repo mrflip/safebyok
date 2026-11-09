@@ -158,14 +158,14 @@ export type Boxscope = Z.infer<typeof boxscope>
 
 /** The scope naming one of a bank's vaults, as its calls are handed it: the `vaultlabel` required, the `applabel` and `user_id` invited, each name checked.
  * It takes whatever carries the names, a plain bag, a Vault object, its snapshot or a
- * BankVault, and leaves the rest. A store in the scope refuses: it belongs in the
+ * BankVault, and leaves the rest. A vaultDB or deviceDB in the scope refuses: it belongs in the
  * second bag, the options, and would be dropped unseen here.
  *
- * @example bankedVaultScope.parse({ vaultlabel: 'main', vaultDB })  // throws: stores go in the second bag
+ * @example bankedVaultScope.parse({ vaultlabel: 'main', vaultDB })  // throws: a vaultDB goes in the second bag
  */
 export const bankedVaultScope = Checker(({ obj, applabel, user_id, vaultlabel }) => {
-  const store = never(Phrases.StoreInVaultScope).optional()
-  return obj({ applabel: applabel.optional(), user_id: user_id.optional(), vaultlabel, vaultDB: store, deviceDB: store })
+  const database = never(Phrases.DatabaseInVaultScope).optional()
+  return obj({ applabel: applabel.optional(), user_id: user_id.optional(), vaultlabel, vaultDB: database, deviceDB: database })
 }, 'bad_scope')
 
 /** The scope naming one of a bank's vaults, as {@link bankedVaultScope} checks it: its `vaultlabel`, and the bank's own `applabel` and `user_id` if you like.

@@ -48,7 +48,7 @@ export class BoxFields {
   private constructor(box: Box) { this.box = box }
   // --
 
-  // == [Fields]: of, bind, save, trySave
+  // == [Fields]: of, bind, put, tryPut
 
   /** The fields of `box`, the same instance at every call. */
   static of(box: Box): BoxFields {
@@ -67,17 +67,17 @@ export class BoxFields {
   }
 
   /** Read each bound field over the whisper exposed, and seal it in one put. */
-  async save(opts: BoxPutOpts = {}): Promise<Box> {
+  async put(opts: BoxPutOpts = {}): Promise<Box> {
     if (this.#fields.size === 0) { throw noFieldsBound() }
     const { isExposed, isVeiled } = this.box.snapshot
     if (! isExposed) { throw notExposedError() }
-    if (isVeiled) { throw savingVeiledFields() }
+    if (isVeiled) { throw puttingVeiledFields() }
     this.#readFields()
     return this.box.putExposed({}, opts)
   }
 
-  /** Non-throwing form of {@link save}. */
-  trySave(opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.save(opts)) }
+  /** Non-throwing form of {@link put}. */
+  tryPut(opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.put(opts)) }
   // --
 
   // == [Binding]: bindField, unbindField, renderFields, readFields
@@ -132,7 +132,7 @@ export class BoxFields {
   // --
 }
 
-// == [Helpers]: fieldTextOf, noFieldsBound, savingVeiledFields
+// == [Helpers]: fieldTextOf, noFieldsBound, puttingVeiledFields
 
 /** What a field shows of a leaf: its text, and a blank for an object, a list or nothing there. */
 const fieldTextOf = (leaf: unknown): string => {
@@ -142,5 +142,5 @@ const fieldTextOf = (leaf: unknown): string => {
 
 const noFieldsBound = (): VaultError => new VaultError('bad_option', Phrases.NoFieldsBound)
 
-const savingVeiledFields = (): VaultError => new VaultError('bad_option', Phrases.SavingVeiledFields)
+const puttingVeiledFields = (): VaultError => new VaultError('bad_option', Phrases.PuttingVeiledFields)
 // --

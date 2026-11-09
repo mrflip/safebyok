@@ -47,13 +47,13 @@ const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<
 }
 // --
 
-// == [What storage answers]: Landing, BoxLanding, RowOfVault, RowOfBox, BoxesFetched, BoxFetched, Heard
+// == [What storage answers]: Written, BoxWritten, RowOfVault, RowOfBox, BoxesFetched, BoxFetched, Heard
 
-/** Whether a conditional write landed, and `ante`, the row it replaced or that stood in its way. */
-export type Landing = { landed: boolean, ante: unknown }
+/** Whether a conditional write took effect, and `ante`, the row it replaced or that stood in its way. */
+export type Written = { isWritten: boolean, ante: unknown }
 
-/** A box write's {@link Landing}, with the vault row as read in the same step. */
-export type BoxLanding = Landing & { vault: unknown }
+/** A box write's {@link Written}, with the vault row as read in the same step. */
+export type BoxWritten = Written & { vault: unknown }
 
 /** A vault row as storage hands it up, unchecked, under its vaultlabel. */
 export type RowOfVault = { vaultlabel: string, vault: unknown }
@@ -248,8 +248,8 @@ export abstract class AdapterVaultDB implements VaultDB {
       const vaultRecord = SX.vaultRecord.parse(record)
       const putOpts = SX.putVaultOpts.parse(opts)
       demandNextSeq(vaultRecord, putOpts.prior)
-      const { landed, ante } = await this.doPutVault(vaultRecord, putOpts)
-      if (landed) { return { ok: true, req_params, act: landingActOf(ante), val: vaultRecord, world: vaultRecord } }
+      const { isWritten, ante } = await this.doPutVault(vaultRecord, putOpts)
+      if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: vaultRecord, world: vaultRecord } }
       const { ifAbsent, ifPresent } = putOpts
       const found = foundVaultRowOf(ante, vaultRecord)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok)) }
@@ -273,9 +273,9 @@ export abstract class AdapterVaultDB implements VaultDB {
       demandNextSeq(boxRecord, putOpts.prior)
       const recordBytes = jsonBytes(boxRecord)
       if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
-      const { landed, ante, vault } = await this.doPutBox(boxRecord, putOpts)
+      const { isWritten, ante, vault } = await this.doPutBox(boxRecord, putOpts)
       const world = liveVaultOf(vault, boxRecord)
-      if (landed) { return { ok: true, req_params, act: landingActOf(ante), val: boxRecord, world } }
+      if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: boxRecord, world } }
       const { ifAbsent, ifPresent } = putOpts
       const found = foundBoxRowOf(ante, boxRecord)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.absentBox(world, null) }
@@ -350,8 +350,8 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** Stores the moved gate's `record` over the row it was made from. */
   async #putMovedGate(record: VaultRecord, stored: VaultRecord): Promise<void> {
-    const { landed, ante } = await this.doPutVault(record, { prior: SX.revisionOf(stored), ifAbsent: 'fail', ifPresent: 'repl' })
-    if (landed) { return }
+    const { isWritten, ante } = await this.doPutVault(record, { prior: SX.revisionOf(stored), ifAbsent: 'fail', ifPresent: 'repl' })
+    if (isWritten) { return }
     const found = liveVaultOf(ante, record)
     throw Refuse.staleWrite(found, found)
   }
@@ -366,9 +366,9 @@ export abstract class AdapterVaultDB implements VaultDB {
       const boxTombstone = SX.boxTombstone.parse(tombstone)
       const delOpts = SX.delOpts.parse(opts)
       demandNextSeq(boxTombstone, delOpts.prior)
-      const { landed, ante, vault } = await this.doDelBox(boxTombstone, delOpts)
+      const { isWritten, ante, vault } = await this.doDelBox(boxTombstone, delOpts)
       const world = liveVaultOf(vault, boxTombstone)
-      if (landed) { return { ok: true, req_params, act: 'deleted', val: boxTombstone, world } }
+      if (isWritten) { return { ok: true, req_params, act: 'deleted', val: boxTombstone, world } }
       const found = foundBoxRowOf(ante, boxTombstone)
       if (found === null) { return this.#answerDelBoxVoid(boxTombstone, world, req_params) }
       if (found.am === 'x') { return this.#answerDelBoxGone(found, world, req_params) }
@@ -401,8 +401,8 @@ export abstract class AdapterVaultDB implements VaultDB {
       const vaultTombstone = SX.vaultTombstone.parse(tombstone)
       const delOpts = SX.delOpts.parse(opts)
       demandNextSeq(vaultTombstone, delOpts.prior)
-      const { landed, ante } = await this.doDelVault(vaultTombstone, delOpts)
-      if (landed) { return { ok: true, req_params, act: 'deleted', val: vaultTombstone, world: vaultTombstone } }
+      const { isWritten, ante } = await this.doDelVault(vaultTombstone, delOpts)
+      if (isWritten) { return { ok: true, req_params, act: 'deleted', val: vaultTombstone, world: vaultTombstone } }
       const found = foundVaultRowOf(ante, vaultTombstone)
       if (found === null) { return this.#answerDelVaultVoid(vaultTombstone, req_params) }
       if (found.vault_tok !== vaultTombstone.vault_tok) { return this.#answerDelVaultVoid(vaultTombstone, req_params) }
@@ -471,14 +471,14 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doListBoxes(asked: VaultQuery): Awaitable<BoxesFetched>
   /** The vault row, and the box row under `vault_tok`, read in one step. */
   protected abstract doGetBox(asked: BoxQuery): Awaitable<BoxFetched>
-  /** Stores `record` where `isVaultPutAllowed` lets it land over the row found, atomic on `revision_tok`. */
-  protected abstract doPutVault(record: VaultRecord, opts: PutOptsGiven): Awaitable<Landing>
-  /** Stores `record` where `isBoxPutAllowed` lets it land over the row found, under a vault row that passes `isLiveVaultRecord`. */
-  protected abstract doPutBox(record: BoxRecord, opts: PutOptsGiven): Awaitable<BoxLanding>
+  /** Stores `record` where `isVaultPutAllowed` lets it be written over the row found, atomic on `revision_tok`. */
+  protected abstract doPutVault(record: VaultRecord, opts: PutOptsGiven): Awaitable<Written>
+  /** Stores `record` where `isBoxPutAllowed` lets it be written over the row found, under a vault row that passes `isLiveVaultRecord`. */
+  protected abstract doPutBox(record: BoxRecord, opts: PutOptsGiven): Awaitable<BoxWritten>
   /** In one step, stores `tombstone` over a row at `opts.prior` that passes `isLiveVaultRecord`, and tombstones that life's boxes. */
-  protected abstract doDelVault(tombstone: VaultTombstone, opts: DelOpts): Awaitable<Landing>
+  protected abstract doDelVault(tombstone: VaultTombstone, opts: DelOpts): Awaitable<Written>
   /** Stores `tombstone` over a row at `opts.prior` that passes `isLiveBoxRecord`, under a vault row that passes `isLiveVaultRecord`. */
-  protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxLanding>
+  protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxWritten>
   /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
   /** Starts telling `hear` of rows that change, and returns how to stop. Storage with no watch never calls it. */
@@ -486,7 +486,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // --
 }
 
-// == [Helpers]: refusalOf, RowOfOtherAddress, isRowFound, foundVaultRowOf, foundBoxRowOf, listedRowOf, liveVaultOf, movedGateOf, listedBoxesOf, demandNextSeq, landingActOf, jsonBytes
+// == [Helpers]: refusalOf, RowOfOtherAddress, isRowFound, foundVaultRowOf, foundBoxRowOf, listedRowOf, liveVaultOf, movedGateOf, listedBoxesOf, demandNextSeq, writeActOf, jsonBytes
 
 /** The refusal a verb's throw stands for: a refusal as it came, else `storage_unavailable`. */
 const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultError => {
@@ -557,8 +557,8 @@ const demandNextSeq = ({ revision_seq }: Revision, prior: Revision): void => {
   if (revision_seq !== (prior.revision_seq + 1)) { throw Refuse.seqNotNext() }
 }
 
-// A peek is enough: storage judged `ante` against its row check before the put landed.
-const landingActOf = (ante: unknown): 'born' | 'reborn' | 'replaced' => {
+// A peek is enough: storage judged `ante` against its row check before the put was written.
+const writeActOf = (ante: unknown): 'born' | 'reborn' | 'replaced' => {
   if (ante === null) { return 'born' }
   return SX.isTombstoneRow(ante) ? 'reborn' : 'replaced'
 }

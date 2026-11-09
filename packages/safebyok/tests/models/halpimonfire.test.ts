@@ -140,7 +140,7 @@ describe("A gate change after its record is stored", () => {
     expect(deviceDB.cachedNow()).to.include({ gate_epoch: 1 })
   })
 
-  it("leaves the vault unlocked on the new lease where a lock crossed its making, with no second erase", async () => {
+  it("leaves the vault unlocked on the new lease where a lock crossed its making, with no second forget", async () => {
     const { vault, deviceDB } = await makeBornVault()
     deviceDB.forget.mockClear()
     crossingGrant(() => { vault.lock() })

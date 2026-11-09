@@ -120,7 +120,7 @@ export class Bank {
     Object.freeze(this)
   }
 
-  /** Complete `scope` into a {@link VaultScope} of this bank, refusing a scope of another bank. */
+  /** The full {@link VaultScope} of `scope` in this bank, refusing a scope of another bank. */
   vaultScopeOf(scope: BankedVaultScope): VaultScope {
     const { vaultlabel } = bankedVaultScope.parseConsistent(scope, this.scope, { message: Phrases.otherScope })
     return { ...this.scope, vaultlabel }
@@ -163,9 +163,9 @@ export class Bank {
   }
   // --
 
-  // == [Ending]: autolock, lock, vacate, sweep, letGo, listOwnLeases, scrub, eraseOwnLeases, forgetOwnBank, tellHost
+  // == [Ending]: autolock, lock, vacate, sweep, letGo, listOwnLeases, scrub, forgetOwnLeases, forgetOwnBank, tellHost
 
-  /** Lock each listed vault with a cached lease past autolock, erasing it. Call it after `hello` and on your own timer.
+  /** Lock each listed vault with a cached lease past autolock, forgetting it. Call it after `hello` and on your own timer.
    * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.buildFromCache` leaves such a row for it.
    */
   async autolock(): Promise<void> {
@@ -185,7 +185,7 @@ export class Bank {
     return this
   }
 
-  /** Sign out on this device: disable the bank, and erase every lease of this bank cached here and its bank row, settling once each erase has been tried. */
+  /** Sign out on this device: disable the bank, and forget every lease of this bank cached here and its bank row, settling once each forget has been tried. */
   vacate(story: VacateStory = {}): Promise<void> {
     const { cause = bankDisabled() } = VX.vacateStory.parse(story)
     this.#letGo(cause, () => { this.#vaultListing.vacate() })
@@ -218,26 +218,26 @@ export class Bank {
   // A fresh device holds no bank row: the next bank of this scope gets a new device_id.
   /** A vacate's scrub of this device: every lease row of this bank, then its bank row, then `vacated` told. */
   async #scrub(cause: VaultError): Promise<void> {
-    const unerased = await this.#eraseOwnLeases()
+    const unerased = await this.#forgetOwnLeases()
     await this.#forgetOwnBank()
     this.#tellHost({ kind: 'vacated', cause, unerased })
   }
 
-  /** A vacate's erase of every row of this bank, listed or not, as a fresh page told 'identity_revoked' has listed
-   * none; answers how many it could not erase.
+  /** A vacate's forget of every row of this bank, listed or not, as a fresh page told 'identity_revoked' has listed
+   * none; answers how many it could not forget.
    */
-  async #eraseOwnLeases(): Promise<number> {
+  async #forgetOwnLeases(): Promise<number> {
     const listed = await this.#listOwnLeases()
     if (! listed.ok) { tellBadNewsTo(this.#hostHandlers.onBadNews, this, [listed.err]); return 0 }
-    const erased = await Promise.all(listed.val.map(async (row) => {
+    const forgotten = await Promise.all(listed.val.map(async (row) => {
       const forgot = await this.deviceDB.tryForget(row)
       if (! forgot.ok) { this.#tellHost({ kind: 'lease_unerased', refusal: forgot.err, vault: null, where: 'vacate' }) }
       return forgot.ok
     }))
-    return erased.filter((isErased) => ! isErased).length
+    return forgotten.filter((isForgotten) => ! isForgotten).length
   }
 
-  /** A vacate's erase of this bank's row in the deviceDB, a refusal told as bad news. */
+  /** A vacate's forget of this bank's row in the deviceDB, a refusal told as bad news. */
   async #forgetOwnBank(): Promise<void> {
     const forgot = await this.deviceDB.tryForgetBank(this.scope)
     if (! forgot.ok) { tellBadNewsTo(this.#hostHandlers.onBadNews, this, [forgot.err]) }
@@ -355,8 +355,8 @@ const reportAtError = (refusal: VaultError, bank: Bank): void => {
   reportToPlatform(refusal)
 }
 
-// A lock or a vacate meant the lease gone; a tombstone's erase and an outdated row's are tried again by the next lease cached.
-/** The default's answer to a cached lease that outlived its erase. */
+// A lock or a vacate meant the lease gone; a tombstone's forget and an outdated row's are tried again by the next lease cached.
+/** The default's answer to a cached lease that outlived its forget. */
 const heedUnerased = ({ refusal, vault, where, bank }: Extract<BankEvent, { kind: 'lease_unerased' }>): void => {
   if (where === 'tombstone' || where === 'undeleted') {
     bank.logger.warn(refusal.message, { call: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
@@ -386,7 +386,7 @@ export const DefaultOnLifecycle: LifecycleHandler = (event) => {
 }
 
 // What the dialog throws is dropped: it may quote what the user typed.
-/** `requestCleartext` held to its contract: the one way a gating asks the user. */
+/** `requestCleartext`, made to honor its contract: the one way a gating asks the user. */
 export const guardRequestCleartext = (requestCleartext: RequestCleartext): AskUser => {
   const host = HostChecks.requestCleartext.parse(requestCleartext, { where: 'requestCleartext' })
   return brandGuarded(async (gating: AnyGating): Promise<boolean> => {
@@ -399,7 +399,7 @@ export const guardRequestCleartext = (requestCleartext: RequestCleartext): AskUs
   })
 }
 
-/** `onLifecycle` held to its contract: the one way the core tells the host what happened in the bank's life. */
+/** `onLifecycle`, made to honor its contract: the one way the core tells the host what happened in the bank's life. */
 export const guardOnLifecycle = (onLifecycle: LifecycleHandler): GuardedLifecycleHandler => {
   const host = HostChecks.onLifecycle.parse(onLifecycle, { where: 'onLifecycle' })
   return brandGuarded(async (event: BankEvent): Promise<void> => {

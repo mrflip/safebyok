@@ -49,10 +49,10 @@ export const InstantNotWhole = "An instant is whole epoch milliseconds"
 export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when its gate is null: a novel vault has neither, and a gated one both"
 // --
 
-// == [Scopes]: StoreInVaultScope
+// == [Scopes]: DatabaseInVaultScope
 
-/** Why a store in the scope naming a vault refuses: it goes in the second bag, the options. */
-export const StoreInVaultScope = "A vault's stores go in the second bag, its options, not in the scope naming the vault"
+/** Why a vaultDB or deviceDB in the scope naming a vault refuses: it goes in the second bag, the options. */
+export const DatabaseInVaultScope = "A vault's vaultDB and deviceDB go in the second bag, its options, not in the scope naming the vault"
 // --
 
 // == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, VaultDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, BankExpected, VaultErrorExpected
@@ -67,7 +67,7 @@ export const GuardedExpected = "Expected a host's function as Bank.make wraps it
 export const GuardedLoggerExpected = "Expected a logger as Bank.make guards it"
 
 /** Anything but a vaultDB branded by safebyok and answering each of its verbs, where a vaultDB is asked. */
-export const VaultDBExpected = "Expected a VaultDB: a store or client branded by safebyok, answering each of its verbs"
+export const VaultDBExpected = "Expected a VaultDB: an adapter or client branded by safebyok, answering each of its verbs"
 
 /** Anything but an instance of a class extending safebyok's DeviceDB, where a deviceDB is asked. */
 export const DeviceDBExpected = "Expected a DeviceDB: an instance of a class extending safebyok's DeviceDB"
@@ -118,7 +118,7 @@ export const PasskeyAnswerUsed = "This passkey's answer was used already, and it
 export const prfSaltNotFresh = (count: number): string => `A new passkey answers over a fresh salt of ${String(count)} random bytes, as base64url text: safebyok-react's createPasskey mints one`
 // --
 
-// == [Options]: leaseHoursShape, MinutesShape, VaultDBShape, DeviceDBShape, KeyDeriverShape, LoggerShape, StringStoreShape, KeyDeriverSpecShape, memoryPerLane, StrengthCheckerShape
+// == [Options]: leaseHoursShape, MinutesShape, VaultDBShape, DeviceDBShape, KeyDeriverShape, LoggerShape, KeyDeriverSpecShape, memoryPerLane, StrengthCheckerShape
 
 /** A `leaseHours` that is no number of hours a lease may last, up to `maxHours`. */
 export const leaseHoursShape = (maxHours: number): string => `Expected a number of hours above zero and at most ${String(maxHours)}, fractions too (0.25 is fifteen minutes), or Infinity for never: until lock()`
@@ -129,17 +129,14 @@ export const MinutesShape = "Expected a number of minutes, zero or more, fractio
 /** A `vaultDB` that is no storage adapter. */
 export const VaultDBShape = "Expected a storage adapter, an instance of the AdapterVaultDB class: localVaultDB({ store }), idbVaultDB() from 'safebyok-indexeddb', or your backend's own"
 
-/** A `deviceDB` that is no device store. */
-export const DeviceDBShape = "Expected a device store, an instance of the DeviceDB class: new MemoryDeviceDB(), or your own class that extends DeviceDB, both imported from 'safebyok'"
+/** A `deviceDB` that is no device database. */
+export const DeviceDBShape = "Expected a device database, an instance of the DeviceDB class: new MemoryDeviceDB(), or your own class that extends DeviceDB, both imported from 'safebyok'"
 
 /** A `keyDeriver` left out, or no object. */
 export const KeyDeriverShape = `Expected a KeyDeriver: in a browser, argon2idWebV1Deriver from 'safebyok/browser'; elsewhere, your own, with a key_deriver_label, a salt_bytes of ${String(PassphraseSaltBytes)} and a deriveKeyBytes function`
 
 /** A `logger` that is no object. */
 export const LoggerShape = "Expected a VaultLogger, with log, warn and error functions: leave it out for the default logger, or pass functions that do nothing to log nowhere"
-
-/** A `store` that is no object. */
-export const StringStoreShape = "Expected a StringStore, such as memoryStore() or domStore(localStorage, prefix)"
 
 /** A keyDeriverSpec that is no object. */
 export const KeyDeriverSpecShape = `Expected a keyDeriverSpec: algorithm 'argon2id', key_deriver_label, memory_kib, iterations, parallelism, salt_bytes (${String(PassphraseSaltBytes)}) and output_bytes`
@@ -190,7 +187,7 @@ export const LeaseScopepathShape = `A lease's scopepath is 'lease', an applabel,
 export const BoxScopepathShape = `A box's scopepath is 'box', an applabel, a user_id, a vaultlabel and a boxlabel, joined on ${ScopepathDelimiter}`
 // --
 
-// == [Bank and vault]: VaultScopeAdvice, otherScope, VaultGoneWhileOpening, OtherStoresThanEnlisted, VaultBehindWhileOpening, VaultObjectGone, VaultBehind
+// == [Bank and vault]: VaultScopeAdvice, otherScope, VaultGoneWhileOpening, OtherDatabasesThanListed, VaultBehindWhileOpening, VaultObjectGone, VaultBehind
 
 /** The advice a refusal of the scope naming a vault ends with: what that scope takes, and what else names a vault. */
 export const VaultScopeAdvice = "That scope holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
@@ -201,8 +198,8 @@ export const otherScope = (fieldnames: readonly string[]): string => `This names
 /** Why a vault let go while the bank was opening it hands out no Vault object. */
 export const VaultGoneWhileOpening = "The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault)."
 
-/** Why options naming other stores than the vault the bank has enlisted was born from refuse. */
-export const OtherStoresThanEnlisted = "The bank already has this vault enlisted, born from other stores than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Stores are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault)."
+/** Why options naming another vaultDB or deviceDB than the listed vault was born from refuse. */
+export const OtherDatabasesThanListed = "The bank already lists this vault, born from another vaultDB or deviceDB than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Databases are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault)."
 
 /** Why the bank will not open a vault that storage offers older than this device has seen. */
 export const VaultBehindWhileOpening = "This device has already seen a newer copy of this vault than storage offers now, so it won't open this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask for the vault again; otherwise the app's support should look at its storage."
@@ -232,7 +229,7 @@ export const ProvingBeforePassphrase = "This vault has no passphrase yet, so not
 export const VaultChangedInStorage = "The vault changed in storage since this device read it -- a vault unlocker was changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying."
 // --
 
-// == [Vault: lifecycle]: VaultLocked, GateMoved, GatingLanded
+// == [Vault: lifecycle]: VaultLocked, GateMoved
 
 /** Why a call that needs the vault unlocked does nothing while it is locked. */
 export const VaultLocked = "The vault is locked, so nothing was read or written: call ensureUnlocked(), which asks the user, and call again."
@@ -240,8 +237,6 @@ export const VaultLocked = "The vault is locked, so nothing was read or written:
 /** Why a call stops when a wayin changed, here or on another device, as it worked. */
 export const GateMoved = "A vault unlocker changed while this call was under way -- the passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on."
 
-/** Why a proof checked after its gating landed unlocks nothing. */
-export const GatingLanded = "The prompt ended while this proof was being checked -- it was answered or dismissed -- and its end wins: nothing was unlocked. Ask again when the user wants the vault."
 // --
 
 // == [Vault: options]: HelloOptionsAdvice, EnsureUnlockedOptionsAdvice, RenewPastLease, DemandOptionsAdvice
@@ -289,13 +284,13 @@ export const BoxStoredDamaged = "A box in this vault is stored damaged, so it ca
 export const WayinStoredDamaged = "One of this vault's unlockers is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other vault unlocker, if the vault has one, still opens it. A damaged passkey is mended by adding the passkey again; a damaged passphrase only by removing the vault and making it again."
 // --
 
-// == [Storables]: PartialLoad, AlreadyEnlisted, BoxPatchAdvice, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, SavingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: PartialLoad, AlreadyListed, BoxPatchAdvice, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
 /** Why a birth makes nothing of a dna for a scope the listing already holds alive. */
-export const AlreadyEnlisted = "This listing already has an instance enlisted under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
+export const AlreadyListed = "This listing already has an instance under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
 
 /** Why a put that storage answered with no record refuses: only a broken adapter answers that. */
 export const PutAnsweredNothing = "A put was answered with no record, which a vaultDB never does: the storage adapter needs a developer's look."
@@ -317,13 +312,13 @@ export const NotExposed = "This box has no whisper exposed: call box.expose() fi
 export const BoxExpected = "BoxFields.of takes a Box, as vault.getBox answers one."
 
 /** Why saving a box's fields is refused while they show a blank. */
-export const SavingVeiledFields = "This box's whisper is veiled, so its fields hold no whisper to save: call box.unveil() first."
+export const PuttingVeiledFields = "This box's whisper is veiled, so its fields hold no whisper to put: call box.unveil() first."
 
 /** Why saving a box's fields is refused with none to read. */
-export const NoFieldsBound = "This box has no field bound, so there is nothing to save: bind one with BoxFields.of(box).bind(path), or call box.putExposed()."
+export const NoFieldsBound = "This box has no field bound, so there is nothing to put: bind one with BoxFields.of(box).bind(path), or call box.putExposed()."
 
 /** Why a record storage holds under the revision_seq held, but another revision_tok, is not adopted. */
-export const OneRevisionTwoToks = "Storage and this device disagree about one revision of a record: storage holds that revision_seq under another revision_tok, as if two puts landed as one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
+export const OneRevisionTwoToks = "Storage and this device disagree about one revision of a record: storage holds that revision_seq under another revision_tok, as if two puts written as one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
 
 /** Why a record storage holds deleted at the revision held alive, or the other way round, is not adopted. */
 export const OneRevisionTwoFates = "Storage and this device disagree about one revision of a record: one of them holds it alive and the other holds it deleted, or storage holds nothing for it. This device kept its own copy and did not take in what storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
@@ -502,7 +497,7 @@ export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed, s
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed, so the bank could not derive a key from a passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For a deriver that fetches its code, check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
 // --
 
-// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, boxTooLarge, VaultFull, StorageFull, SeqNotNext, storeFailed, storeThrew
+// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, boxTooLarge, VaultFull, StorageFull, SeqNotNext, deviceDBFailed, thrownNamed
 
 /** A well-formed row out of storage, whose own `fieldnames` are not the address it was asked for at. */
 export const rowOfOtherAddress = (fieldnames: readonly string[]): string => `The vault's storage answered with a row naming another ${fieldnames.join(' and ')} than the one asked for: the database or its storage adapter has filed it under the wrong address.`
@@ -543,14 +538,14 @@ export const StorageFull = "The vault's storage has no room left for this write:
 /** A put whose revision_seq is not one past its prior's. */
 export const SeqNotNext = "A record's revision_seq must be one past its prior's."
 
-/** A device store's failure in `call`, `named` the sentence naming what it threw, or blank. */
-export const storeFailed = (call: string, named: string): string => `This device's own storage failed in ${call}: try again.${named}`
+/** A device database's failure in `call`, `named` the sentence naming what it threw, or blank. */
+export const deviceDBFailed = (call: string, named: string): string => `This device's own storage failed in ${call}: try again.${named}`
 
-/** The sentence naming what a device store threw, by its `name` alone. */
-export const storeThrew = (thrownName: string): string => ` It threw ${thrownName}.`
+/** The sentence naming what a datastore threw, by its `name` alone. */
+export const thrownNamed = (thrownName: string): string => ` It threw ${thrownName}.`
 // --
 
-// == [Refusals: storage backends]: storageFailed, StorageIssue, IdentityRevoked, NoBrowserStore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserStoreFailed, SchemaNotServed, fetchFailed, WatchEnded
+// == [Refusals: storage backends]: storageFailed, StorageIssue, IdentityRevoked, NoBrowserDatastore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserDatadeviceDBFailed, SchemaNotServed, fetchFailed, WatchEnded
 
 /** A vault's storage backend failing in `call`, `named` the sentence naming what it threw, or blank. */
 export const storageFailed = (call: string, named: string): string => `The vault's storage could not be reached, or failed, in ${call}: try again shortly.${named}`
@@ -561,20 +556,20 @@ export const StorageIssue = "The vault's storage answered with a row that is not
 /** A storage backend that no longer serves the user the call names. */
 export const IdentityRevoked = "The vault's storage no longer serves this user: they signed out, or another user signed in. Open the vault again for the user signed in."
 
-/** A context with no browser store (IndexedDB) at all. */
-export const NoBrowserStore = "This context has no IndexedDB, so the vault has nowhere to keep its rows: run it in a browser that offers IndexedDB."
+/** A context with no browser datastore (IndexedDB) at all. */
+export const NoBrowserDatastore = "This context has no IndexedDB, so the vault has nowhere to keep its rows: run it in a browser that offers IndexedDB."
 
-/** A browser store's transaction aborted before it committed. */
+/** A browser datastore's transaction aborted before it committed. */
 export const TransactionAborted = "An IndexedDB transaction was aborted before it committed, and wrote nothing: try again."
 
-/** A browser store's database closed under the vault. */
+/** A browser datastore closed under the vault. */
 export const DatabaseClosed = "The vault's IndexedDB database was closed under it, by the browser or another tab upgrading it: reload the page."
 
-/** A browser store the page is not allowed to use. */
+/** A browser datastore the page is not allowed to use. */
 export const StorageWithheld = "The browser withholds IndexedDB from this page (site data blocked, or a private window that keeps none), so the vault has nowhere to keep its rows."
 
-/** A browser store failing in a way none of the others names. */
-export const BrowserStoreFailed = "IndexedDB failed while the vault was reading or writing its rows: try again shortly. IndexedDB's own error is this error's cause."
+/** A browser datastore failing in a way none of the others names. */
+export const BrowserDatastoreFailed = "IndexedDB failed while the vault was reading or writing its rows: try again shortly. IndexedDB's own error is this error's cause."
 
 /** A GraphQL server whose answer lacks the field asked for. */
 export const SchemaNotServed = "The GraphQL server answered without what was asked of it: is it serving safebyok-graphql's VaultSchemaSdl?"

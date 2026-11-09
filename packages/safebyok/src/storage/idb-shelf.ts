@@ -1,4 +1,4 @@
-/** The versioned shelf: an IndexedDB store's one object store, in a database named for its layout version. */
+/** The versioned shelf: an IndexedDB datastore's one object store, in a database named for its layout version. */
 
 import { createStore, type UseStore } from 'idb-keyval'
 import type * as Z from 'zod'

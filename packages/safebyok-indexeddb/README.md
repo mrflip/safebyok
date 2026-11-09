@@ -61,7 +61,7 @@ copy it:
   verbs: the base class checks scope and options on the way in, validates every row on the way
   out, and turns a put or deletion that did not land into its refusal.
 * **Do each `do*` in one transaction of your store**, reading the vault row beside the rows it
-  writes, and answer what it found (`ante`, and `vault` for a box) with whether it landed.
+  writes, and answer what it found (`ante`, and `vault` for a box) with `isWritten`, whether it took effect.
   `src/idb-vault-db.ts` decides each with the predicates `safebyok/storage` exports. Use those, and
   no check of your own: `isVaultPutAllowed` and `isBoxPutAllowed` for a put, `isLiveVaultRecord` and
   `isLiveBoxRecord` for a deletion, so that a row failing its check is never written over.

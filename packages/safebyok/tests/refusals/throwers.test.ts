@@ -124,7 +124,7 @@ describe("Refusals.storageFailed", () => {
     const err = Refusals.storageFailed('putBox', thrown)
     expect(err).to.include({ refusalkind: 'storage_unavailable' })
     expect(err).not.to.have.property('cause')
-    expect(err.message).to.equal(Phrases.storageFailed('putBox', Phrases.storeThrew('Error')))
+    expect(err.message).to.equal(Phrases.storageFailed('putBox', Phrases.thrownNamed('Error')))
     expect(err.message).not.to.include('c2VjcmV0')
   })
 

@@ -39,8 +39,8 @@ export const sanitizeForeignError = (thrown: Thrown): Error => {
 /** A `storage_unavailable` refusal: the backend could not be reached, or failed.
  * @param cause - What the backend threw, kept for debugging as {@link sanitizeForeignError} makes it.
  *   It holds only what the backend holds: ciphertext and unencrypted fields. True of a `VaultDB`
- *   adapter, never of the device store, which is handed lease records: `DeviceDB` replaces what its
- *   store throws with a condition that keeps only its `name`.
+ *   adapter, never of the device database, which is handed lease records: `DeviceDB` replaces what its
+ *   subclass throws with a condition that keeps only its `name`.
  * @param message - What failed, when there is more to say than that storage failed: which read or
  *   write it was, say. Never quotes a record or a name.
  *
@@ -99,13 +99,13 @@ export const putAnsweredNothing = (): VaultError => new VaultError('record_confl
 export const otherVaultTokAtBirth = (): VaultError => new VaultError('record_conflict', Phrases.OtherVaultTokAtBirth)
 // --
 
-// == [Storable Throwers]: partialLoadError, alreadyEnlistedError, disabledError, absentBoxError, notListedBoxError, absentVaultError, deletedVaultError, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
+// == [Storable Throwers]: partialLoadError, alreadyListedError, disabledError, absentBoxError, notListedBoxError, absentVaultError, deletedVaultError, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
 
 /** A `bad_option` refusal: the record in hand is not full, and needs hydrating first. */
 export const partialLoadError = () => new VaultError('bad_option', Phrases.PartialLoad)
 
 /** A `bad_option` refusal: the listing already holds an instance under the dna's scope. */
-export const alreadyEnlistedError    = () => new VaultError('bad_option', Phrases.AlreadyEnlisted)
+export const alreadyListedError    = () => new VaultError('bad_option', Phrases.AlreadyListed)
 
 /** A `disabled` refusal: this object was let go by a sweep, a vacate or a delete. */
 export const disabledError    = () => new VaultError('disabled', Phrases.LetGoInstance)
@@ -179,8 +179,8 @@ export const samePassphrase = (): VaultError => new VaultError('same_passphrase'
 /** A `dismissed` refusal: the prompt was dismissed before an attempt succeeded. */
 export const gatingDismissed = (): VaultError => new VaultError('dismissed', Phrases.GatingDismissed)
 
-/** A `gating_landed` refusal: an attempt reached a prompt that has already ended. */
-export const gatingConcluded = (): VaultError => new VaultError('gating_landed', Phrases.GatingConcluded)
+/** A `gating_concluded` refusal: an attempt reached a prompt that has already ended. */
+export const gatingConcluded = (): VaultError => new VaultError('gating_concluded', Phrases.GatingConcluded)
 
 /** An `attempt_in_flight` refusal: another attempt on this prompt is still running. */
 export const attemptInFlight = (): VaultError => new VaultError('attempt_in_flight', Phrases.AttemptInFlight)
@@ -322,13 +322,13 @@ export const storageFull = (cause: Thrown): VaultError => (
 export const seqNotNext = (): VaultError => new VaultError('bad_option', Phrases.SeqNotNext)
 // --
 
-// == [DeviceDB Throwers]: storeFailed
+// == [DeviceDB Throwers]: deviceDBFailed
 
-/** A store's failure as `storage_unavailable`, naming the verb and the thrown `name` and nothing else: the store is handed every lease row, and what it throws may quote one. */
-export const storeFailed = (call: string, thrown: unknown): VaultError => {
+/** A device database's failure as `storage_unavailable`, naming the verb and the thrown `name` and nothing else: the device database is handed every lease row, and what it throws may quote one. */
+export const deviceDBFailed = (call: string, thrown: unknown): VaultError => {
   const thrownName = thrownNameOf(thrown)
-  const named = (thrownName === null) ? '' : Phrases.storeThrew(thrownName)
-  return new VaultError('storage_unavailable', Phrases.storeFailed(call, named))
+  const named = (thrownName === null) ? '' : Phrases.thrownNamed(thrownName)
+  return new VaultError('storage_unavailable', Phrases.deviceDBFailed(call, named))
 }
 // --
 
@@ -338,7 +338,7 @@ export const storeFailed = (call: string, thrown: unknown): VaultError => {
 /** A storage backend's failure as `storage_unavailable`, naming the call and the thrown `name` and nothing else. */
 export const storageFailed = (call: string, thrown: unknown): VaultError => {
   const thrownName = thrownNameOf(thrown)
-  const named = (thrownName === null) ? '' : Phrases.storeThrew(thrownName)
+  const named = (thrownName === null) ? '' : Phrases.thrownNamed(thrownName)
   return new VaultError('storage_unavailable', Phrases.storageFailed(call, named))
 }
 
