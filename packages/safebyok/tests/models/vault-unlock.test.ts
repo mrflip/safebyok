@@ -260,7 +260,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     expect(deviceDB.cachedNow()).to.not.be.null
   })
 
-  it("locks the vault where a cached lease will not open at its first seal: 'damaged_lease', and the row erased", async () => {
+  it("locks the vault where a cached lease will not open at its first seal, erasing the row", async () => {
     const { demandStored, anotherSession, deviceDB } = await makeBornVault()
     const cached = deviceDB.cachedNow() as Record<string, unknown>
     deviceDB.layCached({ ...cached, lease_key: await makeLeaseKey() })

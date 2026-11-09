@@ -5,8 +5,7 @@ import      { toB64 }                               from '../../src/helpers/cryp
 import type { KeyDeriver }                          from '../../src/deriver/basederiver'
 import      { type StrengthChecker, StrongVerdict } from '../../src/helpers/passphrase-strength'
 
-/**
- * A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
+/** A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
  * unlocking runs in milliseconds. Deterministic in passphrase and salt, like the real one; unlike
  * the real one, worthless against a brute-forcer -- which is why its label says `test`. Never
  * hand it to a vault that holds a real secret.
@@ -23,8 +22,7 @@ export const testDeriver: KeyDeriver = {
   },
 }
 
-/**
- * A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a
+/** A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a
  * short one such as 'pw'. Never hand it to a vault that holds a real secret.
  */
 export const anyStrengthChecker: StrengthChecker = () => StrongVerdict
@@ -43,15 +41,13 @@ export const fakeCiphered = (tag: string): FakeCiphered => {
   return fake as FakeCiphered
 }
 
-/**
- * The scope of `user_id`'s vault in the `acme` app.
+/** The scope of `user_id`'s vault in the `acme` app.
  *
  * @example scopeOf('u1')           // => { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
  */
 export const scopeOf = (user_id: string, vaultlabel = 'main'): VaultScope => ({ applabel: 'acme', user_id, vaultlabel })
 
-/**
- * A shape-valid passphrase wayin, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
+/** A shape-valid passphrase wayin, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
  * never decrypt. It wraps the vault's first vaultKey, and was sealed by the bank world's first device.
  */
 export const wayinOf = (tag: string, overrides: Partial<PassphraseWayinRecord> = {}): PassphraseWayinRecord => ({
@@ -70,8 +66,7 @@ const digestOf = async (text: string): Promise<Uint8Array> => (
   new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))
 )
 
-/**
- * A passkey's answer, as a fake authenticator would give it: for tests, in place of a WebAuthn
+/** A passkey's answer, as a fake authenticator would give it: for tests, in place of a WebAuthn
  * call. The credential is `tag`'s own (its id base64url of `cred-<tag>`), the salt a 32-byte one
  * made from `tag` unless given, and the answer SHA-256 of the credential and salt -- so the same
  * passkey asked with the same salt answers the same, and with another salt answers otherwise, as
@@ -86,8 +81,7 @@ export const passkeyOf = async (tag: string, prfSaltGiven?: string): Promise<Pas
   return { credential_id, prf_salt_b64: saltB64, prfBytes: await digestOf(`${credential_id}:${saltB64}`) }
 }
 
-/**
- * Base64url text, bent a little: its first character swapped for another valid one, so it is
+/** Base64url text, bent a little: its first character swapped for another valid one, so it is
  * always different, keeps its length, decodes whenever `b64` does, and a tamper test reaches the
  * check it means to exercise. Blank text has no character to bend, and nothing put in its place
  * decodes, so it throws: a tamper test aimed at an empty field is aimed at the wrong field.

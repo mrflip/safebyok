@@ -49,6 +49,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper, exposure, isShowing, isVeiled, subscribe
 
+  /** The storage format of the record in hand. */
   get fmt(): number { return this.central.fmt }
 
   /** The life of the box under its boxlabel, as the record in hand has it: minted at its birth, and kept by every later revision of that life. */
@@ -59,8 +60,11 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** The sealed parts of the record in hand; null where it is not full. */
   get box_key_wrapped():        BoxRecord['box_key_wrapped'] | null  { return this.full?.box_key_wrapped ?? null }
+  /** The whisper's codec in the record in hand, or null where the record is not full. */
   get whisper_codec():          'json_v1' | null                     { return this.full?.whisper_codec ?? null }
+  /** The whisper's schema version in the record in hand, or null where the record is not full. */
   get whisper_schema_version(): 1 | null                             { return this.full?.whisper_schema_version ?? null }
+  /** The ciphered whisper in the record in hand, or null where the record is not full. */
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
 
   /** The whisper exposed on this instance, or a bag standing in for it while it hides. Ask {@link exposure} why, never the bag.
@@ -75,7 +79,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // Taken in the order `whisper` picks its bag.
   /** Where the whisper stands, read live: `showing`, or why `whisper` hides it.
-   * `locked` means the whisper is exposed but hidden while the vault is locked; it is not the vault's lock, for which ask {@link isLocked} (an unexposed box in a locked vault answers `unexposed`).
+   * `locked` means the whisper is exposed but hidden while the vault is locked; it is not the vault's lock, for which ask `isLocked` (an unexposed box in a locked vault answers `unexposed`).
    */
   get exposure(): BoxExposure {
     if (this.#exposed === null) { return 'unexposed' }
@@ -102,6 +106,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this.#unseal(this.demandFullProps())
   }
 
+  /** Non-throwing form of {@link extractWhisper}. */
   tryExtractWhisper(opts: TimelyOpts = {}): Promise<Outcome<Whisper>> { return outcomeOf(() => this.extractWhisper(opts)) }
 
   /** Open the stored whisper and hold it on the instance, showing, where `box.whisper` offers it until {@link unexpose}.
@@ -179,7 +184,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Seals `patch` over the record in hand and stores it, answering this box; a deleted box is reborn.
    *
    * A lock does not interrupt or reverse a put once its write has begun. A patch leaving out the whisper or the sidecar keeps
-   * the one stored, so a box held sparse is fetched first. */
+   * the one stored, so a box held sparse is fetched first.
+   */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
     const { ifAbsent, ifPresent, ...timely } = VX.boxPutOpts.parse(opts)
     await this.ensurePuttable(timely)
@@ -190,6 +196,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
+  /** Non-throwing form of {@link put}. */
   tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.put(patch, opts)) }
 
   /** Seal the whisper exposed, veiled or not, and store it; `patch` may name a sidecar, never a whisper. */
@@ -199,6 +206,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this.put({ whisper: this.#exposed, sidecar }, opts)
   }
 
+  /** Non-throwing form of {@link putExposed}. */
   tryPutExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.putExposed(patch, opts)) }
 
   /** The next record `patch` makes, sealed and not stored, and the revision it goes over. */
@@ -235,13 +243,16 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Holding a whisper on the instance needs the box enabled and the vault unlocked. */
   demandExposable(): this { return this.demandEnabled().demandUnlocked() }
 
+  /** Demand that this box is present. */
   demandPresent(): this {
     if (! this.isPresent) { throw absentBoxError(this) }
     return this
   }
 
+  /** Hydrate this box so that its whisper can be unsealed. */
   ensureUnsealable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
+  /** Hydrate this box so that a put can seal over its full record. */
   ensurePuttable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
   // --
 

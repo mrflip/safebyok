@@ -44,11 +44,13 @@ export class Gate {
 
   // == [Methods]: pickle, toJSON
 
+  /** A frozen, plain {@link GateProps} object of this gate and its wayins. */
   pickle(): GateProps {
     const { gate_epoch, passphrase_wayin, passkey_wayin } = this
     return Object.freeze({ gate_epoch, passphrase_wayin, passkey_wayin })
   }
 
+  /** This gate for `JSON.stringify`, showing only each wayin's header. */
   toJSON(): { gate_epoch: number, passphrase_wayin: WayinHeader, passkey_wayin: WayinHeader | null } {
     return { gate_epoch: this.gate_epoch, passphrase_wayin: this.ppWayin.toJSON(), passkey_wayin: this.pkWayin?.toJSON() ?? null }
   }

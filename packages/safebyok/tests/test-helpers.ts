@@ -1,5 +1,4 @@
-/**
- * safebyok's test helpers, behind one door: star-import it as `TH` in this package's tests
+/** safebyok's test helpers, behind one door: star-import it as `TH` in this package's tests
  * (`import * as TH from './test-helpers'`), and from `safebyok/testing` in another package's. The
  * helpers live in `tests/test-helpers/`, a part for each family, and this file names what each
  * one publishes. A cheap key deriver, shape-valid records whose ciphertext is fake, a live lease,

@@ -37,6 +37,7 @@ export class Lease implements LeaseStamp {
 
   get #leaseStamp(): LeaseStamp { return leaseStamp.parse(this) }
 
+  /** This lease's {@link LeaseSparse}, which holds no key material. */
   toJSON(): LeaseSparse { return this.#leaseStamp }
   // --
 
@@ -111,6 +112,7 @@ export class Lease implements LeaseStamp {
     await this.#friend.forgetLease()
   }
 
+  /** Non-throwing form of {@link vacate}. */
   tryVacate(): Promise<Outcome<void>> { return outcomeOf(() => this.vacate()) }
 
   /** Forget the cached record with no lease held to {@link vacate}: one may stand from an earlier session. */
@@ -118,6 +120,7 @@ export class Lease implements LeaseStamp {
     await leaseFriend.parse(friend).forgetLease()
   }
 
+  /** Non-throwing form of {@link forget}. */
   static tryForget(friend: LeaseFriend): Promise<Outcome<void>> { return outcomeOf(() => this.forget(friend)) }
 
   /** Drop the keys, leaving the cached record for the next session. */

@@ -277,7 +277,7 @@ describe("box.putExposed", () => {
     expect(await box.extractWhisper()).to.deep.equal(Exposed)
   })
 
-  it("refuses 'vault_locked' while locked, veiled or not (the Coach, 2026-11-05)", async () => {
+  it("refuses 'vault_locked' while locked, veiled or not", async () => {
     for (const makeState of [StateMakers.locked, StateMakers.lockedVeiled]) {
       const box = await makeState()
       held.mw.clearCalls()

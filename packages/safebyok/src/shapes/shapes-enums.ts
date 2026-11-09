@@ -60,6 +60,7 @@ export type BoxExposure = typeof boxExposureVals[number]
 export const wayinkindVals = ['passphrase', 'passkey'] as const
 export type Wayinkind = typeof wayinkindVals[number]
 
+/** The kinds of gating, each named for the change the user's cleartext allows. */
 export const gatingkindVals = ['build_vault', 'unlock_vault', 'replace_passphrase', 'add_passkey', 'revoke_passkey', 'del_vault'] as const
 export type Gatingkind = typeof gatingkindVals[number]
 

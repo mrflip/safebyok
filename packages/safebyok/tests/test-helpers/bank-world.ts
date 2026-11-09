@@ -13,10 +13,13 @@ import { anyStrengthChecker, testDeriver } from './builders'
 import { quietLogger } from './logging'
 import { T0, Dna, Passphrase, byPassphrase } from './vault-world'
 
+/** The autolock duration these worlds hand a bank. */
 export const AutolockMinutes = 60
 
+/** The bank scope these worlds hand `Bank.make`. */
 export const BankScopeGiven = Object.freeze({ applabel: Dna.applabel, user_id: Dna.user_id })
 
+/** The vault scope a test hands `bank.ensureVault`. */
 export const VaultScopeGiven = Object.freeze({ vaultlabel: Dna.vaultlabel })
 
 /** A second vaultlabel, for a bank that holds two vaults. */
@@ -56,6 +59,7 @@ export const useBankWorlds = (): void => {
   })
 }
 
+/** A vaultDB, a deviceDB, a scripted dialog and a movable clock for tests of a bank. */
 export const makeBankWorld = () => {
   let now = T0
   _cheat_clock(() => now)

@@ -30,6 +30,7 @@ export abstract class DeviceDB {
     } catch (err) { throw refusalOf(err, 'stow') }
   }
 
+  /** Non-throwing form of {@link stow}. */
   tryStow(row: LeaseRow): Promise<Outcome<void>> { return outcomeOf(() => this.stow(row)) }
 
   /** The row stowed for this vault under this `vault_tok`, or null. */
@@ -41,6 +42,7 @@ export abstract class DeviceDB {
     } catch (err) { throw refusalOf(err, 'peek') }
   }
 
+  /** Non-throwing form of {@link peek}. */
   tryPeek(asked: LeaseQuery): Promise<Outcome<LeaseRow | null>> { return outcomeOf(() => this.peek(asked)) }
 
   // `peek` checks the `vault_tok` here in the base; `forget` leaves it to the store, whose check must be one atomic step with its delete.
@@ -52,6 +54,7 @@ export abstract class DeviceDB {
     } catch (err) { throw refusalOf(err, 'forget') }
   }
 
+  /** Non-throwing form of {@link forget}. */
   tryForget(asked: LeaseQuery): Promise<Outcome<void>> { return outcomeOf(() => this.forget(asked)) }
 
   /** Every lease stowed on this device, oldest first. */
@@ -63,6 +66,7 @@ export abstract class DeviceDB {
     } catch (err) { throw refusalOf(err, 'listLeases') }
   }
 
+  /** Non-throwing form of {@link listLeases}. */
   tryListLeases(): Promise<Outcome<LeaseDated[]>> { return outcomeOf(() => this.listLeases()) }
 
   /** Every lease row on this device beside the scopepath it is filed under, unchecked, damaged rows among them. */
@@ -72,6 +76,7 @@ export abstract class DeviceDB {
     } catch (err) { throw refusalOf(err, 'listRawLeases') }
   }
 
+  /** Non-throwing form of {@link listRawLeases}. */
   tryListRawLeases(): Promise<Outcome<RawLease[]>> { return outcomeOf(() => this.listRawLeases()) }
 
   /** Deletes the row filed under a scopepath `listRawLeases` gave, damaged or not, with no `vault_tok` to match. */
@@ -82,6 +87,7 @@ export abstract class DeviceDB {
     } catch (err) { throw refusalOf(err, 'delRawLease') }
   }
 
+  /** Non-throwing form of {@link delRawLease}. */
   tryDelRawLease(scopepath: LeaseScopepath): Promise<Outcome<void>> { return outcomeOf(() => this.delRawLease(scopepath)) }
   // --
 
@@ -96,6 +102,7 @@ export abstract class DeviceDB {
     } catch (err) { throw refusalOf(err, 'ensureBank') }
   }
 
+  /** Non-throwing form of {@link ensureBank}. */
   tryEnsureBank(scope: BankScope): Promise<Outcome<BankRow>> { return outcomeOf(() => this.ensureBank(scope)) }
 
   /** Erases the bank row of this bank scope, so that the next `ensureBank` mints a fresh `device_id`. */
@@ -106,6 +113,7 @@ export abstract class DeviceDB {
     } catch (err) { throw refusalOf(err, 'forgetBank') }
   }
 
+  /** Non-throwing form of {@link forgetBank}. */
   tryForgetBank(scope: BankScope): Promise<Outcome<void>> { return outcomeOf(() => this.forgetBank(scope)) }
 
   /** Every bank row stored on this device as a bag, unchecked, damaged rows among them. */
@@ -116,6 +124,7 @@ export abstract class DeviceDB {
     } catch (err) { throw refusalOf(err, 'listRawBanks') }
   }
 
+  /** Non-throwing form of {@link listRawBanks}. */
   tryListRawBanks(): Promise<Outcome<Record<string, unknown>[]>> { return outcomeOf(() => this.listRawBanks()) }
   // --
 

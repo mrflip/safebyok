@@ -269,7 +269,7 @@ describe("listing.put and listing.del: the prior tok they put", () => {
     expect(held.mw.stored.size).to.eq(0)
   })
 
-  it("meets a stored revision lower than the one held with 'stale_write' carrying it; the box judges it older and keeps its own, stuck there", async () => {
+  it("meets a stored revision lower than the held revision with 'stale_write' carrying it; the box judges it older and keeps its own, stuck there", async () => {
     const listing = boxListingOf(held.mw)
     held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
     const box = await listing.build(fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 }))

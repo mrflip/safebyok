@@ -22,9 +22,11 @@ import { VaultListing } from './vault-listing'
 
 // == [Given to a bank]: DefaultRefreshMillis
 
+/** How old a vault or box may grow before it is fetched again, unless the host's options say otherwise. */
 export const DefaultRefreshMillis = 5 * MinuteMillis
 // --
 
+/** The signed-in user's vaults in the app, one Vault object per scope, and what they share. */
 export class Bank {
   // == [Props]: applabel, user_id, scope, device_id, keyDeriver, deviceDB, logger, strengthChecker, leaseMillis, boxRefreshMillis, #hostHandlers, #tellBadNews, #listeners, #vaultListing, #endCause, #vacating, #lastHello, #snapshot, #getSnapshot, #subscribe
 
@@ -68,21 +70,28 @@ export class Bank {
 
   // == [Getters]: vaultListing, autolockMinutes, snapshot, getSnapshot, subscribe, toJSON
 
+  /** The listing of this bank's vaults. */
   get vaultListing(): VaultListing { return this.#vaultListing }
 
+  /** The autolock duration in minutes, past which a cached lease no longer unlocks a vault. */
   get autolockMinutes(): number { return this.leaseMillis / MinuteMillis }
 
+  /** This bank's current {@link BankSnapshot}. */
   get snapshot(): BankSnapshot { return this.#snapshot }
 
+  /** The unbound snapshot getter, for `useSyncExternalStore`. */
   get getSnapshot(): () => BankSnapshot { return this.#getSnapshot }
 
+  /** The unbound subscribe callback, for `useSyncExternalStore`. */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
 
+  /** This bank's snapshot, for `JSON.stringify`. */
   toJSON(): BankSnapshot { return this.#snapshot }
   // --
 
   // == [Construction]: make, constructor, vaultScopeOf
 
+  /** Make a bank from the host's options, ready for {@link hello}. */
   static make(opts: BankOpts): Bank { return new Bank(opts) }
 
   constructor(opts: BankOpts) {
@@ -111,6 +120,7 @@ export class Bank {
     Object.freeze(this)
   }
 
+  /** Complete `scope` into a {@link VaultScope} of this bank, refusing a scope of another bank. */
   vaultScopeOf(scope: BankedVaultScope): VaultScope {
     const { vaultlabel } = bankedVaultScope.parseConsistent(scope, this.scope, { message: Phrases.otherScope })
     return { ...this.scope, vaultlabel }
@@ -122,8 +132,10 @@ export class Bank {
   /** False: a bank has no lock, and each vault keeps its own. */
   get isLocked(): boolean { return false }
 
+  /** Resolves at once: nothing above a bank needs refreshing. */
   ensureTimely(): Promise<void> { return Promise.resolve() }
 
+  /** Does nothing: no world sits above a bank. */
   takeWorld(): void { /* no world sits above a bank */ }
   // --
 
@@ -139,6 +151,7 @@ export class Bank {
     valOf(hello)
   }
 
+  /** Non-throwing form of {@link hello}. */
   tryHello(): Promise<Outcome<void>> { return outcomeOf(() => this.hello()) }
 
   /** A sweep or a vacate crossing it leaves the listing disabled, which refuses. */
@@ -253,6 +266,7 @@ export class Bank {
     return (listed?.isPresent === true) ? listed : this.#vaultListing.buildVault(asked)
   }
 
+  /** Non-throwing form of {@link ensureVault}. */
   tryEnsureVault(scope: BankedVaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(scope)) }
   // --
 

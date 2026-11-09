@@ -154,7 +154,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
     expect(await unsealIn(again)).to.deep.equal(Whisper)
   })
 
-  it("revokes the passkey: a vault unlocked by the passkey stays unlocked through the revoke and still seals; the next session's passkey refuses 'absent_wayin', and the passphrase opens what that vault sealed", async () => {
+  it("revokes the passkey: a vault unlocked by the passkey stays unlocked through the revoke and still seals; the next session's passkey is refused, and the passphrase opens what that vault sealed", async () => {
     const { vault, box, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox(makeBornVaultWithPasskey())
     vault.lock()
     await unlockTyping(vault, byPasskey('laptop'))

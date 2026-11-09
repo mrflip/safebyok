@@ -331,7 +331,7 @@ describe("refusingAs", () => {
 
 describe("objCheck", () => {
   // objCheck @example 1
-  it("makes one strict validator of an object from its fields, refusing 'bad_record' unless given a kind", () => {
+  it("makes a strict validator of an object from its fields, with a default refusal kind", () => {
     const checkedScope = objCheck(bankScopeOf)
     expect(checkedScope.parse({ applabel: 'acme', user_id: 'u1' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
     const err = TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_record')

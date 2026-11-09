@@ -22,12 +22,16 @@ export type GoodAnswer<ValT, ActT extends string, WorldT = VaultRow> = GoodOutco
 /** What a `try*` verb answers on a refusal: its `err`, with the `act`, `world` and `dbhas` it carries. */
 export type BadAnswer = BadOutcome & { req_params: ReqParams, act: string, world: unknown, dbhas?: unknown }
 
+/** The answer of a `try*` verb: a {@link GoodAnswer} or a {@link BadAnswer}. */
 export type Answer<ValT, ActT extends string, WorldT = VaultRow> = GoodAnswer<ValT, ActT, WorldT> | BadAnswer
 
 export type { DelAct, GotAct, ListAct, PutAct } from '../shapes/shapes-enums'
 
+/** The bank's vaults from `listVaults`, and the rows that failed their checks. */
 export type BankListed  = { vaults: (VaultRecord | VaultTombstone)[], damaged_rows: DamagedVault[] }
+/** A vault's boxes from `listBoxes`, sparse, and the rows that failed their checks. */
 export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
+/** The count of box rows left after `tidyGone`. */
 export type Tidied      = { totalCount: number }
 
 /** A row that changed, as a watch hears it, with its vault row where the store sent one. */
@@ -50,11 +54,16 @@ export type Landing = { landed: boolean, ante: unknown }
 /** A box write's {@link Landing}, with the vault row as read in the same step. */
 export type BoxLanding = Landing & { vault: unknown }
 
+/** A vault row as a store hands it up, unchecked, under its vaultlabel. */
 export type RowOfVault = { vaultlabel: string, vault: unknown }
+/** A box row as a store hands it up, unchecked, under its boxlabel. */
 export type RowOfBox   = { boxlabel: string, box: unknown }
+/** A vault's rows as a store hands them up, unchecked: the vault row and its box rows. */
 export type BoxesFetched = { vault: unknown, boxes: RowOfBox[] }
+/** A box row and its vault row as a store hands them up, unchecked. */
 export type BoxFetched   = { vault: unknown, box: unknown }
 // A box's notice may come without its vault row: the vault changes slowly, and arrives in its own notices.
+/** A change reported by a store's watch: a vault row, a box row, or both. */
 export type Heard = { vault?: unknown, box?: unknown }
 // --
 
@@ -66,39 +75,51 @@ export interface VaultDB {
   readonly [IsVaultDB]: true
   /** The bank's vaults, full or tombstone, no boxes; a row failing validation goes in `damaged_rows`. */
   listVaults(scope: BankScope): Promise<GoodAnswer<BankListed, ListAct, BankScope>>
+  /** Non-throwing form of {@link VaultDB.listVaults}. */
   tryListVaults(scope: BankScope): Promise<Answer<BankListed, ListAct, BankScope>>
   /** The vault by scope alone, whatever its life. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
   getVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<GoodAnswer<VaultRecord | null, GotAct>>
+  /** Non-throwing form of {@link VaultDB.getVault}. */
   tryGetVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<Answer<VaultRecord | null, GotAct>>
   /** The boxes under this `vault_tok`, sparse, with its vault row as `world`. */
   listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, ListAct>>
+  /** Non-throwing form of {@link VaultDB.listBoxes}. */
   tryListBoxes(asked: VaultQuery): Promise<Answer<BoxesListed, ListAct>>
   /** The box under this `vault_tok`, with its vault row as `world`; `ifAbsent: 'nil'` answers null over none. */
   getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>>
+  /** Non-throwing form of {@link VaultDB.getBox}. */
   tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<Answer<BoxRecord | null, GotAct>>
   /** Stores a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
   putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>>
+  /** Non-throwing form of {@link VaultDB.putVault}. */
   tryPutVault(record: VaultRecord, opts: PutVaultOpts): Promise<Answer<VaultRow, PutAct>>
   /** Stores a box under a vault live at its `vault_tok`, as `opts` allow. */
   putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>>
+  /** Non-throwing form of {@link VaultDB.putBox}. */
   tryPutBox(record: BoxRecord, opts: PutOpts): Promise<Answer<BoxRow, PutAct>>
   /** Lays the new passphrase wayin on the vault row at this revision, leaving its passkey wayin as stored. */
   replacePassphrase(params: ReplacePassphraseParams): Promise<GoodAnswer<VaultRecord, 'replaced'>>
+  /** Non-throwing form of {@link VaultDB.replacePassphrase}. */
   tryReplacePassphrase(params: ReplacePassphraseParams): Promise<Answer<VaultRecord, 'replaced'>>
   /** Lays a passkey wayin on a vault row holding none. */
   addPasskey(params: AddPasskeyParams): Promise<GoodAnswer<VaultRecord, 'added'>>
+  /** Non-throwing form of {@link VaultDB.addPasskey}. */
   tryAddPasskey(params: AddPasskeyParams): Promise<Answer<VaultRecord, 'added'>>
   /** Takes the passkey wayin off the vault row; one holding none answers as stored. */
   revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>>
+  /** Non-throwing form of {@link VaultDB.revokePasskey}. */
   tryRevokePasskey(params: RevokePasskeyParams): Promise<Answer<VaultRecord, 'revoked'>>
   /** Deletes a box at `prior`: its live row, or the damaged row `damaged_rows` lists. */
   delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>>
+  /** Non-throwing form of {@link VaultDB.delBox}. */
   tryDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<Answer<BoxTombstone, DelAct>>
   /** Deletes a vault at `prior`, its live row or the damaged row `damaged_rows` lists, with the boxes of its life. */
   delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>>
+  /** Non-throwing form of {@link VaultDB.delVault}. */
   tryDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Answer<VaultTombstone, DelAct>>
   /** For hosts: removes the box rows of tombstoned or vanished vaults, and counts those left. */
   tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
+  /** Non-throwing form of {@link VaultDB.tidyGone}. */
   tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>>
   /** Tells `onNotice` of rows that change under a bank or a vault, `onBadNews` of a watch it ends; returns how to stop.
    * Nothing may count on a notice arriving.
@@ -160,6 +181,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { throw refusalOf(err, 'listVaults', req_params) }
   }
 
+  /** Non-throwing form of {@link listVaults}. */
   async tryListVaults(scope: BankScope) { return answerOf(() => this.listVaults(scope)) }
 
   /** The vault by scope alone, whatever its life. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
@@ -177,6 +199,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { throw refusalOf(err, 'getVault', req_params) }
   }
 
+  /** Non-throwing form of {@link getVault}. */
   async tryGetVault(scope: VaultScope, opts?: IfAbsentOpts) { return answerOf(() => this.getVault(scope, opts)) }
 
   /** The boxes under this `vault_tok`, sparse, with its vault row as `world`. */
@@ -190,6 +213,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { throw refusalOf(err, 'listBoxes', req_params) }
   }
 
+  /** Non-throwing form of {@link listBoxes}. */
   async tryListBoxes(asked: VaultQuery) { return answerOf(() => this.listBoxes(asked)) }
 
   /** The box under this `vault_tok`, with its vault row as `world`; `ifAbsent: 'nil'` answers null over none. */
@@ -209,6 +233,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { throw refusalOf(err, 'getBox', req_params) }
   }
 
+  /** Non-throwing form of {@link getBox}. */
   async tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts) { return answerOf(() => this.getBox(asked, opts)) }
   // --
 
@@ -234,6 +259,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { throw refusalOf(err, 'putVault', req_params) }
   }
 
+  /** Non-throwing form of {@link putVault}. */
   async tryPutVault(record: VaultRecord, opts: PutVaultOpts) { return answerOf(() => this.putVault(record, opts)) }
 
   /** Stores a box under a vault live at its `vault_tok`, as `opts` allow. */
@@ -260,6 +286,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { throw refusalOf(err, 'putBox', req_params) }
   }
 
+  /** Non-throwing form of {@link putBox}. */
   async tryPutBox(record: BoxRecord, opts: PutOpts) { return answerOf(() => this.putBox(record, opts)) }
   // --
 
@@ -277,6 +304,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { throw refusalOf(err, 'replacePassphrase', req_params) }
   }
 
+  /** Non-throwing form of {@link replacePassphrase}. */
   async tryReplacePassphrase(params: ReplacePassphraseParams) { return answerOf(() => this.replacePassphrase(params)) }
 
   /** Lays a passkey wayin on a vault row holding none. */
@@ -292,6 +320,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { throw refusalOf(err, 'addPasskey', req_params) }
   }
 
+  /** Non-throwing form of {@link addPasskey}. */
   async tryAddPasskey(params: AddPasskeyParams) { return answerOf(() => this.addPasskey(params)) }
 
   /** Takes the passkey wayin off the vault row; one holding none answers as stored. */
@@ -306,6 +335,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { throw refusalOf(err, 'revokePasskey', req_params) }
   }
 
+  /** Non-throwing form of {@link revokePasskey}. */
   async tryRevokePasskey(params: RevokePasskeyParams) { return answerOf(() => this.revokePasskey(params)) }
 
   /** The vault row a gate verb moves: live in this life, at the revision and registration `asked` names. */
@@ -344,6 +374,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { throw refusalOf(err, 'delBox', req_params) }
   }
 
+  /** Non-throwing form of {@link delBox}. */
   async tryDelBox(tombstone: BoxTombstone, opts: DelOpts) { return answerOf(() => this.delBox(tombstone, opts)) }
 
   /** The `void` answer: the box label's sentinel. */
@@ -378,6 +409,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { throw refusalOf(err, 'delVault', req_params) }
   }
 
+  /** Non-throwing form of {@link delVault}. */
   async tryDelVault(tombstone: VaultTombstone, opts: DelOpts) { return answerOf(() => this.delVault(tombstone, opts)) }
 
   /** The `void` answer: the sentinel of the life the del names. */
@@ -406,6 +438,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { throw refusalOf(err, 'tidyGone', req_params) }
   }
 
+  /** Non-throwing form of {@link tidyGone}. */
   async tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>> { return answerOf(() => this.tidyGone(scope)) }
   // --
 
