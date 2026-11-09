@@ -51,10 +51,10 @@ export const refusalkindVals = [
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
-  'record_conflict',     // storage answered what cannot be: one revision under two toks, a record of another scope or another vault_tok, a put that answered nothing; a fetch again is worth one try, and if it persists the system is fundamentally not working
+  'record_conflict',     // storage answered what cannot be: one revision under two toks, a record of another vault_tok than this device holds, a put that answered nothing; a fetch again is worth one try, and if it persists the system is fundamentally not working
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it; its own error is the cause
-  'storage_issue',       // the storage backend answered with a row that is no object at all: the database is so broken we just can't, and a retry is unlikely to help
+  'storage_issue',       // the storage backend answered with a row no working store could: no object at all, or naming another address than the one asked: the database is so broken we just can't, and a retry is unlikely to help
   'vault_gone',          // the vault a call was working on is no longer stored: deleted, here or elsewhere
   'vault_mismatch',      // a live vault stands where the call's vault stood, under another vault_tok than the call holds
   'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- a lock landed, or it was answered -- so it unlocked nothing

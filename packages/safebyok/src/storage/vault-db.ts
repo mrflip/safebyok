@@ -494,7 +494,7 @@ const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultE
   return Object.assign(refusal, { meta: { ...refusal.meta, call, req_params } })
 }
 
-const RowOfOtherAddress = { kind: 'record_conflict', message: Phrases.rowOfOtherAddress } as const
+const RowOfOtherAddress = { kind: 'storage_issue', message: Phrases.rowOfOtherAddress } as const
 
 const demandRowObject = (raw: unknown): void => {
   if (! CX.isPlainBag(raw)) { throw Refuse.storageIssue() }

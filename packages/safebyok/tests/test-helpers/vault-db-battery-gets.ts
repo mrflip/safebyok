@@ -34,7 +34,7 @@ export const describeGets = ({ fresh, storeWith, rowsOf, twinOf }: BatteryWorld)
       const { vaultDB, vault } = await storeWith()
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...misfiling })
       const answer = await vaultDB.tryGetVault(vaultScope)
-      expect(answer).to.deep.include({ ok: false, act: 'record_conflict', world: null })
+      expect(answer).to.deep.include({ ok: false, act: 'storage_issue', world: null })
       expect(answer.err?.meta?.fieldnames).to.deep.equal([fieldname])
     })
 
@@ -49,21 +49,21 @@ export const describeGets = ({ fresh, storeWith, rowsOf, twinOf }: BatteryWorld)
       const { vaultDB, box } = await storeWith({ box: true })
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { ...box, ...misfiling })
       const answer = await vaultDB.tryGetBox(boxQuery)
-      expect(answer).to.deep.include({ ok: false, act: 'record_conflict' })
+      expect(answer).to.deep.include({ ok: false, act: 'storage_issue' })
       expect(answer.err?.meta?.fieldnames).to.deep.equal([fieldname])
     })
 
     it.each(VaultMisfilings)("refuses from getBox a vault row naming another %s", async (_fieldname, misfiling) => {
       const { vaultDB, vault } = await storeWith({ box: true })
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...misfiling })
-      expect(await vaultDB.tryGetBox(boxQuery)).to.deep.include({ ok: false, act: 'record_conflict' })
+      expect(await vaultDB.tryGetBox(boxQuery)).to.deep.include({ ok: false, act: 'storage_issue' })
     })
 
     it.each(VaultMisfilings)("fails the whole of listVaults over a vault row naming another %s", async (fieldname, misfiling) => {
       const { vaultDB, vault } = await storeWith()
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...misfiling })
       const answer = await vaultDB.tryListVaults(bankScope)
-      expect(answer).to.deep.include({ ok: false, act: 'record_conflict' })
+      expect(answer).to.deep.include({ ok: false, act: 'storage_issue' })
       expect(answer.err?.meta?.fieldnames).to.deep.equal([fieldname])
     })
 
@@ -71,32 +71,32 @@ export const describeGets = ({ fresh, storeWith, rowsOf, twinOf }: BatteryWorld)
       const { vaultDB, box } = await storeWith({ box: true })
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { ...box, ...misfiling })
       const answer = await vaultDB.tryListBoxes(vaultQuery)
-      expect(answer).to.deep.include({ ok: false, act: 'record_conflict' })
+      expect(answer).to.deep.include({ ok: false, act: 'storage_issue' })
       expect(answer.err?.meta?.fieldnames).to.deep.equal([fieldname])
     })
 
     it("refuses a putBox that did not land, over a row naming another user_id", async () => {
       const { vaultDB, box } = await storeWith({ box: true })
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { ...boxAt(3), user_id: 'u2' })
-      expect(await vaultDB.tryPutBox(boxAt(1), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'record_conflict' })
+      expect(await vaultDB.tryPutBox(boxAt(1), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'storage_issue' })
     })
 
     it("refuses a delBox that did not land, over a row naming another boxlabel", async () => {
       const { vaultDB, box } = await storeWith({ box: true })
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { ...boxAt(3), boxlabel: 'other' })
-      expect(await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'record_conflict' })
+      expect(await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'storage_issue' })
     })
 
     it("refuses a putVault that did not land, over a row naming another user_id", async () => {
       const { vaultDB, vault } = await storeWith()
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vaultAt(3), user_id: 'u2' })
-      expect(await vaultDB.tryPutVault(vaultAt(1), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'record_conflict' })
+      expect(await vaultDB.tryPutVault(vaultAt(1), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'storage_issue' })
     })
 
     it("refuses a delVault that did not land, over a row naming another vaultlabel", async () => {
       const { vaultDB, vault } = await storeWith()
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vaultAt(3), vaultlabel: 'other' })
-      expect(await vaultDB.tryDelVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'record_conflict' })
+      expect(await vaultDB.tryDelVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'storage_issue' })
     })
   })
 

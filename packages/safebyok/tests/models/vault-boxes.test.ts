@@ -229,7 +229,7 @@ describe("vault.delBox", () => {
 describe("a row no listing can set aside", () => {
   const Unlistable = [
     ['is not an object',          (): unknown => ['rubble'],                'storage_issue'],
-    ['names another user_id',     (row: object): unknown => ({ ...row, user_id: 'u2' }), 'record_conflict'],
+    ['names another user_id',     (row: object): unknown => ({ ...row, user_id: 'u2' }), 'storage_issue'],
   ] as const
 
   it.each(Unlistable)("fails the whole of vault.hello where one %s", async (_blurb, rowOf, refusalkind) => {
