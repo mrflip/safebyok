@@ -335,7 +335,7 @@ export const storeFailed = (call: string, thrown: unknown): VaultError => {
 }
 // --
 
-// == [Backend Throwers]: storageFailed, identityRevoked
+// == [Backend Throwers]: storageFailed, storageIssue, identityRevoked
 
 // A backend's error may quote the call's arguments, so only its `name` is kept.
 /** A storage backend's failure as `storage_unavailable`, naming the call and the thrown `name` and nothing else. */
@@ -344,6 +344,9 @@ export const storageFailed = (call: string, thrown: unknown): VaultError => {
   const named = (thrownName === null) ? '' : Phrases.storeThrew(thrownName)
   return new VaultError('storage_unavailable', Phrases.storageFailed(call, named))
 }
+
+/** A `storage_issue` refusal: a row out of storage is not an object at all. */
+export const storageIssue = (): VaultError => new VaultError('storage_issue', Phrases.StorageIssue)
 
 /** An `identity_revoked` refusal: the storage backend no longer serves the user the call names. */
 export const identityRevoked = (): VaultError => new VaultError('identity_revoked', Phrases.IdentityRevoked)

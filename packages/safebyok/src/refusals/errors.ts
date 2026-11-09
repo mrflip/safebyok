@@ -21,7 +21,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   `same_passphrase`, `camped`, `vault_empty`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_box`, `damaged_lease`, `newer_format`,
- *   `identity_revoked`, `damaged_row`.
+ *   `identity_revoked`, `damaged_row`, `storage_issue`.
  *
  * A record that fails its checks is named for its direction, by a VaultDB and a vault alike. One
  * read from storage that fails them is `damaged_row`, on the way out, and a box that will not open
@@ -54,6 +54,7 @@ export const refusalkindVals = [
   'record_conflict',     // storage answered what cannot be: one revision under two toks, a record of another scope or another vault_tok, a put that answered nothing; a fetch again is worth one try, and if it persists the system is fundamentally not working
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it; its own error is the cause
+  'storage_issue',       // the storage backend answered with a row that is no object at all: the database is so broken we just can't, and a retry is unlikely to help
   'vault_gone',          // the vault a call was working on is no longer stored: deleted, here or elsewhere
   'vault_mismatch',      // a live vault stands where the call's vault stood, under another vault_tok than the call holds
   'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- a lock landed, or it was answered -- so it unlocked nothing
@@ -98,6 +99,7 @@ export const RefusalFamilyForKind = {
   record_conflict:     'condition',
   identity_revoked:    'bad_news',
   storage_unavailable: 'condition',
+  storage_issue:       'bad_news',
   vault_gone:          'condition',
   vault_mismatch:      'condition',
   gating_landed:       'condition',
