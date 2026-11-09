@@ -174,21 +174,25 @@ const RunForGatingkind: { [KindT in Gatingkind]: Run<KindT> } = {
 
   unlock_vault: ({ proved }, { vault, friend }) => friend.unlockByProof(vault, proved),
 
+  // Each gate change leases the vault under the epoch it stored. The old lease stays in force for the moments between: the vaultKey did not change.
   replace_passphrase: async ({ ante, anteProving, nextProving }, { listing, vault, friend }) => {
     const nextWayin        = await nextProving.buildWayin(anteProving)
     const passphrase_wayin = SX.passphraseWayinRecord.parse(nextWayin.pickle())
-    return friend.landGate(vault, anteProving, () => listing.replacePassphrase({ ...ante, gate: { passphrase_wayin } }))
+    const stored = await listing.replacePassphrase({ ...ante, gate: { passphrase_wayin } })
+    return friend.unlockByProof(vault, anteProving, stored.gate.gate_epoch)
   },
 
   add_passkey: async ({ ante, proved, passkeyProving }, { listing, vault, friend }) => {
     const passkeyWayin  = await passkeyProving.buildWayin(proved)
     const passkey_wayin = SX.passkeyWayinRecord.parse(passkeyWayin.pickle())
-    return friend.landGate(vault, proved, () => listing.addPasskey({ ...ante, gate: { passkey_wayin } }))
+    const stored = await listing.addPasskey({ ...ante, gate: { passkey_wayin } })
+    return friend.unlockByProof(vault, proved, stored.gate.gate_epoch)
   },
 
-  revoke_passkey: ({ ante, proved }, { listing, vault, friend }) => (
-    friend.landGate(vault, proved, () => listing.revokePasskey({ ...ante, gate: { passkey_wayin: null } }))
-  ),
+  revoke_passkey: async ({ ante, proved }, { listing, vault, friend }) => {
+    const stored = await listing.revokePasskey({ ...ante, gate: { passkey_wayin: null } })
+    return friend.unlockByProof(vault, proved, stored.gate.gate_epoch)
+  },
 
   del_vault: async ({ ante }, { listing, vault }) => {
     // The lock first: no box opens under a lease while the tombstone goes out. The answer delivered vacates its boxes.

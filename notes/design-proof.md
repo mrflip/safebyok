@@ -191,7 +191,7 @@ that the vacate lands after the put. The put is called before `align`, because a
 `lock()`. So `await caching` needs no compare, and no second vacate.
 
 **A `lock()` crossing a gate change** does not hold, as at an unlock: the proof says this user may have
-the vault unlocked. The three gate changes end in one private `#landGate`, which leases the vault for a
+the vault unlocked. Each of the three gate changes ends in `#unlockByProof`, which leases the vault for a
 full term under the epoch that landed.
 
 **`sweep`, `vacate` and `delete`** leave a one-way state: every `demandReadyToX` refuses from then on, so
@@ -344,8 +344,8 @@ vaultDB check more (`notes/design-vaultdb.md`, VG1 to VG3). Each change ends the
 does not already carry:
 
 ```text
-vault.#landGate(proved, commit)
-├─ stored = await commit(): vaultListing.<gate verb>(params)    ← the commit; params spread from ante, the record the attempt read, its gate holding the wayin
+each gate change's run
+├─ stored = await vaultListing.<gate verb>(params)    ← the commit; params spread from ante, the record the attempt read, its gate holding the wayin
 │  ├─ ante's revision is the prior; moved → 'stale_write', nothing stored
 │  ├─ the store refuses what its row rules out, such as an addPasskey over a passkey held
 │  ├─ the vaultDB lays the wayin on the row, moves gate_epoch and the revision up, and leaves the rest as stored
@@ -386,7 +386,7 @@ gating.attempt({ antePassphraseClear, nextPassphraseClear })
 │    weak → may re-enter
 └─ run({ ante, anteProving, nextProving })           ── no clear goes past here ──
    ├─ nextWayin = nextProving.buildWayin(anteProving)    unwrap the vaultKey; wrap; dropped
-   └─ vault.#landGate(anteProving, commit)
+   └─ vaultListing.<gate verb>, then vault.#unlockByProof(anteProving, stored.gate.gate_epoch)
       commit: vaultListing.replacePassphrase({ ...ante, gate: { passphrase_wayin: nextWayin } })    ← the commit
 ```
 
@@ -410,7 +410,7 @@ gating.attempt({ passphraseClear, passkeyClear })
 ├─ passkeyProving = PasskeyProving.buildNovel(gate.stamp, passkeyClear, world)
 └─ run({ ante, proved, passkeyProving })             ── no clear goes past here ──
    ├─ passkeyWayin = passkeyProving.buildWayin(proved)   unwrap the vaultKey; wrap; dropped
-   └─ vault.#landGate(proved, commit)
+   └─ vaultListing.<gate verb>, then vault.#unlockByProof(proved, stored.gate.gate_epoch)
       commit: vaultListing.addPasskey({ ...ante, gate: { passkey_wayin: passkeyWayin } })           ← the commit
            one added before the enter key → refused; after it → 'stale_write'
 ```
@@ -429,7 +429,7 @@ gating.attempt({ passphraseClear })
 ├─ proved = PassphraseProving.buildStored(gate, passphraseClear, world)
 │    wrong → may re-enter
 └─ run({ ante, proved })                             ── no clear goes past here ──
-   └─ vault.#landGate(proved, commit)
+   └─ vaultListing.<gate verb>, then vault.#unlockByProof(proved, stored.gate.gate_epoch)
       commit: vaultListing.revokePasskey({ ...ante, gate: { passkey_wayin: null } })                ← the commit
            revoked before the enter key → 'revoked', nothing moved; after it → 'stale_write'
 ```

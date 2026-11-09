@@ -303,10 +303,8 @@ export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplac
 
 /** What a gating's run hears of its vault's private verbs, past the enter key. A plain object, held in private by the vault and the gating: no public method of a vault takes a proving. */
 export const gatingFriend = objCheck(({ fn }) => ({
-  /** Unlock the vault with what a proving proved. */
-  unlockByProof: fn<(vault: Vault, proved: Proving) => Promise<Vault>>(),
-  /** Store a changed gate by `putGate`, then lease the vault under the epoch it landed. */
-  landGate:      fn<(vault: Vault, proved: Proving, putGate: () => Promise<VaultRecord>) => Promise<Vault>>(),
+  /** Unlock the vault with what a proving proved, under `gate_epoch` where a gate change just stored one. */
+  unlockByProof: fn<(vault: Vault, proved: Proving, gate_epoch?: number) => Promise<Vault>>(),
 }), { refusalkind: 'bad_option', extras: 'strip' })
 
 /** What a gating's run hears of its vault's private verbs, once {@link gatingFriend} has checked it. */

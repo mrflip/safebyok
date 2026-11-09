@@ -374,7 +374,7 @@ it. A `Box` reaches the Lease only through the public `vault.sealStampedString` 
 the lease a whisper's text and a stamp and hand back a sealed whisper or text, never a key. The `LeaseFriend` whose
 `peekLease` answers the cached row with its leaseKey handle is held in `Lease.#friend` and made
 in `Vault.#leaseFriend`; no public `Vault` method takes a proving, as a gating's run (`RunForGatingkind`) comes to
-`#unlockByProof` and `#landGate` by `Vault.#gatingFriend`, private in the vault and the gating; nothing public on a
+`#unlockByProof` by `Vault.#gatingFriend`, private in the vault and the gating; nothing public on a
 `Vault` or a `Lease` hands the friend out, and a test catches it with a spy on `Proving.prototype.buildLease`.
 Neither class has a getter, field, spread, JSON or Symbol that yields a key. The row itself is also in reach of
 whoever holds the deviceDB (G4). The entry points export neither `Lease` nor `Proving`, so the published surface

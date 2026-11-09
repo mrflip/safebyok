@@ -302,7 +302,7 @@ describe("a vault and a lease show neither the lease friend nor the lease key ha
     }
     await TH.expectRefusal(vault.addPasskeyPrompt(), 'dismissed')
     const json = JSON.stringify(gatingShown)
-    for (const named of ['friend', 'gatingFriend', 'launchArgs', 'landGate', 'unlockByProof']) {
+    for (const named of ['friend', 'gatingFriend', 'launchArgs', 'unlockByProof']) {
       expect(Object.keys(gatingShown!)).to.not.include(named)
       expect(json).to.not.include(named)
       expect(vault).to.not.have.property(named)

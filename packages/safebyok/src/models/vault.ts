@@ -92,7 +92,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, delVaultPrompt, del, each with its try form, landGate
+  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, delVaultPrompt, del, each with its try form
 
   /** SLOPDOC: Replaces the passphrase through a gating; the passkey stays and no other device is locked. */
   async replacePassphrasePrompt(): Promise<this> {
@@ -139,12 +139,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Delete this vault by {@link delVaultPrompt}, which takes the passphrase's proof. */
   override del(): Promise<this> { return this.delVaultPrompt() }
 
-  // The old lease stays in force for the moments between: the vaultKey did not change.
-  /** Put the gate, then lease the vault for a full term under the epoch it landed. */
-  async #landGate(proved: Proving, putGate: () => Promise<SX.VaultRecord>): Promise<this> {
-    const stored = await putGate()
-    return this.#unlockByProof(proved, stored.gate.gate_epoch)
-  }
   // --
 
   // == [Unlocking]: ensureUnlocked, unlock, each with its try form
@@ -214,8 +208,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The private verbs a gating's run calls past the enter key, as no public method of a vault takes a proving (G9). */
   static readonly #gatingFriend: GatingFriend = {
-    unlockByProof: (vault, proved) => vault.#unlockByProof(proved),
-    landGate:      (vault, proved, putGate) => vault.#landGate(proved, putGate),
+    unlockByProof: (vault, proved, gate_epoch) => vault.#unlockByProof(proved, gate_epoch),
   }
 
   get #launchArgs(): LaunchArgs<Exclude<Gatingkind, 'build_vault'>> {
