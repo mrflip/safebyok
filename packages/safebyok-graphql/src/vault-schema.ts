@@ -6,7 +6,7 @@ import { refusalkindVals } from 'safebyok/storage'
 // allowlists see whose bank each one reaches. A sidecar, a damaged row and a refusal's meta are
 // JSON: the app's own object, a row past reading, and the few fields a server lets cross.
 
-// The fields a vault row's every form holds, and a box row's.
+// The fields a vault row's every form has, and a box row's.
 const vaultSparseFields = `
   applabel:      String!
   user_id:       String!
@@ -46,7 +46,7 @@ const answerFields = `
 export const VaultSchemaSdl = `"""A JSON value carried whole: a box's sidecar, a damaged row, or a refusal's meta."""
 scalar SafebyokJson
 
-"""A time as integer UTC epoch milliseconds: any safe integer, past what GraphQL's 32-bit Int holds."""
+"""A time as integer UTC epoch milliseconds: any safe integer, beyond GraphQL's 32-bit Int."""
 scalar SafebyokEpochMillis
 
 """Why a call refused, as safebyok names it."""
@@ -121,7 +121,7 @@ type SafebyokBoxRecord {${boxSparseFields}
 type SafebyokBoxTombstone {${boxSparseFields}
 }
 
-"""A box row as a listing holds it, live or deleted, without its sidecar or its ciphered fields."""
+"""A box row as a listing has it, live or deleted, without its sidecar or its ciphered fields."""
 type SafebyokBoxSparse {${boxSparseFields}
 }
 
@@ -143,7 +143,7 @@ type SafebyokRevision {
 
 # Answers
 
-"""A request's scope, tokens and revision, each null where the request held none."""
+"""A request's scope, tokens and revision, each null where the request had none."""
 type SafebyokReqParams {
   applabel:     String
   user_id:      String
@@ -281,17 +281,17 @@ input SafebyokRevokedGateInput {
   passkey_wayin: SafebyokPasskeyWayinInput
 }
 
-"""The vault row a passphrase moves, at the revision it was read, its gate holding the new passphrase wayin alone."""
+"""The vault row a passphrase moves, at the revision it was read, its gate with the new passphrase wayin alone."""
 input SafebyokReplacePassphraseInput {${vaultSparseFields}
   gate:          SafebyokPassphraseGateInput!
 }
 
-"""The vault row a passkey joins, at the revision it was read, its gate holding the new passkey wayin alone."""
+"""The vault row a passkey joins, at the revision it was read, its gate with the new passkey wayin alone."""
 input SafebyokAddPasskeyInput {${vaultSparseFields}
   gate:          SafebyokPasskeyGateInput!
 }
 
-"""The vault row a passkey leaves, at the revision it was read, its gate holding a null passkey_wayin alone."""
+"""The vault row a passkey leaves, at the revision it was read, its gate with a null passkey_wayin alone."""
 input SafebyokRevokePasskeyInput {${vaultSparseFields}
   gate:          SafebyokRevokedGateInput!
 }

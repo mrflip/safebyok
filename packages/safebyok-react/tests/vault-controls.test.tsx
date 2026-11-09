@@ -64,7 +64,7 @@ describe("VaultLockControl", () => {
     expect(ensuring).not.toHaveBeenCalled()
   })
 
-  it("stays locked, and tells nobody, when the user declines the dialog", async () => {
+  it("stays locked, and tells nobody, when the user dismisses the dialog", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
     const news: VaultError[] = []

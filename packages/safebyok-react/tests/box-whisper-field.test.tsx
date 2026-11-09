@@ -12,7 +12,7 @@ TH.sweepBankWorlds()
 /** An obvious fake whisper, as stored. */
 const StoredKey = 'sk-ant-fake-stored'
 
-/** A vault, unlocked, holding `anthropic`, its apiKey {@link StoredKey} and a dotted token beside it. */
+/** A vault, unlocked, with `anthropic`, its apiKey {@link StoredKey} and a dotted token beside it. */
 const boxOfWorld = async (): Promise<{ vault: Vault, box: Box }> => {
   const { vault } = await TH.makeBankWithVault()
   const whisper = { apiKey: StoredKey, Credentials: { SessionToken: 'fake-session-token' } }
@@ -66,13 +66,13 @@ describe("BoxWhisperField", () => {
     expect(box.isShowing).to.be.true
   })
 
-  it("stores an edit through its box's fields' save", async () => {
+  it("puts an edit through its box's fields' put", async () => {
     // BoxWhisperField @example 1
     const { box } = await boxOfWorld()
     render(<BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />)
     await exposing(box)
     fireEvent.change(theField(), { target: { value: 'sk-ant-fake-edited' } })
-    await act(async () => { await BoxFields.of(box).save() })
+    await act(async () => { await BoxFields.of(box).put() })
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-ant-fake-edited', Credentials: { SessionToken: 'fake-session-token' } })
   })
 

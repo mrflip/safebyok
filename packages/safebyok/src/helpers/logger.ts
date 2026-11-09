@@ -57,7 +57,7 @@ export const parseLogger = (candidate: VaultLogger | null | undefined): VaultLog
   return made
 }
 
-/** True for a logger {@link parseLogger} made safe, or the {@link DefaultLogger}: what a bank's world and a lease's friend hold. */
+/** True for a logger {@link parseLogger} made safe, or the {@link DefaultLogger}: what a bank's world and a lease's friend have. */
 export const isGuardedLogger = (val: unknown): val is VaultLogger => (typeof val === 'object') && (val !== null) && guardedOnes.has(val)
 
 /** A host's logger as the guard sees it: whatever its calls return, such as an async logger's promise, is the guard's to settle. */
@@ -91,7 +91,7 @@ const forwarding = (): VaultLogger => {
   return forwarder
 }
 
-/** The logger every storage adapter, vault, provider and store uses when given none of its own.
+/** The logger every storage adapter, vault, provider and datastore uses when given none of its own.
  * It hands each call on, as it is made, to the logger last handed {@link setDefaultLogger}, or
  * else to the console, each line tagged 'safebyok:'. Pass it to Bank.make or BankProvider to have
  * the vault use the default whatever its storage adapter was given.
@@ -118,7 +118,7 @@ const tell = (hostLogger: AnyReturningLogger, level: VaultLoggerLevel, message?:
     // Called as a method, so a logger built as a class keeps its `this`.
     void dropRejection(hostLogger[level](message, story, err))
   } catch {
-    // A logger that throws must not break the lock, open or store that called it.
+    // A logger that throws must not break the lock, open or put that called it.
   }
 }
 

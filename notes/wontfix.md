@@ -38,25 +38,25 @@ not as a settled ruling, and check it against the current design before relying 
   vault's box calls.** `getBox`, `putBox` and `delBox` calls in flight together on one vault, for
   different boxes or the same `boxlabel`, settle in no promised order. The vault joins only its
   storage refresh (a `hello()` during one is in it, not behind it) and its gating (one prompt at a
-  time); nothing queues the box calls. A store's expectation (`vault_tok`, `gate_epoch`, a box's
+  time); nothing queues the box calls. A vaultDB's expectation (`vault_tok`, `gate_epoch`, a box's
   `revision_tok`) prevents a lost update, not a reordering: a host that needs an order awaits each
   call before making the next.
-* 2026-10-31 (the Coach, newvault sprint, thread 2): **a refused erase of a cached lease is not
-  retried.** `Lease.buildFromCache` meeting a row of another epoch erases the deviceDB's record
+* 2026-10-31 (the Coach, newvault sprint, thread 2): **a refused forget of a cached lease is not
+  retried.** `Lease.buildFromCache` meeting a row of another epoch forgets the deviceDB's record
   once (`tryForgetLease`); a refusal is warned of and left. The record is unusable either way, and
-  the next grant writes over it. A `lock()`'s own refused erase is told as a panic (`vault.#panic`).
+  the next grant writes over it. A `lock()`'s own refused forget is told as a panic (`vault.#panic`).
 * 2026-10-31 (the Coach, newvault sprint, thread 2): **no autolock timer past the Trigger's cap.**
   A lease whose `autolock_at` lies more than `MaxTimerMillis` (about 24.5 days) away arms no
   timer, by design: it locks no vault on its own, but reads not in force, and refuses
   `vault_locked`, once the clock passes its `autolock_at`.
-* 2026-10-31 (the Coach, newvault sprint): **a lease's `vacate()` whose device erase is refused
-  is not retried.** `vacate()` drops the lease's keys and record, then erases the deviceDB's record
+* 2026-10-31 (the Coach, newvault sprint): **a lease's `revoke()` whose device forget is refused
+  is not retried.** `revoke()` drops the lease's keys and record, then forgets the deviceDB's record
   once (`forgetLease`); a refusal is thrown from `vacate()`, and a second `vacate()` on the same
-  lease erases nothing, as it already dropped its record. The entry on a refused erase of a cached
-  lease covers the refused erase on `Lease.buildFromCache`; this one covers `vacate()` itself. The deviceDB is
+  lease forgets nothing, as it already dropped its record. The entry on a refused forget of a cached
+  lease covers the refused forget on `Lease.buildFromCache`; this one covers `revoke()` itself. The deviceDB is
   a cache, and the next session asks for the passphrase. Pinned by
   `packages/safebyok/tests/loosened/lease.test.ts` (its one test); the Coach, "yeah skip", on
-  retrying a refused erase.
+  retrying a refused forget.
 * 2026-11-02 (the Coach, unrace, `unrace-new_vault.md` at commit e135d0352, since deleted; not yet built):
   **a failed delete still locks the vault on this device.** `del_vault` locks first, as a lock is
   synchronous and safe, then removes the vault from the vaultDB and the deviceDB, then vacates. So a
@@ -64,22 +64,22 @@ not as a settled ruling, and check it against the current design before relying 
   delete again. That is unpleasant, and could leave them thinking the vault is gone from their other
   devices when it is not. The verb does refuse, so a host can say so. The Coach: "Still: WONTFIX."
 * 2026-11-03 (unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *The lease*): **a `lock()` during
-  the cache's `Lease.buildFromCache` loses.** The vault reads unlocked on the lease built from the cache, the lock's erase
+  the cache's `Lease.buildFromCache` loses.** The vault reports unlocked on the lease built from the cache, the lock's forget
   stands, and the next session asks for a proof. The next `lock()` ends that session.
 * 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
   since moved here):
-  **a `lock()` whose erase is refused can reopen with no proof.** The vault locks and the lock's erase of
+  **a `lock()` whose forget is refused can reopen with no proof.** The vault locks and the lock's forget of
   the deviceDB's cached lease is refused and told as a panic, so the record survives. The next `ensureUnlocked`
   gets it from `Lease.buildFromCache` and attaches it, asking nothing, so a vault the user locked reopens with no
   passphrase. With no `onPanic`, the panic's vacate stops that in the tab that locked; with one, stopping it is the
   host's. Either way the row can survive for other tabs and later sessions. The Coach, 2026-11-02: won't fix, but
   "one I worry about"; and, 2026-11-03: "This is why the panic button exists, there is no fix we can apply if the
   system somehow is operational enough to read leases, decrypt data and everything else but delete data."
-* 2026-11-03 (the Coach, unrace): **a refused erase with no `onPanic` can bring a false prompt.** `Vault.#panic`
-  unlists the vault, so `ensureVault` then asks for a passphrase for a vault that exists. The Coach: "If the
+* 2026-11-03 (the Coach, unrace): **a refused forget with no `onPanic` can bring a false prompt.** `Vault.#panic`
+  delists the vault, so `ensureVault` then asks for a passphrase for a vault that exists. The Coach: "If the
   host has no on panic they've given their opinion, wontfix."
-* 2026-11-03 (the Coach, unrace): **a delete whose erase is refused, with no `onPanic`, still lands.** The vault
-  is tombstoned in the vaultDB and the delete is answered, whatever the erase of the cached lease did. The same
+* 2026-11-03 (the Coach, unrace): **a delete whose forget is refused, with no `onPanic`, still lands.** The vault
+  is tombstoned in the vaultDB and the delete is answered, whatever the forget of the cached lease did. The same
   ruling: a host with no `onPanic` has given its opinion.
 * 2026-11-03 (the Coach, unrace): **a host's own getter that throws a `VaultError` quoting the passphrase passes
   the gating's check whole.** The gating replaces a foreign throw from a getter with `unexpected_error`, keeping nothing of it, but passes a
@@ -124,8 +124,8 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-11-07 (the Coach, devicedb_idb, on a damaged lease row outliving a vacate: "I predict trouble when multiple tabs have the
   same lease. Mark anything like this wontfix. We will in future have tabs notify but store independently, how I don't know."):
   **a lease row that fails its check is neither listed nor forgotten.** `DeviceDB.listLeases` leaves it out and `DeviceDB.forget`
-  leaves it standing, as it holds no `vault_tok` to match, so a vacate or a `bank.autolock` never erases it; it stays until a later
-  stow over its scope; `DeviceDB.listRawLeases` shows it beside its scopepath, and a host deletes it by that scopepath with `DeviceDB.delRawLease`. Also: **tabs sharing one device store's leases are undefined.** Every tab of an origin opens the same
+  leaves it standing, as it holds no `vault_tok` to match, so a vacate or a `bank.autolock` never forgets it; it stays until a later
+  stow over its scope; `DeviceDB.listRawLeases` shows it beside its scopepath, and a host deletes it by that scopepath with `DeviceDB.forgetRawLease`. Also: **tabs sharing one device database's leases are undefined.** Every tab of an origin opens the same
   `IdbDeviceDB` database, so one tab's stow, forget or vacate lands under another's lease unannounced.
 * 2026-11-07 (devicedb_idb, the device database's wipe): **a tab holding an old device database open keeps it.** `IdbDeviceDB`
   deletes the databases of an older version unread on its first call, and a tab of an older release still holding one open blocks
@@ -137,5 +137,5 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-11-09 (the Coach, after designing it in `whiteboard/20261108-del_damaged/del_damaged-spec.md`: "I predict too many bug reports about
   non-bugs"; replaces the 2026-11-03 row that a damaged row stays until the customer names it): **the library does not delete a row that
   fails its check.** A damaged box row stays listed in `damaged_rows`, reads as `damaged_row`, and still counts toward `maxBoxes`; a damaged vault
-  row is told as bad news and stops a `delVault` that meets it. The customer clears either with their own store's tools. The spec is the design
+  row is told as bad news and stops a `delVault` that meets it. The customer clears either with their own datastore's tools. The spec is the design
   to start from if that changes.

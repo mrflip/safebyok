@@ -9,7 +9,7 @@ import { damagedLease, leaseNotInForce, unopenedWhisper } from '../refusals/thro
 import type { Wayinkind } from '../shapes/shapes-enums'
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, LeaseFormat, leaseFriend, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from '../shapes/shapes-gateish'
 
-/** A vault's vaultKey in force on this device, good for one `gate_epoch`. It holds the key wrapped under a non-extractable leaseKey, opens it for a single call, and never hands it out. */
+/** A vault's vaultKey in force on this device, good for one `gate_epoch`. It has the key wrapped under a non-extractable leaseKey, opens it for a single call, and never hands it out. */
 export class Lease implements LeaseStamp {
   // == [Props]: fmt, applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, proved_at, wayinkind, #friend, #record, #vaultStamp, #isFromCache, #leaseStamp, toJSON
 
@@ -37,7 +37,7 @@ export class Lease implements LeaseStamp {
 
   get #leaseStamp(): LeaseStamp { return leaseStamp.parse(this) }
 
-  /** This lease's {@link LeaseSparse}, which holds no key material. */
+  /** This lease's {@link LeaseSparse}, which has no key material. */
   toJSON(): LeaseSparse { return this.#leaseStamp }
   // --
 
@@ -53,8 +53,8 @@ export class Lease implements LeaseStamp {
   }
 
   /** The lease cached for `gate_epoch`, or null so the vault asks for a proof. A row of another epoch or stamp is forgotten;
-   * one past autolock stays, not loaded, for a later proof to write over or `bank.autolock` to erase.
-   * A store that refuses, or a row that will not read, is bad news and null, the row left standing.
+   * one past autolock stays, not loaded, for a later proof to write over or `bank.autolock` to forget.
+   * A device database that refuses, or a row that will not read, is bad news and null, the row left standing.
    */
   static async buildFromCache(friend: LeaseFriend, gate_epoch: number): Promise<Lease | null> {
     const { gate_epoch: epoch } = leaseFromCacheArgs.parse({ friend, gate_epoch })
@@ -84,10 +84,10 @@ export class Lease implements LeaseStamp {
   /** A new lease under a fresh leaseKey. */
   static async buildGranted(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
     const { opts: { gate_epoch, wayinkind } } = leaseGrantedArgs.parse({ friend, vaultKey, opts })
-    const held     = vaultStamp.parse(friend)
-    const granted  = leaseStamp.parse({ fmt: LeaseFormat, ...held, gate_epoch, proved_at: nowMillis(), wayinkind })
+    const vaultstamp = vaultStamp.parse(friend)
+    const granted  = leaseStamp.parse({ fmt: LeaseFormat, ...vaultstamp, gate_epoch, proved_at: nowMillis(), wayinkind })
     const leaseKey = await makeLeaseKey()
-    const vault_key_lease_wrapped = await wrapKeyUnder(leaseKey, vaultKey, cipherCtx([held, granted], 'vault_key_lease_wrapped'))
+    const vault_key_lease_wrapped = await wrapKeyUnder(leaseKey, vaultKey, cipherCtx([vaultstamp, granted], 'vault_key_lease_wrapped'))
     return new Lease(friend, leaseRecord.parse({ ...granted, lease_key: leaseKey, vault_key_lease_wrapped }), false)
   }
   // --
@@ -103,19 +103,19 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Ending one]: vacate, tryVacate, forget, tryForget, evict
+  // == [Ending one]: revoke, tryRevoke, forget, tryForget, evict
 
   /** Drop the keys and forget the cached record, so this device is locked. */
-  async vacate(): Promise<void> {
+  async revoke(): Promise<void> {
     if (this.#record === null) { return }
     this.evict()
     await this.#friend.forgetLease()
   }
 
-  /** Non-throwing form of {@link vacate}. */
-  tryVacate(): Promise<Outcome<void>> { return outcomeOf(() => this.vacate()) }
+  /** Non-throwing form of {@link revoke}. */
+  tryRevoke(): Promise<Outcome<void>> { return outcomeOf(() => this.revoke()) }
 
-  /** Forget the cached record with no lease held to {@link vacate}: one may stand from an earlier session. */
+  /** Forget the cached record with no lease granted to {@link revoke}: one may stand from an earlier session. */
   static async forget(friend: LeaseFriend): Promise<void> {
     await leaseFriend.parse(friend).forgetLease()
   }
@@ -145,7 +145,7 @@ export class Lease implements LeaseStamp {
     }
   }
 
-  /** The text `sealed` holds, bound to `stamp`: what `sealWith` sealed. */
+  /** The text `sealed` contains, bound to `stamp`: what `sealWith` sealed. */
   async unsealWith(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
     const checked = leaseUnsealArgs.parse({ sealed, stamp })
     const vaultKey = await this.#vaultKey('unwrapKey')
@@ -183,7 +183,7 @@ export class Lease implements LeaseStamp {
     try {
       return await unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
     } catch {
-      // Locking drops the vault's lease and forgets its row by scope; this one is evicted too, should the vault hold another.
+      // Locking drops the vault's lease and forgets its row by scope; this one is evicted too, should the vault have another.
       this.#friend.lock()
       this.evict()
       throw damagedLease()
@@ -193,7 +193,7 @@ export class Lease implements LeaseStamp {
 
   // == [Guards]: isPresent, demandRecord
 
-  /** The lease still holds its record, as `Storable.isPresent` says of a thing not gone. */
+  /** The lease still has its record, as `Storable.isPresent` says of a thing not gone. */
   get isPresent(): boolean { return this.#record !== null }
 
   /** The record, while the lease is in force. */

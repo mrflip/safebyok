@@ -12,9 +12,8 @@ const FlavorCases: readonly (readonly [Refusalkind, string, string])[] = [
   // closing the dialog:
   ["absent_wayin",        "close",     'a passkey gone closes the dialog'],
   ["vault_locked",        "close",     'a lock that won closes the dialog'],
-  ["locked_while_asking", "close",     'a lock that landed while the dialog asked closes it'],
-  ["gating_landed",       "close",     'a gating ended meanwhile closes the dialog'],
-  ["declined",            "close",     'a gating declined elsewhere closes the dialog'],
+  ["gating_concluded",    "close",     'a gating ended meanwhile closes the dialog'],
+  ["dismissed",           "close",     'a gating dismissed elsewhere closes the dialog'],
   ["storage_unavailable", "close",     'storage out of reach closes the dialog'],
   ["vault_gone",          "close",     'a vault found deleted closes the dialog'],
   // waiting out the attempt under way:

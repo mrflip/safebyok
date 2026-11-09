@@ -1,4 +1,4 @@
-// fake-indexeddb installs IndexedDB's globals before the device store loads, for the banks browserOpts makes.
+// fake-indexeddb installs IndexedDB's globals before the DeviceDB loads, for the banks browserOpts makes.
 import 'fake-indexeddb/auto'
 import { argon2idAsync } from '@noble/hashes/argon2.js'
 import { describe, expect, it } from 'vitest'
@@ -44,7 +44,7 @@ describe("Argon2id's reference test vector", () => {
 })
 
 // The value was taken from @noble/hashes' argon2idAsync called directly (and agrees with hash-wasm's argon2id), over the spec's
-// 65_536 KiB, 3 passes, 1 lane and 32 bytes, for this passphrase and salt; safebyok-fastkey's tests hold its wasm deriver to it too.
+// 65_536 KiB, 3 passes, 1 lane and 32 bytes, for this passphrase and salt; safebyok-fastkey's tests check its wasm deriver against it too.
 describe("a saved Argon2id value", () => {
   it("is what argon2idWebV1Deriver derives for one fixed passphrase and salt, at the spec's cost", { timeout: FullStrengthDeriveMillis }, async () => {
     const saltBytes = Uint8Array.from({ length: 16 }, (_unused, ii) => ((ii * 37) + 11) % 256)
@@ -80,6 +80,13 @@ describe("safebyok/browser", () => {
     expect(PassphraseSaltBytes).to.eq(Argon2idWebV1.salt_bytes)
   })
 
+  it("refuses a spec under a reserved label that safebyok does not supply, whatever its case", () => {
+    for (const key_deriver_label of ['argon2id_web_v2', 'ARGON2ID_WEB_V2']) {
+      const err = TH.expectSyncRefusal(() => parseKeyDeriverSpec({ ...CheapSpec, key_deriver_label }), 'bad_option')
+      expect(err.message).to.include('argon2id_web_')
+    }
+  })
+
   it("is not on the front door", () => {
     for (const exportname of ['argon2idWebV1Deriver', 'argon2idDeriver', 'idbDeviceDB', 'zxcvbnStrengthChecker', 'browserOpts']) {
       expect(Front).to.not.have.property(exportname)
@@ -88,7 +95,7 @@ describe("safebyok/browser", () => {
 })
 
 describe("browserOpts", () => {
-  it("answers a frozen bag of the Argon2id deriver, a device store in IndexedDB and the zxcvbn checker", () => {
+  it("answers a frozen bag of the Argon2id deriver, a DeviceDB in IndexedDB and the zxcvbn checker", () => {
     const bag = browserOpts({ dbName: freshDbName() })
     expect(Object.isFrozen(bag)).to.be.true
     expect(bag).to.have.all.keys('keyDeriver', 'deviceDB', 'strengthChecker')
@@ -104,14 +111,14 @@ describe("browserOpts", () => {
     expect(browserOpts()).to.eq(browserOpts({ dbName: 'safebyok' }))
   })
 
-  it("answers another device store for another dbName, the deriver and checker shared", () => {
+  it("answers another DeviceDB for another dbName, the deriver and checker shared", () => {
     const [one, other] = [browserOpts({ dbName: freshDbName() }), browserOpts({ dbName: freshDbName() })]
     expect(one.deviceDB).to.not.eq(other.deviceDB)
     expect(one.keyDeriver).to.eq(other.keyDeriver)
     expect(one.strengthChecker).to.eq(other.strengthChecker)
   })
 
-  it("refuses a dbName that is not non-empty text, and an option it does not take", () => {
+  it("refuses a dbName that is not non-empty text, and an option it does not accept", () => {
     TH.expectSyncRefusal(() => browserOpts({ dbName: '' }), 'bad_option')
     TH.expectSyncRefusal(() => browserOpts({ dbName: 3 } as never), 'bad_option')
     TH.expectSyncRefusal(() => browserOpts({ dbname: 'acme' } as never), 'bad_option')

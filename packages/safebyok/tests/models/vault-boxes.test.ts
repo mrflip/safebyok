@@ -8,7 +8,7 @@ import { Sidecar, Whisper, boxlabel, makeWorld, makeWorldWithBox, makeWorldWithR
 useVaultWorlds()
 
 describe("vault.hello: the host's call for the list and the pushes", () => {
-  it("is run by no box verb, a getBox fetching only its own box and holding only that one", async () => {
+  it("is run by no box verb, a getBox fetching only its own box and listing only that one", async () => {
     const { openNextSession, tryListBoxes, tryGetBox } = await makeWorldWithBox()
     const next = await openNextSession()
     tryListBoxes.mockClear()
@@ -44,7 +44,7 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
   })
 
-  it("a put from another session reaches the box held", async () => {
+  it("a put from another session reaches the box listed", async () => {
     const { vault, openNextSession } = await makeWorldWithBox()
     const next = await openNextSession()
     await next.hello()
@@ -139,9 +139,9 @@ describe("a box verb the vaultDB refuses over its vault's row", () => {
 
 describe("vault.getBox", () => {
   it("takes the gate a box's answer brings: a row moved elsewhere, no notice heard, leaves the vault full with the new gate", async () => {
-    const { vault, storeBehindOurBack, demandStored } = await makeWorldWithBox()
+    const { vault, putBehindOurBack, demandStored } = await makeWorldWithBox()
     const stored = demandStored()
-    const moved = storeBehindOurBack({ ...stored, gate: { ...stored.gate, gate_epoch: stored.gate.gate_epoch + 1 } })
+    const moved = putBehindOurBack({ ...stored, gate: { ...stored.gate, gate_epoch: stored.gate.gate_epoch + 1 } })
     await vault.fetchBox(boxlabel)
     expect(vault.isFull).to.be.true
     expect(vault.revision_tok).to.eq(moved.revision_tok)
@@ -195,7 +195,7 @@ describe("vault.getBox", () => {
 })
 
 describe("vault.delBox", () => {
-  it("of a box stored and not held hears 'stale_write' over the sentinel, the frontier delivered, and the retry lands", async () => {
+  it("of a box stored and not listed hears 'stale_write' over the sentinel, the frontier delivered, and the retry is written", async () => {
     const { next, boxrows } = await nextUnlisted()
     await TH.expectRefusal(next.delBox(boxlabel), 'stale_write')
     expect(boxrows.get(boxlabel)).to.have.property('am', 'a')
@@ -203,7 +203,7 @@ describe("vault.delBox", () => {
     expect(boxrows.get(boxlabel)).to.have.property('am', 'x')
   })
 
-  it("leaves the box held in its tombstone, a get then absent, the whisper refused", async () => {
+  it("leaves the box listed in its tombstone, a get then absent, the whisper refused", async () => {
     const { vault, boxrows } = await makeWorldWithBox()
     const dead = await vault.delBox(boxlabel)
     expect(dead?.isPresent).to.be.false
@@ -213,7 +213,7 @@ describe("vault.delBox", () => {
     await expect(dead?.extractWhisper()).rejects.toThrow()
   })
 
-  it("resolves null for nothing stored, storing nothing", async () => {
+  it("resolves null for nothing stored, deleting nothing", async () => {
     const { vault, boxrows } = await makeWorld()
     expect(await vault.delBox(boxlabel)).to.be.null
     expect(boxrows.has(boxlabel)).to.be.false
@@ -261,12 +261,12 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['Not A Label'])
   })
 
-  it("drops an instance held under it from the list, disabled", async () => {
-    const { vault, box: held, boxrows } = await makeWorldWithBox()
+  it("drops an instance listed under it from the list, disabled", async () => {
+    const { vault, box: listed, boxrows } = await makeWorldWithBox()
     boxrows.set(boxlabel, { garbage: true })
     await vault.hello()
-    expect(vault.boxListing.at(held.scope)).to.be.null
-    expect(held.isEnabled).to.be.false
+    expect(vault.boxListing.at(listed.scope)).to.be.null
+    expect(listed.isEnabled).to.be.false
   })
 
   it("refuses a birth over it as 'damaged_row', the row standing", async () => {

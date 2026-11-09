@@ -31,13 +31,13 @@ describe("guardedLogger", () => {
 })
 
 describe("gatingLaunchArgs", () => {
-  const friend = { unlockByProof: () => undefined, landGate: () => undefined }
+  const friend = { unlockByProof: () => undefined }
   const scope  = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
   const askUser = guardRequestCleartext(() => undefined)
 
-  it("takes a kind, a scope, the friend's two verbs and the bank's dialog, and refuses a friend short of one", () => {
+  it("takes a kind, a scope, the friend's verb and the bank's dialog, and refuses a friend without it", () => {
     expect(GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend, askUser }).gatingkind).to.eq('add_passkey')
-    TH.expectSyncRefusal(() => GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend: { landGate: friend.landGate }, askUser }))
+    TH.expectSyncRefusal(() => GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend: {}, askUser }))
   })
 
   it("takes null where the host gave no dialog", () => {
@@ -109,7 +109,7 @@ describe("freshPasskeyAnswer", () => {
   it("refuses an answer over a salt too short, naming the salt", async () => {
     const answer = await TH.passkeyOf('laptop')
     const err = TH.expectSyncRefusal(() => GX.freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' }))
-    expect(err.message).to.eq(`prf_salt_b64: ${Phrases.prfSaltNotFresh(PasskeySaltBytes)}`)
+    expect(err.message).to.eq(`prf_salt_b64: ${Phrases.prfSaltShape(PasskeySaltBytes)}`)
   })
 })
 // --

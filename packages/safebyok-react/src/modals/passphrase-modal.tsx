@@ -1,24 +1,23 @@
 import { useRef } from 'react'
 import { PasskeyUnlockButton, offersPasskey } from '../components/passkey-unlock-button'
 import { Messages } from '../helpers/messages'
-import { useRoundFor } from '../hooks/round-for'
 import type { PassphraseModalProps } from '../shapes'
 import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, holdsFocus, unlockedFor, useAdvice, useAttempts, useConfirmation } from './modal-kit'
 
 /** The passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
 export const PassphraseModal = (props: PassphraseModalProps) => (
-  <AnsweringOnce key={useRoundFor(props.gating)} gating={props.gating} onDone={props.onDone}>
+  <AnsweringOnce key={props.gating.gatingTok} gating={props.gating} onDone={props.onDone}>
     {(done) => <PassphraseForm {...props} onDone={done} />}
   </AnsweringOnce>
 )
 
-const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername, passphraseAdvice, passkeyRpId }: PassphraseModalProps) => {
+const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername, passkeyRpId }: PassphraseModalProps) => {
   const { gripe, setGripe, fail, attempt } = useAttempts('PassphraseModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const { ref: confirmRef, gripeId, differs } = useConfirmation(setGripe)
   const creating = gating.gatingkind === 'build_vault'
-  const advice = useAdvice(passphraseAdvice, gating, creating, fail)
+  const advice = useAdvice(gating, creating, fail)
   const passkeyGating = gating.gatingkind === 'unlock_vault' && offersPasskey(gating) ? gating : null
 
   const submit = () => {

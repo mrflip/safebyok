@@ -16,7 +16,7 @@ describe("GraphQLVaultDB over the typed schema", () => {
     makeTwin:             TH.makeTwin,
     _cheat_rowsOf:        () => TH.rowsOf(),
     _cheat_failNextCall:  (vaultDB) => { vaultDB.failNext() },
-    _cheat_storeOf:       TH.storeOf,
+    _cheat_adapterOf:       TH.adapterOf,
     boxNoticesCarryVault: false,
   })
 
@@ -33,7 +33,7 @@ describe("GraphQLVaultDB over the typed schema", () => {
 
 // == [A client of its own]: FakeResult, fakeClient, gotNotice, revokedNotice
 
-/** What one call of a fake client hands back, as urql's own `OperationResult` holds it. */
+/** What one call of a fake client hands back, as urql's own `OperationResult` has it. */
 type FakeResult = { data?: unknown, error?: CombinedError, hasNext?: boolean }
 
 /** A GraphQLVaultDB over a fake urql Client whose queries and mutations answer `asked`, and each of whose subscriptions
@@ -70,7 +70,7 @@ const revokedNotice = { safebyokWatch: { ok: false, act: 'identity_revoked', val
 // --
 
 describe("GraphQLVaultDB's constructor", () => {
-  it("refuses a client it cannot use, or an option it does not take", () => {
+  it("refuses a client it cannot use, or an option it does not accept", () => {
     const client = new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] })
     const unusable = [{}, { client: { query: () => client } }, { client: 'urql' }, { client, maxRecordBytes: 0 }]
     for (const opts of unusable) { TH.expectSyncRefusal(() => new GraphQLVaultDB(opts as never), 'bad_option') }
@@ -97,7 +97,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'unexpected_error')
   })
 
-  it("refuses a failed request with a cause holding the error's name, HTTP status and code alone", async () => {
+  it("refuses a failed request with a cause with the error's name, HTTP status and code alone", async () => {
     const networkError = new Error('{"whisper_ciphered":"the record sent"}', { cause: { code: 'ECONNRESET', detail: 'the record sent' } })
     const combined = new CombinedError({ networkError, response: { status: 502, body: 'the record sent' } })
     const { vaultDB } = fakeClient({ error: combined })
@@ -122,7 +122,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     await TH.expectRefusal(vaultDB.listVaults(TH.bankScope), 'unexpected_error')
   })
 
-  it("refuses a malformed request before sending it, as any store refuses one", async () => {
+  it("refuses a malformed request before sending it, as any VaultDB refuses one", async () => {
     const { vaultDB } = fakeClient({ data: null })
     await TH.expectRefusal(vaultDB.getVault({ ...TH.vaultScope, vaultlabel: '' }), 'bad_scope')
   })

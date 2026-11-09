@@ -8,7 +8,7 @@ import { objCheck } from '../helpers/validator'
 /** The most characters `head`, `tail` or `minStars` may ask for: a whiff, not a copy. */
 const MaxShown = 1000
 
-/** The check of `mask`'s options, each defaulted, a field it does not take refused. Its `parse` refuses 'bad_option'. */
+/** The check of `mask`'s options, each defaulted, a field it does not accept refused. Its `parse` refuses 'bad_option'. */
 export const maskOpts = objCheck(({ union, lit, uint }) => {
   const shownCount = uint.lte(MaxShown)
   const resultLen  = union([lit(Infinity), uint])

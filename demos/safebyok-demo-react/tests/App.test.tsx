@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
-// fake-indexeddb installs an indexedDB global before the demo's stores open their shelves.
+// fake-indexeddb installs an indexedDB global before the demo's VaultDB and DeviceDB open their shelves.
 import 'fake-indexeddb/auto'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/App'
-import { vaultDB } from '../src/lib/stores'
+import { vaultDB } from '../src/lib/storage'
 import * as TH from './test-helpers'
 
 // The App derives through the browser's Argon2id: 64 MiB for every passphrase typed, near a
 // second each here. What these tests click through is the page, not the deriver (the core's
-// tests hold that), so the cheap test deriver stands in.
+// tests keep to that), so the cheap test deriver stands in.
 vi.mock('safebyok/browser', async (importOriginal) => {
   const browser = await importOriginal<typeof import('safebyok/browser')>()
   const { testDeriver } = await import('safebyok/testing')

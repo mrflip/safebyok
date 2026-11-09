@@ -1,6 +1,6 @@
 /** The checks and types of the gate: wayins, provings, leases and gatings, imported as `GX`. */
 
-import { string as zodString } from 'zod'
+import { NEVER } from 'zod'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
 import type { VaultError } from '../refusals/errors'
@@ -75,7 +75,7 @@ export type GateProps = Z.infer<typeof gateProps>
 /** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` quotes none of it.
  * What a blank one means is the gating's to say.
  */
-export const passphraseCleartext = Checker(() => zodString({ error: Phrases.PassphraseNotText }).brand<'PassphraseCleartext'>(), 'bad_option')
+export const passphraseCleartext = Checker(({ str }) => str.brand<'PassphraseCleartext'>(), 'bad_option')
 
 /** A passphrase's cleartext once {@link passphraseCleartext} has parsed it: the only text the key deriver is handed. */
 export type PassphraseCleartext = Z.infer<typeof passphraseCleartext>
@@ -97,9 +97,9 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
   prfBytes:      bytes(PrfAnswerBytes).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
 }), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
 
-/** A passkey's answer when asked for a vault's PRF: the cleartext a gating takes for a passkey. `safebyok-react`'s `askPasskey` makes one.
- * An `unlock_vault` gating takes it as `passkeyClear` in `attempt`, in place of the passphrase.
- * `build_vault` and `add_passkey` take it there beside the passphrase.
+/** A passkey's answer when asked for a vault's PRF: the cleartext a gating accepts for a passkey. `safebyok-react`'s `askPasskey` makes one.
+ * An `unlock_vault` gating accepts it as `passkeyClear` in `attempt`, in place of the passphrase.
+ * `build_vault` and `add_passkey` accept it there beside the passphrase.
  *
  * @example await gating.attempt({ passkeyClear: passkey })   // an unlock_vault gating, by the passkey alone
  */
@@ -111,7 +111,7 @@ export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
  * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })  // throws
  */
 export const freshPasskeyAnswer = Checker(() => (
-  passkeyAnswer.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltNotFresh(PasskeySaltBytes), path: ['prf_salt_b64'] })
+  passkeyAnswer.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltShape(PasskeySaltBytes), path: ['prf_salt_b64'] })
 ), 'bad_option')
 // --
 
@@ -140,7 +140,7 @@ export type PassphraseVerdict = Z.infer<typeof passphraseVerdict>
 
 // == [The vault's stamp]: vaultStamp, VaultStamp
 
-/** The fields of a vault fixed for its life, which every ctx under it binds: the scope, `vault_tok` and `registered_at`. Its `parse` takes them from whatever carries them, a Vault included, and strips the rest. */
+/** The fields of a vault fixed for its life, which every ctx under it binds: the scope, `vault_tok` and `registered_at`. Its `parse` accepts them from whatever carries them, a Vault included, and strips the rest. */
 export const vaultStamp = objCheck(({ vaultScope, vault_tok, epochMillis }) => ({
   ...vaultScope.unwrap().shape,
   vault_tok,
@@ -192,7 +192,7 @@ export type Novel = typeof NOVEL
 export const LeaseFormat = 7001
 
 /** True when `val` is a leaseKey as `makeLeaseKey` makes one: a non-extractable AES-GCM CryptoKey whose usages are within `wrapKey` and `unwrapKey`, among them `unwrapKey`.
- * A device store hands back what it kept by structured clone, so a key that is extractable, of
+ * A device database hands back what it kept by structured clone, so a key that is extractable, of
  * another algorithm, or for another use was not written by this package: its record reads as none.
  *
  * @example isLeaseKey(await makeVaultKey())  // false: extractable
@@ -234,21 +234,21 @@ export const leaseMillis = Checker(({ int }) => int.positive().max(ForeverMillis
 /** The check of a logger as the bank hands its models one: guarded by `parseLogger`. */
 export const guardedLogger = Checker(({ custom }) => custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected), 'bad_option')
 
-/** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
+/** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It has no key, and reaches neither the record nor the boxes. */
 export const leaseFriend = objCheck(({ fn }) => ({
   ...vaultStamp.shape,
   logger:          guardedLogger,
   /** The autolock duration: a cached row proved longer ago than this is due for locking. */
   leaseMillis,
-  /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
+  /** Lock the vault: a lease that will not open calls it, as what the vault has is no use. */
   lock:            fn<() => unknown>(),
   /** The record this device has cached, or null for none. */
   peekLease:       fn<() => Promise<unknown>>(),
-  /** Cache a lease's record on this device, in place of any it held. */
+  /** Cache a lease's record on this device, in place of any it had. */
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
   /** Forget the lease this device has cached. */
   forgetLease:     fn<() => Promise<void>>(),
-  /** Forget the lease this device has cached, telling the host of a refused erase. */
+  /** Forget the lease this device has cached, telling the host of a failed revoke. */
   tryForgetLease:  fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
   tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),
@@ -294,19 +294,22 @@ export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplac
   gatingkind:              oneof(EX.gatingkindVals),
   vaultBuildClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
   vaultUnlockClears:       obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
-    .refine(({ passphraseClear, passkeyClear = null }) => passphraseClear !== undefined || passkeyClear !== null, Phrases.ProofMissing),
+    .transform(({ passphraseClear, passkeyClear }, ctx) => {
+      if (passphraseClear !== undefined) { return { passphraseClear } }
+      if (passkeyClear) { return { passkeyClear } }
+      ctx.addIssue({ code: 'custom', message: Phrases.ProofMissing })
+      return NEVER
+    }),
   passphraseReplaceClears: obj({ antePassphraseClear: passphraseCleartext, nextPassphraseClear: passphraseCleartext }).strict(),
   passkeyAddClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer }).strict(),
   passkeyRevokeClears:     obj({ passphraseClear: passphraseCleartext }).strict(),
   vaultDelClears:          obj({ passphraseClear: passphraseCleartext }).strict(),
 }))
 
-/** What a gating's run hears of its vault's private verbs, past the enter key. A plain object, held in private by the vault and the gating: no public method of a vault takes a proving. */
+/** What a gating's run hears of its vault's private verbs, past the enter key. A plain object, kept private by the vault and the gating: no public method of a vault accepts a proving. */
 export const gatingFriend = objCheck(({ fn }) => ({
-  /** Unlock the vault with what a proving proved. */
-  unlockByProof: fn<(vault: Vault, proved: Proving) => Promise<Vault>>(),
-  /** Store a changed gate by `commit`, then lease the vault under the epoch it landed. */
-  landGate:      fn<(vault: Vault, proved: Proving, commit: () => Promise<VaultRecord>) => Promise<Vault>>(),
+  /** Unlock the vault with what a proving proved, under `gate_epoch` where a gate change just wrote one. */
+  unlockByProof: fn<(vault: Vault, proved: Proving, gate_epoch?: number) => Promise<Vault>>(),
 }), { refusalkind: 'bad_option', extras: 'strip' })
 
 /** What a gating's run hears of its vault's private verbs, once {@link gatingFriend} has checked it. */
@@ -327,7 +330,7 @@ export type ClearsForGatingkind = {
 
 // == [Given to a gating]: RequestCleartext, AskUser, AnyGating, GatingSnapshot, VaultBuildProvings, VaultUnlockProvings, AnteProvings, PassphraseReplaceProvings, PasskeyAddProvings, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs, Asked, Prove
 
-/** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way declines. */
+/** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way dismisses. */
 export type RequestCleartext = (gating: AnyGating) => unknown
 
 /** The host's dialog as a bank keeps it, wrapped by `guardRequestCleartext`: true once the dialog closes, false if it threw. Never throws. */
@@ -340,6 +343,8 @@ export type AnyGating = { [KindT in EX.Gatingkind]: Gating<KindT> }[EX.Gatingkin
 export interface GatingSnapshot extends VaultScope {
   /** What the gating does once the user's cleartext proves the gate: build, unlock or delete the vault, or change its gate. */
   readonly gatingkind: EX.Gatingkind
+  /** Unique to this gating, for a dialog to key on. */
+  readonly gatingTok:  string
 }
 
 /** What a build_vault attempt proves: the provings of a new vault's wayins, with no record to prove them against. */
@@ -348,7 +353,7 @@ export type VaultBuildProvings = { passphraseProving: PassphraseProving, passkey
 /** What an unlock_vault attempt proves: either wayin will do. */
 export type VaultUnlockProvings = { proved: Proving }
 
-/** The record an attempt read and the passphrase proved against it: all a revoke_passkey or a del_vault needs, and a commit's `ante`. */
+/** The record an attempt read and the passphrase proved against it: all a revoke_passkey or a del_vault needs, and a gate verb's `ante`. */
 export type AnteProvings = { ante: VaultRecord, proved: PassphraseProving }
 
 /** What a replace_passphrase attempt proves: the ante passphrase against the record it read, and the next, unproved. */
@@ -373,7 +378,7 @@ export type Run<KindT extends EX.Gatingkind> = (provings: ProvingsForGatingkind[
 /** The vault each kind of gating acts on, null for a `build_vault` whose vault does not exist yet. */
 export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
 
-/** All a gating is launched with; `prior`, the revision a birth lands after, is read at launch, and `askUser` is the bank's, null with no host dialog. */
+/** All a gating is launched with; `prior`, the revision a birth is put over, is read at launch, and `askUser` is the bank's, null with no host dialog. */
 export type LaunchArgs<KindT extends EX.Gatingkind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], prior: KindT extends 'build_vault' ? Revision : null, friend: GatingFriend, askUser: AskUser | null }
 
 /** The vault, scope, listing and world a gating hands its {@link Prove}. */

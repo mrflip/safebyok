@@ -65,7 +65,7 @@ describe("Checkers", () => {
   it("refuses an unknown field in a slice made in the call", () => {
     expect(boxSparse.parse(sparse)).to.deep.equal(sparse)
     const err = TH.expectSyncRefusal(() => boxSparse.parse({ ...sparse, note: 'hi' }), 'bad_record')
-    expect(err.message).to.eq("There is a field it does not take (its name is not repeated): it takes only applabel, user_id, vaultlabel, boxlabel, written_at. Check the spelling, or leave it out")
+    expect(err.message).to.eq("There is a field it does not accept (its name is not repeated): it accepts only applabel, user_id, vaultlabel, boxlabel, written_at. Check the spelling, or leave it out")
     TH.expectSyncRefusal(() => boxRecord.parse(sparse), 'bad_record')
   })
 
@@ -114,25 +114,25 @@ describe("Checkers", () => {
     expect(err.meta?.fieldnames).to.deep.equal([])
   })
 
-  it("quotes no value it refuses, counts the fields it does not take, never naming one, and lists the fields it takes", () => {
+  it("quotes no value it refuses, counts the fields it does not accept, never naming one, and lists the fields it takes", () => {
     const secret = 'sk-live-0xSECRET'
     const err = TH.expectSyncRefusal(() => boxRecord.parse({ ...sparse, applabel: secret, user_id: `${secret} `, written_at: secret, whisper_ciphered: 7, vault_key: secret, [secret]: 1, 'sk live': 2 }), 'bad_record')
     expect(err.message).to.not.include('SECRET')
     expect(err.message).to.not.include('sk live')
     expect(err.message).to.not.include('vault_key')
-    expect(err.message).to.include("There are 3 fields it does not take (their names are not repeated): it takes only applabel, user_id, vaultlabel, boxlabel, written_at, whisper_ciphered.")
+    expect(err.message).to.include("There are 3 fields it does not accept (their names are not repeated): it accepts only applabel, user_id, vaultlabel, boxlabel, written_at, whisper_ciphered.")
     expect(JSON.stringify(err.meta)).to.not.include('SECRET')
     expect(err.cause).to.be.undefined
   })
 
   it("names an unknown field's place by its path, never its name, and says when an object takes no fields", () => {
-    const { strictBag, holder } = Checkers('bad_option', ({ obj }) => {
+    const { strictBag, outer } = Checkers('bad_option', ({ obj }) => {
       const strictBag = obj({}).strict()
-      return { strictBag, holder: obj({ inner: strictBag }) }
+      return { strictBag, outer: obj({ inner: strictBag }) }
     })
-    expect(TH.expectSyncRefusal(() => strictBag.parse({ salt_b64: 1 }), 'bad_option').message).to.eq("There is a field it does not take (its name is not repeated): it takes no fields. Check the spelling, or leave it out")
-    const nested = TH.expectSyncRefusal(() => holder.parse({ inner: { staleMinute: 1, [`ghp_${'aB3'.repeat(12)}`]: 2 } }), 'bad_option')
-    expect(nested.message).to.match(/^inner: There are 2 fields it does not take/)
+    expect(TH.expectSyncRefusal(() => strictBag.parse({ salt_b64: 1 }), 'bad_option').message).to.eq("There is a field it does not accept (its name is not repeated): it accepts no fields. Check the spelling, or leave it out")
+    const nested = TH.expectSyncRefusal(() => outer.parse({ inner: { staleMinute: 1, [`ghp_${'aB3'.repeat(12)}`]: 2 } }), 'bad_option')
+    expect(nested.message).to.match(/^inner: There are 2 fields it does not accept/)
     expect(nested.message).to.not.include('staleMinute')
     expect(nested.meta?.fieldnames).to.deep.equal(['inner'])
   })
@@ -157,11 +157,11 @@ describe("Checkers", () => {
   it("renders to JSON Schema as the schema it was made from, a pipe and a recursion through a lazy included", () => {
     const build = ({ lazy, union, arr, str, num, obj }: typeof Kit) => {
       const tree: Zod.ZodType = lazy(() => union([num, arr(tree)]))
-      return { piped: str.transform((text) => text.length).pipe(num), tree, holder: obj({ tree }).strict() }
+      return { piped: str.transform((text) => text.length).pipe(num), tree, outer: obj({ tree }).strict() }
     }
     const made = Checkers('bad_record', build)
     const plain = build(Kit)
-    for (const valname of ['piped', 'holder'] as const) {
+    for (const valname of ['piped', 'outer'] as const) {
       expect(Zod.toJSONSchema(made[valname], { unrepresentable: 'any' })).to.deep.equal(Zod.toJSONSchema(plain[valname], { unrepresentable: 'any' }))
     }
     // A recursive validator at the root refers to itself through a definition, where Zod's own says '#'.
@@ -240,7 +240,7 @@ describe("Checkers", () => {
   })
 
   // Checkers @example 1
-  it("parses and then holds the result to another bag with parseConsistent, refusing its call's kind", () => {
+  it("parses and then has the result to another bag with parseConsistent, refusing its call's kind", () => {
     expect(boxSparse.parseConsistent(sparse, { ...scope, written_at: undefined, gate_epoch: 4 })).to.deep.equal(sparse)
     const err = TH.expectSyncRefusal(() => boxSparse.parseConsistent(sparse, { ...scope, user_id: 'u2' }), 'bad_record')
     expect(err.meta).to.deep.equal({ fieldnames: ['user_id'] })
@@ -279,11 +279,11 @@ describe("Checkers", () => {
 describe("Checker", () => {
   // Checker @example 1
   it("checks a value whole, refusing with a sentence of its own as a bad record unless given a kind", () => {
-    const prfSalt = Checker(({ str }) => str.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltNotFresh(PasskeySaltBytes)))
+    const prfSalt = Checker(({ str }) => str.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltShape(PasskeySaltBytes)))
     const salt = toB64(new Uint8Array(PasskeySaltBytes).fill(7))
     expect(prfSalt.parse(salt)).to.eq(salt)
     const err = TH.expectSyncRefusal(() => prfSalt.parse(toB64(new Uint8Array(PasskeySaltBytes - 1))), 'bad_record')
-    expect(err.message).to.eq(Phrases.prfSaltNotFresh(PasskeySaltBytes))
+    expect(err.message).to.eq(Phrases.prfSaltShape(PasskeySaltBytes))
   })
 
   // Checker @example 2
@@ -294,9 +294,9 @@ describe("Checker", () => {
   })
 
   it("spreads a module of validators into the kit, a nested one refusing with the outer call's kind", () => {
-    const holder = Checker(({ obj, gateRecord }) => obj({ gate: gateRecord }).strict(), 'bad_record', [GateChecks])
-    expect(holder.parse({ gate })).to.deep.equal({ gate })
-    TH.expectSyncRefusal(() => holder.parse({ gate: { passphrase: { ...gate.passphrase, memory_kib: -1 } } }), 'bad_record')
+    const outer = Checker(({ obj, gateRecord }) => obj({ gate: gateRecord }).strict(), 'bad_record', [GateChecks])
+    expect(outer.parse({ gate })).to.deep.equal({ gate })
+    TH.expectSyncRefusal(() => outer.parse({ gate: { passphrase: { ...gate.passphrase, memory_kib: -1 } } }), 'bad_record')
   })
 
   it("gives parseConsistent to a validator of an object, and refuses a disagreement as its kind", () => {
@@ -337,11 +337,11 @@ describe("objCheck", () => {
     const err = TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_record')
     expect(err.meta?.fieldnames).to.deep.equal(['applabel'])
     const extra = TH.expectSyncRefusal(() => checkedScope.parse({ ...scope, vault_tok: 'tok' }), 'bad_record')
-    expect(extra.message).to.eq("There are 2 fields it does not take (their names are not repeated): it takes only applabel, user_id. Check the spelling, or leave them out")
+    expect(extra.message).to.eq("There are 2 fields it does not accept (their names are not repeated): it accepts only applabel, user_id. Check the spelling, or leave them out")
   })
 
   // objCheck @example 2
-  it("drops a field it does not take, unread, under extras 'strip'", () => {
+  it("drops a field it does not accept, unread, under extras 'strip'", () => {
     const checkedScope = objCheck(bankScopeOf, { refusalkind: 'bad_scope', extras: 'strip' })
     expect(checkedScope.parse({ ...scope, vault_tok: 'tok' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
     TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_scope')
@@ -360,14 +360,14 @@ describe("objCheck", () => {
   })
 
   it("takes a kind and a module of validators", () => {
-    const holder = objCheck(({ gateRecord, uint }) => ({ gate: gateRecord, gate_epoch: uint }), 'bad_option', [GateChecks])
-    expect(holder.parse({ gate, gate_epoch: 1 })).to.deep.equal({ gate, gate_epoch: 1 })
-    TH.expectSyncRefusal(() => holder.parse({ gate, gate_epoch: -1 }), 'bad_option')
+    const outer = objCheck(({ gateRecord, uint }) => ({ gate: gateRecord, gate_epoch: uint }), 'bad_option', [GateChecks])
+    expect(outer.parse({ gate, gate_epoch: 1 })).to.deep.equal({ gate, gate_epoch: 1 })
+    TH.expectSyncRefusal(() => outer.parse({ gate, gate_epoch: -1 }), 'bad_option')
   })
 })
 
 describe("consistent", () => {
-  it("is true for a record naming the same app, user and vault as a scope, whatever else it holds", () => {
+  it("is true for a record naming the same app, user and vault as a scope, whatever else it has", () => {
     expect(consistent({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1' }, TH.scopeOf('u1'))).to.be.true
   })
 
@@ -484,7 +484,7 @@ const ExportedCheckers = Object.fromEntries(Object.entries(ShapeModules).flatMap
     .map(([exportname, exported]) => [`${modname}.${exportname}`, exported as Zod.ZodType])
 )))
 
-/** What every input below carries as a value, never as a key: a refusal holding it quoted its input. */
+/** What every input below carries as a value, never as a key: a refusal with it quoted its input. */
 const Marker = 'zqxMarkerValue7'
 
 /** The inputs each part of a checker is handed, each carrying the marker as a value. */

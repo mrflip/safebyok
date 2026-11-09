@@ -1,4 +1,4 @@
-/** A vault's lease through a gate change, a refused erase of its row, and the discards down the chain. */
+/** A vault's lease through a gate change, a refused forget of its row, and the discards down the chain. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
@@ -20,15 +20,14 @@ const stubReportError = () => {
 
 afterEach(() => { vi.unstubAllGlobals() })
 
-const expectLockWon = async ({ vault, deviceDB, demandStored }: Awaited<ReturnType<typeof makeBornVault>>, epoch0: number): Promise<void> => {
+const expectChangeUnlocked = async ({ vault, deviceDB, demandStored }: Awaited<ReturnType<typeof makeBornVault>>, epoch0: number): Promise<void> => {
   expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
-  expect(vault.isLocked).to.be.true
-  await TH.eventually(() => deviceDB.cachedNow() === null)
-  await TH.expectRefusal(vault.ensureUnlocked(), 'declined')
+  expect(vault.isUnlocked).to.be.true
+  await TH.eventually(() => deviceDB.cachedNow() !== null)
 }
 
 describe("A lease renewed through a gate change", () => {
-  it("renewed: a lease held is attached under the epoch that landed, its row cached, and the vault never reads locked on the way", async () => {
+  it("renewed: a lease granted is attached under the epoch that was written, its row cached, and the vault never reports locked on the way", async () => {
     const { vault, deviceDB, demandStored } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
     const epoch0 = vault.gate.gate_epoch
@@ -43,20 +42,18 @@ describe("A lease renewed through a gate change", () => {
     expect(await vault.unsealStampedString(sealed, Stamp)).to.eq('sk-test')
   })
 
-  it("was locked: a vault locked at the start lands the change and stays locked, caching no row", async () => {
+  it("was locked: a vault locked at the start writes the change and ends unlocked, its row cached", async () => {
     const { vault, deviceDB, demandStored } = await makeBornVault()
     const epoch0 = vault.gate.gate_epoch
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    deviceDB.tryStow.mockClear()
     await replaceTyping(vault, Passphrase, NewPassphrase)
-    expect(vault.isLocked).to.be.true
+    expect(vault.isUnlocked).to.be.true
     expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
-    expect(deviceDB.tryStow).not.toHaveBeenCalled()
-    expect(deviceDB.cachedNow()).to.be.null
+    expect(deviceDB.cachedNow()).to.not.be.null
   })
 
-  it("lock crossed: a lock() past the enter key wins: the change lands, the new lease goes unattached, and no row stands", async () => {
+  it("leaves the vault unlocked where a lock() came past the enter key", async () => {
     const born = await makeBornVault()
     const { vault } = born
     const epoch0 = vault.gate.gate_epoch
@@ -69,25 +66,25 @@ describe("A lease renewed through a gate change", () => {
     }
     await vault.replacePassphrasePrompt()
     world.requestCleartext = asBefore
-    await expectLockWon(born, epoch0)
+    await expectChangeUnlocked(born, epoch0)
   })
 
-  it("lock crossed: a lock() as the commit lands wins too", async () => {
+  it("leaves the vault unlocked where a lock() came as the commit was written", async () => {
     const born = await makeBornVault()
     const { vault, opts: { vaultDB } } = born
     const epoch0 = vault.gate.gate_epoch
     const commit = vaultDB.tryReplacePassphrase.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (params) => {
-      const landed = await commit(params)
+      const written = await commit(params)
       vault.lock()
-      return landed
+      return written
     })
     await replaceTyping(vault, Passphrase, NewPassphrase)
-    await expectLockWon(born, epoch0)
+    await expectChangeUnlocked(born, epoch0)
   })
 })
 
-describe("A refused erase of the row: lease_unerased", () => {
+describe("A refused forget of the row: lease_revoke_failed", () => {
   const Refusal = new VaultError('storage_unavailable', 'the disk is full')
 
   it("is announced by the friend's tryForgetLease, which answers it as a bad Outcome", async () => {
@@ -96,7 +93,7 @@ describe("A refused erase of the row: lease_unerased", () => {
     deviceDB.forget.mockRejectedValueOnce(Refusal)
     await TH.expectBad(friend.tryForgetLease(), 'storage_unavailable')
     await TH.eventually(() => onLifecycle.mock.calls.length > 0)
-    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_unerased', refusal: Refusal, vault, where: 'undeleted' }))
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal, vault, where: 'undeleted' }))
   })
 
   it("is heard by the host's onLifecycle, leaving the vault locked and enabled; a rejection of it goes to the platform and no further", async () => {
@@ -107,7 +104,7 @@ describe("A refused erase of the row: lease_unerased", () => {
     vault.lock()
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => reported.mock.calls.length === 1)
-    expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_unerased', refusal: Refusal, vault, where: 'lock' }))
+    expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal, vault, where: 'lock' }))
     expect(vault.isEnabled).to.be.true
     expect(deviceDB.cachedNow()).not.to.be.null
   })
@@ -148,7 +145,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test' })
   })
 
-  it("sweep leaves the row, drops the lease, disables and unlists all the way down", async () => {
+  it("sweep leaves the row, drops the lease, disables and delists all the way down", async () => {
     const { vault, listing, box, deviceDB } = await makeVaultWithBox()
     const { boxListing } = vault
     await box.expose()
@@ -164,7 +161,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(deviceDB.peek).not.toHaveBeenCalled()
   })
 
-  it("vacate erases the row too, disables and unlists all the way down, and leaves the vaultDB untouched", async () => {
+  it("vacate forgets the row too, disables and delists all the way down, and leaves the vaultDB untouched", async () => {
     const { vault, listing, box, deviceDB, demandStored } = await makeVaultWithBox()
     const stored = demandStored()
     vault.vacate()
@@ -191,7 +188,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(deviceDB.forget).not.toHaveBeenCalled()
   })
 
-  it("past a discard vault.boxListing answers the listing it held, its verbs refusing", async () => {
+  it("past a discard vault.boxListing answers the listing it listed, its verbs refusing", async () => {
     const { vault } = await makeVaultWithBox()
     const boxes = vault.boxListing
     vault.sweep()
@@ -241,7 +238,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(dialog).not.toHaveBeenCalled()
   })
 
-  it("a swept listing stores nothing: a put or a delete refuses before reaching the vaultDB", async () => {
+  it("a swept listing puts nothing: a put or a delete refuses before reaching the vaultDB", async () => {
     const { listing, demandStored } = await makeBornVault()
     const stored = demandStored()
     listing.sweep()
@@ -284,12 +281,12 @@ describe("The discards: sweep and vacate, down the chain", () => {
   })
 })
 
-/** Every value `holder` shows by a field or getter, own or inherited, symbols too; its methods stay uncalled. */
-const valuesShownBy = (holder: object): unknown[] => {
+/** Every value `subject` shows by a field or getter, own or inherited, symbols too; its methods stay uncalled. */
+const valuesShownBy = (subject: object): unknown[] => {
   const shown: unknown[] = []
-  for (let proto: object | null = holder; proto !== null && proto !== Object.prototype; proto = Object.getPrototypeOf(proto) as object | null) {
+  for (let proto: object | null = subject; proto !== null && proto !== Object.prototype; proto = Object.getPrototypeOf(proto) as object | null) {
     for (const ckey of Reflect.ownKeys(proto)) {
-      try { shown.push(Reflect.get(holder, ckey)) } catch { /* a getter's refusal shows nothing */ }
+      try { shown.push(Reflect.get(subject, ckey)) } catch { /* a getter's refusal shows nothing */ }
     }
   }
   return shown
@@ -301,11 +298,11 @@ describe("a vault and a lease show neither the lease friend nor the lease key ha
     let gatingShown: object | null = null
     world.requestCleartext = (gating) => {
       gatingShown = gating
-      gating.decline()
+      gating.dismiss()
     }
-    await TH.expectRefusal(vault.addPasskeyPrompt(), 'declined')
+    await TH.expectRefusal(vault.addPasskeyPrompt(), 'dismissed')
     const json = JSON.stringify(gatingShown)
-    for (const named of ['friend', 'gatingFriend', 'launchArgs', 'landGate', 'unlockByProof']) {
+    for (const named of ['friend', 'gatingFriend', 'launchArgs', 'unlockByProof']) {
       expect(Object.keys(gatingShown!)).to.not.include(named)
       expect(json).to.not.include(named)
       expect(vault).to.not.have.property(named)
@@ -316,14 +313,14 @@ describe("a vault and a lease show neither the lease friend nor the lease key ha
     const { vault, deviceDB, friend, lease } = await makeBornVaultAndFriend()
     const row = deviceDB.cachedNow() as Record<string, unknown>
     expect(row['lease_key']).to.be.an.instanceof(CryptoKey)
-    for (const holder of [vault, lease]) {
-      const shown = valuesShownBy(holder)
+    for (const subject of [vault, lease]) {
+      const shown = valuesShownBy(subject)
       expect(shown).to.not.include(friend)
       expect(shown).to.not.include(row['lease_key'])
       expect(shown).to.not.include(row)
-      const json = JSON.stringify(holder)
+      const json = JSON.stringify(subject)
       for (const named of ['friend', 'leaseFriend', 'peekLease', 'lease_key', 'vault_key_lease_wrapped']) {
-        expect(Object.keys(holder)).to.not.include(named)
+        expect(Object.keys(subject)).to.not.include(named)
         expect(json).to.not.include(named)
       }
     }

@@ -4,7 +4,7 @@ import * as Phrases from '../../src/helpers/phrases'
 import { cipherCtx, deriveWrappingKey, fromB64, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { Gate } from '../../src/models/gate'
-import { salt_b64, vaultScope } from '../../src/shapes/shapes-core'
+import { vaultScope } from '../../src/shapes/shapes-core'
 import { type ProvingWorld, FirstGateEpoch, type PasskeyAnswer, passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import { VaultError } from '../../src/refusals/errors'
@@ -29,7 +29,7 @@ const novelPassphrase = (world: ProvingWorld = provingWorldOf()): Promise<Passph
 
 const novelOverHanded = (handBack: () => unknown): Promise<PassphraseProving> => novelPassphrase(provingWorldOf({ keyDeriver: deriverHanding(handBack) }))
 
-/** A passphrase proving that holds a wayin under a new vaultKey, beside that wayin. */
+/** A passphrase proving that has a wayin under a new vaultKey, beside that wayin. */
 const novelWithWayin = async (): Promise<{ proving: PassphraseProving, wayin: Wayin }> => {
   const proving = await novelPassphrase()
   return { proving, wayin: await proving.buildWayin(NOVEL) }
@@ -56,7 +56,7 @@ const findsWeak = () => ({ strong: false as const, reason: 'too short' })
 
 const findsStrongAsync = () => Promise.resolve({ strong: true as const })
 
-/** Whether `one`'s lease opens what `other`'s seals: whether both hold one vaultKey. */
+/** Whether `one`'s lease opens what `other`'s seals: whether both have one vaultKey. */
 const expectOneVaultKey = async (one: Proving, other: Proving): Promise<void> => {
   const friend = fakeLeaseFriendOf()
   const stamp = sealStampOf('b1')
@@ -119,8 +119,8 @@ describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
     [() => ({ world: TH.omitting(provingWorldOf(), 'device_id') }),       'a world with no device_id'],
     [() => ({ world: TH.omitting(provingWorldOf(), 'strengthChecker') }), 'a world with no strengthChecker'],
     [() => ({ world: provingWorldOf({ device_id: '' }) }),                'a world with an empty device_id'],
-    [() => ({ world: { ...provingWorldOf(), keyDeriver: TH.testDeriver } }), "a world holding the host's bare keyDeriver"],
-    [() => ({ world: { ...provingWorldOf(), strengthChecker: TH.anyStrengthChecker } }), "a world holding the host's bare strengthChecker"],
+    [() => ({ world: { ...provingWorldOf(), keyDeriver: TH.testDeriver } }), "a world with the host's bare keyDeriver"],
+    [() => ({ world: { ...provingWorldOf(), strengthChecker: TH.anyStrengthChecker } }), "a world with the host's bare strengthChecker"],
     [() => ({ stamp: { ...WorldStamp, vault_tok: undefined } }),          'a stamp with no vault_tok'],
     [() => ({ stamp: { ...WorldStamp, registered_at: 'yesterday' } }),    'a stamp registered at a time that is no epoch millis'],
     [() => ({ stamp: null }),                                             'no stamp at all'],
@@ -233,7 +233,7 @@ describe("PasskeyProving.buildNovel(stamp, passkeyClear, world)", () => {
 })
 
 describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
-  it("proves the gate's passphrase wayin: its stamp and epoch the gate's, its header the wayin's, and it holds the gate's vaultKey", async () => {
+  it("proves the gate's passphrase wayin: its stamp and epoch the gate's, its header the wayin's, and it has the gate's vaultKey", async () => {
     const { gate, answerOf } = await gateWithBoth(2)
     const proving = await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf())
     expect(proving.stamp).to.deep.equal(WorldStamp)
@@ -263,15 +263,15 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
 
-  // The record's check lets it through: 22 base64url characters, the last with stray padding bits.
-  it("refuses a stored salt that will not decode", async () => {
+  // 22 base64url characters, the last with stray padding bits: it passes for a salt by its length and its characters alone.
+  it("refuses a stored salt that will not decode, before the deriver hears it", async () => {
     const salt = `${"A".repeat(21)}B`
     const { gate } = await gateWithBoth()
     const { passphrase_wayin } = gate.pickle()
     const deriveKeyBytes = vi.fn(() => Promise.resolve(randomBytes(32)))
     const keyDeriver: KeyDeriver = { key_deriver_label: passphrase_wayin.key_deriver_label, salt_bytes: 16, deriveKeyBytes }
-    const damaged = { stamp: WorldStamp, ...gate.pickle(), passphrase_wayin: { ...passphrase_wayin, salt_b64: salt_b64.parse(salt) } }
-    const err = await TH.expectRefusal(PassphraseProving.buildStored(damaged, TestPassphrase, provingWorldOf({ keyDeriver })), 'bad_record')
+    const damaged = { stamp: WorldStamp, ...gate.pickle(), passphrase_wayin: { ...passphrase_wayin, salt_b64: salt as never } }
+    const err = await TH.expectRefusal(PassphraseProving.buildStored(damaged, TestPassphrase, provingWorldOf({ keyDeriver })), 'bad_option')
     expect(TH.thrownText(err)).to.not.include(salt)
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
@@ -505,7 +505,7 @@ describe("proving.buildWayin(source)", () => {
     await expectOneVaultKey(proving, proving)
   })
 
-  it("refuses a buildWayin on a stored proving: it holds its wayin from birth", async () => {
+  it("refuses a buildWayin on a stored proving: it has its wayin from birth", async () => {
     const { gate } = await gateWithBoth()
     const proving = await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf())
     await TH.expectRefusal(proving.buildWayin(NOVEL))
@@ -594,7 +594,7 @@ describe("proving.buildLease(friend, gate_epoch?)", () => {
     expect(friend.tryCacheLease).not.toHaveBeenCalled()
   })
 
-  it("records the epoch passed, for the gate a change lands", async () => {
+  it("records the epoch passed, for the gate a change writes", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
     const lease = await proving.buildLease(fakeLeaseFriendOf(), 5)

@@ -21,9 +21,9 @@ class BoxRefusingVaultDB extends MemoryVaultDB {
 }
 
 /** What useVault answers for the vault `main`: its stage, and the cause's kind once spent. */
-const ShowsHeld = () => {
-  const held = useVault('main')
-  return <span data-testid="held">{held.stage === 'spent' ? `spent ${held.cause.refusalkind}` : held.stage}</span>
+const ShowsMain = () => {
+  const main = useVault('main')
+  return <span data-testid="main">{main.stage === 'spent' ? `spent ${main.cause.refusalkind}` : main.stage}</span>
 }
 
 /** Calls `hook` as it renders, and renders nothing. */
@@ -54,23 +54,23 @@ describe("useVault and useVaultSnapshot", () => {
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
   })
 
-  it("read waiting while the bank's hello is refused, its snapshot saying so", async () => {
+  it("read waiting while the bank's hello is refused, its snapshot still made", async () => {
     const world = TH.makeBankWorld()
     world.vaultDB._cheat_refuseGets('storage_unavailable')
     render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /></BankProvider>)
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 refused') })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })
     expect(shown('vault')).to.eq('waiting none')
   })
 
   it("read waiting while the bank's hello is still on its way", async () => {
     const world = TH.makeBankWorld()
-    const listing = TH.held<never>()
+    const listing = TH.makePending<never>()
     vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(listing.promise)
-    render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsHeld /></BankProvider>)
+    render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsMain /></BankProvider>)
     await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(shown('vault')).to.eq('waiting none')
-    expect(screen.getByTestId('held').textContent).to.eq('waiting')
+    expect(screen.getByTestId("main").textContent).to.eq('waiting')
   })
 
   it("read spent once the bank is vacated, carrying the cause, and useVaultSnapshot null", async () => {
@@ -79,11 +79,11 @@ describe("useVault and useVaultSnapshot", () => {
     await seeding.hello()
     await seeding.ensureVault(TH.VaultScopeGiven)
     seeding.sweep()
-    render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsHeld /></BankProvider>)
-    await waitFor(() => { expect(screen.getByTestId('held').textContent).to.eq('present') })
+    render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsMain /></BankProvider>)
+    await waitFor(() => { expect(screen.getByTestId("main").textContent).to.eq('present') })
     const cause = new VaultError('identity_revoked', 'signed out')
     await act(async () => { await TH.seenBanks[0]?.vacate({ cause }) })
-    expect(screen.getByTestId('held').textContent).to.eq('spent identity_revoked')
+    expect(screen.getByTestId("main").textContent).to.eq('spent identity_revoked')
     expect(shown('vault')).to.eq('spent none')
   })
 
@@ -214,7 +214,7 @@ const VeilPage = () => {
 
 const shownOfBox = (testid: 'boxes' | 'box' | 'whisper' | 'showing' | 'veil') => screen.getByTestId(testid).textContent
 
-/** A world whose vault `main` holds `anthropic`, its apiKey a fake, put from another device; and that device's vault. */
+/** A world whose vault `main` has `anthropic`, its apiKey a fake, put from another device; and that device's vault. */
 const boxWorld = async () => {
   const world = TH.makeBankWorld()
   const { vault } = await TH.makeBankWithVault(world)

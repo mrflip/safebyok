@@ -28,7 +28,7 @@ export type VaultFieldArgs = {
   safebyokWatch:             DB.BankScope & { vaultlabel?: string | null }
 }
 
-/** A verb's answer as it crosses the wire: every field its answer type names, null where it holds none. */
+/** A verb's answer as it crosses the wire: every field its answer type names, null where it has none. */
 export type CrossingAnswer = {
   ok:         boolean
   act:        string
@@ -187,7 +187,7 @@ const epochMillisOf = (val: unknown): number => {
   throw new GraphQLError('SafebyokEpochMillis is a time in integer UTC epoch milliseconds')
 }
 
-/** `SafebyokEpochMillis`: a time as integer UTC epoch milliseconds, past the 32 bits GraphQL's own Int holds. */
+/** `SafebyokEpochMillis`: a time as integer UTC epoch milliseconds, beyond GraphQL's own 32-bit Int. */
 const safebyokEpochMillis = new GraphQLScalarType<number, number>({
   name:               'SafebyokEpochMillis',
   coerceOutputValue:  epochMillisOf,

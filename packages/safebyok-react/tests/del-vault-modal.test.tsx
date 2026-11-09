@@ -11,11 +11,11 @@ TH.sweepBankWorlds()
 const shownFor = async () => {
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)
-  const held = await TH.heldGatingOf(world, TH.deleting)
+  const opened = await TH.openGatingOf(world, TH.deleting)
   const answers: DialogAnswer[] = []
-  const onDone = (answer: DialogAnswer) => { answers.push(answer); held.close() }
-  render(<DelVaultModal gating={TH.gatingOfKind(held.gating, 'del_vault')} onDone={onDone} />)
-  return { ...held, answers }
+  const onDone = (answer: DialogAnswer) => { answers.push(answer); opened.close() }
+  render(<DelVaultModal gating={TH.gatingOfKind(opened.gating, 'del_vault')} onDone={onDone} />)
+  return { ...opened, answers }
 }
 
 const alertText = () => screen.getByRole('alert').textContent
@@ -42,10 +42,10 @@ describe("DelVaultModal", () => {
     expect(await raising).to.include({ ok: true })
   })
 
-  it("answers declined on Cancel, and the vault stays", async () => {
+  it("answers dismissed on Cancel, and the vault stays", async () => {
     const { bank, raising, answers } = await shownFor()
     fireEvent.click(screen.getByText(Messages.cancelButton))
-    expect(answers).to.deep.equal(['declined'])
+    expect(answers).to.deep.equal(['dismissed'])
     expect(await raising).to.include({ ok: false })
     expect(bank.vaultAt(TH.VaultScopeGiven)?.isPresent).to.be.true
   })

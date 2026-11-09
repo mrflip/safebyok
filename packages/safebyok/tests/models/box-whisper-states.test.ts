@@ -8,17 +8,17 @@ import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
-const held = useModelsWorld()
+const world = useModelsWorld()
 
 const Exposed = { apiKey: 'sk-test-0000' }
 
 /** A box built of `record`, with the same record in storage. */
 const builtOf = (record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> => {
-  held.mw.seedStore(record)
-  return boxListingOf(held.mw).build(record)
+  world.mw.seedPut(record)
+  return boxListingOf(world.mw).build(record)
 }
 
-/** A box storing {@link Exposed}, none of it exposed. */
+/** A box whose whisper is {@link Exposed}, none of it exposed. */
 const unexposedOf = async (): Promise<TestableBox> => {
   const box = await builtOf(fullBoxRecord())
   await box.put({ whisper: Exposed })
@@ -36,7 +36,7 @@ const veiledOf = async (): Promise<TestableBox> => {
 }
 
 const locking = (box: TestableBox): TestableBox => {
-  held.mw.setLocked(true)
+  world.mw.setLocked(true)
   return box
 }
 
@@ -56,8 +56,8 @@ const Operations = {
   unveil:   (box: TestableBox) => box.unveil(),
   unexpose: (box: TestableBox) => box.unexpose(),
   expose:   (box: TestableBox) => box.expose(),
-  lock:     (box: TestableBox) => { held.mw.setLocked(true); return box },
-  unlock:   (box: TestableBox) => { held.mw.setLocked(false); return box },
+  lock:     (box: TestableBox) => { world.mw.setLocked(true); return box },
+  unlock:   (box: TestableBox) => { world.mw.setLocked(false); return box },
 }
 
 const Shows = { value: Exposed, encrypted: ENCRYPTED, locked: LOCKED, veiled: VEILED } as const
@@ -152,7 +152,7 @@ describe("the veil from behind a lock", () => {
     const box = locking(await showingOf())
     box.veil()
     expect(box.getSnapshot().isVeiled).to.be.true
-    held.mw.setLocked(false)
+    world.mw.setLocked(false)
     expect(box.whisper).to.eq(VEILED)
   })
 
@@ -161,7 +161,7 @@ describe("the veil from behind a lock", () => {
     box.unveil()
     expect(box.getSnapshot().isVeiled).to.be.false
     expect(box.whisper).to.eq(LOCKED)
-    held.mw.setLocked(false)
+    world.mw.setLocked(false)
     expect(box.whisper).to.deep.equal(Exposed)
   })
 
@@ -223,7 +223,7 @@ describe("the endings of a box exposed", () => {
 
   it("a tombstone received clears the value and the veil", async () => {
     const box = await veiledOf()
-    box.receive(held.mw.tombstoneBoxRecord({ box_tok: box.box_tok, revision_seq: box.revision_seq + 1, revision_tok: 'rev-gone' }))
+    box.receive(world.mw.tombstoneBoxRecord({ box_tok: box.box_tok, revision_seq: box.revision_seq + 1, revision_tok: 'rev-gone' }))
     expect(box.isPresent).to.be.false
     expect(box.whisper).to.eq(ENCRYPTED)
     expect(box.isVeiled).to.be.false
@@ -280,20 +280,20 @@ describe("box.putExposed", () => {
   it("refuses 'vault_locked' while locked, veiled or not", async () => {
     for (const makeState of [StateMakers.locked, StateMakers.lockedVeiled]) {
       const box = await makeState()
-      held.mw.clearCalls()
+      world.mw.clearCalls()
       await TH.expectRefusal(box.putExposed(), 'vault_locked')
-      expect(held.mw.callsOf('put')).to.deep.equal([])
-      held.mw.setLocked(false)
+      expect(world.mw.callsOf('put')).to.deep.equal([])
+      world.mw.setLocked(false)
     }
   })
 
-  it("refuses with nothing exposed, or a patch naming a whisper, storing nothing", async () => {
+  it("refuses with nothing exposed, or a patch naming a whisper, writing nothing", async () => {
     const unexposed = await unexposedOf()
     const showing = await showingOf()
-    held.mw.clearCalls()
+    world.mw.clearCalls()
     await TH.expectRefusal(unexposed.putExposed())
     await TH.expectRefusal(showing.putExposed({ whisper: Exposed } as never))
-    expect(held.mw.callsOf('put')).to.deep.equal([])
+    expect(world.mw.callsOf('put')).to.deep.equal([])
   })
 
   it("answers an Outcome from tryPutExposed", async () => {
@@ -309,10 +309,10 @@ describe("box.putExposed", () => {
 // == [Hearing of a lock]: subscribe, getSnapshot, isLocked
 
 describe("box.subscribe and box.getSnapshot, through a lock", () => {
-  it("reads isLocked live, and holds none of it on the box", async () => {
+  it("reads isLocked live, and has none of it on the box", async () => {
     const box = await unexposedOf()
     expect(box.isLocked).to.be.false
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     expect(box.isLocked).to.be.true
     expect(Object.keys(box)).to.not.include('isLocked')
   })
@@ -323,12 +323,12 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     const listener = vi.fn()
     const unsubscribe = subscribe(listener)
     const before = getSnapshot()
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     expect(listener).toHaveBeenCalledTimes(1)
     expect(box.whisper).to.eq(LOCKED)
     expect(getSnapshot()).to.eq(before)
     unsubscribe()
-    held.mw.setLocked(false)
+    world.mw.setLocked(false)
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
@@ -336,9 +336,9 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     const box = await unexposedOf()
     const before = box.getSnapshot()
     expect(before).to.not.have.property('isLocked')
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     expect(box.getSnapshot()).to.eq(before)
-    held.mw.setLocked(false)
+    world.mw.setLocked(false)
     expect(box.getSnapshot()).to.eq(before)
   })
 
@@ -348,7 +348,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     const unsubscribe = box.subscribe(listener)
     unsubscribe()
     await box.expose()
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     expect(listener).not.toHaveBeenCalled()
   })
 
@@ -359,7 +359,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     const unsubscribeOne = one.subscribe(listener)
     other.subscribe(listener)
     unsubscribeOne()
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
@@ -375,7 +375,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     expect(box.whisper).to.eq(box.whisper)
     box.veil()
     expect(box.whisper).to.eq(box.whisper)
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     expect(box.whisper).to.eq(box.whisper)
   })
 })

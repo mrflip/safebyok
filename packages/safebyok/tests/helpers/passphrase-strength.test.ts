@@ -72,8 +72,8 @@ describe("guardStrengthChecker", () => {
 
   it("refuses a passphrase that is no string, before the checker hears it", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
-    const err = await TH.expectRefusal(guardStrengthChecker(checker)(42 as never, scope))
-    expect(err.message).to.match(/passphrase/i)
+    const err = await TH.expectRefusal(guardStrengthChecker(checker)(42 as never, scope), 'bad_option')
+    expect(err.message).to.match(/expected string/u)
     expect(checker).not.toHaveBeenCalled()
   })
 
@@ -165,7 +165,6 @@ describe("guardStrengthChecker's load", () => {
     const checker = Object.assign(() => StrongVerdict, { load: () => Promise.reject(chunkLost) })
     const err = await TH.expectRefusal(guardStrengthChecker(checker).load())
     expect(err.message).to.match(/strengthChecker's load\(\) failed/)
-    expect(err.message).to.match(/bank\.hello\(\)/)
     expect(err.cause).to.eq(chunkLost)
   })
 
@@ -182,7 +181,7 @@ describe("DefaultStrengthChecker, and the CUSTOMIZATION.md section its reason po
     for (const passphrase of ['correct horse battery staple', 'pw', '']) {
       const verdict = await DefaultStrengthChecker(passphrase, scope)
       expect(verdict).to.have.property('strong', false)
-      expect(verdict).to.have.property('reason').that.matches(/can't take a new passphrase yet/)
+      expect(verdict).to.have.property('reason').that.matches(/can't accept a new passphrase yet/)
       expect(JSON.stringify(verdict)).to.not.include(passphrase || 'no passphrase at all')
     }
     expect(await guardStrengthChecker(DefaultStrengthChecker)('correct horse battery staple', scope)).to.have.property('strong', false)

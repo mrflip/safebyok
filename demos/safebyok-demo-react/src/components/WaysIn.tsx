@@ -35,7 +35,7 @@ export const WaysIn = () => {
       {gripe !== null && <p className="gripe">{gripe}</p>}
       <div className="row">
         <button type="button" onClick={() => { void prompt(() => vault.tryReplacePassphrasePrompt()) }}>Change passphrase</button>
-        {/* The vault holds one passkey at most: to replace it, the user removes it and adds another. */}
+        {/* The vault has one passkey at most: to replace it, the user removes it and adds another. */}
         {passkeysAvailable() && passkey_wayin === null && (
           <button type="button" onClick={() => { void prompt(() => vault.tryAddPasskeyPrompt()) }}>Add fingerprint</button>
         )}

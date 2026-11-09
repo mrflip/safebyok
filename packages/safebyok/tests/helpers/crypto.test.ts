@@ -80,17 +80,17 @@ describe("cipherCtx", () => {
   })
 
   describe("refuses", () => {
-    it("a record holding a field set to undefined, rather than treating it as if it were not there", () => {
-      const holding = { boxlabel: 'anthropic', written_at: 1, revision_tok: 'r1', sidecar: undefined } as unknown as CipherCtxRecord
-      TH.expectSyncRefusal(() => cipherCtx(holding, 'whisper_ciphered'))
-      TH.expectSyncRefusal(() => cipherCtx([vaultStamp, holding], 'whisper_ciphered'))
-      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'whisper_ciphered', holding))
+    it("a record with a field set to undefined, rather than treating it as if it were not there", () => {
+      const withField = { boxlabel: 'anthropic', written_at: 1, revision_tok: 'r1', sidecar: undefined } as unknown as CipherCtxRecord
+      TH.expectSyncRefusal(() => cipherCtx(withField, 'whisper_ciphered'))
+      TH.expectSyncRefusal(() => cipherCtx([vaultStamp, withField], 'whisper_ciphered'))
+      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'whisper_ciphered', withField))
     })
 
-    it("a record holding a field set to null", () => {
-      const holding = { ...vaultStamp, registered_at: null } as unknown as CipherCtxRecord
-      TH.expectSyncRefusal(() => cipherCtx(holding, 'vault_key_passphrase_wrapped'))
-      TH.expectSyncRefusal(() => cipherCtx([holding, boxStamp], 'box_key_wrapped'))
+    it("a record with a field set to null", () => {
+      const withField = { ...vaultStamp, registered_at: null } as unknown as CipherCtxRecord
+      TH.expectSyncRefusal(() => cipherCtx(withField, 'vault_key_passphrase_wrapped'))
+      TH.expectSyncRefusal(() => cipherCtx([withField, boxStamp], 'box_key_wrapped'))
       TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { ...header, device_id: null } as unknown as CipherCtxRecord))
     })
 

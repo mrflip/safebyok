@@ -1,5 +1,6 @@
 import type { Modelkind } from '../helpers/consts'
-import { consistent } from '../helpers/validator'
+import { verifyConsistent } from '../helpers/validator'
+import * as Phrases from '../helpers/phrases'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { type Outcome, demandGood, outcomeOf } from '../refusals/outcome'
 import type { Gatingkind } from '../shapes/shapes-enums'
@@ -8,9 +9,9 @@ import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
 import type { AskUser, GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BankFriend, BoxPut, BoxPutOpts, EraseSite, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
+import type { BankFriend, BoxPut, BoxPutOpts, RevokeSite, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
-import { alreadyHeldError, deletedVaultError, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
+import { alreadyListedError, deletedVaultError, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
@@ -26,7 +27,7 @@ import type { VaultListing } from './vault-listing'
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
 
-/** SLOPDOC: A vault as this device holds it: a storable that ducks as its record, and the world its boxes live in. */
+/** SLOPDOC: A vault as this device has it: a storable that ducks as its record, and the world its boxes live in. */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> {
   // == [Props]: applabel, user_id, vaultlabel, world, listing, #bankFriend, #lease, #friend, #boxListing, #gate
 
@@ -40,7 +41,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The bank's private calls, as the listing handed them. */
   readonly #bankFriend: BankFriend
 
-  /** The lease this device holds, and null is what locked means. */
+  /** The lease granted on this device, and null is what locked means. */
   #lease: Lease | null = null
 
   #friend: LeaseFriend | null = null
@@ -58,7 +59,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The full record in hand, what a gate change spreads into its params. */
   get fullRecord(): VaultRecord { return this.demandFullProps() }
 
-  // Made on first read, not at settle: the base constructor settles before this class's fields exist.
+  // Made on first read, not at align: the base constructor aligns before this class's fields exist.
   /** The Gate of the record in hand, the same while the record's `gate` is the same object, so a record received remakes it. */
   get gate(): Gate {
     const full = this.demandFullProps()
@@ -75,24 +76,24 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Construction]: constructor, launchBirth
 
-  /** A vault as its listing holds it. */
+  /** Construct the storable vault, adopting its bank friend. */
   constructor(world: VaultWorld, listing: VaultListing, central: Fetched<VaultRecord, VaultSparse>, bankFriend: BankFriend) {
     super(world, listing, central)
     this.#bankFriend = VX.bankFriend.parse(bankFriend)
   }
 
-  /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it holds one. */
+  /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it has one. */
   static async launchBirth(listing: VaultListing, scope: VaultScope, askUser: AskUser | null): Promise<Vault> {
     const checked = listing.scopeOf(scope)
     listing.demandEnabled()
-    const held = listing.at(checked)
-    if (held?.isPresent === true) { throw alreadyHeldError() }
-    const prior = SX.revisionOf(held ?? SX.VoidRevision)
+    const listed = listing.at(checked)
+    if (listed?.isPresent === true) { throw alreadyListedError() }
+    const prior = SX.revisionOf(listed ?? SX.VoidRevision)
     return Gating.launch('build_vault', { listing, scope: checked, vault: null, prior, friend: Vault.#gatingFriend, askUser })
   }
   // --
 
-  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, delVaultPrompt, del, each with its try form, landGate
+  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, delVaultPrompt, del, each with its try form
 
   /** SLOPDOC: Replaces the passphrase through a gating; the passkey stays and no other device is locked. */
   async replacePassphrasePrompt(): Promise<this> {
@@ -115,7 +116,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link addPasskeyPrompt}. */
   tryAddPasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskeyPrompt()) }
 
-  /** Revoke the passkey through a revoke_passkey gating. With none held it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
+  /** Revoke the passkey through a revoke_passkey gating. With none it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
   async revokePasskeyPrompt(): Promise<this> {
     await this.ensureTimely(VX.Promptly); this.demandPromptable()
     if (this.gate.pkWayin === null) { return this }
@@ -136,17 +137,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link delVaultPrompt}. */
   tryDelVaultPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.delVaultPrompt()) }
 
-  /** Delete this vault by {@link delVaultPrompt}, which takes the passphrase's proof. */
+  /** Delete this vault by {@link delVaultPrompt}, which accepts the passphrase's proof. */
   override del(): Promise<this> { return this.delVaultPrompt() }
 
-  // The old lease stays in force for the moments between: the vaultKey did not change.
-  /** Run the commit, then attach a lease under the epoch it landed. */
-  async #landGate(proved: Proving, commit: () => Promise<SX.VaultRecord>): Promise<this> {
-    const heldLease = this.#lease
-    const stored = await commit()
-    await this.#renewLease(proved, stored.gate.gate_epoch, heldLease)
-    return this
-  }
   // --
 
   // == [Unlocking]: ensureUnlocked, unlock, each with its try form
@@ -174,58 +167,49 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
   // --
 
-  // == [The lease]: lock, vacateLease, unlockByProof, attachLease, renewLease
+  // == [The lease]: lock, vacateLease, unlockByProof, attachLease
 
-  /** Lock the vault and its boxes before returning, and erase the row cached on this device.
-   * A refused erase is announced as `lease_unerased` and does not throw. A no-op on a vault discarded.
+  /** Lock the vault and its boxes before returning, and forget the row cached on this device.
+   * A failed revoke is announced as `lease_revoke_failed` and does not throw. A no-op on a vault discarded.
    */
   override lock(): this {
     if (! this.isEnabled) { return this }
-    void this.#vacateLease('lock')
-    this.listing.declineGatingAtLock(this)
+    void this.#revokeLease('lock')
     return this
   }
 
-  /** SLOPDOC: Drops any lease held and erases the row cached on this device, announcing a refused erase at `where`. */
-  async #vacateLease(where: Exclude<EraseSite, 'undeleted'>): Promise<void> {
-    // The lease goes first, so a refused erase leaves none; the erase starts before any await, landing in call order.
-    const held = this.#lease
+  /** SLOPDOC: Drops any lease granted and forgets the row cached on this device, announcing a failed revoke at `where`. */
+  async #revokeLease(where: Exclude<RevokeSite, 'undeleted'>): Promise<void> {
+    // The lease goes first, so a refused forget leaves none; the forget starts before any await, so forgets start in call order.
+    const granted = this.#lease
     this.#lease = null
-    const vacating = held?.tryVacate() ?? Lease.tryForget(this.#leaseFriend())
-    this.settle()
-    const vacated = await vacating
-    if (! vacated.ok) { this.#bankFriend.announce({ kind: 'lease_unerased', refusal: vacated.err, vault: this, where }) }
+    const revoking = granted?.tryRevoke() ?? Lease.tryForget(this.#leaseFriend())
+    this.align()
+    const revoked = await revoking
+    if (! revoked.ok) { this.#bankFriend.announce({ kind: 'lease_revoke_failed', refusal: revoked.err, vault: this, where }) }
   }
 
-  /** The lease `proved` earns, attached. A lock landing during the unlock does not hold: the proof says this user may have the vault unlocked. */
-  async #unlockByProof(proved: Proving): Promise<this> {
-    const lease = await proved.buildLease(this.#leaseFriend())
+  /** The lease `proved` earns, attached. A lock called during the unlock does not stand: the proof says this user may have the vault unlocked. */
+  async #unlockByProof(proved: Proving, gate_epoch?: number): Promise<this> {
+    const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
     await this.#attachLease(lease)
     return this
   }
 
-  /** Hold `lease` as this vault's, and cache it on this device. */
+  /** Attach `lease` to this vault, and cache it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
     this.demandAttachable()
     this.#lease = lease
     await lease.cacheAsCacheCan()
-    this.settle()
-  }
-
-  /** Attach a new lease under `gate_epoch` where `heldLease` is in force. A lock crossing the change wins. */
-  async #renewLease(proved: Proving, gate_epoch: number, heldLease: Lease | null): Promise<void> {
-    if (heldLease === null) { return }
-    const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
-    if (heldLease.isPresent) { await this.#attachLease(lease) }
+    this.align()
   }
   // --
 
   // == [The gating's friend]: gatingFriend, launchArgs
 
-  /** The private verbs a gating's run calls past the enter key, as no public method of a vault takes a proving (G9). */
+  /** The private verbs a gating's run calls past the enter key, as no public method of a vault accepts a proving (G9). */
   static readonly #gatingFriend: GatingFriend = {
-    unlockByProof: (vault, proved) => vault.#unlockByProof(proved),
-    landGate:      (vault, proved, commit) => vault.#landGate(proved, commit),
+    unlockByProof: (vault, proved, gate_epoch) => vault.#unlockByProof(proved, gate_epoch),
   }
 
   get #launchArgs(): LaunchArgs<Exclude<Gatingkind, 'build_vault'>> {
@@ -255,7 +239,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       forgetLease:     () => deviceDB.forget(asked),
       tryForgetLease:  async (): Promise<Outcome<void>> => {
         const outcome = await deviceDB.tryForget(asked)
-        if (! outcome.ok) { this.#bankFriend.announce({ kind: 'lease_unerased', refusal: outcome.err, vault: this, where: 'undeleted' }) }
+        if (! outcome.ok) { this.#bankFriend.announce({ kind: 'lease_revoke_failed', refusal: outcome.err, vault: this, where: 'undeleted' }) }
         return outcome
       },
       tellBadNews:     (badnews) => { this.#bankFriend.tellBadNews(badnews) },
@@ -266,7 +250,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   #stampOfLife(): VaultScope & { vault_tok: string } { return { ...this.scope, vault_tok: this.vault_tok } }
   // --
 
-  // == [The boxes' world]: sealStampedString, unsealStampedString, takeWorld
+  // == [The boxes' world]: sealStampedString, unsealStampedString, receiveWorld
 
   /** `whisperText` sealed under a fresh boxKey under this vault's key, both bound to `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
@@ -274,7 +258,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.#demandLease(checked.stamp).sealWith(checked.whisperText, checked.stamp)
   }
 
-  /** The text `sealed` holds, bound to `stamp`. */
+  /** The text `sealed` contains, bound to `stamp`. */
   async unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
     const checked = GX.leaseUnsealArgs.parse({ sealed, stamp })
     return this.#demandLease(checked.stamp).unsealWith(checked.sealed, checked.stamp)
@@ -282,7 +266,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
   // `receive` refuses `otherVaultTok` for a row of another life: the one consistency guard on this path.
-  takeWorld(world: unknown): void { this.receive(SX.vaultRow.refusingAs('damaged_row').parse(world)) }
+  receiveWorld(world: unknown): void { this.receive(SX.vaultRow.refusingAs('damaged_row').parse(world)) }
   // --
 
   // == [Box verbs]: hello, bringUp, getBox, fetchBox, putBox, delBox, each with its try form
@@ -319,7 +303,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link fetchBox}. */
   tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
 
-  /** Seals `patch` over the box listed at its `boxlabel` as the next revision and stores it, answering the box; {@link Box.put} has the options and the refusals. */
+  /** Seals `patch` over the box listed at its `boxlabel` as the next revision and puts it, answering the box; {@link Box.put} has the options and the refusals. */
   async putBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Box> {
     const box = this.boxListing.puttable({ ...patch, ...this.scope }, opts)
     return box.put(patch, opts)
@@ -343,7 +327,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The vault's own lock, not its world's: the bank has none. */
   override get isLocked(): boolean { return this.#lease === null }
 
-  /** True while this vault holds a lease. */
+  /** True while this vault has a lease granted. */
   get isUnlocked(): boolean { return this.#lease !== null }
 
   /** Refuses unless the vault is enabled, present and unlocked. */
@@ -354,7 +338,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   #demandLease(stamp: CipherCtxRecord): Lease {
     this.demandEnabled().demandPresent()
-    if (! consistent(stamp, this.#stampOfLife())) { throw stampOfOtherVault() }
+    verifyConsistent(stamp, this.#stampOfLife(), { kind: 'unexpected_error', message: Phrases.StampOfOtherVault })
     if (this.#lease === null) { throw unlockFirst() }
     return this.#lease
   }
@@ -380,13 +364,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Protected, overriding Storable's]: adopt, sweepContents, vacateContents, isFullRecord, lifeTokPathOf, makeSnapshot
 
-  /** Take in `central`. A tombstone locks the vault, erases the cached row and vacates the boxes, the vault keeping its slot.
-   * A refused erase is announced as `lease_unerased`, and the tombstone stands.
+  /** Adopt `central`. A tombstone locks the vault, forgets the cached row and vacates the boxes, the vault keeping its slot.
+   * A failed revoke is announced as `lease_revoke_failed`, and the tombstone stands.
    */
   protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {
     super.adopt(central)
     if (this.isPresent) { return }
-    void this.#vacateLease('tombstone')
+    void this.#revokeLease('tombstone')
     this.#boxListing?.vacate()
   }
 
@@ -395,14 +379,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#lease?.evict()
     this.#lease = null
     this.#boxListing?.sweep()
-    this.listing.declineGatingAtDiscard(this)
+    this.listing.dismissGatingAtDiscard(this)
   }
 
-  /** Locked, the row cached erased, and the boxes vacated. */
+  /** Locked, the row cached forgotten, and the boxes vacated. */
   protected override vacateContents(): void {
-    void this.#vacateLease('vacate')
+    void this.#revokeLease('vacate')
     this.#boxListing?.vacate()
-    this.listing.declineGatingAtDiscard(this)
+    this.listing.dismissGatingAtDiscard(this)
   }
 
   /** A full vault record is one alive that carries its `gate`; a sparse one or a tombstone is not. */

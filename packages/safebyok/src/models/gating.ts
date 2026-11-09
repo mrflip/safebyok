@@ -1,5 +1,6 @@
 import type { Modelkind } from '../helpers/consts'
 import { VaultError, isVaultError } from '../refusals/errors'
+import { randomId } from '../helpers/crypto'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type Outcome, bad, outcomeOf, valOf } from '../refusals/outcome'
 import * as EX from '../shapes/shapes-enums'
@@ -11,17 +12,19 @@ import * as VX from '../shapes/shapes-vaultish'
 import type { VaultWorld } from '../shapes/shapes-vaultish'
 import * as SX from '../shapes/shapes-storage'
 import type { VaultRecord } from '../shapes/shapes-storage'
-import { proofMissing, attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
+import { attemptInFlight, clearsThrew, gatingDismissed, gatingConcluded, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import { Gate } from './gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Vault } from './vault'
 import type { VaultListing } from './vault-listing'
 
-/** One ask of the user, one open per bank. It holds the clears only for the length of an attempt, and settles once: launch answers with that outcome. */
+/** One ask of the user, one open per bank. It has the clears only for the length of an attempt, and concludes once: launch answers with that outcome. */
 export class Gating<KindT extends Gatingkind = Gatingkind> {
-  // == [Props]: gatingkind, applabel, user_id, vaultlabel, vault, passkeyHeader, #listing, #launchArgs, #run, #prove, #settled, #settle, #outcome, #isAttempting, #isLastAttempt
+  // == [Props]: gatingkind, gatingTok, applabel, user_id, vaultlabel, vault, passkeyHeader, #listing, #launchArgs, #run, #prove, #concluded, #conclude, #outcome, #isAttempting, #isLastAttempt
 
   declare readonly gatingkind:    KindT
+  /** Unique to this gating, for a dialog to key on: the next gating's form starts empty, whatever was typed in this one. */
+  declare readonly gatingTok:     string
   declare readonly applabel:      string
   declare readonly user_id:       string
   declare readonly vaultlabel:    string
@@ -33,30 +36,30 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   readonly #launchArgs: LaunchArgs<KindT>
   readonly #run:        Run<KindT>
   readonly #prove:      Prove<KindT>
-  readonly #settled:    Promise<Outcome<Vault>>
-  #settle:        (outcome: Outcome<Vault>) => void = () => undefined
+  readonly #concluded:    Promise<Outcome<Vault>>
+  #conclude:        (outcome: Outcome<Vault>) => void = () => undefined
   #outcome:       Outcome<Vault> | null = null
   #isAttempting  = false
   #isLastAttempt = false
   // --
 
-  // == [Getters]: isOpen, whenSettled, scope, toJSON
+  // == [Getters]: isOpen, whenConcluded, scope, toJSON
 
-  /** True until this gating settles. */
+  /** True until this gating concludes. */
   get isOpen(): boolean { return this.#outcome === null }
 
-  /** The outcome once settled, a promise that never rejects: a dialog closes on it, as the package cannot close a host's dialog. */
-  get whenSettled(): Promise<Outcome<Vault>> { return this.#settled }
+  /** The outcome once concluded, a promise that never rejects: a dialog closes on it, as the package cannot close a host's dialog. */
+  get whenConcluded(): Promise<Outcome<Vault>> { return this.#concluded }
 
   get #scope(): VaultScope {
     const { applabel, user_id, vaultlabel } = this
     return { applabel, user_id, vaultlabel }
   }
 
-  /** This gating's {@link GatingSnapshot}: its kind and vault scope, never a cleartext. */
+  /** This gating's {@link GatingSnapshot}: its kind, token and vault scope, never a cleartext. */
   toJSON(): GatingSnapshot {
-    const { gatingkind } = this
-    return { gatingkind, ...this.#scope }
+    const { gatingkind, gatingTok } = this
+    return { gatingkind, gatingTok, ...this.#scope }
   }
   // --
 
@@ -64,14 +67,14 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   private constructor(gatingkind: KindT, launchArgs: LaunchArgs<KindT>) {
     const { listing, scope, vault } = launchArgs
-    tattoo(this, { gatingkind, ...scope })
+    tattoo(this, { gatingkind, gatingTok: randomId(), ...scope })
     adorn(this, 'vault', vault)
     adorn(this, 'passkeyHeader', vault?.gate.toJSON().passkey_wayin ?? null)
     this.#listing = listing
     this.#launchArgs = launchArgs
     this.#run = RunForGatingkind[gatingkind]
     this.#prove = ProveForGatingkind[gatingkind]
-    this.#settled = new Promise((resolve) => { this.#settle = resolve })
+    this.#concluded = new Promise((resolve) => { this.#conclude = resolve })
     Object.freeze(this)
   }
 
@@ -79,13 +82,13 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   static async launch<KindT extends Gatingkind>(gatingkind: KindT, args: LaunchArgs<KindT>): Promise<Vault> {
     const { scope, askUser } = GX.gatingLaunchArgs.parse({ gatingkind, scope: args.scope, friend: args.friend, askUser: args.askUser })
     const gating = new Gating(gatingkind, { ...args, scope })
-    args.listing.holdGating(gating as unknown as AnyGating)
+    args.listing.attachGating(gating as unknown as AnyGating)
     if (askUser !== null) { void gating.#askHost(askUser) }
-    return valOf(await gating.#settled)
+    return valOf(await gating.#concluded)
   }
 
   async #askHost(askUser: AskUser): Promise<void> {
-    this.#endAsking((await askUser(this as unknown as AnyGating)) ? gatingDeclined() : requestCleartextThrew())
+    this.#endAsking((await askUser(this as unknown as AnyGating)) ? gatingDismissed() : requestCleartextThrew())
   }
   // --
 
@@ -109,7 +112,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   }
 
   #refusalOfAttempt(): VaultError | null {
-    if (this.#outcome !== null) { return gatingSettled() }
+    if (this.#outcome !== null) { return gatingConcluded() }
     return this.#isAttempting ? attemptInFlight() : null
   }
 
@@ -120,39 +123,31 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     // A correctable refusal, short of the last attempt, leaves the clears unspent for the next.
     if (outcome.ok || (! isCorrectable(outcome.err)) || this.#isLastAttempt) {
       spendClears(clears)
-      this.#settleOnce(outcome)
+      this.#concludeOnce(outcome)
     }
     return outcome
   }
   // --
 
-  // == [Settling]: decline, declineAtLock, declineAtDiscard, endAsking, settleOnce
+  // == [Concluding]: dismiss, endAsking, concludeOnce
 
-  /** The user said no. With no attempt under way the gating settles 'declined'; one under way runs on, and its outcome settles it. */
-  decline(): void { this.#endAsking(gatingDeclined()) }
+  /** Ends the asking with nothing proved: the gating concludes 'dismissed', or an attempt under way runs on and its outcome concludes it. */
+  dismiss(): void { this.#endAsking(gatingDismissed()) }
 
-  /** A lock on the vault it asks for. With no attempt under way the gating settles at once; past the enter key nothing turns back, and the attempt's outcome settles it. A `del_vault` hears nothing: a lock does not stop a delete. */
-  declineAtLock(): void {
-    if (this.gatingkind !== 'del_vault') { this.declineAtDiscard() }
-  }
-
-  /** What it asks of is going away, whatever its kind: it settles as {@link declineAtLock} has it. */
-  declineAtDiscard(): void { this.#endAsking(lockedWhileAsking()) }
-
-  /** No more attempts: `refusal` settles the gating, or else the attempt under way does, whatever it answers. */
+  /** No more attempts: `refusal` concludes the gating, or else the attempt under way does, whatever it answers. */
   #endAsking(refusal: VaultError): void {
     if (this.#isAttempting) {
       this.#isLastAttempt = true
       return
     }
-    this.#settleOnce(bad(refusal))
+    this.#concludeOnce(bad(refusal))
   }
 
-  #settleOnce(outcome: Outcome<Vault>): void {
+  #concludeOnce(outcome: Outcome<Vault>): void {
     if (this.#outcome !== null) { return }
     this.#outcome = outcome
-    this.#listing.releaseGating()
-    this.#settle(outcome)
+    this.#listing.detachGating()
+    this.#conclude(outcome)
   }
   // --
 
@@ -179,21 +174,25 @@ const RunForGatingkind: { [KindT in Gatingkind]: Run<KindT> } = {
 
   unlock_vault: ({ proved }, { vault, friend }) => friend.unlockByProof(vault, proved),
 
+  // Each gate change leases the vault under the epoch it wrote. The old lease stays in force for the moments between: the vaultKey did not change.
   replace_passphrase: async ({ ante, anteProving, nextProving }, { listing, vault, friend }) => {
     const nextWayin        = await nextProving.buildWayin(anteProving)
     const passphrase_wayin = SX.passphraseWayinRecord.parse(nextWayin.pickle())
-    return friend.landGate(vault, anteProving, () => listing.replacePassphrase({ ...ante, gate: { passphrase_wayin } }))
+    const stored = await listing.replacePassphrase({ ...ante, gate: { passphrase_wayin } })
+    return friend.unlockByProof(vault, anteProving, stored.gate.gate_epoch)
   },
 
   add_passkey: async ({ ante, proved, passkeyProving }, { listing, vault, friend }) => {
     const passkeyWayin  = await passkeyProving.buildWayin(proved)
     const passkey_wayin = SX.passkeyWayinRecord.parse(passkeyWayin.pickle())
-    return friend.landGate(vault, proved, () => listing.addPasskey({ ...ante, gate: { passkey_wayin } }))
+    const stored = await listing.addPasskey({ ...ante, gate: { passkey_wayin } })
+    return friend.unlockByProof(vault, proved, stored.gate.gate_epoch)
   },
 
-  revoke_passkey: ({ ante, proved }, { listing, vault, friend }) => (
-    friend.landGate(vault, proved, () => listing.revokePasskey({ ...ante, gate: { passkey_wayin: null } }))
-  ),
+  revoke_passkey: async ({ ante, proved }, { listing, vault, friend }) => {
+    const stored = await listing.revokePasskey({ ...ante, gate: { passkey_wayin: null } })
+    return friend.unlockByProof(vault, proved, stored.gate.gate_epoch)
+  },
 
   del_vault: async ({ ante }, { listing, vault }) => {
     // The lock first: no box opens under a lease while the tombstone goes out. The answer delivered vacates its boxes.
@@ -220,7 +219,6 @@ const ProveForGatingkind: { [KindT in Gatingkind]: Prove<KindT> } = {
     await vault.ensureTimely(VX.Promptly); vault.demandPromptable()
     const { gate } = vault
     if (passphraseClear !== undefined) { return { proved: await PassphraseProving.buildStored(gate, passphraseClear, world) } }
-    if (! passkeyClear) { throw proofMissing() }
     return { proved: await PasskeyProving.buildStored(gate, passkeyClear) }
   },
   replace_passphrase: async ({ vault, world }, clears) => {
@@ -242,7 +240,7 @@ const ProveForGatingkind: { [KindT in Gatingkind]: Prove<KindT> } = {
   del_vault:      ({ vault, world }, clears) => provePassphrase(vault, checkedClears(GX.vaultDelClears, clears), world),
 }
 
-/** The attempt's one record and the gate it holds, read once, after its timeliness request. */
+/** The attempt's one record and the gate it has, read once, after its timeliness request. */
 const timelyAnte = async (vault: Vault): Promise<{ ante: VaultRecord, gate: Gate }> => {
   await vault.ensureTimely(VX.Promptly); vault.demandPromptable()
   return { ante: vault.fullRecord, gate: vault.gate }

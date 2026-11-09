@@ -54,7 +54,7 @@ export const delOpts = zodToConvex(DB.delOpts)
 export const capacity = zodOutputToConvex(DB.capacity)
 // --
 
-// == [Answers]: rowOfVault, rowOfBox, boxesFetched, boxFetched, landing, boxLanding, putBoxAnswer, tidied, rowsWatched
+// == [Answers]: rowOfVault, rowOfBox, boxesFetched, boxFetched, written, boxWritten, putBoxAnswer, tidied, rowsWatched
 
 /** A vault row by its vaultlabel, the row as stored. */
 export const rowOfVault = v.object({ vaultlabel: v.string(), vault: v.any() })
@@ -68,22 +68,22 @@ export const boxesFetched = v.object({ vault: v.any(), boxes: v.array(rowOfBox) 
 /** One box row, and the vault row read beside it. */
 export const boxFetched = v.object({ vault: v.any(), box: v.any() })
 
-/** Whether a vault's put or del landed, and the row it found. */
-export const landing = v.object({ landed: v.boolean(), ante: v.any() })
+/** Whether a vault's put or del was written, and the row it found. */
+export const written = v.object({ isWritten: v.boolean(), ante: v.any() })
 
-/** Whether a box's put or del landed, the row it found, and the vault row read beside it. */
-export const boxLanding = v.object({ landed: v.boolean(), ante: v.any(), vault: v.any() })
+/** Whether a box's put or del was written, the row it found, and the vault row read beside it. */
+export const boxWritten = v.object({ isWritten: v.boolean(), ante: v.any(), vault: v.any() })
 
 /** A box's put, or the vault's capacity when it had no room for a new box. */
-export const putBoxAnswer = v.union(boxLanding, v.object({ capacity }))
+export const putBoxAnswer = v.union(boxWritten, v.object({ capacity }))
 
-/** How many box rows a bank's live vaults still hold. */
+/** How many box rows a bank's live vaults still have. */
 export const tidied = v.object({ totalCount: v.number() })
 
 /** A box row with the labels and life it is filed under. */
 export const rowOfWatchedBox = v.object({ vaultlabel: v.string(), vault_tok: v.string(), boxlabel: v.string(), box: v.any() })
 
-/** Every row a watch's scope holds. */
+/** Every row a watch's scope has. */
 export const rowsWatched = v.object({ vaults: v.array(rowOfVault), boxes: v.array(rowOfWatchedBox) })
 // --
 

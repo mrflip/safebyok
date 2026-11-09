@@ -10,19 +10,19 @@ run on until they move here; its long README describes that design, not this one
 
 ## What a host relies on
 
-* **The backend holds ciphertext it cannot open.** It can read what is visible: labels, times and
+* **The backend has ciphertext it cannot open.** It can read what is visible: labels, times and
   each box's sidecar, which are authenticated but never encrypted. Put no secret in a sidecar.
 * **Nothing is recoverable, and removal is not revocation.** Nobody can open a vault whose
   passphrase is forgotten and which has no working passkey. A replaced passphrase or revoked passkey
   stops opening the vault, but the vaultKey never changes, so a copy of the old record still opens.
 * **State is framework-agnostic.** `Bank`, `Vault`, `Box` and `vault.boxListing` each have
   `subscribe` and `getSnapshot`, detached, as `useSyncExternalStore` wants them. A snapshot keeps
-  its identity until something changes, and never holds a whisper. It is plain data, but for the
+  its identity until something changes, and never has a whisper. It is plain data, but for the
   bank's `openGating`, the live gating a dialog answers.
 * **The core speaks only to interfaces**: a `VaultDB` for what syncs, a `DeviceDB` for what stays
   on this device, and a `KeyDeriver`. Each adapter is its own package. The core uses no Node
   built-ins, so it runs wherever the host does.
-* **The vaultDB is the ground truth, what this instance holds is a cache, and failure is a throw.**
+* **The vaultDB is the ground truth, what this instance has is a cache, and failure is a throw.**
   A refusal is a `VaultError` with a `refusalkind`. Primitive calls have no retries or abort
   controllers: add them where you need them. Most calls have a `try` form (`tryEnsureVault`)
   answering `{ ok, val, err }`.
@@ -32,17 +32,17 @@ run on until they move here; its long README describes that design, not this one
 
 ## The cast
 
-[VOCABULARY.md](../../VOCABULARY.md) has the only names for these. Its nouns hold, but some calls
+[VOCABULARY.md](../../VOCABULARY.md) has the only names for these. Its nouns still stand, but some calls
 it names are the old design's (`putWayin`, `getWhisper`): for calls, trust the types here.
 
 * **whisper**: the secret, always a plain object of JSON, such as `{ apiKey: 'sk-...' }`. A **box**
-  holds one, encrypted, with its `boxlabel` and sidecar.
+  has one, encrypted, with its `boxlabel` and sidecar.
 * **vault**: one user's boxes, named by `applabel`, `user_id` and `vaultlabel`. Deleted and made
   anew, it is a new life: a new `vault_tok` and a new `Vault` instance.
 * **bank**: a signed-in user's vaults and what they share. One per signed-in user.
 * **wayin**: a way in: one passphrase, and at most one passkey. Together they are the **gate**.
 * **gating**: one request for the user's passphrase or passkey, the one place UI meets the vault.
-  The bank's snapshot holds it as `openGating`, and hands it to the host's `requestCleartext` if
+  The bank's snapshot has it as `openGating`, and hands it to the host's `requestCleartext` if
   there is one.
 * **lease**: what lets this device unlock again without asking, until `autolockMinutes` passes.
 
@@ -61,7 +61,7 @@ const bank = Bank.make({
     if (gating.gatingkind !== 'build_vault' && gating.gatingkind !== 'unlock_vault') { return }
     while (gating.isOpen) { // a wrong passphrase leaves it open
       const passphraseClear = await dialog.ask(gating.gatingkind)
-      if (passphraseClear === null) { return } // returning with no attempt under way declines
+      if (passphraseClear === null) { return } // returning with no attempt under way dismisses
       await gating.attempt({ passphraseClear })
     }
   },
@@ -77,14 +77,14 @@ await vault.ensureUnlocked() // no lease now: asks, unlock_vault
 ```
 
 **Rendering the dialog from the snapshot.** Leave `requestCleartext` out, and a gating calls none
-of your functions: it waits, open, in `bank.snapshot.openGating` until its `attempt` or `decline`
-settles it. Render your dialog while that is not null. The bank notifies its subscribers as a
-gating opens and as it settles, whether by the user's answer, a lock, a sweep or a vacate, so the
-dialog closes by itself.
+of your functions: it waits, open, in `bank.snapshot.openGating` until its `attempt` or `dismiss`
+concludes it. Render your dialog while that is not null. The bank notifies its subscribers as a
+gating opens and as it concludes, whether by the user's answer, a sweep or a vacate, so the
+dialog closes by itself. A lock leaves it open.
 
 ```ts
 const { openGating } = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
-// Render a dialog while openGating is not null. Its Cancel calls openGating.decline().
+// Render a dialog while openGating is not null. Its Cancel calls openGating.dismiss().
 ```
 
 A passkey prompt needs a live user gesture: ask it from the click on a button in your dialog.
@@ -96,24 +96,24 @@ Easy to get wrong:
 * The core sets no timers. Call `bank.autolock()` after `hello` and on a timer of your own.
 * `vault.hello()` lists a vault's boxes and starts their watch. Until then `vault.boxListing` is
   empty, and with no watch nothing from another device arrives until the next `vault.hello()`.
-* `bank.vacate()` is sign-out: it disables the bank, then erases this bank's leases on this device
-  and its bank row in the deviceDB, leaving the vaultDB alone, and settles once each erase has been
-  tried. The next `deviceDB.ensureBank` for that user mints a new `device_id`. Await it before the
-  page goes: a lease it cannot erase reaches your `onLifecycle` as `lease_unerased`, and
-  `vacated` follows once the erase settles, counting them. A refused listing of the leases, or a
+* `bank.vacate()` is sign-out: it disables the bank, then forgets this bank's leases on this device
+  and its bank row in the deviceDB, leaving the vaultDB alone, and settles once each forget has been
+  tried. The next `deviceDB.ensureCachedBank` for that user mints a new `device_id`. Await it before the
+  page goes: a lease it cannot forget reaches your `onLifecycle` as `lease_revoke_failed`, and
+  `vacated` follows once the forget settles, counting them. A refused listing of the leases, or a
   bank row it cannot forget, reaches your `onBadNews`.
 * **A bank swept or vacated is spent.** From the moment you call either, `bank.isEnabled` is false
   for good, `hello`, `ensureVault` and `vaultAt` refuse `disabled`, and the bank calls none of your
   functions: what it would tell them goes to `DefaultOnLifecycle` and `DefaultOnBadNews`. The one
-  exception is the erase of a vacate, which still tells your `onLifecycle` and `onBadNews` what it
+  exception is the forget of a vacate, which still tells your `onLifecycle` and `onBadNews` what it
   could not do.
 * **A revoked identity vacates the bank**, whatever your handlers do: `identity_revoked`, raised by
   your storage adapter, ends the bank, whose snapshot then shows that refusal, and your
   `onLifecycle` hears `vacated` with it as the `cause`. Make another bank once the user signs in
   again.
 * **`onLifecycle` hears what happens in the bank's life**, each event a `BankEvent` told by its
-  `kind`: `helloed` with the outcome of each `bank.hello()` and `vault.hello()`; `lease_unerased`
-  for a cached lease that outlived its erase, with `where` it happened and the vault, if one; and
+  `kind`: `helloed` with the outcome of each `bank.hello()` and `vault.hello()`; `lease_revoke_failed`
+  for a cached lease that outlived its forget, with `where` it happened and the vault, if one; and
   `vacated`. With no `onLifecycle`, `DefaultOnLifecycle` logs a lease left by a lock or a vacate at
   error, reports it to the platform and vacates the vault; reports a vacate's cause other than
   `disabled` the same way; and warns of the rest that went wrong. An `onLifecycle` of your own
@@ -137,7 +137,7 @@ Easy to get wrong:
 
 ## Showing a whisper
 
-`box.expose()` holds a whisper on the box until `box.unexpose()`, a sweep, a vacate or a delete, and
+`box.expose()` keeps a whisper on the box until `box.unexpose()`, a sweep, a vacate or a delete, and
 `box.whisper` shows it. While it will not show, `box.whisper` answers a frozen bag with no fields,
 and a put of one refuses. To learn why it hides, ask `box.exposure`: `'unexposed'`, `'locked'`,
 `'veiled'` or `'showing'` (`useBoxExposure` in safebyok-react). `box.isShowing` and
@@ -149,7 +149,7 @@ carries `isExposed` and `isVeiled`, and its vault's snapshot `isLocked`. `box.ve
 lock hides it, and an unlock shows it again. `box.subscribe` hears of all of this. The lock is the vault's, on
 `vault.getSnapshot()`, not the box's.
 
-**A script.** Fetch the passphrase in `requestCleartext`, with a token the container already holds:
+**A script.** Fetch the passphrase in `requestCleartext`, with a token the container already has:
 
 ```ts
 const bank = Bank.make({
@@ -203,7 +203,7 @@ There are important considerations to building a form safely, and we have provid
 **A host outside this repo cannot make a `Bank` yet.** The `safebyok` entry point exports `Bank`,
 `Box`, `Gating`, `Vault`, their snapshot types and `VaultError`, `safebyok/dom` exports `BoxFields`, and
 `safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. `safebyok/browser` exports the Argon2id derivers,
-`idbDeviceDB`, the device store in IndexedDB, `zxcvbnStrengthChecker`, and `browserOpts`, the three in one bag. Nothing in
+`idbDeviceDB`, the device database in IndexedDB, `zxcvbnStrengthChecker`, and `browserOpts`, the three in one bag. Nothing in
 the core exports a `VaultDB`.
 
 ## Next

@@ -11,7 +11,7 @@ import type { BoxWhisperFieldProps } from '../shapes'
  * @example
  *   <BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />
  *   <button onClick={async () => { await vault.ensureUnlocked(); await box.expose() }}>Edit</button>
- *   <button onClick={() => BoxFields.of(box).save()}>Save</button>
+ *   <button onClick={() => BoxFields.of(box).put()}>Save</button>
  */
 export const BoxWhisperField = ({ box, path, readOnly, ...passed }: BoxWhisperFieldProps) => {
   const isShowing = useBoxIsShowing(box)

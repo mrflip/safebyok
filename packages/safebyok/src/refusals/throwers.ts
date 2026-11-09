@@ -1,4 +1,4 @@
-/** The throwers: every refusal the core raises is made here, from a phrase in helpers/phrases.ts, so they are audited in one place.
+/** The throwers: every refusal the core throws is made here, from a phrase in helpers/phrases.ts, so they are audited in one place.
  *
  * A refusal kind earns its place one of three ways: the core or a host routes on it; it gives a material head start in
  * debugging (this is a package bug for sure; the vault was not tombstoned but disappeared; a check that should be
@@ -11,7 +11,7 @@
  * empathetic and frank to the person who trusted us with their data, and readable to the coder. Reuse is welcome, never
  * forced: a new refusal gets a new thrower and a new phrase. Templated phrases are encouraged.
  *
- * A refusal's `meta` holds what reads at a glance, and an adapter may hand a bag of its own beside the cause: props to
+ * A refusal's `meta` has what reads at a glance, and an adapter may hand a bag of its own beside the cause: props to
  * depth two only; no arrays, which are kept as their JSON text; an object past depth two replaced by the string '{...}'.
  */
 
@@ -38,9 +38,9 @@ export const sanitizeForeignError = (thrown: Thrown): Error => {
 
 /** A `storage_unavailable` refusal: the backend could not be reached, or failed.
  * @param cause - What the backend threw, kept for debugging as {@link sanitizeForeignError} makes it.
- *   It holds only what the backend holds: ciphertext and unencrypted fields. True of a `VaultDB`
- *   adapter, never of the device store, which is handed lease records: `DeviceDB` replaces what its
- *   store throws with a condition that keeps only its `name`.
+ *   It has only what the backend has: ciphertext and unencrypted fields. True of a `VaultDB`
+ *   adapter, never of the device database, which is handed lease records: `DeviceDB` replaces what its
+ *   subclass throws with a condition that keeps only its `name`.
  * @param message - What failed, when there is more to say than that storage failed: which read or
  *   write it was, say. Never quotes a record or a name.
  *
@@ -62,14 +62,14 @@ export const unexpectedError = (thrown: Thrown): VaultError => (
 /** An `insecure_context` refusal: the page is not a secure context. */
 export const insecureContext = (): VaultError => new VaultError('insecure_context', Phrases.InsecureContext)
 
-/** A `bad_option` refusal: the bank is not ready until `bank.hello()` finishes. */
+/** A `bad_option` refusal: the bank is not ready until `bank.hello()` returns. */
 export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases.BankHelloFirst)
 
 /** A `disabled` refusal: this bank was let go by a sweep or a vacate. */
 export const bankDisabled = (): VaultError => new VaultError('disabled', Phrases.BankLetGo)
 // --
 
-// == [Vault Throwers]: lockedError, unlockFirst, stampOfOtherVault
+// == [Vault Throwers]: lockedError, unlockFirst
 
 /** A `vault_locked` refusal: the vault is locked, and `ensureUnlocked()` will ask the user. */
 export const lockedError      = () => new VaultError('vault_locked', Phrases.VaultLocked)
@@ -77,8 +77,6 @@ export const lockedError      = () => new VaultError('vault_locked', Phrases.Vau
 /** A `vault_locked` refusal: the vault has no lease for a seal or unseal to use. */
 export const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
 
-/** An `unexpected_error` refusal: a stamp names another vault, or another life of this one. */
-export const stampOfOtherVault = (): VaultError => new VaultError('unexpected_error', Phrases.StampOfOtherVault)
 // --
 
 // == [Vault Listing Throwers]: delOfOtherLife, vaultStoredDamaged
@@ -99,13 +97,13 @@ export const putAnsweredNothing = (): VaultError => new VaultError('record_confl
 export const otherVaultTokAtBirth = (): VaultError => new VaultError('record_conflict', Phrases.OtherVaultTokAtBirth)
 // --
 
-// == [Storable Throwers]: partialLoadError, alreadyHeldError, disabledError, absentBoxError, notListedBoxError, absentVaultError, deletedVaultError, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
+// == [Storable Throwers]: partialLoadError, alreadyListedError, disabledError, absentBoxError, notListedBoxError, absentVaultError, deletedVaultError, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
 
 /** A `bad_option` refusal: the record in hand is not full, and needs hydrating first. */
 export const partialLoadError = () => new VaultError('bad_option', Phrases.PartialLoad)
 
-/** A `bad_option` refusal: the listing already holds an instance under the dna's scope. */
-export const alreadyHeldError    = () => new VaultError('bad_option', Phrases.AlreadyHeld)
+/** A `bad_option` refusal: the listing already has an instance under the dna's scope. */
+export const alreadyListedError    = () => new VaultError('bad_option', Phrases.AlreadyListed)
 
 /** A `disabled` refusal: this object was let go by a sweep, a vacate or a delete. */
 export const disabledError    = () => new VaultError('disabled', Phrases.LetGoInstance)
@@ -122,16 +120,16 @@ export const absentVaultError = ({ vaultlabel }: { vaultlabel: string }) => new 
 /** A `vault_gone` refusal: this vault was deleted. */
 export const deletedVaultError = () => new VaultError('vault_gone', Phrases.VaultDeleted)
 
-/** A `record_conflict` refusal: storage holds this revision_seq under another revision_tok. */
+/** A `record_conflict` refusal: this revision_seq is stored under another revision_tok. */
 export const oneRevisionTwoToks = (): VaultError => new VaultError('record_conflict', Phrases.OneRevisionTwoToks)
 
-/** A `record_conflict` refusal: storage holds this revision as another life of the thing. */
+/** A `record_conflict` refusal: this revision is stored as another life of the thing. */
 export const oneRevisionTwoLives = (): VaultError => new VaultError('record_conflict', Phrases.OneRevisionTwoLives)
 
 /** A `record_conflict` refusal: storage and this device disagree on whether this revision is alive or deleted. */
 export const oneRevisionTwoFates = (): VaultError => new VaultError('record_conflict', Phrases.OneRevisionTwoFates)
 
-/** A `record_conflict` refusal: storage holds this record under another vault_tok than this device does. */
+/** A `record_conflict` refusal: this record is stored under another vault_tok than this device does. */
 export const otherVaultTok = (): VaultError => new VaultError('record_conflict', Phrases.OtherVaultTok)
 
 /** An `unexpected_error` refusal: `Storable` met a shape it cannot reconcile, which is a bug. */
@@ -162,7 +160,7 @@ export const unopenedWhisper = (): VaultError => new VaultError('damaged_box', P
 export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --
 
-// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gatingDeclined, lockedWhileAsking, gatingSettled, attemptInFlight, proofMissing
+// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gatingDismissed, gatingConcluded, attemptInFlight
 
 /** An `already_asking` refusal: a prompt is already open on this bank. */
 export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
@@ -176,29 +174,24 @@ export const clearsThrew = (): VaultError => new VaultError('unexpected_error', 
 /** A `same_passphrase` refusal: the new passphrase matches the current passphrase. */
 export const samePassphrase = (): VaultError => new VaultError('same_passphrase', Phrases.SamePassphrase)
 
-/** A `declined` refusal: the prompt was declined, or closed before an attempt succeeded. */
-export const gatingDeclined = (): VaultError => new VaultError('declined', Phrases.GatingDeclined)
+/** A `dismissed` refusal: the prompt was dismissed before an attempt succeeded. */
+export const gatingDismissed = (): VaultError => new VaultError('dismissed', Phrases.GatingDismissed)
 
-/** A `locked_while_asking` refusal: the vault locked before the user answered. */
-export const lockedWhileAsking = (): VaultError => new VaultError('locked_while_asking', Phrases.LockedWhileAsking)
-
-/** A `gating_landed` refusal: an attempt reached a prompt that has already ended. */
-export const gatingSettled = (): VaultError => new VaultError('gating_landed', Phrases.GatingSettled)
+/** A `gating_concluded` refusal: an attempt reached a prompt that has already ended. */
+export const gatingConcluded = (): VaultError => new VaultError('gating_concluded', Phrases.GatingConcluded)
 
 /** An `attempt_in_flight` refusal: another attempt on this prompt is still running. */
 export const attemptInFlight = (): VaultError => new VaultError('attempt_in_flight', Phrases.AttemptInFlight)
 
-/** A `bad_option` refusal: an attempt handed in neither a passphrase nor a passkey's answer. */
-export const proofMissing = (): VaultError => new VaultError('bad_option', Phrases.ProofMissing)
 // --
 
-// == [Gate Throwers]: passkeyHeldAlready
+// == [Gate Throwers]: passkeyAlreadyAdded
 
 /** A `bad_option` refusal: this vault already has a passkey. */
-export const passkeyHeldAlready = (): VaultError => new VaultError('bad_option', Phrases.PasskeyHeldAlready)
+export const passkeyAlreadyAdded = (): VaultError => new VaultError('bad_option', Phrases.PasskeyAlreadyAdded)
 // --
 
-// == [Proving Throwers]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, keyDeriverLoadFailed, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver, undecodedSalt, provingOfOtherVault, leaseOfOtherVault
+// == [Proving Throwers]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, keyDeriverLoadFailed, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
 
 /** A `bad_option` refusal: the key deriver handed back something other than fresh key bytes of the right length. */
 export const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeyBytes))
@@ -206,7 +199,7 @@ export const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrase
 /** An `unexpected_error` refusal: a proving was asked for the vaultKey before it made or opened a wayin. */
 export const wayinNotMadeYet = (): VaultError => new VaultError('unexpected_error', Phrases.WayinNotMadeYet)
 
-/** An `unexpected_error` refusal: this proving already holds a wayin. */
+/** An `unexpected_error` refusal: this proving already has a wayin. */
 export const wayinMadeAlready = (): VaultError => new VaultError('unexpected_error', Phrases.WayinMadeAlready)
 
 /** An `unexpected_error` refusal that keeps nothing of what the key deriver threw. */
@@ -236,40 +229,17 @@ export const otherPrfSalt = (): VaultError => new VaultError('wrong_passkey', Ph
 /** A `newer_format` refusal: the vault was made with a key deriver this package does not carry. */
 export const unknownKeyDeriver = (): VaultError => new VaultError('newer_format', Phrases.UnknownKeyDeriver)
 
-/** A `bad_record` refusal: the stored passphrase salt is not valid base64url text. */
-export const undecodedSalt = (): VaultError => new VaultError('bad_record', Phrases.UndecodedSalt)
-
-/** An `unexpected_error` refusal: the source proving belongs to another vault. */
-export const provingOfOtherVault = (): VaultError => new VaultError('unexpected_error', Phrases.ProvingOfOtherVault)
-
-/** An `unexpected_error` refusal: a proving was asked for a lease on another vault. */
-export const leaseOfOtherVault = (): VaultError => new VaultError('unexpected_error', Phrases.LeaseOfOtherVault)
 // --
 
-// == [Helper Throwers]: unboundCipherCtx, strengthCheckerMisanswered, strengthCheckerLoadFailed
-
-/** An `unexpected_error` refusal: a cipher ctx is missing a stamp, or a part or field of a stamp. */
-export const unboundCipherCtx = (): VaultError => new VaultError('unexpected_error', Phrases.UnboundCipherCtx)
-
-/** A `bad_option` refusal: the host's strength checker answered something other than a verdict. */
-export const strengthCheckerMisanswered = (): VaultError => new VaultError('bad_option', Phrases.StrengthCheckerMisanswered)
+// == [Helper Throwers]: strengthCheckerLoadFailed
 
 /** An `unexpected_error` refusal: the strength checker's `load()` failed, with its error as `cause`. */
 export const strengthCheckerLoadFailed = (cause: unknown): VaultError => new VaultError('unexpected_error', Phrases.StrengthCheckerLoadFailed, { cause })
 // --
 
-// == [Deriver Throwers]: reservedLabel, suppliedSpecChanged
-
-/** A `bad_option` refusal: a key deriver's label starts with a reserved prefix. */
-export const reservedLabel = (reservedPrefix: string): VaultError => new VaultError('bad_option', Phrases.reservedDeriverLabel(reservedPrefix))
-
-/** A `bad_option` refusal: a spec reuses a supplied label with different settings. */
-export const suppliedSpecChanged = (label: string): VaultError => new VaultError('bad_option', Phrases.suppliedSpecChanged(label))
-// --
-
 // == [VaultDB Throwers]: vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, storageFull, seqNotNext
 
-/* The refusals of a vaultDB, each read the same in an answer and an error: `meta` holds the `world` and `dbhas` the answer carries. */
+/* The refusals of a vaultDB, each read the same in an answer and an error: `meta` has the `world` and `dbhas` the answer carries. */
 
 /** A `vault_empty` refusal: nothing is stored for this life of the vault. */
 export const vaultEmpty = (world: SX.VaultRow): VaultError => (
@@ -311,7 +281,7 @@ export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): VaultE
   new VaultError('box_too_large', Phrases.boxTooLarge(recordBytes, maxRecordBytes))
 )
 
-/** A `vault_full` refusal: the vault holds as many boxes as its storage allows. */
+/** A `vault_full` refusal: the vault has as many boxes as its storage allows. */
 export const vaultFull = (capacity: SX.Capacity): VaultError => (
   new VaultError('vault_full', Phrases.VaultFull, { meta: { capacity } })
 )
@@ -325,13 +295,13 @@ export const storageFull = (cause: Thrown): VaultError => (
 export const seqNotNext = (): VaultError => new VaultError('bad_option', Phrases.SeqNotNext)
 // --
 
-// == [DeviceDB Throwers]: storeFailed
+// == [DeviceDB Throwers]: deviceDBFailed
 
-/** A store's failure as `storage_unavailable`, naming the verb and the thrown `name` and nothing else: the store is handed every lease row, and what it throws may quote one. */
-export const storeFailed = (call: string, thrown: unknown): VaultError => {
+/** A device database's failure as `storage_unavailable`, naming the verb and the thrown `name` and nothing else: the device database is handed every lease row, and what it throws may quote one. */
+export const deviceDBFailed = (call: string, thrown: unknown): VaultError => {
   const thrownName = thrownNameOf(thrown)
-  const named = (thrownName === null) ? '' : Phrases.storeThrew(thrownName)
-  return new VaultError('storage_unavailable', Phrases.storeFailed(call, named))
+  const named = (thrownName === null) ? '' : Phrases.thrownNamed(thrownName)
+  return new VaultError('storage_unavailable', Phrases.deviceDBFailed(call, named))
 }
 // --
 
@@ -341,7 +311,7 @@ export const storeFailed = (call: string, thrown: unknown): VaultError => {
 /** A storage backend's failure as `storage_unavailable`, naming the call and the thrown `name` and nothing else. */
 export const storageFailed = (call: string, thrown: unknown): VaultError => {
   const thrownName = thrownNameOf(thrown)
-  const named = (thrownName === null) ? '' : Phrases.storeThrew(thrownName)
+  const named = (thrownName === null) ? '' : Phrases.thrownNamed(thrownName)
   return new VaultError('storage_unavailable', Phrases.storageFailed(call, named))
 }
 

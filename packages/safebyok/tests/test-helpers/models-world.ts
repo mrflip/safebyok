@@ -1,4 +1,4 @@
-/** The test world of `src/models/`: a fake vault (the {@link BoxWorld}), a {@link TestableVaultDB} over one live vault row, one log of every call made to them, and the builders of the records they hold.
+/** The test world of `src/models/`: a fake vault (the {@link BoxWorld}), a {@link TestableVaultDB} over one live vault row, one log of every call made to them, and the builders of the records they have.
  * Import it directly, not through `TH`: `src/models/` is not exported, and the door
  * `tests/test-helpers.ts` is published as `safebyok/testing`.
  *
@@ -10,7 +10,7 @@
  * in `afterEach`, as vitest's `restoreMocks` does not put real timers back: {@link useModelsWorld}
  * makes a new world before each test and disposes it after.
  *
- * The seal. The fake vault's seal verbs refuse 'vault_locked' while it reads locked, and
+ * The seal. The fake vault's seal verbs refuse 'vault_locked' while it reports locked, and
  * otherwise keep each whisper's text by the stamp it was sealed under and give it back for that
  * stamp alone: its sealed parts are the constants
  * {@link FakeBoxKeyWrapped} and {@link FakeWhisperCiphered}. A record it never sealed, as the
@@ -97,7 +97,7 @@ export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' |
 /** One call made to the world or the vaultDB, in {@link ModelsWorld.calls}. `priorRevisionTok` is null for a birth. */
 export type ModelsCall =
   | { verb: 'ensureTimely', maxMillis: number | undefined }
-  | { verb: 'takeWorld',    world: unknown }
+  | { verb: 'receiveWorld',    world: unknown }
   | { verb: 'get',          scope: Boxscope }
   | { verb: 'put',          record: BoxRecord, priorRevisionTok: string | null, ifAbsent: PutOpts['ifAbsent'], ifPresent: PutOpts['ifPresent'] }
   | { verb: 'del',          scope: Boxscope, priorRevisionTok: string | null }
@@ -174,7 +174,7 @@ export type ModelsWorld = {
   dispose(): void
 
   /** Lay `record` in the vaultDB as the row under its boxlabel, unchecked. */
-  seedStore(record: Fetched<BoxRecord, BoxSparse>): void
+  seedPut(record: Fetched<BoxRecord, BoxSparse>): void
 
   /** Script the next `tryGetBox` calls to answer with `answers`, one each. */
   willGet(...answers: readonly Scripted<{ scope: Boxscope }>[]): void
@@ -182,14 +182,14 @@ export type ModelsWorld = {
   willPut(...answers: readonly Scripted<PutCall>[]): void
   /** Script the next `tryDelBox` calls to answer with `answers`, one each. */
   willDel(...answers: readonly Scripted<{ scope: Boxscope, priorRevisionTok: string | null }>[]): void
-  /** The next `ensureTimely` runs `thunk` (async, so it may hold, or reject). */
+  /** The next `ensureTimely` runs `thunk` (async, so it may stay pending, or reject). */
   willEnsureTimely(...thunks: readonly ((maxMillis: number | undefined) => Promise<void> | void)[]): void
 
   /** The good answer about `scope`: `val` is the record stored, null for none. */
   answerOf(scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world?: unknown): BoxAnswer
   /** The refused answer about `scope`; `dbhas` is the row it carries. */
   refusalOf(scope: Boxscope, err: VaultError, world?: unknown, dbhas?: unknown): BoxAnswer
-  /** The `stale_write` refusal about `scope` carrying what storage holds as `dbhas`: a record, or null; `undefined` leaves it out. */
+  /** The `stale_write` refusal about `scope` carrying what storage has stored as `dbhas`: a record, or null; `undefined` leaves it out. */
   staleWriteOf(scope: Boxscope, stored: Fetched<BoxRecord, BoxSparse> | null | undefined, world?: unknown): BoxAnswer
 
   /** Push `record` through the live watch as a notice, under the world's vault row unless told otherwise, resolving once the listing has delivered it. Throws where no watch is live. */
@@ -284,7 +284,7 @@ const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, wo
  * @example
  *   const mw = makeModelsWorld()
  *   afterEach(() => { mw.dispose() })
- *   mw.seedStore(mw.fullBoxRecord({ revision_seq: 2 }))
+ *   mw.seedPut(mw.fullBoxRecord({ revision_seq: 2 }))
  *   const listing = boxListingOf(mw)
  *   const box = await listing.fetch(mw.boxscope('anthropic_api_key'))
  *   expect(mw.callsOf('get')).to.have.lengthOf(1)
@@ -338,7 +338,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       if (whisperText === undefined) { throw Refuse.unopenedWhisper() }
       return whisperText
     },
-    takeWorld:    (taken) => { calls.push({ verb: 'takeWorld', world: taken }) },
+    receiveWorld:    (taken) => { calls.push({ verb: 'receiveWorld', world: taken }) },
     ensureTimely: async (maxMillis) => {
       calls.push({ verb: 'ensureTimely', maxMillis })
       const { scripted, answer } = ensureTimelyScript.take(maxMillis)
@@ -391,7 +391,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     },
     dispose,
 
-    seedStore: (record) => { stored.set(record.boxlabel, record) },
+    seedPut: (record) => { stored.set(record.boxlabel, record) },
 
     willGet:          (...answers) => { vaultDB.scripts.get.push(...answers) },
     willPut:          (...answers) => { vaultDB.scripts.put.push(...answers) },
@@ -418,11 +418,11 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   }
 }
 
-/** A new {@link makeModelsWorld} before each test, disposed after it. Call it at the top of a test file; `held.mw` is the current test's world, as `mw` in the other examples.
+/** A new {@link makeModelsWorld} before each test, disposed after it. Call it at the top of a test file; `world.mw` is the current test's world, as `mw` in the other examples.
  *
  * @example
- *   const held = useModelsWorld()
- *   it('fetches', async () => { held.mw.seedStore(fullBoxRecord()); await boxListingOf(held.mw).fetch(held.mw.boxscope('anthropic_api_key')) })
+ *   const world = useModelsWorld()
+ *   it('fetches', async () => { world.mw.seedPut(fullBoxRecord()); await boxListingOf(world.mw).fetch(world.mw.boxscope('anthropic_api_key')) })
  */
 export const useModelsWorld = (opts: ModelsWorldOpts = {}): { readonly mw: ModelsWorld } => {
   let current: ModelsWorld | null = null
@@ -433,7 +433,7 @@ export const useModelsWorld = (opts: ModelsWorldOpts = {}): { readonly mw: Model
   })
   return {
     get mw() {
-      if (current === null) { throw new Error('held.mw is made before each test and disposed after it: reach it inside a test or a hook.') }
+      if (current === null) { throw new Error('world.mw is made before each test and disposed after it: reach it inside a test or a hook.') }
       return current
     },
   }
@@ -441,9 +441,9 @@ export const useModelsWorld = (opts: ModelsWorldOpts = {}): { readonly mw: Model
 
 // == [Testable]: TestableBox, TestableBoxListing, boxListingOf, BoxListingOverrides
 
-/** A {@link Box} that shows a test the record it holds, which the storable keeps protected: `_cheat_central` is its `central`, as a {@link TestableBoxListing} makes it. */
+/** A {@link Box} that shows a test the record it has, which the storable keeps protected: `_cheat_central` is its `central`, as a {@link TestableBoxListing} makes it. */
 export class TestableBox extends Box {
-  /** The record this box holds, for a test to read. */
+  /** The record this box has, for a test to read. */
   get _cheat_central(): Fetched<BoxRecord, BoxSparse> { return this.central } // eslint-disable-line unicorn/prefer-private-class-fields
 
 }

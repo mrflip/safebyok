@@ -12,10 +12,10 @@ import { boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, vaultScopepathOf } fr
 
 // == [World]: makeVaultDB, idbRowsOf, failNextCall, dbNamesNow, plantClosedDB
 
-/** The database each store under test was made over, by store. */
+/** The database each VaultDB under test was made over, by VaultDB. */
 const dbNameOf = new WeakMap<IdbVaultDB, string>()
 
-/** A store over a database of its own, which no other test has touched. */
+/** A VaultDB over a database of its own, which no other test has touched. */
 const makeVaultDB = (opts: IdbVaultDBOpts = {}): IdbVaultDB => {
   const dbName = `test-${crypto.randomUUID()}`
   const vaultDB = new IdbVaultDB({ ...opts, dbName })
@@ -23,7 +23,7 @@ const makeVaultDB = (opts: IdbVaultDBOpts = {}): IdbVaultDB => {
   return vaultDB
 }
 
-/** The connection a store makes its transactions on, caught as it lists a bank. */
+/** The connection a VaultDB makes its transactions on, caught as it lists a bank. */
 const connectionOf = async (vaultDB: IdbVaultDB): Promise<unknown> => {
   const transaction = vi.spyOn(IDBDatabase.prototype, 'transaction')
   try {
@@ -35,7 +35,7 @@ const connectionOf = async (vaultDB: IdbVaultDB): Promise<unknown> => {
 }
 
 // The twin's connection is compared, not its shelf: a forgotten shelf whose name drifted would share the page's connection unseen.
-/** A second store over the same database, on a connection of its own, as another tab holds. */
+/** A second VaultDB over the same database, on a connection of its own, as another tab has. */
 const makeTwin = async (vaultDB: IdbVaultDB): Promise<IdbVaultDB> => {
   const dbName = dbNameOf.get(vaultDB)!
   TH._cheat_forgetShelf(`${dbName}:vaults-v${DB.VaultsDBVersion}`)
@@ -45,7 +45,7 @@ const makeTwin = async (vaultDB: IdbVaultDB): Promise<IdbVaultDB> => {
   return twin
 }
 
-/** The backdoor to a store's rows, through a connection of its own to the store's database. */
+/** The backdoor to a VaultDB's rows, through a connection of its own to the VaultDB's database. */
 const idbRowsOf = (vaultDB: IdbVaultDB): TH.VaultDBRowCheats => {
   const shelf = createStore(`${dbNameOf.get(vaultDB)!}:vaults-v${DB.VaultsDBVersion}`, 'rows')
   return {
@@ -59,21 +59,21 @@ const idbRowsOf = (vaultDB: IdbVaultDB): TH.VaultDBRowCheats => {
   }
 }
 
-/** Makes the next transaction any store opens fail, as it does when the browser closes the database under the page. */
+/** Makes the next transaction any VaultDB opens fail, as it does when the browser closes the database under the page. */
 const failNextCall = (): void => {
   vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementationOnce(() => {
     throw new DOMException('The database connection is closing.', 'InvalidStateError')
   })
 }
 
-/** The name of every database IndexedDB holds now. */
+/** The name of every database IndexedDB has stored now. */
 const dbNamesNow = async (): Promise<string[]> => {
   const dbs = await indexedDB.databases()
   return dbs.map((db) => db.name).filter((dbname) => dbname !== undefined)
 }
 
-// idb-keyval holds its connection open for the page's life, as an old tab would; this one closes, as a closed tab has.
-/** Makes the database `dbname` holding one row in an object store, and closes it. */
+// idb-keyval has its connection open for the page's life, as an old tab would; this one closes, as a closed tab has.
+/** Makes the database `dbname` with one row in an object store, and closes it. */
 const plantClosedDB = async (dbname: string): Promise<void> => {
   const storename = 'rows'
   const opening = indexedDB.open(dbname)
@@ -137,7 +137,7 @@ describe("IdbVaultDB's databases", () => {
     expect(tidied.totalCount).to.eq(0)
   })
 
-  it("hears a write from another store over the same database", async () => {
+  it("hears a write from another VaultDB over the same database", async () => {
     const vaultDB = makeVaultDB()
     const notices: unknown[] = []
     const unwatch = vaultDB.watch(TH.bankScope, (notice) => { notices.push(notice) })
@@ -169,7 +169,7 @@ describe("IdbVaultDB's database name and wipe", () => {
     })
   })
 
-  it("leaves a newer version's database, another dbName's, and the device store's where they stand", async () => {
+  it("leaves a newer version's database, another dbName's, and the device database's where they stand", async () => {
     const dbName = `test-${crypto.randomUUID()}`
     const kept = [`${dbName}:vaults-v001-002-000`, `${dbName}:device_db`, `${dbName}:device-v001-001-001`, `other-${dbName}:vaults`]
     for (const keptname of kept) { await plantClosedDB(keptname) }
@@ -209,7 +209,7 @@ describe("IdbVaultDB's refusals", () => {
 
   const AbsentCases = [
     [undefined, 'refuses a call where there is no IndexedDB'],
-    [null,      'refuses a call where the browser holds IndexedDB as null'],
+    [null,      'refuses a call where the browser has IndexedDB as null'],
   ] as const
 
   for (const [absent, blurb] of AbsentCases) {

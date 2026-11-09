@@ -46,7 +46,7 @@ is the current `packages/safebyok/src`, so it uses today's verbs, not the design
 One sentence each. The goal is that when lock is called, nothing crosses it, and we get there with simple code analyzed in
 context, not by fine-tuning each of these.
 
-* A `lock()` landing during `lease.peek` (0.5 to 5 ms) loses: the vault ends unlocked with its cached row erased, until the
+* A `lock()` landing during `lease.peek` (0.5 to 5 ms) loses: the vault ends unlocked with its cached row forgotten, until the
   next `lock()`.
 
 ## A gate change rejecting after its record is stored
@@ -82,13 +82,13 @@ Copied from `unrace-progress.md` at the sprint's end; names as they stood when r
 * An instance arriving during `putBox`'s `ensureTimely` sends the birth into `demandNotHeld`, refusing `bad_option` (thread 9's review).
 * A second `attempt` with the same answer while the first runs zeroes the bytes in use, so the first answers `bad_option` (thread 10's review).
 * A tombstone or sparse record landing during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).
-* A `del_vault`'s `lock()` with a refused erase and no `onPanic` vacates the vault during the delete, and `listing.del` still lands (thread 11).
-* A tombstone or discard between the commit and the lease in `#landGate` settles the gating as failed though the row moved (thread 11's review).
+* A `del_vault`'s `lock()` with a refused forget and no `onPanic` vacates the vault during the delete, and `listing.del` still lands (thread 11).
+* A tombstone or discard between the gate verb and the lease concludes the gating as failed though the row moved (thread 11's review).
 * A gate verb refused `vault_gone` or `vault_mismatch` doesn't deliver, so the Vault reads present until its next fetch, box answer or notice (thread 11's review).
 * Crossing `hello`s: the last to answer sets the stage (thread 12).
 * A record changed between `getBank` and the watch's start isn't heard until the next fetch (thread 12).
 * A listed live vault whose row is void in `getBank` stays listed until its next fetch (thread 12).
-* A held lease whose cache row never landed, or that another page's `tidy` erased, isn't found by `tidy`, leaving the vault unlocked past autolock; this keeps a lease that should drop (thread 12 and its review; a Coach's row).
+* A held lease whose cache row never landed, or that another page's `tidy` forgotten, isn't found by `tidy`, leaving the vault unlocked past autolock; this keeps a lease that should drop (thread 12 and its review; a Coach's row).
 * A birth past the enter key finishes and caches its lease after `bank.vacate`; this keeps a lease that should drop (thread 12's review).
 * A swept `hello` landing late marks a fresh listing `refused` (thread 12).
 * A `getBank` or plugin load that never answers holds `tidy` back; this keeps a lease that should drop (thread 12's rework).

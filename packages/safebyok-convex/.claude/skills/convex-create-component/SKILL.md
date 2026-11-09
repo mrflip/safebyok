@@ -58,7 +58,7 @@ API.
    functions in the app instead of exposing component functions directly.
 10. Run codegen (see Validation) and `pnpm justify` inside
     `packages/safebyok-convex/`, and fix codegen, type, or boundary issues
-    before finishing.
+    before shipping.
 
 ## Choose the Shape
 

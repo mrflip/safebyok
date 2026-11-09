@@ -41,7 +41,7 @@ doing someone else's job. The state the object already holds should make the bra
 async create(input, opts = {}) {
   const dna = boxDna.parse(input)
   await this.#ensureCreatable(); this.#demandCreatable()
-  this.demandNotHeld(dna)
+  this.demandNotListed(dna)
   const { whisper, sidecar, ...sparse } = this.stampDna(dna)
   const draft = await sealedRecordOf(this.world, { ...sparse, fmt: BoxFormat, am: 'a', vault_tok: this.world.vault_tok, box_tok: makeLifeTok() }, sidecar, whisper)
   await this.#ensureCreatable(); this.#demandCreatable()
@@ -423,7 +423,7 @@ disables every thing in it, and removes them, so nothing crosses it halfway. The
 ```ts
 protected async deliver(answer) {
   this.demandEnabled()
-  if (answer.world !== null) { this.world.takeWorld(answer.world) }
+  if (answer.world !== null) { this.world.receiveWorld(answer.world) }
 ```
 
 **Not this fault:** guards and ensures with the same body. `ensurePuttable`, `ensureUnsealable` and `ensureDeletable` all call
@@ -467,8 +467,8 @@ opinion, with a refusal that doesn't carry the frontier.
 **Goofus:**
 
 ```ts
-protected demandNotHeld(scope) {
-  if (this.at(scope) !== null) { throw alreadyHeldError() }
+protected demandNotListed(scope) {
+  if (this.at(scope) !== null) { throw alreadyListedError() }
 }
 ```
 
@@ -857,17 +857,17 @@ box.put({ whisper: { a: 7 } })            // seals '{"a":7}'
 box.put({ whisper: 7 })                   // refused 'bad_option'
 ```
 
-**Goofus again:** `Settled` promises refusals for the host, and nothing ever puts one in it. Every `receive` and `settle` answers an
+**Goofus again:** `Aligned` promises refusals for the host, and nothing ever puts one in it. Every `receive` and `align` answers an
 empty `badnews`, and every caller still reads it.
 
 ```ts
-settle() {
+align() {
   this.#replaceSnapshot()
   return { badnews: [] }
 }
 ```
 
-**Gallant again:** `settle` and `receive` answer nothing, and `Settled.badnews` goes.
+**Gallant again:** `align` and `receive` answer nothing, and `Aligned.badnews` goes.
 
 **Goofus a third time:** a one-line precondition spread across three methods and a listing verb with a birth-only name.
 
@@ -878,9 +878,9 @@ const prior = listing.demandBirthSlot(checked) ?? VS.VoidRevision
 // VaultListing
 demandBirthSlot(scope) {
   this.demandEnabled()
-  const held = this.at(scope)
-  if (held?.isPresent === true) { throw alreadyHeldError() }
-  return held
+  const listed = this.at(scope)
+  if (listed?.isPresent === true) { throw alreadyListedError() }
+  return listed
 }
 ensureVault(record, prior) { return this.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' }) }
 ```
@@ -890,12 +890,12 @@ ensureVault(record, prior) { return this.put(record, { prior, ifAbsent: 'add', i
 ```ts
 // Vault.launchBirth
 listing.demandEnabled()
-const held = listing.at(checked)
-if (held?.isPresent === true) { throw alreadyHeldError() }
-const prior = VS.revisionOf(held ?? VS.VoidRevision)
+const listed = listing.at(checked)
+if (listed?.isPresent === true) { throw alreadyListedError() }
+const prior = VS.revisionOf(listed ?? VS.VoidRevision)
 ```
 
-*Status: the whisper, Planned, Thread 1b. `Settled.badnews`, Planned, Thread 4. `demandBirthSlot`, Fixed.*
+*Status: the whisper, Planned, Thread 1b. `Aligned.badnews`, Planned, Thread 4. `demandBirthSlot`, Fixed.*
 
 ## A boolean says the positive `#say-the-positive`
 
@@ -905,7 +905,7 @@ Every read of a negative boolean is a double negative, and guards read worst of 
 
 ```ts
 #isDisabled = false
-if (! this.#isDisabled) { this.settle() }
+if (! this.#isDisabled) { this.align() }
 
 demandEnabled(): this { if (this.#isDisabled) { throw disabledError() } return this }
 ```
@@ -914,7 +914,7 @@ demandEnabled(): this { if (this.#isDisabled) { throw disabledError() } return t
 
 ```ts
 #isEnabled = true
-if (this.#isEnabled) { this.settle() }
+if (this.#isEnabled) { this.align() }
 
 demandEnabled():    this { if (! this.#isEnabled) { throw disabledError() } return this }
 ```

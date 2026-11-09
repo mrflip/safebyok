@@ -8,11 +8,11 @@ import { SessionBar } from './components/SessionBar'
 import { TroubleBoundary } from './components/TroubleBoundary'
 import { useSession } from './hooks/useSession'
 import { createAuth, type Session } from './lib/auth'
-import { Applabel, bankOpts, dbStore, deviceStore, vaultDB } from './lib/stores'
+import { Applabel, bankOpts, dbStorage, deviceStorage, vaultDB } from './lib/storage'
 
 // The demo's fake auth; a real app has its own (Google, Clerk, Convex...). All the vault needs
 // from it is a stable user_id.
-const auth = createAuth({ applabel: Applabel, dbStore, deviceStore })
+const auth = createAuth({ applabel: Applabel, dbStorage, deviceStorage })
 
 /** The app: the account strip, the knock-knock machines side by side, and the developer's tools below them. */
 const Page = ({ session }: { session: Session | null }) => (

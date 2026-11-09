@@ -1,4 +1,4 @@
-/** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB and the bank. */
+/** A bank's vaults as this device has them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
 import { nowMillis } from '../helpers/clock'
 import type { Modelkind } from '../helpers/consts'
@@ -40,7 +40,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** SLOPDOC: A new vault for `scope`, asked of the user, stored and unlocked; or, locked, the slot's winner. */
+  /** SLOPDOC: A new vault for `scope`, asked of the user, put and unlocked; or, locked, the slot's winner. */
   buildVault(scope: VaultScope): Promise<Vault> { return Vault.launchBirth(this, scope, this.bankFriend.askUser) }
 
   /** Non-throwing form of {@link buildVault}. */
@@ -51,7 +51,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return new BoxListing(vault, { scope: vault.scope, vaultDB: this.vaultDB, maxMillisSinceRefresh: this.world.boxRefreshMillis, bankFriend: this.bankFriend })
   }
 
-  /** The scope of `duck`, held to this bank: no listing answers for another's. */
+  /** The scope of `duck`, which must be this bank's: no listing answers for another's. */
   scopeOf(duck: unknown):  VaultScope  { return vaultScope.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
 
   /** Parse `duck` as a {@link VaultSparse}. */
@@ -76,7 +76,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [Fetching]: list
 
-  /** Every vault and tombstone the vaultDB holds for this bank, delivered: each meets its slot as a fetch's answer would. Boxes wait on their vault's listing. A damaged row is bad news. */
+  /** Every vault and tombstone stored in the vaultDB for this bank, delivered: each meets its slot as a fetch's answer would. Boxes wait on their vault's listing. A damaged row is bad news. */
   async list(): Promise<void> {
     this.demandEnabled()
     const answer = await this.vaultDB.tryListVaults(this.world.scope)
@@ -91,9 +91,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 
-  // == [The gate's commits]: replacePassphrase, addPasskey, revokePasskey, del
+  // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, del
 
-  /** Lay a new passphrase wayin on the row, deliver what it stores to the vault held, and answer that record. Nothing locks: the vaultKey does not change. */
+  /** Lay a new passphrase wayin on the row, deliver what it writes to the vault listed, and answer that record. Nothing locks: the vaultKey does not change. */
   async replacePassphrase(params: ReplacePassphraseParams): Promise<SX.VaultRecord> {
     this.demandEnabled()
     return this.#deliverStored(await this.vaultDB.tryReplacePassphrase(params))
@@ -111,7 +111,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return this.#deliverStored(await this.vaultDB.tryRevokePasskey(params))
   }
 
-  /** The record a gate verb stored: the vault held may hold a newer one by the time its answer is delivered. */
+  /** The record a gate verb wrote: the vault listed may have a newer one by the time its answer is delivered. */
   async #deliverStored(answer: Answer<SX.VaultRecord, string>): Promise<SX.VaultRecord> {
     await this.deliver(answer)
     return valOf(answer)
@@ -119,66 +119,61 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** SLOPDOC: Deletes the vault `ante` names over its own revision; its boxes cascade in the vaultDB. */
   override async del(ante: VaultSparse | Vault): Promise<Vault | null> {
-    const held = this.at(this.scopeOf(ante))
-    if ((held !== null) && (held.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
+    const listed = this.at(this.scopeOf(ante))
+    if ((listed !== null) && (listed.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
     return this.delOver(this.sparseOf(ante))
   }
   // --
 
-  // == [The one gating open]: holdGating, releaseGating, declineGatingAtLock, declineGatingAtDiscard, sweep, vacate, declineGatingOfGoneListing
+  // == [The one gating open]: attachGating, detachGating, dismissGatingAtDiscard, sweep, vacate, dismissGatingOfGoneListing
 
-  /** Claims the one gating this bank may have open. */
-  holdGating(gating: AnyGating): void {
+  /** Attaches the one gating this bank may have open. */
+  attachGating(gating: AnyGating): void {
     if (this.#openGating !== null) { throw alreadyAsking() }
     this.#openGating = gating
     this.tellListeners()
   }
 
-  /** The open gating has settled. */
-  releaseGating(): void {
+  /** The open gating has concluded. */
+  detachGating(): void {
     this.#openGating = null
     this.tellListeners()
   }
 
-  /** The open gating hears a lock of `vault`, if it asks for that vault: a birth's does not. */
-  declineGatingAtLock(vault: Vault): void {
-    if (this.#openGating?.vault === vault) { this.#openGating.declineAtLock() }
+  /** `vault` is going away: the open gating concludes, if it asks for that vault, whatever its kind. */
+  dismissGatingAtDiscard(vault: Vault): void {
+    if (this.#openGating?.vault === vault) { this.#openGating.dismiss() }
   }
 
-  /** `vault` is going away: the open gating settles, if it asks for that vault, whatever its kind. */
-  declineGatingAtDiscard(vault: Vault): void {
-    if (this.#openGating?.vault === vault) { this.#openGating.declineAtDiscard() }
-  }
-
-  /** Sweep this listing's vaults, and decline the open gating whatever vault it asks for. */
+  /** Sweep this listing's vaults, and dismiss the open gating whatever vault it asks for. */
   override sweep(): this {
     super.sweep()
-    this.#declineGatingOfGoneListing()
+    this.#dismissGatingOfGoneListing()
     return this
   }
 
-  /** Vacate this listing's vaults, and decline the open gating whatever vault it asks for. */
+  /** Vacate this listing's vaults, and dismiss the open gating whatever vault it asks for. */
   override vacate(): this {
     super.vacate()
-    this.#declineGatingOfGoneListing()
+    this.#dismissGatingOfGoneListing()
     return this
   }
 
-  // Past the disable: the decline tells the listeners, who must meet the listing already disabled.
-  /** The open gating, whatever vault it asks for, settles with the listing going away. */
-  #declineGatingOfGoneListing(): void { this.#openGating?.declineAtDiscard() }
+  // Past the disable: the dismiss tells the listeners, who must meet the listing already disabled.
+  /** The open gating, whatever vault it asks for, concludes with the listing going away. */
+  #dismissGatingOfGoneListing(): void { this.#openGating?.dismiss() }
   // --
 
   // == [Defined by the vault listing]: vaultTokOfWorld, fateOver, scopepathOf, makeThing, nothingStoredError, tryGetRow, tryPutRow, tryDelRow, watchRows, isOwnRow
 
   protected vaultTokOfWorld(): null { return null }
 
-  /** An older record loses to the vault held. A newer one replaces it where it is of another `vault_tok`, or alive over a tombstone. */
-  protected override fateOver(held: Vault, record: Fetched<VaultRecord, VaultSparse>): SlotFate {
-    const age = cmpRevisions(held, record)
+  /** An older record loses to the vault listed. A newer one replaces it where it is of another `vault_tok`, or alive over a tombstone. */
+  protected override fateOver(listed: Vault, record: Fetched<VaultRecord, VaultSparse>): SlotFate {
+    const age = cmpRevisions(listed, record)
     if (age === 'older') { return 'lose' }
-    const isOtherLife = record.vault_tok !== held.vault_tok
-    const isRebirth = (! held.isPresent) && (! VX.isTombstone(record))
+    const isOtherLife = record.vault_tok !== listed.vault_tok
+    const isRebirth = (! listed.isPresent) && (! VX.isTombstone(record))
     return ((age === 'newer') && (isOtherLife || isRebirth)) ? 'replace' : 'receive'
   }
 

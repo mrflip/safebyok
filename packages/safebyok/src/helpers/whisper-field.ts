@@ -1,7 +1,7 @@
 /** `WhisperFieldAttributes`, for the field a user types a whisper's text into. */
 
 /** The attributes that make a browser and its password managers leave alone the field a user types a secret into, as React props or by `setAttribute`.
- * Name such a field for what it holds, never `key`, `password` or `token`, which managers look for.
+ * Name such a field for what it contains, never `key`, `password` or `token`, which managers look for.
  * A browser's built-in manager may honor none: Chrome's still offers a saved password for a `type="password"` field marked `off`.
  *
  * @example <input name="whisper_text" type="password" {...WhisperFieldAttributes} />

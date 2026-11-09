@@ -24,7 +24,7 @@ function ApiKeyField({ box }) {
     <>
       <input ref={fields.bind('apiKey')} type="password" autoComplete="off" spellCheck={false} />
       {isExposed
-        ? <button onClick={() => fields.trySave().then(showOutcome)}>Save</button>
+        ? <button onClick={() => fields.tryPut().then(showOutcome)}>Save</button>
         : <button onClick={() => box.expose().catch(showRefusal)}>Show</button>}
     </>
   )
@@ -33,7 +33,7 @@ function ApiKeyField({ box }) {
 
 The whisper reaches no prop or state of yours, so it is only in the page (and on the screen), where React's dev tools
 do not list it. The field goes blank at a lock or a veil, and an edit comes back with the value. Nothing is stored
-until `fields.save()`. Both buttons refuse while the vault is locked, so `showOutcome` and `showRefusal`, yours to
+until `fields.put()`. Both buttons refuse while the vault is locked, so `showOutcome` and `showRefusal`, yours to
 write, say so. `BoxFields.of` answers the same instance for a box wherever it is called. Outside React,
 `const letGo = BoxFields.of(box).bind('apiKey')(el)` fills any element with a `value`, and `letGo()` lets it go.
 
@@ -43,8 +43,8 @@ React's own documentation, are in [notes/expose_improves_security.md](https://gi
 
 ## Dialogs
 
-`BankProvider` shows its own dialog for each gating the bank holds open: the dialog follows `openGating` in the bank's
-snapshot, and closes when the gating settles, whether by the user's answer, a lock, a sweep or a vacate. Its passkey
+`BankProvider` shows its own dialog for each gating the bank has open: the dialog follows `openGating` in the bank's
+snapshot, and closes when the gating concludes, whether by the user's answer, a sweep or a vacate; a lock leaves it up. Its passkey
 button asks the passkey from the user's click on it, so a gating opened from a timer or a fetch shows the dialog all the
 same, and the user's click supplies the gesture the browser needs.
 
@@ -54,7 +54,7 @@ when the bank is made.
 
 ## Signing out
 
-Call `bank.vacate()` when the user signs out, before you clear their `user_id`: it erases the bank's cached leases and
+Call `bank.vacate()` when the user signs out, before you clear their `user_id`: it forgets the bank's cached leases and
 its bank row on this device, so the next person to use it starts fresh. `BankProvider` doesn't vacate when `user_id` turns `null`,
 since auth may blink to `null` while it refreshes a token or reconnects, after a laptop wakes for instance. When a
 different user signs in, it vacates the last user's bank itself.

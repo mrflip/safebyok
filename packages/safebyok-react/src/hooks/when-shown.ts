@@ -17,7 +17,7 @@ export const useWhenShown = (): { whenShown: WhenShown, isShown: () => boolean }
   const shown = useRef(false)
   // No cleanup of `waiting`: an unmounted component never calls its handlers, which are garbage-collected with it.
   const waiting = useRef<(() => void)[]>([])
-  // A layout effect sets and clears `shown` in the commit itself: a click can land before React runs
+  // A layout effect sets and clears `shown` in the commit itself: a click can arrive before React runs
   // passive effects, and an answer can settle between a commit that unmounts the component and
   // its passive cleanup. Activity and Suspense both run it again on showing what they hid.
   useLayoutEffect(() => {
@@ -26,7 +26,7 @@ export const useWhenShown = (): { whenShown: WhenShown, isShown: () => boolean }
     return () => { shown.current = false }
   }, [])
   // `goOn` is called in the same turn while shown, never after an await: a host awaiting the call
-  // the handler awaited would run first, and could raise another gating before hearing an answer.
+  // the handler awaited would run first, and could launch another gating before hearing an answer.
   // The loop asks again once woken: the commit that showed the component can hide or unmount it again,
   // by a layout effect's update, before the woken handler's turn comes.
   const whenShown = useCallback(async <ValT>(goOn: () => ValT): Promise<Awaited<ValT>> => {

@@ -38,7 +38,7 @@ export const KnockKnockExposed = () => {
   return (
     <section className="flow knock-knock" aria-labelledby={`${fieldId}-title`}>
       <h2 id={`${fieldId}-title`}>Knock-knock, with an exposed whisper</h2>
-      <p className="quiet">Your key is held open by safebyok while you edit, and put away when you leave.</p>
+      <p className="quiet">Your key stays open in safebyok while you edit, and put away when you leave.</p>
       <div className="api-key-slot">
         <label htmlFor={fieldId}>Anthropic API key</label>
         {box === null

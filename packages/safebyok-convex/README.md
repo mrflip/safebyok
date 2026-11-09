@@ -1,8 +1,8 @@
 # safebyok-convex
 
 safebyok's vaultDB on [Convex](https://convex.dev): a Convex **component** that keeps vault and box
-rows in tables of its own, and **`ConvexVaultDB`**, which stores through it from your app's Convex
-client. Your deployment holds ciphertext and the few plain fields a row is found by; it never sees a
+rows in tables of its own, and **`ConvexVaultDB`**, which writes through it from your app's Convex
+client. Your deployment has ciphertext and the few plain fields a row is found by; it never sees a
 whisper, a passphrase, or a key that opens one.
 
 ## Install
@@ -77,7 +77,7 @@ Hand `vaultDB` to the core, as its README's *A host* shows.
 **Sign in first.** Open the vault once the Convex client is authenticated (in React, once
 `useConvexAuth()` says so): a call made before then refuses as `identity_revoked`.
 
-**Other writes arrive live.** `watch` holds a `watchRows` query open on the bank or vault it is
+**Other writes arrive live.** `watch` keeps a `watchRows` query open on the bank or vault it is
 given, and tells its listener of each row that changes, from any device.
 
 **A call that fails** refuses as `storage_unavailable`, naming the call and nothing of Convex's
@@ -89,7 +89,7 @@ when it reconnects, so a put may land after any timeout you set.
 
 Three tables, inside the component:
 
-| Table             | One row per        | Holds                                                   | Index                                                              |
+| Table             | One row per        | Has                                                     | Index                                                              |
 | ----------------- | ------------------ | ------------------------------------------------------- | ------------------------------------------------------------------ |
 | `safebyok_vaults` | vault              | its scope and its vault row, live or a tombstone        | `by_scope`: `user_id`, `applabel`, `vaultlabel`                    |
 | `safebyok_boxes`  | box, in each life  | its scope, its life's `vault_tok`, and its box row      | `by_box`: `user_id`, `applabel`, `vaultlabel`, `vault_tok`, `boxlabel` |
@@ -97,14 +97,13 @@ Three tables, inside the component:
 
 `user_id` leads every index, so one user's rows are one range of each. Rows are stored as the core
 writes them: encrypted, each whisper, each box's boxKey and the vaultKey once for each way in; in
-the open, the labels, tokens, times, salts and sidecars. `tidyGone` removes the rows the core has
-finished with, and the tallies of ended lives.
+the open, the labels, tokens, times, salts and sidecars. `tidyGone` removes the rows it considers expired, and the tallies of ended lives.
 
 **Upgrading.** Until 1.0 there is no migration. A release that changes these tables says so in its
 changelog; Convex will not deploy a schema the stored rows do not match, so clear the component's
 tables first (on the dashboard's Data page, pick the `safebyok` component).
 
-**How big a vault can be.** The component holds every life of a vault to **8,000 box rows** and
+**How big a vault can be.** The component limits every life of a vault to **8,000 box rows** and
 **7 MiB less 1 KiB** of them as Convex weighs a document, whatever the client asks, so that one
 `delVault` can always reach the whole vault within a Convex transaction's limits. A deleted box
 leaves its tombstone in its row, which counts toward both limits as a live box does; a box put

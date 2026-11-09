@@ -1,4 +1,4 @@
-/** The demo's test helpers, star-imported as `TH`: everything `safebyok/testing` exports, and the means to render a component inside a BankProvider over stores in memory, to watch the vault beside it, to answer the dialogs the provider raises, and to stand in for Anthropic. */
+/** The demo's test helpers, star-imported as `TH`: everything `safebyok/testing` exports, and the means to render a component inside a BankProvider over storages in memory, to watch the vault beside it, to answer the dialogs the provider raises, and to stand in for Anthropic. */
 import type { ReactNode } from 'react'
 import { expect, onTestFinished, vi, type MockInstance } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -10,7 +10,7 @@ import { SessionBar } from '../src/components/SessionBar'
 import { useSession } from '../src/hooks/useSession'
 import { JokeModel } from '../src/lib/anthropic'
 import { createAuth, type Auth } from '../src/lib/auth'
-import type { StringStore } from '../src/lib/local-store'
+import type { StringStorage } from '../src/lib/string-storage'
 
 export * from 'safebyok/testing'
 
@@ -31,8 +31,8 @@ export const renderInBank = (ui: ReactNode, user_id: string | null = 'u1') => {
   return { vaultDB }
 }
 
-/** A StringStore in memory, for the fake auth under test: each call a fresh, empty one. */
-export const memoryStore = (): StringStore => {
+/** A StringStorage in memory, for the fake auth under test: each call a fresh, empty one. */
+export const memoryStorage = (): StringStorage => {
   const texts = new Map<string, string>()
   return {
     get: (ckey) => texts.get(ckey) ?? null,
@@ -41,8 +41,8 @@ export const memoryStore = (): StringStore => {
   }
 }
 
-/** A fake auth over fresh stores in memory. */
-export const makeAuth = (): Auth => createAuth({ applabel: 'acme', dbStore: memoryStore(), deviceStore: memoryStore() })
+/** A fake auth over fresh storages in memory. */
+export const makeAuth = (): Auth => createAuth({ applabel: 'acme', dbStorage: memoryStorage(), deviceStorage: memoryStorage() })
 
 /** The SessionBar as the App renders it, handed the live session of `auth`. */
 export const LiveSessionBar = ({ auth }: { auth: Auth }) => <SessionBar auth={auth} session={useSession(auth)} />

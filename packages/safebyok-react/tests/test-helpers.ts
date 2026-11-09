@@ -1,4 +1,4 @@
-/** safebyok-react's test helpers: everything `safebyok/testing` has, a provider over a bank world, a render that hears what React reports, a promise held for the test to settle, and a way to have Suspense hide what it holds.
+/** safebyok-react's test helpers: everything `safebyok/testing` has, a provider over a bank world, a render that hears what React reports, a promise pending until the test settles it, and a way to have Suspense hide what it renders.
  * Those that need JSX are in `test-helpers-react.tsx`, which it re-exports. Star-import it as `TH` (`import * as TH from './test-helpers'`).
  */
 import { fireEvent, render, screen } from '@testing-library/react'
@@ -15,7 +15,7 @@ export * from './test-helpers-react'
 /** Sweep every bank a test made, after it: `useBankWorlds`, named so React's hook rules do not take it for a hook. */
 export const sweepBankWorlds = useBankWorlds
 
-// == [Rendering]: renderReporting, Catcher, held, Hider
+// == [Rendering]: renderReporting, Catcher, makePending, Hider
 
 /** `ui` rendered as Testing Library's `render` does, and `reported`: each error a boundary caught, as React hands it to `onCaughtError`. */
 export const renderReporting = (ui: ReactElement) => {
@@ -34,7 +34,7 @@ export class Catcher extends Component<{ children: ReactNode }, { caught: string
 const unsettled = () => { /* replaced before the promise's executor returns */ }
 
 /** A promise and the functions that settle it, for the test to settle when it chooses. */
-export const held = <ValT = undefined>() => {
+export const makePending = <ValT = undefined>() => {
   let resolve: (val: ValT) => void = unsettled
   let reject: (err: unknown) => void = unsettled
   const promise = new Promise<ValT>((resolver, rejecter) => {
@@ -77,11 +77,11 @@ export const withoutGesture = () => {
 }
 // --
 
-// == [Held gatings]: addPasskeyTo, heldGatingOf, building, unlocking, replacing, deleting, addingPasskey, revokingPasskey, passphraseGatingOf, gatingOfKind
+// == [Open gatings]: addPasskeyTo, openGatingOf, building, unlocking, replacing, deleting, addingPasskey, revokingPasskey, passphraseGatingOf, gatingOfKind
 
 /** Add a passkey to `vault`, a vault of `world`'s own bank, as its user would at the dialog: `passkeyClear`, or the passkey `passkeyOf('laptop')` makes.
  *
- * @example await TH.addPasskeyTo(world, vault, await createPasskey(TH.PasskeyMaking))  // one the fake authenticator holds
+ * @example await TH.addPasskeyTo(world, vault, await createPasskey(TH.PasskeyMaking))  // one the fake authenticator has
  */
 export const addPasskeyTo = async (world: BankWorld, vault: Vault, passkeyClear?: PasskeyAnswer | null) => {
   const { typing } = world.dialog
@@ -96,18 +96,18 @@ export const addPasskeyTo = async (world: BankWorld, vault: Vault, passkeyClear?
 /** What a test hands `createPasskey`: a relying party and a user, as a host would name them. */
 export const PasskeyMaking = { rp: { name: 'Acme' }, user: { name: 'u1 (main vault)', displayName: 'u1' } }
 
-/** The gating `raise` opens on a fresh bank over `world`'s vaultDB, on another device, held open until it settles or the test calls `close`, as a host's requestCleartext holds it while its dialog shows; and `raising`, the outcome of `raise`.
+/** The gating `raise` opens on a fresh bank over `world`'s vaultDB, on another device, kept open until it concludes or the test calls `close`, as a host's requestCleartext keeps it open while its dialog shows; and `raising`, the outcome of `raise`.
  *
  * @example
  *   await TH.makeBankWithVault(world)
- *   const { gating, raising, close } = await TH.heldGatingOf(world, TH.unlocking)
+ *   const { gating, raising, close } = await TH.openGatingOf(world, TH.unlocking)
  */
-export const heldGatingOf = async (world: BankWorld, raise: (bank: Bank) => Promise<Outcome<unknown>>, overrides: Partial<BankOpts> = {}) => {
-  const handed = held<AnyGating>()
-  const closing = held()
+export const openGatingOf = async (world: BankWorld, raise: (bank: Bank) => Promise<Outcome<unknown>>, overrides: Partial<BankOpts> = {}) => {
+  const handed = makePending<AnyGating>()
+  const closing = makePending()
   const requestCleartext: RequestCleartext = async (gating) => {
     handed.resolve(gating)
-    await Promise.race([gating.whenSettled, closing.promise])
+    await Promise.race([gating.whenConcluded, closing.promise])
   }
   const bank = world.bankOnAnotherDevice({ requestCleartext, ...overrides })
   await bank.hello()
@@ -138,13 +138,13 @@ export const deleting = async (bank: Bank) => {
   return vault.tryDelVaultPrompt()
 }
 
-/** What opens an `add_passkey` gating on a bank whose vault is built and holds no passkey. */
+/** What opens an `add_passkey` gating on a bank whose vault is built and has no passkey. */
 export const addingPasskey = async (bank: Bank) => {
   const vault = await bank.ensureVault(VaultScopeGiven)
   return vault.tryAddPasskeyPrompt()
 }
 
-/** What opens a `revoke_passkey` gating on a bank whose vault is built and holds a passkey. */
+/** What opens a `revoke_passkey` gating on a bank whose vault is built and has a passkey. */
 export const revokingPasskey = async (bank: Bank) => {
   const vault = await bank.ensureVault(VaultScopeGiven)
   return vault.tryRevokePasskeyPrompt()
@@ -224,13 +224,13 @@ export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
   const calls = { create: [] as CredentialCreationOptions[], get: [] as CredentialRequestOptions[] }
   const handed: Uint8Array[] = []
   let refusal: string | null = null
-  let holding: Promise<unknown> | null = null
+  let waitingOn: Promise<unknown> | null = null
 
   // Each call refuses as told, or waits as told, before it answers.
   const asTold = async () => {
-    const [errname, waiting] = [refusal, holding]
+    const [errname, waiting] = [refusal, waitingOn]
     refusal = null
-    holding = null
+    waitingOn = null
     if (waiting !== null) { await waiting }
     if (errname !== null) { throw new DOMException('The fake authenticator refused, as told.', errname) }
   }
@@ -276,14 +276,14 @@ export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
   })
   return {
     calls,
-    /** The credential ids (base64url) of every passkey the fake holds. */
+    /** The credential ids (base64url) of every passkey the fake has. */
     credentialIds: () => [...secrets.keys()],
     /** Every PRF answer the fake handed out, as the bytes it handed: what its caller should have zeroed once copied. */
     answersHanded: () => [...handed],
     /** Make the next call throw a DOMException named `errname`: `NotAllowedError` is a dismissal. */
-    refuseNext:    (errname: string) => { refusal = errname },
+    refuseNext: (errname: string) => { refusal = errname },
     /** Make the next call wait for `waiting` before it answers, as a user slow to touch the sensor. */
-    holdNext:      (waiting: Promise<unknown>) => { holding = waiting },
+    answerNextAfter: (waiting: Promise<unknown>) => { waitingOn = waiting },
   }
 }
 

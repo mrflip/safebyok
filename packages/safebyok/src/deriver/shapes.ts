@@ -16,22 +16,7 @@ export const ReservedLabelPrefix = 'argon2id_web_'
 export const TestLabelPrefix = 'test_'
 // --
 
-// == [The spec]: keyDeriverSpec, KeyDeriverSpec, Argon2idWebV1, SuppliedSpecs
-
-/** The label and Argon2id settings of a key deriver, each held to its bounds. */
-export const { keyDeriverSpec } = Checkers('bad_option', ({ obj, str, int, lit }) => ({
-  keyDeriverSpec: obj({
-    algorithm:         lit('argon2id'),
-    key_deriver_label: str.min(1),
-    memory_kib:        int.gte(MinMemoryKibPerLane).lte(MaxMemoryKib),
-    iterations:        int.gte(1).lt(Uint32Bound),
-    parallelism:       int.gte(1),
-    salt_bytes:        lit(PassphraseSaltBytes),
-    output_bytes:      lit(PassphraseKeyBytes),
-  }, Phrases.KeyDeriverSpecShape).refine((spec) => spec.memory_kib >= MinMemoryKibPerLane * spec.parallelism, { error: Phrases.memoryPerLane(MinMemoryKibPerLane), path: ['memory_kib'] }),
-}))
-
-export type KeyDeriverSpec = Z.infer<typeof keyDeriverSpec>
+// == [The spec]: Argon2idWebV1, SuppliedSpecs, keyDeriverSpec, KeyDeriverSpec
 
 /** The Argon2id settings of the key deriver safebyok supplies. */
 export const Argon2idWebV1 = Object.freeze({
@@ -46,4 +31,28 @@ export const Argon2idWebV1 = Object.freeze({
 
 /** Every key deriver spec safebyok supplies, whose settings no caller may change. */
 export const SuppliedSpecs: readonly KeyDeriverSpec[] = Object.freeze([Argon2idWebV1])
+
+/** The label and Argon2id settings of a key deriver, each within its bounds, a supplied spec's settings kept and a label under {@link ReservedLabelPrefix} refused. */
+export const { keyDeriverSpec } = Checkers('bad_option', ({ obj, str, int, lit }) => ({
+  keyDeriverSpec: obj({
+    algorithm:         lit('argon2id'),
+    key_deriver_label: str.min(1),
+    memory_kib:        int.gte(MinMemoryKibPerLane).lte(MaxMemoryKib),
+    iterations:        int.gte(1).lt(Uint32Bound),
+    parallelism:       int.gte(1),
+    salt_bytes:        lit(PassphraseSaltBytes),
+    output_bytes:      lit(PassphraseKeyBytes),
+  }, Phrases.KeyDeriverSpecShape)
+    .refine((spec) => spec.memory_kib >= MinMemoryKibPerLane * spec.parallelism, { error: Phrases.memoryPerLane(MinMemoryKibPerLane), path: ['memory_kib'] })
+    .superRefine((spec, ctx) => {
+      const supplied = SuppliedSpecs.find(({ key_deriver_label }) => key_deriver_label === spec.key_deriver_label)
+      if (supplied === undefined) {
+        if (spec.key_deriver_label.toLowerCase().startsWith(ReservedLabelPrefix)) { ctx.addIssue({ code: 'custom', message: Phrases.reservedDeriverLabel(ReservedLabelPrefix), path: ['key_deriver_label'] }) }
+      } else if (Object.entries(supplied).some(([fieldname, val]) => (spec as Readonly<Record<string, unknown>>)[fieldname] !== val)) {
+        ctx.addIssue({ code: 'custom', message: Phrases.suppliedSpecChanged(supplied.key_deriver_label), path: ['key_deriver_label'] })
+      }
+    }),
+}))
+
+export type KeyDeriverSpec = Z.infer<typeof keyDeriverSpec>
 // --

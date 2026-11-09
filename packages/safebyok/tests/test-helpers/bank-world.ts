@@ -22,13 +22,13 @@ export const BankScopeGiven = Object.freeze({ applabel: Dna.applabel, user_id: D
 /** The vault scope a test hands `bank.ensureVault`. */
 export const VaultScopeGiven = Object.freeze({ vaultlabel: Dna.vaultlabel })
 
-/** A second vaultlabel, for a bank that holds two vaults. */
+/** A second vaultlabel, for a bank that has two vaults. */
 export const OtherScopeGiven = Object.freeze({ vaultlabel: 'other' })
 
 /** The vaultlabels of a snapshot's vaults, in its order. */
 export const labelsOf = ({ vaults }: BankSnapshot): string[] => vaults.map(({ vaultlabel }) => vaultlabel)
 
-/** A {@link MemoryVaultDB} that refuses every vault get, once told to, as a store out of reach or a user signed out does. */
+/** A {@link MemoryVaultDB} that refuses every vault get, once told to, as a VaultDB out of reach or a user signed out does. */
 export class RefusingVaultDB extends MemoryVaultDB {
   #refusalkind: Refusalkind | null = null
 
@@ -68,7 +68,7 @@ export const makeBankWorld = () => {
   const dialog = { typing: byPassphrase(Passphrase) as object }
   const requestCleartext: RequestCleartext = async (gating) => { await gating.attempt(dialog.typing) }
   const baseOpts: BankOpts = { ...BankScopeGiven, device_id: '00000000-0000-4000-8000-0000000000b1', vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
-  /** A bank over this world's stores: called twice, two pages on one device. */
+  /** A bank over this world's VaultDB and DeviceDB: called twice, two pages on one device. */
   const bankOn = (overrides: Partial<BankOpts> = {}): Bank => {
     const bank = Bank.make({ ...baseOpts, ...overrides })
     madeBanks.push(bank)

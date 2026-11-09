@@ -1,7 +1,7 @@
 # safebyok-postgres
 
 safebyok's vaultDB in [Postgres](https://www.postgresql.org): the SQL that makes two tables, and
-**`PostgresVaultDB`**, which stores vault and box rows in them from your server. Your database holds
+**`PostgresVaultDB`**, which writes vault and box rows to them from your server. Your database has
 ciphertext and the few plain fields a row is found by; it never sees a whisper, a passphrase, or a
 key that opens one.
 
@@ -52,7 +52,7 @@ const vaultDB = new PostgresVaultDB({ client: pgClientOf(pool) })
   package does not add.
 * **`maxRecordBytes`**, optional, as every vaultDB takes it.
 
-`PostgresVaultDB` stores what it is handed under the scope it is handed. **Your route decides who
+`PostgresVaultDB` writes what it is handed under the scope it is handed. **Your route decides who
 may reach which bank**: check the signed-in user before a request reaches the vaultDB, and build
 each scope's `user_id` from that check, never from the request.
 
@@ -118,14 +118,14 @@ with this package for now.
 
 ## What is stored
 
-`safebyok_vaults` holds a row per vault, keyed by `applabel`, `user_id` and `vaultlabel`;
+`safebyok_vaults` has a row per vault, keyed by `applabel`, `user_id` and `vaultlabel`;
 `safebyok_boxes` a row per box, keyed by those, the life of its vault (`vault_tok`) and its
 `boxlabel`. Each row's record is one `jsonb` column, `vault` or `box`, as safebyok wrote it. A
 deleted vault or box leaves its tombstone in place, and `tidyGone` removes the boxes of a vault's
 ended lives. Row-level security is on with no policy, so of the roles you grant the tables to,
 only their owner, the role your server connects as, reaches the rows; a superuser, or a role that
 bypasses row-level security, reaches them too. A notification is not a table: any role that may
-connect can LISTEN on any user's channel and hear the rows each write stores.
+connect can LISTEN on any user's channel and hear the rows each write changes.
 
 **You own the database's roles, and are responsible for its row-level security** and for who may
 connect and LISTEN: this package grants nothing and creates no role or policy.
@@ -141,7 +141,7 @@ and run `PostgresVaultDB` on your server, connected with the database connection
 * **Keep the tables out of the Data API.** The tables come with row-level security on and no
   policy, so the `anon` and `authenticated` roles reach nothing: leave them so.
 * **Listen over a direct or session-mode connection.** The transaction-mode pooler (port 6543)
-  cannot hold a LISTEN.
+  cannot keep a LISTEN.
 
 This package has not been run against Supabase: this section is a reading of its documentation.
 

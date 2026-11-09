@@ -11,10 +11,10 @@ const getDb = TH.useFileDatabase()
 TH.useServers()
 
 const serverOf = new WeakMap<GraphQLVaultDB, TH.Server>()
-const optsOf = new WeakMap<GraphQLVaultDB, TH.StoreOpts>()
+const optsOf = new WeakMap<GraphQLVaultDB, TH.VaultDBOverOpts>()
 
-/** A browser of a fresh server, its store made with `opts`. */
-const freshBrowser = async (opts: TH.StoreOpts = {}): Promise<GraphQLVaultDB> => {
+/** A browser of a fresh server, its VaultDB made with `opts`. */
+const freshBrowser = async (opts: TH.VaultDBOverOpts = {}): Promise<GraphQLVaultDB> => {
   const server = await TH.freshServer(getDb(), opts)
   const browser = TH.browserAt(server)
   serverOf.set(browser, server)
@@ -24,7 +24,7 @@ const freshBrowser = async (opts: TH.StoreOpts = {}): Promise<GraphQLVaultDB> =>
 
 /** A browser of a second server over the same rows, as another device reaches through another instance of the app. */
 const twinOf = async (browser: GraphQLVaultDB): Promise<GraphQLVaultDB> => {
-  const server = await TH.serve(await TH.storeOver(getDb(), optsOf.get(browser)))
+  const server = await TH.serve(await TH.vaultDBOver(getDb(), optsOf.get(browser)))
   const twin = TH.browserAt(server)
   serverOf.set(twin, server)
   return twin
@@ -44,16 +44,16 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
     makeCappedVaultDB:    async (maxBoxes) => await freshBrowser({ maxBoxes }),
     makeTwin:             twinOf,
     _cheat_rowsOf:        () => TH.rowsOf(getDb()),
-    _cheat_storeOf:       (browser) => serverOf.get(browser)!.store,
+    _cheat_adapterOf:       (browser) => serverOf.get(browser)!.vaultDB,
     boxNoticesCarryVault: false,
   })
 
-  it("hears what a browser of another server stores, a box too large for a notice included", async () => {
+  it("hears what a browser of another server puts, a box too large for a notice included", async () => {
     const db = getDb()
     const listening = { count: 0 }
     await TH.freshServer(db)
-    const watcher = TH.browserAt(await TH.serve(await TH.storeListening(db, listening)))
-    const writer = TH.browserAt(await TH.serve(await TH.storeOver(db)))
+    const watcher = TH.browserAt(await TH.serve(await TH.vaultDBListening(db, listening)))
+    const writer = TH.browserAt(await TH.serve(await TH.vaultDBOver(db)))
     const notices = watching(watcher)
     await expect.poll(() => listening.count).to.eq(1)
     const vault = TH.vaultAt()
@@ -70,7 +70,7 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
     const db = getDb()
     const listening = { count: 0 }
     await TH.freshServer(db)
-    const browser = TH.browserAt(await TH.serve(await TH.storeListening(db, listening)))
+    const browser = TH.browserAt(await TH.serve(await TH.vaultDBListening(db, listening)))
     const unwatch = browser.watch(TH.bankScope, () => undefined)
     await expect.poll(() => listening.count).to.eq(1)
     unwatch()

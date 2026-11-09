@@ -3,7 +3,7 @@ import { ForeverMillis } from '../../src/helpers/consts'
 import * as GX from '../../src/shapes/shapes-gateish'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord } from '../test-helpers/models-world'
-import { holdsCases } from '../test-helpers/cases'
+import { expectCases } from '../test-helpers/cases'
 import * as TH from '../test-helpers'
 
 const mw = makeModelsWorld({ fakeTimers: false })
@@ -14,7 +14,7 @@ const gone   = tombstoneBoxRecord({ revision_seq: 2 })
 
 describe("The checks of options", () => {
   describe("VX.horizonMillis", () => {
-    holdsCases(VX.horizonMillis, [
+    expectCases(VX.horizonMillis, [
       [0,         true,  'passes zero: nothing is timely'],
       [60_000,    true,  'passes a span of milliseconds'],
       [0.5,       true,  'passes a fraction of a millisecond'],
@@ -33,7 +33,7 @@ describe("The checks of options", () => {
   })
 
   describe("GX.leaseMillis", () => {
-    holdsCases(GX.leaseMillis, [
+    expectCases(GX.leaseMillis, [
       [60_000,          true,  'passes a whole number of milliseconds'],
       [ForeverMillis,   true,  "passes ForeverMillis, a host's never"],
       [Infinity,        false, "refuses Infinity: the bank keeps a host's as ForeverMillis"],
@@ -43,7 +43,7 @@ describe("The checks of options", () => {
   })
 
   describe("VX.timelyOpts and VX.boxPutOpts", () => {
-    holdsCases(VX.timelyOpts, [
+    expectCases(VX.timelyOpts, [
       [{},                                          true,  'passes no options'],
       [{ maxMillisSinceRefresh: 0, maxWorldMillis: Infinity }, true, 'passes both horizons'],
       [{ maxMillisSinceRefresh: undefined },        true,  'passes a horizon left undefined'],
@@ -51,7 +51,7 @@ describe("The checks of options", () => {
       [{ maxWorldMillis: '5' },                     false, 'refuses a world horizon that is text'],
       [{ maxWorldMillis: NaN },                     false, 'refuses a world horizon that is NaN'],
     ])
-    holdsCases(VX.boxPutOpts, [
+    expectCases(VX.boxPutOpts, [
       [{ maxWorldMillis: 5 },                       true,  'passes the horizons'],
       [{},                                          true,  'passes no options'],
       [{ maxWorldMillis: -1 },                      false, 'refuses a negative horizon'],
@@ -70,14 +70,14 @@ describe("The checks of options", () => {
 })
 
 describe("VX.ifAbsent and VX.fetchOpts", () => {
-  holdsCases(VX.ifAbsent, [
+  expectCases(VX.ifAbsent, [
     ["fail",     true,  'passes fail'],
     ["nil",      true,  'passes nil'],
     ["create",   false, 'refuses create, which fetch does not offer'],
     [undefined,  false, 'refuses undefined: fetchOpts gives the default, not the check'],
   ])
 
-  holdsCases(VX.fetchOpts, [
+  expectCases(VX.fetchOpts, [
     [{},                                                true,  'passes no options'],
     [{ ifAbsent: 'nil' },                               true,  'passes ifAbsent nil'],
     [{ ifAbsent: undefined },                           true,  'passes ifAbsent undefined, as a caller spreading options may leave it'],
@@ -104,14 +104,14 @@ describe("VX.boxCreateOpts", () => {
     expect(VX.boxCreateOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'add', ifPresent: 'repl', maxWorldMillis: 5 })
   })
 
-  it("holds ifAbsent to 'add': a create that must find a box is not a create", () => {
+  it("has ifAbsent to 'add': a create that must find a box is not a create", () => {
     TH.expectSyncRefusal(() => VX.boxCreateOpts.parse({ ifAbsent: 'fail' }))
   })
 })
 
 describe("VX.ifPresent and VX.boxPutOpts", () => {
 
-  holdsCases(VX.ifPresent, [
+  expectCases(VX.ifPresent, [
     ["repl",     true,  'passes repl'],
     ["fail",     true,  'passes fail'],
     ["get",      true,  'passes get'],
@@ -119,7 +119,7 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
     [undefined,  false, 'refuses undefined: boxPutOpts gives the default, not the check'],
   ])
 
-  holdsCases(VX.boxPutOpts, [
+  expectCases(VX.boxPutOpts, [
     [{ ifPresent: 'repl' },                             true,  'passes ifPresent repl'],
     [{ ifPresent: undefined },                          true,  'passes ifPresent undefined'],
     [{ ifPresent: 'repl', maxWorldMillis: 5 },          true,  'passes ifPresent beside the timely options'],
@@ -147,12 +147,12 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
 
 describe("The checks of the world and the listing", () => {
   describe("VX.listingWorld", () => {
-    holdsCases(VX.listingWorld, [
+    expectCases(VX.listingWorld, [
       [mw.world,                                 true,  'passes the test world'],
       [{ ...mw.world, extra: 1 },                true,  'passes a world with more than the base reaches into'],
       [null,                                     false, 'refuses null'],
       [{},                                       false, 'refuses an empty object'],
-      [{ ...mw.world, takeWorld: undefined },    false, 'refuses a world that cannot takeWorld'],
+      [{ ...mw.world, receiveWorld: undefined },    false, 'refuses a world that cannot receiveWorld'],
       [{ ...mw.world, ensureTimely: 5 },         false, 'refuses a world whose ensureTimely is no function'],
       [{ ...mw.world, isLocked: undefined },     false, 'refuses a world with no isLocked'],
       [{ ...mw.world, isLocked: 'locked' },      false, 'refuses a world whose isLocked is no boolean'],
@@ -161,7 +161,7 @@ describe("The checks of the world and the listing", () => {
 
   describe("VX.listingOpts", () => {
     const opts = { vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000, bankFriend: mw.bankFriend }
-    holdsCases(VX.listingOpts, [
+    expectCases(VX.listingOpts, [
       [opts,                                                     true,  'passes the test vaultDB, a horizon and the calls the bank branded'],
       [{ ...opts, maxMillisSinceRefresh: Infinity },             true,  'passes a horizon of Infinity'],
       [{ ...opts, vaultDB: { tryPutBox: () => null } },          false, 'refuses a vaultDB with no tryGetBox'],
@@ -175,7 +175,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...opts, bankFriend: undefined },                       false, 'refuses a missing bankFriend'],
       [{ ...opts, world: mw.world },                             false, 'refuses a world, which the listing takes beside its options'],
       [{ ...opts, onBadNews: () => null },                       false, 'refuses an onBadNews, which only a bank takes'],
-      [{ ...opts, extra: 1 },                                    false, 'refuses an option it does not take, being strict'],
+      [{ ...opts, extra: 1 },                                    false, 'refuses an option it does not accept, being strict'],
     ])
 
     it("names the failing field", () => {
@@ -187,7 +187,7 @@ describe("The checks of the world and the listing", () => {
   describe("VX.storableArgs", () => {
     const listing = boxListingOf(mw)
     const args = { world: mw.world, listing, central: sparse }
-    holdsCases(VX.storableArgs, [
+    expectCases(VX.storableArgs, [
       [args,                                           true,  'passes a world, a listing and a central'],
       [{ ...args, central: gone },                     true,  'passes a tombstone'],
       [{ ...args, central: null },                     false, 'refuses a null central'],
@@ -195,9 +195,9 @@ describe("The checks of the world and the listing", () => {
       [{ ...args, listing: {} },                       false, 'refuses a listing with no listing modelkind'],
       [{ ...args, listing: undefined },                false, 'refuses a missing listing'],
       [{ ...args, world: null },                       false, 'refuses a null world'],
-      [{ ...args, world: { ...mw.world, takeWorld: undefined } }, false, 'refuses a world that cannot takeWorld'],
+      [{ ...args, world: { ...mw.world, receiveWorld: undefined } }, false, 'refuses a world that cannot receiveWorld'],
       [{ ...args, opts: { maxMillisSinceRefresh: 1000 } }, false, "refuses options, the horizon being the listing's"],
-      [{ ...args, extra: 1 },                          false, 'refuses an argument it does not take, being strict'],
+      [{ ...args, extra: 1 },                          false, 'refuses an argument it does not accept, being strict'],
     ])
 
     it("names the failing field", () => {

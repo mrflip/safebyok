@@ -15,7 +15,7 @@ safebyok's vaultDB over [GraphQL](https://graphql.org), in two halves:
 serves, and checks each answer against its own copy of safebyok, refusing as `unexpected_error`
 what a server of another version answers.
 
-Your server and your database hold ciphertext and the few plain fields a row is found by; neither
+Your server and your database have ciphertext and the few plain fields a row is found by; neither
 ever sees a whisper, a passphrase, or a key that opens one.
 
 ## Install
@@ -118,10 +118,10 @@ sending, so a caller that skips those checks, or is not a browser at all, is ref
 Every operation answers a typed object, the same fields as its verb's `try*` answer: `ok`, `act`,
 `val`, `world`, `dbhas`, `req_params` and `err`. Rows are typed, a live row and a tombstone each a
 type of a union. A box's sidecar, a damaged row and a refusal's meta are `SafebyokJson`, carried
-whole; times are `SafebyokEpochMillis`, integer UTC epoch milliseconds past what GraphQL's `Int`
-holds. Scopes are typed arguments, so your logs and allowlists see whose bank each operation
+whole; times are `SafebyokEpochMillis`, integer UTC epoch milliseconds beyond GraphQL's 32-bit
+`Int`. Scopes are typed arguments, so your logs and allowlists see whose bank each operation
 reaches. Every name the schema adds begins `safebyok` or `Safebyok`, to sit beside your own.
-`VaultOperations` holds the documents `GraphQLVaultDB` sends, for a server that allows only the
+`VaultOperations` has the documents `GraphQLVaultDB` sends, for a server that allows only the
 operations it knows.
 
 **A refusal is the answer's `err` field, never a GraphQL error**: its `refusalkind`, its message,
@@ -140,6 +140,6 @@ checks refuse, is `unexpected_error`: a server out of step with this copy of saf
 The tests run in-process, with no database or GraphQL server to stand up: the battery runs over a
 `GraphQLVaultDB` whose urql Client executes against the resolvers, over a `PostgresVaultDB` on
 [PGlite](https://pglite.dev), with a second Client as another device; and again through Yoga over
-fetch, as in the recipe. A drift test holds every type the schema sends or takes to the core check
+fetch, as in the recipe. A drift test checks every type the schema sends or takes against the core check
 that reads it. Before running `vitest` by hand, run `pnpm build:deps`: the tests read
 the core and `safebyok-postgres` from their `dist/`.

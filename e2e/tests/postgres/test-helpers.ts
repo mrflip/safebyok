@@ -42,9 +42,9 @@ export const describeOnPostgres = (suite: PostgresSuite, title: string, body: ()
 export type FileDatabase = {
   /** A pool over it for what the test does as the host's own code: plant a row, count, empty. Shared by the file. */
   host: Pool
-  /** A pool of its own over it, as one server holds; ended with {@link FileDatabase.endDevices}. */
+  /** A pool of its own over it, as one server has; ended with {@link FileDatabase.endDevices}. */
   devicePool: () => Pool
-  /** A connection of its own to it, as a listener holds; ended with the devices. */
+  /** A connection of its own to it, as a listener has; ended with the devices. */
   client: () => Promise<Client>
   /** Empties both tables. */
   empty: () => Promise<void>
@@ -135,7 +135,7 @@ export const useFileDatabase = (): (() => FileDatabase) => {
 }
 // --
 
-// == [Stores]: listenOver, StoreOpts, storeOver, freshStore
+// == [VaultDBs]: listenOver, VaultDBOverOpts, vaultDBOver, freshVaultDB
 
 /** A `listen` as the package's README has it, over a connection of its own, already listening for the battery's user. */
 export const listenOver = async (db: FileDatabase): Promise<PostgresListen> => {
@@ -165,18 +165,18 @@ export const listenOver = async (db: FileDatabase): Promise<PostgresListen> => {
   return listen
 }
 
-export type StoreOpts = Omit<PostgresVaultDBOpts, 'client' | 'listen'>
+export type VaultDBOverOpts = Omit<PostgresVaultDBOpts, 'client' | 'listen'>
 
-/** A PostgresVaultDB over `db` as one server holds it: a pool and a listener of its own. */
-export const storeOver = async (db: FileDatabase, opts: StoreOpts = {}): Promise<PostgresVaultDB> => (
+/** A PostgresVaultDB over `db` as one server has it: a pool and a listener of its own. */
+export const vaultDBOver = async (db: FileDatabase, opts: VaultDBOverOpts = {}): Promise<PostgresVaultDB> => (
   new PostgresVaultDB({ ...opts, client: pgClientOf(db.devicePool()), listen: await listenOver(db) })
 )
 
-/** A store over `db` once the last test's stores are ended and the tables emptied. */
-export const freshStore = async (db: FileDatabase, opts: StoreOpts = {}): Promise<PostgresVaultDB> => {
+/** A VaultDB over `db` once the last test's VaultDBs are ended and the tables emptied. */
+export const freshVaultDB = async (db: FileDatabase, opts: VaultDBOverOpts = {}): Promise<PostgresVaultDB> => {
   await db.endDevices()
   await db.empty()
-  return await storeOver(db, opts)
+  return await vaultDBOver(db, opts)
 }
 // --
 

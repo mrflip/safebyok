@@ -8,11 +8,11 @@ import type { BankRow, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '..
 
 /** The scopepath of the lease row at `scope`. */
 const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath => [applabel, user_id, vaultlabel]
-/** The ckey the lease row filed under `scopepath` is held at. */
+/** The ckey the lease row filed under `scopepath` is stored at. */
 const leaseCkeyOf = (scopepath: LeaseScopepath): string => ckeyOf(...scopepath)
 const bankCkeyOf = ({ applabel, user_id }: BankScope): string => ckeyOf(applabel, user_id)
 
-/** A device store that keeps its rows in memory, for the page's life. */
+/** A device database that keeps its rows in memory, for the page's life. */
 export class MemoryDeviceDB extends DeviceDB {
   // == [Props]: #leaserows, #bankrows
 
@@ -28,7 +28,7 @@ export class MemoryDeviceDB extends DeviceDB {
   _cheat_bankRows(): Map<string, unknown> { return this.#bankrows } // eslint-disable-line unicorn/prefer-private-class-fields
   // --
 
-  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doDelRawLease, doEnsureBank, doForgetBank, doListBanks
+  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureCachedBank, doForgetBank, doListBanks
 
   protected doStow(row: LeaseRow): void {
     const scopepath = leaseScopepathOf(row)
@@ -50,11 +50,11 @@ export class MemoryDeviceDB extends DeviceDB {
     return [...this.#leaserows.values()].map((filed) => structuredClone(filed))
   }
 
-  protected doDelRawLease(scopepath: LeaseScopepath): void {
+  protected doForgetRawLease(scopepath: LeaseScopepath): void {
     this.#leaserows.delete(leaseCkeyOf(scopepath))
   }
 
-  protected doEnsureBank(made: BankRow): unknown {
+  protected doEnsureCachedBank(made: BankRow): unknown {
     const stored = this.#bankrows.get(bankCkeyOf(made))
     if (SX.bankRow.safeParse(stored).success) { return structuredClone(stored) }
     this.#bankrows.set(bankCkeyOf(made), structuredClone(made))

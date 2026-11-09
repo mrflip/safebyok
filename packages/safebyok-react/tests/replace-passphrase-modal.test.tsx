@@ -14,17 +14,17 @@ const NextPassphrase = 'a whole new passphrase for the vault'
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
 /** A replace_passphrase gating on a vault built under {@link TH.Passphrase}, shown in a ReplacePassphraseModal whose answers the test reads, closed by the first. */
-const shownFor = async (opts: { bankOpts?: Partial<BankOpts>, passphraseAdvice?: (typed: string) => string | null } = {}) => {
+const shownFor = async (opts: { bankOpts?: Partial<BankOpts> } = {}) => {
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)
-  const held = await TH.heldGatingOf(world, TH.replacing, opts.bankOpts)
+  const opened = await TH.openGatingOf(world, TH.replacing, opts.bankOpts)
   const answers: DialogAnswer[] = []
-  const onDone = (answer: DialogAnswer) => { answers.push(answer); held.close() }
-  render(<ReplacePassphraseModal gating={TH.gatingOfKind(held.gating, 'replace_passphrase')} onDone={onDone} passphraseAdvice={opts.passphraseAdvice} />)
-  return { ...held, world, answers }
+  const onDone = (answer: DialogAnswer) => { answers.push(answer); opened.close() }
+  render(<ReplacePassphraseModal gating={TH.gatingOfKind(opened.gating, 'replace_passphrase')} onDone={onDone} />)
+  return { ...opened, world, answers }
 }
 
-/** Whether `passphrase` unlocks the world's vault, asked from a device that holds no lease on it. */
+/** Whether `passphrase` unlocks the world's vault, asked from a device that has no lease on it. */
 const unlocksWith = async (world: TH.BankWorld, passphrase: string): Promise<boolean> => {
   const bank = world.bankOnAnotherDevice({ device_id: '00000000-0000-4000-8000-0000000000b3', requestCleartext: async (gating) => { await gating.attempt({ passphraseClear: passphrase }) } })
   await bank.hello()
@@ -70,7 +70,7 @@ describe("ReplacePassphraseModal", () => {
       await waitFor(() => { expect(alertText()).to.not.eq('') })
       expect(gating.isOpen).to.be.true
       expect(answers).to.deep.equal([])
-      gating.decline()
+      gating.dismiss()
       expect(await unlocksWith(world, TH.Passphrase)).to.be.true
     })
   }
@@ -85,18 +85,18 @@ describe("ReplacePassphraseModal", () => {
     expect(answers).to.deep.equal([])
   })
 
-  it("never gives the current passphrase to the advice", async () => {
+  it("never gives the current passphrase to the strength checker", async () => {
     const heard: string[] = []
-    await shownFor({ passphraseAdvice: (typed) => { heard.push(typed); return null } })
+    await shownFor({ bankOpts: { strengthChecker: (typed: string) => { heard.push(typed); return { strong: true as const } } } })
     fireEvent.change(screen.getByPlaceholderText('current passphrase'), { target: { value: TH.Passphrase } })
     fireEvent.change(screen.getByPlaceholderText('new passphrase'), { target: { value: NextPassphrase } })
     await waitFor(() => { expect(heard).to.deep.equal([NextPassphrase]) })
   })
 
-  it("answers declined on Cancel, and the gating is declined", async () => {
+  it("answers dismissed on Cancel, and the gating is dismissed", async () => {
     const { world, raising, answers } = await shownFor()
     fireEvent.click(screen.getByText(Messages.cancelButton))
-    expect(answers).to.deep.equal(['declined'])
+    expect(answers).to.deep.equal(['dismissed'])
     expect(await raising).to.include({ ok: false })
     expect(await unlocksWith(world, TH.Passphrase)).to.be.true
   })

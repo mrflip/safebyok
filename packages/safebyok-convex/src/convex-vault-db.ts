@@ -4,7 +4,7 @@ import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import * as DB from 'safebyok/storage'
-import type { AdapterVaultDBOpts, BankScope, BoxesFetched, BoxFetched, BoxLanding, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Landing, PutOptsGiven, RowOfVault, Tidied, VaultError, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
+import type { AdapterVaultDBOpts, BankScope, BoxesFetched, BoxFetched, BoxWritten, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Written, PutOptsGiven, RowOfVault, Tidied, VaultError, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
 import * as Phrases from './phrases'
 import { isSafebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
@@ -44,7 +44,7 @@ export type ConvexVaultDBOpts = AdapterVaultDBOpts & {
   client: ConvexVaultClient
   /** The safebyok functions the app serves, `api.safebyok`. */
   api: SafebyokApi
-  /** A soft cap on the box rows a vault holds, live or tombstoned, under the component's own limit. */
+  /** A soft cap on the box rows a vault has, live or tombstoned, under the component's own limit. */
   maxBoxes?: number | undefined
 }
 
@@ -96,23 +96,23 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     return await reaching('doGetBox', () => this.#client.query(this.#api.getBox, { asked }))
   }
 
-  protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Landing> {
+  protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Written> {
     return await reaching('doPutVault', () => this.#client.mutation(this.#api.putVault, { record, opts }))
   }
 
   // The component answers a full vault with its capacity rather than throwing, so the refusal is made here, where the core's throwers are.
-  protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxLanding> {
+  protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxWritten> {
     const args = (this.#maxBoxes === undefined) ? { record, opts } : { record, opts, maxBoxes: this.#maxBoxes }
     const answer = await reaching('doPutBox', () => this.#client.mutation(this.#api.putBox, args))
     if ('capacity' in answer) { throw DB.vaultFull(answer.capacity) }
     return answer
   }
 
-  protected async doDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Landing> {
+  protected async doDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Written> {
     return await reaching('doDelVault', () => this.#client.mutation(this.#api.delVault, { tombstone, opts }))
   }
 
-  protected async doDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<BoxLanding> {
+  protected async doDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<BoxWritten> {
     return await reaching('doDelBox', () => this.#client.mutation(this.#api.delBox, { tombstone, opts }))
   }
 
@@ -171,7 +171,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 const ConvexDocumentBytes = 1_048_576
 
 /** What `call` resolves, or the refusal that says what stopped it. */
-// A thunk, since ConvexReactClient.query throws at once a refusal it already holds.
+// A thunk, since ConvexReactClient.query throws at once a refusal it already has.
 const reaching = async <ValT>(callname: string, call: () => Promise<ValT>): Promise<ValT> => {
   try {
     return await call()

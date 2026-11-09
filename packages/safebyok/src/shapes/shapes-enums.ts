@@ -21,14 +21,14 @@ export type RecordShape = typeof recordShapeVals[number]
 export const ageVals = ['older', 'same', 'newer'] as const
 export type Age = typeof ageVals[number]
 
-/** Every policy `reconcileCentral` may choose: `older` and `same` end the receive with central as it was; `fill` takes the record over the one in hand; `adopt` takes the one received; `gone` takes its tombstone. */
+/** Every policy `reconcileCentral` may choose: `older` and `same` make no change; `fill`, `adopt` replace the #central record; `gone` becomes a tombstone. */
 export const centralPolicyVals = ['older', 'same', 'fill', 'adopt', 'gone'] as const
 export type CentralPolicy = typeof centralPolicyVals[number]
 // --
 
 // == [Policies]: ifPresentVals, IfPresent, ifAbsentVals, IfAbsent, putIfAbsentVals, PutIfAbsent
 
-/** The policies for a put over a live record: `repl`, the default, replaces it; `fail` refuses `camped`; `get` takes it up. */
+/** The policies for a put over a live record: `repl`, the default, replaces it; `fail` refuses `camped`; `get` answers it. */
 export const ifPresentVals = ['repl', 'fail', 'get'] as const
 export type IfPresent = typeof ifPresentVals[number]
 
@@ -36,7 +36,7 @@ export type IfPresent = typeof ifPresentVals[number]
 export const ifAbsentVals = ['fail', 'nil'] as const
 export type IfAbsent = typeof ifAbsentVals[number]
 
-/** The policies for a put over a thing absent, never stored or deleted: `add`, the default, stores it; `fail` refuses. */
+/** The policies for a put over a thing absent, never stored or deleted: `add`, the default, puts it; `fail` refuses. */
 export const putIfAbsentVals = ['add', 'fail'] as const
 export type PutIfAbsent = typeof putIfAbsentVals[number]
 // --

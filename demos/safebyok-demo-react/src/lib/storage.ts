@@ -1,9 +1,9 @@
 import { browserOpts } from 'safebyok/browser'
-import { localStore, type StringStore } from './local-store'
+import { prefixedStorage, type StringStorage } from './string-storage'
 import { OutageVaultDB } from './outage-vault-db'
 
 // The demo's storage wiring. The vault's rows live in this browser's IndexedDB, standing in for the
-// remote database a backend would hold: ciphertext that never opens without the passphrase. A real
+// remote database a backend would have: ciphertext that never opens without the passphrase. A real
 // app hands the provider a vaultDB over its own backend (Convex, REST) instead. The device's leases
 // live in IndexedDB too, so an unlocked vault stays unlocked through a reload until its lease ends.
 
@@ -17,7 +17,7 @@ export const vaultDB = new OutageVaultDB({ dbName: Applabel })
 export const bankOpts = { ...browserOpts({ dbName: Applabel }), applabel: Applabel, vaultDB }
 
 /** The fake auth's account rows: pretend-backend scaffolding, beside the vault's rows. */
-export const dbStore: StringStore = localStore('safebyok-demo:db:')
+export const dbStorage: StringStorage = prefixedStorage('safebyok-demo:db:')
 
 /** The fake auth's session: stands in for a cookie; never leaves the browser. */
-export const deviceStore: StringStore = localStore('safebyok-demo:device:')
+export const deviceStorage: StringStorage = prefixedStorage('safebyok-demo:device:')

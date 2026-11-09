@@ -32,7 +32,7 @@ const vault = await bank.ensureVault({ vaultlabel: 'main' })
 
 A vault records only its deriver's label, and this deriver derives exactly what the core's does
 under the same label. So a vault made through WebAssembly on one device opens through
-`@noble/hashes` on another, and back: each device may run whichever suits it. The tests hold the two
+`@noble/hashes` on another, and back: each device may run whichever suits it. The tests compare the two
 to each other byte for byte, and both to Argon2id's reference test vector.
 
 A spec of your own works the same way, through either implementation:
@@ -56,7 +56,7 @@ machine: about 130 ms a derivation through WebAssembly, against about 580 ms thr
 0.9 s against 3 s. A user waits for one derivation at each unlock, and one at each passphrase
 change.
 
-The derivation runs as one synchronous WebAssembly call: it holds the thread for its 130 ms, where
+The derivation runs as one synchronous WebAssembly call: it blocks the thread for its 130 ms, where
 the core's deriver takes longer but yields to the event loop as it goes. For a spec heavier than the
 supplied one, consider running the vault's unlock where a pause does not show.
 

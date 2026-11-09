@@ -1,7 +1,7 @@
 import { VaultError, isVaultError } from './errors'
 import { storageUnavailable, unexpectedError } from './throwers'
 
-/** The answer a non-throwing safebyok call resolves to: a {@link GoodOutcome} holding its `val`, or a {@link BadOutcome} holding its refusal as `err`.
+/** The answer a non-throwing safebyok call resolves to: a {@link GoodOutcome} with its `val`, or a {@link BadOutcome} with its refusal as `err`.
  * TypeScript narrows on `ok`.
  *
  * @example

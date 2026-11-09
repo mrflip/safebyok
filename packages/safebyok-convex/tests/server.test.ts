@@ -39,8 +39,8 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['watchRows',  (caller) => caller.query(api.safebyok.watchRows, { scope: TH.bankScope })],
 ]
 
-/** What u1 holds, as the component itself lists it. */
-const heldBy = async (backend: Backend) => {
+/** What u1 has stored, as the component itself lists it. */
+const storedIn = async (backend: Backend) => {
   const asOwner = backend.withIdentity({ subject: 'u1' })
   return await asOwner.query(api.safebyok.watchRows, { scope: TH.bankScope })
 }
@@ -58,7 +58,7 @@ describe("SafebyokComponent.api, for the user a call names", () => {
     const asOwner = backend.withIdentity({ subject: 'u1' })
     expect(await asOwner.query(api.safebyok.getVault, { scope: TH.vaultScope })).to.deep.equal(vault)
     expect(await asOwner.query(api.safebyok.getBox, { asked: { ...vaultQuery, boxlabel: box.boxlabel } })).to.deep.equal({ vault, box })
-    expect(await asOwner.mutation(api.safebyok.putVault, { record: vault, opts: birth })).to.deep.equal({ landed: false, ante: vault })
+    expect(await asOwner.mutation(api.safebyok.putVault, { record: vault, opts: birth })).to.deep.equal({ isWritten: false, ante: vault })
   })
 })
 
@@ -66,17 +66,17 @@ describe("SafebyokComponent.api, for anyone else", () => {
   for (const [fnname, call] of EveryCall) {
     it(`refuses ${fnname} when no one is signed in`, async () => {
       const backend = await seeded()
-      const before = await heldBy(backend)
+      const before = await storedIn(backend)
       expect(await TH.convexRefusalOf(call(backend))).to.deep.equal({ kind: 'identity_revoked' })
-      expect(await heldBy(backend)).to.deep.equal(before)
+      expect(await storedIn(backend)).to.deep.equal(before)
     })
 
     it(`refuses ${fnname} to a user it does not name`, async () => {
       const backend = await seeded()
-      const before = await heldBy(backend)
+      const before = await storedIn(backend)
       const stranger = backend.withIdentity({ subject: 'u2' })
       expect(await TH.convexRefusalOf(call(stranger))).to.deep.equal({ kind: 'identity_revoked' })
-      expect(await heldBy(backend)).to.deep.equal(before)
+      expect(await storedIn(backend)).to.deep.equal(before)
     })
   }
 

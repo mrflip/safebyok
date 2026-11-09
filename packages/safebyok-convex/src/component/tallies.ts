@@ -4,7 +4,7 @@ import type { WithoutSystemFields } from 'convex/server'
 import type { Doc } from './_generated/dataModel'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 
-// A vault is held to limits, whatever its client asks, so that one transaction can always tombstone
+// A vault answers to limits, whatever its client asks, so that one transaction can always tombstone
 // it whole: `delVault` reads every box row of the life once and writes each live one, and a Convex
 // transaction may read 16 MiB and write 16,000 documents. The limits are half of each, leaving room
 // for the vault row and the tally, as a modified client need not keep its vault small. A box's
@@ -25,7 +25,7 @@ const ConvexTransactionWrittenDocuments = 16_000
 /** Room for the tally row beside the vault row. */
 const TallyReserveBytes = 1024
 
-/** The most box rows one life of a vault holds, live or tombstoned. */
+/** The most box rows one life of a vault has, live or tombstoned. */
 export const MaxVaultBoxes = ConvexTransactionWrittenDocuments / 2
 
 /** The most one life's box rows weigh together, live or tombstoned, in bytes as Convex counts a document. */
@@ -37,7 +37,7 @@ export const MaxVaultBoxBytes = (ConvexTransactionReadBytes / 2) - ConvexDocumen
 /** The labels and token that name one life of one vault. */
 export type Life = { applabel: string, user_id: string, vaultlabel: string, vault_tok: string }
 
-/** How many box rows a life holds, live or tombstoned, and what they weigh. */
+/** How many box rows a life has, live or tombstoned, and what they weigh. */
 export type Tally = { box_count: number, box_bytes: number }
 
 /** A life's tally as a put finds it: the row it is kept in, if any, and the count, null for a life past a limit. */
@@ -80,7 +80,7 @@ export const refuses = (tally: Tally | null, growth: Tally, maxBoxes: number): b
   return ((growth.box_count > 0) && (after.box_count > maxBoxes)) || ((growth.box_bytes > 0) && (after.box_bytes > MaxVaultBoxBytes))
 }
 
-/** Move the life's tally by a put's `growth`, storing it the first time; a life past a limit keeps none. */
+/** Move the life's tally by a put's `growth`, writing it the first time; a life past a limit keeps none. */
 export const record = async (db: DatabaseWriter, life: Life, { kept, tally }: Reckoning, growth: Tally): Promise<void> => {
   if (tally === null) { return }
   if (kept) { await db.patch('safebyok_tallies', kept._id, plus(tally, growth)) } else { await db.insert('safebyok_tallies', { ...life, ...plus(tally, growth) }) }

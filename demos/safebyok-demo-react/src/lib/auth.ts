@@ -1,4 +1,4 @@
-import type { StringStore } from './local-store'
+import type { StringStorage } from './string-storage'
 
 /**
  * SCAFFOLDING a real host application replaces with its own auth (Google sign-in, Clerk, Convex
@@ -24,21 +24,21 @@ export type Auth = {
 }
 
 /**
- * Fake auth over the demo's two stores: accounts live in the pretend-remote `dbStore` (a backend
- * would own them), the session lives in the on-device `deviceStore` (a cookie would). Not a
+ * Fake auth over the demo's two storages: accounts live in the pretend-remote `dbStorage` (a backend
+ * would own them), the session lives in the on-device `deviceStorage` (a cookie would). Not a
  * pattern for production -- there is no password and no verification, by design: the vault
  * passphrase is deliberately a separate thing from signing in.
  *
- * @param opts - `applabel`, namespacing the rows; `dbStore` and `deviceStore`, where they live;
+ * @param opts - `applabel`, namespacing the rows; `dbStorage` and `deviceStorage`, where they live;
  *   and `clock`, which stamps a new account's `registered_at` in epoch milliseconds, rounded down
  *   (default: the wall clock).
  *
  * @example
- *   const auth = createAuth({ applabel: 'acme', dbStore, deviceStore })
+ *   const auth = createAuth({ applabel: 'acme', dbStorage, deviceStorage })
  *   const session = await auth.signIn('margo')  // { user_id: 'user_3f...', userlabel: 'margo' }
  */
-export const createAuth = (opts: { applabel: string, dbStore: StringStore, deviceStore: StringStore, clock?: AuthClock | undefined }): Auth => {
-  const { applabel, dbStore, deviceStore, clock = WallClock } = opts
+export const createAuth = (opts: { applabel: string, dbStorage: StringStorage, deviceStorage: StringStorage, clock?: AuthClock | undefined }): Auth => {
+  const { applabel, dbStorage, deviceStorage, clock = WallClock } = opts
   const accountCkey = (userlabel: string) => `account:${applabel}:${userlabel}`
   const sessionCkey = `session:${applabel}`
 
@@ -57,7 +57,7 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
   const bump = () => { listeners.forEach((listener) => { listener() }) }
 
   function getSession(): Session | null {
-    const text = deviceStore.get(sessionCkey)
+    const text = deviceStorage.get(sessionCkey)
     if (text === null) { return null }
     try {
       const parsed: unknown = JSON.parse(text)
@@ -65,7 +65,7 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
         return parsed as Session
       }
     } catch { /* fall through: a mangled session reads as signed out */ }
-    deviceStore.del(sessionCkey)
+    deviceStorage.del(sessionCkey)
     return null
   }
 
@@ -82,26 +82,26 @@ export const createAuth = (opts: { applabel: string, dbStore: StringStore, devic
         return Promise.reject(new Error('A username is 2 to 40 lowercase letters and digits, joined by single underscores, starting with a letter.'))
       }
       const ckey = accountCkey(userlabel)
-      const existing = dbStore.get(ckey)
+      const existing = dbStorage.get(ckey)
       const account = existing === null ? newAccount(userlabel) : JSON.parse(existing) as Account
-      if (existing === null) { dbStore.put(ckey, JSON.stringify(account)) }
+      if (existing === null) { dbStorage.put(ckey, JSON.stringify(account)) }
       session = { user_id: account.user_id, userlabel: account.userlabel }
-      deviceStore.put(sessionCkey, JSON.stringify(session))
+      deviceStorage.put(sessionCkey, JSON.stringify(session))
       bump()
       return Promise.resolve(session)
     },
 
     signOut: () => {
       session = null
-      deviceStore.del(sessionCkey)
+      deviceStorage.del(sessionCkey)
       bump()
     },
 
     deleteAccount: () => {
       if (session === null) { return Promise.resolve() }
-      dbStore.del(accountCkey(session.userlabel))
+      dbStorage.del(accountCkey(session.userlabel))
       session = null
-      deviceStore.del(sessionCkey)
+      deviceStorage.del(sessionCkey)
       bump()
       return Promise.resolve()
     },

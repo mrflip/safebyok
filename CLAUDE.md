@@ -7,7 +7,7 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 **safebyok** is a TypeScript npm package: an end-to-end encrypted vault for API keys and other
 small secrets a user brings to a browser app. Secrets are encrypted on the device under keys that
 never leave it, and synchronized between devices through a storage layer the host application
-plugs in; the backend only ever holds ciphertext. Not yet used outside the project that motivated
+plugs in; the backend only ever has ciphertext. Not yet used outside the project that motivated
 it, but close to a wider release.
 
 ## Working relationship
@@ -64,7 +64,7 @@ govern how code is changed:
   1.0.0, neither binds backward**: no compatibility shims, no migrations, no reading of older
   stored shapes. An old record that fails today's validation fails safe (it reads as absent or
   corrupt), and the changeset says what a host will see.
-* **The vaultDB is the ground truth; what the local instance holds is a cache.** A
+* **The vaultDB is the ground truth; what the local instance keeps is a cache.** A
   data-integrity failure met in a consistent state is reported by throwing. Insert no
   retry logic, abort controllers or other whizbangs into the critical path of a primitive
   operation: the customer, or orchestration code we provide, can add them as warranted.
@@ -127,7 +127,7 @@ through the whole tree with `rg -l` first, then open the hits that matter.
 * `STYLE.md` -- naming (`val`, `ckey`, `bag`, `kind`, what `key` means here), layout, doc blocks,
   validation, shapes and tests: specific, unguessable, and only partly linted. **Writing code,
   read *Naming* once; read *Comments and doc blocks*, *Tests*, *Validation* or *Shapes and duck
-  typing* when you write a doc block, a test, a validator, or a type or class that holds state.**
+  typing* when you write a doc block, a test, a validator, or a type or class that keeps state.**
   Every export has a doc block written for its caller and tests in proportion.
 * `packages/safebyok/eslint.config.mjs` -- the final authority on formatting; the other configs
   are cut from it. Where it and a prose document disagree, flag the bug. `@ts-expect-error` and
@@ -146,7 +146,7 @@ STYLE.md *Naming* is the source; these few shape code too deeply to fix in revie
   cryptographic key is named for its role (`vaultKey`, `boxKey`); a map key is a `ckey`.
 * Smush the tags `name`, `kind`, `label`, `path` and `bag` into one word: `vaultlabel`,
   `woodkind`. `type` is only a datatype; a menu choice is a `kind` or a `flavor`.
-* Stored fields are underbar_case (`salt_bytes`), and so is a host-facing field holding one
+* Stored fields are underbar_case (`salt_bytes`), and so is a host-facing field containing one
   (`user_id`, never `userId`); everything else camelCase. Times are integer UTC epoch
   milliseconds, never strings or `Date`s.
 

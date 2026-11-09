@@ -1,4 +1,4 @@
-/** The AdapterVaultDB base class, over a MemoryVaultDB: how it reads a store's own failure, how a plain verb and its try form agree, and the duck a model takes for a VaultDB. */
+/** The AdapterVaultDB base class, over a MemoryVaultDB: how it reads a VaultDB's own failure, how a plain verb and its try form agree, and the duck a model takes for a VaultDB. */
 
 import { describe, expect, it } from 'vitest'
 import { VaultError, isVaultError } from '../../src/refusals/errors'
@@ -37,12 +37,12 @@ describe("AdapterVaultDB", () => {
     })
   })
 
-  describe("a store's own failure", () => {
+  describe("a VaultDB's own failure", () => {
     class FailingVaultDB extends MemoryVaultDB {
       protected override doListVaults(): never { throw new Error('socket closed') }
     }
 
-    it("reads as storage_unavailable, the store's error its cause, by a throw and by an answer alike", async () => {
+    it("reads as storage_unavailable, the VaultDB's error its cause, by a throw and by an answer alike", async () => {
       const vaultDB = new FailingVaultDB()
       await expect(vaultDB.listVaults(bankScope)).rejects.toSatisfy((err) => isVaultError(err, 'storage_unavailable'))
       const answer = await vaultDB.tryListVaults(bankScope)
@@ -51,7 +51,7 @@ describe("AdapterVaultDB", () => {
       expect((answer.err?.cause as Error).message).to.eq('socket closed')
     })
 
-    it("a VaultError a store throws passes up unchanged, with the request's safe metadata", async () => {
+    it("a VaultError a VaultDB throws passes up unchanged, with the request's safe metadata", async () => {
       class RefusingVaultDB extends MemoryVaultDB {
         protected override doListVaults(): never { throw new VaultError('storage_unavailable', 'Storage is down.') }
       }
@@ -76,7 +76,7 @@ describe("AdapterVaultDB", () => {
   describe("the duck a model takes for one", () => {
     const brand = { [Symbol.for('@safebyok/vaultdb')]: true }
 
-    it("takes a store, or a client of one that wears the brand and answers every verb", () => {
+    it("takes a VaultDB, or a client of one that wears the brand and answers every verb", () => {
       const vaultDB = new MemoryVaultDB()
       expect(brandedVaultDB.parse(vaultDB)).to.eq(vaultDB)
       const client = { ...brand, ...verbsOf(vaultDB) }

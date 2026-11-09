@@ -14,7 +14,7 @@ describe("SX.sentinelBoxOf and the void row", () => {
   })
 })
 
-describe("the row checks a store's conditional writes run", () => {
+describe("the row checks a VaultDB's conditional writes run", () => {
   const box = boxAt()
   const vault = vaultAt()
   const putOver = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'repl' } as const
@@ -30,12 +30,12 @@ describe("the row checks a store's conditional writes run", () => {
     expect(SX.isLiveVaultRecord(null, 'life1')).to.be.false
   })
 
-  it.each(boxFlaws)("isLiveBoxRecord and isBoxPutAllowed answer false for a row holding %s", (_flawname, flawOf) => {
+  it.each(boxFlaws)("isLiveBoxRecord and isBoxPutAllowed answer false for a row with %s", (_flawname, flawOf) => {
     expect(SX.isLiveBoxRecord(flawOf(box), 'life1')).to.be.false
     expect(SX.isBoxPutAllowed(flawOf(box), { ...putOver, prior: priorOf(box) })).to.be.false
   })
 
-  it.each(vaultFlaws)("isLiveVaultRecord and isVaultPutAllowed answer false for a row holding %s", (_flawname, flawOf) => {
+  it.each(vaultFlaws)("isLiveVaultRecord and isVaultPutAllowed answer false for a row with %s", (_flawname, flawOf) => {
     expect(SX.isLiveVaultRecord(flawOf(vault), 'life1')).to.be.false
     expect(SX.isVaultPutAllowed(flawOf(vault), { ...putOver, prior: priorOf(vault) })).to.be.false
   })

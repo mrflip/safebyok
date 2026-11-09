@@ -59,7 +59,7 @@ type QueryModification =
   | { type: 'QueryFailed', queryId: number, errorMessage: string, errorData?: JSONValue, logLines: string[], journal: null }
   | { type: 'QueryRemoved', queryId: number }
 
-// What the options and the host hold, checked only: what is kept is the caller's own object, `this` and all.
+// What the options and the host have, checked only: what is kept is the caller's own object, `this` and all.
 const { fakeHost, fakeDeploymentOpts } = Checkers('bad_option', ({ obj, custom }) => {
   const fn = custom<(...args: never[]) => unknown>((candidate) => typeof candidate === 'function')
   const logger = obj({ log: fn, warn: fn, error: fn, logVerbose: fn.optional() })
@@ -141,7 +141,7 @@ export class FakeDeployment<Host extends FakeHost> {
     return answer
   }
 
-  /** The functions every connected socket watches right now, by path: the live queries a client holds open here. */
+  /** The functions every connected socket watches right now, by path: the live queries a client keeps open here. */
   watching(): string[] {
     return Array.from(this.sessions.values(), (session) => Array.from(session.watched.values(), (watch) => watch.udfPath)).flat()
   }

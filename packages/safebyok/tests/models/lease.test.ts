@@ -24,8 +24,8 @@ const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ friend: FakeLeaseF
   return { friend, lease }
 }
 
-/** A friend of {@link WorldStamp} whose slot holds a record cached under `stamp`. */
-const friendHoldingRowOf = async (stamp: Partial<VaultStamp>): Promise<FakeLeaseFriend> => {
+/** A friend of {@link WorldStamp} whose slot has a record cached under `stamp`. */
+const friendWithRowOf = async (stamp: Partial<VaultStamp>): Promise<FakeLeaseFriend> => {
   const elsewhere = fakeLeaseFriendOf(stamp)
   const lease = await makeGrantedLease(elsewhere)
   await lease.cacheAsCacheCan()
@@ -184,9 +184,9 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(got?.isPresent).to.be.true
   })
 
-  it("tells a store's refusal as bad news, once, and answers null", async () => {
+  it("tells a datastore's refusal as bad news, once, and answers null", async () => {
     const friend = fakeLeaseFriendOf()
-    const refusal = new VaultError('unexpected_error', 'the store is down')
+    const refusal = new VaultError('unexpected_error', 'the datastore is down')
     friend.peekLease.mockRejectedValue(refusal)
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
     expect(friend.tellBadNews).toHaveBeenCalledExactlyOnceWith([refusal])
@@ -216,7 +216,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
 
   for (const [stamp, blurb] of OtherStampCases) {
     it(`forgets a cached lease of ${blurb}, telling it as bad news, and answers null`, async () => {
-      const friend = await friendHoldingRowOf(stamp)
+      const friend = await friendWithRowOf(stamp)
       expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
       expect(friend.tryForgetLease).toHaveBeenCalledTimes(1)
       expect(friend.cached).to.be.null
@@ -226,8 +226,8 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
   }
 
   it("tells the bad news for a row of another stamp even where its forget is refused", async () => {
-    const friend = await friendHoldingRowOf({ user_id: 'u2' })
-    friend.tryForgetLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
+    const friend = await friendWithRowOf({ user_id: 'u2' })
+    friend.tryForgetLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the datastore is down')))
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
     expect(friend.tellBadNews).toHaveBeenCalledOnce()
   })
@@ -241,7 +241,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
 
   it("still answers null where a row of another gate has its forget refused, telling no bad news and logging nothing", async () => {
     const { friend } = await grantedWorld()
-    friend.tryForgetLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
+    friend.tryForgetLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the datastore is down')))
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch + 1)).to.be.null
     expect(friend.tellBadNews).not.toHaveBeenCalled()
     expect(friend.logged).to.deep.equal([])
@@ -273,10 +273,10 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
   }
 })
 
-describe("lease.vacate(), lease.evict() and isPresent", () => {
+describe("lease.revoke(), lease.evict() and isPresent", () => {
   it("vacate forgets the cached record and leaves the lease forgotten and out of force", async () => {
     const { friend, lease } = await grantedWorld()
-    await lease.vacate()
+    await lease.revoke()
     expect(friend.forgetLease).toHaveBeenCalledTimes(1)
     expect(friend.cached).to.be.null
     expect(lease.isPresent).to.be.false
@@ -284,23 +284,23 @@ describe("lease.vacate(), lease.evict() and isPresent", () => {
 
   it("is idempotent: a second vacate forgets nothing more", async () => {
     const { friend, lease } = await grantedWorld()
-    await lease.vacate()
-    await lease.vacate()
+    await lease.revoke()
+    await lease.revoke()
     expect(friend.forgetLease).toHaveBeenCalledTimes(1)
   })
 
-  it("throws what forgetLease refuses, the lease out of force all the same; tryVacate answers it as a bad Outcome", async () => {
+  it("throws what forgetLease refuses, the lease out of force all the same; tryRevoke answers it as a bad Outcome", async () => {
     const { friend, lease } = await grantedWorld()
-    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the store is down'))
-    await TH.expectRefusal(lease.vacate())
+    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
+    await TH.expectRefusal(lease.revoke())
     expect(lease.isPresent).to.be.false
     const other = await grantedWorld()
-    other.friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the store is down'))
-    await TH.expectBad(other.lease.tryVacate())
+    other.friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
+    await TH.expectBad(other.lease.tryRevoke())
     expect(other.lease.isPresent).to.be.false
   })
 
-  it("Lease.forget erases a record with no lease held, on each call, and starts before it answers, so erases land in call order", async () => {
+  it("Lease.forget forgets a record with no lease granted, on each call, and starts before it answers, so forgets are written in call order", async () => {
     const friend = fakeLeaseFriendOf()
     friend.cached = 'a row of an earlier session'
     const forgetting = Lease.tryForget(friend)
@@ -313,9 +313,9 @@ describe("lease.vacate(), lease.evict() and isPresent", () => {
 
   it("Lease.forget throws what forgetLease refuses; tryForget answers it as a bad Outcome", async () => {
     const friend = fakeLeaseFriendOf()
-    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the store is down'))
+    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
     await TH.expectRefusal(Lease.forget(friend))
-    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the store is down'))
+    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
     await TH.expectBad(Lease.tryForget(friend))
   })
 
@@ -337,7 +337,7 @@ describe("lease.vacate(), lease.evict() and isPresent", () => {
     const { lease } = await grantedWorld()
     const stamp = sealStampOf('b1')
     const sealed = await lease.sealWith(WhisperText, stamp)
-    await lease.vacate()
+    await lease.revoke()
     await TH.expectRefusal(lease.sealWith(WhisperText, stamp), 'vault_locked')
     await TH.expectRefusal(lease.unsealWith(sealed, stamp), 'vault_locked')
   })

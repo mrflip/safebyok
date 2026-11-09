@@ -3,7 +3,7 @@
 The passes only a person can make, before the Coach marks a Version PR ready
 (`notes/releasing.md`). CI cannot run them: the tests use a fake `navigator.credentials`,
 jsdom, a fake
-IndexedDB and in-process stores, and a fake Convex deployment. The same pass each time, so that
+IndexedDB and in-process storage, and a fake Convex deployment. The same pass each time, so that
 what was checked last release is what is checked this one. Whatever a container can run is
 automated instead, so it is not here; what is below stays by hand.
 
@@ -31,11 +31,11 @@ The core's browser paths run in jsdom and a fake IndexedDB in CI; this is where 
 real thing. Chrome, Firefox and Safari, a current release of each, on a desktop, and Safari on an
 iPhone.
 
-* [ ] Create a vault, store a box, reload: the vault is locked, then unlocks with the
-  passphrase, and the box reads back (IndexedDB device store and vault store, `argon2idWebV1Deriver`).
+* [ ] Create a vault, put a box, reload: the vault is locked, then unlocks with the
+  passphrase, and the box reads back (IndexedDB DeviceDB and VaultDB, `argon2idWebV1Deriver`).
 * [ ] The device remembers the unlock for its window and forgets it after: lock it, reload.
 * [ ] A second tab: unlock in one, the other follows; sign out in one, both lock (the device
-  shelf's cross-tab erase).
+  shelf's cross-tab forget).
 * [ ] A private window: the vault opens, or refuses calmly, with no stray console output.
 * [ ] `safebyok-fastkey` where WebAssembly runs; under a Content-Security-Policy without
   `'wasm-unsafe-eval'` it refuses with `bad_option`, naming why.

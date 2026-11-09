@@ -2,7 +2,7 @@ import { brandGuarded } from './consts'
 import { isVaultError } from '../refusals/errors'
 import { decorate } from './helpers'
 import * as Phrases from './phrases'
-import { strengthCheckerLoadFailed, strengthCheckerMisanswered } from '../refusals/throwers'
+import { strengthCheckerLoadFailed } from '../refusals/throwers'
 import * as HostErrorSanitizer from '../refusals/host-error-sanitizer'
 import * as CX from '../shapes/shapes-core'
 import type { VaultScope } from '../shapes/shapes-core'
@@ -42,7 +42,7 @@ export type StrengthChecker = {
   load?: (() => void | Promise<void>) | undefined
 }
 
-/** A strength checker as a bank keeps it: the host's, held to its contract by {@link guardStrengthChecker}. */
+/** A strength checker as a bank keeps it: the host's, made to honor its contract by {@link guardStrengthChecker}. */
 export type GuardedStrengthChecker = {
   (passphrase: string, scope: VaultScope): Promise<PassphraseVerdict>
   readonly load: () => Promise<void>
@@ -54,7 +54,7 @@ export const StrongVerdict: PassphraseVerdict = Object.freeze({ strong: true })
 /** The verdict {@link DefaultStrengthChecker} answers of every passphrase: a word to the user, and one to the app's makers. */
 const DefaultVerdict: PassphraseVerdict = Object.freeze({
   strong: false,
-  reason: "This app can't take a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Bank.make needs a strengthChecker, such as zxcvbnStrengthChecker from safebyok/browser, as safebyok's CUSTOMIZATION.md says under Pluggable Passphrase Strength Checker.",
+  reason: "This app can't accept a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Bank.make needs a strengthChecker, such as zxcvbnStrengthChecker from safebyok/browser, as safebyok's CUSTOMIZATION.md says under Pluggable Passphrase Strength Checker.",
 })
 
 /** The strength checker of a vault whose host chose none: every passphrase is too weak, so no vault can be made, nor a passphrase changed.
@@ -67,7 +67,7 @@ const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "
 
 // A blank passphrase is weak before the host's checker hears it. A throw is replaced, as the checker heard the passphrase;
 // a failed `load` keeps its throw as the cause, as it heard nothing; a VaultError it throws passes as it came.
-/** `hostChecker` held to its contract: the one way a vault, or a dialog checking as the user types, asks it. */
+/** `hostChecker`, made to honor its contract: the one way a vault, or a dialog checking as the user types, asks it. */
 export const guardStrengthChecker = (hostChecker: StrengthChecker): GuardedStrengthChecker => {
   const host = GX.strengthChecker.parse(hostChecker, { where: 'strengthChecker' })
   const check = async (passphrase: string, scope: VaultScope): Promise<PassphraseVerdict> => {
@@ -75,17 +75,15 @@ export const guardStrengthChecker = (hostChecker: StrengthChecker): GuardedStren
     const told = CX.vaultScope.parse(scope)
     const typed = GX.passphraseCleartext.parse(passphrase)
     if (! typed.trim()) { return BlankVerdict }
-    let checked: ReturnType<typeof GX.passphraseVerdict.safeParse>
+    let answered: unknown
     try {
-      // Parsed inside the guard, to be certain no cleartext passphrase leakage
-      checked = GX.passphraseVerdict.safeParse(await host(typed, told))
+      // The spread reads each field here, inside the guard, so a getter or proxy of the host's that throws is replaced, and the parse below reads plain data.
+      answered = { ...await host(typed, told) }
     } catch (err) {
       throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', Phrases.StrengthCheckerThrew)
     }
-    if (! checked.success) {
-      throw strengthCheckerMisanswered()
-    }
-    return checked.data.strong ? StrongVerdict : checked.data
+    const verdict = GX.passphraseVerdict.parse(answered, { advice: Phrases.StrengthCheckerMisanswered })
+    return verdict.strong ? StrongVerdict : verdict
   }
   const load = async (): Promise<void> => {
     try {

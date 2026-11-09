@@ -24,7 +24,7 @@ const NoDialog = ({ onDone }: Pick<GatingModalProps, 'onDone'>) => {
   useEffect(() => {
     if (answered.current) { return }
     answered.current = true
-    onDone('declined')
+    onDone('dismissed')
   }, [onDone])
   return null
 }

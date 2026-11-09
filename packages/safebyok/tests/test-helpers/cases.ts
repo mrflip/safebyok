@@ -15,8 +15,8 @@ const verdictOf = (attempt: () => unknown): string => {
   }
 }
 
-/** A check held to its table of cases: each passes, or refuses. */
-export const holdsCases = (check: { parse: (val: unknown) => unknown }, cases: readonly Case[]): void => {
+/** A check run against its table of cases: each passes, or refuses. */
+export const expectCases = (check: { parse: (val: unknown) => unknown }, cases: readonly Case[]): void => {
   for (const [input, passes, blurb] of cases) {
     it(blurb, () => { expect(verdictOf(() => check.parse(input))).to.eq(passes ? 'passes' : 'refuses') })
   }

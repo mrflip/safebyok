@@ -132,7 +132,7 @@ describe("ConvexVaultDB over a ConvexReactClient, on a host's functions", () => 
     await TH.expectBad(hostedVaultDB('u2').vaultDB.tryListVaults(TH.bankScope), 'identity_revoked')
   })
 
-  it("is refused again for a query the client already holds the refusal of", async () => {
+  it("is refused again for a query the client already has the refusal of", async () => {
     const { vaultDB } = hostedVaultDB('u2')
     await TH.expectBad(vaultDB.tryGetVault(TH.vaultScope), 'identity_revoked')
     await TH.expectBad(vaultDB.tryGetVault(TH.vaultScope), 'identity_revoked')

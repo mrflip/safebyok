@@ -14,14 +14,14 @@ const WeekMillis = 7 * 24 * 60 * MinuteMillis
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
 /** The gating `raise` opens, shown in a PassphraseModal whose answers the test reads, closed by the first. */
-const shownFor = async (raise: typeof TH.building, opts: { built?: boolean, bankOpts?: Parameters<typeof TH.heldGatingOf>[2], leaseMillis?: number, passphraseAdvice?: (typed: string) => string | null } = {}) => {
+const shownFor = async (raise: typeof TH.building, opts: { built?: boolean, bankOpts?: Parameters<typeof TH.openGatingOf>[2], leaseMillis?: number } = {}) => {
   const world = TH.makeBankWorld()
   if (opts.built === true) { await TH.makeBankWithVault(world) }
-  const held = await TH.heldGatingOf(world, raise, opts.bankOpts)
+  const opened = await TH.openGatingOf(world, raise, opts.bankOpts)
   const answers: DialogAnswer[] = []
-  const onDone = (answer: DialogAnswer) => { answers.push(answer); held.close() }
-  render(<PassphraseModal gating={TH.passphraseGatingOf(held.gating)} onDone={onDone} leaseMillis={opts.leaseMillis} passphraseAdvice={opts.passphraseAdvice} />)
-  return { ...held, answers }
+  const onDone = (answer: DialogAnswer) => { answers.push(answer); opened.close() }
+  render(<PassphraseModal gating={TH.passphraseGatingOf(opened.gating)} onDone={onDone} leaseMillis={opts.leaseMillis} />)
+  return { ...opened, answers }
 }
 
 const alertText = () => screen.getByRole('alert').textContent
@@ -55,12 +55,6 @@ describe("PassphraseModal, building a vault", () => {
     expect(gating.isOpen).to.be.true
     expect(answers).to.deep.equal([])
   })
-
-  it("shows the host's advice in place of the checker's", async () => {
-    await shownFor(TH.building, { passphraseAdvice: (typed) => `${String(typed.length)} characters` })
-    fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'short' } })
-    await waitFor(() => { expect(screen.queryByText('5 characters')).to.not.be.null })
-  })
 })
 
 describe("PassphraseModal, unlocking a vault", () => {
@@ -81,18 +75,32 @@ describe("PassphraseModal, unlocking a vault", () => {
   ] as const
 
   for (const [how, closeIt] of CloseCases) {
-    it(`answers declined on ${how}, and the gating is declined`, async () => {
+    it(`answers dismissed on ${how}, and the gating is dismissed`, async () => {
       const { raising, answers } = await shownFor(TH.unlocking, { built: true })
       closeIt()
-      expect(answers).to.deep.equal(['declined'])
+      expect(answers).to.deep.equal(['dismissed'])
       expect(await raising).to.include({ ok: false })
     })
   }
 
-  it("answers declined once its gating settles with no attempt, as at a lock", async () => {
+  it("answers dismissed once its gating concludes with no attempt, as at a sweep", async () => {
     const { bank, answers } = await shownFor(TH.unlocking, { built: true })
-    act(() => { bank.lock() })
-    await waitFor(() => { expect(answers).to.deep.equal(['declined']) })
+    act(() => { bank.sweep() })
+    await waitFor(() => { expect(answers).to.deep.equal(['dismissed']) })
+  })
+})
+
+describe("PassphraseModal over a later gating", () => {
+  it("starts its form empty, nothing typed carrying over", async () => {
+    const world = TH.makeBankWorld()
+    await TH.makeBankWithVault(world)
+    const first = await TH.openGatingOf(world, TH.unlocking)
+    const second = await TH.openGatingOf(world, TH.unlocking)
+    const ui = (gating: typeof first.gating) => <PassphraseModal gating={TH.passphraseGatingOf(gating)} onDone={() => undefined} />
+    const { rerender } = render(ui(first.gating))
+    fireEvent.change(screen.getByLabelText(Messages.passphraseField), { target: { value: TH.Passphrase } })
+    rerender(ui(second.gating))
+    expect(screen.getByLabelText<HTMLInputElement>(Messages.passphraseField).value).to.eq('')
   })
 })
 

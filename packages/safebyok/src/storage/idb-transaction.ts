@@ -42,7 +42,7 @@ const abortOf = (transaction: IDBTransaction): Promise<Error | null> => new Prom
   transaction.addEventListener('abort', () => { resolve(transaction.error ?? new DOMException(Phrases.TransactionAborted, 'AbortError')) })
 })
 
-/** Abort `transaction`, where it has not already finished. */
+/** Abort `transaction`, where it has not already committed. */
 const abandon = (transaction: IDBTransaction): void => {
   try {
     transaction.abort()
@@ -62,13 +62,13 @@ export const rowAt = async (store: IDBObjectStore, scopepath: IDBValidKey): Prom
 /** The refusal that says what went wrong in IndexedDB. */
 const troubleOf = (err: unknown): VaultError => {
   if (isVaultError(err)) { return err }
-  // A browser with IndexedDB switched off may hold the global as null rather than leave it out.
-  if ((typeof indexedDB === 'undefined') || ((indexedDB as IDBFactory | null) === null)) { return storageUnavailable(err, Phrases.NoBrowserStore) }
+  // A browser with IndexedDB switched off may have the global as null rather than leave it out.
+  if ((typeof indexedDB === 'undefined') || ((indexedDB as IDBFactory | null) === null)) { return storageUnavailable(err, Phrases.NoBrowserDatastore) }
   const errname = (err instanceof Error) ? err.name : null
   if (errname === 'QuotaExceededError') { return storageFull(err) }
   if (errname === 'AbortError') { return storageUnavailable(err, Phrases.TransactionAborted) }
   if (errname === 'InvalidStateError') { return storageUnavailable(err, Phrases.DatabaseClosed) }
   if (errname === 'SecurityError') { return storageUnavailable(err, Phrases.StorageWithheld) }
-  return storageUnavailable(err, Phrases.BrowserStoreFailed)
+  return storageUnavailable(err, Phrases.BrowserDatastoreFailed)
 }
 // --

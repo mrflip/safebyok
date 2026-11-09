@@ -33,7 +33,7 @@ describe("safebyok", () => {
     expectTypeOf<Parameters<Front.BankAnnounce>[0]>().toEqualTypeOf<Front.BankAnnouncement>()
     expectTypeOf<Parameters<Front.LifecycleHandler>[0]>().toEqualTypeOf<Front.BankEvent>()
     expectTypeOf<Front.BankOpts['onLifecycle']>().toEqualTypeOf<Front.LifecycleHandler | undefined>()
-    expectTypeOf<Extract<Front.BankEvent, { kind: 'lease_unerased' }>['where']>().toEqualTypeOf<Front.EraseSite>()
+    expectTypeOf<Extract<Front.BankEvent, { kind: 'lease_revoke_failed' }>['where']>().toEqualTypeOf<Front.RevokeSite>()
     expectTypeOf<Front.BankFriend['askUser']>().toEqualTypeOf<Front.AskUser | null>()
     expectTypeOf<Parameters<typeof Front.tellBadNewsTo>[0]>().toEqualTypeOf<Front.BadNewsHandler>()
   })
@@ -51,7 +51,7 @@ describe("safebyok", () => {
     expect(Front.PassphraseSaltBytes).to.eq(16)
   })
 
-  it("exports the device store a host hands Bank.make: the DeviceDB base to extend, and MemoryDeviceDB", () => {
+  it("exports the DeviceDB a host hands Bank.make: the DeviceDB base to extend, and MemoryDeviceDB", () => {
     expect(new Front.MemoryDeviceDB()).toBeInstanceOf(Front.DeviceDB)
     expectTypeOf<Front.MemoryDeviceDB>().toExtend<Front.BankOpts['deviceDB']>()
   })

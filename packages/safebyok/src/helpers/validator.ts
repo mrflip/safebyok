@@ -1,4 +1,4 @@
-/** `Checkers`, `Checker` and `objCheck`, where every validator is made, and the {@link Kit} its builders are handed; and `consistent`, `demandConsistent` and `verifyConsistent`, which hold one bag to another, as a validator's `parseConsistent` does. */
+/** `Checkers`, `Checker` and `objCheck`, where every validator is made, and the {@link Kit} its builders are handed; and `consistent`, `demandConsistent` and `verifyConsistent`, which compare one bag to another, as a validator's `parseConsistent` does. */
 
 import * as Zod from 'zod'
 import type * as Z from 'zod'
@@ -56,7 +56,7 @@ export type Merged<SourcesT extends readonly object[]> =
 /** Make validators: `build` gets the kit and returns its schemas by name, and each comes back with a `parse` that throws a VaultError of `kind`.
  * The message names each failing field by its path, up to eight, and counts the rest, each with
  * its check's own sentence or Zod's English. `meta.fieldnames` lists the same fields. For fields
- * an object does not take, it says how many, never which, and lists the fields it takes. It quotes
+ * an object does not accept, it says how many, never which, and lists the fields it accepts. It quotes
  * no input and carries no `cause`.
  *
  * `parse(val, story?)` frames the message as the {@link Story} asks: `where` the input was
@@ -73,11 +73,11 @@ export type Merged<SourcesT extends readonly object[]> =
  * `.catchall()`, puts each failing key in the path. Judge such an object whole with `custom`.
  *
  * A validator also has `refusingAs(kind)`: the same schema again, its `parse` refusing `kind`. Where
- * one tier checks what another does and refuses in its own kind, it takes the other's validator
+ * one tier checks what another does and refuses in its own kind, it accepts the other's validator
  * and makes it so (`SX.vaultRow.refusingAs('damaged_row')`), rather than listing its fields twice.
  *
  * A validator of an object also has `parseConsistent(val, other, refusal?)`: it parses `val`,
- * holds the result to `other` as {@link verifyConsistent} does, and returns the result. Where they
+ * checks the result against `other` as {@link verifyConsistent} does, and returns the result. Where they
  * disagree it refuses `kind`, or the `refusal` given: its `kind`, its `message`, or both. A
  * `refusal` can also carry a `where` and `advice`, which frame a failed parse as `parse`'s do.
  *
@@ -107,10 +107,10 @@ export const Checkers = <ValsT extends Record<string, Z.ZodType>, const SourcesT
 }
 
 /** Make one validator: `build` gets the kit and returns its schema, which comes back with a `parse` that throws a VaultError of `kind`, 'bad_record' unless given.
- * It refuses as a {@link Checkers} call's validators do, and takes `sources` as one does.
+ * It refuses as a {@link Checkers} call's validators do, and accepts `sources` as one does.
  *
  * @example
- *   export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltNotFresh(PasskeySaltBytes)), 'bad_record')
+ *   export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltShape(PasskeySaltBytes)), 'bad_record')
  * @example export const callback = Checker(({ fn }) => fn(), 'bad_option')
  */
 export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readonly object[] = readonly []>(
@@ -119,7 +119,7 @@ export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readon
 
 /** Make one validator of an object: `build` gets the kit and returns the object's fields, and the object, strict unless `opts` says otherwise, comes back as a {@link Checker} hands one back.
  * `opts` is the kind it refuses, or an {@link ObjCheckOpts}: `refusalkind`, the kind, 'bad_record'
- * unless given, and `extras`, what it does with a field it does not take: 'strict', the default,
+ * unless given, and `extras`, what it does with a field it does not accept: 'strict', the default,
  * refuses it, and 'strip' drops it unread, as Zod's object does. Any other `opts` refuses.
  * A check of the object whole (`.refine()`, `.readonly()`, a sentence of its own)
  * is made in a {@link Checker} call instead: one chained onto this one's validator would refuse
@@ -131,7 +131,7 @@ export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readon
  *     revision_tok: revision_tok.nullable(),
  *     damage:       oneof(boxDamageVals),
  *   }), 'bad_record', [CX])
- *   boxDamaged.parse({ ...damaged, note: 'hi' })  // throws 'bad_record', "There is a field it does not take ..."
+ *   boxDamaged.parse({ ...damaged, note: 'hi' })  // throws 'bad_record', "There is a field it does not accept ..."
  * @example
  *   export const boxCiphered = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({
  *     box_key_wrapped,
@@ -150,7 +150,7 @@ export const objCheck = <ShapeT extends Z.ZodRawShape, const SourcesT extends re
 /** The kit a builder is handed: `sources` spread in beneath {@link Kit}. */
 const kitWith = <SourcesT extends readonly object[]>(sources?: SourcesT): KitWith<SourcesT> => Object.assign({}, ...(sources ?? []), Kit) as KitWith<SourcesT>
 
-/** True exactly when `A` and `B` are the same type: hold a hand-written shape to its checker with `true satisfies AssertEqual<Shape, CheckerInput<typeof check>>`. */
+/** True exactly when `A` and `B` are the same type: match a hand-written shape to its checker with `true satisfies AssertEqual<Shape, CheckerInput<typeof check>>`. */
 export type AssertEqual<A, B> = Z.core.util.AssertEqual<A, B>
 
 /** What a checker accepts: the input type of its schema. */
@@ -163,14 +163,14 @@ export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
   /** This validator's schema again, its `parse` and `parseConsistent` refusing `kind`. */
   refusingAs: (kind: Refusalkind) => Refusing<SchemaT>
 } & (Z.output<SchemaT> extends object ? {
-  /** `val`, parsed, once each field it holds that `other` holds too is `===` to `other`'s: the call's kind otherwise, or `refusal`'s, naming the fields that disagree. A failed parse refuses as `parse` does. */
+  /** `val`, parsed, once each field it has that `other` has too is `===` to `other`'s: the call's kind otherwise, or `refusal`'s, naming the fields that disagree. A failed parse refuses as `parse` does. */
   parseConsistent: (val: unknown, other: object, refusal?: Partial<ConsistencyRefusal> & Story) => Z.output<SchemaT>
 } : unknown)
 // --
 
 // == [Refusals]: refusing, InEnglish, English, fieldnamesOf, MaxFailuresSaid, fieldnameOf, sentenceOf, refusalOf, framed
 
-/** A clone of `schema` whose `parse` throws a VaultError of `kind` where Zod's would throw its own, and whose `parseConsistent` parses, then holds the result to another bag. Every schema gets `parseConsistent`; {@link Refusing} types it only on an object's. */
+/** A clone of `schema` whose `parse` throws a VaultError of `kind` where Zod's would throw its own, and whose `parseConsistent` parses, then compares the result to another bag. Every schema gets `parseConsistent`; {@link Refusing} types it only on an object's. */
 const refusing = <SchemaT extends Z.ZodType>(kind: Refusalkind, schema: SchemaT): Refusing<SchemaT> => {
   const parse = (val: unknown, story?: Story): Z.output<SchemaT> => {
     const framing = story === undefined ? {} : Checks.story.parse(story)
@@ -187,7 +187,7 @@ const refusing = <SchemaT extends Z.ZodType>(kind: Refusalkind, schema: SchemaT)
 }
 
 /** The error map every `parse` runs under: Zod's own English, whatever map the host set with `z.config`, which could quote the input.
- * For fields an object does not take, it says how many and lists the fields it takes. A sentence
+ * For fields an object does not accept, it says how many and lists the fields it accepts. A sentence
  * a check carries still wins.
  */
 const InEnglish = {
@@ -197,7 +197,7 @@ const InEnglish = {
 /** Zod's English error map. */
 const English = Zod.locales.en().localeError
 
-/** The fields an object schema takes, by its shape: none for any other schema. */
+/** The fields an object schema accepts, by its shape: none for any other schema. */
 const fieldnamesOf = (schema: unknown): string[] => (schema instanceof Zod.ZodObject ? Object.keys(schema.shape) : [])
 
 /** The most failures a refusal's message names; it counts the rest. */
@@ -232,10 +232,10 @@ const framed = (said: string, { where, advice }: Story): string => {
 // == [Consistency]: consistent, demandConsistent, verifyConsistent, disagreeing
 
 /** True when `bag` agrees with `other` wherever both make an assertion: each field defined in both (present, and not undefined) is `===`.
- * A field only one of them holds, or holds as undefined, is passed by. The fields compared are
+ * A field only one of them has, or has as undefined, is passed by. The fields compared are
  * `bag`'s own enumerable ones, so `bag` is plain data, a parse's output; `other` may be anything
- * holding fields, a Vault object's getters included, each read by its name. So `other` says what
- * is held to: hand it only the fields meant. An absent field passes, so a value an absent field
+ * with fields, a Vault object's getters included, each read by its name. So `other` says what
+ * is compared: hand it only the fields meant. An absent field passes, so a value an absent field
  * must fail is parsed first. Either bag not an object refuses.
  *
  * @example consistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' })   // true: no field is defined in both
@@ -262,7 +262,7 @@ export const verifyConsistent = <BagT extends object>(bag: BagT, other: object, 
   return bag
 }
 
-/** The names of the fields `bag` and `other` both define and hold apart, frozen: each bag checked to be an object first. */
+/** The names of the fields `bag` and `other` both define and have at different values, frozen: each bag checked to be an object first. */
 const disagreeing = (bag: object, other: object): readonly string[] => {
   const ours = Checks.bag.parse(bag)
   const theirs: Partial<Record<string, unknown>> = Checks.bag.parse(other)
@@ -274,7 +274,7 @@ const disagreeing = (bag: object, other: object): readonly string[] => {
 
 // == [Checks]: Checks, ConsistencyRefusal, Story, ObjCheckOpts
 
-/** The checks this module makes for itself, under one name: `bag`, any object, taken as it is, so a getter still reads; `consistencyRefusal`, what a disagreement refuses with; `story`, the words around a parse's refusal; and `objCheckOpts`, how an {@link objCheck} validator refuses. Made below {@link Checkers} and its refusals, which the call needs. */
+/** The checks this module makes for itself, under one name: `bag`, any object, accepted as it is, so a getter still reads; `consistencyRefusal`, what a disagreement refuses with; `story`, the words around a parse's refusal; and `objCheckOpts`, how an {@link objCheck} validator refuses. Made below {@link Checkers} and its refusals, which the call needs. */
 const Checks = Checkers('bad_option', ({ custom, obj, oneof, str, union }) => ({
   bag:                custom<object>((val) => typeof val === 'object' && val !== null, Phrases.BagNotObject),
   consistencyRefusal: obj({
@@ -292,7 +292,7 @@ const Checks = Checkers('bad_option', ({ custom, obj, oneof, str, union }) => ({
   objCheckOpts:       obj({
     /** The kind thrown; 'bad_record' by default. */
     refusalkind: oneof(refusalkindVals).default('bad_record'),
-    /** `strict`, the default, refuses a field the object does not take; `strip` drops it unread. */
+    /** `strict`, the default, refuses a field the object does not accept; `strip` drops it unread. */
     extras:      oneof(['strict', 'strip']).default('strict'),
   }).strict(),
 }))

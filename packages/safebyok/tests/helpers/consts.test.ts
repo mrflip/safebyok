@@ -59,14 +59,14 @@ describe("hasModelkind", () => {
 })
 
 describe("isVaultDB and isDeviceDB", () => {
-  it("tell a store by the brand its base class carries, as another copy of safebyok would make it", () => {
+  it("tell a VaultDB or a DeviceDB by the brand its base class carries, as another copy of safebyok would make it", () => {
     expect(isVaultDB(new MemoryVaultDB())).to.be.true
     expect(isDeviceDB(new MemoryDeviceDB())).to.be.true
     expect(isVaultDB({ [Symbol.for('@safebyok/vaultdb')]: true })).to.be.true
     expect(isDeviceDB({ [Symbol.for('@safebyok/devicedb')]: true })).to.be.true
   })
 
-  it("refuse a duck, the other store, and a copy of a store's own fields, which leaves the brand behind", () => {
+  it("refuse a duck, the other one, and a copy of a VaultDB's own fields, which leaves the brand behind", () => {
     const vaultDB = new MemoryVaultDB()
     expect(isDeviceDB({ tryPeek: () => null, tryStow: () => null, tryForget: () => null })).to.be.false
     expect(isVaultDB(Object.assign({}, vaultDB))).to.be.false
@@ -78,7 +78,7 @@ describe("isVaultDB and isDeviceDB", () => {
 })
 
 describe("isAdapterVaultDB", () => {
-  it("tells an adapter's store from a client of one, which wears only the VaultDB's brand", () => {
+  it("tells an AdapterVaultDB from a client of one, which wears only the VaultDB's brand", () => {
     const vaultDB = new MemoryVaultDB()
     const client = { [Symbol.for('@safebyok/vaultdb')]: true }
     expect([isVaultDB(vaultDB), isAdapterVaultDB(vaultDB)]).to.deep.equal([true, true])
@@ -86,7 +86,7 @@ describe("isAdapterVaultDB", () => {
     expect(isAdapterVaultDB({ [Symbol.for('@safebyok/adaptervaultdb')]: true })).to.be.true
   })
 
-  it("refuses a plain object answering every verb, and a copy of a store's own fields", () => {
+  it("refuses a plain object answering every verb, and a copy of a VaultDB's own fields", () => {
     const vaultDB = new MemoryVaultDB()
     const verbs = Object.fromEntries(VaultDBVerbnames.map((verbname) => [verbname, vaultDB[verbname].bind(vaultDB)]))
     expect([isVaultDB(verbs), isAdapterVaultDB(verbs)]).to.deep.equal([false, false])

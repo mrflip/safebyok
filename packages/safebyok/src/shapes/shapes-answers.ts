@@ -1,4 +1,4 @@
-/** The checks of a vaultDB's answers as a client takes them off a wire, where an absent field arrives as null: each parses to the answer its verb returns. Imported as `AX`. */
+/** The checks of a vaultDB's answers as a client receives them from a wire, where an absent field arrives as null: each parses to the answer its verb returns. Imported as `AX`. */
 
 import type * as Z from 'zod'
 import { Checkers } from '../helpers/validator'
@@ -51,7 +51,7 @@ export type CrossedReqParams = Z.output<typeof crossedReqParams>
 
 // == [Answers]: listVaultsAnswer, getVaultAnswer, putVaultAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delVaultAnswer, listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer, crossedNotice
 
-/** The answer a verb returns, made from the one that crossed: its request's metadata as the core holds it, and its refusal a VaultError again. */
+/** The answer a verb returns, made from the one that crossed: its request's metadata as the core has it, and its refusal a VaultError again. */
 const answerOfCrossed = <ValT, ActT extends string, WorldT>(crossed: Crossed<ValT, ActT, WorldT>): Answer<ValT, ActT, WorldT> => {
   const req_params = reqParamsOfCrossed(crossed.req_params)
   if (crossed.ok) { return { ok: true, act: crossed.act, val: crossed.val, world: crossed.world, dbhas: crossed.dbhas, req_params } }
@@ -65,12 +65,12 @@ type Crossed<ValT, ActT extends string, WorldT> = { req_params: CrossedReqParams
   | { ok: false, act: string, val: null, world: unknown, err: CrossedErr }
 )
 
-/** `crossed` as the core holds a request's metadata, each null field left out. */
+/** `crossed` as the core has a request's metadata, each null field left out. */
 const reqParamsOfCrossed = (crossed: CrossedReqParams): ReqParams => (
   Object.fromEntries(Object.entries(crossed).filter(([, field]) => field !== null))
 )
 
-/** The VaultError `crossed` stands for, its meta holding what crossed and what the answer holds. */
+/** The VaultError `crossed` stands for, its meta with what crossed and what the answer has. */
 const vaultErrorOfCrossed = ({ refusalkind, message, meta }: CrossedErr, answered: RefusalMeta): VaultError => {
   const crossedMeta = Object.fromEntries(Object.entries(meta ?? {}).filter(([, field]) => field !== null)) as RefusalMeta
   return new VaultError(refusalkind, message, { meta: { ...crossedMeta, ...answered } })

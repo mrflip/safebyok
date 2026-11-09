@@ -13,7 +13,7 @@ export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
   if (stage === 'unborn') { return <CreateVaultButton vaultlabel={vaultlabel} /> }
   if ((bank === null) || (vault === null) || (snapshot === null)) { return null }
   // `vault.tryEnsureUnlocked()` on the vault in hand, never `bank.ensureVault`: an Unlock never builds a vault.
-  const unlock = async () => { tellUnlessDeclined(tellBadNews, await vault.tryEnsureUnlocked()) }
+  const unlock = async () => { tellUnlessDismissed(tellBadNews, await vault.tryEnsureUnlocked()) }
   const { isLocked } = snapshot
   return (
     <span className="vault-lock-control" data-locked={isLocked}>
@@ -32,7 +32,7 @@ export const CreateVaultButton = ({ vaultlabel }: VaultControlProps) => {
   const isReady = (useBankSnapshot()?.stage === 'ready')
   const create = async () => {
     if ((bank === null) || (! isReady)) { return }
-    tellUnlessDeclined(tellBadNews, await bank.tryEnsureVault({ vaultlabel }))
+    tellUnlessDismissed(tellBadNews, await bank.tryEnsureVault({ vaultlabel }))
   }
   return (
     <button type="button" className="create-vault-button" disabled={! isReady} onClick={() => { void create() }}>
@@ -41,7 +41,7 @@ export const CreateVaultButton = ({ vaultlabel }: VaultControlProps) => {
   )
 }
 
-const tellUnlessDeclined = (tellBadNews: TellBadNews, outcome: Outcome<unknown>): void => {
-  if (outcome.ok || isVaultError(outcome.err, 'declined')) { return }
+const tellUnlessDismissed = (tellBadNews: TellBadNews, outcome: Outcome<unknown>): void => {
+  if (outcome.ok || isVaultError(outcome.err, 'dismissed')) { return }
   tellBadNews([outcome.err])
 }

@@ -1,12 +1,11 @@
 import { useRef } from 'react'
 import { Messages } from '../helpers/messages'
-import { useRoundFor } from '../hooks/round-for'
 import type { RevokePasskeyModalProps } from '../shapes'
 import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts } from './modal-kit'
 
 /** The dialog for a `revoke_passkey` gating, which removes the vault's passkey once the user proves its passphrase. */
 export const RevokePasskeyModal = (props: RevokePasskeyModalProps) => (
-  <AnsweringOnce key={useRoundFor(props.gating)} gating={props.gating} onDone={props.onDone}>
+  <AnsweringOnce key={props.gating.gatingTok} gating={props.gating} onDone={props.onDone}>
     {(done) => <RevokePasskeyForm {...props} onDone={done} />}
   </AnsweringOnce>
 )

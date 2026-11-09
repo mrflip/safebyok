@@ -230,7 +230,7 @@ raising a budget follows the same rule, and says in the PR why the bundle grew. 
 
 * **`human/`** -- from agents, to Coaches: one file per entry (`human/README.md`).
 * **`whiteboard/`** -- a thread's plans and progress, while it is open.
-* **`winboard/`** -- a finished thread's folder, moved from `whiteboard/`, with its `human/`
+* **`winboard/`** -- a completed thread's folder, moved from `whiteboard/`, with its `human/`
   entries renamed `*-human.md` and a `*-resolution.md` saying how each of its gripes was settled.
 * **`notes/security.md`** -- a decision a security reviewer should look at, in a sentence or two,
   dated. Add one when you make such a decision, in the same PR, through a subagent (the file's

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as DB from 'safebyok/storage'
 import * as TH from '../test-helpers'
 
-// The component's validators are converted from the core's checkers: these cases hold the
+// The component's validators are converted from the core's checkers: these cases keep to the
 // conversion to its purpose, a record the core writes goes in whole and a misshapen one stops at the door.
 
 type Backend = ReturnType<typeof TH.componentTest>
@@ -20,7 +20,7 @@ const storedRows = (backend: Backend) => backend.run(async ({ db }) => {
   return { vaults: vaultDocs.map(({ vault: row }): unknown => row), boxes: boxDocs.map(({ box: row }): unknown => row), tallies: tallyDocs.length }
 })
 
-/** A backend holding the vault, live, as every box put needs. */
+/** A backend with the vault, live, as every box put needs. */
 const withVault = async (): Promise<Backend> => {
   const backend = TH.componentTest()
   await backend.mutation(api.putVault, { record: vault, opts: birth })
@@ -37,7 +37,7 @@ describe("the component's validators, against what the core writes", () => {
     expect(await storedRows(backend)).to.deep.equal({ vaults: [TH.vaultTombstoneOf(vault)], boxes: [TH.boxTombstoneOf(box)], tallies: 0 })
   })
 
-  it("take a sidecar of any JSON the core admits, and store it as it came", async () => {
+  it("take a sidecar of any JSON the core admits, and put it as it came", async () => {
     const backend = await withVault()
     const sidecar = { label: 'work', tags: ['a', 'b'], nested: { count: 2, on: true, none: null } }
     const record = TH.boxAt(0, 'life1', { sidecar })
@@ -62,7 +62,7 @@ const MisshapenCases = [
 
 describe("the component's validators, against a misshapen call", () => {
   for (const [argsOf, fnname, blurb] of MisshapenCases) {
-    it(`refuse ${blurb}, storing nothing`, async () => {
+    it(`refuse ${blurb}, putting nothing`, async () => {
       const backend = await withVault()
       const fnRef = (fnname === 'putVault') ? api.putVault : api.putBox
       await expect(backend.mutation(fnRef, argsOf() as never)).rejects.toThrow(/Validator/)

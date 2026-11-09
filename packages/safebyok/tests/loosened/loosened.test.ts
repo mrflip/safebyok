@@ -11,29 +11,29 @@ import { Dna, Passphrase, byPassphrase, makeVaultWorld, replaceTyping, useVaultW
 import { PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { passphraseCleartext } from '../../src/shapes/shapes-gateish'
 
-const held = useModelsWorld()
+const world = useModelsWorld()
 useVaultWorlds()
 
 // == [Creation and re-creation]: registered_at over a rebirth, the tombstone's registered_at
 
 describe("registered_at over a rebirth", () => {
-  it("VOCABULARY.md:153 (registered_at is when a box was first stored): a box deleted and reborn is registered at the rebirth's put, not its first store", async () => {
-    held.mw.seedStore(fullBoxRecord())
-    const box = await fakeSealBoxListingOf(held.mw).build(fullBoxRecord())
+  it("VOCABULARY.md:153 (registered_at is when a box was first stored): a box deleted and reborn is registered at the rebirth's put, not its first put", async () => {
+    world.mw.seedPut(fullBoxRecord())
+    const box = await fakeSealBoxListingOf(world.mw).build(fullBoxRecord())
     await box.del()
-    held.mw.setNow(T0 + 5000)
+    world.mw.setNow(T0 + 5000)
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} })
     expect(box._cheat_central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
   })
 
-  it("VOCABULARY.md:155 (registered_at is when this life of a box began, kept by every later revision of that life): a store that answers a rebirth with the buried record's registered_at, as a database default might keep it, is adopted quietly, and the box's registered_at follows it, the rebirth's own time lost with the staged copy that carried it", async () => {
-    const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
-    held.mw.setNow(T0 + 5000)
-    held.mw.willPut(({ record }) => held.mw.answerOf(box.scope, { ...record, registered_at: T0 }))
+  it("VOCABULARY.md:155 (registered_at is when this life of a box began, kept by every later revision of that life): a VaultDB that answers a rebirth with the buried record's registered_at, as a database default might keep it, is adopted quietly, and the box's registered_at follows it, the rebirth's own time lost with the staged copy that carried it", async () => {
+    const box = await fakeSealBoxListingOf(world.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
+    world.mw.setNow(T0 + 5000)
+    world.mw.willPut(({ record }) => world.mw.answerOf(box.scope, { ...record, registered_at: T0 }))
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} })
     expect(box._cheat_central).to.deep.include({ registered_at: T0 })
     expect(box.registered_at).to.eq(T0)
-    expect(held.mw.badnews).to.deep.equal([])
+    expect(world.mw.badnews).to.deep.equal([])
   })
 })
 
@@ -70,7 +70,7 @@ describe("the gate changes the vault sends", () => {
     const theirs = await other.listing.build(demandStored())
     await unlockTyping(theirs, byPassphrase(Passphrase))
     await replaceTyping(vault, Passphrase, NewPassphrase)
-    other.storeBehindOurBack(demandStored())
+    other.putBehindOurBack(demandStored())
     await theirs.fetch()
     expect(theirs.gate.pickle().passphrase_wayin).to.deep.equal(demandStored().gate.passphrase_wayin)
     expect(theirs.isUnlocked).to.be.true

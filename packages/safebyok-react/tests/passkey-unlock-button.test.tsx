@@ -10,14 +10,14 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** An unlock_vault gating, held open on another device, for a vault holding a passkey the fake authenticator holds; and the authenticator. */
+/** An unlock_vault gating, kept open on another device, for a vault with a passkey the fake authenticator has; and the authenticator. */
 const passkeyedUnlock = async () => {
   const authenticator = TH.installFakeAuthenticator()
   const world = TH.makeBankWorld()
   const { vault } = await TH.makeBankWithVault(world)
   await TH.addPasskeyTo(world, vault, await createPasskey(TH.PasskeyMaking))
-  const held = await TH.heldGatingOf(world, TH.unlocking)
-  return { ...held, gating: TH.gatingOfKind(held.gating, 'unlock_vault'), authenticator, world }
+  const opened = await TH.openGatingOf(world, TH.unlocking)
+  return { ...opened, gating: TH.gatingOfKind(opened.gating, 'unlock_vault'), authenticator, world }
 }
 
 /** The button for `gating`, what it told `onDone` and `onGripe`, and what React reported. */
@@ -46,7 +46,7 @@ describe("PasskeyUnlockButton", () => {
   it("is not there in a browser without WebAuthn, nor for a vault with no passkey", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
-    const { gating } = await TH.heldGatingOf(world, TH.unlocking)
+    const { gating } = await TH.openGatingOf(world, TH.unlocking)
     buttonFor(TH.gatingOfKind(gating, 'unlock_vault'))
     expect(screen.queryByText(Messages.passkeyButton)).to.be.null
     TH.installFakeAuthenticator()
@@ -68,8 +68,8 @@ describe("PasskeyUnlockButton", () => {
     const { gating, authenticator } = await passkeyedUnlock()
     buttonFor(gating, { takesFocus: true })
     const button = screen.getByText(Messages.passkeyButton)
-    const touching = TH.held()
-    authenticator.holdNext(touching.promise)
+    const touching = TH.makePending()
+    authenticator.answerNextAfter(touching.promise)
     authenticator.refuseNext('NotAllowedError')
     fireEvent.click(button)
     await waitFor(() => { expect(asking()).to.eq('true') })
@@ -95,9 +95,9 @@ describe("PasskeyUnlockButton", () => {
     authenticator.refuseNext('UnknownError')
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await waitFor(() => { expect(gripes).to.deep.equal([null, Messages.passkeyAskFailed]) })
-    refusingAttempts(new VaultError('locked_while_asking', 'locked'))
+    refusingAttempts(new VaultError('dismissed', 'dismissed'))
     fireEvent.click(screen.getByText(Messages.passkeyButton))
-    await waitFor(() => { expect(answers).to.deep.equal(['declined']) })
+    await waitFor(() => { expect(answers).to.deep.equal(['dismissed']) })
   })
 
   it("leaves an attempt under way to answer when pressed during it", async () => {
@@ -124,8 +124,8 @@ describe("PasskeyUnlockButton", () => {
   it("never tries a passkey the user touched while an Activity hid it, zeroing its answer: once shown again, a press unlocks", async () => {
     const { gating, authenticator, raising } = await passkeyedUnlock()
     const attempts = vi.spyOn(Gating.prototype, 'attempt')
-    const touching = TH.held()
-    authenticator.holdNext(touching.promise)
+    const touching = TH.makePending()
+    authenticator.answerNextAfter(touching.promise)
     const { ui, answers, rerender } = buttonFor(gating)
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     rerender(TH.inActivity('hidden', ui))
@@ -140,12 +140,12 @@ describe("PasskeyUnlockButton", () => {
   })
 })
 
-/** The unlock dialog for a vault holding a passkey, and its answers. */
+/** The unlock dialog for a vault with a passkey, and its answers. */
 const dialogFor = async () => {
-  const held = await passkeyedUnlock()
+  const opened = await passkeyedUnlock()
   const answers: DialogAnswer[] = []
-  render(<PassphraseModal gating={held.gating} onDone={(answer) => { answers.push(answer); held.close() }} />)
-  return { ...held, answers }
+  render(<PassphraseModal gating={opened.gating} onDone={(answer) => { answers.push(answer); opened.close() }} />)
+  return { ...opened, answers }
 }
 
 describe("PassphraseModal, for a vault with a passkey", () => {
@@ -182,7 +182,7 @@ describe("PassphraseModal, for a vault with a passkey", () => {
 
   it("offers no passkey to a user choosing the vault's first passphrase", async () => {
     TH.installFakeAuthenticator()
-    const { gating } = await TH.heldGatingOf(TH.makeBankWorld(), TH.building)
+    const { gating } = await TH.openGatingOf(TH.makeBankWorld(), TH.building)
     render(<PassphraseModal gating={TH.passphraseGatingOf(gating)} onDone={() => undefined} />)
     expect(screen.queryByText(Messages.passkeyButton)).to.be.null
   })

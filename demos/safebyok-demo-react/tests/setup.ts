@@ -5,7 +5,7 @@ import { afterEach } from 'vitest'
 
 afterEach(cleanup)
 
-// A findBy or waitFor returns the moment its condition holds, so its ceiling costs nothing when
-// the test passes. What it waits on includes making a vault (its keys, its stores), which on a
+// A findBy or waitFor returns the moment its condition has, so its ceiling costs nothing when
+// the test passes. What it waits on includes making a vault (its keys, the rows it puts and stows), which on a
 // loaded CI machine outlasts the default second; the test's own ceiling (vite.config.ts) is higher.
 configure({ asyncUtilTimeout: 5000 })

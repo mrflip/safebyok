@@ -53,7 +53,7 @@ export type FakeLeaseFriend = LeaseFriend & {
   forgetLease:     Mock<LeaseFriend['forgetLease']>
   tryForgetLease:  Mock<LeaseFriend['tryForgetLease']>
   tellBadNews:     Mock<LeaseFriend['tellBadNews']>
-  /** The record the slot holds, null for none. Set it to seed one, whatever it is. */
+  /** The record the slot has, null for none. Set it to seed one, whatever it is. */
   cached:          unknown
   /** Every call the logger heard, oldest first. */
   logged:          LoggedCall[]
@@ -151,7 +151,7 @@ export const isZeroed = (bytes: Uint8Array): boolean => bytes.every((byte) => by
 /** What opens a wayin: the passphrase, for a passphrase wayin, or a copy of the PRF bytes taken before the proving zeroed them, for a passkey wayin. */
 export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
 
-/** A test backdoor: the raw bytes of the vaultKey `wayin` wraps, opened from outside the models as a later unlock would open it, from the secret, the wayin's header and the vault's stamp. It exists only so a test can show two wayins hold one vaultKey, or that a wayin opens at all; no model hands out a vaultKey. Rejects with WebCrypto's error when the wayin will not open. */
+/** A test backdoor: the raw bytes of the vaultKey `wayin` wraps, opened from outside the models as a later unlock would open it, from the secret, the wayin's header and the vault's stamp. It exists only so a test can show two wayins have one vaultKey, or that a wayin opens at all; no model hands out a vaultKey. Rejects with WebCrypto's error when the wayin will not open. */
 export const _cheat_vaultKeyBytesOf = async (vault: VaultStamp, wayin: Wayin, secret: WayinSecret, keyDeriver: KeyDeriver = testDeriver): Promise<Uint8Array> => {
   const header = wayin.toJSON()
   const ctx = wayinCtxOf(vaultStamp.parse(vault), header)

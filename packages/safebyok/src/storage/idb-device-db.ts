@@ -33,20 +33,20 @@ const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseS
 /** The scopepath of the bank row at `scope`. */
 const bankScopepathOf = ({ applabel, user_id }: BankScope): BankScopepath => [applabel, user_id]
 
-/** The shelf of the device database of `dbName`, which holds the leases. */
+/** The shelf of the device database of `dbName`, which has the leases. */
 const deviceShelfOf = (dbName: string): UseStore => versionedShelfOf({
   dbName, dbstem: 'device', version: DeviceDBVersion, storename: 'leases', oldnames: [`${dbName}:device_db`, `${dbName}:device-v1`],
 })
 
-// A database of its own, as a versioned shelf holds one object store: a second store in the device database would move its
+// A database of its own, as a versioned shelf has one object store: a second object store in the device database would move its
 // version on, and every device would forget its leases.
-/** The shelf of the bank database of `dbName`, which holds the bank rows. */
+/** The shelf of the bank database of `dbName`, which has the bank rows. */
 const bankShelfOf = (dbName: string): UseStore => versionedShelfOf({
   dbName, dbstem: 'bank', version: BankDBVersion, storename: 'bank', oldnames: [],
 })
 // --
 
-/** A device store that keeps this device's leases and bank rows in its browser's IndexedDB. */
+/** A device database that keeps this device's leases and bank rows in its browser's IndexedDB. */
 export class IdbDeviceDB extends DeviceDB {
   // == [Props]: #leaseShelf, #bankShelf
 
@@ -64,7 +64,7 @@ export class IdbDeviceDB extends DeviceDB {
   }
   // --
 
-  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doDelRawLease, doEnsureBank, doForgetBank, doListBanks
+  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureCachedBank, doForgetBank, doListBanks
 
   protected async doStow(row: LeaseRow): Promise<void> {
     await inOneStep(this.#leaseShelf, 'readwrite', (store) => { store.put(row, leaseScopepathOf(row)) })
@@ -89,11 +89,11 @@ export class IdbDeviceDB extends DeviceDB {
     return scopepaths.map((scopepath, ii) => ({ scopepath: scopepath as LeaseScopepath, row: rows[ii] }))
   }
 
-  protected async doDelRawLease(scopepath: LeaseScopepath): Promise<void> {
+  protected async doForgetRawLease(scopepath: LeaseScopepath): Promise<void> {
     await inOneStep(this.#leaseShelf, 'readwrite', (store) => { store.delete(scopepath) })
   }
 
-  protected async doEnsureBank(made: BankRow): Promise<unknown> {
+  protected async doEnsureCachedBank(made: BankRow): Promise<unknown> {
     return await inOneStep(this.#bankShelf, 'readwrite', async (store) => {
       const stored = await rowAt(store, bankScopepathOf(made))
       if (SX.bankRow.safeParse(stored).success) { return stored }
@@ -112,7 +112,7 @@ export class IdbDeviceDB extends DeviceDB {
   // --
 }
 
-/** A device store in this browser's IndexedDB, what a browser app hands `Bank.make`. */
+/** A device database in this browser's IndexedDB, what a browser app hands `Bank.make`. */
 export const idbDeviceDB = (opts?: IdbDeviceDBOpts): IdbDeviceDB => new IdbDeviceDB(opts)
 
 true satisfies Z.core.util.AssertEqual<IdbDeviceDBOpts, Z.input<typeof idbDeviceDBOpts>>

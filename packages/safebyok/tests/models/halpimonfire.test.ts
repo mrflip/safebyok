@@ -12,28 +12,28 @@ import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBox
 import { Dna, NewPassphrase, Passphrase, buildTyping, byPassphrase, delTyping, makeBornVault, makeVaultWorld, replaceTyping, unlockTyping, useVaultWorlds, hearingBadNews } from '../test-helpers/vault-world'
 import type { BoxWorld } from '../../src/shapes/shapes-vaultish'
 
-const held = useModelsWorld()
+const world = useModelsWorld()
 useVaultWorlds()
 
-describe("a lock() landing during a put", () => {
+describe("a lock() called during a put", () => {
   it("during the seal refuses 'vault_locked', putting nothing: put checks the lock at both ends of the seal", async () => {
     const lock = { during: false }
-    const listing = fakeSealBoxListingOf(held.mw, {}, () => { if (lock.during) { held.mw.setLocked(true) } })
+    const listing = fakeSealBoxListingOf(world.mw, {}, () => { if (lock.during) { world.mw.setLocked(true) } })
     const record = fullBoxRecord()
-    held.mw.seedStore(record)
+    world.mw.seedPut(record)
     const box = await listing.build(record)
     lock.during = true
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sealed while locking' } }), 'vault_locked')
-    expect(held.mw.callsOf('put')).to.deep.equal([])
+    expect(world.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("during the put lands the record anyway: the put is past the window, and the box reads locked after", async () => {
+  it("during the put writes the record anyway: the put is past the window, and the box reports locked after", async () => {
     const record = fullBoxRecord()
-    held.mw.seedStore(record)
-    const box = await boxListingOf(held.mw).build(record)
-    held.mw.willPut(({ record: sent }) => {
-      held.mw.setLocked(true)
-      return held.mw.answerOf(box.scope, sent)
+    world.mw.seedPut(record)
+    const box = await boxListingOf(world.mw).build(record)
+    world.mw.willPut(({ record: sent }) => {
+      world.mw.setLocked(true)
+      return world.mw.answerOf(box.scope, sent)
     })
     await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
     expect(box.isLocked).to.be.true
@@ -41,7 +41,7 @@ describe("a lock() landing during a put", () => {
   })
 })
 
-describe("A lock that lands while an unlock proves", () => {
+describe("A lock called while an unlock proves", () => {
   it("ends unlocked: the proof still takes up and caches its lease, and the next lock() ends that session", async () => {
     const { vault, deviceDB, fakeBank } = await makeBornVault()
     vault.lock()
@@ -58,8 +58,8 @@ describe("A lock that lands while an unlock proves", () => {
   })
 })
 
-describe("A lock that lands during a box verb", () => {
-  it("during hello leaves the list made and the next putBox refusing 'vault_locked', storing nothing", async () => {
+describe("A lock called during a box verb", () => {
+  it("during hello leaves the list made and the next putBox refusing 'vault_locked', putting nothing", async () => {
     const { vault, vaultDB } = await makeBornVault()
     const tryListBoxes = vaultDB.tryListBoxes.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryListBoxes').mockImplementationOnce((...args) => { vault.lock(); return tryListBoxes(...args) })
@@ -80,16 +80,16 @@ describe("A lock that lands during a box verb", () => {
 /** A stored box whose next unseal runs `crossing` with the whisper opened, before it comes back to `box.expose`. */
 const boxCrossingUnseal = async (crossing: (box: TestableBox) => unknown) => {
   const unsealStampedString: BoxWorld['unsealStampedString'] = async (sealed, stamp) => {
-    const whisperText = await held.mw.world.unsealStampedString(sealed, stamp)
+    const whisperText = await world.mw.world.unsealStampedString(sealed, stamp)
     crossing(box)
     return whisperText
   }
-  const listing = boxListingOf(held.mw, { world: held.mw.worldWith({ unsealStampedString }) })
-  const box = await listing.create(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
+  const listing = boxListingOf(world.mw, { world: world.mw.worldWith({ unsealStampedString }) })
+  const box = await listing.create(boxDnaOf(world.mw.boxscope('anthropic_api_key')))
   return box
 }
 
-describe("An ending that lands while box.expose unseals", () => {
+describe("An ending called while box.expose unseals", () => {
   it.each(['sweep', 'vacate'] as const)("a %s refuses, and leaves nothing exposed", async (ending) => {
     const box = await boxCrossingUnseal((crossed) => crossed[ending]())
     await TH.expectRefusal(box.expose())
@@ -98,9 +98,9 @@ describe("An ending that lands while box.expose unseals", () => {
   })
 
   it("a lock() refuses 'vault_locked', and leaves nothing exposed", async () => {
-    const box = await boxCrossingUnseal(() => { held.mw.setLocked(true) })
+    const box = await boxCrossingUnseal(() => { world.mw.setLocked(true) })
     await TH.expectRefusal(box.expose(), 'vault_locked')
-    held.mw.setLocked(false)
+    world.mw.setLocked(false)
     expect(box.whisper).to.eq(ENCRYPTED)
   })
 })
@@ -129,7 +129,7 @@ describe("A gate change after its record is stored", () => {
     expect(vault.isUnlocked).to.be.false
   })
 
-  it("a crypto failure in buildLease rejects, the row stored, the vault on its new gate under the lease it held", async () => {
+  it("a crypto failure in buildLease rejects, the row stored, the vault on its new gate under the lease it world", async () => {
     const { vault, demandStored, deviceDB } = await makeBornVault()
     const failure = new VaultError('unexpected_error', "the platform said no")
     vi.spyOn(Proving.prototype, 'buildLease').mockRejectedValueOnce(failure)
@@ -140,23 +140,23 @@ describe("A gate change after its record is stored", () => {
     expect(deviceDB.cachedNow()).to.include({ gate_epoch: 1 })
   })
 
-  it("a lock crossing the renewal drops the new lease with no second erase, which could take a later lease's row", async () => {
+  it("leaves the vault unlocked on the new lease where a lock crossed its making, with no second forget", async () => {
     const { vault, deviceDB } = await makeBornVault()
     deviceDB.forget.mockClear()
     crossingGrant(() => { vault.lock() })
     await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
-    expect(vault.isUnlocked).to.be.false
-    expect(deviceDB.cachedNow()).to.be.null
+    expect(vault.isUnlocked).to.be.true
+    expect(deviceDB.cachedNow()).to.not.be.null
     expect(deviceDB.forget).toHaveBeenCalledOnce()
   })
 
-  it("a tombstone crossing the renewal resolves: the lease it held is gone, so the new one is dropped unattached, and demandAttachable is never met", async () => {
+  it("refuses as it attaches where a tombstone crossed the new lease's making, and leaves no row", async () => {
     const { vault, demandStored, deviceDB, anotherSession } = await makeBornVault()
     crossingGrant(async () => {
       await delTyping(await anotherSession().build(demandStored()), NewPassphrase)
       await TH.expectRefusal(vault.fetch())
     })
-    await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
+    await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase))
     expect(vault.isPresent).to.be.false
     expect(vault.isUnlocked).to.be.false
     expect(deviceDB.cachedNow()).to.be.null

@@ -1,4 +1,4 @@
-/** Helpers the package's own modules share: attaching what no loop, spread, log line or `JSON.stringify` finds, or what each of them finds, yielding to queued microtasks, and what the stores share. */
+/** Helpers the package's own modules share: attaching what no loop, spread, log line or `JSON.stringify` finds, or what each of them finds, yielding to queued microtasks, and what the databases share. */
 
 // == [Hidden]: adorn, decorate
 
@@ -57,11 +57,11 @@ export function tattooProp<VT>(obj: object, propname: string, val: VT, opts: Tat
 export function nextMicrotask(): Promise<void> { return new Promise(queueMicrotask) }
 // --
 
-// == [Stores]: Awaitable, ckeyOf
+// == [Databases]: Awaitable, ckeyOf
 
-/** What a store's generic call answers: a store over a synchronous backend need not make a promise. */
+/** What an adapter's generic call answers: an adapter over synchronous storage need not make a promise. */
 export type Awaitable<ValT> = ValT | Promise<ValT>
 
-/** The ckey of `parts`, whichever characters they hold: JSON, so no two lists of parts meet. */
+/** The ckey of `parts`, whichever characters they contain: JSON, so no two lists of parts meet. */
 export const ckeyOf = (...parts: string[]): string => JSON.stringify(parts)
 // --

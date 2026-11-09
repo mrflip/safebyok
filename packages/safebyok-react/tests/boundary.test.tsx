@@ -2,7 +2,6 @@ import { screen } from '@testing-library/react'
 import { Component, type ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
 import { VaultError } from 'safebyok'
-import { useRoundFor } from '../src/hooks/round-for'
 import { Boundary, forBoundary } from '../src/provider/boundary'
 import * as TH from './test-helpers'
 
@@ -60,26 +59,6 @@ describe("Boundary", () => {
   })
 })
 
-/** The example's shape: a boundary keyed by the gating it serves, over a child that fails for one gating. */
-const Served = ({ gating, failing }: { gating: object, failing: object }) => (
-  <Boundary key={useRoundFor(gating)} fallback={<p>fallback</p>}>
-    <Thrower {...(gating === failing ? { failure: { err: new Error('broke') } } : {})} />
-  </Boundary>
-)
-
-describe("useRoundFor", () => {
-  it("starts a boundary afresh for another gating, and keeps it as it is for the same one, as its example shows", () => {
-    const first = {}
-    const second = {}
-    const { rerender } = TH.renderReporting(<Served gating={first} failing={first} />)
-    expect(screen.queryByText('fallback')).to.not.be.null
-    rerender(<Served gating={first} failing={second} />)
-    expect(screen.queryByText('fallback')).to.not.be.null
-    rerender(<Served gating={second} failing={first} />)
-    expect(screen.queryByText('fine')).to.not.be.null
-  })
-})
-
 /** A child that fails as the dialog does: `err` thrown in render through forBoundary. */
 const ForBoundaryThrower = ({ err }: { err: unknown }) => { throw forBoundary(err, 'PassphraseModal') }
 
@@ -118,14 +97,8 @@ describe("forBoundary", () => {
     })
   }
 
-  it("names the component a foreign throw came from, and the functions to look at", () => {
-    for (const source of ['PassphraseModal', 'ReplacePassphraseModal'] as const) {
-      expect(forBoundary(new TypeError('fell over'), source).message).to.include(`safebyok-react's ${source}`).and.to.include('the functions the app handed the dialog')
-    }
-  })
-
-  it("names no functions to look at for a dialog handed none", () => {
+  it("names the component a foreign throw came from", () => {
     const { message } = forBoundary(new TypeError('fell over'), 'DelVaultModal')
-    expect(message).to.include("safebyok-react's DelVaultModal").and.to.not.include('the functions the app handed the dialog')
+    expect(message).to.include("safebyok-react's DelVaultModal")
   })
 })

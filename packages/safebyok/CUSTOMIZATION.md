@@ -96,7 +96,7 @@ const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), strengthChecker, ap
 ### Leaving it out: your own
 
 Pass your own `strengthChecker` after the spread, and zxcvbn never runs. To keep it out of your
-bundle too, import the deriver and the device store by name rather than `browserOpts`:
+bundle too, import the deriver and the device database by name rather than `browserOpts`:
 
 ```ts
 import { Bank } from 'safebyok'
@@ -113,7 +113,7 @@ bundler that leaves it out, a Content Security Policy that blocks it, an offline
 fails, loud and clear, and no vault is born until a later hello loads it.
 
 Ask the vault's checker from your passphrase field as the user types, so they hear the reason
-before they submit: `gating.checkStrength(typed)` is yours, held to the contract above, its
+before they submit: `gating.checkStrength(typed)` is yours, under the contract above, its
 verdict `{ strong: true }` or `{ strong: false, reason }`, so the field and the vault decide
 alike. `safebyok-react`'s dialog does so by default.
 

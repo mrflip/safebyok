@@ -28,7 +28,7 @@ export const ensureApiKeyBoxExposed = async (bank: Bank, boxlabel: string): Prom
   const vault = await bank.ensureVault({ vaultlabel: ApiKeyVaultlabel })
   await vault.ensureUnlocked()
   const box = await vault.putBox({ boxlabel, whisper: {} }, { ifPresent: 'get', ifAbsent: 'add' })
-  // Exposed before a lock, it holds what was typed: an unlock alone brings the edit back.
+  // Exposed before a lock, it has what was typed: an unlock alone brings the edit back.
   if (! box.snapshot.isExposed) { await box.expose() }
   return box
 }

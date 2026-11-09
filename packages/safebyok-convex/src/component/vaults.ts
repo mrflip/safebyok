@@ -63,20 +63,20 @@ export const getBox = query({
 
 // == [Puts]: putVault, putBox
 
-/** Store a vault row where `opts` allow it over the row found, answering the landing. */
+/** Put a vault row where `opts` allow it over the row found, answering whether it was written. */
 export const putVault = mutation({
   args:    CVX.putVaultArgs,
-  returns: CVX.landing,
+  returns: CVX.written,
   handler: async (ctx, { record, opts }) => {
     const anteDoc = await findVaultDoc(ctx.db, record)
     const ante = anteDoc?.vault ?? null
-    const landed = DB.isVaultPutAllowed(ante, opts)
-    if (landed) { await storeVaultDoc(ctx.db, anteDoc, record) }
-    return { landed, ante }
+    const isWritten = DB.isVaultPutAllowed(ante, opts)
+    if (isWritten) { await writeVaultDoc(ctx.db, anteDoc, record) }
+    return { isWritten, ante }
   },
 })
 
-/** Store a box row under the vault's live life as `opts` allow, answering the landing. */
+/** Put a box row under the vault's live life as `opts` allow, answering whether it was written. */
 export const putBox = mutation({
   args:    CVX.putBoxArgs,
   returns: CVX.putBoxAnswer,
@@ -86,8 +86,8 @@ export const putBox = mutation({
     const life = lifeOf(record)
     const anteDoc = await findBoxDoc(ctx.db, life, record.boxlabel)
     const ante = anteDoc?.box ?? null
-    const landed = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
-    if (! landed) { return { landed, ante, vault } }
+    const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
+    if (! isWritten) { return { isWritten, ante, vault } }
     // Convex passes NaN as a number, and Math.min would carry it past the limit: no box count exceeds NaN.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
     const boxDoc = { ...life, boxlabel: record.boxlabel, box: record }
@@ -95,37 +95,37 @@ export const putBox = mutation({
     const growth = { box_count: (anteDoc === null ? 1 : 0), box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) }
     const reckoning = await Tallies.reckon(ctx.db, life)
     if (Tallies.refuses(reckoning.tally, growth, cap)) { return { capacity: Tallies.capacityOf(reckoning.tally, cap) } }
-    await storeBoxDoc(ctx.db, anteDoc, boxDoc)
+    await writeBoxDoc(ctx.db, anteDoc, boxDoc)
     await Tallies.record(ctx.db, life, reckoning, growth)
-    return { landed, ante, vault }
+    return { isWritten, ante, vault }
   },
 })
 // --
 
 // == [Dels]: delVault, delBox
 
-/** Store a vault's tombstone over its live row at `opts.prior`, answering the landing. */
+/** Write a vault's tombstone over its live row at `opts.prior`, answering whether it was written. */
 export const delVault = mutation({
   args:    CVX.delVaultArgs,
-  returns: CVX.landing,
+  returns: CVX.written,
   handler: async (ctx, { tombstone, opts: { prior } }) => {
     const anteDoc = await findVaultDoc(ctx.db, tombstone)
     const ante = anteDoc?.vault ?? null
     const isOurs = DB.isLiveVaultRecord(ante, tombstone.vault_tok)
     const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
-    const landed = isOurs && DB.isRowAt(ante, prior)
+    const isWritten = isOurs && DB.isRowAt(ante, prior)
     // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
-    if ((! landed) && (isOurs || isDamaged)) { return { landed, ante } }
-    if (landed) { await storeVaultDoc(ctx.db, anteDoc, tombstone) }
+    if ((! isWritten) && (isOurs || isDamaged)) { return { isWritten, ante } }
+    if (isWritten) { await writeVaultDoc(ctx.db, anteDoc, tombstone) }
     await tombstoneBoxes(ctx.db, lifeOf(tombstone), tombstone.written_at)
-    return { landed, ante }
+    return { isWritten, ante }
   },
 })
 
-/** Store a box's tombstone over its live row at `opts.prior`, answering the landing. */
+/** Write a box's tombstone over its live row at `opts.prior`, answering whether it was written. */
 export const delBox = mutation({
   args:    CVX.delBoxArgs,
-  returns: CVX.boxLanding,
+  returns: CVX.boxWritten,
   handler: async (ctx, { tombstone, opts: { prior } }) => {
     const vaultDoc = await findVaultDoc(ctx.db, tombstone)
     const vault = vaultDoc?.vault ?? null
@@ -133,14 +133,14 @@ export const delBox = mutation({
     const anteDoc = await findBoxDoc(ctx.db, life, tombstone.boxlabel)
     const ante = anteDoc?.box ?? null
     const isDeletable = DB.isLiveBoxRecord(ante, tombstone.vault_tok) && DB.isRowAt(ante, prior)
-    const landed = DB.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
-    if (landed) {
+    const isWritten = DB.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
+    if (isWritten) {
       const boxDoc = { ...life, boxlabel: tombstone.boxlabel, box: tombstone }
-      await storeBoxDoc(ctx.db, anteDoc, boxDoc)
+      await writeBoxDoc(ctx.db, anteDoc, boxDoc)
       // The tombstone takes the row's place, and counts as the row did.
       await Tallies.forget(ctx.db, life, { box_count: 0, box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) })
     }
-    return { landed, ante, vault }
+    return { isWritten, ante, vault }
   },
 })
 // --
@@ -181,7 +181,7 @@ export const watchRows = query({
 })
 // --
 
-// == [Helpers]: lifeOf, findVaultDoc, findBoxDoc, storeVaultDoc, storeBoxDoc, tombstoneBoxes, listVaultDocs, listBoxDocs, listTallyDocs, VaultDoc, BoxDoc
+// == [Helpers]: lifeOf, findVaultDoc, findBoxDoc, writeVaultDoc, writeBoxDoc, tombstoneBoxes, listVaultDocs, listBoxDocs, listTallyDocs, VaultDoc, BoxDoc
 
 /** The life a record is filed under. */
 const lifeOf = ({ applabel, user_id, vaultlabel, vault_tok }: Life): Life => ({ applabel, user_id, vaultlabel, vault_tok })
@@ -200,14 +200,14 @@ const findBoxDoc = async (db: DatabaseReader, { applabel, user_id, vaultlabel, v
     .unique()
 )
 
-/** Store `vault` in place of `anteDoc`, or as a new document. */
-const storeVaultDoc = async (db: DatabaseWriter, anteDoc: VaultDoc | null, vault: DB.VaultRecord | DB.VaultTombstone): Promise<void> => {
+/** Write `vault` in place of `anteDoc`, or as a new document. */
+const writeVaultDoc = async (db: DatabaseWriter, anteDoc: VaultDoc | null, vault: DB.VaultRecord | DB.VaultTombstone): Promise<void> => {
   const { applabel, user_id, vaultlabel } = vault
   if (anteDoc) { await db.replace('safebyok_vaults', anteDoc._id, { applabel, user_id, vaultlabel, vault }) } else { await db.insert('safebyok_vaults', { applabel, user_id, vaultlabel, vault }) }
 }
 
-/** Store `boxDoc` in place of `anteDoc`, or as a new document. */
-const storeBoxDoc = async (db: DatabaseWriter, anteDoc: BoxDoc | null, boxDoc: BoxDocGiven): Promise<void> => {
+/** Write `boxDoc` in place of `anteDoc`, or as a new document. */
+const writeBoxDoc = async (db: DatabaseWriter, anteDoc: BoxDoc | null, boxDoc: BoxDocGiven): Promise<void> => {
   if (anteDoc) { await db.replace('safebyok_boxes', anteDoc._id, boxDoc) } else { await db.insert('safebyok_boxes', boxDoc) }
 }
 

@@ -14,10 +14,10 @@ import * as TH from '../postgres/test-helpers'
 // Everything the Postgres tests use too, so a test here star-imports this one module as TH.
 export * from '../postgres/test-helpers'
 
-// == [Servers]: Server, useServers, serve, storeListening
+// == [Servers]: Server, useServers, serve, vaultDBListening
 
-/** One server: Yoga over the README's route, on a port of its own, and the store it hosts. */
-export type Server = { url: string, store: PostgresVaultDB }
+/** One server: Yoga over the README's route, on a port of its own, and the VaultDB it hosts. */
+export type Server = { url: string, vaultDB: PostgresVaultDB }
 
 const closers: (() => Promise<void>)[] = []
 
@@ -29,14 +29,14 @@ export const useServers = (): void => {
 /** Closes every server open, cutting the watches still streaming from them. */
 const closeServers = async (): Promise<void> => { await Promise.all(closers.splice(0).map((close) => close())) }
 
-/** A server hosting `store` on a free port of this machine, its signed-in user the request's `x-test-user` header in place of a session. */
-export const serve = async (store: PostgresVaultDB): Promise<Server> => {
+/** A server hosting `vaultDB` on a free port of this machine, its signed-in user the request's `x-test-user` header in place of a session. */
+export const serve = async (vaultDB: PostgresVaultDB): Promise<Server> => {
   /** What each request's resolvers know of it: the user its auth signed in, or null. */
   type VaultContext = { user_id: string | null }
   const yoga = createYoga<object, VaultContext>({
     schema: createSchema<VaultContext>({
       typeDefs:  [VaultSchemaSdl],
-      resolvers: [vaultResolvers({ vaultDB: store, userIdOf: ({ user_id }: VaultContext) => user_id })],
+      resolvers: [vaultResolvers({ vaultDB, userIdOf: ({ user_id }: VaultContext) => user_id })],
     }),
     graphqlEndpoint: '/api/graphql',
     context:         ({ request }) => ({ user_id: request.headers.get('x-test-user') }),
@@ -49,11 +49,11 @@ export const serve = async (store: PostgresVaultDB): Promise<Server> => {
     http.close(() => { resolve() })
   }))
   const { port } = http.address() as AddressInfo
-  return { url: `http://127.0.0.1:${String(port)}/api/graphql`, store }
+  return { url: `http://127.0.0.1:${String(port)}/api/graphql`, vaultDB }
 }
 
-/** A PostgresVaultDB over `db` as one server holds it, its listen counted in `listening` as each watch starts and stops. */
-export const storeListening = async (db: TH.FileDatabase, listening: { count: number }): Promise<PostgresVaultDB> => {
+/** A PostgresVaultDB over `db` as one server has it, its listen counted in `listening` as each watch starts and stops. */
+export const vaultDBListening = async (db: TH.FileDatabase, listening: { count: number }): Promise<PostgresVaultDB> => {
   const listen = await TH.listenOver(db)
   const counted: PostgresListen = async (channel, onNotify) => {
     const unlisten = await listen(channel, onNotify)
@@ -66,10 +66,10 @@ export const storeListening = async (db: TH.FileDatabase, listening: { count: nu
   return new PostgresVaultDB({ client: pgClientOf(db.devicePool()), listen: counted })
 }
 
-/** A server over emptied tables, the last test's servers closed and their stores ended first. */
-export const freshServer = async (db: TH.FileDatabase, opts: TH.StoreOpts = {}): Promise<Server> => {
+/** A server over emptied tables, the last test's servers closed and their VaultDBs ended first. */
+export const freshServer = async (db: TH.FileDatabase, opts: TH.VaultDBOverOpts = {}): Promise<Server> => {
   await closeServers()
-  return await serve(await TH.freshStore(db, opts))
+  return await serve(await TH.freshVaultDB(db, opts))
 }
 // --
 

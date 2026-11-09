@@ -12,7 +12,7 @@ import * as SX from '../shapes/shapes-storage'
 import * as CX from '../shapes/shapes-core'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
 import type { DelAct, GotAct, ListAct, PutAct } from '../shapes/shapes-enums'
-import type { AddPasskeyParams, AdapterVaultDBOpts, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultQuery, VaultRecord, VaultRow, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import type { AddPasskeyParams, AdapterVaultDBOpts, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReplacePassphraseParams, ReqParams, RevokePasskeyParams, VaultQuery, VaultRecord, VaultRow, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
 
 // == [Answers]: GoodAnswer, BadAnswer, Answer, ListAct, GotAct, PutAct, DelAct, BankListed, BoxesListed, Tidied, Notice, answerOf
@@ -35,7 +35,7 @@ export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
 /** The count of box rows left after `tidyGone`. */
 export type Tidied      = { totalCount: number }
 
-/** A row that changed, as a watch hears it, with its vault row where the store sent one. */
+/** A row that changed, as a watch hears it, with its vault row where storage sent one. */
 export type Notice = { act: 'got' | 'gone', val: VaultRow | BoxRow, world: VaultRow | null }
 
 const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<GoodAnswer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
@@ -47,24 +47,24 @@ const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<
 }
 // --
 
-// == [What a store answers]: Landing, BoxLanding, RowOfVault, RowOfBox, BoxesFetched, BoxFetched, Heard
+// == [What storage answers]: Written, BoxWritten, RowOfVault, RowOfBox, BoxesFetched, BoxFetched, Heard
 
-/** Whether a conditional write landed, and `ante`, the row it replaced or that stood in its way. */
-export type Landing = { landed: boolean, ante: unknown }
+/** Whether a conditional write took effect, and `ante`, the row it replaced or that stood in its way. */
+export type Written = { isWritten: boolean, ante: unknown }
 
-/** A box write's {@link Landing}, with the vault row as read in the same step. */
-export type BoxLanding = Landing & { vault: unknown }
+/** A box write's {@link Written}, with the vault row as read in the same step. */
+export type BoxWritten = Written & { vault: unknown }
 
-/** A vault row as a store hands it up, unchecked, under its vaultlabel. */
+/** A vault row as storage hands it up, unchecked, under its vaultlabel. */
 export type RowOfVault = { vaultlabel: string, vault: unknown }
-/** A box row as a store hands it up, unchecked, under its boxlabel. */
+/** A box row as storage hands it up, unchecked, under its boxlabel. */
 export type RowOfBox   = { boxlabel: string, box: unknown }
-/** A vault's rows as a store hands them up, unchecked: the vault row and its box rows. */
+/** A vault's rows as storage hands them up, unchecked: the vault row and its box rows. */
 export type BoxesFetched = { vault: unknown, boxes: RowOfBox[] }
-/** A box row and its vault row as a store hands them up, unchecked. */
+/** A box row and its vault row as storage hands them up, unchecked. */
 export type BoxFetched   = { vault: unknown, box: unknown }
 // A box's notice may come without its vault row: the vault changes slowly, and arrives in its own notices.
-/** A change reported by a store's watch: a vault row, a box row, or both. */
+/** A change reported by storage's watch: a vault row, a box row, or both. */
 export type Heard = { vault?: unknown, box?: unknown }
 // --
 
@@ -90,11 +90,11 @@ export interface VaultDB {
   getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>>
   /** Non-throwing form of {@link VaultDB.getBox}. */
   tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<Answer<BoxRecord | null, GotAct>>
-  /** Stores a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
+  /** Puts a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
   putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>>
   /** Non-throwing form of {@link VaultDB.putVault}. */
   tryPutVault(record: VaultRecord, opts: PutVaultOpts): Promise<Answer<VaultRow, PutAct>>
-  /** Stores a box under a vault live at its `vault_tok`, as `opts` allow. */
+  /** Puts a box under a vault live at its `vault_tok`, as `opts` allow. */
   putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>>
   /** Non-throwing form of {@link VaultDB.putBox}. */
   tryPutBox(record: BoxRecord, opts: PutOpts): Promise<Answer<BoxRow, PutAct>>
@@ -102,11 +102,11 @@ export interface VaultDB {
   replacePassphrase(params: ReplacePassphraseParams): Promise<GoodAnswer<VaultRecord, 'replaced'>>
   /** Non-throwing form of {@link VaultDB.replacePassphrase}. */
   tryReplacePassphrase(params: ReplacePassphraseParams): Promise<Answer<VaultRecord, 'replaced'>>
-  /** Lays a passkey wayin on a vault row holding none. */
+  /** Lays a passkey wayin on a vault row with none. */
   addPasskey(params: AddPasskeyParams): Promise<GoodAnswer<VaultRecord, 'added'>>
   /** Non-throwing form of {@link VaultDB.addPasskey}. */
   tryAddPasskey(params: AddPasskeyParams): Promise<Answer<VaultRecord, 'added'>>
-  /** Takes the passkey wayin off the vault row; one holding none answers as stored. */
+  /** Removes the passkey wayin from the vault row; one with none answers as stored. */
   revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>>
   /** Non-throwing form of {@link VaultDB.revokePasskey}. */
   tryRevokePasskey(params: RevokePasskeyParams): Promise<Answer<VaultRecord, 'revoked'>>
@@ -153,7 +153,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** True: the brand a model knows a vaultDB by, from whichever copy of safebyok. */
   get [IsVaultDB](): true { return true }
 
-  /** True: the brand an adapter's store answers to, and a client of one does not. */
+  /** True: the brand an adapter answers to, and a client of one does not. */
   get [IsAdapterVaultDB](): true { return true }
   // --
 
@@ -241,15 +241,15 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   // == [Puts]: putVault, tryPutVault, putBox, tryPutBox
 
-  /** Stores a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
+  /** Puts a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
   async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
     const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
       const vaultRecord = SX.vaultRecord.parse(record)
       const putOpts = SX.putVaultOpts.parse(opts)
-      demandNextSeq(vaultRecord, putOpts.prior)
-      const { landed, ante } = await this.doPutVault(vaultRecord, putOpts)
-      if (landed) { return { ok: true, req_params, act: landingActOf(ante), val: vaultRecord, world: vaultRecord } }
+      SX.nextSeq.parse({ record: vaultRecord, prior: putOpts.prior })
+      const { isWritten, ante } = await this.doPutVault(vaultRecord, putOpts)
+      if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: vaultRecord, world: vaultRecord } }
       const { ifAbsent, ifPresent } = putOpts
       const found = foundVaultRowOf(ante, vaultRecord)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok)) }
@@ -264,18 +264,18 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Non-throwing form of {@link putVault}. */
   async tryPutVault(record: VaultRecord, opts: PutVaultOpts) { return answerOf(() => this.putVault(record, opts)) }
 
-  /** Stores a box under a vault live at its `vault_tok`, as `opts` allow. */
+  /** Puts a box under a vault live at its `vault_tok`, as `opts` allow. */
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> {
     const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
       const boxRecord = SX.boxRecord.parse(record)
       const putOpts = SX.putOpts.parse(opts)
-      demandNextSeq(boxRecord, putOpts.prior)
+      SX.nextSeq.parse({ record: boxRecord, prior: putOpts.prior })
       const recordBytes = jsonBytes(boxRecord)
       if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
-      const { landed, ante, vault } = await this.doPutBox(boxRecord, putOpts)
+      const { isWritten, ante, vault } = await this.doPutBox(boxRecord, putOpts)
       const world = liveVaultOf(vault, boxRecord)
-      if (landed) { return { ok: true, req_params, act: landingActOf(ante), val: boxRecord, world } }
+      if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: boxRecord, world } }
       const { ifAbsent, ifPresent } = putOpts
       const found = foundBoxRowOf(ante, boxRecord)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.absentBox(world, null) }
@@ -309,7 +309,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Non-throwing form of {@link replacePassphrase}. */
   async tryReplacePassphrase(params: ReplacePassphraseParams) { return answerOf(() => this.replacePassphrase(params)) }
 
-  /** Lays a passkey wayin on a vault row holding none. */
+  /** Lays a passkey wayin on a vault row with none. */
   async addPasskey(params: AddPasskeyParams): Promise<GoodAnswer<VaultRecord, 'added'>> {
     const req_params = SX.reqParamsOf(params)
     try {
@@ -325,7 +325,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Non-throwing form of {@link addPasskey}. */
   async tryAddPasskey(params: AddPasskeyParams) { return answerOf(() => this.addPasskey(params)) }
 
-  /** Takes the passkey wayin off the vault row; one holding none answers as stored. */
+  /** Removes the passkey wayin from the vault row; one with none answers as stored. */
   async revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>> {
     const req_params = SX.reqParamsOf(params)
     try {
@@ -348,10 +348,10 @@ export abstract class AdapterVaultDB implements VaultDB {
     return stored
   }
 
-  /** Stores the moved gate's `record` over the row it was made from. */
+  /** Puts the moved gate's `record` over the row it was made from. */
   async #putMovedGate(record: VaultRecord, stored: VaultRecord): Promise<void> {
-    const { landed, ante } = await this.doPutVault(record, { prior: SX.revisionOf(stored), ifAbsent: 'fail', ifPresent: 'repl' })
-    if (landed) { return }
+    const { isWritten, ante } = await this.doPutVault(record, { prior: SX.revisionOf(stored), ifAbsent: 'fail', ifPresent: 'repl' })
+    if (isWritten) { return }
     const found = liveVaultOf(ante, record)
     throw Refuse.staleWrite(found, found)
   }
@@ -365,10 +365,10 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const boxTombstone = SX.boxTombstone.parse(tombstone)
       const delOpts = SX.delOpts.parse(opts)
-      demandNextSeq(boxTombstone, delOpts.prior)
-      const { landed, ante, vault } = await this.doDelBox(boxTombstone, delOpts)
+      SX.nextSeq.parse({ record: boxTombstone, prior: delOpts.prior })
+      const { isWritten, ante, vault } = await this.doDelBox(boxTombstone, delOpts)
       const world = liveVaultOf(vault, boxTombstone)
-      if (landed) { return { ok: true, req_params, act: 'deleted', val: boxTombstone, world } }
+      if (isWritten) { return { ok: true, req_params, act: 'deleted', val: boxTombstone, world } }
       const found = foundBoxRowOf(ante, boxTombstone)
       if (found === null) { return this.#answerDelBoxVoid(boxTombstone, world, req_params) }
       if (found.am === 'x') { return this.#answerDelBoxGone(found, world, req_params) }
@@ -400,9 +400,9 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const vaultTombstone = SX.vaultTombstone.parse(tombstone)
       const delOpts = SX.delOpts.parse(opts)
-      demandNextSeq(vaultTombstone, delOpts.prior)
-      const { landed, ante } = await this.doDelVault(vaultTombstone, delOpts)
-      if (landed) { return { ok: true, req_params, act: 'deleted', val: vaultTombstone, world: vaultTombstone } }
+      SX.nextSeq.parse({ record: vaultTombstone, prior: delOpts.prior })
+      const { isWritten, ante } = await this.doDelVault(vaultTombstone, delOpts)
+      if (isWritten) { return { ok: true, req_params, act: 'deleted', val: vaultTombstone, world: vaultTombstone } }
       const found = foundVaultRowOf(ante, vaultTombstone)
       if (found === null) { return this.#answerDelVaultVoid(vaultTombstone, req_params) }
       if (found.vault_tok !== vaultTombstone.vault_tok) { return this.#answerDelVaultVoid(vaultTombstone, req_params) }
@@ -471,22 +471,22 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doListBoxes(asked: VaultQuery): Awaitable<BoxesFetched>
   /** The vault row, and the box row under `vault_tok`, read in one step. */
   protected abstract doGetBox(asked: BoxQuery): Awaitable<BoxFetched>
-  /** Stores `record` where `isVaultPutAllowed` lets it land over the row found, atomic on `revision_tok`. */
-  protected abstract doPutVault(record: VaultRecord, opts: PutOptsGiven): Awaitable<Landing>
-  /** Stores `record` where `isBoxPutAllowed` lets it land over the row found, under a vault row that passes `isLiveVaultRecord`. */
-  protected abstract doPutBox(record: BoxRecord, opts: PutOptsGiven): Awaitable<BoxLanding>
-  /** In one step, stores `tombstone` over a row at `opts.prior` that passes `isLiveVaultRecord`, and tombstones that life's boxes. */
-  protected abstract doDelVault(tombstone: VaultTombstone, opts: DelOpts): Awaitable<Landing>
-  /** Stores `tombstone` over a row at `opts.prior` that passes `isLiveBoxRecord`, under a vault row that passes `isLiveVaultRecord`. */
-  protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxLanding>
+  /** Puts `record` where `isVaultPutAllowed` lets it be written over the row found, atomic on `revision_tok`. */
+  protected abstract doPutVault(record: VaultRecord, opts: PutOptsGiven): Awaitable<Written>
+  /** Puts `record` where `isBoxPutAllowed` lets it be written over the row found, under a vault row that passes `isLiveVaultRecord`. */
+  protected abstract doPutBox(record: BoxRecord, opts: PutOptsGiven): Awaitable<BoxWritten>
+  /** In one step, writes `tombstone` over a row at `opts.prior` that passes `isLiveVaultRecord`, and tombstones that life's boxes. */
+  protected abstract doDelVault(tombstone: VaultTombstone, opts: DelOpts): Awaitable<Written>
+  /** Writes `tombstone` over a row at `opts.prior` that passes `isLiveBoxRecord`, under a vault row that passes `isLiveVaultRecord`. */
+  protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxWritten>
   /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
-  /** Starts telling `hear` of rows that change, and returns how to stop. A store with no watch never calls it. */
+  /** Starts telling `hear` of rows that change, and returns how to stop. Storage with no watch never calls it. */
   protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void): () => void { return noUnwatching }
   // --
 }
 
-// == [Helpers]: refusalOf, RowOfOtherAddress, isRowFound, foundVaultRowOf, foundBoxRowOf, listedRowOf, liveVaultOf, movedGateOf, listedBoxesOf, demandNextSeq, landingActOf, jsonBytes
+// == [Helpers]: refusalOf, RowOfOtherAddress, isRowFound, foundVaultRowOf, foundBoxRowOf, listedRowOf, liveVaultOf, movedGateOf, listedBoxesOf, writeActOf, jsonBytes
 
 /** The refusal a verb's throw stands for: a refusal as it came, else `storage_unavailable`. */
 const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultError => {
@@ -500,25 +500,25 @@ const demandRowObject = (raw: unknown): void => {
   if (! CX.isPlainBag(raw)) { throw Refuse.storageIssue() }
 }
 
-/** Whether a store answered a row at all: null is its word for none. */
+/** Whether storage answered a row at all: null is its word for none. */
 const isRowFound = (raw: unknown): boolean => {
   if (raw === null) { return false }
   demandRowObject(raw)
   return true
 }
 
-// Held to its scope and not its vault_tok: a vault row of another life is an answer the verbs have words for.
-/** The vault row a store answered for `asked`'s scope, null for none. */
+// Checked against its scope and not its vault_tok: a vault row of another life is an answer the verbs have words for.
+/** The vault row storage answered for `asked`'s scope, null for none. */
 const foundVaultRowOf = (raw: unknown, asked: VaultScope): VaultRow | null => (
   isRowFound(raw) ? SX.storedVaultRow.parseConsistent(raw, CX.vaultScope.parse(asked), RowOfOtherAddress) : null
 )
 
-/** The box row a store answered for `asked`'s scope and `vault_tok`, null for none. */
+/** The box row storage answered for `asked`'s scope and `vault_tok`, null for none. */
 const foundBoxRowOf = (raw: unknown, asked: BoxQuery): BoxRow | null => (
   isRowFound(raw) ? SX.storedBoxRow.parseConsistent(raw, SX.boxQuery.parse(asked), RowOfOtherAddress) : null
 )
 
-/** A listing's row, held to the `address` it is listed at; null for one that is to be set aside as damaged. */
+/** A listing's row, checked against the `address` it is listed at; null for one that is to be set aside as damaged. */
 const listedRowOf = <RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknown, address: object): RowT | null => {
   const parsed = rowCheck.safeParse(raw)
   if (parsed.success) { return verifyConsistent(parsed.data, address, RowOfOtherAddress) }
@@ -526,7 +526,7 @@ const listedRowOf = <RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknow
   return null
 }
 
-/** The vault row a store answered, where it is live in the life `asked` names. */
+/** The vault row storage answered, where it is live in the life `asked` names. */
 const liveVaultOf = (raw: unknown, asked: VaultQuery): VaultRecord => {
   const found = foundVaultRowOf(raw, asked)
   if (found === null) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(asked, asked.vault_tok)) }
@@ -553,12 +553,8 @@ const listedBoxesOf = ({ vault_tok, ...scope }: VaultQuery, rows: RowOfBox[]): B
   return listed
 }
 
-const demandNextSeq = ({ revision_seq }: Revision, prior: Revision): void => {
-  if (revision_seq !== (prior.revision_seq + 1)) { throw Refuse.seqNotNext() }
-}
-
-// A peek is enough: the store judged `ante` against its row check before the put landed.
-const landingActOf = (ante: unknown): 'born' | 'reborn' | 'replaced' => {
+// A peek is enough: storage judged `ante` against its row check before the put was written.
+const writeActOf = (ante: unknown): 'born' | 'reborn' | 'replaced' => {
   if (ante === null) { return 'born' }
   return SX.isTombstoneRow(ante) ? 'reborn' : 'replaced'
 }

@@ -14,7 +14,7 @@ const StoredKey = 'sk-ant-fake-stored'
 /** A requestCleartext that types the test's passphrase into every dialog. */
 const typingPassphrase: RequestCleartext = async (gating) => { await gating.attempt(TH.byPassphrase(TH.Passphrase)) }
 
-/** The inspector open on `anthropic`, under a provider on its own device, the vault holding that box with its apiKey {@link StoredKey}. */
+/** The inspector open on `anthropic`, under a provider on its own device, the vault with that box with its apiKey {@link StoredKey}. */
 const renderOverBox = async (boxlabel = 'anthropic') => {
   const { world, vault } = await TH.makeBankWithVault()
   await vault.putBox({ boxlabel: 'anthropic', whisper: { apiKey: StoredKey } }, { ifAbsent: 'add' })

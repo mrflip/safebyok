@@ -1,4 +1,4 @@
-/** A vault's boxes as this device holds them: the box listing, and what it is given to reach the vaultDB and the vault. */
+/** A vault's boxes as this device has them: the box listing, and what it is given to reach the vaultDB and the vault. */
 
 import { VaultError } from '../refusals/errors'
 import type { Modelkind } from '../helpers/consts'
@@ -44,7 +44,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     Object.freeze(this)
   }
 
-  /** The scope of `duck`, held to this vault: no listing answers for another's. */
+  /** The scope of `duck`, which must be this vault's: no listing answers for another's. */
   scopeOf(duck: unknown):  Boxscope  { return boxscope.parseConsistent(duck, this.scope) }
 
   /** Parse `duck` as a {@link BoxSparse}. */
@@ -56,46 +56,46 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Methods]: list, get, tryGet, puttable, create, tryCreate, shellFor
 
-  /** Hold every box the vaultDB lists for this vault, sparse, and set its damaged rows aside. */
+  /** Enlist every box the vaultDB lists for this vault, sparse, and set its damaged rows aside. */
   async list(): Promise<void> {
     this.demandEnabled()
     const answer = await this.vaultDB.tryListBoxes({ ...this.scope, vault_tok: this.world.vault_tok })
     this.demandEnabled()
-    if (answer.world !== null) { this.world.takeWorld(answer.world) }
+    if (answer.world !== null) { this.world.receiveWorld(answer.world) }
     if (! answer.ok) {
       this.panicIfRevoked(answer.err)
       throw answer.err
     }
     const { boxes, damaged_rows } = answer.val
     this.#damagedRows = Object.freeze(damaged_rows)
-    for (const { boxlabel } of damaged_rows) { this.things.find((held) => held.boxlabel === boxlabel)?.vacate() }
+    for (const { boxlabel } of damaged_rows) { this.things.find((listed) => listed.boxlabel === boxlabel)?.vacate() }
     await Promise.all(boxes.map((box) => this.build(box)))
   }
 
   /** The box under `scoped`, no older than `opts` allows, or null under `ifAbsent: 'nil'`. */
   async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
-    const held = this.at(scoped)
-    if (held === null) { return this.fetch(scoped, opts) }
+    const listed = this.at(scoped)
+    if (listed === null) { return this.fetch(scoped, opts) }
     const { ifAbsent, ...timely } = VX.fetchOpts.parse(opts)
-    return this.handleIfAbsent(await held.hydrate(timely), scoped, ifAbsent)
+    return this.handleIfAbsent(await listed.hydrate(timely), scoped, ifAbsent)
   }
 
   /** Non-throwing form of {@link get}. */
   tryGet(scoped: Boxscope, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.get(scoped, opts)) }
 
-  /** The box a put of `scoped` goes through: the one held, or a void one made for an empty slot. */
+  /** The box a put of `scoped` goes through: the one listed, or a void one made for an empty slot. */
   puttable(scoped: unknown, opts: BoxPutOpts = {}): Box {
     const { ifAbsent } = VX.boxPutOpts.parse(opts)
     const scope = this.scopeOf(scoped)
-    const held = this.at(scope)
-    if ((held === null) && (ifAbsent === 'fail')) { throw notListedBoxError(scope) }
-    return held ?? this.#shellFor(scope)
+    const listed = this.at(scope)
+    if ((listed === null) && (ifAbsent === 'fail')) { throw notListedBoxError(scope) }
+    return listed ?? this.#shellFor(scope)
   }
 
-  /** The box a delete of `scoped` goes through: the one held, or a void one made for an empty slot. */
+  /** The box a delete of `scoped` goes through: the one listed, or a void one made for an empty slot. */
   deletable(scoped: unknown): Box { return this.puttable(scoped) }
 
-  /** Seals a new box and stores it where no live record stands, answering the box listed. */
+  /** Seals a new box and puts it where no live record stands, answering the box listed. */
   async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box> {
     const filled = VX.boxCreateOpts.parse(opts)
     const dna = boxDna.parse(input)
@@ -105,7 +105,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** Non-throwing form of {@link create}. */
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
-  /** A void box held under `scope`. */
+  /** A void box listed under `scope`. */
   #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.sentinelBoxOf(scope, this.world.vault_tok)) }
   // --
 

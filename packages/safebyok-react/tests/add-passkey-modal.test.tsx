@@ -13,15 +13,15 @@ const shownFor = async (opts: TH.FakeAuthenticatorOpts = {}) => {
   const authenticator = TH.installFakeAuthenticator(opts)
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)
-  const held = await TH.heldGatingOf(world, TH.addingPasskey)
+  const opened = await TH.openGatingOf(world, TH.addingPasskey)
   const answers: DialogAnswer[] = []
-  const onDone = (answer: DialogAnswer) => { answers.push(answer); held.close() }
-  const ui = <AddPasskeyModal gating={TH.gatingOfKind(held.gating, 'add_passkey')} onDone={onDone} />
-  return { ...held, ...render(ui), ui, answers, authenticator }
+  const onDone = (answer: DialogAnswer) => { answers.push(answer); opened.close() }
+  const ui = <AddPasskeyModal gating={TH.gatingOfKind(opened.gating, 'add_passkey')} onDone={onDone} />
+  return { ...opened, ...render(ui), ui, answers, authenticator }
 }
 
-/** The credential id of the passkey the vault in `bank` holds, or null. */
-const passkeyHeld = (bank: Bank) => {
+/** The credential id of the passkey the vault in `bank` has, or null. */
+const passkeyOf = (bank: Bank) => {
   const wayin = bank.vaultAt(TH.VaultScopeGiven)?.gate.toJSON().passkey_wayin
   return wayin?.wayinkind === 'passkey' ? wayin.credential_id : null
 }
@@ -35,7 +35,7 @@ describe("AddPasskeyModal", () => {
     TH.submitPasskeyAdd(TH.Passphrase)
     await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
     expect(await raising).to.include({ ok: true })
-    expect(passkeyHeld(bank)).to.equal(authenticator.credentialIds()[0])
+    expect(passkeyOf(bank)).to.equal(authenticator.credentialIds()[0])
     const [call] = authenticator.calls.create
     expect(call?.publicKey?.rp.name).to.equal(gating.applabel)
     expect(call?.publicKey?.user).to.include({ name: 'u1 (main vault)' })
@@ -46,11 +46,11 @@ describe("AddPasskeyModal", () => {
     TH.submitPasskeyAdd('not the passphrase')
     await waitFor(() => { expect(alertText()).to.not.eq('') })
     expect(gating.isOpen).to.be.true
-    expect(passkeyHeld(bank)).to.be.null
+    expect(passkeyOf(bank)).to.be.null
     TH.submitPasskeyAdd(TH.Passphrase)
     await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
     expect(await raising).to.include({ ok: true })
-    expect(passkeyHeld(bank)).to.equal(authenticator.credentialIds()[1])
+    expect(passkeyOf(bank)).to.equal(authenticator.credentialIds()[1])
   })
 
   it("asks for the passphrase before the browser makes a passkey", async () => {
@@ -86,8 +86,8 @@ describe("AddPasskeyModal", () => {
 
   it("asks the browser for one passkey at a time, however often the user submits", async () => {
     const { answers, authenticator } = await shownFor()
-    const touching = TH.held()
-    authenticator.holdNext(touching.promise)
+    const touching = TH.makePending()
+    authenticator.answerNextAfter(touching.promise)
     TH.submitPasskeyAdd(TH.Passphrase)
     fireEvent.click(screen.getByText(Messages.addPasskeyButton))
     await act(async () => { touching.resolve(undefined); await TH.wakeupAtNextTick() })
@@ -95,19 +95,19 @@ describe("AddPasskeyModal", () => {
     expect(authenticator.calls.create).to.have.lengthOf(1)
   })
 
-  it("answers declined on Cancel, and the vault holds no passkey", async () => {
+  it("answers dismissed on Cancel, and the vault has no passkey", async () => {
     const { bank, raising, answers } = await shownFor()
     fireEvent.click(screen.getByText('Cancel'))
-    expect(answers).to.deep.equal(['declined'])
+    expect(answers).to.deep.equal(['dismissed'])
     expect(await raising).to.include({ ok: false })
-    expect(passkeyHeld(bank)).to.be.null
+    expect(passkeyOf(bank)).to.be.null
   })
 
   it("never adds a passkey made while an Activity hid the dialog, zeroing its answer untried", async () => {
     const { gating, ui, rerender, authenticator } = await shownFor()
     const attempts = vi.spyOn(Gating.prototype, 'attempt')
-    const touching = TH.held()
-    authenticator.holdNext(touching.promise)
+    const touching = TH.makePending()
+    authenticator.answerNextAfter(touching.promise)
     TH.submitPasskeyAdd(TH.Passphrase)
     rerender(TH.inActivity('hidden', ui))
     await act(async () => { touching.resolve(undefined); await TH.wakeupAtNextTick() })

@@ -47,7 +47,7 @@ describe("versionedShelfOf(spec)", () => {
     }
   })
 
-  it("lists the browser's databases for its wipe once for each database, however many stores use it", async () => {
+  it("lists the browser's databases for its wipe once for each database, however many shelves use it", async () => {
     const spec = specOf()
     const databases = vi.spyOn(indexedDB, 'databases')
     try {
@@ -73,7 +73,7 @@ describe("versionedShelfOf(spec)", () => {
     expect(() => versionedShelfOf(specOf(over as unknown as Partial<VersionedShelfSpec>))).to.throw(VaultError).with.property('refusalkind', 'bad_option')
   })
 
-  it("refuses a spec that is no bag, and a field it does not take", () => {
+  it("refuses a spec that is no bag, and a field it does not accept", () => {
     expect(() => versionedShelfOf(null as never)).to.throw(VaultError)
     expect(() => versionedShelfOf({ ...specOf(), extra: 1 } as never)).to.throw(VaultError)
   })

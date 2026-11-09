@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Bank, DefaultOnBadNews, DefaultOnLifecycle, tellBadNewsTo, type Vault } from 'safebyok'
 import { providerProps } from '../shapes'
-import type { BankProviderProps, ContextValue, GatingModalProps, Handlers, HeldBankOpts, TellBadNews } from '../shapes'
+import type { BankProviderProps, ContextValue, GatingModalProps, Handlers, ProviderBankOpts, TellBadNews } from '../shapes'
 import { GatingModal } from './gating-modal'
 import { useDeviceId, useWarnOfIgnoredOpts } from './provider-hooks'
 
@@ -11,7 +11,7 @@ const BankContext = createContext<ContextValue | null>(null)
 
 const tellNobody: TellBadNews = () => { /* no bank, no news */ }
 
-/** What a provider hands down while it holds no bank. */
+/** What a provider hands down while it has no bank. */
 const Bankless: ContextValue = Object.freeze({ bank: null, helloedVaults: new WeakSet<Vault>(), tellBadNews: tellNobody })
 
 /** What the nearest BankProvider hands down, or a throw naming `hookname` where there is none. */
@@ -22,10 +22,10 @@ export const useProvided = (hookname: string): ContextValue => {
 }
 // --
 
-// == [Holding]: useHeldBank
+// == [The provider's bank]: useProviderBank
 
-/** The bank made from the first render's `opts` once `device_id` is known, and held until unmount. */
-const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Handlers, isHostAsking: boolean, onMade: (bank: Bank) => void): ContextValue => {
+/** The bank made from the first render's `opts` once `device_id` is known, and kept until unmount. */
+const useProviderBank = (opts: ProviderBankOpts, device_id: string | null, handlers: Handlers, isHostAsking: boolean, onMade: (bank: Bank) => void): ContextValue => {
   const [madeFrom] = useState(opts)
   const [contextValue, setContextValue] = useState<ContextValue>(Bankless)
 
@@ -52,7 +52,7 @@ const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Han
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the bank lives only between this effect and its cleanup, and render must hand it down
     setContextValue({ bank, helloedVaults: new WeakSet<Vault>(), tellBadNews })
     onMade(bank)
-    // The bank tells onLifecycle of the hello and its snapshot of a refusal.
+    // The bank tells onLifecycle of the hello.
     void bank.tryHello()
     return () => {
       bank.sweep()
@@ -92,27 +92,27 @@ export const BankProvider = (props: BankProviderProps) => {
 }
 
 /** The dialog for `bank`'s open gating, while it has one. */
-const OpenGatingDialog = ({ bank, ...dialogProps }: Pick<GatingModalProps, 'passphraseUsername' | 'passphraseAdvice' | 'passkeyRpId'> & { bank: Bank }) => {
+const OpenGatingDialog = ({ bank, ...dialogProps }: Pick<GatingModalProps, 'passphraseUsername' | 'passkeyRpId'> & { bank: Bank }) => {
   const { openGating } = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
   if (openGating === null) { return null }
-  // No key: each dialog keys its form by the gating itself, which a React key cannot be.
-  return <GatingModal gating={openGating} leaseMillis={bank.leaseMillis} {...dialogProps} onDone={() => { openGating.decline() }} />
+  // No key: each dialog keys its form by its gating's `gatingTok`.
+  return <GatingModal gating={openGating} leaseMillis={bank.leaseMillis} {...dialogProps} onDone={() => { openGating.dismiss() }} />
 }
 
-/** Hold one user's bank once the device is named, and show the dialog for its gatings. */
+/** Keep one user's bank once the device is named, and show the dialog for its gatings. */
 const UserBankProvider = (props: BankProviderProps & { device_id: string | null, onMade: (bank: Bank) => void }) => {
-  const { passphraseUsername, passphraseAdvice, passkeyRpId, children, device_id, onMade, onLifecycle = DefaultOnLifecycle, onBadNews = DefaultOnBadNews, requestCleartext, ...bankish } = props
+  const { passphraseUsername, passkeyRpId, children, device_id, onMade, onLifecycle = DefaultOnLifecycle, onBadNews = DefaultOnBadNews, requestCleartext, ...bankish } = props
   // The bank is made once, so whether the host's dialog asks is fixed at the first render, as the bank's other options are.
   /** True when the host's `requestCleartext` answers this bank's gatings. */
   const [isHostAsking] = useState(requestCleartext !== undefined)
-  const contextValue = useHeldBank(bankish, device_id, { onLifecycle, onBadNews, requestCleartext }, isHostAsking, onMade)
+  const contextValue = useProviderBank(bankish, device_id, { onLifecycle, onBadNews, requestCleartext }, isHostAsking, onMade)
   const { bank } = contextValue
 
   return (
     <BankContext.Provider value={contextValue}>
       {children}
       {(bank !== null) && (! isHostAsking) && (
-        <OpenGatingDialog bank={bank} passphraseUsername={passphraseUsername} passphraseAdvice={passphraseAdvice} passkeyRpId={passkeyRpId} />
+        <OpenGatingDialog bank={bank} passphraseUsername={passphraseUsername} passkeyRpId={passkeyRpId} />
       )}
     </BankContext.Provider>
   )

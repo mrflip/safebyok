@@ -47,16 +47,16 @@ describe("label", () => {
     expect(checked.error?.issues.map((issue) => issue.message)).to.deep.equal([Phrases.LabelShape])
   })
 
-  it("says what is wrong in its own sentences, and never quotes the label", () => {
+  it("says what is wrong and never quotes the label", () => {
     const said = JSON.stringify([PX.label.safeParse('Secret_Label'), PX.label.safeParse(`secret${'x'.repeat(MaxLabelChars)}`)].map((checked) => checked.error?.issues.map((issue) => issue.message)))
     expect(said).to.include('starting with a letter and ending on a letter or digit')
-    expect(said).to.include('at most 40 characters')
+    expect(said).to.include('<=40')
     expect(said.toLowerCase()).to.not.include('secret')
   })
 
   it("answers for text of millions of characters, refusing it by its length", () => {
     const vast = 'n'.repeat(12_000_000)
-    expect(JSON.stringify(PX.label.safeParse(vast).error?.issues.map((issue) => issue.message))).to.include('at most 40 characters')
+    expect(JSON.stringify(PX.label.safeParse(vast).error?.issues.map((issue) => issue.message))).to.include('<=40')
     expect(Patterns.label.test(vast)).to.be.true
     expect(Patterns.label.test(`${vast}__`)).to.be.false
   })
@@ -132,7 +132,7 @@ describe("user_id", () => {
   it("names its bound when it refuses, and never quotes the id", () => {
     const overlong = `alice@example.com${'u'.repeat(MaxUserIdChars)}`
     const refusals = [PX.user_id.safeParse(overlong), PX.user_id.safeParse(''), PX.user_id.safeParse('alice smith')].map((checked) => JSON.stringify(checked.error?.issues.map((issue) => issue.message)))
-    expect(refusals[0]).to.include('at most 100 characters')
+    expect(refusals[0]).to.include('<=100')
     expect(refusals[1]).to.include("can't be empty")
     expect(refusals[2]).to.include('percent-encode')
     expect(refusals.join(' ')).to.not.include('alice')
@@ -158,7 +158,7 @@ describe("Patterns.user_id", () => {
 })
 
 describe("label and user_id, inside a host's own Zod", () => {
-  // A host on classic Zod holds them in its own schemas, as a form checking a box might.
+  // A host on classic Zod has them in its own schemas, as a form checking a box might.
   const BoxForm = Zod.object({ boxlabel: PX.label, user_id: Zod.optional(PX.user_id) })
 
   it("compose into a host's schema and check as they do alone", () => {
@@ -181,7 +181,7 @@ const EpochMillisCases = [
   // edge cases:
   [FarPast - 1,               false,  'one millisecond before 1981'],
   [FarFuture + 1,             false,  'one millisecond past the ceiling'],
-  [8.64e15,                   false,  'the last instant a Date holds, far past the ceiling'],
+  [8.64e15,                   false,  'the last instant a Date has, far past the ceiling'],
   [0,                         false,  'the epoch itself'],
   [NowMillis + 0.5,               false,  'a fraction of a millisecond'],
   [Infinity,                  false,  'a time that never comes'],
@@ -203,7 +203,7 @@ describe("epochMillis", () => {
     expect(tooSmall.error?.issues[0]?.message).to.match(/epoch seconds/)
     expect(tooLarge.error?.issues[0]?.message).to.match(/epoch microseconds/)
     expect(PX.epochMillis.safeParse(1e300).error?.issues[0]?.message).to.match(/epoch microseconds/)
-    expect(PX.epochMillis.safeParse(NowMillis + 0.5).error?.issues[0]?.message).to.match(/whole epoch milliseconds/)
+    expect(PX.epochMillis.safeParse(NowMillis + 0.5).error?.issues[0]?.message).to.match(/expected int/u)
   })
 
   // epochMillis @example

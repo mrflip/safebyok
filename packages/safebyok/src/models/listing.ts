@@ -15,7 +15,7 @@ import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
 import type { Storable } from './storable'
 
-/** SLOPDOC: The live instances of one kind of thing, by scope, each made once and held, as its tombstone once gone. */
+/** SLOPDOC: The live instances of one kind of thing, by scope, each made once and enlisted, as its tombstone once gone. */
 export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>> {
   // == [Props]: world, maxMillisSinceRefresh, vaultDB, bankFriend, #things, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
 
@@ -43,7 +43,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Getters]: things, snapshot, getSnapshot, subscribe
 
-  /** Every instance this listing holds, whether present or deleted. */
+  /** Every instance listed, whether present or deleted. */
   get things(): readonly ThingT[] { return [...this.#things.values()] }
 
   /** The snapshot of every present instance, as the instance itself gives it: frozen, the same array until one of them changes. */
@@ -67,7 +67,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.maxMillisSinceRefresh = maxMillisSinceRefresh
   }
 
-  /** The instance of `record`, built or brought up to it, and held. Stores nothing. */
+  /** The instance of `record`, built or brought up to it, and enlisted. Writes nothing. */
   async build(record: Fetched<RecordT, SparseT>): Promise<ThingT> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
     return this.buildOrReceive(record)
   }
@@ -82,24 +82,24 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async ensureTimelyWorld(maxMillis?: number): Promise<void> { await this.world.ensureTimely(VX.maxMillis.parse(maxMillis)) }
   // --
 
-  // == [The held things]: at, unlist, hold
+  // == [The listed things]: at, delist, enlist
 
-  /** The instance held under the scope of `duck`, or null. */
+  /** The instance listed under the scope of `duck`, or null. */
   at(duck: unknown): ThingT | null {
     return this.#things.get(this.scopepathOf(this.scopeOf(duck))) ?? null
   }
 
-  /** Stop holding `thing`, as its own discard asks: the slot empties only for this very instance. */
-  unlist(thing: Thing<ScopeT, RecordT, SparseT>): void {
+  /** Delist `thing`, as its own discard asks: the slot empties only for this very instance. */
+  delist(thing: Thing<ScopeT, RecordT, SparseT>): void {
     const scopepath = this.scopepathOf(this.scopeOf(thing))
-    const held: Thing<ScopeT, RecordT, SparseT> | undefined = this.#things.get(scopepath)
-    if (held !== thing) { return }
+    const listed: Thing<ScopeT, RecordT, SparseT> | undefined = this.#things.get(scopepath)
+    if (listed !== thing) { return }
     this.#things.delete(scopepath)
     this.#remakeSnapshot()
   }
 
-  /** Hold `thing`, born here, under its scope, and make the listing's snapshot again on each change of the thing's. */
-  #hold(thing: ThingT): void {
+  /** Enlist `thing`, born here, under its scope, and make the listing's snapshot again on each change of the thing's. */
+  #enlist(thing: ThingT): void {
     this.#things.set(this.scopepathOf(thing.scope), thing)
     thing.becomeNotifiable()
     thing.subscribeOwn(() => { this.#remakeSnapshot() })
@@ -120,16 +120,16 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.#unwatch = null
   }
 
-  /** Lock each thing held. */
+  /** Lock each thing listed. */
   lock(): this {
     for (const thing of this.things) { thing.lock() }
     return this
   }
 
-  /** End the watch, sweep each thing, and take no further calls. A repeat is a no-op. Never throws. */
+  /** End the watch, sweep each thing, and accept no further calls. A repeat is a no-op. Never throws. */
   sweep(): this { return this.#disable((thing) => { thing.sweep() }) }
 
-  /** End the watch, vacate each thing, and take no further calls. A repeat is a no-op. Never throws. */
+  /** End the watch, vacate each thing, and accept no further calls. A repeat is a no-op. Never throws. */
   vacate(): this { return this.#disable((thing) => { thing.vacate() }) }
 
   #disable(discard: (thing: ThingT) => void): this {
@@ -143,7 +143,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Storage verbs]: fetch, handleIfAbsent, put, del, delOver, each with its try form
 
-  /** SLOPDOC: The instance under `scope` as storage now holds it, built where none was held. */
+  /** SLOPDOC: The instance under `scope` as it is now stored, built where none was listed. */
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
     const { ifAbsent, maxWorldMillis } = VX.fetchOpts.parse(opts)
     const asked = this.scopeOf(scope)
@@ -164,7 +164,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return (found?.isPresent === true) ? found : null
   }
 
-  /** Stores `record` over the revision `prior`, answering the instance held. */
+  /** Puts `record` over the revision `prior`, answering the instance listed. */
   async put(record: RecordT, opts: PutOpts): Promise<ThingT> {
     const checked = this.recordOf(record)
     const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
@@ -196,10 +196,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Delivering an answer]: deliver, deliverGood, receiveNothing, buildOrReceive, makeThingOf
 
-  /** SLOPDOC: The pipeline every storage answer takes, from its world through the instance held to the caller. */
+  /** SLOPDOC: The pipeline every storage answer follows, from its world through the instance listed to the caller. */
   protected async deliver(answer: ListingAnswer<RecordT, SparseT>): Promise<ThingT | null> {
     this.demandEnabled()
-    if (answer.world !== null) { this.world.takeWorld(answer.world) }
+    if (answer.world !== null) { this.world.receiveWorld(answer.world) }
     if (answer.ok) { return this.#deliverGood(answer) }
     const stored = (answer.dbhas ?? null) as VaultRow | BoxRow | null
     if ((stored !== null) && this.isOwnRow(stored)) {
@@ -213,7 +213,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     throw answer.err
   }
 
-  /** The instance a good answer leaves held, or null where none is. */
+  /** The instance a good answer leaves listed, or null where none is. */
   #deliverGood(answer: GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>): ThingT | null {
     const scope = this.scopeOf(answer.req_params)
     const record = recordOfAnswer<RecordT, SparseT>(answer)
@@ -221,29 +221,29 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return (record === null) ? this.#receiveNothing(scope) : this.buildOrReceive(record)
   }
 
-  /** The instance held under `scope`, told that storage holds nothing there. */
+  /** The instance listed under `scope`, told that nothing is stored there. */
   #receiveNothing(scope: ScopeT): ThingT | null {
     this.demandEnabled()
-    const held = this.at(scope)
-    if (held === null) { return null }
-    this.bankFriend.tellBadNews(held.receive(null).badnews)
+    const listed = this.at(scope)
+    if (listed === null) { return null }
+    this.bankFriend.tellBadNews(listed.receive(null).badnews)
     this.#remakeSnapshot()
-    return held
+    return listed
   }
 
-  // The one place an instance is made and held: `#makeThingOf` is called from here alone, and only where no instance is held.
+  // The one place an instance is made and enlisted: `#makeThingOf` is called from here alone, and only where no instance is listed.
   /** The instance under the scope of `record`: built, brought up to it or replaced, by the record's fate. */
   protected buildOrReceive(record: Fetched<RecordT, SparseT>): ThingT {
     this.demandEnabled()
     const sparse = this.sparseOf(record)
-    const held = this.at(this.scopeOf(sparse))
-    const fate = (held === null) ? 'replace' : this.fateOver(held, record)
-    if ((held !== null) && (fate === 'lose')) { return held }
-    const thing = ((fate === 'replace') ? null : held) ?? this.#makeThingOf(sparse)
+    const listed = this.at(this.scopeOf(sparse))
+    const fate = (listed === null) ? 'replace' : this.fateOver(listed, record)
+    if ((listed !== null) && (fate === 'lose')) { return listed }
+    const thing = ((fate === 'replace') ? null : listed) ?? this.#makeThingOf(sparse)
     this.bankFriend.tellBadNews(thing.receive(record).badnews)
-    if (thing !== held) {
-      this.#hold(thing)
-      held?.vacate()
+    if (thing !== listed) {
+      this.#enlist(thing)
+      listed?.vacate()
     }
     this.#remakeSnapshot()
     return thing
@@ -265,7 +265,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     if ((! this.#isEnabled) || (! this.isOwnRow(val))) { return }
     void (async () => {
       const { ok, err } = await outcomeOf(() => {
-        if (world !== null) { this.world.takeWorld(world) }
+        if (world !== null) { this.world.receiveWorld(world) }
         return this.#isEnabled ? this.buildOrReceive(val) : null
       })
       if (! ok) { this.bankFriend.tellBadNews([err]) }
@@ -320,7 +320,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Defined by the concrete listing]: fateOver, vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, tryGetRow, tryPutRow, tryDelRow, watchRows, isOwnRow
 
-  /** The fate of `record` meeting `held`, the thing in its slot: by default its `receive` takes it in. */
+  /** The fate of `record` meeting `listed`, the thing in its slot: by default its `receive` judges it. */
   protected fateOver(_held: ThingT, _record: Fetched<RecordT, SparseT>): SlotFate { return 'receive' }
 
   /** The `vault_tok` every record of this listing lies under, being the vault's own; null for a listing whose records make their own, as a vault's do. */
@@ -333,7 +333,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The full record `duck` is, as a plain copy. */
   abstract recordOf(duck: unknown): RecordT
   protected abstract makeThing(central: Fetched<RecordT, SparseT>): ThingT
-  /** The refusal for a scope where storage holds no row and no instance is held. */
+  /** The refusal for a scope where no row is stored and no instance is listed. */
   protected abstract nothingStoredError(scope: ScopeT): VaultError
   /** The vaultDB's get of this kind of thing, answering null for nothing stored. */
   protected abstract tryGetRow(scope: ScopeT): Promise<ListingAnswer<RecordT, SparseT>>
@@ -341,7 +341,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected abstract tryDelRow(tombstone: DelTombstone<SparseT>, opts: DelOpts): Promise<ListingAnswer<RecordT, SparseT>>
   /** Start the vaultDB's watch over this listing's scope, `onBadNews` hearing of its end unbidden; returns how to stop. */
   protected abstract watchRows(onNotice: (notice: VaultDBNotice) => void, onBadNews: (news: VaultError) => void): () => void
-  /** True for a row this listing holds: the vaultDB's watch tells of a vault's rows and its boxes' alike. */
+  /** True for a row this listing has: the vaultDB's watch tells of a vault's rows and its boxes' alike. */
   protected abstract isOwnRow(row: VaultRow | BoxRow): row is (VaultRow | BoxRow) & Fetched<RecordT, SparseT>
   // --
 }
