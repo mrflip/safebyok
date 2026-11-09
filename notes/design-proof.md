@@ -347,7 +347,7 @@ does not already carry:
 each gate change's run
 ├─ stored = await vaultListing.<gate verb>(params)    ← the commit; params spread from ante, the record the attempt read, its gate holding the wayin
 │  ├─ ante's revision is the prior; moved → 'stale_write', nothing stored
-│  ├─ the store refuses what its row rules out, such as an addPasskey over a passkey held
+│  ├─ the vaultDB refuses what its row rules out, such as an addPasskey over a passkey held
 │  ├─ the vaultDB lays the wayin on the row, moves gate_epoch and the revision up, and leaves the rest as stored
 │  └─ no lock: adopt never locks on a move
 └─ vault.#unlockByProof(proved, stored.gate.gate_epoch)    a fresh lease of full term; a lock() crossing the change does not hold
@@ -486,7 +486,7 @@ A Box operation naming a stale or missing vault_tok will fail `vault_mismatch` (
 
 ## Required of the parts not yet drawn
 
-* A store's conditional put is atomic on `revision_tok`.
+* Storage's conditional put is atomic on `revision_tok`.
 * The deviceDB's calls land in the order they were made (*The lease*).
 * `lock()` removes the cached lease even on a vault already reporting locked.
 * The deviceDB has `cache`, `peek` and `vacate`, by scope and `vault_tok`: `vacate` and `del_vault` both need a removal.
@@ -497,7 +497,7 @@ A Box operation naming a stale or missing vault_tok will fail `vault_mismatch` (
 * `adopt` ignores a record older by `revision_seq`.
 * `Promptly`, a constant: the timeliness an attempt asks of `ensureTimely`. `maxMillis: 0` is the customer's to ask, as an
   override from the inside is one the customer cannot.
-* `ifPresent` is customer-facing. Expect both `Storable` and the store to have a part in deciding it, as the implementer
+* `ifPresent` is customer-facing. Expect both `Storable` and the vaultDB to have a part in deciding it, as the implementer
   finds (the Coach, 2026-11-03). Only `repl` saves. `fail` refuses `camped` with the corpse (`dbhas`, the request), not as a `stale_write`; `get` answers the live
   row in place of the request, `declined`.
 * Every box query names scope and `vault_tok`, and a box row under another `vault_tok` is no row. Only a

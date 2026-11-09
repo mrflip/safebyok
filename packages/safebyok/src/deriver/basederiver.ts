@@ -6,7 +6,7 @@ import { type KeyDeriverSpec, ReservedLabelPrefix, SuppliedSpecs, TestLabelPrefi
 
 /** What `Bank.make` takes to make a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
 export interface KeyDeriver {
-  /** The name each wayin stores for how its key was derived, so a later device derives it alike. */
+  /** The name each wayin records for how its key was derived, so a later device derives it alike. */
   readonly key_deriver_label: string
   /** How many bytes of salt each derivation takes: {@link PassphraseSaltBytes}, for every deriver. */
   readonly salt_bytes:        typeof PassphraseSaltBytes

@@ -67,7 +67,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.maxMillisSinceRefresh = maxMillisSinceRefresh
   }
 
-  /** The instance of `record`, built or brought up to it, and enlisted. Stores nothing. */
+  /** The instance of `record`, built or brought up to it, and enlisted. Writes nothing. */
   async build(record: Fetched<RecordT, SparseT>): Promise<ThingT> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
     return this.buildOrReceive(record)
   }
@@ -164,7 +164,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return (found?.isPresent === true) ? found : null
   }
 
-  /** Stores `record` over the revision `prior`, answering the instance listed. */
+  /** Puts `record` over the revision `prior`, answering the instance listed. */
   async put(record: RecordT, opts: PutOpts): Promise<ThingT> {
     const checked = this.recordOf(record)
     const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)

@@ -374,7 +374,7 @@ export const bankOpts = objCheck(({ fn, custom, applabel, user_id, device_id }) 
   onLifecycle:         fn<LifecycleHandler>().optional(),
 }), { refusalkind: 'bad_option' }, [CX])
 
-/** What a host hands `Bank.make`: who the bank is for, where it stores, and the functions it calls back. */
+/** What a host hands `Bank.make`: who the bank is for, where it writes, and the functions it calls back. */
 export interface BankOpts {
   /** Your app's own label, so several apps can share one backend. */
   applabel:             string

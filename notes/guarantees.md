@@ -57,8 +57,8 @@ disabled bank asks no one: every `Gating.launch` follows, in the same tick, a ch
 enabled, and a sweep or a vacate disables both before it returns. `onLifecycle` is wrapped there too, by `guardOnLifecycle`; it hears a
 `BankEvent`, a bag of what happened (a refusal, an outcome or a count), the live `Bank`, and the live `Vault` it concerns, if one,
 and no secret material: neither instance hands out a key (G9). A revoked identity vacates the bank in the core, whatever that
-handler does. The `DeviceDB` (`storage/device-db.ts`, `storage/memory-device-db.ts`) stores the leaseKey
-opaque, and what a store throws is replaced at `storeFailed` (`refusals/throwers.ts`, from the catch in each `DeviceDB` verb),
+handler does. The `DeviceDB` (`storage/device-db.ts`, `storage/memory-device-db.ts`) stows the leaseKey
+opaque, and what a device database throws is replaced at `deviceDBFailed` (`refusals/throwers.ts`, from the catch in each `DeviceDB` verb),
 which keeps nothing of it (G8).
 
 ## The construction
@@ -88,7 +88,7 @@ the kind of field, and the record's own visible header or stamp. So a wrap or a 
 to another vault, slot, box, lease or purpose does not open, and a visible field altered in
 storage (a sidecar, a salt, a deadline) makes its record refuse to open.
 
-## Bytes, handles, and the three stores
+## Bytes, handles, and the three datastores
 
 Three layers hold key material, and the words for each matter.
 
@@ -101,7 +101,7 @@ Three layers hold key material, and the words for each matter.
   key's bytes are never observable from JavaScript, by anyone, including the code that made it.
   `crypto.ts` is the only module that calls `crypto.subtle`.
 * **IndexedDB** keeps a `CryptoKey` by structured clone: the handle survives a page load, its
-  material still inside the browser, never as bytes JavaScript sees. The one key safebyok stores
+  material still inside the browser, never as bytes JavaScript sees. The one key safebyok writes
   this way is the leaseKey (`lease.cacheAsCacheCan`, through a `DeviceDB`'s `stow`). The core's `IdbDeviceDB`
   (`storage/idb-device-db.ts`, on `safebyok/browser`) rests the lease row, its `lease_key` handle among it, in
   the database `${dbName}:device-v001-001-001` by IndexedDB's structured clone, never as bytes; its `MemoryDeviceDB`
@@ -122,7 +122,7 @@ again, and zero it once its one attempt is done (`attemptOnce`).
 
 ## The secret values
 
-Eight values are secret. Everything else safebyok stores or shows is either public or
+Eight values are secret. Everything else safebyok writes or shows is either public or
 *visible*: readable where it lies, authenticated by the ctx that binds it, and never secret.
 
 | Value | Form | Where it may exist | For how long | Who touches it |
@@ -133,7 +133,7 @@ Eight values are secret. Everything else safebyok stores or shows is either publ
 | wayinKey | `CryptoKey`, non-extractable, `wrapKey`/`unwrapKey` | `Proving.#wayinKey` | the proving, which lives for its gating's chain | `Proving` |
 | vaultKey | `CryptoKey` | locals only; stored only wrapped | one method | `Proving`, `Lease` |
 | boxKey | `CryptoKey` | locals only; stored only wrapped | one cipher or decipher | `Lease` |
-| leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record`, through the `DeviceDB` as a `LeaseRow`, and at rest in the device store | the lease | `Lease`, `Proving.buildLease`; the `DeviceDB` stores it opaque |
+| leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record`, through the `DeviceDB` as a `LeaseRow`, and at rest in the device database | the lease | `Lease`, `Proving.buildLease`; the `DeviceDB` stows it opaque |
 | whisper | the host's JSON object, then its JSON text, which crosses from box to lease, and the UTF-8 bytes only the lease makes | the host's value in and out; the text a string in arguments and locals, which cannot be zeroed (G6); the bytes locals in the `Lease`, zeroed; the value on a `Box` from `expose` until `unexpose`, a sweep, a vacate or a delete, a lock and a veil keeping it (*Open items*, 1) | one seal or open, but for that exposed value | `Box`, the Vault's seal verbs, `Lease` |
 
 Not secret, by design: every salt (`salt_b64`, `prf_salt_b64`), a passkey's `credential_id`,
@@ -320,7 +320,7 @@ the eighth value that this note names here: it lives in locals and arguments for
 message, `cause`, `meta` or any property (`errors.ts`); no refusal interpolates anything but a
 kind, a limit, a field name, or the `name` of an error it replaces (`thrownNameOf`, `errors.ts`: a
 DOMException's or an Error's class name such as `QuotaExceededError`, or whatever name a host's own
-device store gave its error, kept by the device-store conditions until a redact
+device database gave its error, kept by the device-database conditions until a redact
 lands; the Coach, 2026-10-28). No validator's refusal quotes an input value. It names a failing field by its
 path, so a key a host chose, which is no secret, may be named (`tests/helpers/validator.test.ts`, *repeats the keys of
 a schema keyed by its input in the refusal*). `tests/helpers/validator.test.ts`, *every checker a shapes module
@@ -348,14 +348,14 @@ already proved). A proving's key, a grant or a wayin is made inside the gating's
 `unexpected_error` with the DOMException as its `cause`. A seal's error reaches the host as thrown
 from `putBox`, `box.put`, `putExposed`, `vault.boxListing.create` or the public `vault.sealStampedString`. From the
 `try*` forms of the first four, `outcomeOf` makes it an `unexpected_error` with the DOMException as its `cause`. Either way it keeps no secret: a WebCrypto
-error carries a name and a message, never key material. A device-store failure's cause never crosses to the host: `storeFailed`
-(`refusals/throwers.ts`, from the catch in each `DeviceDB` verb) keeps neither what the store threw nor its message,
+error carries a name and a message, never key material. A device-database failure's cause never crosses to the host: `storeFailed`
+(`refusals/throwers.ts`, from the catch in each `DeviceDB` verb) keeps neither what the device database threw nor its message,
 only its `name`, as a `DeviceDB` is handed every lease record and the logger hands a condition to the
 host whole (`tests/storage/device-db.test.ts`, *a deviceDB whose store throws*). `unexpectedError` keeps a foreign throw
 as `cause` only where the thrower heard no secret. The invariant at the one catch that ends each
 Lease and Box `try*` form (`outcomeOf`, `outcome.ts`) is checkable by reading what can reach it: a
 refusal (passed as itself), the vault's demand, or a bug's own throw from this package's lines;
-never a host function's throw or the device store's, each replaced before it gets there, and a
+never a host function's throw or the device database's, each replaced before it gets there, and a
 WebCrypto error only from the seal, key, grant and wayin paths named above. The Vault's, the Bank's and the box
 listing's `try*` forms are each one `outcomeOf` over the throwing form too, and the throwing forms end in no such catch. The logger hears messages, a story bag of kinds and calls, and `VaultError`s;
 `Proving.toJSON`, `Lease.toJSON` and `Wayin.toJSON` show no key material, and a lease that will
@@ -430,6 +430,6 @@ listed here, has no counterpart in the core.
    memory: to make it go away is `unexpose`, and a bag or a copy of one refuses at a put, so it can never replace the secret. Forging the mark
    only refuses a put. `BoxFields` (`src/dom/box-fields.ts`, the `safebyok/dom` entry) writes a leaf of it to an element's `value`, through
    `Box`'s public surface alone, so it is also in the DOM while it shows. A lock or a veil writes a blank over it, an edit having been read back
-   into the `Box` first by `box.patchWhisper`, which works while locked and stores nothing, and the element is never read while hidden. The last
+   into the `Box` first by `box.patchWhisper`, which works while locked and writes nothing, and the element is never read while hidden. The last
    field to unbind unexposes. It is the host's decision, which a host would otherwise make for itself without the guard. "whisper is unsafe by design and its
    implementation may change as we tune its unsafeness" (the Coach, 2026-10-31).

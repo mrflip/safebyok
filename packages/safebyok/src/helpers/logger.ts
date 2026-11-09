@@ -118,7 +118,7 @@ const tell = (hostLogger: AnyReturningLogger, level: VaultLoggerLevel, message?:
     // Called as a method, so a logger built as a class keeps its `this`.
     void dropRejection(hostLogger[level](message, story, err))
   } catch {
-    // A logger that throws must not break the lock, open or store that called it.
+    // A logger that throws must not break the lock, open or put that called it.
   }
 }
 

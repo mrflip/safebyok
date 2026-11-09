@@ -40,7 +40,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** SLOPDOC: A new vault for `scope`, asked of the user, stored and unlocked; or, locked, the slot's winner. */
+  /** SLOPDOC: A new vault for `scope`, asked of the user, put and unlocked; or, locked, the slot's winner. */
   buildVault(scope: VaultScope): Promise<Vault> { return Vault.launchBirth(this, scope, this.bankFriend.askUser) }
 
   /** Non-throwing form of {@link buildVault}. */
@@ -93,7 +93,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, del
 
-  /** Lay a new passphrase wayin on the row, deliver what it stores to the vault listed, and answer that record. Nothing locks: the vaultKey does not change. */
+  /** Lay a new passphrase wayin on the row, deliver what it writes to the vault listed, and answer that record. Nothing locks: the vaultKey does not change. */
   async replacePassphrase(params: ReplacePassphraseParams): Promise<SX.VaultRecord> {
     this.demandEnabled()
     return this.#deliverStored(await this.vaultDB.tryReplacePassphrase(params))
@@ -111,7 +111,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return this.#deliverStored(await this.vaultDB.tryRevokePasskey(params))
   }
 
-  /** The record a gate verb stored: the vault listed may hold a newer one by the time its answer is delivered. */
+  /** The record a gate verb wrote: the vault listed may hold a newer one by the time its answer is delivered. */
   async #deliverStored(answer: Answer<SX.VaultRecord, string>): Promise<SX.VaultRecord> {
     await this.deliver(answer)
     return valOf(answer)

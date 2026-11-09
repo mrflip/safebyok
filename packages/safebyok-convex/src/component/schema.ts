@@ -2,7 +2,7 @@ import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 
 // Each row is held whole, as the core wrote it, under the labels it is found by: the component
-// stores what it is handed and judges a row only through the core's own predicates, so a row the
+// writes what it is handed and judges a row only through the core's own predicates, so a row the
 // core would call damaged is kept as it is and read back as it is. `user_id` leads every index, so
 // one user's rows are one range.
 

@@ -38,7 +38,7 @@ not as a settled ruling, and check it against the current design before relying 
   vault's box calls.** `getBox`, `putBox` and `delBox` calls in flight together on one vault, for
   different boxes or the same `boxlabel`, settle in no promised order. The vault joins only its
   storage refresh (a `hello()` during one is in it, not behind it) and its gating (one prompt at a
-  time); nothing queues the box calls. A store's expectation (`vault_tok`, `gate_epoch`, a box's
+  time); nothing queues the box calls. A vaultDB's expectation (`vault_tok`, `gate_epoch`, a box's
   `revision_tok`) prevents a lost update, not a reordering: a host that needs an order awaits each
   call before making the next.
 * 2026-10-31 (the Coach, newvault sprint, thread 2): **a refused forget of a cached lease is not
@@ -125,7 +125,7 @@ not as a settled ruling, and check it against the current design before relying 
   same lease. Mark anything like this wontfix. We will in future have tabs notify but store independently, how I don't know."):
   **a lease row that fails its check is neither listed nor forgotten.** `DeviceDB.listLeases` leaves it out and `DeviceDB.forget`
   leaves it standing, as it holds no `vault_tok` to match, so a vacate or a `bank.autolock` never forgets it; it stays until a later
-  stow over its scope; `DeviceDB.listRawLeases` shows it beside its scopepath, and a host deletes it by that scopepath with `DeviceDB.forgetRawLease`. Also: **tabs sharing one device store's leases are undefined.** Every tab of an origin opens the same
+  stow over its scope; `DeviceDB.listRawLeases` shows it beside its scopepath, and a host deletes it by that scopepath with `DeviceDB.forgetRawLease`. Also: **tabs sharing one device database's leases are undefined.** Every tab of an origin opens the same
   `IdbDeviceDB` database, so one tab's stow, forget or vacate lands under another's lease unannounced.
 * 2026-11-07 (devicedb_idb, the device database's wipe): **a tab holding an old device database open keeps it.** `IdbDeviceDB`
   deletes the databases of an older version unread on its first call, and a tab of an older release still holding one open blocks
@@ -137,5 +137,5 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-11-09 (the Coach, after designing it in `whiteboard/20261108-del_damaged/del_damaged-spec.md`: "I predict too many bug reports about
   non-bugs"; replaces the 2026-11-03 row that a damaged row stays until the customer names it): **the library does not delete a row that
   fails its check.** A damaged box row stays listed in `damaged_rows`, reads as `damaged_row`, and still counts toward `maxBoxes`; a damaged vault
-  row is told as bad news and stops a `delVault` that meets it. The customer clears either with their own store's tools. The spec is the design
+  row is told as bad news and stops a `delVault` that meets it. The customer clears either with their own datastore's tools. The spec is the design
   to start from if that changes.

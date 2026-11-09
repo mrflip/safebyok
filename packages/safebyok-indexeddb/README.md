@@ -26,7 +26,7 @@ const vaultDB = idbVaultDB({ dbName: 'acme' })
 Hand it to the core wherever a `VaultDB` is asked for.
 
 * **`dbName`** names the database, default `'safebyok'`; the rows go in `<dbName>:vaults-v001-001-001`, and a vault database of an older name is deleted unread. Two
-  stores made with one `dbName`, in one tab or two, share the rows.
+  `IdbVaultDB`s made with one `dbName`, in one tab or two, share the rows.
 * **`maxRecordBytes`** is the AdapterVaultDB's own: the largest box record a `putBox` takes.
 * An option it cannot use refuses with kind `bad_option`.
 
@@ -54,21 +54,21 @@ of a life that is over.
 
 ## Writing an adapter of your own
 
-This package is the example of a key-value backend. To store vaults in another key-value store,
+This package is the example of a key-value backend. To write vaults to another key-value datastore,
 copy it:
 
 * **Extend `AdapterVaultDB` from `safebyok/storage` and write its `do*` methods**, never its public
   verbs: the base class checks scope and options on the way in, validates every row on the way
   out, and turns a put or deletion that did not land into its refusal.
-* **Do each `do*` in one transaction of your store**, reading the vault row beside the rows it
+* **Do each `do*` in one transaction of your datastore**, reading the vault row beside the rows it
   writes, and answer what it found (`ante`, and `vault` for a box) with `isWritten`, whether it took effect.
   `src/idb-vault-db.ts` decides each with the predicates `safebyok/storage` exports. Use those, and
   no check of your own: `isVaultPutAllowed` and `isBoxPutAllowed` for a put, `isLiveVaultRecord` and
   `isLiveBoxRecord` for a deletion, so that a row failing its check is never written over.
-* **Triage your store's failures into refusals** where you catch them (`inOneStep` from
+* **Triage your datastore's failures into refusals** where you catch them (`inOneStep` from
   `safebyok/storage` does it for IndexedDB); anything else you throw becomes `storage_unavailable`.
 * **Prove it with the battery**: `describeVaultDBBattery` from `safebyok/testing` runs every
-  call against a fresh store, given a backdoor to its rows (`tests/idb-vault-db.test.ts`).
+  call against a fresh datastore, given a backdoor to its rows (`tests/idb-vault-db.test.ts`).
 
 ## Developing this package
 

@@ -89,7 +89,7 @@ export const makeVaultKey = (): Promise<CryptoKey> => (
   crypto.subtle.generateKey(AesGcm, true, ['wrapKey', 'unwrapKey'])
 )
 
-/** A fresh random 256-bit AES-GCM key for one box: a boxKey, made new on every store. Extractable, so that it can be wrapped. */
+/** A fresh random 256-bit AES-GCM key for one box: a boxKey, made new on every put. Extractable, so that it can be wrapped. */
 export const makeBoxKey = (): Promise<CryptoKey> => (
   crypto.subtle.generateKey(AesGcm, true, ['encrypt', 'decrypt'])
 )

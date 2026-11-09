@@ -36,7 +36,7 @@ export type IfPresent = typeof ifPresentVals[number]
 export const ifAbsentVals = ['fail', 'nil'] as const
 export type IfAbsent = typeof ifAbsentVals[number]
 
-/** The policies for a put over a thing absent, never stored or deleted: `add`, the default, stores it; `fail` refuses. */
+/** The policies for a put over a thing absent, never stored or deleted: `add`, the default, puts it; `fail` refuses. */
 export const putIfAbsentVals = ['add', 'fail'] as const
 export type PutIfAbsent = typeof putIfAbsentVals[number]
 // --

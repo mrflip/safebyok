@@ -95,7 +95,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** The box a delete of `scoped` goes through: the one listed, or a void one made for an empty slot. */
   deletable(scoped: unknown): Box { return this.puttable(scoped) }
 
-  /** Seals a new box and stores it where no live record stands, answering the box listed. */
+  /** Seals a new box and puts it where no live record stands, answering the box listed. */
   async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box> {
     const filled = VX.boxCreateOpts.parse(opts)
     const dna = boxDna.parse(input)

@@ -90,11 +90,11 @@ export interface VaultDB {
   getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>>
   /** Non-throwing form of {@link VaultDB.getBox}. */
   tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<Answer<BoxRecord | null, GotAct>>
-  /** Stores a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
+  /** Puts a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
   putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>>
   /** Non-throwing form of {@link VaultDB.putVault}. */
   tryPutVault(record: VaultRecord, opts: PutVaultOpts): Promise<Answer<VaultRow, PutAct>>
-  /** Stores a box under a vault live at its `vault_tok`, as `opts` allow. */
+  /** Puts a box under a vault live at its `vault_tok`, as `opts` allow. */
   putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>>
   /** Non-throwing form of {@link VaultDB.putBox}. */
   tryPutBox(record: BoxRecord, opts: PutOpts): Promise<Answer<BoxRow, PutAct>>
@@ -241,7 +241,7 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   // == [Puts]: putVault, tryPutVault, putBox, tryPutBox
 
-  /** Stores a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
+  /** Puts a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
   async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
     const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
@@ -264,7 +264,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Non-throwing form of {@link putVault}. */
   async tryPutVault(record: VaultRecord, opts: PutVaultOpts) { return answerOf(() => this.putVault(record, opts)) }
 
-  /** Stores a box under a vault live at its `vault_tok`, as `opts` allow. */
+  /** Puts a box under a vault live at its `vault_tok`, as `opts` allow. */
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> {
     const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
@@ -348,7 +348,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     return stored
   }
 
-  /** Stores the moved gate's `record` over the row it was made from. */
+  /** Puts the moved gate's `record` over the row it was made from. */
   async #putMovedGate(record: VaultRecord, stored: VaultRecord): Promise<void> {
     const { isWritten, ante } = await this.doPutVault(record, { prior: SX.revisionOf(stored), ifAbsent: 'fail', ifPresent: 'repl' })
     if (isWritten) { return }
@@ -471,13 +471,13 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doListBoxes(asked: VaultQuery): Awaitable<BoxesFetched>
   /** The vault row, and the box row under `vault_tok`, read in one step. */
   protected abstract doGetBox(asked: BoxQuery): Awaitable<BoxFetched>
-  /** Stores `record` where `isVaultPutAllowed` lets it be written over the row found, atomic on `revision_tok`. */
+  /** Puts `record` where `isVaultPutAllowed` lets it be written over the row found, atomic on `revision_tok`. */
   protected abstract doPutVault(record: VaultRecord, opts: PutOptsGiven): Awaitable<Written>
-  /** Stores `record` where `isBoxPutAllowed` lets it be written over the row found, under a vault row that passes `isLiveVaultRecord`. */
+  /** Puts `record` where `isBoxPutAllowed` lets it be written over the row found, under a vault row that passes `isLiveVaultRecord`. */
   protected abstract doPutBox(record: BoxRecord, opts: PutOptsGiven): Awaitable<BoxWritten>
-  /** In one step, stores `tombstone` over a row at `opts.prior` that passes `isLiveVaultRecord`, and tombstones that life's boxes. */
+  /** In one step, writes `tombstone` over a row at `opts.prior` that passes `isLiveVaultRecord`, and tombstones that life's boxes. */
   protected abstract doDelVault(tombstone: VaultTombstone, opts: DelOpts): Awaitable<Written>
-  /** Stores `tombstone` over a row at `opts.prior` that passes `isLiveBoxRecord`, under a vault row that passes `isLiveVaultRecord`. */
+  /** Writes `tombstone` over a row at `opts.prior` that passes `isLiveBoxRecord`, under a vault row that passes `isLiveVaultRecord`. */
   protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxWritten>
   /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>

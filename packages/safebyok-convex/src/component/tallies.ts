@@ -80,7 +80,7 @@ export const refuses = (tally: Tally | null, growth: Tally, maxBoxes: number): b
   return ((growth.box_count > 0) && (after.box_count > maxBoxes)) || ((growth.box_bytes > 0) && (after.box_bytes > MaxVaultBoxBytes))
 }
 
-/** Move the life's tally by a put's `growth`, storing it the first time; a life past a limit keeps none. */
+/** Move the life's tally by a put's `growth`, writing it the first time; a life past a limit keeps none. */
 export const record = async (db: DatabaseWriter, life: Life, { kept, tally }: Reckoning, growth: Tally): Promise<void> => {
   if (tally === null) { return }
   if (kept) { await db.patch('safebyok_tallies', kept._id, plus(tally, growth)) } else { await db.insert('safebyok_tallies', { ...life, ...plus(tally, growth) }) }

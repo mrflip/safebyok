@@ -203,7 +203,7 @@ There are important considerations to building a form safely, and we have provid
 **A host outside this repo cannot make a `Bank` yet.** The `safebyok` entry point exports `Bank`,
 `Box`, `Gating`, `Vault`, their snapshot types and `VaultError`, `safebyok/dom` exports `BoxFields`, and
 `safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. `safebyok/browser` exports the Argon2id derivers,
-`idbDeviceDB`, the device store in IndexedDB, `zxcvbnStrengthChecker`, and `browserOpts`, the three in one bag. Nothing in
+`idbDeviceDB`, the device database in IndexedDB, `zxcvbnStrengthChecker`, and `browserOpts`, the three in one bag. Nothing in
 the core exports a `VaultDB`.
 
 ## Next

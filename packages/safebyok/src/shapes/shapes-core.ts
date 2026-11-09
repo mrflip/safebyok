@@ -53,7 +53,7 @@ export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, c
   vault_key_lease_wrapped: ciphered.brand<'VaultKeyLeaseWrapped'>(),
 }))
 
-/** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltBytes} bytes, as the models' wayin record stores it and a fresh passkey answer carries it. The stored field of the old vault record keeps the shape-only check, as its length was judged at use, not at read. */
+/** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltBytes} bytes, as the models' wayin record has it and a fresh passkey answer carries it. The stored field of the old vault record keeps the shape-only check, as its length was judged at use, not at read. */
 export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltNotFresh(PasskeySaltBytes)), 'bad_record')
 
 /** A passphrase wayin's passphraseSalt, its `salt_b64`: base64url text of the random bytes the key deriver takes beside the passphrase. */

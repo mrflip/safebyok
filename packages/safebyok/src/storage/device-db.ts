@@ -131,7 +131,7 @@ export abstract class DeviceDB {
   // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureBank, doForgetBank, doListBanks
 
   // A device database starts each call's work in the order called, or a `forget` made after a `stow` may not forget it.
-  /** Stores `row` as the lease of its vault scope, over any row there. */
+  /** Stows `row` as the lease of its vault scope, over any row there. */
   protected abstract doStow(row: LeaseRow): Awaitable<void>
   /** The row stored at this vault scope, whatever its `vault_tok`, or null. */
   protected abstract doPeek(scope: VaultScope): Awaitable<unknown>
@@ -141,7 +141,7 @@ export abstract class DeviceDB {
   protected abstract doListLeases(): Awaitable<RawLease[]>
   /** Removes whatever row is filed under `scopepath`, in one step. */
   protected abstract doForgetRawLease(scopepath: LeaseScopepath): Awaitable<void>
-  /** The bank row stored at `made`'s bank scope where it passes its check, else `made`, stored over it, in one step. */
+  /** The bank row stored at `made`'s bank scope where it passes its check, else `made`, written over it, in one step. */
   protected abstract doEnsureBank(made: BankRow): Awaitable<unknown>
   /** Removes whatever row is stored at this bank scope, in one step. */
   protected abstract doForgetBank(scope: BankScope): Awaitable<void>

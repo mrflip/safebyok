@@ -174,7 +174,7 @@ const RunForGatingkind: { [KindT in Gatingkind]: Run<KindT> } = {
 
   unlock_vault: ({ proved }, { vault, friend }) => friend.unlockByProof(vault, proved),
 
-  // Each gate change leases the vault under the epoch it stored. The old lease stays in force for the moments between: the vaultKey did not change.
+  // Each gate change leases the vault under the epoch it wrote. The old lease stays in force for the moments between: the vaultKey did not change.
   replace_passphrase: async ({ ante, anteProving, nextProving }, { listing, vault, friend }) => {
     const nextWayin        = await nextProving.buildWayin(anteProving)
     const passphrase_wayin = SX.passphraseWayinRecord.parse(nextWayin.pickle())

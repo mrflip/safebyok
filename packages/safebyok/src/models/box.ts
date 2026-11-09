@@ -151,7 +151,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** Merge `patch` over the whisper exposed, shown or hidden, into a new object, arrays replaced, and tell the subscribers; nothing is stored. */
+  /** Merge `patch` over the whisper exposed, shown or hidden, into a new object, arrays replaced, and tell the subscribers; nothing is written. */
   patchWhisper(patch: Whisper): this {
     const given = VX.whisperPatch.parse(patch)
     this.demandEnabled()
@@ -181,7 +181,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Putting]: put, tryPut, putExposed, tryPutExposed, edit, keptWhisper
 
-  /** Seals `patch` over the record in hand and stores it, answering this box; a deleted box is reborn.
+  /** Seals `patch` over the record in hand and puts it, answering this box; a deleted box is reborn.
    *
    * A lock does not interrupt or reverse a put once its write has begun. A patch leaving out the whisper or the sidecar keeps
    * the one stored, so a box held sparse is fetched first.
@@ -199,7 +199,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Non-throwing form of {@link put}. */
   tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.put(patch, opts)) }
 
-  /** Seal the whisper exposed, veiled or not, and store it; `patch` may name a sidecar, never a whisper. */
+  /** Seal the whisper exposed, veiled or not, and put it; `patch` may name a sidecar, never a whisper. */
   async putExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<this> {
     const { sidecar } = VX.boxExposedPatch.parse(patch)
     if (this.#exposed === null) { throw notExposedError() }
@@ -209,7 +209,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Non-throwing form of {@link putExposed}. */
   tryPutExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.putExposed(patch, opts)) }
 
-  /** The next record `patch` makes, sealed and not stored, and the revision it goes over. */
+  /** The next record `patch` makes, sealed and not put, and the revision it goes over. */
   async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: SX.Revision }> {
     const prior = this.central
     const written_at = nowMillis()

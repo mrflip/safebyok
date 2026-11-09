@@ -100,7 +100,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   // == [Puts]: putVault, tryPutVault, putBox, tryPutBox
 
-  /** Stores a vault's birth, or its rebirth over a tombstone. */
+  /** Puts a vault's birth, or its rebirth over a tombstone. */
   async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> { return goodAnswerOf(await this.tryPutVault(record, opts)) }
 
   async tryPutVault(record: VaultRecord, opts: PutVaultOpts): Promise<Answer<VaultRow, PutAct>> {
@@ -110,7 +110,7 @@ export class GraphQLVaultDB implements VaultDB {
     })
   }
 
-  /** Stores a box under a vault live at its `vault_tok`, as `opts` allow. */
+  /** Puts a box under a vault live at its `vault_tok`, as `opts` allow. */
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> { return goodAnswerOf(await this.tryPutBox(record, opts)) }
 
   async tryPutBox(record: BoxRecord, opts: PutOpts): Promise<Answer<BoxRow, PutAct>> {

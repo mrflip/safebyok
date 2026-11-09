@@ -161,7 +161,7 @@ export const unknownFields = (count: number, fieldnames: readonly string[]): str
 export const moreFailures = (count: number): string => `and ${String(count)} more ${count === 1 ? 'failure' : 'failures'}`
 
 /** A whisper that is no plain object of JSON. */
-export const WhisperShape = "A whisper is a plain object of JSON, with no symbol key anywhere: a bare string, number, boolean, array, null or undefined cannot be stored, so wrap one as { apiKey: 'sk-...' }. To empty a box, delete it (null inside an array or object is fine)"
+export const WhisperShape = "A whisper is a plain object of JSON, with no symbol key anywhere: a bare string, number, boolean, array, null or undefined cannot be put, so wrap one as { apiKey: 'sk-...' }. To empty a box, delete it (null inside an array or object is fine)"
 /** A bag holding `fieldnames` at other values than the bag it is checked against holds them. */
 export const fieldsDisagree = (fieldnames: readonly string[]): string => `This holds another ${fieldnames.join(' and ')} than what it is checked against: a field both hold must agree`
 
@@ -199,7 +199,7 @@ export const otherScope = (fieldnames: readonly string[]): string => `This names
 export const VaultGoneWhileOpening = "The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault)."
 
 /** Why options naming another vaultDB or deviceDB than the listed vault was born from refuse. */
-export const OtherDatabasesThanListed = "The bank already lists this vault, born from another vaultDB or deviceDB than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Databases are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each store once and pass it every time. To open the vault from other stores, let it go first (bank.reopenVault)."
+export const OtherDatabasesThanListed = "The bank already lists this vault, born from another vaultDB or deviceDB than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Databases are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each database once and pass it every time. To open the vault from other databases, let it go first (bank.reopenVault)."
 
 /** Why the bank will not open a vault that storage offers older than this device has seen. */
 export const VaultBehindWhileOpening = "This device has already seen a newer copy of this vault than storage offers now, so it won't open this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask for the vault again; otherwise the app's support should look at its storage."
@@ -225,7 +225,7 @@ export const PasskeyBeforePassphrase = "This vault has no passphrase yet, and a 
 /** Why a change that needs proving waits for the vault's first passphrase. */
 export const ProvingBeforePassphrase = "This vault has no passphrase yet, so nothing can prove this change: set its passphrase first, as ensureUnlocked() or putWayin() does."
 
-/** Why a new gate is not stored over a vault that changed in storage since this device read it. */
+/** Why a new gate is not written over a vault that changed in storage since this device read it. */
 export const VaultChangedInStorage = "The vault changed in storage since this device read it -- a vault unlocker was changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying."
 // --
 
@@ -260,19 +260,19 @@ export const DemandOptionsAdvice = "demandConsistentWith()'s only option is `lea
 export const BoxAbsent = "No box is stored under that boxlabel in this vault: its snapshot lists the ones it holds."
 
 /** Why putBox() with no whisper, over a box the vault does not hold, refuses. */
-export const NoWhisperToKeep = "No box is stored under that boxlabel, so there is no whisper to keep: hand putBox() the whisper to store."
+export const NoWhisperToKeep = "No box is stored under that boxlabel, so there is no whisper to keep: hand putBox() the whisper to put."
 
-/** Why a put told to only create refuses a whole record: what it would store is recycled. */
+/** Why a put told to only create refuses a whole record: what it would put is recycled. */
 export const RecordForNewBox = "A put that only creates was handed a whole record, sealed whisper and all: hand it the whisper and the sidecar, so that no stored data is recycled."
 
 /** Why a vault that holds its limit of `maxBoxes` boxes takes no new one. */
-export const vaultFullOfBoxes = (maxBoxes: number): string => `This vault already holds its limit of ${String(maxBoxes)} boxes: remove one before storing another. A vault meant to hold more can be opened with a larger maxBoxes, up to what its storage adapter allows.`
+export const vaultFullOfBoxes = (maxBoxes: number): string => `This vault already holds its limit of ${String(maxBoxes)} boxes: remove one before putting another. A vault meant to hold more can be opened with a larger maxBoxes, up to what its storage adapter allows.`
 
 /** Why a box is not read from a vault deleted, or deleted and made anew, on another device, and the Vault object is gone. */
 export const VaultGoneWhileGettingBox = "The vault this device held was deleted, or deleted and made anew, on another device, so no box was read, and this Vault object is gone: what is stored now is another vault, or none. Ask the bank for the vault again (bank.ensureVault) to see what is stored."
 
-/** Why a box is not stored into a vault deleted, or deleted and made anew, on another device as it was being stored. */
-export const VaultDeletedWhilePuttingBox = "The vault was deleted, or deleted and made anew, on another device while this one was storing into it, so nothing was written. Read the vault again (hello) to see what is stored now."
+/** Why a box is not put into a vault deleted, or deleted and made anew, on another device as it was being put. */
+export const VaultDeletedWhilePuttingBox = "The vault was deleted, or deleted and made anew, on another device while this one was putting into it, so nothing was written. Read the vault again (hello) to see what is stored now."
 // --
 
 // == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged
@@ -295,12 +295,12 @@ export const AlreadyListed = "This listing already has an instance under the dna
 /** Why a put that storage answered with no record refuses: only a broken adapter answers that. */
 export const PutAnsweredNothing = "A put was answered with no record, which a vaultDB never does: the storage adapter needs a developer's look."
 
-/** Why an update of a box naming neither its whisper nor its sidecar stores nothing. */
-export const BoxPatchAdvice = "Nothing was stored. An update of a box names its whisper, its sidecar, or both: the half left out is kept."
-export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to store."
+/** Why an update of a box naming neither its whisper nor its sidecar writes nothing. */
+export const BoxPatchAdvice = "Nothing was written. An update of a box names its whisper, its sidecar, or both: the half left out is kept."
+export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to write."
 
-/** Why an update of a box whose patch names another's scope stores nothing. */
-export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was stored: update the one it names, which listing.at(scope) answers.`
+/** Why an update of a box whose patch names another's scope writes nothing. */
+export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was written: update the one it names, which listing.at(scope) answers.`
 
 /** Why a bag marked `Whispered`, which a box answers for a whisper it will not show, is refused where a whisper is wanted. */
 export const WhisperedIsNoWhisper = "That is what a box shows for a whisper it will not show, as it is encrypted, locked or veiled. It is not a whisper: expose and unlock one first, or call box.putExposed()."

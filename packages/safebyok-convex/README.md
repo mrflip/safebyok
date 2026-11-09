@@ -1,7 +1,7 @@
 # safebyok-convex
 
 safebyok's vaultDB on [Convex](https://convex.dev): a Convex **component** that keeps vault and box
-rows in tables of its own, and **`ConvexVaultDB`**, which stores through it from your app's Convex
+rows in tables of its own, and **`ConvexVaultDB`**, which writes through it from your app's Convex
 client. Your deployment holds ciphertext and the few plain fields a row is found by; it never sees a
 whisper, a passphrase, or a key that opens one.
 

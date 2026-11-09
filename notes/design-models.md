@@ -44,13 +44,13 @@ Gone from the interface, so in no table: every `cleartexts` parameter (`ensureVa
 * 🗳️ box: holds whisper, scoped by applabel/user_id/vaultlabel/boxlabel and for most things vault_tok
 * 🏦 vault, scoped by applabel/user_id/vaultlabel and for most things vault_tok, often gate_epoch
 * 🫥 disabled:  throws from every guard
-* 📱 deviceDB: this device's store of cached leases and the device record
+* 📱 deviceDB: this device's database of cached leases and the device record
 
 Given the seam and the row, everything to its right is guaranteed.
 
 * Left of the seam, what holds on the way in, on the method's first row only: 🎬 unlocked; 🏦 or 🗳️, the object acted on, ⏳ where it must be timely; 1️⃣ one at a time. Blank: not required. A ? marks a sigil read in, where neither the old cell nor the gating file says so.
 * Right of the seam: act, the outcome where it has a name; ok; post, the listing then the object, and whether each changed and to what; ret, the return or its properties where they matter; note.
-* Only the rows and columns with something to say are here. Proving and Gate store nothing, so they have no post column.
+* Only the rows and columns with something to say are here. Proving and Gate write nothing, so they have no post column.
 
 ## Preconditions
 
@@ -218,7 +218,7 @@ Every proving instance holds a strong key from birth, and only the statics hear 
 | Seam                                                      | act          | ok | ret           | note                                                                              |
 | --------------------------------------------------------- | ------------ | -- | ------------- | --------------------------------------------------------------------------------- |
 | `Gate.make(stamp, passphraseWayin, passkeyWayin or null)` | -            | 👌 | gate          | sync. The first gate, of`gate_epoch` 1                                            |
-| `gate.demandPasskeyAddable`                               | -            | 👌 |               | sync. The one check before anyone is asked; past the enter key, the store refuses |
+| `gate.demandPasskeyAddable`                               | -            | 👌 |               | sync. The one check before anyone is asked; past the enter key, the vaultDB refuses |
 |                                                           | passkey held | 💣 |               | refused, nobody asked                                                             |
 | `gate.pickle`                                             | -            | 👌 | record's gate | no gate or wayin table of its own; adapters lay it out as they like               |
 
