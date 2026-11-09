@@ -1,51 +1,49 @@
 import { useRef } from 'react'
 import { Messages } from '../helpers/messages'
 import type { ReplacePassphraseModalProps } from '../shapes'
-import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, useAdvice, useAttempts, useConfirmation } from './modal-kit'
+import { ChosenPassphraseFields, DialogBoundary, ModalForm, PassphraseField, UsernameField, textOf, useAttemptAction, useChosenPassphrase } from './modal-kit'
 
 /** The dialog for a `replace_passphrase` gating, which proves the passphrase in use and chooses the next. */
 export const ReplacePassphraseModal = (props: ReplacePassphraseModalProps) => (
-  <AnsweringOnce key={props.gating.gatingTok} gating={props.gating} onDone={props.onDone}>
-    {(done) => <ReplacePassphraseForm {...props} onDone={done} />}
-  </AnsweringOnce>
+  <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
+    <ReplacePassphraseForm {...props} />
+  </DialogBoundary>
 )
 
-const ReplacePassphraseForm = ({ gating, onDone: done, passphraseUsername }: ReplacePassphraseModalProps) => {
-  const { gripe, setGripe, fail, attempt } = useAttempts('ReplacePassphraseModal', done)
+const ReplacePassphraseForm = ({ gating, passphraseUsername }: ReplacePassphraseModalProps) => {
   const anteRef = useRef<HTMLInputElement>(null)
-  const nextRef = useRef<HTMLInputElement>(null)
-  const { ref: confirmRef, gripeId, differs } = useConfirmation(setGripe)
-  const advice = useAdvice(gating, true, fail)
-
-  const submit = () => {
-    const nextPassphraseClear = nextRef.current?.value ?? ''
-    if (differs(nextPassphraseClear)) { return }
-    void attempt(() => gating.attempt({ antePassphraseClear: anteRef.current?.value ?? '', nextPassphraseClear }), 'unlocked')
-  }
-
-  const forgetGripe = () => { setGripe(null) }
+  const { chosenRef, confirmRef, ...chosen } = useChosenPassphrase(gating, 'ReplacePassphraseModal')
+  const { gripe, gripeId, action } = useAttemptAction(
+    gating,
+    'ReplacePassphraseModal',
+    (form) => gating.attempt({ antePassphraseClear: textOf(form, 'current-password'), nextPassphraseClear: textOf(form, 'new-password') }),
+    (refusalkind) => (refusalkind === 'wrong_passphrase' ? anteRef : chosenRef),
+  )
+  const isAnteWrong = gripe?.refusalkind === 'wrong_passphrase'
 
   return (
     <ModalForm
+      gating={gating}
       title={Messages.changeTitle}
       blurb={Messages.changeBlurb}
       submitWord={Messages.changeButton}
-      gripe={gripe}
+      pendingWord={Messages.changingButton}
+      isSubmittable={chosen.isSubmittable}
+      gripeText={gripe?.text ?? null}
       gripeId={gripeId}
-      done={done}
-      onSubmit={submit}
+      action={action}
+      onReset={chosen.forget}
     >
       <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)} />
-      <PassphraseField ref={anteRef} credential="current-password" fieldlabel={Messages.currentField} takesFocus onChange={forgetGripe} />
-      <PassphraseField
-        ref={nextRef}
-        credential="new-password"
-        fieldlabel={Messages.newField}
-        takesFocus={false}
-        advice={advice.said}
-        onChange={(typed) => { forgetGripe(); void advice.hear(typed) }}
+      <PassphraseField ref={anteRef} fieldname="current-password" fieldlabel={Messages.currentField} invalidBy={isAnteWrong ? gripeId : undefined} />
+      <ChosenPassphraseFields
+        chosen={chosen}
+        chosenRef={chosenRef}
+        confirmRef={confirmRef}
+        chosenLabel={Messages.newField}
+        confirmLabel={Messages.confirmNewField}
+        chosenInvalidBy={(gripe === null) || isAnteWrong ? undefined : gripeId}
       />
-      <ConfirmField ref={confirmRef} gripeId={gripeId} fieldlabel={Messages.confirmNewField} gripe={gripe} onChange={forgetGripe} />
     </ModalForm>
   )
 }

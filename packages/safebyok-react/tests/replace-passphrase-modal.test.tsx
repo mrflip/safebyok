@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import type { BankOpts } from 'safebyok'
 import { ReplacePassphraseModal } from '../src/modals/replace-passphrase-modal'
 import { Messages } from '../src/helpers/messages'
-import type { DialogAnswer } from '../src/shapes'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
@@ -13,15 +12,13 @@ const NextPassphrase = 'a whole new passphrase for the vault'
 /** A strength checker that finds a passphrase under 12 characters weak. */
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
-/** A replace_passphrase gating on a vault built under {@link TH.Passphrase}, shown in a ReplacePassphraseModal whose answers the test reads, closed by the first. */
+/** A replace_passphrase gating on a vault built under {@link TH.Passphrase}, shown in a ReplacePassphraseModal. */
 const shownFor = async (opts: { bankOpts?: Partial<BankOpts> } = {}) => {
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)
   const opened = await TH.openGatingOf(world, TH.replacing, opts.bankOpts)
-  const answers: DialogAnswer[] = []
-  const onDone = (answer: DialogAnswer) => { answers.push(answer); opened.close() }
-  render(<ReplacePassphraseModal gating={TH.gatingOfKind(opened.gating, 'replace_passphrase')} onDone={onDone} />)
-  return { ...opened, world, answers }
+  render(<ReplacePassphraseModal gating={TH.gatingOfKind(opened.gating, 'replace_passphrase')} />)
+  return { ...opened, world }
 }
 
 /** Whether `passphrase` unlocks the world's vault, asked from a device that has no lease on it. */
@@ -36,53 +33,57 @@ const unlocksWith = async (world: TH.BankWorld, passphrase: string): Promise<boo
 const alertText = () => screen.getByRole('alert').textContent
 
 describe("ReplacePassphraseModal", () => {
-  it("replaces the passphrase, filed under the user and the vault, and answers unlocked", async () => {
-    const { world, raising, answers } = await shownFor()
+  it("replaces the passphrase, filed under the user and the vault, and the gating concludes", async () => {
+    const { world, raising } = await shownFor()
     expect(screen.getByText(Messages.changeTitle)).to.exist
     expect(screen.getByDisplayValue('u1 (main vault)')).to.exist
-    TH.submitReplacement(TH.Passphrase, NextPassphrase)
-    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
+    await TH.submitReplacement(TH.Passphrase, NextPassphrase)
     expect(await raising).to.include({ ok: true })
     expect(await unlocksWith(world, NextPassphrase)).to.be.true
     expect(await unlocksWith(world, TH.Passphrase)).to.be.false
   })
 
-  it("refuses a confirmation that differs, attempting nothing, and lets the user try again", async () => {
-    const { gating, raising, answers } = await shownFor()
-    TH.submitReplacement(TH.Passphrase, NextPassphrase, 'a whole new passphrase for the vualt')
-    expect(alertText()).to.eq(Messages.passphrasesDiffer)
+  it("keeps the button disabled while the confirmation differs, naming the field", async () => {
+    const { gating } = await shownFor()
+    fireEvent.change(screen.getByPlaceholderText('new passphrase'), { target: { value: NextPassphrase } })
+    fireEvent.change(screen.getByPlaceholderText('confirm new passphrase'), { target: { value: 'a whole new passphrase for the vualt' } })
+    expect(screen.getByText(Messages.passphrasesDiffer)).to.exist
     expect(screen.getByPlaceholderText('confirm new passphrase').getAttribute('aria-invalid')).to.eq('true')
+    expect(screen.getByText<HTMLButtonElement>(Messages.changeButton).disabled).to.be.true
     expect(gating.isOpen).to.be.true
-    TH.submitReplacement(TH.Passphrase, NextPassphrase)
-    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
-    expect(await raising).to.include({ ok: true })
+  })
+
+  it("names its three fields apart", async () => {
+    await shownFor()
+    const names = ['current passphrase', 'new passphrase', 'confirm new passphrase'].map((placeholder) => screen.getByPlaceholderText<HTMLInputElement>(placeholder).name)
+    expect(names).to.deep.equal(['current-password', 'new-password', 'confirm-password'])
   })
 
   const InPlaceCases = [
-    ["not the passphrase", NextPassphrase, 'shows a wrong current passphrase in place'],
-    [TH.Passphrase,        TH.Passphrase,  'shows a new passphrase that is the current one in place'],
+    ["not the passphrase", NextPassphrase, 'current passphrase', 'shows a wrong current passphrase in place, at its field'],
+    [TH.Passphrase,        TH.Passphrase,  'new passphrase',     'shows a new passphrase that is the current one in place, at its field'],
   ] as const
 
-  for (const [antePassphrase, nextPassphrase, blurb] of InPlaceCases) {
+  for (const [antePassphrase, nextPassphrase, faulted, blurb] of InPlaceCases) {
     it(blurb, async () => {
-      const { world, gating, answers } = await shownFor()
-      TH.submitReplacement(antePassphrase, nextPassphrase)
+      const { world, gating } = await shownFor()
+      await TH.submitReplacement(antePassphrase, nextPassphrase)
       await waitFor(() => { expect(alertText()).to.not.eq('') })
       expect(gating.isOpen).to.be.true
-      expect(answers).to.deep.equal([])
+      expect(screen.getByPlaceholderText(faulted).getAttribute('aria-invalid')).to.eq('true')
+      expect(document.activeElement).to.equal(screen.getByPlaceholderText(faulted))
       gating.dismiss()
       expect(await unlocksWith(world, TH.Passphrase)).to.be.true
     })
   }
 
-  it("shows the strength checker's reason as the user types the new passphrase, and a weak one's refusal in place", async () => {
-    const { gating, answers } = await shownFor({ bankOpts: { strengthChecker: underTwelveWeak } })
+  it("shows the strength checker's reason as the user types the new passphrase, the button disabled", async () => {
+    const { gating } = await shownFor({ bankOpts: { strengthChecker: underTwelveWeak } })
     fireEvent.change(screen.getByPlaceholderText('new passphrase'), { target: { value: 'short' } })
-    await waitFor(() => { expect(screen.queryByText('Make it longer.')).to.not.be.null })
-    TH.submitReplacement(TH.Passphrase, 'short')
-    await waitFor(() => { expect(alertText()).to.eq('Make it longer.') })
+    fireEvent.change(screen.getByPlaceholderText('confirm new passphrase'), { target: { value: 'short' } })
+    await screen.findByText('Make it longer.')
+    expect(screen.getByText<HTMLButtonElement>(Messages.changeButton).disabled).to.be.true
     expect(gating.isOpen).to.be.true
-    expect(answers).to.deep.equal([])
   })
 
   it("never gives the current passphrase to the strength checker", async () => {
@@ -93,10 +94,9 @@ describe("ReplacePassphraseModal", () => {
     await waitFor(() => { expect(heard).to.deep.equal([NextPassphrase]) })
   })
 
-  it("answers dismissed on Cancel, and the gating is dismissed", async () => {
-    const { world, raising, answers } = await shownFor()
+  it("dismisses the gating on Cancel", async () => {
+    const { world, raising } = await shownFor()
     fireEvent.click(screen.getByText(Messages.cancelButton))
-    expect(answers).to.deep.equal(['dismissed'])
     expect(await raising).to.include({ ok: false })
     expect(await unlocksWith(world, TH.Passphrase)).to.be.true
   })

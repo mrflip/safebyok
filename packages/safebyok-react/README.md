@@ -48,9 +48,14 @@ snapshot, and closes when the gating concludes, whether by the user's answer, a 
 button asks the passkey from the user's click on it, so a gating opened from a timer or a fetch shows the dialog all the
 same, and the user's click supplies the gesture the browser needs.
 
+The dialogs are native `<dialog>` elements with the class `modal`, opened with `showModal()`, so the browser keeps the
+focus inside and leaves the page behind inert; style the dimmed page with `.modal::backdrop`. jsdom has no `showModal` or
+`close`, so a host's tests that show a dialog need a stand-in on `HTMLDialogElement.prototype`.
+
 Pass `requestCleartext` to use a dialog of your own: the provider then renders none. It is called with each gating, and
 as last rendered, so an inline arrow is fine. Pass it from the first render, as whether the host's dialog asks is fixed
-when the bank is made.
+when the bank is made. To show one of this package's modals there, keep the gating until it concludes:
+`setGating(gating); await gating.whenConcluded; setGating(null)`.
 
 ## Signing out
 

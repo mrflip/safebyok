@@ -1,5 +1,5 @@
-import { useEffect, useRef, type ComponentType } from 'react'
-import type { Gating, Gatingkind } from 'safebyok'
+import { useEffect, type ComponentType } from 'react'
+import type { AnyGating, Gating, Gatingkind } from 'safebyok'
 import { AddPasskeyModal } from '../modals/add-passkey-modal'
 import { DelVaultModal } from '../modals/del-vault-modal'
 import { PassphraseModal } from '../modals/passphrase-modal'
@@ -18,20 +18,14 @@ const DialogForGatingkind: { [KindT in Gatingkind]: ComponentType<KindModalProps
   del_vault:          DelVaultModal,
 }
 
-const NoDialog = ({ onDone }: Pick<GatingModalProps, 'onDone'>) => {
-  // An onDone written inline is new at each render, and so re-runs the effect.
-  const answered = useRef(false)
-  useEffect(() => {
-    if (answered.current) { return }
-    answered.current = true
-    onDone('dismissed')
-  }, [onDone])
+const NoDialog = ({ gating }: { gating: AnyGating }) => {
+  useEffect(() => { gating.dismiss() }, [gating])
   return null
 }
 
 /** The dialog for any gating, by its `gatingkind`. */
 export const GatingModal = ({ gating, ...rest }: GatingModalProps) => {
   const Dialog = DialogForGatingkind[gating.gatingkind] as ComponentType<GatingModalProps> | undefined
-  if (Dialog === undefined) { return <NoDialog onDone={rest.onDone} /> }
+  if (Dialog === undefined) { return <NoDialog gating={gating} /> }
   return <Dialog gating={gating} {...rest} />
 }

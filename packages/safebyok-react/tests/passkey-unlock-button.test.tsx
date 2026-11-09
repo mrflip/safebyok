@@ -5,7 +5,6 @@ import { Messages } from '../src/helpers/messages'
 import { createPasskey } from '../src/helpers/passkey'
 import { PasskeyUnlockButton } from '../src/components/passkey-unlock-button'
 import { PassphraseModal } from '../src/modals/passphrase-modal'
-import type { DialogAnswer } from '../src/shapes'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
@@ -20,12 +19,11 @@ const passkeyedUnlock = async () => {
   return { ...opened, gating: TH.gatingOfKind(opened.gating, 'unlock_vault'), authenticator, world }
 }
 
-/** The button for `gating`, what it told `onDone` and `onGripe`, and what React reported. */
+/** The button for `gating`, what it told `onGripe`, and what React reported. */
 const buttonFor = (gating: Gating<'unlock_vault'>, extra: { takesFocus?: boolean } = {}) => {
-  const answers: string[] = []
   const gripes: (string | null)[] = []
-  const ui = <PasskeyUnlockButton gating={gating} onDone={(answer) => { answers.push(answer) }} onGripe={(gripe) => { gripes.push(gripe) }} {...extra} />
-  return { ...TH.renderReporting(ui), ui, answers, gripes }
+  const ui = <PasskeyUnlockButton gating={gating} onGripe={(gripe) => { gripes.push(gripe) }} {...extra} />
+  return { ...TH.renderReporting(ui), ui, gripes }
 }
 
 /** The button's aria-disabled, 'true' while the browser asks. */
@@ -37,9 +35,8 @@ const refusingAttempts = (err: unknown) => vi.spyOn(Gating.prototype, 'attempt')
 describe("PasskeyUnlockButton", () => {
   it("unlocks the vault with the passkey the user touches", async () => {
     const { gating, raising } = await passkeyedUnlock()
-    const { answers } = buttonFor(gating)
+    buttonFor(gating)
     fireEvent.click(screen.getByText(Messages.passkeyButton))
-    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
     expect(await raising).to.include({ ok: true })
   })
 
@@ -56,12 +53,11 @@ describe("PasskeyUnlockButton", () => {
 
   it("says only that its last word no longer stands when the user dismisses the prompt, and takes a press again", async () => {
     const { gating, authenticator } = await passkeyedUnlock()
-    const { answers, gripes } = buttonFor(gating)
+    const { gripes } = buttonFor(gating)
     authenticator.refuseNext('NotAllowedError')
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await waitFor(() => { expect(asking()).to.eq('false') })
     expect(gripes).to.deep.equal([null])
-    expect(answers).to.deep.equal([])
   })
 
   it("stays focusable while the browser asks", async () => {
@@ -89,24 +85,26 @@ describe("PasskeyUnlockButton", () => {
     expect(document.activeElement).to.equal(screen.getByText(Messages.passkeyButton))
   })
 
-  it("hands a browser's failure to onGripe in calm words, and a refusal that closes the dialog to onDone", async () => {
+  it("hands a browser's failure to onGripe in calm words, and says nothing of a refusal on a gating that has concluded", async () => {
     const { gating, authenticator } = await passkeyedUnlock()
-    const { answers, gripes } = buttonFor(gating)
+    const { gripes } = buttonFor(gating)
     authenticator.refuseNext('UnknownError')
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await waitFor(() => { expect(gripes).to.deep.equal([null, Messages.passkeyAskFailed]) })
+    gating.dismiss()
     refusingAttempts(new VaultError('dismissed', 'dismissed'))
     fireEvent.click(screen.getByText(Messages.passkeyButton))
-    await waitFor(() => { expect(answers).to.deep.equal(['dismissed']) })
+    await waitFor(() => { expect(gripes).to.deep.equal([null, Messages.passkeyAskFailed, null]) })
+    await waitFor(() => { expect(asking()).to.eq('false') })
+    expect(gripes).to.have.lengthOf(3)
   })
 
   it("leaves an attempt under way to answer when pressed during it", async () => {
     const { gating } = await passkeyedUnlock()
-    const { answers, gripes } = buttonFor(gating)
+    const { gripes } = buttonFor(gating)
     refusingAttempts(new VaultError('attempt_in_flight', 'busy'))
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await waitFor(() => { expect(asking()).to.eq('false') })
-    expect(answers).to.deep.equal([])
     expect(gripes).to.deep.equal([null])
   })
 
@@ -121,42 +119,49 @@ describe("PasskeyUnlockButton", () => {
     expect(reported).to.deep.equal([misuse])
   })
 
-  it("never tries a passkey the user touched while an Activity hid it, zeroing its answer: once shown again, a press unlocks", async () => {
+  it("tries a passkey the user touched while an Activity hid it: the press authorized it", async () => {
     const { gating, authenticator, raising } = await passkeyedUnlock()
-    const attempts = vi.spyOn(Gating.prototype, 'attempt')
     const touching = TH.makePending()
     authenticator.answerNextAfter(touching.promise)
-    const { ui, answers, rerender } = buttonFor(gating)
+    const { ui, rerender } = buttonFor(gating)
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     rerender(TH.inActivity('hidden', ui))
     await act(async () => { touching.resolve(undefined); await TH.wakeupAtNextTick() })
-    await waitFor(() => { expect(authenticator.answersHanded()).to.have.lengthOf(2) })
-    expect(attempts).not.toHaveBeenCalled()
-    rerender(TH.inActivity('visible', ui))
-    await waitFor(() => { expect(asking()).to.eq('false') })
-    fireEvent.click(screen.getByText(Messages.passkeyButton))
-    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
     expect(await raising).to.include({ ok: true })
   })
 })
 
-/** The unlock dialog for a vault with a passkey, and its answers. */
+/** The unlock dialog for a vault with a passkey. */
 const dialogFor = async () => {
   const opened = await passkeyedUnlock()
-  const answers: DialogAnswer[] = []
-  render(<PassphraseModal gating={opened.gating} onDone={(answer) => { answers.push(answer); opened.close() }} />)
-  return { ...opened, answers }
+  render(<PassphraseModal gating={opened.gating} />)
+  return opened
 }
 
 describe("PassphraseModal, for a vault with a passkey", () => {
   it("offers the passkey first, with the focus, and closes unlocked when it is used", async () => {
-    const { answers, raising } = await dialogFor()
+    const { raising } = await dialogFor()
     const button = screen.getByText(Messages.passkeyButton)
     expect(document.activeElement).to.equal(button)
     expect(button.compareDocumentPosition(screen.getByPlaceholderText('vault passphrase')) & Node.DOCUMENT_POSITION_FOLLOWING).to.not.equal(0)
     fireEvent.click(button)
-    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
     expect(await raising).to.include({ ok: true })
+  })
+
+  it("takes no press while a passphrase attempt runs", async () => {
+    const { authenticator } = await dialogFor()
+    const running = TH.makePending()
+    vi.spyOn(Gating.prototype, 'attempt').mockImplementation(async () => {
+      await running.promise
+      return { ok: false, err: new VaultError('wrong_passphrase', 'Not that one.') } as never
+    })
+    TH.submitPassphrase(TH.Passphrase)
+    await screen.findByText(Messages.unlockingButton)
+    expect(asking()).to.eq('true')
+    fireEvent.click(screen.getByText(Messages.passkeyButton))
+    expect(authenticator.calls.get).to.have.lengthOf(0)
+    await act(async () => { running.resolve(undefined); await TH.wakeupAtNextTick() })
+    await waitFor(() => { expect(asking()).to.eq('false') })
   })
 
   it("keeps the passkey's word while the user types the passphrase, until they submit", async () => {
@@ -171,19 +176,18 @@ describe("PassphraseModal, for a vault with a passkey", () => {
   })
 
   it("keeps the passphrase when the passkey meets misuse: the button goes, and the dialog says why", async () => {
-    const { answers } = await dialogFor()
+    await dialogFor()
     refusingAttempts(new VaultError('bad_option', 'misused'))
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await screen.findByText(Messages.passkeyTrouble)
     expect(screen.queryByText(Messages.passkeyButton)).to.be.null
     expect(document.activeElement).to.equal(screen.getByPlaceholderText('vault passphrase'))
-    expect(answers).to.deep.equal([])
   })
 
   it("offers no passkey to a user choosing the vault's first passphrase", async () => {
     TH.installFakeAuthenticator()
     const { gating } = await TH.openGatingOf(TH.makeBankWorld(), TH.building)
-    render(<PassphraseModal gating={TH.passphraseGatingOf(gating)} onDone={() => undefined} />)
+    render(<PassphraseModal gating={TH.passphraseGatingOf(gating)} />)
     expect(screen.queryByText(Messages.passkeyButton)).to.be.null
   })
 })

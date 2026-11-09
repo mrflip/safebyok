@@ -405,7 +405,7 @@ describe("BankProvider's dialog", () => {
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(screen.queryByText(Messages.chooseTitle)).to.not.be.null })
-    TH.submitNewPassphrase(TH.Passphrase)
+    await TH.submitNewPassphrase(TH.Passphrase)
     await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
     expect(dialogShown()).to.be.false
   })

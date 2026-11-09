@@ -1,39 +1,31 @@
 import { describe, expect, it } from 'vitest'
-import { correctablekindVals, VaultError, type Refusalkind } from 'safebyok'
-import { attemptRefusalFlavor } from '../src/helpers/attempt-refusals'
+import { correctablekindVals, VaultError, type AnyGating, type Refusalkind } from 'safebyok'
+import { gripeOfRefusal } from '../src/helpers/attempt-refusals'
 
-const FlavorCases: readonly (readonly [Refusalkind, string, string])[] = [
-  // shown in place, to ask again:
-  ["wrong_passphrase",    "in_place",  'a typo is shown beside the field'],
-  ["wrong_passkey",       "in_place",  'a passkey that did not open the vault is shown in place'],
-  ["passkey_unavailable", "in_place",  'a browser or authenticator that cannot answer for a passkey is shown in place, the passphrase still open'],
-  ["weak_passphrase",     "in_place",  "a weak new passphrase is shown in place, the checker's reason its message"],
-  ["same_passphrase",     "in_place",  'a new passphrase that is the current one again is shown in place, to choose another'],
-  // closing the dialog:
-  ["absent_wayin",        "close",     'a passkey gone closes the dialog'],
-  ["vault_locked",        "close",     'a lock that won closes the dialog'],
-  ["gating_concluded",    "close",     'a gating ended meanwhile closes the dialog'],
-  ["dismissed",           "close",     'a gating dismissed elsewhere closes the dialog'],
-  ["storage_unavailable", "close",     'storage out of reach closes the dialog'],
-  ["vault_gone",          "close",     'a vault found deleted closes the dialog'],
-  // waiting out the attempt under way:
-  ["attempt_in_flight",   "in_flight", 'a second attempt while one runs closes nothing: the first answers'],
-  // the boundary:
-  ["bad_option",          "trouble",   'misuse goes to the boundary, to be reported'],
-  ["unexpected_error",    "trouble",   'a bug goes to the boundary, to be reported'],
-]
+const Open = { isOpen: true } as AnyGating
+const Concluded = { isOpen: false } as AnyGating
+const gripeOf = (gating: AnyGating, err: unknown) => gripeOfRefusal(gating, err, 'PassphraseModal')
 
-describe("attemptRefusalFlavor", () => {
-  for (const [kind, flavor, blurb] of FlavorCases) {
-    it(blurb, () => { expect(attemptRefusalFlavor(new VaultError(kind, 'A refusal.'))).to.eq(flavor) })
-  }
-
-  it("shows in place exactly the kinds the core leaves a gating open for", () => {
-    for (const kind of correctablekindVals) { expect(attemptRefusalFlavor(new VaultError(kind, 'A refusal.'))).to.eq('in_place') }
+describe("gripeOfRefusal", () => {
+  it("words each kind the core leaves a gating open for, and names the kind", () => {
+    for (const refusalkind of correctablekindVals) {
+      expect(gripeOf(Open, new VaultError(refusalkind, 'A refusal.'))).to.deep.equal({ text: 'A refusal.', refusalkind })
+    }
   })
 
-  it("sends a failure that is no VaultError to the boundary", () => {
-    expect(attemptRefusalFlavor(new TypeError('fell over'))).to.eq('trouble')
-    expect(attemptRefusalFlavor(null)).to.eq('trouble')
+  it("says nothing of a second attempt while one runs: the first answers", () => {
+    expect(gripeOf(Open, new VaultError('attempt_in_flight', 'A refusal.'))).to.be.null
+  })
+
+  const ConcludedKinds: readonly Refusalkind[] = ['absent_wayin', 'gating_concluded', 'dismissed', 'storage_unavailable', 'vault_gone', 'bad_option']
+  for (const refusalkind of ConcludedKinds) {
+    it(`says nothing of ${refusalkind} on a gating it concluded: the gating's outcome tells it`, () => {
+      expect(gripeOf(Concluded, new VaultError(refusalkind, 'A refusal.'))).to.be.null
+    })
+  }
+
+  it("throws anything else met while the gating is open, for the boundary", () => {
+    expect(() => gripeOf(Open, new VaultError('bad_option', 'A refusal.'))).to.throw('A refusal.')
+    expect(() => gripeOf(Open, new TypeError('fell over'))).to.throw(VaultError)
   })
 })

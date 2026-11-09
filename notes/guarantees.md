@@ -117,8 +117,7 @@ attempt is over (G2 says when a correctable refusal leaves them to the host); th
 `Proving.#wayinKey` until the proving is dropped; nothing of either is ever stored. Outside the core,
 `safebyok-react`'s `bytesOf` (the package runs on the old core until it moves) copies the browser's PRF
 result into the answer and zeroes the buffer it copied from, so the answer's bytes are the one copy.
-Its dialogs try an answer at once or zero it untried, never keeping one for a hidden dialog to show
-again, and zero it once its one attempt is done (`attemptOnce`).
+Its dialogs try an answer as soon as it comes back, hidden or not, and zero it once its one attempt is done (`attemptOnce`).
 
 ## The secret values
 
@@ -170,7 +169,7 @@ bytes by an inline `reduce`) → `PasskeyProving.buildNovel`, `buildStored` → 
 (`models/gating.ts`) reaches the `passkeyClear.prfBytes` of whatever the attempt was handed, checked or not, a view
 or a bare `ArrayBuffer`, and `fill(0)`s it: in `gating.attempt` for an attempt refused at the door, and in
 `#attemptOnce` for one that concludes its gating. In `safebyok-react`, `PasskeyUnlockButton` and `GatingModal`'s
-`put_passkey` form hand it on at once or zero it untried (`useWhenShown`'s `isShown`), and `attemptOnce` zeroes it
+`put_passkey` form hand it on at once, whether or not an Activity has hidden them, and `attemptOnce` zeroes it
 after its attempt.
 
 **passphraseKey bytes.** Naked: `keyDeriver.deriveKeyBytes` → `passphraseKeyOf`
@@ -249,8 +248,7 @@ gating, a proving derived from them or not. So an answer is single-use, and one 
 `bad_option` by its all-zero bytes (`passkeyAnswer`, `shapes-gateish.ts`). Only a refusal the user can correct,
 `wrong_passkey` among them, past the derivation too, short of the last attempt, leaves them unspent, for the host to
 hand in again or zero, and the gating keeps no reference to zero them by later. *Caveat:* that zeroing is then the
-host's; `safebyok-react`'s dialogs do it (`attemptOnce`), and never keep an answer for a hidden dialog to show
-again. The passkeyKey is HKDF-SHA256 of those bytes, its
+host's; `safebyok-react`'s dialogs do it (`attemptOnce`). The passkeyKey is HKDF-SHA256 of those bytes, its
 `info` the wayin's whole ctx, derived non-extractable (`deriveWrappingKey`). The result, the
 wayinKey, is not a local: it is `Proving.#wayinKey`, private, for the proving's life, and no
 method returns it or a vaultKey (`models/proving.ts`). Bytes refused before import: anything but

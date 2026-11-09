@@ -1,65 +1,82 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import type { Gating } from 'safebyok'
 import { PasskeyUnlockButton, offersPasskey } from '../components/passkey-unlock-button'
 import { Messages } from '../helpers/messages'
 import type { PassphraseModalProps } from '../shapes'
-import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, holdsFocus, unlockedFor, useAdvice, useAttempts, useConfirmation } from './modal-kit'
+import { ChosenPassphraseFields, DialogBoundary, ModalForm, PassphraseField, UsernameField, holdsFocus, textOf, unlockedFor, useAttemptAction, useChosenPassphrase } from './modal-kit'
 
 /** The passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
 export const PassphraseModal = (props: PassphraseModalProps) => (
-  <AnsweringOnce key={props.gating.gatingTok} gating={props.gating} onDone={props.onDone}>
-    {(done) => <PassphraseForm {...props} onDone={done} />}
-  </AnsweringOnce>
+  <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
+    {props.gating.gatingkind === 'build_vault' ? <BuildForm {...props} gating={props.gating} /> : <UnlockForm {...props} gating={props.gating} />}
+  </DialogBoundary>
 )
 
-const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername, passkeyRpId }: PassphraseModalProps) => {
-  const { gripe, setGripe, fail, attempt } = useAttempts('PassphraseModal', done)
+const BuildForm = ({ gating, leaseMillis, passphraseUsername }: PassphraseModalProps & { gating: Gating<'build_vault'> }) => {
+  const { chosenRef, confirmRef, ...chosen } = useChosenPassphrase(gating, 'PassphraseModal')
+  const { gripe, gripeId, action } = useAttemptAction(
+    gating,
+    'PassphraseModal',
+    (form) => gating.attempt({ passphraseClear: textOf(form, 'new-password') }),
+    () => chosenRef,
+  )
+  return (
+    <ModalForm
+      gating={gating}
+      title={Messages.chooseTitle}
+      blurb={Messages.chooseBlurb}
+      submitWord={Messages.createButton}
+      pendingWord={Messages.creatingButton}
+      isSubmittable={chosen.isSubmittable}
+      gripeText={gripe?.text ?? null}
+      gripeId={gripeId}
+      footnote={leaseMillis === undefined ? undefined : unlockedFor(leaseMillis, true)}
+      action={action}
+      onReset={chosen.forget}
+    >
+      <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)} />
+      <ChosenPassphraseFields chosen={chosen} chosenRef={chosenRef} confirmRef={confirmRef} chosenLabel={Messages.passphraseField} confirmLabel={Messages.confirmField} chosenInvalidBy={gripe === null ? undefined : gripeId} />
+    </ModalForm>
+  )
+}
+
+const UnlockForm = ({ gating, leaseMillis, passphraseUsername, passkeyRpId }: PassphraseModalProps & { gating: Gating<'unlock_vault'> }) => {
   const fieldRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
-  const { ref: confirmRef, gripeId, differs } = useConfirmation(setGripe)
-  const creating = gating.gatingkind === 'build_vault'
-  const advice = useAdvice(gating, creating, fail)
-  const passkeyGating = gating.gatingkind === 'unlock_vault' && offersPasskey(gating) ? gating : null
+  const [passkeyGripe, setPasskeyGripe] = useState<string | null>(null)
+  const { gripe, gripeId, action } = useAttemptAction(
+    gating,
+    'PassphraseModal',
+    (form) => {
+      setPasskeyGripe(null)
+      return gating.attempt({ passphraseClear: textOf(form, 'current-password') })
+    },
+    () => fieldRef,
+  )
+  const offering = offersPasskey(gating)
 
-  const submit = () => {
-    const typed = fieldRef.current?.value ?? ''
-    if (creating && differs(typed)) { return }
-    void attempt(() => gating.attempt({ passphraseClear: typed }), 'unlocked')
-  }
-
-  const hearPassphrase = (typed: string) => {
-    setGripe((prev) => (prev?.fromPasskey === true ? prev : null))
-    if (creating) { void advice.hear(typed) }
-  }
-
-  const passkeyGripe = (text: string | null) => {
-    setGripe(text === null ? null : { text, fromPasskey: true })
+  const hearPasskey = (text: string | null) => {
+    setPasskeyGripe(text)
     // A passkey button that took itself away took the focus with it, so the focus goes back to the passphrase field.
     if (text !== null && ! holdsFocus(formRef.current)) { fieldRef.current?.focus() }
   }
 
   return (
     <ModalForm
-      title={creating ? Messages.chooseTitle : Messages.unlockTitle}
-      blurb={creating ? Messages.chooseBlurb : Messages.unlockBlurb}
-      submitWord={creating ? Messages.createButton : Messages.unlockButton}
-      gripe={gripe}
+      gating={gating}
+      title={Messages.unlockTitle}
+      blurb={Messages.unlockBlurb}
+      submitWord={Messages.unlockButton}
+      pendingWord={Messages.unlockingButton}
+      gripeText={passkeyGripe ?? gripe?.text ?? null}
       gripeId={gripeId}
-      footnote={leaseMillis === undefined ? undefined : unlockedFor(leaseMillis, creating)}
+      footnote={leaseMillis === undefined ? undefined : unlockedFor(leaseMillis, false)}
       formRef={formRef}
-      done={done}
-      onSubmit={submit}
+      action={action}
     >
-      {passkeyGating !== null && <PasskeyUnlockButton gating={passkeyGating} rpId={passkeyRpId} takesFocus onDone={done} onGripe={passkeyGripe} />}
+      {offering && <PasskeyUnlockButton gating={gating} rpId={passkeyRpId} onGripe={hearPasskey} />}
       <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)} />
-      <PassphraseField
-        ref={fieldRef}
-        credential={creating ? 'new-password' : 'current-password'}
-        fieldlabel={Messages.passphraseField}
-        takesFocus={passkeyGating === null}
-        advice={creating ? advice.said : undefined}
-        onChange={hearPassphrase}
-      />
-      {creating && <ConfirmField ref={confirmRef} gripeId={gripeId} fieldlabel={Messages.confirmField} gripe={gripe} onChange={() => { setGripe(null) }} />}
+      <PassphraseField ref={fieldRef} fieldname="current-password" fieldlabel={Messages.passphraseField} invalidBy={gripe === null ? undefined : gripeId} />
     </ModalForm>
   )
 }

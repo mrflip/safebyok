@@ -3,21 +3,18 @@ import { describe, expect, it, vi } from 'vitest'
 import { Gating, type Bank } from 'safebyok'
 import { AddPasskeyModal } from '../src/modals/add-passkey-modal'
 import { Messages } from '../src/helpers/messages'
-import type { DialogAnswer } from '../src/shapes'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** An add_passkey gating on a vault built under {@link TH.Passphrase}, shown in an AddPasskeyModal whose answers the test reads, closed by the first; and the fake authenticator. */
+/** An add_passkey gating on a vault built under {@link TH.Passphrase}, shown in an AddPasskeyModal; and the fake authenticator. */
 const shownFor = async (opts: TH.FakeAuthenticatorOpts = {}) => {
   const authenticator = TH.installFakeAuthenticator(opts)
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)
   const opened = await TH.openGatingOf(world, TH.addingPasskey)
-  const answers: DialogAnswer[] = []
-  const onDone = (answer: DialogAnswer) => { answers.push(answer); opened.close() }
-  const ui = <AddPasskeyModal gating={TH.gatingOfKind(opened.gating, 'add_passkey')} onDone={onDone} />
-  return { ...opened, ...render(ui), ui, answers, authenticator }
+  const ui = <AddPasskeyModal gating={TH.gatingOfKind(opened.gating, 'add_passkey')} />
+  return { ...opened, ...render(ui), ui, authenticator }
 }
 
 /** The credential id of the passkey the vault in `bank` has, or null. */
@@ -29,11 +26,10 @@ const passkeyOf = (bank: Bank) => {
 const alertText = () => screen.getByRole('alert').textContent
 
 describe("AddPasskeyModal", () => {
-  it("makes a passkey under the app's name and the user's, adds it on the passphrase, and answers unlocked", async () => {
-    const { bank, gating, raising, answers, authenticator } = await shownFor()
+  it("makes a passkey under the app's name and the user's, adds it on the passphrase, and the gating concludes", async () => {
+    const { bank, gating, raising, authenticator } = await shownFor()
     expect(screen.getByText(Messages.addPasskeyTitle)).to.exist
     TH.submitPasskeyAdd(TH.Passphrase)
-    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
     expect(await raising).to.include({ ok: true })
     expect(passkeyOf(bank)).to.equal(authenticator.credentialIds()[0])
     const [call] = authenticator.calls.create
@@ -42,38 +38,32 @@ describe("AddPasskeyModal", () => {
   })
 
   it("shows a wrong passphrase in place, adding nothing, and adds a passkey made anew on the right one", async () => {
-    const { bank, gating, raising, answers, authenticator } = await shownFor()
+    const { bank, gating, raising, authenticator } = await shownFor()
     TH.submitPasskeyAdd('not the passphrase')
     await waitFor(() => { expect(alertText()).to.not.eq('') })
     expect(gating.isOpen).to.be.true
     expect(passkeyOf(bank)).to.be.null
     TH.submitPasskeyAdd(TH.Passphrase)
-    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
     expect(await raising).to.include({ ok: true })
     expect(passkeyOf(bank)).to.equal(authenticator.credentialIds()[1])
   })
 
   it("asks for the passphrase before the browser makes a passkey", async () => {
-    const { gating, answers, authenticator } = await shownFor()
+    const { gating, authenticator } = await shownFor()
     fireEvent.click(screen.getByText(Messages.addPasskeyButton))
-    await screen.findByText(Messages.passphraseFirst)
+    await act(async () => { await TH.wakeupAtNextTick() })
     expect(authenticator.calls.create).to.have.lengthOf(0)
     expect(gating.isOpen).to.be.true
-    expect(document.activeElement).to.equal(screen.getByPlaceholderText('vault passphrase'))
-    TH.submitPasskeyAdd(TH.Passphrase)
-    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
-    expect(authenticator.calls.create).to.have.lengthOf(1)
   })
 
   it("does nothing when the user dismisses the browser's prompt: the gating stays open", async () => {
-    const { gating, answers, authenticator } = await shownFor()
+    const { gating, authenticator } = await shownFor()
     const attempts = vi.spyOn(Gating.prototype, 'attempt')
     authenticator.refuseNext('NotAllowedError')
     TH.submitPasskeyAdd(TH.Passphrase)
     await waitFor(() => { expect(authenticator.calls.create).to.have.lengthOf(1) })
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(attempts).not.toHaveBeenCalled()
-    expect(answers).to.deep.equal([])
     expect(gating.isOpen).to.be.true
   })
 
@@ -85,35 +75,30 @@ describe("AddPasskeyModal", () => {
   })
 
   it("asks the browser for one passkey at a time, however often the user submits", async () => {
-    const { answers, authenticator } = await shownFor()
+    const { authenticator } = await shownFor()
     const touching = TH.makePending()
     authenticator.answerNextAfter(touching.promise)
     TH.submitPasskeyAdd(TH.Passphrase)
-    fireEvent.click(screen.getByText(Messages.addPasskeyButton))
+    fireEvent.click(await screen.findByText(Messages.addingPasskeyButton))
     await act(async () => { touching.resolve(undefined); await TH.wakeupAtNextTick() })
-    await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
     expect(authenticator.calls.create).to.have.lengthOf(1)
   })
 
-  it("answers dismissed on Cancel, and the vault has no passkey", async () => {
-    const { bank, raising, answers } = await shownFor()
+  it("dismisses the gating on Cancel, and the vault has no passkey", async () => {
+    const { bank, raising } = await shownFor()
     fireEvent.click(screen.getByText('Cancel'))
-    expect(answers).to.deep.equal(['dismissed'])
     expect(await raising).to.include({ ok: false })
     expect(passkeyOf(bank)).to.be.null
   })
 
-  it("never adds a passkey made while an Activity hid the dialog, zeroing its answer untried", async () => {
-    const { gating, ui, rerender, authenticator } = await shownFor()
-    const attempts = vi.spyOn(Gating.prototype, 'attempt')
+  it("adds a passkey the user made while an Activity hid the dialog: the press authorized it", async () => {
+    const { raising, ui, rerender, authenticator } = await shownFor()
     const touching = TH.makePending()
     authenticator.answerNextAfter(touching.promise)
     TH.submitPasskeyAdd(TH.Passphrase)
+    await waitFor(() => { expect(authenticator.calls.create).to.have.lengthOf(1) })
     rerender(TH.inActivity('hidden', ui))
     await act(async () => { touching.resolve(undefined); await TH.wakeupAtNextTick() })
-    await waitFor(() => { expect(authenticator.answersHanded()).to.have.lengthOf(1) })
-    await act(async () => { await TH.wakeupAtNextTick() })
-    expect(attempts).not.toHaveBeenCalled()
-    expect(gating.isOpen).to.be.true
+    expect(await raising).to.include({ ok: true })
   })
 })
