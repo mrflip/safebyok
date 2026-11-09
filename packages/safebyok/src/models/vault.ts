@@ -52,6 +52,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Getters]: fmt, fullRecord, gate, boxListing
 
+  /** The storage format of the record in hand. */
   get fmt(): number { return this.central.fmt }
 
   /** The full record in hand, what a gate change spreads into its params. */
@@ -100,6 +101,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
+  /** Non-throwing form of {@link replacePassphrasePrompt}. */
   tryReplacePassphrasePrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrasePrompt()) }
 
   /** Add a passkey through an add_passkey gating. */
@@ -110,6 +112,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
+  /** Non-throwing form of {@link addPasskeyPrompt}. */
   tryAddPasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskeyPrompt()) }
 
   /** Revoke the passkey through a revoke_passkey gating. With none held it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
@@ -120,6 +123,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
+  /** Non-throwing form of {@link revokePasskeyPrompt}. */
   tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
 
   /** SLOPDOC: Deletes this vault through a gating, leaving a tombstone in its slot and nothing of it on this device. */
@@ -129,6 +133,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
+  /** Non-throwing form of {@link delVaultPrompt}. */
   tryDelVaultPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.delVaultPrompt()) }
 
   /** Delete this vault by {@link delVaultPrompt}, which takes the passphrase's proof. */
@@ -155,6 +160,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.unlock()
   }
 
+  /** Non-throwing form of {@link ensureUnlocked}. */
   tryEnsureUnlocked(): Promise<Outcome<this>> { return outcomeOf(() => this.ensureUnlocked()) }
 
   /** Ask the user for proof, and unlock by it. */
@@ -164,13 +170,15 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
+  /** Non-throwing form of {@link unlock}. */
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
   // --
 
   // == [The lease]: lock, vacateLease, unlockByProof, attachLease, renewLease
 
   /** Lock the vault and its boxes before returning, and erase the row cached on this device.
-   * A refused erase is announced as `lease_unerased` and does not throw. A no-op on a vault discarded. */
+   * A refused erase is announced as `lease_unerased` and does not throw. A no-op on a vault discarded.
+   */
   override lock(): this {
     if (! this.isEnabled) { return this }
     void this.#vacateLease('lock')
@@ -294,6 +302,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     await this.boxListing.list()
   }
 
+  /** Non-throwing form of {@link hello}. */
   tryHello(): Promise<Outcome<this>> { return outcomeOf(() => this.hello()) }
 
   /** Hydrate and return the box listed at `boxlabel` (i.e. fetch if stale). A missing box is null for `ifAbsent: 'nil'`, or refused for `ifAbsent: 'fail'`. */
@@ -320,12 +329,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryPutBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
 
   /** Tombstones the box listed at `boxlabel` and answers it, or null where none is stored; {@link BoxListing.del} has the refusals.
-   * A damaged box, one that failed validation when read back, reads as missing here: {@link tryDelDamagedBox} removes it. */
+   * A damaged box, one that failed validation when read back, reads as missing here: {@link tryDelDamagedBox} removes it.
+   */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
     const box = await this.boxListing.deletable({ ...this.scope, boxlabel }).del(opts)
     return SX.isRowAt(box, SX.VoidRevision) ? null : box
   }
 
+  /** Non-throwing form of {@link delBox}. */
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
 
   /** Delete the damaged box listed at `boxlabel`, the only verb that does. Refuses 'absent_box' for a healthy box or none listed. */
@@ -348,6 +359,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The vault's own lock, not its world's: the bank has none. */
   override get isLocked(): boolean { return this.#lease === null }
 
+  /** True while this vault holds a lease. */
   get isUnlocked(): boolean { return this.#lease !== null }
 
   /** Refuses unless the vault is enabled, present and unlocked. */
@@ -372,6 +384,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** A hello needs the vault enabled and present. */
   demandHelloable(): this { return this.demandEnabled().demandPresent() }
 
+  /** Demand that this vault is present. */
   demandPresent(): this {
     if (! this.isPresent) { throw deletedVaultError() }
     return this
@@ -384,7 +397,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // == [Protected, overriding Storable's]: adopt, sweepContents, vacateContents, isFullRecord, lifeTokPathOf, makeSnapshot
 
   /** Take in `central`. A tombstone locks the vault, erases the cached row and vacates the boxes, the vault keeping its slot.
-   * A refused erase is announced as `lease_unerased`, and the tombstone stands. */
+   * A refused erase is announced as `lease_unerased`, and the tombstone stands.
+   */
   protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {
     super.adopt(central)
     if (this.isPresent) { return }

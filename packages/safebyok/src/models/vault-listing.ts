@@ -28,6 +28,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   #openGating: AnyGating | null = null
 
+  /** The gating open on this bank, or null. */
   get openGating(): AnyGating | null { return this.#openGating }
   // --
 
@@ -42,6 +43,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** SLOPDOC: A new vault for `scope`, asked of the user, stored and unlocked; or, locked, the slot's winner. */
   buildVault(scope: VaultScope): Promise<Vault> { return Vault.launchBirth(this, scope, this.bankFriend.askUser) }
 
+  /** Non-throwing form of {@link buildVault}. */
   tryBuildVault(scope: VaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.buildVault(scope)) }
 
   /** The listing of `vault`'s boxes, its watch not started. */
@@ -52,8 +54,10 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** The scope of `duck`, held to this bank: no listing answers for another's. */
   scopeOf(duck: unknown):  VaultScope  { return vaultScope.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
 
+  /** Parse `duck` as a {@link VaultSparse}. */
   sparseOf(duck: unknown): VaultSparse { return SX.vaultSparse.parse(duck) }
 
+  /** Parse `duck` as a {@link VaultRecord} of this bank. */
   recordOf(duck: unknown): VaultRecord { return SX.vaultRecord.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
   // --
 
@@ -153,6 +157,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return this
   }
 
+  /** Vacate this listing's vaults, and decline the open gating whatever vault it asks for. */
   override vacate(): this {
     super.vacate()
     this.#declineGatingOfGoneListing()

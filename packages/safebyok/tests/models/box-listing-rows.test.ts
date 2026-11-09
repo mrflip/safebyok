@@ -37,7 +37,7 @@ describe("BoxListing: an absent box", () => {
       expect(listing.at(scope())).to.be.null
     })
 
-    it("refuses 'absent_box' for a box held gone, which receives the answer as the same", async () => {
+    it("refuses 'absent_box' for a box held gone, which stays held", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(gone())
       held.mw.clearCalls()

@@ -308,7 +308,7 @@ describe("PasskeyProving.buildStored(gate, passkeyClear)", () => {
     expect(isZeroed(answer.prfBytes)).to.be.false
   })
 
-  it("refuses a gate with no passkey wayin as 'absent_wayin', the answer unspent", async () => {
+  it("refuses a gate with no passkey wayin, leaving the answer unspent", async () => {
     const { gate } = await builtGateOf()
     const answer = passkeyAnswerOf()
     await TH.expectRefusal(PasskeyProving.buildStored(gate, answer), 'absent_wayin')

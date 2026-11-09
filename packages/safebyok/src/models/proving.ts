@@ -46,6 +46,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   readonly #wayinKey: CryptoKey
   #wayin: Wayin | null = null
 
+  /** This proving for `JSON.stringify`, showing only its wayinkind. */
   toJSON(): { wayinkind: Wayinkind } { return { wayinkind: this.wayinkind } }
   // --
 
@@ -123,6 +124,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   get modelkind(): 'proving' { return 'proving' satisfies Modelkind }
 }
 
+/** A passphrase made into a wayinKey for one gating. */
 export class PassphraseProving extends Proving<PassphraseWayinHeader> {
   // == [Construction]: buildNovel, buildStored
 
@@ -149,6 +151,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
   // --
 }
 
+/** A passkey's answer made into a wayinKey for one gating. */
 export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   // == [Construction]: buildNovel, buildStored
 

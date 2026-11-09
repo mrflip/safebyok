@@ -18,17 +18,20 @@ export interface KeyDeriver {
   readonly load?:             (() => void | Promise<void>) | undefined
 }
 
+/** A key deriver that carries the settings of its {@link KeyDeriverSpec}. */
 export type Argon2idKeyDeriver = KeyDeriverSpec & KeyDeriver
 // --
 
 // == [Checks]: parseKeyDeriverSpec, checkSuppliedSpecKept, isTestDeriver
 
+/** Parse `candidate` into a {@link KeyDeriverSpec}, and refuse a spec that misuses a supplied label. */
 export const parseKeyDeriverSpec = (candidate: unknown): KeyDeriverSpec => {
   const spec = keyDeriverSpec.parse(candidate)
   checkSuppliedSpecKept(spec)
   return spec
 }
 
+/** Refuse a spec that changes a supplied spec's settings, or claims a label under {@link ReservedLabelPrefix}. */
 export const checkSuppliedSpecKept = (candidate: KeyDeriverSpec): void => {
   const supplied = SuppliedSpecs.find((spec) => spec.key_deriver_label === candidate.key_deriver_label)
   if (supplied === undefined) {
@@ -40,5 +43,6 @@ export const checkSuppliedSpecKept = (candidate: KeyDeriverSpec): void => {
   if (! kept) { throw suppliedSpecChanged(supplied.key_deriver_label) }
 }
 
+/** True when `keyDeriver`'s label starts with {@link TestLabelPrefix}. */
 export const isTestDeriver = (keyDeriver: Pick<KeyDeriver, 'key_deriver_label'>): boolean => keyDeriver.key_deriver_label.startsWith(TestLabelPrefix)
 // --

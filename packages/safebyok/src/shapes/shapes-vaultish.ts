@@ -34,6 +34,7 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 
 // == [Record forms]: liveness, tombstone, isTombstone, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna
 
+/** The checks of a record's `am`, and of a tombstone's fields. */
 export const { liveness, tombstone } = Checkers('bad_record', ({ obj, oneof }) => ({
   liveness:  obj({ am: SX.am }),
   tombstone: SX.sparseBase.extend({ am: oneof(EX.tombstoneAmVals) }),
@@ -201,6 +202,7 @@ export const storableArgs = objCheck(({ custom }) => ({
 
 // == [Given to a listing]: Thing, ListingAnswer, DelTombstone, SlotFate, ListingOf
 
+/** A vault or box as a listing holds it. */
 export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
 
 /** The answer of a vaultDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
@@ -347,12 +349,14 @@ export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 's
 
 // == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, EraseSite, BankAnnouncement, BankEvent, LifecycleHandler, GuardedLifecycleHandler, BankAnnounce, BankPanic, BankStage, BankSnapshot
 
+/** The checks of a bank's durations in minutes: `positiveMinutes` for the autolock, and `refreshMinutes` for a refresh interval, which may be zero. */
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
   positiveMinutes: union([num.positive(), lit(Infinity)], Phrases.PositiveMinutesShape),
   refreshMinutes:  union([num.nonnegative(), lit(Infinity)], Phrases.MinutesShape),
 }))
 
 // The host's functions and logger are checked once, by the guard that wraps each; here they are only named.
+/** The check of the options handed to `Bank.make`. */
 export const bankOpts = objCheck(({ fn, custom, applabel, user_id, device_id }) => ({
   applabel,
   user_id,

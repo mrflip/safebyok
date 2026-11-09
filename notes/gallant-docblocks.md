@@ -34,7 +34,8 @@ leaves behind, are the class's story, said once there or not at all. "A host may
 
 ```ts
 /** A forced reset a host may repeat: lists what the vaultDB holds, tidies old leases, and starts the watch.
- * Refused, the bank is not ready; one a sweep crossed refuses only its own caller. */
+ * Refused, the bank is not ready; one a sweep crossed refuses only its own caller.
+ */
 async hello(): Promise<void>
 ```
 
@@ -127,7 +128,8 @@ caller checks before calling it, and with the file folded the first line is all 
 ```ts
 /** Seals a new box and stores it.
  *
- * Refuses where a live box already stands under the scope, as `camped`. Answers the box listed. */
+ * Refuses where a live box already stands under the scope, as `camped`. Answers the box listed.
+ */
 async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box>
 ```
 
@@ -158,7 +160,8 @@ async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<Vaul
  * found decides:
  * * live, under `ifPresent: 'fail'`: refused as `camped`; under `'get'`: answered as it stands, act `declined`
  * * void or a tombstone, under `ifAbsent: 'fail'`: refused as `vault_empty` or `vault_gone`
- * * anything else: refused as `stale_write`; read the vault again and edit from the revision it answers. */
+ * * anything else: refused as `stale_write`; read the vault again and edit from the revision it answers.
+ */
 async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>>
 ```
 
@@ -179,7 +182,8 @@ async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box>
 /** Seals `patch` over the record in hand as the next revision and stores it, answering the box.
  *
  * A lock does not interrupt or reverse a put once its write has begun. A patch leaving out the whisper or the sidecar keeps
- * the one stored, so a box held sparse is fetched first. */
+ * the one stored, so a box held sparse is fetched first.
+ */
 async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box>
 ```
 
@@ -458,7 +462,8 @@ States the 'vault_full' a caller meets in normal use, and gives no recipe for it
 // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
 /** A soft cap on the boxes a vault holds. Default: the smaller of {@link MaxBoxes}, 100, and the `maxBoxes` the vaultDB adapter advises.
  * A box past it refuses 'vault_full': delete one first, or relaunch with a larger value. Replacing or reading a box is
- * always allowed, even over the limit. Lowering it afterwards is undefined. */
+ * always allowed, even over the limit. Lowering it afterwards is undefined.
+ */
 ```
 
 ## Option values get a list `#option-values-get-a-list`
@@ -481,7 +486,8 @@ Two options and their values gapped into one sentence, the default in parenthese
 /** How an {@link objCheck} validator refuses.
  * - `refusalkind`      -- the kind thrown (default: 'bad_record')
  * - `extras: 'strict'` -- refuse a field the object does not take (default)
- * - `extras: 'strip'`  -- drop it unread */
+ * - `extras: 'strip'`  -- drop it unread
+ */
 ```
 
 **Goofus:**
@@ -499,7 +505,8 @@ The two values gapped behind a semicolon, each explained in a clause.
 ```ts
 /** Why a row sits in `damaged_records`.
  * - `format_mismatch` -- written by a newer version of the app; updating may read it
- * - `damaged_record`  -- anything else */
+ * - `damaged_record`  -- anything else
+ */
 ```
 
 **Goofus:**
@@ -521,7 +528,8 @@ The values told as policy prose: neither one named, the default not marked. Prop
  * - `ifPresent: 'get'`  -- a live row is answered as it stands, act 'declined'; nothing is written
  * - `ifAbsent: 'add'`   -- a void or tombstoned row at `prior` is written over: a birth, or a rebirth (default)
  * - `ifAbsent: 'fail'`  -- a void row refuses 'vault_empty', a tombstone 'vault_gone'
- * A row not at `prior` refuses 'stale_write': a rebirth names the tombstone's revision, not the void one. */
+ * A row not at `prior` refuses 'stale_write': a rebirth names the tombstone's revision, not the void one.
+ */
 ```
 
 ## Point, don't redefine `#point-dont-redefine`
@@ -597,7 +605,8 @@ Use words a front-end developer (the customer) or a regular person (the user) kn
 ```ts
 /** Serialized name/value pairs bound into the wrapped value as cryptographic context.
  * The value cannot be unwrapped unless the same bytes, unchanged, are independently provided along with the wrapping
- * key. Any change to that associated data, another user_id or a forged registered_at, will not unwrap. */
+ * key. Any change to that associated data, another user_id or a forged registered_at, will not unwrap.
+ */
 ```
 
 ## The guarantee, second specimen `#say-the-guarantee`

@@ -95,7 +95,7 @@ describe("box.whisper through a lock", () => {
     expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-edited', org: 'acme' })
   })
 
-  it("refuses 'vault_locked' at an expose while locked, keeping the one exposed", async () => {
+  it("refuses 'vault_locked' at an expose while locked, keeping the exposed whisper", async () => {
     const box = await exposedOf()
     held.mw.setLocked(true)
     await TH.expectRefusal(box.expose(), 'vault_locked')

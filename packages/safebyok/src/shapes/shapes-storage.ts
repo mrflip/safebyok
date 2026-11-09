@@ -17,7 +17,9 @@ export const VoidRevisionSeq = -1
 export const VoidLifeTok = '00000000-0000-0000-0000-000000000000'
 /** The `registered_at` and `written_at` of a void row: 2008-08-08T08:08:08.777Z, plain on sight. */
 export const VoidTime = 1_218_182_888_777
+/** The `fmt` every box row carries. */
 export const BoxFormat = 5001
+/** The `fmt` every vault row carries. */
 export const VaultFormat = 6001
 /** The revision of a void row, and of a birth's prior. */
 export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidRevisionSeq } as const
@@ -52,6 +54,7 @@ export type Times    = Readonly<Z.infer<typeof times>>
 // == [Scopes]: vaultQuery, boxQuery, watchScope, VaultQuery, BoxQuery, WatchScope
 
 // A scope's validator is CX's, frozen; `unwrap()` is its object, to extend.
+/** The checks of a vaultDB verb's request: a vault or box scope under its `vault_tok`, and the scope of a watch. */
 export const { vaultQuery, boxQuery, watchScope } = Checkers('bad_scope', ({ vaultlabel, vault_tok, bankScope, vaultScope, boxscope }) => ({
   vaultQuery: vaultScope.unwrap().extend({ vault_tok }),
   boxQuery:   boxscope.unwrap().extend({ vault_tok }),
@@ -65,6 +68,7 @@ export type WatchScope = Readonly<Z.input<typeof watchScope>>
 
 // == [Wayins and gate]: passphraseWayinRecord, passkeyWayinRecord, gate, Gate
 
+/** The checks of the wayins as stored, and of the gate that holds them. */
 export const { passphraseWayinRecord, passkeyWayinRecord, gate } = Checkers('bad_option', ({ obj, lit, uint, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_id, vault_key_wayin_wrapped }) => {
   const passphraseWayinRecord = obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
   const passkeyWayinRecord    = obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
@@ -77,6 +81,7 @@ export type Gate = Readonly<Z.infer<typeof gate>>
 
 // == [Vault forms]: vaultSparse, vaultRecord, vaultTombstone, vaultRow, VaultSparse, VaultRecord, VaultTombstone, VaultRow, DamagedVault
 
+/** The checks of a vault's stored forms: its sparse fields, its live record, its tombstone, and a row of either. */
 export const { vaultSparse, vaultRecord, vaultTombstone, vaultRow } = Checkers('bad_option', ({ lit, discrim }) => {
   const vaultSparse    = CX.vaultScope.unwrap().extend({ fmt: lit(VaultFormat), ...sparseBase.shape })
   const vaultRecord    = vaultSparse.extend({ am: lit('a'), gate }).strict()
@@ -88,12 +93,15 @@ export const { vaultSparse, vaultRecord, vaultTombstone, vaultRow } = Checkers('
 export type VaultSparse    = Readonly<Z.infer<typeof vaultSparse>>
 export type VaultRecord    = Readonly<Z.infer<typeof vaultRecord>>
 export type VaultTombstone = Readonly<Z.infer<typeof vaultTombstone>>
+/** A vault row as stored: live, or a tombstone. */
 export type VaultRow       = VaultRecord | VaultTombstone
+/** A vault row that failed its checks, as `damaged_rows` lists it. */
 export type DamagedVault   = VaultSparse & Readonly<{ damagekind: EX.Damagekind }>
 // --
 
 // == [Box forms]: boxSparse, boxRecord, boxTombstone, boxRow, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox
 
+/** The checks of a box's stored forms: its sparse fields, its live record, its tombstone, and a row of either. */
 export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_option', ({ lit, discrim, box_tok, box_key_wrapped, whisper_ciphered }) => {
   const boxSparse = CX.boxscope.unwrap().extend({
     fmt: lit(BoxFormat),
@@ -121,7 +129,9 @@ export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_opti
 export type BoxSparse    = Readonly<Z.infer<typeof boxSparse>>
 export type BoxRecord    = Readonly<Z.infer<typeof boxRecord>>
 export type BoxTombstone = Readonly<Z.infer<typeof boxTombstone>>
+/** A box row as stored: live, or a tombstone. */
 export type BoxRow       = BoxRecord | BoxTombstone
+/** A box row that failed its checks, as `damaged_rows` lists it. */
 export type DamagedBox   = BoxSparse & Readonly<{ damagekind: EX.Damagekind }>
 // --
 
@@ -136,6 +146,7 @@ export const { foundVaultRow, foundBoxRow } = Checkers('damaged_row', () => ({
 
 // == [Gate verbs' params]: replacePassphraseParams, passkeyAddParams, revokePasskeyParams, ReplacePassphraseParams, AddPasskeyParams, RevokePasskeyParams
 
+/** The checks of the gate verbs' params: a vault record whose gate holds only the wayin that the verb changes. */
 export const { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } = Checkers('bad_option', ({ obj, lit }) => {
   // A vault record holding a gate that holds only the wayin the verb moves.
   const gateParams = vaultSparse.extend({ am: lit('a') })
@@ -152,6 +163,7 @@ export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParam
 
 // == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
 
+/** The checks of the options a vaultDB verb takes, and of the safe metadata an answer carries. */
 export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Checkers('bad_option', ({ obj, oneof, box_tok }) => {
   const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
   const putIfAbsent = oneof(EX.putIfAbsentVals).default('add')
@@ -211,6 +223,7 @@ export type Capacity = Z.infer<typeof capacity>
 
 // == [Row helpers]: rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, isNewerFormat, damagedVaultOf, damagedBoxOf, isDamagedVaultAt, isDamagedBoxAt, boxTombstoneOf
 
+/** The checks that read a row's revision and liveness, or its format, without judging the rest. */
 export const { rowPeek, fmtPeek } = Checkers('bad_option', ({ obj, num, vault_tok }) => ({
   rowPeek: obj({ ...revision.shape, am, vault_tok }),
   fmtPeek: obj({ fmt: num }),
@@ -222,8 +235,10 @@ export const reqParamsOf = (args: unknown): ReqParams => {
   return parsed.success ? parsed.data : {}
 }
 
+/** The {@link Revision} fields of a row. */
 export const revisionOf = ({ revision_tok, revision_seq }: Revision): Revision => ({ revision_tok, revision_seq })
 
+/** Fresh revision fields for the next write, written at `written_at`. */
 export const nextRevisionOf = ({ revision_seq }: Revision, written_at: number) => ({ revision_tok: randomId(), revision_seq: revision_seq + 1, written_at })
 
 const peekOf = (raw: unknown) => {
@@ -238,6 +253,7 @@ export const isRowAt = (raw: unknown, prior: Revision): boolean => {
   return (peek?.revision_tok === prior.revision_tok) && (peek.revision_seq === prior.revision_seq)
 }
 
+/** True when `raw` is a live row. */
 export const isLiveRow = (raw: unknown): boolean => (peekOf(raw)?.am === 'a')
 
 /** True when `raw` is a live row of the life `vault_tok`. */
@@ -256,6 +272,7 @@ export const isLifeOver = (raw: unknown, vault_tok: string): boolean => {
   return (peek !== null) && ((peek.am === 'x') || (peek.vault_tok !== vault_tok))
 }
 
+/** True when `raw` is the tombstone of a deleted row. */
 export const isTombstoneRow = (raw: unknown): boolean => (peekOf(raw)?.am === 'x')
 
 const sentinelTimes = { registered_at: VoidTime, written_at: VoidTime }

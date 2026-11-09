@@ -11,10 +11,9 @@ export type LoggedCall = {
   err:     Error | null | undefined
 }
 
-/**
- * A VaultLogger that logs nowhere and keeps every call it hears, in order, for a test to look at
+/** A VaultLogger that logs nowhere and keeps every call it hears, in order, for a test to look at
  * -- bar the one notice `Bank.make` gives of a `test_` key deriver's label ({@link TestDeriverNotice}),
- * which every vault opened through {@link testDeriver} would otherwise add to every count.
+ * which every vault opened through `testDeriver` would otherwise add to every count.
  *
  * @returns The `logger` to hand Bank.make, and the `calls` it has heard so far.
  *
@@ -33,12 +32,11 @@ export const spyLogger = () => {
   return { logger, calls }
 }
 
-/**
- * A VaultLogger for a test that has nothing to say about logging: it swallows `log`, and lets
+/** A VaultLogger for a test that has nothing to say about logging: it swallows `log`, and lets
  * `warn` and `error` through to the console as the default logger would, so a warning no test
  * meant to provoke still shows in the test output -- bar the one notice `Bank.make` gives of a
  * `test_` key deriver's label ({@link TestDeriverNotice}), which every vault opened through
- * {@link testDeriver} would otherwise print. {@link memoryVaultOpts} hands it to every vault by
+ * `testDeriver` would otherwise print. `memoryVaultOpts` hands it to every vault by
  * default. A test that provokes a warning on purpose, or looks at what a vault logged, hands
  * {@link spyLogger}'s logger in its place.
  *
@@ -50,8 +48,7 @@ export const quietLogger: VaultLogger = {
   error: (message, story, err) => { consoleLogger.error(message, story, err) },
 }
 
-/**
- * Everything a logger was handed, as one text to search for what must never be there: each
+/** Everything a logger was handed, as one text to search for what must never be there: each
  * call's message, its story as JSON, and its error -- message, stack, own properties -- down
  * through every cause. It never throws: a cause seen before is written `[cause seen above]`, and
  * a story or own properties JSON cannot write (a circular reference, a bigint) are written
@@ -66,8 +63,7 @@ export const loggedText = (calls: readonly LoggedCall[]): string => (
   calls.map((call) => [call.level, call.message ?? '', jsonOrPlaceholder(call.story ?? {}), thrownText(call.err)].join(' ')).join('\n')
 )
 
-/**
- * Everything a thrown value carries, as one text to search for what must never be there: an
+/** Everything a thrown value carries, as one text to search for what must never be there: an
  * error's message, stack and own properties, and the same of each cause beneath it; anything else
  * thrown, as JSON. Like {@link loggedText}, it never throws: a cause seen before is written
  * `[cause seen above]`, and own properties JSON cannot write are written `[not JSON]`.
@@ -79,8 +75,7 @@ export const loggedText = (calls: readonly LoggedCall[]): string => (
  */
 export const thrownText = (thrown: unknown): string => errorText(thrown, new Set())
 
-/**
- * Every string and number in `val`, at any depth, as text: the values of a record, to search an
+/** Every string and number in `val`, at any depth, as text: the values of a record, to search an
  * error or a log for. Field names are not among them. Give the record values distinctive
  * enough that finding one means it was quoted: an epoch of `2` turns up in any stack's line numbers.
  *
@@ -98,8 +93,7 @@ export const leafTexts = (val: unknown): string[] => {
   return leaves
 }
 
-/**
- * What a spread, a key list, a log line and `JSON.stringify` see of `obj`: its own enumerable
+/** What a spread, a key list, a log line and `JSON.stringify` see of `obj`: its own enumerable
  * fields, as a plain object, and nothing a private field or a getter holds. For a test of what a
  * model shows of itself.
  *
@@ -110,8 +104,7 @@ export const leafTexts = (val: unknown): string[] => {
  */
 export const shownOf = (obj: object): Record<string, unknown> => Object.fromEntries(Object.entries(obj))
 
-/**
- * What `JSON.stringify` writes of `val`, read back: for a test of what a model serializes as.
+/** What `JSON.stringify` writes of `val`, read back: for a test of what a model serializes as.
  *
  * @example expect(TH.jsonOf(model)).to.deep.equal({ label: 'shown' })   // through its toJSON, where it has one
  */
@@ -120,8 +113,7 @@ export const jsonOf = (val: unknown): Record<string, unknown> => {
   return JSON.parse(written) as Record<string, unknown>
 }
 
-/**
- * An error and every cause under it as text: message, stack and own properties each. Anything
+/** An error and every cause under it as text: message, stack and own properties each. Anything
  * else thrown, as JSON. `seen` holds the errors already written, so a cause cycle ends.
  */
 const errorText = (thrown: unknown, seen: Set<unknown>): string => {

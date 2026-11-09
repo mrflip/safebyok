@@ -749,8 +749,7 @@ not go in a sentence is a smell to report. For length, measure it against the do
 flexibility in a library you trust from memory (the DOM, Node's `fs`, Zod): usually one line, rarely more than five. No
 count holds the length: a reviewer does. The first line runs long only while it is one fact a caller must know before
 calling `#one-sentence-headline`: `create` refusing a live box is that news and stays on the line; a put's stale-write
-criteria are a description under a short headline (the pairs: `notes/gallant-docblocks.md`). A coding agent writes the first line and nothing more; everything past it
-is the documentarian's.
+criteria are a description under a short headline (the pairs: `notes/gallant-docblocks.md`).
 
 * **Every export gets a doc block; a private member gets a phrase** `#a-helper-gets-a-phrase` (``/** The whisper of `record` */``). Both answer the caller's three questions and no others `#three-questions`: when
   do I call it, what do I get, what would I otherwise get wrong. Never who calls it, nor what a sibling does.
@@ -860,11 +859,12 @@ is tested beside that verb. Test and build artifacts never land in `src/`.
   passes. Name it for what it does: if the helper should not assert, give it a different name
   (`check...`, `read...`); if it should, make it assert and keep the name. Never add an assertion
   to a helper merely to make the rule happy.
-* **Every use case of an exported function has a test. A title is one plain clause naming the behaviour.** It quotes no
-  refusal kind and chains no second outcome: the assertions carry those. `it("refuses a misspelt field")`, never
+* **Every use case of an exported function has a test. A title is one plain clause naming the behaviour.** It chains no
+  second outcome, and quotes a refusal kind only if the customer checks for it and reacts: `stale_write` is part of our
+  API, `bad_record` is not. The assertions carry the rest. `it("refuses a misspelt field")`, never
   `"refuses a misspelt field as 'bad_option', as its second example shows"`. A test that covers an `@example` says so on
   its first line, `// putBox @example 2`, which `rg` finds. The blurb slot of a bulk case list follows the same rule. The
-  linter (`vitest/valid-title`) refuses a quoted kind; the length is for review.
+  linter (`vitest/valid-title`) holds the list of kinds a title may quote; the length is for review.
 * **Each example ties to a plausible failure mode.** Ask what null, undefined and a missing value
   mean; what an absurd type does (`seal(42)`); what a not-quite-absurd one does (a salt one byte
   short, a passphrase of only whitespace, a vault written by a newer version).

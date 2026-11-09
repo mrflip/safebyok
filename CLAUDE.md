@@ -155,7 +155,7 @@ STYLE.md *Naming* is the source; these few shape code too deeply to fix in revie
 STYLE.md *Comments and doc blocks* is the source; `notes/gallant-docblocks.md` has the pairs, by tag.
 
 * **Write the first line before the body**: one sentence on the `/**`, saying what the member does for its caller. A
-  name that will not sit against that line is the wrong name. Write nothing past the first line; a documentarian does.
+  name that will not sit against that line is the wrong name.
 * **A doc block has no past** `#purpose-not-path`: not how the code came to be, what it replaced, the ruling or the request
   behind it, or why it is built this way. A reason worth keeping is a `//` comment above it.
 * **A doc block does not read the body aloud** `#purpose-not-machinery`: not the steps, the helpers it calls, or what a

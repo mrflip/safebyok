@@ -367,7 +367,7 @@ describe("an unlock through a gating", () => {
     expect(passkeyClear.prfBytes.every((byte) => byte === 0)).to.be.true
   })
 
-  it("settles a passkey at a gate with no passkey wayin 'absent_wayin', spending the answer", async () => {
+  it("settles a passkey at a gate with no passkey wayin, spending the answer", async () => {
     const { vault, gatingAt } = await lockedVault()
     const unlocking = TH.expectRefusal(vault.ensureUnlocked(), 'absent_wayin')
     const gating = await gatingAt<'unlock_vault'>()

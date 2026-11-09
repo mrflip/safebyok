@@ -17,6 +17,7 @@ const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGive
   SX.isRowAt(ante, prior) && (SX.isLiveRow(ante) ? (ifPresent === 'repl') : (ifAbsent === 'add'))
 )
 
+/** A vaultDB held in this tab's memory, gone when the tab closes. */
 export class MemoryVaultDB extends AdapterVaultDB {
   // == [Props]: #vaultrowsOfBank, #boxLives, #heeders, #maxBoxes
 

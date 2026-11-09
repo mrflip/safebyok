@@ -29,6 +29,7 @@ export const T0 = Date.UTC(2026, 9, 31)
 /** The scope of the one vault these worlds hold. */
 export const Dna = Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
 
+/** The passphrase these worlds' vaults are made with. */
 export const Passphrase = 'correct horse battery staple'
 
 /** The passphrase a gate change sets in place of {@link Passphrase}. */
