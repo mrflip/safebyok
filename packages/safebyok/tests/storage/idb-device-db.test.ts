@@ -103,15 +103,15 @@ describe("IdbDeviceDB's database", () => {
     const dbName = freshDbName()
     const deviceDB = makeDeviceDB(dbName)
     await deviceDB.stow({ ...TH.vaultScope, vault_tok: 'tok_one', proved_at: Date.now(), lease_key: await makeLeaseKey() })
-    await deviceDB.ensureBank(TH.bankScope)
+    await deviceDB.ensureCachedBank(TH.bankScope)
     expect(await dbNamesNow()).to.include.members([`${dbName}:device-v001-001-001`, `${dbName}:bank-v001-001-001`])
   })
 
   it("keeps the bank rows of each dbName apart", async () => {
     const dbName = freshDbName()
-    const made = await makeDeviceDB(dbName).ensureBank(TH.bankScope)
-    expect(await makeDeviceDB(dbName).ensureBank(TH.bankScope)).to.deep.equal(made)
-    expect(await makeDeviceDB().ensureBank(TH.bankScope)).to.not.deep.equal(made)
+    const made = await makeDeviceDB(dbName).ensureCachedBank(TH.bankScope)
+    expect(await makeDeviceDB(dbName).ensureCachedBank(TH.bankScope)).to.deep.equal(made)
+    expect(await makeDeviceDB().ensureCachedBank(TH.bankScope)).to.not.deep.equal(made)
   })
 
   it("refuses each call where there is no IndexedDB", async () => {

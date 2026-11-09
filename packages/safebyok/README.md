@@ -98,7 +98,7 @@ Easy to get wrong:
   empty, and with no watch nothing from another device arrives until the next `vault.hello()`.
 * `bank.vacate()` is sign-out: it disables the bank, then forgets this bank's leases on this device
   and its bank row in the deviceDB, leaving the vaultDB alone, and settles once each forget has been
-  tried. The next `deviceDB.ensureBank` for that user mints a new `device_id`. Await it before the
+  tried. The next `deviceDB.ensureCachedBank` for that user mints a new `device_id`. Await it before the
   page goes: a lease it cannot forget reaches your `onLifecycle` as `lease_revoke_failed`, and
   `vacated` follows once the forget settles, counting them. A refused listing of the leases, or a
   bank row it cannot forget, reaches your `onBadNews`.

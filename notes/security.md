@@ -102,11 +102,11 @@ added or folded into through the subagent, and no other entry changes.
   revocation concerns the user.
   amended 2026-11-08 (bank_followups): three changes, each to a sentence above.
   (1) The vacate's scrub also forgets this bank's own row in the deviceDB, `{ applabel, user_id, device_id }`, no secret, after it forgets the leases (`DeviceDB.forgetBank(scope)` /
-  `tryForgetBank`, the `doForgetBank` hook of `MemoryDeviceDB` and `IdbDeviceDB`), whether or not the lease listing was refused. The next `ensureBank` for that scope mints a fresh
+  `tryForgetBank`, the `doForgetBank` hook of `MemoryDeviceDB` and `IdbDeviceDB`), whether or not the lease listing was refused. The next `ensureCachedBank` for that scope mints a fresh
   `device_id`, so a device after sign-out is not linkable to its earlier wayins by `device_id`; a vault of that user and device built before the vacate still carries the old one in
   the clear. A refused forget reaches the host's `onPanic` as a refused lease forget does (the scrub's only other reach into the host's handlers), and a store's throw is replaced at
   `storeFailed` like every `DeviceDB` verb's. `vacate` stays synchronous and disables first. The known race is unchanged: an unlock in flight can still cache a lease after the forget, and
-  a `device_id` minted by an `ensureBank` in flight across the vacate is not forgotten.
+  a `device_id` minted by an `ensureCachedBank` in flight across the vacate is not forgotten.
   (2) `DefaultOnPanic` and a disabled bank's panic handler now also log each panic, `bank.logger.error(refusal.message, { call: 'Bank.onPanic', refusalkind })`, beside `reportError` to the
   platform, so that a platform with no `reportError` hears of it. The log carries the refusal's message and kind only, never its `cause` (a test checks that a `cause` carrying a passphrase
   is not logged); the logger is the host's, so the message goes wherever the host sends it.
@@ -2062,7 +2062,7 @@ added or folded into through the subagent, and no other entry changes.
   key deriver label, a fresh random salt (the deriver's `salt_bytes`), this device's `device_id` and `registered_at` =
   the vault's clock now; for a passkey, the answer's `credential_id` and PRF salt, `device_id` and `registered_at`.
   Amended 2026-11-07 (device_bank, sprint react_new, thread 15, branch `20261107-device_bank`): **the new core's `DeviceDB` mints the `device_id` per bank scope,
-  not per vault, through `ensureBank`.** `DeviceDB.ensureBank({ applabel, user_id })` (`packages/safebyok/src/storage/device-db.ts`) answers the device's bank row
+  not per vault, through `ensureCachedBank`.** `DeviceDB.ensureCachedBank({ applabel, user_id })` (`packages/safebyok/src/storage/device-db.ts`) answers the device's bank row
   `{ applabel, user_id, device_id }` and mints `device_id` on the first call with `crypto.randomUUID()` (through `randomId`, `helpers/crypto.ts`); the host
   (`BankProvider`, a later thread) hands that `device_id` to `Bank.make`, and each wayin carries it in the clear, visible in storage. It is random because an id drawn
   from anything about the device or the user would link what the vault does not; a fresh UUID per bank scope links only the wayins one device built under one bank

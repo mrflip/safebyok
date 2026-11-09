@@ -24,14 +24,14 @@ const provided = (overrides: Partial<Props> = {}, world = TH.makeBankWorld()) =>
   return { world, props, rerender: (given: Props) => { rendered.rerender(ui(given)) }, unmount: rendered.unmount }
 }
 
-/** A MemoryDeviceDB whose ensureBank for `user_id` waits until the test calls `answer`; every other user's answers at once. */
+/** A MemoryDeviceDB whose ensureCachedBank for `user_id` waits until the test calls `answer`; every other user's answers at once. */
 const deviceDBHolding = (user_id: string) => {
   const deviceDB = new MemoryDeviceDB()
   const answering = TH.held()
-  const ensureBank = deviceDB.ensureBank.bind(deviceDB)
-  vi.spyOn(deviceDB, 'ensureBank').mockImplementation(async (scope) => {
+  const ensureCachedBank = deviceDB.ensureCachedBank.bind(deviceDB)
+  vi.spyOn(deviceDB, 'ensureCachedBank').mockImplementation(async (scope) => {
     if (scope.user_id === user_id) { await answering.promise }
-    return ensureBank(scope)
+    return ensureCachedBank(scope)
   })
   return { deviceDB, answer: () => { answering.resolve(undefined) } }
 }
@@ -72,14 +72,14 @@ describe("BankProvider's bank", () => {
 
   it("makes each bank with the device_id its deviceDB keeps for the bank's scope", async () => {
     const deviceDB = new MemoryDeviceDB()
-    const kept = await deviceDB.ensureBank({ applabel: 'acme', user_id: 'u1' })
+    const kept = await deviceDB.ensureCachedBank({ applabel: 'acme', user_id: 'u1' })
     const { props, rerender } = provided({ deviceDB })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
     rerender({ ...props, user_id: 'u2' })
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     const [first, second] = TH.seenBanks
     expect(first?.device_id).to.eq(kept.device_id)
-    const { device_id } = await deviceDB.ensureBank({ applabel: 'acme', user_id: 'u2' })
+    const { device_id } = await deviceDB.ensureCachedBank({ applabel: 'acme', user_id: 'u2' })
     expect(second?.device_id).to.eq(device_id)
     expect(second?.device_id).to.not.eq(kept.device_id)
   })
@@ -125,7 +125,7 @@ describe("BankProvider's bank", () => {
     expect(making).not.toHaveBeenCalled()
     answer()
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
-    const { device_id } = await deviceDB.ensureBank({ applabel: 'acme', user_id: 'u2' })
+    const { device_id } = await deviceDB.ensureCachedBank({ applabel: 'acme', user_id: 'u2' })
     expect(making.mock.calls.map(([opts]) => [opts.user_id, opts.device_id])).to.deep.equal([['u2', device_id]])
   })
 
@@ -140,9 +140,9 @@ describe("BankProvider's bank", () => {
     expect(shown('bank')).to.eq('none')
   })
 
-  it("throws a refused ensureBank to the nearest error boundary", async () => {
+  it("throws a refused ensureCachedBank to the nearest error boundary", async () => {
     const deviceDB = new MemoryDeviceDB()
-    vi.spyOn(deviceDB, 'ensureBank').mockRejectedValue(new VaultError('storage_unavailable', 'the disk is full'))
+    vi.spyOn(deviceDB, 'ensureCachedBank').mockRejectedValue(new VaultError('storage_unavailable', 'the disk is full'))
     const props = TH.providerPropsOf(TH.makeBankWorld(), { deviceDB })
     const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
     await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
@@ -150,7 +150,7 @@ describe("BankProvider's bank", () => {
   })
 
   it("throws a deviceDB that is no DeviceDB to the nearest error boundary", async () => {
-    const props = TH.providerPropsOf(TH.makeBankWorld(), { deviceDB: { ensureBank: vi.fn() } as unknown as MemoryDeviceDB })
+    const props = TH.providerPropsOf(TH.makeBankWorld(), { deviceDB: { ensureCachedBank: vi.fn() } as unknown as MemoryDeviceDB })
     const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
     await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })

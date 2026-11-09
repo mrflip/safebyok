@@ -64,7 +64,7 @@ export class IdbDeviceDB extends DeviceDB {
   }
   // --
 
-  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureBank, doForgetBank, doListBanks
+  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureCachedBank, doForgetBank, doListBanks
 
   protected async doStow(row: LeaseRow): Promise<void> {
     await inOneStep(this.#leaseShelf, 'readwrite', (store) => { store.put(row, leaseScopepathOf(row)) })
@@ -93,7 +93,7 @@ export class IdbDeviceDB extends DeviceDB {
     await inOneStep(this.#leaseShelf, 'readwrite', (store) => { store.delete(scopepath) })
   }
 
-  protected async doEnsureBank(made: BankRow): Promise<unknown> {
+  protected async doEnsureCachedBank(made: BankRow): Promise<unknown> {
     return await inOneStep(this.#bankShelf, 'readwrite', async (store) => {
       const stored = await rowAt(store, bankScopepathOf(made))
       if (SX.bankRow.safeParse(stored).success) { return stored }

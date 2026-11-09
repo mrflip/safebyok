@@ -13,7 +13,7 @@ export const useDeviceId = (deviceDB: BankOpts['deviceDB'], applabel: string, us
     if (user_id === null) { return }
     // Drop answers to a cleaned-up run -- the standard React pattern for a fetch.
     let isCurrent = true
-    void deviceDB.ensureBank({ applabel, user_id })
+    void deviceDB.ensureCachedBank({ applabel, user_id })
       .then(({ device_id }) => { if (isCurrent) { setFound({ applabel, user_id, device_id }) } })
       .catch((err: unknown) => { if (isCurrent) { setRefused({ err }) } })
     return () => { isCurrent = false }

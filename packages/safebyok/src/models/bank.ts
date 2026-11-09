@@ -56,8 +56,8 @@ export class Bank {
   #endCause:              VaultError | null = null
   /** The first vacate's promise, which a repeat answers; null until a vacate. */
   #vacating:              Promise<void> | null = null
-  /** The outcome of the last `hello`, null with none yet. */
-  #lastHello:             Outcome<void> | null = null
+  /** Whether a `hello` has succeeded. */
+  #isHelloed              = false
   #snapshot:              BankSnapshot
 
   readonly #getSnapshot = (): BankSnapshot => this.#snapshot
@@ -145,7 +145,7 @@ export class Bank {
   async hello(): Promise<void> {
     this.demandEnabled()
     const hello = await outcomeOf(() => this.#bringUp())
-    this.#lastHello = hello
+    this.#isHelloed ||= hello.ok
     this.#remakeSnapshot()
     this.#announce({ kind: 'helloed', outcome: hello, vault: null })
     demandGood(hello)
@@ -201,7 +201,7 @@ export class Bank {
     return this
   }
 
-  /** The bank disabled, its snapshot refused with `cause` and its listing let go by `discard`, for good; a repeat is a no-op. */
+  /** The bank disabled, its snapshot saying `cause` and its listing let go by `discard`, for good; a repeat is a no-op. */
   #letGo(cause: VaultError, discard: () => void): void {
     if (! this.isEnabled) { return }
     this.#endCause = cause
@@ -288,9 +288,8 @@ export class Bank {
   }
 
   #makeSnapshot(): BankSnapshot {
-    const hello = this.#lastHello
-    const [stage, err] = this.#endCause ? ['refused' as const, this.#endCause] : [stageOf(hello), hello?.err ?? null]
-    return Object.freeze({ ...this.scope, stage, err, device_id: this.device_id, vaults: this.#vaultListing.snapshot, openGating: this.#vaultListing.openGating })
+    const stage: BankStage = this.#isHelloed ? 'ready' : 'made'
+    return Object.freeze({ ...this.scope, stage: this.#endCause ? 'disabled' : stage, err: this.#endCause ?? null, device_id: this.device_id, vaults: this.#vaultListing.snapshot, openGating: this.#vaultListing.openGating })
   }
   // --
 
@@ -312,8 +311,7 @@ export class Bank {
 
   #demandReady(): void {
     this.demandEnabled()
-    if (this.#lastHello === null) { throw helloFirst() }
-    demandGood(this.#lastHello)
+    if (! this.#isHelloed) { throw helloFirst() }
   }
   // --
 
@@ -422,15 +420,10 @@ interface Handlers {
 const DefaultHandlers: Handlers = { onLifecycle: guardOnLifecycle(DefaultOnLifecycle), onBadNews: DefaultOnBadNews }
 // --
 
-// == [Helpers]: millisOf, stageOf, checkSecureContext
+// == [Helpers]: millisOf, checkSecureContext
 
 // A host's Infinity minutes, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
 const millisOf = (minutes: number | undefined, fallback: number): number => (minutes === undefined ? fallback : Math.min(Math.round(minutes * MinuteMillis), ForeverMillis))
-
-const stageOf = (hello: Outcome<void> | null): BankStage => {
-  if (hello === null) { return 'made' }
-  return hello.ok ? 'ready' : 'refused'
-}
 
 const checkSecureContext = (): void => {
   if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw insecureContext() }

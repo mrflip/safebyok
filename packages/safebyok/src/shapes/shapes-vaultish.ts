@@ -462,14 +462,14 @@ export type BankAnnounce = (announcement: BankAnnouncement) => void
 /** How a listing vacates its bank for a revoked identity: handed to each as it is made. Never throws. */
 export type BankPanic = (refusal: VaultError) => void
 
-/** `made` until a `hello` answers; `ready` after `hello` succeeds; `refused` once one refuses or the bank is swept or vacated, the snapshot's `err` saying why. */
-export type BankStage = 'made' | 'ready' | 'refused'
+/** `made` until a `hello` succeeds; `ready` after one does; `disabled` once the bank is swept or vacated, the snapshot's `err` saying why. */
+export type BankStage = 'made' | 'ready' | 'disabled'
 
 /** A bank as a host renders it: its scope, how far its `hello` got, its vaults, and the gating it has open. */
 export interface BankSnapshot extends BankScope {
-  /** How far the bank's `hello` got, `made`, `ready` or `refused`, and `refused` from a sweep or a vacate on. */
+  /** How far the bank has come: `made`, `ready` or `disabled`. */
   readonly stage:      BankStage
-  /** Why the last `hello` refused, or why the bank is disabled, or null. */
+  /** Why the bank is disabled, or null. */
   readonly err:        VaultError | null
   /** Your id for this device, as `Bank.make` was given it. */
   readonly device_id:  string

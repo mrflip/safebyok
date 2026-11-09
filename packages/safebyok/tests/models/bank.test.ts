@@ -122,14 +122,15 @@ describe("bank.hello", () => {
     expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
   })
 
-  it("refuses with no network, the bank not ready: its own refusal is what the snapshot shows and each bank call throws, until a hello lands", async () => {
+  it("refuses with no network, the bank not ready: each bank call asks for a hello first, until one succeeds", async () => {
     const world = makeBankWorld()
     const bank = world.bankOn()
     world.vaultDB._cheat_refuseGets('storage_unavailable')
     const refusal = await TH.expectRefusal(bank.hello(), 'storage_unavailable')
-    expect(bank.snapshot).to.include({ stage: 'refused', err: refusal })
-    await expect(bank.ensureVault(VaultScopeGiven)).rejects.toThrow(refusal)
-    expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(refusal)
+    expect(refusal.refusalkind).to.eq('storage_unavailable')
+    expect(bank.snapshot).to.include({ stage: 'made', err: null })
+    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'bad_option')
+    TH.expectSyncRefusal(() => bank.vaultAt(VaultScopeGiven), 'bad_option')
     world.vaultDB._cheat_refuseGets(null)
     await bank.hello()
     expect(bank.snapshot).to.include({ stage: 'ready', err: null })
@@ -143,7 +144,7 @@ describe("bank.hello", () => {
     const err = await TH.expectRefusal(bank.hello())
     expect(err.cause).to.eq(thrown)
     expect(err.message).to.match(/strengthChecker's load\(\) failed/)
-    expect(bank.snapshot).to.include({ stage: 'refused', err })
+    expect(bank.snapshot).to.include({ stage: 'made', err: null })
     expect(listVaults).not.toHaveBeenCalled()
   })
 
@@ -155,7 +156,7 @@ describe("bank.hello", () => {
     const err = await TH.expectRefusal(bank.hello())
     expect(err.cause).to.eq(thrown)
     expect(err.message).to.match(/keyDeriver's load\(\) failed/)
-    expect(bank.snapshot).to.include({ stage: 'refused', err })
+    expect(bank.snapshot).to.include({ stage: 'made', err: null })
     expect(listVaults).not.toHaveBeenCalled()
   })
 
@@ -165,7 +166,7 @@ describe("bank.hello", () => {
     const bank = world.bankOn({ keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load: () => Promise.reject(refused) }) })
     const err = await TH.expectRefusal(bank.hello(), 'storage_unavailable')
     expect(err).to.eq(refused)
-    expect(bank.snapshot).to.include({ stage: 'refused', err })
+    expect(bank.snapshot).to.include({ stage: 'made', err: null })
   })
 
   it("passes a VaultError a strength checker's load throws as it came", async () => {
@@ -174,7 +175,7 @@ describe("bank.hello", () => {
     const bank = world.bankOn({ strengthChecker: Object.assign((() => ({ strong: true })) as typeof anyStrengthChecker, { load: () => Promise.reject(refused) }) })
     const err = await TH.expectRefusal(bank.hello(), 'storage_unavailable')
     expect(err).to.eq(refused)
-    expect(bank.snapshot).to.include({ stage: 'refused', err })
+    expect(bank.snapshot).to.include({ stage: 'made', err: null })
   })
 
   it("tells of a damaged vault row as bad news, and readies the bank without it", async () => {
@@ -423,7 +424,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     expect(reported).toHaveBeenCalledExactlyOnceWith(refusal)
     expect(onBadNews).not.toHaveBeenCalled()
     await TH.eventually(() => ! fresh.isEnabled)
-    expect(fresh.snapshot).to.include({ stage: 'refused', err: refusal })
+    expect(fresh.snapshot).to.include({ stage: 'disabled', err: refusal })
     await TH.expectRefusal(fresh.hello(), 'disabled')
     vi.unstubAllGlobals()
   })
@@ -435,7 +436,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     expect(vault.isEnabled).to.be.false
     expect(bank.snapshot.vaults).to.deep.equal([])
     await TH.eventually(() => world.leaseRows().length === 0)
-    expect(bank.snapshot).to.include({ stage: 'refused', err: refusal })
+    expect(bank.snapshot).to.include({ stage: 'disabled', err: refusal })
   })
 
   it("vacates the bank on a revocation whatever the host's onLifecycle does, which hears it as vacated once the vacate settles", async () => {
@@ -444,7 +445,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     onLifecycle.mockClear()
     world.vaultDB._cheat_refuseGets('identity_revoked')
     const refusal = await TH.expectRefusal(vault.fetch(), 'identity_revoked')
-    expect(bank.snapshot).to.include({ stage: 'refused', err: refusal })
+    expect(bank.snapshot).to.include({ stage: 'disabled', err: refusal })
     expect(onLifecycle).not.toHaveBeenCalled()
     await TH.eventually(() => onLifecycle.mock.calls.length > 0)
     expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: refusal, unrevoked: 0, bank })

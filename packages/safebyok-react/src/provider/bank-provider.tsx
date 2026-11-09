@@ -52,7 +52,7 @@ const useProviderBank = (opts: ProviderBankOpts, device_id: string | null, handl
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the bank lives only between this effect and its cleanup, and render must hand it down
     setContextValue({ bank, helloedVaults: new WeakSet<Vault>(), tellBadNews })
     onMade(bank)
-    // The bank tells onLifecycle of the hello and its snapshot of a refusal.
+    // The bank tells onLifecycle of the hello.
     void bank.tryHello()
     return () => {
       bank.sweep()

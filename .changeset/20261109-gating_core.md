@@ -16,3 +16,5 @@ A passphrase wayin's `salt_b64` that does not decode as base64url now fails its 
 Refusals of a label or `user_id` that is too long, an empty token, an instant that is not whole and a passphrase that is not text now say what Zod says, and `box.put`'s refusal of a patch no longer ends with advice; each kept its kind. A `keyDeriverSpec` that misuses a supplied label or the reserved prefix now refuses with `key_deriver_label:` before its sentence, and a `strengthChecker` that answers no verdict now hears what failed before the sentence it heard.
 
 In `safebyok-react`, the `VaultHeld` type that `useVault` returns is now `VaultLifecycle`.
+
+A bank's snapshot no longer records a refused `hello`: `stage` is `made`, `ready` or `disabled`, and `err` says only why a bank is disabled. A refused `hello` still throws and is still told to `onLifecycle` as `helloed`, and the bank stays `made` for another try. `DeviceDB.ensureBank` is now `ensureCachedBank`.

@@ -91,21 +91,21 @@ export abstract class DeviceDB {
   tryForgetRawLease(scopepath: LeaseScopepath): Promise<Outcome<void>> { return outcomeOf(() => this.forgetRawLease(scopepath)) }
   // --
 
-  // == [Bank verbs]: ensureBank, tryEnsureBank, forgetBank, tryForgetBank, listRawBanks, tryListRawBanks
+  // == [Bank verbs]: ensureCachedBank, tryEnsureCachedBank, forgetBank, tryForgetBank, listRawBanks, tryListRawBanks
 
   /** The bank row of this bank scope, made with a fresh random `device_id` on the first call. */
-  async ensureBank(scope: BankScope): Promise<BankRow> {
+  async ensureCachedBank(scope: BankScope): Promise<BankRow> {
     try {
       const { applabel, user_id } = CX.bankScope.parse(scope)
       const made = SX.bankRow.parse({ applabel, user_id, device_id: randomId() })
-      return SX.bankRow.parse(await this.doEnsureBank(made))
-    } catch (err) { throw refusalOf(err, 'ensureBank') }
+      return SX.bankRow.parse(await this.doEnsureCachedBank(made))
+    } catch (err) { throw refusalOf(err, 'ensureCachedBank') }
   }
 
-  /** Non-throwing form of {@link ensureBank}. */
-  tryEnsureBank(scope: BankScope): Promise<Outcome<BankRow>> { return outcomeOf(() => this.ensureBank(scope)) }
+  /** Non-throwing form of {@link ensureCachedBank}. */
+  tryEnsureCachedBank(scope: BankScope): Promise<Outcome<BankRow>> { return outcomeOf(() => this.ensureCachedBank(scope)) }
 
-  /** Forgets the bank row of this bank scope, so that the next `ensureBank` mints a fresh `device_id`. */
+  /** Forgets the bank row of this bank scope, so that the next `ensureCachedBank` mints a fresh `device_id`. */
   async forgetBank(scope: BankScope): Promise<void> {
     try {
       const { applabel, user_id } = CX.bankScope.parse(scope)
@@ -128,7 +128,7 @@ export abstract class DeviceDB {
   tryListRawBanks(): Promise<Outcome<Record<string, unknown>[]>> { return outcomeOf(() => this.listRawBanks()) }
   // --
 
-  // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureBank, doForgetBank, doListBanks
+  // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureCachedBank, doForgetBank, doListBanks
 
   // A device database starts each call's work in the order called, or a `forget` made after a `stow` may not forget it.
   /** Stows `row` as the lease of its vault scope, over any row there. */
@@ -142,7 +142,7 @@ export abstract class DeviceDB {
   /** Removes whatever row is filed under `scopepath`, in one step. */
   protected abstract doForgetRawLease(scopepath: LeaseScopepath): Awaitable<void>
   /** The bank row stored at `made`'s bank scope where it passes its check, else `made`, written over it, in one step. */
-  protected abstract doEnsureBank(made: BankRow): Awaitable<unknown>
+  protected abstract doEnsureCachedBank(made: BankRow): Awaitable<unknown>
   /** Removes whatever row is stored at this bank scope, in one step. */
   protected abstract doForgetBank(scope: BankScope): Awaitable<void>
   /** Every bank row stored, in any order. */

@@ -242,7 +242,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     await bank.vacate()
     expect(vault.isEnabled).to.be.false
     expect(() => vault.demandEnabled()).to.throw(VaultError)
-    expect(bank.snapshot.stage).to.eq('refused')
+    expect(bank.snapshot.stage).to.eq('disabled')
     expect(bank.snapshot.err).to.include({ refusalkind: 'disabled' })
     expect(bank.snapshot.vaults).to.deep.equal([])
     expect(seen).toHaveBeenCalled()
@@ -302,26 +302,26 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(onBadNews).toHaveBeenCalledExactlyOnceWith({ news: refusal, bank })
   })
 
-  it("forgets the bank's row in the deviceDB after its leases, so the next ensureBank mints another device_id, another user's row staying", async () => {
+  it("forgets the bank's row in the deviceDB after its leases, so the next ensureCachedBank mints another device_id, another user's row staying", async () => {
     const world = makeBankWorld()
     const { bank } = await makeBankWithVault(world)
-    const made = await world.deviceDB.ensureBank(BankScopeGiven)
-    const kept = await world.deviceDB.ensureBank({ ...BankScopeGiven, user_id: 'u2' })
+    const made = await world.deviceDB.ensureCachedBank(BankScopeGiven)
+    const kept = await world.deviceDB.ensureCachedBank({ ...BankScopeGiven, user_id: 'u2' })
     const forget = vi.spyOn(world.deviceDB, 'forget')
     const tryForgetBank = vi.spyOn(world.deviceDB, 'tryForgetBank')
     await bank.vacate()
     expect(await world.deviceDB.listRawBanks()).to.deep.equal([kept])
     expect(forget.mock.invocationCallOrder[0]).to.be.below(tryForgetBank.mock.invocationCallOrder[0]!)
-    const remade = await world.deviceDB.ensureBank(BankScopeGiven)
+    const remade = await world.deviceDB.ensureCachedBank(BankScopeGiven)
     expect(remade.device_id).to.not.eq(made.device_id)
   })
 
   it("leaves the bank's row at a sweep", async () => {
     const world = makeBankWorld()
     const { bank } = await makeBankWithVault(world)
-    const made = await world.deviceDB.ensureBank(BankScopeGiven)
+    const made = await world.deviceDB.ensureCachedBank(BankScopeGiven)
     bank.sweep()
-    expect(await world.deviceDB.ensureBank(BankScopeGiven)).to.deep.equal(made)
+    expect(await world.deviceDB.ensureCachedBank(BankScopeGiven)).to.deep.equal(made)
   })
 
   it("tells the host's onBadNews of a bank row its vacate cannot forget, and forgets it where the listing of the leases is refused", async () => {
@@ -345,7 +345,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(bank.isEnabled).to.be.false
     expect(() => bank.demandEnabled()).to.throw(Phrases.BankLetGo)
     expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(Phrases.BankLetGo)
-    expect(bank.snapshot).to.include({ stage: 'refused', err: cause })
+    expect(bank.snapshot).to.include({ stage: 'disabled', err: cause })
     await listing.reached
     await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'disabled')
     await TH.expectRefusal(bank.hello(), 'disabled')
@@ -424,7 +424,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     bank.subscribe(seen)
     await bank.vacate()
     expect(seen).toHaveBeenCalledOnce()
-    expect(bank.snapshot.stage).to.eq('refused')
+    expect(bank.snapshot.stage).to.eq('disabled')
   })
 
   it("dismisses a birth's open gating, so no lease is stowed past the vacate", async () => {
@@ -457,7 +457,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const world = makeBankWorld()
     const { bank, vault } = await makeBankWithVault(world)
     bank.sweep()
-    expect(bank.snapshot.stage).to.eq('refused')
+    expect(bank.snapshot.stage).to.eq('disabled')
     expect(bank.snapshot.vaults).to.deep.equal([])
     expect(vault.isEnabled).to.be.false
     expect(vault.isUnlocked).to.be.false
@@ -481,7 +481,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const hello = bank.tryHello()
     await ending(bank)
     await TH.expectBad(hello, 'disabled')
-    expect(bank.snapshot.stage).to.eq('refused')
+    expect(bank.snapshot.stage).to.eq('disabled')
     expect(bank.snapshot.err).to.include({ refusalkind: 'disabled', message: Phrases.BankLetGo })
   })
 

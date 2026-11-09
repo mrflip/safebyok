@@ -54,11 +54,11 @@ describe("useVault and useVaultSnapshot", () => {
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
   })
 
-  it("read waiting while the bank's hello is refused, its snapshot saying so", async () => {
+  it("read waiting while the bank's hello is refused, its snapshot still made", async () => {
     const world = TH.makeBankWorld()
     world.vaultDB._cheat_refuseGets('storage_unavailable')
     render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /></BankProvider>)
-    await waitFor(() => { expect(shown('bank')).to.eq('u1 refused') })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })
     expect(shown('vault')).to.eq('waiting none')
   })
 

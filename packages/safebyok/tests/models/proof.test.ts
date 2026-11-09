@@ -345,7 +345,7 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: main unlocked'])
 
     await bank.vacate()
-    bankUi.expectRenders(['refused: main locked', 'refused: no vaults'])
+    bankUi.expectRenders(['disabled: main locked', 'disabled: no vaults'])
     expect(bank.isEnabled).to.be.false
     await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'disabled')
     await TH.expectRefusal(bank.hello(), 'disabled')
@@ -362,7 +362,7 @@ describe("the proof", () => {
     expectNoBadNews()
   })
 
-  it("the VaultDB goes out of reach: an unlocked vault keeps its lease, a refused hello paints refused, and the next one recovers", async () => {
+  it("the VaultDB goes out of reach: an unlocked vault keeps its lease, a refused hello changes nothing on screen, and the next one recovers", async () => {
     const { world, bank, vault } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
@@ -373,13 +373,13 @@ describe("the proof", () => {
     await TH.expectRefusal(vault.ensureUnlocked(), 'storage_unavailable')
     expect(vault.isUnlocked).to.be.true
     await TH.expectRefusal(bank.hello(), 'storage_unavailable')
-    bankUi.expectRenders(['refused: main unlocked'])
-    expect(bank.snapshot.err?.refusalkind).to.eq('storage_unavailable')
-    TH.expectSyncRefusal(() => bank.vaultAt(VaultScopeGiven), 'storage_unavailable')
+    bankUi.expectRenders([])
+    expect(bank.snapshot.err).to.be.null
+    expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
 
     world.vaultDB._cheat_refuseGets(null)
     await bank.hello()
-    bankUi.expectRenders(['ready: main unlocked'])
+    bankUi.expectRenders([])
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
   })
 
