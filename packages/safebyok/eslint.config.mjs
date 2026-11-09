@@ -19,6 +19,12 @@ const SourceFiles = ['**/*.{js,mjs,cjs,ts,mts,cts}']
 /** A quoted snake_case refusal kind, such as `'stale_write'`: the underscore keeps out option values (`'gone'`). */
 const QuotedKind = "'[a-z]+_[a-z_]+'"
 
+/** The refusal kinds a customer checks for and reacts to: part of our API, so a test title may quote them. */
+const CustomerKinds = ['absent_box', 'damaged_box', 'damaged_row', 'identity_revoked', 'newer_format', 'stale_write', 'vault_locked', 'weak_passphrase', 'wrong_passphrase']
+
+/** A quoted refusal kind other than {@link CustomerKinds}, which a test title leaves to its assertions. */
+const UntitledKind = `'(?!(?:${CustomerKinds.join('|')})')[a-z]+_[a-z_]+'`
+
 /**
  * Every assertion method `expect` carries in `tests/`, read from vitest's chai registry
  * (`chai.Assertion.prototype`), not from memory: chai's methods and its chainable methods,
@@ -448,11 +454,12 @@ export default defineConfig([
       // Same ground as vitest/expect-expect above, but with no way to name our own assertion
       // helpers. One rule enforcing this is enough, and that one is the one we can configure.
       'sonarjs/assertions-in-tests': 'off',
-      // STYLE.md *Tests*: a title is one plain clause, and quotes no refusal kind; the assertions carry it. A bulk
-      // example list's `it(blurb, ...)` title is a variable by construction, which allowArguments lets pass.
+      // STYLE.md *Tests*: a title is one plain clause, and quotes only a refusal kind the customer reacts to; the
+      // assertions carry the rest. A bulk example list's `it(blurb, ...)` title is a variable by construction, which
+      // allowArguments lets pass.
       'vitest/valid-title': ['warn', {
         allowArguments: true,
-        mustNotMatch:   [QuotedKind, 'A title quotes no refusal kind; the assertions carry it: STYLE.md, Tests'],
+        mustNotMatch:   [UntitledKind, 'A title quotes only a refusal kind the customer reacts to; the assertions carry the rest: STYLE.md, Tests'],
       }],
     },
   },

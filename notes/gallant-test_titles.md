@@ -2,7 +2,7 @@
 
 Specimens of the test-title register in `packages/safebyok/tests/`, harvested 2026-11-05 at `b7bacb68`, one fault each,
 with the rewrite. The rule is STYLE.md *Tests*: a title is one plain clause naming the behaviour; the assertions carry the
-kinds; a pointer to an `@example` is a `// member @example 2` comment on the test's first line.
+kinds no customer reacts to; a pointer to an `@example` is a `// member @example 2` comment on the test's first line.
 
 This file is for the agent fixing titles and the reviewer checking it. Each principle has a hashtag to cite.
 
@@ -19,15 +19,17 @@ Contents: `#kind-is-the-assertion`, `#no-as-trailer`, `#outcome-not-action`, `#i
 
 ## The kind is the assertion's `#kind-is-the-assertion`
 
-A kind in the title repeats the `expectRefusal` one line below. Keep it only where the kind is the behaviour under test, a
-`stale_write` race, a `wrong_passphrase`: a *condition* kind in `RefusalKind`'s sort. A *misuse* kind (`bad_option`,
-`bad_scope`, `bad_record`) never is. Three or more contiguous siblings refusing one kind group under a `describe` that names
-it once; two, or siblings apart, just drop it.
+A kind in the title repeats the `expectRefusal` one line below. Keep it only where the customer checks for that kind and
+reacts to it, a `stale_write` race, a `wrong_passphrase`: those kinds are part of our API, and `CustomerKinds` in the lint
+lists them. A *misuse* kind (`bad_option`, `bad_scope`, `bad_record`) never is one. Three or more contiguous siblings
+refusing a listed kind group under a `describe` that names it once. Any other kind just drops, and what its siblings share
+moves up into a `describe`.
 
 | Goofus | Gallant |
 |---|---|
 | [vault.ensureTimely(maxMillis)] "refuses a maxMillis out of range as 'bad_option'" | "refuses a maxMillis out of range" |
-| three siblings each ending "as 'bad_option'" | `describe("refuses 'bad_option' for", ...)` over `it("a stamp with no vault_tok")` and the rest |
+| three siblings each ending "as 'bad_option'" | `describe("refuses a stamp", ...)` over `it("with no vault_tok")` and the rest |
+| `it("refuses a row moved since the attempt read it", async () => {` | `it("refuses 'stale_write' a row moved since the attempt read it", async () => {`: the customer checks for this particular exception and reacts to it, so it is part of our API |
 
 ## No "as" trailer `#no-as-trailer`
 

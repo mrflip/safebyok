@@ -478,7 +478,7 @@ describe("a tampered lease record", () => {
     await TH.expectRefusal(got!.sealWith(WhisperText, stamp), 'damaged_lease')
   })
 
-  it("refuses 'damaged_lease' quoting none of the record", async () => {
+  it("refuses a damaged lease, quoting none of the record", async () => {
     const { friend } = await grantedWorld()
     friend.cached = { ...(friend.cached as LeaseRecord), proved_at: T0 + 1 }
     const got = await Lease.buildFromCache(friend, GrantedAs.gate_epoch)
