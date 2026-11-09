@@ -179,9 +179,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** SLOPDOC: Deletes the thing `duck` names and delivers storage's answer: its tombstone, if anything was stored. */
   async del(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<ThingT | null> {
-    const scope = this.scopeOf(duck)
-    const held = (duck.am === 'd') ? null : this.at(scope)
-    return this.delOver(held?.sparse ?? this.sparseOf(duck))
+    return this.delOver(this.at(duck)?.sparse ?? this.sparseOf(duck))
   }
 
   /** Non-throwing form of {@link del}. */

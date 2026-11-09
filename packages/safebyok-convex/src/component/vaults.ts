@@ -1,5 +1,5 @@
 import * as DB from 'safebyok/storage'
-import type { PutOptsGiven, VaultScope, WatchScope } from 'safebyok/storage'
+import type { VaultScope, WatchScope } from 'safebyok/storage'
 import { v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
@@ -70,7 +70,7 @@ export const putVault = mutation({
   handler: async (ctx, { record, opts }) => {
     const anteDoc = await findVaultDoc(ctx.db, record)
     const ante = anteDoc?.vault ?? null
-    const landed = isPutAllowed(ante, opts)
+    const landed = DB.isVaultPutAllowed(ante, opts)
     if (landed) { await storeVaultDoc(ctx.db, anteDoc, record) }
     return { landed, ante }
   },
@@ -86,12 +86,12 @@ export const putBox = mutation({
     const life = lifeOf(record)
     const anteDoc = await findBoxDoc(ctx.db, life, record.boxlabel)
     const ante = anteDoc?.box ?? null
-    const landed = DB.isCheckedLiveVault(vault, record.vault_tok) && isPutAllowed(ante, opts)
+    const landed = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
     if (! landed) { return { landed, ante, vault } }
     // Convex passes NaN as a number, and Math.min would carry it past the limit: no box count exceeds NaN.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
     const boxDoc = { ...life, boxlabel: record.boxlabel, box: record }
-    // A put over a tombstone or a damaged row takes that row's place: only a new boxlabel adds a row.
+    // A put over a tombstone takes that row's place: only a new boxlabel adds a row.
     const growth = { box_count: (anteDoc === null ? 1 : 0), box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) }
     const reckoning = await Tallies.reckon(ctx.db, life)
     if (Tallies.refuses(reckoning.tally, growth, cap)) { return { capacity: Tallies.capacityOf(reckoning.tally, cap) } }
@@ -111,7 +111,7 @@ export const delVault = mutation({
   handler: async (ctx, { tombstone, opts: { prior } }) => {
     const anteDoc = await findVaultDoc(ctx.db, tombstone)
     const ante = anteDoc?.vault ?? null
-    const isOurs = DB.isLiveRowUnder(ante, tombstone.vault_tok)
+    const isOurs = DB.isLiveVaultRecord(ante, tombstone.vault_tok)
     const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
     const landed = isOurs && DB.isRowAt(ante, prior)
     // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
@@ -132,8 +132,8 @@ export const delBox = mutation({
     const life = lifeOf(tombstone)
     const anteDoc = await findBoxDoc(ctx.db, life, tombstone.boxlabel)
     const ante = anteDoc?.box ?? null
-    const isDeletable = DB.isLiveRow(ante) && DB.isRowAt(ante, prior)
-    const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
+    const isDeletable = DB.isLiveBoxRecord(ante, tombstone.vault_tok) && DB.isRowAt(ante, prior)
+    const landed = DB.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
     if (landed) {
       const boxDoc = { ...life, boxlabel: tombstone.boxlabel, box: tombstone }
       await storeBoxDoc(ctx.db, anteDoc, boxDoc)
@@ -181,12 +181,7 @@ export const watchRows = query({
 })
 // --
 
-// == [Helpers]: isPutAllowed, lifeOf, findVaultDoc, findBoxDoc, storeVaultDoc, storeBoxDoc, tombstoneBoxes, listVaultDocs, listBoxDocs, listTallyDocs, VaultDoc, BoxDoc
-
-/** True when a put under `opts` may land over `ante`, the row it would replace. */
-const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
-  DB.isRowAt(ante, prior) && (DB.isLiveRow(ante) ? (ifPresent === 'repl') : (ifAbsent === 'add'))
-)
+// == [Helpers]: lifeOf, findVaultDoc, findBoxDoc, storeVaultDoc, storeBoxDoc, tombstoneBoxes, listVaultDocs, listBoxDocs, listTallyDocs, VaultDoc, BoxDoc
 
 /** The life a record is filed under. */
 const lifeOf = ({ applabel, user_id, vaultlabel, vault_tok }: Life): Life => ({ applabel, user_id, vaultlabel, vault_tok })

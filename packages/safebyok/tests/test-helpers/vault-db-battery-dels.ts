@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 import * as SX from '../../src/shapes/shapes-storage'
-import { bankScope, vaultScope, boxscope, Now, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf, stale, boxQuery } from './storage-world'
+import { bankScope, vaultScope, boxscope, Now, vaultAt, boxAt, boxFlaws, vaultFlaws, vaultTombstoneOf, boxTombstoneOf, priorOf, stale, boxQuery } from './storage-world'
 import type { VaultDB } from '../../src/storage/vault-db'
 import type { BatteryWorld } from './vault-db-battery'
 
@@ -43,6 +43,14 @@ export const describeDels = ({ storeWith, rowsOf }: BatteryWorld): void => {
       expect(await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'damaged_row' })
       expect(await vaultDB.tryDelBox(sentinelled, { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'damaged_row' })
       expect(await storedBoxOf(vaultDB)).to.deep.equal({ garbage: true })
+    })
+
+    it.each(boxFlaws)("refuses a row holding %s at its own revision, holding the row", async (_flawname, flawOf) => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      const flawed = flawOf(box)
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', flawed)
+      expect(await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'damaged_row' })
+      expect(await storedBoxOf(vaultDB)).to.deep.equal(flawed)
     })
   })
 
@@ -100,6 +108,15 @@ export const describeDels = ({ storeWith, rowsOf }: BatteryWorld): void => {
       expect(await vaultDB.tryDelVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'damaged_row' })
       expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
     })
+
+    it.each(vaultFlaws)("refuses a row holding %s at its own revision, holding the row and tombstoning no box", async (_flawname, flawOf) => {
+      const { vaultDB, vault, box } = await storeWith({ box: true })
+      const flawed = flawOf(vault)
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, flawed)
+      expect(await vaultDB.tryDelVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'damaged_row' })
+      expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.deep.equal(flawed)
+      expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
+    })
   })
 
   describe("tidyGone", () => {
@@ -117,6 +134,16 @@ export const describeDels = ({ storeWith, rowsOf }: BatteryWorld): void => {
     it("keeps the boxes under a vault row past reading, as it may yet be read", async () => {
       const { vaultDB, box } = await storeWith({ box: true })
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { garbage: true })
+      expect(await vaultDB.tidyGone(bankScope)).to.deep.include({ val: { totalCount: 1 } })
+      expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
+    })
+
+    it.each([
+      ['a tombstone',       { am: 'x', smuggled: 'field' }],
+      ["another life's row", { vault_tok: 'life2', smuggled: 'field' }],
+    ])("keeps the boxes under a row failing its check that peeks as %s", async (_peekname, flaw) => {
+      const { vaultDB, vault, box } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...flaw })
       expect(await vaultDB.tidyGone(bankScope)).to.deep.include({ val: { totalCount: 1 } })
       expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
     })

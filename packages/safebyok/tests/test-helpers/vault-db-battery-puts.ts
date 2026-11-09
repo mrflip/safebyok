@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { VaultRecord } from '../../src/shapes/shapes-storage'
-import { vaultScope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, priorOf, stale, boxQuery } from './storage-world'
+import { vaultScope, boxscope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, boxFlaws, vaultFlaws, vaultTombstoneOf, boxTombstoneOf, priorOf, stale, boxQuery } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
 
 const anyIfPresent = ['repl', 'fail', 'get'] as const
@@ -219,6 +219,29 @@ export const describePuts = ({ fresh, storeWith, rowsOf, hasCap, makeCapped }: B
     it("lands a gate verb, which takes no ifAbsent, over the live row it moves", async () => {
       const { vaultDB, vault } = await storeWith()
       expect(await vaultDB.tryRevokePasskey(gateParamsOf(vault, { passkey_wayin: null }))).to.deep.include({ ok: true })
+    })
+  })
+
+  describe("a put over a row failing its check, at that row's own revision", () => {
+    it.each(boxFlaws)("refuses a box put over a row holding %s, whatever its ifPresent, holding the row", async (_flawname, flawOf) => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      const flawed = flawOf(box)
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', flawed)
+      for (const ifPresent of anyIfPresent) {
+        expect(await vaultDB.tryPutBox(boxAt(1), { prior: priorOf(box), ifPresent })).to.deep.include({ ok: false, act: 'damaged_row' })
+      }
+      const boxrows = await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')
+      expect(boxrows.get('openai')).to.deep.equal(flawed)
+    })
+
+    it.each(vaultFlaws)("refuses a vault put over a row holding %s, whatever its ifPresent, holding the row", async (_flawname, flawOf) => {
+      const { vaultDB, vault } = await storeWith()
+      const flawed = flawOf(vault)
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, flawed)
+      for (const ifPresent of ['fail', 'get'] as const) {
+        expect(await vaultDB.tryPutVault(vaultAt(1), { prior: priorOf(vault), ifPresent })).to.deep.include({ ok: false, act: 'damaged_row' })
+      }
+      expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.deep.equal(flawed)
     })
   })
 

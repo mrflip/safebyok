@@ -167,11 +167,6 @@ const codeOf = (thrown: unknown): string | undefined => (
 )
 // --
 
-/** True when a put under `opts` may land over `ante`, the row it would replace. */
-const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
-  DB.isRowAt(ante, prior) && (DB.isLiveRow(ante) ? (ifPresent === 'repl') : (ifAbsent === 'add'))
-)
-
 const firstOf = (rows: unknown[], column: string): unknown => ((rows[0] as Record<string, unknown> | undefined)?.[column] ?? null)
 
 /** A vaultDB in your Postgres: `new PostgresVaultDB({ client: pgClientOf(pool) })`. */
@@ -241,7 +236,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Landing> {
     return await this.#transact(async (tx) => {
       const ante = await lockedVaultRowOf(tx, record)
-      if (! isPutAllowed(ante, opts)) { return { landed: false, ante } }
+      if (! DB.isVaultPutAllowed(ante, opts)) { return { landed: false, ante } }
       if (! await storeVaultRow(tx, record, ante)) { return { landed: false, ante: await vaultRowOf(tx, record) } }
       await notify(tx, record, [noticeTextOf(record)])
       return { landed: true, ante }
@@ -252,11 +247,11 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return await this.#transact(async (tx) => {
       const vault = await lockedVaultRowOf(tx, record)
       const ante = await boxRowOf(tx, record, record.boxlabel)
-      const landed = DB.isCheckedLiveVault(vault, record.vault_tok) && isPutAllowed(ante, opts)
+      const landed = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
       if (landed) {
         await this.#demandRoom(tx, record, ante)
         await storeBoxRow(tx, record, record.boxlabel, record)
-        await notify(tx, record, [noticeTextOf(vault as VaultRecord, record)])  // isCheckedLiveVault has checked it
+        await notify(tx, record, [noticeTextOf(vault as VaultRecord, record)])  // isLiveVaultRecord has checked it
       }
       return { landed, ante, vault }
     })
@@ -265,7 +260,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   protected async doDelVault(tombstone: VaultTombstone, { prior }: DelOpts): Promise<Landing> {
     return await this.#transact(async (tx) => {
       const ante = await lockedVaultRowOf(tx, tombstone)
-      const isOurs = DB.isLiveRowUnder(ante, tombstone.vault_tok)
+      const isOurs = DB.isLiveVaultRecord(ante, tombstone.vault_tok)
       const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
       const landed = isOurs && DB.isRowAt(ante, prior)
       // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
@@ -291,11 +286,11 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return await this.#transact(async (tx) => {
       const vault = await lockedVaultRowOf(tx, tombstone)
       const ante = await boxRowOf(tx, tombstone, tombstone.boxlabel)
-      const isDeletable = DB.isLiveRow(ante) && DB.isRowAt(ante, prior)
-      const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
+      const isDeletable = DB.isLiveBoxRecord(ante, tombstone.vault_tok) && DB.isRowAt(ante, prior)
+      const landed = DB.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
       if (landed) {
         await storeBoxRow(tx, tombstone, tombstone.boxlabel, tombstone)
-        await notify(tx, tombstone, [noticeTextOf(vault as VaultRecord, tombstone)])  // isCheckedLiveVault has checked it
+        await notify(tx, tombstone, [noticeTextOf(vault as VaultRecord, tombstone)])  // isLiveVaultRecord has checked it
       }
       return { landed, ante, vault }
     })
