@@ -47,7 +47,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.deep.equal(born)
     })
 
-    it("two replacements of one box at one prior write one, the other refused holding the winner", async () => {
+    it("two replacements of one box at one prior write one, the other refused with the winner", async () => {
       const { vaultDB, box } = await putWith({ box: true })
       const twin = await twinOf(vaultDB)
       const ours = boxAt(1, 'life1', { sidecar: { by: 'ours' } })
@@ -59,7 +59,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect(await vaultDB.getBox(boxQuery)).to.deep.include({ val: written[0]?.val })
     })
 
-    it("two first writes of one box write one, the other refused holding the winner", async () => {
+    it("two first writes of one box write one, the other refused with the winner", async () => {
       const { vaultDB } = await putWith()
       const twin = await twinOf(vaultDB)
       const ours = boxAt(0, 'life1', { box_tok: 'boxA' })
@@ -86,7 +86,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect([...boxrows.values()].filter((row) => SX.isLiveRow(row))).to.deep.equal([])
     })
 
-    it("two gate verbs at one revision write one, the other refused holding the winner", async () => {
+    it("two gate verbs at one revision write one, the other refused with the winner", async () => {
       const { vaultDB, vault } = await putWith()
       const twin = await twinOf(vaultDB)
       const ours = gateParamsOf(vault, { passkey_wayin: passkeyWayin })

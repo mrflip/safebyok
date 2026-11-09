@@ -177,13 +177,13 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
   })
 
   it("read a scope's names through a getter", () => {
-    class Holder {
+    class Wrapper {
       readonly #applabel = 'acme'
       readonly user_id = 'u1'
       readonly vaultlabel = 'main'
       get applabel(): string { return this.#applabel }
     }
-    expect(CX.vaultScope.parse(new Holder())).to.deep.equal(scope)
+    expect(CX.vaultScope.parse(new Wrapper())).to.deep.equal(scope)
   })
 
   it("refuse a bad boxlabel, naming the field", () => {
@@ -199,7 +199,7 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
     TH.expectSyncRefusal(() => CX.bankScope.parse('acme'))
   })
 
-  it("refuse a name holding the scopepath delimiter, in every place a name goes", () => {
+  it("refuse a name containing the scopepath delimiter, in every place a name goes", () => {
     for (const fieldname of ['applabel', 'user_id', 'vaultlabel', 'boxlabel']) {
       const err = TH.expectSyncRefusal(() => CX.boxscope.parse({ ...scope, boxlabel: 'openai', [fieldname]: 'a^b' }))
       expect(err.meta?.fieldnames).to.deep.equal([fieldname])
@@ -212,12 +212,12 @@ const ScopeCases = [
   // regular usage:
   [TH.scopeOf('u1'),                                  true,   'an applabel, a user_id and a vaultlabel'],
   [TH.scopeOf('user|2fJ8:google'),                    true,   'a user_id in whatever form the host app issues'],
-  [TH.scopeOf('u'.repeat(100)),                       true,   'a user_id of a hundred characters, the most it holds'],
+  [TH.scopeOf('u'.repeat(100)),                       true,   'a user_id of a hundred characters, the most it has'],
   // refused, a name failing its check:
   [TH.scopeOf('u'.repeat(101)),                       false,  'a user_id over a hundred characters'],
   [{ ...TH.scopeOf('u1'), applabel: 'Acme: Ünïcode' },  false,  'an applabel that is no label'],
   [{ ...TH.scopeOf('u1'), user_id: '' },              false,  'an empty user_id'],
-  [{ ...TH.scopeOf('u1'), vaultlabel: 'tab\there' },  false,  'a vaultlabel holding a control character'],
+  [{ ...TH.scopeOf('u1'), vaultlabel: 'tab\there' },  false,  'a vaultlabel containing a control character'],
   [{ ...TH.scopeOf('u1'), applabel: 'cafe\u{301}' },  false,  'an applabel outside ASCII'],
   // refused:
   [{ ...TH.scopeOf('u1'), applabel: 42 },             false,  'an applabel that is not text'],

@@ -19,7 +19,7 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
     expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
   })
 
-  it("holds no vault where the dialog throws: the refusal is sanitized, and a second buildVault is not refused as already held", async () => {
+  it("has no vault where the dialog throws: the refusal is sanitized, and a second buildVault is not refused as already listed", async () => {
     const { listing, storedNow } = makeVaultWorld(null, { requestCleartext: () => { throw new Error("the user closed the dialog") } })
     await TH.expectRefusal(listing.buildVault(Dna))
     expect(listing.things).to.have.lengthOf(0)
@@ -27,7 +27,7 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
     expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
   })
 
-  it("refuses a dna for a scope already held, before the dialog is shown", async () => {
+  it("refuses a dna for a scope already listed, before the dialog is shown", async () => {
     const { listing, fakeBank } = makeVaultWorld()
     const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     const dialog = vi.fn()
@@ -39,7 +39,7 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
 })
 
 describe("VaultListing.build of a record, and its constructor", () => {
-  it("holds the vault with the gate its record carries", async () => {
+  it("has the vault with the gate its record carries", async () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
     const vault = await listing.build(record)
@@ -47,14 +47,14 @@ describe("VaultListing.build of a record, and its constructor", () => {
     expect(vault.gate).to.equal(vault.gate)
   })
 
-  it("ducks as its record, the gate_epoch riding on the Gate: listing.recordOf(vault) answers the record it holds", async () => {
+  it("ducks as its record, the gate_epoch riding on the Gate: listing.recordOf(vault) answers the record it has", async () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
     const vault = await listing.build(record)
     expect(listing.recordOf(vault)).to.deep.equal(record)
   })
 
-  it("has no gate in hand while it holds a sparse record, and refuses until it is hydrated", async () => {
+  it("has no gate in hand while it has a sparse record, and refuses until it is hydrated", async () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
     const vault = await listing.build(listing.sparseOf(record))
@@ -71,7 +71,7 @@ describe("VaultListing.build of a record, and its constructor", () => {
     TH.expectSyncRefusal(() => new VaultListing(TH.omitting(fakeBank, 'boxRefreshMillis'), opts))
   })
 
-  it("refuses a deviceDB that is a duck of one, and a host's bare function or logger where the bank holds it guarded", () => {
+  it("refuses a deviceDB that is a duck of one, and a host's bare function or logger where the bank has it guarded", () => {
     const { fakeBank, opts } = makeVaultWorld()
     const duck = { tryPeek: vi.fn(), tryStow: vi.fn(), tryForget: vi.fn() }
     const err = TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, deviceDB: duck as never }, opts))

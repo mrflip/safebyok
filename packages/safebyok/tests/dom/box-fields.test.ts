@@ -6,15 +6,15 @@ import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
-const held = useModelsWorld()
+const world = useModelsWorld()
 
 const Stored = { apiKey: 'sk-test-0000', org: { name: 'acme', seats: 3 }, tags: ['a', 'b'] }
 
 /** A box whose whisper is {@link Stored}, not exposed. */
 const unexposedOf = async (): Promise<TestableBox> => {
   const record = fullBoxRecord()
-  held.mw.seedPut(record)
-  const box = await boxListingOf(held.mw).build(record)
+  world.mw.seedPut(record)
+  const box = await boxListingOf(world.mw).build(record)
   return box.put({ whisper: Stored })
 }
 
@@ -88,7 +88,7 @@ describe("fields.bind: what an element shows", () => {
 
 describe("fields.bind: into hiding and back", () => {
   const HidingCases = [
-    ['a lock',  () => { held.mw.setLocked(true) }, () => { held.mw.setLocked(false) }],
+    ['a lock',  () => { world.mw.setLocked(true) }, () => { world.mw.setLocked(false) }],
     ['a veil',  (box: TestableBox) => { box.veil() }, (box: TestableBox) => { box.unveil() }],
   ] as const
   for (const [blurb, hide, show] of HidingCases) {
@@ -218,7 +218,7 @@ describe("fields.put", () => {
     BoxFields.of(box).bind('org.name')(nameEl)
     keyEl.value = 'sk-saved'
     nameEl.value = 'zenith'
-    const tryPutBox = vi.spyOn(held.mw.vaultDB, 'tryPutBox')
+    const tryPutBox = vi.spyOn(world.mw.vaultDB, 'tryPutBox')
     expect(await BoxFields.of(box).put()).to.eq(box)
     expect(tryPutBox).toHaveBeenCalledOnce()
     const merged = { ...Stored, apiKey: 'sk-saved', org: { name: 'zenith', seats: 3 } }
@@ -269,7 +269,7 @@ describe("fields.put", () => {
     const veiled = await TH.expectRefusal(BoxFields.of(box).put(), 'bad_option')
     expect(veiled.message).to.eq(Phrases.PuttingVeiledFields)
     box.unveil()
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     await TH.expectRefusal(BoxFields.of(box).put(), 'vault_locked')
   })
 
@@ -307,7 +307,7 @@ describe("fields.bind: the last unbind", () => {
     const unbind = BoxFields.of(box).bind('apiKey')(el)
     unbind?.()
     el.value = 'let go'
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     expect(el.value).to.eq('let go')
   })
 
@@ -319,7 +319,7 @@ describe("fields.bind: the last unbind", () => {
     await box.expose()
     BoxFields.of(box).bind('apiKey')(el)
     expect(el.value).to.eq(Stored.apiKey)
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     expect(el.value).to.eq('')
   })
 })

@@ -12,7 +12,7 @@ TH.sweepBankWorlds()
 /** An obvious fake whisper, as stored. */
 const StoredKey = 'sk-ant-fake-stored'
 
-/** A vault, unlocked, holding `anthropic`, its apiKey {@link StoredKey} and a dotted token beside it. */
+/** A vault, unlocked, with `anthropic`, its apiKey {@link StoredKey} and a dotted token beside it. */
 const boxOfWorld = async (): Promise<{ vault: Vault, box: Box }> => {
   const { vault } = await TH.makeBankWithVault()
   const whisper = { apiKey: StoredKey, Credentials: { SessionToken: 'fake-session-token' } }

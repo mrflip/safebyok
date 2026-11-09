@@ -3,7 +3,7 @@ import { VaultError } from '../../src/refusals/errors'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
-import { holdsCases } from '../test-helpers/cases'
+import { expectCases } from '../test-helpers/cases'
 import * as TH from '../test-helpers'
 
 const mw = makeModelsWorld({ fakeTimers: false })
@@ -18,7 +18,7 @@ const baseProps = { revision_tok: 'rev-a1', revision_seq: 1, registered_at: T0, 
 
 describe("The checks of what the base knows of a record", () => {
   describe("SX.am", () => {
-    holdsCases(SX.am, [
+    expectCases(SX.am, [
       // each am:
       ["a",       true,  'passes alive'],
       ["d",       true,  'passes damaged'],
@@ -32,7 +32,7 @@ describe("The checks of what the base knows of a record", () => {
   })
 
   describe("SX.revision", () => {
-    holdsCases(SX.revision, [
+    expectCases(SX.revision, [
       // good:
       [revision,                                   true,  'passes a tok and a seq'],
       [{ ...revision, revision_seq: SX.VoidRevisionSeq }, true, 'passes the seq of a central never stored'],
@@ -52,7 +52,7 @@ describe("The checks of what the base knows of a record", () => {
   })
 
   describe("SX.times", () => {
-    holdsCases(SX.times, [
+    expectCases(SX.times, [
       [{ registered_at: T0, written_at: T0 },       true,  'passes two epoch milliseconds'],
       [{ registered_at: T0 },                       false, 'refuses a missing written_at'],
       [{ registered_at: 5, written_at: T0 },        false, 'refuses a small number, seconds or a count'],
@@ -63,11 +63,11 @@ describe("The checks of what the base knows of a record", () => {
   })
 
   describe("VX.liveness and SX.vaulted", () => {
-    holdsCases(VX.liveness, [
+    expectCases(VX.liveness, [
       [{ am: 'a' },  true,  'passes liveness with an am'],
       [{},           false, 'refuses liveness without an am'],
     ])
-    holdsCases(SX.vaulted, [
+    expectCases(SX.vaulted, [
       [{ vault_tok: 'vault-tok-u1' }, true,  'passes a vault_tok'],
       [{ vault_tok: '' },             false, 'refuses an empty vault_tok'],
       [{},                            false, 'refuses a missing vault_tok'],
@@ -75,7 +75,7 @@ describe("The checks of what the base knows of a record", () => {
   })
 
   describe("SX.sparseBase", () => {
-    holdsCases(SX.sparseBase, [
+    expectCases(SX.sparseBase, [
       // each form of a record:
       [full,                                  true,  'passes a full record'],
       [sparse,                                true,  'passes a sparse record'],
@@ -107,7 +107,7 @@ describe("The checks of what the base knows of a record", () => {
   })
 
   describe("VX.tombstone", () => {
-    holdsCases(VX.tombstone, [
+    expectCases(VX.tombstone, [
       [gone,   true,  'passes a deletion tombstone'],
       [ouch,   true,  'passes a damaged one\'s tombstone'],
       [sparse, false, 'refuses an alive sparse record'],
@@ -131,7 +131,7 @@ describe("The checks of what the base knows of a record", () => {
 
 describe("The checks of what reconciling passes", () => {
   describe("VX.reconciled", () => {
-    holdsCases(VX.reconciled, [
+    expectCases(VX.reconciled, [
       [{ central: sparse, policy: 'same' },  true,  'passes a central and the policy that chose it'],
       [{ central: gone,   policy: 'gone' },  true,  'passes a tombstone central'],
       [{ central: sparse },                  false, 'refuses a missing policy'],
@@ -141,7 +141,7 @@ describe("The checks of what reconciling passes", () => {
   })
 
   describe("VX.aligned", () => {
-    holdsCases(VX.aligned, [
+    expectCases(VX.aligned, [
       [{ badnews: [] },                                       true,  'passes no bad news'],
       [{ badnews: [new VaultError('stale_write', 'x')] },     true,  'passes bad news of VaultErrors'],
       [{ badnews: [new Error('plain')] },                     false, 'refuses bad news that is no VaultError'],

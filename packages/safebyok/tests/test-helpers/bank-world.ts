@@ -22,7 +22,7 @@ export const BankScopeGiven = Object.freeze({ applabel: Dna.applabel, user_id: D
 /** The vault scope a test hands `bank.ensureVault`. */
 export const VaultScopeGiven = Object.freeze({ vaultlabel: Dna.vaultlabel })
 
-/** A second vaultlabel, for a bank that holds two vaults. */
+/** A second vaultlabel, for a bank that has two vaults. */
 export const OtherScopeGiven = Object.freeze({ vaultlabel: 'other' })
 
 /** The vaultlabels of a snapshot's vaults, in its order. */

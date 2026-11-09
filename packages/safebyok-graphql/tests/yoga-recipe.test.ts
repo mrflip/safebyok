@@ -107,7 +107,7 @@ const serverOf = (vaultDB: GraphQLVaultDB): { route: Route, adapter: PostgresVau
   return server
 }
 
-/** A second browser through the same route, as another device holds. */
+/** A second browser through the same route, as another device has. */
 const makeTwin = (vaultDB: GraphQLVaultDB): GraphQLVaultDB => {
   const server = serverOf(vaultDB)
   const twin = browserFor(server.route, signedInAsAsked)

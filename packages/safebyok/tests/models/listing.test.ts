@@ -5,153 +5,153 @@ import { VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'
 import { boxDnaOf, boxListingOf, fullBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
-const held = useModelsWorld()
+const world = useModelsWorld()
 
 // == [Helpers of the pipeline tests]: scopeOf, dnaOf, seededListing
 
-const scopeOf = (boxlabel = 'anthropic_api_key') => held.mw.boxscope(boxlabel)
+const scopeOf = (boxlabel = 'anthropic_api_key') => world.mw.boxscope(boxlabel)
 const dnaOf = (boxlabel = 'anthropic_api_key') => boxDnaOf(scopeOf(boxlabel))
 
-/** A listing holding a full box and a deleted one, each of a record storage holds too, with no call made yet. */
+/** A listing with a full box and a deleted one, each of a record storage has stored too, with no call made yet. */
 const seededListing = async () => {
-  const listing = boxListingOf(held.mw)
+  const listing = boxListingOf(world.mw)
   const full = fullBoxRecord({ boxlabel: 'full_box' })
   const gone = tombstoneBoxRecord({ boxlabel: 'gone_box', revision_seq: 2 })
-  held.mw.seedPut(full)
-  held.mw.seedPut(gone)
+  world.mw.seedPut(full)
+  world.mw.seedPut(gone)
   await listing.build(full)
   await listing.build(gone)
-  held.mw.setNow(T0 + 660_000)
-  held.mw.clearCalls()
+  world.mw.setNow(T0 + 660_000)
+  world.mw.clearCalls()
   return listing
 }
 // --
 
 describe("listing.ensureTimelyWorld(maxMillis)", () => {
   it("refuses a span out of range, asking the world nothing", async () => {
-    const listing = boxListingOf(held.mw)
+    const listing = boxListingOf(world.mw)
     await TH.expectRefusal(listing.ensureTimelyWorld(-1))
-    expect(held.mw.callsOf('ensureTimely')).to.deep.equal([])
+    expect(world.mw.callsOf('ensureTimely')).to.deep.equal([])
   })
 })
 
 describe("Listing's pipeline: what every answer takes", () => {
   describe("listing.hello()", () => {
-    it("holds nothing of an empty listing, and still starts the watch", async () => {
-      const listing = boxListingOf(held.mw)
+    it("has nothing of an empty listing, and still starts the watch", async () => {
+      const listing = boxListingOf(world.mw)
       await listing.hello()
       expect(listing.things).to.deep.equal([])
-      expect(held.mw.callsOf('watch')).to.have.lengthOf(1)
+      expect(world.mw.callsOf('watch')).to.have.lengthOf(1)
     })
 
-    it("fetches nothing: the instances held stay as they are", async () => {
+    it("fetches nothing: the instances world stay as they are", async () => {
       const listing = await seededListing()
-      held.mw.clearCalls()
+      world.mw.clearCalls()
       await listing.hello()
-      expect(held.mw.callsOf('get')).to.deep.equal([])
+      expect(world.mw.callsOf('get')).to.deep.equal([])
     })
 
     it("rejects, throwing nothing at its caller, where the VaultDB's watch refuses", async () => {
-      const listing = boxListingOf(held.mw)
-      vi.spyOn(held.mw.vaultDB, 'watch').mockImplementation(() => { throw new VaultError('storage_unavailable', "The storage could not be reached.") })
+      const listing = boxListingOf(world.mw)
+      vi.spyOn(world.mw.vaultDB, 'watch').mockImplementation(() => { throw new VaultError('storage_unavailable', "The storage could not be reached.") })
       await expect(listing.hello()).rejects.toThrow(/could not be reached/)
     })
 
     it("tells as bad news the end the VaultDB's watch reports", async () => {
-      const listing = boxListingOf(held.mw)
+      const listing = boxListingOf(world.mw)
       const ended = new VaultError('storage_unavailable', "The stream ended.")
       await listing.hello()
-      held.mw.watches[0]?.onBadNews?.(ended)
-      expect(held.mw.badnews).to.deep.equal([ended])
+      world.mw.watches[0]?.onBadNews?.(ended)
+      expect(world.mw.badnews).to.deep.equal([ended])
     })
 
     it("panics with a vaultDB's 'identity_revoked' before its caller hears it, telling no bad news", async () => {
-      const listing = boxListingOf(held.mw)
+      const listing = boxListingOf(world.mw)
       const revoked = new VaultError('identity_revoked', "Signed out.")
-      vi.spyOn(held.mw.vaultDB, 'tryListBoxes').mockResolvedValueOnce({ ok: false, err: revoked, world: null } as never)
+      vi.spyOn(world.mw.vaultDB, 'tryListBoxes').mockResolvedValueOnce({ ok: false, err: revoked, world: null } as never)
       await expect(listing.list()).rejects.toBe(revoked)
-      expect(held.mw.panics).to.deep.equal([revoked])
-      expect(held.mw.badnews).to.deep.equal([])
+      expect(world.mw.panics).to.deep.equal([revoked])
+      expect(world.mw.badnews).to.deep.equal([])
     })
 
     it("starts one watch however often it is called", async () => {
-      const listing = boxListingOf(held.mw)
+      const listing = boxListingOf(world.mw)
       await listing.hello()
       await listing.hello()
-      expect(held.mw.callsOf('watch')).to.have.lengthOf(1)
+      expect(world.mw.callsOf('watch')).to.have.lengthOf(1)
     })
   })
 
   describe("listing.goodbye()", () => {
     it("ends the watch once, and leaves the instances as they are", async () => {
-      const listing = boxListingOf(held.mw)
+      const listing = boxListingOf(world.mw)
       await listing.hello()
       const box = await listing.build(fullBoxRecord())
       listing.goodbye()
       listing.goodbye()
-      expect(held.mw.callsOf('unwatch')).to.have.lengthOf(1)
-      expect(held.mw.watches[0]?.active).to.be.false
+      expect(world.mw.callsOf('unwatch')).to.have.lengthOf(1)
+      expect(world.mw.watches[0]?.active).to.be.false
       expect(listing.at(box.scope)).to.eq(box)
     })
 
     it("does nothing before hello", () => {
-      boxListingOf(held.mw).goodbye()
-      expect(held.mw.calls).to.deep.equal([])
+      boxListingOf(world.mw).goodbye()
+      expect(world.mw.calls).to.deep.equal([])
     })
   })
 
   describe("the watch's notices", () => {
-    it("delivers a notice as a good answer: a box not held is built and held", async () => {
-      const listing = boxListingOf(held.mw)
+    it("delivers a notice as a good answer: a box not world is built and world", async () => {
+      const listing = boxListingOf(world.mw)
       await listing.hello()
-      held.mw.clearCalls()
-      await held.mw.notify(fullBoxRecord(), 'a world')
+      world.mw.clearCalls()
+      await world.mw.notify(fullBoxRecord(), 'a world')
       const box = listing.at(scopeOf())
       expect(box?.isFull).to.be.true
       expect(listing.snapshot).to.have.lengthOf(1)
-      expect(held.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'a world' }])
-      expect(held.mw.callsOf('get')).to.deep.equal([])
+      expect(world.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'a world' }])
+      expect(world.mw.callsOf('get')).to.deep.equal([])
     })
 
-    it("hands a notice to the box held, which receives it", async () => {
-      const listing = boxListingOf(held.mw)
+    it("hands a notice to the box world, which receives it", async () => {
+      const listing = boxListingOf(world.mw)
       await listing.hello()
       const box = await listing.build(fullBoxRecord())
-      await held.mw.notify(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2, sidecar: { note: 'pushed' } }))
+      await world.mw.notify(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2, sidecar: { note: 'pushed' } }))
       expect(listing.at(scopeOf())).to.eq(box)
       expect(box.revision_seq).to.eq(2)
       expect(box.sidecar).to.deep.equal({ note: 'pushed' })
     })
 
-    it("delivers a notice of a deletion, which no fetch's ifAbsent judges: the box is held gone", async () => {
-      const listing = boxListingOf(held.mw)
+    it("delivers a notice of a deletion, which no fetch's ifAbsent judges: the box is world gone", async () => {
+      const listing = boxListingOf(world.mw)
       await listing.hello()
       const box = await listing.build(fullBoxRecord())
-      await held.mw.notify(tombstoneBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
+      await world.mw.notify(tombstoneBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
       expect(box.isPresent).to.be.false
       expect(listing.snapshot).to.deep.equal([])
-      expect(held.mw.badnews).to.deep.equal([])
+      expect(world.mw.badnews).to.deep.equal([])
     })
 
     it("tells a refusal met on the way to its world, rather than throwing it", async () => {
-      const listing = boxListingOf(held.mw)
+      const listing = boxListingOf(world.mw)
       await listing.hello()
       await listing.build(fullBoxRecord())
-      await held.mw.notify(fullBoxRecord({ revision_tok: 'rev-other' }))
-      expect(held.mw.badnews).to.have.length(1)
+      await world.mw.notify(fullBoxRecord({ revision_tok: 'rev-other' }))
+      expect(world.mw.badnews).to.have.length(1)
     })
   })
 
   describe("listing.snapshot, getSnapshot and subscribe", () => {
-    it("is empty, frozen and the same array before anything is held", () => {
-      const listing = boxListingOf(held.mw)
+    it("is empty, frozen and the same array before anything is world", () => {
+      const listing = boxListingOf(world.mw)
       expect(listing.snapshot).to.deep.equal([])
       expect(Object.isFrozen(listing.snapshot)).to.be.true
       expect(listing.getSnapshot()).to.eq(listing.snapshot)
     })
 
-    it("holds present things only, each as the thing's own snapshot", async () => {
-      const listing = boxListingOf(held.mw)
+    it("has present things only, each as the thing's own snapshot", async () => {
+      const listing = boxListingOf(world.mw)
       const full  = await listing.build(fullBoxRecord({ boxlabel: 'full_box' }))
       const draft = await listing.create(dnaOf('draft_box'))
       await listing.build(tombstoneBoxRecord({ boxlabel: 'gone_box', revision_seq: 2 }))
@@ -163,19 +163,19 @@ describe("Listing's pipeline: what every answer takes", () => {
     })
 
     it("is the same array until one thing's snapshot changes, and tells its listeners once per change", async () => {
-      const listing = boxListingOf(held.mw)
+      const listing = boxListingOf(world.mw)
       let told = 0
       listing.subscribe(() => { told += 1 })
       await listing.build(fullBoxRecord())
       expect(told).to.eq(1)
       const before = listing.snapshot
 
-      held.mw.seedPut(fullBoxRecord())
+      world.mw.seedPut(fullBoxRecord())
       await listing.fetch(scopeOf())
       expect(listing.snapshot).to.eq(before)
       expect(told).to.eq(1)
 
-      held.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
+      world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
       await listing.fetch(scopeOf())
       expect(listing.snapshot).to.not.eq(before)
       expect(listing.snapshot[0]).to.include({ revision_seq: 2 })
@@ -183,8 +183,8 @@ describe("Listing's pipeline: what every answer takes", () => {
     })
 
     it("follows a thing's change that no delivery brought: a put, once", async () => {
-      const listing = boxListingOf(held.mw)
-      held.mw.seedPut(fullBoxRecord())
+      const listing = boxListingOf(world.mw)
+      world.mw.seedPut(fullBoxRecord())
       const box = await listing.build(fullBoxRecord())
       let told = 0
       listing.subscribe(() => { told += 1 })
@@ -195,10 +195,10 @@ describe("Listing's pipeline: what every answer takes", () => {
     })
 
     it("takes a box in when it comes back to life, and lets it go when it is deleted", async () => {
-      const listing = boxListingOf(held.mw)
+      const listing = boxListingOf(world.mw)
       const box = await listing.build(tombstoneBoxRecord({ revision_seq: 2 }))
       expect(listing.snapshot).to.deep.equal([])
-      held.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
+      world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
       await listing.fetch(scopeOf())
       expect(listing.snapshot).to.deep.equal([box.getSnapshot()])
       await listing.del(box)
@@ -206,7 +206,7 @@ describe("Listing's pipeline: what every answer takes", () => {
     })
 
     it("stops telling a listener once it unsubscribes", async () => {
-      const listing = boxListingOf(held.mw)
+      const listing = boxListingOf(world.mw)
       let told = 0
       const unsubscribe = listing.subscribe(() => { told += 1 })
       await listing.create(dnaOf('one'))

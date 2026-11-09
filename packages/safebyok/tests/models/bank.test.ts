@@ -65,7 +65,7 @@ describe("bank.hello", () => {
     const onLifecycle = vi.fn()
     const world = makeBankWorld()
     const bank = world.bankOn({ onLifecycle })
-    const answer = TH.holdNextAnswer(world.vaultDB, 'tryListVaults')
+    const answer = TH.pendingNextAnswer(world.vaultDB, 'tryListVaults')
     const hello = bank.tryHello()
     await answer.reached
     bank.sweep()
@@ -74,7 +74,7 @@ describe("bank.hello", () => {
     expect(onLifecycle).not.toHaveBeenCalled()
   })
 
-  it("lists every vault and tombstone the vaultDB holds, locked, with no prompt, the tombstone in its slot but not its snapshot", async () => {
+  it("lists every vault and tombstone the vaultDB has stored, locked, with no prompt, the tombstone in its slot but not its snapshot", async () => {
     const world = makeBankWorld()
     const { bank: elsewhere, vault } = await makeBankWithVault(world)
     await elsewhere.ensureVault(OtherScopeGiven)
@@ -88,36 +88,36 @@ describe("bank.hello", () => {
     expect(bank.vaultAt(VaultScopeGiven)?.isPresent).to.be.false
   })
 
-  it("on a second call receives a row of the same life into the vault held, and replaces one of a new life, the old vault vacated", async () => {
+  it("on a second call receives a row of the same life into the vault listed, and replaces one of a new life, the old vault vacated", async () => {
     const world = makeBankWorld()
     const { bank: elsewhere, vault } = await makeBankWithVault(world)
     const bank = world.bankOnAnotherDevice()
     await bank.hello()
-    const held = bank.vaultAt(VaultScopeGiven)
+    const listed = bank.vaultAt(VaultScopeGiven)
     await bank.hello()
-    expect(bank.vaultAt(VaultScopeGiven)).to.equal(held)
+    expect(bank.vaultAt(VaultScopeGiven)).to.equal(listed)
     await vault.delVaultPrompt()
     await elsewhere.ensureVault(VaultScopeGiven)
     await bank.hello()
     const reborn = bank.vaultAt(VaultScopeGiven)
-    expect(reborn).not.to.equal(held)
+    expect(reborn).not.to.equal(listed)
     expect(reborn?.isPresent).to.be.true
-    expect(held?.isEnabled).to.be.false
+    expect(listed?.isEnabled).to.be.false
   })
 
-  it("tombstones the vault held where the row is deleted, the vault staying in its slot and gone from the snapshot, and a rebuild goes over it", async () => {
+  it("tombstones the vault listed where the row is deleted, the vault staying in its slot and gone from the snapshot, and a rebuild goes over it", async () => {
     const world = makeBankWorld()
     const { vault } = await makeBankWithVault(world)
     const bank = world.bankOnAnotherDevice()
     await bank.hello()
-    const held = bank.vaultAt(VaultScopeGiven)
+    const listed = bank.vaultAt(VaultScopeGiven)
     await vault.delVaultPrompt()
     await bank.hello()
-    expect(bank.vaultAt(VaultScopeGiven)).to.equal(held)
-    expect(held?.isPresent).to.be.false
+    expect(bank.vaultAt(VaultScopeGiven)).to.equal(listed)
+    expect(listed?.isPresent).to.be.false
     expect(bank.snapshot.vaults).to.deep.equal([])
     const reborn = await bank.ensureVault(VaultScopeGiven)
-    expect(reborn).not.to.equal(held)
+    expect(reborn).not.to.equal(listed)
     expect(reborn.isUnlocked).to.be.true
     expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
   })
@@ -234,12 +234,12 @@ describe("bank.hello", () => {
   })
 })
 
-describe("the host's functions, as a bank holds them", () => {
-  it("holds each wrapped and branded, never the host's own on a prop", () => {
+describe("the host's functions, as a bank has them", () => {
+  it("has each wrapped and branded, never the host's own on a prop", () => {
     const requestCleartext = vi.fn()
     const onLifecycle = vi.fn()
     const bank = makeBankWorld().bankOn({ requestCleartext, onLifecycle })
-    for (const held of [bank.keyDeriver, bank.strengthChecker]) { expect(isGuarded(held)).to.be.true }
+    for (const guarded of [bank.keyDeriver, bank.strengthChecker]) { expect(isGuarded(guarded)).to.be.true }
     expect(Object.values(bank)).to.not.include.members([requestCleartext, onLifecycle, testDeriver, anyStrengthChecker])
   })
 
@@ -472,7 +472,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     await makeBankWithVault(world)
     const bank = world.bankOn({ onLifecycle })
     world.vaultDB._cheat_refuseGets('identity_revoked')
-    const answer = TH.holdNextAnswer(world.vaultDB, 'tryListVaults')
+    const answer = TH.pendingNextAnswer(world.vaultDB, 'tryListVaults')
     const hello = bank.tryHello()
     await answer.reached
     bank.sweep()
@@ -681,7 +681,7 @@ describe("the snapshot's open gating", () => {
     await TH.expectRefusal(unlocking, 'dismissed')
   })
 
-  it("serializes an open gating as its scope and kind, holding no secret", async () => {
+  it("serializes an open gating as its scope and kind, having no secret", async () => {
     const { bank, gating, unlocking } = await bankWaitingOnUnlock()
     const text = JSON.stringify(bank.snapshot)
     const { openGating } = JSON.parse(text) as { openGating: unknown }
@@ -765,16 +765,16 @@ describe("the snapshot's open gating", () => {
 
   it("keeps an attempt that crosses a sweep in the snapshot until it concludes, past the disable", async () => {
     const { world } = await makeBankWithVault()
-    const held = heldDeriver()
-    const bank = world.bankOnAnotherDevice({ requestCleartext: undefined, keyDeriver: held.deriver })
+    const pending = pendingDeriver()
+    const bank = world.bankOnAnotherDevice({ requestCleartext: undefined, keyDeriver: pending.deriver })
     await bank.hello()
     const unlocking = (bank.vaultAt(VaultScopeGiven)!).ensureUnlocked()
     const gating = await vi.waitFor(() => bank.snapshot.openGating ?? fail("no gating yet"), { interval: 1 })
     const attempting = gating.attempt(byPassphrase(Passphrase))
-    await vi.waitFor(() => held.isAsked() || fail("not derived yet"), { interval: 1 })
+    await vi.waitFor(() => pending.isAsked() || fail("not derived yet"), { interval: 1 })
     bank.sweep()
     expect(bank.snapshot.openGating).to.equal(gating)
-    held.answer()
+    pending.answer()
     await TH.expectRefusal(unlocking)
     await attempting
     expect(bank.snapshot.openGating).to.be.null
@@ -807,8 +807,8 @@ const isRefusing = (call: () => unknown): boolean => {
   }
 }
 
-/** A key deriver that holds each derivation until the test calls `answer`. */
-const heldDeriver = () => {
+/** A key deriver that has each derivation until the test calls `answer`. */
+const pendingDeriver = () => {
   let isAsked = false
   let release = nothing
   const released = new Promise<void>((resolve) => { release = resolve })

@@ -5,7 +5,7 @@ import { LOCKED } from '../../src/helpers/consts'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
-import { holdsCases } from '../test-helpers/cases'
+import { expectCases } from '../test-helpers/cases'
 import * as TH from '../test-helpers'
 
 const mw = makeModelsWorld({ fakeTimers: false })
@@ -19,7 +19,7 @@ const scope     = mw.boxscope('anthropic_api_key')
 
 describe("SX.boxRecord and SX.boxSparse", () => {
   describe("SX.boxRecord", () => {
-    holdsCases(SX.boxRecord, [
+    expectCases(SX.boxRecord, [
       [full,                                            true,  'passes a full record'],
       [{ ...full, sidecar: {} },                        true,  'passes an empty sidecar'],
       [sparse,                                          false, 'refuses a sparse record: it is the full one'],
@@ -65,7 +65,7 @@ describe("SX.boxRecord and SX.boxSparse", () => {
   })
 
   describe("SX.boxSparse", () => {
-    holdsCases(SX.boxSparse, [
+    expectCases(SX.boxSparse, [
       [sparse,                                  true,  'passes a sparse record'],
       [full,                                    true,  'passes a full record, stripping what is not sparse'],
       [gone,                                    true,  'passes a tombstone'],
@@ -111,7 +111,7 @@ describe("VX.boxDna", () => {
   // A dna carries no revision_seq, so the factory's props stop at the rest.
   const { revision_seq: _revision_seq, ...factoryProps } = baseProps
 
-  holdsCases(VX.boxDna, [
+  expectCases(VX.boxDna, [
     // the scope, the whisper and the sidecar, and what a caller may give beside them:
     [dna,                                                   true,  'passes the scope, a whisper and a sidecar'],
     [{ ...dna, whisper: { key: 'sk-ant-fake', orgId: null } }, true, 'passes a whisper that is an object, null inside it'],
@@ -189,7 +189,7 @@ describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch
   const { sidecar: _sidecar, ...sealedless } = full
 
   describe("boxDna", () => {
-    holdsCases(VX.boxDna, [
+    expectCases(VX.boxDna, [
       [{ ...scope, whisper, sidecar: {}, am: 'x', vault_tok: 'tok-u1' },     true,  'passes the props the factory controls'],
       [{ ...scope, whisper, sidecar: {}, revision_seq: 3 },                  false, 'refuses a revision_seq'],
       [{ ...scope, whisper, sidecar: {}, am: 'q' },                          false, 'refuses a factory prop that fails its check'],
@@ -202,7 +202,7 @@ describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch
   })
 
   describe("boxPatch", () => {
-    holdsCases(VX.boxPatch, [
+    expectCases(VX.boxPatch, [
       [{ whisper, sidecar: {} },                                             true,  'passes the whisper and the sidecar alone'],
       [{ ...full, whisper, sidecar: {} },                                    true,  'passes a full record given back with its whisper and a sidecar'],
       [{ ...sparse, whisper, sidecar: {} },                                  true,  'passes a sparse record given back so'],
@@ -242,7 +242,7 @@ describe("SX.vaultRecord and SX.vaultSparse: the gate rides in the vault record,
 
   const gate = { gate_epoch: GX.FirstGateEpoch, passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
 
-  holdsCases(SX.vaultRecord, [
+  expectCases(SX.vaultRecord, [
     [{ ...sparseVault, gate },       true,  'passes a record with its gate, a passphrase wayin and no passkey'],
     [{ ...sparseVault, gate: null }, false, 'refuses a record whose gate is null: a vault record is never without one'],
     [sparseVault,                    false, 'refuses a record without its gate'],

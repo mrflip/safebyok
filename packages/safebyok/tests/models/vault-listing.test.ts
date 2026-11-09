@@ -1,4 +1,4 @@
-/** The vault listing's slot: what each record does to the vault held under its scope, and the end state a delete lands on. */
+/** The vault listing's slot: what each record does to the vault listed under its scope, and the end state a delete lands on. */
 
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
@@ -173,7 +173,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     expect(deviceDB.cachedNow()).to.be.null
   })
 
-  it("holds a tombstone of another vault_tok the same way, the old vacated", async () => {
+  it("has a tombstone of another vault_tok the same way, the old vacated", async () => {
     const { vault, listing, restoreRow } = await makeBornVault()
     const other = await otherLifeAt(5)
     restoreRow(tombstoneOver(other))
@@ -259,7 +259,7 @@ describe("building over a tombstone", () => {
     expect(storedNow()).to.deep.equal(before)
   })
 
-  it("a vault listing refuses to answer for another user, where another vault of this user is plainly not held", () => {
+  it("a vault listing refuses to answer for another user, where another vault of this user is plainly not listed", () => {
     const { listing } = makeVaultWorld()
     TH.expectSyncRefusal(() => listing.at({ ...Dna, user_id: 'another_user' }))
     expect(listing.at({ ...Dna, vaultlabel: 'another_vault' })).to.be.null
@@ -315,7 +315,7 @@ describe("building over a tombstone", () => {
     expect(born.vault_tok).to.eq(record.vault_tok)
   })
 
-  it("a birth's listing.put, another won: the vault stored is held and answered, locked, and the record dropped", async () => {
+  it("a birth's listing.put, another won: the vault stored is listed and answered, locked, and the record dropped", async () => {
     const { listing, tombstone, restoreRow } = await deleted()
     const theirs = await otherLifeAt(2)
     restoreRow(theirs)
@@ -326,7 +326,7 @@ describe("building over a tombstone", () => {
     expect(listing.at(Dna)).to.eq(won)
   })
 
-  it("a birth's listing.put, refused: a newer tombstone stored delivers, and nothing of the record is held", async () => {
+  it("a birth's listing.put, refused: a newer tombstone stored delivers, and nothing of the record is listed", async () => {
     const { vault, listing, tombstone, demandStored, restoreRow } = await deleted()
     const record = await birthOver(tombstone)
     const stored = demandStored()
@@ -363,7 +363,7 @@ describe("lock() with an forget that throws synchronously", () => {
 })
 
 describe("a damaged row", () => {
-  it("refuses a fetch 'damaged_row', and the vault held stands", async () => {
+  it("refuses a fetch 'damaged_row', and the vault listed stands", async () => {
     const { vault, listing, restoreRow } = await makeBornVault()
     restoreRow({ garbage: true } as never)
     await TH.expectRefusal(listing.fetch(Dna), 'damaged_row')

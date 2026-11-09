@@ -77,7 +77,7 @@ describe("bank.autolock", () => {
     expect(world.leaseRows()).to.have.lengthOf(1)
   })
 
-  it("past autolock, a lease held stays held: ensureUnlocked looks at no row, forgets nothing and asks nothing", async () => {
+  it("past autolock, a lease granted stays granted: ensureUnlocked looks at no row, forgets nothing and asks nothing", async () => {
     const world = makeBankWorld()
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const { vault } = await makeBankWithVault(world, { requestCleartext })
@@ -93,7 +93,7 @@ describe("bank.autolock", () => {
     expect(world.leaseRows()).to.have.lengthOf(1)
   })
 
-  it("past autolock, a late page's ensureUnlocked leaves the row, not loaded, so the page holding its lease finds it and locks", async () => {
+  it("past autolock, a late page's ensureUnlocked leaves the row, not loaded, so the page with its lease finds it and locks", async () => {
     const world = makeBankWorld()
     const { bank: pageA, vault: vaultA } = await makeBankWithVault(world)
     const row = world.leaseRows()[0]
@@ -339,7 +339,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
 
   it("disables the bank at once, before it forgets its rows: every call refuses, and the snapshot reads refused with the cause", async () => {
     const { world, bank } = await makeBankWithVault()
-    const listing = TH.holdNextCall(world.deviceDB, 'tryListLeases')
+    const listing = TH.pendingNextCall(world.deviceDB, 'tryListLeases')
     const cause = new VaultError('identity_revoked', 'signed out')
     const vacating = bank.vacate({ cause })
     expect(bank.isEnabled).to.be.false
@@ -366,7 +366,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     onLifecycle.mockClear()
     const refusal = new VaultError('storage_unavailable', 'no storage')
     vi.spyOn(world.deviceDB, 'forget').mockRejectedValue(refusal)
-    const listing = TH.holdNextCall(world.deviceDB, 'tryListLeases')
+    const listing = TH.pendingNextCall(world.deviceDB, 'tryListLeases')
     const vacating = bank.vacate()
     await listing.reached
     const news = new VaultError('storage_unavailable', 'news past the disable')

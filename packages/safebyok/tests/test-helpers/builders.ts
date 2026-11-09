@@ -8,7 +8,7 @@ import      { type StrengthChecker, StrongVerdict } from '../../src/helpers/pass
 /** A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
  * unlocking runs in milliseconds. Deterministic in passphrase and salt, like the real one; unlike
  * the real one, worthless against a brute-forcer -- which is why its label says `test`. Never
- * hand it to a vault that holds a real secret.
+ * hand it to a vault that has a real secret.
  */
 export const testDeriver: KeyDeriver = {
   key_deriver_label: 'test_digest_v0',
@@ -23,7 +23,7 @@ export const testDeriver: KeyDeriver = {
 }
 
 /** A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a
- * short one such as 'pw'. Never hand it to a vault that holds a real secret.
+ * short one such as 'pw'. Never hand it to a vault that has a real secret.
  */
 export const anyStrengthChecker: StrengthChecker = () => StrongVerdict
 
@@ -70,7 +70,7 @@ const digestOf = async (text: string): Promise<Uint8Array> => (
  * call. The credential is `tag`'s own (its id base64url of `cred-<tag>`), the salt a 32-byte one
  * made from `tag` unless given, and the answer SHA-256 of the credential and salt -- so the same
  * passkey asked with the same salt answers the same, and with another salt answers otherwise, as
- * a real PRF does. Worthless as a secret: never hand it to a vault that holds a real one.
+ * a real PRF does. Worthless as a secret: never hand it to a vault that has a real one.
  *
  * @example await TH.unlock(vault, await passkeyOf('laptop'))
  * @example await passkeyOf('laptop', otherSaltB64)  // the same credential, answering another salt

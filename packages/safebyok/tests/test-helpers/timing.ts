@@ -18,7 +18,7 @@ export const wakeupAtNextTick = (): Promise<void> => new Promise((resolve) => { 
  */
 export const aWhile = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 50) })
 
-/** Resolves once `check` holds, looking every few milliseconds; rejects after two seconds, so a
+/** Resolves once `check` is true, looking every few milliseconds; rejects after two seconds, so a
  * thing that never comes to pass fails its test rather than hanging it.
  *
  * @param check - Whether the thing has come to pass yet.
@@ -41,7 +41,7 @@ export const changeCounter = () => {
   return { heard, onChange: () => { heard.count += 1 } }
 }
 
-/** A latch for holding an async seam mid-flight, so a test can make one call in the middle of
+/** A latch that keeps an async seam pending, so a test can make one call in the middle of
  * another: `pass()` waits until `release()` is called, and `reached` resolves once something is
  * waiting at it. Released, it stays open: later passes go straight through.
  *
@@ -50,7 +50,7 @@ export const changeCounter = () => {
  * @example
  *   const latch = TH.makeLatch()
  *   const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase, saltBytes) => { await latch.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
- *   // then as holdNextCall's: await latch.reached, act, latch.release()
+ *   // then as pendingNextCall's: await latch.reached, act, latch.release()
  */
 export const makeLatch = () => {
   const opened = deferred()
@@ -127,50 +127,50 @@ const errandsAt = new WeakMap<object, (() => Promise<unknown>)[]>()
 /** The method a spy of {@link beforeNextCall}'s own stands in front of. */
 const originalOf = new WeakMap<object, AsyncFn>()
 
-/** Holds the next call to `target[verb]` at a latch (see {@link makeLatch}) until the test releases
+/** Keeps the next call to `target[verb]` at a latch (see {@link makeLatch}) until the test releases
  * it, so the test can make another call while that one is in flight. Later calls go straight
  * through.
  *
- * @param target - The object whose method to hold: an adapter, a deriver.
+ * @param target - The object whose method to keep pending: an adapter, a deriver.
  * @param verb - The method, one returning a promise.
  * @returns The latch: await `reached`, then `release()`.
  *
  * @example
- *   const latch = TH.holdNextCall(vaultDB, 'tryGetVault')
+ *   const latch = TH.pendingNextCall(vaultDB, 'tryGetVault')
  *   const unlocking = TH.tryUnlock(vault, 'pw')   // now waiting at the latch
  *   await latch.reached
  *   await vault.lock()                     // called mid-unlock: the unlock refuses, nothing unlocked
  *   latch.release()
  */
-export const holdNextCall = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {
+export const pendingNextCall = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {
   const latch = makeLatch()
   beforeNextCall(target, verb, latch.pass)
   return latch
 }
 
-/** Holds the answer of the next call to `target[verb]` at a latch (see {@link makeLatch}) once the call itself has run, until the test releases it.
+/** Keeps the answer of the next call to `target[verb]` at a latch (see {@link makeLatch}) once the call itself has run, until the test releases it.
  * The target has done the work, and the caller has not yet heard. Later calls go straight through.
  *
- * Use it, not {@link holdNextCall}, to make a call while a write is in flight to a DeviceDB, which
- * applies calls in the order made: a hold at the door would let a later call
+ * Use it, not {@link pendingNextCall}, to make a call while a write is in flight to a DeviceDB, which
+ * applies calls in the order made: a latch at the door would let a later call
  * reach it first, which a DeviceDB never does. Arm it before any spy of the test's own on the same
  * method, which then counts each call once.
  *
- * @param target - The object whose method's answer to hold: an adapter.
+ * @param target - The object whose method's answer to keep pending: an adapter.
  * @param verb - The method, one returning a promise.
  * @returns The latch: await `reached`, then `release()`.
  *
  * @example
- *   const written = TH.holdNextAnswer(deviceDB, 'tryPutLease')
+ *   const written = TH.pendingNextAnswer(deviceDB, 'tryPutLease')
  *   const unlocking = TH.tryUnlock(vault, 'pw')   // the lease is in the deviceDB; the unlock has not heard
  *   await written.reached
  *   await vault.lock()                     // its forget is called after the write
  *   written.release()
  */
-export const holdNextAnswer = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {
+export const pendingNextAnswer = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {
   const latch = makeLatch()
   const original = (target as unknown as Record<string, AsyncFn | undefined>)[verb]
-  if (original === undefined) { throw new TypeError(`holdNextAnswer found no method ${verb} to hold.`) }
+  if (original === undefined) { throw new TypeError(`pendingNextAnswer found no method ${verb} to keep pending.`) }
   vi.spyOn(target as unknown as Record<string, AsyncFn>, verb).mockImplementationOnce(async (...args: unknown[]) => {
     const answer = await original.apply(target, args)
     await latch.pass()
@@ -179,7 +179,7 @@ export const holdNextAnswer = <Target extends object>(target: Target, verb: Asyn
   return latch
 }
 
-/** Has `vault` read storage afresh, as storage holds it once this is called.
+/** Has `vault` read storage afresh, as storage has it once this is called.
  * A read already under way may have begun before the test's last write, and a refresh asked for
  * meanwhile shares it, so this awaits that one, then asks for another.
  *

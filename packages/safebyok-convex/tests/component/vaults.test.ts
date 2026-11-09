@@ -7,7 +7,7 @@ import type { Life, Tally } from '../../src/component/tallies'
 
 // The VaultDB contract is the battery's, run over this component through a ConvexVaultDB and a fake
 // deployment. What is left here is the component's own: the rows a watch and a tidy reach, the
-// tally each life keeps, the caps a box put is held to, and Convex's per-transaction limits.
+// tally each life keeps, the caps a box put is limited by, and Convex's per-transaction limits.
 
 type Backend = ReturnType<typeof TH.componentTest>
 
@@ -24,7 +24,7 @@ const boxOf = (boxlabel: string, { revision_seq = 0, cipherBytes = 3, ...extra }
   TH.boxAt(revision_seq, 'life1', { boxlabel, box_tok: `tok-${boxlabel}`, whisper_ciphered: { cipher_iv_b64: 'aXY', ciphertext_b64: 'c'.repeat(cipherBytes) }, ...extra })
 )
 
-/** A backend holding `record` as u1's vault, live, as every box put needs. */
+/** A backend with `record` as u1's vault, live, as every box put needs. */
 const withVault = async (transactionLimits = false, record = vault): Promise<Backend> => {
   const backend = TH.componentTest(transactionLimits)
   await backend.mutation(api.putVault, { record, opts: birth })
@@ -199,7 +199,7 @@ describe("a life's tally", () => {
 })
 
 describe("putBox's count cap", () => {
-  it("holds a life to the client's maxBoxes, answering how full it is, and never refuses a replacement", async () => {
+  it("has a life to the client's maxBoxes, answering how full it is, and never refuses a replacement", async () => {
     const backend = await withVault()
     await backend.mutation(api.putBox, { record: boxOf('anthropic'), opts: birth, maxBoxes: 2 })
     await backend.mutation(api.putBox, { record: boxOf('openai'), opts: birth, maxBoxes: 2 })
@@ -209,7 +209,7 @@ describe("putBox's count cap", () => {
     expect(await backend.mutation(api.putBox, replacement)).to.deep.include({ isWritten: true })
   })
 
-  it("holds a life to the component's own count limit, whatever cap the client asks", async () => {
+  it("has a life to the component's own count limit, whatever cap the client asks", async () => {
     const backend = await withVault()
     await backend.run(async ({ db }) => { await db.insert('safebyok_tallies', { ...life1, box_count: MaxVaultBoxes, box_bytes: 1000 }) })
     const full = { capacity: { boxes: { used: MaxVaultBoxes, max: MaxVaultBoxes }, bytes: { used: 1000, max: MaxVaultBoxBytes } } }
@@ -251,7 +251,7 @@ describe("putBox's count cap", () => {
   })
 })
 
-/** A backend whose life1 holds eight boxes of 900,000 bytes, a little under its weight limit, and the room left. */
+/** A backend whose life1 has eight boxes of 900,000 bytes, a little under its weight limit, and the room left. */
 const nearlyFull = async () => {
   const backend = await withVault()
   for (let ii = 0; ii < 8; ii++) {
@@ -295,7 +295,7 @@ describe("putBox's weight limit", () => {
 
 // A Convex transaction may read 16 MiB and write 16,000 documents. Listing and watching read a life
 // once; deleting the vault reads every box row of the life and writes each live one. The component
-// holds every life to MaxVaultBoxes boxes and MaxVaultBoxBytes of box rows so that each of these
+// has every life to MaxVaultBoxes boxes and MaxVaultBoxBytes of box rows so that each of these
 // stays one transaction, beside a vault row as heavy as a document may be.
 
 /** What listing, watching and deleting life1's vault find, each one whole transaction over it. */

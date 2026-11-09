@@ -14,14 +14,14 @@ const WeekMillis = 7 * 24 * 60 * MinuteMillis
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
 /** The gating `raise` opens, shown in a PassphraseModal whose answers the test reads, closed by the first. */
-const shownFor = async (raise: typeof TH.building, opts: { built?: boolean, bankOpts?: Parameters<typeof TH.heldGatingOf>[2], leaseMillis?: number } = {}) => {
+const shownFor = async (raise: typeof TH.building, opts: { built?: boolean, bankOpts?: Parameters<typeof TH.openGatingOf>[2], leaseMillis?: number } = {}) => {
   const world = TH.makeBankWorld()
   if (opts.built === true) { await TH.makeBankWithVault(world) }
-  const held = await TH.heldGatingOf(world, raise, opts.bankOpts)
+  const opened = await TH.openGatingOf(world, raise, opts.bankOpts)
   const answers: DialogAnswer[] = []
-  const onDone = (answer: DialogAnswer) => { answers.push(answer); held.close() }
-  render(<PassphraseModal gating={TH.passphraseGatingOf(held.gating)} onDone={onDone} leaseMillis={opts.leaseMillis} />)
-  return { ...held, answers }
+  const onDone = (answer: DialogAnswer) => { answers.push(answer); opened.close() }
+  render(<PassphraseModal gating={TH.passphraseGatingOf(opened.gating)} onDone={onDone} leaseMillis={opts.leaseMillis} />)
+  return { ...opened, answers }
 }
 
 const alertText = () => screen.getByRole('alert').textContent
@@ -94,8 +94,8 @@ describe("PassphraseModal over a later gating", () => {
   it("starts its form empty, nothing typed carrying over", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
-    const first = await TH.heldGatingOf(world, TH.unlocking)
-    const second = await TH.heldGatingOf(world, TH.unlocking)
+    const first = await TH.openGatingOf(world, TH.unlocking)
+    const second = await TH.openGatingOf(world, TH.unlocking)
     const ui = (gating: typeof first.gating) => <PassphraseModal gating={TH.passphraseGatingOf(gating)} onDone={() => undefined} />
     const { rerender } = render(ui(first.gating))
     fireEvent.change(screen.getByLabelText(Messages.passphraseField), { target: { value: TH.Passphrase } })

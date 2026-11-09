@@ -24,8 +24,8 @@ const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ friend: FakeLeaseF
   return { friend, lease }
 }
 
-/** A friend of {@link WorldStamp} whose slot holds a record cached under `stamp`. */
-const friendHoldingRowOf = async (stamp: Partial<VaultStamp>): Promise<FakeLeaseFriend> => {
+/** A friend of {@link WorldStamp} whose slot has a record cached under `stamp`. */
+const friendWithRowOf = async (stamp: Partial<VaultStamp>): Promise<FakeLeaseFriend> => {
   const elsewhere = fakeLeaseFriendOf(stamp)
   const lease = await makeGrantedLease(elsewhere)
   await lease.cacheAsCacheCan()
@@ -216,7 +216,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
 
   for (const [stamp, blurb] of OtherStampCases) {
     it(`forgets a cached lease of ${blurb}, telling it as bad news, and answers null`, async () => {
-      const friend = await friendHoldingRowOf(stamp)
+      const friend = await friendWithRowOf(stamp)
       expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
       expect(friend.tryForgetLease).toHaveBeenCalledTimes(1)
       expect(friend.cached).to.be.null
@@ -226,7 +226,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
   }
 
   it("tells the bad news for a row of another stamp even where its forget is refused", async () => {
-    const friend = await friendHoldingRowOf({ user_id: 'u2' })
+    const friend = await friendWithRowOf({ user_id: 'u2' })
     friend.tryForgetLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the datastore is down')))
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
     expect(friend.tellBadNews).toHaveBeenCalledOnce()
@@ -300,7 +300,7 @@ describe("lease.revoke(), lease.evict() and isPresent", () => {
     expect(other.lease.isPresent).to.be.false
   })
 
-  it("Lease.forget forgets a record with no lease held, on each call, and starts before it answers, so forgets are written in call order", async () => {
+  it("Lease.forget forgets a record with no lease granted, on each call, and starts before it answers, so forgets are written in call order", async () => {
     const friend = fakeLeaseFriendOf()
     friend.cached = 'a row of an earlier session'
     const forgetting = Lease.tryForget(friend)

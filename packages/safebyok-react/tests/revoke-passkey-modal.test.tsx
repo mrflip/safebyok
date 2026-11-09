@@ -8,20 +8,20 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** A revoke_passkey gating on a vault built under {@link TH.Passphrase} and holding a passkey, shown in a RevokePasskeyModal whose answers the test reads, closed by the first. */
+/** A revoke_passkey gating on a vault built under {@link TH.Passphrase} and with a passkey, shown in a RevokePasskeyModal whose answers the test reads, closed by the first. */
 const shownFor = async () => {
   const world = TH.makeBankWorld()
   const { vault } = await TH.makeBankWithVault(world)
   await TH.addPasskeyTo(world, vault)
-  const held = await TH.heldGatingOf(world, TH.revokingPasskey)
+  const opened = await TH.openGatingOf(world, TH.revokingPasskey)
   const answers: DialogAnswer[] = []
-  const onDone = (answer: DialogAnswer) => { answers.push(answer); held.close() }
-  render(<RevokePasskeyModal gating={TH.gatingOfKind(held.gating, 'revoke_passkey')} onDone={onDone} />)
-  return { ...held, answers }
+  const onDone = (answer: DialogAnswer) => { answers.push(answer); opened.close() }
+  render(<RevokePasskeyModal gating={TH.gatingOfKind(opened.gating, 'revoke_passkey')} onDone={onDone} />)
+  return { ...opened, answers }
 }
 
-/** Whether the vault in `bank` holds a passkey. */
-const holdsPasskey = (bank: Bank) => bank.vaultAt(TH.VaultScopeGiven)?.gate.toJSON().passkey_wayin != null
+/** Whether the vault in `bank` has a passkey. */
+const hasPasskey = (bank: Bank) => bank.vaultAt(TH.VaultScopeGiven)?.gate.toJSON().passkey_wayin != null
 
 const alertText = () => screen.getByRole('alert').textContent
 
@@ -33,7 +33,7 @@ describe("RevokePasskeyModal", () => {
     TH.submitPasskeyRevoke(TH.Passphrase)
     await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
     expect(await raising).to.include({ ok: true })
-    expect(holdsPasskey(bank)).to.be.false
+    expect(hasPasskey(bank)).to.be.false
   })
 
   it("shows a wrong passphrase in place, removing nothing, and removes on the right one", async () => {
@@ -41,7 +41,7 @@ describe("RevokePasskeyModal", () => {
     TH.submitPasskeyRevoke('not the passphrase')
     await waitFor(() => { expect(alertText()).to.not.eq('') })
     expect(gating.isOpen).to.be.true
-    expect(holdsPasskey(bank)).to.be.true
+    expect(hasPasskey(bank)).to.be.true
     TH.submitPasskeyRevoke(TH.Passphrase)
     await waitFor(() => { expect(answers).to.deep.equal(['unlocked']) })
     expect(await raising).to.include({ ok: true })
@@ -52,6 +52,6 @@ describe("RevokePasskeyModal", () => {
     fireEvent.click(screen.getByText('Cancel'))
     expect(answers).to.deep.equal(['dismissed'])
     expect(await raising).to.include({ ok: false })
-    expect(holdsPasskey(bank)).to.be.true
+    expect(hasPasskey(bank)).to.be.true
   })
 })

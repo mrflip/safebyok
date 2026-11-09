@@ -15,7 +15,7 @@ export const vaults = anyApi['vaults'] as unknown as ComponentApi['vaults']
 /** The component's functions at the root, as a client calls them: no host wrapper, no auth. */
 export const rootApi = anyApi['vaults'] as unknown as SafebyokApi
 
-/** A fresh in-memory backend holding only the component, its functions at the root, held to Convex's transaction limits if asked. */
+/** A fresh in-memory backend with only the component, its functions at the root, limited to Convex's transaction limits if asked. */
 export const componentTest = (transactionLimits = false) => convexTest({ schema, modules, transactionLimits })
 
 /** A host of only the component, its functions at the root, for a fake deployment whose clients write as any user. */

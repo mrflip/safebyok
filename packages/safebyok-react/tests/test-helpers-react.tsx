@@ -1,6 +1,6 @@
 /**
  * The helpers of safebyok-react's tests that build JSX, kept apart from `test-helpers.ts` because
- * a `.ts` file cannot hold JSX. `test-helpers.ts` re-exports them: reach them as `TH`
+ * a `.ts` file cannot contain JSX. `test-helpers.ts` re-exports them: reach them as `TH`
  * (`import * as TH from './test-helpers'`), never by this file's name.
  */
 import { Activity, useEffect, type ReactNode } from 'react'

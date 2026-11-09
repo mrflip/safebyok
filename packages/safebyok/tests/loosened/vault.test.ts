@@ -9,7 +9,7 @@ import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultWi
 useVaultWorlds()
 
 describe("the ways in changing under a vault unlocked", () => {
-  it("safebyok-old/README.md:844, 'Every change locks the other devices ... each other device falls back to `locked`': a vault that receives a newer record whose wayins are not the ones in hand takes its gate and stays unlocked, its held lease still sealing", async () => {
+  it("safebyok-old/README.md:844, 'Every change locks the other devices ... each other device falls back to `locked`': a vault that receives a newer record whose wayins are not the ones in hand takes its gate and stays unlocked, its granted lease still sealing", async () => {
     const record = await storedVaultRecord()
     const { listing, putBehindOurBack } = makeVaultWorld(record)
     const vault = await listing.build(record)
@@ -29,7 +29,7 @@ describe("the ways in changing under a vault unlocked", () => {
 })
 
 describe("an older copy of the vault record", () => {
-  it("safebyok-old/README.md:1204, 'Storage handing back an older copy could otherwise bring back a way in that was removed': the next session on this device holds a vault record restored from before a passphrase change, and the passphrase replaced opens it again", async () => {
+  it("safebyok-old/README.md:1204, 'Storage handing back an older copy could otherwise bring back a way in that was removed': the next session on this device has a vault record restored from before a passphrase change, and the passphrase replaced opens it again", async () => {
     const { vault, restoreRow, demandStored, anotherSession, deviceDB } = await makeBornVault()
     const ante = demandStored()
     await replaceTyping(vault, Passphrase, NewPassphrase)

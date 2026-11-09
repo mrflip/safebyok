@@ -17,14 +17,14 @@ const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false 
 const shownFor = async (opts: { bankOpts?: Partial<BankOpts> } = {}) => {
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)
-  const held = await TH.heldGatingOf(world, TH.replacing, opts.bankOpts)
+  const opened = await TH.openGatingOf(world, TH.replacing, opts.bankOpts)
   const answers: DialogAnswer[] = []
-  const onDone = (answer: DialogAnswer) => { answers.push(answer); held.close() }
-  render(<ReplacePassphraseModal gating={TH.gatingOfKind(held.gating, 'replace_passphrase')} onDone={onDone} />)
-  return { ...held, world, answers }
+  const onDone = (answer: DialogAnswer) => { answers.push(answer); opened.close() }
+  render(<ReplacePassphraseModal gating={TH.gatingOfKind(opened.gating, 'replace_passphrase')} onDone={onDone} />)
+  return { ...opened, world, answers }
 }
 
-/** Whether `passphrase` unlocks the world's vault, asked from a device that holds no lease on it. */
+/** Whether `passphrase` unlocks the world's vault, asked from a device that has no lease on it. */
 const unlocksWith = async (world: TH.BankWorld, passphrase: string): Promise<boolean> => {
   const bank = world.bankOnAnotherDevice({ device_id: '00000000-0000-4000-8000-0000000000b3', requestCleartext: async (gating) => { await gating.attempt({ passphraseClear: passphrase }) } })
   await bank.hello()

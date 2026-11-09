@@ -8,7 +8,7 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** What the vault is before the gating is raised: absent, built, or built and holding a passkey. */
+/** What the vault is before the gating is raised: absent, built, or built and with a passkey. */
 type Before = 'absent' | 'built' | 'passkeyed'
 
 /** The gating `raise` opens, shown in a GatingModal (as `shown` makes it out to be) whose answers the test reads. */
@@ -18,10 +18,10 @@ const shownFor = async (raise: (bank: Bank) => ReturnType<typeof TH.building>, b
     const { vault } = await TH.makeBankWithVault(world)
     if (before === 'passkeyed') { await TH.addPasskeyTo(world, vault) }
   }
-  const held = await TH.heldGatingOf(world, raise)
+  const opened = await TH.openGatingOf(world, raise)
   const answers: DialogAnswer[] = []
-  render(<GatingModal gating={shown(held.gating)} onDone={(answer) => { answers.push(answer); held.close() }} />)
-  return { ...held, answers }
+  render(<GatingModal gating={shown(opened.gating)} onDone={(answer) => { answers.push(answer); opened.close() }} />)
+  return { ...opened, answers }
 }
 
 /** `gating`, made out to be of a gatingkind this package has no dialog for, as one a newer core raises. */
@@ -54,14 +54,14 @@ describe("GatingModal", () => {
   it("answers once for a gatingkind with no dialog, though its onDone is new at each render", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
-    const held = await TH.heldGatingOf(world, TH.unlocking)
+    const opened = await TH.openGatingOf(world, TH.unlocking)
     const answers: DialogAnswer[] = []
-    const ui = () => <GatingModal gating={forged(held.gating)} onDone={(answer) => { answers.push(answer) }} />
+    const ui = () => <GatingModal gating={forged(opened.gating)} onDone={(answer) => { answers.push(answer) }} />
     const { rerender } = render(ui())
     rerender(ui())
     rerender(ui())
-    held.close()
-    await held.raising
+    opened.close()
+    await opened.raising
     expect(answers).to.deep.equal(['dismissed'])
   })
 })

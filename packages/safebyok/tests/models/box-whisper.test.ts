@@ -10,12 +10,12 @@ import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxListingOf, fullBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
-const held = useModelsWorld()
+const world = useModelsWorld()
 
 /** A box built of `record`, with the same record in storage. */
 const builtOf = (record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> => {
-  held.mw.seedPut(record)
-  return boxListingOf(held.mw).build(record)
+  world.mw.seedPut(record)
+  return boxListingOf(world.mw).build(record)
 }
 
 const TestWhisper = { apiKey: 'sk-test-0000' }
@@ -41,8 +41,8 @@ describe("box.extractWhisper(): refused from its guard", () => {
   ] as const
   for (const [recordOf, isLocked, refusalkind, blurb] of RefusedCases) {
     it(`refuses '${refusalkind}' for ${blurb}`, async () => {
-      const box = await boxListingOf(held.mw).build(recordOf())
-      held.mw.setLocked(isLocked)
+      const box = await boxListingOf(world.mw).build(recordOf())
+      world.mw.setLocked(isLocked)
       await TH.expectRefusal(box.extractWhisper(), refusalkind)
     })
   }
@@ -60,9 +60,9 @@ describe("box.extractWhisper(): what the lease opens that is no whisper", () => 
   ] as const
   for (const [blurb, text] of OpenedCases) {
     it(`refuses 'damaged_box' for ${blurb}, quoting none of it`, async () => {
-      const { world } = held.mw
-      const leasedWorld: BoxWorld = { vault_tok: world.vault_tok, get isLocked() { return world.isLocked }, demandUnlocked: () => world.demandUnlocked(), receiveWorld: (taken) => { world.receiveWorld(taken) }, ensureTimely: (maxMillis) => world.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text), subscribe: (listener) => world.subscribe(listener) }
-      const box = await boxListingOf(held.mw, { world: leasedWorld }).build(fullBoxRecord())
+      const base = world.mw.world
+      const leasedWorld: BoxWorld = { vault_tok: base.vault_tok, get isLocked() { return base.isLocked }, demandUnlocked: () => base.demandUnlocked(), receiveWorld: (taken) => { base.receiveWorld(taken) }, ensureTimely: (maxMillis) => base.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text), subscribe: (listener) => base.subscribe(listener) }
+      const box = await boxListingOf(world.mw, { world: leasedWorld }).build(fullBoxRecord())
       const err = await TH.expectRefusal(box.extractWhisper(), 'damaged_box')
       expect(err.message).to.eq(Phrases.UndecodedWhisper)
       expect(JSON.stringify({ meta: err.meta, cause: String(err.cause) })).to.not.include('SECRET')
@@ -76,10 +76,10 @@ describe("box.extractWhisper(): what the lease opens that is no whisper", () => 
 describe("box.whisper through a lock", () => {
   it("keeps the whisper exposed while the vault locks, and reads it again once unlocked", async () => {
     const box = await exposedOf()
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     expect(box.whisper).to.eq(LOCKED)
     expect(box.getSnapshot().isExposed).to.be.true
-    held.mw.setLocked(false)
+    world.mw.setLocked(false)
     expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-0000' })
   })
 
@@ -87,19 +87,19 @@ describe("box.whisper through a lock", () => {
     const box = await exposedOf({ apiKey: 'sk-test-0000' })
     const exposed = box.whisper as { apiKey: string, org?: string }
     exposed.apiKey = 'sk-test-edited'
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     exposed.org = 'acme'
     expect(box.whisper).to.eq(LOCKED)
-    held.mw.setLocked(false)
+    world.mw.setLocked(false)
     expect(box.whisper).to.eq(exposed)
     expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-edited', org: 'acme' })
   })
 
   it("refuses 'vault_locked' at an expose while locked, keeping the exposed whisper", async () => {
     const box = await exposedOf()
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     await TH.expectRefusal(box.expose(), 'vault_locked')
-    held.mw.setLocked(false)
+    world.mw.setLocked(false)
     expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-0000' })
   })
 })
@@ -161,12 +161,12 @@ describe("the bags and Storable.isFUBag: a mark, not an identity", () => {
 
   it("puts nothing of a whisper read while locked and put after the unlock", async () => {
     const box = await exposedOf()
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     const readWhileLocked = box.whisper
-    held.mw.setLocked(false)
-    held.mw.clearCalls()
+    world.mw.setLocked(false)
+    world.mw.clearCalls()
     await TH.expectRefusal(box.put({ whisper: readWhileLocked }))
-    expect(held.mw.callsOf('put')).to.deep.equal([])
+    expect(world.mw.callsOf('put')).to.deep.equal([])
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-0000' })
   })
 })
@@ -182,24 +182,24 @@ describe("box.whisper and box.put: what a whisper may be", () => {
     [true,                                               'a bare boolean'],
     [['sk-test-SECRET'],                                 'an array'],
     [{ apiKey: 'sk-test-SECRET', when: new Date(T0) },   'an object JSON would mangle'],
-    [['sk-test-SECRET', undefined],                      'an array holding undefined'],
-    [{ SECRET_KEY: new Map() },                          'an object holding a Map'],
+    [['sk-test-SECRET', undefined],                      'an array with undefined'],
+    [{ SECRET_KEY: new Map() },                          'an object with a Map'],
   ] as const
 
   for (const [whisper, blurb] of BadWhisperCases) {
     it(`refuses a put of ${blurb}, putting nothing and quoting nothing`, async () => {
       const box = await builtOf(fullBoxRecord())
-      held.mw.clearCalls()
+      world.mw.clearCalls()
       const err = await TH.expectRefusal(box.put({ whisper: whisper as never, sidecar: {} }))
       expect(TH.thrownText(err)).to.not.include('SECRET')
       expect(JSON.stringify(err.meta)).to.not.include('SECRET')
-      expect(held.mw.callsOf('put')).to.deep.equal([])
+      expect(world.mw.callsOf('put')).to.deep.equal([])
     })
   }
 
   it("refuses before its guards: a whisper JSON would mangle refuses while the vault is locked", async () => {
     const box = await builtOf(fullBoxRecord())
-    held.mw.setLocked(true)
+    world.mw.setLocked(true)
     await TH.expectRefusal(box.put({ whisper: new Date(T0), sidecar: {} }))
   })
 
@@ -223,7 +223,7 @@ describe("box.whisper and box.put: what a whisper may be", () => {
     expect(box.whisper).to.deep.equal(AsPut)
   })
 
-  for (const [whisper, blurb] of [[{}, 'an empty object'], [{ val: null }, 'an object with a val, no holder now']] as const) {
+  for (const [whisper, blurb] of [[{}, 'an empty object'], [{ val: null }, 'an object with a val, nothing in it now']] as const) {
     it(`puts and opens ${blurb} as the whisper it is`, async () => {
       const box = await builtOf(fullBoxRecord())
       await box.put({ whisper })

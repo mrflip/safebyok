@@ -34,9 +34,9 @@ export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
   makeVaultDB: (opts?: AdapterVaultDBOpts) => Awaitable<DBT>
   /** The backdoor to a VaultDB's raw rows. */
   _cheat_rowsOf: (vaultDB: DBT) => VaultDBRowCheats
-  /** A second VaultDB over the same rows, as another device holds; without it, the races run over one VaultDB. */
+  /** A second VaultDB over the same rows, as another device has; without it, the races run over one VaultDB. */
   makeTwin?: (vaultDB: DBT) => Awaitable<VaultDB>
-  /** A fresh, empty VaultDB holding at most `maxBoxes` live boxes to a vault; without it, the cases of a cap are skipped. */
+  /** A fresh, empty VaultDB with at most `maxBoxes` live boxes to a vault; without it, the cases of a cap are skipped. */
   makeCappedVaultDB?: (maxBoxes: number) => Awaitable<DBT>
   /** Makes the VaultDB's next call to its storage fail as its storage would; without it, that case is skipped. */
   _cheat_failNextCall?: (vaultDB: DBT) => Awaitable<void>
@@ -84,7 +84,7 @@ export type BatteryWorld = {
 /** Stands in for a hook the VaultDB did not give, in a case that is skipped without it. */
 const notGiven = (hookname: string) => (): never => { throw new TypeError(`The VaultDB gave the battery no ${hookname}.`) }
 
-// Every VaultDB a world's hooks are handed is one its own factories made, so the narrowing to DBT holds;
+// Every VaultDB a world's hooks are handed is one its own factories made, so the narrowing to DBT has;
 // a world given no `_cheat_adapterOf` was handed AdapterVaultDBs.
 const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWorld => {
   const { makeVaultDB, _cheat_rowsOf, makeTwin, makeCappedVaultDB, _cheat_failNextCall, _cheat_adapterOf, watches = true, boxNoticesCarryVault = true } = opts

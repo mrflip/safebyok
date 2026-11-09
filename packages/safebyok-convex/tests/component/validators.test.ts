@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as DB from 'safebyok/storage'
 import * as TH from '../test-helpers'
 
-// The component's validators are converted from the core's checkers: these cases hold the
+// The component's validators are converted from the core's checkers: these cases keep to the
 // conversion to its purpose, a record the core writes goes in whole and a misshapen one stops at the door.
 
 type Backend = ReturnType<typeof TH.componentTest>
@@ -20,7 +20,7 @@ const storedRows = (backend: Backend) => backend.run(async ({ db }) => {
   return { vaults: vaultDocs.map(({ vault: row }): unknown => row), boxes: boxDocs.map(({ box: row }): unknown => row), tallies: tallyDocs.length }
 })
 
-/** A backend holding the vault, live, as every box put needs. */
+/** A backend with the vault, live, as every box put needs. */
 const withVault = async (): Promise<Backend> => {
   const backend = TH.componentTest()
   await backend.mutation(api.putVault, { record: vault, opts: birth })

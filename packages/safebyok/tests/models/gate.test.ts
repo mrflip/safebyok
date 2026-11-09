@@ -10,7 +10,7 @@ useFakeClock()
 const builtGate = ({ passkey = false } = {}) => builtGateOf(passkey ? passkeyAnswerOf() : undefined)
 
 describe("Gate.make(stamp, passphraseWayin, passkeyWayin)", () => {
-  it("is of the first epoch, holding the wayins handed", async () => {
+  it("is of the first epoch, with the wayins handed", async () => {
     const proving = await PassphraseProving.buildNovel(WorldStamp, TestPassphrase, provingWorldOf())
     const wayin = await proving.buildWayin(NOVEL)
     const gate = Gate.make(WorldStamp, wayin, null)
@@ -96,14 +96,14 @@ describe("gate.pickle() and gate.toJSON()", () => {
     expect(() => { (gate as { passkey_wayin: unknown }).passkey_wayin = gate.passphrase_wayin }).to.throw(TypeError)
   })
 
-  it("holds the stamp it was handed, as parsed, hidden", async () => {
+  it("has the stamp it was handed, as parsed, hidden", async () => {
     const { gate } = await builtGate()
     expect(gate.stamp).to.deep.equal(WorldStamp)
   })
 })
 
 describe("gate.demandPasskeyAddable()", () => {
-  it("passes a gate with no passkey and refuses one that holds one", async () => {
+  it("passes a gate with no passkey and refuses one that has one", async () => {
     const { gate } = await builtGate()
     expect(() => { gate.demandPasskeyAddable() }).to.not.throw()
     const { gate: both } = await builtGate({ passkey: true })

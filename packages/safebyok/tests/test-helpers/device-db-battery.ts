@@ -369,7 +369,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.listRawBanks()).to.have.lengthOf(1)
       })
 
-      it("takes a vault scope or any bag holding a bank scope, keeping only the bank scope", async () => {
+      it("takes a vault scope or any bag with a bank scope, keeping only the bank scope", async () => {
         const deviceDB = await fresh()
         const made = await deviceDB.ensureCachedBank({ ...vaultScope, vault_tok: 'tok_one' } as never)
         expect(made).to.have.keys(['applabel', 'user_id', 'device_id'])

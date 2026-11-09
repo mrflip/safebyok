@@ -1,4 +1,4 @@
-/** VaultSchemaSdl against the core's checks: each type the schema sends or takes holds the fields its check reads, no more and no fewer. */
+/** VaultSchemaSdl against the core's checks: each type the schema sends or takes has the fields its check reads, no more and no fewer. */
 
 import { describe, expect, it } from 'vitest'
 import { buildSchema, getNamedType, isInputObjectType, isLeafType, isObjectType, isUnionType } from 'graphql'
@@ -25,13 +25,13 @@ type CheckDef = {
   shape?:     CheckShape
 }
 
-/** A schema type holding fields: a type an answer sends, or an input a verb takes. */
+/** A schema type with fields: a type an answer sends, or an input a verb takes. */
 type FieldedType = GraphQLObjectType | GraphQLInputObjectType
 
 /** `check`'s definition, as the walk reads it. */
 const defOf = (check: Check): CheckDef => check._zod.def
 
-/** The check that holds `check`'s fields: past each nullable, default and readonly, a transform's input and a list's element. */
+/** The check that has `check`'s fields: past each nullable, default and readonly, a transform's input and a list's element. */
 const unwrapped = (check: Check): Check => {
   const def = defOf(check)
   const inner = def.innerType ?? def.in ?? def.element
@@ -67,10 +67,10 @@ const driftOf = (check: Check, gqltype: GraphQLOutputType | GraphQLInputType, pa
   return shapes.flatMap((shape) => shapeDriftOf(shape, fieldedTypesOf(named), path))
 }
 
-/** Each mismatch between the check's `shape` and whichever of `fieldedTypes` holds its fields, at `path`. */
+/** Each mismatch between the check's `shape` and whichever of `fieldedTypes` has its fields, at `path`. */
 const shapeDriftOf = (shape: CheckShape, fieldedTypes: readonly FieldedType[], path: string): string[] => {
   const fieldnames = Object.keys(shape)
-  // A field the check holds only ever null (listVaults' dbhas) the schema may leave out: its default fills it.
+  // A field the check has only ever null (listVaults' dbhas) the schema may leave out: its default fills it.
   const optional = new Set(fieldnames.filter((fieldname) => choicesOf(shape[fieldname]!).length === 0))
   const fits = (gqlnames: string[]) => (
     gqlnames.every((gqlname) => fieldnames.includes(gqlname)) && fieldnames.every((fieldname) => gqlnames.includes(fieldname) || optional.has(fieldname))
@@ -146,7 +146,7 @@ const InputChecks = [
 // --
 
 describe("VaultSchemaSdl", () => {
-  it("holds each field the core's checks read, and no other", () => {
+  it("has each field the core's checks read, and no other", () => {
     expect(schemaDriftOf(buildSchema(VaultSchemaSdl))).to.deep.equal([])
   })
 
@@ -157,7 +157,7 @@ describe("VaultSchemaSdl", () => {
     expect(drift.join('\n')).to.include('cipher_iv_b64')
   })
 
-  it("is caught holding a field no check reads", () => {
+  it("is caught with a field no check reads", () => {
     const padded = buildSchema(VaultSchemaSdl.replace('  message:     String!\n', '  message:     String!\n  hint:        String\n'))
     expect(schemaDriftOf(padded).join('\n')).to.include('hint')
   })

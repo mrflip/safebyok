@@ -93,7 +93,7 @@ describe("useWhenShown", () => {
   it("waits while a Suspense boundary hides the component, and goes on once it shows again", async () => {
     const grabbed: WhenShown[] = []
     const grab = (whenShown: WhenShown) => { grabbed.push(whenShown) }
-    const hiding = TH.held()
+    const hiding = TH.makePending()
     const shown = (pending: Promise<undefined> | null) => (
       <Suspense fallback={<p>Loading</p>}>
         <TH.Hider hiding={pending} />
@@ -219,7 +219,7 @@ describe("useWhenShown", () => {
   })
 
   it("lets a handler zero an answer that comes back while an Activity hides the component, never keeping it for it to show again, as its second example shows", async () => {
-    const asking = TH.held<Uint8Array>()
+    const asking = TH.makePending<Uint8Array>()
     const heard: Uint8Array[] = []
     const shown = (mode: 'visible' | 'hidden') => (
       <Activity mode={mode}><Asker asking={() => asking.promise} onAnswer={(answer) => { heard.push(answer) }} /></Activity>
@@ -239,7 +239,7 @@ describe("useWhenShown", () => {
   })
 
   it("lets a handler tell its host once its await settles, while the component shows, as its example has it", async () => {
-    const unlocking = TH.held()
+    const unlocking = TH.makePending()
     const heard: boolean[] = []
     render(<Unlocker unlocking={() => unlocking.promise} onDone={(unlocked) => { heard.push(unlocked) }} />)
     fireEvent.click(screen.getByText('Unlock'))
@@ -250,8 +250,8 @@ describe("useWhenShown", () => {
     expect(heard).to.deep.equal([true])
   })
 
-  it("holds a handler whose await settles while an Activity hides the component, until it shows again", async () => {
-    const unlocking = TH.held()
+  it("keeps a handler waiting whose await settles while an Activity hides the component, until it shows again", async () => {
+    const unlocking = TH.makePending()
     const heard: boolean[] = []
     const shown = (mode: 'visible' | 'hidden') => (
       <Activity mode={mode}><Unlocker unlocking={() => unlocking.promise} onDone={(unlocked) => { heard.push(unlocked) }} /></Activity>
@@ -270,7 +270,7 @@ describe("useWhenShown", () => {
   })
 
   it("stops a handler whose await settles after the component unmounted", async () => {
-    const unlocking = TH.held()
+    const unlocking = TH.makePending()
     const heard: boolean[] = []
     const { unmount } = render(<Unlocker unlocking={() => unlocking.promise} onDone={(unlocked) => { heard.push(unlocked) }} />)
     fireEvent.click(screen.getByText('Unlock'))
@@ -292,10 +292,10 @@ describe("useWhenShown", () => {
     document.body.append(container)
     const root = createRoot(container)
     onTestFinished(() => { root.unmount(); container.remove() })
-    const unlocking = TH.held()
+    const unlocking = TH.makePending()
     const heard: boolean[] = []
-    const mounted = TH.held()
-    const unmounted = TH.held()
+    const mounted = TH.makePending()
+    const unmounted = TH.makePending()
     root.render(<><Unlocker unlocking={() => unlocking.promise} onDone={(unlocked) => { heard.push(unlocked) }} /><Committing committed={() => { mounted.resolve(undefined) }} /></>)
     await mounted.promise
     await TH.wakeupAtNextTick()

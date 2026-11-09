@@ -258,7 +258,7 @@ method returns it or a vaultKey (`models/proving.ts`). Bytes refused before impo
 wrapped under* and *a passkey proving's key*), `tests/helpers/crypto.test.ts` (*deriveWrappingKey*),
 `tests/models/gating.test.ts` (*gating.attempt*, among them *refuses a second while one runs 'attempt_in_flight',
 spending what it was handed, and the first goes on*, *concludes a malformed attempt, spends what came with it, and the
-refusal holds no passphrase* and *spends an answer from another realm, whose bytes are no instance of this realm's
+refusal has no passphrase* and *spends an answer from another realm, whose bytes are no instance of this realm's
 Uint8Array*).
 
 **G3. The vaultKey is never stored naked, and never persisted as a handle.** It exists (a) as an

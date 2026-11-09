@@ -56,7 +56,7 @@ const lockedVault = async (born = makeBornVault()) => {
 }
 
 describe("a birth through a gating", () => {
-  it("shows the dialog a gating asking for the scope, and on attempt lands the vault stored, held and unlocked", async () => {
+  it("shows the dialog a gating asking for the scope, and on attempt lands the vault stored, listed and unlocked", async () => {
     const { listing, gatingAt, storedNow, deviceDB } = birthWorld()
     const launched = listing.buildVault(Dna)
     const gating = await gatingAt<'build_vault'>()
@@ -119,7 +119,7 @@ describe("a birth through a gating", () => {
     gating.dismiss()
   })
 
-  it("holds nothing where the put is refused: the gating concludes the refusal, nothing stored, held or cached", async () => {
+  it("has nothing where the put is refused: the gating concludes the refusal, nothing stored, listed or cached", async () => {
     const { listing, opts, gatingAt, storedNow, deviceDB } = birthWorld()
     const refusal = new VaultError('storage_unavailable', "the disk is full")
     vi.spyOn(opts.vaultDB, 'tryPutVault').mockResolvedValueOnce(TH.bad(refusal) as never)
@@ -132,7 +132,7 @@ describe("a birth through a gating", () => {
     expect(deviceDB.tryStow).not.toHaveBeenCalled()
   })
 
-  it("leaves the vault stored and held, locked, where the lease is refused past the put, and the passphrase opens it next", async () => {
+  it("leaves the vault stored and listed, locked, where the lease is refused past the put, and the passphrase opens it next", async () => {
     const { listing, gatingAt, storedNow, deviceDB } = birthWorld()
     vi.spyOn(PassphraseProving.prototype, 'buildLease').mockRejectedValueOnce(new VaultError('unexpected_error', "no lease today"))
     const launched = TH.expectRefusal(listing.buildVault(Dna))
@@ -221,7 +221,7 @@ describe("one gating open per bank", () => {
 })
 
 describe("the dialog ending", () => {
-  it("concludes 'dismissed' on dismiss, holding nothing, and whenConcluded hears it", async () => {
+  it("concludes 'dismissed' on dismiss, having nothing, and whenConcluded hears it", async () => {
     const { listing, gatingAt, storedNow } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna), 'dismissed')
     const gating = await gatingAt<'build_vault'>()
@@ -254,7 +254,7 @@ describe("gating.attempt", () => {
     expect(landed.isUnlocked).to.be.true
   })
 
-  it("refuses another kind's clears, concluding the gating, putting nothing, and the refusal holds no passphrase", async () => {
+  it("refuses another kind's clears, concluding the gating, putting nothing, and the refusal has no passphrase", async () => {
     const { listing, gatingAt, storedNow } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna))
     const gating = await gatingAt<'build_vault'>()
@@ -289,7 +289,7 @@ describe("gating.attempt", () => {
     expect(passkeyClear.prfBytes.every((byte) => byte === 0)).to.be.true
   })
 
-  it("concludes a malformed attempt, spends what came with it, and the refusal holds no passphrase", async () => {
+  it("concludes a malformed attempt, spends what came with it, and the refusal has no passphrase", async () => {
     const { listing, gatingAt, storedNow } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna))
     const gating = await gatingAt<'build_vault'>()
@@ -342,7 +342,7 @@ describe("an unlock through a gating", () => {
     await TH.expectRefusal(second, 'dismissed')
   })
 
-  it("asks once no lease is held or cached; a wrong passphrase re-enters, and the right one unlocks", async () => {
+  it("asks once no lease is granted or cached; a wrong passphrase re-enters, and the right one unlocks", async () => {
     const { vault, gatingAt } = await lockedVault()
     const unlocking = vault.ensureUnlocked()
     const gating = await gatingAt<'unlock_vault'>()

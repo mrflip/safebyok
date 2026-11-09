@@ -21,7 +21,7 @@ const crossed = (answer: Answer<unknown, string, unknown>): unknown => {
   return JSON.parse(JSON.stringify(sent, (_ckey, field: unknown) => field ?? null)) as unknown
 }
 
-/** A VaultDB holding the vault and one box, at revision 0. */
+/** A VaultDB with the vault and one box, at revision 0. */
 const vaultDBWithBox = async (): Promise<MemoryVaultDB> => {
   const vaultDB = new MemoryVaultDB()
   await vaultDB.putVault(vaultAt(), { prior: SX.VoidRevision })

@@ -12,28 +12,28 @@ import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBox
 import { Dna, NewPassphrase, Passphrase, buildTyping, byPassphrase, delTyping, makeBornVault, makeVaultWorld, replaceTyping, unlockTyping, useVaultWorlds, hearingBadNews } from '../test-helpers/vault-world'
 import type { BoxWorld } from '../../src/shapes/shapes-vaultish'
 
-const held = useModelsWorld()
+const world = useModelsWorld()
 useVaultWorlds()
 
 describe("a lock() called during a put", () => {
   it("during the seal refuses 'vault_locked', putting nothing: put checks the lock at both ends of the seal", async () => {
     const lock = { during: false }
-    const listing = fakeSealBoxListingOf(held.mw, {}, () => { if (lock.during) { held.mw.setLocked(true) } })
+    const listing = fakeSealBoxListingOf(world.mw, {}, () => { if (lock.during) { world.mw.setLocked(true) } })
     const record = fullBoxRecord()
-    held.mw.seedPut(record)
+    world.mw.seedPut(record)
     const box = await listing.build(record)
     lock.during = true
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sealed while locking' } }), 'vault_locked')
-    expect(held.mw.callsOf('put')).to.deep.equal([])
+    expect(world.mw.callsOf('put')).to.deep.equal([])
   })
 
   it("during the put writes the record anyway: the put is past the window, and the box reports locked after", async () => {
     const record = fullBoxRecord()
-    held.mw.seedPut(record)
-    const box = await boxListingOf(held.mw).build(record)
-    held.mw.willPut(({ record: sent }) => {
-      held.mw.setLocked(true)
-      return held.mw.answerOf(box.scope, sent)
+    world.mw.seedPut(record)
+    const box = await boxListingOf(world.mw).build(record)
+    world.mw.willPut(({ record: sent }) => {
+      world.mw.setLocked(true)
+      return world.mw.answerOf(box.scope, sent)
     })
     await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
     expect(box.isLocked).to.be.true
@@ -80,12 +80,12 @@ describe("A lock called during a box verb", () => {
 /** A stored box whose next unseal runs `crossing` with the whisper opened, before it comes back to `box.expose`. */
 const boxCrossingUnseal = async (crossing: (box: TestableBox) => unknown) => {
   const unsealStampedString: BoxWorld['unsealStampedString'] = async (sealed, stamp) => {
-    const whisperText = await held.mw.world.unsealStampedString(sealed, stamp)
+    const whisperText = await world.mw.world.unsealStampedString(sealed, stamp)
     crossing(box)
     return whisperText
   }
-  const listing = boxListingOf(held.mw, { world: held.mw.worldWith({ unsealStampedString }) })
-  const box = await listing.create(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
+  const listing = boxListingOf(world.mw, { world: world.mw.worldWith({ unsealStampedString }) })
+  const box = await listing.create(boxDnaOf(world.mw.boxscope('anthropic_api_key')))
   return box
 }
 
@@ -98,9 +98,9 @@ describe("An ending called while box.expose unseals", () => {
   })
 
   it("a lock() refuses 'vault_locked', and leaves nothing exposed", async () => {
-    const box = await boxCrossingUnseal(() => { held.mw.setLocked(true) })
+    const box = await boxCrossingUnseal(() => { world.mw.setLocked(true) })
     await TH.expectRefusal(box.expose(), 'vault_locked')
-    held.mw.setLocked(false)
+    world.mw.setLocked(false)
     expect(box.whisper).to.eq(ENCRYPTED)
   })
 })
@@ -129,7 +129,7 @@ describe("A gate change after its record is stored", () => {
     expect(vault.isUnlocked).to.be.false
   })
 
-  it("a crypto failure in buildLease rejects, the row stored, the vault on its new gate under the lease it held", async () => {
+  it("a crypto failure in buildLease rejects, the row stored, the vault on its new gate under the lease it world", async () => {
     const { vault, demandStored, deviceDB } = await makeBornVault()
     const failure = new VaultError('unexpected_error', "the platform said no")
     vi.spyOn(Proving.prototype, 'buildLease').mockRejectedValueOnce(failure)

@@ -26,7 +26,7 @@ import { type ProvingWorldGiven, provingWorldOf } from './proving-world'
 /** The clock's first reading: 31 October 2026. */
 export const T0 = Date.UTC(2026, 9, 31)
 
-/** The scope of the one vault these worlds hold. */
+/** The scope of the one vault these worlds have. */
 export const Dna = Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
 
 /** The passphrase these worlds' vaults are made with. */
@@ -101,7 +101,7 @@ export const useVaultWorlds = (): void => {
   })
 }
 
-/** The real deviceDB, each verb a friend binds spied on, and the one row these worlds hold, to read or lay over. */
+/** The real deviceDB, each verb a friend binds spied on, and the one row these worlds have, to read or lay over. */
 const makeDeviceDB = () => {
   const memoryDB = new MemoryDeviceDB()
   const rows = memoryDB._cheat_leaseRows()
@@ -195,7 +195,7 @@ export const hearingBadNews = (opts: ListingOpts, onBadNews: (news: unknown) => 
   bankFriend: { ...opts.bankFriend, tellBadNews: brandGuarded((badnews: readonly VaultError[]) => { for (const news of badnews) { onBadNews(news) } }) },
 })
 
-/** The record of a vault created of `Dna`, gated under `passphrase`, as a vaultDB holds it. */
+/** The record of a vault created of `Dna`, gated under `passphrase`, as a vaultDB has stored it. */
 export const storedVaultRecord = async (passphrase: string = Passphrase): Promise<VaultRecord> => {
   const { listing, demandStored } = makeVaultWorld()
   await buildTyping(listing, Dna, byPassphrase(passphrase))
@@ -209,7 +209,7 @@ export const makeBornVault = async (typing: Typing = byPassphrase(Passphrase), w
   return { ...world, vault }
 }
 
-/** A vault as {@link makeBornVault} makes it, and the friend its birth built its lease on and the lease it holds, caught by a spy, as nothing of a vault hands them out. */
+/** A vault as {@link makeBornVault} makes it, and the friend its birth built its lease on and the lease it has, caught by a spy, as nothing of a vault hands them out. */
 export const makeBornVaultAndFriend = async (...args: Parameters<typeof makeBornVault>) => {
   const buildLease = vi.spyOn(Proving.prototype, 'buildLease')
   const born = await makeBornVault(...args)
@@ -226,13 +226,13 @@ export const makeBornVaultWithPasskey = async () => {
 
 const RoundTripStamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
 
-/** What the lease `opener` unseals of a whisper the vault `sealer` seals: the two hold one vaultKey only if it comes back. */
+/** What the lease `opener` unseals of a whisper the vault `sealer` seals: the two have one vaultKey only if it comes back. */
 export const roundTrip = async (sealer: Vault, opener: Lease): Promise<string> => opener.unsealWith(await sealer.sealStampedString('sk-test', RoundTripStamp), RoundTripStamp)
 
 /** {@link roundTrip} through the vaults' own seal verbs. */
 export const vaultRoundTrip = async (sealer: Vault, opener: Vault): Promise<string> => opener.unsealStampedString(await sealer.sealStampedString('sk-test', RoundTripStamp), RoundTripStamp)
 
-/** A passphrase proving of the vault `stamp` names, its wayin made, so it holds a vaultKey to lease. */
+/** A passphrase proving of the vault `stamp` names, its wayin made, so it has a vaultKey to lease. */
 export const makeProving = async ({ vault_tok, registered_at }: { vault_tok: string, registered_at: number }) => {
   const proving = await PassphraseProving.buildNovel({ ...Dna, vault_tok, registered_at }, passphraseCleartext.parse(Passphrase), provingWorldOf({ device_id: '00000000-0000-4000-8000-000000000001' }))
   await proving.buildWayin(NOVEL)
@@ -251,7 +251,7 @@ export const boxWorldOf = (vault: Vault): BoxWorld => ({
   unsealStampedString: (sealed, stamp) => vault.unsealStampedString(sealed, stamp),
 })
 
-/** The boxlabel of the one box the box-verb worlds hold. */
+/** The boxlabel of the one box the box-verb worlds have. */
 export const boxlabel = 'anthropic_api_key'
 /** The whisper those worlds put in it. */
 export const Whisper  = { apiKey: 'sk-test-0000' }
@@ -265,7 +265,7 @@ export const makeWorld = async () => {
   const tryListBoxes = vi.spyOn(world.vaultDB, 'tryListBoxes')
   const tryPutBox    = vi.spyOn(world.vaultDB, 'tryPutBox')
   const tryGetBox    = vi.spyOn(world.vaultDB, 'tryGetBox')
-  /** The next session on this device: a vault of the record stored, its boxes not yet listed, unlocked by the passphrase, sealing under the vaultKey the first holds. */
+  /** The next session on this device: a vault of the record stored, its boxes not yet listed, unlocked by the passphrase, sealing under the vaultKey the first has. */
   const openNextSession = async () => {
     const vault = await world.anotherSession().build(world.demandStored())
     await unlockTyping(vault, byPassphrase(Passphrase))

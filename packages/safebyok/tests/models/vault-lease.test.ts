@@ -27,7 +27,7 @@ const expectChangeUnlocked = async ({ vault, deviceDB, demandStored }: Awaited<R
 }
 
 describe("A lease renewed through a gate change", () => {
-  it("renewed: a lease held is attached under the epoch that was written, its row cached, and the vault never reports locked on the way", async () => {
+  it("renewed: a lease granted is attached under the epoch that was written, its row cached, and the vault never reports locked on the way", async () => {
     const { vault, deviceDB, demandStored } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
     const epoch0 = vault.gate.gate_epoch
@@ -188,7 +188,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(deviceDB.forget).not.toHaveBeenCalled()
   })
 
-  it("past a discard vault.boxListing answers the listing it held, its verbs refusing", async () => {
+  it("past a discard vault.boxListing answers the listing it listed, its verbs refusing", async () => {
     const { vault } = await makeVaultWithBox()
     const boxes = vault.boxListing
     vault.sweep()
@@ -281,12 +281,12 @@ describe("The discards: sweep and vacate, down the chain", () => {
   })
 })
 
-/** Every value `holder` shows by a field or getter, own or inherited, symbols too; its methods stay uncalled. */
-const valuesShownBy = (holder: object): unknown[] => {
+/** Every value `subject` shows by a field or getter, own or inherited, symbols too; its methods stay uncalled. */
+const valuesShownBy = (subject: object): unknown[] => {
   const shown: unknown[] = []
-  for (let proto: object | null = holder; proto !== null && proto !== Object.prototype; proto = Object.getPrototypeOf(proto) as object | null) {
+  for (let proto: object | null = subject; proto !== null && proto !== Object.prototype; proto = Object.getPrototypeOf(proto) as object | null) {
     for (const ckey of Reflect.ownKeys(proto)) {
-      try { shown.push(Reflect.get(holder, ckey)) } catch { /* a getter's refusal shows nothing */ }
+      try { shown.push(Reflect.get(subject, ckey)) } catch { /* a getter's refusal shows nothing */ }
     }
   }
   return shown
@@ -313,14 +313,14 @@ describe("a vault and a lease show neither the lease friend nor the lease key ha
     const { vault, deviceDB, friend, lease } = await makeBornVaultAndFriend()
     const row = deviceDB.cachedNow() as Record<string, unknown>
     expect(row['lease_key']).to.be.an.instanceof(CryptoKey)
-    for (const holder of [vault, lease]) {
-      const shown = valuesShownBy(holder)
+    for (const subject of [vault, lease]) {
+      const shown = valuesShownBy(subject)
       expect(shown).to.not.include(friend)
       expect(shown).to.not.include(row['lease_key'])
       expect(shown).to.not.include(row)
-      const json = JSON.stringify(holder)
+      const json = JSON.stringify(subject)
       for (const named of ['friend', 'leaseFriend', 'peekLease', 'lease_key', 'vault_key_lease_wrapped']) {
-        expect(Object.keys(holder)).to.not.include(named)
+        expect(Object.keys(subject)).to.not.include(named)
         expect(json).to.not.include(named)
       }
     }

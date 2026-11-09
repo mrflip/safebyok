@@ -53,7 +53,7 @@ const knock = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Knock' }))
 }
 
-/** The rows `vaultDB` holds for the box under the key's vaultlabel, by boxlabel. */
+/** The rows `vaultDB` has for the box under the key's vaultlabel, by boxlabel. */
 const storedBoxRows = (vaultDB: MemoryVaultDB) => {
   const vaultrow = vaultDB._cheat_vaultRowsOf({ applabel: 'acme', user_id: 'u1' }).get(ApiKeyVaultlabel) as { vault_tok: string }
   return vaultDB._cheat_boxRowsOf({ applabel: 'acme', user_id: 'u1', vaultlabel: ApiKeyVaultlabel }, vaultrow.vault_tok)

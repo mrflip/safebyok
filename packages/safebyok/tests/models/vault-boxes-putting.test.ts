@@ -136,7 +136,7 @@ describe("a void instance, then a put: no hello, no fetch", () => {
     expect(tryGetBox).not.toHaveBeenCalled()
   })
 
-  it("is held in things and left out of the snapshot until it is written", async () => {
+  it("is listed in things and left out of the snapshot until it is written", async () => {
     const { vault } = await makeWorld()
     const shell = vault.boxListing.puttable({ ...vault.scope, boxlabel })
     expect(vault.boxListing.things).to.deep.equal([shell])
@@ -179,7 +179,7 @@ describe("a void instance, then a put: no hello, no fetch", () => {
     expect(await reborn.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-0001' })
   })
 
-  it("as a void held within its horizon, has getBox ask nothing, and fetchBox hear the box stored, keeping the instance", async () => {
+  it("as a void listed within its horizon, has getBox ask nothing, and fetchBox hear the box stored, keeping the instance", async () => {
     const { next, box, tryGetBox } = await nextUnlisted()
     const shell = next.boxListing.puttable({ ...next.scope, boxlabel })
     expect(shell.isPresent).to.eq(false)
@@ -193,7 +193,7 @@ describe("a void instance, then a put: no hello, no fetch", () => {
     expect(await got?.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("as a tombstone held within its horizon, has getBox ask nothing, and fetchBox hear a box reborn elsewhere", async () => {
+  it("as a tombstone listed within its horizon, has getBox ask nothing, and fetchBox hear a box reborn elsewhere", async () => {
     const { vault, box, openNextSession, tryGetBox } = await makeWorldWithBox()
     await vault.delBox(boxlabel)
     const next = await openNextSession()
@@ -224,7 +224,7 @@ describe("vault.putBox over a live box", () => {
     expect(tryPutBox).not.toHaveBeenCalled()
   })
 
-  it("under ifAbsent 'fail' on a tombstone held, over a box reborn elsewhere, leaves it to the vaultDB: 'stale_write' with the frontier delivered", async () => {
+  it("under ifAbsent 'fail' on a tombstone listed, over a box reborn elsewhere, leaves it to the vaultDB: 'stale_write' with the frontier delivered", async () => {
     const { next, box } = await nextUnlisted()
     const elsewhere = await next.getBox(boxlabel)
     await elsewhere?.del()
@@ -324,7 +324,7 @@ describe("a sidecar-only put", () => {
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("puts what a kept reference holds at a put after a lock and an unlock: nothing blanked it", async () => {
+  it("puts what a kept reference has at a put after a lock and an unlock: nothing blanked it", async () => {
     const { vault, box } = await makeWorldWithBox()
     await box.put({ whisper: { apiKey: 'sk-test-0000' } })
     await box.expose()
@@ -336,7 +336,7 @@ describe("a sidecar-only put", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-edited' })
   })
 
-  it("is what putBox of a sidecar alone does to a box held", async () => {
+  it("is what putBox of a sidecar alone does to a box listed", async () => {
     const { vault } = await makeWorldWithBox()
     const box = await vault.putBox({ boxlabel, sidecar: { note: 'home' } })
     expect(box.sidecar).to.deep.equal({ note: 'home' })

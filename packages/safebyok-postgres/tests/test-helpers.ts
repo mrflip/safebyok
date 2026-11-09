@@ -66,7 +66,7 @@ const listenOn = async (db: PGlite, channel: string): Promise<Set<(text: string)
   if (heeders !== undefined) { return heeders }
   const fresh = new Set<(text: string) => void>()
   heedersOf.set(channel, fresh)
-  // PGlite LISTENs on the identifier as given, so a channel keeps its case and characters only quoted; a user_id holds no `"`.
+  // PGlite LISTENs on the identifier as given, so a channel keeps its case and characters only quoted; a user_id has no `"`.
   await db.listen(`"${channel}"`, (text) => { for (const onNotify of fresh) { onNotify(text) } })
   return fresh
 }
@@ -103,7 +103,7 @@ export const emptyTables = async (): Promise<void> => {
   await db.exec('TRUNCATE safebyok_vaults, safebyok_boxes')
 }
 
-/** A second VaultDB over the same tables and opts as `vaultDB`, as another device holds. */
+/** A second VaultDB over the same tables and opts as `vaultDB`, as another device has. */
 export const makeTwin = async (vaultDB: PostgresVaultDB): Promise<PostgresVaultDB> => await vaultDBOver(optsOf.get(vaultDB))
 
 export const failNextCall = (vaultDB: PostgresVaultDB): void => { clientsOf.get(vaultDB)?.failNext() }

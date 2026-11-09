@@ -11,7 +11,7 @@ export { _cheat_forgetShelf } from '../src/storage/idb-shelf'
 export { testDeriver, anyStrengthChecker, fakeCiphered, scopeOf, wayinOf, passkeyOf, tweakB64 } from './test-helpers/builders'
 export type { FakeCiphered } from './test-helpers/builders'
 export { wakeupAtNextTick, aWhile, eventually, changeCounter, makeLatch, beforeNextCall,
-  holdNextCall, holdNextAnswer, readAfresh } from './test-helpers/timing'
+  pendingNextCall, pendingNextAnswer, readAfresh } from './test-helpers/timing'
 export type { AsyncVerbOf } from './test-helpers/timing'
 export { spyLogger, quietLogger, loggedText, thrownText, leafTexts, shownOf, jsonOf } from './test-helpers/logging'
 export type { LoggedCall } from './test-helpers/logging'

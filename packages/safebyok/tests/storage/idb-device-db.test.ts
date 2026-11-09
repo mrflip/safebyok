@@ -47,14 +47,14 @@ const failNextCall = async (deviceDB: IdbDeviceDB): Promise<void> => {
   })
 }
 
-/** The name of every database IndexedDB holds now. */
+/** The name of every database IndexedDB has stored now. */
 const dbNamesNow = async (): Promise<string[]> => {
   const dbs = await indexedDB.databases()
   return dbs.map((db) => db.name).filter((dbname) => dbname !== undefined)
 }
 
-// idb-keyval holds its connection open for the page's life, as an old tab would; this one closes, as a closed tab has.
-/** Makes the database `dbname` holding one row in `storename`, and closes it. */
+// idb-keyval has its connection open for the page's life, as an old tab would; this one closes, as a closed tab has.
+/** Makes the database `dbname` with one row in `storename`, and closes it. */
 const plantClosedDB = async (dbname: string, storename: string): Promise<void> => {
   const opening = indexedDB.open(dbname)
   opening.addEventListener('upgradeneeded', () => { opening.result.createObjectStore(storename) })
@@ -163,7 +163,7 @@ describe("IdbDeviceDB's wipe of the old databases", () => {
     expect(await dbNamesNow()).to.include(newername)
   })
 
-  it("answers its calls while another tab holds an old database open", async () => {
+  it("answers its calls while another tab has an old database open", async () => {
     const dbName = freshDbName()
     await set('lease', { wrapped: 'old' }, createStore(`${dbName}:device_db`, 'records'))
     const deviceDB = makeDeviceDB(dbName)

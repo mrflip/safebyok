@@ -35,10 +35,10 @@ const sent = async (schema: GraphQLSchema, source: string, variableValues: objec
   return answer
 }
 
-/** A VaultDB's own answer as one crosses: dbhas null where it holds none. */
+/** A VaultDB's own answer as one crosses: dbhas null where it has none. */
 const asCrossed = (answer: DB.Answer<unknown, string, unknown>) => ({ ...answer, dbhas: answer.dbhas ?? null })
 
-/** The gate verbs' params: the vault record, its gate holding only the wayin the verb moves. */
+/** The gate verbs' params: the vault record, its gate with only the wayin the verb moves. */
 const gateParamsOf = (vault: DB.VaultRecord, gate: object) => ({ ...vault, gate })
 
 /** A server whose watches are counted while they listen, and the VaultDB behind it. */

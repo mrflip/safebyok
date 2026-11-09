@@ -189,7 +189,7 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       expect(nil).to.deep.include({ act: 'gotvoid', val: null, dbhas: null })
     })
 
-    it("over a tombstone, refuses holding it, and answers null with ifAbsent nil", async () => {
+    it("over a tombstone, refuses with it, and answers null with ifAbsent nil", async () => {
       const { vaultDB, vault } = await putWith()
       const tombstone = vaultTombstoneOf(vault)
       await vaultDB.delVault(tombstone, { prior: priorOf(vault) })
@@ -281,7 +281,7 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       expect(answer).to.deep.include({ ok: false, world: null, dbhas: vault })
     })
 
-    it("refuses a vault_tok no row holds, over no row or another life's tombstone", async () => {
+    it("refuses a vault_tok no row has, over no row or another life's tombstone", async () => {
       const vaultDB = await fresh()
       const asked = { ...boxscope, vault_tok: 'oldlife' }
       const sentinel = SX.sentinelVaultOf(vaultScope, 'oldlife')

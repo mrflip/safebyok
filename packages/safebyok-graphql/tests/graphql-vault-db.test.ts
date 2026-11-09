@@ -33,7 +33,7 @@ describe("GraphQLVaultDB over the typed schema", () => {
 
 // == [A client of its own]: FakeResult, fakeClient, gotNotice, revokedNotice
 
-/** What one call of a fake client hands back, as urql's own `OperationResult` holds it. */
+/** What one call of a fake client hands back, as urql's own `OperationResult` has it. */
 type FakeResult = { data?: unknown, error?: CombinedError, hasNext?: boolean }
 
 /** A GraphQLVaultDB over a fake urql Client whose queries and mutations answer `asked`, and each of whose subscriptions
@@ -97,7 +97,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'unexpected_error')
   })
 
-  it("refuses a failed request with a cause holding the error's name, HTTP status and code alone", async () => {
+  it("refuses a failed request with a cause with the error's name, HTTP status and code alone", async () => {
     const networkError = new Error('{"whisper_ciphered":"the record sent"}', { cause: { code: 'ECONNRESET', detail: 'the record sent' } })
     const combined = new CombinedError({ networkError, response: { status: 502, body: 'the record sent' } })
     const { vaultDB } = fakeClient({ error: combined })

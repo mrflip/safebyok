@@ -57,7 +57,7 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
   })
 
   // The value was taken from hash-wasm's argon2id called directly (and agrees with noble's argon2idAsync), over the spec's
-  // memorySize 65_536, 3 iterations, 1 lane and 32 bytes, for the passphrase and saltOf(16) below; the core's browser.test.ts holds its deriver to it too.
+  // memorySize 65_536, 3 iterations, 1 lane and 32 bytes, for the passphrase and saltOf(16) below; the core's browser.test.ts has its deriver to it too.
   it("derives the saved value for one fixed passphrase and salt, at the supplied spec's cost", { timeout: 60_000 }, async () => {
     const wasmBytes = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltOf(16))
     expect(hexOf(wasmBytes)).to.eq(SavedHex)
@@ -76,7 +76,7 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
 // Argon2id's own test vector, from its reference implementation (phc-winner-argon2's test.c:
 // version 0x13, 2 passes, 64 MiB, one lane, "password" and "somesalt"). Its salt is 8 bytes, under the
 // 16 a keyDeriverSpec asks, so hash-wasm is asked directly with the vector's parameters; the core's
-// own tests hold noble to the same vector, so neither implementation can agree with the other by
+// own tests check noble against the same vector, so neither implementation can agree with the other by
 // sharing a mistake.
 describe("Argon2id's reference test vector", () => {
   const ReferenceHex = '09316115d5cf24ed5a15a31a3ba326e5cf32edc24702987c02b6566f61913cf7'
@@ -172,7 +172,7 @@ describe("argon2idWasmDeriver", () => {
   })
 })
 
-// The core's parseKeyDeriverSpec is what both factories check with: these hold the two to the
+// The core's parseKeyDeriverSpec is what both factories check with: these check the two against the
 // same refusals, word for word, rather than restating the bounds.
 const UnworkableSpecs = [
   [{ salt_bytes: 15 },                    'a salt of 15 bytes'],
@@ -223,7 +223,7 @@ const putFakeBox = async (bank: Bank): Promise<void> => {
   await vault.putBox({ boxlabel: 'openai', whisper: FakeWhisper })
 }
 
-/** Unlocks the vault `bank` holds, asking the user as the world's dialog types, and checks the box the other device put is there. */
+/** Unlocks the vault `bank` has, asking the user as the world's dialog types, and checks the box the other device put is there. */
 const expectWhisperOpens = async (bank: Bank): Promise<void> => {
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
   await vault.ensureUnlocked()

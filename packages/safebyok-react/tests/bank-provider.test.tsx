@@ -25,9 +25,9 @@ const provided = (overrides: Partial<Props> = {}, world = TH.makeBankWorld()) =>
 }
 
 /** A MemoryDeviceDB whose ensureCachedBank for `user_id` waits until the test calls `answer`; every other user's answers at once. */
-const deviceDBHolding = (user_id: string) => {
+const deviceDBPending = (user_id: string) => {
   const deviceDB = new MemoryDeviceDB()
-  const answering = TH.held()
+  const answering = TH.makePending()
   const ensureCachedBank = deviceDB.ensureCachedBank.bind(deviceDB)
   vi.spyOn(deviceDB, 'ensureCachedBank').mockImplementation(async (scope) => {
     if (scope.user_id === user_id) { await answering.promise }
@@ -43,7 +43,7 @@ const leaseUsers = async (deviceDB: MemoryDeviceDB) => {
 }
 
 describe("BankProvider's bank", () => {
-  it("holds no bank while nobody is signed in", async () => {
+  it("has no bank while nobody is signed in", async () => {
     provided({ user_id: null })
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(shown('bank')).to.eq('none')
@@ -104,7 +104,7 @@ describe("BankProvider's bank", () => {
   })
 
   it("hands down no bank until its deviceDB answers", async () => {
-    const { deviceDB, answer } = deviceDBHolding('u1')
+    const { deviceDB, answer } = deviceDBPending('u1')
     const making = vi.spyOn(Bank, 'make')
     provided({ deviceDB })
     await act(async () => { await TH.wakeupAtNextTick() })
@@ -115,7 +115,7 @@ describe("BankProvider's bank", () => {
   })
 
   it("waits for the next user's device_id before making their bank", async () => {
-    const { deviceDB, answer } = deviceDBHolding('u2')
+    const { deviceDB, answer } = deviceDBPending('u2')
     const { props, rerender } = provided({ deviceDB })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
     const making = vi.spyOn(Bank, 'make')
@@ -130,7 +130,7 @@ describe("BankProvider's bank", () => {
   })
 
   it("makes no bank when the user signs out while its deviceDB answers", async () => {
-    const { deviceDB, answer } = deviceDBHolding('u1')
+    const { deviceDB, answer } = deviceDBPending('u1')
     const making = vi.spyOn(Bank, 'make')
     const { props, rerender } = provided({ deviceDB })
     rerender({ ...props, user_id: null })
@@ -317,28 +317,28 @@ describe("BankProvider's handlers", () => {
 
   it("tells a refused hello to the onLifecycle last rendered", async () => {
     const world = TH.makeBankWorld()
-    const held: { refuse?: (err: unknown) => void } = {}
-    vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(new Promise((_resolve, reject) => { held.refuse = reject }))
+    const pendingListVaults: { refuse?: (err: unknown) => void } = {}
+    vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(new Promise((_resolve, reject) => { pendingListVaults.refuse = reject }))
     const [first, last] = [vi.fn<LifecycleHandler>(), vi.fn<LifecycleHandler>()]
     const { props, rerender } = provided({ onLifecycle: first }, world)
     await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
     rerender({ ...props, onLifecycle: last })
-    held.refuse?.(Refusal)
+    pendingListVaults.refuse?.(Refusal)
     await waitFor(() => { expect(last).toHaveBeenCalledOnce() })
     expect(first).not.toHaveBeenCalled()
   })
 
   it("tells neither onLifecycle, onBadNews nor the logger of a hello that a sign-out crossed", async () => {
     const world = TH.makeBankWorld()
-    const held: { refuse?: (err: unknown) => void } = {}
-    vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(new Promise((_resolve, reject) => { held.refuse = reject }))
+    const pendingListVaults: { refuse?: (err: unknown) => void } = {}
+    vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(new Promise((_resolve, reject) => { pendingListVaults.refuse = reject }))
     const [onLifecycle, onBadNews] = [vi.fn(), vi.fn()]
     const spy = TH.spyLogger()
     const { props, rerender } = provided({ onLifecycle, onBadNews, logger: spy.logger }, world)
     await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
     rerender({ ...props, user_id: null })
     await waitFor(() => { expect(shown('bank')).to.eq('none') })
-    held.refuse?.(Refusal)
+    pendingListVaults.refuse?.(Refusal)
     await act(async () => { await TH.wakeupAtNextTick() })
     expect([onLifecycle, onBadNews].map((handler) => handler.mock.calls.length)).to.deep.equal([0, 0])
     expect(spy.calls).to.deep.equal([])
@@ -373,7 +373,7 @@ describe("BankProvider's handlers", () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const next = vi.fn()
-    const forgetting = TH.held()
+    const forgetting = TH.makePending()
     const previous = vi.fn()
     const { props, rerender, deviceDB } = await unlockedProvided({ onLifecycle: previous })
     vi.spyOn(deviceDB, 'forget').mockImplementation(async () => { await forgetting.promise; throw Refusal })
@@ -422,7 +422,7 @@ describe("BankProvider's dialog", () => {
     expect(dialogShown()).to.be.false
   })
 
-  it("opens the dialog for the gating the bank holds", async () => {
+  it("opens the dialog for the gating the bank has", async () => {
     provided()
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))

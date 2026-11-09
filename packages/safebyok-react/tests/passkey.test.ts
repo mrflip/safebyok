@@ -7,7 +7,7 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** The passkey header a vault holding the passkey `credential_id` keeps on its gate. */
+/** The passkey header a vault with the passkey `credential_id` keeps on its gate. */
 const headerOf = (credential_id: string, prf_salt_b64: string): WayinHeader => ({
   wayinkind: 'passkey', credential_id, prf_salt_b64, device_id: TH.DeviceId, registered_at: 0,
 }) as WayinHeader
@@ -160,8 +160,8 @@ describe("askPasskey", () => {
     const authenticator = TH.installFakeAuthenticator()
     const made = await createPasskey(TH.PasskeyMaking)
     authenticator.refuseNext('NotAllowedError')
-    const [held, absent] = [headerOf(made?.credential_id ?? '', made?.prf_salt_b64 ?? ''), headerOf('AAAAAAAAAAAAAAAAAAAAAA', made?.prf_salt_b64 ?? '')]
-    expect(await askPasskey(held)).to.be.null
+    const [stored, absent] = [headerOf(made?.credential_id ?? '', made?.prf_salt_b64 ?? ''), headerOf('AAAAAAAAAAAAAAAAAAAAAA', made?.prf_salt_b64 ?? '')]
+    expect(await askPasskey(stored)).to.be.null
     expect(await askPasskey(absent)).to.be.null
   })
 
@@ -205,7 +205,7 @@ describe("askPasskey's header and options", () => {
     })
   }
 
-  // No vault the core read holds such a salt: it came from the host.
+  // No vault the core read has such a salt: it came from the host.
   it("refuses a salt that is not base64url", async () => {
     const authenticator = TH.installFakeAuthenticator()
     const refused = await refusalOf(askPasskey(headerOf('AAAA', 'not base64url!')))
@@ -267,7 +267,7 @@ describe("a passkey unlock, end to end", () => {
     const world = TH.makeBankWorld()
     const { vault } = await TH.makeBankWithVault(world)
     await TH.addPasskeyTo(world, vault, await createPasskey(TH.PasskeyMaking))
-    const { gating, raising } = await TH.heldGatingOf(world, TH.unlocking)
+    const { gating, raising } = await TH.openGatingOf(world, TH.unlocking)
     const passkeyClear = await askPasskey(gating.passkeyHeader)
     if (passkeyClear === null) { throw new Error('dismissed') }
     expect(await TH.gatingOfKind(gating, 'unlock_vault').attempt({ passkeyClear })).to.include({ ok: true })
@@ -278,7 +278,7 @@ describe("a passkey unlock, end to end", () => {
     TH.installFakeAuthenticator()
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
-    const { gating, raising } = await TH.heldGatingOf(world, TH.addingPasskey)
+    const { gating, raising } = await TH.openGatingOf(world, TH.addingPasskey)
     const passkeyClear = await createPasskey(TH.PasskeyMaking)
     if (passkeyClear === null) { throw new Error('dismissed') }
     expect(await TH.gatingOfKind(gating, 'add_passkey').attempt({ passphraseClear: TH.Passphrase, passkeyClear })).to.include({ ok: true })

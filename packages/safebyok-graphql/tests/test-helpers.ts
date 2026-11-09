@@ -59,7 +59,7 @@ const listenOn = async (db: PGlite, channel: string): Promise<Set<(text: string)
   if (heeders !== undefined) { return heeders }
   const fresh = new Set<(text: string) => void>()
   heedersOf.set(channel, fresh)
-  // PGlite LISTENs on the identifier as given, so a channel keeps its case and characters only quoted; a user_id holds no `"`.
+  // PGlite LISTENs on the identifier as given, so a channel keeps its case and characters only quoted; a user_id has no `"`.
   await db.listen(`"${channel}"`, (text) => { for (const onNotify of fresh) { onNotify(text) } })
   return fresh
 }
@@ -73,7 +73,7 @@ export const listen: PostgresListen = async (channel, onNotify) => {
 
 // == [The server]: TestContext, serverOver, schemaOver
 
-/** What the test server's context holds for one request: the user its auth signed in, or null. */
+/** What the test server's context has for one request: the user its auth signed in, or null. */
 export type TestContext = { user_id: string | null }
 
 /** The server's PostgresVaultDB over this file's PGlite. */
@@ -144,7 +144,7 @@ const serverOf = (vaultDB: GraphQLVaultDB): { schema: GraphQLSchema, adapter: Po
   return server
 }
 
-/** A second browser's VaultDB over the same server, as another device holds. */
+/** A second browser's VaultDB over the same server, as another device has. */
 export const makeTwin = (vaultDB: GraphQLVaultDB): FlakyVaultDB => {
   const server = serverOf(vaultDB)
   const twin = browserOver(server.schema)

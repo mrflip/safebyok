@@ -6,7 +6,7 @@ import * as TH from '../test-helpers'
 
 TH.sweepBankWorlds()
 
-/** The inspector over the deviceDB of a world whose bank built `main`, and so holds its lease. */
+/** The inspector over the deviceDB of a world whose bank built `main`, and so has its lease. */
 const renderOverLease = async () => {
   const { world } = await TH.makeBankWithVault()
   render(<DevDeviceDBInspector deviceDB={world.deviceDB} />)

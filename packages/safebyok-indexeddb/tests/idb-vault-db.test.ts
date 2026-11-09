@@ -35,7 +35,7 @@ const connectionOf = async (vaultDB: IdbVaultDB): Promise<unknown> => {
 }
 
 // The twin's connection is compared, not its shelf: a forgotten shelf whose name drifted would share the page's connection unseen.
-/** A second VaultDB over the same database, on a connection of its own, as another tab holds. */
+/** A second VaultDB over the same database, on a connection of its own, as another tab has. */
 const makeTwin = async (vaultDB: IdbVaultDB): Promise<IdbVaultDB> => {
   const dbName = dbNameOf.get(vaultDB)!
   TH._cheat_forgetShelf(`${dbName}:vaults-v${DB.VaultsDBVersion}`)
@@ -66,14 +66,14 @@ const failNextCall = (): void => {
   })
 }
 
-/** The name of every database IndexedDB holds now. */
+/** The name of every database IndexedDB has stored now. */
 const dbNamesNow = async (): Promise<string[]> => {
   const dbs = await indexedDB.databases()
   return dbs.map((db) => db.name).filter((dbname) => dbname !== undefined)
 }
 
-// idb-keyval holds its connection open for the page's life, as an old tab would; this one closes, as a closed tab has.
-/** Makes the database `dbname` holding one row in an object store, and closes it. */
+// idb-keyval has its connection open for the page's life, as an old tab would; this one closes, as a closed tab has.
+/** Makes the database `dbname` with one row in an object store, and closes it. */
 const plantClosedDB = async (dbname: string): Promise<void> => {
   const storename = 'rows'
   const opening = indexedDB.open(dbname)
@@ -209,7 +209,7 @@ describe("IdbVaultDB's refusals", () => {
 
   const AbsentCases = [
     [undefined, 'refuses a call where there is no IndexedDB'],
-    [null,      'refuses a call where the browser holds IndexedDB as null'],
+    [null,      'refuses a call where the browser has IndexedDB as null'],
   ] as const
 
   for (const [absent, blurb] of AbsentCases) {

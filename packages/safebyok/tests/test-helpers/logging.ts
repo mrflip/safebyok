@@ -52,7 +52,7 @@ export const quietLogger: VaultLogger = {
  * call's message, its story as JSON, and its error -- message, stack, own properties -- down
  * through every cause. It never throws: a cause seen before is written `[cause seen above]`, and
  * a story or own properties JSON cannot write (a circular reference, a bigint) are written
- * `[not JSON]`, so what they hold goes unsearched.
+ * `[not JSON]`, so what they contain goes unsearched.
  *
  * @param calls - What a {@link spyLogger} heard.
  * @returns The text, one call to a line.
@@ -94,7 +94,7 @@ export const leafTexts = (val: unknown): string[] => {
 }
 
 /** What a spread, a key list, a log line and `JSON.stringify` see of `obj`: its own enumerable
- * fields, as a plain object, and nothing a private field or a getter holds. For a test of what a
+ * fields, as a plain object, and nothing a private field or a getter has. For a test of what a
  * model shows of itself.
  *
  * @param obj - A Vault object, a box, a way in, a lease, or any object.
@@ -114,7 +114,7 @@ export const jsonOf = (val: unknown): Record<string, unknown> => {
 }
 
 /** An error and every cause under it as text: message, stack and own properties each. Anything
- * else thrown, as JSON. `seen` holds the errors already written, so a cause cycle ends.
+ * else thrown, as JSON. `seen` has the errors already written, so a cause cycle ends.
  */
 const errorText = (thrown: unknown, seen: Set<unknown>): string => {
   if (thrown === undefined || thrown === null) { return '' }

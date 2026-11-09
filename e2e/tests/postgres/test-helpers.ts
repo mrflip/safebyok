@@ -42,9 +42,9 @@ export const describeOnPostgres = (suite: PostgresSuite, title: string, body: ()
 export type FileDatabase = {
   /** A pool over it for what the test does as the host's own code: plant a row, count, empty. Shared by the file. */
   host: Pool
-  /** A pool of its own over it, as one server holds; ended with {@link FileDatabase.endDevices}. */
+  /** A pool of its own over it, as one server has; ended with {@link FileDatabase.endDevices}. */
   devicePool: () => Pool
-  /** A connection of its own to it, as a listener holds; ended with the devices. */
+  /** A connection of its own to it, as a listener has; ended with the devices. */
   client: () => Promise<Client>
   /** Empties both tables. */
   empty: () => Promise<void>
@@ -167,7 +167,7 @@ export const listenOver = async (db: FileDatabase): Promise<PostgresListen> => {
 
 export type VaultDBOverOpts = Omit<PostgresVaultDBOpts, 'client' | 'listen'>
 
-/** A PostgresVaultDB over `db` as one server holds it: a pool and a listener of its own. */
+/** A PostgresVaultDB over `db` as one server has it: a pool and a listener of its own. */
 export const vaultDBOver = async (db: FileDatabase, opts: VaultDBOverOpts = {}): Promise<PostgresVaultDB> => (
   new PostgresVaultDB({ ...opts, client: pgClientOf(db.devicePool()), listen: await listenOver(db) })
 )

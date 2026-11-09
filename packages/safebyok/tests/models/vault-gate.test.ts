@@ -30,7 +30,7 @@ const dialogOf = (world: Born) => {
   }
 }
 
-/** The proving of the gate the vault holds that `passphrase` opens, refusing 'wrong_passphrase' otherwise. */
+/** The proving of the gate the vault has that `passphrase` opens, refusing 'wrong_passphrase' otherwise. */
 const proveBy = ({ vault }: Born, passphrase: string) => PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(passphrase), vault.world)
 
 /** Moves the row past what the attempt read, as another device does just before `verb`'s commit reaches the vaultDB. */
@@ -182,7 +182,7 @@ describe("gating.attempt of another kind's clears", () => {
 })
 
 describe("vault.addPasskeyPrompt()", () => {
-  it("lays the passkey's wayin and keeps the passphrase's: both open, and the passphrase's lease stays held", async () => {
+  it("lays the passkey's wayin and keeps the passphrase's: both open, and the passphrase's lease stays granted", async () => {
     const born = await makeBornVault()
     const { vault, demandStored } = born
     const { gate: anteGate } = demandStored()
@@ -195,7 +195,7 @@ describe("vault.addPasskeyPrompt()", () => {
     await expect(PasskeyProving.buildStored(vault.gate, await TH.passkeyOf('laptop'))).resolves.to.be.instanceOf(PasskeyProving)
   })
 
-  it("refuses where a passkey is held, nobody asked", async () => {
+  it("refuses where a passkey is stored, nobody asked", async () => {
     const born = await makeBornVaultWithPasskey()
     const { shown } = dialogOf(born)
     await TH.expectRefusal(born.vault.addPasskeyPrompt())
@@ -249,7 +249,7 @@ describe("vault.revokePasskeyPrompt()", () => {
     expect(vault.isUnlocked).to.be.true
   })
 
-  it("is a no-op with no passkey held", async () => {
+  it("is a no-op with no passkey stored", async () => {
     const born = await makeBornVault()
     const { storedNow, vault } = born
     const ante = storedNow()
@@ -268,7 +268,7 @@ describe("vault.revokePasskeyPrompt()", () => {
     expect(demandStored().gate.passkey_wayin).to.be.null
   })
 
-  it("refuses 'wrong_passphrase' a passkey's holder who cannot prove the passphrase, the wayin left", async () => {
+  it("refuses 'wrong_passphrase' the user of a passkey who cannot prove the passphrase, the wayin left", async () => {
     const { vault, demandStored } = await makeBornVaultWithPasskey()
     await TH.expectRefusal(revokeTyping(vault, 'not it'), 'wrong_passphrase')
     expect(demandStored().gate.passkey_wayin).not.to.be.null
@@ -283,7 +283,7 @@ describe("vault.revokePasskeyPrompt()", () => {
 })
 
 describe("a gate change on other sessions", () => {
-  it("locks no other device: the session holding the older gate stays unlocked as it adopts the new, and its next session asks the new passphrase", async () => {
+  it("locks no other device: the session with the older gate stays unlocked as it adopts the new, and its next session asks the new passphrase", async () => {
     const { vault, demandStored, anotherSession } = await makeBornVault()
     const theirs = await anotherSession().build(demandStored())
     await unlockTyping(theirs, { passphraseClear: Passphrase })

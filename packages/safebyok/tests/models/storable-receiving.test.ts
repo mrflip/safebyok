@@ -9,7 +9,7 @@ import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { TestableBox, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
-const held = useModelsWorld()
+const world = useModelsWorld()
 
 /** Each policy `reconcileCentral` returned, in order, across every SpiedBox: a sealed storable takes no field of its own. */
 const policies: CentralPolicy[] = []
@@ -48,10 +48,10 @@ const rcvdOf = (shape: RecordShape, rev: Partial<BoxSparse>): Rec => {
 
 /** A box given `central`, not yet listed and not yet timely. */
 const boxOf = (central: Rec): SpiedBox => (
-  new SpiedBox(held.mw.world, boxListingOf(held.mw), central)
+  new SpiedBox(world.mw.world, boxListingOf(world.mw), central)
 )
 
-/** The box's held records and the own props that follow the record in hand, for comparing before and after. */
+/** The box's world records and the own props that follow the record in hand, for comparing before and after. */
 const stateOf = (box: TestableBox) => ({
   central:      box._cheat_central,
   revision_seq: box.revision_seq,
@@ -79,7 +79,7 @@ const ShapesAll: readonly RecordShape[] = ['full', 'sparse', 'gone']
 const ShapesAlive: readonly RecordShape[] = ['full', 'sparse']
 
 describe("storable.receive(rcvd): the reconcileCentral table, through a Box", () => {
-  beforeEach(() => { held.mw.setNow(T0 + 9000) })
+  beforeEach(() => { world.mw.setNow(T0 + 9000) })
 
   describe("an older rcvd", () => {
     for (const centralShape of ShapesAll) {
@@ -91,7 +91,7 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
     }
 
     for (const rcvdShape of ShapesAll) {
-      it(`older | ${rcvdShape} | full notes no success: an older record says nothing of the revision held`, () => {
+      it(`older | ${rcvdShape} | full notes no success: an older record says nothing of the revision world`, () => {
         const box = boxOf(Centrals.full())
         box.receive(rcvdOf(rcvdShape, OlderRev))
         expect(box.isTimely).to.be.false
@@ -100,7 +100,7 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
   })
 
   describe("success noted on a record not older, where the record in hand is whole", () => {
-    it("same | sparse | sparse notes no success: nothing whole is held", () => {
+    it("same | sparse | sparse notes no success: nothing whole is world", () => {
       const box = boxOf(Centrals.sparse())
       box.receive(rcvdOf('sparse', SameRev))
       expect(box.isTimely).to.be.false
@@ -220,7 +220,7 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       })
     }
 
-    it("other | newer | full | never stored takes 'adopt': a box born elsewhere first is the one storage holds", () => {
+    it("other | newer | full | never stored takes 'adopt': a box born elsewhere first is the one storage has stored", () => {
       const box = boxOf(tombstoneBoxRecord({ revision_seq: SX.VoidRevisionSeq, revision_tok: 'rev-never' }))
       const rcvd = fullBoxRecord({ revision_seq: 0, revision_tok: 'rev-b0', ...OtherLife })
       box.receive(rcvd)
@@ -238,12 +238,12 @@ describe("storable.receive(null)", () => {
   })
 
   for (const centralShape of ShapesAlive) {
-    it(`for a thing held alive (${centralShape}) refuses, by same | gone | alive`, () => {
+    it(`for a thing world alive (${centralShape}) refuses, by same | gone | alive`, () => {
       expectReceiveConflict(boxOf(Centrals[centralShape]()), null)
     })
   }
 
-  it("for a thing held gone reads as 'same', by same | gone | gone", () => {
+  it("for a thing world gone reads as 'same', by same | gone | gone", () => {
     expectReceivedUnchanged(boxOf(Centrals.gone()), null, 'same')
   })
 })

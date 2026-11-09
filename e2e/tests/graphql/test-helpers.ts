@@ -52,7 +52,7 @@ export const serve = async (vaultDB: PostgresVaultDB): Promise<Server> => {
   return { url: `http://127.0.0.1:${String(port)}/api/graphql`, vaultDB }
 }
 
-/** A PostgresVaultDB over `db` as one server holds it, its listen counted in `listening` as each watch starts and stops. */
+/** A PostgresVaultDB over `db` as one server has it, its listen counted in `listening` as each watch starts and stops. */
 export const vaultDBListening = async (db: TH.FileDatabase, listening: { count: number }): Promise<PostgresVaultDB> => {
   const listen = await TH.listenOver(db)
   const counted: PostgresListen = async (channel, onNotify) => {

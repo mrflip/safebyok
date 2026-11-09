@@ -10,7 +10,7 @@ import type { BatteryWorld } from './vault-db-battery'
 const anyIfPresent = ['repl', 'fail', 'get'] as const
 const anyIfAbsent  = ['add', 'fail'] as const
 
-/** A gate verb's params: a vault record holding a gate that holds the wayin. */
+/** A gate verb's params: a vault record with a gate that has the wayin. */
 export const gateParamsOf = (vault: VaultRecord, gate: object) => ({ ...vault, gate }) as never
 
 /** Registers the puts' and gate verbs' cases over `world`. */
@@ -49,7 +49,7 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
     })
 
-    it("refuses over a live row whatever its revision, holding the row", async () => {
+    it("refuses over a live row whatever its revision, with the row", async () => {
       const { vaultDB, vault } = await putWith()
       expect(await vaultDB.tryPutVault(vaultAt(8), { prior: stale })).to.deep.include({ ok: false, act: 'camped', dbhas: vault, world: vault })
     })
@@ -108,7 +108,7 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await vaultDB.tryPutBox(next, { prior: priorOf(box), ifPresent: 'fail' })).to.deep.include({ ok: false, act: 'camped', dbhas: box, world: vault })
     })
 
-    it("refuses over a row moved past its prior, holding the row and leaving it", async () => {
+    it("refuses over a row moved past its prior, with the row and leaving it", async () => {
       const { vaultDB, vault, box } = await putWith({ box: true })
       expect(await vaultDB.tryPutBox(boxAt(8), { prior: stale })).to.deep.include({ ok: false, act: 'stale_write', dbhas: box, world: vault })
       expect(await vaultDB.getBox(boxQuery)).to.deep.include({ val: box })
@@ -129,7 +129,7 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')).to.have.property('size', 0)
     })
 
-    it.skipIf(! hasCap)("refuses a new box past its VaultDB's cap, and replaces one held", async () => {
+    it.skipIf(! hasCap)("refuses a new box past its VaultDB's cap, and replaces one stored", async () => {
       const vaultDB = await makeCapped(1)
       await vaultDB.putVault(vaultAt(), { prior: SX.VoidRevision })
       const box = boxAt()
@@ -223,7 +223,7 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
   })
 
   describe("a put over a row failing its check, at that row's own revision", () => {
-    it.each(boxFlaws)("refuses a box put over a row holding %s, whatever its ifPresent, holding the row", async (_flawname, flawOf) => {
+    it.each(boxFlaws)("refuses a box put over a row with %s, whatever its ifPresent, with the row", async (_flawname, flawOf) => {
       const { vaultDB, box } = await putWith({ box: true })
       const flawed = flawOf(box)
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', flawed)
@@ -234,7 +234,7 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(boxrows.get('openai')).to.deep.equal(flawed)
     })
 
-    it.each(vaultFlaws)("refuses a vault put over a row holding %s, whatever its ifPresent, holding the row", async (_flawname, flawOf) => {
+    it.each(vaultFlaws)("refuses a vault put over a row with %s, whatever its ifPresent, with the row", async (_flawname, flawOf) => {
       const { vaultDB, vault } = await putWith()
       const flawed = flawOf(vault)
       await rowsOf(vaultDB).plantVaultRow(vaultScope, flawed)
@@ -272,7 +272,7 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: val })
     })
 
-    it("addPasskey adds over no passkey, and refuses over one held, with the stored record", async () => {
+    it("addPasskey adds over no passkey, and refuses over one stored, with the stored record", async () => {
       const { vaultDB, vault } = await putWith()
       const { act, val } = await vaultDB.addPasskey(gateParamsOf(vault, { passkey_wayin: passkeyWayin }))
       expect(act).to.eq('added')
@@ -280,10 +280,10 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await vaultDB.tryAddPasskey(gateParamsOf(val, { passkey_wayin: { ...passkeyWayin, device_id: '00000000-0000-4000-8000-0000000000d2' } }))).to.deep.include({ ok: false, act: 'camped', dbhas: val, world: val })
     })
 
-    it("revokePasskey nulls a passkey held, and over none answers revoked with nothing moved", async () => {
+    it("revokePasskey nulls a passkey stored, and over none answers revoked with nothing moved", async () => {
       const { vaultDB, vault } = await putWith()
-      const { val: holding } = await vaultDB.addPasskey(gateParamsOf(vault, { passkey_wayin: passkeyWayin }))
-      const { act, val } = await vaultDB.revokePasskey(gateParamsOf(holding, { passkey_wayin: null }))
+      const { val: withPasskey } = await vaultDB.addPasskey(gateParamsOf(vault, { passkey_wayin: passkeyWayin }))
+      const { act, val } = await vaultDB.revokePasskey(gateParamsOf(withPasskey, { passkey_wayin: null }))
       expect(act).to.eq('revoked')
       expect(val.gate).to.deep.equal({ gate_epoch: 3, passphrase_wayin: passphraseWayin, passkey_wayin: null })
       expect(await vaultDB.revokePasskey(gateParamsOf(val, { passkey_wayin: null }))).to.deep.include({ act: 'revoked', val, world: val })

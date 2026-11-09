@@ -1,4 +1,4 @@
-/** A vault's unlocking: ensureUnlocked and the lock, and the lease it holds by unlock or by the cache. */
+/** A vault's unlocking: ensureUnlocked and the lock, and the lease it has by unlock or by the cache. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { makeLeaseKey } from '../../src/helpers/crypto'
@@ -15,7 +15,7 @@ useVaultWorlds()
 const Stamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
 
 describe("proving.buildWayin: one wayin per proving, of its own vault", () => {
-  it("refuses a second wayin of a proving that holds one, and a source proving of another vault", async () => {
+  it("refuses a second wayin of a proving that has one, and a source proving of another vault", async () => {
     const { vault, fakeBank: world } = await makeBornVault()
     const mine = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(Passphrase), world)
     await TH.expectRefusal(mine.buildWayin(NOVEL))
@@ -105,7 +105,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(vault.getSnapshot().isLocked).to.be.true
   })
 
-  it("unlocks a vault held sparse by proof, its full record fetched for the gate", async () => {
+  it("unlocks a vault listed sparse by proof, its full record fetched for the gate", async () => {
     const { demandStored } = await makeBornVault()
     const record = demandStored()
     const { listing } = makeVaultWorld(record)
@@ -116,7 +116,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(vault.isFull).to.be.true
   })
 
-  it("vault.unlock on a vault held sparse fetches its full record, where the gating it launches would refuse", async () => {
+  it("vault.unlock on a vault listed sparse fetches its full record, where the gating it launches would refuse", async () => {
     const { demandStored } = await makeBornVault()
     const record = demandStored()
     const { listing } = makeVaultWorld(record)
@@ -142,9 +142,9 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
   })
 })
 
-describe("The vault holds a lease: by unlock, or by the cache", () => {
+describe("The vault has a lease: by unlock, or by the cache", () => {
 
-  it("holds the lease, reporting unlocked, and caches its row, in place of the lease it displaces", async () => {
+  it("has the lease, reporting unlocked, and caches its row, in place of the lease it displaces", async () => {
     const { vault, deviceDB, advance } = await makeBornVault()
     const bornRow = deviceDB.cachedNow() as { proved_at: number }
     advance(1)
@@ -158,7 +158,7 @@ describe("The vault holds a lease: by unlock, or by the cache", () => {
     const vault = await anotherSession().build(demandStored())
     const kept = deviceDB.cachedNow()
     expect(kept).not.to.be.null
-    const peeked = TH.holdNextAnswer(deviceDB.memoryDB, 'peek')
+    const peeked = TH.pendingNextAnswer(deviceDB.memoryDB, 'peek')
     const ensuring = vault.ensureUnlocked()
     await peeked.reached
     vault.sweep()
@@ -172,7 +172,7 @@ describe("The vault holds a lease: by unlock, or by the cache", () => {
     const { vault, deviceDB } = await makeBornVault()
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    const cached = TH.holdNextAnswer(deviceDB.memoryDB, 'tryStow')
+    const cached = TH.pendingNextAnswer(deviceDB.memoryDB, 'tryStow')
     const unlocking = unlockTyping(vault, byPassphrase(Passphrase))
     await cached.reached
     expect(vault.isUnlocked).to.be.true
@@ -183,7 +183,7 @@ describe("The vault holds a lease: by unlock, or by the cache", () => {
     expect(vault.isLocked).to.be.true
   })
 
-  it("holds the lease where the deviceDB refuses its row, told as bad news: it costs the next session a proof, not this one its lease", async () => {
+  it("has the lease where the deviceDB refuses its row, told as bad news: it costs the next session a proof, not this one its lease", async () => {
     const onBadNews = vi.fn()
     const { fakeBank, opts, deviceDB, demandStored } = await makeBornVault()
     const record = demandStored()
@@ -233,7 +233,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     expect(again.isUnlocked).to.be.true
   })
 
-  it("takes up no lease another device cached before the gate changed: a revoked passkey's holder asks for the proof", async () => {
+  it("takes up no lease another device cached before the gate changed: the user of a revoked passkey asks for the proof", async () => {
     const { vault, demandStored } = await makeBornVaultWithPasskey()
     const other = makeVaultWorld(demandStored(), { device_id: '00000000-0000-4000-8000-000000000002' })
     const theirs = await other.listing.build(other.demandStored())
@@ -298,7 +298,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     expect(await vaultRoundTrip(vault, again)).to.eq('sk-test')
   })
 
-  it("forgets the row at a lock() of a vault that holds no lease: the next session asks for the proof", async () => {
+  it("forgets the row at a lock() of a vault that has no lease: the next session asks for the proof", async () => {
     const { demandStored, anotherSession, deviceDB } = await makeBornVault()
     const record = demandStored()
     const idle = await anotherSession().build(record)

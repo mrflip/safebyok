@@ -158,7 +158,7 @@ describe("Patterns.user_id", () => {
 })
 
 describe("label and user_id, inside a host's own Zod", () => {
-  // A host on classic Zod holds them in its own schemas, as a form checking a box might.
+  // A host on classic Zod has them in its own schemas, as a form checking a box might.
   const BoxForm = Zod.object({ boxlabel: PX.label, user_id: Zod.optional(PX.user_id) })
 
   it("compose into a host's schema and check as they do alone", () => {
@@ -181,7 +181,7 @@ const EpochMillisCases = [
   // edge cases:
   [FarPast - 1,               false,  'one millisecond before 1981'],
   [FarFuture + 1,             false,  'one millisecond past the ceiling'],
-  [8.64e15,                   false,  'the last instant a Date holds, far past the ceiling'],
+  [8.64e15,                   false,  'the last instant a Date has, far past the ceiling'],
   [0,                         false,  'the epoch itself'],
   [NowMillis + 0.5,               false,  'a fraction of a millisecond'],
   [Infinity,                  false,  'a time that never comes'],

@@ -65,7 +65,7 @@ const boxList = (boxes: readonly BoxSnapshot[]): string => boxes.map(({ boxlabel
 
 const boxRow = ({ boxlabel, isPresent, sidecar }: BoxSnapshot): string => `${boxlabel} ${isPresent ? JSON.stringify(sidecar) : 'deleted'}`
 
-/** The store of the component that shows the whisper itself: `box.whisper` is its snapshot, as the box's snapshot never holds it. */
+/** The store of the component that shows the whisper itself: `box.whisper` is its snapshot, as the box's snapshot never has it. */
 const whisperStoreOf = (box: Box): Store<Whisper> => ({ subscribe: box.subscribe, getSnapshot: () => box.whisper })
 
 /** The view of `box`'s whisper: the whisper while it shows, else where it stands. */
@@ -129,7 +129,7 @@ describe("the proof", () => {
     const boxesUi = mountComponent(vault.boxListing, boxList)
     boxesUi.expectRenders(['no boxes'])
 
-    // Seal a box: storage holds only ciphertext, and the list shows it.
+    // Seal a box: storage has stored only ciphertext, and the list shows it.
     const box = await vault.putBox(ApiKey)
     boxesUi.expectRenders(['anthropic_api_key'])
     const boxUi = mountComponent(box, boxRow, { hearsVault: true })
@@ -215,7 +215,7 @@ describe("the proof", () => {
     expect(dialog.shown).to.deep.equal([])
     nextPageUi.expectRenders(['ready: main unlocked'])
 
-    // It opens what the page before it sealed: the lease it picked up holds the same vaultKey.
+    // It opens what the page before it sealed: the lease it picked up has the same vaultKey.
     await pickedUp.hello()
     const nextBoxesUi = mountComponent(pickedUp.boxListing, boxList)
     nextBoxesUi.expectRenders(['anthropic_api_key'])
@@ -415,7 +415,7 @@ describe("the proof", () => {
     await vault.hello()
     boxesUi.expectRenders(['anthropic_api_key, openai_api_key, gemini_api_key'])
 
-    // It replaces the passphrase: this device stays unlocked and holds the new gate; a later unlock takes the new passphrase.
+    // It replaces the passphrase: this device stays unlocked and has the new gate; a later unlock takes the new passphrase.
     phone.typing = { antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }
     await phoneVault.replacePassphrasePrompt()
     await ticks(1)

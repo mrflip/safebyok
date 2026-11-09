@@ -31,12 +31,12 @@ export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
       expect(await vaultDB.delBox({ ...tombstone, revision_tok: 'again', revision_seq: 8 }, { prior: stale })).to.deep.include({ act: 'gone', val: tombstone, world: vault })
     })
 
-    it("refuses over a live row moved past its prior, holding the row", async () => {
+    it("refuses over a live row moved past its prior, with the row", async () => {
       const { vaultDB, vault, box } = await putWith({ box: true })
       expect(await vaultDB.tryDelBox({ ...boxTombstoneOf(box), revision_seq: 8 }, { prior: stale })).to.deep.include({ ok: false, act: 'stale_write', dbhas: box, world: vault })
     })
 
-    it("refuses a row past peeking at any prior, the sentinels a listing shows among them, holding the row", async () => {
+    it("refuses a row past peeking at any prior, the sentinels a listing shows among them, with the row", async () => {
       const { vaultDB, box } = await putWith({ box: true })
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { garbage: true })
       const sentinelled = SX.boxTombstone.parse({ ...SX.sentinelBoxOf(boxscope, 'life1'), ...SX.nextRevisionOf(SX.VoidRevision, Now) })
@@ -45,7 +45,7 @@ export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
       expect(await storedBoxOf(vaultDB)).to.deep.equal({ garbage: true })
     })
 
-    it.each(boxFlaws)("refuses a row holding %s at its own revision, holding the row", async (_flawname, flawOf) => {
+    it.each(boxFlaws)("refuses a row with %s at its own revision, with the row", async (_flawname, flawOf) => {
       const { vaultDB, box } = await putWith({ box: true })
       const flawed = flawOf(box)
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', flawed)
@@ -64,7 +64,7 @@ export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
       expect(row.revision_tok).to.not.eq(box.revision_tok)
     })
 
-    it("refuses over a live row moved past its prior, holding the row and tombstoning no box", async () => {
+    it("refuses over a live row moved past its prior, with the row and tombstoning no box", async () => {
       const { vaultDB, vault, box } = await putWith({ box: true })
       expect(await vaultDB.tryDelVault({ ...vaultTombstoneOf(vault), revision_seq: 8 }, { prior: stale })).to.deep.include({ ok: false, act: 'stale_write', dbhas: vault })
       expect(await vaultDB.getBox(boxQuery)).to.deep.include({ val: box })
@@ -109,7 +109,7 @@ export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
       expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
     })
 
-    it.each(vaultFlaws)("refuses a row holding %s at its own revision, holding the row and tombstoning no box", async (_flawname, flawOf) => {
+    it.each(vaultFlaws)("refuses a row with %s at its own revision, with the row and tombstoning no box", async (_flawname, flawOf) => {
       const { vaultDB, vault, box } = await putWith({ box: true })
       const flawed = flawOf(vault)
       await rowsOf(vaultDB).plantVaultRow(vaultScope, flawed)

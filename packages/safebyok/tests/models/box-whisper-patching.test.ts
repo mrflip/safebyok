@@ -6,16 +6,16 @@ import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
-const held = useModelsWorld()
+const world = useModelsWorld()
 
 const Stored = { apiKey: 'sk-test-0000', org: { name: 'acme', seats: 3 }, tags: ['a', 'b'] }
-const lock = () => { held.mw.setLocked(true) }
+const lock = () => { world.mw.setLocked(true) }
 
 /** A box whose whisper is {@link Stored}, not exposed. */
 const unexposedOf = async (): Promise<TestableBox> => {
   const record = fullBoxRecord()
-  held.mw.seedPut(record)
-  const box = await boxListingOf(held.mw).build(record)
+  world.mw.seedPut(record)
+  const box = await boxListingOf(world.mw).build(record)
   return box.put({ whisper: Stored })
 }
 
@@ -25,7 +25,7 @@ describe("box.patchWhisper", () => {
 
     await box.expose()
     const was = box.whisper
-    const tryPutBox = vi.spyOn(held.mw.vaultDB, 'tryPutBox')
+    const tryPutBox = vi.spyOn(world.mw.vaultDB, 'tryPutBox')
     expect(box.patchWhisper({ org: { seats: 4 }, tags: ['c'], added: true })).to.eq(box)
     expect(box.whisper).not.to.eq(was)
     expect(box.whisper).to.deep.equal({ apiKey: Stored.apiKey, org: { name: 'acme', seats: 4 }, tags: ['c'], added: true })
@@ -34,7 +34,7 @@ describe("box.patchWhisper", () => {
     expect(await box.extractWhisper()).to.deep.equal(Stored)
   })
 
-  it("tells each subscriber once, leaving the snapshot, which holds nothing of the value, as it was", async () => {
+  it("tells each subscriber once, leaving the snapshot, which has nothing of the value, as it was", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -77,11 +77,11 @@ describe("box.patchWhisper", () => {
     lock()
     const told = vi.fn()
     box.subscribe(told)
-    const tryPutBox = vi.spyOn(held.mw.vaultDB, 'tryPutBox')
+    const tryPutBox = vi.spyOn(world.mw.vaultDB, 'tryPutBox')
     expect(box.patchWhisper({ apiKey: 'sk-patched' }).whisper).to.eq(LOCKED)
     expect(told).toHaveBeenCalledOnce()
     expect(tryPutBox).not.toHaveBeenCalled()
-    held.mw.setLocked(false)
+    world.mw.setLocked(false)
     expect(box.whisper).to.deep.include({ apiKey: 'sk-patched' })
   })
 
@@ -138,7 +138,7 @@ describe("the identity useSyncExternalStore reads", () => {
     expect(box.whisper).to.eq(box.whisper)
     lock()
     expect(box.whisper).to.eq(box.whisper)
-    held.mw.setLocked(false)
+    world.mw.setLocked(false)
     box.unveil()
     expect(box.whisper).to.eq(box.whisper)
     box.unexpose()

@@ -28,7 +28,7 @@ const makeVaultWithBox = async (born: ReturnType<typeof makeBornVault> = makeBor
     const found = await boxIn(vault)
     return found.extractWhisper()
   }
-  /** The next session on this device: a new listing over the same vaultDB and deviceDB, holding the vault record stored, after its hello. */
+  /** The next session on this device: a new listing over the same vaultDB and deviceDB, with the vault record stored, after its hello. */
   const openNextSession = async () => {
     const listing = world.anotherSession()
     const vault = await listing.build(world.demandStored())
@@ -39,7 +39,7 @@ const makeVaultWithBox = async (born: ReturnType<typeof makeBornVault> = makeBor
 }
 
 describe("Birth: a vault born with its gate seals its first box under the birth lease", () => {
-  it("is born unlocked under a gate of its passphrase, which the vault record carries, and a box built in it opens the whisper it sealed; neither record stored holds the whisper or the passphrase", async () => {
+  it("is born unlocked under a gate of its passphrase, which the vault record carries, and a box built in it opens the whisper it sealed; neither record stored has the whisper or the passphrase", async () => {
     const { vault, box, demandStored } = await makeVaultWithBox()
     expect(vault.isUnlocked).to.be.true
     expect(demandStored().gate).to.deep.include(vault.gate.pickle())
@@ -170,7 +170,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
   })
 })
 
-/** The vault as another device holds it: its own deviceDB, caching no lease yet, over the record this device stored, after its hello. */
+/** The vault as another device has it: its own deviceDB, caching no lease yet, over the record this device stored, after its hello. */
 const openOtherDevice = async (stored: VaultRecord) => {
   const other = makeVaultWorld(stored, { device_id: '00000000-0000-4000-8000-000000000002' })
   const vault = await other.listing.build(other.demandStored())
@@ -193,7 +193,7 @@ describe("Another device, over the same vaultDB and boxes", () => {
     expect(other.deviceDB.cachedNow()).not.to.be.null
   })
 
-  it("seals, on the other device, a whisper this one opens: every lease of the vault holds its one vaultKey", async () => {
+  it("seals, on the other device, a whisper this one opens: every lease of the vault has its one vaultKey", async () => {
     const { vault, boxIn, unsealIn, demandStored } = await makeVaultWithBox()
     const other = await openOtherDevice(demandStored())
     await unlockTyping(other.vault, byPassphrase(Passphrase))

@@ -29,7 +29,7 @@ const novelPassphrase = (world: ProvingWorld = provingWorldOf()): Promise<Passph
 
 const novelOverHanded = (handBack: () => unknown): Promise<PassphraseProving> => novelPassphrase(provingWorldOf({ keyDeriver: deriverHanding(handBack) }))
 
-/** A passphrase proving that holds a wayin under a new vaultKey, beside that wayin. */
+/** A passphrase proving that has a wayin under a new vaultKey, beside that wayin. */
 const novelWithWayin = async (): Promise<{ proving: PassphraseProving, wayin: Wayin }> => {
   const proving = await novelPassphrase()
   return { proving, wayin: await proving.buildWayin(NOVEL) }
@@ -56,7 +56,7 @@ const findsWeak = () => ({ strong: false as const, reason: 'too short' })
 
 const findsStrongAsync = () => Promise.resolve({ strong: true as const })
 
-/** Whether `one`'s lease opens what `other`'s seals: whether both hold one vaultKey. */
+/** Whether `one`'s lease opens what `other`'s seals: whether both have one vaultKey. */
 const expectOneVaultKey = async (one: Proving, other: Proving): Promise<void> => {
   const friend = fakeLeaseFriendOf()
   const stamp = sealStampOf('b1')
@@ -119,8 +119,8 @@ describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
     [() => ({ world: TH.omitting(provingWorldOf(), 'device_id') }),       'a world with no device_id'],
     [() => ({ world: TH.omitting(provingWorldOf(), 'strengthChecker') }), 'a world with no strengthChecker'],
     [() => ({ world: provingWorldOf({ device_id: '' }) }),                'a world with an empty device_id'],
-    [() => ({ world: { ...provingWorldOf(), keyDeriver: TH.testDeriver } }), "a world holding the host's bare keyDeriver"],
-    [() => ({ world: { ...provingWorldOf(), strengthChecker: TH.anyStrengthChecker } }), "a world holding the host's bare strengthChecker"],
+    [() => ({ world: { ...provingWorldOf(), keyDeriver: TH.testDeriver } }), "a world with the host's bare keyDeriver"],
+    [() => ({ world: { ...provingWorldOf(), strengthChecker: TH.anyStrengthChecker } }), "a world with the host's bare strengthChecker"],
     [() => ({ stamp: { ...WorldStamp, vault_tok: undefined } }),          'a stamp with no vault_tok'],
     [() => ({ stamp: { ...WorldStamp, registered_at: 'yesterday' } }),    'a stamp registered at a time that is no epoch millis'],
     [() => ({ stamp: null }),                                             'no stamp at all'],
@@ -233,7 +233,7 @@ describe("PasskeyProving.buildNovel(stamp, passkeyClear, world)", () => {
 })
 
 describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
-  it("proves the gate's passphrase wayin: its stamp and epoch the gate's, its header the wayin's, and it holds the gate's vaultKey", async () => {
+  it("proves the gate's passphrase wayin: its stamp and epoch the gate's, its header the wayin's, and it has the gate's vaultKey", async () => {
     const { gate, answerOf } = await gateWithBoth(2)
     const proving = await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf())
     expect(proving.stamp).to.deep.equal(WorldStamp)
@@ -505,7 +505,7 @@ describe("proving.buildWayin(source)", () => {
     await expectOneVaultKey(proving, proving)
   })
 
-  it("refuses a buildWayin on a stored proving: it holds its wayin from birth", async () => {
+  it("refuses a buildWayin on a stored proving: it has its wayin from birth", async () => {
     const { gate } = await gateWithBoth()
     const proving = await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf())
     await TH.expectRefusal(proving.buildWayin(NOVEL))

@@ -44,7 +44,7 @@ describe("Argon2id's reference test vector", () => {
 })
 
 // The value was taken from @noble/hashes' argon2idAsync called directly (and agrees with hash-wasm's argon2id), over the spec's
-// 65_536 KiB, 3 passes, 1 lane and 32 bytes, for this passphrase and salt; safebyok-fastkey's tests hold its wasm deriver to it too.
+// 65_536 KiB, 3 passes, 1 lane and 32 bytes, for this passphrase and salt; safebyok-fastkey's tests check its wasm deriver against it too.
 describe("a saved Argon2id value", () => {
   it("is what argon2idWebV1Deriver derives for one fixed passphrase and salt, at the spec's cost", { timeout: FullStrengthDeriveMillis }, async () => {
     const saltBytes = Uint8Array.from({ length: 16 }, (_unused, ii) => ((ii * 37) + 11) % 256)

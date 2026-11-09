@@ -6,7 +6,7 @@ import * as TH from '../test-helpers'
 
 TH.sweepBankWorlds()
 
-/** The inspector over a world whose vault holds `anthropic`, under a provider signed in as the world's user. */
+/** The inspector over a world whose vault has `anthropic`, under a provider signed in as the world's user. */
 const renderOverBox = async () => {
   const { world, vault } = await TH.makeBankWithVault()
   await vault.putBox({ boxlabel: 'anthropic', whisper: { apiKey: 'sk-ant-fake-stored' } }, { ifAbsent: 'add' })
