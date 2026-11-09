@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
-import { type Outcome, storageTroubleOf, bad, good, outcomeOf, valOf } from '../../src/refusals/outcome'
+import { type GoodOutcome, type Outcome, storageTroubleOf, bad, demandGood, good, outcomeOf, valOf } from '../../src/refusals/outcome'
 import * as Refusals from '../../src/refusals/throwers'
 
 /** An app's own call, which rejects: what outcomeOf's first example wraps. */
@@ -109,6 +109,19 @@ describe("valOf", () => {
     expect(valOf(good('vault record'))).to.eq('vault record')
     const refusal = new VaultError('stale_write', 'Read it again.')
     expect(() => valOf(bad(refusal))).to.throw(refusal)
+  })
+})
+
+describe("demandGood", () => {
+  it("hands back a good outcome as it came", () => {
+    const outcome = good('vault record')
+    expect(demandGood(outcome)).to.eq(outcome)
+    expectTypeOf(demandGood(good(7))).toEqualTypeOf<GoodOutcome<number>>()
+  })
+
+  it("throws a bad outcome's err as it came", () => {
+    const refusal = new VaultError('stale_write', 'Read it again.')
+    expect(() => demandGood(bad(refusal))).to.throw(refusal)
   })
 })
 

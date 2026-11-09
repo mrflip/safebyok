@@ -17,7 +17,7 @@ built. *Open* is a live case that has no thread and needs a ruling.
 
 Contents:
 
-* **Call chains:** `#straight-chute`, `#sugar-holds-no-logic`, `#no-bouncing`, `#own-your-form`, `#no-call-for-side-effects`
+* **Call chains:** `#straight-chute`, `#sugar-holds-no-logic`, `#no-bouncing`, `#own-your-form`, `#no-call-for-side-effects`, `#one-body-per-pair`, `#outcome-for-its-consumer`, `#offer-the-form-they-want`, `#one-catch-routes-the-news`
 * **Guards and awaits:** `#ensure-works-demand-refuses`, `#guard-at-the-entrypoint`, `#chain-guards`, `#no-second-ensure`
 * **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-crash`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`, `#no-repair-in-normal-ops`
 * **Reuse:** `#use-the-helper`, `#one-test-one-place`, `#use-what-you-parse`
@@ -189,7 +189,7 @@ async put(patch, opts = {}) {
   await this.ensurePuttable(timely); const given = this.demandPuttable(patch)
 ```
 
-**Goofus again:** `valOf` here runs only so that it throws.
+**Goofus again:** `valOf` here runs only so that it throws. `demandGood(hello)` says so.
 
 ```ts
 const hello = await outcomeOf(() => this.#bringUp(listing))
@@ -227,6 +227,129 @@ protected buildOrReceive(record) {
 ```
 
 *Status: `box.put`, `listing.build`, Fixed. `bank.hello`, Planned, Thread 2.*
+
+## A try pair has one body `#one-body-per-pair`
+
+Work out which half is easier to write, the throwing form or the try form. That half holds the body; the other is one line
+that wraps it. A method whose `Outcome` carries `meta` holds its body on the try side.
+
+**Goofus:** the throwing form unwraps an Outcome, the try form wraps it again, and the one caller takes it apart a third time.
+
+```ts
+async cache() {
+  if (this.#isFromCache) { return }
+  valOf(await this.#friend.tryCacheLease(this.#demandRecord()))
+}
+tryCache() { return outcomeOf(() => this.cache()) }
+async cacheAsCacheCan() {
+  const cached = await this.tryCache()
+  if (! cached.ok) { this.#friend.tellBadNews([cached.err]) }
+}
+```
+
+**Gallant:** one method, working directly. Where there are two forms, one holds the body and the other wraps it.
+
+```ts
+async cacheAsCacheCan() {
+  if (this.#isFromCache) { return }
+  const cached = await this.#friend.tryCacheLease(this.#demandRecord())
+  if (! cached.ok) { this.#friend.tellBadNews([cached.err]) }
+}
+
+async getBox(boxlabel, opts = {}) { return this.boxListing.get({ ...this.scope, boxlabel }, opts) }
+tryGetBox(boxlabel, opts = {}) { return outcomeOf(() => this.getBox(boxlabel, opts)) }
+```
+
+## Make an outcome only for someone who wants one `#outcome-for-its-consumer`
+
+`outcomeOf` is for a function that returns an `Outcome`, or whose immediate consumer needs one. Made and unmade on the spot,
+possibly across methods, it is a try/catch in a costume: write the try/catch. `valOf` is for its value; to throw a bad outcome
+and discard the answer, `demandGood`.
+
+**Goofus:** an outcome built only to be unbuilt, and a `valOf` whose value nobody takes.
+
+```ts
+valOf(await outcomeOf(() => unwrapKeyUnder(this.#wayinKey, wrapped, ctx, CheckUsage), wrongProof))
+
+const hello = await outcomeOf(() => this.#bringUp())
+this.#announce({ kind: 'helloed', outcome: hello })
+valOf(hello)
+```
+
+**Gallant:** the catch says what it traps. The announce wants the outcome, so `outcomeOf` stays, and `demandGood` throws it.
+
+```ts
+try {
+  await unwrapKeyUnder(this.#wayinKey, wrapped, ctx, CheckUsage)
+} catch {
+  throw wrongProof()
+}
+
+const hello = await outcomeOf(() => this.#bringUp())
+this.#announce({ kind: 'helloed', outcome: hello })
+demandGood(hello)
+```
+
+## Offer the form your callers want `#offer-the-form-they-want`
+
+An interface of our own, a friend above all, has one form of each verb: the one its callers use. If every caller unwraps it,
+it is the wrong form.
+
+**Goofus:** each caller of the friend's verb turns its Outcome back into a throw.
+
+```ts
+tryForgetLease: () => deviceDB.tryForget(asked),   // the friend
+valOf(await this.#friend.tryForgetLease())         // a caller, and every other
+```
+
+**Gallant:**
+
+```ts
+forgetLease: () => deviceDB.forget(asked),
+await this.#friend.forgetLease()
+```
+
+## One catch routes the news `#one-catch-routes-the-news`
+
+Several steps that each tell bad news and return bury the path that works. Throw from the steps, and route the refusal to
+bad news in one catch. A throw that is no refusal is a bug, and goes on through. Say each condition on its own line, where
+each has its own answer.
+
+**Goofus:** two conditions with different answers share a branch, and every refusal has its own exit.
+
+```ts
+if (! peeked.ok) {
+  friend.tellBadNews([peeked.err])
+  return null
+}
+if (checked.data.gate_epoch !== epoch || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
+  await forgetOutdated(friend)
+  return null
+}
+```
+
+**Gallant:** an outdated row is ordinary and says nothing; a row of another stamp is news.
+
+```ts
+try {
+  const peeked = await friend.peekLease()
+  if (peeked === null) { return null }
+  // ...
+  if (checked.data.gate_epoch !== epoch) {
+    await forgetOutdated(friend)
+    return null
+  }
+  if (! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
+    await forgetOutdated(friend)
+    throw damagedLease()
+  }
+  return new Lease(friend, checked.data, true)
+} catch (err) {
+  if (! isVaultError(err)) { throw err }
+  friend.tellBadNews([err])
+  return null
+}
+```
 
 ---
 

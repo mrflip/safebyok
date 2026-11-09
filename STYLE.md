@@ -238,7 +238,9 @@ throws. A method named `try` always resolves an `Outcome`; one whose result make
 outcome is renamed. The doc block lives on the throwing half, and the `try` half's one line points
 to it. The implementation lives on whichever half is easier to write, and `valOf` or one
 try/catch derives the other, never a second implementation; a method whose `Outcome` carries
-`meta` is implemented on the `try` side. A VaultDB's and a DeviceDB's public verbs are try pairs too
+`meta` is implemented on the `try` side. `outcomeOf` is for a function that returns an `Outcome` or
+whose immediate consumer needs one; to throw a bad one and discard the answer, `demandGood`, not
+`valOf`. A VaultDB's and a DeviceDB's public verbs are try pairs too
 (`getBox` and `tryGetBox`); the `do*` hooks an adapter implements throw, and have one form.
 
 **A check is a triplet, not a pair** (the Coach, 2026-10-22): "an ensureConsistent() and get
