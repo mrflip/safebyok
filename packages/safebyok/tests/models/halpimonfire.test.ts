@@ -142,12 +142,12 @@ describe("A gate change after its record is stored", () => {
 
   it("a lock crossing the renewal drops the new lease with no second erase, which could take a later lease's row", async () => {
     const { vault, deviceDB } = await makeBornVault()
-    deviceDB.tryForget.mockClear()
+    deviceDB.forget.mockClear()
     crossingGrant(() => { vault.lock() })
     await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
     expect(vault.isUnlocked).to.be.false
     expect(deviceDB.cachedNow()).to.be.null
-    expect(deviceDB.tryForget).toHaveBeenCalledOnce()
+    expect(deviceDB.forget).toHaveBeenCalledOnce()
   })
 
   it("a tombstone crossing the renewal resolves: the lease it held is gone, so the new one is dropped unattached, and demandAttachable is never met", async () => {

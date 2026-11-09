@@ -1,44 +1,27 @@
 # Hanging: bank-provider.tsx interactive session
 
-Questions and issues either of us noticed, banked so we don't side quest. One bullet each; who raised it in brackets. Settled items move to provider-resolved.md.
+Questions and issues either of us noticed, banked so we don't side quest. One bullet each; who raised it in brackets. Settled items move to provider-resolved.md. The start-up reads, the listings and the IndexedDB cache are in whiteboard/20261108-query_efficiently/query_efficiently.md, after the fate makeover.
 
-## For this PR
+## To confirm
 
-Nothing open.
+* #600's calls, made by its worker: a bank row the scrub can't forget goes to `onBadNews`, a warning rather than an error; when listing the leases is refused, `vacated` says `unerased: 0` and the refusal goes to `onBadNews`. [agent, 2026-11-08]
+* After a panic's vacate, does the provider remake the bank for the same `user_id`? A stale session would loop: make, panic, vacate. Recommended: no. The bank stays spent, `useVault` says `spent`, and a host that wants another hears `vacated` and remounts `<BankProvider key=…>`; a vacate forgets the device row (#598), so that gets a fresh `device_id`. Costs one README line. [Coach, agent]
 
-## After this PR
+## Small
 
-* **Next, stacked in order:** 20261108-bank_followups (running), then the lifecycle callback (lifecycle-callback.md, *Rulings*), then the gating dialog from the snapshot, then the react layout (folders and one shapes file), then the react comment tour. [agent, 2026-11-08]
-  * Gating dialog from the snapshot (the Coach, 2026-11-08: "YES PLEASE" to dropping `useGatingDialog`). The bank's snapshot gains `openGating: AnyGating | null`, the live gating: `VaultListing.holdGating` and `releaseGating` already set and clear the one open gating, and they remake the bank's snapshot and notify. Every end (settle, lock, discard, sweep, vacate) already passes through `releaseGating`. The provider renders `<GatingModal gating={snapshot.openGating} key=…the gating…>`; the modal calls `gating.attempt` or `gating.decline`. Gone: `useGatingDialog` (about 50 lines), its ref, its round counter, `endAny`, `onSwept`'s close, and the gesture pre-check, since the modal's own click is the gesture. `requestCleartext` stays for a host with its own dialog; with none, the gating waits in the snapshot to be rendered. A core contract change.
-  * Types: every type into one shapes file, `PassphraseModalProps` too, with `shapes-provider.ts` folded in, and the checkers with them (passkey.ts's `PasskeyChecks` among them), so they can share props. A single-use local alias (`SafeNavigator`) stays beside its use. The Coach: prop names are already in the destructure, it saves agents tokens, and the checkers can share props.
-  * Folders, in the same PR as the types (the Coach, 2026-11-08: "it's weird to have visual components sitting next to provider/hooks/shapes"): `provider/` (bank-provider, provider-hooks, gating-modal, boundary), `hooks/` (hooks, when-shown, reveal-toggle, and `useRoundFor` out of boundary), `src/shapes.ts` as one file, no folder (the Coach left it to me), `helpers/` (messages, passkey, attempt-refusals), `components/` (whisper-field, box-whisper-field, passkey-unlock-button, vault-controls), `modals/` (modal.tsx as modal-kit.tsx, and the five modals), `devmode/` as is. Moved by `git mv`; exports unchanged.
-  * Comment tour, every react file but the provider, the hooks and the shapes: "is this comment necessary for a competent React programmer assisted by an agent?", or "would they plausibly undo something important without it?" An export keeps its first-line doc block, since the host reads it on hover.
+* notes/wontfix.md, design-models.md, design-proof.md, gallant-test_titles.md and reference-timings.md still name `onPanic`. wontfix.md's rulings ("a host with no `onPanic` has given its opinion") need rereading against `onLifecycle`, not just renaming. [agent, 2026-11-08]
+* `Listing.bankFriend` is `protected` in TypeScript only, so a host can reach it at runtime through the bank's vault listing. Recorded in guarantees.md and security.md; a real `#private` route if it matters. [agent, 2026-11-08]
+* The context value is `{ bank, helloedVaults, tellBadNews }`, against the wish for `Bank | null`. `helloedVaults` goes with query_efficiently; `tellBadNews` stays while `vault-controls` reports refusals. [agent, 2026-11-08]
 
-The start-up reads, the listings and the IndexedDB cache moved to whiteboard/20261108-query_efficiently/query_efficiently.md.
+## Waiting on a host
 
-## Little React things
-
-* Building blocks for hosts who compose their own providers: an optional `device_id` prop on BankProvider (skip the fetch when the host has one), or exporting `useDeviceId` / `useHeldBank`. Adding an export later is cheap and removing one breaks semver, so wait for a host to ask; the core plus `useSyncExternalStore` is already the full-control escape hatch. [Coach]
-* The device is named before the user and the bank: `device_id` should come down with, or before, `user_id`, as a thing the app provides, and we give it a tool to get one (today's `useDeviceId` / `ensureBank`). The bank's real identity is then `(device_id, applabel, user_id)`, which we could form into a `bank_id`. [Coach]
-
-## Under way?
-
-* **Open, after thread 2.** After a panic's vacate, should the provider remake the bank for the same `user_id`? "Who are we to disagree" says yes, but if the session really is stale, the new bank's `hello` hits `identity_revoked` again: a make, panic, vacate loop against the host's server. Remake only on new props (`user_id`, `device_id`, or a future host "session" signal)? [Coach, agent]
-  * Still open, 2026-11-08. The Coach: could we ask the host to mint a new `device_id`? With a host-provided `device_id` (the `bank_id` item), a new one is a new key and so a new bank, and whether to retry is the host's call. A vacate forgets the device row by contract (#598), so a remade bank gets a fresh `device_id`, and thread 2's `vacated` event gives the host the signal. Left: does the provider remake on `vacated`, or leave it to the host?
-* One `onEvent` for the bank's handlers, and the bank's events in React's event loop (a hook that subscribes): weigh after this PR. [Coach]
-  * The Coach (2026-11-08): what was meant is a callback the host hands us, through which we announce lifecycle events (a bank made, helloed, swept or vacated, a panic, a user switch), taking the policy that follows out of our hands. The host then decides what follows: vacating at sign-out, remaking after a panic, minting a new device_id. Surveyed and ruled 2026-11-08: lifecycle-callback.md. `onLifecycle` replaces `onPanic`, `onBadNews` stays apart; its own thread after 20261108-bank_followups.
-
-## Explain
-
-* On a disabled bank, `useVault` reports `'waiting'` forever (its snapshot never reaches `ready`). It should say the bank has ended. [agent]
-  * After a sweep or a vacate the bank's snapshot says `stage: 'refused'` with the end cause, and `useVault` takes anything but `'ready'` as `'waiting'` (hooks.ts:39). Fix: `VaultHeld` gains an ended stage carrying the cause. Riding thread 2, which rewrites `useVault`'s hello (2026-11-08).
-* **Planned as thread 3 (see Next).** The gating dialog is imperative because `requestCleartext`'s contract is ("resolve when the user is done"). A more React-native design: the bank's snapshot exposes the open gating, the provider's dialog renders it, and cancel calls `gating.decline()`; `requestCleartext` stays for hosts with their own dialog. A core and contract redesign. [agent]
+* The device is named before the user and the bank: `device_id` comes down with, or before, `user_id`, as a thing the app provides, and we give it a tool to get one (today's `useDeviceId` / `ensureBank`). The bank's real identity is then `(device_id, applabel, user_id)`, which we could form into a `bank_id`. An optional `device_id` prop on BankProvider (skip the fetch when the host has one) is the small form; exporting `useDeviceId` / `useHeldBank` the other. Adding an export later is cheap and removing one breaks semver; the core plus `useSyncExternalStore` is already the full-control escape hatch. [Coach]
 
 ## Later
-* Add buttons to one of the Backdoor (devmode inspector) panels that simulate these: a revoked identity (panic and vacate), a sweep, a failed lease erase. [Coach]
+
+* Add buttons to one of the Backdoor (devmode inspector) panels that simulate a revoked identity (panic and vacate), a sweep, a failed lease erase. [Coach]
 * A demo that uses this to make a "doppler-lite" (a secrets manager in miniature). [Coach]
 
 ## Core
 
-* `fateOver` / `buildOrReceive` / `deliver` / `reconcileCentral` / `takeWorld` are already too complex and due for a makeover. Code nominated for machinery there goes on the list of accusations; other code shouldn't do work to cover for them. [Coach]
-* Lease caching does an Outcome-to-throw-to-Outcome round trip for one caller. `tryStow` answers an Outcome, `lease.cache` throws it (`valOf`), `lease.tryCache` catches it (`outcomeOf`), and `cacheAsCacheCan` tells bad news; its only caller is `Vault.#attachLease` (vault.ts:202). Collapse to one method and stop `cache`/`tryCache` being public. Decide explicitly what a vacated lease's `#demandRecord()` throw becomes (today: bad news `vault_locked`). [Coach, agent] After thread 2, whose `lease_unerased` absorbs lease.ts's logger-only `forgetOutdated`.
+* `fateOver` / `buildOrReceive` / `deliver` / `reconcileCentral` / `takeWorld` are too complex and due for a makeover; query_efficiently waits on it. Code nominated for machinery there goes on the list of accusations; other code shouldn't do work to cover for them. Accused so far: `Listing.deliver` awaiting around synchronous work, and the lazy `Vault.boxListing` getter with `hydrate`'s fast path on a disabled vault (whiteboard/20261108-bank_disable/thread.md). [Coach]

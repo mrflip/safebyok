@@ -88,7 +88,7 @@ describe("a tombstone over a live vault", () => {
     const listing = new VaultListing(fakeBank, hearingBadNews(opts, onBadNews))
     const vault = await listing.build(demandStored())
     const refusal = new VaultError('storage_unavailable', 'the disk is full')
-    deviceDB.tryForget.mockResolvedValueOnce(TH.bad(refusal))
+    deviceDB.forget.mockRejectedValueOnce(refusal)
     restoreRow(tombstoneOver(demandStored()))
     await listing.fetch(Dna, { ifAbsent: 'nil' })
     await erased()
@@ -145,7 +145,7 @@ describe("vault.del()", () => {
     await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])))
     expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
     await world.vault.ensureTimely(0)
-    TH.expectSyncRefusal(() => world.vault.demandEnabled())
+    TH.expectSyncRefusal(() => world.vault.demandPresent())
   })
 })
 
@@ -355,7 +355,7 @@ describe("lock() with an erase that throws synchronously", () => {
   it("reads locked, does not throw, and announces the refused erase", async () => {
     const onLifecycle = vi.fn()
     const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onLifecycle })
-    deviceDB.tryForget.mockImplementationOnce(() => { throw new Error('the duck is broken') })
+    deviceDB.forget.mockImplementationOnce(() => { throw new Error('the duck is broken') })
     expect(() => vault.lock()).to.not.throw()
     expect(vault.isLocked).to.be.true
     await erased()

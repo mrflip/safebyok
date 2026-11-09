@@ -60,8 +60,8 @@ brings this device up to it, and nothing guards against them. Each is pinned in 
   lease, unlocked and sealing, and its cached row is of the old epoch, so the next session asks for a proof.
 * `demandReadyToAttach` refusing after a tombstone or a sweep crosses is **a birth's alone**: `vault_gone` or `disabled`, the new
   lease vacated. A gate change can't meet it: the tombstone or sweep drops the lease held, `#renewLease` sees it forgotten
-  and vacates the new one, and the verb *resolves*, over a vault now gone or let go.
-* A refused `tryCache` is no rejection: the verb resolves, unlocked, and `onBadNews` hears it.
+  and leaves the new one unattached, and the verb *resolves*, over a vault now gone or let go.
+* A refused stow in `cacheAsCacheCan` is no rejection: the verb resolves, unlocked, and `onBadNews` hears it.
 
 ## Crossings the sprint's threads raised
 

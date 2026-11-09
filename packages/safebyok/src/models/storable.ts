@@ -142,9 +142,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   async fetch(opts: FetchOpts = {}): Promise<this> {
     const { ifAbsent, maxWorldMillis } = VX.fetchOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
-    this.#demandInstanceEnabled()
+    this.demandEnabled()
     await this.#oneFetchAtATime()
-    this.#demandInstanceEnabled()
+    this.demandEnabled()
     if (ifAbsent === 'fail') { this.demandPresent() }
     return this
   }
@@ -291,7 +291,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Guards]: isEnabled, isLocked, isTimely, isRefreshedWithin, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, demandDeletable, demandUnlocked, demandEnabled, demandInstanceEnabled, demandFull, demandWhole, demandFullProps, ensureDeletable
+  // == [Guards]: isEnabled, isLocked, isTimely, isRefreshedWithin, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, demandDeletable, demandUnlocked, demandEnabled, demandFull, demandWhole, demandFullProps, ensureDeletable
 
   /** False past a sweep or a vacate, and from then on. */
   get isEnabled(): boolean { return this.#isEnabled }
@@ -330,10 +330,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
-  demandEnabled():  this { this.#demandInstanceEnabled();                                                     return this }
-
-  // Not `demandEnabled`, which a Vault widens to refuse a vault gone: a fetch is how a thing gone hears its slot has moved on.
-  #demandInstanceEnabled(): void { if (! this.#isEnabled) { throw disabledError() } }
+  demandEnabled():  this { if (! this.#isEnabled) { throw disabledError() }                            return this }
 
   demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
 

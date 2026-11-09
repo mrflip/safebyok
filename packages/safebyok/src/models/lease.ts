@@ -3,6 +3,7 @@ import { consistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
+import { isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import { damagedLease, leaseNotInForce, unopenedWhisper } from '../refusals/throwers'
 import type { Wayinkind } from '../shapes/shapes-enums'
@@ -56,24 +57,27 @@ export class Lease implements LeaseStamp {
    */
   static async buildFromCache(friend: LeaseFriend, gate_epoch: number): Promise<Lease | null> {
     const { gate_epoch: epoch } = leaseFromCacheArgs.parse({ friend, gate_epoch })
-    const peeked = await friend.tryPeekLease()
-    if (! peeked.ok) {
-      friend.tellBadNews([peeked.err])
+    try {
+      const peeked = await friend.peekLease()
+      if (peeked === null) { return null }
+      const checked = leaseRecord.safeParse(peeked)
+      // The damaged row stands until the next lease is cached over it.
+      if (! checked.success) { throw damagedLease() }
+      if (checked.data.gate_epoch !== epoch) {
+        await friend.tryForgetLease()
+        return null
+      }
+      if (! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
+        await friend.tryForgetLease()
+        throw damagedLease()
+      }
+      if (isPastAutolock(checked.data, friend)) { return null }
+      return new Lease(friend, checked.data, true)
+    } catch (err) {
+      if (! isVaultError(err)) { throw err }
+      friend.tellBadNews([err])
       return null
     }
-    if (peeked.val === null) { return null }
-    const checked = leaseRecord.safeParse(peeked.val)
-    // The damaged row stands until the next lease is cached over it.
-    if (! checked.success) {
-      friend.tellBadNews([damagedLease()])
-      return null
-    }
-    if (checked.data.gate_epoch !== epoch || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
-      await forgetOutdated(friend)
-      return null
-    }
-    if (isPastAutolock(checked.data, friend)) { return null }
-    return new Lease(friend, checked.data, true)
   }
 
   /** A new lease under a fresh leaseKey. */
@@ -87,20 +91,13 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Caching]: cache, tryCache, cacheAsCacheCan
-
-  /** Caches this lease on this device. */
-  async cache(): Promise<void> {
-    if (this.#isFromCache) { return }
-    valOf(await this.#friend.tryCacheLease(this.#demandRecord()))
-  }
-
-  tryCache(): Promise<Outcome<void>> { return outcomeOf(() => this.cache()) }
+  // == [Caching]: cacheAsCacheCan
 
   // A refusal costs the next session a proof, not this one its lease.
   /** Caches this lease if it can, telling the host of a refusal as bad news. */
   async cacheAsCacheCan(): Promise<void> {
-    const cached = await this.tryCache()
+    if (this.#isFromCache) { return }
+    const cached = await this.#friend.tryCacheLease(this.#demandRecord())
     if (! cached.ok) { this.#friend.tellBadNews([cached.err]) }
   }
   // --
@@ -111,14 +108,14 @@ export class Lease implements LeaseStamp {
   async vacate(): Promise<void> {
     if (this.#record === null) { return }
     this.evict()
-    valOf(await this.#friend.tryForgetLease())
+    await this.#friend.forgetLease()
   }
 
   tryVacate(): Promise<Outcome<void>> { return outcomeOf(() => this.vacate()) }
 
   /** Forget the cached record with no lease held to {@link vacate}: one may stand from an earlier session. */
   static async forget(friend: LeaseFriend): Promise<void> {
-    valOf(await leaseFriend.parse(friend).tryForgetLease())
+    await leaseFriend.parse(friend).forgetLease()
   }
 
   static tryForget(friend: LeaseFriend): Promise<Outcome<void>> { return outcomeOf(() => this.forget(friend)) }
@@ -205,14 +202,8 @@ export class Lease implements LeaseStamp {
   get modelkind(): 'lease' { return 'lease' satisfies Modelkind }
 }
 
-// == [Judging the cached record]: isPastAutolock, forgetOutdated
+// == [Judging the cached record]: isPastAutolock
 
 /** True once a row was proved longer ago than the autolock duration: due for locking, as `bank.autolock` judges it. */
 const isPastAutolock = ({ proved_at }: LeaseStamp, { leaseMillis }: LeaseFriend): boolean => nowMillis() - proved_at > leaseMillis
-
-/** Forget a cached record no use to this vault, telling of a refusal: tried once, never again (notes/wontfix.md). */
-const forgetOutdated = async (friend: LeaseFriend): Promise<void> => {
-  const del = await friend.tryForgetLease()
-  if (! del.ok) { friend.tellUnerased(del.err) }
-}
 // --

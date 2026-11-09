@@ -432,7 +432,7 @@ export const tellBadNewsToInput = objCheck(({ fn, custom, arr }) => ({
 }), 'bad_option')
 
 /** Where a cached lease outlived its erase: a vault's lock, tombstone or vacate, the bank's vacate, or a row of another epoch or life met at an unlock. */
-export type EraseSite = 'lock' | 'tombstone' | 'vacate' | 'outdated'
+export type EraseSite = 'lock' | 'tombstone' | 'vacate' | 'undeleted'
 
 /** What a bank's listings and vaults announce through it: a {@link BankEvent} before the bank names itself. */
 export type BankAnnouncement =

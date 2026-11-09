@@ -95,7 +95,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** SLOPDOC: Replaces the passphrase through a gating; the passkey stays and no other device is locked. */
   async replacePassphrasePrompt(): Promise<this> {
-    await this.ensureTimely(); this.demandEnabled()
+    await this.ensureTimely(); this.demandPromptable()
     await Gating.launch('replace_passphrase', this.#launchArgs)
     return this
   }
@@ -104,7 +104,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Add a passkey through an add_passkey gating. */
   async addPasskeyPrompt(): Promise<this> {
-    await this.ensureTimely(VX.Promptly); this.demandEnabled()
+    await this.ensureTimely(VX.Promptly); this.demandPromptable()
     this.gate.demandPasskeyAddable()
     await Gating.launch('add_passkey', this.#launchArgs)
     return this
@@ -114,7 +114,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Revoke the passkey through a revoke_passkey gating. With none held it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
   async revokePasskeyPrompt(): Promise<this> {
-    await this.ensureTimely(VX.Promptly); this.demandEnabled()
+    await this.ensureTimely(VX.Promptly); this.demandPromptable()
     if (this.gate.pkWayin === null) { return this }
     await Gating.launch('revoke_passkey', this.#launchArgs)
     return this
@@ -124,7 +124,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** SLOPDOC: Deletes this vault through a gating, leaving a tombstone in its slot and nothing of it on this device. */
   async delVaultPrompt(): Promise<this> {
-    await this.ensureTimely(); this.demandEnabled()
+    await this.ensureTimely(); this.demandPromptable()
     await Gating.launch('del_vault', this.#launchArgs)
     return this
   }
@@ -148,7 +148,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** This vault timely and unlocked: as it stands, else by the lease cached on this device, else by {@link unlock}. */
   async ensureUnlocked(): Promise<this> {
-    await this.ensureTimely(); this.demandEnabled()
+    await this.ensureTimely(); this.demandPromptable()
     if (this.isUnlocked) { return this }
     const cached = await Lease.buildFromCache(this.#leaseFriend(), this.gate.gate_epoch)
     if (cached) { await this.#attachLease(cached); return this }
@@ -159,7 +159,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Ask the user for proof, and unlock by it. */
   async unlock(): Promise<this> {
-    await this.ensureAttachable(); this.demandAttachable()
+    await this.ensureTimely(); this.demandPromptable()
     await Gating.launch('unlock_vault', this.#launchArgs)
     return this
   }
@@ -179,7 +179,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   /** SLOPDOC: Drops any lease held and erases the row cached on this device, announcing a refused erase at `where`. */
-  async #vacateLease(where: Exclude<EraseSite, 'outdated'>): Promise<void> {
+  async #vacateLease(where: Exclude<EraseSite, 'undeleted'>): Promise<void> {
     // The lease goes first, so a refused erase leaves none; the erase starts before any await, landing in call order.
     const held = this.#lease
     this.#lease = null
@@ -198,7 +198,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Hold `lease` as this vault's, and cache it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
-    this.demandEnabled()
+    this.demandAttachable()
     this.#lease = lease
     await lease.cacheAsCacheCan()
     this.settle()
@@ -208,11 +208,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async #renewLease(proved: Proving, gate_epoch: number, heldLease: Lease | null): Promise<void> {
     if (heldLease === null) { return }
     const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
-    if (! heldLease.isPresent) {
-      lease.evict()
-      return
-    }
-    await this.#attachLease(lease)
+    if (heldLease.isPresent) { await this.#attachLease(lease) }
   }
   // --
 
@@ -246,11 +242,15 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       logger,
       leaseMillis,
       lock:            () => { this.lock() },
-      tryPeekLease:    () => deviceDB.tryPeek(asked),
+      peekLease:       () => deviceDB.peek(asked),
       tryCacheLease:   (record) => deviceDB.tryStow(record),
-      tryForgetLease:  () => deviceDB.tryForget(asked),
+      forgetLease:     () => deviceDB.forget(asked),
+      tryForgetLease:  async (): Promise<Outcome<void>> => {
+        const outcome = await deviceDB.tryForget(asked)
+        if (! outcome.ok) { this.#bankFriend.announce({ kind: 'lease_unerased', refusal: outcome.err, vault: this, where: 'undeleted' }) }
+        return outcome
+      },
       tellBadNews:     (badnews) => { this.#bankFriend.tellBadNews(badnews) },
-      tellUnerased:    (refusal) => { this.#bankFriend.announce({ kind: 'lease_unerased', refusal, vault: this, where: 'outdated' }) },
     }
   }
 
@@ -281,7 +281,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** List this vault's boxes and start their watch. */
   async hello(): Promise<this> {
-    this.demandEnabled()
+    this.demandHelloable()
     const hello = await outcomeOf(() => this.#bringUp())
     this.#bankFriend.announce({ kind: 'helloed', outcome: hello, vault: this })
     valOf(hello)
@@ -322,14 +322,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Tombstones the box listed at `boxlabel` and answers it, or null where none is stored; {@link BoxListing.del} has the refusals.
    * A damaged box, one that failed validation when read back, reads as missing here: {@link tryDelDamagedBox} removes it. */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
-    const timely = VX.timelyOpts.parse(opts)
-    const boxes = this.boxListing
-    const scope = boxes.scopeOf({ ...this.scope, boxlabel })
-    this.demandUnlocked()
-    const held = boxes.at(scope)
-    if (held !== null) { return held.del(timely) }
-    await this.ensureTimely(timely.maxWorldMillis); this.demandUnlocked()
-    return boxes.del(SX.sentinelBoxOf(scope, this.vault_tok))
+    const box = await this.boxListing.deletable({ ...this.scope, boxlabel }).del(opts)
+    return SX.isRowAt(box, SX.VoidRevision) ? null : box
   }
 
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
@@ -349,7 +343,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Guards]: isLocked, isUnlocked, demandUnlocked, demandLease, demandAttachable, demandEnabled, demandPresent, ensureAttachable, ensureTimely
+  // == [Guards]: isLocked, isUnlocked, demandUnlocked, demandLease, demandPromptable, demandAttachable, demandHelloable, demandPresent, ensureTimely
 
   /** The vault's own lock, not its world's: the bank has none. */
   override get isLocked(): boolean { return this.#lease === null }
@@ -358,32 +352,30 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Refuses unless the vault is enabled, present and unlocked. */
   override demandUnlocked(): this {
-    this.demandEnabled()
+    this.demandEnabled().demandPresent()
     return super.demandUnlocked()
   }
 
   #demandLease(stamp: CipherCtxRecord): Lease {
-    this.demandEnabled()
+    this.demandEnabled().demandPresent()
     if (! consistent(stamp, this.#stampOfLife())) { throw stampOfOtherVault() }
     if (this.#lease === null) { throw unlockFirst() }
     return this.#lease
   }
 
-  /** An attach needs the vault enabled and present. */
-  demandAttachable(): this { return this.demandEnabled() }
+  /** A prompt needs the vault enabled and present. */
+  demandPromptable(): this { return this.demandEnabled().demandPresent() }
 
-  /** Refuses unless the vault is enabled and present. */
-  override demandEnabled(): this {
-    super.demandEnabled()
-    return this.demandPresent()
-  }
+  /** An attach needs the vault enabled and present. */
+  demandAttachable(): this { return this.demandEnabled().demandPresent() }
+
+  /** A hello needs the vault enabled and present. */
+  demandHelloable(): this { return this.demandEnabled().demandPresent() }
 
   demandPresent(): this {
     if (! this.isPresent) { throw deletedVaultError() }
     return this
   }
-
-  ensureAttachable(): Promise<this> { return this.ensureTimely() }
 
   /** This vault, refreshed within `maxMillis`, by default its horizon: as it stands where it is recent, otherwise fetched. */
   ensureTimely(maxMillis?: number): Promise<this> { return this.hydrate({ maxMillisSinceRefresh: maxMillis }) }

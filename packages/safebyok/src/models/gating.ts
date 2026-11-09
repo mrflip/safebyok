@@ -215,7 +215,7 @@ const ProveForGatingkind: { [KindT in Gatingkind]: Prove<KindT> } = {
   },
   unlock_vault: async ({ vault, world }, clears) => {
     const { passphraseClear, passkeyClear } = checkedClears(GX.vaultUnlockClears, clears)
-    await vault.ensureTimely(VX.Promptly); vault.demandEnabled()
+    await vault.ensureTimely(VX.Promptly); vault.demandPromptable()
     const { gate } = vault
     if (passphraseClear !== undefined) { return { proved: await PassphraseProving.buildStored(gate, passphraseClear, world) } }
     if (! passkeyClear) { throw proofMissing() }
@@ -242,7 +242,7 @@ const ProveForGatingkind: { [KindT in Gatingkind]: Prove<KindT> } = {
 
 /** The attempt's one record and the gate it holds, read once, after its timeliness request. */
 const timelyAnte = async (vault: Vault): Promise<{ ante: VaultRecord, gate: Gate }> => {
-  await vault.ensureTimely(VX.Promptly); vault.demandEnabled()
+  await vault.ensureTimely(VX.Promptly); vault.demandPromptable()
   return { ante: vault.fullRecord, gate: vault.gate }
 }
 
