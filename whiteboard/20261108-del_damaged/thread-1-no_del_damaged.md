@@ -1,6 +1,6 @@
 # Thread 1: no delete of a damaged row (2026-11-09)
 
-Branch `20261109-no_del_damaged`, cut from `20261108-box_deletable` (#607). Justify: green. Core 2582, react 273, convex 226, graphql 233 + 3 skipped, postgres 122 + 1, indexeddb 109 + 2, fastkey 43, demo 96, e2e 295 + 4, scripts 311, the old packages' suites unchanged; lint 368 warnings, no errors. `CI=true pnpm --filter safebyok build` clean.
+Branch `20261109-no_del_damaged`, PR #610, cut from `20261108-box_deletable` (#607, since merged). Justify: green. Core 2582, react 273, convex 226, graphql 233 + 3 skipped, postgres 122 + 1, indexeddb 109 + 2, fastkey 43, demo 96, e2e 295 + 4, scripts 311, the old packages' suites unchanged; lint 368 warnings, no errors. `CI=true pnpm --filter safebyok build` clean.
 
 The Coach (2026-11-09): "I predict too many bug reports about non-bugs ... remove the feature end-to-end." `notes/wontfix.md` holds the ruling, `del_damaged-spec.md` the design to start from if it ever returns.
 
