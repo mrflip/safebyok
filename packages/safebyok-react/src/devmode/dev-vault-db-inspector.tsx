@@ -77,19 +77,24 @@ const BankRowsTable = ({ vaultDB, scope }: { vaultDB: VaultDB, scope: BankScope 
   )
 }
 
+// A damaged row is a scope: there is no revision or time to show for it.
+const RevisionCells = ({ row }: { row: VaultRow | BoxSparse | DamagedVault | DamagedBox }) => (
+  (row.am === 'd') ? <><td /><td /></> : <><td>{row.revision_seq}</td><td>{timeOf(row.written_at)}</td></>
+)
+
 const VaultRowLines = ({ vaultRow, boxes, onGetVault, onGetBox, onDelBox }: VaultRowLinesProps) => {
   const boxRows: readonly (BoxSparse | DamagedBox)[] = boxes === null ? [] : [...boxes.boxes, ...boxes.damaged_rows]
   return (
     <>
       <tr className="dev-vault-row" data-am={vaultRow.am}>
         <td>{vaultRow.vaultlabel}</td><td />
-        <td>{vaultRow.am}</td><td>{vaultRow.revision_seq}</td><td>{timeOf(vaultRow.written_at)}</td>
+        <td>{vaultRow.am}</td><RevisionCells row={vaultRow} />
         <td><button type="button" onClick={() => { void onGetVault() }}>getVault</button></td>
       </tr>
       {boxRows.map((boxRow) => (
         <tr key={boxRow.boxlabel} className="dev-box-row" data-am={boxRow.am}>
           <td /><td>{boxRow.boxlabel}</td>
-          <td>{boxRow.am}</td><td>{boxRow.revision_seq}</td><td>{timeOf(boxRow.written_at)}</td>
+          <td>{boxRow.am}</td><RevisionCells row={boxRow} />
           <td>
             <button type="button" onClick={() => { void onGetBox(boxRow) }}>getBox</button>
             {boxRow.am !== 'd' && <button type="button" onClick={() => { void onDelBox(boxRow) }}>delBox</button>}

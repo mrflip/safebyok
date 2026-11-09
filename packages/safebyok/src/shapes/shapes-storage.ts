@@ -95,8 +95,8 @@ export type VaultRecord    = Readonly<Z.infer<typeof vaultRecord>>
 export type VaultTombstone = Readonly<Z.infer<typeof vaultTombstone>>
 /** A vault row as stored: live, or a tombstone. */
 export type VaultRow       = VaultRecord | VaultTombstone
-/** A vault row that failed its checks, as `damaged_rows` lists it. */
-export type DamagedVault   = VaultSparse & Readonly<{ damagekind: EX.Damagekind }>
+/** A vault row that failed validation, named by where it is stored: its scope, under whatever label storage holds, and `am` 'd'. */
+export type DamagedVault   = Readonly<{ applabel: string, user_id: string, vaultlabel: string, am: 'd' }>
 // --
 
 // == [Box forms]: boxSparse, boxRecord, boxTombstone, boxRow, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox
@@ -131,16 +131,18 @@ export type BoxRecord    = Readonly<Z.infer<typeof boxRecord>>
 export type BoxTombstone = Readonly<Z.infer<typeof boxTombstone>>
 /** A box row as stored: live, or a tombstone. */
 export type BoxRow       = BoxRecord | BoxTombstone
-/** A box row that failed its checks, as `damaged_rows` lists it. */
-export type DamagedBox   = BoxSparse & Readonly<{ damagekind: EX.Damagekind }>
+/** A box row that failed validation, named by where it is stored: its scope, under whatever label storage holds, its vault's `vault_tok`, and `am` 'd'. */
+export type DamagedBox   = Readonly<{ applabel: string, user_id: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>
 // --
 
-// == [Rows found]: foundVaultRow, foundBoxRow
+// == [Rows found]: foundVaultRow, foundBoxRow, storedVaultRow, storedBoxRow
 
-/** A vault row or box row as a store answers it, null for none: one failing its checks refuses 'damaged_row'. */
-export const { foundVaultRow, foundBoxRow } = Checkers('damaged_row', () => ({
-  foundVaultRow: vaultRow.nullable(),
-  foundBoxRow:   boxRow.nullable(),
+/** A vault row or box row as a store answers it, null for none where the check says `found`: one failing its checks refuses 'damaged_row'. */
+export const { foundVaultRow, foundBoxRow, storedVaultRow, storedBoxRow } = Checkers('damaged_row', () => ({
+  foundVaultRow:  vaultRow.nullable(),
+  foundBoxRow:    boxRow.nullable(),
+  storedVaultRow: vaultRow,
+  storedBoxRow:   boxRow,
 }))
 // --
 
@@ -221,12 +223,11 @@ export const capacity = objCheck(({ obj, union, int, uint, lit }) => {
 export type Capacity = Z.infer<typeof capacity>
 // --
 
-// == [Row helpers]: rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, isNewerFormat, damagedVaultOf, damagedBoxOf, boxTombstoneOf
+// == [Row helpers]: rowPeek, reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf
 
-/** The checks that read a row's revision and liveness, or its format, without judging the rest. */
-export const { rowPeek, fmtPeek } = Checkers('bad_option', ({ obj, num, vault_tok }) => ({
+/** The check that reads a row's revision and liveness without judging the rest. */
+export const { rowPeek } = Checkers('bad_option', ({ obj, vault_tok }) => ({
   rowPeek: obj({ ...revision.shape, am, vault_tok }),
-  fmtPeek: obj({ fmt: num }),
 }), [CX])
 
 /** The request's safe metadata, for an answer to carry; empty when any of it fails its check, as a bad field may be anything. */
@@ -292,7 +293,7 @@ export const isTombstoneRow = (raw: unknown): boolean => (peekOf(raw)?.am === 'x
 
 const sentinelTimes = { registered_at: VoidTime, written_at: VoidTime }
 
-/** The tombstone of a vault row nothing holds. A damaged listing's label comes from storage, and is not checked here: it is part of what is reported. */
+/** The tombstone of a vault row nothing holds. */
 export const sentinelVaultOf = ({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone => ({
   applabel, user_id, vaultlabel, fmt: VaultFormat, ...VoidRevision, ...sentinelTimes, am: 'x', vault_tok,
 })
@@ -302,19 +303,11 @@ export const sentinelBoxOf = ({ applabel, user_id, vaultlabel, boxlabel }: Boxsc
   applabel, user_id, vaultlabel, boxlabel, fmt: BoxFormat, ...VoidRevision, ...sentinelTimes, am: 'x', vault_tok, box_tok: VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
 })
 
-/** True when `raw` names a format past `ownFormat`: a row a newer version of the app wrote. */
-export const isNewerFormat = (raw: unknown, ownFormat: number): boolean => {
-  const peek = fmtPeek.safeParse(raw)
-  return peek.success && (peek.data.fmt > ownFormat)
-}
+/** A listing's entry for a vault row that failed validation. Its label comes from storage, unchecked: it is part of what is reported. */
+export const damagedVaultOf = ({ applabel, user_id, vaultlabel }: VaultScope): DamagedVault => ({ applabel, user_id, vaultlabel, am: 'd' })
 
-const damagekindOf = (raw: unknown, ownFormat: number): EX.Damagekind => (isNewerFormat(raw, ownFormat) ? 'format_mismatch' : 'damaged_row')
-
-/** A vault row that failed validation, in the one shape: `am` 'd', with sentinels where the row cannot be read. */
-export const damagedVaultOf = (scope: VaultScope, raw: unknown): DamagedVault => ({ ...sentinelVaultOf(scope), ...peekOf(raw), am: 'd', damagekind: damagekindOf(raw, VaultFormat) })
-
-/** A box row that failed validation, in the one shape: `am` 'd', with sentinels where the row cannot be read. */
-export const damagedBoxOf = (scope: Boxscope, vault_tok: string, raw: unknown): DamagedBox => ({ ...sentinelBoxOf(scope, vault_tok), ...peekOf(raw), vault_tok, am: 'd', damagekind: damagekindOf(raw, BoxFormat) })
+/** A listing's entry for a box row that failed validation. Its label comes from storage, unchecked: it is part of what is reported. */
+export const damagedBoxOf = ({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string): DamagedBox => ({ applabel, user_id, vaultlabel, boxlabel, vault_tok, am: 'd' })
 
 /** The tombstone a vault's deletion leaves for a box row, or null for a row already one or past reading. */
 export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone | null => {

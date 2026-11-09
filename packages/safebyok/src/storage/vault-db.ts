@@ -175,7 +175,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const val: BankListed = { vaults: [], damaged_rows: [] }
       for (const { vaultlabel, vault } of rows) {
         const parsed = SX.vaultRow.safeParse(vault)
-        if (parsed.success) { val.vaults.push(parsed.data) } else { val.damaged_rows.push(SX.damagedVaultOf({ ...bankScope, vaultlabel }, vault)) }
+        if (parsed.success) { val.vaults.push(parsed.data) } else { val.damaged_rows.push(SX.damagedVaultOf({ ...bankScope, vaultlabel })) }
       }
       return { ok: true, req_params, act: (rows.length > 0) ? 'got' : 'gotvoid', val, world: bankScope }
     } catch (err) { throw refusalOf(err, 'listVaults', req_params) }
@@ -513,7 +513,7 @@ const listedBoxesOf = ({ vault_tok, ...scope }: VaultQuery, rows: RowOfBox[]): B
   const listed: BoxesListed = { boxes: [], damaged_rows: [] }
   for (const { boxlabel, box } of rows) {
     const parsed = SX.boxRow.safeParse(box)
-    if (parsed.success) { listed.boxes.push(SX.boxSparse.parse(parsed.data)) } else { listed.damaged_rows.push(SX.damagedBoxOf({ ...scope, boxlabel }, vault_tok, box)) }
+    if (parsed.success) { listed.boxes.push(SX.boxSparse.parse(parsed.data)) } else { listed.damaged_rows.push(SX.damagedBoxOf({ ...scope, boxlabel }, vault_tok)) }
   }
   return listed
 }

@@ -25,28 +25,16 @@ export const describeGets = ({ fresh, storeWith, rowsOf, twinOf }: BatteryWorld)
       expect(answer.val).to.deep.equal({ vaults: [], damaged_rows: [] })
     })
 
-    it("lists vaults full or tombstone, and sets aside a row failing validation as a tombstone in the one shape", async () => {
+    it("lists vaults full or tombstone, and sets aside a row failing validation as its scope alone", async () => {
       const { vaultDB, vault } = await storeWith()
       await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('broken'), { revision_tok: 'r9', revision_seq: 9, am: 'a', vault_tok: 'life9', garbage: true })
-      await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('rubble'), 'not even an object')
+      await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('newer'), { fmt: SX.VaultFormat + 1, revision_seq: 9 })
       const { act, val } = await vaultDB.listVaults(bankScope)
       expect(act).to.eq('got')
       expect(val.vaults).to.deep.equal([vault])
-      expect(val.damaged_rows.map(({ vaultlabel, am, revision_seq, vault_tok }) => ({ vaultlabel, am, revision_seq, vault_tok }))).to.have.deep.members([
-        { vaultlabel: 'broken', am: 'd', revision_seq: 9, vault_tok: 'life9' },
-        { vaultlabel: 'rubble', am: 'd', revision_seq: SX.VoidRevisionSeq, vault_tok: SX.VoidRevisionTok },
-      ])
-      for (const damaged of val.damaged_rows) { expect(SX.vaultSparse.safeParse(damaged).success).to.be.true }
-    })
-
-    it("tells a row of a later fmt from any other it sets aside", async () => {
-      const { vaultDB } = await storeWith()
-      await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('newer'), { fmt: SX.VaultFormat + 1, revision_seq: 9 })
-      await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('rubble'), 'not even an object')
-      const { val } = await vaultDB.listVaults(bankScope)
-      expect(val.damaged_rows.map(({ vaultlabel, damagekind }) => ({ vaultlabel, damagekind }))).to.have.deep.members([
-        { vaultlabel: 'newer',  damagekind: 'format_mismatch' },
-        { vaultlabel: 'rubble', damagekind: 'damaged_row' },
+      expect(val.damaged_rows).to.have.deep.members([
+        { ...vaultScopeOf('broken'), am: 'd' },
+        { ...vaultScopeOf('newer'),  am: 'd' },
       ])
     })
 
@@ -100,23 +88,19 @@ export const describeGets = ({ fresh, storeWith, rowsOf, twinOf }: BatteryWorld)
       const other = boxAt(0, 'life1', { boxlabel: 'other' })
       await vaultDB.putBox(other, { prior: SX.VoidRevision })
       await vaultDB.delBox(boxTombstoneOf(other), { prior: priorOf(other) })
-      await rowsOf(vaultDB).plantBoxRow(boxscopeOf('rubble'), 'life1', 12)
+      await rowsOf(vaultDB).plantBoxRow(boxscopeOf('rubble'), 'life1', { garbage: true })
       const { act, val, world } = await vaultDB.listBoxes(vaultQuery)
       expect(act).to.eq('got')
       expect(world).to.deep.equal(vault)
       expect(val.boxes).to.have.deep.members([SX.boxSparse.parse(box), SX.boxSparse.parse(boxTombstoneOf(other))])
-      expect(val.damaged_rows.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'rubble', am: 'd' }])
+      expect(val.damaged_rows).to.deep.equal([{ ...boxscopeOf('rubble'), vault_tok: 'life1', am: 'd' }])
     })
 
-    it("tells a box row of a later fmt from any other it sets aside", async () => {
+    it("holds a box row of a later fmt, set aside, to its scope alone", async () => {
       const { vaultDB } = await storeWith()
-      await rowsOf(vaultDB).plantBoxRow(boxscopeOf('newer'), 'life1', { fmt: SX.BoxFormat + 1 })
-      await rowsOf(vaultDB).plantBoxRow(boxscopeOf('rubble'), 'life1', 12)
+      await rowsOf(vaultDB).plantBoxRow(boxscopeOf('newer'), 'life1', { fmt: SX.BoxFormat + 1, revision_seq: 9 })
       const { val } = await vaultDB.listBoxes(vaultQuery)
-      expect(val.damaged_rows.map(({ boxlabel, damagekind }) => ({ boxlabel, damagekind }))).to.have.deep.members([
-        { boxlabel: 'newer',  damagekind: 'format_mismatch' },
-        { boxlabel: 'rubble', damagekind: 'damaged_row' },
-      ])
+      expect(val.damaged_rows).to.deep.equal([{ ...boxscopeOf('newer'), vault_tok: 'life1', am: 'd' }])
     })
 
     it("lists a box under a label failing its check among the damaged", async () => {

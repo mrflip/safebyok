@@ -50,6 +50,15 @@ describe("DevVaultDBInspector", () => {
     expect(within(boxRow('mangled')).queryByRole('button', { name: 'delBox' })).to.be.null
   })
 
+  it("leaves a damaged box row's revision and time blank", async () => {
+    const { world, vault } = await renderOverBox()
+    world.vaultDB._cheat_boxRowsOf(vault.scope, vault.snapshot.vault_tok).set('mangled', { am: 'a', revision_seq: 9 })
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await waitFor(() => { expect(boxRow('mangled').dataset['am']).to.eq('d') })
+    const cells = within(boxRow('mangled')).getAllByRole('cell').map((cell) => cell.textContent)
+    expect(cells.slice(1, 5)).to.deep.eq(['mangled', 'd', '', ''])
+  })
+
   it("lists a box put elsewhere, as its watch hears of it", async () => {
     const { vault } = await renderOverBox()
     await vault.putBox({ boxlabel: 'openai', whisper: { apiKey: 'sk-fake' } }, { ifAbsent: 'add' })
