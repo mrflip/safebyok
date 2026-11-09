@@ -12,11 +12,6 @@ export type { MemoryVaultDBOpts } from '../shapes/shapes-storage'
 type BoxLife = { scope: VaultScope, vault_tok: string, boxrows: Map<string, unknown> }
 type Heeder = { scope: WatchScope, hear: (heard: Heard) => void }
 
-/** True when a put under `opts` may land over `ante`, the row it would replace. */
-const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
-  SX.isRowAt(ante, prior) && (SX.isLiveRow(ante) ? (ifPresent === 'repl') : (ifAbsent === 'add'))
-)
-
 /** A vaultDB held in this tab's memory, gone when the tab closes. */
 export class MemoryVaultDB extends AdapterVaultDB {
   // == [Props]: #vaultrowsOfBank, #boxLives, #heeders, #maxBoxes
@@ -118,7 +113,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   protected doPutVault(record: VaultRecord, opts: PutOptsGiven): Landing {
     const ante = this.#vaultRowOf(record)
-    const landed = isPutAllowed(ante, opts)
+    const landed = SX.isVaultPutAllowed(ante, opts)
     if (landed) { this.#storeVaultRow(record) }
     return { landed, ante: structuredClone(ante) }
   }
@@ -127,7 +122,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const vault = this.#vaultRowOf(record)
     const boxrows = this._cheat_boxRowsOf(record, record.vault_tok)
     const ante = boxrows.get(record.boxlabel) ?? null
-    const landed = SX.isCheckedLiveVault(vault, record.vault_tok) && isPutAllowed(ante, opts)
+    const landed = SX.isLiveVaultRecord(vault, record.vault_tok) && SX.isBoxPutAllowed(ante, opts)
     if (landed) {
       this.#demandRoom(boxrows, ante)
       this.#storeBoxRow(boxrows, vault, record)
@@ -137,7 +132,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   protected doDelVault(tombstone: VaultTombstone, { prior }: DelOpts): Landing {
     const ante = this.#vaultRowOf(tombstone)
-    const isOurs = SX.isLiveRowUnder(ante, tombstone.vault_tok)
+    const isOurs = SX.isLiveVaultRecord(ante, tombstone.vault_tok)
     const isDamaged = (ante !== null) && (! SX.vaultRow.safeParse(ante).success)
     const landed = isOurs && SX.isRowAt(ante, prior)
     // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
@@ -151,8 +146,8 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const vault = this.#vaultRowOf(tombstone)
     const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
     const ante = boxrows.get(tombstone.boxlabel) ?? null
-    const isDeletable = SX.isLiveRow(ante) && SX.isRowAt(ante, prior)
-    const landed = SX.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
+    const isDeletable = SX.isLiveBoxRecord(ante, tombstone.vault_tok) && SX.isRowAt(ante, prior)
+    const landed = SX.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
     if (landed) { this.#storeBoxRow(boxrows, vault, tombstone) }
     return { landed, ante: structuredClone(ante), vault: structuredClone(vault) }
   }

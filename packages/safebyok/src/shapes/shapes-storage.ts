@@ -221,7 +221,7 @@ export const capacity = objCheck(({ obj, union, int, uint, lit }) => {
 export type Capacity = Z.infer<typeof capacity>
 // --
 
-// == [Row helpers]: rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, isNewerFormat, damagedVaultOf, damagedBoxOf, boxTombstoneOf
+// == [Row helpers]: rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, isNewerFormat, damagedVaultOf, damagedBoxOf, boxTombstoneOf
 
 /** The checks that read a row's revision and liveness, or its format, without judging the rest. */
 export const { rowPeek, fmtPeek } = Checkers('bad_option', ({ obj, num, vault_tok }) => ({
@@ -256,20 +256,35 @@ export const isRowAt = (raw: unknown, prior: Revision): boolean => {
 /** True when `raw` is a live row. */
 export const isLiveRow = (raw: unknown): boolean => (peekOf(raw)?.am === 'a')
 
-/** True when `raw` is a live row of the life `vault_tok`. */
-export const isLiveRowUnder = (raw: unknown, vault_tok: string): boolean => (isLiveRow(raw) && (peekOf(raw)?.vault_tok === vault_tok))
-
 /** True when `raw` passes a vault row's checks, live in the life `vault_tok`. */
-export const isCheckedLiveVault = (raw: unknown, vault_tok: string): boolean => {
+export const isLiveVaultRecord = (raw: unknown, vault_tok: string): boolean => {
   const parsed = vaultRow.safeParse(raw)
   return parsed.success && (parsed.data.am === 'a') && (parsed.data.vault_tok === vault_tok)
 }
 
-/** True when `raw` is no row, a tombstone, or a row of another life, so the boxes under `vault_tok` belong to nothing. A row past peeking might be theirs, and is false. */
+/** True when `raw` passes a box row's checks, live in the life `vault_tok`. */
+export const isLiveBoxRecord = (raw: unknown, vault_tok: string): boolean => {
+  const parsed = boxRow.safeParse(raw)
+  return parsed.success && (parsed.data.am === 'a') && (parsed.data.vault_tok === vault_tok)
+}
+
+// A row that fails its check is never put over, whatever `prior` names: only `isRowAt` reads the peek, and it runs after the check.
+const isPutAllowedOver = (rowCheck: Z.ZodType<{ am: EX.Am } | null>, ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => {
+  const found = rowCheck.safeParse(ante)
+  return found.success && isRowAt(ante, prior) && ((found.data?.am === 'a') ? (ifPresent === 'repl') : (ifAbsent === 'add'))
+}
+
+/** True when a vault row's put under `opts` may land over `ante`, the row stored there or null. */
+export const isVaultPutAllowed = (ante: unknown, opts: PutOptsGiven): boolean => isPutAllowedOver(foundVaultRow, ante, opts)
+
+/** True when a box row's put under `opts` may land over `ante`, the row stored there or null. */
+export const isBoxPutAllowed = (ante: unknown, opts: PutOptsGiven): boolean => isPutAllowedOver(foundBoxRow, ante, opts)
+
+/** True when `raw` is no row, a tombstone, or a row of another life, so the boxes under `vault_tok` belong to nothing. A row failing its checks might be theirs, and is false. */
 export const isLifeOver = (raw: unknown, vault_tok: string): boolean => {
   if (raw === null) { return true }
-  const peek = peekOf(raw)
-  return (peek !== null) && ((peek.am === 'x') || (peek.vault_tok !== vault_tok))
+  const parsed = vaultRow.safeParse(raw)
+  return parsed.success && ((parsed.data.am === 'x') || (parsed.data.vault_tok !== vault_tok))
 }
 
 /** True when `raw` is the tombstone of a deleted row. */

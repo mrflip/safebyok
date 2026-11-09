@@ -16,15 +16,10 @@ export type IdbVaultDBOpts = AdapterVaultDBOpts & { dbName?: string | undefined 
 const idbVaultDBOpts = DB.objCheck(({ str }) => ({ ...DB.adapterVaultDBOpts.shape, dbName: str.min(1).optional() }), 'bad_option')
 // --
 
-// == [Helpers]: Rung, isPutAllowed, isHeardBy
+// == [Helpers]: Rung, isHeardBy
 
 /** What a write tells every watch on its database: the scope it wrote under, and the rows a watch hears. */
 type Rung = { scope: VaultScope, heard: Heard }
-
-/** True when a put under `opts` may land over `ante`, the row it would replace. */
-const isPutAllowed = (ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
-  DB.isRowAt(ante, prior) && (DB.isLiveRow(ante) ? (ifPresent === 'repl') : (ifAbsent === 'add'))
-)
 
 /** True when a watch on `watched` hears a write under `scope`. */
 const isHeardBy = (watched: WatchScope, scope: VaultScope): boolean => (
@@ -78,7 +73,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Landing> {
     const landing = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const ante = await DB.rowAt(store, vaultScopepathOf(record))
-      const landed = isPutAllowed(ante, opts)
+      const landed = DB.isVaultPutAllowed(ante, opts)
       if (landed) { store.put(record, vaultScopepathOf(record)) }
       return { landed, ante }
     })
@@ -89,7 +84,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxLanding> {
     const landing = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [vault, ante] = await Promise.all([DB.rowAt(store, vaultScopepathOf(record)), DB.rowAt(store, boxScopepathOf(record))])
-      const landed = DB.isCheckedLiveVault(vault, record.vault_tok) && isPutAllowed(ante, opts)
+      const landed = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
       if (landed) { store.put(record, boxScopepathOf(record)) }
       return { landed, ante, vault }
     })
@@ -100,7 +95,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   protected async doDelVault(tombstone: VaultTombstone, { prior }: DelOpts): Promise<Landing> {
     const { landing, rungs } = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const ante = await DB.rowAt(store, vaultScopepathOf(tombstone))
-      const isOurs = DB.isLiveRowUnder(ante, tombstone.vault_tok)
+      const isOurs = DB.isLiveVaultRecord(ante, tombstone.vault_tok)
       const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
       const landed = isOurs && DB.isRowAt(ante, prior)
       // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
@@ -124,8 +119,8 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   protected async doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): Promise<BoxLanding> {
     const landing = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [vault, ante] = await Promise.all([DB.rowAt(store, vaultScopepathOf(tombstone)), DB.rowAt(store, boxScopepathOf(tombstone))])
-      const isDeletable = DB.isLiveRow(ante) && DB.isRowAt(ante, prior)
-      const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
+      const isDeletable = DB.isLiveBoxRecord(ante, tombstone.vault_tok) && DB.isRowAt(ante, prior)
+      const landed = DB.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
       if (landed) { store.put(tombstone, boxScopepathOf(tombstone)) }
       return { landed, ante, vault }
     })

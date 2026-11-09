@@ -44,6 +44,22 @@ export const boxAt = (revision_seq = 0, vault_tok = 'life1', extra: object = {})
   ...extra,
 })
 
+/** Flaws that leave a box row's `am` and revision readable and fail its check, each named. */
+export const boxFlaws = [
+  ['a later fmt',                   (box: BoxRecord) => ({ ...box, fmt: SX.BoxFormat + 1 })],
+  ['an extra field',                (box: BoxRecord) => ({ ...box, smuggled: 'field' })],
+  ['garbled ciphertext',            (box: BoxRecord) => ({ ...box, whisper_ciphered: 'garbled' })],
+  ['a tombstone holding a whisper', (box: BoxRecord) => ({ ...box, am: 'x' })],
+] as const
+
+/** Flaws that leave a vault row's `am` and revision readable and fail its check, each named. */
+export const vaultFlaws = [
+  ['a later fmt',                (vault: VaultRecord) => ({ ...vault, fmt: SX.VaultFormat + 1 })],
+  ['an extra field',             (vault: VaultRecord) => ({ ...vault, smuggled: 'field' })],
+  ['a garbled gate',             (vault: VaultRecord) => ({ ...vault, gate: 'rubble' })],
+  ['a tombstone holding a gate', (vault: VaultRecord) => ({ ...vault, am: 'x' })],
+] as const
+
 const tombstoneFieldsOf = ({ revision_tok, revision_seq }: Revision) => ({ revision_tok: `${revision_tok}x`, revision_seq: revision_seq + 1, am: 'x' as const })
 
 /** The tombstone that deletes the vault `record`, one revision on. */

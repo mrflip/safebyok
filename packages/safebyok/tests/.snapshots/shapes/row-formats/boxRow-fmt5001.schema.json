@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "applabel": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
+        },
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+\\|%\\-]+$"
+        },
+        "vaultlabel": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
+        },
+        "boxlabel": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
+        },
+        "fmt": {
+          "type": "number",
+          "const": 5001
+        },
+        "revision_tok": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision_seq": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "registered_at": {
+          "type": "integer",
+          "minimum": 347155200000,
+          "maximum": 9007199254740
+        },
+        "written_at": {
+          "type": "integer",
+          "minimum": 347155200000,
+          "maximum": 9007199254740
+        },
+        "am": {
+          "type": "string",
+          "const": "a"
+        },
+        "vault_tok": {
+          "type": "string",
+          "minLength": 1
+        },
+        "box_tok": {
+          "type": "string",
+          "minLength": 1
+        },
+        "whisper_codec": {
+          "type": "string",
+          "const": "json_v1"
+        },
+        "whisper_schema_version": {
+          "type": "number",
+          "const": 1
+        },
+        "sidecar": {},
+        "box_key_wrapped": {
+          "type": "object",
+          "properties": {
+            "cipher_iv_b64": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ciphertext_b64": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "cipher_iv_b64",
+            "ciphertext_b64"
+          ],
+          "additionalProperties": false
+        },
+        "whisper_ciphered": {
+          "type": "object",
+          "properties": {
+            "cipher_iv_b64": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ciphertext_b64": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "cipher_iv_b64",
+            "ciphertext_b64"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "applabel",
+        "user_id",
+        "vaultlabel",
+        "boxlabel",
+        "fmt",
+        "revision_tok",
+        "revision_seq",
+        "registered_at",
+        "written_at",
+        "am",
+        "vault_tok",
+        "box_tok",
+        "whisper_codec",
+        "whisper_schema_version",
+        "sidecar",
+        "box_key_wrapped",
+        "whisper_ciphered"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "applabel": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
+        },
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+\\|%\\-]+$"
+        },
+        "vaultlabel": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
+        },
+        "boxlabel": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
+        },
+        "fmt": {
+          "type": "number",
+          "const": 5001
+        },
+        "revision_tok": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision_seq": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "registered_at": {
+          "type": "integer",
+          "minimum": 347155200000,
+          "maximum": 9007199254740
+        },
+        "written_at": {
+          "type": "integer",
+          "minimum": 347155200000,
+          "maximum": 9007199254740
+        },
+        "am": {
+          "type": "string",
+          "const": "x"
+        },
+        "vault_tok": {
+          "type": "string",
+          "minLength": 1
+        },
+        "box_tok": {
+          "type": "string",
+          "minLength": 1
+        },
+        "whisper_codec": {
+          "type": "string",
+          "const": "json_v1"
+        },
+        "whisper_schema_version": {
+          "type": "number",
+          "const": 1
+        }
+      },
+      "required": [
+        "applabel",
+        "user_id",
+        "vaultlabel",
+        "boxlabel",
+        "fmt",
+        "revision_tok",
+        "revision_seq",
+        "registered_at",
+        "written_at",
+        "am",
+        "vault_tok",
+        "box_tok",
+        "whisper_codec",
+        "whisper_schema_version"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

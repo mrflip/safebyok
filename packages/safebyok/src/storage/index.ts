@@ -43,7 +43,7 @@ export type { AddPasskeyParams, ReplacePassphraseParams, RevokePasskeyParams } f
 export { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, adapterVaultDBOpts, memoryVaultDBOpts, capacity } from '../shapes/shapes-storage'
 export type { AdapterVaultDBOpts, Capacity, DelOpts, IfAbsentOpts, MemoryVaultDBOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReqParams } from '../shapes/shapes-storage'
 export { rowPeek, fmtPeek, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
-export { isRowAt, isLiveRow, isLiveRowUnder, isCheckedLiveVault, isLifeOver, isTombstoneRow, isNewerFormat } from '../shapes/shapes-storage'
+export { isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow, isNewerFormat } from '../shapes/shapes-storage'
 export { sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf } from '../shapes/shapes-storage'
 export { leaseQuery, leaseDated, leaseRow, leaseScopepath, bankRow } from '../shapes/shapes-storage'
 export type { BankRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'

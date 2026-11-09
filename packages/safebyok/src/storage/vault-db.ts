@@ -469,15 +469,13 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doListBoxes(asked: VaultQuery): Awaitable<BoxesFetched>
   /** The vault row, and the box row under `vault_tok`, read in one step. */
   protected abstract doGetBox(asked: BoxQuery): Awaitable<BoxFetched>
-  /** Stores `record` where the row stands at `opts.prior`, atomic on `revision_tok`.
-   * It lands over a live row when `ifPresent` is 'repl', or where none stands when `ifAbsent` is 'add'.
-   */
+  /** Stores `record` where `isVaultPutAllowed` lets it land over the row found, atomic on `revision_tok`. */
   protected abstract doPutVault(record: VaultRecord, opts: PutOptsGiven): Awaitable<Landing>
-  /** Stores `record` as `doPutVault` would, where the vault row also passes its checks live under its `vault_tok`. */
+  /** Stores `record` where `isBoxPutAllowed` lets it land over the row found, under a vault row that passes `isLiveVaultRecord`. */
   protected abstract doPutBox(record: BoxRecord, opts: PutOptsGiven): Awaitable<BoxLanding>
-  /** In one step, stores `tombstone` over the live row at `opts.prior` and tombstones that life's boxes. */
+  /** In one step, stores `tombstone` over a row at `opts.prior` that passes `isLiveVaultRecord`, and tombstones that life's boxes. */
   protected abstract doDelVault(tombstone: VaultTombstone, opts: DelOpts): Awaitable<Landing>
-  /** Stores `tombstone` over the live box row at `opts.prior`, under a vault live at its `vault_tok`. */
+  /** Stores `tombstone` over a row at `opts.prior` that passes `isLiveBoxRecord`, under a vault row that passes `isLiveVaultRecord`. */
   protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxLanding>
   /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
@@ -524,7 +522,7 @@ const demandNextSeq = ({ revision_seq }: Revision, prior: Revision): void => {
   if (revision_seq !== (prior.revision_seq + 1)) { throw Refuse.seqNotNext() }
 }
 
-// A raw peek, not a parse: a put lands over a damaged row its `prior` names.
+// A peek is enough: the store judged `ante` against its row check before the put landed.
 const landingActOf = (ante: unknown): 'born' | 'reborn' | 'replaced' => {
   if (ante === null) { return 'born' }
   return SX.isTombstoneRow(ante) ? 'reborn' : 'replaced'
