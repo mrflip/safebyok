@@ -16,7 +16,7 @@ import { absentBoxError, notExposedError, undecodedWhisper } from '../refusals/t
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 
-/** A box as this device holds it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
+/** A box as this device has it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   // == [Props]: applabel, user_id, vaultlabel, boxlabel, world, listing, #exposed, #isVeiled, #subscribeWithVault
 
@@ -55,7 +55,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** The life of the box under its boxlabel, as the record in hand has it: minted at its birth, and kept by every later revision of that life. */
   get box_tok(): string { return this.central.box_tok }
 
-  /** The sidecar of the record in hand, which only the full record carries; null otherwise. It holds nothing secret, so it shows whether the vault is locked or not. */
+  /** The sidecar of the record in hand, which only the full record carries; null otherwise. It has nothing secret, so it shows whether the vault is locked or not. */
   get sidecar(): Sidecar | null { return this.full?.sidecar ?? null }
 
   /** The sealed parts of the record in hand; null where it is not full. */
@@ -109,7 +109,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Non-throwing form of {@link extractWhisper}. */
   tryExtractWhisper(opts: TimelyOpts = {}): Promise<Outcome<Whisper>> { return outcomeOf(() => this.extractWhisper(opts)) }
 
-  /** Open the stored whisper and hold it on the instance, showing, where `box.whisper` offers it until {@link unexpose}.
+  /** Open the stored whisper and keep it on the instance, showing, where `box.whisper` offers it until {@link unexpose}.
    * See notes/expose_improves_security.md
    */
   async expose(opts: TimelyOpts = {}): Promise<this> {
@@ -120,7 +120,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** Discard the whisper held on the instance, and its veil, from any state. */
+  /** Discard the whisper kept on the instance, and its veil, from any state. */
   unexpose(): this {
     this.#dropExposed()
     this.align()
@@ -160,7 +160,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** Swap in a new whisper exposed, and tell the subscribers even where the snapshot, which holds none of it, has not moved. */
+  /** Swap in a new whisper exposed, and tell the subscribers even where the snapshot, which has none of it, has not moved. */
   #replaceExposed(exposed: Whisper): void {
     const ante = this.snapshot
     this.#exposed = exposed
@@ -173,9 +173,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     const { sidecar, box_key_wrapped, whisper_ciphered } = record
     const stamp = boxStampOf(SX.boxSparse.parse(record), sidecar)
     const whisperText = await this.world.unsealStampedString({ box_key_wrapped, whisper_ciphered }, stamp)
-    const held = CX.whisper.safeParse(parseJsonOrNull(whisperText))
-    if (! held.success) { throw undecodedWhisper() }
-    return held.data
+    const parsed = CX.whisper.safeParse(parseJsonOrNull(whisperText))
+    if (! parsed.success) { throw undecodedWhisper() }
+    return parsed.data
   }
   // --
 
@@ -184,7 +184,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Seals `patch` over the record in hand and puts it, answering this box; a deleted box is reborn.
    *
    * A lock does not interrupt or reverse a put once its write has begun. A patch leaving out the whisper or the sidecar keeps
-   * the one stored, so a box held sparse is fetched first.
+   * the one stored, so a sparse box is fetched first.
    */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
     const { ifAbsent, ifPresent, ...timely } = VX.boxPutOpts.parse(opts)
@@ -240,7 +240,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return given
   }
 
-  /** Holding a whisper on the instance needs the box enabled and the vault unlocked. */
+  /** Keeping a whisper on the instance needs the box enabled and the vault unlocked. */
   demandExposable(): this { return this.demandEnabled().demandUnlocked() }
 
   /** Demand that this box is present. */

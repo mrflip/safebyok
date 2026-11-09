@@ -143,7 +143,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Storage verbs]: fetch, handleIfAbsent, put, del, delOver, each with its try form
 
-  /** SLOPDOC: The instance under `scope` as storage now holds it, built where none was listed. */
+  /** SLOPDOC: The instance under `scope` as it is now stored, built where none was listed. */
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
     const { ifAbsent, maxWorldMillis } = VX.fetchOpts.parse(opts)
     const asked = this.scopeOf(scope)
@@ -221,7 +221,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return (record === null) ? this.#receiveNothing(scope) : this.buildOrReceive(record)
   }
 
-  /** The instance listed under `scope`, told that storage holds nothing there. */
+  /** The instance listed under `scope`, told that nothing is stored there. */
   #receiveNothing(scope: ScopeT): ThingT | null {
     this.demandEnabled()
     const listed = this.at(scope)
@@ -333,7 +333,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The full record `duck` is, as a plain copy. */
   abstract recordOf(duck: unknown): RecordT
   protected abstract makeThing(central: Fetched<RecordT, SparseT>): ThingT
-  /** The refusal for a scope where storage holds no row and no instance is listed. */
+  /** The refusal for a scope where no row is stored and no instance is listed. */
   protected abstract nothingStoredError(scope: ScopeT): VaultError
   /** The vaultDB's get of this kind of thing, answering null for nothing stored. */
   protected abstract tryGetRow(scope: ScopeT): Promise<ListingAnswer<RecordT, SparseT>>
@@ -341,7 +341,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected abstract tryDelRow(tombstone: DelTombstone<SparseT>, opts: DelOpts): Promise<ListingAnswer<RecordT, SparseT>>
   /** Start the vaultDB's watch over this listing's scope, `onBadNews` hearing of its end unbidden; returns how to stop. */
   protected abstract watchRows(onNotice: (notice: VaultDBNotice) => void, onBadNews: (news: VaultError) => void): () => void
-  /** True for a row this listing holds: the vaultDB's watch tells of a vault's rows and its boxes' alike. */
+  /** True for a row this listing has: the vaultDB's watch tells of a vault's rows and its boxes' alike. */
   protected abstract isOwnRow(row: VaultRow | BoxRow): row is (VaultRow | BoxRow) & Fetched<RecordT, SparseT>
   // --
 }

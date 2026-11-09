@@ -90,7 +90,7 @@ const isUnbound = (part: CipherCtxRecord | string | null | undefined): boolean =
 
 /** A fresh random 256-bit AES-GCM key for wrapping other keys: a brand-new vaultKey.
  * It is extractable, as a key must be to be wrapped, so keep it only inside the operation that
- * wraps it. Between operations nothing holds a vaultKey unwrapped: each wayin and a lease keep it
+ * wraps it. Between operations nothing keeps a vaultKey unwrapped: each wayin and a lease keep it
  * wrapped, and a lease unwraps it non-extractable, for one usage, at each cipher or decipher.
  */
 export const makeVaultKey = (): Promise<CryptoKey> => (

@@ -107,7 +107,7 @@ export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
  */
 export const { whisper, whisperBag } = Checkers('bad_option', ({ lazy, union, str, num, bool, lit, arr, custom }) => {
   const whisperJson: Z.ZodType<WhisperJson> = lazy(() => union([str, num, bool, lit(null), whisperArr, plainBag]))
-  // An object is judged whole, so a refusal's path never holds one of its keys, which are the caller's own.
+  // An object is judged whole, so a refusal's path never contains one of its keys, which are the caller's own.
   const whisperMembers = record(str, whisperJson)
   const plainBag = custom<Record<string, WhisperJson>>((val) => isPlainBag(val) && whisperMembers.safeParse(val).success, Phrases.WhisperBagShape)
   const whisperArr = arr(whisperJson)

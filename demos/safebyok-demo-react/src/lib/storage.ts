@@ -3,7 +3,7 @@ import { prefixedStorage, type StringStorage } from './string-storage'
 import { OutageVaultDB } from './outage-vault-db'
 
 // The demo's storage wiring. The vault's rows live in this browser's IndexedDB, standing in for the
-// remote database a backend would hold: ciphertext that never opens without the passphrase. A real
+// remote database a backend would have: ciphertext that never opens without the passphrase. A real
 // app hands the provider a vaultDB over its own backend (Convex, REST) instead. The device's leases
 // live in IndexedDB too, so an unlocked vault stays unlocked through a reload until its lease ends.
 

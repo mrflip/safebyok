@@ -34,7 +34,7 @@ interface BoundField {
 /** The one `BoxFields` of each box, so that every caller shares its fields and its last unbind. */
 const fieldsOfBox = new WeakMap<Box, BoxFields>()
 
-/** The elements bound to a box's whisper, each holding a leaf of it while it shows and a blank while it does not. */
+/** The elements bound to a box's whisper, each with a leaf of it while it shows and a blank while it does not. */
 export class BoxFields {
   // == [Props]: box, #refs, #fields, #stopHearing
 

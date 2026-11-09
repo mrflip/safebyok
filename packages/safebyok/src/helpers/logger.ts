@@ -57,7 +57,7 @@ export const parseLogger = (candidate: VaultLogger | null | undefined): VaultLog
   return made
 }
 
-/** True for a logger {@link parseLogger} made safe, or the {@link DefaultLogger}: what a bank's world and a lease's friend hold. */
+/** True for a logger {@link parseLogger} made safe, or the {@link DefaultLogger}: what a bank's world and a lease's friend have. */
 export const isGuardedLogger = (val: unknown): val is VaultLogger => (typeof val === 'object') && (val !== null) && guardedOnes.has(val)
 
 /** A host's logger as the guard sees it: whatever its calls return, such as an async logger's promise, is the guard's to settle. */

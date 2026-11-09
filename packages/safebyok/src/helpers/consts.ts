@@ -10,7 +10,7 @@ import type { VaultListing } from '../models/vault-listing'
 import type { Wayin } from '../models/wayin'
 import type { Whisper } from '../shapes/shapes-core'
 
-/** The character a scopepath joins its parts on: `^`, which no label or user_id may hold. */
+/** The character a scopepath joins its parts on: `^`, which no label or user_id may contain. */
 export const ScopepathDelimiter = '^'
 
 /** The latest instant the package accepts, 2255-06-05T23:47:34.740Z, as `epochMillis` checks: the last millisecond whose epoch microseconds fit a safe integer. */
@@ -36,13 +36,13 @@ export const BankDBVersion = '001-001-001'
 export const VaultsDBVersion = '001-001-001'
 
 // RFC 9106's recommendation for Argon2id. One length for every deriver, until a host asks for another.
-/** How many random bytes a passphraseSalt holds: the `salt_bytes` of every key deriver. */
+/** How many random bytes a passphraseSalt has: the `salt_bytes` of every key deriver. */
 export const PassphraseSaltBytes = 16
 
 /** How many bytes a passphraseKey is: a 256-bit AES-GCM key. */
 export const PassphraseKeyBytes = 32
 
-/** How many random bytes a passkey wayin's `prf_salt_b64` holds: a new passkey's answer carries a fresh salt this long, and a stored salt of any other length fails its record's check. */
+/** How many random bytes a passkey wayin's `prf_salt_b64` has: a new passkey's answer carries a fresh salt this long, and a stored salt of any other length fails its record's check. */
 export const PasskeySaltBytes = 32
 
 // A brand is a `Symbol.for` key, so a second copy of safebyok (our ESM and CJS builds side by side, or one an adapter

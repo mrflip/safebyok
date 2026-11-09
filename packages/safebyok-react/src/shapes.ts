@@ -6,7 +6,7 @@ import { fromB64, type WhisperFieldAttributes } from 'safebyok/utils'
 // The types and checkers of safebyok-react, grouped by area. It imports types from no component or hook,
 // so nothing in it can make a cycle at run time.
 
-// == [Provider]: BankProviderProps, providerProps, HeldBankOpts, Handlers, ContextValue, TellBadNews, GatingModalProps, BoundaryProps, BoundarySource
+// == [Provider]: BankProviderProps, providerProps, ProviderBankOpts, Handlers, ContextValue, TellBadNews, GatingModalProps, BoundaryProps, BoundarySource
 
 /** What BankProvider is handed: the Bank.make options but `device_id`, the signed-in `user_id`, and the dialogs' props. */
 export interface BankProviderProps extends Omit<BankOpts, 'user_id' | 'device_id' | 'requestCleartext'> {
@@ -33,10 +33,10 @@ export const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ de
 // Hand-written for the doc comment a host sees on each prop, and matched to the checker so neither drifts.
 true satisfies AssertEqual<BankProviderProps, CheckerInput<typeof providerProps>>
 
-/** The options a held bank is made from: Bank.make's, but `device_id` and the handlers, for a `user_id` that may be null. */
-export type HeldBankOpts = Omit<BankOpts, 'user_id' | 'device_id' | 'onLifecycle' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
+/** The options a provider's bank is made from: Bank.make's, but `device_id` and the handlers, for a `user_id` that may be null. */
+export type ProviderBankOpts = Omit<BankOpts, 'user_id' | 'device_id' | 'onLifecycle' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
 
-/** The functions a held bank calls back, each as it was last rendered. */
+/** The functions a provider's bank calls back, each as it was last rendered. */
 export type Handlers = { onLifecycle: LifecycleHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext | undefined }
 
 /** What the provider hands down: the signed-in user's bank, the Vault objects a hook has called `tryHello` on, and how to tell the host's `onBadNews`. */
@@ -72,13 +72,13 @@ export type BoundaryProps = {
 export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'DelVaultModal' | 'AddPasskeyModal' | 'RevokePasskeyModal' | 'PasskeyUnlockButton'
 // --
 
-// == [Hooks]: VaultStage, VaultHeld, WhenShown
+// == [Hooks]: VaultStage, VaultLifecycle, WhenShown
 
 /** Where the vault a hook names stands: `waiting`, `unborn`, `present`, or `spent` once its bank is swept or vacated. */
 export type VaultStage = 'waiting' | 'unborn' | 'present' | 'spent'
 
 /** What {@link useVault} answers: the vault's stage, its Vault object while it is `present`, and why its bank ended once `spent`. */
-export type VaultHeld = { stage: 'waiting' | 'unborn', vault: null } | { stage: 'present', vault: Vault } | { stage: 'spent', vault: null, cause: VaultError }
+export type VaultLifecycle = { stage: 'waiting' | 'unborn', vault: null } | { stage: 'present', vault: Vault } | { stage: 'spent', vault: null, cause: VaultError }
 
 /** A function that calls `goOn` once the component is shown, for an async handler to go on through. */
 export type WhenShown = <ValT>(goOn: () => ValT) => Promise<Awaited<ValT>>
@@ -278,7 +278,7 @@ export type DevVaultDBInspectorProps = { vaultDB: VaultDB }
 /** What a panel's last button answered: the verb it called, whether it refused, and what it said. */
 export type LastCall = { verbname: string, isOk: boolean, said: string }
 
-/** What a panel's listing holds: the rows last listed, null before the first, and the refusal of the last attempt. */
+/** What a panel's listing has: the rows last listed, null before the first, and the refusal of the last attempt. */
 export type Listing<ValT> = { val: ValT | null, trouble: string | null }
 
 /** A lease row as the table lists it, with the scopepath it is filed under where `listRawLeases` gave one. */

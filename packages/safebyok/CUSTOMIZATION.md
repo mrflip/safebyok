@@ -113,7 +113,7 @@ bundler that leaves it out, a Content Security Policy that blocks it, an offline
 fails, loud and clear, and no vault is born until a later hello loads it.
 
 Ask the vault's checker from your passphrase field as the user types, so they hear the reason
-before they submit: `gating.checkStrength(typed)` is yours, held to the contract above, its
+before they submit: `gating.checkStrength(typed)` is yours, under the contract above, its
 verdict `{ strong: true }` or `{ strong: false, reason }`, so the field and the vault decide
 alike. `safebyok-react`'s dialog does so by default.
 

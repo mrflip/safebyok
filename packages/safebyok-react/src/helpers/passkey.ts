@@ -26,7 +26,7 @@ export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAn
   const created = await askAuthenticator(() => navigator.credentials.create({
     publicKey: {
       rp:                     { name: opts.rp.name, ...optional('id', opts.rp.id) },
-      // A random handle, never the host's own user id: an authenticator holding a passkey for the
+      // A random handle, never the host's own user id: an authenticator with a passkey for the
       // same site and handle would replace it, and the host's sign-in passkey with it.
       user:                   { ...opts.user, id: crypto.getRandomValues(new Uint8Array(16)) },
       challenge:              crypto.getRandomValues(new Uint8Array(32)),
@@ -118,7 +118,7 @@ const answerOf = (credential_id: string, saltBytes: Uint8Array, answer: BufferSo
 
 /** Zero `source` after copying its bytes, so the answer's bytes are the only copy. */
 const bytesOf = (source: BufferSource): Uint8Array<ArrayBuffer> => {
-  // ArrayBuffer.isView, not instanceof, holds across realms (an iframe's buffers, say).
+  // ArrayBuffer.isView, not instanceof, stays true across realms (an iframe's buffers, say).
   const handed = ArrayBuffer.isView(source) ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength) : new Uint8Array(source)
   const copied = Uint8Array.from(handed)
   handed.fill(0)

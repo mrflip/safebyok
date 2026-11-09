@@ -33,14 +33,14 @@ const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseS
 /** The scopepath of the bank row at `scope`. */
 const bankScopepathOf = ({ applabel, user_id }: BankScope): BankScopepath => [applabel, user_id]
 
-/** The shelf of the device database of `dbName`, which holds the leases. */
+/** The shelf of the device database of `dbName`, which has the leases. */
 const deviceShelfOf = (dbName: string): UseStore => versionedShelfOf({
   dbName, dbstem: 'device', version: DeviceDBVersion, storename: 'leases', oldnames: [`${dbName}:device_db`, `${dbName}:device-v1`],
 })
 
-// A database of its own, as a versioned shelf holds one object store: a second object store in the device database would move its
+// A database of its own, as a versioned shelf has one object store: a second object store in the device database would move its
 // version on, and every device would forget its leases.
-/** The shelf of the bank database of `dbName`, which holds the bank rows. */
+/** The shelf of the bank database of `dbName`, which has the bank rows. */
 const bankShelfOf = (dbName: string): UseStore => versionedShelfOf({
   dbName, dbstem: 'bank', version: BankDBVersion, storename: 'bank', oldnames: [],
 })

@@ -10,19 +10,19 @@ run on until they move here; its long README describes that design, not this one
 
 ## What a host relies on
 
-* **The backend holds ciphertext it cannot open.** It can read what is visible: labels, times and
+* **The backend has ciphertext it cannot open.** It can read what is visible: labels, times and
   each box's sidecar, which are authenticated but never encrypted. Put no secret in a sidecar.
 * **Nothing is recoverable, and removal is not revocation.** Nobody can open a vault whose
   passphrase is forgotten and which has no working passkey. A replaced passphrase or revoked passkey
   stops opening the vault, but the vaultKey never changes, so a copy of the old record still opens.
 * **State is framework-agnostic.** `Bank`, `Vault`, `Box` and `vault.boxListing` each have
   `subscribe` and `getSnapshot`, detached, as `useSyncExternalStore` wants them. A snapshot keeps
-  its identity until something changes, and never holds a whisper. It is plain data, but for the
+  its identity until something changes, and never has a whisper. It is plain data, but for the
   bank's `openGating`, the live gating a dialog answers.
 * **The core speaks only to interfaces**: a `VaultDB` for what syncs, a `DeviceDB` for what stays
   on this device, and a `KeyDeriver`. Each adapter is its own package. The core uses no Node
   built-ins, so it runs wherever the host does.
-* **The vaultDB is the ground truth, what this instance holds is a cache, and failure is a throw.**
+* **The vaultDB is the ground truth, what this instance has is a cache, and failure is a throw.**
   A refusal is a `VaultError` with a `refusalkind`. Primitive calls have no retries or abort
   controllers: add them where you need them. Most calls have a `try` form (`tryEnsureVault`)
   answering `{ ok, val, err }`.
@@ -32,17 +32,17 @@ run on until they move here; its long README describes that design, not this one
 
 ## The cast
 
-[VOCABULARY.md](../../VOCABULARY.md) has the only names for these. Its nouns hold, but some calls
+[VOCABULARY.md](../../VOCABULARY.md) has the only names for these. Its nouns still stand, but some calls
 it names are the old design's (`putWayin`, `getWhisper`): for calls, trust the types here.
 
 * **whisper**: the secret, always a plain object of JSON, such as `{ apiKey: 'sk-...' }`. A **box**
-  holds one, encrypted, with its `boxlabel` and sidecar.
+  has one, encrypted, with its `boxlabel` and sidecar.
 * **vault**: one user's boxes, named by `applabel`, `user_id` and `vaultlabel`. Deleted and made
   anew, it is a new life: a new `vault_tok` and a new `Vault` instance.
 * **bank**: a signed-in user's vaults and what they share. One per signed-in user.
 * **wayin**: a way in: one passphrase, and at most one passkey. Together they are the **gate**.
 * **gating**: one request for the user's passphrase or passkey, the one place UI meets the vault.
-  The bank's snapshot holds it as `openGating`, and hands it to the host's `requestCleartext` if
+  The bank's snapshot has it as `openGating`, and hands it to the host's `requestCleartext` if
   there is one.
 * **lease**: what lets this device unlock again without asking, until `autolockMinutes` passes.
 
@@ -137,7 +137,7 @@ Easy to get wrong:
 
 ## Showing a whisper
 
-`box.expose()` holds a whisper on the box until `box.unexpose()`, a sweep, a vacate or a delete, and
+`box.expose()` keeps a whisper on the box until `box.unexpose()`, a sweep, a vacate or a delete, and
 `box.whisper` shows it. While it will not show, `box.whisper` answers a frozen bag with no fields,
 and a put of one refuses. To learn why it hides, ask `box.exposure`: `'unexposed'`, `'locked'`,
 `'veiled'` or `'showing'` (`useBoxExposure` in safebyok-react). `box.isShowing` and
@@ -149,7 +149,7 @@ carries `isExposed` and `isVeiled`, and its vault's snapshot `isLocked`. `box.ve
 lock hides it, and an unlock shows it again. `box.subscribe` hears of all of this. The lock is the vault's, on
 `vault.getSnapshot()`, not the box's.
 
-**A script.** Fetch the passphrase in `requestCleartext`, with a token the container already holds:
+**A script.** Fetch the passphrase in `requestCleartext`, with a token the container already has:
 
 ```ts
 const bank = Bank.make({

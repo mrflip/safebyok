@@ -77,13 +77,13 @@ export const boxWritten = v.object({ isWritten: v.boolean(), ante: v.any(), vaul
 /** A box's put, or the vault's capacity when it had no room for a new box. */
 export const putBoxAnswer = v.union(boxWritten, v.object({ capacity }))
 
-/** How many box rows a bank's live vaults still hold. */
+/** How many box rows a bank's live vaults still have. */
 export const tidied = v.object({ totalCount: v.number() })
 
 /** A box row with the labels and life it is filed under. */
 export const rowOfWatchedBox = v.object({ vaultlabel: v.string(), vault_tok: v.string(), boxlabel: v.string(), box: v.any() })
 
-/** Every row a watch's scope holds. */
+/** Every row a watch's scope has. */
 export const rowsWatched = v.object({ vaults: v.array(rowOfVault), boxes: v.array(rowOfWatchedBox) })
 // --
 

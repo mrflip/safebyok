@@ -381,7 +381,7 @@ export const bankOpts = objCheck(({ fn, custom, applabel, user_id, device_id }) 
 export interface BankOpts {
   /** Your app's own label, so several apps can share one backend. */
   applabel:             string
-  /** The signed-in user's stable, opaque id from your own auth, hashed first if it holds anything sensitive. */
+  /** The signed-in user's stable, opaque id from your own auth, hashed first if it contains anything sensitive. */
   user_id:              string
   /** Your id for this device, a random UUID you keep per device. */
   device_id:            string

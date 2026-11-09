@@ -62,7 +62,7 @@ export const rowAt = async (store: IDBObjectStore, scopepath: IDBValidKey): Prom
 /** The refusal that says what went wrong in IndexedDB. */
 const troubleOf = (err: unknown): VaultError => {
   if (isVaultError(err)) { return err }
-  // A browser with IndexedDB switched off may hold the global as null rather than leave it out.
+  // A browser with IndexedDB switched off may have the global as null rather than leave it out.
   if ((typeof indexedDB === 'undefined') || ((indexedDB as IDBFactory | null) === null)) { return storageUnavailable(err, Phrases.NoBrowserDatastore) }
   const errname = (err instanceof Error) ? err.name : null
   if (errname === 'QuotaExceededError') { return storageFull(err) }

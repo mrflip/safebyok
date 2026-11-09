@@ -12,7 +12,7 @@ export type { MemoryVaultDBOpts } from '../shapes/shapes-storage'
 type BoxLife = { scope: VaultScope, vault_tok: string, boxrows: Map<string, unknown> }
 type Heeder = { scope: WatchScope, hear: (heard: Heard) => void }
 
-/** A vaultDB held in this tab's memory, gone when the tab closes. */
+/** A vaultDB kept in this tab's memory, gone when the tab closes. */
 export class MemoryVaultDB extends AdapterVaultDB {
   // == [Props]: #vaultrowsOfBank, #boxLives, #heeders, #maxBoxes
 

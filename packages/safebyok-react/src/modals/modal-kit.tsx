@@ -69,7 +69,7 @@ const DialogTrouble = ({ doing, onDone }: { doing: string, onDone: (answer: Dial
         <h3 id={titleId}>{Messages.troubleTitle}</h3>
         <p className="gripe" id={wordId}>{Messages.troubleWord(doing)}</p>
         <div className="row">
-          {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the field that held focus is gone; the WAI-ARIA dialog pattern moves focus to the dialog's one control */}
+          {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the field that had focus is gone; the WAI-ARIA dialog pattern moves focus to the dialog's one control */}
           <button type="button" autoFocus onClick={() => { onDone('dismissed') }}>{Messages.closeButton}</button>
         </div>
       </div>

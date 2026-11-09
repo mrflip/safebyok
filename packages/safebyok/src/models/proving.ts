@@ -52,7 +52,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   // == [Construction]: constructor
 
-  /** A proving of a stored wayin is born holding it; a proving minted for a new wayin holds none until `buildWayin`. */
+  /** A proving of a stored wayin is born with it; a proving minted for a new wayin has none until `buildWayin`. */
   protected constructor(stamp: VaultStamp, gate_epoch: number, header: HeaderT, wayinKey: CryptoKey, stored: Wayin | null = null) {
     this.wayinkind = header.wayinkind
     this.header = Object.freeze(header)
@@ -72,7 +72,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return checked.world.strengthChecker(checked.passphraseClear, checked.scope)
   }
 
-  /** The wayin this proving holds, made under a vaultKey new (`NOVEL`) or held by the `source` proving of the same vault. A proving holds one wayin. */
+  /** This proving's wayin, made under a vaultKey new (`NOVEL`) or the `source` proving's of the same vault. A proving has one wayin. */
   async buildWayin(source: Novel | Proving): Promise<Wayin> {
     if (this.#wayin !== null) { throw wayinMadeAlready() }
     const checked = Checks.wayinSource.parse(source)
@@ -81,7 +81,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return this.#wrapVaultKey(vaultKey)
   }
 
-  /** SLOPDOC: A lease on `friend`'s vault under the vaultKey its wayin holds; granted and cached only once attached. */
+  /** SLOPDOC: A lease on `friend`'s vault under the vaultKey its wayin has; granted and cached only once attached. */
   async buildLease(friend: LeaseFriend, gate_epoch: number = this.gate_epoch): Promise<Lease> {
     const checked = provingLeaseArgs.parse({ friend, gate_epoch })
     verifyConsistent(checked.friend, this.stamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherVault })

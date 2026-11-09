@@ -234,17 +234,17 @@ export const leaseMillis = Checker(({ int }) => int.positive().max(ForeverMillis
 /** The check of a logger as the bank hands its models one: guarded by `parseLogger`. */
 export const guardedLogger = Checker(({ custom }) => custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected), 'bad_option')
 
-/** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It holds no key, and reaches neither the record nor the boxes. */
+/** All a lease or a proving hears of a vault, as a plain object, its fields fixed for the vault's life, the deviceDB's lease verbs bound to its scope and `vault_tok`. It has no key, and reaches neither the record nor the boxes. */
 export const leaseFriend = objCheck(({ fn }) => ({
   ...vaultStamp.shape,
   logger:          guardedLogger,
   /** The autolock duration: a cached row proved longer ago than this is due for locking. */
   leaseMillis,
-  /** Lock the vault: a lease that will not open calls it, as what the vault holds is no use. */
+  /** Lock the vault: a lease that will not open calls it, as what the vault has is no use. */
   lock:            fn<() => unknown>(),
   /** The record this device has cached, or null for none. */
   peekLease:       fn<() => Promise<unknown>>(),
-  /** Cache a lease's record on this device, in place of any it held. */
+  /** Cache a lease's record on this device, in place of any it had. */
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
   /** Forget the lease this device has cached. */
   forgetLease:     fn<() => Promise<void>>(),
@@ -306,7 +306,7 @@ export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplac
   vaultDelClears:          obj({ passphraseClear: passphraseCleartext }).strict(),
 }))
 
-/** What a gating's run hears of its vault's private verbs, past the enter key. A plain object, held in private by the vault and the gating: no public method of a vault accepts a proving. */
+/** What a gating's run hears of its vault's private verbs, past the enter key. A plain object, kept private by the vault and the gating: no public method of a vault accepts a proving. */
 export const gatingFriend = objCheck(({ fn }) => ({
   /** Unlock the vault with what a proving proved, under `gate_epoch` where a gate change just wrote one. */
   unlockByProof: fn<(vault: Vault, proved: Proving, gate_epoch?: number) => Promise<Vault>>(),

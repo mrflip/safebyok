@@ -17,7 +17,7 @@ const Unsafe = /[\p{M}\p{C}\p{Z}\p{Default_Ignorable_Code_Point}\p{Bidi_Control}
 const composeAndStrip = (text: string): string => text.normalize('NFC').replaceAll(Unsafe, '')
 
 // Twice, since removing an invisible from between two Hangul jamo leaves them to compose.
-/** `text` as one compact line of visible characters: composed to NFC and stripped of all {@link Unsafe} holds, never escaped. */
+/** `text` as one compact line of visible characters: composed to NFC and stripped of all {@link Unsafe} matches, never escaped. */
 const plainLine = (text: string): string => composeAndStrip(composeAndStrip(text))
 
 /** `text` as a list of its code points, so that a surrogate pair is never parted. */
@@ -39,7 +39,7 @@ const butcher = (chars: readonly string[], { head, tail, minStars, maxLen }: Rec
   return '*'.repeat(maxLen)
 }
 
-/** An outline of a secret text for a log or a reminder: a whiff of each end with stars between, so a user can tell which API key a box holds.
+/** An outline of a secret text for a log or a reminder: a whiff of each end with stars between, so a user can tell which API key a box has.
  * The result is always one plain line of visible characters, and fidelity gives way to that.
  * It is public: it gives away the text's ends and, up to `maxLen`, its length.
  * Marks, invisibles, controls and spaces are stripped, so a script that writes vowels as marks loses

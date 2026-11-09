@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Bank, DefaultOnBadNews, DefaultOnLifecycle, tellBadNewsTo, type Vault } from 'safebyok'
 import { providerProps } from '../shapes'
-import type { BankProviderProps, ContextValue, GatingModalProps, Handlers, HeldBankOpts, TellBadNews } from '../shapes'
+import type { BankProviderProps, ContextValue, GatingModalProps, Handlers, ProviderBankOpts, TellBadNews } from '../shapes'
 import { GatingModal } from './gating-modal'
 import { useDeviceId, useWarnOfIgnoredOpts } from './provider-hooks'
 
@@ -11,7 +11,7 @@ const BankContext = createContext<ContextValue | null>(null)
 
 const tellNobody: TellBadNews = () => { /* no bank, no news */ }
 
-/** What a provider hands down while it holds no bank. */
+/** What a provider hands down while it has no bank. */
 const Bankless: ContextValue = Object.freeze({ bank: null, helloedVaults: new WeakSet<Vault>(), tellBadNews: tellNobody })
 
 /** What the nearest BankProvider hands down, or a throw naming `hookname` where there is none. */
@@ -22,10 +22,10 @@ export const useProvided = (hookname: string): ContextValue => {
 }
 // --
 
-// == [Holding]: useHeldBank
+// == [The provider's bank]: useProviderBank
 
-/** The bank made from the first render's `opts` once `device_id` is known, and held until unmount. */
-const useHeldBank = (opts: HeldBankOpts, device_id: string | null, handlers: Handlers, isHostAsking: boolean, onMade: (bank: Bank) => void): ContextValue => {
+/** The bank made from the first render's `opts` once `device_id` is known, and kept until unmount. */
+const useProviderBank = (opts: ProviderBankOpts, device_id: string | null, handlers: Handlers, isHostAsking: boolean, onMade: (bank: Bank) => void): ContextValue => {
   const [madeFrom] = useState(opts)
   const [contextValue, setContextValue] = useState<ContextValue>(Bankless)
 
@@ -99,13 +99,13 @@ const OpenGatingDialog = ({ bank, ...dialogProps }: Pick<GatingModalProps, 'pass
   return <GatingModal gating={openGating} leaseMillis={bank.leaseMillis} {...dialogProps} onDone={() => { openGating.dismiss() }} />
 }
 
-/** Hold one user's bank once the device is named, and show the dialog for its gatings. */
+/** Keep one user's bank once the device is named, and show the dialog for its gatings. */
 const UserBankProvider = (props: BankProviderProps & { device_id: string | null, onMade: (bank: Bank) => void }) => {
   const { passphraseUsername, passkeyRpId, children, device_id, onMade, onLifecycle = DefaultOnLifecycle, onBadNews = DefaultOnBadNews, requestCleartext, ...bankish } = props
   // The bank is made once, so whether the host's dialog asks is fixed at the first render, as the bank's other options are.
   /** True when the host's `requestCleartext` answers this bank's gatings. */
   const [isHostAsking] = useState(requestCleartext !== undefined)
-  const contextValue = useHeldBank(bankish, device_id, { onLifecycle, onBadNews, requestCleartext }, isHostAsking, onMade)
+  const contextValue = useProviderBank(bankish, device_id, { onLifecycle, onBadNews, requestCleartext }, isHostAsking, onMade)
   const { bank } = contextValue
 
   return (

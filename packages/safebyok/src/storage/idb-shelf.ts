@@ -31,7 +31,7 @@ const versionedShelfSpec = objCheck(({ str, arr }) => ({
   oldnames:  arr(str.min(1)),
 }), 'bad_option')
 
-// A page's one shelf for each database: each connection a shelf holds open is never closed, and its wipe is run once.
+// A page's one shelf for each database: each connection a shelf keeps open is never closed, and its wipe is run once.
 /** The shelf of each database this page has made one for, by the database's name. */
 const shelves = new Map<string, UseStore>()
 
@@ -46,7 +46,7 @@ export const versionedShelfOf = (spec: VersionedShelfSpec): UseStore => {
   const made: UseStore = async (txMode, callback) => {
     if (! isWiped) {
       isWiped = true
-      // The old databases are deleted unread and never awaited: a tab still holding one open holds its delete back (notes/wontfix.md).
+      // The old databases are deleted unread and never awaited: a tab still keeping one open keeps its delete waiting (notes/wontfix.md).
       void wipeOlderDBs(checked)
     }
     return await shelf(txMode, callback)

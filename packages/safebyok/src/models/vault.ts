@@ -27,7 +27,7 @@ import type { VaultListing } from './vault-listing'
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
 
-/** SLOPDOC: A vault as this device holds it: a storable that ducks as its record, and the world its boxes live in. */
+/** SLOPDOC: A vault as this device has it: a storable that ducks as its record, and the world its boxes live in. */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> {
   // == [Props]: applabel, user_id, vaultlabel, world, listing, #bankFriend, #lease, #friend, #boxListing, #gate
 
@@ -82,7 +82,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#bankFriend = VX.bankFriend.parse(bankFriend)
   }
 
-  /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it holds one. */
+  /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it has one. */
   static async launchBirth(listing: VaultListing, scope: VaultScope, askUser: AskUser | null): Promise<Vault> {
     const checked = listing.scopeOf(scope)
     listing.demandEnabled()
@@ -116,7 +116,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link addPasskeyPrompt}. */
   tryAddPasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskeyPrompt()) }
 
-  /** Revoke the passkey through a revoke_passkey gating. With none held it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
+  /** Revoke the passkey through a revoke_passkey gating. With none it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
   async revokePasskeyPrompt(): Promise<this> {
     await this.ensureTimely(VX.Promptly); this.demandPromptable()
     if (this.gate.pkWayin === null) { return this }
@@ -189,7 +189,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (! revoked.ok) { this.#bankFriend.announce({ kind: 'lease_revoke_failed', refusal: revoked.err, vault: this, where }) }
   }
 
-  /** The lease `proved` earns, attached. A lock called during the unlock does not hold: the proof says this user may have the vault unlocked. */
+  /** The lease `proved` earns, attached. A lock called during the unlock does not stand: the proof says this user may have the vault unlocked. */
   async #unlockByProof(proved: Proving, gate_epoch?: number): Promise<this> {
     const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
     await this.#attachLease(lease)
@@ -258,7 +258,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.#demandLease(checked.stamp).sealWith(checked.whisperText, checked.stamp)
   }
 
-  /** The text `sealed` holds, bound to `stamp`. */
+  /** The text `sealed` contains, bound to `stamp`. */
   async unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
     const checked = GX.leaseUnsealArgs.parse({ sealed, stamp })
     return this.#demandLease(checked.stamp).unsealWith(checked.sealed, checked.stamp)

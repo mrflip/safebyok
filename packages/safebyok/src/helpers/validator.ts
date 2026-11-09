@@ -1,4 +1,4 @@
-/** `Checkers`, `Checker` and `objCheck`, where every validator is made, and the {@link Kit} its builders are handed; and `consistent`, `demandConsistent` and `verifyConsistent`, which hold one bag to another, as a validator's `parseConsistent` does. */
+/** `Checkers`, `Checker` and `objCheck`, where every validator is made, and the {@link Kit} its builders are handed; and `consistent`, `demandConsistent` and `verifyConsistent`, which compare one bag to another, as a validator's `parseConsistent` does. */
 
 import * as Zod from 'zod'
 import type * as Z from 'zod'
@@ -163,14 +163,14 @@ export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
   /** This validator's schema again, its `parse` and `parseConsistent` refusing `kind`. */
   refusingAs: (kind: Refusalkind) => Refusing<SchemaT>
 } & (Z.output<SchemaT> extends object ? {
-  /** `val`, parsed, once each field it holds that `other` holds too is `===` to `other`'s: the call's kind otherwise, or `refusal`'s, naming the fields that disagree. A failed parse refuses as `parse` does. */
+  /** `val`, parsed, once each field it has that `other` has too is `===` to `other`'s: the call's kind otherwise, or `refusal`'s, naming the fields that disagree. A failed parse refuses as `parse` does. */
   parseConsistent: (val: unknown, other: object, refusal?: Partial<ConsistencyRefusal> & Story) => Z.output<SchemaT>
 } : unknown)
 // --
 
 // == [Refusals]: refusing, InEnglish, English, fieldnamesOf, MaxFailuresSaid, fieldnameOf, sentenceOf, refusalOf, framed
 
-/** A clone of `schema` whose `parse` throws a VaultError of `kind` where Zod's would throw its own, and whose `parseConsistent` parses, then holds the result to another bag. Every schema gets `parseConsistent`; {@link Refusing} types it only on an object's. */
+/** A clone of `schema` whose `parse` throws a VaultError of `kind` where Zod's would throw its own, and whose `parseConsistent` parses, then compares the result to another bag. Every schema gets `parseConsistent`; {@link Refusing} types it only on an object's. */
 const refusing = <SchemaT extends Z.ZodType>(kind: Refusalkind, schema: SchemaT): Refusing<SchemaT> => {
   const parse = (val: unknown, story?: Story): Z.output<SchemaT> => {
     const framing = story === undefined ? {} : Checks.story.parse(story)
@@ -232,10 +232,10 @@ const framed = (said: string, { where, advice }: Story): string => {
 // == [Consistency]: consistent, demandConsistent, verifyConsistent, disagreeing
 
 /** True when `bag` agrees with `other` wherever both make an assertion: each field defined in both (present, and not undefined) is `===`.
- * A field only one of them holds, or holds as undefined, is passed by. The fields compared are
+ * A field only one of them has, or has as undefined, is passed by. The fields compared are
  * `bag`'s own enumerable ones, so `bag` is plain data, a parse's output; `other` may be anything
- * holding fields, a Vault object's getters included, each read by its name. So `other` says what
- * is held to: hand it only the fields meant. An absent field passes, so a value an absent field
+ * with fields, a Vault object's getters included, each read by its name. So `other` says what
+ * is compared: hand it only the fields meant. An absent field passes, so a value an absent field
  * must fail is parsed first. Either bag not an object refuses.
  *
  * @example consistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' })   // true: no field is defined in both
@@ -262,7 +262,7 @@ export const verifyConsistent = <BagT extends object>(bag: BagT, other: object, 
   return bag
 }
 
-/** The names of the fields `bag` and `other` both define and hold apart, frozen: each bag checked to be an object first. */
+/** The names of the fields `bag` and `other` both define and have at different values, frozen: each bag checked to be an object first. */
 const disagreeing = (bag: object, other: object): readonly string[] => {
   const ours = Checks.bag.parse(bag)
   const theirs: Partial<Record<string, unknown>> = Checks.bag.parse(other)

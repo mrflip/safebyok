@@ -1,4 +1,4 @@
-/** A bank's vaults as this device holds them: the vault listing, and what it is given to reach the vaultDB and the bank. */
+/** A bank's vaults as this device has them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
 import { nowMillis } from '../helpers/clock'
 import type { Modelkind } from '../helpers/consts'
@@ -76,7 +76,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [Fetching]: list
 
-  /** Every vault and tombstone the vaultDB holds for this bank, delivered: each meets its slot as a fetch's answer would. Boxes wait on their vault's listing. A damaged row is bad news. */
+  /** Every vault and tombstone stored in the vaultDB for this bank, delivered: each meets its slot as a fetch's answer would. Boxes wait on their vault's listing. A damaged row is bad news. */
   async list(): Promise<void> {
     this.demandEnabled()
     const answer = await this.vaultDB.tryListVaults(this.world.scope)
@@ -111,7 +111,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return this.#deliverStored(await this.vaultDB.tryRevokePasskey(params))
   }
 
-  /** The record a gate verb wrote: the vault listed may hold a newer one by the time its answer is delivered. */
+  /** The record a gate verb wrote: the vault listed may have a newer one by the time its answer is delivered. */
   async #deliverStored(answer: Answer<SX.VaultRecord, string>): Promise<SX.VaultRecord> {
     await this.deliver(answer)
     return valOf(answer)
@@ -125,17 +125,17 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 
-  // == [The one gating open]: holdGating, releaseGating, dismissGatingAtDiscard, sweep, vacate, dismissGatingOfGoneListing
+  // == [The one gating open]: attachGating, detachGating, dismissGatingAtDiscard, sweep, vacate, dismissGatingOfGoneListing
 
-  /** Claims the one gating this bank may have open. */
-  holdGating(gating: AnyGating): void {
+  /** Attaches the one gating this bank may have open. */
+  attachGating(gating: AnyGating): void {
     if (this.#openGating !== null) { throw alreadyAsking() }
     this.#openGating = gating
     this.tellListeners()
   }
 
   /** The open gating has concluded. */
-  releaseGating(): void {
+  detachGating(): void {
     this.#openGating = null
     this.tellListeners()
   }

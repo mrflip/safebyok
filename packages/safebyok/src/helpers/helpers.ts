@@ -62,6 +62,6 @@ export function nextMicrotask(): Promise<void> { return new Promise(queueMicrota
 /** What an adapter's generic call answers: an adapter over synchronous storage need not make a promise. */
 export type Awaitable<ValT> = ValT | Promise<ValT>
 
-/** The ckey of `parts`, whichever characters they hold: JSON, so no two lists of parts meet. */
+/** The ckey of `parts`, whichever characters they contain: JSON, so no two lists of parts meet. */
 export const ckeyOf = (...parts: string[]): string => JSON.stringify(parts)
 // --

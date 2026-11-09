@@ -10,11 +10,11 @@ import { type Boxscope, type VaultScope, sidecar } from './shapes-core'
 
 // == [Sentinels and formats]: VoidRevisionTok, VoidRevisionSeq, VoidLifeTok, VoidTime, BoxFormat, VaultFormat, VoidRevision
 
-/** The `revision_tok` of a void row, and of a birth's prior: no populated row ever holds it. */
+/** The `revision_tok` of a void row, and of a birth's prior: no populated row ever has it. */
 export const VoidRevisionTok = '00000000-0000-0000-0000-000000000000'
-/** The `revision_seq` of a void row, and of a birth's prior: every populated row holds 0 or more. */
+/** The `revision_seq` of a void row, and of a birth's prior: every populated row has 0 or more. */
 export const VoidRevisionSeq = -1
-/** The `box_tok` or `vault_tok` of a void row: no life ever minted holds it. */
+/** The `box_tok` or `vault_tok` of a void row: no life ever minted has it. */
 export const VoidLifeTok = '00000000-0000-0000-0000-000000000000'
 /** The `registered_at` and `written_at` of a void row: 2008-08-08T08:08:08.777Z, plain on sight. */
 export const VoidTime = 1_218_182_888_777
@@ -29,7 +29,7 @@ export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidR
 
 // == [Record bases]: am, revision, times, vaulted, sparseBase, Revision, Times
 
-/** What every stored row holds in common: its `am`, its revision, its times and its vault's `vault_tok`, and `sparseBase`, the four together. */
+/** What every stored row has in common: its `am`, its revision, its times and its vault's `vault_tok`, and `sparseBase`, the four together. */
 export const { am, revision, times, vaulted, sparseBase } = Checkers('bad_option', ({ obj, int, oneof, epochMillis, revision_tok, vault_tok }) => {
   const revision = obj({
     revision_tok,
@@ -69,7 +69,7 @@ export type WatchScope = Readonly<Z.input<typeof watchScope>>
 
 // == [Wayins and gate]: passphraseWayinRecord, passkeyWayinRecord, gate, Gate
 
-/** The checks of the wayins as stored, and of the gate that holds them. */
+/** The checks of the wayins as stored, and of the gate that has them. */
 export const { passphraseWayinRecord, passkeyWayinRecord, gate } = Checkers('bad_option', ({ obj, lit, uint, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_id, vault_key_wayin_wrapped }) => {
   const passphraseWayinRecord = obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
   const passkeyWayinRecord    = obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
@@ -111,7 +111,7 @@ export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_opti
     box_tok,
     /** How the whisper became the bytes ciphered: `json_v1`, its JSON with every object's keys sorted, as UTF-8. */
     whisper_codec:          lit('json_v1'),
-    /** Which generation of the whisper's own shape this box holds: 1, the only one so far. */
+    /** Which generation of the whisper's own shape this box has: 1, the only one so far. */
     whisper_schema_version: lit(1),
   })
   const boxRecord = boxSparse.extend({
@@ -149,9 +149,9 @@ export const { foundVaultRow, foundBoxRow, storedVaultRow, storedBoxRow } = Chec
 
 // == [Gate verbs' params]: replacePassphraseParams, passkeyAddParams, revokePasskeyParams, ReplacePassphraseParams, AddPasskeyParams, RevokePasskeyParams
 
-/** The checks of the gate verbs' params: a vault record whose gate holds only the wayin that the verb changes. */
+/** The checks of the gate verbs' params: a vault record whose gate has only the wayin that the verb changes. */
 export const { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } = Checkers('bad_option', ({ obj, lit }) => {
-  // A vault record holding a gate that holds only the wayin the verb moves.
+  // A vault record with a gate that has only the wayin the verb moves.
   const gateParams = vaultSparse.extend({ am: lit('a') })
   const replacePassphraseParams = gateParams.extend({ gate: obj({ passphrase_wayin: passphraseWayinRecord }).strict() }).strict()
   const passkeyAddParams        = gateParams.extend({ gate: obj({ passkey_wayin: passkeyWayinRecord }).strict() }).strict()
@@ -188,7 +188,7 @@ export const adapterVaultDBOpts = objCheck(({ num }) => ({
 export const memoryVaultDBOpts = objCheck(({ uint }) => ({
   ...adapterVaultDBOpts.shape,
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** A soft cap on the live boxes one vault holds; no limit by default. */
+  /** A soft cap on the live boxes one vault has; no limit by default. */
   maxBoxes: uint.optional(),
 }), 'bad_option')
 
@@ -208,7 +208,7 @@ export type MemoryVaultDBOpts = Readonly<Z.input<typeof memoryVaultDBOpts>>
 
 // == [Capacity]: capacity, Capacity
 
-/** How much room a vault has: boxes against the most it holds, and bytes against the most its storage holds of one vault.
+/** How much room a vault has: boxes against the most it has, and bytes against the most its storage allows of one vault.
  * A vault reckons it from its last read; a VaultDB from storage, in `getCapacity` and a
  * `vault_full`'s `meta.capacity`. Either is an estimate: storage checks again on every write, and
  * its answer wins. A limit storage reports as `Infinity` reads as `Number.MAX_SAFE_INTEGER`.
@@ -295,12 +295,12 @@ export const isTombstoneRow = (raw: unknown): boolean => (peekOf(raw)?.am === 'x
 
 const sentinelTimes = { registered_at: VoidTime, written_at: VoidTime }
 
-/** The tombstone of a vault row nothing holds. */
+/** The tombstone of a vault row that is not stored. */
 export const sentinelVaultOf = ({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone => ({
   applabel, user_id, vaultlabel, fmt: VaultFormat, ...VoidRevision, ...sentinelTimes, am: 'x', vault_tok,
 })
 
-/** The tombstone of a box row nothing holds. */
+/** The tombstone of a box row that is not stored. */
 export const sentinelBoxOf = ({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string): BoxTombstone => ({
   applabel, user_id, vaultlabel, boxlabel, fmt: BoxFormat, ...VoidRevision, ...sentinelTimes, am: 'x', vault_tok, box_tok: VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
 })

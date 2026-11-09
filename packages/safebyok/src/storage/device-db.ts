@@ -135,7 +135,7 @@ export abstract class DeviceDB {
   protected abstract doStow(row: LeaseRow): Awaitable<void>
   /** The row stored at this vault scope, whatever its `vault_tok`, or null. */
   protected abstract doPeek(scope: VaultScope): Awaitable<unknown>
-  /** Removes the row at this vault scope when it holds this `vault_tok`, in one step. */
+  /** Removes the row at this vault scope when it has this `vault_tok`, in one step. */
   protected abstract doForget(asked: LeaseQuery): Awaitable<void>
   /** Every lease row stored, each beside the scopepath it is filed under, in any order and in one step. */
   protected abstract doListLeases(): Awaitable<RawLease[]>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Bank, BankOpts } from 'safebyok'
-import type { HeldBankOpts } from '../shapes'
+import type { ProviderBankOpts } from '../shapes'
 
 // == [Device]: useDeviceId
 
@@ -34,7 +34,7 @@ const changedKeys = (was: Record<string, unknown>, now: Record<string, unknown>)
 )
 
 /** Warn once, through `bank`'s logger, of each option changed since `madeFrom`, which the bank ignores. */
-export const useWarnOfIgnoredOpts = (bank: Bank | null, wasOpts: HeldBankOpts, nowOpts: HeldBankOpts): void => {
+export const useWarnOfIgnoredOpts = (bank: Bank | null, wasOpts: ProviderBankOpts, nowOpts: ProviderBankOpts): void => {
   const toldOfIgnored = useRef(false)
   useEffect(() => {
     if (bank === null || toldOfIgnored.current) { return }

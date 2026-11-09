@@ -8,7 +8,7 @@ import type { BankRow, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '..
 
 /** The scopepath of the lease row at `scope`. */
 const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath => [applabel, user_id, vaultlabel]
-/** The ckey the lease row filed under `scopepath` is held at. */
+/** The ckey the lease row filed under `scopepath` is stored at. */
 const leaseCkeyOf = (scopepath: LeaseScopepath): string => ckeyOf(...scopepath)
 const bankCkeyOf = ({ applabel, user_id }: BankScope): string => ckeyOf(applabel, user_id)
 

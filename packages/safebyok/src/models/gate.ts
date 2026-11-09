@@ -1,7 +1,7 @@
 import { type Modelkind, hasModelkind } from '../helpers/consts'
 import { Checkers } from '../helpers/validator'
 import { decorate, tattoo } from '../helpers/helpers'
-import { passkeyHeldAlready } from '../refusals/throwers'
+import { passkeyAlreadyAdded } from '../refusals/throwers'
 import { type GateProps, type PasskeyWayinRecord, type PassphraseWayinRecord, type VaultStamp, type WayinHeader, FirstGateEpoch, gateProps, vaultStamp } from '../shapes/shapes-gateish'
 import { Wayin } from './wayin'
 
@@ -58,9 +58,9 @@ export class Gate {
 
   // == [Guards]: demandPasskeyAddable
 
-  /** Demands that this gate hold no passkey: the one check before anyone is asked for one. */
+  /** Demands that this gate have no passkey: the one check before anyone is asked for one. */
   demandPasskeyAddable(): void {
-    if (this.pkWayin !== null) { throw passkeyHeldAlready() }
+    if (this.pkWayin !== null) { throw passkeyAlreadyAdded() }
   }
   // --
 

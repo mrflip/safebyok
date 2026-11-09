@@ -24,7 +24,7 @@ export const Patterns = Object.freeze({
   user_id: /^(?!\.+$)[A-Za-z0-9_.~:@+\|%\-]+$/,
 })
 
-/** The most characters a label holds. */
+/** The most characters a label contains. */
 export const MaxLabelChars = 40
 
 /** An applabel, a vaultlabel or a boxlabel: lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two to {@link MaxLabelChars} characters.
@@ -37,12 +37,12 @@ export const MaxLabelChars = 40
  */
 export const label = str().max(MaxLabelChars).regex(Patterns.label, Phrases.LabelShape)
 
-/** The most characters a user_id holds. */
+/** The most characters a user_id contains. */
 export const MaxUserIdChars = 100
 
 /** A user_id: 1 to {@link MaxUserIdChars} of ASCII letters, digits and `-_.~:@+|%`, never dots alone, opaque, compared byte for byte.
  * Those cover an email address and the common identity providers' ids; percent-encode (RFC 3986)
- * one that holds anything else. Pass the provider's stable id: a vault is found by its user_id,
+ * one that contains anything else. Pass the provider's stable id: a vault is found by its user_id,
  * and one that changes orphans the vault.
  *
  * @example user_id.safeParse('auth0|5f7c8ec7').success      // true
@@ -54,7 +54,7 @@ export const user_id = str().min(1, { error: Phrases.UserIdMissing, abort: true 
 // == [Instants]: epochMillis, EpochMillis
 
 /** The check for an instant: whole UTC epoch milliseconds from {@link FarPast} to {@link FarFuture}, both included.
- * Every time the package keeps is one, and a stored record holding anything else fails its check.
+ * Every time the package keeps is one, and a stored record with anything else fails its check.
  * The bounds catch epoch seconds and epoch microseconds passed by mistake.
  *
  * @example epochMillis.safeParse(1_792_022_400).success            // false: seconds, not ms

@@ -42,8 +42,8 @@ export const refusalkindVals = [
   'absent_vault',        // the vault has never been created, and this call will not create it
   'absent_wayin',        // the vault has no passkey, and one was asked for: to unlock with, or to remove
   'bad_scope',           // a name in a scope -- a label, or the user_id -- that fails its check
-  'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage holds in one record
-  'vault_full',          // a new box in a vault already holding its maxBoxes (a best-effort cap), or a write storage has no room for
+  'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage allows in one record
+  'vault_full',          // a new box in a vault already at its maxBoxes (a best-effort cap), or a write storage has no room for
   'bad_option',          // an option, argument or record handed in that fails its check: Bank.make's, argon2idDeriver's, a vaultDB verb's, a putBox()'s sidecar
   'bad_record',          // a record that fails a check serving both ways, a record handed in and one read back
   'damaged_box',         // a box's whisper would not open under the vault's lease, or opened to no whisper this package knows
@@ -56,7 +56,7 @@ export const refusalkindVals = [
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it; its own error is the cause
   'storage_issue',       // the storage backend answered with a row no working store could: no object at all, or naming another address than the one asked: the database is so broken we just can't, and a retry is unlikely to help
   'vault_gone',          // the vault a call was working on is no longer stored: deleted, here or elsewhere
-  'vault_mismatch',      // a live vault stands where the call's vault stood, under another vault_tok than the call holds
+  'vault_mismatch',      // a live vault stands where the call's vault stood, under another vault_tok than the call has
   'gating_concluded',    // a proof under way was for a prompt that ended meanwhile -- it was answered or dismissed -- so it unlocked nothing
   'damaged_lease',       // this device's lease would not open under its leaseKey: it was forgotten, and the vault locked
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
@@ -64,7 +64,7 @@ export const refusalkindVals = [
   'dismissed',           // the dialog was dismissed with no attempt under way, so nothing was done
   'same_passphrase',     // a new passphrase that is the one the vault already has
   'camped',              // a vaultDB put told not to replace a live row found one there
-  'vault_empty',         // a vaultDB call named a vault_tok no row holds, and no live row stands there: nothing of this life
+  'vault_empty',         // a vaultDB call named a vault_tok no row has, and no live row stands there: nothing of this life
   'damaged_row',         // a row read from storage failed its checks, on the way out, and is set aside
   'gate_issue',          // a vaultDB gate verb whose params disagree with the stored row: its registered_at
   'disabled',            // a call on a bank, a listing or a thing of theirs no longer enabled, since a sweep, a vacate or a delete: it answers nothing more
@@ -118,7 +118,7 @@ export const RefusalFamilyForKind = {
 // == [The error]: RefusalMeta, VaultErrorOpts, VaultError
 
 /** The facts a refusal learned, each under its own name, filled only by the refusals that name it.
- * Records are as storage holds them, ciphertext and visible fields, never secret material.
+ * Records are as stored, ciphertext and visible fields, never secret material.
  */
 export type RefusalMeta = {
   /** `vault_full` from storage: how full the vault is, read in the step that refused the write.
@@ -161,7 +161,7 @@ export class VaultError extends Error {
 
   /** A refusal of `refusalkind`, its family read from {@link RefusalFamilyForKind}.
    * @param message - What went wrong and what to do, calmly, for a non-expert. Never quotes secret material.
-   * @param opts - `cause`, the lower-level failure kept for debugging, and `meta`. Neither may hold secret material.
+   * @param opts - `cause`, the lower-level failure kept for debugging, and `meta`. Neither may contain secret material.
    */
   constructor(refusalkind: Refusalkind, message: string, opts?: VaultErrorOpts) {
     const { meta, ...errorOpts } = opts ?? {}

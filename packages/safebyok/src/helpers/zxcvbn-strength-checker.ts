@@ -22,7 +22,7 @@ export const MinZxcvbnScore = 3
 const checkerInput = objCheck(({ passphraseCleartext, vaultScope }) => ({ typed: passphraseCleartext, scope: vaultScope }), 'bad_option', [GX, CX])
 
 // Intl.Segmenter is missing from browsers before 2024 and from React Native's Hermes; there each code point counts as one.
-/** How many characters `typed` holds, as its reader counts them. */
+/** How many characters `typed` contains, as its reader counts them. */
 const graphemeCount = (typed: string): number => (
   typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter().segment(typed)].length : (typed.match(/./gsu) ?? []).length
 )

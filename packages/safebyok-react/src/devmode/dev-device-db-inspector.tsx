@@ -91,7 +91,7 @@ const LeaseRowLine = ({ row, scopepath, onForget, onForgetRaw }: LeaseRowLinePro
   )
 }
 
-// A raw row holds the leaseKey and the vaultKeyLeaseWrapped: show each such field's kind, never its
+// A raw row has the leaseKey and the vaultKeyLeaseWrapped: show each such field's kind, never its
 // content.
 const cellOf = (fieldname: string, val: unknown): string => {
   if (val === undefined) { return '–' }

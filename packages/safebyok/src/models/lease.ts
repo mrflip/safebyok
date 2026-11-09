@@ -9,7 +9,7 @@ import { damagedLease, leaseNotInForce, unopenedWhisper } from '../refusals/thro
 import type { Wayinkind } from '../shapes/shapes-enums'
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, LeaseFormat, leaseFriend, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from '../shapes/shapes-gateish'
 
-/** A vault's vaultKey in force on this device, good for one `gate_epoch`. It holds the key wrapped under a non-extractable leaseKey, opens it for a single call, and never hands it out. */
+/** A vault's vaultKey in force on this device, good for one `gate_epoch`. It has the key wrapped under a non-extractable leaseKey, opens it for a single call, and never hands it out. */
 export class Lease implements LeaseStamp {
   // == [Props]: fmt, applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, proved_at, wayinkind, #friend, #record, #vaultStamp, #isFromCache, #leaseStamp, toJSON
 
@@ -37,7 +37,7 @@ export class Lease implements LeaseStamp {
 
   get #leaseStamp(): LeaseStamp { return leaseStamp.parse(this) }
 
-  /** This lease's {@link LeaseSparse}, which holds no key material. */
+  /** This lease's {@link LeaseSparse}, which has no key material. */
   toJSON(): LeaseSparse { return this.#leaseStamp }
   // --
 
@@ -145,7 +145,7 @@ export class Lease implements LeaseStamp {
     }
   }
 
-  /** The text `sealed` holds, bound to `stamp`: what `sealWith` sealed. */
+  /** The text `sealed` contains, bound to `stamp`: what `sealWith` sealed. */
   async unsealWith(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
     const checked = leaseUnsealArgs.parse({ sealed, stamp })
     const vaultKey = await this.#vaultKey('unwrapKey')
@@ -183,7 +183,7 @@ export class Lease implements LeaseStamp {
     try {
       return await unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
     } catch {
-      // Locking drops the vault's lease and forgets its row by scope; this one is evicted too, should the vault hold another.
+      // Locking drops the vault's lease and forgets its row by scope; this one is evicted too, should the vault have another.
       this.#friend.lock()
       this.evict()
       throw damagedLease()
@@ -193,7 +193,7 @@ export class Lease implements LeaseStamp {
 
   // == [Guards]: isPresent, demandRecord
 
-  /** The lease still holds its record, as `Storable.isPresent` says of a thing not gone. */
+  /** The lease still has its record, as `Storable.isPresent` says of a thing not gone. */
   get isPresent(): boolean { return this.#record !== null }
 
   /** The record, while the lease is in force. */

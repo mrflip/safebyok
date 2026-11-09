@@ -1,4 +1,4 @@
-/** A vault's boxes as this device holds them: the box listing, and what it is given to reach the vaultDB and the vault. */
+/** A vault's boxes as this device has them: the box listing, and what it is given to reach the vaultDB and the vault. */
 
 import { VaultError } from '../refusals/errors'
 import type { Modelkind } from '../helpers/consts'

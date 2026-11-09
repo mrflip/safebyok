@@ -126,7 +126,7 @@ const boxPropsOf = (box: BoxRow): unknown[] => {
   })
 }
 
-/** The fields `props` hold, named in the order of `fieldnames`, a ciphered field's pair made whole again. */
+/** The fields `props` have, named in the order of `fieldnames`, a ciphered field's pair made whole again. */
 const fieldsOf = (fieldnames: readonly string[], props: unknown[]): Record<string, unknown> => (
   Object.fromEntries(props.slice(0, fieldnames.length).map((prop, idx) => {
     const field = fieldnames[idx] ?? ''

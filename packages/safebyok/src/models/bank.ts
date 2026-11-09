@@ -215,7 +215,7 @@ export class Bank {
     return listed.ok ? good(listed.val.filter((row) => this.#isOwnLease(row))) : listed
   }
 
-  // A fresh device holds no bank row: the next bank of this scope gets a new device_id.
+  // A fresh device has no bank row: the next bank of this scope gets a new device_id.
   /** This bank's leases revoked and its bank row forgotten on this device, then `vacated` told. */
   async #vacateDevice(cause: VaultError): Promise<void> {
     const unrevoked = await this.#revokeOwnLeases()

@@ -102,11 +102,11 @@ export interface VaultDB {
   replacePassphrase(params: ReplacePassphraseParams): Promise<GoodAnswer<VaultRecord, 'replaced'>>
   /** Non-throwing form of {@link VaultDB.replacePassphrase}. */
   tryReplacePassphrase(params: ReplacePassphraseParams): Promise<Answer<VaultRecord, 'replaced'>>
-  /** Lays a passkey wayin on a vault row holding none. */
+  /** Lays a passkey wayin on a vault row with none. */
   addPasskey(params: AddPasskeyParams): Promise<GoodAnswer<VaultRecord, 'added'>>
   /** Non-throwing form of {@link VaultDB.addPasskey}. */
   tryAddPasskey(params: AddPasskeyParams): Promise<Answer<VaultRecord, 'added'>>
-  /** Removes the passkey wayin from the vault row; one holding none answers as stored. */
+  /** Removes the passkey wayin from the vault row; one with none answers as stored. */
   revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>>
   /** Non-throwing form of {@link VaultDB.revokePasskey}. */
   tryRevokePasskey(params: RevokePasskeyParams): Promise<Answer<VaultRecord, 'revoked'>>
@@ -309,7 +309,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Non-throwing form of {@link replacePassphrase}. */
   async tryReplacePassphrase(params: ReplacePassphraseParams) { return answerOf(() => this.replacePassphrase(params)) }
 
-  /** Lays a passkey wayin on a vault row holding none. */
+  /** Lays a passkey wayin on a vault row with none. */
   async addPasskey(params: AddPasskeyParams): Promise<GoodAnswer<VaultRecord, 'added'>> {
     const req_params = SX.reqParamsOf(params)
     try {
@@ -325,7 +325,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Non-throwing form of {@link addPasskey}. */
   async tryAddPasskey(params: AddPasskeyParams) { return answerOf(() => this.addPasskey(params)) }
 
-  /** Removes the passkey wayin from the vault row; one holding none answers as stored. */
+  /** Removes the passkey wayin from the vault row; one with none answers as stored. */
   async revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>> {
     const req_params = SX.reqParamsOf(params)
     try {

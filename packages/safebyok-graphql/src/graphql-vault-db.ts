@@ -133,7 +133,7 @@ export class GraphQLVaultDB implements VaultDB {
     })
   }
 
-  /** Lays a passkey wayin on a vault row holding none. */
+  /** Lays a passkey wayin on a vault row with none. */
   async addPasskey(params: AddPasskeyParams): Promise<GoodAnswer<VaultRecord, 'added'>> { return goodAnswerOf(await this.tryAddPasskey(params)) }
 
   async tryAddPasskey(params: AddPasskeyParams): Promise<Answer<VaultRecord, 'added'>> {
@@ -239,7 +239,7 @@ export class GraphQLVaultDB implements VaultDB {
 
 // == [Answers]: answerOf, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, heedNotice
 
-/** What `ask` answers, or a bad answer holding the refusal it threw. */
+/** What `ask` answers, or a bad answer with the refusal it threw. */
 const answerOf = async <ValT, ActT extends string, WorldT>(call: string, req_params: ReqParams, ask: () => Promise<Answer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
   const outcome = await DB.outcomeOf(ask)
   if (outcome.ok) { return outcome.val }
@@ -286,7 +286,7 @@ const statusOf = (response: unknown): number | null => {
   return Number.isSafeInteger(status) ? status as number : null
 }
 
-/** A code such as ECONNREFUSED that `thrown` holds, or null: only a word of capitals, which quotes nothing. */
+/** A code such as ECONNREFUSED that `thrown` has, or null: only a word of capitals, which quotes nothing. */
 const codeOf = (thrown: unknown): string | null => {
   const code: unknown = (typeof thrown === 'object') && (thrown !== null) && ('code' in thrown) ? thrown.code : null
   return (typeof code === 'string') && /^[A-Z][A-Z0-9_]{0,39}$/.test(code) ? code : null
@@ -309,7 +309,7 @@ const heedNotice = ({ data }: OperationResult<unknown>, onNotice: (notice: Notic
 // == [Typenames]: Drop, dropTypename, wayinOf, gateOf, rowOf, rowsOf, listedOf, answerDrop, rowAnswerOf, listedAnswerOf, tidiedAnswerOf
 
 // An exchange such as urql's cacheExchange adds `__typename` to each selection a document makes. It is dropped
-// selection by selection, never by a deep strip: a sidecar, a meta or a damaged row may hold a `__typename` of its own.
+// selection by selection, never by a deep strip: a sidecar, a meta or a damaged row may have a `__typename` of its own.
 
 /** How one selection drops its `__typename`. */
 type Drop = (val: unknown) => unknown

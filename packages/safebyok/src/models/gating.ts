@@ -18,7 +18,7 @@ import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Vault } from './vault'
 import type { VaultListing } from './vault-listing'
 
-/** One ask of the user, one open per bank. It holds the clears only for the length of an attempt, and concludes once: launch answers with that outcome. */
+/** One ask of the user, one open per bank. It has the clears only for the length of an attempt, and concludes once: launch answers with that outcome. */
 export class Gating<KindT extends Gatingkind = Gatingkind> {
   // == [Props]: gatingkind, gatingTok, applabel, user_id, vaultlabel, vault, passkeyHeader, #listing, #launchArgs, #run, #prove, #concluded, #conclude, #outcome, #isAttempting, #isLastAttempt
 
@@ -82,7 +82,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   static async launch<KindT extends Gatingkind>(gatingkind: KindT, args: LaunchArgs<KindT>): Promise<Vault> {
     const { scope, askUser } = GX.gatingLaunchArgs.parse({ gatingkind, scope: args.scope, friend: args.friend, askUser: args.askUser })
     const gating = new Gating(gatingkind, { ...args, scope })
-    args.listing.holdGating(gating as unknown as AnyGating)
+    args.listing.attachGating(gating as unknown as AnyGating)
     if (askUser !== null) { void gating.#askHost(askUser) }
     return valOf(await gating.#concluded)
   }
@@ -146,7 +146,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   #concludeOnce(outcome: Outcome<Vault>): void {
     if (this.#outcome !== null) { return }
     this.#outcome = outcome
-    this.#listing.releaseGating()
+    this.#listing.detachGating()
     this.#conclude(outcome)
   }
   // --
@@ -240,7 +240,7 @@ const ProveForGatingkind: { [KindT in Gatingkind]: Prove<KindT> } = {
   del_vault:      ({ vault, world }, clears) => provePassphrase(vault, checkedClears(GX.vaultDelClears, clears), world),
 }
 
-/** The attempt's one record and the gate it holds, read once, after its timeliness request. */
+/** The attempt's one record and the gate it has, read once, after its timeliness request. */
 const timelyAnte = async (vault: Vault): Promise<{ ante: VaultRecord, gate: Gate }> => {
   await vault.ensureTimely(VX.Promptly); vault.demandPromptable()
   return { ante: vault.fullRecord, gate: vault.gate }

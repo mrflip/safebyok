@@ -15,7 +15,7 @@ export const DeviceIdShape = "A device_id is a UUID, such as crypto.randomUUID()
 /** An empty user_id. */
 export const UserIdMissing = "A user_id names the signed-in user, so it can't be empty"
 
-/** A user_id holding a character outside its set, or only dots. */
+/** A user_id containing a character outside its set, or only dots. */
 export const UserIdChars = "A user_id is ASCII letters, digits and - _ . ~ : @ + | %, and not dots alone: percent-encode (RFC 3986) any other character"
 // --
 
@@ -39,10 +39,10 @@ export const DatabaseInVaultScope = "A vaultDB and a deviceDB go to Bank.make, n
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
 
-/** A host's bare function, or anything else, where a bank's world holds that function as the bank wraps it. */
+/** A host's bare function, or anything else, where a bank's world has that function as the bank wraps it. */
 export const GuardedExpected = "Expected a host's function as Bank.make wraps it"
 
-/** A host's bare logger, or anything else, where a bank's world holds its logger as the bank guards it. */
+/** A host's bare logger, or anything else, where a bank's world has its logger as the bank guards it. */
 export const GuardedLoggerExpected = "Expected a logger as Bank.make guards it"
 
 /** Anything but a vaultDB branded by safebyok and answering each of its verbs, where a vaultDB is asked. */
@@ -117,7 +117,7 @@ export const StrengthCheckerShape = "Expected a function from the passphrase, an
 
 // == [Refusals]: unknownFields, moreFailures, WhisperShape, fieldsDisagree, BagNotObject, WhisperBagShape
 
-/** An object holding `count` fields it does not accept, never named, as a name may be the caller's data, and the `fieldnames` it accepts. */
+/** An object with `count` fields it does not accept, never named, as a name may be the caller's data, and the `fieldnames` it accepts. */
 export const unknownFields = (count: number, fieldnames: readonly string[]): string => {
   const refused = count === 1 ? 'There is a field it does not accept (its name is not repeated)' : `There are ${String(count)} fields it does not accept (their names are not repeated)`
   const accepted = fieldnames.length === 0 ? 'it accepts no fields' : `it accepts only ${fieldnames.join(', ')}`
@@ -129,11 +129,11 @@ export const moreFailures = (count: number): string => `and ${String(count)} mor
 
 /** A whisper that is no plain object of JSON. */
 export const WhisperShape = "A whisper is a plain object of JSON, with no symbol key anywhere: a bare string, number, boolean, array, null or undefined cannot be put, so wrap one as { apiKey: 'sk-...' }. To empty a box, delete it (null inside an array or object is fine)"
-/** A bag holding `fieldnames` at other values than the bag it is checked against holds them. */
-export const fieldsDisagree = (fieldnames: readonly string[]): string => `This holds another ${fieldnames.join(' and ')} than what it is checked against: a field both hold must agree`
+/** A bag whose `fieldnames` have other values than in the bag it is checked against. */
+export const fieldsDisagree = (fieldnames: readonly string[]): string => `This has another ${fieldnames.join(' and ')} than what it is checked against: a field both have must agree`
 
 /** A bag to check another against that is not an object. */
-export const BagNotObject = "What a bag is checked against is an object, holding the fields to compare"
+export const BagNotObject = "What a bag is checked against is an object, with the fields to compare"
 
 /** An object in a whisper or a sidecar that is not plain JSON. */
 export const WhisperBagShape = "An object in a whisper or a sidecar is a plain object of JSON: strings, numbers, booleans, null, arrays and plain objects, never undefined, a Date, a Map, a class's instance or a symbol key"
@@ -163,7 +163,7 @@ export const RecordForNewBox = "A create operation found a record already presen
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
-/** Why a birth makes nothing of a dna for a scope the listing already holds alive. */
+/** Why a birth makes nothing of a dna for a scope the listing already has alive. */
 export const AlreadyListed = "This listing already has an instance under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
 
 /** Why a put that storage answered with no record refuses: only a broken adapter answers that. */
@@ -185,21 +185,21 @@ export const NotExposed = "This box has no whisper exposed: call box.expose() fi
 export const BoxExpected = "BoxFields.of accepts a Box, as vault.getBox answers one."
 
 /** Why saving a box's fields is refused while they show a blank. */
-export const PuttingVeiledFields = "This box's whisper is veiled, so its fields hold no whisper to put: call box.unveil() first."
+export const PuttingVeiledFields = "This box's whisper is veiled, so its fields have no whisper to put: call box.unveil() first."
 
 /** Why saving a box's fields is refused with none to read. */
 export const NoFieldsBound = "This box has no field bound, so there is nothing to put: bind one with BoxFields.of(box).bind(path), or call box.putExposed()."
 
-/** Why a record storage holds under the revision_seq held, but another revision_tok, is not adopted. */
+/** Why a record stored under the revision_seq in hand, but another revision_tok, is not adopted. */
 export const OneRevisionTwoToks = "Storage and this device disagree about a record's history (the expected revision sequence matched, but its confirming token did not). Report this as a bug."
 
-/** Why a record storage holds deleted at the revision held alive, or the other way round, is not adopted. */
+/** Why a record stored deleted, at a revision the instance has alive, or the other way round, is not adopted. */
 export const OneRevisionTwoFates = "Storage and this device disagree about a record's history (one records a deleted record, the other a live one). Report this as a bug."
 
-/** Why a record storage holds under the revision held, but of another life of the thing, is not adopted. */
+/** Why a record stored under the revision in hand, but of another life of the thing, is not adopted. */
 export const OneRevisionTwoLives = "Storage and this device disagree about a record's history (it has been deleted and recreated). This should not happen: report this as a bug."
 
-/** Why a record under another vault_tok than the instance holds is not adopted. */
+/** Why a record under another vault_tok than the instance has is not adopted. */
 export const OtherVaultTok = "Storage delivered a record from a deleted vault. This should not happen: report this as a bug."
 
 /** Why a record under another vault_tok than the vault its listing lies in is not made into an instance. */
@@ -238,11 +238,11 @@ export const UnknownKeyDeriver = "This vault was made with a key deriver this pa
 /** Why what a keyDeriver hands back is refused when it is not `count` fresh key bytes. */
 export const notKeyBytes = (count: number): string => `The keyDeriver handed back something other than ${String(count)} fresh key bytes.`
 
-/** Why a proving asked for the vaultKey before it holds a wayin refuses: a bug. */
+/** Why a proving asked for the vaultKey before it has a wayin refuses: a bug. */
 export const WayinNotMadeYet = "A proving was asked for the vaultKey before it made or opened a wayin: a bug in the caller."
 
-/** Why a proving that holds a wayin already makes no other. */
-export const WayinMadeAlready = "This proving holds a wayin already, and a proving holds one: make a new proving for another wayin. A bug in the caller."
+/** Why a proving that has a wayin already makes no other. */
+export const WayinMadeAlready = "This proving has a wayin already, and a proving has one: make a new proving for another wayin. A bug in the caller."
 
 /** Why a wayin is not made under the vaultKey of a proving of another vault. */
 export const ProvingOfOtherVault = "The source proving is of another vault: a wayin is made only under the vaultKey of the vault it lets into, so none was made. This is a bug in safebyok."
@@ -290,10 +290,10 @@ export const boxNotListed = (boxlabel: string): string => `No box is listed unde
 export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."
 // --
 
-// == [Models: gates]: PasskeyHeldAlready, DelOfOtherLife
+// == [Models: gates]: PasskeyAlreadyAdded, DelOfOtherLife
 
-/** Why a passkey is not added to a gate that holds one. */
-export const PasskeyHeldAlready = "This vault has a passkey already, and holds one at a time, so nothing was asked or changed: revoke it first (vault.revokePasskeyPrompt), then add the new one."
+/** Why a passkey is not added to a gate that has one. */
+export const PasskeyAlreadyAdded = "This vault has a passkey already, and may have only one, so nothing was asked or changed: revoke it first (vault.revokePasskeyPrompt), then add the new one."
 
 /** Why a stale Vault's delete does not reach the vault made since in its slot. */
 export const DelOfOtherLife = "The vault listed in this slot is under another vault_tok than this Vault, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
@@ -327,7 +327,7 @@ export const reservedDeriverLabel = (prefix: string): string => `Labels beginnin
 
 export const suppliedSpecChanged = (label: string): string => `A key deriver labelled ${label} must carry that spec's parameters exactly, or vaults made under it will not open elsewhere: spread the exported spec into yours, or choose a label of your own.`
 
-export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault holds real secrets, open it with argon2idWebV1Deriver (from safebyok/browser), or another vetted Argon2id deriver."
+export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault has real secrets, open it with argon2idWebV1Deriver (from safebyok/browser), or another vetted Argon2id deriver."
 // --
 
 // == [The models' bank]: BankHelloFirst, BankLetGo, vaultStoredDamaged
@@ -393,14 +393,14 @@ export const AbsentBox = "No box is stored under that label."
 /** A change of the gate refused, `why` saying which check it failed. */
 export const gateIssue = (why: string): string => `This change of the gate was refused: ${why}`
 
-/** Why a gate verb naming a registered_at the stored vault does not hold is refused, as {@link gateIssue}'s `why`. */
+/** Why a gate verb naming a registered_at the stored vault does not have is refused, as {@link gateIssue}'s `why`. */
 export const RegisteredAtNotStored = "its registered_at is not the stored one."
 
-/** A box record over the bytes its storage holds in one record. */
-export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): string => `That box weighs ${String(recordBytes)} bytes, over the ${String(maxRecordBytes)} its storage holds in one record.`
+/** A box record over the bytes its storage allows in one record. */
+export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): string => `That box weighs ${String(recordBytes)} bytes, over the ${String(maxRecordBytes)} its storage allows in one record.`
 
-/** A vault holding as many boxes as its storage allows. */
-export const VaultFull = "This vault holds as many boxes as its storage allows."
+/** A vault with as many boxes as its storage allows. */
+export const VaultFull = "This vault has as many boxes as its storage allows."
 
 /** A write the storage itself had no room for. */
 export const StorageFull = "The vault's storage has no room left for this write: free some, then try again. The storage adapter's own error is this error's cause."

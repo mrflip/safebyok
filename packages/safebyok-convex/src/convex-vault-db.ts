@@ -44,7 +44,7 @@ export type ConvexVaultDBOpts = AdapterVaultDBOpts & {
   client: ConvexVaultClient
   /** The safebyok functions the app serves, `api.safebyok`. */
   api: SafebyokApi
-  /** A soft cap on the box rows a vault holds, live or tombstoned, under the component's own limit. */
+  /** A soft cap on the box rows a vault has, live or tombstoned, under the component's own limit. */
   maxBoxes?: number | undefined
 }
 
@@ -171,7 +171,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 const ConvexDocumentBytes = 1_048_576
 
 /** What `call` resolves, or the refusal that says what stopped it. */
-// A thunk, since ConvexReactClient.query throws at once a refusal it already holds.
+// A thunk, since ConvexReactClient.query throws at once a refusal it already has.
 const reaching = async <ValT>(callname: string, call: () => Promise<ValT>): Promise<ValT> => {
   try {
     return await call()

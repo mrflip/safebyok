@@ -14,14 +14,14 @@ Whispers are encrypted on this device before anything reaches storage. The page 
 browser's batteries, `browserOpts` from `safebyok/browser`: Argon2id to derive, zxcvbn to judge
 a new passphrase, and the device's leases in this browser's IndexedDB. The vault's rows live in
 IndexedDB too, in a database of their own (through `safebyok-indexeddb`), standing in for the
-ciphertext a backend would hold. Only the fake auth's scaffolding rows sit in localStorage; the
+ciphertext a backend would have. Only the fake auth's scaffolding rows sit in localStorage; the
 `device_id` each user's bank is made with is kept beside the leases, as the provider asks the
 deviceDB for it.
 
 ## The page
 
 The Knock-Knock Machine: bring an Anthropic API key, say who's there, and Claude finishes the
-joke. Its header holds the sign-in strip
+joke. Its header has the sign-in strip
 ([src/components/SessionBar.tsx](src/components/SessionBar.tsx)) and, once signed in, the
 account menu ([src/components/AccountMenu.tsx](src/components/AccountMenu.tsx)): the vault's
 lock control, *Sign out*, which locks the user's vaults on this device, and *Delete account*,

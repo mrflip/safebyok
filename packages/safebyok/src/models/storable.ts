@@ -24,7 +24,7 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
 }
 // --
 
-/** A vault or box held in this tab, kept in step with its row in the vaultDB. */
+/** A vault or box in this tab, kept in step with its row in the vaultDB. */
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
   // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #oneFetchAtATime, #listeners, #getSnapshot, #subscribe, isFUBag
 
@@ -40,13 +40,13 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   declare registered_at: number
   declare written_at:    number
 
-  /** The scope, held once and frozen: the listing keys and watches by it, and the verbs name it. Its props are also tattooed on, so the thing ducks as its record; a getter keeps `scope` itself off the duck. */
+  /** The scope, set once and frozen: the listing keys and watches by it, and the verbs name it. Its props are also tattooed on, so the thing ducks as its record; a getter keeps `scope` itself off the duck. */
   readonly #scope: ScopeT
 
   /** Set by a sweep or a vacate, and never cleared. */
   #isEnabled = true
 
-  /** The latest record this device knows storage holds: full, sparse or a tombstone, void on a new instance. */
+  /** The latest record this device knows is stored: full, sparse or a tombstone, void on a new instance. */
   #central: Fetched<RecordT, SparseT>
   /** Made when `snapshot` is first asked for, and again by each `align` once one exists. */
   #snapshot: SnapshotT | null = null
@@ -193,7 +193,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return isAdopting ? this.align() : { badnews: [] }
   }
 
-  /** A tombstone made here, from the sparse props held, under `revision`, written now. */
+  /** A tombstone made here, from the sparse props in hand, under `revision`, written now. */
   protected tombstoneFor(revision: Revision): Tombstone<SparseT> {
     const { revision_tok, revision_seq } = revision
     return { ...this.sparse, revision_tok, revision_seq, written_at: nowMillis(), am: 'x' }
@@ -281,7 +281,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return this
   }
 
-  /** Drop what this instance holds of secrets, leave what this device has cached, and answer nothing from here on, delisted. A repeat is a no-op. Never throws. */
+  /** Drop what this instance has of secrets, leave what this device has cached, and answer nothing from here on, delisted. A repeat is a no-op. Never throws. */
   sweep(): this { return this.#disable(() => { this.sweepContents() }) }
 
   /** As `sweep`, and what this device has cached of it goes too. Storage is untouched. A repeat is a no-op. Never throws. */
