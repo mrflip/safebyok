@@ -274,7 +274,7 @@ from the host's `requestCleartext` refuses every call waiting on the gating `une
 carrying nothing of what it threw (it may quote the passphrase: #262), so a dialog that fails for
 a reason the host could name -- a lost user gesture, a passkey the platform refused -- cannot say
 so. Decide what a `requestCleartext` may refuse with: a short list of kinds it may throw as
-`VaultError`s, kept as they came, or a `gating.refuse(kind)` beside `decline()`.
+`VaultError`s, kept as they came, or a `gating.refuse(kind)` beside `dismiss()`.
 
 The same throw reaches `del()` (the documentarian's run 2,
 [#312](https://github.com/mrflip/safebyok/pull/312)): once its write is sent, a `requestCleartext`

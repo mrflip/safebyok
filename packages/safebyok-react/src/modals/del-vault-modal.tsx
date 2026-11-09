@@ -1,12 +1,11 @@
 import { useRef } from 'react'
 import { Messages } from '../helpers/messages'
-import { useRoundFor } from '../hooks/round-for'
 import type { DelVaultModalProps } from '../shapes'
 import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts } from './modal-kit'
 
 /** The dialog for a `del_vault` gating, which deletes the vault once the user proves its passphrase. */
 export const DelVaultModal = (props: DelVaultModalProps) => (
-  <AnsweringOnce key={useRoundFor(props.gating)} gating={props.gating} onDone={props.onDone}>
+  <AnsweringOnce key={props.gating.gatingTok} gating={props.gating} onDone={props.onDone}>
     {(done) => <DelVaultForm {...props} onDone={done} />}
   </AnsweringOnce>
 )

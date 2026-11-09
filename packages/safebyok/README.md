@@ -61,7 +61,7 @@ const bank = Bank.make({
     if (gating.gatingkind !== 'build_vault' && gating.gatingkind !== 'unlock_vault') { return }
     while (gating.isOpen) { // a wrong passphrase leaves it open
       const passphraseClear = await dialog.ask(gating.gatingkind)
-      if (passphraseClear === null) { return } // returning with no attempt under way declines
+      if (passphraseClear === null) { return } // returning with no attempt under way dismisses
       await gating.attempt({ passphraseClear })
     }
   },
@@ -77,14 +77,14 @@ await vault.ensureUnlocked() // no lease now: asks, unlock_vault
 ```
 
 **Rendering the dialog from the snapshot.** Leave `requestCleartext` out, and a gating calls none
-of your functions: it waits, open, in `bank.snapshot.openGating` until its `attempt` or `decline`
+of your functions: it waits, open, in `bank.snapshot.openGating` until its `attempt` or `dismiss`
 settles it. Render your dialog while that is not null. The bank notifies its subscribers as a
-gating opens and as it settles, whether by the user's answer, a lock, a sweep or a vacate, so the
-dialog closes by itself.
+gating opens and as it settles, whether by the user's answer, a sweep or a vacate, so the
+dialog closes by itself. A lock leaves it open.
 
 ```ts
 const { openGating } = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
-// Render a dialog while openGating is not null. Its Cancel calls openGating.decline().
+// Render a dialog while openGating is not null. Its Cancel calls openGating.dismiss().
 ```
 
 A passkey prompt needs a live user gesture: ask it from the click on a button in your dialog.

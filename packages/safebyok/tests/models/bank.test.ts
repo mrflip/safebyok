@@ -532,7 +532,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     const attempts: Outcome<unknown>[] = []
     const bank = makeBankWorld().bankOn({ strengthChecker: undefined, requestCleartext: async (gating) => { attempts.push(await gating.attempt(byPassphrase(Passphrase))) } })
     await bank.hello()
-    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'declined')
+    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'dismissed')
     const [attempted] = attempts
     expect(attempted?.err).to.include({ refusalkind: 'weak_passphrase' })
     expect(attempted?.err?.message).to.include('CUSTOMIZATION.md')
@@ -664,32 +664,32 @@ describe("the snapshot's open gating", () => {
     expect(bank.snapshot.openGating).to.equal(bank.vaultListing.openGating)
     expect(gating.isOpen).to.be.true
     expect(Object.isFrozen(bank.snapshot)).to.be.true
-    gating.decline()
-    await TH.expectRefusal(unlocking, 'declined')
+    gating.dismiss()
+    await TH.expectRefusal(unlocking, 'dismissed')
   })
 
   it("serializes an open gating as its scope and kind, holding no secret", async () => {
     const { bank, gating, unlocking } = await bankWaitingOnUnlock()
     const text = JSON.stringify(bank.snapshot)
     const { openGating } = JSON.parse(text) as { openGating: unknown }
-    expect(openGating).to.deep.equal({ ...VaultScopeGiven, ...BankScopeGiven, gatingkind: 'unlock_vault' })
-    gating.decline()
-    await TH.expectRefusal(unlocking, 'declined')
+    expect(openGating).to.deep.equal({ ...VaultScopeGiven, ...BankScopeGiven, gatingkind: 'unlock_vault', gatingTok: gating.gatingTok })
+    gating.dismiss()
+    await TH.expectRefusal(unlocking, 'dismissed')
   })
 
   it("tells a subscriber when a gating opens and again when it settles", async () => {
     const { bank, gating, unlocking } = await bankWaitingOnUnlock()
     const seen: unknown[] = []
     bank.subscribe(() => { seen.push(bank.snapshot.openGating) })
-    gating.decline()
-    await TH.expectRefusal(unlocking, 'declined')
+    gating.dismiss()
+    await TH.expectRefusal(unlocking, 'dismissed')
     expect(seen).to.deep.equal([null])
     const bornOver = bank.vaultAt(VaultScopeGiven)!
     const again = bornOver.ensureUnlocked()
     await vi.waitFor(() => bank.snapshot.openGating ?? fail("no gating yet"), { interval: 1 })
     expect(seen).to.have.lengthOf(2)
-    bank.snapshot.openGating?.decline()
-    await TH.expectRefusal(again, 'declined')
+    bank.snapshot.openGating?.dismiss()
+    await TH.expectRefusal(again, 'dismissed')
     expect(seen).to.have.lengthOf(3)
   })
 
@@ -698,8 +698,8 @@ describe("the snapshot's open gating", () => {
     const before = bank.snapshot
     expect(bank.snapshot).to.equal(before)
     expect(bank.snapshot.openGating).to.equal(gating)
-    gating.decline()
-    await TH.expectRefusal(unlocking, 'declined')
+    gating.dismiss()
+    await TH.expectRefusal(unlocking, 'dismissed')
     expect(bank.snapshot).to.not.equal(before)
   })
 
@@ -711,13 +711,22 @@ describe("the snapshot's open gating", () => {
   })
 
   const Enders: readonly (readonly [string, (made: { bank: Bank, vault: Vault }) => void])[] = [
-    ["a lock of its vault",   ({ vault }) => { vault.lock() }],
-    ["a lock of the bank",    ({ bank })  => { bank.lock() }],
     ["a sweep of its vault",  ({ vault }) => { vault.sweep() }],
     ["a vacate of its vault", ({ vault }) => { vault.vacate() }],
     ["a sweep of the bank",   ({ bank })  => { bank.sweep() }],
     ["a vacate of the bank",  ({ bank })  => { void bank.vacate() }],
   ]
+
+  it.each([
+    ["a lock of its vault", ({ vault }: { bank: Bank, vault: Vault }) => { vault.lock() }],
+    ["a lock of the bank",  ({ bank }: { bank: Bank, vault: Vault })  => { bank.lock() }],
+  ] as const)("keeps the gating through %s", async (_label, lockIt) => {
+    const { bank, vault, gating, unlocking } = await bankWaitingOnUnlock()
+    lockIt({ bank, vault })
+    expect(bank.snapshot.openGating).to.equal(gating)
+    gating.dismiss()
+    await TH.expectRefusal(unlocking, 'dismissed')
+  })
 
   it.each(Enders)("drops the gating at %s, before the call returns", async (_label, end) => {
     const { bank, vault, gating, unlocking } = await bankWaitingOnUnlock()
@@ -768,11 +777,11 @@ describe("the snapshot's open gating", () => {
     expect(bank.snapshot.openGating).to.be.null
   })
 
-  it("waits with no host dialog until a decline settles it", async () => {
+  it("waits with no host dialog until a dismiss settles it", async () => {
     const { gating, unlocking } = await bankWaitingOnUnlock()
-    gating.decline()
-    await TH.expectRefusal(unlocking, 'declined')
-    await TH.expectBad(gating.whenSettled, 'declined')
+    gating.dismiss()
+    await TH.expectRefusal(unlocking, 'dismissed')
+    await TH.expectBad(gating.whenSettled, 'dismissed')
   })
 })
 

@@ -52,7 +52,7 @@ export type TellBadNews = (badnews: readonly VaultError[]) => void
 export type GatingModalProps = {
   /** The gating the dialog answers, from `requestCleartext` or the bank's snapshot. */
   gating:              AnyGating
-  /** Called once with 'unlocked' or 'deleted' when an attempt succeeds, and with 'declined' otherwise. */
+  /** Called once with 'unlocked' or 'deleted' when an attempt succeeds, and with 'dismissed' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** The bank's `leaseMillis`, for the line saying how long an unlock lasts. */
   leaseMillis?:        number | undefined
@@ -164,8 +164,8 @@ export type BoxWhisperFieldProps = Omit<ComponentPropsWithoutRef<'input'>, 'type
 export type PasskeyUnlockButtonProps = {
   /** The gating the passkey answers, as the bank handed it to `requestCleartext`. */
   gating:      Gating<'unlock_vault'>
-  /** Called with 'unlocked' when the passkey unlocks the vault, and with 'declined' on a refusal that closes the dialog. */
-  onDone:      (answer: 'unlocked' | 'declined') => void
+  /** Called with 'unlocked' when the passkey unlocks the vault, and with 'dismissed' on a refusal that closes the dialog. */
+  onDone:      (answer: 'unlocked' | 'dismissed') => void
   /** What the button has to say, or null once what it said last no longer stands. */
   onGripe:     (gripe: string | null) => void
   /** The relying party the passkey was made under, if not the page's own domain. */
@@ -180,8 +180,8 @@ export type VaultControlProps = { vaultlabel: string }
 
 // == [Modals]: DialogAnswer, PassphraseAdvice, Gripe, ModalFormProps, PassphraseGating, PassphraseModalProps, ReplacePassphraseModalProps, AddPasskeyModalProps, RevokePasskeyModalProps, DelVaultModalProps
 
-/** How a dialog closed: 'unlocked', 'deleted' or 'declined'. */
-export type DialogAnswer = 'unlocked' | 'deleted' | 'declined'
+/** How a dialog closed: 'unlocked', 'deleted' or 'dismissed'. */
+export type DialogAnswer = 'unlocked' | 'deleted' | 'dismissed'
 
 /** What a host says of a passphrase as the user chooses it, or null for nothing. It hears the passphrase in plain text, so keep it on the device. */
 export type PassphraseAdvice = (passphrase: string) => string | null | Promise<string | null>
@@ -204,7 +204,7 @@ export type ModalFormProps = {
   /** A quiet line under the live region: how long an unlock lasts. */
   footnote?:  string | undefined
   formRef?:   Ref<HTMLFormElement> | undefined
-  /** The dialog's one answer: Cancel and Escape answer 'declined'. */
+  /** The dialog's one answer: Cancel and Escape answer 'dismissed'. */
   done:       (answer: DialogAnswer) => void
   /** Called at each submit. The form's default is already prevented. */
   onSubmit:   () => void
@@ -219,7 +219,7 @@ export type PassphraseGating = Gating<'build_vault'> | Gating<'unlock_vault'>
 export type PassphraseModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              PassphraseGating
-  /** Called once with 'unlocked' when an attempt succeeds, and with 'declined' otherwise. */
+  /** Called once with 'unlocked' when an attempt succeeds, and with 'dismissed' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** The bank's `leaseMillis`, for the line saying how long an unlock lasts. */
   leaseMillis?:        number | undefined
@@ -235,7 +235,7 @@ export type PassphraseModalProps = {
 export type ReplacePassphraseModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              Gating<'replace_passphrase'>
-  /** Called once with 'unlocked' when the passphrase is replaced, and with 'declined' otherwise. */
+  /** Called once with 'unlocked' when the passphrase is replaced, and with 'dismissed' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined
@@ -247,7 +247,7 @@ export type ReplacePassphraseModalProps = {
 export type AddPasskeyModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              Gating<'add_passkey'>
-  /** Called once with 'unlocked' when the passkey is added, and with 'declined' otherwise. */
+  /** Called once with 'unlocked' when the passkey is added, and with 'dismissed' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** What a password manager files the passphrase under, and what the authenticator lists the passkey under. */
   passphraseUsername?: string | undefined
@@ -259,7 +259,7 @@ export type AddPasskeyModalProps = {
 export type RevokePasskeyModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              Gating<'revoke_passkey'>
-  /** Called once with 'unlocked' when the passkey is removed, and with 'declined' otherwise. */
+  /** Called once with 'unlocked' when the passkey is removed, and with 'dismissed' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined
@@ -269,7 +269,7 @@ export type RevokePasskeyModalProps = {
 export type DelVaultModalProps = {
   /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
   gating:              Gating<'del_vault'>
-  /** Called once with 'deleted' when the vault is deleted, and with 'declined' otherwise. */
+  /** Called once with 'deleted' when the vault is deleted, and with 'dismissed' otherwise. */
   onDone:              (answer: DialogAnswer) => void
   /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined

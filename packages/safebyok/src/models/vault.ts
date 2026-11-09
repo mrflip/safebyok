@@ -140,12 +140,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   override del(): Promise<this> { return this.delVaultPrompt() }
 
   // The old lease stays in force for the moments between: the vaultKey did not change.
-  /** Run the commit, then attach a lease under the epoch it landed. */
+  /** Run the commit, then lease the vault for a full term under the epoch it landed. */
   async #landGate(proved: Proving, commit: () => Promise<SX.VaultRecord>): Promise<this> {
-    const heldLease = this.#lease
     const stored = await commit()
-    await this.#renewLease(proved, stored.gate.gate_epoch, heldLease)
-    return this
+    return this.#unlockByProof(proved, stored.gate.gate_epoch)
   }
   // --
 
@@ -174,7 +172,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
   // --
 
-  // == [The lease]: lock, vacateLease, unlockByProof, attachLease, renewLease
+  // == [The lease]: lock, vacateLease, unlockByProof, attachLease
 
   /** Lock the vault and its boxes before returning, and erase the row cached on this device.
    * A refused erase is announced as `lease_unerased` and does not throw. A no-op on a vault discarded.
@@ -182,7 +180,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   override lock(): this {
     if (! this.isEnabled) { return this }
     void this.#vacateLease('lock')
-    this.listing.declineGatingAtLock(this)
     return this
   }
 
@@ -198,8 +195,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   /** The lease `proved` earns, attached. A lock landing during the unlock does not hold: the proof says this user may have the vault unlocked. */
-  async #unlockByProof(proved: Proving): Promise<this> {
-    const lease = await proved.buildLease(this.#leaseFriend())
+  async #unlockByProof(proved: Proving, gate_epoch?: number): Promise<this> {
+    const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
     await this.#attachLease(lease)
     return this
   }
@@ -210,13 +207,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#lease = lease
     await lease.cacheAsCacheCan()
     this.settle()
-  }
-
-  /** Attach a new lease under `gate_epoch` where `heldLease` is in force. A lock crossing the change wins. */
-  async #renewLease(proved: Proving, gate_epoch: number, heldLease: Lease | null): Promise<void> {
-    if (heldLease === null) { return }
-    const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
-    if (heldLease.isPresent) { await this.#attachLease(lease) }
   }
   // --
 
@@ -395,14 +385,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#lease?.evict()
     this.#lease = null
     this.#boxListing?.sweep()
-    this.listing.declineGatingAtDiscard(this)
+    this.listing.dismissGatingAtDiscard(this)
   }
 
   /** Locked, the row cached erased, and the boxes vacated. */
   protected override vacateContents(): void {
     void this.#vacateLease('vacate')
     this.#boxListing?.vacate()
-    this.listing.declineGatingAtDiscard(this)
+    this.listing.dismissGatingAtDiscard(this)
   }
 
   /** A full vault record is one alive that carries its `gate`; a sparse one or a tombstone is not. */

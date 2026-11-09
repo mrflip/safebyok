@@ -17,7 +17,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `box_too_large`, `vault_full`,
  *   `stale_write`, `record_conflict`, `storage_unavailable`,
- *   `vault_gone`, `vault_mismatch`, `gating_landed`, `attempt_in_flight`, `already_asking`, `locked_while_asking`, `declined`,
+ *   `vault_gone`, `vault_mismatch`, `gating_landed`, `attempt_in_flight`, `already_asking`, `dismissed`,
  *   `same_passphrase`, `camped`, `vault_empty`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_box`, `damaged_lease`, `newer_format`,
@@ -57,12 +57,11 @@ export const refusalkindVals = [
   'storage_issue',       // the storage backend answered with a row no working store could: no object at all, or naming another address than the one asked: the database is so broken we just can't, and a retry is unlikely to help
   'vault_gone',          // the vault a call was working on is no longer stored: deleted, here or elsewhere
   'vault_mismatch',      // a live vault stands where the call's vault stood, under another vault_tok than the call holds
-  'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- a lock landed, or it was answered -- so it unlocked nothing
+  'gating_landed',       // a proof under way was for a prompt that ended meanwhile -- it was answered or dismissed -- so it unlocked nothing
   'damaged_lease',       // this device's lease would not open under its leaseKey: it was erased, and the vault locked
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
   'already_asking',      // a gating is open on this bank, so a second one was not launched: one dialog at a time, and no join
-  'locked_while_asking', // a lock landed before the user's attempt, so the gating settled and nothing was proved
-  'declined',            // the dialog was declined, or closed with no attempt under way, so nothing was done
+  'dismissed',           // the dialog was dismissed with no attempt under way, so nothing was done
   'same_passphrase',     // a new passphrase that is the one the vault already has
   'camped',              // a vaultDB put told not to replace a live row found one there
   'vault_empty',         // a vaultDB call named a vault_tok no row holds, and no live row stands there: nothing of this life
@@ -106,8 +105,7 @@ export const RefusalFamilyForKind = {
   damaged_lease:       'bad_news',
   attempt_in_flight:   'condition',
   already_asking:      'condition',
-  locked_while_asking: 'condition',
-  declined:            'condition',
+  dismissed:           'condition',
   same_passphrase:     'condition',
   camped:              'condition',
   vault_empty:         'condition',

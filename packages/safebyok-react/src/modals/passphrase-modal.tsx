@@ -1,13 +1,12 @@
 import { useRef } from 'react'
 import { PasskeyUnlockButton, offersPasskey } from '../components/passkey-unlock-button'
 import { Messages } from '../helpers/messages'
-import { useRoundFor } from '../hooks/round-for'
 import type { PassphraseModalProps } from '../shapes'
 import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, holdsFocus, unlockedFor, useAdvice, useAttempts, useConfirmation } from './modal-kit'
 
 /** The passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
 export const PassphraseModal = (props: PassphraseModalProps) => (
-  <AnsweringOnce key={useRoundFor(props.gating)} gating={props.gating} onDone={props.onDone}>
+  <AnsweringOnce key={props.gating.gatingTok} gating={props.gating} onDone={props.onDone}>
     {(done) => <PassphraseForm {...props} onDone={done} />}
   </AnsweringOnce>
 )

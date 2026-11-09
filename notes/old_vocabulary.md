@@ -128,7 +128,7 @@ To be deleted at 1.0.0.
 | `Proof`, `PassphraseProof`, `Proof.parse`, a proof (what the user presents) | cleartext (what the user hands a gating's attempt), made into a `Proving` (`PassphraseProving`, `PasskeyProving`) |
 | `Ask`, `getProof` (a `Vault.make` option)              | `Gating`, `requestCleartext` (a `Bank.make` option)     |
 | `AskWhy` (`absent`, `locked`, `lease_ending`)          | `GatingKind` (`initialize_gate`, `unlock_vault`, ...), read as `gating.gatingkind` |
-| `ProofAnswer` (`unlocked`, `declined`, `carry_on`)     | none: the gating's attempt settles it, `decline()` declines, and `requestCleartext` resolving declines what is still open |
+| `ProofAnswer` (`unlocked`, `declined`, `carry_on`)     | none: the gating's attempt settles it, `dismiss()` dismisses, and `requestCleartext` resolving dismisses what is still open |
 | `carry_on`, `lease_ending`                             | none: `ensureUnlocked({ renewMinutes })` asks while the lease ends within that time |
 | `ask.attempt(proof, { wayinId? })`                     | the gating's typed attempt: `attempt`, `attemptPassphrase`, `attemptPasskey` |
 | `vault.unlock(proof)`, `tryUnlock`                     | `vault.ensureUnlocked()`, whose `unlock_vault` gating takes the cleartext |
@@ -184,7 +184,7 @@ stands here whole.
 | `WayinSummary`, a wayin's sparse shape and `vault_tok` in a log line | none yet                                                |
 | a wayin's `registered_at` and `device_id` "of its sealing" | of the device that built it: only a box is sealed      |
 | `PassphraseWayin`, `PasskeyWayin`, `Wayin.make`         | `Wayin`, over a `WayinRecord`                           |
-| a gating's `lockLanded`                                | `declineAtLock()`; `whenSettled`                        |
+| a gating's `lockLanded`                                | gone: a lock leaves a gating open                       |
 | one gating pending per vault, every waiting call hearing how it settles | one gating open per bank; a second call refuses `already_asking` |
 | `proving.grantLease()`, `wrappedWith`; a proving "reseals wayins" | `proving.buildLease()`, `proving.buildWayin()`; the wrap and unwrap are private |
 | a lease taken up "until its `ask_passphrase_at`", then dropped from memory by a timer | a cached lease past autolock (`proved_at` plus `leaseMillis`) is never taken up; `bank.autolock()` locks |

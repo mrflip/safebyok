@@ -1,5 +1,6 @@
 import type { Modelkind } from '../helpers/consts'
 import { VaultError, isVaultError } from '../refusals/errors'
+import { randomId } from '../helpers/crypto'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type Outcome, bad, outcomeOf, valOf } from '../refusals/outcome'
 import * as EX from '../shapes/shapes-enums'
@@ -11,7 +12,7 @@ import * as VX from '../shapes/shapes-vaultish'
 import type { VaultWorld } from '../shapes/shapes-vaultish'
 import * as SX from '../shapes/shapes-storage'
 import type { VaultRecord } from '../shapes/shapes-storage'
-import { proofMissing, attemptInFlight, clearsThrew, gatingDeclined, gatingSettled, lockedWhileAsking, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
+import { proofMissing, attemptInFlight, clearsThrew, gatingDismissed, gatingSettled, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import { Gate } from './gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Vault } from './vault'
@@ -19,9 +20,11 @@ import type { VaultListing } from './vault-listing'
 
 /** One ask of the user, one open per bank. It holds the clears only for the length of an attempt, and settles once: launch answers with that outcome. */
 export class Gating<KindT extends Gatingkind = Gatingkind> {
-  // == [Props]: gatingkind, applabel, user_id, vaultlabel, vault, passkeyHeader, #listing, #launchArgs, #run, #prove, #settled, #settle, #outcome, #isAttempting, #isLastAttempt
+  // == [Props]: gatingkind, gatingTok, applabel, user_id, vaultlabel, vault, passkeyHeader, #listing, #launchArgs, #run, #prove, #settled, #settle, #outcome, #isAttempting, #isLastAttempt
 
   declare readonly gatingkind:    KindT
+  /** Unique to this gating, for a dialog to key on: the next gating's form starts empty, whatever was typed in this one. */
+  declare readonly gatingTok:     string
   declare readonly applabel:      string
   declare readonly user_id:       string
   declare readonly vaultlabel:    string
@@ -53,10 +56,10 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     return { applabel, user_id, vaultlabel }
   }
 
-  /** This gating's {@link GatingSnapshot}: its kind and vault scope, never a cleartext. */
+  /** This gating's {@link GatingSnapshot}: its kind, token and vault scope, never a cleartext. */
   toJSON(): GatingSnapshot {
-    const { gatingkind } = this
-    return { gatingkind, ...this.#scope }
+    const { gatingkind, gatingTok } = this
+    return { gatingkind, gatingTok, ...this.#scope }
   }
   // --
 
@@ -64,7 +67,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   private constructor(gatingkind: KindT, launchArgs: LaunchArgs<KindT>) {
     const { listing, scope, vault } = launchArgs
-    tattoo(this, { gatingkind, ...scope })
+    tattoo(this, { gatingkind, gatingTok: randomId(), ...scope })
     adorn(this, 'vault', vault)
     adorn(this, 'passkeyHeader', vault?.gate.toJSON().passkey_wayin ?? null)
     this.#listing = listing
@@ -85,7 +88,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   }
 
   async #askHost(askUser: AskUser): Promise<void> {
-    this.#endAsking((await askUser(this as unknown as AnyGating)) ? gatingDeclined() : requestCleartextThrew())
+    this.#endAsking((await askUser(this as unknown as AnyGating)) ? gatingDismissed() : requestCleartextThrew())
   }
   // --
 
@@ -126,18 +129,10 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   }
   // --
 
-  // == [Settling]: decline, declineAtLock, declineAtDiscard, endAsking, settleOnce
+  // == [Settling]: dismiss, endAsking, settleOnce
 
-  /** The user said no. With no attempt under way the gating settles 'declined'; one under way runs on, and its outcome settles it. */
-  decline(): void { this.#endAsking(gatingDeclined()) }
-
-  /** A lock on the vault it asks for. With no attempt under way the gating settles at once; past the enter key nothing turns back, and the attempt's outcome settles it. A `del_vault` hears nothing: a lock does not stop a delete. */
-  declineAtLock(): void {
-    if (this.gatingkind !== 'del_vault') { this.declineAtDiscard() }
-  }
-
-  /** What it asks of is going away, whatever its kind: it settles as {@link declineAtLock} has it. */
-  declineAtDiscard(): void { this.#endAsking(lockedWhileAsking()) }
+  /** Ends the asking with nothing proved: the gating settles 'dismissed', or an attempt under way runs on and its outcome settles it. */
+  dismiss(): void { this.#endAsking(gatingDismissed()) }
 
   /** No more attempts: `refusal` settles the gating, or else the attempt under way does, whatever it answers. */
   #endAsking(refusal: VaultError): void {

@@ -161,9 +161,9 @@ describe("the proof", () => {
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
     await expect(vault.getBox(ApiKey.boxlabel)).resolves.to.eq(box)
 
-    // The user closes the dialog: the unlock refuses declined, and nothing moves.
+    // The user closes the dialog: the unlock refuses dismissed, and nothing moves.
     dialog.typing = []
-    await TH.expectRefusal(vault.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(vault.ensureUnlocked(), 'dismissed')
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main locked'])
 
@@ -330,7 +330,7 @@ describe("the proof", () => {
     world.advance(AutolockMillis + 1)
     const latePage = world.bankOn({ requestCleartext: () => undefined, onBadNews })
     await latePage.hello()
-    await TH.expectRefusal(latePage.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(latePage.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'dismissed')
     expect(world.leaseRows()).to.have.lengthOf(1)
     bankUi.expectRenders([])
     await bank.autolock()

@@ -95,8 +95,8 @@ export const BankProvider = (props: BankProviderProps) => {
 const OpenGatingDialog = ({ bank, ...dialogProps }: Pick<GatingModalProps, 'passphraseUsername' | 'passphraseAdvice' | 'passkeyRpId'> & { bank: Bank }) => {
   const { openGating } = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
   if (openGating === null) { return null }
-  // No key: each dialog keys its form by the gating itself, which a React key cannot be.
-  return <GatingModal gating={openGating} leaseMillis={bank.leaseMillis} {...dialogProps} onDone={() => { openGating.decline() }} />
+  // No key: each dialog keys its form by its gating's `gatingTok`.
+  return <GatingModal gating={openGating} leaseMillis={bank.leaseMillis} {...dialogProps} onDone={() => { openGating.dismiss() }} />
 }
 
 /** Hold one user's bank once the device is named, and show the dialog for its gatings. */

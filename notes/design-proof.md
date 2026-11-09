@@ -190,10 +190,9 @@ it from the cache. This requires of the new deviceDB that calls land in the orde
 that the vacate lands after the put. The put is called before `settle`, because a listener may call
 `lock()`. So `await caching` needs no compare, and no second vacate.
 
-**A `lock()` crossing a gate change** does change state, as the vault was unlocked, so it wins. A local
-shows it: `heldLease`'s forgotten flag, read after `buildLease` so that it covers the put and the
-crypto. By then the change has landed, so skipping the attach leaves nothing half done. The three gate
-changes share these lines as one private `#renewLease(proved, gate_epoch, heldLease)`.
+**A `lock()` crossing a gate change** does not hold, as at an unlock: the proof says this user may have
+the vault unlocked. The three gate changes end in one private `#landGate`, which leases the vault for a
+full term under the epoch that landed.
 
 **`sweep`, `vacate` and `delete`** leave a one-way state: every `demandReadyToX` refuses from then on, so
 anything worth guarding stops working. A swept or vacated thing is also unlisted, a deleted vault stays, tombstoned, while its box listing and boxes go, and the refusals are for whoever
@@ -223,15 +222,18 @@ arrives, with no timer. Disabled calls stop the reopening in this tab, even if t
 second refusal panics again and finds the vacate done, a no-op, so this needs no counter; a vacate marks itself
 done before its erase.
 
-**A `lock()` and the dialog.** The package cannot close a host's dialog, so a gating says when to:
-`gating.whenSettled`, a promise a dialog closes on. On lock, a gating:
+**A `lock()` and the dialog.** A lock leaves an open gating open: it says the vault is locked, and
+the dialog is still the user's to answer. An unlock it was asking for still unlocks, and a change of
+the gate lands and unlocks. A valid request goes through if it was authorized at the
+start of its critical section.
+
+**A `dismiss()` and the dialog.** The package cannot close a host's dialog, so a gating says when to:
+`gating.whenSettled`, a promise a dialog closes on. A Cancel, a sweep or a vacate dismisses:
 
 ```text
-no attempt under way    settles it 'locked_while_asking': the verb refuses, the dialog closes; a later attempt refuses 'gating_landed'
-an attempt under way    sets the variable: the attempt runs through and its outcome settles the gating, so a wrong
-                        passphrase crossed by a lock answers 'wrong_passphrase'; a re-entry refuses
-a birth vault gating    nothing
-a del_vault gating      nothing
+no attempt under way    settles it 'dismissed': the verb refuses, the dialog closes; a later attempt refuses 'gating_landed'
+an attempt under way    the attempt runs through and its outcome settles the gating, so a wrong passphrase
+                        crossed by a dismiss answers 'wrong_passphrase'; a re-entry refuses
 ```
 
 ## End-of-method invariants
@@ -250,8 +252,8 @@ second field.
 | `send`           | The record held is what it put, or newer; snapshot and cache settled                                                                                                                      | Nothing stored; on `stale_write`, the stored record taken in                                         |
 | `attachLease`    | Held and in force; its put called; settled                                                                                                                                                 | Past sweep: the lease vacated, no put                                                                |
 | `ensureVault`    | A Vault held, the only one of its scope. Landed: unlocked, or locked by a `lock()` after the attach. Another won: locked                                                                  | Nothing stored; held only what the answer delivered                                                  |
-| `ensureUnlocked` | Unlocked, a lease in force at its attach                                                                                                                                                  | `locked_while_asking`: no lease held, none cached by this call                                       |
-| A gate change    | The record holds the next gate, its epoch one up. Unlocked under that epoch if it was unlocked and no lock crossed; else locked, no lease                                                 | Nothing stored, unless the answer was lost; the lease as it was                                      |
+| `ensureUnlocked` | Unlocked, a lease in force at its attach                                                                                                                                                  | `dismissed`: no lease held, none cached by this call                                       |
+| A gate change    | The record holds the next gate, its epoch one up. Unlocked under that epoch, a fresh lease of full term, whatever lock came before or crossed                                                 | Nothing stored, unless the answer was lost; the lease as it was                                      |
 | `delVault`       | A tombstone stored and its box rows tombstoned; nothing of it on this device; the Vault tombstoned in its slot                                                                           | Nothing stored, unless the answer was lost; the Vault locked, and otherwise as it was                |
 | `gating.attempt` | At most one under way; its gate read once; no clear held                                                                                                                                  | The same; correctable: the gating still open; any other: settled                                     |
 
@@ -343,13 +345,12 @@ does not already carry:
 
 ```text
 vault.#landGate(proved, commit)
-├─ heldLease = the vault's lease, or null
 ├─ stored = await commit(): vaultListing.<gate verb>(params)    ← the commit; params spread from ante, the record the attempt read, its gate holding the wayin
 │  ├─ ante's revision is the prior; moved → 'stale_write', nothing stored
 │  ├─ the store refuses what its row rules out, such as an addPasskey over a passkey held
 │  ├─ the vaultDB lays the wayin on the row, moves gate_epoch and the revision up, and leaves the rest as stored
 │  └─ no lock: adopt never locks on a move
-└─ vault.#renewLease(proved, stored.gate.gate_epoch, heldLease)    a lock() crossing the change wins: no new lease
+└─ vault.#unlockByProof(proved, stored.gate.gate_epoch)    a fresh lease of full term; a lock() crossing the change does not hold
 ```
 
 * **The lease comes after the put**, so its `gate_epoch` is the one that landed, and a refused put
@@ -514,4 +515,3 @@ Eyebrow raisers from the Coach's replies in the sprint's Closer Look (`whiteboar
 * **The gating family:** `ProveForGatingkind`, its kind-keyed type maps and the casts they force, and `#settled`, `#outcome` and their flags. "same family of design smells around gating". See `whiteboard/20261102-newdesign/unrace-gating-prompt.md`.
 * **The cache and the erase on one control path:** `lease.tryCache()` before the settle, the erase before the first await. "that sounds dangerous".
 * **Clears:** `spendClears` and `checkedClears` reach into the host's objects, and who owns a passkey answer's PRF bytes is open. "I assumed that the buffer exhaustion was best practice".
-* **`heldLease.isForgotten`:** a lease object acting as the test that a lock crossed a gate change. Wants a later investigation.

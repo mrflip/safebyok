@@ -81,18 +81,32 @@ describe("PassphraseModal, unlocking a vault", () => {
   ] as const
 
   for (const [how, closeIt] of CloseCases) {
-    it(`answers declined on ${how}, and the gating is declined`, async () => {
+    it(`answers dismissed on ${how}, and the gating is dismissed`, async () => {
       const { raising, answers } = await shownFor(TH.unlocking, { built: true })
       closeIt()
-      expect(answers).to.deep.equal(['declined'])
+      expect(answers).to.deep.equal(['dismissed'])
       expect(await raising).to.include({ ok: false })
     })
   }
 
-  it("answers declined once its gating settles with no attempt, as at a lock", async () => {
+  it("answers dismissed once its gating settles with no attempt, as at a sweep", async () => {
     const { bank, answers } = await shownFor(TH.unlocking, { built: true })
-    act(() => { bank.lock() })
-    await waitFor(() => { expect(answers).to.deep.equal(['declined']) })
+    act(() => { bank.sweep() })
+    await waitFor(() => { expect(answers).to.deep.equal(['dismissed']) })
+  })
+})
+
+describe("PassphraseModal over a later gating", () => {
+  it("starts its form empty, nothing typed carrying over", async () => {
+    const world = TH.makeBankWorld()
+    await TH.makeBankWithVault(world)
+    const first = await TH.heldGatingOf(world, TH.unlocking)
+    const second = await TH.heldGatingOf(world, TH.unlocking)
+    const ui = (gating: typeof first.gating) => <PassphraseModal gating={TH.passphraseGatingOf(gating)} onDone={() => undefined} />
+    const { rerender } = render(ui(first.gating))
+    fireEvent.change(screen.getByLabelText(Messages.passphraseField), { target: { value: TH.Passphrase } })
+    rerender(ui(second.gating))
+    expect(screen.getByLabelText<HTMLInputElement>(Messages.passphraseField).value).to.eq('')
   })
 })
 

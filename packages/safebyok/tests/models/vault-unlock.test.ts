@@ -33,7 +33,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     fakeBank.requestCleartext = dialog
     await expect(vault.ensureUnlocked()).resolves.to.eq(vault)
     expect(dialog).not.toHaveBeenCalled()
-    await TH.expectBad(vault.tryUnlock(), 'declined')
+    await TH.expectBad(vault.tryUnlock(), 'dismissed')
     expect(dialog).toHaveBeenCalledOnce()
   })
 
@@ -42,7 +42,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     const dialog = vi.fn()
     fakeBank.requestCleartext = dialog
     const next = await new VaultListing(fakeBank, opts).build(demandStored())
-    await TH.expectBad(next.tryUnlock(), 'declined')
+    await TH.expectBad(next.tryUnlock(), 'dismissed')
     expect(next.isUnlocked).to.be.false
     expect(dialog).toHaveBeenCalledOnce()
     await next.ensureUnlocked()
@@ -74,7 +74,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     await TH.expectRefusal(vault.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), {}))
   })
 
-  it("locks at `lock()`, reading locked before it returns and erasing the row; seal and unseal refuse; then 'declined' with no proof and a dialog closed unanswered, the proof's own refusal with a wrong one, and it unlocks with the right one", async () => {
+  it("locks at `lock()`, reading locked before it returns and erasing the row; seal and unseal refuse; then 'dismissed' with no proof and a dialog closed unanswered, the proof's own refusal with a wrong one, and it unlocks with the right one", async () => {
     const { vault, deviceDB } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
     expect(vault.lock()).to.equal(vault)
@@ -83,7 +83,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'vault_locked')
     await TH.expectRefusal(vault.unsealStampedString(sealed, Stamp), 'vault_locked')
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    await TH.expectRefusal(vault.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(vault.ensureUnlocked(), 'dismissed')
     await TH.expectRefusal(unlockTyping(vault, byPassphrase('not the passphrase')), 'wrong_passphrase')
     expect(vault.isLocked).to.be.true
     await unlockTyping(vault, byPassphrase(Passphrase))
@@ -227,7 +227,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     await replaceTyping(vault, Passphrase, NewPassphrase)
     deviceDB.layCached(stale)
     const again = await anotherSession().build(demandStored())
-    await TH.expectRefusal(again.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
     expect(deviceDB.cachedNow()).to.be.null
     await unlockTyping(again, byPassphrase(NewPassphrase))
     expect(again.isUnlocked).to.be.true
@@ -242,7 +242,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     other.storeBehindOurBack(demandStored())
     const again = await other.anotherSession().build(other.demandStored())
     expect(other.deviceDB.cachedNow()).not.to.be.null
-    await TH.expectRefusal(again.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
     expect(again.gate.pkWayin).to.be.null
     expect(other.deviceDB.cachedNow()).to.be.null
   })
@@ -255,7 +255,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     expect(within.isUnlocked).to.be.true
     advance(1)
     const past = await anotherSession().build(demandStored())
-    await TH.expectRefusal(past.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(past.ensureUnlocked(), 'dismissed')
     expect(past.isLocked).to.be.true
     expect(deviceDB.cachedNow()).to.not.be.null
   })
@@ -279,7 +279,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     deviceDB.layCached({ ...cached, lease_key: 'no key at all' })
     const listing = new VaultListing(fakeBank, hearingBadNews(opts, onBadNews))
     const again = await listing.build(demandStored())
-    await TH.expectRefusal(again.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
     expect(onBadNews.mock.calls[0]?.[0]).to.deep.include({ refusalkind: 'damaged_lease' })
     await unlockTyping(again, byPassphrase(Passphrase))
     expect(again.isUnlocked).to.be.true
@@ -292,7 +292,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const again = await anotherSession().build(record)
-    await TH.expectRefusal(again.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
     await unlockTyping(vault, byPassphrase(Passphrase))
     await again.ensureUnlocked()
     expect(await vaultRoundTrip(vault, again)).to.eq('sk-test')
@@ -306,6 +306,6 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     idle.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const again = await anotherSession().build(record)
-    await TH.expectRefusal(again.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
   })
 })

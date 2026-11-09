@@ -10,7 +10,7 @@ import type { BoundarySource, DialogAnswer, Gripe, ModalFormProps, PassphraseAdv
 // == [Answer]: DialogAnswer, answerOf, useAnswerOnce, AnsweringOnce, DialogTrouble, cancelOnEscape
 
 const answerOf = (gating: AnyGating, outcome: Outcome<Vault>): DialogAnswer => {
-  if (! outcome.ok) { return 'declined' }
+  if (! outcome.ok) { return 'dismissed' }
   return gating.gatingkind === 'del_vault' ? 'deleted' : 'unlocked'
 }
 
@@ -26,7 +26,7 @@ const useAnswerOnce = (gating: AnyGating, onDone: (answer: DialogAnswer) => void
   const { whenShown } = useWhenShown()
   useEffect(() => {
     let current = true
-    // A lock, a sweep or a vacate settles the gating with no attempt: the dialog closes on it.
+    // A sweep or a vacate settles the gating with no attempt: the dialog closes on it.
     void gating.whenSettled.then((outcome) => whenShown(() => { if (current) { done(answerOf(gating, outcome)) } }))
     return () => { current = false }
   }, [gating, done, whenShown])
@@ -49,7 +49,7 @@ export const AnsweringOnce = ({ gating, onDone, children }: {
 const cancelOnEscape = (onDone: (answer: DialogAnswer) => void) => (evt: KeyboardEvent) => {
   if (evt.key !== 'Escape') { return }
   evt.stopPropagation()
-  onDone('declined')
+  onDone('dismissed')
 }
 
 const DialogTrouble = ({ doing, onDone }: { doing: string, onDone: (answer: DialogAnswer) => void }) => {
@@ -70,7 +70,7 @@ const DialogTrouble = ({ doing, onDone }: { doing: string, onDone: (answer: Dial
         <p className="gripe" id={wordId}>{Messages.troubleWord(doing)}</p>
         <div className="row">
           {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the field that held focus is gone; the WAI-ARIA dialog pattern moves focus to the dialog's one control */}
-          <button type="button" autoFocus onClick={() => { onDone('declined') }}>{Messages.closeButton}</button>
+          <button type="button" autoFocus onClick={() => { onDone('dismissed') }}>{Messages.closeButton}</button>
         </div>
       </div>
     </div>
@@ -92,7 +92,7 @@ export const useAttempts = (source: BoundarySource, done: (answer: DialogAnswer)
     const flavor = attemptRefusalFlavor(err)
     if (flavor === 'in_flight') { return }
     if (flavor === 'in_place') { setGripe({ text: (err as Error).message, fromPasskey: false }); return }
-    if (flavor === 'close') { done('declined'); return }
+    if (flavor === 'close') { done('dismissed'); return }
     // Thrown from an event handler, it would miss every boundary.
     fail(err)
   }
@@ -123,7 +123,7 @@ export const ModalForm = ({ title, blurb, submitWord, gripe, gripeId, footnote, 
         {footnote !== undefined && <p className="quiet">{footnote}</p>}
         <div className="row">
           <button type="submit">{submitWord}</button>
-          <button type="button" onClick={() => { done('declined') }}>{Messages.cancelButton}</button>
+          <button type="button" onClick={() => { done('dismissed') }}>{Messages.cancelButton}</button>
         </div>
       </form>
     </div>

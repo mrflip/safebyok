@@ -70,7 +70,7 @@ describe("ReplacePassphraseModal", () => {
       await waitFor(() => { expect(alertText()).to.not.eq('') })
       expect(gating.isOpen).to.be.true
       expect(answers).to.deep.equal([])
-      gating.decline()
+      gating.dismiss()
       expect(await unlocksWith(world, TH.Passphrase)).to.be.true
     })
   }
@@ -93,10 +93,10 @@ describe("ReplacePassphraseModal", () => {
     await waitFor(() => { expect(heard).to.deep.equal([NextPassphrase]) })
   })
 
-  it("answers declined on Cancel, and the gating is declined", async () => {
+  it("answers dismissed on Cancel, and the gating is dismissed", async () => {
     const { world, raising, answers } = await shownFor()
     fireEvent.click(screen.getByText(Messages.cancelButton))
-    expect(answers).to.deep.equal(['declined'])
+    expect(answers).to.deep.equal(['dismissed'])
     expect(await raising).to.include({ ok: false })
     expect(await unlocksWith(world, TH.Passphrase)).to.be.true
   })

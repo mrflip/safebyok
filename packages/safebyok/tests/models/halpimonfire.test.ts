@@ -140,23 +140,23 @@ describe("A gate change after its record is stored", () => {
     expect(deviceDB.cachedNow()).to.include({ gate_epoch: 1 })
   })
 
-  it("a lock crossing the renewal drops the new lease with no second erase, which could take a later lease's row", async () => {
+  it("leaves the vault unlocked on the new lease where a lock crossed its making, with no second erase", async () => {
     const { vault, deviceDB } = await makeBornVault()
     deviceDB.forget.mockClear()
     crossingGrant(() => { vault.lock() })
     await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
-    expect(vault.isUnlocked).to.be.false
-    expect(deviceDB.cachedNow()).to.be.null
+    expect(vault.isUnlocked).to.be.true
+    expect(deviceDB.cachedNow()).to.not.be.null
     expect(deviceDB.forget).toHaveBeenCalledOnce()
   })
 
-  it("a tombstone crossing the renewal resolves: the lease it held is gone, so the new one is dropped unattached, and demandAttachable is never met", async () => {
+  it("refuses as it attaches where a tombstone crossed the new lease's making, and leaves no row", async () => {
     const { vault, demandStored, deviceDB, anotherSession } = await makeBornVault()
     crossingGrant(async () => {
       await delTyping(await anotherSession().build(demandStored()), NewPassphrase)
       await TH.expectRefusal(vault.fetch())
     })
-    await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
+    await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase))
     expect(vault.isPresent).to.be.false
     expect(vault.isUnlocked).to.be.false
     expect(deviceDB.cachedNow()).to.be.null

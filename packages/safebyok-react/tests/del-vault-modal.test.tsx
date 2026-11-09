@@ -42,10 +42,10 @@ describe("DelVaultModal", () => {
     expect(await raising).to.include({ ok: true })
   })
 
-  it("answers declined on Cancel, and the vault stays", async () => {
+  it("answers dismissed on Cancel, and the vault stays", async () => {
     const { bank, raising, answers } = await shownFor()
     fireEvent.click(screen.getByText(Messages.cancelButton))
-    expect(answers).to.deep.equal(['declined'])
+    expect(answers).to.deep.equal(['dismissed'])
     expect(await raising).to.include({ ok: false })
     expect(bank.vaultAt(TH.VaultScopeGiven)?.isPresent).to.be.true
   })

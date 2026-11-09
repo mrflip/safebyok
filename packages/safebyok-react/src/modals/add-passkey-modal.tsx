@@ -2,13 +2,12 @@ import { useRef } from 'react'
 import type { PasskeyAnswer } from 'safebyok'
 import { Messages } from '../helpers/messages'
 import { attemptOnce, createPasskey } from '../helpers/passkey'
-import { useRoundFor } from '../hooks/round-for'
 import type { AddPasskeyModalProps } from '../shapes'
 import { AnsweringOnce, ModalForm, PassphraseField, UsernameField, useAttempts } from './modal-kit'
 
 /** The dialog for an `add_passkey` gating, which makes a passkey and adds it to the vault once the user proves its passphrase. */
 export const AddPasskeyModal = (props: AddPasskeyModalProps) => (
-  <AnsweringOnce key={useRoundFor(props.gating)} gating={props.gating} onDone={props.onDone}>
+  <AnsweringOnce key={props.gating.gatingTok} gating={props.gating} onDone={props.onDone}>
     {(done) => <AddPasskeyForm {...props} onDone={done} />}
   </AnsweringOnce>
 )

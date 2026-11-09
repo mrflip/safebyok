@@ -327,7 +327,7 @@ export type ClearsForGatingkind = {
 
 // == [Given to a gating]: RequestCleartext, AskUser, AnyGating, GatingSnapshot, VaultBuildProvings, VaultUnlockProvings, AnteProvings, PassphraseReplaceProvings, PasskeyAddProvings, ProvingsForGatingkind, Run, VaultForGatingkind, LaunchArgs, Asked, Prove
 
-/** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way declines. */
+/** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way dismisses. */
 export type RequestCleartext = (gating: AnyGating) => unknown
 
 /** The host's dialog as a bank keeps it, wrapped by `guardRequestCleartext`: true once the dialog closes, false if it threw. Never throws. */
@@ -340,6 +340,8 @@ export type AnyGating = { [KindT in EX.Gatingkind]: Gating<KindT> }[EX.Gatingkin
 export interface GatingSnapshot extends VaultScope {
   /** What the gating does once the user's cleartext proves the gate: build, unlock or delete the vault, or change its gate. */
   readonly gatingkind: EX.Gatingkind
+  /** Unique to this gating, for a dialog to key on. */
+  readonly gatingTok:  string
 }
 
 /** What a build_vault attempt proves: the provings of a new vault's wayins, with no record to prove them against. */

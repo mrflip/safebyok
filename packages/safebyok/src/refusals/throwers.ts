@@ -162,7 +162,7 @@ export const unopenedWhisper = (): VaultError => new VaultError('damaged_box', P
 export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --
 
-// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gatingDeclined, lockedWhileAsking, gatingSettled, attemptInFlight, proofMissing
+// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gatingDismissed, gatingSettled, attemptInFlight, proofMissing
 
 /** An `already_asking` refusal: a prompt is already open on this bank. */
 export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
@@ -176,11 +176,8 @@ export const clearsThrew = (): VaultError => new VaultError('unexpected_error', 
 /** A `same_passphrase` refusal: the new passphrase matches the current passphrase. */
 export const samePassphrase = (): VaultError => new VaultError('same_passphrase', Phrases.SamePassphrase)
 
-/** A `declined` refusal: the prompt was declined, or closed before an attempt succeeded. */
-export const gatingDeclined = (): VaultError => new VaultError('declined', Phrases.GatingDeclined)
-
-/** A `locked_while_asking` refusal: the vault locked before the user answered. */
-export const lockedWhileAsking = (): VaultError => new VaultError('locked_while_asking', Phrases.LockedWhileAsking)
+/** A `dismissed` refusal: the prompt was dismissed before an attempt succeeded. */
+export const gatingDismissed = (): VaultError => new VaultError('dismissed', Phrases.GatingDismissed)
 
 /** A `gating_landed` refusal: an attempt reached a prompt that has already ended. */
 export const gatingSettled = (): VaultError => new VaultError('gating_landed', Phrases.GatingSettled)

@@ -95,9 +95,9 @@ describe("PasskeyUnlockButton", () => {
     authenticator.refuseNext('UnknownError')
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await waitFor(() => { expect(gripes).to.deep.equal([null, Messages.passkeyAskFailed]) })
-    refusingAttempts(new VaultError('locked_while_asking', 'locked'))
+    refusingAttempts(new VaultError('dismissed', 'dismissed'))
     fireEvent.click(screen.getByText(Messages.passkeyButton))
-    await waitFor(() => { expect(answers).to.deep.equal(['declined']) })
+    await waitFor(() => { expect(answers).to.deep.equal(['dismissed']) })
   })
 
   it("leaves an attempt under way to answer when pressed during it", async () => {

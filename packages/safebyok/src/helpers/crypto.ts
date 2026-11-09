@@ -21,7 +21,7 @@ export const randomBytes = (count: number): Uint8Array => (
   crypto.getRandomValues(new Uint8Array(count))
 )
 
-/** A fresh random UUID from the platform, for a revisionTok, or a life tok by {@link makeLifeTok}. */
+/** A fresh random UUID from the platform, for a revisionTok, a gatingTok, or a life tok by {@link makeLifeTok}. */
 export const randomId = (): string => crypto.randomUUID()
 
 /** A fresh life tok, a thing's `vault_tok` or `box_tok`: random, minted at each birth of the thing it marks, and only ever compared. */

@@ -44,9 +44,9 @@ describe("GatingModal", () => {
     })
   }
 
-  it("answers declined at once for a gatingkind with no dialog, and the gating is declined", async () => {
+  it("answers dismissed at once for a gatingkind with no dialog, and the gating is dismissed", async () => {
     const { raising, answers } = await shownFor(TH.unlocking, 'built', forged)
-    await waitFor(() => { expect(answers).to.deep.equal(['declined']) })
+    await waitFor(() => { expect(answers).to.deep.equal(['dismissed']) })
     expect(screen.queryByRole('dialog')).to.be.null
     expect(await raising).to.include({ ok: false })
   })
@@ -62,6 +62,6 @@ describe("GatingModal", () => {
     rerender(ui())
     held.close()
     await held.raising
-    expect(answers).to.deep.equal(['declined'])
+    expect(answers).to.deep.equal(['dismissed'])
   })
 })

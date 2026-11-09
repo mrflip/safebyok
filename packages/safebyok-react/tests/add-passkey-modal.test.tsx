@@ -95,10 +95,10 @@ describe("AddPasskeyModal", () => {
     expect(authenticator.calls.create).to.have.lengthOf(1)
   })
 
-  it("answers declined on Cancel, and the vault holds no passkey", async () => {
+  it("answers dismissed on Cancel, and the vault holds no passkey", async () => {
     const { bank, raising, answers } = await shownFor()
     fireEvent.click(screen.getByText('Cancel'))
-    expect(answers).to.deep.equal(['declined'])
+    expect(answers).to.deep.equal(['dismissed'])
     expect(await raising).to.include({ ok: false })
     expect(passkeyHeld(bank)).to.be.null
   })

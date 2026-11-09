@@ -20,11 +20,10 @@ const stubReportError = () => {
 
 afterEach(() => { vi.unstubAllGlobals() })
 
-const expectLockWon = async ({ vault, deviceDB, demandStored }: Awaited<ReturnType<typeof makeBornVault>>, epoch0: number): Promise<void> => {
+const expectChangeUnlocked = async ({ vault, deviceDB, demandStored }: Awaited<ReturnType<typeof makeBornVault>>, epoch0: number): Promise<void> => {
   expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
-  expect(vault.isLocked).to.be.true
-  await TH.eventually(() => deviceDB.cachedNow() === null)
-  await TH.expectRefusal(vault.ensureUnlocked(), 'declined')
+  expect(vault.isUnlocked).to.be.true
+  await TH.eventually(() => deviceDB.cachedNow() !== null)
 }
 
 describe("A lease renewed through a gate change", () => {
@@ -43,20 +42,18 @@ describe("A lease renewed through a gate change", () => {
     expect(await vault.unsealStampedString(sealed, Stamp)).to.eq('sk-test')
   })
 
-  it("was locked: a vault locked at the start lands the change and stays locked, caching no row", async () => {
+  it("was locked: a vault locked at the start lands the change and ends unlocked, its row cached", async () => {
     const { vault, deviceDB, demandStored } = await makeBornVault()
     const epoch0 = vault.gate.gate_epoch
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    deviceDB.tryStow.mockClear()
     await replaceTyping(vault, Passphrase, NewPassphrase)
-    expect(vault.isLocked).to.be.true
+    expect(vault.isUnlocked).to.be.true
     expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
-    expect(deviceDB.tryStow).not.toHaveBeenCalled()
-    expect(deviceDB.cachedNow()).to.be.null
+    expect(deviceDB.cachedNow()).to.not.be.null
   })
 
-  it("lock crossed: a lock() past the enter key wins: the change lands, the new lease goes unattached, and no row stands", async () => {
+  it("leaves the vault unlocked where a lock() came past the enter key", async () => {
     const born = await makeBornVault()
     const { vault } = born
     const epoch0 = vault.gate.gate_epoch
@@ -69,10 +66,10 @@ describe("A lease renewed through a gate change", () => {
     }
     await vault.replacePassphrasePrompt()
     world.requestCleartext = asBefore
-    await expectLockWon(born, epoch0)
+    await expectChangeUnlocked(born, epoch0)
   })
 
-  it("lock crossed: a lock() as the commit lands wins too", async () => {
+  it("leaves the vault unlocked where a lock() came as the commit landed", async () => {
     const born = await makeBornVault()
     const { vault, opts: { vaultDB } } = born
     const epoch0 = vault.gate.gate_epoch
@@ -83,7 +80,7 @@ describe("A lease renewed through a gate change", () => {
       return landed
     })
     await replaceTyping(vault, Passphrase, NewPassphrase)
-    await expectLockWon(born, epoch0)
+    await expectChangeUnlocked(born, epoch0)
   })
 })
 
@@ -301,9 +298,9 @@ describe("a vault and a lease show neither the lease friend nor the lease key ha
     let gatingShown: object | null = null
     world.requestCleartext = (gating) => {
       gatingShown = gating
-      gating.decline()
+      gating.dismiss()
     }
-    await TH.expectRefusal(vault.addPasskeyPrompt(), 'declined')
+    await TH.expectRefusal(vault.addPasskeyPrompt(), 'dismissed')
     const json = JSON.stringify(gatingShown)
     for (const named of ['friend', 'gatingFriend', 'launchArgs', 'landGate', 'unlockByProof']) {
       expect(Object.keys(gatingShown!)).to.not.include(named)

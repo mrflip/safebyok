@@ -388,7 +388,7 @@ export interface BankOpts {
   deviceDB:             DeviceDB
   /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
   keyDeriver:           KeyDeriver
-  /** Your dialog, called with each gating that needs the user's passphrase or passkey; left out, each gating waits in the bank's snapshot for your own `attempt` or `decline`. */
+  /** Your dialog, called with each gating that needs the user's passphrase or passkey; left out, each gating waits in the bank's snapshot for your own `attempt` or `dismiss`. */
   requestCleartext?:    RequestCleartext | undefined
   /** Judges each new passphrase before a vault takes it; without one, every new passphrase is too weak (CUSTOMIZATION.md). */
   strengthChecker?:     StrengthChecker | undefined

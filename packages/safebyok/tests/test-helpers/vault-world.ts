@@ -46,7 +46,7 @@ export type Typing = Typed | Promise<Typed>
 
 type Typed = Partial<Record<'passphraseClear' | 'antePassphraseClear' | 'nextPassphraseClear', string>> & { passkeyClear?: GX.PasskeyAnswer | null }
 
-/** What `ask` answers under a dialog shown once: it attempts `typing` and closes. A correctable refusal, which leaves the gating to decline as the dialog closes, is thrown as itself. */
+/** What `ask` answers under a dialog shown once: it attempts `typing` and closes. A correctable refusal, which leaves the gating to dismiss as the dialog closes, is thrown as itself. */
 const askTyping = async <ValT>(world: VaultWorld, typing: Typing, ask: () => Promise<ValT>): Promise<ValT> => {
   // The world is the fake bank, whose friend's askUser shows its requestCleartext as it stands.
   const fake = world as FakeBank

@@ -48,9 +48,9 @@ tripwire for the core's own wiring rather than a lock: `Bank`'s constructor wrap
 (`refusals/host-error-sanitizer.ts`), the one function that stands a refusal in for a foreign throw, reading nothing
 of it; and `requestCleartext` by `guardRequestCleartext` (`models/bank.ts`), which answers false for a throw and drops it,
 for `Gating.#askHost` to refuse as `requestCleartextThrew`. A host may leave `requestCleartext` out: the friend's
-`askUser` is then null, no host function is called, and the gating waits, open, for its `attempt` or `decline`. Either
+`askUser` is then null, no host function is called, and the gating waits, open, for its `attempt` or `dismiss`. Either
 way the bank's snapshot holds the live gating as `openGating`, for a dialog to answer; a gating holds no clear between
-attempts (G1), and its `toJSON` shows only its scope and kind. That wrap travels in the `BankFriend` the bank hands its
+attempts (G1), and its `toJSON` shows only its scope, kind and random `gatingTok`. That wrap travels in the `BankFriend` the bank hands its
 vault listing, which holds it protected and hands it to each vault, which holds it private, and it reaches a gating only
 in its launch args; no public member of a bank or a vault answers it. A
 disabled bank asks no one: every `Gating.launch` follows, in the same tick, a check that its vault or vault listing is
@@ -203,7 +203,7 @@ the `LeaseFriend`'s `tryCacheLease` (made in `Vault.#makeFriend`) → `DeviceDB.
 `structuredClone` into a Map); read back, from
 `vault.ensureUnlocked`, by `Lease.buildFromCache` (`peekLease` → `DeviceDB.peek`), which checks the row with
 `leaseRecord` and builds a Lease around it. Dropped from memory by `lease.evict`: in `lease.vacate`, at a sweep
-(`sweepContents`), and when the lease proves damaged (`Lease.#vaultKey`). A lease built for a renewal that a lock crossed is neither attached nor stowed, and goes out of scope. Erased
+(`sweepContents`), and when the lease proves damaged (`Lease.#vaultKey`). Erased
 from the store by `DeviceDB.forget`: through `lease.vacate` or `Lease.forget` (`forgetLease`) from the
 vault's `#vacateLease`, at `vault.lock()`, at a vacate and at a tombstone; through `tryForgetLease`, in
 `Lease.buildFromCache`, for a row of another epoch or stamp; and row by row from `bank.vacate`

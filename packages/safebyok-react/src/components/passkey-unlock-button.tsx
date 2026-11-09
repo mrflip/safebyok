@@ -3,7 +3,6 @@ import type { AnyGating } from 'safebyok'
 import { attemptRefusalFlavor } from '../helpers/attempt-refusals'
 import { Messages } from '../helpers/messages'
 import { askPasskey, attemptOnce, passkeysAvailable } from '../helpers/passkey'
-import { useRoundFor } from '../hooks/round-for'
 import { useWhenShown } from '../hooks/when-shown'
 import { Boundary, forBoundary } from '../provider/boundary'
 import type { PasskeyUnlockButtonProps } from '../shapes'
@@ -13,7 +12,7 @@ import type { PasskeyUnlockButtonProps } from '../shapes'
  * @example <PasskeyUnlockButton gating={gating} onDone={close} onGripe={setGripe} />
  */
 export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
-  <Boundary key={useRoundFor(props.gating)} fallback={null} onCaught={() => { props.onGripe(Messages.passkeyTrouble) }}>
+  <Boundary key={props.gating.gatingTok} fallback={null} onCaught={() => { props.onGripe(Messages.passkeyTrouble) }}>
     <PasskeyPress {...props} />
   </Boundary>
 )
@@ -34,7 +33,7 @@ const PasskeyPress = ({ gating, onDone, onGripe, rpId, takesFocus }: PasskeyUnlo
   const heard = (err: unknown) => {
     const flavor = attemptRefusalFlavor(err)
     if (flavor === 'in_flight') { return }
-    if (flavor === 'close') { onDone('declined'); return }
+    if (flavor === 'close') { onDone('dismissed'); return }
     // Thrown from an event handler it would miss the boundary, so it is rethrown in render.
     if (flavor === 'trouble') { setFailure({ err }); return }
     onGripe((err as Error).message)

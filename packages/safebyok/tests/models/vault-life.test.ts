@@ -60,7 +60,7 @@ describe("Locking, and the sessions after it on this device", () => {
     expect(again.isLocked).to.be.true
     const box = await boxIn(again)
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
-    await TH.expectRefusal(again.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
     await TH.expectRefusal(unlockTyping(again, byPassphrase('not the passphrase')), 'wrong_passphrase')
     await unlockTyping(again, byPassphrase(Passphrase))
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
@@ -77,7 +77,7 @@ describe("Locking, and the sessions after it on this device", () => {
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const third = await openNextSession()
     expect(third.vault.isLocked).to.be.true
-    await TH.expectRefusal(third.vault.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(third.vault.ensureUnlocked(), 'dismissed')
     await unlockTyping(third.vault, byPassphrase(Passphrase))
     expect(await unsealIn(third.vault)).to.deep.equal(Whisper)
   })
@@ -109,7 +109,7 @@ describe("The lock, with a box in hand", () => {
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const { vault: again } = await openNextSession()
     expect(again.isLocked).to.be.true
-    await TH.expectRefusal(again.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
   })
 
   it("keeps the exposed whisper through the lock: unlocked again by the passphrase, the box answers it again", async () => {
@@ -183,7 +183,7 @@ describe("Another device, over the same vaultDB and boxes", () => {
     const { vault, unsealIn, demandStored, deviceDB } = await makeVaultWithBox()
     const other = await openOtherDevice(demandStored())
     expect(other.vault.isLocked).to.be.true
-    await TH.expectRefusal(other.vault.ensureUnlocked(), 'declined')
+    await TH.expectRefusal(other.vault.ensureUnlocked(), 'dismissed')
     await unlockTyping(other.vault, byPassphrase(Passphrase))
     expect(other.deviceDB.cachedNow()).not.to.be.null
     expect(await unsealIn(other.vault)).to.deep.equal(Whisper)

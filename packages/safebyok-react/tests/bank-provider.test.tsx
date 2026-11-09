@@ -454,7 +454,7 @@ describe("BankProvider's dialog", () => {
     expect(dialogShown()).to.be.false
   })
 
-  it("closes the dialog on Cancel, declining its gating", async () => {
+  it("closes the dialog on Cancel, dismissing its gating", async () => {
     provided()
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))
@@ -497,7 +497,7 @@ describe("BankProvider's dialog", () => {
     fireEvent.change(passphraseFieldOf(), { target: { value: 'half typed' } })
     const vault = bank.vaultAt({ vaultlabel: 'main' })!
     await act(async () => {
-      first?.decline()
+      first?.dismiss()
       void vault.tryEnsureUnlocked()
       await vi.waitFor(() => { expect(bank.snapshot.openGating).to.not.equal(first); expect(bank.snapshot.openGating).to.not.be.null })
     })
@@ -509,7 +509,7 @@ describe("BankProvider's dialog", () => {
     expect(dialogShown()).to.be.false
   })
 
-  it("closes the dialog once its gating settles elsewhere, as at a lock", async () => {
+  it("leaves the dialog up through a lock", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
     provided({}, world)
@@ -517,7 +517,8 @@ describe("BankProvider's dialog", () => {
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(dialogShown()).to.be.true })
     fireEvent.click(screen.getByText('Lock'))
-    await waitFor(() => { expect(dialogShown()).to.be.false })
+    await waitFor(() => { expect(shown('vault')).to.eq('present locked') })
+    expect(dialogShown()).to.be.true
   })
 
   it("closes the dialog when the user signs out", async () => {

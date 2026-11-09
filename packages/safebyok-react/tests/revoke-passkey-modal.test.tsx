@@ -47,10 +47,10 @@ describe("RevokePasskeyModal", () => {
     expect(await raising).to.include({ ok: true })
   })
 
-  it("answers declined on Cancel, and the passkey stays", async () => {
+  it("answers dismissed on Cancel, and the passkey stays", async () => {
     const { bank, raising, answers } = await shownFor()
     fireEvent.click(screen.getByText('Cancel'))
-    expect(answers).to.deep.equal(['declined'])
+    expect(answers).to.deep.equal(['dismissed'])
     expect(await raising).to.include({ ok: false })
     expect(holdsPasskey(bank)).to.be.true
   })

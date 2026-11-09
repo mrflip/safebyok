@@ -78,17 +78,19 @@ describe("vault.replacePassphrasePrompt()", () => {
     await proveBy(born, NewPassphrase)
   })
 
-  it("refuses a lock before the enter key, storing nothing, and the attempt too late is refused", async () => {
+  it("unlocks with a change attempted after a lock", async () => {
     const born = await makeBornVault()
     const { vault, storedNow } = born
     const ante = storedNow()
     const { gatingAt } = dialogOf(born)
-    const replacing = TH.expectRefusal(vault.replacePassphrasePrompt())
+    const replacing = vault.replacePassphrasePrompt()
     const gating = await gatingAt<'replace_passphrase'>()
     vault.lock()
+    expect(gating.isOpen).to.be.true
+    await TH.expectGood(gating.attempt({ antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }))
     await replacing
-    await TH.expectBad(gating.attempt({ antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }))
-    expect(storedNow()).to.equal(ante)
+    expect(storedNow()).to.not.equal(ante)
+    expect(vault.isUnlocked).to.be.true
   })
 
   it("refuses 'stale_write' a row moved since the attempt read it, overwriting nothing, the vault taking in the row stored and staying unlocked", async () => {
@@ -151,8 +153,8 @@ describe("vault.replacePassphrasePrompt()", () => {
 
   it("the try form answers the refusal", async () => {
     const born = await makeBornVault()
-    born.fakeBank.requestCleartext = (gating) => { gating.decline() }
-    await TH.expectBad(born.vault.tryReplacePassphrasePrompt(), 'declined')
+    born.fakeBank.requestCleartext = (gating) => { gating.dismiss() }
+    await TH.expectBad(born.vault.tryReplacePassphrasePrompt(), 'dismissed')
   })
 })
 

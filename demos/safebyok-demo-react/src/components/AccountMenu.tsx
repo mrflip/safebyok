@@ -22,7 +22,7 @@ export const AccountMenu = ({ auth, session }: { auth: Auth, session: Session })
     if (stage === 'waiting') { setGripe('Your vault is still loading: try again in a moment.'); return }
     if (stage === 'present') {
       // The vault's own dialog is the confirmation: it asks for the passphrase. A confirm() before
-      // it could outlast the click's activation, and the dialog would then be declined unasked.
+      // it could outlast the click's activation, and the dialog would then be dismissed unasked.
       const deleted = await vault.tryDelVaultPrompt()
       if (! deleted.ok) {
         if (! isQuietRefusal(deleted.err)) { setGripe(deleted.err.message) }

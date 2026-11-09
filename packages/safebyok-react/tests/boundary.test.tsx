@@ -2,7 +2,6 @@ import { screen } from '@testing-library/react'
 import { Component, type ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
 import { VaultError } from 'safebyok'
-import { useRoundFor } from '../src/hooks/round-for'
 import { Boundary, forBoundary } from '../src/provider/boundary'
 import * as TH from './test-helpers'
 
@@ -57,26 +56,6 @@ describe("Boundary", () => {
     const { reported } = TH.renderReporting(<Boundary fallback={<p>Something went wrong.</p>}><Thrower failure={{ err: null }} /></Boundary>)
     expect(screen.queryByText('Something went wrong.')).to.not.be.null
     expect(reported).to.deep.equal([null])
-  })
-})
-
-/** The example's shape: a boundary keyed by the gating it serves, over a child that fails for one gating. */
-const Served = ({ gating, failing }: { gating: object, failing: object }) => (
-  <Boundary key={useRoundFor(gating)} fallback={<p>fallback</p>}>
-    <Thrower {...(gating === failing ? { failure: { err: new Error('broke') } } : {})} />
-  </Boundary>
-)
-
-describe("useRoundFor", () => {
-  it("starts a boundary afresh for another gating, and keeps it as it is for the same one, as its example shows", () => {
-    const first = {}
-    const second = {}
-    const { rerender } = TH.renderReporting(<Served gating={first} failing={first} />)
-    expect(screen.queryByText('fallback')).to.not.be.null
-    rerender(<Served gating={first} failing={second} />)
-    expect(screen.queryByText('fallback')).to.not.be.null
-    rerender(<Served gating={second} failing={first} />)
-    expect(screen.queryByText('fine')).to.not.be.null
   })
 })
 

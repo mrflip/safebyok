@@ -259,7 +259,7 @@ describe("a vault shared between the two derivers", () => {
     })
     await mistyped.hello()
     const vault = await mistyped.ensureVault(TH.VaultScopeGiven)
-    await expect(vault.ensureUnlocked()).rejects.toThrow(/declined/u)
+    await expect(vault.ensureUnlocked()).rejects.toThrow(/dismissed/u)
     const second = devices.second()
     await second.hello()
     await expectWhisperOpens(second)

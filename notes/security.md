@@ -331,6 +331,17 @@ added or folded into through the subagent, and no other entry changes.
   that session: we hold proof that this user intends and is permitted to have the vault unlocked, and nothing turns back midway. A
   `lock()` before the enter key settles the gating `locked_while_asking`; a later attempt refuses `gating_landed`, spending the passkey
   answer it was handed.
+  Amended 2026-11-09 (gating_core; ruled by the Coach): **a `lock()` no longer ends an open gating, and a gate change always ends the vault
+  unlocked.** (1) The `locked_while_asking` refusal kind is removed: the dialog stays up after a `lock()`, and an attempt made after it
+  goes through, on the rule that a valid request goes through if it was authorized at the start of its critical section and the user's
+  proof of the passphrase or passkey is that authorization. (2) After a gate change (replace passphrase, add passkey, revoke passkey) the
+  vault always gets a fresh lease of full term under the new gate epoch and ends unlocked, even if it was locked before the dialog opened
+  or a `lock()` crossed the change; a `lock()` that lands during a gate change does not hold. (3) A sweep or a vacate
+  dismisses the vault's open gating with refusal kind `dismissed`, the kind a user's Cancel gives, so the kind alone does not tell a
+  Cancel from a vault going away; an attempt already under way runs to its end and its outcome is final (`models/gating.ts`, `vault.ts`,
+  `vault-listing.ts`). A tombstone taken in does not end an open gating: the dialog stays up, and the next attempt refuses because the
+  vault is no longer present, unlocking and changing nothing. Every attempt still proves the passphrase or passkey, so an open dialog grants nothing by itself; after an
+  autolock the dialog stays on an unattended screen, though it asks only for a passphrase.
 
 * 2026-10-28 (store_trynames, branch `20261028-store_trynames`): **`VaultDB`'s and `DeviceDB`'s public verbs are try pairs, and both
   forms of a `DeviceDB` verb give `VaultError`s.** `tryGetBox` resolves the Outcome; `getBox` resolves the

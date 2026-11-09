@@ -1,12 +1,11 @@
 import { useRef } from 'react'
 import { Messages } from '../helpers/messages'
-import { useRoundFor } from '../hooks/round-for'
 import type { ReplacePassphraseModalProps } from '../shapes'
 import { AnsweringOnce, ConfirmField, ModalForm, PassphraseField, UsernameField, useAdvice, useAttempts, useConfirmation } from './modal-kit'
 
 /** The dialog for a `replace_passphrase` gating, which proves the passphrase in use and chooses the next. */
 export const ReplacePassphraseModal = (props: ReplacePassphraseModalProps) => (
-  <AnsweringOnce key={useRoundFor(props.gating)} gating={props.gating} onDone={props.onDone}>
+  <AnsweringOnce key={props.gating.gatingTok} gating={props.gating} onDone={props.onDone}>
     {(done) => <ReplacePassphraseForm {...props} onDone={done} />}
   </AnsweringOnce>
 )
