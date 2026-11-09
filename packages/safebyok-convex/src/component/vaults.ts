@@ -104,7 +104,7 @@ export const putBox = mutation({
 
 // == [Dels]: delVault, delBox
 
-/** Store a vault's tombstone over its live or damaged row at `opts.prior`, answering the landing. */
+/** Store a vault's tombstone over its live row at `opts.prior`, answering the landing. */
 export const delVault = mutation({
   args:    CVX.delVaultArgs,
   returns: CVX.landing,
@@ -113,8 +113,8 @@ export const delVault = mutation({
     const ante = anteDoc?.vault ?? null
     const isOurs = DB.isLiveRowUnder(ante, tombstone.vault_tok)
     const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
-    const landed = (isOurs && DB.isRowAt(ante, prior)) || DB.isDamagedVaultAt(ante, tombstone, prior)
-    // A live row of this life, or damage, that the tombstone does not name stops the del whole; any other row lets a repeat sweep the boxes.
+    const landed = isOurs && DB.isRowAt(ante, prior)
+    // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
     if ((! landed) && (isOurs || isDamaged)) { return { landed, ante } }
     if (landed) { await storeVaultDoc(ctx.db, anteDoc, tombstone) }
     await tombstoneBoxes(ctx.db, lifeOf(tombstone), tombstone.written_at)
@@ -122,7 +122,7 @@ export const delVault = mutation({
   },
 })
 
-/** Store a box's tombstone over its live or damaged row at `opts.prior`, answering the landing. */
+/** Store a box's tombstone over its live row at `opts.prior`, answering the landing. */
 export const delBox = mutation({
   args:    CVX.delBoxArgs,
   returns: CVX.boxLanding,
@@ -132,7 +132,7 @@ export const delBox = mutation({
     const life = lifeOf(tombstone)
     const anteDoc = await findBoxDoc(ctx.db, life, tombstone.boxlabel)
     const ante = anteDoc?.box ?? null
-    const isDeletable = (DB.isLiveRow(ante) && DB.isRowAt(ante, prior)) || DB.isDamagedBoxAt(ante, tombstone, prior)
+    const isDeletable = DB.isLiveRow(ante) && DB.isRowAt(ante, prior)
     const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
     if (landed) {
       const boxDoc = { ...life, boxlabel: tombstone.boxlabel, box: tombstone }

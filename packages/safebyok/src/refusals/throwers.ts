@@ -138,7 +138,7 @@ export const otherVaultTok = (): VaultError => new VaultError('record_conflict',
 export const shapeUnreconciled = (): VaultError => new VaultError('unexpected_error', Phrases.ShapeUnreconciled)
 // --
 
-// == [Box Throwers]: recordForNewBox, undecodedWhisper, notExposedError, absentDamagedBoxError
+// == [Box Throwers]: recordForNewBox, undecodedWhisper, notExposedError
 
 /** The refusal of a put that said only-if-new, handed a whole record. */
 export const recordForNewBox = (): VaultError => new VaultError('bad_option', Phrases.RecordForNewBox)
@@ -148,9 +148,6 @@ export const undecodedWhisper = (): VaultError => new VaultError('damaged_box', 
 
 /** The refusal of a call that works on the exposed whisper, on a box with none. */
 export const notExposedError = (): VaultError => new VaultError('bad_option', Phrases.NotExposed)
-
-/** An `absent_box` refusal: no damaged box is listed under the label given. */
-export const absentDamagedBoxError = ({ boxlabel }: { boxlabel: string }) => new VaultError('absent_box', Phrases.damagedBoxAbsent(boxlabel))
 // --
 
 // == [Lease Throwers]: damagedLease, unopenedWhisper, leaseNotInForce

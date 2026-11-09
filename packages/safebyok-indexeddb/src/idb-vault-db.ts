@@ -102,8 +102,8 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
       const ante = await DB.rowAt(store, vaultScopepathOf(tombstone))
       const isOurs = DB.isLiveRowUnder(ante, tombstone.vault_tok)
       const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
-      const landed = (isOurs && DB.isRowAt(ante, prior)) || DB.isDamagedVaultAt(ante, tombstone, prior)
-      // A live row of this life, or damage, that the tombstone does not name stops the del whole; any other row lets a repeat sweep the boxes.
+      const landed = isOurs && DB.isRowAt(ante, prior)
+      // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
       if ((! landed) && (isOurs || isDamaged)) { return { landing: { landed, ante }, rungs: [] } }
       if (landed) { store.put(tombstone, vaultScopepathOf(tombstone)) }
       const vault = landed ? tombstone : ante
@@ -124,7 +124,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   protected async doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): Promise<BoxLanding> {
     const landing = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [vault, ante] = await Promise.all([DB.rowAt(store, vaultScopepathOf(tombstone)), DB.rowAt(store, boxScopepathOf(tombstone))])
-      const isDeletable = (DB.isLiveRow(ante) && DB.isRowAt(ante, prior)) || DB.isDamagedBoxAt(ante, tombstone, prior)
+      const isDeletable = DB.isLiveRow(ante) && DB.isRowAt(ante, prior)
       const landed = DB.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
       if (landed) { store.put(tombstone, boxScopepathOf(tombstone)) }
       return { landed, ante, vault }

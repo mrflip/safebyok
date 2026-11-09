@@ -41,13 +41,13 @@ describe("DevVaultDBInspector", () => {
     await waitFor(() => { expect(lastCall()).to.include('totalCount') })
   })
 
-  it("lists a damaged box row, and deletes it by delBox", async () => {
+  it("lists a damaged box row with getBox and no delBox", async () => {
     const { world, vault } = await renderOverBox()
     world.vaultDB._cheat_boxRowsOf(vault.scope, vault.snapshot.vault_tok).set('mangled', { am: 'a', fmt: 'nonsense' })
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
     await waitFor(() => { expect(boxRow('mangled').dataset['am']).to.eq('d') })
-    fireEvent.click(within(boxRow('mangled')).getByRole('button', { name: 'delBox' }))
-    await waitFor(() => { expect(boxRow('mangled').dataset['am']).to.eq('x') })
+    expect(within(boxRow('mangled')).getByRole('button', { name: 'getBox' })).to.exist
+    expect(within(boxRow('mangled')).queryByRole('button', { name: 'delBox' })).to.be.null
   })
 
   it("lists a box put elsewhere, as its watch hears of it", async () => {

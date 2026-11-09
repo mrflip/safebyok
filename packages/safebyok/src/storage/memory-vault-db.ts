@@ -139,8 +139,8 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const ante = this.#vaultRowOf(tombstone)
     const isOurs = SX.isLiveRowUnder(ante, tombstone.vault_tok)
     const isDamaged = (ante !== null) && (! SX.vaultRow.safeParse(ante).success)
-    const landed = (isOurs && SX.isRowAt(ante, prior)) || SX.isDamagedVaultAt(ante, tombstone, prior)
-    // A live row of this life, or damage, that the tombstone does not name stops the del whole; any other row lets a repeat sweep the boxes.
+    const landed = isOurs && SX.isRowAt(ante, prior)
+    // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
     if ((! landed) && (isOurs || isDamaged)) { return { landed, ante: structuredClone(ante) } }
     if (landed) { this.#storeVaultRow(tombstone) }
     this.#tombstoneBoxes(tombstone)
@@ -151,7 +151,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const vault = this.#vaultRowOf(tombstone)
     const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
     const ante = boxrows.get(tombstone.boxlabel) ?? null
-    const isDeletable = (SX.isLiveRow(ante) && SX.isRowAt(ante, prior)) || SX.isDamagedBoxAt(ante, tombstone, prior)
+    const isDeletable = SX.isLiveRow(ante) && SX.isRowAt(ante, prior)
     const landed = SX.isCheckedLiveVault(vault, tombstone.vault_tok) && isDeletable
     if (landed) { this.#storeBoxRow(boxrows, vault, tombstone) }
     return { landed, ante: structuredClone(ante), vault: structuredClone(vault) }

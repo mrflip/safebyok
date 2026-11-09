@@ -156,7 +156,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   // == [Dels]: delBox, tryDelBox, delVault, tryDelVault, tidyGone, tryTidyGone
 
-  /** Deletes a box at `prior`: its live row, or the damaged row `damaged_rows` lists. */
+  /** Deletes a box's live row at `prior`. */
   async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> { return goodAnswerOf(await this.tryDelBox(tombstone, opts)) }
 
   async tryDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<Answer<BoxTombstone, DelAct>> {
@@ -166,7 +166,7 @@ export class GraphQLVaultDB implements VaultDB {
     })
   }
 
-  /** Deletes a vault at `prior`, its live row or the damaged row `damaged_rows` lists, with the boxes of its life. */
+  /** Deletes a vault's live row at `prior`, with the boxes of its life. */
   async delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>> { return goodAnswerOf(await this.tryDelVault(tombstone, opts)) }
 
   async tryDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Answer<VaultTombstone, DelAct>> {
