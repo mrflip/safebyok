@@ -226,6 +226,20 @@ describe("vault.delBox", () => {
   })
 })
 
+describe("a row no listing can set aside", () => {
+  const Unlistable = [
+    ['is not an object',          (): unknown => ['rubble'],                'storage_issue'],
+    ['names another user_id',     (row: object): unknown => ({ ...row, user_id: 'u2' }), 'record_conflict'],
+  ] as const
+
+  it.each(Unlistable)("fails the whole of vault.hello where one %s", async (_blurb, rowOf, refusalkind) => {
+    const { openNextSession, boxrows } = await makeWorldWithBox()
+    boxrows.set(boxlabel, rowOf(boxrows.get(boxlabel) as object))
+    const next = await openNextSession()
+    await TH.expectRefusal(next.hello(), refusalkind)
+  })
+})
+
 describe("a damaged record is set aside, and nothing acts on it", () => {
   it("lists it in damaged_rows, and refuses a get of it as 'damaged_row'", async () => {
     const { openNextSession } = await makeWorldWithRubble()

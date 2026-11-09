@@ -15,8 +15,135 @@ const LiteralSidecar = {
   tags:  ['\u{5D0}\u{5D1}', null, 1.5],
 }
 
+/** Fields of a vault row that may name another vault than its address. */
+const VaultMisfilings = [['user_id', { user_id: 'u2' }], ['vaultlabel', { vaultlabel: 'other' }]] as const
+
+/** Fields of a box row that may name another box than its address. */
+const BoxMisfilings = [['user_id', { user_id: 'u2' }], ['vault_tok', { vault_tok: 'life2' }], ['boxlabel', { boxlabel: 'other' }]] as const
+
+/** What storage may hold for a row that is not an object. */
+const NoObjects = [['an array', ['rubble']], ['a string', 'rubble'], ['a number', 12]] as const
+
+/** A row a listing finds that is not an object: unlike a get, a null there is a row. */
+const ListedNoObjects = [...NoObjects, ['a null', null]] as const
+
 /** Registers the gets' cases over `world`. */
 export const describeGets = ({ fresh, storeWith, rowsOf, twinOf }: BatteryWorld): void => {
+  describe("a row out of storage, held to its address", () => {
+    it.each(VaultMisfilings)("refuses from getVault a well-formed vault row naming another %s", async (fieldname, misfiling) => {
+      const { vaultDB, vault } = await storeWith()
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...misfiling })
+      const answer = await vaultDB.tryGetVault(vaultScope)
+      expect(answer).to.deep.include({ ok: false, act: 'record_conflict', world: null })
+      expect(answer.err?.meta?.fieldnames).to.deep.equal([fieldname])
+    })
+
+    it("answers getVault with a vault row of any vault_tok, as its address is its scope alone", async () => {
+      const { vaultDB } = await storeWith()
+      const otherLife = vaultAt(3, 'life2')
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, otherLife)
+      expect(await vaultDB.getVault(vaultScope)).to.deep.include({ ok: true, act: 'got', val: otherLife })
+    })
+
+    it.each(BoxMisfilings)("refuses from getBox a well-formed box row naming another %s", async (fieldname, misfiling) => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { ...box, ...misfiling })
+      const answer = await vaultDB.tryGetBox(boxQuery)
+      expect(answer).to.deep.include({ ok: false, act: 'record_conflict' })
+      expect(answer.err?.meta?.fieldnames).to.deep.equal([fieldname])
+    })
+
+    it.each(VaultMisfilings)("refuses from getBox a vault row naming another %s", async (_fieldname, misfiling) => {
+      const { vaultDB, vault } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...misfiling })
+      expect(await vaultDB.tryGetBox(boxQuery)).to.deep.include({ ok: false, act: 'record_conflict' })
+    })
+
+    it.each(VaultMisfilings)("fails the whole of listVaults over a vault row naming another %s", async (fieldname, misfiling) => {
+      const { vaultDB, vault } = await storeWith()
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...misfiling })
+      const answer = await vaultDB.tryListVaults(bankScope)
+      expect(answer).to.deep.include({ ok: false, act: 'record_conflict' })
+      expect(answer.err?.meta?.fieldnames).to.deep.equal([fieldname])
+    })
+
+    it.each(BoxMisfilings)("fails the whole of listBoxes over a box row naming another %s", async (fieldname, misfiling) => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { ...box, ...misfiling })
+      const answer = await vaultDB.tryListBoxes(vaultQuery)
+      expect(answer).to.deep.include({ ok: false, act: 'record_conflict' })
+      expect(answer.err?.meta?.fieldnames).to.deep.equal([fieldname])
+    })
+
+    it("refuses a putBox that did not land, over a row naming another user_id", async () => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { ...boxAt(3), user_id: 'u2' })
+      expect(await vaultDB.tryPutBox(boxAt(1), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'record_conflict' })
+    })
+
+    it("refuses a delBox that did not land, over a row naming another boxlabel", async () => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { ...boxAt(3), boxlabel: 'other' })
+      expect(await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'record_conflict' })
+    })
+
+    it("refuses a putVault that did not land, over a row naming another user_id", async () => {
+      const { vaultDB, vault } = await storeWith()
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vaultAt(3), user_id: 'u2' })
+      expect(await vaultDB.tryPutVault(vaultAt(1), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'record_conflict' })
+    })
+
+    it("refuses a delVault that did not land, over a row naming another vaultlabel", async () => {
+      const { vaultDB, vault } = await storeWith()
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vaultAt(3), vaultlabel: 'other' })
+      expect(await vaultDB.tryDelVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'record_conflict' })
+    })
+  })
+
+  describe("a row out of storage that is not an object", () => {
+    it.each(NoObjects)("refuses from getVault %s", async (_blurb, rubble) => {
+      const { vaultDB } = await storeWith()
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, rubble)
+      expect(await vaultDB.tryGetVault(vaultScope)).to.deep.include({ ok: false, act: 'storage_issue' })
+    })
+
+    it.each(NoObjects)("refuses from getBox %s", async (_blurb, rubble) => {
+      const { vaultDB } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', rubble)
+      expect(await vaultDB.tryGetBox(boxQuery)).to.deep.include({ ok: false, act: 'storage_issue' })
+    })
+
+    it.each(NoObjects)("refuses from getBox %s where its vault row should be", async (_blurb, rubble) => {
+      const { vaultDB } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, rubble)
+      expect(await vaultDB.tryGetBox(boxQuery)).to.deep.include({ ok: false, act: 'storage_issue' })
+    })
+
+    it.each(ListedNoObjects)("fails the whole of listVaults over %s", async (_blurb, rubble) => {
+      const { vaultDB } = await storeWith()
+      await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('rubble'), rubble)
+      expect(await vaultDB.tryListVaults(bankScope)).to.deep.include({ ok: false, act: 'storage_issue' })
+    })
+
+    it.each(ListedNoObjects)("fails the whole of listBoxes over %s", async (_blurb, rubble) => {
+      const { vaultDB } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantBoxRow(boxscopeOf('rubble'), 'life1', rubble)
+      expect(await vaultDB.tryListBoxes(vaultQuery)).to.deep.include({ ok: false, act: 'storage_issue' })
+    })
+
+    it("refuses a putBox that did not land over one", async () => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', ['rubble'])
+      expect(await vaultDB.tryPutBox(boxAt(1), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'storage_issue' })
+    })
+
+    it("refuses a delVault that did not land over one", async () => {
+      const { vaultDB, vault } = await storeWith()
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, 'rubble')
+      expect(await vaultDB.tryDelVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'storage_issue' })
+    })
+  })
+
   describe("listVaults", () => {
     it("answers gotvoid over a bank with no vaults, its world the scope", async () => {
       const vaultDB = await fresh()
