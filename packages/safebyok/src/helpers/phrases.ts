@@ -2,12 +2,9 @@
  * The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts.
  */
 
-import { PassphraseSaltBytes, ScopepathDelimiter } from './consts'
+import { PassphraseSaltBytes } from './consts'
 
-// == [Names]: labelTooLong, LabelShape, DeviceIdShape, UserIdMissing, userIdTooLong, UserIdChars
-
-/** A label longer than `maxChars`. */
-export const labelTooLong = (maxChars: number): string => `A label is at most ${String(maxChars)} characters`
+// == [Names]: LabelShape, DeviceIdShape, UserIdMissing, UserIdChars
 
 /** A label of the wrong shape. */
 export const LabelShape = "A label is lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two characters at least"
@@ -18,41 +15,23 @@ export const DeviceIdShape = "A device_id is a UUID, such as crypto.randomUUID()
 /** An empty user_id. */
 export const UserIdMissing = "A user_id names the signed-in user, so it can't be empty"
 
-/** A user_id longer than `maxChars`. */
-export const userIdTooLong = (maxChars: number): string => `A user_id is at most ${String(maxChars)} characters`
-
 /** A user_id holding a character outside its set, or only dots. */
 export const UserIdChars = "A user_id is ASCII letters, digits and - _ . ~ : @ + | %, and not dots alone: percent-encode (RFC 3986) any other character"
 // --
 
-// == [Tokens]: TokenMissing
-
-/** An empty token. */
-export const TokenMissing = "A token is minted by safebyok, so it can't be empty"
-// --
-
-// == [Instants]: InstantTooEarly, InstantTooLate, InstantNotWhole
+// == [Instants]: InstantTooEarly, InstantTooLate
 
 /** An instant before 1981. */
 export const InstantTooEarly = "An instant is epoch milliseconds no earlier than 1981; a smaller number is likely epoch seconds"
 
 /** An instant after 2255. */
 export const InstantTooLate = "An instant is epoch milliseconds no later than 2255; a larger number is likely epoch microseconds"
-
-/** An instant with a fraction of a millisecond. */
-export const InstantNotWhole = "An instant is whole epoch milliseconds"
-// --
-
-// == [Records]: GateEpochAndGate
-
-/** A vault record whose `gate_epoch` and `gate` disagree: a gate at epoch 0, or none at a later epoch. */
-export const GateEpochAndGate = "A vault record's gate_epoch is 0 exactly when its gate is null: a novel vault has neither, and a gated one both"
 // --
 
 // == [Scopes]: DatabaseInVaultScope
 
-/** Why a vaultDB or deviceDB in the scope naming a vault refuses: it goes in the second bag, the options. */
-export const DatabaseInVaultScope = "A vault's vaultDB and deviceDB go in the second bag, its options, not in the scope naming the vault"
+/** Why a vaultDB or deviceDB in the scope naming a vault refuses: each goes to `Bank.make`. */
+export const DatabaseInVaultScope = "A vaultDB and a deviceDB go to Bank.make, never in the scope naming a vault"
 // --
 
 // == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, VaultDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, BankExpected, VaultErrorExpected
@@ -91,10 +70,7 @@ export const BankExpected = "Expected a Bank"
 export const VaultErrorExpected = "Expected a VaultError"
 // --
 
-// == [Passphrases]: PassphraseNotText, passphraseSaltShape, passphraseTooShort, PassphraseGuessable, PassphraseUnjudged
-
-/** A passphrase handed over as anything but text. */
-export const PassphraseNotText = "A passphrase is the text the user typed, as a string"
+// == [Passphrases]: passphraseSaltShape, passphraseTooShort, PassphraseGuessable, PassphraseUnjudged
 
 /** A passphrase wayin's salt that is not `saltChars` characters of base64url text, for `saltBytes` bytes. */
 export const passphraseSaltShape = (saltBytes: number, saltChars: number): string => `A passphrase salt is base64url text of ${String(saltBytes)} bytes: ${String(saltChars)} characters`
@@ -109,28 +85,19 @@ export const PassphraseGuessable = "That passphrase would be easy to guess: add 
 export const PassphraseUnjudged = "This passphrase can't be checked just now: the list of common passwords it is checked against didn't load. Check your connection, then try again."
 // --
 
-// == [Passkeys]: PasskeyAnswerUsed, prfSaltNotFresh
+// == [Passkeys]: PasskeyAnswerUsed, prfSaltShape
 
 /** A passkey's answer whose PRF bytes are zeroed: the vault zeroes an answer once it has used it. */
 export const PasskeyAnswerUsed = "This passkey's answer was used already, and its bytes zeroed: ask the passkey again, as safebyok-react's askPasskey does, and hand in its fresh answer"
 
-/** A new passkey's answer over a salt that is not `count` bytes as base64url text: a wayin sealed over it would read as damaged at every unlock. */
-export const prfSaltNotFresh = (count: number): string => `A new passkey answers over a fresh salt of ${String(count)} random bytes, as base64url text: safebyok-react's createPasskey mints one`
+/** A passkey's salt that is not `count` bytes of base64url text. */
+export const prfSaltShape = (count: number): string => `A passkey's salt is base64url text of ${String(count)} bytes`
 // --
 
-// == [Options]: leaseHoursShape, MinutesShape, VaultDBShape, DeviceDBShape, KeyDeriverShape, LoggerShape, KeyDeriverSpecShape, memoryPerLane, StrengthCheckerShape
-
-/** A `leaseHours` that is no number of hours a lease may last, up to `maxHours`. */
-export const leaseHoursShape = (maxHours: number): string => `Expected a number of hours above zero and at most ${String(maxHours)}, fractions too (0.25 is fifteen minutes), or Infinity for never: until lock()`
+// == [Options]: MinutesShape, KeyDeriverShape, LoggerShape, KeyDeriverSpecShape, memoryPerLane, StrengthCheckerShape
 
 /** A `staleMinutes` or `renewMinutes` that is no number of minutes. */
 export const MinutesShape = "Expected a number of minutes, zero or more, fractions too (0.5 is thirty seconds), or Infinity"
-
-/** A `vaultDB` that is no storage adapter. */
-export const VaultDBShape = "Expected a storage adapter, an instance of the AdapterVaultDB class: idbVaultDB() from 'safebyok-indexeddb', or your backend's own"
-
-/** A `deviceDB` that is no device database. */
-export const DeviceDBShape = "Expected a device database, an instance of the DeviceDB class: new MemoryDeviceDB(), or your own class that extends DeviceDB, both imported from 'safebyok'"
 
 /** A `keyDeriver` left out, or no object. */
 export const KeyDeriverShape = `Expected a KeyDeriver: in a browser, argon2idWebV1Deriver from 'safebyok/browser'; elsewhere, your own, with a key_deriver_label, a salt_bytes of ${String(PassphraseSaltBytes)} and a deriveKeyBytes function`
@@ -172,102 +139,26 @@ export const BagNotObject = "What a bag is checked against is an object, holding
 export const WhisperBagShape = "An object in a whisper or a sidecar is a plain object of JSON: strings, numbers, booleans, null, arrays and plain objects, never undefined, a Date, a Map, a class's instance or a symbol key"
 // --
 
-// == [Scopepaths]: BankScopepathShape, VaultScopepathShape, LeaseScopepathShape, BoxScopepathShape
-
-/** A bank's scopepath of the wrong shape. */
-export const BankScopepathShape = `A bank's scopepath is 'bank', an applabel and a user_id, joined on ${ScopepathDelimiter}`
-
-/** A vault's scopepath of the wrong shape. */
-export const VaultScopepathShape = `A vault's scopepath is 'vault', an applabel, a user_id and a vaultlabel, joined on ${ScopepathDelimiter}`
-
-/** A lease's scopepath of the wrong shape. */
-export const LeaseScopepathShape = `A lease's scopepath is 'lease', an applabel, a user_id and a vaultlabel, joined on ${ScopepathDelimiter}`
-
-/** A box's scopepath of the wrong shape. */
-export const BoxScopepathShape = `A box's scopepath is 'box', an applabel, a user_id, a vaultlabel and a boxlabel, joined on ${ScopepathDelimiter}`
-// --
-
-// == [Bank and vault]: VaultScopeAdvice, otherScope, VaultGoneWhileOpening, OtherDatabasesThanListed, VaultBehindWhileOpening, VaultObjectGone, VaultBehind
-
-/** The advice a refusal of the scope naming a vault ends with: what that scope accepts, and what else names a vault. */
-export const VaultScopeAdvice = "That scope holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
+// == [Bank and vault]: otherScope
 
 /** Why a scope naming another applabel or user_id than the bank's refuses, `fieldnames` the ones that differ, never their values. */
 export const otherScope = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's, which serves one app and one signed-in user. Use the bank of the app and user it belongs to.`
-
-/** Why a vault let go while the bank was opening it hands out no Vault object. */
-export const VaultGoneWhileOpening = "The app let this vault go while it was being opened, so no Vault object was handed out. Ask the bank for the vault again (bank.ensureVault)."
-
-/** Why options naming another vaultDB or deviceDB than the listed vault was born from refuse. */
-export const OtherDatabasesThanListed = "The bank already lists this vault, born from another vaultDB or deviceDB than these options name (their vaultDB or deviceDB, or the bank's own where they leave one out): one vault lives in one place. Databases are compared as objects, so the options must name the same vaultDB object and deviceDB object the vault was opened with, not new ones made over the same storage: make each database once and pass it every time. To open the vault from other databases, let it go first (bank.reopenVault)."
-
-/** Why the bank will not open a vault that storage offers older than this device has seen. */
-export const VaultBehindWhileOpening = "This device has already seen a newer copy of this vault than storage offers now, so it won't open this one: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask for the vault again; otherwise the app's support should look at its storage."
-
-/** Why a Vault object whose vault was deleted, or which the app let go, reads and writes nothing more. */
-export const VaultObjectGone = "This Vault object is gone -- the vault was deleted, here or on another device, or the app let this Vault object go -- so nothing more was read or written. Ask the bank for the vault again (bank.ensureVault) to see what is stored now."
-
-/** Why a vault that storage offers older than this device has seen is not used, and locks. */
-export const VaultBehind = "This device has already seen a newer copy of this vault than storage offers now, so it won't use this one, and the vault locked: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask the bank for the vault again; otherwise the app's support should look at its storage."
 // --
 
-// == [Vault: ways in]: PassphraseKept, NoPasskeyToRemove, PasskeyBeforePassphrase, ProvingBeforePassphrase
-
-/** Why a vault's passphrase is not removed: it can be replaced, never removed. */
-export const PassphraseKept = "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed."
-
-/** Why removing a passkey the vault does not hold changes nothing. */
-export const NoPasskeyToRemove = "This vault has no passkey to remove: it may have been removed on another device. Nothing was changed."
-
-/** Why a passkey is not added to a vault with no passphrase yet. */
-export const PasskeyBeforePassphrase = "This vault has no passphrase yet, and a passkey is added under the passphrase, so nothing was asked or changed: set the passphrase first -- ensureUnlocked() asks for it, with a passkey beside it if the dialog offers one -- then add the passkey."
-
-/** Why a change that needs proving waits for the vault's first passphrase. */
-export const ProvingBeforePassphrase = "This vault has no passphrase yet, so nothing can prove this change: set its passphrase first, as ensureUnlocked() or putWayin() does."
-
-// --
-
-// == [Vault: lifecycle]: VaultLocked, GateMoved
+// == [Vault: lifecycle]: VaultLocked
 
 /** Why a call that needs the vault unlocked does nothing while it is locked. */
 export const VaultLocked = "The vault locked mid-operation. Please unlock again to carry on."
 
-/** Why a call stops when a wayin changed, here or on another device, as it worked. */
-export const GateMoved = "Unlock method changed elsewhere. Please unlock again to carry on."
-
 // --
 
-// == [Vault: boxes]: BoxAbsent, NoWhisperToKeep, RecordForNewBox, vaultFullOfBoxes, VaultGoneWhileGettingBox, VaultDeletedWhilePuttingBox
-
-/** Why a call naming a box the vault does not hold refuses. */
-export const BoxAbsent = "No box is stored for that boxlabel."
-
-/** Why putBox() with no whisper, over a box the vault does not hold, refuses. */
-export const NoWhisperToKeep = "No box is stored for that boxlabel."
+// == [Vault: boxes]: RecordForNewBox
 
 /** Why a put told to only create refuses a whole record: what it would put is recycled. */
 export const RecordForNewBox = "A create operation found a record already present."
-
-/** Why a vault that holds its limit of `maxBoxes` boxes accepts no new one. */
-export const vaultFullOfBoxes = (maxBoxes: number): string => `This vault already holds its limit of ${String(maxBoxes)} boxes: remove one before putting another. A vault meant to hold more can be opened with a larger maxBoxes, up to what its storage adapter allows.`
-
-/** Why a box is not read from a vault deleted, or deleted and made anew, on another device, and the Vault object is gone. */
-export const VaultGoneWhileGettingBox = "The vault this device held was deleted, so the box cannot be fetched: try again"
-
-/** Why a box is not put into a vault deleted, or deleted and made anew, on another device as it was being put. */
-export const VaultDeletedWhilePuttingBox = "The vault was deleted while this box was being put. This should not happen: report this as a bug."
 // --
 
-// == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged
-
-/** Bad news of a box stored damaged, which its meta.box_listed names. */
-export const BoxStoredDamaged = "Storage discovered a damaged box. This should not happen: report this as a bug."
-
-/** Bad news of a wayin stored damaged, which its meta.wayin_listed names. */
-export const WayinStoredDamaged = "One of this vault's unlockers is stored damaged. This should not happen: report this as a bug."
-// --
-
-// == [Storables]: PartialLoad, AlreadyListed, BoxPatchAdvice, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: PartialLoad, AlreadyListed, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
@@ -279,7 +170,6 @@ export const AlreadyListed = "This listing already has an instance under the dna
 export const PutAnsweredNothing = "A put was answered with no record, which a vaultDB never does: the storage adapter needs a developer's look."
 
 /** Why an update of a box naming neither its whisper nor its sidecar writes nothing. */
-export const BoxPatchAdvice = "Nothing was written. An update of a box names its whisper, its sidecar, or both: the half left out is kept."
 export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to write."
 
 /** Why an update of a box whose patch names another's scope writes nothing. */
@@ -322,7 +212,7 @@ export const RecordOfOtherScope = "Storage delivered a misnamed record. This sho
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
 
-// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, UndecodedSalt, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, ProofClosureThrew, KeyDeriverThrew
+// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, ProofClosureThrew, KeyDeriverThrew
 
 /** Why a proof that hands in neither a passphrase nor a passkey's answer is refused. */
 export const ProofMissing = "A proof hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
@@ -344,9 +234,6 @@ export const OtherPrfSalt = "The passkey answered for a different salt than this
 
 /** Why a passphrase wayin made under another key deriver than the world's is not tried. */
 export const UnknownKeyDeriver = "This vault was made with a key deriver this package does not carry: update safebyok, or open the vault where it was made."
-
-/** Why a stored passphrase wayin whose salt is not base64url text of whole bytes is refused: its record is damaged. */
-export const UndecodedSalt = "This vault's stored passphrase salt is not valid base64url text: its record is damaged."
 
 /** Why what a keyDeriver hands back is refused when it is not `count` fresh key bytes. */
 export const notKeyBytes = (count: number): string => `The keyDeriver handed back something other than ${String(count)} fresh key bytes.`

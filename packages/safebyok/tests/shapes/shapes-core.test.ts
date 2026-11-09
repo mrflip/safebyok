@@ -253,6 +253,7 @@ const SaltCases = [
   ["-_Az09".repeat(7) + "A",    false,  'the 43 characters of 32 bytes'],
   ["A".repeat(21) + "+",        false,  'a standard-base64 character'],
   ["A".repeat(21) + "=",        false,  'padding'],
+  ["A".repeat(21) + "B",        false,  'stray padding bits in its last character'],
   ["",                          false,  'no text'],
 ] as const
 

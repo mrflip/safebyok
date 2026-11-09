@@ -12,7 +12,7 @@ import * as VX from '../shapes/shapes-vaultish'
 import type { VaultWorld } from '../shapes/shapes-vaultish'
 import * as SX from '../shapes/shapes-storage'
 import type { VaultRecord } from '../shapes/shapes-storage'
-import { proofMissing, attemptInFlight, clearsThrew, gatingDismissed, gatingConcluded, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
+import { attemptInFlight, clearsThrew, gatingDismissed, gatingConcluded, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import { Gate } from './gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Vault } from './vault'
@@ -219,7 +219,6 @@ const ProveForGatingkind: { [KindT in Gatingkind]: Prove<KindT> } = {
     await vault.ensureTimely(VX.Promptly); vault.demandPromptable()
     const { gate } = vault
     if (passphraseClear !== undefined) { return { proved: await PassphraseProving.buildStored(gate, passphraseClear, world) } }
-    if (! passkeyClear) { throw proofMissing() }
     return { proved: await PasskeyProving.buildStored(gate, passkeyClear) }
   },
   replace_passphrase: async ({ vault, world }, clears) => {

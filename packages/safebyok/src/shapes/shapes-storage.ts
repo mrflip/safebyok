@@ -2,6 +2,7 @@
 
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
+import * as Phrases from '../helpers/phrases'
 import { randomId } from '../helpers/crypto'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
@@ -163,10 +164,10 @@ export type AddPasskeyParams        = Readonly<Z.input<typeof passkeyAddParams>>
 export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParams>>
 // --
 
-// == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
+// == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
 
-/** The checks of the options a vaultDB verb accepts, and of the safe metadata an answer carries. */
-export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Checkers('bad_option', ({ obj, oneof, box_tok }) => {
+/** The checks of the options a vaultDB verb accepts, of a write's record against its prior revision, and of the safe metadata an answer carries. */
+export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, nextSeq } = Checkers('bad_option', ({ obj, oneof, box_tok }) => {
   const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
   const putIfAbsent = oneof(EX.putIfAbsentVals).default('add')
   const putOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(EX.ifPresentVals).default('repl') })
@@ -174,7 +175,8 @@ export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Check
   const delOpts = obj({ prior: revision })
 
   const reqParams = boxQuery.extend({ box_tok, ...revision.shape, prior: revision }).partial()
-  return { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams }
+  const nextSeq = obj({ record: revision, prior: revision }).refine(({ record, prior }) => record.revision_seq === (prior.revision_seq + 1), Phrases.SeqNotNext)
+  return { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, nextSeq }
 }, [CX])
 
 /** The check of an AdapterVaultDB's options, refusing 'bad_option'. */

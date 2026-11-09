@@ -10,7 +10,7 @@ import { Checker, Checkers, objCheck } from '../helpers/validator'
 import type { KeyDeriver } from '../deriver/basederiver'
 import { Patterns } from './primitives'
 
-// Unpadded base64url spends four characters on three bytes, so the salt's length is judged without decoding it.
+// Unpadded base64url spends four characters on three bytes, so the salt's length is judged before decoding it.
 /** How many characters of base64url text a passphraseSalt is. */
 const PassphraseSaltChars = Math.ceil((PassphraseSaltBytes * 4) / 3)
 
@@ -35,17 +35,17 @@ export { epochMillis, type EpochMillis } from './primitives'
  * A token is plain text, as a host's adapter may write one by hand. A device's id is a UUID. A key deriver's label
  * and a passkey's credential id are plain text, not empty. A salt or a ciphered field is
  * branded for its role, since nothing but safebyok makes one. A passphrase's salt is base64url text of
- * {@link PassphraseSaltBytes} bytes, judged by its characters and length; a passkey's is text, not empty, and its length is judged where its
+ * {@link PassphraseSaltBytes} bytes, judged by its characters, its length and decoding it; a passkey's is text, not empty, and its length is judged where its
  * wayin is, so a salt of the wrong length is a damaged wayin while the vault's other wayin still opens.
  */
 export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
-  vault_tok:               str.min(1, Phrases.TokenMissing),
-  box_tok:                 str.min(1, Phrases.TokenMissing),
-  revision_tok:            str.min(1, Phrases.TokenMissing),
+  vault_tok:               str.min(1),
+  box_tok:                 str.min(1),
+  revision_tok:            str.min(1),
   device_id:               uuid(Phrases.DeviceIdShape),
   key_deriver_label:       str.min(1),
   credential_id:           str.min(1),
-  salt_b64:                str.length(PassphraseSaltChars, SaltShape).regex(Patterns.b64url, SaltShape).brand<'PassphraseSalt'>(),
+  salt_b64:                str.length(PassphraseSaltChars, { error: SaltShape, abort: true }).regex(Patterns.b64url, { error: SaltShape, abort: true }).refine((salt) => fromB64OrNull(salt) !== null, SaltShape).brand<'PassphraseSalt'>(),
   prf_salt_b64:            str.min(1).brand<'PrfSalt'>(),
   whisper_ciphered:        ciphered.brand<'WhisperCiphered'>(),
   box_key_wrapped:         ciphered.brand<'BoxKeyWrapped'>(),
@@ -54,7 +54,7 @@ export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, c
 }))
 
 /** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltBytes} bytes, as the models' wayin record has it and a fresh passkey answer carries it. The stored field of the old vault record keeps the shape-only check, as its length was judged at use, not at read. */
-export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltNotFresh(PasskeySaltBytes)), 'bad_record')
+export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltShape(PasskeySaltBytes)), 'bad_record')
 
 /** A passphrase wayin's passphraseSalt, its `salt_b64`: base64url text of the random bytes the key deriver takes beside the passphrase. */
 export type PassphraseSalt = Z.infer<typeof salt_b64>
@@ -158,10 +158,9 @@ export type Boxscope = Z.infer<typeof boxscope>
 
 /** The scope naming one of a bank's vaults, as its calls are handed it: the `vaultlabel` required, the `applabel` and `user_id` invited, each name checked.
  * It accepts whatever carries the names, a plain bag, a Vault object, its snapshot or a
- * BankVault, and leaves the rest. A vaultDB or deviceDB in the scope refuses: it belongs in the
- * second bag, the options, and would be dropped unseen here.
+ * BankVault, and leaves the rest. A vaultDB or deviceDB in the scope refuses: each goes to `Bank.make`.
  *
- * @example bankedVaultScope.parse({ vaultlabel: 'main', vaultDB })  // throws: a vaultDB goes in the second bag
+ * @example bankedVaultScope.parse({ vaultlabel: 'main', vaultDB })  // throws: a vaultDB goes to Bank.make
  */
 export const bankedVaultScope = Checker(({ obj, applabel, user_id, vaultlabel }) => {
   const database = never(Phrases.DatabaseInVaultScope).optional()

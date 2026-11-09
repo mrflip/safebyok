@@ -80,6 +80,13 @@ describe("safebyok/browser", () => {
     expect(PassphraseSaltBytes).to.eq(Argon2idWebV1.salt_bytes)
   })
 
+  it("refuses a spec under a reserved label that safebyok does not supply, whatever its case", () => {
+    for (const key_deriver_label of ['argon2id_web_v2', 'ARGON2ID_WEB_V2']) {
+      const err = TH.expectSyncRefusal(() => parseKeyDeriverSpec({ ...CheapSpec, key_deriver_label }), 'bad_option')
+      expect(err.message).to.include('argon2id_web_')
+    }
+  })
+
   it("is not on the front door", () => {
     for (const exportname of ['argon2idWebV1Deriver', 'argon2idDeriver', 'idbDeviceDB', 'zxcvbnStrengthChecker', 'browserOpts']) {
       expect(Front).to.not.have.property(exportname)

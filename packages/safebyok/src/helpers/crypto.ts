@@ -4,9 +4,10 @@
  */
 
 import { base64urlnopad } from '@scure/base'
-import { unboundCipherCtx } from '../refusals/throwers'
 import type { Ciphered } from '../shapes/shapes-core'
+import * as Phrases from './phrases'
 import { stableJsonify } from './stable-jsonify'
+import { Checker } from './validator'
 
 // == [Constants]: AesGcm, IvBytes
 
@@ -46,7 +47,7 @@ export const fromB64OrNull = (b64: string): Uint8Array | null => {
 }
 // --
 
-// == [The ctx]: CipherCtxRecord, cipherCtx, isUnbound
+// == [The ctx]: CipherCtxRecord, cipherCtx, ctxBound, isBoundCtx, isUnbound
 
 /** One record of a {@link cipherCtx}, a stamp or a header: a flat record of strings and numbers, encoded with its keys sorted, every field bound. */
 export type CipherCtxRecord = Readonly<Record<string, string | number>>
@@ -65,11 +66,18 @@ export type CipherCtxRecord = Readonly<Record<string, string | number>>
 export const cipherCtx = (stamp: CipherCtxRecord | readonly CipherCtxRecord[], purpose: string, ...header: [] | [CipherCtxRecord]): Uint8Array => {
   const stamps: readonly CipherCtxRecord[] = Array.isArray(stamp) ? stamp : [stamp as CipherCtxRecord]
   const parts = [...stamps, purpose, ...header]
-  if (stamps.length === 0 || parts.some((part) => isUnbound(part))) {
-    throw unboundCipherCtx()
-  }
+  ctxBound.parse({ stamps, parts })
   return new TextEncoder().encode(stableJsonify(parts))
 }
+
+/** The check that a ctx has a stamp and that every one of its parts is bound. */
+const ctxBound = Checker(({ custom }) => custom((bag) => isBoundCtx(bag as CtxBag), Phrases.UnboundCipherCtx), 'unexpected_error')
+
+/** True when a ctx has a stamp and each of its parts is bound. */
+const isBoundCtx = ({ stamps, parts }: CtxBag): boolean => stamps.length > 0 && parts.every((part) => ! isUnbound(part))
+
+/** A ctx's stamps and its parts, as {@link ctxBound} judges them. */
+type CtxBag = { stamps: readonly unknown[], parts: readonly (CipherCtxRecord | string)[] }
 
 /** True when `part` is undefined or null, or a record with a field set to undefined or null: what its type forbids and a caller may still hand in. */
 const isUnbound = (part: CipherCtxRecord | string | null | undefined): boolean => (

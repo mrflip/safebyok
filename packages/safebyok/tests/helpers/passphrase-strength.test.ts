@@ -72,8 +72,8 @@ describe("guardStrengthChecker", () => {
 
   it("refuses a passphrase that is no string, before the checker hears it", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
-    const err = await TH.expectRefusal(guardStrengthChecker(checker)(42 as never, scope))
-    expect(err.message).to.match(/passphrase/i)
+    const err = await TH.expectRefusal(guardStrengthChecker(checker)(42 as never, scope), 'bad_option')
+    expect(err.message).to.match(/expected string/u)
     expect(checker).not.toHaveBeenCalled()
   })
 

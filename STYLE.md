@@ -157,7 +157,7 @@ them. An in-package validator, one the main entry does not export, follows the r
 plain name collides with nothing (`BX.made`), and keeps the suffix, under the same exception,
 where it would: idb.ts's and string-store.ts's `listenerShape` sits beside the `listener` it
 checks. A sentence in `phrases.ts`
-named for the shape it describes (`Phrases.VaultDBShape`) is a phrase, not a validator.
+named for the shape it describes (`Phrases.KeyDeriverShape`) is a phrase, not a validator.
 
 **Enumerations lead with their values, then the validator, then the type**, and a wider one
 spreads a narrower: `export const wayinkindVals = [...] as const`,

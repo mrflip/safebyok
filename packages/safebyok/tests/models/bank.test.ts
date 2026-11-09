@@ -188,6 +188,18 @@ describe("bank.hello", () => {
     expect((onBadNews.mock.calls[0]?.[0] as BadNews).news.message).to.include('broken')
   })
 
+  it("tells of a vault whose stored passphrase salt will not decode as a damaged row", async () => {
+    const { world } = await makeBankWithVault()
+    const rows = world.vaultDB._cheat_vaultRowsOf(BankScopeGiven)
+    const row = rows.get(Dna.vaultlabel) as { gate: { passphrase_wayin: object } }
+    rows.set(Dna.vaultlabel, { ...row, gate: { ...row.gate, passphrase_wayin: { ...row.gate.passphrase_wayin, salt_b64: `${'A'.repeat(21)}B` } } })
+    const onBadNews = vi.fn()
+    const bank = world.bankOn({ onBadNews })
+    await bank.hello()
+    expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['damaged_row'])
+    expect((onBadNews.mock.calls[0]?.[0] as BadNews).news.message).to.include(Dna.vaultlabel)
+  })
+
   it("tells of a damaged vault row even where another row's delivery refuses the hello", async () => {
     const onBadNews = vi.fn()
     const { world, bank } = await makeBankWithVault(makeBankWorld(), { onBadNews })

@@ -12,7 +12,7 @@ import * as SX from '../shapes/shapes-storage'
 import * as CX from '../shapes/shapes-core'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
 import type { DelAct, GotAct, ListAct, PutAct } from '../shapes/shapes-enums'
-import type { AddPasskeyParams, AdapterVaultDBOpts, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReplacePassphraseParams, ReqParams, Revision, RevokePasskeyParams, VaultQuery, VaultRecord, VaultRow, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import type { AddPasskeyParams, AdapterVaultDBOpts, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReplacePassphraseParams, ReqParams, RevokePasskeyParams, VaultQuery, VaultRecord, VaultRow, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
 
 // == [Answers]: GoodAnswer, BadAnswer, Answer, ListAct, GotAct, PutAct, DelAct, BankListed, BoxesListed, Tidied, Notice, answerOf
@@ -247,7 +247,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const vaultRecord = SX.vaultRecord.parse(record)
       const putOpts = SX.putVaultOpts.parse(opts)
-      demandNextSeq(vaultRecord, putOpts.prior)
+      SX.nextSeq.parse({ record: vaultRecord, prior: putOpts.prior })
       const { isWritten, ante } = await this.doPutVault(vaultRecord, putOpts)
       if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: vaultRecord, world: vaultRecord } }
       const { ifAbsent, ifPresent } = putOpts
@@ -270,7 +270,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const boxRecord = SX.boxRecord.parse(record)
       const putOpts = SX.putOpts.parse(opts)
-      demandNextSeq(boxRecord, putOpts.prior)
+      SX.nextSeq.parse({ record: boxRecord, prior: putOpts.prior })
       const recordBytes = jsonBytes(boxRecord)
       if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
       const { isWritten, ante, vault } = await this.doPutBox(boxRecord, putOpts)
@@ -365,7 +365,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const boxTombstone = SX.boxTombstone.parse(tombstone)
       const delOpts = SX.delOpts.parse(opts)
-      demandNextSeq(boxTombstone, delOpts.prior)
+      SX.nextSeq.parse({ record: boxTombstone, prior: delOpts.prior })
       const { isWritten, ante, vault } = await this.doDelBox(boxTombstone, delOpts)
       const world = liveVaultOf(vault, boxTombstone)
       if (isWritten) { return { ok: true, req_params, act: 'deleted', val: boxTombstone, world } }
@@ -400,7 +400,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const vaultTombstone = SX.vaultTombstone.parse(tombstone)
       const delOpts = SX.delOpts.parse(opts)
-      demandNextSeq(vaultTombstone, delOpts.prior)
+      SX.nextSeq.parse({ record: vaultTombstone, prior: delOpts.prior })
       const { isWritten, ante } = await this.doDelVault(vaultTombstone, delOpts)
       if (isWritten) { return { ok: true, req_params, act: 'deleted', val: vaultTombstone, world: vaultTombstone } }
       const found = foundVaultRowOf(ante, vaultTombstone)
@@ -486,7 +486,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // --
 }
 
-// == [Helpers]: refusalOf, RowOfOtherAddress, isRowFound, foundVaultRowOf, foundBoxRowOf, listedRowOf, liveVaultOf, movedGateOf, listedBoxesOf, demandNextSeq, writeActOf, jsonBytes
+// == [Helpers]: refusalOf, RowOfOtherAddress, isRowFound, foundVaultRowOf, foundBoxRowOf, listedRowOf, liveVaultOf, movedGateOf, listedBoxesOf, writeActOf, jsonBytes
 
 /** The refusal a verb's throw stands for: a refusal as it came, else `storage_unavailable`. */
 const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultError => {
@@ -551,10 +551,6 @@ const listedBoxesOf = ({ vault_tok, ...scope }: VaultQuery, rows: RowOfBox[]): B
     if (found === null) { listed.damaged_rows.push(SX.damagedBoxOf(address, vault_tok)) } else { listed.boxes.push(SX.boxSparse.parse(found)) }
   }
   return listed
-}
-
-const demandNextSeq = ({ revision_seq }: Revision, prior: Revision): void => {
-  if (revision_seq !== (prior.revision_seq + 1)) { throw Refuse.seqNotNext() }
 }
 
 // A peek is enough: storage judged `ante` against its row check before the put was written.

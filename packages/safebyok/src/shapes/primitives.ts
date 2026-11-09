@@ -35,7 +35,7 @@ export const MaxLabelChars = 40
  * @example label.safeParse('0__b_').success               // false three ways: a digit first, '__' inside, '_' last
  * @example label.safeParse('0__b_').error?.issues.length  // 1: one sentence names every rule, so show it whole
  */
-export const label = str().max(MaxLabelChars, Phrases.labelTooLong(MaxLabelChars)).regex(Patterns.label, Phrases.LabelShape)
+export const label = str().max(MaxLabelChars).regex(Patterns.label, Phrases.LabelShape)
 
 /** The most characters a user_id holds. */
 export const MaxUserIdChars = 100
@@ -48,7 +48,7 @@ export const MaxUserIdChars = 100
  * @example user_id.safeParse('auth0|5f7c8ec7').success      // true
  * @example user_id.safeParse('a/b').success                 // false: percent-encode it, 'a%2Fb'
  */
-export const user_id = str().min(1, { error: Phrases.UserIdMissing, abort: true }).max(MaxUserIdChars, Phrases.userIdTooLong(MaxUserIdChars)).regex(Patterns.user_id, Phrases.UserIdChars)
+export const user_id = str().min(1, { error: Phrases.UserIdMissing, abort: true }).max(MaxUserIdChars).regex(Patterns.user_id, Phrases.UserIdChars)
 // --
 
 // == [Instants]: epochMillis, EpochMillis
@@ -59,7 +59,7 @@ export const user_id = str().min(1, { error: Phrases.UserIdMissing, abort: true 
  *
  * @example epochMillis.safeParse(1_792_022_400).success            // false: seconds, not ms
  */
-export const epochMillis = num().gte(FarPast, Phrases.InstantTooEarly).lte(FarFuture, Phrases.InstantTooLate).int(Phrases.InstantNotWhole)
+export const epochMillis = num().gte(FarPast, Phrases.InstantTooEarly).lte(FarFuture, Phrases.InstantTooLate).int()
 
 /** An instant, whole UTC epoch milliseconds, as `Date.now()` gives and {@link epochMillis} checks: a plain number, since a host writes one by hand. */
 export type EpochMillis = Z.infer<typeof epochMillis>

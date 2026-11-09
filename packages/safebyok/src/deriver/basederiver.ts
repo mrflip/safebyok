@@ -1,6 +1,5 @@
 import type { PassphraseSaltBytes } from '../helpers/consts'
-import { reservedLabel, suppliedSpecChanged } from '../refusals/throwers'
-import { type KeyDeriverSpec, ReservedLabelPrefix, SuppliedSpecs, TestLabelPrefix, keyDeriverSpec } from './shapes'
+import { type KeyDeriverSpec, TestLabelPrefix, keyDeriverSpec } from './shapes'
 
 // == [KeyDeriver]: KeyDeriver, Argon2idKeyDeriver
 
@@ -22,26 +21,10 @@ export interface KeyDeriver {
 export type Argon2idKeyDeriver = KeyDeriverSpec & KeyDeriver
 // --
 
-// == [Checks]: parseKeyDeriverSpec, checkSuppliedSpecKept, isTestDeriver
+// == [Checks]: parseKeyDeriverSpec, isTestDeriver
 
-/** Parse `candidate` into a {@link KeyDeriverSpec}, and refuse a spec that misuses a supplied label. */
-export const parseKeyDeriverSpec = (candidate: unknown): KeyDeriverSpec => {
-  const spec = keyDeriverSpec.parse(candidate)
-  checkSuppliedSpecKept(spec)
-  return spec
-}
-
-/** Refuse a spec that changes a supplied spec's settings, or claims a label under {@link ReservedLabelPrefix}. */
-export const checkSuppliedSpecKept = (candidate: KeyDeriverSpec): void => {
-  const supplied = SuppliedSpecs.find((spec) => spec.key_deriver_label === candidate.key_deriver_label)
-  if (supplied === undefined) {
-    if (candidate.key_deriver_label.toLowerCase().startsWith(ReservedLabelPrefix)) { throw reservedLabel(ReservedLabelPrefix) }
-    return
-  }
-  const carried: Readonly<Record<string, unknown>> = candidate
-  const kept = Object.entries(supplied).every(([fieldname, val]) => carried[fieldname] === val)
-  if (! kept) { throw suppliedSpecChanged(supplied.key_deriver_label) }
-}
+/** Parse `candidate` into a {@link KeyDeriverSpec}, refusing a spec that misuses a supplied label. */
+export const parseKeyDeriverSpec = (candidate: unknown): KeyDeriverSpec => keyDeriverSpec.parse(candidate)
 
 /** True when `keyDeriver`'s label starts with {@link TestLabelPrefix}. */
 export const isTestDeriver = (keyDeriver: Pick<KeyDeriver, 'key_deriver_label'>): boolean => keyDeriver.key_deriver_label.startsWith(TestLabelPrefix)

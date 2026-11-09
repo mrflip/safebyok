@@ -254,8 +254,8 @@ export type BoxHalves = { whisper: Whisper, sidecar: Sidecar }
 /** True where a patch names a half of its box. */
 const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown }): boolean => (whisper !== undefined) || (sidecar !== undefined)
 
-/** The checks of what a caller hands `create` (`boxDna`) and `put` (`boxPatch`). */
-export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
+/** The checks of what a caller hands `create` (`boxDna`) and `put` (`boxPatch`, and `boxPatchNew` where `ifPresent` is 'fail'). */
+export const { boxDna, boxPatch, boxPatchNew } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
   const factory = SX.boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
     applabel, user_id, vaultlabel, boxlabel,
@@ -264,9 +264,12 @@ export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applab
     whisper_codec:          lit('json_v1').default('json_v1'),
     whisper_schema_version: lit(1).default(1),
   }).strict().transform((dna) => omit(dna, factory.keyof().options))
-  const boxPatch = SX.boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
-    .transform(({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }))
-  return { boxDna, boxPatch }
+  const patchFields = SX.boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
+  const pickHalves  = ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }: Z.output<typeof patchFields>) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel })
+  const boxPatch    = patchFields.transform(pickHalves)
+  // A whole record's whisper_ciphered is recycled, so a put told to only create refuses one, before pickHalves drops it.
+  const boxPatchNew = patchFields.refine((patch) => ! ('whisper_ciphered' in patch), Phrases.RecordForNewBox).transform(pickHalves)
+  return { boxDna, boxPatch, boxPatchNew }
 })
 
 /** The check of what `box.putExposed` accepts: a sidecar, if any, and never a whisper. */

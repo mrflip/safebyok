@@ -12,7 +12,7 @@ import * as VX from '../shapes/shapes-vaultish'
 import { type BoxExposedPatch, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../shapes/shapes-storage'
 import { stableJsonify } from '../helpers/stable-jsonify'
-import { absentBoxError, notExposedError, recordForNewBox, undecodedWhisper } from '../refusals/throwers'
+import { absentBoxError, notExposedError, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 
@@ -232,8 +232,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** The parsed `patch`, refused unless a put of it under `opts` may go ahead now. */
   demandPuttable(patch: BoxPatch, { ifPresent }: BoxPutOpts = {}): BoxPatchGiven {
-    const given = VX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope, advice: Phrases.BoxPatchAdvice })
-    if ((ifPresent === 'fail') && ('whisper_ciphered' in patch)) { throw recordForNewBox() }
+    const patchCheck = (ifPresent === 'fail') ? VX.boxPatchNew : VX.boxPatch
+    const given = patchCheck.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
     this.demandEnabled()
     this.world.demandUnlocked()
     this.demandWhole()

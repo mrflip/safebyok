@@ -69,7 +69,7 @@ export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases
 export const bankDisabled = (): VaultError => new VaultError('disabled', Phrases.BankLetGo)
 // --
 
-// == [Vault Throwers]: lockedError, unlockFirst, stampOfOtherVault
+// == [Vault Throwers]: lockedError, unlockFirst
 
 /** A `vault_locked` refusal: the vault is locked, and `ensureUnlocked()` will ask the user. */
 export const lockedError      = () => new VaultError('vault_locked', Phrases.VaultLocked)
@@ -77,8 +77,6 @@ export const lockedError      = () => new VaultError('vault_locked', Phrases.Vau
 /** A `vault_locked` refusal: the vault has no lease for a seal or unseal to use. */
 export const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
 
-/** An `unexpected_error` refusal: a stamp names another vault, or another life of this one. */
-export const stampOfOtherVault = (): VaultError => new VaultError('unexpected_error', Phrases.StampOfOtherVault)
 // --
 
 // == [Vault Listing Throwers]: delOfOtherLife, vaultStoredDamaged
@@ -162,7 +160,7 @@ export const unopenedWhisper = (): VaultError => new VaultError('damaged_box', P
 export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --
 
-// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gatingDismissed, gatingConcluded, attemptInFlight, proofMissing
+// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gatingDismissed, gatingConcluded, attemptInFlight
 
 /** An `already_asking` refusal: a prompt is already open on this bank. */
 export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
@@ -185,8 +183,6 @@ export const gatingConcluded = (): VaultError => new VaultError('gating_conclude
 /** An `attempt_in_flight` refusal: another attempt on this prompt is still running. */
 export const attemptInFlight = (): VaultError => new VaultError('attempt_in_flight', Phrases.AttemptInFlight)
 
-/** A `bad_option` refusal: an attempt handed in neither a passphrase nor a passkey's answer. */
-export const proofMissing = (): VaultError => new VaultError('bad_option', Phrases.ProofMissing)
 // --
 
 // == [Gate Throwers]: passkeyHeldAlready
@@ -195,7 +191,7 @@ export const proofMissing = (): VaultError => new VaultError('bad_option', Phras
 export const passkeyHeldAlready = (): VaultError => new VaultError('bad_option', Phrases.PasskeyHeldAlready)
 // --
 
-// == [Proving Throwers]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, keyDeriverLoadFailed, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver, undecodedSalt, provingOfOtherVault, leaseOfOtherVault
+// == [Proving Throwers]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, keyDeriverLoadFailed, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
 
 /** A `bad_option` refusal: the key deriver handed back something other than fresh key bytes of the right length. */
 export const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeyBytes))
@@ -233,35 +229,12 @@ export const otherPrfSalt = (): VaultError => new VaultError('wrong_passkey', Ph
 /** A `newer_format` refusal: the vault was made with a key deriver this package does not carry. */
 export const unknownKeyDeriver = (): VaultError => new VaultError('newer_format', Phrases.UnknownKeyDeriver)
 
-/** A `bad_record` refusal: the stored passphrase salt is not valid base64url text. */
-export const undecodedSalt = (): VaultError => new VaultError('bad_record', Phrases.UndecodedSalt)
-
-/** An `unexpected_error` refusal: the source proving belongs to another vault. */
-export const provingOfOtherVault = (): VaultError => new VaultError('unexpected_error', Phrases.ProvingOfOtherVault)
-
-/** An `unexpected_error` refusal: a proving was asked for a lease on another vault. */
-export const leaseOfOtherVault = (): VaultError => new VaultError('unexpected_error', Phrases.LeaseOfOtherVault)
 // --
 
-// == [Helper Throwers]: unboundCipherCtx, strengthCheckerMisanswered, strengthCheckerLoadFailed
-
-/** An `unexpected_error` refusal: a cipher ctx is missing a stamp, or a part or field of a stamp. */
-export const unboundCipherCtx = (): VaultError => new VaultError('unexpected_error', Phrases.UnboundCipherCtx)
-
-/** A `bad_option` refusal: the host's strength checker answered something other than a verdict. */
-export const strengthCheckerMisanswered = (): VaultError => new VaultError('bad_option', Phrases.StrengthCheckerMisanswered)
+// == [Helper Throwers]: strengthCheckerLoadFailed
 
 /** An `unexpected_error` refusal: the strength checker's `load()` failed, with its error as `cause`. */
 export const strengthCheckerLoadFailed = (cause: unknown): VaultError => new VaultError('unexpected_error', Phrases.StrengthCheckerLoadFailed, { cause })
-// --
-
-// == [Deriver Throwers]: reservedLabel, suppliedSpecChanged
-
-/** A `bad_option` refusal: a key deriver's label starts with a reserved prefix. */
-export const reservedLabel = (reservedPrefix: string): VaultError => new VaultError('bad_option', Phrases.reservedDeriverLabel(reservedPrefix))
-
-/** A `bad_option` refusal: a spec reuses a supplied label with different settings. */
-export const suppliedSpecChanged = (label: string): VaultError => new VaultError('bad_option', Phrases.suppliedSpecChanged(label))
 // --
 
 // == [VaultDB Throwers]: vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, storageFull, seqNotNext

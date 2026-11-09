@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import * as Phrases from '../../src/helpers/phrases'
-import { ScopepathDelimiter } from '../../src/helpers/consts'
 
 describe("Phrases", () => {
   it("counts one unknown field in the singular, several in the plural, naming none, and lists the fields taken", () => {
@@ -12,17 +11,5 @@ describe("Phrases", () => {
   it("counts one more failure in the singular, several in the plural", () => {
     expect(Phrases.moreFailures(1)).to.eq("and 1 more failure")
     expect(Phrases.moreFailures(3)).to.eq("and 3 more failures")
-  })
-
-  it("names each limit it is given", () => {
-    expect(Phrases.labelTooLong(40)).to.include('40')
-    expect(Phrases.userIdTooLong(100)).to.include('100')
-    expect(Phrases.vaultFullOfBoxes(50)).to.include('50')
-  })
-
-  it("names the scopepath delimiter where a scopepath's shape is said", () => {
-    for (const said of [Phrases.BankScopepathShape, Phrases.VaultScopepathShape, Phrases.LeaseScopepathShape, Phrases.BoxScopepathShape]) {
-      expect(said).to.include(ScopepathDelimiter)
-    }
   })
 })

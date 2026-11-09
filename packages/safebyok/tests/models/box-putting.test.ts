@@ -4,7 +4,6 @@ import { ENCRYPTED, VEILED } from '../../src/helpers/consts'
 import { describe, expect, it } from 'vitest'
 import { type BoxHalves, type Fetched } from '../../src/shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
-import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { FakeBoxKeyWrapped, FakeWhisperCiphered, type TestableBox, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0, type TestableBoxListing } from '../test-helpers/models-world'
 
@@ -189,10 +188,10 @@ describe("box.put(patch): a patch naming a half", () => {
     })
   }
 
-  it("tells a patch that fails its check how an update of a box is written", async () => {
+  it("names the failing field of a patch that fails its check", async () => {
     const box = await builtOf(fullBoxRecord())
-    const err = await TH.expectRefusal(box.put({ whisper: null } as never))
-    expect(err.message).to.contain(Phrases.BoxPatchAdvice)
+    const err = await TH.expectRefusal(box.put({ whisper: null } as never), 'bad_option')
+    expect(err.message).to.contain('whisper')
   })
 
   it("refuses before its guards: a patch naming neither refuses while the vault is locked, too", async () => {

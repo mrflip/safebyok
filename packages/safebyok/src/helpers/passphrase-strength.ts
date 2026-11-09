@@ -2,7 +2,7 @@ import { brandGuarded } from './consts'
 import { isVaultError } from '../refusals/errors'
 import { decorate } from './helpers'
 import * as Phrases from './phrases'
-import { strengthCheckerLoadFailed, strengthCheckerMisanswered } from '../refusals/throwers'
+import { strengthCheckerLoadFailed } from '../refusals/throwers'
 import * as HostErrorSanitizer from '../refusals/host-error-sanitizer'
 import * as CX from '../shapes/shapes-core'
 import type { VaultScope } from '../shapes/shapes-core'
@@ -75,17 +75,15 @@ export const guardStrengthChecker = (hostChecker: StrengthChecker): GuardedStren
     const told = CX.vaultScope.parse(scope)
     const typed = GX.passphraseCleartext.parse(passphrase)
     if (! typed.trim()) { return BlankVerdict }
-    let checked: ReturnType<typeof GX.passphraseVerdict.safeParse>
+    let answered: unknown
     try {
-      // Parsed inside the guard, to be certain no cleartext passphrase leakage
-      checked = GX.passphraseVerdict.safeParse(await host(typed, told))
+      // The spread reads each field here, inside the guard, so a getter or proxy of the host's that throws is replaced, and the parse below reads plain data.
+      answered = { ...await host(typed, told) }
     } catch (err) {
       throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', Phrases.StrengthCheckerThrew)
     }
-    if (! checked.success) {
-      throw strengthCheckerMisanswered()
-    }
-    return checked.data.strong ? StrongVerdict : checked.data
+    const verdict = GX.passphraseVerdict.parse(answered, { advice: Phrases.StrengthCheckerMisanswered })
+    return verdict.strong ? StrongVerdict : verdict
   }
   const load = async (): Promise<void> => {
     try {

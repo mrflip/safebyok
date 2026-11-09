@@ -1,6 +1,6 @@
 /** The checks and types of the gate: wayins, provings, leases and gatings, imported as `GX`. */
 
-import { string as zodString } from 'zod'
+import { NEVER } from 'zod'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
 import type { VaultError } from '../refusals/errors'
@@ -75,7 +75,7 @@ export type GateProps = Z.infer<typeof gateProps>
 /** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` quotes none of it.
  * What a blank one means is the gating's to say.
  */
-export const passphraseCleartext = Checker(() => zodString({ error: Phrases.PassphraseNotText }).brand<'PassphraseCleartext'>(), 'bad_option')
+export const passphraseCleartext = Checker(({ str }) => str.brand<'PassphraseCleartext'>(), 'bad_option')
 
 /** A passphrase's cleartext once {@link passphraseCleartext} has parsed it: the only text the key deriver is handed. */
 export type PassphraseCleartext = Z.infer<typeof passphraseCleartext>
@@ -111,7 +111,7 @@ export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
  * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })  // throws
  */
 export const freshPasskeyAnswer = Checker(() => (
-  passkeyAnswer.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltNotFresh(PasskeySaltBytes), path: ['prf_salt_b64'] })
+  passkeyAnswer.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltShape(PasskeySaltBytes), path: ['prf_salt_b64'] })
 ), 'bad_option')
 // --
 
@@ -294,7 +294,12 @@ export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplac
   gatingkind:              oneof(EX.gatingkindVals),
   vaultBuildClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
   vaultUnlockClears:       obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
-    .refine(({ passphraseClear, passkeyClear = null }) => passphraseClear !== undefined || passkeyClear !== null, Phrases.ProofMissing),
+    .transform(({ passphraseClear, passkeyClear }, ctx) => {
+      if (passphraseClear !== undefined) { return { passphraseClear } }
+      if (passkeyClear) { return { passkeyClear } }
+      ctx.addIssue({ code: 'custom', message: Phrases.ProofMissing })
+      return NEVER
+    }),
   passphraseReplaceClears: obj({ antePassphraseClear: passphraseCleartext, nextPassphraseClear: passphraseCleartext }).strict(),
   passkeyAddClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer }).strict(),
   passkeyRevokeClears:     obj({ passphraseClear: passphraseCleartext }).strict(),

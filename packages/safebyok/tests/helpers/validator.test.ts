@@ -279,11 +279,11 @@ describe("Checkers", () => {
 describe("Checker", () => {
   // Checker @example 1
   it("checks a value whole, refusing with a sentence of its own as a bad record unless given a kind", () => {
-    const prfSalt = Checker(({ str }) => str.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltNotFresh(PasskeySaltBytes)))
+    const prfSalt = Checker(({ str }) => str.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltShape(PasskeySaltBytes)))
     const salt = toB64(new Uint8Array(PasskeySaltBytes).fill(7))
     expect(prfSalt.parse(salt)).to.eq(salt)
     const err = TH.expectSyncRefusal(() => prfSalt.parse(toB64(new Uint8Array(PasskeySaltBytes - 1))), 'bad_record')
-    expect(err.message).to.eq(Phrases.prfSaltNotFresh(PasskeySaltBytes))
+    expect(err.message).to.eq(Phrases.prfSaltShape(PasskeySaltBytes))
   })
 
   // Checker @example 2
