@@ -174,7 +174,7 @@ export type ModelsWorld = {
   dispose(): void
 
   /** Lay `record` in the vaultDB as the row under its boxlabel, unchecked. */
-  seedStore(record: Fetched<BoxRecord, BoxSparse>): void
+  seedPut(record: Fetched<BoxRecord, BoxSparse>): void
 
   /** Script the next `tryGetBox` calls to answer with `answers`, one each. */
   willGet(...answers: readonly Scripted<{ scope: Boxscope }>[]): void
@@ -284,7 +284,7 @@ const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, wo
  * @example
  *   const mw = makeModelsWorld()
  *   afterEach(() => { mw.dispose() })
- *   mw.seedStore(mw.fullBoxRecord({ revision_seq: 2 }))
+ *   mw.seedPut(mw.fullBoxRecord({ revision_seq: 2 }))
  *   const listing = boxListingOf(mw)
  *   const box = await listing.fetch(mw.boxscope('anthropic_api_key'))
  *   expect(mw.callsOf('get')).to.have.lengthOf(1)
@@ -391,7 +391,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     },
     dispose,
 
-    seedStore: (record) => { stored.set(record.boxlabel, record) },
+    seedPut: (record) => { stored.set(record.boxlabel, record) },
 
     willGet:          (...answers) => { vaultDB.scripts.get.push(...answers) },
     willPut:          (...answers) => { vaultDB.scripts.put.push(...answers) },
@@ -422,7 +422,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
  *
  * @example
  *   const held = useModelsWorld()
- *   it('fetches', async () => { held.mw.seedStore(fullBoxRecord()); await boxListingOf(held.mw).fetch(held.mw.boxscope('anthropic_api_key')) })
+ *   it('fetches', async () => { held.mw.seedPut(fullBoxRecord()); await boxListingOf(held.mw).fetch(held.mw.boxscope('anthropic_api_key')) })
  */
 export const useModelsWorld = (opts: ModelsWorldOpts = {}): { readonly mw: ModelsWorld } => {
   let current: ModelsWorld | null = null

@@ -6,13 +6,13 @@ afterEach(() => { localStorage.clear() })
 
 describe("prefixedStorage", () => {
   it("puts, gets and deletes a text in localStorage under its prefix", () => {
-    const store = prefixedStorage('demo:')
-    expect(store.get('session')).to.be.null
-    store.put('session', '{"user_id":"u1"}')
+    const storage = prefixedStorage('demo:')
+    expect(storage.get('session')).to.be.null
+    storage.put('session', '{"user_id":"u1"}')
     expect(localStorage.getItem('demo:session')).to.eq('{"user_id":"u1"}')
-    expect(store.get('session')).to.eq('{"user_id":"u1"}')
-    store.del('session')
-    expect(store.get('session')).to.be.null
+    expect(storage.get('session')).to.eq('{"user_id":"u1"}')
+    storage.del('session')
+    expect(storage.get('session')).to.be.null
   })
 
   it("keeps two prefixes apart", () => {

@@ -64,10 +64,10 @@ describe("BoxListing: an absent box", () => {
 
   describe("listing.fetch(scope) of a stored tombstone", () => {
     for (const [form, tombstone, am] of [['deleted', gone, 'x']] as const) {
-      const storeTombstone = () => { held.mw.seedStore(tombstone()) }
+      const seedTombstone = () => { held.mw.seedPut(tombstone()) }
 
       it(`refuses 'absent_box' for a ${form} box, built and held as its tombstone`, async () => {
-        storeTombstone()
+        seedTombstone()
         const listing = boxListingOf(held.mw)
         await TH.expectRefusal(listing.fetch(scope()), 'absent_box')
         const box = listing.at(scope())
@@ -78,7 +78,7 @@ describe("BoxListing: an absent box", () => {
       })
 
       it(`resolves null for a ${form} box under 'nil', held all the same`, async () => {
-        storeTombstone()
+        seedTombstone()
         const listing = boxListingOf(held.mw)
         expect(await listing.fetch(scope(), { ifAbsent: 'nil' })).to.be.null
         expect(listing.at(scope())?.am).to.eq(am)
@@ -87,7 +87,7 @@ describe("BoxListing: an absent box", () => {
       it(`takes a ${form} box held alive away, then refuses 'absent_box'`, async () => {
         const listing = boxListingOf(held.mw)
         const box = await listing.build(fullBoxRecord())
-        storeTombstone()
+        seedTombstone()
         await TH.expectRefusal(listing.fetch(scope()), 'absent_box')
         expect(listing.at(scope())).to.eq(box)
         expect(box.am).to.eq(am)
@@ -96,7 +96,7 @@ describe("BoxListing: an absent box", () => {
     }
 
     it("resolves the box for a stored box, whichever the ifAbsent", async () => {
-      held.mw.seedStore(fullBoxRecord())
+      held.mw.seedPut(fullBoxRecord())
       const listing = boxListingOf(held.mw)
       const box = await listing.fetch(scope())
       expect(box?.isFull).to.be.true
@@ -112,7 +112,7 @@ describe("BoxListing: an absent box", () => {
     it("does not judge a put's or a del's answer: a deleted box comes back held", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(fullBoxRecord())
-      held.mw.seedStore(fullBoxRecord())
+      held.mw.seedPut(fullBoxRecord())
       expect(await listing.del(box)).to.eq(box)
     })
   })
@@ -135,7 +135,7 @@ describe("BoxListing: an absent box", () => {
     it("tryHydrate resolves a good outcome for a box that storage has lost", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(fullBoxRecord())
-      held.mw.seedStore(gone())
+      held.mw.seedPut(gone())
       const outcome = await box.tryHydrate({ maxMillisSinceRefresh: 0 })
       expect(outcome.ok).to.be.true
       expect(box.isPresent).to.be.false
@@ -247,7 +247,7 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
     expect(listing.getSnapshot()[0]).to.eq(box.getSnapshot())
   })
 
-  it("shows a box created from a dna as the record it stored", async () => {
+  it("shows a box created from a dna as the record it put", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.create(boxDnaOf(scope()))
     const [shown] = listing.snapshot
@@ -264,7 +264,7 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
   it("follows the box through a put: the listing shows the sidecar `box.sidecar` now gives", async () => {
     const listing = boxListingOf(held.mw)
     const record = fullBoxRecord({ sidecar: { uncle: 'Bob' } })
-    held.mw.seedStore(record)
+    held.mw.seedPut(record)
     const box = await listing.build(record)
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { uncle: 'Robert' } })
     expect(box.sidecar).to.deep.equal({ uncle: 'Robert' })

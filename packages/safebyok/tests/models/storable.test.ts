@@ -11,14 +11,14 @@ const held = useModelsWorld()
 
 /** A box holding `record`, by default the full box record `anthropic_api_key` at revision 1, with the same in storage. */
 const builtBoxOf = (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Promise<TestableBox> => {
-  held.mw.seedStore(record)
+  held.mw.seedPut(record)
   return boxListingOf(held.mw).build(record)
 }
 
 /** The own props that follow the record in hand, as the box holds them now. */
 const followingPropsOf = (box: TestableBox) => ({ vault_tok: box.vault_tok, revision_tok: box.revision_tok, revision_seq: box.revision_seq, written_at: box.written_at })
 
-/** Script the store's next `del` to hold until `release`, answering `tombstone`; `entered` resolves once the store has the call. The fake timers stay where they are: `vi.waitFor` would move them. */
+/** Script the VaultDB's next `del` to hold until `release`, answering `tombstone`; `entered` resolves once the VaultDB has the call. The fake timers stay where they are: `vi.waitFor` would move them. */
 const holdNextDel = (box: TestableBox, tombstone: ReturnType<typeof tombstoneBoxRecord>): { entered: Promise<void>, release: () => void } => {
   let release: (() => void) | undefined
   const gate = new Promise<BoxAnswer>((resolve) => { release = () => { resolve(held.mw.answerOf(box.scope, tombstone)) } })
@@ -128,7 +128,7 @@ describe("Storable own props", () => {
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-a3', revision_seq: 3, written_at: T0 + 30 })
     })
 
-    it("follow the record a put lands, which is one revision on, written now", async () => {
+    it("follow the record a put writes, which is one revision on, written now", async () => {
       const box = await builtBoxOf()
       held.mw.setNow(T0 + 500)
       await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } })
@@ -139,7 +139,7 @@ describe("Storable own props", () => {
       expect(followingPropsOf(box)).to.include({ revision_tok: box._cheat_central.revision_tok, revision_seq: 2 })
     })
 
-    it("follow the tombstone a del lands, once the store answers", async () => {
+    it("follow the tombstone a del writes, once the VaultDB answers", async () => {
       const box = await builtBoxOf()
       held.mw.setNow(T0 + 500)
       const { entered, release } = holdNextDel(box, held.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2', written_at: T0 + 900 }))

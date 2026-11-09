@@ -22,7 +22,7 @@ const vaultDBDuck = () => Object.fromEntries(['tryGetVault', 'tryPutVault', 'try
 
 describe("BoxListing", () => {
   describe("new BoxListing(world, opts)", () => {
-    it("makes a listing of a world, a store and a horizon, calling none of them", () => {
+    it("makes a listing of a world, a vaultDB and a horizon, calling none of them", () => {
       const listing = new BoxListing(held.mw.world, good())
       expect(listing).to.be.instanceOf(BoxListing)
       expect(listing.things).to.deep.equal([])
@@ -77,7 +77,7 @@ describe("BoxListing", () => {
       expect(listing.snapshot).to.have.lengthOf(1)
     })
 
-    it("refuses a dna, which is no record, holding and storing nothing", async () => {
+    it("refuses a dna, which is no record, holding and putting nothing", async () => {
       const listing = boxListingOf(held.mw)
       await TH.expectRefusal(listing.build(dna() as never))
       expect(listing.things).to.deep.equal([])
@@ -98,7 +98,7 @@ describe("boxListing.get(scoped, opts)", () => {
   it("hydrates a box held, answering that instance", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(sparseBoxRecord())
-    held.mw.seedStore(fullBoxRecord())
+    held.mw.seedPut(fullBoxRecord())
     held.mw.clearCalls()
     await expect(listing.get(box.scope)).resolves.to.eq(box)
     expect(box.isFull).to.be.true
@@ -108,7 +108,7 @@ describe("boxListing.get(scoped, opts)", () => {
   it("asks nothing of a full box held within its horizon, and asks again given a horizon of 0", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(fullBoxRecord())
-    held.mw.seedStore(fullBoxRecord())
+    held.mw.seedPut(fullBoxRecord())
     held.mw.clearCalls()
     await listing.get(box.scope)
     expect(held.mw.callsOf('get')).to.deep.equal([])
@@ -118,7 +118,7 @@ describe("boxListing.get(scoped, opts)", () => {
 
   it("fetches a box not held, and holds what it finds", async () => {
     const listing = boxListingOf(held.mw)
-    held.mw.seedStore(fullBoxRecord())
+    held.mw.seedPut(fullBoxRecord())
     const box = await listing.get(held.mw.boxscope(Label))
     expect(box?.isFull).to.be.true
     expect(listing.at(held.mw.boxscope(Label))).to.eq(box)
@@ -133,14 +133,14 @@ describe("boxListing.get(scoped, opts)", () => {
   it("refuses a box whose tombstone it finds as absent, or answers null where asked for nil", async () => {
     const listing = boxListingOf(held.mw)
     const box = await listing.build(tombstoneBoxRecord())
-    held.mw.seedStore(tombstoneBoxRecord())
+    held.mw.seedPut(tombstoneBoxRecord())
     await TH.expectRefusal(listing.get(box.scope), 'absent_box')
     expect(await listing.get(box.scope, { ifAbsent: 'nil' })).to.be.null
   })
 
   it("answers the box stored while the vault is locked", async () => {
     const listing = boxListingOf(held.mw)
-    held.mw.seedStore(fullBoxRecord())
+    held.mw.seedPut(fullBoxRecord())
     held.mw.setLocked(true)
     const box = await listing.get(held.mw.boxscope(Label))
     expect(box?.boxlabel).to.eq(Label)

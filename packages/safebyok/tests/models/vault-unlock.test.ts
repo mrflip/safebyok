@@ -239,7 +239,7 @@ describe("The lease this device has cached: taken up in ensureUnlocked alone", (
     const theirs = await other.listing.build(other.demandStored())
     await unlockTyping(theirs, byPasskey('laptop'))
     await revokeTyping(vault, Passphrase)
-    other.storeBehindOurBack(demandStored())
+    other.putBehindOurBack(demandStored())
     const again = await other.anotherSession().build(other.demandStored())
     expect(other.deviceDB.cachedNow()).not.to.be.null
     await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')

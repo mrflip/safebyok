@@ -1,4 +1,4 @@
-// fake-indexeddb installs IndexedDB's globals before the device store loads, for the banks browserOpts makes.
+// fake-indexeddb installs IndexedDB's globals before the DeviceDB loads, for the banks browserOpts makes.
 import 'fake-indexeddb/auto'
 import { argon2idAsync } from '@noble/hashes/argon2.js'
 import { describe, expect, it } from 'vitest'
@@ -88,7 +88,7 @@ describe("safebyok/browser", () => {
 })
 
 describe("browserOpts", () => {
-  it("answers a frozen bag of the Argon2id deriver, a device store in IndexedDB and the zxcvbn checker", () => {
+  it("answers a frozen bag of the Argon2id deriver, a DeviceDB in IndexedDB and the zxcvbn checker", () => {
     const bag = browserOpts({ dbName: freshDbName() })
     expect(Object.isFrozen(bag)).to.be.true
     expect(bag).to.have.all.keys('keyDeriver', 'deviceDB', 'strengthChecker')
@@ -104,7 +104,7 @@ describe("browserOpts", () => {
     expect(browserOpts()).to.eq(browserOpts({ dbName: 'safebyok' }))
   })
 
-  it("answers another device store for another dbName, the deriver and checker shared", () => {
+  it("answers another DeviceDB for another dbName, the deriver and checker shared", () => {
     const [one, other] = [browserOpts({ dbName: freshDbName() }), browserOpts({ dbName: freshDbName() })]
     expect(one.deviceDB).to.not.eq(other.deviceDB)
     expect(one.keyDeriver).to.eq(other.keyDeriver)

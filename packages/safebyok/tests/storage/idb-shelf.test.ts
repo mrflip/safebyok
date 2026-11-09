@@ -47,7 +47,7 @@ describe("versionedShelfOf(spec)", () => {
     }
   })
 
-  it("lists the browser's databases for its wipe once for each database, however many stores use it", async () => {
+  it("lists the browser's databases for its wipe once for each database, however many shelves use it", async () => {
     const spec = specOf()
     const databases = vi.spyOn(indexedDB, 'databases')
     try {

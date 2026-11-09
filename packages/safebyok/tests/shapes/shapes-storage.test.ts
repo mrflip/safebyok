@@ -14,7 +14,7 @@ describe("SX.sentinelBoxOf and the void row", () => {
   })
 })
 
-describe("the row checks a store's conditional writes run", () => {
+describe("the row checks a VaultDB's conditional writes run", () => {
   const box = boxAt()
   const vault = vaultAt()
   const putOver = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'repl' } as const

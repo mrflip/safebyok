@@ -1,4 +1,4 @@
-/** The battery every DeviceDB runs: one call registers the cases a store must pass, over a fresh store for each. */
+/** The battery every DeviceDB runs: one call registers the cases a DeviceDB must pass, over a fresh DeviceDB for each. */
 
 import { describe, expect, it } from 'vitest'
 import { makeLeaseKey } from '../../src/helpers/crypto'
@@ -11,32 +11,32 @@ import type { DeviceDB } from '../../src/storage/device-db'
 import { expectBad, expectGood, expectRefusal } from './refusals'
 import { bankScope, vaultScope, vaultScopeOf } from './storage-world'
 
-// == [The hooks a store hands the battery]: DeviceDBRowCheats, DeviceDBBatteryOpts
+// == [The hooks a DeviceDB hands the battery]: DeviceDBRowCheats, DeviceDBBatteryOpts
 
-/** A store's raw lease and bank rows, past its verbs: the test backdoor the battery plants a row by, damaged or not, and reads the rows back by. */
+/** A DeviceDB's raw lease and bank rows, past its verbs: the test backdoor the battery plants a row by, damaged or not, and reads the rows back by. */
 export type DeviceDBRowCheats = {
-  /** Stores `row` as the lease row at `scope`, unchecked. */
+  /** Writes `row` as the lease row at `scope`, unchecked. */
   plantLeaseRow: (scope: VaultScope, row: unknown) => Awaitable<void>
   /** Every lease row as stored, in any order. */
   leaseRowsOf:   () => Awaitable<unknown[]>
-  /** Stores `row` as the bank row at `scope`, unchecked. */
+  /** Writes `row` as the bank row at `scope`, unchecked. */
   plantBankRow:  (scope: BankScope, row: unknown) => Awaitable<void>
   /** Every bank row as stored, in any order. */
   bankRowsOf:    () => Awaitable<unknown[]>
 }
 
-/** What a store hands {@link describeDeviceDBBattery}: how to make one, and the backdoors to its rows and its storage. */
+/** What a DeviceDB hands {@link describeDeviceDBBattery}: how to make one, and the backdoors to its rows and its device database. */
 export type DeviceDBBatteryOpts<DBT extends DeviceDB = DeviceDB> = {
-  /** A fresh, empty store. */
+  /** A fresh, empty DeviceDB. */
   makeDeviceDB:         () => Awaitable<DBT>
-  /** The backdoor to a store's raw rows; without it, the cases of a planted or counted row are skipped. */
+  /** The backdoor to a DeviceDB's raw rows; without it, the cases of a planted or counted row are skipped. */
   _cheat_rowsOf?:       (deviceDB: DBT) => DeviceDBRowCheats
-  /** Makes the store's next call to its storage fail as its storage would; without it, that case is skipped. */
+  /** Makes the DeviceDB's next call to its device database fail as that database would; without it, that case is skipped. */
   _cheat_failNextCall?: (deviceDB: DBT) => Awaitable<void>
 }
 // --
 
-/** The check of what a store hands the battery: each hook a function, judged by its interface alone. */
+/** The check of what a DeviceDB hands the battery: each hook a function, judged by its interface alone. */
 const batteryOpts = objCheck(({ fn }) => ({
   makeDeviceDB:        fn<DeviceDBBatteryOpts['makeDeviceDB']>(),
   _cheat_rowsOf:       fn<NonNullable<DeviceDBBatteryOpts['_cheat_rowsOf']>>().optional(),
@@ -52,7 +52,7 @@ const asked = { ...vaultScope, vault_tok: 'tok_one' }
 /** A lease row of the vault `asked` names, its leaseKey a real handle, its other fields opaque. */
 const leaseRowOf = async (over: Partial<LeaseRow> = {}): Promise<LeaseRow> => ({ ...asked, proved_at: T0, lease_key: await makeLeaseKey(), wrapped: 'opaque', ...over })
 
-/** The scopepath a store files the lease row of `scope` under. */
+/** The scopepath a DeviceDB files the lease row of `scope` under. */
 const scopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath => [applabel, user_id, vaultlabel]
 
 /** A raw row, as the bag a case reads a field of. */
@@ -61,10 +61,10 @@ const bagOf = (row: unknown): Record<string, unknown> => row as Record<string, u
 
 // == [The battery]: describeDeviceDBBattery
 
-/** Stands in for a hook the store did not give, in a case that is skipped without it. */
-const notGiven = (hookname: string) => (): never => { throw new TypeError(`The store gave the battery no ${hookname}.`) }
+/** Stands in for a hook the DeviceDB did not give, in a case that is skipped without it. */
+const notGiven = (hookname: string) => (): never => { throw new TypeError(`The DeviceDB gave the battery no ${hookname}.`) }
 
-// The opts are checked before anything registers, so a store missing a hook fails here, not inside each case.
+// The opts are checked before anything registers, so a DeviceDB missing a hook fails here, not inside each case.
 /** Registers the cases every DeviceDB must pass, under `label`. */
 export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opts: DeviceDBBatteryOpts<DBT>): void => {
   batteryOpts.parse(opts, { where: `describeDeviceDBBattery("${label}")` })
@@ -152,7 +152,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.listLeases()).to.deep.equal([])
       })
 
-      it.skipIf(noRows)("leaves no row behind in the store", async () => {
+      it.skipIf(noRows)("leaves no row behind in the DeviceDB", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         await deviceDB.forget(asked)
@@ -173,7 +173,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(forgotten.ok).to.be.true
       })
 
-      it("lands after a stow called before it and not awaited", async () => {
+      it("is written after a stow called before it and not awaited", async () => {
         const deviceDB = await fresh()
         const row = await leaseRowOf()
         const stowing = deviceDB.stow(row)
@@ -225,7 +225,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.listLeases()).to.deep.equal([])
       })
 
-      it("answers an empty list for an empty store", async () => {
+      it("answers an empty list for an empty DeviceDB", async () => {
         const deviceDB = await fresh()
         expect(await expectGood(deviceDB.tryListLeases())).to.deep.equal([])
       })
@@ -263,7 +263,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(again?.scopepath).to.deep.equal(scopepathOf(vaultScope))
       })
 
-      it("answers an empty list for an empty store", async () => {
+      it("answers an empty list for an empty DeviceDB", async () => {
         const deviceDB = await fresh()
         expect(await deviceDB.listRawLeases()).to.deep.equal([])
       })
@@ -471,13 +471,13 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await expectGood(deviceDB.tryListRawBanks())).to.have.deep.members([made, { device_id: 5 }])
       })
 
-      it("answers an empty list for an empty store", async () => {
+      it("answers an empty list for an empty DeviceDB", async () => {
         const deviceDB = await fresh()
         expect(await deviceDB.listRawBanks()).to.deep.equal([])
       })
     })
 
-    describe("a store whose storage fails", () => {
+    describe("a DeviceDB whose device database fails", () => {
       it.skipIf(_cheat_failNextCall === undefined)("refuses each verb", async () => {
         const deviceDB = await fresh()
         const row = await leaseRowOf()

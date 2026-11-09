@@ -594,7 +594,7 @@ describe("proving.buildLease(friend, gate_epoch?)", () => {
     expect(friend.tryCacheLease).not.toHaveBeenCalled()
   })
 
-  it("records the epoch passed, for the gate a change lands", async () => {
+  it("records the epoch passed, for the gate a change writes", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
     const lease = await proving.buildLease(fakeLeaseFriendOf(), 5)

@@ -198,8 +198,8 @@ describe("an old instance, replaced by the very call it made", () => {
 
 describe("an older record", () => {
   it("of another vault_tok loses to a live vault, changing nothing", async () => {
-    const { vault, listing, demandStored, restoreRow, storeBehindOurBack } = await makeBornVault()
-    storeBehindOurBack(demandStored())
+    const { vault, listing, demandStored, restoreRow, putBehindOurBack } = await makeBornVault()
+    putBehindOurBack(demandStored())
     await listing.fetch(Dna)
     const { revision_seq } = vault
     restoreRow(await otherLifeAt(revision_seq - 1))
@@ -298,7 +298,7 @@ describe("building over a tombstone", () => {
     expect(storedNow()).to.include({ vault_tok: reborn.vault_tok, revision_seq: 2 })
   })
 
-  it("a birth's listing.put, landed: a new vault of the record in the slot, locked", async () => {
+  it("a birth's listing.put, written: a new vault of the record in the slot, locked", async () => {
     const { vault, listing, tombstone } = await deleted()
     const record = await birthOver(tombstone)
     const reborn = await listing.put(record, { prior: tombstone, ifAbsent: 'add', ifPresent: 'get' })
@@ -308,7 +308,7 @@ describe("building over a tombstone", () => {
     expect(vault.isEnabled).to.be.false
   })
 
-  it("a birth's listing.put, nothing ever stored: lands over never stored", async () => {
+  it("a birth's listing.put, nothing ever stored: written over never stored", async () => {
     const { listing } = makeVaultWorld()
     const record = await birthOver(SX.VoidRevision)
     const born = await listing.put(record, { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'get' })
@@ -338,7 +338,7 @@ describe("building over a tombstone", () => {
 })
 
 describe("the entrypoints, handed rubble", () => {
-  it("a birth's listing.put refuses a record that is no record, storing nothing", async () => {
+  it("a birth's listing.put refuses a record that is no record, putting nothing", async () => {
     const { listing, storedNow } = makeVaultWorld()
     await TH.expectRefusal(listing.put({ garbage: true } as never, { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'get' }))
     expect(storedNow()).to.be.null

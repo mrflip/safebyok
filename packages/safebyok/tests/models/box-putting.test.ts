@@ -12,7 +12,7 @@ const held = useModelsWorld()
 
 /** A box built of `record`, with the same record in storage. */
 const builtOf = (record: Fetched<BoxRecord, BoxSparse>, listing: TestableBoxListing = boxListingOf(held.mw)): Promise<TestableBox> => {
-  held.mw.seedStore(record)
+  held.mw.seedPut(record)
   return listing.build(record)
 }
 
@@ -77,7 +77,7 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
 
   it("never seals over a sparse record", async () => {
     const box = await builtOf(sparseBoxRecord())
-    held.mw.seedStore(fullBoxRecord())
+    held.mw.seedPut(fullBoxRecord())
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } })
     expect(held.mw.callsOf('get')).to.have.lengthOf(1)
     expect(box.sidecar).to.deep.equal({ account: 'home' })
@@ -107,7 +107,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
   for (const opts of [{}, { ifPresent: 'repl' }] as const) {
     it(`refuses 'stale_write' for a box that moved in storage, handing the box the revision stored, with opts ${JSON.stringify(opts)}`, async () => {
       const box = await builtOf(fullBoxRecord())
-      held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
+      held.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
       held.mw.clearCalls()
       await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
       const [put] = held.mw.callsOf('put')
@@ -118,7 +118,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
 
     it(`refuses it over a tombstone stored, with opts ${JSON.stringify(opts)}`, async () => {
       const box = await builtOf(fullBoxRecord())
-      held.mw.seedStore(tombstoneBoxRecord({ revision_seq: 1, revision_tok: 'rev-gone' }))
+      held.mw.seedPut(tombstoneBoxRecord({ revision_seq: 1, revision_tok: 'rev-gone' }))
       held.mw.clearCalls()
       await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ...opts, ...asBuilt }), 'stale_write')
       expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_seq: 1 })
@@ -134,7 +134,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
 
   it("seals over the revision it took on entry: a frontier received during the seal is met as 'stale_write', not sealed over", async () => {
     const rival = fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-rival' })
-    const listing = fakeSealBoxListingOf(held.mw, {}, () => { held.mw.seedStore(rival); box.receive(rival) })
+    const listing = fakeSealBoxListingOf(held.mw, {}, () => { held.mw.seedPut(rival); box.receive(rival) })
     const box = await listing.build(fullBoxRecord())
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }), 'stale_write')
     expect(held.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-rival', revision_seq: 2 })
@@ -234,7 +234,7 @@ describe("box.put checks its patch before it asks the lock", () => {
 
   it("refuses an empty patch over a sparse box, after its one fetch", async () => {
     const box = await builtOf(sparseBoxRecord())
-    held.mw.seedStore(fullBoxRecord())
+    held.mw.seedPut(fullBoxRecord())
     await TH.expectRefusal(box.put({}))
     expect(held.mw.callsOf('get')).to.have.lengthOf(1)
     expect(held.mw.callsOf('put')).to.deep.equal([])

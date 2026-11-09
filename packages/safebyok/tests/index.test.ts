@@ -51,7 +51,7 @@ describe("safebyok", () => {
     expect(Front.PassphraseSaltBytes).to.eq(16)
   })
 
-  it("exports the device store a host hands Bank.make: the DeviceDB base to extend, and MemoryDeviceDB", () => {
+  it("exports the DeviceDB a host hands Bank.make: the DeviceDB base to extend, and MemoryDeviceDB", () => {
     expect(new Front.MemoryDeviceDB()).toBeInstanceOf(Front.DeviceDB)
     expectTypeOf<Front.MemoryDeviceDB>().toExtend<Front.BankOpts['deviceDB']>()
   })

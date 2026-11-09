@@ -17,8 +17,8 @@ useVaultWorlds()
 // == [Creation and re-creation]: registered_at over a rebirth, the tombstone's registered_at
 
 describe("registered_at over a rebirth", () => {
-  it("VOCABULARY.md:153 (registered_at is when a box was first stored): a box deleted and reborn is registered at the rebirth's put, not its first store", async () => {
-    held.mw.seedStore(fullBoxRecord())
+  it("VOCABULARY.md:153 (registered_at is when a box was first stored): a box deleted and reborn is registered at the rebirth's put, not its first put", async () => {
+    held.mw.seedPut(fullBoxRecord())
     const box = await fakeSealBoxListingOf(held.mw).build(fullBoxRecord())
     await box.del()
     held.mw.setNow(T0 + 5000)
@@ -26,7 +26,7 @@ describe("registered_at over a rebirth", () => {
     expect(box._cheat_central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
   })
 
-  it("VOCABULARY.md:155 (registered_at is when this life of a box began, kept by every later revision of that life): a store that answers a rebirth with the buried record's registered_at, as a database default might keep it, is adopted quietly, and the box's registered_at follows it, the rebirth's own time lost with the staged copy that carried it", async () => {
+  it("VOCABULARY.md:155 (registered_at is when this life of a box began, kept by every later revision of that life): a VaultDB that answers a rebirth with the buried record's registered_at, as a database default might keep it, is adopted quietly, and the box's registered_at follows it, the rebirth's own time lost with the staged copy that carried it", async () => {
     const box = await fakeSealBoxListingOf(held.mw).build(tombstoneBoxRecord({ revision_seq: 2 }))
     held.mw.setNow(T0 + 5000)
     held.mw.willPut(({ record }) => held.mw.answerOf(box.scope, { ...record, registered_at: T0 }))
@@ -70,7 +70,7 @@ describe("the gate changes the vault sends", () => {
     const theirs = await other.listing.build(demandStored())
     await unlockTyping(theirs, byPassphrase(Passphrase))
     await replaceTyping(vault, Passphrase, NewPassphrase)
-    other.storeBehindOurBack(demandStored())
+    other.putBehindOurBack(demandStored())
     await theirs.fetch()
     expect(theirs.gate.pickle().passphrase_wayin).to.deep.equal(demandStored().gate.passphrase_wayin)
     expect(theirs.isUnlocked).to.be.true

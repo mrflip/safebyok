@@ -14,11 +14,11 @@ const Exposed = { apiKey: 'sk-test-0000' }
 
 /** A box built of `record`, with the same record in storage. */
 const builtOf = (record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> => {
-  held.mw.seedStore(record)
+  held.mw.seedPut(record)
   return boxListingOf(held.mw).build(record)
 }
 
-/** A box storing {@link Exposed}, none of it exposed. */
+/** A box whose whisper is {@link Exposed}, none of it exposed. */
 const unexposedOf = async (): Promise<TestableBox> => {
   const box = await builtOf(fullBoxRecord())
   await box.put({ whisper: Exposed })
@@ -287,7 +287,7 @@ describe("box.putExposed", () => {
     }
   })
 
-  it("refuses with nothing exposed, or a patch naming a whisper, storing nothing", async () => {
+  it("refuses with nothing exposed, or a patch naming a whisper, writing nothing", async () => {
     const unexposed = await unexposedOf()
     const showing = await showingOf()
     held.mw.clearCalls()

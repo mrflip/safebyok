@@ -84,10 +84,10 @@ export class Lease implements LeaseStamp {
   /** A new lease under a fresh leaseKey. */
   static async buildGranted(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
     const { opts: { gate_epoch, wayinkind } } = leaseGrantedArgs.parse({ friend, vaultKey, opts })
-    const held     = vaultStamp.parse(friend)
-    const granted  = leaseStamp.parse({ fmt: LeaseFormat, ...held, gate_epoch, proved_at: nowMillis(), wayinkind })
+    const vaultstamp = vaultStamp.parse(friend)
+    const granted  = leaseStamp.parse({ fmt: LeaseFormat, ...vaultstamp, gate_epoch, proved_at: nowMillis(), wayinkind })
     const leaseKey = await makeLeaseKey()
-    const vault_key_lease_wrapped = await wrapKeyUnder(leaseKey, vaultKey, cipherCtx([held, granted], 'vault_key_lease_wrapped'))
+    const vault_key_lease_wrapped = await wrapKeyUnder(leaseKey, vaultKey, cipherCtx([vaultstamp, granted], 'vault_key_lease_wrapped'))
     return new Lease(friend, leaseRecord.parse({ ...granted, lease_key: leaseKey, vault_key_lease_wrapped }), false)
   }
   // --

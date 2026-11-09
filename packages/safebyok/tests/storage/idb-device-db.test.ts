@@ -1,6 +1,6 @@
 /** IdbDeviceDB: the battery every DeviceDB runs, and what is its own: options, separate databases, and the old databases it deletes. */
 
-// fake-indexeddb installs IndexedDB's globals before the store loads: real transactions and structured clone, with no browser.
+// fake-indexeddb installs IndexedDB's globals before the DeviceDB loads: real transactions and structured clone, with no browser.
 import 'fake-indexeddb/auto'
 import { createStore, promisifyRequest, set } from 'idb-keyval'
 import { describe, expect, it, vi } from 'vitest'
@@ -12,20 +12,20 @@ import * as TH from '../test-helpers'
 
 // == [World]: makeDeviceDB, idbRowsOf, failNextCall, dbNamesNow, plantClosedDB
 
-/** The database each store under test was made over, by store. */
+/** The database each DeviceDB under test was made over, by DeviceDB. */
 const dbNameOf = new WeakMap<IdbDeviceDB, string>()
 
 /** A fresh dbName, which no other test has touched. */
 const freshDbName = (): string => `test-${crypto.randomUUID()}`
 
-/** A store over a database of its own. */
+/** A DeviceDB over a database of its own. */
 const makeDeviceDB = (dbName = freshDbName()): IdbDeviceDB => {
   const deviceDB = new IdbDeviceDB({ dbName })
   dbNameOf.set(deviceDB, dbName)
   return deviceDB
 }
 
-/** The backdoor to a store's lease and bank rows, through connections of its own to the store's databases. */
+/** The backdoor to a DeviceDB's lease and bank rows, through connections of its own to the DeviceDB's databases. */
 const idbRowsOf = (deviceDB: IdbDeviceDB): TH.DeviceDBRowCheats => {
   const leaseShelf = createStore(`${dbNameOf.get(deviceDB)!}:device-v001-001-001`, 'leases')
   const bankShelf = createStore(`${dbNameOf.get(deviceDB)!}:bank-v001-001-001`, 'bank')
@@ -37,8 +37,8 @@ const idbRowsOf = (deviceDB: IdbDeviceDB): TH.DeviceDBRowCheats => {
   }
 }
 
-// The store's databases are opened first, so neither upgrade transaction is the one to fail.
-/** Makes the next transaction any store opens fail, as it does when the browser closes the database under the page. */
+// The DeviceDB's databases are opened first, so neither upgrade transaction is the one to fail.
+/** Makes the next transaction any DeviceDB opens fail, as it does when the browser closes the database under the page. */
 const failNextCall = async (deviceDB: IdbDeviceDB): Promise<void> => {
   await deviceDB.listLeases()
   await deviceDB.listRawBanks()
@@ -86,7 +86,7 @@ describe("IdbDeviceDB's options", () => {
 })
 
 describe("IdbDeviceDB's database", () => {
-  it("keeps the leases of each dbName apart, and shares them between stores of one", async () => {
+  it("keeps the leases of each dbName apart, and shares them between DeviceDBs of one", async () => {
     const deviceDB = makeDeviceDB()
     await deviceDB.stow({ ...TH.vaultScope, vault_tok: 'tok_one', proved_at: Date.now(), lease_key: await makeLeaseKey() })
     expect(await makeDeviceDB().listLeases()).to.deep.equal([])

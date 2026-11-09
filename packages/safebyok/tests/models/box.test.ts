@@ -13,7 +13,7 @@ const held = useModelsWorld()
 /** A box holding `record` (the full box record `anthropic_api_key` at revision 1, by default) as received, through a listing over the test world. */
 /** A box built of `record`, with the same record in storage. */
 const builtOf = (record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> => {
-  held.mw.seedStore(record)
+  held.mw.seedPut(record)
   return boxListingOf(held.mw).build(record)
 }
 
@@ -38,7 +38,7 @@ describe("Box own props", () => {
     const box = await boxOf()
     const keys = Object.keys(box)
     const received = held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' })
-    held.mw.seedStore(received)
+    held.mw.seedPut(received)
     box.receive(received)
     expect(Object.keys(box)).to.have.members(keys)
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'edited' } })
@@ -418,7 +418,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
 
   it("takes { ...record, whisper, sidecar } to put, putting the next revision over the one held", async () => {
     const record = fullBoxRecord()
-    held.mw.seedStore(record)
+    held.mw.seedPut(record)
     const box = await builtOf(record)
     held.mw.clearCalls()
     await expect(box.put(roundTripOf(record), { maxMillisSinceRefresh: Infinity, maxWorldMillis: Infinity })).resolves.to.eq(box)

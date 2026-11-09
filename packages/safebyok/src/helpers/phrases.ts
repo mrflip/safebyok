@@ -409,7 +409,7 @@ export const VaultDeleted = "This vault was deleted. Ask the bank for the vault 
 export const PasskeyHeldAlready = "This vault has a passkey already, and holds one at a time, so nothing was asked or changed: revoke it first (vault.revokePasskeyPrompt), then add the new one."
 
 /** Why a stale Vault's delete does not reach the vault made since in its slot. */
-export const DelOfOtherLife = "The vault held in this slot is under another vault_tok than this Vault, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
+export const DelOfOtherLife = "The vault listed in this slot is under another vault_tok than this Vault, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 
 // == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDismissed, AlreadyAsking, AttemptInFlight, GatingConcluded, RequestCleartextThrew, ClearsThrew, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, TestDeriverNotice

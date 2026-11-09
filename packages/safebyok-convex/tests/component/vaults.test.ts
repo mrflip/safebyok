@@ -55,7 +55,7 @@ const talliedLives = (backend: Backend) => backend.run(async ({ db }) => {
   return tallyDocs.map(({ user_id, vault_tok }) => `${user_id}/${vault_tok}`)
 })
 
-/** Box rows stored straight into their lives, untallied, as a component that kept no tallies left them. */
+/** Box rows written straight into their lives, untallied, as a component that kept no tallies left them. */
 const plantBoxes = (backend: Backend, boxes: (DB.BoxRecord | DB.BoxTombstone)[]) => backend.run(async ({ db }) => {
   await Promise.all(boxes.map((box) => {
     const { applabel, user_id, vaultlabel, vault_tok, boxlabel } = box

@@ -231,7 +231,7 @@ describe("bankedVaultScope", () => {
   })
 
   // bankedVaultScope @example
-  it("refuses a store in the scope, which belongs in the options", () => {
+  it("refuses a vaultDB in the scope, which belongs in the options", () => {
     const err = TH.expectSyncRefusal(() => CX.bankedVaultScope.parse({ vaultlabel: 'main', vaultDB: {} }))
     expect(err.message).to.contain(Phrases.DatabaseInVaultScope)
     expect(err.meta?.fieldnames).to.deep.equal(['vaultDB'])

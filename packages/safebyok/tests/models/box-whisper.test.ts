@@ -14,13 +14,13 @@ const held = useModelsWorld()
 
 /** A box built of `record`, with the same record in storage. */
 const builtOf = (record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> => {
-  held.mw.seedStore(record)
+  held.mw.seedPut(record)
   return boxListingOf(held.mw).build(record)
 }
 
 const TestWhisper = { apiKey: 'sk-test-0000' }
 
-/** A box storing `whisper`, that whisper exposed. */
+/** A box whose whisper is `whisper`, that whisper exposed. */
 const exposedOf = async (whisper: Whisper = TestWhisper): Promise<TestableBox> => {
   const box = await builtOf(fullBoxRecord())
   await box.put({ whisper })
@@ -159,7 +159,7 @@ describe("the bags and Storable.isFUBag: a mark, not an identity", () => {
     })
   }
 
-  it("stores nothing of a whisper read while locked and put after the unlock", async () => {
+  it("puts nothing of a whisper read while locked and put after the unlock", async () => {
     const box = await exposedOf()
     held.mw.setLocked(true)
     const readWhileLocked = box.whisper
@@ -224,7 +224,7 @@ describe("box.whisper and box.put: what a whisper may be", () => {
   })
 
   for (const [whisper, blurb] of [[{}, 'an empty object'], [{ val: null }, 'an object with a val, no holder now']] as const) {
-    it(`stores and opens ${blurb} as the whisper it is`, async () => {
+    it(`puts and opens ${blurb} as the whisper it is`, async () => {
       const box = await builtOf(fullBoxRecord())
       await box.put({ whisper })
       expect(await box.extractWhisper()).to.deep.equal(whisper)

@@ -1,4 +1,4 @@
-/** DeviceDB, the base: what it makes of a store that throws. The cases every store must pass are the battery's (tests/test-helpers/device-db-battery.ts). */
+/** DeviceDB, the base: what it makes of a device database that throws. The cases every DeviceDB must pass are the battery's (tests/test-helpers/device-db-battery.ts). */
 
 import { describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
@@ -8,7 +8,7 @@ import * as TH from '../test-helpers'
 
 const asked = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'tok_one' }
 
-/** A store whose every generic call throws what it is told. */
+/** A DeviceDB whose every generic call throws what it is told. */
 class BrokenDeviceDB extends DeviceDB {
   readonly thrown: unknown
   constructor(thrown: unknown) { super(); this.thrown = thrown }
@@ -22,7 +22,7 @@ class BrokenDeviceDB extends DeviceDB {
   protected doListBanks(): never { throw this.thrown }
 }
 
-describe("a deviceDB whose store throws", () => {
+describe("a deviceDB whose generic call throws", () => {
   it("refuses every verb, naming the verb and the thrown name, never quoting the thrown message", async () => {
     const thrown = new DOMException('lease_key secret-looking text', 'QuotaExceededError')
     const deviceDB = new BrokenDeviceDB(thrown)
@@ -45,14 +45,14 @@ describe("a deviceDB whose store throws", () => {
     }
   })
 
-  it("passes a VaultError the store throws as it came", async () => {
+  it("passes a VaultError a generic call throws as it came", async () => {
     const refusal = new VaultError('storage_unavailable', 'This browser does not let the app keep anything on this device.')
     const err = await TH.expectBad(new BrokenDeviceDB(refusal).tryPeek(asked), 'storage_unavailable')
     expect(err).to.eq(refusal)
   })
 })
 
-describe("a deviceDB whose store answers a bank row that fails its check", () => {
+describe("a deviceDB whose generic call answers a bank row that fails its check", () => {
   it("refuses ensureBank", async () => {
     class GarbledDeviceDB extends BrokenDeviceDB {
       protected override doEnsureBank(): unknown { return { applabel: 'acme', user_id: 'u1', device_id: 'not-a-uuid' } }

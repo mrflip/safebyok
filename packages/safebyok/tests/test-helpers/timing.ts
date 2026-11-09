@@ -41,7 +41,7 @@ export const changeCounter = () => {
   return { heard, onChange: () => { heard.count += 1 } }
 }
 
-/** A latch for holding an async seam mid-flight, so a test can land one call in the middle of
+/** A latch for holding an async seam mid-flight, so a test can make one call in the middle of
  * another: `pass()` waits until `release()` is called, and `reached` resolves once something is
  * waiting at it. Released, it stays open: later passes go straight through.
  *
@@ -128,7 +128,7 @@ const errandsAt = new WeakMap<object, (() => Promise<unknown>)[]>()
 const originalOf = new WeakMap<object, AsyncFn>()
 
 /** Holds the next call to `target[verb]` at a latch (see {@link makeLatch}) until the test releases
- * it, so the test can land another call while that one is in flight. Later calls go straight
+ * it, so the test can make another call while that one is in flight. Later calls go straight
  * through.
  *
  * @param target - The object whose method to hold: an adapter, a deriver.
@@ -139,7 +139,7 @@ const originalOf = new WeakMap<object, AsyncFn>()
  *   const latch = TH.holdNextCall(vaultDB, 'tryGetVault')
  *   const unlocking = TH.tryUnlock(vault, 'pw')   // now waiting at the latch
  *   await latch.reached
- *   await vault.lock()                     // lands mid-unlock: the unlock refuses, nothing unlocked
+ *   await vault.lock()                     // called mid-unlock: the unlock refuses, nothing unlocked
  *   latch.release()
  */
 export const holdNextCall = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {
@@ -149,11 +149,11 @@ export const holdNextCall = <Target extends object>(target: Target, verb: AsyncV
 }
 
 /** Holds the answer of the next call to `target[verb]` at a latch (see {@link makeLatch}) once the call itself has run, until the test releases it.
- * The store has done the work, and the caller has not yet heard. Later calls go straight through.
+ * The target has done the work, and the caller has not yet heard. Later calls go straight through.
  *
- * Use it, not {@link holdNextCall}, to land a call while a write is in flight to a store that
- * applies calls in the order made, as a DeviceDB does: a hold at the door would let a later call
- * land first, which that store never does. Arm it before any spy of the test's own on the same
+ * Use it, not {@link holdNextCall}, to make a call while a write is in flight to a DeviceDB, which
+ * applies calls in the order made: a hold at the door would let a later call
+ * reach it first, which a DeviceDB never does. Arm it before any spy of the test's own on the same
  * method, which then counts each call once.
  *
  * @param target - The object whose method's answer to hold: an adapter.
@@ -162,9 +162,9 @@ export const holdNextCall = <Target extends object>(target: Target, verb: AsyncV
  *
  * @example
  *   const written = TH.holdNextAnswer(deviceDB, 'tryPutLease')
- *   const unlocking = TH.tryUnlock(vault, 'pw')   // the lease is in the store; the unlock has not heard
+ *   const unlocking = TH.tryUnlock(vault, 'pw')   // the lease is in the deviceDB; the unlock has not heard
  *   await written.reached
- *   await vault.lock()                     // its forget lands after the write
+ *   await vault.lock()                     // its forget is called after the write
  *   written.release()
  */
 export const holdNextAnswer = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {
@@ -186,7 +186,7 @@ export const holdNextAnswer = <Target extends object>(target: Target, verb: Asyn
  * @param vault - The Vault object to read into: anything with a `refresh()`.
  *
  * @example
- *   world.dbStore.put(boxCkey, spoiled)   // a change elsewhere, its ring perhaps answered by a read begun before it
+ *   world.putBehindOurBack(spoiled)   // a change elsewhere, its ring perhaps answered by a read begun before it
  *   await TH.readAfresh(vault)              // the snapshot shows it
  */
 export const readAfresh = async (vault: { refresh: () => Promise<unknown> }): Promise<void> => {

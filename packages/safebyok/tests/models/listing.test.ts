@@ -17,8 +17,8 @@ const seededListing = async () => {
   const listing = boxListingOf(held.mw)
   const full = fullBoxRecord({ boxlabel: 'full_box' })
   const gone = tombstoneBoxRecord({ boxlabel: 'gone_box', revision_seq: 2 })
-  held.mw.seedStore(full)
-  held.mw.seedStore(gone)
+  held.mw.seedPut(full)
+  held.mw.seedPut(gone)
   await listing.build(full)
   await listing.build(gone)
   held.mw.setNow(T0 + 660_000)
@@ -51,13 +51,13 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(held.mw.callsOf('get')).to.deep.equal([])
     })
 
-    it("rejects, throwing nothing at its caller, where the store's watch refuses", async () => {
+    it("rejects, throwing nothing at its caller, where the VaultDB's watch refuses", async () => {
       const listing = boxListingOf(held.mw)
-      vi.spyOn(held.mw.vaultDB, 'watch').mockImplementation(() => { throw new VaultError('storage_unavailable', "The store could not be reached.") })
+      vi.spyOn(held.mw.vaultDB, 'watch').mockImplementation(() => { throw new VaultError('storage_unavailable', "The storage could not be reached.") })
       await expect(listing.hello()).rejects.toThrow(/could not be reached/)
     })
 
-    it("tells as bad news the end the store's watch reports", async () => {
+    it("tells as bad news the end the VaultDB's watch reports", async () => {
       const listing = boxListingOf(held.mw)
       const ended = new VaultError('storage_unavailable', "The stream ended.")
       await listing.hello()
@@ -170,12 +170,12 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(told).to.eq(1)
       const before = listing.snapshot
 
-      held.mw.seedStore(fullBoxRecord())
+      held.mw.seedPut(fullBoxRecord())
       await listing.fetch(scopeOf())
       expect(listing.snapshot).to.eq(before)
       expect(told).to.eq(1)
 
-      held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
+      held.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
       await listing.fetch(scopeOf())
       expect(listing.snapshot).to.not.eq(before)
       expect(listing.snapshot[0]).to.include({ revision_seq: 2 })
@@ -184,7 +184,7 @@ describe("Listing's pipeline: what every answer takes", () => {
 
     it("follows a thing's change that no delivery brought: a put, once", async () => {
       const listing = boxListingOf(held.mw)
-      held.mw.seedStore(fullBoxRecord())
+      held.mw.seedPut(fullBoxRecord())
       const box = await listing.build(fullBoxRecord())
       let told = 0
       listing.subscribe(() => { told += 1 })
@@ -198,7 +198,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(tombstoneBoxRecord({ revision_seq: 2 }))
       expect(listing.snapshot).to.deep.equal([])
-      held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
+      held.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
       await listing.fetch(scopeOf())
       expect(listing.snapshot).to.deep.equal([box.getSnapshot()])
       await listing.del(box)

@@ -166,8 +166,8 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     return made
   }
   const listing = makeListing()
-  /** Another device's put of `record`, landing in the vaultDB behind this one's back, at the next revision. */
-  const storeBehindOurBack = (record: VaultRecord): VaultRecord => {
+  /** Another device's put of `record`, written in the vaultDB behind this one's back, at the next revision. */
+  const putBehindOurBack = (record: VaultRecord): VaultRecord => {
     const stored = { ...record, revision_tok: `rev-${String(record.revision_seq + 1)}`, revision_seq: record.revision_seq + 1, written_at: now }
     vaultrows.set(Dna.vaultlabel, stored)
     return stored
@@ -180,7 +180,7 @@ export const makeVaultWorld = (stored0: VaultRecord | null = null, worldOverride
     return stored
   }
   return {
-    listing, fakeBank, opts, badnews, vaultDB, deviceDB, storeBehindOurBack, restoreRow, demandStored, storedNow,
+    listing, fakeBank, opts, badnews, vaultDB, deviceDB, putBehindOurBack, restoreRow, demandStored, storedNow,
     /** A new listing over the same vaultDB, deviceDB and clock: the next session on this device. */
     anotherSession: makeListing,
     /** Move the clock on by `millis`; no timer fires. */
@@ -258,7 +258,7 @@ export const Whisper  = { apiKey: 'sk-test-0000' }
 /** The sidecar those worlds put beside it. */
 export const Sidecar  = Object.freeze({ note: 'work' })
 
-/** A born vault, and the rows of its boxes as the vaultDB stores them. */
+/** A born vault, and the rows of its boxes as the vaultDB puts them. */
 export const makeWorld = async () => {
   const world = await makeBornVault()
   const boxrows = world.vaultDB._cheat_boxRowsOf(world.vault.scope, world.vault.vault_tok)

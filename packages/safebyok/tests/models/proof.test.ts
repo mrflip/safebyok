@@ -1,4 +1,4 @@
-/** The sprint's proof, and how the package is used: a host drives a bank through a whole life, over real in-memory stores,
+/** The sprint's proof, and how the package is used: a host drives a bank through a whole life, over a real in-memory VaultDB and DeviceDB,
  * and every step asserts what its components render.
  */
 
@@ -203,7 +203,7 @@ describe("the proof", () => {
     expect(await reborn.getBox(ApiKey.boxlabel, { ifAbsent: 'nil' })).to.be.null
     await reborn.putBox(ApiKey)
 
-    // A fresh Bank on the same stores: it lists the vault locked, and picks up the cached lease with nobody asked.
+    // A fresh Bank on the same VaultDB and DeviceDB: it lists the vault locked, and picks up the cached lease with nobody asked.
     const nextPage = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
     const nextPageUi = mountComponent(nextPage, bankStatus)
     nextPageUi.expectRenders(['made: no vaults'])
@@ -362,7 +362,7 @@ describe("the proof", () => {
     expectNoBadNews()
   })
 
-  it("the store goes out of reach: an unlocked vault keeps its lease, a refused hello paints refused, and the next one recovers", async () => {
+  it("the VaultDB goes out of reach: an unlocked vault keeps its lease, a refused hello paints refused, and the next one recovers", async () => {
     const { world, bank, vault } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
@@ -402,12 +402,12 @@ describe("the proof", () => {
     const phoneBox = await phoneVault.getBox(ApiKey.boxlabel)
     expect(await phoneBox?.extractWhisper()).to.deep.equal(ApiKey.whisper)
 
-    // A box it adds lands in this device's list.
+    // A box it adds is enlisted in this device's list.
     await phoneVault.putBox({ ...ApiKey, boxlabel: 'openai_api_key' })
     await ticks(1)
     boxesUi.expectRenders(['anthropic_api_key, openai_api_key'])
 
-    // A store with no watch, or a watch ended: nothing arrives until the host says hello to the vault again, on its own timer.
+    // A VaultDB with no watch, or a watch ended: nothing arrives until the host says hello to the vault again, on its own timer.
     vault.boxListing.goodbye()
     await phoneVault.putBox({ ...ApiKey, boxlabel: 'gemini_api_key' })
     await ticks(1)

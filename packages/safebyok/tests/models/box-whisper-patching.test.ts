@@ -11,16 +11,16 @@ const held = useModelsWorld()
 const Stored = { apiKey: 'sk-test-0000', org: { name: 'acme', seats: 3 }, tags: ['a', 'b'] }
 const lock = () => { held.mw.setLocked(true) }
 
-/** A box storing {@link Stored}, not exposed. */
+/** A box whose whisper is {@link Stored}, not exposed. */
 const unexposedOf = async (): Promise<TestableBox> => {
   const record = fullBoxRecord()
-  held.mw.seedStore(record)
+  held.mw.seedPut(record)
   const box = await boxListingOf(held.mw).build(record)
   return box.put({ whisper: Stored })
 }
 
 describe("box.patchWhisper", () => {
-  it("deep-merges into a new object, its arrays replaced, leaving the old one be and storing nothing", async () => {
+  it("deep-merges into a new object, its arrays replaced, leaving the old one be and putting nothing", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -46,7 +46,7 @@ describe("box.patchWhisper", () => {
     expect(box.getSnapshot()).to.eq(was)
   })
 
-  it("is what box.putExposed then stores", async () => {
+  it("is what box.putExposed then puts", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -70,7 +70,7 @@ describe("box.patchWhisper", () => {
     expect(err.message).to.eq(Phrases.NotExposed)
   })
 
-  it("merges while locked, showing nothing and storing nothing, and the unlock shows it", async () => {
+  it("merges while locked, showing nothing and putting nothing, and the unlock shows it", async () => {
     const box = await unexposedOf()
 
     await box.expose()

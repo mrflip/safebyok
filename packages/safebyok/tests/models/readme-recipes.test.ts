@@ -18,7 +18,7 @@ const hookOf = <ValT>(subscribe: (listener: () => void) => () => void, read: () 
   return { painted, unsubscribe, current: () => painted.at(-1) as ValT }
 }
 
-/** A box storing {@link Stored}, on a bank that asks as a dialog would, in a vault unlocked. */
+/** A box whose whisper is {@link Stored}, on a bank that asks as a dialog would, in a vault unlocked. */
 const makeRecipeBox = async (): Promise<{ vault: Vault, box: Box }> => {
   const bank = makeBankWorld().bankOn()
   await bank.hello()
@@ -92,7 +92,7 @@ describe("safebyok-react's README's raw field", () => {
 })
 
 describe("the README's React form", () => {
-  it("paints a new object at each patch, a read-only blank at a lock and a veil, and stores what was patched", async () => {
+  it("paints a new object at each patch, a read-only blank at a lock and a veil, and puts what was patched", async () => {
     const { vault, box } = await makeRecipeBox()
     await box.expose()
     const hook = hookOf(box.subscribe, () => box.whisper)

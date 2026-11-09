@@ -40,7 +40,7 @@ export const bootDatabaseFirst = (): void => {
 }
 // --
 
-// == [Stores]: FlakyClient, flakyClientOf, listen, storeOver, makeVaultDB, emptyTables, makeTwin, failNextCall
+// == [VaultDBs]: FlakyClient, flakyClientOf, listen, vaultDBOver, makeVaultDB, emptyTables, makeTwin, failNextCall
 
 /** A client over a PGlite whose next statement can be made to fail as a dropped connection does. */
 export type FlakyClient = PostgresClient & { failNext: () => void }
@@ -78,12 +78,12 @@ export const listen: PostgresListen = async (channel, onNotify) => {
 }
 
 const clientsOf = new WeakMap<PostgresVaultDB, FlakyClient>()
-const optsOf = new WeakMap<PostgresVaultDB, StoreOpts>()
+const optsOf = new WeakMap<PostgresVaultDB, VaultDBOverOpts>()
 
-type StoreOpts = Omit<PostgresVaultDBOpts, 'client'>
+type VaultDBOverOpts = Omit<PostgresVaultDBOpts, 'client'>
 
 /** A PostgresVaultDB over this file's PGlite, listening on it. */
-export const storeOver = async (opts: StoreOpts = {}): Promise<PostgresVaultDB> => {
+export const vaultDBOver = async (opts: VaultDBOverOpts = {}): Promise<PostgresVaultDB> => {
   const db = await database()
   const client = flakyClientOf(db)
   const vaultDB = new PostgresVaultDB({ listen, ...opts, client })
@@ -92,10 +92,10 @@ export const storeOver = async (opts: StoreOpts = {}): Promise<PostgresVaultDB> 
   return vaultDB
 }
 
-/** A fresh store over emptied tables. */
+/** A fresh VaultDB over emptied tables. */
 export const makeVaultDB = async (opts?: AdapterVaultDBOpts & { maxBoxes?: number }): Promise<PostgresVaultDB> => {
   await emptyTables()
-  return await storeOver(opts)
+  return await vaultDBOver(opts)
 }
 
 export const emptyTables = async (): Promise<void> => {
@@ -103,8 +103,8 @@ export const emptyTables = async (): Promise<void> => {
   await db.exec('TRUNCATE safebyok_vaults, safebyok_boxes')
 }
 
-/** A second store over the same tables and opts as `vaultDB`, as another device holds. */
-export const makeTwin = async (vaultDB: PostgresVaultDB): Promise<PostgresVaultDB> => await storeOver(optsOf.get(vaultDB))
+/** A second VaultDB over the same tables and opts as `vaultDB`, as another device holds. */
+export const makeTwin = async (vaultDB: PostgresVaultDB): Promise<PostgresVaultDB> => await vaultDBOver(optsOf.get(vaultDB))
 
 export const failNextCall = (vaultDB: PostgresVaultDB): void => { clientsOf.get(vaultDB)?.failNext() }
 // --

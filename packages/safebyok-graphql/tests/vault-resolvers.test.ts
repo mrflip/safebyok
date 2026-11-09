@@ -15,7 +15,7 @@ import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
 
-/** A store whose database is out of reach, its driver's error naming what a browser must never see. */
+/** A VaultDB whose storage is out of reach, its driver's error naming what a browser must never see. */
 const unreachable = () => new PostgresVaultDB({ client: {
   query:       () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
   transaction: () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
@@ -35,13 +35,13 @@ const sent = async (schema: GraphQLSchema, source: string, variableValues: objec
   return answer
 }
 
-/** A store's own answer as one crosses: dbhas null where it holds none. */
+/** A VaultDB's own answer as one crosses: dbhas null where it holds none. */
 const asCrossed = (answer: DB.Answer<unknown, string, unknown>) => ({ ...answer, dbhas: answer.dbhas ?? null })
 
 /** The gate verbs' params: the vault record, its gate holding only the wayin the verb moves. */
 const gateParamsOf = (vault: DB.VaultRecord, gate: object) => ({ ...vault, gate })
 
-/** A server whose watches are counted while they listen, and the store behind it. */
+/** A server whose watches are counted while they listen, and the VaultDB behind it. */
 const watchedServer = async () => {
   const listening = new Set<unknown>()
   const listen: PostgresListen = async (channel, onNotify) => {
@@ -52,8 +52,8 @@ const watchedServer = async () => {
       return unlisten()
     }
   }
-  const store = await TH.serverOver({ listen })
-  return { listening, store, schema: TH.schemaOver(store) }
+  const vaultDB = await TH.serverOver({ listen })
+  return { listening, vaultDB, schema: TH.schemaOver(vaultDB) }
 }
 
 /** The notices a watch of `scope` hears through `schema`, for the session `context`, each as it crossed. */
@@ -103,21 +103,21 @@ describe("vaultResolvers", () => {
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })
 
-  it("answers each verb as the store's own try* verb does", async () => {
+  it("answers each verb as the VaultDB's own try* verb does", async () => {
     await TH.emptyTables()
-    const store = await TH.serverOver()
-    const schema = TH.schemaOver(store)
+    const vaultDB = await TH.serverOver()
+    const schema = TH.schemaOver(vaultDB)
     const record = TH.vaultAt()
     const born = DB.putVaultAnswer.parse(await sent(schema, VaultOperations.putVault, { record, opts: { prior: DB.VoidRevision } }))
     expect(born).to.deep.include({ ok: true, act: 'born', val: record })
-    expect(DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, TH.vaultScope))).to.deep.eq(asCrossed(await store.tryGetVault(TH.vaultScope)))
-    expect(DB.listVaultsAnswer.parse(await sent(schema, VaultOperations.listVaults, TH.bankScope))).to.deep.eq(asCrossed(await store.tryListVaults(TH.bankScope)))
+    expect(DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, TH.vaultScope))).to.deep.eq(asCrossed(await vaultDB.tryGetVault(TH.vaultScope)))
+    expect(DB.listVaultsAnswer.parse(await sent(schema, VaultOperations.listVaults, TH.bankScope))).to.deep.eq(asCrossed(await vaultDB.tryListVaults(TH.bankScope)))
 
     const box = TH.boxAt(0, 'life1', { sidecar: { note: 'work', 'nested key': [1, { deep: null }] } })
     const boxed = DB.putBoxAnswer.parse(await sent(schema, VaultOperations.putBox, { record: box, opts: { prior: DB.VoidRevision } }))
     expect(boxed).to.deep.include({ ok: true, act: 'born', val: box, world: record })
-    expect(DB.getBoxAnswer.parse(await sent(schema, VaultOperations.getBox, TH.boxQuery))).to.deep.eq(asCrossed(await store.tryGetBox(TH.boxQuery)))
-    expect(DB.listBoxesAnswer.parse(await sent(schema, VaultOperations.listBoxes, TH.vaultQuery))).to.deep.eq(asCrossed(await store.tryListBoxes(TH.vaultQuery)))
+    expect(DB.getBoxAnswer.parse(await sent(schema, VaultOperations.getBox, TH.boxQuery))).to.deep.eq(asCrossed(await vaultDB.tryGetBox(TH.boxQuery)))
+    expect(DB.listBoxesAnswer.parse(await sent(schema, VaultOperations.listBoxes, TH.vaultQuery))).to.deep.eq(asCrossed(await vaultDB.tryListBoxes(TH.vaultQuery)))
 
     const replaced = DB.replacePassphraseAnswer.parse(await sent(schema, VaultOperations.replacePassphrase, { params: gateParamsOf(record, { passphrase_wayin: { ...TH.passphraseWayin, key_deriver_label: 'moved' } }) }))
     expect(replaced).to.deep.include({ ok: true, act: 'replaced' })
@@ -135,7 +135,7 @@ describe("vaultResolvers", () => {
     expect(tidied).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 0 }, world: TH.bankScope })
   })
 
-  it("takes the store's default for an option left out", async () => {
+  it("takes the VaultDB's default for an option left out", async () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver())
     const absent = DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, TH.vaultScope)) as DB.BadAnswer
@@ -150,7 +150,7 @@ describe("vaultResolvers", () => {
     expect(nulled.err.refusalkind).to.eq('bad_option')
   })
 
-  it("sends a refusal as the answer's err with nothing of what the store's driver said", async () => {
+  it("sends a refusal as the answer's err with nothing of what the VaultDB's driver said", async () => {
     const crossed = await sent(TH.schemaOver(unreachable()), VaultOperations.getVault, TH.vaultScope)
     const answer = DB.getVaultAnswer.parse(crossed) as DB.BadAnswer
     expect(answer.err.refusalkind).to.eq('storage_unavailable')
@@ -203,11 +203,11 @@ describe("vaultResolvers", () => {
 describe("vaultResolvers' watch", () => {
   it("hears each row that changes while the session that subscribed stays signed in as its user", async () => {
     await TH.emptyTables()
-    const { listening, store, schema } = await watchedServer()
+    const { listening, vaultDB, schema } = await watchedServer()
     const { stream, nextNotice } = await watching(schema, { user_id: 'u1' })
-    await store.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+    await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
     expect(await nextNotice()).to.deep.eq({ ok: true, val: { act: 'got', val: TH.vaultAt(), world: TH.vaultAt() } })
-    await store.putBox(TH.boxAt(), { prior: DB.VoidRevision })
+    await vaultDB.putBox(TH.boxAt(), { prior: DB.VoidRevision })
     expect(await nextNotice()).to.have.nested.property('val.val.boxlabel', TH.boxAt().boxlabel)
     expect(listening.size).to.eq(1)
     await stream.return(undefined)
@@ -225,13 +225,13 @@ describe("vaultResolvers' watch", () => {
   it("ends once its session is signed out or in as another user", async () => {
     for (const revoked of ['u2', null]) {
       await TH.emptyTables()
-      const { listening, store, schema } = await watchedServer()
+      const { listening, vaultDB, schema } = await watchedServer()
       const session: TH.TestContext = { user_id: 'u1' }
       const { nextNotice } = await watching(schema, session)
-      await store.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+      await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
       expect(await nextNotice()).to.have.property('ok', true)
       session.user_id = revoked
-      await store.putBox(TH.boxAt(), { prior: DB.VoidRevision })
+      await vaultDB.putBox(TH.boxAt(), { prior: DB.VoidRevision })
       expect(await nextNotice()).to.have.nested.property('err.refusalkind', 'identity_revoked')
       expect(await nextNotice()).to.be.null
       await vi.waitFor(() => { expect(listening.size).to.eq(0) })
@@ -240,11 +240,11 @@ describe("vaultResolvers' watch", () => {
 
   it("ends with a refusal carrying nothing of what its throwing userIdOf said", async () => {
     await TH.emptyTables()
-    const { listening, store, schema } = await watchedServer()
+    const { listening, vaultDB, schema } = await watchedServer()
     const session: TH.TestContext = { user_id: 'u1' }
     const { stream } = await watching(schema, session)
-    Object.defineProperty(session, 'user_id', { get: () => { throw new Error('session store s3cr3t-host is down') } })
-    await store.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+    Object.defineProperty(session, 'user_id', { get: () => { throw new Error('session datastore s3cr3t-host is down') } })
+    await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
     const last = await stream.next()
     expect(JSON.stringify(last)).not.to.include('s3cr3t')
     expect(DB.crossedNotice.parse(overTheWire(last.value?.data?.['safebyokWatch']))).to.have.nested.property('err.refusalkind', 'unexpected_error')

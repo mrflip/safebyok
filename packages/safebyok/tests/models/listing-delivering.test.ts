@@ -41,7 +41,7 @@ describe("Listing's pipeline: what every answer takes", () => {
     })
 
     it("takes the world of a good answer", async () => {
-      held.mw.seedStore(fullBoxRecord())
+      held.mw.seedPut(fullBoxRecord())
       held.mw.willGet(held.mw.answerOf(scopeOf(), fullBoxRecord(), 'the world now'))
       await boxListingOf(held.mw).fetch(scopeOf())
       expect(held.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'the world now' }])
@@ -59,7 +59,7 @@ describe("Listing's pipeline: what every answer takes", () => {
     })
 
     it("hands the world its maxWorldMillis", async () => {
-      held.mw.seedStore(fullBoxRecord())
+      held.mw.seedPut(fullBoxRecord())
       await boxListingOf(held.mw).fetch(scopeOf(), { maxWorldMillis: 5, ifAbsent: 'nil' })
       expect(held.mw.callsOf('ensureTimely')[0]?.maxMillis).to.eq(5)
     })
@@ -81,7 +81,7 @@ describe("Listing's pipeline: what every answer takes", () => {
     it("is thrown to a fetch, which cannot have the record it asked for: the box as it was, nothing told", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.build(fullBoxRecord())
-      held.mw.seedStore(fullBoxRecord({ revision_tok: 'rev-other' }))
+      held.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-other' }))
       held.mw.clearCalls()
       await TH.expectRefusal(listing.fetch(scopeOf()))
       expect(listing.at(scopeOf())).to.eq(box)
@@ -111,7 +111,7 @@ describe("Listing's pipeline: what every answer takes", () => {
 
     it("is thrown to a fetch of a scope not held, and nothing is held, saved or told", async () => {
       const listing = boxListingOf(held.mw)
-      held.mw.seedStore(fullBoxRecord())
+      held.mw.seedPut(fullBoxRecord())
       const refused = vi.spyOn(Box.prototype, 'receive').mockImplementationOnce(() => { throw new VaultError('record_conflict', "Refused.") })
       try {
         await TH.expectRefusal(listing.fetch(scopeOf()))
@@ -164,7 +164,7 @@ describe("Listing's pipeline: what every answer takes", () => {
     it("a create(dna) over the scope of a box stored and held alive hears the vaultDB's 'camped': the box held kept", async () => {
       const listing = boxListingOf(held.mw)
       const record = fullBoxRecord()
-      held.mw.seedStore(record)
+      held.mw.seedPut(record)
       const box = await listing.build(record)
       await TH.expectRefusal(listing.create(dnaOf()), 'camped')
       expect(listing.at(scopeOf())).to.eq(box)
@@ -174,7 +174,7 @@ describe("Listing's pipeline: what every answer takes", () => {
     it("a create(dna) over the scope of a box stored and held deleted brings it back on the instance held, at the next seq", async () => {
       const listing = boxListingOf(held.mw)
       const record = tombstoneBoxRecord({ revision_seq: 2 })
-      held.mw.seedStore(record)
+      held.mw.seedPut(record)
       const box = await listing.build(record)
       await expect(listing.create(dnaOf())).resolves.to.eq(box)
       expect(listing.at(scopeOf())).to.eq(box)
@@ -189,10 +189,10 @@ describe("Listing's pipeline: what every answer takes", () => {
         await listing.hello()
         const box = await listing.build(fullBoxRecord({ boxlabel: 'built' }))
         await listing.build(fullBoxRecord({ boxlabel: 'built' }))
-        held.mw.seedStore(fullBoxRecord({ boxlabel: 'fetched' }))
+        held.mw.seedPut(fullBoxRecord({ boxlabel: 'fetched' }))
         await listing.fetch(scopeOf('fetched'))
         await listing.fetch(scopeOf('fetched'))
-        held.mw.seedStore(fullBoxRecord({ boxlabel: 'built' }))
+        held.mw.seedPut(fullBoxRecord({ boxlabel: 'built' }))
         await listing.put(fullBoxRecord({ boxlabel: 'built', revision_tok: 'rev-a2', revision_seq: 2 }), { prior: fullBoxRecord({ boxlabel: 'built' }) })
         await listing.del(box)
         await held.mw.notify(fullBoxRecord({ boxlabel: 'noticed' }))
@@ -241,7 +241,7 @@ describe("listing: a record of another vault_tok meets no instance held", () => 
   it("refuses build(record) of a record of another vault_tok, and passes over a notice of one", async () => {
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.build(fullBoxRecord({ vault_tok: OtherVault })))
-    held.mw.seedStore(fullBoxRecord())
+    held.mw.seedPut(fullBoxRecord())
     await listing.hello()
     held.mw.clearCalls()
     await held.mw.notify(fullBoxRecord({ boxlabel: 'other_box', vault_tok: OtherVault }))

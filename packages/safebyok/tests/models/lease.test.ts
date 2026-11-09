@@ -184,9 +184,9 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(got?.isPresent).to.be.true
   })
 
-  it("tells a store's refusal as bad news, once, and answers null", async () => {
+  it("tells a datastore's refusal as bad news, once, and answers null", async () => {
     const friend = fakeLeaseFriendOf()
-    const refusal = new VaultError('unexpected_error', 'the store is down')
+    const refusal = new VaultError('unexpected_error', 'the datastore is down')
     friend.peekLease.mockRejectedValue(refusal)
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
     expect(friend.tellBadNews).toHaveBeenCalledExactlyOnceWith([refusal])
@@ -227,7 +227,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
 
   it("tells the bad news for a row of another stamp even where its forget is refused", async () => {
     const friend = await friendHoldingRowOf({ user_id: 'u2' })
-    friend.tryForgetLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
+    friend.tryForgetLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the datastore is down')))
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
     expect(friend.tellBadNews).toHaveBeenCalledOnce()
   })
@@ -241,7 +241,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
 
   it("still answers null where a row of another gate has its forget refused, telling no bad news and logging nothing", async () => {
     const { friend } = await grantedWorld()
-    friend.tryForgetLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the store is down')))
+    friend.tryForgetLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the datastore is down')))
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch + 1)).to.be.null
     expect(friend.tellBadNews).not.toHaveBeenCalled()
     expect(friend.logged).to.deep.equal([])
@@ -291,16 +291,16 @@ describe("lease.revoke(), lease.evict() and isPresent", () => {
 
   it("throws what forgetLease refuses, the lease out of force all the same; tryRevoke answers it as a bad Outcome", async () => {
     const { friend, lease } = await grantedWorld()
-    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the store is down'))
+    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
     await TH.expectRefusal(lease.revoke())
     expect(lease.isPresent).to.be.false
     const other = await grantedWorld()
-    other.friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the store is down'))
+    other.friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
     await TH.expectBad(other.lease.tryRevoke())
     expect(other.lease.isPresent).to.be.false
   })
 
-  it("Lease.forget forgets a record with no lease held, on each call, and starts before it answers, so forgets land in call order", async () => {
+  it("Lease.forget forgets a record with no lease held, on each call, and starts before it answers, so forgets are written in call order", async () => {
     const friend = fakeLeaseFriendOf()
     friend.cached = 'a row of an earlier session'
     const forgetting = Lease.tryForget(friend)
@@ -313,9 +313,9 @@ describe("lease.revoke(), lease.evict() and isPresent", () => {
 
   it("Lease.forget throws what forgetLease refuses; tryForget answers it as a bad Outcome", async () => {
     const friend = fakeLeaseFriendOf()
-    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the store is down'))
+    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
     await TH.expectRefusal(Lease.forget(friend))
-    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the store is down'))
+    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
     await TH.expectBad(Lease.tryForget(friend))
   })
 

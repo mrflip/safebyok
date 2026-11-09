@@ -26,7 +26,7 @@ const tellByAutolock = async (world: ReturnType<typeof makeBankWorld>, bank: Ban
 
 
 describe("bank.hello", () => {
-  it("readies a bank over empty stores, loading its plugins, telling its listeners, and answering the same snapshot until something changes", async () => {
+  it("readies a bank over an empty VaultDB and DeviceDB, loading its plugins, telling its listeners, and answering the same snapshot until something changes", async () => {
     const world = makeBankWorld()
     const load = vi.fn()
     const bank = world.bankOn({ keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load }) })
@@ -255,7 +255,7 @@ describe("the host's functions, as a bank holds them", () => {
 })
 
 describe("DefaultOnLifecycle", () => {
-  const Refusal = new VaultError('storage_unavailable', 'no store', { cause: new Error(Passphrase) })
+  const Refusal = new VaultError('storage_unavailable', 'no storage', { cause: new Error(Passphrase) })
   const Revoked = new VaultError('identity_revoked', 'signed out')
   const LifecycleCases = [
     // a cached lease that outlived its forget:
@@ -546,12 +546,12 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     expect(warn.mock.calls).to.have.length(1)
     const [cached] = world.leaseRows() as [{ gate_epoch: number }]
     vi.spyOn(world.deviceDB, 'peek').mockResolvedValueOnce({ ...cached, gate_epoch: cached.gate_epoch + 1 } as never)
-    vi.spyOn(world.deviceDB, 'forget').mockRejectedValueOnce(new VaultError('storage_unavailable', 'the store is down'))
+    vi.spyOn(world.deviceDB, 'forget').mockRejectedValueOnce(new VaultError('storage_unavailable', 'the datastore is down'))
     const page = world.bankOn({ logger })
     await page.hello()
     const unlocked = await page.vaultAt(VaultScopeGiven)?.ensureUnlocked()
     expect(unlocked?.isUnlocked).to.be.true
-    expect(warn).toHaveBeenCalledWith('the store is down', expect.objectContaining({ call: 'Bank.onLifecycle' }), undefined)
+    expect(warn).toHaveBeenCalledWith('the datastore is down', expect.objectContaining({ call: 'Bank.onLifecycle' }), undefined)
   })
 
   it("hears a vault's bad news the same as its own, a revocation told so vacating nothing, and news past a sweep going to the logger", async () => {
@@ -559,7 +559,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     const spy = TH.spyLogger()
     const world = makeBankWorld()
     const { bank, vault } = await makeBankWithVault(world, { onBadNews, logger: spy.logger })
-    const [news, revoked] = [new VaultError('storage_unavailable', 'the device store is down'), new VaultError('identity_revoked', 'the host says no')]
+    const [news, revoked] = [new VaultError('storage_unavailable', 'the device database is down'), new VaultError('identity_revoked', 'the host says no')]
     for (const peekRefusal of [news, revoked]) {
       vault.lock()
       vi.spyOn(world.deviceDB, 'peek').mockRejectedValueOnce(peekRefusal)

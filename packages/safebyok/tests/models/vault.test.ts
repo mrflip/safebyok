@@ -9,7 +9,7 @@ import { Dna, Passphrase, T0, makeBornVault, makeBornVaultAndFriend, makeVaultWo
 useVaultWorlds()
 
 describe("VaultListing.buildVault: the gate is built before the vault is born, and stored in the vault record alone", () => {
-  it("builds the vault's gate from what the closure answers, and stores the record with it over no record", async () => {
+  it("builds the vault's gate from what the closure answers, and puts the record with it over no record", async () => {
     const { listing, storedNow } = makeVaultWorld()
     const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     expect(vault.gate.passphrase_wayin.wayinkind).to.eq('passphrase')
@@ -169,11 +169,11 @@ describe("vault.ensureTimely(maxMillis)", () => {
     expect(gets).toHaveBeenCalledOnce()
   })
 
-  it("lands what it fetches on the instance", async () => {
-    const { vault, demandStored, storeBehindOurBack } = await bornWithGets()
-    const landed = storeBehindOurBack(demandStored())
+  it("adopts what it fetches on the instance", async () => {
+    const { vault, demandStored, putBehindOurBack } = await bornWithGets()
+    const moved = putBehindOurBack(demandStored())
     await vault.ensureTimely(0)
-    expect(vault.revision_tok).to.eq(landed.revision_tok)
+    expect(vault.revision_tok).to.eq(moved.revision_tok)
   })
 
   it("resolves over a vault its fetch finds gone, enabled still, and leaves the guards that need it present to refuse", async () => {

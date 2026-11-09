@@ -21,8 +21,8 @@ const crossed = (answer: Answer<unknown, string, unknown>): unknown => {
   return JSON.parse(JSON.stringify(sent, (_ckey, field: unknown) => field ?? null)) as unknown
 }
 
-/** A store holding the vault and one box, at revision 0. */
-const storeWithBox = async (): Promise<MemoryVaultDB> => {
+/** A VaultDB holding the vault and one box, at revision 0. */
+const vaultDBWithBox = async (): Promise<MemoryVaultDB> => {
   const vaultDB = new MemoryVaultDB()
   await vaultDB.putVault(vaultAt(), { prior: SX.VoidRevision })
   await vaultDB.putBox(boxAt(), { prior: SX.VoidRevision })
@@ -32,7 +32,7 @@ const storeWithBox = async (): Promise<MemoryVaultDB> => {
 
 describe("AX's answer checks", () => {
   it("parse each good answer that crossed back to the answer its verb returned", async () => {
-    const vaultDB = await storeWithBox()
+    const vaultDB = await vaultDBWithBox()
     const answers = [
       [AX.listVaultsAnswer, await vaultDB.tryListVaults(bankScope)],
       [AX.getVaultAnswer,   await vaultDB.tryGetVault(vaultScope)],
@@ -51,7 +51,7 @@ describe("AX's answer checks", () => {
   })
 
   it("parses a refusal that crossed to a VaultError of its kind", async () => {
-    const vaultDB = await storeWithBox()
+    const vaultDB = await vaultDBWithBox()
     const answer = await vaultDB.tryPutVault(vaultAt(1), { prior: stale })
     expect(answer.ok).to.be.false
     const parsed = AX.putVaultAnswer.parse(crossed(answer))
@@ -65,7 +65,7 @@ describe("AX's answer checks", () => {
   })
 
   it("take a damaged row only under damaged_rows", async () => {
-    const vaultDB = await storeWithBox()
+    const vaultDB = await vaultDBWithBox()
     const listed = crossed(await vaultDB.tryListVaults(bankScope)) as { val: { vaults: unknown[], damaged_rows: unknown[] } }
     const damaged = SX.damagedVaultOf({ ...vaultScope, vaultlabel: 'other' })
     expect(() => AX.listVaultsAnswer.parse({ ...listed, val: { ...listed.val, damaged_rows: [damaged] } })).not.to.throw()
@@ -73,7 +73,7 @@ describe("AX's answer checks", () => {
   })
 
   it("takes a damaged row under the label it is stored under", async () => {
-    const vaultDB = await storeWithBox()
+    const vaultDB = await vaultDBWithBox()
     const listed = crossed(await vaultDB.tryListVaults(bankScope)) as { val: { vaults: unknown[], damaged_rows: unknown[] } }
     const misnamed = SX.damagedVaultOf({ ...vaultScope, vaultlabel: 'Not A Label' })
     const parsed = AX.listVaultsAnswer.parse({ ...listed, val: { ...listed.val, damaged_rows: [misnamed] } })
@@ -81,7 +81,7 @@ describe("AX's answer checks", () => {
   })
 
   it("refuses an answer out of step with its verb's checker", async () => {
-    const vaultDB = await storeWithBox()
+    const vaultDB = await vaultDBWithBox()
     const got = crossed(await vaultDB.tryGetVault(vaultScope)) as Record<string, unknown>
     for (const bad of [{ ...got, surplus: 1 }, { ...got, act: 'born' }, { ...got, world: null }]) {
       expect(() => AX.getVaultAnswer.parse(bad)).to.throw(VaultError).with.property('refusalkind', 'unexpected_error')

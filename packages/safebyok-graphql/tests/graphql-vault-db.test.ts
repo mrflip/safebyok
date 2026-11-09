@@ -16,7 +16,7 @@ describe("GraphQLVaultDB over the typed schema", () => {
     makeTwin:             TH.makeTwin,
     _cheat_rowsOf:        () => TH.rowsOf(),
     _cheat_failNextCall:  (vaultDB) => { vaultDB.failNext() },
-    _cheat_storeOf:       TH.storeOf,
+    _cheat_adapterOf:       TH.adapterOf,
     boxNoticesCarryVault: false,
   })
 
@@ -122,7 +122,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     await TH.expectRefusal(vaultDB.listVaults(TH.bankScope), 'unexpected_error')
   })
 
-  it("refuses a malformed request before sending it, as any store refuses one", async () => {
+  it("refuses a malformed request before sending it, as any VaultDB refuses one", async () => {
     const { vaultDB } = fakeClient({ data: null })
     await TH.expectRefusal(vaultDB.getVault({ ...TH.vaultScope, vaultlabel: '' }), 'bad_scope')
   })

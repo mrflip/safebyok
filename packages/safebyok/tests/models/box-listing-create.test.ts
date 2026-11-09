@@ -19,7 +19,7 @@ const stored = { revision_tok: 'rev-s5', revision_seq: 5 }
 
 describe("BoxListing", () => {
   describe("listing.create(dna)", () => {
-    it("holds a box of the record it stored, at revision 0, once it lands", async () => {
+    it("holds a box of the record it stored, at revision 0, once it is written", async () => {
       const listing = boxListingOf(held.mw)
       const box = await listing.create(dna())
       expect(box).to.be.instanceOf(Box)
@@ -65,12 +65,12 @@ describe("BoxListing", () => {
 
     it("hears the vaultDB's 'camped' over a live row it does not hold, delivered before it is thrown", async () => {
       const listing = boxListingOf(held.mw)
-      held.mw.seedStore(fullBoxRecord(stored))
+      held.mw.seedPut(fullBoxRecord(stored))
       await TH.expectRefusal(listing.create(dna()), 'camped')
       expect(listing.at(scope())?.revision_seq).to.eq(5)
     })
 
-    it("refuses a dna naming another vault, sealing and storing nothing", async () => {
+    it("refuses a dna naming another vault, sealing and putting nothing", async () => {
       const listing = boxListingOf(held.mw)
       await TH.expectRefusal(listing.create({ ...dna(), vaultlabel: 'another_vault' }))
       expect(listing.things).to.deep.equal([])
@@ -86,7 +86,7 @@ describe("BoxListing", () => {
       expect(held.mw.callsOf('get')).to.deep.equal([])
     })
 
-    it("refuses a put of another vault's record, storing nothing", async () => {
+    it("refuses a put of another vault's record, putting nothing", async () => {
       const listing = boxListingOf(held.mw)
       await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, { prior: SX.VoidRevision }))
       expect(held.mw.callsOf('put')).to.deep.equal([])
@@ -191,7 +191,7 @@ describe("BoxListing: create holds a dna to boxDna at its door", () => {
 })
 
 describe("boxListing.create(dna, opts)", () => {
-  it("refuses a whole record, storing nothing", async () => {
+  it("refuses a whole record, putting nothing", async () => {
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.create({ ...fullBoxRecord() }))
     expect(held.mw.callsOf('put')).to.deep.equal([])
@@ -223,7 +223,7 @@ describe("boxListing.create(dna, opts)", () => {
 // == [Sealed at birth]: create, boxDna, the vault's lease
 
 describe("boxListing.create(dna): the box is sealed at birth", () => {
-  it("stores a full record at revision 0 over no record, its sealed parts the fake lease's", async () => {
+  it("puts a full record at revision 0 over no record, its sealed parts the fake lease's", async () => {
     const box = await boxListingOf(held.mw).create(dna())
     expect(box.isFull).to.be.true
     expect(box.revision_seq).to.eq(0)

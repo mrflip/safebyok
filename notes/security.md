@@ -122,12 +122,12 @@ added or folded into through the subagent, and no other entry changes.
   (in `BankFriend`, reached from `Listing.panicIfRevoked`) calls `bank.vacate({ cause })` synchronously, at the moment `DefaultOnPanic` did; a host with its own handler, which before kept a revoked bank
   alive, can no longer. A vacate still memoizes, so a burst of revocations vacates once.
   (2) The host's `onLifecycle` is wrapped once, in `Bank`'s constructor, by `guardOnLifecycle` (validated as a function; its throw or rejection goes to the platform), and hears a `BankEvent`, each with the live `Bank`:
-  `lease_unerased` (a refusal, the vault or null, and `where`: lock, tombstone, vacate or outdated), `vacated` (`cause`, and the count `unerased`), or `helloed` (the `Outcome<void>` of `bank.hello` or
+  `lease_revoke_failed` (a refusal, the vault or null, and `where`: lock, tombstone, vacate or outdated), `vacated` (`cause`, and the count `unrevoked`), or `helloed` (the `Outcome<void>` of `bank.hello` or
   `vault.hello`, and the vault or null). It carries no secret material: the refusals are VaultErrors whose device-store causes are already replaced by `storeFailed`, and neither Bank nor Vault hands out a key.
-  (3) The four sites that met a refused lease forget are one `lease_unerased` event, and the default decides severity: `DefaultOnLifecycle` logs a lock's or a vacate's refused forget at error, reports it to the platform
+  (3) The four sites that met a refused lease forget are one `lease_revoke_failed` event, and the default decides severity: `DefaultOnLifecycle` logs a lock's or a vacate's refused forget at error, reports it to the platform
   and vacates the vault (as `DefaultOnPanic` did), and warns through the logger of a tombstone's or an outdated row's, as before. The outdated-row forget in `Lease.buildFromCache` (`forgetOutdated`) tells a new
   `LeaseFriend.tellUnerased` instead of writing to the logger itself.
-  (4) Handlers are heard while the bank is enabled, and after a sweep or a vacate only from the vacate's own scrub, which tells `lease_unerased` per refused row and then `vacated` once it settles, neither awaited,
+  (4) Handlers are heard while the bank is enabled, and after a sweep or a vacate only from the vacate's own scrub, which tells `lease_revoke_failed` per refused row and then `vacated` once it settles, neither awaited,
   so a host handler that awaits `bank.vacate()` cannot deadlock. A disabled bank routes every other event to `DefaultOnLifecycle`, whose only action, a vault's vacate, is a no-op on a vault already let go.
   A bank row the scrub cannot forget is now told as bad news (`onBadNews`), not as a panic (it replaces the bank_followups sentence that sent a refused forget to `onPanic`). Where this entry says a disabled
   bank's panic goes to a handler that only reports to the platform, or that `DefaultOnPanic` logs each panic, read `DefaultOnLifecycle`, whose error log is `{ call: 'Bank.onLifecycle', refusalkind }` with the message only.
@@ -318,7 +318,7 @@ added or folded into through the subagent, and no other entry changes.
   `lock()` is a panic.** `vault.#revokeLease` reads locked at once, but where the deviceDB refuses the forget the row stands: with a host
   `onPanic` the vault stays locked and enabled, the row in place, and the next `ensureUnlocked` on this device takes it up with no proof;
   with none, the refusal goes to the platform's `reportError` where there is one, and the vault is vacated, which tries the forget once
-  more (amended 2026-11-08 (lifecycle_callback): the refusal is a `lease_unerased` event with `where: 'lock'` to the bank's `onLifecycle`; `DefaultOnLifecycle` logs it at error, reports it to the platform and vacates the vault, and a host's own `onLifecycle` replaces that, so the vault stays locked and enabled with the row in place, as it did with a host `onPanic`). Amended 2026-11-03 (vault_slot, branch `20261103-vault_slot`): `#revokeLease`
+  more (amended 2026-11-08 (lifecycle_callback): the refusal is a `lease_revoke_failed` event with `where: 'lock'` to the bank's `onLifecycle`; `DefaultOnLifecycle` logs it at error, reports it to the platform and vacates the vault, and a host's own `onLifecycle` replaces that, so the vault stays locked and enabled with the row in place, as it did with a host `onPanic`). Amended 2026-11-03 (vault_slot, branch `20261103-vault_slot`): `#revokeLease`
   (`packages/safebyok/src/models/vault.ts`) evicts and nulls the lease before it calls the deviceDB's forget, and turns a synchronous
   throw from a duck's `tryRevoke` into a refusal, so `lock()` cannot fail open: it reads locked and does not throw, and the refused
   forget goes to the panic path above.

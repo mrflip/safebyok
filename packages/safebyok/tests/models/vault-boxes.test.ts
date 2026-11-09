@@ -139,9 +139,9 @@ describe("a box verb the vaultDB refuses over its vault's row", () => {
 
 describe("vault.getBox", () => {
   it("takes the gate a box's answer brings: a row moved elsewhere, no notice heard, leaves the vault full with the new gate", async () => {
-    const { vault, storeBehindOurBack, demandStored } = await makeWorldWithBox()
+    const { vault, putBehindOurBack, demandStored } = await makeWorldWithBox()
     const stored = demandStored()
-    const moved = storeBehindOurBack({ ...stored, gate: { ...stored.gate, gate_epoch: stored.gate.gate_epoch + 1 } })
+    const moved = putBehindOurBack({ ...stored, gate: { ...stored.gate, gate_epoch: stored.gate.gate_epoch + 1 } })
     await vault.fetchBox(boxlabel)
     expect(vault.isFull).to.be.true
     expect(vault.revision_tok).to.eq(moved.revision_tok)
@@ -195,7 +195,7 @@ describe("vault.getBox", () => {
 })
 
 describe("vault.delBox", () => {
-  it("of a box stored and not held hears 'stale_write' over the sentinel, the frontier delivered, and the retry lands", async () => {
+  it("of a box stored and not held hears 'stale_write' over the sentinel, the frontier delivered, and the retry is written", async () => {
     const { next, boxrows } = await nextUnlisted()
     await TH.expectRefusal(next.delBox(boxlabel), 'stale_write')
     expect(boxrows.get(boxlabel)).to.have.property('am', 'a')
@@ -213,7 +213,7 @@ describe("vault.delBox", () => {
     await expect(dead?.extractWhisper()).rejects.toThrow()
   })
 
-  it("resolves null for nothing stored, storing nothing", async () => {
+  it("resolves null for nothing stored, deleting nothing", async () => {
     const { vault, boxrows } = await makeWorld()
     expect(await vault.delBox(boxlabel)).to.be.null
     expect(boxrows.has(boxlabel)).to.be.false

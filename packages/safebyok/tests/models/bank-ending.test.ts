@@ -176,7 +176,7 @@ describe("bank.autolock", () => {
     const world = makeBankWorld()
     const onBadNews = vi.fn()
     const bank = world.bankOn({ onBadNews })
-    const refusal = new VaultError('storage_unavailable', 'no store')
+    const refusal = new VaultError('storage_unavailable', 'no storage')
     vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValueOnce({ ok: false, err: refusal })
     await bank.autolock()
     expect(onBadNews).toHaveBeenCalledWith({ news: refusal, bank })
@@ -187,7 +187,7 @@ describe("bank.autolock", () => {
     const onBadNews = vi.fn()
     const spy = TH.spyLogger()
     const bank = world.bankOn({ onBadNews, logger: spy.logger })
-    const refusal = new VaultError('storage_unavailable', 'no store')
+    const refusal = new VaultError('storage_unavailable', 'no storage')
     vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValueOnce({ ok: false, err: refusal })
     const locking = bank.autolock()
     bank.sweep()
@@ -200,7 +200,7 @@ describe("bank.autolock", () => {
     const onLifecycle = vi.fn()
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle })
     onLifecycle.mockClear()
-    const refusal = new VaultError('storage_unavailable', 'no store')
+    const refusal = new VaultError('storage_unavailable', 'no storage')
     vi.spyOn(world.deviceDB, 'forget').mockRejectedValue(refusal)
     world.advance(AutolockMillis + 1)
     await bank.autolock()
@@ -268,7 +268,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
 
   it("tells the host's onLifecycle of a lease its vacate cannot forget and then of the vacate, though the bank is disabled, a repeat doing nothing", async () => {
     const world = makeBankWorld()
-    const refusal = new VaultError('storage_unavailable', 'no store')
+    const refusal = new VaultError('storage_unavailable', 'no storage')
     const onLifecycle = vi.fn()
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
@@ -292,7 +292,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
 
   it("tells the host's onBadNews of a refused listing of the cached leases, though the bank is disabled", async () => {
     const world = makeBankWorld()
-    const refusal = new VaultError('storage_unavailable', 'no store')
+    const refusal = new VaultError('storage_unavailable', 'no storage')
     const onBadNews = vi.fn()
     const bank = world.bankOn({ onBadNews })
     vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValue({ ok: false, err: refusal })
@@ -326,7 +326,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
 
   it("tells the host's onBadNews of a bank row its vacate cannot forget, and forgets it where the listing of the leases is refused", async () => {
     const world = makeBankWorld()
-    const [refusal, listRefused] = [new VaultError('storage_unavailable', 'no store'), new VaultError('storage_unavailable', 'no listing')]
+    const [refusal, listRefused] = [new VaultError('storage_unavailable', 'no storage'), new VaultError('storage_unavailable', 'no listing')]
     const onLifecycle = vi.fn()
     const onBadNews = vi.fn()
     const bank = world.bankOn({ onLifecycle, onBadNews })
@@ -364,7 +364,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     const { bank, vault } = await makeBankWithVault(world, { requestCleartext, onLifecycle, onBadNews, logger: spy.logger })
     requestCleartext.mockClear()
     onLifecycle.mockClear()
-    const refusal = new VaultError('storage_unavailable', 'no store')
+    const refusal = new VaultError('storage_unavailable', 'no storage')
     vi.spyOn(world.deviceDB, 'forget').mockRejectedValue(refusal)
     const listing = TH.holdNextCall(world.deviceDB, 'tryListLeases')
     const vacating = bank.vacate()
@@ -398,7 +398,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
 
   it("settles where the host's onLifecycle awaits a vacate of the bank its forget is telling", async () => {
     const world = makeBankWorld()
-    const refusal = new VaultError('storage_unavailable', 'no store')
+    const refusal = new VaultError('storage_unavailable', 'no storage')
     const onLifecycle = vi.fn(async ({ bank }: { bank: Bank }) => { await bank.vacate() })
     const bank = world.bankOn({ onLifecycle })
     const row = { ...BankScopeGiven, vaultlabel: 'unlisted', vault_tok: makeLifeTok(), proved_at: T0 }
@@ -427,7 +427,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(bank.snapshot.stage).to.eq('refused')
   })
 
-  it("dismisses a birth's open gating, so no lease lands past the vacate", async () => {
+  it("dismisses a birth's open gating, so no lease is stowed past the vacate", async () => {
     const world = makeBankWorld()
     let closeDialog: () => void = vi.fn()
     const bank = world.bankOn({ requestCleartext: async (gating) => {

@@ -28,7 +28,7 @@ const makeVaultWithBox = async (born: ReturnType<typeof makeBornVault> = makeBor
     const found = await boxIn(vault)
     return found.extractWhisper()
   }
-  /** The next session on this device: a new listing over the same stores and deviceDB, holding the vault record stored, after its hello. */
+  /** The next session on this device: a new listing over the same vaultDB and deviceDB, holding the vault record stored, after its hello. */
   const openNextSession = async () => {
     const listing = world.anotherSession()
     const vault = await listing.build(world.demandStored())
@@ -39,7 +39,7 @@ const makeVaultWithBox = async (born: ReturnType<typeof makeBornVault> = makeBor
 }
 
 describe("Birth: a vault born with its gate seals its first box under the birth lease", () => {
-  it("is born unlocked under a gate of its passphrase, which the vault record stores, and a box built in it opens the whisper it sealed; neither record stored holds the whisper or the passphrase", async () => {
+  it("is born unlocked under a gate of its passphrase, which the vault record carries, and a box built in it opens the whisper it sealed; neither record stored holds the whisper or the passphrase", async () => {
     const { vault, box, demandStored } = await makeVaultWithBox()
     expect(vault.isUnlocked).to.be.true
     expect(demandStored().gate).to.deep.include(vault.gate.pickle())

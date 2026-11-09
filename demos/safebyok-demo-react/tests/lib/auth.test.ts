@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createAuth } from '../../src/lib/auth'
 import type { StringStorage } from '../../src/lib/string-storage'
-import { memoryStore } from '../test-helpers'
+import { memoryStorage } from '../test-helpers'
 
-/** Two fresh stores, a clock the test moves by hand, and the auth over them. */
+/** Two fresh storages, a clock the test moves by hand, and the auth over them. */
 const makeWorld = () => {
-  const dbStorage = memoryStore()
-  const deviceStorage = memoryStore()
+  const dbStorage = memoryStorage()
+  const deviceStorage = memoryStorage()
   let nowMillis = Date.UTC(2026, 9, 15, 9, 30)
   const clock = { now: () => nowMillis }
   const advance = (byMillis: number) => { nowMillis += byMillis }
@@ -49,8 +49,8 @@ describe("createAuth", () => {
   })
 
   it("reads the wall clock when handed none", async () => {
-    const dbStorage = memoryStore()
-    const auth = createAuth({ applabel: 'acme', dbStorage, deviceStorage: memoryStore() })
+    const dbStorage = memoryStorage()
+    const auth = createAuth({ applabel: 'acme', dbStorage, deviceStorage: memoryStorage() })
     vi.useFakeTimers({ now: Date.UTC(2026, 9, 15, 9, 30), toFake: ['Date'] })
     try {
       await auth.signIn('margo')
@@ -61,8 +61,8 @@ describe("createAuth", () => {
   })
 
   it("rounds a clock's fraction down", async () => {
-    const dbStorage = memoryStore()
-    const auth = createAuth({ applabel: 'acme', dbStorage, deviceStorage: memoryStore(), clock: { now: () => Date.UTC(2026, 9, 15) + 0.75 } })
+    const dbStorage = memoryStorage()
+    const auth = createAuth({ applabel: 'acme', dbStorage, deviceStorage: memoryStorage(), clock: { now: () => Date.UTC(2026, 9, 15) + 0.75 } })
     await auth.signIn('margo')
     expect(margosAccount(dbStorage)).to.have.property('registered_at', Date.UTC(2026, 9, 15))
   })

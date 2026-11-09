@@ -41,7 +41,7 @@ describe("PostgresVaultDB's constructor", () => {
 })
 
 describe("PostgresVaultDB's rows", () => {
-  it("stores each record whole as jsonb, beside the columns it is found by", async () => {
+  it("puts each record whole as jsonb, beside the columns it is found by", async () => {
     const vaultDB = await TH.makeVaultDB()
     const vault = TH.vaultAt()
     const box = TH.boxAt()
@@ -194,7 +194,7 @@ describe("PostgresVaultDB's channels", () => {
       const unlisten = await TH.listen(channel, onNotify)
       return () => { stopped.push(channel); return unlisten() }
     }
-    const watcher = await TH.storeOver({ listen })
+    const watcher = await TH.vaultDBOver({ listen })
     const unwatch = watcher.watch(TH.bankScope, () => undefined)
     await vi.waitFor(() => { expect(listened).to.deep.equal(['safebyok_u1']) })
     unwatch()

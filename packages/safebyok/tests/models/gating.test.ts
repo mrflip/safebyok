@@ -1,4 +1,4 @@
-/** A real gating, real provings, and the in-memory stores: `build_vault` and `unlock_vault` from the dialog's first sight of a gating to its concluding. */
+/** A real gating, real provings, and the in-memory VaultDB and DeviceDB: `build_vault` and `unlock_vault` from the dialog's first sight of a gating to its concluding. */
 
 import { runInNewContext } from 'node:vm'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
@@ -88,7 +88,7 @@ describe("a birth through a gating", () => {
     expect(passkeyClear.prfBytes.every((byte) => byte === 0)).to.be.true
   })
 
-  it("leaves the gating open on a weak passphrase, storing nothing and spending no passkey answer, and the next attempt lands", async () => {
+  it("leaves the gating open on a weak passphrase, putting nothing and spending no passkey answer, and the next attempt lands", async () => {
     const { listing, gatingAt, storedNow } = birthWorld({ strengthChecker })
     const launched = listing.buildVault(Dna)
     const gating = await gatingAt<'build_vault'>()
@@ -254,7 +254,7 @@ describe("gating.attempt", () => {
     expect(landed.isUnlocked).to.be.true
   })
 
-  it("refuses another kind's clears, concluding the gating, storing nothing, and the refusal holds no passphrase", async () => {
+  it("refuses another kind's clears, concluding the gating, putting nothing, and the refusal holds no passphrase", async () => {
     const { listing, gatingAt, storedNow } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna))
     const gating = await gatingAt<'build_vault'>()

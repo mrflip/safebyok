@@ -12,7 +12,7 @@ describe("forgetting a lease whose forget is refused", () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
     await lease.cacheAsCacheCan()
-    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the store is down'))
+    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
     await TH.expectRefusal(lease.revoke())
     expect(lease.isPresent).to.be.false
     await lease.revoke()

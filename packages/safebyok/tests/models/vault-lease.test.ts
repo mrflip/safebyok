@@ -27,7 +27,7 @@ const expectChangeUnlocked = async ({ vault, deviceDB, demandStored }: Awaited<R
 }
 
 describe("A lease renewed through a gate change", () => {
-  it("renewed: a lease held is attached under the epoch that landed, its row cached, and the vault never reports locked on the way", async () => {
+  it("renewed: a lease held is attached under the epoch that was written, its row cached, and the vault never reports locked on the way", async () => {
     const { vault, deviceDB, demandStored } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
     const epoch0 = vault.gate.gate_epoch
@@ -42,7 +42,7 @@ describe("A lease renewed through a gate change", () => {
     expect(await vault.unsealStampedString(sealed, Stamp)).to.eq('sk-test')
   })
 
-  it("was locked: a vault locked at the start lands the change and ends unlocked, its row cached", async () => {
+  it("was locked: a vault locked at the start writes the change and ends unlocked, its row cached", async () => {
     const { vault, deviceDB, demandStored } = await makeBornVault()
     const epoch0 = vault.gate.gate_epoch
     vault.lock()
@@ -69,15 +69,15 @@ describe("A lease renewed through a gate change", () => {
     await expectChangeUnlocked(born, epoch0)
   })
 
-  it("leaves the vault unlocked where a lock() came as the commit landed", async () => {
+  it("leaves the vault unlocked where a lock() came as the commit was written", async () => {
     const born = await makeBornVault()
     const { vault, opts: { vaultDB } } = born
     const epoch0 = vault.gate.gate_epoch
     const commit = vaultDB.tryReplacePassphrase.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (params) => {
-      const landed = await commit(params)
+      const written = await commit(params)
       vault.lock()
-      return landed
+      return written
     })
     await replaceTyping(vault, Passphrase, NewPassphrase)
     await expectChangeUnlocked(born, epoch0)
@@ -238,7 +238,7 @@ describe("The discards: sweep and vacate, down the chain", () => {
     expect(dialog).not.toHaveBeenCalled()
   })
 
-  it("a swept listing stores nothing: a put or a delete refuses before reaching the vaultDB", async () => {
+  it("a swept listing puts nothing: a put or a delete refuses before reaching the vaultDB", async () => {
     const { listing, demandStored } = await makeBornVault()
     const stored = demandStored()
     listing.sweep()

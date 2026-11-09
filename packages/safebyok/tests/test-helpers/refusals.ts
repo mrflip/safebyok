@@ -55,7 +55,7 @@ export type ExpectingGood<DbT> = {
  * good Outcome's `val`, once {@link expectGood} has checked it is one: the test fails, naming the
  * refusal, on a bad one. Every other member is `db`'s own.
  *
- * @param db - The store whose answers the test reads.
+ * @param db - The VaultDB whose answers the test reads.
  * @returns `db`, its verbs answering with their `val`s.
  *
  * @example expect(await TH.expectingGood(vaultDB).tryGetBox(scope, 'anthropic', TH.inThisVault)).to.be.null

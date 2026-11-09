@@ -88,20 +88,20 @@ const signedInAsAsked = (variables: Record<string, unknown>): string | null => (
   TH.signedInAsAsked({ variables } as unknown as Parameters<TH.Signing>[0]).user_id
 )
 
-const serversOf = new WeakMap<GraphQLVaultDB, { route: Route, store: PostgresVaultDB }>()
+const serversOf = new WeakMap<GraphQLVaultDB, { route: Route, adapter: PostgresVaultDB }>()
 
-/** A fresh browser over emptied tables, through its own route, its server's store made with `opts` and at most `maxBoxes` boxes to a vault. */
+/** A fresh browser over emptied tables, through its own route, its server's VaultDB made with `opts` and at most `maxBoxes` boxes to a vault. */
 const makeVaultDB = async (opts: DB.AdapterVaultDBOpts = {}, maxBoxes?: number): Promise<GraphQLVaultDB> => {
   await TH.emptyTables()
-  const store = await TH.serverOver({ ...opts, ...((maxBoxes !== undefined) && { maxBoxes }) })
-  const route = vaultRoute(store, byHeader)
+  const adapter = await TH.serverOver({ ...opts, ...((maxBoxes !== undefined) && { maxBoxes }) })
+  const route = vaultRoute(adapter, byHeader)
   const vaultDB = browserFor(route, signedInAsAsked)
-  serversOf.set(vaultDB, { route, store })
+  serversOf.set(vaultDB, { route, adapter })
   return vaultDB
 }
 
-/** The route and store behind a browser makeVaultDB or makeTwin made. */
-const serverOf = (vaultDB: GraphQLVaultDB): { route: Route, store: PostgresVaultDB } => {
+/** The route and VaultDB behind a browser makeVaultDB or makeTwin made. */
+const serverOf = (vaultDB: GraphQLVaultDB): { route: Route, adapter: PostgresVaultDB } => {
   const server = serversOf.get(vaultDB)
   if (server === undefined) { throw new Error('This takes a browser makeVaultDB or makeTwin made') }
   return server
@@ -122,7 +122,7 @@ describe("the README's Yoga recipe, its browser half", () => {
     makeCappedVaultDB:    async (maxBoxes) => await makeVaultDB({}, maxBoxes),
     makeTwin,
     _cheat_rowsOf:        () => TH.rowsOf(),
-    _cheat_storeOf:       (vaultDB) => serverOf(vaultDB).store,
+    _cheat_adapterOf:       (vaultDB) => serverOf(vaultDB).adapter,
     boxNoticesCarryVault: false,
   })
 })

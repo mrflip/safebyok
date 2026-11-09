@@ -123,28 +123,28 @@ export const browserOver = (schema: GraphQLSchema, signing: Signing = signedInAs
 }
 // --
 
-// == [The battery's stores]: makeVaultDB, makeTwin, storeOf
+// == [The battery's VaultDBs]: makeVaultDB, makeTwin, adapterOf
 
-const serversOf = new WeakMap<GraphQLVaultDB, { schema: GraphQLSchema, store: PostgresVaultDB }>()
+const serversOf = new WeakMap<GraphQLVaultDB, { schema: GraphQLSchema, adapter: PostgresVaultDB }>()
 
-/** A fresh browser's store over emptied tables, its server's store made with `opts` and at most `maxBoxes` boxes to a vault. */
+/** A fresh browser's VaultDB over emptied tables, its server's VaultDB made with `opts` and at most `maxBoxes` boxes to a vault. */
 export const makeVaultDB = async (opts: AdapterVaultDBOpts = {}, maxBoxes?: number): Promise<FlakyVaultDB> => {
   await emptyTables()
-  const store = await serverOver({ ...opts, ...((maxBoxes !== undefined) && { maxBoxes }) })
-  const schema = schemaOver(store)
+  const adapter = await serverOver({ ...opts, ...((maxBoxes !== undefined) && { maxBoxes }) })
+  const schema = schemaOver(adapter)
   const vaultDB = browserOver(schema)
-  serversOf.set(vaultDB, { schema, store })
+  serversOf.set(vaultDB, { schema, adapter })
   return vaultDB
 }
 
-/** The server a store makeVaultDB made talks to. */
-const serverOf = (vaultDB: GraphQLVaultDB): { schema: GraphQLSchema, store: PostgresVaultDB } => {
+/** The server a VaultDB makeVaultDB made talks to. */
+const serverOf = (vaultDB: GraphQLVaultDB): { schema: GraphQLSchema, adapter: PostgresVaultDB } => {
   const server = serversOf.get(vaultDB)
-  if (server === undefined) { throw new Error('This takes a store makeVaultDB or makeTwin made') }
+  if (server === undefined) { throw new Error('This takes a VaultDB makeVaultDB or makeTwin made') }
   return server
 }
 
-/** A second browser's store over the same server, as another device holds. */
+/** A second browser's VaultDB over the same server, as another device holds. */
 export const makeTwin = (vaultDB: GraphQLVaultDB): FlakyVaultDB => {
   const server = serverOf(vaultDB)
   const twin = browserOver(server.schema)
@@ -152,8 +152,8 @@ export const makeTwin = (vaultDB: GraphQLVaultDB): FlakyVaultDB => {
   return twin
 }
 
-/** The PostgresVaultDB behind a browser's store, for the battery's races. */
-export const storeOf = (vaultDB: GraphQLVaultDB): AdapterVaultDB => serverOf(vaultDB).store
+/** The PostgresVaultDB behind a browser's VaultDB, for the battery's races. */
+export const adapterOf = (vaultDB: GraphQLVaultDB): AdapterVaultDB => serverOf(vaultDB).adapter
 // --
 
 // == [Rows]: sql, rowsOf

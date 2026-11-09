@@ -11,9 +11,9 @@ const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as 
 describe("register", () => {
   it("installs the component under the name a host gave it, and hands back its functions", async () => {
     const backend = defineTestApp({ schema: defineSchema({}) }).defineModules({}).createTest()
-    const vaultstore = register(backend, 'vaultstore')
-    await backend.mutation(vaultstore.vaults.putVault, { record: vault, opts: birth })
-    expect(await backend.query(vaultstore.vaults.getVault, { scope: TH.vaultScope })).to.deep.equal(vault)
+    const vaultdb = register(backend, 'vaultdb')
+    await backend.mutation(vaultdb.vaults.putVault, { record: vault, opts: birth })
+    expect(await backend.query(vaultdb.vaults.getVault, { scope: TH.vaultScope })).to.deep.equal(vault)
   })
 
   it("serves a host app's re-exported functions, as defineTestApp's component helper", async () => {

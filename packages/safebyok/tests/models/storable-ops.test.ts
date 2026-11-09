@@ -11,11 +11,11 @@ const held = useModelsWorld()
 
 // == [Hydrate]: when it fetches, the world first, the thing's horizon
 
-/** A box listing of horizon `horizonMillis`, and its box `anthropic_api_key` built from the full record seeded in the store at revision 1: received at the clock's reading, so timely from then. Calls are cleared after. */
+/** A box listing of horizon `horizonMillis`, and its box `anthropic_api_key` built from the full record seeded in the VaultDB at revision 1: received at the clock's reading, so timely from then. Calls are cleared after. */
 const timelyBoxOf = async (horizonMillis = 1000) => {
   const { mw } = held
   const record = mw.fullBoxRecord()
-  mw.seedStore(record)
+  mw.seedPut(record)
   const listing = boxListingOf(mw, { maxMillisSinceRefresh: horizonMillis })
   const box = await listing.build(record)
   mw.clearCalls()
@@ -57,7 +57,7 @@ describe("storable.hydrate(opts): when it fetches", () => {
     it(`fetches a sparse central however timely: ${blurb}`, async () => {
       const { listing, box } = await timelyBoxOf(60_000)
       await listing.build(held.mw.sparseBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
-      held.mw.seedStore(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+      held.mw.seedPut(held.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
       held.mw.clearCalls()
       expect(box.isFull).to.be.false
       expect(box.isTimely).to.be.true
@@ -69,7 +69,7 @@ describe("storable.hydrate(opts): when it fetches", () => {
     })
   }
 
-  it("never fetches a created box for want of the whisperCiphered: the birth that landed is full", async () => {
+  it("never fetches a created box for want of the whisperCiphered: the birth that was written is full", async () => {
     const box = await boxListingOf(held.mw).create(boxDnaOf(held.mw.boxscope('anthropic_api_key')))
     expect(box.isFull).to.be.true
     await box.hydrate({ maxMillisSinceRefresh: Infinity })
@@ -170,7 +170,7 @@ describe("storable.hydrate(opts): after a failed fetch", () => {
   it("rejects a hydrate whose fetch fails with its refusal, and fetches again on the next", async () => {
     const { box } = await timelyBoxOf()
     held.mw.setNow(T0 + 2000)
-    held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "The store could not be reached.")))
+    held.mw.willGet(held.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "The storage could not be reached.")))
     await expect(box.hydrate()).rejects.toThrow(/could not be reached/)
     await box.hydrate()
     expect(held.mw.callsOf('get')).to.have.lengthOf(2)
@@ -278,7 +278,7 @@ describe("storable verbs while the vault is locked", () => {
     [(box: TestableBox) => box.del(),                                                          'del'],
   ] as const
   for (const [verb, verbname] of EntryCases) {
-    it(`refuses ${verbname} at its entry with 'vault_locked', storing nothing`, async () => {
+    it(`refuses ${verbname} at its entry with 'vault_locked', writing nothing`, async () => {
       const { box } = await timelyBoxOf()
       held.mw.setLocked(true)
       await TH.expectRefusal(verb(box), 'vault_locked')
@@ -299,8 +299,8 @@ describe("storable verbs while the vault is locked", () => {
 
 // == [Try forms]: outcomes, never a rejection
 
-/** The refusal a store that cannot be reached answers. */
-const storeDown = (): VaultError => new VaultError('storage_unavailable', "The store could not be reached.")
+/** The refusal a VaultDB that cannot be reached answers. */
+const storageDown = (): VaultError => new VaultError('storage_unavailable', "The storage could not be reached.")
 
 describe("storable try forms: an outcome, never a rejection", () => {
   const GoodCases = [
@@ -317,9 +317,9 @@ describe("storable try forms: an outcome, never a rejection", () => {
   }
 
   const BadCases = [
-    [(box: TestableBox) => box.tryFetch(),                                                   (box: TestableBox) => { held.mw.willGet(held.mw.refusalOf(box.scope, storeDown())) },  "storage_unavailable", 'tryFetch that storage refuses'],
-    [(box: TestableBox) => box.tryFetch(),                                                   () => { held.mw.willGet(() => { throw new Error("socket closed") }) },         undefined,             'tryFetch whose store throws a plain Error'],
-    [(box: TestableBox) => box.tryHydrate(),                                                 () => { held.mw.willEnsureTimely(() => Promise.reject(storeDown())) },         "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
+    [(box: TestableBox) => box.tryFetch(),                                                   (box: TestableBox) => { held.mw.willGet(held.mw.refusalOf(box.scope, storageDown())) },  "storage_unavailable", 'tryFetch that storage refuses'],
+    [(box: TestableBox) => box.tryFetch(),                                                   () => { held.mw.willGet(() => { throw new Error("socket closed") }) },         undefined,             'tryFetch whose VaultDB throws a plain Error'],
+    [(box: TestableBox) => box.tryHydrate(),                                                 () => { held.mw.willEnsureTimely(() => Promise.reject(storageDown())) },         "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
     [(box: TestableBox) => box.tryPut({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'x' } }), (box: TestableBox) => { held.mw.willPut(held.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'tryPut that storage refuses as stale'],
     [(box: TestableBox) => box.tryDel(),                                                     () => { held.mw.setLocked(true) },                                      "vault_locked",        'tryDel while locked'],
   ] as const
@@ -386,9 +386,9 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
 // == [Rebirth, sentences]: a deletion arriving again after a put, phrases.ts
 
 describe("storable.receive(rcvd): after a put over a box held gone", () => {
-  it("keeps a rebirth landed over a box held gone when the deletion held arrives again: an older record says nothing new", async () => {
+  it("keeps a rebirth written over a box held gone when the deletion held arrives again: an older record says nothing new", async () => {
     const gone = tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' })
-    held.mw.seedStore(gone)
+    held.mw.seedPut(gone)
     const box = await fakeSealBoxListingOf(held.mw).build(gone)
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} })
     box.receive(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
@@ -442,7 +442,7 @@ describe("storable.hydrate(opts): timeliness asks of the record in hand alone", 
   })
 
   it("fetches a sparse box whatever its age, until a whole record is in hand", async () => {
-    held.mw.seedStore(fullBoxRecord())
+    held.mw.seedPut(fullBoxRecord())
     const box = await boxListingOf(held.mw).build(sparseBoxRecord())
     await box.hydrate({ maxMillisSinceRefresh: Infinity })
     expect(held.mw.callsOf('get')).to.have.lengthOf(1)

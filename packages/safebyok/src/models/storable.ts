@@ -202,7 +202,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Reconcile]: reconcileCentral, sameLife, classifyRecordShape
 
-  /** SLOPDOC: Judges `rcvd` against the central held, answering the central that results and the policy applied. */
+  /** SLOPDOC: Judges `rcvd` against the central adopted, answering the central that results and the policy applied. */
   protected reconcileCentral(rcvd: Fetched<RecordT, SparseT>, rcvdShape: RecordShape): Reconciled<RecordT, SparseT> { // eslint-disable-line sonarjs/cognitive-complexity
     // The vault_tok first, whatever the life: a joined life tok path cannot tell 'a-b' + 'c' from 'a' + 'b-c'.
     if ((rcvd.vault_tok !== this.vault_tok))                     { throw otherVaultTok() }
@@ -225,7 +225,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     throw shapeUnreconciled()
   }
 
-  /** Whether `record` is of the life of the central held: the same `lifeTokPathOf`. */
+  /** Whether `record` is of the life of the central adopted: the same `lifeTokPathOf`. */
   #sameLife(record: Fetched<RecordT, SparseT>): boolean {
     return this.lifeTokPathOf(record) === this.lifeTokPathOf(this.#central)
   }
@@ -360,7 +360,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Protected, for a subclass to override]: adopt, sweepContents, vacateContents, demandPresent, isFullRecord, lifeTokPathOf, makeSnapshot
 
   // Every adopt is followed by an align, which the snapshot is made from: an adopt left unaligned would leave it behind.
-  /** Assign the props of `central`, judged against the central held until now, then hold it, frozen; the snapshot waits for `align`. */
+  /** Assign the props of `central`, judged against the central adopted until now, then keep it, frozen; the snapshot waits for `align`. */
   protected adopt(central: Fetched<RecordT, SparseT>): void {
     this.assign(central)
     this.#central = Object.freeze(central)

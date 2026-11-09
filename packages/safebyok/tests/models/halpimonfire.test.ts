@@ -20,16 +20,16 @@ describe("a lock() called during a put", () => {
     const lock = { during: false }
     const listing = fakeSealBoxListingOf(held.mw, {}, () => { if (lock.during) { held.mw.setLocked(true) } })
     const record = fullBoxRecord()
-    held.mw.seedStore(record)
+    held.mw.seedPut(record)
     const box = await listing.build(record)
     lock.during = true
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sealed while locking' } }), 'vault_locked')
     expect(held.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("during the put lands the record anyway: the put is past the window, and the box reports locked after", async () => {
+  it("during the put writes the record anyway: the put is past the window, and the box reports locked after", async () => {
     const record = fullBoxRecord()
-    held.mw.seedStore(record)
+    held.mw.seedPut(record)
     const box = await boxListingOf(held.mw).build(record)
     held.mw.willPut(({ record: sent }) => {
       held.mw.setLocked(true)
@@ -41,7 +41,7 @@ describe("a lock() called during a put", () => {
   })
 })
 
-describe("A lock that lands while an unlock proves", () => {
+describe("A lock called while an unlock proves", () => {
   it("ends unlocked: the proof still takes up and caches its lease, and the next lock() ends that session", async () => {
     const { vault, deviceDB, fakeBank } = await makeBornVault()
     vault.lock()
@@ -58,8 +58,8 @@ describe("A lock that lands while an unlock proves", () => {
   })
 })
 
-describe("A lock that lands during a box verb", () => {
-  it("during hello leaves the list made and the next putBox refusing 'vault_locked', storing nothing", async () => {
+describe("A lock called during a box verb", () => {
+  it("during hello leaves the list made and the next putBox refusing 'vault_locked', putting nothing", async () => {
     const { vault, vaultDB } = await makeBornVault()
     const tryListBoxes = vaultDB.tryListBoxes.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryListBoxes').mockImplementationOnce((...args) => { vault.lock(); return tryListBoxes(...args) })
@@ -89,7 +89,7 @@ const boxCrossingUnseal = async (crossing: (box: TestableBox) => unknown) => {
   return box
 }
 
-describe("An ending that lands while box.expose unseals", () => {
+describe("An ending called while box.expose unseals", () => {
   it.each(['sweep', 'vacate'] as const)("a %s refuses, and leaves nothing exposed", async (ending) => {
     const box = await boxCrossingUnseal((crossed) => crossed[ending]())
     await TH.expectRefusal(box.expose())
