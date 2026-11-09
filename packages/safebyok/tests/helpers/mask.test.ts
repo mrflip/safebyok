@@ -286,7 +286,7 @@ describe("mask", () => {
       [{ head: 1001 },                     'a head past the ceiling'],
       [{ tail: Infinity },                 'an infinite tail'],
       [{ head: '2' as unknown as number }, 'a head that is text'],
-      [{ heads: 2 } as never,              'a field it does not take, a misspelt head'],
+      [{ heads: 2 } as never,              'a field it does not accept, a misspelt head'],
     ]
     for (const [opts, blurb] of BadOpts) {
       it(`refuses ${blurb}`, () => {

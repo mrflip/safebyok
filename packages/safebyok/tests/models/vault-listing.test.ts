@@ -92,7 +92,7 @@ describe("a tombstone over a live vault", () => {
     await listing.fetch(Dna, { ifAbsent: 'nil' })
     await forgotten()
     expect(vault.isPresent).to.be.false
-    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_unerased', refusal, vault, where: 'tombstone' }))
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal, vault, where: 'tombstone' }))
     expect(onBadNews).not.toHaveBeenCalledWith(refusal)
     listing.goodbye()
   })
@@ -358,7 +358,7 @@ describe("lock() with an forget that throws synchronously", () => {
     expect(() => vault.lock()).to.not.throw()
     expect(vault.isLocked).to.be.true
     await forgotten()
-    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_unerased', vault, where: 'lock' }))
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_revoke_failed', vault, where: 'lock' }))
   })
 })
 

@@ -370,7 +370,7 @@ describe("vault.delVaultPrompt()", () => {
     await delTyping(vault)
     expect(storedNow()).to.include({ am: 'x' })
     await TH.eventually(() => onLifecycle.mock.calls.length > 0)
-    expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_unerased', vault }))
+    expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', vault }))
   })
 
   it("refuses a vault found gone, nobody asked", async () => {

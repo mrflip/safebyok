@@ -10,7 +10,7 @@ import { SessionBar } from '../src/components/SessionBar'
 import { useSession } from '../src/hooks/useSession'
 import { JokeModel } from '../src/lib/anthropic'
 import { createAuth, type Auth } from '../src/lib/auth'
-import type { StringStore } from '../src/lib/local-store'
+import type { StringStorage } from '../src/lib/string-storage'
 
 export * from 'safebyok/testing'
 
@@ -31,8 +31,8 @@ export const renderInBank = (ui: ReactNode, user_id: string | null = 'u1') => {
   return { vaultDB }
 }
 
-/** A StringStore in memory, for the fake auth under test: each call a fresh, empty one. */
-export const memoryStore = (): StringStore => {
+/** A StringStorage in memory, for the fake auth under test: each call a fresh, empty one. */
+export const memoryStore = (): StringStorage => {
   const texts = new Map<string, string>()
   return {
     get: (ckey) => texts.get(ckey) ?? null,
@@ -42,7 +42,7 @@ export const memoryStore = (): StringStore => {
 }
 
 /** A fake auth over fresh stores in memory. */
-export const makeAuth = (): Auth => createAuth({ applabel: 'acme', dbStore: memoryStore(), deviceStore: memoryStore() })
+export const makeAuth = (): Auth => createAuth({ applabel: 'acme', dbStorage: memoryStore(), deviceStorage: memoryStore() })
 
 /** The SessionBar as the App renders it, handed the live session of `auth`. */
 export const LiveSessionBar = ({ auth }: { auth: Auth }) => <SessionBar auth={auth} session={useSession(auth)} />

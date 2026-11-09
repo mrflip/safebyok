@@ -11,7 +11,7 @@ const Checks = Checkers('bad_option', ({ obj, custom }) => {
   return { gateMakeArgs: obj({ passphraseWayin: wayin, passkeyWayin: wayin.nullable() }) }
 })
 
-/** The wayins of a vault's record as of one `gate_epoch`, a read-only view: a change is a vaultDB verb's, and a new `Gate` is read from the record it lands. */
+/** The wayins of a vault's record as of one `gate_epoch`, a read-only view: a change is a vaultDB verb's, and a new `Gate` is read from the record it writes. */
 export class Gate {
   // == [Props]: gate_epoch, passphrase_wayin, passkey_wayin, ppWayin, pkWayin, stamp
 

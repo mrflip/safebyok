@@ -84,7 +84,7 @@ export type Aligned = Z.infer<typeof aligned>
 /** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */
 export const Promptly = 2000
 
-/** SLOPDOC: The checks of the options a storable and its verbs take. */
+/** SLOPDOC: The checks of the options a storable and its verbs accept. */
 export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, fn }) => {
   const ifPresent     = oneof(EX.ifPresentVals)
   const ifAbsent      = oneof(EX.ifAbsentVals)
@@ -269,13 +269,13 @@ export const { boxDna, boxPatch } = Checkers('bad_option', ({ lit, oneof, applab
   return { boxDna, boxPatch }
 })
 
-/** The check of what `box.putExposed` takes: a sidecar, if any, and never a whisper. */
+/** The check of what `box.putExposed` accepts: a sidecar, if any, and never a whisper. */
 export const boxExposedPatch = objCheck(({ sidecar }) => ({ sidecar: sidecar.optional() }), { refusalkind: 'bad_option' }, [CX])
 
 /** A host's patch for `box.putExposed`, which seals the whisper exposed. */
 export type BoxExposedPatch = Z.input<typeof boxExposedPatch>
 
-/** The check of what `box.patchWhisper` takes: a whisper, to merge over the one exposed. */
+/** The check of what `box.patchWhisper` accepts: a whisper, to merge over the one exposed. */
 export const whisperPatch = Checker(() => CX.whisper, 'bad_option')
 
 /** A box's patch as {@link boxPatch} hands it back: the whisper and the sidecar, each undefined where kept, and the scope's fields as given. */
@@ -347,7 +347,7 @@ export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 's
 
 // --
 
-// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, EraseSite, BankAnnouncement, BankEvent, LifecycleHandler, GuardedLifecycleHandler, BankAnnounce, BankPanic, BankStage, BankSnapshot
+// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, RevokeSite, BankAnnouncement, BankEvent, LifecycleHandler, GuardedLifecycleHandler, BankAnnounce, BankPanic, BankStage, BankSnapshot
 
 /** The checks of a bank's durations in minutes: `positiveMinutes` for the autolock, and `refreshMinutes` for a refresh interval, which may be zero. */
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
@@ -390,7 +390,7 @@ export interface BankOpts {
   keyDeriver:           KeyDeriver
   /** Your dialog, called with each gating that needs the user's passphrase or passkey; left out, each gating waits in the bank's snapshot for your own `attempt` or `dismiss`. */
   requestCleartext?:    RequestCleartext | undefined
-  /** Judges each new passphrase before a vault takes it; without one, every new passphrase is too weak (CUSTOMIZATION.md). */
+  /** Judges each new passphrase before a vault accepts it; without one, every new passphrase is too weak (CUSTOMIZATION.md). */
   strengthChecker?:     StrengthChecker | undefined
   /** Where the bank says what it has no caller to throw to; the console when left out. */
   logger?:              VaultLogger | undefined
@@ -435,19 +435,19 @@ export const tellBadNewsToInput = objCheck(({ fn, custom, arr }) => ({
   badnews:   arr(custom<VaultError>(isVaultError, Phrases.VaultErrorExpected)),
 }), 'bad_option')
 
-/** Where a cached lease outlived its forget: a vault's lock, tombstone or vacate, the bank's vacate, or a row of another epoch or life met at an unlock. */
-export type EraseSite = 'lock' | 'tombstone' | 'vacate' | 'undeleted'
+/** Where a cached lease outlived its revoke: a vault's lock, tombstone or vacate, the bank's vacate, or a row of another epoch or life met at an unlock. */
+export type RevokeSite = 'lock' | 'tombstone' | 'vacate' | 'undeleted'
 
 /** What a bank's listings and vaults announce through it: a {@link BankEvent} before the bank names itself. */
 export type BankAnnouncement =
-  | { readonly kind: 'lease_unerased', readonly refusal: VaultError, readonly vault: Vault | null, readonly where: EraseSite }
-  | { readonly kind: 'vacated', readonly cause: VaultError, readonly unerased: number }
+  | { readonly kind: 'lease_revoke_failed', readonly refusal: VaultError, readonly vault: Vault | null, readonly where: RevokeSite }
+  | { readonly kind: 'vacated', readonly cause: VaultError, readonly unrevoked: number }
   | { readonly kind: 'helloed', readonly outcome: Outcome<void>, readonly vault: Vault | null }
 
 /** What `onLifecycle` hears: what happened in the bank's life, told by its `kind`, and the bank it happened to. */
 export type BankEvent = { readonly bank: Bank } & BankAnnouncement
 
-/** `Bank.make`'s `onLifecycle`: hears what happened in the bank's life, as a hello, a vacate or a cached lease that outlived its forget. */
+/** `Bank.make`'s `onLifecycle`: hears what happened in the bank's life, as a hello, a vacate or a cached lease that outlived its revoke. */
 export type LifecycleHandler = (event: BankEvent) => unknown
 
 /** `onLifecycle` as a bank keeps it, wrapped by `guardOnLifecycle`. Never throws. */
@@ -459,7 +459,7 @@ export type BankAnnounce = (announcement: BankAnnouncement) => void
 /** How a listing vacates its bank for a revoked identity: handed to each as it is made. Never throws. */
 export type BankPanic = (refusal: VaultError) => void
 
-/** `made` until a `hello` answers; `ready` once one lands; `refused` once one refuses or the bank is swept or vacated, the snapshot's `err` saying why. */
+/** `made` until a `hello` answers; `ready` after `hello` succeeds; `refused` once one refuses or the bank is swept or vacated, the snapshot's `err` saying why. */
 export type BankStage = 'made' | 'ready' | 'refused'
 
 /** A bank as a host renders it: its scope, how far its `hello` got, its vaults, and the gating it has open. */

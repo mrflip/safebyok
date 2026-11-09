@@ -15,7 +15,7 @@ export type { Awaitable } from '../helpers/helpers'
 export { ckeyOf } from '../helpers/helpers'
 // --
 
-// == [IndexedDB]: the one transaction an IndexedDB datastore takes per call, the row at a scopepath within it, and the versioned shelf
+// == [IndexedDB]: the one transaction an IndexedDB datastore uses per call, the row at a scopepath within it, and the versioned shelf
 export { inOneStep, rowAt } from './idb-transaction'
 export { versionedShelfOf } from './idb-shelf'
 export type { VersionedShelfSpec } from './idb-shelf'
@@ -60,7 +60,7 @@ export { Checker, Checkers, objCheck, type AssertEqual, type CheckerInput } from
 export type { ConsistencyRefusal, ObjCheckOpts, Refusing, Story } from '../helpers/validator'
 // --
 
-// == [The refusals]: the throwers an adapter raises, and how a refusal reads
+// == [The refusals]: an adapter's throwers
 export { sanitizeForeignError, storageUnavailable, unexpectedError } from '../refusals/throwers'
 export { vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, storageFull, seqNotNext, deviceDBFailed } from '../refusals/throwers'
 export { storageFailed, identityRevoked } from '../refusals/throwers'

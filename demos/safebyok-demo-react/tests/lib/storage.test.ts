@@ -3,7 +3,7 @@ import 'fake-indexeddb/auto'
 import { describe, expect, it } from 'vitest'
 import { IdbDeviceDB, zxcvbnStrengthChecker } from 'safebyok/browser'
 import { OutageVaultDB } from '../../src/lib/outage-vault-db'
-import { bankOpts } from '../../src/lib/stores'
+import { bankOpts } from '../../src/lib/storage'
 
 describe("the demo's bank options", () => {
   it("are the browser's batteries and the vaultDB behind the outage switch", () => {

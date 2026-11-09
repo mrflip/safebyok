@@ -1,4 +1,4 @@
-/** The checks of a vaultDB's answers as a client takes them off a wire, where an absent field arrives as null: each parses to the answer its verb returns. Imported as `AX`. */
+/** The checks of a vaultDB's answers as a client receives them from a wire, where an absent field arrives as null: each parses to the answer its verb returns. Imported as `AX`. */
 
 import type * as Z from 'zod'
 import { Checkers } from '../helpers/validator'

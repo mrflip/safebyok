@@ -24,7 +24,7 @@ describe("SX.boxRecord and SX.boxSparse", () => {
       [{ ...full, sidecar: {} },                        true,  'passes an empty sidecar'],
       [sparse,                                          false, 'refuses a sparse record: it is the full one'],
       [gone,                                            false, 'refuses a tombstone'],
-      [{ ...full, extra: 1 },                           false, 'refuses a field it does not take, being strict'],
+      [{ ...full, extra: 1 },                           false, 'refuses a field it does not accept, being strict'],
       [{ ...full, fmt: 8 },                             false, 'refuses another format'],
       [{ ...full, sidecar: undefined },                 false, 'refuses a missing sidecar'],
       [{ ...full, sidecar: 'work account' },            false, 'refuses a sidecar that is no object'],
@@ -88,7 +88,7 @@ describe("SX.boxRecord and SX.boxSparse", () => {
       expect(parsed.whisper_schema_version).to.eq(1)
     })
 
-    it("strips a field it does not take, where boxRecord refuses it", () => {
+    it("strips a field it does not accept, where boxRecord refuses it", () => {
       expect(SX.boxSparse.parse({ ...sparse, extra: 1 })).to.deep.equal(sparse)
     })
 
@@ -146,7 +146,7 @@ describe("VX.boxDna", () => {
     [{ ...dna, revision_seq: 1 },                           false, 'refuses a revision_seq, which a dna never carries'],
     [{ ...dna, registered_at: 5 },                          false, 'refuses a registered_at that is no epoch'],
     // a bag a person typed:
-    [{ ...dna, sidcar: {} },                                false, 'refuses a field it does not take, being strict'],
+    [{ ...dna, sidcar: {} },                                false, 'refuses a field it does not accept, being strict'],
     [null,                                                  false, 'refuses null'],
   ])
 

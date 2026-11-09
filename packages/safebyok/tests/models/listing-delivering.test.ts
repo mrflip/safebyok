@@ -1,6 +1,7 @@
 /** How a Listing delivers an answer: refused or malformed, past its end, a void row, one instance for each scope, and a record of another vault_tok. */
 
 import { describe, expect, it, vi } from 'vitest'
+import * as Phrases from '../../src/helpers/phrases'
 import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import * as SX from '../../src/shapes/shapes-storage'
@@ -267,7 +268,7 @@ describe("listing: a record of another vault_tok meets no instance held", () => 
     const box = await listing.build(fullBoxRecord())
     held.mw.willGet(held.mw.answerOf(box.scope, fullBoxRecord({ vault_tok: OtherVault, revision_seq: 2, revision_tok: 'rev-a2' })))
     const err = await TH.expectRefusal(listing.fetch(box.scope))
-    expect(err.message).to.contain('kept its own copy')
+    expect(err.message).to.eq(Phrases.OtherVaultTok)
   })
 })
 

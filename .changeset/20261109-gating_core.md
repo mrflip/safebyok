@@ -8,3 +8,5 @@ A lock no longer ends an open gating, and the `locked_while_asking` refusal kind
 `safebyok-react`: the `passphraseAdvice` prop and the `PassphraseAdvice` type are gone. A host's `strengthChecker` judges a passphrase and words the advice, for the live preview and the attempt alike.
 
 The `gating_landed` refusal kind is now `gating_concluded`. For adapters, the `do*` calls answer `Written` and `BoxWritten` with `isWritten`, in place of `Landing`, `BoxLanding` and `landed`. `BoxFields.save` and `trySave` are now `put` and `tryPut`. `DeviceDB.delRawLease` and its `try` form are now `forgetRawLease` and `tryForgetRawLease`, and the `Phrases` names `storeFailed`, `NoBrowserStore` and `BrowserStoreFailed` are now `deviceDBFailed`, `NoBrowserDatastore` and `BrowserDatastoreFailed`.
+
+The `lease_unerased` lifecycle event is now `lease_revoke_failed`, the `vacated` event's `unerased` count is now `unrevoked`, and the `EraseSite` type is now `RevokeSite`.

@@ -237,7 +237,7 @@ Avoid these. Each means several things:
 * **store**: put, stow or storage.
 * **save**: put or stow.
 * **complete**: full, whole, or one of the other verbs.
-* **raise**: increment or throw.
+* **raise**: deprecated. Say increment, throw or start.
 
 Use these only where the precise word does not apply:
 
@@ -245,6 +245,8 @@ Use these only where the precise word does not apply:
 * **apply**: put, stow, commit, write.
 * **edit**, **update**, **add**, **insert**, **create**: to make clear what kind of put.
 * **bump**: increment.
+* **evict**: revoke, forget, detach, vacate, sweep.
+* **start**: construct, make, build.
 * **arrive**: adopt, receive.
 * **send**: deliver, notify, put.
 * **modify**: del, put, update, adopt, deliver.

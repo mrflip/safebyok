@@ -322,7 +322,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** True where the record in hand is whole: {@link isFull}, or a tombstone; only a sparse record is not. */
   get #isWhole(): boolean { return this.isWholeRecord(this.#central) }
 
-  /** Whether `record` is whole, as storage would hand it back complete: full, or a tombstone. A sparse record is not. */
+  /** Whether `record` is whole (full, or a tombstone), as stored in VaultDB. A sparse record is not whole. */
   protected isWholeRecord(record: Fetched<RecordT, SparseT>): record is RecordT | Tombstone<SparseT> {
     return this.isTombstoneRecord(record) || this.isFullRecord(record)
   }

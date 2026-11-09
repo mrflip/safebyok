@@ -157,7 +157,7 @@ export type VaultScope = Z.infer<typeof vaultScope>
 export type Boxscope = Z.infer<typeof boxscope>
 
 /** The scope naming one of a bank's vaults, as its calls are handed it: the `vaultlabel` required, the `applabel` and `user_id` invited, each name checked.
- * It takes whatever carries the names, a plain bag, a Vault object, its snapshot or a
+ * It accepts whatever carries the names, a plain bag, a Vault object, its snapshot or a
  * BankVault, and leaves the rest. A vaultDB or deviceDB in the scope refuses: it belongs in the
  * second bag, the options, and would be dropped unseen here.
  *

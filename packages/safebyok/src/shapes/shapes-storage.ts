@@ -1,4 +1,4 @@
-/** What the vaultDB and the deviceDB write and take, and their helpers. Imported as `SX`. */
+/** What the vaultDB and the deviceDB write and accept, and their helpers. Imported as `SX`. */
 
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
@@ -165,7 +165,7 @@ export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParam
 
 // == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
 
-/** The checks of the options a vaultDB verb takes, and of the safe metadata an answer carries. */
+/** The checks of the options a vaultDB verb accepts, and of the safe metadata an answer carries. */
 export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams } = Checkers('bad_option', ({ obj, oneof, box_tok }) => {
   const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
   const putIfAbsent = oneof(EX.putIfAbsentVals).default('add')
@@ -198,9 +198,9 @@ export type PutOptsGiven = Readonly<Z.output<typeof putOpts>>
 export type PutVaultOpts = Readonly<Z.input<typeof putVaultOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>
 export type ReqParams = Readonly<Z.infer<typeof reqParams>>
-/** What an AdapterVaultDB's constructor takes. */
+/** What an AdapterVaultDB's constructor accepts. */
 export type AdapterVaultDBOpts = Readonly<Z.input<typeof adapterVaultDBOpts>>
-/** What a memory vaultDB's constructor takes. */
+/** What a memory vaultDB's constructor accepts. */
 export type MemoryVaultDBOpts = Readonly<Z.input<typeof memoryVaultDBOpts>>
 // --
 
@@ -331,7 +331,7 @@ export type LeaseDated   = Z.infer<typeof leaseDated>
 export type LeaseRow     = Z.infer<typeof leaseRow>
 
 // Three strings, and no label rules: `forgetRawLease` is for reaching a row filed under labels today's checks refuse.
-/** The check of a lease scopepath, as `forgetRawLease` takes one: three strings. */
+/** The check of a lease scopepath, as `forgetRawLease` accepts one: three strings. */
 export const leaseScopepath = Checker(({ tuple, str }) => tuple([str, str, str]), 'bad_scope')
 
 /** Where a device database files a vault's lease row: its applabel, user_id and vaultlabel, as stored. */

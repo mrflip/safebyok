@@ -97,9 +97,9 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
   prfBytes:      bytes(PrfAnswerBytes).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
 }), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
 
-/** A passkey's answer when asked for a vault's PRF: the cleartext a gating takes for a passkey. `safebyok-react`'s `askPasskey` makes one.
- * An `unlock_vault` gating takes it as `passkeyClear` in `attempt`, in place of the passphrase.
- * `build_vault` and `add_passkey` take it there beside the passphrase.
+/** A passkey's answer when asked for a vault's PRF: the cleartext a gating accepts for a passkey. `safebyok-react`'s `askPasskey` makes one.
+ * An `unlock_vault` gating accepts it as `passkeyClear` in `attempt`, in place of the passphrase.
+ * `build_vault` and `add_passkey` accept it there beside the passphrase.
  *
  * @example await gating.attempt({ passkeyClear: passkey })   // an unlock_vault gating, by the passkey alone
  */
@@ -140,7 +140,7 @@ export type PassphraseVerdict = Z.infer<typeof passphraseVerdict>
 
 // == [The vault's stamp]: vaultStamp, VaultStamp
 
-/** The fields of a vault fixed for its life, which every ctx under it binds: the scope, `vault_tok` and `registered_at`. Its `parse` takes them from whatever carries them, a Vault included, and strips the rest. */
+/** The fields of a vault fixed for its life, which every ctx under it binds: the scope, `vault_tok` and `registered_at`. Its `parse` accepts them from whatever carries them, a Vault included, and strips the rest. */
 export const vaultStamp = objCheck(({ vaultScope, vault_tok, epochMillis }) => ({
   ...vaultScope.unwrap().shape,
   vault_tok,
@@ -248,7 +248,7 @@ export const leaseFriend = objCheck(({ fn }) => ({
   tryCacheLease:   fn<(record: LeaseRecord) => Promise<Outcome<unknown>>>(),
   /** Forget the lease this device has cached. */
   forgetLease:     fn<() => Promise<void>>(),
-  /** Forget the lease this device has cached, telling the host of a refused forget. */
+  /** Forget the lease this device has cached, telling the host of a failed revoke. */
   tryForgetLease:  fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
   tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),
@@ -301,7 +301,7 @@ export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplac
   vaultDelClears:          obj({ passphraseClear: passphraseCleartext }).strict(),
 }))
 
-/** What a gating's run hears of its vault's private verbs, past the enter key. A plain object, held in private by the vault and the gating: no public method of a vault takes a proving. */
+/** What a gating's run hears of its vault's private verbs, past the enter key. A plain object, held in private by the vault and the gating: no public method of a vault accepts a proving. */
 export const gatingFriend = objCheck(({ fn }) => ({
   /** Unlock the vault with what a proving proved, under `gate_epoch` where a gate change just wrote one. */
   unlockByProof: fn<(vault: Vault, proved: Proving, gate_epoch?: number) => Promise<Vault>>(),
@@ -373,7 +373,7 @@ export type Run<KindT extends EX.Gatingkind> = (provings: ProvingsForGatingkind[
 /** The vault each kind of gating acts on, null for a `build_vault` whose vault does not exist yet. */
 export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
 
-/** All a gating is launched with; `prior`, the revision a birth lands after, is read at launch, and `askUser` is the bank's, null with no host dialog. */
+/** All a gating is launched with; `prior`, the revision a birth is put over, is read at launch, and `askUser` is the bank's, null with no host dialog. */
 export type LaunchArgs<KindT extends EX.Gatingkind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], prior: KindT extends 'build_vault' ? Revision : null, friend: GatingFriend, askUser: AskUser | null }
 
 /** The vault, scope, listing and world a gating hands its {@link Prove}. */

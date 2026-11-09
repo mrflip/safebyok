@@ -206,7 +206,7 @@ describe("bank.autolock", () => {
     await bank.autolock()
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => onLifecycle.mock.calls.length === 1)
-    expect(onLifecycle).toHaveBeenCalledWith({ kind: 'lease_unerased', refusal, vault, where: 'lock', bank })
+    expect(onLifecycle).toHaveBeenCalledWith({ kind: 'lease_revoke_failed', refusal, vault, where: 'lock', bank })
   })
 
   it("finds nothing past an autolock of Infinity", async () => {
@@ -280,8 +280,8 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(bank.isEnabled).to.be.false
     await vacating
     expect(onLifecycle.mock.calls).to.deep.equal([
-      [{ kind: 'lease_unerased', refusal, vault: null, where: 'vacate', bank }],
-      [{ kind: 'vacated', cause: bank.snapshot.err, unerased: 1, bank }],
+      [{ kind: 'lease_revoke_failed', refusal, vault: null, where: 'vacate', bank }],
+      [{ kind: 'vacated', cause: bank.snapshot.err, unrevoked: 1, bank }],
     ])
     expect(reported).not.toHaveBeenCalled()
     await bank.vacate()
@@ -334,10 +334,10 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     vi.spyOn(world.deviceDB, 'tryForgetBank').mockResolvedValueOnce({ ok: false, err: refusal })
     await bank.vacate()
     expect(onBadNews.mock.calls).to.deep.equal([[{ news: listRefused, bank }], [{ news: refusal, bank }]])
-    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: bank.snapshot.err, unerased: 0, bank })
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: bank.snapshot.err, unrevoked: 0, bank })
   })
 
-  it("disables the bank at once, before its scrub: every call refuses, and the snapshot reads refused with the cause", async () => {
+  it("disables the bank at once, before it forgets its rows: every call refuses, and the snapshot reads refused with the cause", async () => {
     const { world, bank } = await makeBankWithVault()
     const listing = TH.holdNextCall(world.deviceDB, 'tryListLeases')
     const cause = new VaultError('identity_revoked', 'signed out')
@@ -354,7 +354,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(world.leaseRows()).to.deep.equal([])
   })
 
-  it("tells the host nothing past the disable but its scrub's refusals, a vault's own forget going to the platform", async () => {
+  it("tells the host nothing past the disable but its vacate's refusals, a vault's own forget going to the platform", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
@@ -376,8 +376,8 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     listing.release()
     await vacating
     expect(onLifecycle.mock.calls).to.deep.equal([
-      [{ kind: 'lease_unerased', refusal, vault: null, where: 'vacate', bank }],
-      [{ kind: 'vacated', cause: bank.snapshot.err, unerased: 1, bank }],
+      [{ kind: 'lease_revoke_failed', refusal, vault: null, where: 'vacate', bank }],
+      [{ kind: 'vacated', cause: bank.snapshot.err, unrevoked: 1, bank }],
     ])
     expect([requestCleartext, onBadNews].map((handler) => handler.mock.calls.length)).to.deep.equal([0, 0])
     await TH.eventually(() => reported.mock.calls.some(([err]) => err === refusal))
@@ -409,7 +409,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     await expect(Promise.all(onLifecycle.mock.results.map((result) => result.value as unknown))).resolves.to.deep.equal([undefined, undefined])
   })
 
-  it("refuses a story whose cause is no VaultError, or that has a field it does not take, and stays enabled", () => {
+  it("refuses a story whose cause is no VaultError, or that has a field it does not accept, and stays enabled", () => {
     const bank = makeBankWorld().bankOn()
     TH.expectSyncRefusal(() => bank.vacate({ cause: new Error('signed out') as VaultError }), 'bad_option')
     TH.expectSyncRefusal(() => bank.vacate({ reason: 'signed out' } as never), 'bad_option')

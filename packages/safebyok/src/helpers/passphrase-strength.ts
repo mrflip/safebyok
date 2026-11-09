@@ -54,7 +54,7 @@ export const StrongVerdict: PassphraseVerdict = Object.freeze({ strong: true })
 /** The verdict {@link DefaultStrengthChecker} answers of every passphrase: a word to the user, and one to the app's makers. */
 const DefaultVerdict: PassphraseVerdict = Object.freeze({
   strong: false,
-  reason: "This app can't take a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Bank.make needs a strengthChecker, such as zxcvbnStrengthChecker from safebyok/browser, as safebyok's CUSTOMIZATION.md says under Pluggable Passphrase Strength Checker.",
+  reason: "This app can't accept a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Bank.make needs a strengthChecker, such as zxcvbnStrengthChecker from safebyok/browser, as safebyok's CUSTOMIZATION.md says under Pluggable Passphrase Strength Checker.",
 })
 
 /** The strength checker of a vault whose host chose none: every passphrase is too weak, so no vault can be made, nor a passphrase changed.

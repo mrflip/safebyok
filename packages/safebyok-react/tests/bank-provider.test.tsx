@@ -156,7 +156,7 @@ describe("BankProvider's bank", () => {
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })
   })
 
-  it("throws an option Bank.make does not take to the nearest error boundary", async () => {
+  it("throws an option Bank.make does not accept to the nearest error boundary", async () => {
     const props = { ...TH.providerPropsOf(TH.makeBankWorld()), leaseHours: 3 } as Props
     const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
     await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
@@ -353,8 +353,8 @@ describe("BankProvider's handlers", () => {
     rerender({ ...props, onLifecycle: last })
     refuseErase(deviceDB)
     fireEvent.click(screen.getByText('Lock'))
-    await waitFor(() => { expect(last).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_unerased', refusal: Refusal })) })
-    expect(first).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_unerased' }))
+    await waitFor(() => { expect(last).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal })) })
+    expect(first).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed' }))
     expect(TH.seenBanks).to.have.lengthOf(1)
     expect(shown('vault')).to.eq('present locked')
   })
@@ -382,9 +382,9 @@ describe("BankProvider's handlers", () => {
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     forgetting.resolve(undefined)
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
-    await waitFor(() => { expect(previous).toHaveBeenCalledWith(expect.objectContaining({ kind: 'vacated', unerased: 1 })) })
-    expect(previous.mock.calls.map(([event]) => (event as { kind: string }).kind).filter((kind) => kind !== 'helloed')).to.deep.equal(['lease_unerased', 'vacated'])
-    expect(previous).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_unerased', refusal: Refusal, where: 'vacate' }))
+    await waitFor(() => { expect(previous).toHaveBeenCalledWith(expect.objectContaining({ kind: 'vacated', unrevoked: 1 })) })
+    expect(previous.mock.calls.map(([event]) => (event as { kind: string }).kind).filter((kind) => kind !== 'helloed')).to.deep.equal(['lease_revoke_failed', 'vacated'])
+    expect(previous).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal, where: 'vacate' }))
     expect(next.mock.calls.map(([event]) => (event as { kind: string }).kind).filter((kind) => kind !== 'helloed')).to.deep.equal([])
   })
 })

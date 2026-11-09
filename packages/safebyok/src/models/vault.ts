@@ -8,7 +8,7 @@ import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
 import type { AskUser, GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BankFriend, BoxPut, BoxPutOpts, EraseSite, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
+import type { BankFriend, BoxPut, BoxPutOpts, RevokeSite, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { alreadyListedError, deletedVaultError, stampOfOtherVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
@@ -136,7 +136,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link delVaultPrompt}. */
   tryDelVaultPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.delVaultPrompt()) }
 
-  /** Delete this vault by {@link delVaultPrompt}, which takes the passphrase's proof. */
+  /** Delete this vault by {@link delVaultPrompt}, which accepts the passphrase's proof. */
   override del(): Promise<this> { return this.delVaultPrompt() }
 
   // --
@@ -169,7 +169,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // == [The lease]: lock, vacateLease, unlockByProof, attachLease
 
   /** Lock the vault and its boxes before returning, and forget the row cached on this device.
-   * A refused forget is announced as `lease_unerased` and does not throw. A no-op on a vault discarded.
+   * A failed revoke is announced as `lease_revoke_failed` and does not throw. A no-op on a vault discarded.
    */
   override lock(): this {
     if (! this.isEnabled) { return this }
@@ -177,18 +177,18 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
-  /** SLOPDOC: Drops any lease granted and forgets the row cached on this device, announcing a refused forget at `where`. */
-  async #revokeLease(where: Exclude<EraseSite, 'undeleted'>): Promise<void> {
-    // The lease goes first, so a refused forget leaves none; the forget starts before any await, landing in call order.
+  /** SLOPDOC: Drops any lease granted and forgets the row cached on this device, announcing a failed revoke at `where`. */
+  async #revokeLease(where: Exclude<RevokeSite, 'undeleted'>): Promise<void> {
+    // The lease goes first, so a refused forget leaves none; the forget starts before any await, so forgets start in call order.
     const granted = this.#lease
     this.#lease = null
     const revoking = granted?.tryRevoke() ?? Lease.tryForget(this.#leaseFriend())
     this.align()
     const revoked = await revoking
-    if (! revoked.ok) { this.#bankFriend.announce({ kind: 'lease_unerased', refusal: revoked.err, vault: this, where }) }
+    if (! revoked.ok) { this.#bankFriend.announce({ kind: 'lease_revoke_failed', refusal: revoked.err, vault: this, where }) }
   }
 
-  /** The lease `proved` earns, attached. A lock landing during the unlock does not hold: the proof says this user may have the vault unlocked. */
+  /** The lease `proved` earns, attached. A lock called during the unlock does not hold: the proof says this user may have the vault unlocked. */
   async #unlockByProof(proved: Proving, gate_epoch?: number): Promise<this> {
     const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
     await this.#attachLease(lease)
@@ -206,7 +206,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [The gating's friend]: gatingFriend, launchArgs
 
-  /** The private verbs a gating's run calls past the enter key, as no public method of a vault takes a proving (G9). */
+  /** The private verbs a gating's run calls past the enter key, as no public method of a vault accepts a proving (G9). */
   static readonly #gatingFriend: GatingFriend = {
     unlockByProof: (vault, proved, gate_epoch) => vault.#unlockByProof(proved, gate_epoch),
   }
@@ -238,7 +238,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       forgetLease:     () => deviceDB.forget(asked),
       tryForgetLease:  async (): Promise<Outcome<void>> => {
         const outcome = await deviceDB.tryForget(asked)
-        if (! outcome.ok) { this.#bankFriend.announce({ kind: 'lease_unerased', refusal: outcome.err, vault: this, where: 'undeleted' }) }
+        if (! outcome.ok) { this.#bankFriend.announce({ kind: 'lease_revoke_failed', refusal: outcome.err, vault: this, where: 'undeleted' }) }
         return outcome
       },
       tellBadNews:     (badnews) => { this.#bankFriend.tellBadNews(badnews) },
@@ -364,7 +364,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // == [Protected, overriding Storable's]: adopt, sweepContents, vacateContents, isFullRecord, lifeTokPathOf, makeSnapshot
 
   /** Adopt `central`. A tombstone locks the vault, forgets the cached row and vacates the boxes, the vault keeping its slot.
-   * A refused forget is announced as `lease_unerased`, and the tombstone stands.
+   * A failed revoke is announced as `lease_revoke_failed`, and the tombstone stands.
    */
   protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {
     super.adopt(central)

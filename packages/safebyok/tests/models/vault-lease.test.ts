@@ -84,7 +84,7 @@ describe("A lease renewed through a gate change", () => {
   })
 })
 
-describe("A refused forget of the row: lease_unerased", () => {
+describe("A refused forget of the row: lease_revoke_failed", () => {
   const Refusal = new VaultError('storage_unavailable', 'the disk is full')
 
   it("is announced by the friend's tryForgetLease, which answers it as a bad Outcome", async () => {
@@ -93,7 +93,7 @@ describe("A refused forget of the row: lease_unerased", () => {
     deviceDB.forget.mockRejectedValueOnce(Refusal)
     await TH.expectBad(friend.tryForgetLease(), 'storage_unavailable')
     await TH.eventually(() => onLifecycle.mock.calls.length > 0)
-    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_unerased', refusal: Refusal, vault, where: 'undeleted' }))
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal, vault, where: 'undeleted' }))
   })
 
   it("is heard by the host's onLifecycle, leaving the vault locked and enabled; a rejection of it goes to the platform and no further", async () => {
@@ -104,7 +104,7 @@ describe("A refused forget of the row: lease_unerased", () => {
     vault.lock()
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => reported.mock.calls.length === 1)
-    expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_unerased', refusal: Refusal, vault, where: 'lock' }))
+    expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal, vault, where: 'lock' }))
     expect(vault.isEnabled).to.be.true
     expect(deviceDB.cachedNow()).not.to.be.null
   })

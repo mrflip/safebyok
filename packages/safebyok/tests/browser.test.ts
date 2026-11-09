@@ -111,7 +111,7 @@ describe("browserOpts", () => {
     expect(one.strengthChecker).to.eq(other.strengthChecker)
   })
 
-  it("refuses a dbName that is not non-empty text, and an option it does not take", () => {
+  it("refuses a dbName that is not non-empty text, and an option it does not accept", () => {
     TH.expectSyncRefusal(() => browserOpts({ dbName: '' }), 'bad_option')
     TH.expectSyncRefusal(() => browserOpts({ dbName: 3 } as never), 'bad_option')
     TH.expectSyncRefusal(() => browserOpts({ dbname: 'acme' } as never), 'bad_option')

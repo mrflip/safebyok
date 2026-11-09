@@ -42,7 +42,7 @@ export class Bank {
   /** The refresh horizon of each vault's boxes. */
   readonly boxRefreshMillis: number
 
-  /** The host's `onLifecycle`, guarded, and its `onBadNews`, called while the bank is enabled and by its vacate's scrub. */
+  /** The host's `onLifecycle`, guarded, and its `onBadNews`, called while the bank is enabled and by its vacate. */
   readonly #hostHandlers: Handlers
 
   /** Tell bad news no caller waits on to the host, its every listing and box coming straight here: the friend they tell it through. */
@@ -54,7 +54,7 @@ export class Bank {
   readonly #vaultListing: VaultListing
   /** Why a sweep or a vacate disabled the bank, its snapshot's refusal from then on; null while it is enabled. */
   #endCause:              VaultError | null = null
-  /** The first vacate's scrub, which a repeat answers; null until a vacate. */
+  /** The first vacate's promise, which a repeat answers; null until a vacate. */
   #vacating:              Promise<void> | null = null
   /** The outcome of the last `hello`, null with none yet. */
   #lastHello:             Outcome<void> | null = null
@@ -102,9 +102,9 @@ export class Bank {
     this.device_id = device_id
     this.keyDeriver = guardKeyDeriver(keyDeriver)
     this.deviceDB = deviceDB
-    // A disabled bank calls none of the host's functions, but in its vacate's scrub: the page may belong to the next user by then.
+    // A disabled bank calls none of the host's functions, but in its vacate: the page may belong to the next user by then.
     this.#hostHandlers = { onLifecycle: guardOnLifecycle(onLifecycle), onBadNews }
-    // A revoked identity vacates the bank whatever the host's onLifecycle does; the host hears of it as the scrub's `vacated`.
+    // A revoked identity vacates the bank whatever the host's onLifecycle does; the host hears of it as the vacate's `vacated`.
     const panic = brandGuarded((refusal: VaultError): void => { void this.vacate({ cause: refusal }) })
     // A disabled bank asks no one: every Gating.launch follows an enabled check in the same tick.
     const askUser = requestCleartext === undefined ? null : guardRequestCleartext(requestCleartext)
@@ -163,7 +163,7 @@ export class Bank {
   }
   // --
 
-  // == [Ending]: autolock, lock, vacate, sweep, letGo, listOwnLeases, scrub, forgetOwnLeases, forgetOwnBank, tellHost
+  // == [Ending]: autolock, lock, vacate, sweep, letGo, listOwnLeases, vacateDevice, revokeOwnLeases, forgetOwnBank, tellHost
 
   /** Lock each listed vault with a cached lease past autolock, forgetting it. Call it after `hello` and on your own timer.
    * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.buildFromCache` leaves such a row for it.
@@ -189,9 +189,9 @@ export class Bank {
   vacate(story: VacateStory = {}): Promise<void> {
     const { cause = bankDisabled() } = VX.vacateStory.parse(story)
     this.#letGo(cause, () => { this.#vaultListing.vacate() })
-    // The scrub alone holds the host's handlers past the disable: a lease that outlives sign-out is the one the host most needs to hear of.
-    // A vacate after a sweep still scrubs, as sign-out may come after the page's cleanup.
-    this.#vacating ??= this.#scrub(cause)
+    // A vacate alone uses the host's handlers past the disable: a lease that outlives sign-out is the one the host most needs to hear of.
+    // A vacate after a sweep still forgets its rows, as sign-out may come after the page's cleanup.
+    this.#vacating ??= this.#vacateDevice(cause)
     return this.#vacating
   }
 
@@ -216,25 +216,25 @@ export class Bank {
   }
 
   // A fresh device holds no bank row: the next bank of this scope gets a new device_id.
-  /** A vacate's scrub of this device: every lease row of this bank, then its bank row, then `vacated` told. */
-  async #scrub(cause: VaultError): Promise<void> {
-    const unerased = await this.#forgetOwnLeases()
+  /** This bank's leases revoked and its bank row forgotten on this device, then `vacated` told. */
+  async #vacateDevice(cause: VaultError): Promise<void> {
+    const unrevoked = await this.#revokeOwnLeases()
     await this.#forgetOwnBank()
-    this.#tellHost({ kind: 'vacated', cause, unerased })
+    this.#tellHost({ kind: 'vacated', cause, unrevoked })
   }
 
-  /** A vacate's forget of every row of this bank, listed or not, as a fresh page told 'identity_revoked' has listed
-   * none; answers how many it could not forget.
+  /** A vacate's revoke of every lease of this bank, listed or not, as a fresh page told 'identity_revoked' has listed
+   * none; answers how many it could not revoke.
    */
-  async #forgetOwnLeases(): Promise<number> {
+  async #revokeOwnLeases(): Promise<number> {
     const listed = await this.#listOwnLeases()
     if (! listed.ok) { tellBadNewsTo(this.#hostHandlers.onBadNews, this, [listed.err]); return 0 }
-    const forgotten = await Promise.all(listed.val.map(async (row) => {
+    const revoked = await Promise.all(listed.val.map(async (row) => {
       const forgot = await this.deviceDB.tryForget(row)
-      if (! forgot.ok) { this.#tellHost({ kind: 'lease_unerased', refusal: forgot.err, vault: null, where: 'vacate' }) }
+      if (! forgot.ok) { this.#tellHost({ kind: 'lease_revoke_failed', refusal: forgot.err, vault: null, where: 'vacate' }) }
       return forgot.ok
     }))
-    return forgotten.filter((isForgotten) => ! isForgotten).length
+    return revoked.filter((isRevoked) => ! isRevoked).length
   }
 
   /** A vacate's forget of this bank's row in the deviceDB, a refusal told as bad news. */
@@ -243,9 +243,9 @@ export class Bank {
     if (! forgot.ok) { tellBadNewsTo(this.#hostHandlers.onBadNews, this, [forgot.err]) }
   }
 
-  /** The scrub's word to the host's own `onLifecycle`, past the disable. */
+  /** A vacate's word to the host's own `onLifecycle`, past the disable. */
   #tellHost(announcement: BankAnnouncement): void {
-    // Not awaited: a host's onLifecycle that awaits bank.vacate() is handed this scrub, and each would wait on the other.
+    // Not awaited: a host's onLifecycle that awaits bank.vacate() is handed this vacate, and each would wait on the other.
     void this.#hostHandlers.onLifecycle({ ...announcement, bank: this })
   }
   // --
@@ -321,7 +321,7 @@ export class Bank {
   get modelkind(): 'bank' { return 'bank' satisfies Modelkind }
 }
 
-// == [Host functions]: HostChecks, DefaultOnBadNews, tellBadNewsTo, reportAtError, heedUnerased, DefaultOnLifecycle, guardRequestCleartext, guardOnLifecycle, Handlers, DefaultHandlers
+// == [Host functions]: HostChecks, DefaultOnBadNews, tellBadNewsTo, reportAtError, heedRevokeFailed, DefaultOnLifecycle, guardRequestCleartext, guardOnLifecycle, Handlers, DefaultHandlers
 
 const HostChecks = Checkers('bad_option', ({ fn }) => ({
   requestCleartext: fn<RequestCleartext>(),
@@ -356,8 +356,8 @@ const reportAtError = (refusal: VaultError, bank: Bank): void => {
 }
 
 // A lock or a vacate meant the lease gone; a tombstone's forget and an outdated row's are tried again by the next lease cached.
-/** The default's answer to a cached lease that outlived its forget. */
-const heedUnerased = ({ refusal, vault, where, bank }: Extract<BankEvent, { kind: 'lease_unerased' }>): void => {
+/** The default's answer to a cached lease that outlived its revoke. */
+const heedRevokeFailed = ({ refusal, vault, where, bank }: Extract<BankEvent, { kind: 'lease_revoke_failed' }>): void => {
   if (where === 'tombstone' || where === 'undeleted') {
     bank.logger.warn(refusal.message, { call: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
     return
@@ -369,8 +369,8 @@ const heedUnerased = ({ refusal, vault, where, bank }: Extract<BankEvent, { kind
 /** The `onLifecycle` a bank has when given none: a lease that outlived a lock or a vacate, and a vacate with a cause, to the logger at error and the platform, the vault vacated; a hello refused but by the bank's end to the logger. */
 export const DefaultOnLifecycle: LifecycleHandler = (event) => {
   switch (event.kind) {
-  case 'lease_unerased': {
-    heedUnerased(event)
+  case 'lease_revoke_failed': {
+    heedRevokeFailed(event)
     break
   }
   case 'vacated': {

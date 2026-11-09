@@ -1,4 +1,4 @@
-/** The throwers: every refusal the core raises is made here, from a phrase in helpers/phrases.ts, so they are audited in one place.
+/** The throwers: every refusal the core throws is made here, from a phrase in helpers/phrases.ts, so they are audited in one place.
  *
  * A refusal kind earns its place one of three ways: the core or a host routes on it; it gives a material head start in
  * debugging (this is a package bug for sure; the vault was not tombstoned but disappeared; a check that should be

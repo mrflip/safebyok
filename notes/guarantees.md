@@ -320,8 +320,7 @@ the eighth value that this note names here: it lives in locals and arguments for
 message, `cause`, `meta` or any property (`errors.ts`); no refusal interpolates anything but a
 kind, a limit, a field name, or the `name` of an error it replaces (`thrownNameOf`, `errors.ts`: a
 DOMException's or an Error's class name such as `QuotaExceededError`, or whatever name a host's own
-device database gave its error, kept by the device-database conditions until a redact
-lands; the Coach, 2026-10-28). No validator's refusal quotes an input value. It names a failing field by its
+device database gave its error, kept by the device-database conditions until redaction is built; the Coach, 2026-10-28). No validator's refusal quotes an input value. It names a failing field by its
 path, so a key a host chose, which is no secret, may be named (`tests/helpers/validator.test.ts`, *repeats the keys of
 a schema keyed by its input in the refusal*). `tests/helpers/validator.test.ts`, *every checker a shapes module
 exports*, hands each checker the shapes modules export, and each field under it at any depth, parsed alone, a marked

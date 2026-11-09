@@ -212,7 +212,7 @@ export type GuardedKeyDeriver = Readonly<{
 }>
 
 // Its interface and its salt length are checked, never its other choices (#the-host-is-not-our-threat-model): what its key bytes must be is
-// checked where they land, in passphraseKeyOf. A failed `load` keeps its throw as the cause, as it heard nothing;
+// checked where they arrive, in passphraseKeyOf. A failed `load` keeps its throw as the cause, as it heard nothing;
 // a VaultError `load` throws passes as it came.
 /** `hostDeriver`, made to honor its interface: the one way a proving asks it for key bytes. */
 export const guardKeyDeriver = (hostDeriver: KeyDeriver): GuardedKeyDeriver => {

@@ -15,7 +15,7 @@ import type { BoxWorld } from '../../src/shapes/shapes-vaultish'
 const held = useModelsWorld()
 useVaultWorlds()
 
-describe("a lock() landing during a put", () => {
+describe("a lock() called during a put", () => {
   it("during the seal refuses 'vault_locked', putting nothing: put checks the lock at both ends of the seal", async () => {
     const lock = { during: false }
     const listing = fakeSealBoxListingOf(held.mw, {}, () => { if (lock.during) { held.mw.setLocked(true) } })

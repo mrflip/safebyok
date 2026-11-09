@@ -397,7 +397,7 @@ describe("storable.receive(rcvd): after a put over a box held gone", () => {
 })
 
 describe("storable refusal sentences, from phrases.ts", () => {
-  it("says a revision conflict is worth one fetch, and that one persisting means the system is not working", async () => {
+  it("says a revision conflict is a bug to report", async () => {
     const { box } = await timelyBoxOf()
     const err = TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ revision_seq: 1, revision_tok: 'rev-a1' })))
     expect(err.message).to.eq(Phrases.OneRevisionTwoFates)
@@ -405,7 +405,7 @@ describe("storable refusal sentences, from phrases.ts", () => {
     const twoToks = TH.expectSyncRefusal(() => cmpRevisions({ revision_tok: 'a', revision_seq: 1 }, { revision_tok: 'b', revision_seq: 1 }))
     expect(twoToks.message).to.eq(Phrases.OneRevisionTwoToks)
     for (const message of [Phrases.OneRevisionTwoFates, Phrases.OneRevisionTwoToks, Phrases.OneRevisionTwoLives]) {
-      expect(message).to.contain('worth one try').and.to.contain('fundamentally not working')
+      expect(message).to.match(/report this as a bug/i)
     }
   })
 

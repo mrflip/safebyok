@@ -36,7 +36,7 @@ ways compare side by side, and each knocking with its own key through [src/lib/a
 
 * **With managed fields** ([src/components/KnockKnockFields.tsx](src/components/KnockKnockFields.tsx)):
   the key sits in a field that `safebyok/dom` fills and saves, so it never passes through React.
-  *Add key* builds and unlocks the vault as needed and shows the field; *Save* stores it; *Done*
+  *Add key* builds and unlocks the vault as needed and shows the field; *Save* puts it; *Done*
   hides it again.
 * **With an exposed whisper** ([src/components/KnockKnockExposed.tsx](src/components/KnockKnockExposed.tsx)):
   an ordinary controlled field over `useWhisper(box)`; typing is `box.patchWhisper`, *Save* is
@@ -56,11 +56,11 @@ verb refuses as an unreachable backend does. Take the aside away and what is lef
 |---|---|
 | the library | the `safebyok` workspace package (`packages/safebyok/src/`) |
 | React plumbing | the `safebyok-react` workspace package (provider, hooks, controls, the dialogs) |
-| app scaffolding a host replaces | [src/lib/auth.ts](src/lib/auth.ts) (fake sign-in over localStorage; a real app brings its own auth and passes `user_id` to the provider), [src/lib/stores.ts](src/lib/stores.ts) (the bank's options: this browser's IndexedDB standing in for a backend) |
+| app scaffolding a host replaces | [src/lib/auth.ts](src/lib/auth.ts) (fake sign-in over localStorage; a real app brings its own auth and passes `user_id` to the provider), [src/lib/storage.ts](src/lib/storage.ts) (the bank's options: this browser's IndexedDB standing in for a backend) |
 | developer tools | [src/lib/outage-vault-db.ts](src/lib/outage-vault-db.ts), [src/components/OutageSwitch.tsx](src/components/OutageSwitch.tsx) |
 | the app itself | [src/components/](src/components/), [src/lib/anthropic.ts](src/lib/anthropic.ts) |
 
 Tests live in `tests/`, mirroring `src/`. The machinery's (auth scaffold, the Anthropic request
 shape via an injected fetch) run under node; each
-component's renders it under jsdom, inside a BankProvider over stores in memory, and works it as
+component's renders it under jsdom, inside a BankProvider over databases in memory, and works it as
 a user would (`tests/test-helpers.tsx`). The vault and provider are tested in their own packages.

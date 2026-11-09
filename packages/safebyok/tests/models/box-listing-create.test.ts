@@ -144,7 +144,7 @@ describe("BoxListing: create holds a dna to boxDna at its door", () => {
     expect(held.mw.calls).to.deep.equal([])
   })
 
-  it("refuses a field a dna does not take", async () => {
+  it("refuses a field a dna does not accept", async () => {
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.create({ ...dna(), sidcar: {} } as unknown as BoxDna))
     expect(listing.things).to.deep.equal([])

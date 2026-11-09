@@ -7,7 +7,7 @@ import { memoryStore } from '../test-helpers'
 
 describe("useSession", () => {
   it("is null while signed out, and follows the fake auth in and out", async () => {
-    const auth = createAuth({ applabel: 'acme', dbStore: memoryStore(), deviceStore: memoryStore() })
+    const auth = createAuth({ applabel: 'acme', dbStorage: memoryStore(), deviceStorage: memoryStore() })
     const { result } = renderHook(() => useSession(auth))
     expect(result.current).to.be.null
     const session = await act(() => auth.signIn('margo'))

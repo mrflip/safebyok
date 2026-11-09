@@ -243,7 +243,7 @@ describe("the host's functions, as a bank holds them", () => {
     vi.stubGlobal('reportError', reported)
     const cause = new VaultError('identity_revoked', 'signed out')
     const thrown = new Error('lifecycle handler broke')
-    await guardOnLifecycle(() => { throw thrown })({ kind: 'vacated', cause, unerased: 0, bank: {} as Bank })
+    await guardOnLifecycle(() => { throw thrown })({ kind: 'vacated', cause, unrevoked: 0, bank: {} as Bank })
     expect(reported).toHaveBeenCalledWith(thrown)
     vi.unstubAllGlobals()
   })
@@ -259,13 +259,13 @@ describe("DefaultOnLifecycle", () => {
   const Revoked = new VaultError('identity_revoked', 'signed out')
   const LifecycleCases = [
     // a cached lease that outlived its forget:
-    [{ kind: 'lease_unerased', refusal: Refusal, where: 'lock' },      'error', true,  'reports a lock\'s refused forget at error and to the platform, and vacates the vault'],
-    [{ kind: 'lease_unerased', refusal: Refusal, where: 'vacate' },    'error', true,  'reports a vacate\'s refused forget at error and to the platform'],
-    [{ kind: 'lease_unerased', refusal: Refusal, where: 'tombstone' }, 'warn',  false, 'warns of a tombstone\'s refused forget, vacating nothing'],
-    [{ kind: 'lease_unerased', refusal: Refusal, where: 'undeleted' },  'warn',  false, 'warns of an outdated row\'s refused forget, vacating nothing'],
+    [{ kind: 'lease_revoke_failed', refusal: Refusal, where: 'lock' },      'error', true,  'reports a lock\'s refused forget at error and to the platform, and vacates the vault'],
+    [{ kind: 'lease_revoke_failed', refusal: Refusal, where: 'vacate' },    'error', true,  'reports a vacate\'s refused forget at error and to the platform'],
+    [{ kind: 'lease_revoke_failed', refusal: Refusal, where: 'tombstone' }, 'warn',  false, 'warns of a tombstone\'s refused forget, vacating nothing'],
+    [{ kind: 'lease_revoke_failed', refusal: Refusal, where: 'undeleted' },  'warn',  false, 'warns of an outdated row\'s refused forget, vacating nothing'],
     // a vacate:
-    [{ kind: 'vacated', cause: Revoked, unerased: 0 },                 'error', false, 'reports a vacate for a revoked identity at error and to the platform'],
-    [{ kind: 'vacated', cause: bankDisabled(), unerased: 1 },          null,    false, 'says nothing of a sign-out'],
+    [{ kind: 'vacated', cause: Revoked, unrevoked: 0 },                 'error', false, 'reports a vacate for a revoked identity at error and to the platform'],
+    [{ kind: 'vacated', cause: bankDisabled(), unrevoked: 1 },          null,    false, 'says nothing of a sign-out'],
     // a hello:
     [{ kind: 'helloed', outcome: { ok: false, err: Refusal } },         'warn',  false, 'warns of a refused hello'],
     [{ kind: 'helloed', outcome: { ok: true, val: undefined } },        null,    false, 'says nothing of a hello that lands'],
@@ -293,7 +293,7 @@ describe("DefaultOnLifecycle", () => {
     vi.stubGlobal('reportError', undefined)
     const spy = TH.spyLogger()
     const bank = { vacate: vi.fn(), logger: spy.logger } as unknown as Bank
-    DefaultOnLifecycle({ kind: 'lease_unerased', refusal: Refusal, vault: null, where: 'vacate', bank })
+    DefaultOnLifecycle({ kind: 'lease_revoke_failed', refusal: Refusal, vault: null, where: 'vacate', bank })
     expect(spy.calls).to.deep.equal([{ level: 'error', message: Refusal.message, story: { call: 'Bank.onLifecycle', refusalkind: 'storage_unavailable' }, err: undefined }])
     expect(JSON.stringify(spy.calls)).not.to.include(Passphrase)
     vi.unstubAllGlobals()
@@ -426,7 +426,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     expect(bank.snapshot).to.include({ stage: 'refused', err: refusal })
   })
 
-  it("vacates the bank on a revocation whatever the host's onLifecycle does, which hears it as vacated once the scrub settles", async () => {
+  it("vacates the bank on a revocation whatever the host's onLifecycle does, which hears it as vacated once the vacate settles", async () => {
     const onLifecycle = vi.fn()
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle })
     onLifecycle.mockClear()
@@ -435,7 +435,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     expect(bank.snapshot).to.include({ stage: 'refused', err: refusal })
     expect(onLifecycle).not.toHaveBeenCalled()
     await TH.eventually(() => onLifecycle.mock.calls.length > 0)
-    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: refusal, unerased: 0, bank })
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: refusal, unrevoked: 0, bank })
     expect(world.leaseRows()).to.deep.equal([])
   })
 
@@ -448,7 +448,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     await TH.expectRefusal(vault.boxListing.list(), 'identity_revoked')
     expect(bank.isEnabled).to.be.false
     await TH.eventually(() => onLifecycle.mock.calls.length > 0)
-    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: revoked, unerased: 0, bank })
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: revoked, unrevoked: 0, bank })
   })
 
   it("refuses as disabled a listing of the vaults answered after a sweep, so a revocation in it neither reaches the host nor vacates", async () => {

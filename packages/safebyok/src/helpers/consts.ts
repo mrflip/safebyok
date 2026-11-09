@@ -25,7 +25,7 @@ export const MinuteMillis = 60_000
 /** The span from {@link FarPast} to {@link FarFuture}, in milliseconds: the longest that runs between two instants the package accepts. */
 export const ForeverMillis = FarFuture - FarPast
 
-// A name carrying it marks a stored layout: raise a version when its layout changes, and every older database is deleted unread. Three zero-padded parts, so that names sort as versions do.
+// A name carrying it marks a stored layout: increment a version when its layout changes, and every older database is deleted unread. Three zero-padded parts, so that names sort as versions do.
 /** The layout version in the name of the device database, `${dbName}:device-v001-001-001`. */
 export const DeviceDBVersion = '001-001-001'
 

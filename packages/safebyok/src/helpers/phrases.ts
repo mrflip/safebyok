@@ -127,7 +127,7 @@ export const leaseHoursShape = (maxHours: number): string => `Expected a number 
 export const MinutesShape = "Expected a number of minutes, zero or more, fractions too (0.5 is thirty seconds), or Infinity"
 
 /** A `vaultDB` that is no storage adapter. */
-export const VaultDBShape = "Expected a storage adapter, an instance of the AdapterVaultDB class: localVaultDB({ store }), idbVaultDB() from 'safebyok-indexeddb', or your backend's own"
+export const VaultDBShape = "Expected a storage adapter, an instance of the AdapterVaultDB class: idbVaultDB() from 'safebyok-indexeddb', or your backend's own"
 
 /** A `deviceDB` that is no device database. */
 export const DeviceDBShape = "Expected a device database, an instance of the DeviceDB class: new MemoryDeviceDB(), or your own class that extends DeviceDB, both imported from 'safebyok'"
@@ -150,11 +150,11 @@ export const StrengthCheckerShape = "Expected a function from the passphrase, an
 
 // == [Refusals]: unknownFields, moreFailures, WhisperShape, fieldsDisagree, BagNotObject, WhisperBagShape
 
-/** An object holding `count` fields it does not take, never named, as a name may be the caller's data, and the `fieldnames` it takes. */
+/** An object holding `count` fields it does not accept, never named, as a name may be the caller's data, and the `fieldnames` it accepts. */
 export const unknownFields = (count: number, fieldnames: readonly string[]): string => {
-  const held  = count === 1 ? 'There is a field it does not take (its name is not repeated)' : `There are ${String(count)} fields it does not take (their names are not repeated)`
-  const takes = fieldnames.length === 0 ? 'it takes no fields' : `it takes only ${fieldnames.join(', ')}`
-  return `${held}: ${takes}. Check the spelling, or leave ${count === 1 ? 'it' : 'them'} out`
+  const refused = count === 1 ? 'There is a field it does not accept (its name is not repeated)' : `There are ${String(count)} fields it does not accept (their names are not repeated)`
+  const accepted = fieldnames.length === 0 ? 'it accepts no fields' : `it accepts only ${fieldnames.join(', ')}`
+  return `${refused}: ${accepted}. Check the spelling, or leave ${count === 1 ? 'it' : 'them'} out`
 }
 
 /** How many more failures a refusal found than it names. */
@@ -189,7 +189,7 @@ export const BoxScopepathShape = `A box's scopepath is 'box', an applabel, a use
 
 // == [Bank and vault]: VaultScopeAdvice, otherScope, VaultGoneWhileOpening, OtherDatabasesThanListed, VaultBehindWhileOpening, VaultObjectGone, VaultBehind
 
-/** The advice a refusal of the scope naming a vault ends with: what that scope takes, and what else names a vault. */
+/** The advice a refusal of the scope naming a vault ends with: what that scope accepts, and what else names a vault. */
 export const VaultScopeAdvice = "That scope holds the vault's vaultlabel, and the bank's own applabel and user_id if you like: a Vault object, its snapshot or a BankVault will do."
 
 /** Why a scope naming another applabel or user_id than the bank's refuses, `fieldnames` the ones that differ, never their values. */
@@ -211,7 +211,7 @@ export const VaultObjectGone = "This Vault object is gone -- the vault was delet
 export const VaultBehind = "This device has already seen a newer copy of this vault than storage offers now, so it won't use this one, and the vault locked: nothing was unlocked or written. Storage restored from a backup, or altered, does this. If the vault's storage was restored from an older copy on purpose, the app can have this device accept it (bank.clearCachedVault) and ask the bank for the vault again; otherwise the app's support should look at its storage."
 // --
 
-// == [Vault: ways in]: PassphraseKept, NoPasskeyToRemove, PasskeyBeforePassphrase, ProvingBeforePassphrase, VaultChangedInStorage
+// == [Vault: ways in]: PassphraseKept, NoPasskeyToRemove, PasskeyBeforePassphrase, ProvingBeforePassphrase
 
 /** Why a vault's passphrase is not removed: it can be replaced, never removed. */
 export const PassphraseKept = "A vault keeps its passphrase: it can be replaced (putWayin('passphrase')), never removed. Nothing was changed."
@@ -225,63 +225,46 @@ export const PasskeyBeforePassphrase = "This vault has no passphrase yet, and a 
 /** Why a change that needs proving waits for the vault's first passphrase. */
 export const ProvingBeforePassphrase = "This vault has no passphrase yet, so nothing can prove this change: set its passphrase first, as ensureUnlocked() or putWayin() does."
 
-/** Why a new gate is not written over a vault that changed in storage since this device read it. */
-export const VaultChangedInStorage = "The vault changed in storage since this device read it -- a vault unlocker was changed, or it was deleted or made anew, elsewhere -- so this change was refused and nothing was written. Read the vault again before retrying."
 // --
 
 // == [Vault: lifecycle]: VaultLocked, GateMoved
 
 /** Why a call that needs the vault unlocked does nothing while it is locked. */
-export const VaultLocked = "The vault is locked, so nothing was read or written: call ensureUnlocked(), which asks the user, and call again."
+export const VaultLocked = "The vault locked mid-operation. Please unlock again to carry on."
 
 /** Why a call stops when a wayin changed, here or on another device, as it worked. */
-export const GateMoved = "A vault unlocker changed while this call was under way -- the passphrase or passkey was changed, here or on another device -- so nothing more was done. Unlock again to carry on."
+export const GateMoved = "Unlock method changed elsewhere. Please unlock again to carry on."
 
-// --
-
-// == [Vault: options]: HelloOptionsAdvice, EnsureUnlockedOptionsAdvice, RenewPastLease, DemandOptionsAdvice
-
-/** The advice a refusal of hello()'s options ends with: the one option it takes, and how a click handler hands it an event. */
-export const HelloOptionsAdvice = "hello()'s only option is `staleMinutes`, how many minutes it trusts the vault's last read of storage. Handed to addEventListener or onClick as the handler itself, it is handed an event: wrap it, `() => vault.tryHello()`."
-
-/** The advice a refusal of ensureUnlocked()'s options ends with: the one option it takes, and how a click handler hands it an event. */
-export const EnsureUnlockedOptionsAdvice = "ensureUnlocked()'s only option is `renewMinutes`, how many minutes before the lease ends to ask the user anyway. Handed to addEventListener or onClick as the handler itself, it is handed an event: wrap it, `() => vault.tryEnsureUnlocked()`."
-
-/** Why ensureUnlocked() refuses a renewMinutes as long as the lease or longer. */
-export const RenewPastLease = "ensureUnlocked()'s renewMinutes is as long as the lease or longer (leaseHours), so every call would ask the user: give fewer minutes than the lease lasts, or leave it out. To ask every time, lock() once done."
-
-/** The advice a refusal of demandConsistentWith()'s options ends with: the one option it takes. */
-export const DemandOptionsAdvice = "demandConsistentWith()'s only option is `leaseBound`, true when the thing must also have a lease in force."
 // --
 
 // == [Vault: boxes]: BoxAbsent, NoWhisperToKeep, RecordForNewBox, vaultFullOfBoxes, VaultGoneWhileGettingBox, VaultDeletedWhilePuttingBox
 
 /** Why a call naming a box the vault does not hold refuses. */
-export const BoxAbsent = "No box is stored under that boxlabel in this vault: its snapshot lists the ones it holds."
+export const BoxAbsent = "No box is stored for that boxlabel."
 
 /** Why putBox() with no whisper, over a box the vault does not hold, refuses. */
-export const NoWhisperToKeep = "No box is stored under that boxlabel, so there is no whisper to keep: hand putBox() the whisper to put."
+export const NoWhisperToKeep = "No box is stored for that boxlabel."
 
 /** Why a put told to only create refuses a whole record: what it would put is recycled. */
-export const RecordForNewBox = "A put that only creates was handed a whole record, sealed whisper and all: hand it the whisper and the sidecar, so that no stored data is recycled."
+export const RecordForNewBox = "A create operation found a record already present."
 
-/** Why a vault that holds its limit of `maxBoxes` boxes takes no new one. */
+/** Why a vault that holds its limit of `maxBoxes` boxes accepts no new one. */
 export const vaultFullOfBoxes = (maxBoxes: number): string => `This vault already holds its limit of ${String(maxBoxes)} boxes: remove one before putting another. A vault meant to hold more can be opened with a larger maxBoxes, up to what its storage adapter allows.`
 
 /** Why a box is not read from a vault deleted, or deleted and made anew, on another device, and the Vault object is gone. */
-export const VaultGoneWhileGettingBox = "The vault this device held was deleted, or deleted and made anew, on another device, so no box was read, and this Vault object is gone: what is stored now is another vault, or none. Ask the bank for the vault again (bank.ensureVault) to see what is stored."
+export const VaultGoneWhileGettingBox = "The vault this device held was deleted, so the box cannot be fetched: try again"
 
 /** Why a box is not put into a vault deleted, or deleted and made anew, on another device as it was being put. */
-export const VaultDeletedWhilePuttingBox = "The vault was deleted, or deleted and made anew, on another device while this one was putting into it, so nothing was written. Read the vault again (hello) to see what is stored now."
+export const VaultDeletedWhilePuttingBox = "The vault was deleted while this box was being put. This should not happen: report this as a bug."
 // --
 
 // == [Vault: bad news]: BoxStoredDamaged, WayinStoredDamaged
 
 /** Bad news of a box stored damaged, which its meta.box_listed names. */
-export const BoxStoredDamaged = "A box in this vault is stored damaged, so it can't be read: this error's meta.box_listed names it. It was left as it is; remove it with delBox(), or store its whisper again over it."
+export const BoxStoredDamaged = "Storage discovered a damaged box. This should not happen: report this as a bug."
 
 /** Bad news of a wayin stored damaged, which its meta.wayin_listed names. */
-export const WayinStoredDamaged = "One of this vault's unlockers is stored damaged, so it can't be tried: this error's meta.wayin_listed names it. The other vault unlocker, if the vault has one, still opens it. A damaged passkey is mended by adding the passkey again; a damaged passphrase only by removing the vault and making it again."
+export const WayinStoredDamaged = "One of this vault's unlockers is stored damaged. This should not happen: report this as a bug."
 // --
 
 // == [Storables]: PartialLoad, AlreadyListed, BoxPatchAdvice, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
@@ -309,7 +292,7 @@ export const WhisperedIsNoWhisper = "That is what a box shows for a whisper it w
 export const NotExposed = "This box has no whisper exposed: call box.expose() first."
 
 /** Why `BoxFields.of` refuses what is not a box. */
-export const BoxExpected = "BoxFields.of takes a Box, as vault.getBox answers one."
+export const BoxExpected = "BoxFields.of accepts a Box, as vault.getBox answers one."
 
 /** Why saving a box's fields is refused while they show a blank. */
 export const PuttingVeiledFields = "This box's whisper is veiled, so its fields hold no whisper to put: call box.unveil() first."
@@ -318,22 +301,22 @@ export const PuttingVeiledFields = "This box's whisper is veiled, so its fields 
 export const NoFieldsBound = "This box has no field bound, so there is nothing to put: bind one with BoxFields.of(box).bind(path), or call box.putExposed()."
 
 /** Why a record storage holds under the revision_seq held, but another revision_tok, is not adopted. */
-export const OneRevisionTwoToks = "Storage and this device disagree about one revision of a record: storage holds that revision_seq under another revision_tok, as if two puts written as one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
+export const OneRevisionTwoToks = "Storage and this device disagree about a record's history (the expected revision sequence matched, but its confirming token did not). Report this as a bug."
 
 /** Why a record storage holds deleted at the revision held alive, or the other way round, is not adopted. */
-export const OneRevisionTwoFates = "Storage and this device disagree about one revision of a record: one of them holds it alive and the other holds it deleted, or storage holds nothing for it. This device kept its own copy and did not take in what storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
+export const OneRevisionTwoFates = "Storage and this device disagree about a record's history (one records a deleted record, the other a live one). Report this as a bug."
 
 /** Why a record storage holds under the revision held, but of another life of the thing, is not adopted. */
-export const OneRevisionTwoLives = "Storage and this device disagree about one revision of a record: storage holds it as another life of the thing, as if the thing were deleted and made anew within one revision. This device kept its own copy and did not take in the one storage sent. Fetching the record again is worth one try; if it refuses the same way, the system is fundamentally not working: storage lost or rewrote the record, and the storage adapter is where to look."
+export const OneRevisionTwoLives = "Storage and this device disagree about a record's history (it has been deleted and recreated). This should not happen: report this as a bug."
 
 /** Why a record under another vault_tok than the instance holds is not adopted. */
-export const OtherVaultTok = "Storage holds this record under another vault_tok than this device holds it under: the vault was deleted and made anew, or storage mixed the records of two vaults. This device kept its own copy and did not take in the one storage sent. Load the vault again from storage, and its boxes with it: safebyok does not yet remake what it holds of a vault made anew."
+export const OtherVaultTok = "Storage delivered a record from a deleted vault. This should not happen: report this as a bug."
 
 /** Why a record under another vault_tok than the vault its listing lies in is not made into an instance. */
-export const OtherVaultTokAtBirth = "Storage gave a record under another vault_tok than the vault this listing lies in, so no instance was made of it: the vault was deleted and made anew, or storage mixed the records of two vaults. Load the vault again from storage, and its boxes with it."
+export const OtherVaultTokAtBirth = "Storage delivered a record from a different version of the vault. This should not happen: report this as a bug."
 
 /** Why a record delivered under one scope that names another is not adopted. */
-export const RecordOfOtherScope = "Storage answered with a record whose scope is not the one the answer says it is for, so nothing was made or changed of it: a bug in the storage adapter, which should answer each call with the record stored under the scope asked."
+export const RecordOfOtherScope = "Storage delivered a misnamed record. This should not happen: report this as a bug."
 
 /** Why a pair of shapes no row of the reconcile table names is refused: a bug. */
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
@@ -491,10 +474,10 @@ export const UnboundCipherCtx = "A cipher ctx was handed no stamp, or a part or 
 export const StrengthCheckerMisanswered = "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text."
 
 /** The strengthChecker's load() failing at bank.hello(). */
-export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed, so the bank could not check a new passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For a checker that fetches its dictionary, check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
+export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed: check your package and build settings."
 
 /** The keyDeriver's load() failing at bank.hello(). */
-export const KeyDeriverLoadFailed = "The keyDeriver's load() failed, so the bank could not derive a key from a passphrase, and bank.hello() was refused rather than open a vault in that state. Its error is this error's cause. For a deriver that fetches its code, check that your build ships it and your page may fetch it. A dropped connection mends at the next bank.hello()."
+export const KeyDeriverLoadFailed = "The keyDeriver's load() failed: check your package and build settings."
 // --
 
 // == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, boxTooLarge, VaultFull, StorageFull, SeqNotNext, deviceDBFailed, thrownNamed

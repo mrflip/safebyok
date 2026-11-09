@@ -56,7 +56,7 @@ export type Merged<SourcesT extends readonly object[]> =
 /** Make validators: `build` gets the kit and returns its schemas by name, and each comes back with a `parse` that throws a VaultError of `kind`.
  * The message names each failing field by its path, up to eight, and counts the rest, each with
  * its check's own sentence or Zod's English. `meta.fieldnames` lists the same fields. For fields
- * an object does not take, it says how many, never which, and lists the fields it takes. It quotes
+ * an object does not accept, it says how many, never which, and lists the fields it accepts. It quotes
  * no input and carries no `cause`.
  *
  * `parse(val, story?)` frames the message as the {@link Story} asks: `where` the input was
@@ -73,7 +73,7 @@ export type Merged<SourcesT extends readonly object[]> =
  * `.catchall()`, puts each failing key in the path. Judge such an object whole with `custom`.
  *
  * A validator also has `refusingAs(kind)`: the same schema again, its `parse` refusing `kind`. Where
- * one tier checks what another does and refuses in its own kind, it takes the other's validator
+ * one tier checks what another does and refuses in its own kind, it accepts the other's validator
  * and makes it so (`SX.vaultRow.refusingAs('damaged_row')`), rather than listing its fields twice.
  *
  * A validator of an object also has `parseConsistent(val, other, refusal?)`: it parses `val`,
@@ -107,7 +107,7 @@ export const Checkers = <ValsT extends Record<string, Z.ZodType>, const SourcesT
 }
 
 /** Make one validator: `build` gets the kit and returns its schema, which comes back with a `parse` that throws a VaultError of `kind`, 'bad_record' unless given.
- * It refuses as a {@link Checkers} call's validators do, and takes `sources` as one does.
+ * It refuses as a {@link Checkers} call's validators do, and accepts `sources` as one does.
  *
  * @example
  *   export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltNotFresh(PasskeySaltBytes)), 'bad_record')
@@ -119,7 +119,7 @@ export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readon
 
 /** Make one validator of an object: `build` gets the kit and returns the object's fields, and the object, strict unless `opts` says otherwise, comes back as a {@link Checker} hands one back.
  * `opts` is the kind it refuses, or an {@link ObjCheckOpts}: `refusalkind`, the kind, 'bad_record'
- * unless given, and `extras`, what it does with a field it does not take: 'strict', the default,
+ * unless given, and `extras`, what it does with a field it does not accept: 'strict', the default,
  * refuses it, and 'strip' drops it unread, as Zod's object does. Any other `opts` refuses.
  * A check of the object whole (`.refine()`, `.readonly()`, a sentence of its own)
  * is made in a {@link Checker} call instead: one chained onto this one's validator would refuse
@@ -131,7 +131,7 @@ export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readon
  *     revision_tok: revision_tok.nullable(),
  *     damage:       oneof(boxDamageVals),
  *   }), 'bad_record', [CX])
- *   boxDamaged.parse({ ...damaged, note: 'hi' })  // throws 'bad_record', "There is a field it does not take ..."
+ *   boxDamaged.parse({ ...damaged, note: 'hi' })  // throws 'bad_record', "There is a field it does not accept ..."
  * @example
  *   export const boxCiphered = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({
  *     box_key_wrapped,
@@ -187,7 +187,7 @@ const refusing = <SchemaT extends Z.ZodType>(kind: Refusalkind, schema: SchemaT)
 }
 
 /** The error map every `parse` runs under: Zod's own English, whatever map the host set with `z.config`, which could quote the input.
- * For fields an object does not take, it says how many and lists the fields it takes. A sentence
+ * For fields an object does not accept, it says how many and lists the fields it accepts. A sentence
  * a check carries still wins.
  */
 const InEnglish = {
@@ -197,7 +197,7 @@ const InEnglish = {
 /** Zod's English error map. */
 const English = Zod.locales.en().localeError
 
-/** The fields an object schema takes, by its shape: none for any other schema. */
+/** The fields an object schema accepts, by its shape: none for any other schema. */
 const fieldnamesOf = (schema: unknown): string[] => (schema instanceof Zod.ZodObject ? Object.keys(schema.shape) : [])
 
 /** The most failures a refusal's message names; it counts the rest. */
@@ -274,7 +274,7 @@ const disagreeing = (bag: object, other: object): readonly string[] => {
 
 // == [Checks]: Checks, ConsistencyRefusal, Story, ObjCheckOpts
 
-/** The checks this module makes for itself, under one name: `bag`, any object, taken as it is, so a getter still reads; `consistencyRefusal`, what a disagreement refuses with; `story`, the words around a parse's refusal; and `objCheckOpts`, how an {@link objCheck} validator refuses. Made below {@link Checkers} and its refusals, which the call needs. */
+/** The checks this module makes for itself, under one name: `bag`, any object, accepted as it is, so a getter still reads; `consistencyRefusal`, what a disagreement refuses with; `story`, the words around a parse's refusal; and `objCheckOpts`, how an {@link objCheck} validator refuses. Made below {@link Checkers} and its refusals, which the call needs. */
 const Checks = Checkers('bad_option', ({ custom, obj, oneof, str, union }) => ({
   bag:                custom<object>((val) => typeof val === 'object' && val !== null, Phrases.BagNotObject),
   consistencyRefusal: obj({
@@ -292,7 +292,7 @@ const Checks = Checkers('bad_option', ({ custom, obj, oneof, str, union }) => ({
   objCheckOpts:       obj({
     /** The kind thrown; 'bad_record' by default. */
     refusalkind: oneof(refusalkindVals).default('bad_record'),
-    /** `strict`, the default, refuses a field the object does not take; `strip` drops it unread. */
+    /** `strict`, the default, refuses a field the object does not accept; `strip` drops it unread. */
     extras:      oneof(['strict', 'strip']).default('strict'),
   }).strict(),
 }))

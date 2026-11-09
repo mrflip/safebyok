@@ -65,7 +65,7 @@ describe("Checkers", () => {
   it("refuses an unknown field in a slice made in the call", () => {
     expect(boxSparse.parse(sparse)).to.deep.equal(sparse)
     const err = TH.expectSyncRefusal(() => boxSparse.parse({ ...sparse, note: 'hi' }), 'bad_record')
-    expect(err.message).to.eq("There is a field it does not take (its name is not repeated): it takes only applabel, user_id, vaultlabel, boxlabel, written_at. Check the spelling, or leave it out")
+    expect(err.message).to.eq("There is a field it does not accept (its name is not repeated): it accepts only applabel, user_id, vaultlabel, boxlabel, written_at. Check the spelling, or leave it out")
     TH.expectSyncRefusal(() => boxRecord.parse(sparse), 'bad_record')
   })
 
@@ -114,13 +114,13 @@ describe("Checkers", () => {
     expect(err.meta?.fieldnames).to.deep.equal([])
   })
 
-  it("quotes no value it refuses, counts the fields it does not take, never naming one, and lists the fields it takes", () => {
+  it("quotes no value it refuses, counts the fields it does not accept, never naming one, and lists the fields it takes", () => {
     const secret = 'sk-live-0xSECRET'
     const err = TH.expectSyncRefusal(() => boxRecord.parse({ ...sparse, applabel: secret, user_id: `${secret} `, written_at: secret, whisper_ciphered: 7, vault_key: secret, [secret]: 1, 'sk live': 2 }), 'bad_record')
     expect(err.message).to.not.include('SECRET')
     expect(err.message).to.not.include('sk live')
     expect(err.message).to.not.include('vault_key')
-    expect(err.message).to.include("There are 3 fields it does not take (their names are not repeated): it takes only applabel, user_id, vaultlabel, boxlabel, written_at, whisper_ciphered.")
+    expect(err.message).to.include("There are 3 fields it does not accept (their names are not repeated): it accepts only applabel, user_id, vaultlabel, boxlabel, written_at, whisper_ciphered.")
     expect(JSON.stringify(err.meta)).to.not.include('SECRET')
     expect(err.cause).to.be.undefined
   })
@@ -130,9 +130,9 @@ describe("Checkers", () => {
       const strictBag = obj({}).strict()
       return { strictBag, holder: obj({ inner: strictBag }) }
     })
-    expect(TH.expectSyncRefusal(() => strictBag.parse({ salt_b64: 1 }), 'bad_option').message).to.eq("There is a field it does not take (its name is not repeated): it takes no fields. Check the spelling, or leave it out")
+    expect(TH.expectSyncRefusal(() => strictBag.parse({ salt_b64: 1 }), 'bad_option').message).to.eq("There is a field it does not accept (its name is not repeated): it accepts no fields. Check the spelling, or leave it out")
     const nested = TH.expectSyncRefusal(() => holder.parse({ inner: { staleMinute: 1, [`ghp_${'aB3'.repeat(12)}`]: 2 } }), 'bad_option')
-    expect(nested.message).to.match(/^inner: There are 2 fields it does not take/)
+    expect(nested.message).to.match(/^inner: There are 2 fields it does not accept/)
     expect(nested.message).to.not.include('staleMinute')
     expect(nested.meta?.fieldnames).to.deep.equal(['inner'])
   })
@@ -337,11 +337,11 @@ describe("objCheck", () => {
     const err = TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_record')
     expect(err.meta?.fieldnames).to.deep.equal(['applabel'])
     const extra = TH.expectSyncRefusal(() => checkedScope.parse({ ...scope, vault_tok: 'tok' }), 'bad_record')
-    expect(extra.message).to.eq("There are 2 fields it does not take (their names are not repeated): it takes only applabel, user_id. Check the spelling, or leave them out")
+    expect(extra.message).to.eq("There are 2 fields it does not accept (their names are not repeated): it accepts only applabel, user_id. Check the spelling, or leave them out")
   })
 
   // objCheck @example 2
-  it("drops a field it does not take, unread, under extras 'strip'", () => {
+  it("drops a field it does not accept, unread, under extras 'strip'", () => {
     const checkedScope = objCheck(bankScopeOf, { refusalkind: 'bad_scope', extras: 'strip' })
     expect(checkedScope.parse({ ...scope, vault_tok: 'tok' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
     TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_scope')

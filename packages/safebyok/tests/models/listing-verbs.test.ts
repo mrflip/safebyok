@@ -178,7 +178,7 @@ describe("listing.put(record, { prior, ifPresent }): over a live record", () => 
   const birth = fullBoxRecord({ revision_tok: 'rev-mine', revision_seq: 0 })
   const live  = fullBoxRecord()
 
-  it("refuses an ifPresent it does not take, calling nothing", async () => {
+  it("refuses an ifPresent it does not accept, calling nothing", async () => {
     const listing = boxListingOf(held.mw)
     await TH.expectRefusal(listing.put(birth, { prior: SX.VoidRevision, ifPresent: 'replace' } as never))
     expect(held.mw.callsOf('put')).to.deep.equal([])

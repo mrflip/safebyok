@@ -175,7 +175,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...opts, bankFriend: undefined },                       false, 'refuses a missing bankFriend'],
       [{ ...opts, world: mw.world },                             false, 'refuses a world, which the listing takes beside its options'],
       [{ ...opts, onBadNews: () => null },                       false, 'refuses an onBadNews, which only a bank takes'],
-      [{ ...opts, extra: 1 },                                    false, 'refuses an option it does not take, being strict'],
+      [{ ...opts, extra: 1 },                                    false, 'refuses an option it does not accept, being strict'],
     ])
 
     it("names the failing field", () => {
@@ -197,7 +197,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...args, world: null },                       false, 'refuses a null world'],
       [{ ...args, world: { ...mw.world, receiveWorld: undefined } }, false, 'refuses a world that cannot receiveWorld'],
       [{ ...args, opts: { maxMillisSinceRefresh: 1000 } }, false, "refuses options, the horizon being the listing's"],
-      [{ ...args, extra: 1 },                          false, 'refuses an argument it does not take, being strict'],
+      [{ ...args, extra: 1 },                          false, 'refuses an argument it does not accept, being strict'],
     ])
 
     it("names the failing field", () => {

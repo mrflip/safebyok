@@ -193,7 +193,7 @@ export const listedKindOf = (thrown: unknown): Refusalkind | null => (
 
 /** The string `name` of `thrown` when it is an object carrying one, else null: all a refusal keeps of an error it replaces.
  * An Error's or a DOMException's is its class name; a host's own error carries whatever name the
- * host gave it, kept as it is until a redact lands.
+ * host gave it, kept as it is.
  *
  * @example thrownNameOf(new DOMException('No room.', 'QuotaExceededError'))  // 'QuotaExceededError'
  */

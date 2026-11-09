@@ -126,10 +126,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return this
   }
 
-  /** End the watch, sweep each thing, and take no further calls. A repeat is a no-op. Never throws. */
+  /** End the watch, sweep each thing, and accept no further calls. A repeat is a no-op. Never throws. */
   sweep(): this { return this.#disable((thing) => { thing.sweep() }) }
 
-  /** End the watch, vacate each thing, and take no further calls. A repeat is a no-op. Never throws. */
+  /** End the watch, vacate each thing, and accept no further calls. A repeat is a no-op. Never throws. */
   vacate(): this { return this.#disable((thing) => { thing.vacate() }) }
 
   #disable(discard: (thing: ThingT) => void): this {
@@ -196,7 +196,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Delivering an answer]: deliver, deliverGood, receiveNothing, buildOrReceive, makeThingOf
 
-  /** SLOPDOC: The pipeline every storage answer takes, from its world through the instance listed to the caller. */
+  /** SLOPDOC: The pipeline every storage answer follows, from its world through the instance listed to the caller. */
   protected async deliver(answer: ListingAnswer<RecordT, SparseT>): Promise<ThingT | null> {
     this.demandEnabled()
     if (answer.world !== null) { this.world.receiveWorld(answer.world) }

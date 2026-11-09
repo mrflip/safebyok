@@ -99,7 +99,7 @@ Easy to get wrong:
 * `bank.vacate()` is sign-out: it disables the bank, then forgets this bank's leases on this device
   and its bank row in the deviceDB, leaving the vaultDB alone, and settles once each forget has been
   tried. The next `deviceDB.ensureBank` for that user mints a new `device_id`. Await it before the
-  page goes: a lease it cannot forget reaches your `onLifecycle` as `lease_unerased`, and
+  page goes: a lease it cannot forget reaches your `onLifecycle` as `lease_revoke_failed`, and
   `vacated` follows once the forget settles, counting them. A refused listing of the leases, or a
   bank row it cannot forget, reaches your `onBadNews`.
 * **A bank swept or vacated is spent.** From the moment you call either, `bank.isEnabled` is false
@@ -112,7 +112,7 @@ Easy to get wrong:
   `onLifecycle` hears `vacated` with it as the `cause`. Make another bank once the user signs in
   again.
 * **`onLifecycle` hears what happens in the bank's life**, each event a `BankEvent` told by its
-  `kind`: `helloed` with the outcome of each `bank.hello()` and `vault.hello()`; `lease_unerased`
+  `kind`: `helloed` with the outcome of each `bank.hello()` and `vault.hello()`; `lease_revoke_failed`
   for a cached lease that outlived its forget, with `where` it happened and the vault, if one; and
   `vacated`. With no `onLifecycle`, `DefaultOnLifecycle` logs a lease left by a lock or a vacate at
   error, reports it to the platform and vacates the vault; reports a vacate's cause other than
