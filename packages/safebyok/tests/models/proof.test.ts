@@ -1,5 +1,6 @@
 /** The sprint's proof, and how the package is used: a host drives a bank through a whole life, over real in-memory stores,
- * and every step asserts what its components render. */
+ * and every step asserts what its components render.
+ */
 
 import { afterEach, describe, expect, it } from 'vitest'
 import type { VaultError } from '../../src/refusals/errors'
