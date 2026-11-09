@@ -749,8 +749,7 @@ not go in a sentence is a smell to report. For length, measure it against the do
 flexibility in a library you trust from memory (the DOM, Node's `fs`, Zod): usually one line, rarely more than five. No
 count holds the length: a reviewer does. The first line runs long only while it is one fact a caller must know before
 calling `#one-sentence-headline`: `create` refusing a live box is that news and stays on the line; a put's stale-write
-criteria are a description under a short headline (the pairs: `notes/gallant-docblocks.md`). A coding agent writes the first line and nothing more; everything past it
-is the documentarian's.
+criteria are a description under a short headline (the pairs: `notes/gallant-docblocks.md`).
 
 * **Every export gets a doc block; a private member gets a phrase** `#a-helper-gets-a-phrase` (``/** The whisper of `record` */``). Both answer the caller's three questions and no others `#three-questions`: when
   do I call it, what do I get, what would I otherwise get wrong. Never who calls it, nor what a sibling does.
