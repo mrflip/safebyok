@@ -14,13 +14,13 @@ const NextPassphrase = 'a whole new passphrase for the vault'
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
 /** A replace_passphrase gating on a vault built under {@link TH.Passphrase}, shown in a ReplacePassphraseModal whose answers the test reads, closed by the first. */
-const shownFor = async (opts: { bankOpts?: Partial<BankOpts>, passphraseAdvice?: (typed: string) => string | null } = {}) => {
+const shownFor = async (opts: { bankOpts?: Partial<BankOpts> } = {}) => {
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)
   const held = await TH.heldGatingOf(world, TH.replacing, opts.bankOpts)
   const answers: DialogAnswer[] = []
   const onDone = (answer: DialogAnswer) => { answers.push(answer); held.close() }
-  render(<ReplacePassphraseModal gating={TH.gatingOfKind(held.gating, 'replace_passphrase')} onDone={onDone} passphraseAdvice={opts.passphraseAdvice} />)
+  render(<ReplacePassphraseModal gating={TH.gatingOfKind(held.gating, 'replace_passphrase')} onDone={onDone} />)
   return { ...held, world, answers }
 }
 
@@ -85,9 +85,9 @@ describe("ReplacePassphraseModal", () => {
     expect(answers).to.deep.equal([])
   })
 
-  it("never gives the current passphrase to the advice", async () => {
+  it("never gives the current passphrase to the strength checker", async () => {
     const heard: string[] = []
-    await shownFor({ passphraseAdvice: (typed) => { heard.push(typed); return null } })
+    await shownFor({ bankOpts: { strengthChecker: (typed: string) => { heard.push(typed); return { strong: true as const } } } })
     fireEvent.change(screen.getByPlaceholderText('current passphrase'), { target: { value: TH.Passphrase } })
     fireEvent.change(screen.getByPlaceholderText('new passphrase'), { target: { value: NextPassphrase } })
     await waitFor(() => { expect(heard).to.deep.equal([NextPassphrase]) })

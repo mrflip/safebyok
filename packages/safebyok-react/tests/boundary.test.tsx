@@ -97,14 +97,8 @@ describe("forBoundary", () => {
     })
   }
 
-  it("names the component a foreign throw came from, and the functions to look at", () => {
-    for (const source of ['PassphraseModal', 'ReplacePassphraseModal'] as const) {
-      expect(forBoundary(new TypeError('fell over'), source).message).to.include(`safebyok-react's ${source}`).and.to.include('the functions the app handed the dialog')
-    }
-  })
-
-  it("names no functions to look at for a dialog handed none", () => {
+  it("names the component a foreign throw came from", () => {
     const { message } = forBoundary(new TypeError('fell over'), 'DelVaultModal')
-    expect(message).to.include("safebyok-react's DelVaultModal").and.to.not.include('the functions the app handed the dialog')
+    expect(message).to.include("safebyok-react's DelVaultModal")
   })
 })

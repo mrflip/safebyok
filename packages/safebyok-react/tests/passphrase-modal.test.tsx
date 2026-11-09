@@ -14,13 +14,13 @@ const WeekMillis = 7 * 24 * 60 * MinuteMillis
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
 /** The gating `raise` opens, shown in a PassphraseModal whose answers the test reads, closed by the first. */
-const shownFor = async (raise: typeof TH.building, opts: { built?: boolean, bankOpts?: Parameters<typeof TH.heldGatingOf>[2], leaseMillis?: number, passphraseAdvice?: (typed: string) => string | null } = {}) => {
+const shownFor = async (raise: typeof TH.building, opts: { built?: boolean, bankOpts?: Parameters<typeof TH.heldGatingOf>[2], leaseMillis?: number } = {}) => {
   const world = TH.makeBankWorld()
   if (opts.built === true) { await TH.makeBankWithVault(world) }
   const held = await TH.heldGatingOf(world, raise, opts.bankOpts)
   const answers: DialogAnswer[] = []
   const onDone = (answer: DialogAnswer) => { answers.push(answer); held.close() }
-  render(<PassphraseModal gating={TH.passphraseGatingOf(held.gating)} onDone={onDone} leaseMillis={opts.leaseMillis} passphraseAdvice={opts.passphraseAdvice} />)
+  render(<PassphraseModal gating={TH.passphraseGatingOf(held.gating)} onDone={onDone} leaseMillis={opts.leaseMillis} />)
   return { ...held, answers }
 }
 
@@ -54,12 +54,6 @@ describe("PassphraseModal, building a vault", () => {
     await waitFor(() => { expect(alertText()).to.eq('Make it longer.') })
     expect(gating.isOpen).to.be.true
     expect(answers).to.deep.equal([])
-  })
-
-  it("shows the host's advice in place of the checker's", async () => {
-    await shownFor(TH.building, { passphraseAdvice: (typed) => `${String(typed.length)} characters` })
-    fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'short' } })
-    await waitFor(() => { expect(screen.queryByText('5 characters')).to.not.be.null })
   })
 })
 

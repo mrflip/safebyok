@@ -92,7 +92,7 @@ export const BankProvider = (props: BankProviderProps) => {
 }
 
 /** The dialog for `bank`'s open gating, while it has one. */
-const OpenGatingDialog = ({ bank, ...dialogProps }: Pick<GatingModalProps, 'passphraseUsername' | 'passphraseAdvice' | 'passkeyRpId'> & { bank: Bank }) => {
+const OpenGatingDialog = ({ bank, ...dialogProps }: Pick<GatingModalProps, 'passphraseUsername' | 'passkeyRpId'> & { bank: Bank }) => {
   const { openGating } = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
   if (openGating === null) { return null }
   // No key: each dialog keys its form by its gating's `gatingTok`.
@@ -101,7 +101,7 @@ const OpenGatingDialog = ({ bank, ...dialogProps }: Pick<GatingModalProps, 'pass
 
 /** Hold one user's bank once the device is named, and show the dialog for its gatings. */
 const UserBankProvider = (props: BankProviderProps & { device_id: string | null, onMade: (bank: Bank) => void }) => {
-  const { passphraseUsername, passphraseAdvice, passkeyRpId, children, device_id, onMade, onLifecycle = DefaultOnLifecycle, onBadNews = DefaultOnBadNews, requestCleartext, ...bankish } = props
+  const { passphraseUsername, passkeyRpId, children, device_id, onMade, onLifecycle = DefaultOnLifecycle, onBadNews = DefaultOnBadNews, requestCleartext, ...bankish } = props
   // The bank is made once, so whether the host's dialog asks is fixed at the first render, as the bank's other options are.
   /** True when the host's `requestCleartext` answers this bank's gatings. */
   const [isHostAsking] = useState(requestCleartext !== undefined)
@@ -112,7 +112,7 @@ const UserBankProvider = (props: BankProviderProps & { device_id: string | null,
     <BankContext.Provider value={contextValue}>
       {children}
       {(bank !== null) && (! isHostAsking) && (
-        <OpenGatingDialog bank={bank} passphraseUsername={passphraseUsername} passphraseAdvice={passphraseAdvice} passkeyRpId={passkeyRpId} />
+        <OpenGatingDialog bank={bank} passphraseUsername={passphraseUsername} passkeyRpId={passkeyRpId} />
       )}
     </BankContext.Provider>
   )

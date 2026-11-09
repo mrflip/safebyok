@@ -11,13 +11,13 @@ export const PassphraseModal = (props: PassphraseModalProps) => (
   </AnsweringOnce>
 )
 
-const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername, passphraseAdvice, passkeyRpId }: PassphraseModalProps) => {
+const PassphraseForm = ({ gating, onDone: done, leaseMillis, passphraseUsername, passkeyRpId }: PassphraseModalProps) => {
   const { gripe, setGripe, fail, attempt } = useAttempts('PassphraseModal', done)
   const fieldRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const { ref: confirmRef, gripeId, differs } = useConfirmation(setGripe)
   const creating = gating.gatingkind === 'build_vault'
-  const advice = useAdvice(passphraseAdvice, gating, creating, fail)
+  const advice = useAdvice(gating, creating, fail)
   const passkeyGating = gating.gatingkind === 'unlock_vault' && offersPasskey(gating) ? gating : null
 
   const submit = () => {

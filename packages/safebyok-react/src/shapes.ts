@@ -16,8 +16,6 @@ export interface BankProviderProps extends Omit<BankOpts, 'user_id' | 'device_id
   requestCleartext?:   RequestCleartext | undefined
   /** What a password manager files a vault's passphrase under. */
   passphraseUsername?: string | undefined
-  /** What to say beside the field as the user chooses a passphrase. */
-  passphraseAdvice?:   PassphraseAdvice | undefined
   /** The relying party the vault's passkey is made and asked under, if not the page's own domain. */
   passkeyRpId?:        string | undefined
   children:            ReactNode
@@ -28,7 +26,6 @@ export const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ de
   user_id:            bankOpts.shape.user_id.nullable(),
   requestCleartext:   fn<RequestCleartext>().optional(),
   passphraseUsername: str.optional(),
-  passphraseAdvice:   custom<PassphraseAdvice>().optional(),
   passkeyRpId:        str.optional(),
   children:           custom<ReactNode>(),
 }), 'bad_option')
@@ -58,8 +55,6 @@ export type GatingModalProps = {
   leaseMillis?:        number | undefined
   /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined
-  /** What to say beside the field as the user chooses a new passphrase. */
-  passphraseAdvice?:   PassphraseAdvice | undefined
   /** The relying party the vault's passkey is made and asked under, if not the page's own domain. */
   passkeyRpId?:        string | undefined
 }
@@ -178,13 +173,10 @@ export type PasskeyUnlockButtonProps = {
 export type VaultControlProps = { vaultlabel: string }
 // --
 
-// == [Modals]: DialogAnswer, PassphraseAdvice, Gripe, ModalFormProps, PassphraseGating, PassphraseModalProps, ReplacePassphraseModalProps, AddPasskeyModalProps, RevokePasskeyModalProps, DelVaultModalProps
+// == [Modals]: DialogAnswer, Gripe, ModalFormProps, PassphraseGating, PassphraseModalProps, ReplacePassphraseModalProps, AddPasskeyModalProps, RevokePasskeyModalProps, DelVaultModalProps
 
 /** How a dialog closed: 'unlocked', 'deleted' or 'dismissed'. */
 export type DialogAnswer = 'unlocked' | 'deleted' | 'dismissed'
-
-/** What a host says of a passphrase as the user chooses it, or null for nothing. It hears the passphrase in plain text, so keep it on the device. */
-export type PassphraseAdvice = (passphrase: string) => string | null | Promise<string | null>
 
 /** What a dialog's live region says, and whether it is about the passkey or a mismatch. */
 export type Gripe = { text: string, fromPasskey: boolean, mismatched?: true }
@@ -225,8 +217,6 @@ export type PassphraseModalProps = {
   leaseMillis?:        number | undefined
   /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined
-  /** What to say beside the field as the user chooses a passphrase. */
-  passphraseAdvice?:   PassphraseAdvice | undefined
   /** The relying party the vault's passkey was made under, if not the page's own domain. */
   passkeyRpId?:        string | undefined
 }
@@ -239,8 +229,6 @@ export type ReplacePassphraseModalProps = {
   onDone:              (answer: DialogAnswer) => void
   /** What a password manager files the passphrase under. */
   passphraseUsername?: string | undefined
-  /** What to say beside the new passphrase's field as the user chooses it. */
-  passphraseAdvice?:   PassphraseAdvice | undefined
 }
 
 /** What AddPasskeyModal is handed. */

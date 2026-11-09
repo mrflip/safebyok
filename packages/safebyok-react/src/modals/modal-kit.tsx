@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
-import { ForeverMillis, HostErrorSanitizer, MinuteMillis, type AnyGating, type Outcome, type Vault } from 'safebyok'
+import { ForeverMillis, MinuteMillis, type AnyGating, type Outcome, type Vault } from 'safebyok'
 import { attemptRefusalFlavor } from '../helpers/attempt-refusals'
 import { Doing, Locale, Messages } from '../helpers/messages'
 import { useRevealToggle } from '../hooks/reveal-toggle'
 import { useWhenShown } from '../hooks/when-shown'
 import { Boundary, forBoundary } from '../provider/boundary'
-import type { BoundarySource, DialogAnswer, Gripe, ModalFormProps, PassphraseAdvice } from '../shapes'
+import type { BoundarySource, DialogAnswer, Gripe, ModalFormProps } from '../shapes'
 
 // == [Answer]: DialogAnswer, answerOf, useAnswerOnce, AnsweringOnce, DialogTrouble, cancelOnEscape
 
@@ -169,7 +169,7 @@ export const unlockedFor = (leaseMillis: number, creating: boolean): string => {
 }
 // --
 
-// == [Passphrase field]: UsernameField, PassphraseField, useConfirmation, ConfirmField, PassphraseAdvice, useAdvice, adviceFailed, checkerAdvice
+// == [Passphrase field]: UsernameField, PassphraseField, useConfirmation, ConfirmField, useAdvice, checkerAdvice
 
 export const UsernameField = ({ username }: { username: string }) => (
   // The inline display wins over a host's stylesheet, which can override [hidden].
@@ -247,14 +247,12 @@ export const ConfirmField = ({ ref, gripeId, fieldlabel, gripe, onChange }: {
   />
 )
 
-const adviceFailed = (thrown: unknown) => HostErrorSanitizer.refusalFor(thrown, 'unexpected_error', "The passphraseAdvice handed to the dialog threw rather than answering. What it threw is left out of this report, as it may quote the passphrase: have it answer a sentence or null, and catch its own failures.")
-
 const checkerAdvice = async (gating: AnyGating, typed: string): Promise<string | null> => {
   const verdict = await gating.checkStrength(typed)
   return verdict.strong ? null : verdict.reason
 }
 
-export const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, gating: AnyGating, creating: boolean, fail: (err: unknown) => void) => {
+export const useAdvice = (gating: AnyGating, creating: boolean, fail: (err: unknown) => void) => {
   const [said, setSaid] = useState<string | null>(null)
   const asked = useRef(0)
   const creatingNow = useRef(creating)
@@ -272,11 +270,10 @@ export const useAdvice = (passphraseAdvice: PassphraseAdvice | undefined, gating
     const askedNow = asked.current
     const latest = () => askedNow === asked.current && creating === creatingNow.current
     try {
-      const answer = passphraseAdvice === undefined ? await checkerAdvice(gating, typed) : (await passphraseAdvice(typed)) ?? null
+      const answer = await checkerAdvice(gating, typed)
       await whenShown(() => { if (latest()) { setSaid(answer) } })
     } catch (err) {
-      // The bank's own check throws only a refusal that quotes nothing; the host's may quote anything.
-      await whenShown(() => { if (latest()) { fail(passphraseAdvice === undefined ? err : adviceFailed(err)) } })
+      await whenShown(() => { if (latest()) { fail(err) } })
     }
   }
   return { said, hear }
