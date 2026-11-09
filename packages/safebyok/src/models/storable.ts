@@ -24,6 +24,7 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
 }
 // --
 
+/** A vault or box held in this tab, kept in step with its row in the vaultDB. */
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
   // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #oneFetchAtATime, #listeners, #getSnapshot, #subscribe, isFUBag
 
@@ -72,6 +73,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Getters]: scope, central, full, sparse, am, toJSON, snapshot, getSnapshot, subscribe, subscribeOwn
 
+  /** The scope this thing is stored under. */
   get scope(): ScopeT { return this.#scope }
 
   /** The most recent view of the stored record. */
@@ -85,8 +87,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The sparse form of central: everything but what only the full record carries. */
   get sparse(): SparseT { return this.listing.sparseOf(this.#central) }
 
+  /** Whether the record in hand is alive, damaged or gone. */
   get am(): Am { return this.#central.am }
 
+  /** The {@link sparse} form of this thing, for `JSON.stringify`. */
   toJSON(): SparseT { return this.sparse }
 
   /** Direct public access to the snapshot */
@@ -149,6 +153,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return this
   }
 
+  /** Non-throwing form of {@link fetch}. */
   tryFetch(opts: FetchOpts = {}): Promise<Outcome<this>> {
     return outcomeOf(() => this.fetch(opts))
   }
@@ -161,6 +166,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return this.fetch({ ifAbsent: 'nil' })
   }
 
+  /** Non-throwing form of {@link hydrate}. */
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
   /** Delete this thing through its listing. A thing gone is deleted again, over its tombstone's revision. */
@@ -170,6 +176,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return this
   }
 
+  /** Non-throwing form of {@link del}. */
   tryDel(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(opts)) }
   // --
 
@@ -218,7 +225,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     throw shapeUnreconciled()
   }
 
-  /** Whether `record` is of the life of the central held: the same {@link lifeTokPathOf}. */
+  /** Whether `record` is of the life of the central held: the same `lifeTokPathOf`. */
   #sameLife(record: Fetched<RecordT, SparseT>): boolean {
     return this.lifeTokPathOf(record) === this.lifeTokPathOf(this.#central)
   }
@@ -328,12 +335,16 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** A delete needs the thing enabled and the vault unlocked, and no more: a thing gone is deleted again. */
   demandDeletable(): this { return this.demandEnabled().demandUnlocked() }
 
+  /** Demand that this thing's vault is unlocked. */
   demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
 
+  /** Demand that this thing is still enabled. */
   demandEnabled():  this { if (! this.#isEnabled) { throw disabledError() }                            return this }
 
+  /** Demand that the record in hand is full. */
   demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
 
+  /** Demand that the record in hand is whole: full, or a tombstone. */
   demandWhole():    this { if (! this.#isWhole)  { throw partialLoadError() }                          return this }
 
   /** The full record in hand. */
@@ -342,6 +353,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     throw partialLoadError()
   }
 
+  /** Hydrate this thing so that a delete can act on it. */
   ensureDeletable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
   // --
 

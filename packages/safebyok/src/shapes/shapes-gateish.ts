@@ -23,7 +23,7 @@ import type { VaultWorld } from './shapes-vaultish'
 
 // == [Wayin kinds]: wayinkind, isPrfSalt
 
-/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link wayinkindVals}. */
+/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link EX.wayinkindVals}. */
 export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinkindVals), 'bad_option')
 
 /** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltBytes} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
@@ -32,6 +32,7 @@ export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_sa
 
 // == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord
 
+/** The checks of a wayin's forms: a header, which omits the wrapped vaultKey, and the full record. */
 export const { passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinRecord } = Checkers('bad_record', ({ discrim }) => {
   const passphraseWayinHeader = SX.passphraseWayinRecord.omit({ vault_key_wayin_wrapped: true }).strip()
   const passkeyWayinHeader    = SX.passkeyWayinRecord.omit({ vault_key_wayin_wrapped: true }).strip()
@@ -59,6 +60,7 @@ export const FirstGateEpoch = 1
 /** Which gate of its vault a gate is: bound into every lease, which a gate of another epoch does not honour. */
 export const gateEpoch = Checker(({ int }) => int.positive(), 'bad_record')
 
+/** The check of a gate's epoch and its wayin records. */
 export const gateProps = objCheck(() => ({
   gate_epoch:       gateEpoch,
   passphrase_wayin: SX.passphraseWayinRecord,
@@ -214,12 +216,14 @@ export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, c
 }, [CX])
 
 export type LeaseStamp  = Z.infer<typeof leaseStamp>
+/** The parts of a lease that are safe to show: its {@link LeaseStamp}. */
 export type LeaseSparse = LeaseStamp
 export type LeaseRecord = Z.infer<typeof leaseRecord>
 // --
 
 // == [What a lease is handed]: sealedWhisper, leaseMillis, guardedLogger, leaseFriend, leaseGrantOpts, ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs, SealedWhisper, LeaseFriend, LeaseGrantOpts
 
+/** The check of a box's sealed parts: its wrapped boxKey and ciphered whisper. */
 export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { refusalkind: 'bad_record', extras: 'strip' }, [CX])
 
 export type SealedWhisper = Z.infer<typeof sealedWhisper>
@@ -253,6 +257,7 @@ export const leaseFriend = objCheck(({ fn }) => ({
 /** All a lease or a proving hears of its vault, once {@link leaseFriend} has checked it. */
 export type LeaseFriend = Z.infer<typeof leaseFriend>
 
+/** The check of the gate epoch and wayin kind a lease is granted under. */
 export const leaseGrantOpts = objCheck(() => ({
   gate_epoch: gateEpoch,
   wayinkind:  wayinkind,
@@ -328,6 +333,7 @@ export type RequestCleartext = (gating: AnyGating) => unknown
 /** The host's dialog as a bank keeps it, wrapped by `guardRequestCleartext`: true once the dialog closes, false if it threw. Never throws. */
 export type AskUser = (gating: AnyGating) => Promise<boolean>
 
+/** A gating of any kind. */
 export type AnyGating = { [KindT in EX.Gatingkind]: Gating<KindT> }[EX.Gatingkind]
 
 /** A gating as a host's dialog renders it: the vault it asks for, and what it asks for. */
@@ -364,12 +370,15 @@ export type ProvingsForGatingkind = {
 /** The change a gating is launched for, past the enter key. It hears provings, never a clear. */
 export type Run<KindT extends EX.Gatingkind> = (provings: ProvingsForGatingkind[KindT], launchArgs: LaunchArgs<KindT>) => Promise<Vault>
 
+/** The vault each kind of gating acts on, null for a `build_vault` whose vault does not exist yet. */
 export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
 
 /** All a gating is launched with; `prior`, the revision a birth lands after, is read at launch, and `askUser` is the bank's, null with no host dialog. */
 export type LaunchArgs<KindT extends EX.Gatingkind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], prior: KindT extends 'build_vault' ? Revision : null, friend: GatingFriend, askUser: AskUser | null }
 
+/** The vault, scope, listing and world a gating hands its {@link Prove}. */
 export type Asked<KindT extends EX.Gatingkind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], listing: VaultListing, world: VaultWorld }
 
+/** Make the provings of an attempt from the user's cleartext. */
 export type Prove<KindT extends EX.Gatingkind> = (asked: Asked<KindT>, clears: unknown) => Promise<ProvingsForGatingkind[KindT]>
 // --

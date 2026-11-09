@@ -1,7 +1,6 @@
 import { vi } from 'vitest'
 
-/**
- * Resolve after the macrotask queue has turned once: every promise already settled has run its
+/** Resolve after the macrotask queue has turned once: every promise already settled has run its
  * continuation, and so has any timer due now. For tests that let background work (a refresh rung
  * by a write) settle before they look.
  *
@@ -9,8 +8,7 @@ import { vi } from 'vitest'
  */
 export const wakeupAtNextTick = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 0) })
 
-/**
- * A while for something that should not happen to have had its chance: fifty milliseconds.
+/** A while for something that should not happen to have had its chance: fifty milliseconds.
  *
  * @returns A promise for the end of the while.
  *
@@ -20,8 +18,7 @@ export const wakeupAtNextTick = (): Promise<void> => new Promise((resolve) => { 
  */
 export const aWhile = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 50) })
 
-/**
- * Resolves once `check` holds, looking every few milliseconds; rejects after two seconds, so a
+/** Resolves once `check` holds, looking every few milliseconds; rejects after two seconds, so a
  * thing that never comes to pass fails its test rather than hanging it.
  *
  * @param check - Whether the thing has come to pass yet.
@@ -34,8 +31,7 @@ export const eventually = async (check: () => boolean): Promise<void> => {
   throw new Error('it never came to pass')
 }
 
-/**
- * A listener for a VaultDB's `subscribe`, and a count of how often it was called, kept for a test
+/** A listener for a VaultDB's `subscribe`, and a count of how often it was called, kept for a test
  * to look at.
  *
  * @returns `onChange`, to subscribe with; `heard`, whose `count` it raises.
@@ -45,8 +41,7 @@ export const changeCounter = () => {
   return { heard, onChange: () => { heard.count += 1 } }
 }
 
-/**
- * A latch for holding an async seam mid-flight, so a test can land one call in the middle of
+/** A latch for holding an async seam mid-flight, so a test can land one call in the middle of
  * another: `pass()` waits until `release()` is called, and `reached` resolves once something is
  * waiting at it. Released, it stays open: later passes go straight through.
  *
@@ -72,8 +67,7 @@ export type AsyncVerbOf<Target> = {
   [Verb in keyof Target]-?: Target[Verb] extends (...args: never[]) => Promise<unknown> ? Verb : never
 }[keyof Target]
 
-/**
- * Has `meanwhile` run inside the next call to `target[verb]`, before the call itself goes on: for
+/** Has `meanwhile` run inside the next call to `target[verb]`, before the call itself goes on: for
  * slipping another device's doings, or a pause, between a vault's look at storage and its write.
  * Only the next call is touched; later ones go straight through, unless armed again: each arming
  * is for one call, in the order armed. A method the test already spies on keeps counting its
@@ -133,8 +127,7 @@ const errandsAt = new WeakMap<object, (() => Promise<unknown>)[]>()
 /** The method a spy of {@link beforeNextCall}'s own stands in front of. */
 const originalOf = new WeakMap<object, AsyncFn>()
 
-/**
- * Holds the next call to `target[verb]` at a latch (see {@link makeLatch}) until the test releases
+/** Holds the next call to `target[verb]` at a latch (see {@link makeLatch}) until the test releases
  * it, so the test can land another call while that one is in flight. Later calls go straight
  * through.
  *
@@ -221,4 +214,5 @@ const deferred = () => {
   return { promise, resolve }
 }
 
+/** A listener that does nothing, for a test with nothing to hear. */
 export const unheard = (): void => undefined

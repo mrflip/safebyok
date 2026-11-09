@@ -107,6 +107,7 @@ export type ModelsCall =
 /** The answer of a scripted call: the answer itself, or a function of the call that makes it (or throws, or rejects). */
 export type Scripted<CallT> = BoxAnswer | ((call: CallT) => unknown)
 
+/** A {@link ListingAnswer} about a box. */
 export type BoxAnswer = ListingAnswer<BoxRecord, BoxSparse>
 
 /** A watch the listing started: the callback it gave, and whether it is still live. */
@@ -117,6 +118,7 @@ export type ModelsWatch = { onNotice: (notice: Notice) => void, onBadNews: ((new
 
 /** The sealed parts of every record the fake seal seals: constants that wrap no key and open under none. */
 export const FakeBoxKeyWrapped   = fakeCiphered('fake-box-key-wrapped')
+/** The `whisper_ciphered` of every record the fake seal seals. */
 export const FakeWhisperCiphered = fakeCiphered('fake-whisper-ciphered')
 
 /** How {@link makeModelsWorld} starts the world. */
@@ -174,8 +176,11 @@ export type ModelsWorld = {
   /** Lay `record` in the vaultDB as the row under its boxlabel, unchecked. */
   seedStore(record: Fetched<BoxRecord, BoxSparse>): void
 
+  /** Script the next `tryGetBox` calls to answer with `answers`, one each. */
   willGet(...answers: readonly Scripted<{ scope: Boxscope }>[]): void
+  /** Script the next `tryPutBox` calls to answer with `answers`, one each. */
   willPut(...answers: readonly Scripted<PutCall>[]): void
+  /** Script the next `tryDelBox` calls to answer with `answers`, one each. */
   willDel(...answers: readonly Scripted<{ scope: Boxscope, priorRevisionTok: string | null }>[]): void
   /** The next `ensureTimely` runs `thunk` (async, so it may hold, or reject). */
   willEnsureTimely(...thunks: readonly ((maxMillis: number | undefined) => Promise<void> | void)[]): void
@@ -192,7 +197,9 @@ export type ModelsWorld = {
 
   /** {@link fullBoxRecord}, in this world's vault. */
   fullBoxRecord(overrides?: Partial<BoxRecord>): BoxRecord
+  /** {@link sparseBoxRecord}, in this world's vault. */
   sparseBoxRecord(overrides?: Partial<BoxSparse>): BoxSparse
+  /** {@link tombstoneBoxRecord}, in this world's vault. */
   tombstoneBoxRecord(overrides?: Partial<BoxSparse>, am?: 'd' | 'x'): Tombstone<BoxSparse>
   /** The scope of the box `boxlabel` in this world's vault. */
   boxscope(boxlabel: string): Boxscope
@@ -230,6 +237,7 @@ export class TestableVaultDB extends MemoryVaultDB {
     this.#watches = watches
   }
 
+  /** Log this get, then answer it from the script or, with the script empty, from storage. */
   override async tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts) {
     const scope = CX.boxscope.parse(asked)
     this.#calls.push({ verb: 'get', scope })
@@ -237,6 +245,7 @@ export class TestableVaultDB extends MemoryVaultDB {
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryGetBox']>>) : super.tryGetBox(asked, opts)
   }
 
+  /** Log this put, then answer it from the script or, with the script empty, from storage. */
   override async tryPutBox(record: BoxRecord, opts: PutOpts) {
     const call: PutCall = { record, priorRevisionTok: priorTokOf(opts.prior), ifAbsent: opts.ifAbsent, ifPresent: opts.ifPresent }
     this.#calls.push({ verb: 'put', ...call })
@@ -244,6 +253,7 @@ export class TestableVaultDB extends MemoryVaultDB {
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryPutBox']>>) : super.tryPutBox(record, opts)
   }
 
+  /** Log this delete, then answer it from the script or, with the script empty, from storage. */
   override async tryDelBox(tombstone: BoxTombstone, opts: DelOpts) {
     const call: DelCall = { scope: CX.boxscope.parse(tombstone), priorRevisionTok: priorTokOf(opts.prior) }
     this.#calls.push({ verb: 'del', ...call })
@@ -251,6 +261,7 @@ export class TestableVaultDB extends MemoryVaultDB {
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryDelBox']>>) : super.tryDelBox(tombstone, opts)
   }
 
+  /** Log this watch and keep it for `notify` to reach. */
   override watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: VaultError) => void): () => void {
     const watch: ModelsWatch = { onNotice, onBadNews, active: true }
     this.#calls.push({ verb: 'watch', onNotice })
@@ -432,6 +443,7 @@ export const useModelsWorld = (opts: ModelsWorldOpts = {}): { readonly mw: Model
 
 /** A {@link Box} that shows a test the record it holds, which the storable keeps protected: `_cheat_central` is its `central`, as a {@link TestableBoxListing} makes it. */
 export class TestableBox extends Box {
+  /** The record this box holds, for a test to read. */
   get _cheat_central(): Fetched<BoxRecord, BoxSparse> { return this.central } // eslint-disable-line unicorn/prefer-private-class-fields
 
 }
@@ -442,20 +454,28 @@ export class TestableBoxListing extends BoxListing {
     return new TestableBox(this.world, this, central)
   }
 
+  /** {@link BoxListing.build}, answering a {@link TestableBox}. */
   override async build(...args: Parameters<BoxListing['build']>): Promise<TestableBox> { return testableOf(await super.build(...args)) }
 
+  /** {@link BoxListing.puttable}, answering a {@link TestableBox}. */
   override puttable(...args: Parameters<BoxListing['puttable']>): TestableBox { return testableOf(super.puttable(...args)) }
 
+  /** {@link BoxListing.create}, answering a {@link TestableBox}. */
   override async create(...args: Parameters<BoxListing['create']>): Promise<TestableBox> { return testableOf(await super.create(...args)) }
 
+  /** {@link BoxListing.fetch}, answering a {@link TestableBox} or null. */
   override async fetch(...args: Parameters<BoxListing['fetch']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.fetch(...args)) }
 
+  /** {@link BoxListing.get}, answering a {@link TestableBox} or null. */
   override async get(...args: Parameters<BoxListing['get']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.get(...args)) }
 
+  /** {@link BoxListing.put}, answering a {@link TestableBox}. */
   override async put(...args: Parameters<BoxListing['put']>): Promise<TestableBox> { return testableOf(await super.put(...args)) }
 
+  /** {@link BoxListing.del}, answering a {@link TestableBox} or null. */
   override async del(...args: Parameters<BoxListing['del']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.del(...args)) }
 
+  /** {@link BoxListing.at}, answering a {@link TestableBox} or null. */
   override at(...args: Parameters<BoxListing['at']>): TestableBox | null { return nullOrTestableOf(super.at(...args)) }
 }
 

@@ -47,8 +47,10 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** The scope of `duck`, held to this vault: no listing answers for another's. */
   scopeOf(duck: unknown):  Boxscope  { return boxscope.parseConsistent(duck, this.scope) }
 
+  /** Parse `duck` as a {@link BoxSparse}. */
   sparseOf(duck: unknown): BoxSparse { return SX.boxSparse.parse(duck) }
 
+  /** Parse `duck` as a {@link BoxRecord} of this vault. */
   recordOf(duck: unknown): BoxRecord { return SX.boxRecord.parseConsistent(duck, this.scope) }
   // --
 
@@ -92,6 +94,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return this.handleIfAbsent(await held.hydrate(timely), scoped, ifAbsent)
   }
 
+  /** Non-throwing form of {@link get}. */
   tryGet(scoped: Boxscope, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.get(scoped, opts)) }
 
   /** The box a put of `scoped` goes through: the one held, or a void one made for an empty slot. */
@@ -110,6 +113,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return this.puttable(input, filled).put(dna, filled)
   }
 
+  /** Non-throwing form of {@link create}. */
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
   /** A void box held under `scope`. */

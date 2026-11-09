@@ -13,6 +13,7 @@ import type { ReqParams } from './shapes-storage'
 // == [Crossed parts]: crossedErr, crossedReqParams, damagedVault, damagedBox, CrossedErr, CrossedReqParams
 
 // A failed check here is a wire out of step with this copy of safebyok, never a damaged row: 'unexpected_error'.
+/** The checks of the parts of a vaultDB answer that cross the wire: a refusal, its safe metadata and the damaged rows listed. */
 export const { crossedErr, crossedReqParams, damagedVault, damagedBox } = Checkers('unexpected_error', ({ obj, arr, str, int, lit, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok, revision_tok }) => {
   const crossedErr = obj({
     refusalkind: oneof(refusalkindVals),
@@ -75,6 +76,7 @@ const vaultErrorOfCrossed = ({ refusalkind, message, meta }: CrossedErr, answere
   return new VaultError(refusalkind, message, { meta: { ...crossedMeta, ...answered } })
 }
 
+/** The checks of each vaultDB verb's answer as it crosses the wire, and of a notice. */
 export const {
   listVaultsAnswer, getVaultAnswer, putVaultAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delVaultAnswer,
   listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer, crossedNotice,

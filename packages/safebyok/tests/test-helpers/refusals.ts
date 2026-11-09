@@ -10,8 +10,7 @@ const NotRefused = Symbol('not refused')
 /** The words a failed expectation adds for an expected `refusalkind`, none when no kind was expected. */
 const kindClause = (refusalkind: Refusalkind | undefined): string => (refusalkind === undefined ? '' : ` of refusalkind '${refusalkind}'`)
 
-/**
- * The VaultError `operation` rejected with, once the test has checked it is one, and of `refusalkind` if given; the
+/** The VaultError `operation` rejected with, once the test has checked it is one, and of `refusalkind` if given; the
  * test fails if `operation` resolves, or rejects with anything else: a plain Error, one that only
  * names itself a VaultError, a VaultError of another kind.
  *
@@ -34,8 +33,7 @@ export const expectRefusal = async (operation: Promise<unknown>, refusalkind?: R
   return refusal as VaultError
 }
 
-/**
- * The `val` of the good Outcome `operation` resolved to, once the test has checked it is one; the
+/** The `val` of the good Outcome `operation` resolved to, once the test has checked it is one; the
  * test fails, naming the refusal, if it resolved a bad one, and with the rejection if it rejected,
  * which no Outcome-returning call may.
  *
@@ -53,8 +51,7 @@ export type ExpectingGood<DbT> = {
   [CkeyT in keyof DbT]: DbT[CkeyT] extends (...args: infer ArgsT) => Promise<Outcome<infer ValT>> ? (...args: ArgsT) => Promise<ValT> : DbT[CkeyT]
 }
 
-/**
- * `db` -- a VaultDB, or anything whose verbs resolve Outcomes -- with each such verb resolving its
+/** `db` -- a VaultDB, or anything whose verbs resolve Outcomes -- with each such verb resolving its
  * good Outcome's `val`, once {@link expectGood} has checked it is one: the test fails, naming the
  * refusal, on a bad one. Every other member is `db`'s own.
  *
@@ -85,8 +82,7 @@ const isOutcome = (settled: unknown): settled is Outcome<unknown> => (
   typeof settled === 'object' && settled !== null && 'ok' in settled && typeof settled.ok === 'boolean'
 )
 
-/**
- * The VaultError of the bad Outcome `operation` resolved to, once the test has checked it is one,
+/** The VaultError of the bad Outcome `operation` resolved to, once the test has checked it is one,
  * and of `refusalkind` if given; the test fails if it resolved a good one, if it rejected (which no
  * Outcome-returning call may), or if its `err` is anything but a VaultError (of that kind).
  *
@@ -104,8 +100,7 @@ export const expectBad = async (operation: Outcome<unknown> | Promise<Outcome<un
   return outcome.err!
 }
 
-/**
- * Asserts that `attempt` throws, there and then, a VaultError (of `refusalkind` if given), and returns it: the
+/** Asserts that `attempt` throws, there and then, a VaultError (of `refusalkind` if given), and returns it: the
  * synchronous twin of {@link expectRefusal}, for a check that throws rather than rejects.
  *
  * @param attempt - The call expected to throw.
@@ -127,8 +122,7 @@ export const expectSyncRefusal = (attempt: () => unknown, refusalkind?: Refusalk
   return refusal as VaultError
 }
 
-/**
- * `bag` with its `ckey` field left out, still typed as the whole bag: for a test that an
+/** `bag` with its `ckey` field left out, still typed as the whole bag: for a test that an
  * entrypoint refuses a caller who forgot a required option, which `exactOptionalPropertyTypes`
  * otherwise lets a test write only with a cast.
  *

@@ -43,13 +43,16 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Getters]: things, snapshot, getSnapshot, subscribe
 
+  /** Every instance this listing holds, whether present or deleted. */
   get things(): readonly ThingT[] { return [...this.#things.values()] }
 
   /** The snapshot of every present instance, as the instance itself gives it: frozen, the same array until one of them changes. */
   get snapshot(): readonly SnapshotT[] { return this.#snapshot }
 
+  /** The unbound snapshot getter, for `useSyncExternalStore`. */
   get getSnapshot(): () => readonly SnapshotT[] { return this.#getSnapshot }
 
+  /** The unbound subscribe callback, for `useSyncExternalStore`. */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   // --
 
@@ -72,6 +75,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Its world]: isLocked, ensureTimelyWorld
 
+  /** True while this listing's world is locked. */
   get isLocked(): boolean { return this.world.isLocked }
 
   /** The world refreshed within `maxMillis`, by default its own horizon. */
@@ -148,6 +152,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return this.handleIfAbsent(await this.deliver(await this.tryGetRow(asked)), asked, ifAbsent)
   }
 
+  /** Non-throwing form of {@link fetch}. */
   tryFetch(scope: ScopeT, opts: FetchOpts = {}): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.fetch(scope, opts)) }
 
   /** `found` when present. Anything else is refused under `ifAbsent: 'fail'`, and null under `ifAbsent: 'nil'`. */
@@ -169,6 +174,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return thing
   }
 
+  /** Non-throwing form of {@link put}. */
   tryPut(record: RecordT, opts: PutOpts): Promise<Outcome<ThingT>> { return outcomeOf(() => this.put(record, opts)) }
 
   /** SLOPDOC: Deletes the thing `duck` names and delivers storage's answer: its tombstone, if anything was stored. */
@@ -178,6 +184,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return this.delOver(held?.sparse ?? this.sparseOf(duck))
   }
 
+  /** Non-throwing form of {@link del}. */
   tryDel(duck: SparseT | Thing<ScopeT, RecordT, SparseT>): Promise<Outcome<ThingT | null>> { return outcomeOf(() => this.del(duck)) }
 
   /** A tombstone over `sparse`'s own revision, and its answer delivered. */

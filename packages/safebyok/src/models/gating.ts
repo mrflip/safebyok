@@ -42,6 +42,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   // == [Getters]: isOpen, whenSettled, scope, toJSON
 
+  /** True until this gating settles. */
   get isOpen(): boolean { return this.#outcome === null }
 
   /** The outcome once settled, a promise that never rejects: a dialog closes on it, as the package cannot close a host's dialog. */
@@ -52,6 +53,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     return { applabel, user_id, vaultlabel }
   }
 
+  /** This gating's {@link GatingSnapshot}: its kind and vault scope, never a cleartext. */
   toJSON(): GatingSnapshot {
     const { gatingkind } = this
     return { gatingkind, ...this.#scope }
