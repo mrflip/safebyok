@@ -96,7 +96,7 @@ export type VaultRecord    = Readonly<Z.infer<typeof vaultRecord>>
 export type VaultTombstone = Readonly<Z.infer<typeof vaultTombstone>>
 /** A vault row as stored: live, or a tombstone. */
 export type VaultRow       = VaultRecord | VaultTombstone
-/** A vault row that failed validation, named by where it is stored: its scope, under whatever label storage holds, and `am` 'd'. */
+/** A vault row that failed validation, named by where it is stored: its scope, under whatever label storage has, and `am` 'd'. */
 export type DamagedVault   = Readonly<{ applabel: string, user_id: string, vaultlabel: string, am: 'd' }>
 // --
 
@@ -132,7 +132,7 @@ export type BoxRecord    = Readonly<Z.infer<typeof boxRecord>>
 export type BoxTombstone = Readonly<Z.infer<typeof boxTombstone>>
 /** A box row as stored: live, or a tombstone. */
 export type BoxRow       = BoxRecord | BoxTombstone
-/** A box row that failed validation, named by where it is stored: its scope, under whatever label storage holds, its vault's `vault_tok`, and `am` 'd'. */
+/** A box row that failed validation, named by where it is stored: its scope, under whatever label storage has, its vault's `vault_tok`, and `am` 'd'. */
 export type DamagedBox   = Readonly<{ applabel: string, user_id: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>
 // --
 

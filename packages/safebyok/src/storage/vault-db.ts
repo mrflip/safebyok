@@ -507,7 +507,7 @@ const isRowFound = (raw: unknown): boolean => {
   return true
 }
 
-// Held to its scope and not its vault_tok: a vault row of another life is an answer the verbs have words for.
+// Checked against its scope and not its vault_tok: a vault row of another life is an answer the verbs have words for.
 /** The vault row storage answered for `asked`'s scope, null for none. */
 const foundVaultRowOf = (raw: unknown, asked: VaultScope): VaultRow | null => (
   isRowFound(raw) ? SX.storedVaultRow.parseConsistent(raw, CX.vaultScope.parse(asked), RowOfOtherAddress) : null
@@ -518,7 +518,7 @@ const foundBoxRowOf = (raw: unknown, asked: BoxQuery): BoxRow | null => (
   isRowFound(raw) ? SX.storedBoxRow.parseConsistent(raw, SX.boxQuery.parse(asked), RowOfOtherAddress) : null
 )
 
-/** A listing's row, held to the `address` it is listed at; null for one that is to be set aside as damaged. */
+/** A listing's row, checked against the `address` it is listed at; null for one that is to be set aside as damaged. */
 const listedRowOf = <RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknown, address: object): RowT | null => {
   const parsed = rowCheck.safeParse(raw)
   if (parsed.success) { return verifyConsistent(parsed.data, address, RowOfOtherAddress) }

@@ -21,7 +21,7 @@ const VaultMisfilings = [['user_id', { user_id: 'u2' }], ['vaultlabel', { vaultl
 /** Fields of a box row that may name another box than its address. */
 const BoxMisfilings = [['user_id', { user_id: 'u2' }], ['vault_tok', { vault_tok: 'life2' }], ['boxlabel', { boxlabel: 'other' }]] as const
 
-/** What storage may hold for a row that is not an object. */
+/** What storage may have for a row that is not an object. */
 const NoObjects = [['an array', ['rubble']], ['a string', 'rubble'], ['a number', 12]] as const
 
 /** A row a listing finds that is not an object: unlike a get, a null there is a row. */
@@ -29,7 +29,7 @@ const ListedNoObjects = [...NoObjects, ['a null', null]] as const
 
 /** Registers the gets' cases over `world`. */
 export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): void => {
-  describe("a row out of storage, held to its address", () => {
+  describe("a row out of storage, checked against its address", () => {
     it.each(VaultMisfilings)("refuses from getVault a well-formed vault row naming another %s", async (fieldname, misfiling) => {
       const { vaultDB, vault } = await putWith()
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...misfiling })
@@ -223,7 +223,7 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       expect(val.damaged_rows).to.deep.equal([{ ...boxscopeOf('rubble'), vault_tok: 'life1', am: 'd' }])
     })
 
-    it("holds a box row of a later fmt, set aside, to its scope alone", async () => {
+    it("reduces a box row of a later fmt, set aside, to its scope alone", async () => {
       const { vaultDB } = await putWith()
       await rowsOf(vaultDB).plantBoxRow(boxscopeOf('newer'), 'life1', { fmt: SX.BoxFormat + 1, revision_seq: 9 })
       const { val } = await vaultDB.listBoxes(vaultQuery)
