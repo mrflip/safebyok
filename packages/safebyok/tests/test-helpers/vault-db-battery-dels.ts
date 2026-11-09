@@ -1,4 +1,4 @@
-/** The battery's dels and tidyGone: a box or a vault deleted, a row past reading named and deleted, and the box rows of an ended life tidied away. */
+/** The battery's dels and tidyGone: a box or a vault deleted, a row past reading refused, and the box rows of an ended life tidied away. */
 
 import { describe, expect, it } from 'vitest'
 import * as SX from '../../src/shapes/shapes-storage'
@@ -34,6 +34,15 @@ export const describeDels = ({ storeWith, rowsOf }: BatteryWorld): void => {
     it("refuses over a live row moved past its prior, holding the row", async () => {
       const { vaultDB, vault, box } = await storeWith({ box: true })
       expect(await vaultDB.tryDelBox({ ...boxTombstoneOf(box), revision_seq: 8 }, { prior: stale })).to.deep.include({ ok: false, act: 'stale_write', dbhas: box, world: vault })
+    })
+
+    it("refuses a row past peeking at any prior, the sentinels a listing shows among them, holding the row", async () => {
+      const { vaultDB, box } = await storeWith({ box: true })
+      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { garbage: true })
+      const sentinelled = SX.boxTombstone.parse({ ...SX.sentinelBoxOf(boxscope, 'life1'), ...SX.nextRevisionOf(SX.VoidRevision, Now) })
+      expect(await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'damaged_row' })
+      expect(await vaultDB.tryDelBox(sentinelled, { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'damaged_row' })
+      expect(await storedBoxOf(vaultDB)).to.deep.equal({ garbage: true })
     })
   })
 
@@ -81,43 +90,15 @@ export const describeDels = ({ storeWith, rowsOf }: BatteryWorld): void => {
       expect(await vaultDB.tryDelVault(tombstone, { prior })).to.deep.include({ ok: false, act: 'damaged_row' })
       expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
     })
-  })
 
-  describe("a damaged row named as damaged_rows lists it", () => {
-    it("delVault deletes rubble at the sentinels and cascades over nothing else; any other prior refuses it", async () => {
-      const { vaultDB, box } = await storeWith({ box: true })
+    it("refuses a row past peeking at the sentinels a listing shows, and a damaged tombstone at its own revision, tombstoning no box", async () => {
+      const { vaultDB, vault, box } = await storeWith({ box: true })
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { garbage: true })
-      const tombstone = SX.vaultTombstone.parse({ ...SX.sentinelVaultOf(vaultScope), ...SX.nextRevisionOf(SX.VoidRevision, Now) })
-      const missed = await vaultDB.tryDelVault(tombstone, { prior: { ...SX.VoidRevision, revision_tok: 'nope' } })
-      expect(missed).to.deep.include({ ok: false, act: 'damaged_row' })
-      const named = await vaultDB.tryDelVault(tombstone, { prior: SX.VoidRevision })
-      expect(named).to.deep.include({ ok: true, act: 'deleted' })
-      expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.include({ am: 'x', revision_seq: 0 })
-      expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
-    })
-
-    it("delVault at the row's own revision and vault_tok deletes it, and this life's boxes; another vault_tok does not", async () => {
-      const { vaultDB, vault } = await storeWith({ box: true })
+      const sentinelled = SX.vaultTombstone.parse({ ...SX.sentinelVaultOf(vaultScope), ...SX.nextRevisionOf(SX.VoidRevision, Now) })
+      expect(await vaultDB.tryDelVault(sentinelled, { prior: SX.VoidRevision })).to.deep.include({ ok: false, act: 'damaged_row' })
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, am: 'x', gate: 'rubble' })
-      const tombstone = vaultTombstoneOf(vault)
-      const prior = priorOf(vault)
-      const missed = await vaultDB.tryDelVault({ ...tombstone, vault_tok: 'otherlife' }, { prior })
-      expect(missed).to.deep.include({ ok: false, act: 'damaged_row' })
-      const named = await vaultDB.tryDelVault(tombstone, { prior })
-      expect(named).to.deep.include({ ok: true, act: 'deleted' })
-      expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.include({ am: 'x', revision_seq: 1 })
-      expect(await storedBoxOf(vaultDB)).to.include({ am: 'x' })
-    })
-
-    it("delBox deletes rubble at the sentinels, and refuses any other prior", async () => {
-      const { vaultDB, box } = await storeWith({ box: true })
-      await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { garbage: true })
-      const tombstone = SX.boxTombstone.parse({ ...SX.sentinelBoxOf(boxscope, 'life1'), ...SX.nextRevisionOf(SX.VoidRevision, Now) })
-      const missed = await vaultDB.tryDelBox(boxTombstoneOf(box), { prior: priorOf(box) })
-      expect(missed).to.deep.include({ ok: false, act: 'damaged_row' })
-      const named = await vaultDB.tryDelBox(tombstone, { prior: SX.VoidRevision })
-      expect(named).to.deep.include({ ok: true, act: 'deleted' })
-      expect(await storedBoxOf(vaultDB)).to.include({ am: 'x', revision_seq: 0 })
+      expect(await vaultDB.tryDelVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'damaged_row' })
+      expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
     })
   })
 

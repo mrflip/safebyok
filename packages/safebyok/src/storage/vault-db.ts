@@ -109,11 +109,11 @@ export interface VaultDB {
   revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>>
   /** Non-throwing form of {@link VaultDB.revokePasskey}. */
   tryRevokePasskey(params: RevokePasskeyParams): Promise<Answer<VaultRecord, 'revoked'>>
-  /** Deletes a box at `prior`: its live row, or the damaged row `damaged_rows` lists. */
+  /** Deletes a box's live row at `prior`. */
   delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>>
   /** Non-throwing form of {@link VaultDB.delBox}. */
   tryDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<Answer<BoxTombstone, DelAct>>
-  /** Deletes a vault at `prior`, its live row or the damaged row `damaged_rows` lists, with the boxes of its life. */
+  /** Deletes a vault's live row at `prior`, with the boxes of its life. */
   delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>>
   /** Non-throwing form of {@link VaultDB.delVault}. */
   tryDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Answer<VaultTombstone, DelAct>>
@@ -357,7 +357,7 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   // == [Dels]: delBox, tryDelBox, #answerDelBoxVoid, #answerDelBoxGone, #answerDelBoxRecord, delVault, tryDelVault, #answerDelVaultVoid, #answerDelVaultGone, #answerDelVaultRecord, tidyGone, tryTidyGone
 
-  /** Deletes a box at `prior`: its live row, or the damaged row `damaged_rows` lists. */
+  /** Deletes a box's live row at `prior`. */
   async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> {
     const req_params = SX.reqParamsOf({ ...tombstone, ...opts })
     try {
@@ -392,7 +392,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     throw Refuse.staleWrite(world, found)
   }
 
-  /** Deletes a vault at `prior`, its live row or the damaged row `damaged_rows` lists, with the boxes of its life. */
+  /** Deletes a vault's live row at `prior`, with the boxes of its life. */
   async delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>> {
     const req_params = SX.reqParamsOf({ ...tombstone, ...opts })
     try {
@@ -475,9 +475,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doPutVault(record: VaultRecord, opts: PutOptsGiven): Awaitable<Landing>
   /** Stores `record` as `doPutVault` would, where the vault row also passes its checks live under its `vault_tok`. */
   protected abstract doPutBox(record: BoxRecord, opts: PutOptsGiven): Awaitable<BoxLanding>
-  /** In one step, stores `tombstone` over the live or damaged row at `opts.prior` and tombstones that life's boxes. */
+  /** In one step, stores `tombstone` over the live row at `opts.prior` and tombstones that life's boxes. */
   protected abstract doDelVault(tombstone: VaultTombstone, opts: DelOpts): Awaitable<Landing>
-  /** Stores `tombstone` over the live or damaged box row at `opts.prior`, under a vault live at its `vault_tok`. */
+  /** Stores `tombstone` over the live box row at `opts.prior`, under a vault live at its `vault_tok`. */
   protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxLanding>
   /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>

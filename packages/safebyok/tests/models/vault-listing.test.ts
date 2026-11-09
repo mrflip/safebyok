@@ -10,7 +10,6 @@ import type { AnyGating } from '../../src/shapes/shapes-gateish'
 import type { VaultRecord } from '../../src/shapes/shapes-storage'
 import { Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
-import type { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as TH from '../test-helpers'
 import { Dna, Passphrase, byPassphrase, delTyping, makeBornVault, makeVaultWorld, storedVaultRecord, useVaultWorlds, buildTyping, hearingBadNews } from '../test-helpers/vault-world'
 
@@ -371,31 +370,5 @@ describe("a damaged row", () => {
     expect(listing.at(Dna)).to.eq(vault)
     expect(vault.isPresent).to.be.true
     expect(vault.isLocked).to.be.false
-  })
-
-  it("leaves when the customer names its vault row, as damaged_rows lists it, past reading and with its peek", async () => {
-    const rubble = { garbage: true }
-    const { listing, restoreRow, storedNow, demandStored } = makeVaultWorld(await storedVaultRecord())
-    const stored = demandStored()
-    for (const raw of [rubble, { ...stored, gate: 'chewed' }]) {
-      restoreRow(raw as never)
-      await listing.del(SX.damagedVaultOf(Dna, raw))
-      expect(storedNow()).to.include({ am: 'x' })
-    }
-  })
-
-  it("leaves when the customer names its box row, its neighbours and vault standing", async () => {
-    const { vault, opts, anotherSession, demandStored } = await makeBornVault()
-    const vaultDB = opts.vaultDB as MemoryVaultDB
-    await vault.boxListing.create(BoxDna)
-    const boxrows = vaultDB._cheat_boxRowsOf(Dna, vault.vault_tok)
-    const scope = omit(BoxDna, ['whisper', 'sidecar'])
-    for (const raw of [{ garbage: true }, { ...boxrows.get(BoxDna.boxlabel) as object, whisper_ciphered: 'chewed' }]) {
-      boxrows.set(BoxDna.boxlabel, raw)
-      const session = await anotherSession().build(demandStored())
-      await session.boxListing.del(SX.damagedBoxOf(scope, vault.vault_tok, raw))
-      expect(boxrows.get(BoxDna.boxlabel)).to.include({ am: 'x' })
-    }
-    expect(vault.isPresent).to.be.true
   })
 })

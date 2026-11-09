@@ -28,7 +28,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** The rows the vaultDB's listing set aside as damaged. */
   #damagedRows: readonly DamagedBox[] = Object.freeze([])
 
-  /** The rows of this vault found damaged, set aside until `del` names one. */
+  /** The rows of this vault found damaged at its last listing. */
   get damaged_rows(): readonly DamagedBox[] { return this.#damagedRows }
   // --
 
@@ -54,7 +54,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   recordOf(duck: unknown): BoxRecord { return SX.boxRecord.parseConsistent(duck, this.scope) }
   // --
 
-  // == [Methods]: list, damagedAt, del, get, tryGet, puttable, create, tryCreate, shellFor
+  // == [Methods]: list, get, tryGet, puttable, create, tryCreate, shellFor
 
   /** Hold every box the vaultDB lists for this vault, sparse, and set its damaged rows aside. */
   async list(): Promise<void> {
@@ -70,20 +70,6 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     this.#damagedRows = Object.freeze(damaged_rows)
     for (const { boxlabel } of damaged_rows) { this.things.find((held) => held.boxlabel === boxlabel)?.vacate() }
     await Promise.all(boxes.map((box) => this.build(box)))
-  }
-
-  /** The entry of {@link damaged_rows} under `scope`, or null. */
-  damagedAt(scope: Boxscope): DamagedBox | null {
-    const { boxlabel } = this.scopeOf(scope)
-    return this.#damagedRows.find((damaged) => damaged.boxlabel === boxlabel) ?? null
-  }
-
-  /** Delete the box `duck` names, and stop setting its row aside as damaged. */
-  override async del(duck: BoxSparse | Box): Promise<Box | null> {
-    const thing = await super.del(duck)
-    const { boxlabel } = this.scopeOf(duck)
-    this.#damagedRows = Object.freeze(this.#damagedRows.filter((damaged) => damaged.boxlabel !== boxlabel))
-    return thing
   }
 
   /** The box under `scoped`, no older than `opts` allows, or null under `ifAbsent: 'nil'`. */

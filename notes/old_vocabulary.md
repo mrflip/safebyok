@@ -200,7 +200,7 @@ stands here whole.
 | `getWhisper`, `useWhisper` (taking a boxlabel)         | `box.extractWhisper()`; `useWhisper` lives in `safebyok-react`, on the old design |
 | a sidecar counted toward `maxWhisperBytes`              | counted with the whisper toward what storage holds in one record (`box_too_large`) |
 | the snapshot's `damagedBoxes`, each a `BoxDamaged` (`{ boxlabel, revision_tok, damage }`, its revision null when the record held none as text, its `damage` `damaged` or `newer_format`) | `damaged_rows`, each a `DamagedBox` with a `damagekind` (`damaged_row`, `format_mismatch`) |
-| `putBox()` writes a fresh box over a damaged one; `delBox()` removes it | `vault.tryDelDamagedBox()`, the only verb that deletes one; `getBox()` and `delBox()` read it as missing |
+| `putBox()` writes a fresh box over a damaged one; `delBox()` removes it | nothing in the library deletes one; `getBox()` and `delBox()` refuse it `damaged_row` |
 | a box under a name the validators refuse "is not damaged: it lists and reads as any other" | listed among the damaged rows, under whatever boxlabel storage holds |
 | the vault record's format `safebyok-vault-v6`; its vaultEpoch; its gate `GateRecord`, null while `novel`, the gateEpoch 0 exactly then; "formerly the vault props" | `fmt` 6001; no vault epoch; the gate always present, `gate_epoch` from 1 |
 | the lease record's format `safebyok-lease-v1`; its `ask_passphrase_at`; `KeptLease`, the record held closed until `kept.leaseOn(vault)` | `fmt` 7001; `proved_at`; the deviceDB's `peek`, then `Lease.buildFromCache` |
