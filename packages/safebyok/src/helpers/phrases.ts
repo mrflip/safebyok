@@ -290,12 +290,14 @@ export const boxNotListed = (boxlabel: string): string => `No box is listed unde
 export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."
 // --
 
-// == [Models: gates]: PasskeyAlreadyAdded, DelOfOtherLife
+// == [Models: gates]: PasskeyAlreadyAdded, DelOfOtherRevision, DelOfOtherLife
 
 /** Why a passkey is not added to a gate that has one. */
 export const PasskeyAlreadyAdded = "This vault has a passkey already, and may have only one, so nothing was asked or changed: revoke it first (vault.revokePasskeyPrompt), then add the new one."
 
 /** Why a stale Vault's delete does not reach the vault made since in its slot. */
+export const DelOfOtherRevision = "This thing is not at the life or revision the delete names, so nothing was deleted. Read it again and ask again."
+
 export const DelOfOtherLife = "The vault listed in this slot is under another vault_tok than this Vault, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 

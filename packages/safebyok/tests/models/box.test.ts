@@ -25,7 +25,7 @@ const snapshotOf = async (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord(
   return box.getSnapshot()
 }
 
-const SnapshotKeys = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'isFull', 'isPresent', 'isExposed', 'isVeiled']
+const SnapshotKeys = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'isFull', 'isPresent', 'isExposed', 'isVeiled', 'isLocked']
 
 describe("Box own props", () => {
   it("are exactly the nine the base tattoos: the four of the scope, registered_at, vault_tok and the three revision props", async () => {
@@ -43,7 +43,7 @@ describe("Box own props", () => {
     expect(Object.keys(box)).to.have.members(keys)
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'edited' } })
     expect(Object.keys(box)).to.have.members(keys)
-    await box.del()
+    await box.del(box.scope)
     expect(Object.keys(box)).to.have.members(keys)
   })
 
@@ -89,17 +89,18 @@ describe("Box sidecar, locked or not", () => {
     }
   })
 
-  it("is the snapshot's sidecar too, which a lock leaves alone: a listener is told through the vault, and the snapshot has", async () => {
+  it("is the snapshot's sidecar too, which a lock leaves alone", async () => {
     const box = await boxOf()
     const listener = vi.fn()
     box.subscribe(listener)
     const before = box.getSnapshot()
     world.mw.setLocked(true)
     expect(listener).toHaveBeenCalledTimes(1)
-    expect(box.getSnapshot()).to.eq(before)
-    expect(box.getSnapshot().sidecar).to.deep.equal({ note: 'a test box' })
+    const locked = box.getSnapshot()
+    expect(locked).to.deep.equal({ ...before, isLocked: true })
+    expect(locked.sidecar).to.deep.equal({ note: 'a test box' })
     box.align()
-    expect(box.getSnapshot()).to.eq(before)
+    expect(box.getSnapshot()).to.eq(locked)
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
@@ -141,7 +142,7 @@ describe("Box sidecar, locked or not", () => {
 })
 
 describe("Box snapshot", () => {
-  it("carries the scope, the revision props, registered_at, written_at, the sidecar, and the states full, present, exposed and veiled, and no more", async () => {
+  it("carries the scope, the revision props, registered_at, written_at, the sidecar, and the states full, present, exposed, veiled and locked, and no more", async () => {
     const box = await boxOf()
     expect(box.getSnapshot()).to.deep.equal({
       ...world.mw.boxscope('anthropic_api_key'),
@@ -154,6 +155,7 @@ describe("Box snapshot", () => {
       isPresent:     true,
       isExposed:     false,
       isVeiled:      false,
+      isLocked:      false,
     })
     expect(Object.keys(box.getSnapshot())).to.have.members(SnapshotKeys)
   })
@@ -189,7 +191,7 @@ describe("Box snapshot", () => {
       expect(snapshot).to.include({ isFull: false, isPresent: false, isExposed: false, sidecar: null, revision_seq: 2, revision_tok: 'rev-x2' })
     })
 
-    it("born from a dna: present, full, the sidecar empty, at revision 0 registered and written now", async () => {
+    it("born from a dna: present, full, unlocked, the sidecar empty, at revision 0 registered and written now", async () => {
       world.mw.setNow(T0 + 7000)
       const box = await boxListingOf(world.mw).create(boxDnaOf(world.mw.boxscope('openai_api_key')))
       expect(box.getSnapshot()).to.deep.equal({
@@ -203,6 +205,7 @@ describe("Box snapshot", () => {
         isPresent:     true,
         isExposed:     false,
         isVeiled:      false,
+        isLocked:      false,
       })
     })
 
@@ -351,7 +354,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
     [(box: TestableBox) => box.put({ whisper, sidecar: {} }, { maxMillisSinceRefresh: -1 }),     'put with opts out of range'],
     [(box: TestableBox) => box.fetch({ ifAbsent: 'shrug' as never }),                             'fetch with an ifAbsent it does not accept'],
     [(box: TestableBox) => box.hydrate({ maxMillisSinceRefresh: -1 }),                            'hydrate with opts out of range'],
-    [(box: TestableBox) => box.del({ maxWorldMillis: -1 }),                                       'del with opts out of range'],
+    [(box: TestableBox) => box.del(box.scope, { maxWorldMillis: -1 }),                                       'del with opts out of range'],
     [(box: TestableBox) => box.extractWhisper({ maxWorldMillis: -1 }),                             'extractWhisper with opts out of range'],
     [(box: TestableBox) => box.expose({ maxWorldMillis: -1 }),                                    'expose with opts out of range'],
   ] as const
@@ -434,7 +437,7 @@ describe("registered_at over a rebirth", () => {
   it("registers a box deleted and reborn at the rebirth's put, as a new life", async () => {
     world.mw.seedPut(fullBoxRecord())
     const box = await fakeSealBoxListingOf(world.mw).build(fullBoxRecord())
-    await box.del()
+    await box.del(box.scope)
     world.mw.setNow(T0 + 5000)
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} })
     expect(box._cheat_central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })

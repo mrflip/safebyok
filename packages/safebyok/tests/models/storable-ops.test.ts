@@ -236,7 +236,7 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
       await pending.promise
       return world.mw.answerOf(scope, tombstone)
     })
-    const deleting = box.del()
+    const deleting = box.del(box.scope)
     await vi.advanceTimersByTimeAsync(0)
     expect(box.isPresent).to.be.true
     expect(world.mw.callsOf('del')[0]?.priorRevisionTok).to.equal('rev-a1')
@@ -245,12 +245,28 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
     expect(box._cheat_central).to.deep.include({ am: 'x', revision_seq: 2 })
   })
 
+  it("deletes at the revision asked where central is at it, and refuses 'stale_write' at another, deleting nothing", async () => {
+    const { box } = await timelyBoxOf()
+    const asked = box.sparse
+    await TH.expectRefusal(box.del({ ...asked, revision_tok: 'rev-other', revision_seq: asked.revision_seq + 1 }), 'stale_write')
+    expect(world.mw.callsOf('del')).to.deep.equal([])
+    expect(box.isPresent).to.be.true
+    await expect(box.del(asked)).resolves.to.eq(box)
+    expect(world.mw.callsOf('del')[0]?.priorRevisionTok).to.equal(asked.revision_tok)
+  })
+
+  it("refuses a scope that is no scope, deleting nothing", async () => {
+    const { box } = await timelyBoxOf()
+    await TH.expectRefusal(box.del({ ...box.scope, boxlabel: '' }))
+    expect(world.mw.callsOf('del')).to.deep.equal([])
+  })
+
   it("deletes again a thing deleted, at its tombstone's revision, which stays", async () => {
     const { box } = await timelyBoxOf()
-    await box.del()
+    await box.del(box.scope)
     const tombstone = box._cheat_central
     world.mw.clearCalls()
-    await expect(box.del()).resolves.to.eq(box)
+    await expect(box.del(box.scope)).resolves.to.eq(box)
     const [del] = world.mw.callsOf('del')
     expect(del?.priorRevisionTok).to.equal(tombstone.revision_tok)
     expect(box._cheat_central).to.deep.include({ am: 'x', revision_seq: tombstone.revision_seq })
@@ -258,10 +274,10 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
 
   it("deletes again a thing deleted; the same tombstone answered reads 'same'", async () => {
     const { box } = await timelyBoxOf()
-    await box.del()
+    await box.del(box.scope)
     const tombstone = box._cheat_central
     world.mw.willDel(({ scope }) => ({ ...world.mw.answerOf(scope, tombstone), act: 'gone' }))
-    await expect(box.del()).resolves.to.eq(box)
+    await expect(box.del(box.scope)).resolves.to.eq(box)
     expect(box._cheat_central).to.eq(tombstone)
     expect(box.isPresent).to.be.false
     expect(box.revision_seq).to.eq(tombstone.revision_seq)
@@ -275,7 +291,7 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
 describe("storable verbs while the vault is locked", () => {
   const EntryCases = [
     [(box: TestableBox) => box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'locked' } }), 'put'],
-    [(box: TestableBox) => box.del(),                                                          'del'],
+    [(box: TestableBox) => box.del(box.scope),                                                          'del'],
   ] as const
   for (const [verb, verbname] of EntryCases) {
     it(`refuses ${verbname} at its entry with 'vault_locked', writing nothing`, async () => {
@@ -307,7 +323,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
     [(box: TestableBox) => box.tryFetch(),                                                   'tryFetch of a stored record'],
     [(box: TestableBox) => box.tryHydrate(),                                                 'tryHydrate of a timely record'],
     [(box: TestableBox) => box.tryPut({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'x' } }), 'tryPut that storage takes'],
-    [(box: TestableBox) => box.tryDel(),                                                     'tryDel that storage takes'],
+    [(box: TestableBox) => box.tryDel(box.scope),                                                     'tryDel that storage takes'],
   ] as const
   for (const [tryVerb, blurb] of GoodCases) {
     it(`resolves a good outcome with the thing: ${blurb}`, async () => {
@@ -321,7 +337,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
     [(box: TestableBox) => box.tryFetch(),                                                   () => { world.mw.willGet(() => { throw new Error("socket closed") }) },         undefined,             'tryFetch whose VaultDB throws a plain Error'],
     [(box: TestableBox) => box.tryHydrate(),                                                 () => { world.mw.willEnsureTimely(() => Promise.reject(storageDown())) },         "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
     [(box: TestableBox) => box.tryPut({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'x' } }), (box: TestableBox) => { world.mw.willPut(world.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'tryPut that storage refuses as stale'],
-    [(box: TestableBox) => box.tryDel(),                                                     () => { world.mw.setLocked(true) },                                      "vault_locked",        'tryDel while locked'],
+    [(box: TestableBox) => box.tryDel(box.scope),                                                     () => { world.mw.setLocked(true) },                                      "vault_locked",        'tryDel while locked'],
   ] as const
   for (const [tryVerb, arrange, refusalkind, blurb] of BadCases) {
     it(`resolves a bad outcome with its refusal: ${blurb}`, async () => {

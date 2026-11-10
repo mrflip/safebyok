@@ -271,15 +271,18 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
     expect(listing.snapshot[0]?.sidecar).to.deep.equal({ uncle: 'Robert' })
   })
 
-  it("keeps its rows through a lock and an unlock, each the box's own snapshot still", async () => {
+  it("remakes its rows at a lock and an unlock, each the box's own new snapshot", async () => {
     const { listing, box } = await listedBox()
     const before = listing.getSnapshot()
+    expect(before[0]?.isLocked).to.be.false
     world.mw.setLocked(true)
-    expect(listing.getSnapshot()).to.eq(before)
-    expect(listing.getSnapshot()[0]).to.eq(box.getSnapshot())
-    expect(before[0]).to.not.have.property('isLocked')
+    const locked = listing.getSnapshot()
+    expect(locked).to.not.eq(before)
+    expect(locked[0]).to.eq(box.getSnapshot())
+    expect(locked[0]?.isLocked).to.be.true
     world.mw.setLocked(false)
-    expect(listing.getSnapshot()).to.eq(before)
+    expect(listing.getSnapshot()).to.not.eq(locked)
     expect(listing.getSnapshot()[0]).to.eq(box.getSnapshot())
+    expect(listing.getSnapshot()[0]?.isLocked).to.be.false
   })
 })

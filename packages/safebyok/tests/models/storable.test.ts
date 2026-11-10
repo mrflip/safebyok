@@ -146,7 +146,7 @@ describe("Storable own props", () => {
       const box = await builtBoxOf()
       world.mw.setNow(T0 + 500)
       const { entered, release, sentTok } = pendingNextDel(box)
-      const deleting = box.del()
+      const deleting = box.del(box.scope)
       await entered
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-a1', revision_seq: 1, written_at: T0 })
       release()
@@ -282,7 +282,7 @@ describe("Storable snapshot and subscription", () => {
       await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } })
       const afterEdit = listener.mock.calls.length
       expect(afterEdit).to.be.greaterThan(0)
-      await box.del()
+      await box.del(box.scope)
       expect(listener.mock.calls.length).to.be.greaterThan(afterEdit)
       expect(box.getSnapshot().isPresent).to.be.false
     })

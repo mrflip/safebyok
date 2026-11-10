@@ -29,15 +29,13 @@ type Store<SnapshotT> = { subscribe: (listener: () => void) => () => void, getSn
 
 /** A component over `useSyncExternalStore(subscribe, getSnapshot)`, both detached as React takes them, painting `view`.
  * A listener told with nothing new, or a snapshot that changed with no listener told, fails the next `expectRenders`.
- * A box's subscriber also hears its vault's moves that leave the box as it was, which React ignores: `hearsVault` does too.
  */
-const mountComponent = <SnapshotT>({ subscribe, getSnapshot }: Store<SnapshotT>, view: (snapshot: SnapshotT) => string, { hearsVault = false } = {}) => {
+const mountComponent = <SnapshotT>({ subscribe, getSnapshot }: Store<SnapshotT>, view: (snapshot: SnapshotT) => string) => {
   let rendered = getSnapshot()
   let idleTells = 0
   const painted = [view(rendered)]
   subscribe(() => {
     const next = getSnapshot()
-    if ((next === rendered) && hearsVault) { return }
     if (next === rendered) { idleTells += 1 }
     rendered = next
     painted.push(view(next))
@@ -133,10 +131,10 @@ describe("the proof", () => {
     // Seal a box: storage has stored only ciphertext, and the list shows it.
     const box = await vault.putBox(ApiKey)
     boxesUi.expectRenders(['anthropic_api_key'])
-    const boxUi = mountComponent(box, boxRow, { hearsVault: true })
+    const boxUi = mountComponent(box, boxRow)
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
-    // The whisper's component watches the box alone, whose subscribers hear of a lock through the vault.
-    const revealUi = mountComponent(whisperStoreOf(box), whisperRevealOf(box), { hearsVault: true })
+    // The whisper's component watches the box alone, whose snapshot shows its vault's lock.
+    const revealUi = mountComponent(whisperStoreOf(box), whisperRevealOf(box))
     revealUi.expectRenders(['unexposed'])
     const boxRows = [...world.vaultDB._cheat_boxRowsOf(vault.scope, vault.vault_tok).values()]
     expect(boxRows).to.have.lengthOf(1)
@@ -152,12 +150,12 @@ describe("the proof", () => {
     const snapshots = [bank.getSnapshot(), vault.getSnapshot(), vault.boxListing.getSnapshot(), box.getSnapshot()]
     expect(JSON.stringify(snapshots)).not.to.include(ApiKey.whisper.apiKey)
 
-    // Lock: every component watching the vault is told before lock() returns, the whisper leaves the screen, and the box refuses.
+    // Lock: every component watching the vault or its boxes is told before lock() returns, the whisper leaves the screen, and the box refuses.
     vault.lock()
     bankUi.expectRenders(['ready: main locked'])
     vaultUi.expectRenders(['main locked'])
-    boxUi.expectRenders([])
-    boxesUi.expectRenders([])
+    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
+    boxesUi.expectRenders(['anthropic_api_key'])
     revealUi.expectRenders(['locked'])
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
     await expect(vault.getBox(ApiKey.boxlabel)).resolves.to.eq(box)
@@ -175,8 +173,8 @@ describe("the proof", () => {
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
     vaultUi.expectRenders(['main unlocked'])
-    boxUi.expectRenders([])
-    boxesUi.expectRenders([])
+    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
+    boxesUi.expectRenders(['anthropic_api_key'])
     revealUi.expectRenders([JSON.stringify(ApiKey.whisper)])
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
 
@@ -188,8 +186,8 @@ describe("the proof", () => {
     vaultUi.expectRenders(['main locked', 'main deleted'])
     await TH.expectRefusal(vault.fetch())
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
-    boxesUi.expectRenders(['no boxes'])
-    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
+    boxesUi.expectRenders(['anthropic_api_key', 'no boxes'])
+    boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}', 'anthropic_api_key {"nickname":"work"}'])
     revealUi.expectRenders(['locked', 'unexposed'])
     await TH.expectRefusal(box.extractWhisper())
 

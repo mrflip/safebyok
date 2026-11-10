@@ -86,7 +86,7 @@ proving.buildLease(friend, gate_epoch?)      a Lease on friend's vault, under th
 ```
 
 A proving never has the Vault. `vault.#leaseFriend()` is all a `Proving` or a `Lease` hears of one: the
-stamp, `leaseMillis`, the clock, the logger, `lock`, `#attachLease`, and the deviceDB's lease verbs bound to its scope. All of
+stamp, `leaseMillis`, the clock, the logger, `lock`, and the deviceDB's lease verbs bound to its scope. All of
 that is fixed for the vault's life, so `gate_epoch`, which moves, is passed where it is wanted. It has no key, and
 reaches neither the record nor the boxes. `buildLease` refuses a friend whose stamp is not the proving's.
 
@@ -98,27 +98,29 @@ can unwrap the vaultKey, for the next wayin and for the next lease. So there is 
 "May re-enter" below means a correctable refusal: the host hears it, and the gating stays open, so it
 can shake its dialog and let the user enter again. Nothing retries.
 
-## `send`
+## `put`
 
 ```text
-box.send(patch)
-├─ await ensureReadyToSend(timely)                   hydrates; locked → refused
-├─ ante   = box.central, the record property
-├─ record = await #edit(patch, ante)                 laid over ante, returned, captured nowhere
-├─ demandReadyToSend
-└─ listing.put(record, ante, { ifPresent })          over ante's revision, not whatever the instance has by then
-   ├─ doTryPut(record, { prior, ifPresent })
-   │    moved → 'stale_write': the stored record delivered, then thrown
-   └─ deliver → receive → adopt, align              send resolves at the end of receive
+box.put(patch, opts)                                 vault.putBox comes here, through boxListing.puttable
+└─ box.tryPut(patch, opts)
+   ├─ await ensurePuttable(patch, timely)            hydrates, unless the box is sparse and patch carries whisper and sidecar
+   ├─ given = demandPuttable(patch, { ifPresent })   the box itself: enabled, unlocked, whole only for a patch missing a half
+   ├─ { record, prior } = await #edit(given)         laid over the record in hand, sealed, returned, captured nowhere
+   ├─ demandPuttable(patch, { ifPresent })           again, past the seal: locked → refused
+   └─ listing.tryPut(record, { prior, ifAbsent, ifPresent })    over the revision #edit read, not whatever the instance has by then
+      ├─ doTryPut(record, { prior, ifAbsent, ifPresent })
+      │    moved → 'stale_write'; a live row and ifPresent 'fail', or a live row of another box_tok at prior → 'camped':
+      │    the stored record delivered, then thrown
+      └─ deliver(answer, record) → receive → adopt, align      checked against what it sent; put resolves at the end of receive
 ```
 
-With nothing kept between `#edit` and the put, `#staged`, `#memoizedNextRevision` and `reconcileStaged`
-have no job: a record laid over a revision that has since moved is
-refused by storage. So a `send` refused leaves nothing behind, as a birth's put does, and a snapshot
-shows a change only once it has landed.
+Nothing is kept between `#edit` and the put: a record laid over a revision that has since moved is
+refused by storage. So a put refused leaves nothing behind, as a birth's put does, and a snapshot
+shows a change only once it has landed. A sparse box under a patch of both halves needs nothing fetched,
+as the put's revision check is what catches a stale one.
 
-`send` is the box's alone. A vault has no `send`, as nothing about its record changes but its gate, which has its own verbs
-(*Changing the gate*). `VaultPatch` goes with it, and the patch hooks move down from `Storable` to `Box`.
+`put` is the box's alone. A vault has no `put`, as nothing about its record changes but its gate, which has its own verbs
+(*Changing the gate*). The patch hooks are `Box`'s.
 
 
 ## Notable Changes (that may be inconsistent)
@@ -129,9 +131,9 @@ shows a change only once it has landed.
   overlapping answers land on one instance. Subscriptions are not counted on: a fetch answer builds where none, as a
   notice does
 * The Bank is durable: `bank.sweep` sweeps its listing and children, and the next hello builds fresh ones (ruled: a swept bank is done, a host makes a new Bank; not built yet)
-* A Vault instance is replaced only when vacated, swept, or created from gone or void. `vaultListing.ensureVault` is the
-  separate entrypoint because it replaces the object; only a deleted vault stays in its slot, tombstoned, so a late
-  fetch answer loses to it; its box listing and boxes are deleted
+* A Vault instance is replaced only when vacated, swept, or created from gone or void: a birth's `vaultListing.put`,
+  delivered, replaces the object; only a deleted vault stays in its slot, tombstoned, so a late
+  fetch answer loses to it; the tombstone delivered vacates its box listing and boxes
 * No timers on a Storable or a lease: a JS timer on a page that may be suspended at any moment says nothing. Refresh
   timers belong to the listing or the bank. Autolock is a best-effort reminder, not a guarantee: `bank.autolock`, called by a host as it likes, after hello and on its own timer, and `Lease.peek` declining to load a row past it at the door, leaving it
 * A lease records `proved_at` and the kind of proving. `bank.autolock` finds cached leases through a deviceDB index range
@@ -140,8 +142,9 @@ shows a change only once it has landed.
 * The device caches only leases and the device record, not vault or box records, and no refresh timer runs
 * The goal: when lock is called, nothing crosses it. We get there with simple code that can be analyzed in context, so a
   crossing is raised in one sentence (`whiteboard/20261102-newdesign/reference-timings.md`), not fine-tuned
-* A box birth: `vault.putBox` with no box listed makes the record over the sentinel prior, seals it, puts (`born` or
-  `reborn`), and the answer is delivered. A sidecar-only `send` unseals and reseals, as the box stamp binds the sidecar
+* A box birth: `vault.putBox` with no box listed lists a void box (`boxListing.puttable`), whose `box.put` makes the record
+  over the sentinel prior, seals it, puts (`born` or `reborn`), and the answer is delivered. A sidecar-only `box.put` unseals
+  and reseals, as the box stamp binds the sidecar
 * A cached lease is never shrugged off when it clearly must not stand. Where a user proving authority and intent to
   unlock crosses something saying lock, the ambiguity settles for clear code and a stated rule: `#attachLease` checks at
   its start and carries through
@@ -158,27 +161,25 @@ shows a change only once it has landed.
 Each way to unlocked makes a lease its own way, then attaches it the same way. No counter and no compare.
 
 ```text
-an unlock    lease = await proved.buildLease(friend);            await lease.attach()
-a birth      lease = await proving.buildLease(friend);           await lease.attach()
-the cache    lease = await Lease.tryPeek(friend, gate_epoch);    await lease.attach()    refused → bad news; null → ask
+an unlock    lease = await proved.buildLease(friend);                  await vault.#attachLease(lease)
+a birth      lease = await passphraseProving.buildLease(friend);       await vault.#attachLease(lease)
+the cache    lease = await Lease.buildFromCache(friend, gate_epoch);   await vault.#attachLease(lease)    null → ask
 
-friend is vault.#leaseFriend(): offers the deviceDB's lease verbs, vault.#attachLease, vault.lock
+friend is vault.#leaseFriend(): the stamp, the deviceDB's lease verbs bound to its scope, vault.lock
 
-vault.#attachLease(lease)                            private: called by lease.attach as friend.attachLease(this)
-├─ lease.isForgotten                                 → refused
-├─ demandReadyToAttach                               swept, vacated or deleted → refused: the lease vacated, no put
-├─ caching     = lease.tryCache()
-├─ displaced   = this.#lease
-├─ this.#lease = lease                               displaced.evict(), where another
-├─ align                                            reports unlocked; listeners run; snapshot re-made
-├─ boxListing.alignThings
-└─ await caching                                     refused → bad news; the lease is still granted
+vault.#attachLease(lease)                            private: by #unlockByProof, and by ensureUnlocked for a cached lease
+├─ demandAttachable                                  swept, vacated or deleted → refused, nothing cached
+├─ this.#lease = lease
+├─ await lease.cacheAsCacheCan()                     refused → bad news; the lease is still granted
+├─ align                                             reports unlocked; listeners run; snapshot re-made
+└─ #alignBoxes                                       each box listed aligned: its snapshot's isLocked moves, its own listeners told once
 
-vault.#revokeLease(onRefused = #panic)               private: called by lock and vacate, and by adopt of a tombstone
-├─ #dropLease                                        lease.evict(); this.#lease = null
-├─ vacating = friend.tryUncacheLease()               always, granted or not: a vault reporting locked still forgets
-├─ align                                            reports locked; listeners run; snapshot re-made
-└─ await vacating                                    refused → panic; from adopt, bad news
+vault.#revokeLease(where)                            private: called by lock and vacate, and by adopt of a tombstone
+├─ this.#lease = null                                the lease goes first, so a refused forget leaves none
+├─ revoking = granted?.tryRevoke() ?? Lease.tryForget(friend)    always, granted or not: a vault reporting locked still forgets
+├─ align                                             reports locked; listeners run; snapshot re-made
+├─ #alignBoxes                                       each box listed aligned, as at the attach
+└─ await revoking                                    refused → announced 'lease_revoke_failed'
 ```
 
 **A `lock()` before the attach, on an unlock or a birth,** loses by the enter-key rule. It leaves a vault
@@ -187,19 +188,19 @@ locked already, so that `lock()` changed no state.
 
 **A `lock()` after the attach** is an ordinary lock of an unlocked vault: it vacates the lease, which removes
 it from the cache. This requires of the new deviceDB that calls land in the order they were made, so
-that the vacate lands after the put. The put is called before `align`, because a listener may call
-`lock()`. So `await caching` needs no compare, and no second vacate.
+that the vacate lands after the put. The put is awaited before `align`, because a listener may call
+`lock()`. So the attach needs no compare, and no second vacate.
 
 **A `lock()` crossing a gate change** does not stand, as at an unlock: the proof says this user may have
 the vault unlocked. Each of the three gate changes ends in `#unlockByProof`, which leases the vault for a
 full term under the epoch that landed.
 
-**`sweep`, `vacate` and `delete`** leave a one-way state: every `demandReadyToX` refuses from then on, so
+**`sweep`, `vacate` and `delete`** leave a one-way state: every guard refuses from then on, so
 anything worth guarding stops working. A swept or vacated thing is also delisted, a deleted vault stays, tombstoned, while its box listing and boxes go, and the refusals are for whoever
-still has a reference. `#attachLease` demands it too. It is the last step, so refusing there leaves only a
-lease to vacate. That vacate can forget a row a sweep left, which costs a passphrase next session, a normal state.
+still has a reference. `#attachLease` demands it too (`demandAttachable`), as its first step, so refusing there
+leaves nothing cached.
 
-**The cache:** a `lock()` during `Lease.peek`'s read loses too: the vault reports unlocked, the lock's
+**The cache:** a `lock()` during `Lease.buildFromCache`'s read loses too: the vault reports unlocked, the lock's
 vacate stands, and the next session asks. A row for `notes/wontfix.md`.
 
 Another tab's `lock()` is not syndicated.
@@ -207,10 +208,10 @@ Another tab's `lock()` is not syndicated.
 ## The discards
 
 ```text
-lock     vacate the lease; lock children; align
+lock     revoke the lease and forget its cache; align; align each box listed
 sweep    drop the lease private property, leaving the cached; disable watches; disable all calls; sweep children; delist children
 vacate   disable; vacate the lease and forget its cache; vacate children (disables, delists them); conclude its gating
-delete   lock; vaultDB.del(vault; storage cascades its boxes, transactionally); forget cached lease; box listing vacates (boxes disable, delist); only the vault stays, tombstoned
+delete   lock; vault.del → vaultListing.del(vault.sparse): a tombstone, storage cascading its boxes, transactionally; delivered, it forgets the cached lease and vacates the box listing (boxes disable, delist); only the vault stays, tombstoned
 autolock bank: deviceDB.leasesProvedBefore(cutoff), an index range scan; lock each listed vault of the row, which forgets it
 ```
 
@@ -245,16 +246,16 @@ second field.
 
 | Method           | When it returns                                                                                                                                                                           | When it throws                                                                                       |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `lock`           | vacate the lease; lock children; align
+| `lock`           | revoke the lease and forget its cache; align; align each box listed
 | `sweep`          | drop the lease private property, leaving the cached; disable watches; disable all calls; sweep children; delist children
 | `vacate`         | disable; vacate the lease and forget its cache; vacate children (disables, delists them); conclude its gating
-| `del`            | lock; vaultDB.del(vault; storage cascades its boxes, transactionally); forget cached lease; box listing vacates (boxes disable, delist); only the vault stays, tombstoned
-| `send`           | The record kept is what it put, or newer; snapshot and cache aligned                                                                                                                      | Nothing stored; on `stale_write`, the stored record taken in                                         |
-| `attachLease`    | Attached and in force; its put called; aligned                                                                                                                                                 | Past sweep: the lease vacated, no put                                                                |
-| `ensureVault`    | A Vault listed, the only one of its scope. Landed: unlocked, or locked by a `lock()` after the attach. Another won: locked                                                                  | Nothing stored; has only what the answer delivered                                                  |
+| `vault.del`      | the tombstone at the revision after the sparse record's, storage cascading its boxes, transactionally; delivered, the cached lease forgotten and the box listing vacated (boxes disable, delist); only the vault stays, tombstoned
+| `box.put`        | The record kept is what it put, or newer; snapshot and cache aligned                                                                                                                      | Nothing stored; on `stale_write` or `camped`, the stored record taken in                             |
+| `attachLease`    | Attached and in force; cached as the cache can; aligned, and each box listed                                                                                                              | Past a discard: refused, nothing cached                                                              |
+| `ensureVault`    | A Vault listed, the only one of its scope: unlocked, or locked by a `lock()` after the attach                                                                                              | Nothing stored; has only what the answer delivered. Another won: `gate_made_elsewhere`, its Vault listed, locked |
 | `ensureUnlocked` | Unlocked, a lease in force at its attach                                                                                                                                                  | `dismissed`: no lease granted, none cached by this call                                       |
 | A gate change    | The record has the next gate, its epoch one up. Unlocked under that epoch, a fresh lease of full term, whatever lock came before or crossed                                                 | Nothing stored, unless the answer was lost; the lease as it was                                      |
-| `delVault`       | A tombstone stored and its box rows tombstoned; nothing of it on this device; the Vault tombstoned in its slot                                                                           | Nothing stored, unless the answer was lost; the Vault locked, and otherwise as it was                |
+| `delVaultPrompt` | A tombstone stored and its box rows tombstoned; nothing of it on this device; the Vault tombstoned in its slot                                                                           | Nothing stored, unless the answer was lost; the Vault locked, and otherwise as it was                |
 | `gating.attempt` | At most one under way; its gate read once; no clear kept                                                                                                                                  | The same; correctable: the gating still open; any other: settled                                     |
 
 ## `build_vault`
@@ -264,7 +265,7 @@ bank.ensureVault(bag)
 ├─ bank.#demandReady                                 hello's own error, where it failed; 'bad_option' before any hello
 ├─ vaultListing.at(scope)                            what hello loaded: a present vault → answer it, nobody asked
 └─ vaultListing.buildVault(scope) → Vault.launchBirth(listing, scope)
-   ├─ prior = listing.demandBirthSlot(scope) ?? VS.NeverStored     the slot's tombstone, else the sentinel
+   ├─ prior = the slot's tombstone's revision, else VoidRevision     a present vault listed → 'bad_option'
    └─ Gating.launch('build_vault', { listing, scope, vault: null, run })
       ├─ no requestCleartext                         → 'bad_option', nobody asked
       ├─ listing.attachGating                          one open on this bank → 'already_asking'
@@ -274,35 +275,34 @@ bank.ensureVault(bag)
 gating.attempt({ passphraseClear, passkeyClear? })           a second while one runs: attempt_in_flight
 │                                                    passkeyClear spent after, unless correctable (G2)
 │                                                    no lock check: a lock does nothing to a birth
-├─ stamp = MSX.vaultStamp.parse({ ...scope, vault_tok, registered_at: now })     pojo; one clock reading for the attempt
+├─ stamp = listing.stampOfBirth(scope)              a fresh vault_tok, registered_at now; one per attempt
 ├─ PassphraseProving.buildNovel(stamp, passphraseClear, world)      weak → may re-enter
 ├─ PasskeyProving.buildNovel(stamp, passkeyClear, world)            where a passkeyClear is handed
 └─ run({ passphraseProving, passkeyProving | null })   ── no clear goes past here ──
-   Vault.#runBirth(listing, provings, prior)
+   the build_vault run
    ├─ passphraseProving.buildWayin(NOVEL)            makeVaultKey; wrap; vaultKey dropped
    ├─ passkeyProving?.buildWayin(passphraseProving)  unwrap from the source; wrap; dropped
    ├─ gate = Gate.make(stamp, passphraseWayin, passkeyWayin | null)
-   ├─ record = recordOfBirth(gate, prior, now)       sync pojo; its gate is gate.pickle()
-   ├─ vault = vaultListing.ensureVault(record, prior)
-   │    ├─ tryPutVault(record, { prior, ifPresent: 'get' })    ← the commit
+   ├─ record = listing.recordOfBirth(gate, prior)    sync pojo at the revision after prior; its gate is gate.pickle()
+   ├─ vault = vaultListing.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' })
+   │    ├─ vaultDB.tryPutVault(record, { prior, ifAbsent, ifPresent })    ← the commit
    │    │    a live row → 'declined', the stored record its answer: another won
    │    │    a newer tombstone → 'stale_write', delivered, then thrown
-   │    └─ deliver → new Vault(what is stored), listed  locked
-   ├─ vault's vault_tok is not the record's → another won: locked, still a success
+   │    └─ deliver(answer, record) → new Vault(what is stored), listed, locked    a declined put pins only the scope
+   ├─ vault's vault_tok is not the record's → another won: refused 'gate_made_elsewhere', its Vault listed, locked
    └─ vault.#unlockByProof(passphraseProving)
       ├─ lease = passphraseProving.buildLease(vault.#leaseFriend())    refused → the vault stays stored and listed, locked
-      └─ lease.attach()                              cached after it
+      └─ vault.#attachLease(lease)                   cached as it attaches
 
 run returns → gating concludes ok → bank.ensureVault resolves    provings dropped with their keys
 host closes dialog → requestCleartext resolves → conclude is a no-op
 ```
 
 `prior` is what crosses the dialog: it decides whether to ask, and the put needs it. It is always a value:
-the tombstone's revision, or `VS.NeverStored` (*Required of the parts not yet drawn*).
+the tombstone's revision, or `VoidRevision` (*Required of the parts not yet drawn*).
 Its staleness is safe: over a live row the put declines, and that answer is the "another won"
-line above; over a newer tombstone it refuses 'stale_write'. A refused put has only what its answer delivered, nothing on the device. `BirthLockSeq`,
-`[UnlockAtBirth]` and `#closeSeqs` have no job. `run` tells a birth from another's by comparing the
-record it sent with the one it got, before attaching a lease. The new Vault reports locked between the
+line above; over a newer tombstone it refuses 'stale_write'. A refused put has only what its answer delivered, nothing on the device.
+`run` tells a birth from another's by comparing the record it sent with the one it got, before attaching a lease. The new Vault reports locked between the
 put and the attach, with no listener yet to see it. A Bank's `lock` during the put or that await is past
 the enter key, so the birth runs through, unlocked.
 
@@ -338,27 +338,30 @@ run returns → gating concludes ok → ensureUnlocked resolves
 ## Changing the gate
 
 A gate is the one thing about a vault record that changes, so a change has a vaultDB verb of its own, named for what
-it does: `replacePassphrase`, `addPasskey` or `revokePasskey`. No client-side next gate exists: a `Gate` is a read-only
-view of a record's gate, and adopt makes a new one from each record. Each verb lets the
-vaultDB check more (`notes/design-vaultdb.md`, VG1 to VG3). Each change ends the same way, and needs nothing the vault
-does not already carry:
+it does: `replacePassphrase`, `addPasskey` or `revokePasskey`. No `Gate` is made for the next gate: a `Gate` is a read-only
+view of a record's gate, and adopt makes a new one from each record. The vault listing mints the whole next record, and each
+verb lets the vaultDB check it against the row (`notes/design-vaultdb.md`, VG1 to VG3). Each change ends the same way, and
+needs nothing the vault does not already carry:
 
 ```text
 each gate change's run
-├─ stored = await vaultListing.<gate verb>(params)    ← the commit; params spread from ante, the record the attempt read, its gate with the wayin
-│  ├─ ante's revision is the prior; moved → 'stale_write', nothing stored
-│  ├─ the vaultDB refuses what its row rules out, such as an addPasskey over a passkey already stored
-│  ├─ the vaultDB lays the wayin on the row, moves gate_epoch and the revision up, and leaves the rest as stored
-│  └─ no lock: adopt never locks on a move
+├─ stored = await vaultListing.<gate verb>(ante, wayin)    ← the commit; ante, the record the attempt read
+│  └─ #gateVerbAnswered(ante, moved, call, { isScopePinned })
+│     ├─ record = ante at nextRevisionOf(prior), gate_epoch one up, the moved wayin laid on its gate
+│     ├─ call(record, { prior })                     the vaultDB's verb; prior is ante's revision; moved → 'stale_write', nothing stored
+│     │    the vaultDB checks registered_at unchanged, gate_epoch one up, only its own wayin moved, then puts the record whole
+│     │    and refuses what its row rules out, such as an addPasskey over a passkey already stored ('camped')
+│     └─ deliver(answer, record)                     checked against what it sent; a revoke pins only the scope
+│        no lock: adopt never locks on a move
 └─ vault.#unlockByProof(proved, stored.gate.gate_epoch)    a fresh lease of full term; a lock() crossing the change does not stand
 ```
 
 * **The lease comes after the put**, so its `gate_epoch` is the one that landed, and a refused put
   has nothing to clean up. The old lease stays in force for the moments between, so the vault does
   not read locked. That is safe, as the vaultKey did not change. A crash between them leaves a cached
-  lease under the old epoch, which `Lease.peek` forgets: a passphrase next session, a normal state.
+  lease under the old epoch, which `Lease.buildFromCache` forgets: a passphrase next session, a normal state.
 * **One record through the attempt.** The attempt reads `ante`, the vault's record, after its timeliness request, and
-  proves against `ante`'s gate. The params spread `ante`, not the live vault, so its revision is the prior. Whatever the
+  proves against `ante`'s gate. The next record is minted from `ante`, not the live vault, so its revision is the prior. Whatever the
   watch delivers during the attempt therefore refuses the put: a passkey revoked elsewhere is not brought back, and a
   passphrase replaced elsewhere is not overwritten.
 * **A write landing after the timeliness request.** The put refuses 'stale_write'. The gating concludes with
@@ -366,14 +369,15 @@ each gate change's run
   the verb again.
 * **No device locks on it.** Another device's session keeps its lease to its lock or next `bank.autolock`; its cached
   lease, of the older `gate_epoch`, is forgotten at its next session (Decided).
-* **The vaultDB checks what it can see, and no more.** It refuses a verb that would touch the other wayin, and an
-  `addPasskey` over a passkey already stored. It cannot tell whether a wrap opens, so a bad `vault_key_wayin_wrapped` still lands.
+* **The vaultDB checks what it can see, and no more.** It refuses a record whose `registered_at` moved, whose `gate_epoch`
+  is not one up, or that moves the other wayin (`gate_issue`), and an `addPasskey` over a passkey already stored (`camped`).
+  It cannot tell whether a wrap opens, so a bad `vault_key_wayin_wrapped` still lands.
 
 ### `replace_passphrase`
 
 ```text
-vault.replacePassphrase()
-├─ await ensureTimely()
+vault.replacePassphrasePrompt()
+├─ await ensureTimely(); demandPromptable
 └─ Gating.launch('replace_passphrase', { listing, scope, vault, run })
    →→→ user hits enter key →→→
 gating.attempt({ antePassphraseClear, nextPassphraseClear })
@@ -387,7 +391,7 @@ gating.attempt({ antePassphraseClear, nextPassphraseClear })
 └─ run({ ante, anteProving, nextProving })           ── no clear goes past here ──
    ├─ nextWayin = nextProving.buildWayin(anteProving)    unwrap the vaultKey; wrap; dropped
    └─ vaultListing.<gate verb>, then vault.#unlockByProof(anteProving, stored.gate.gate_epoch)
-      commit: vaultListing.replacePassphrase({ ...ante, gate: { passphrase_wayin: nextWayin } })    ← the commit
+      commit: vaultListing.replacePassphrase(ante, passphrase_wayin)    ← the commit; passphrase_wayin is nextWayin.pickle()
 ```
 
 The current passphrase is proved before the next is judged, so the `strengthChecker` hears a next
@@ -396,8 +400,8 @@ passphrase only from someone who proved the current one.
 ### `add_passkey`
 
 ```text
-vault.addPasskey()
-├─ await ensureTimely(Promptly)                      the gate in hand is refreshed first
+vault.addPasskeyPrompt()
+├─ await ensureTimely(Promptly); demandPromptable    the gate in hand is refreshed first
 ├─ gate.demandPasskeyAddable                         one already there → refused, nobody asked
 └─ Gating.launch('add_passkey', { listing, scope, vault, run })
    →→→ user hits enter key →→→
@@ -411,16 +415,16 @@ gating.attempt({ passphraseClear, passkeyClear })
 └─ run({ ante, proved, passkeyProving })             ── no clear goes past here ──
    ├─ passkeyWayin = passkeyProving.buildWayin(proved)   unwrap the vaultKey; wrap; dropped
    └─ vaultListing.<gate verb>, then vault.#unlockByProof(proved, stored.gate.gate_epoch)
-      commit: vaultListing.addPasskey({ ...ante, gate: { passkey_wayin: passkeyWayin } })           ← the commit
-           one added before the enter key → refused; after it → 'stale_write'
+      commit: vaultListing.addPasskey(ante, passkey_wayin)                  ← the commit; passkey_wayin is passkeyWayin.pickle()
+           one added before the enter key → 'camped'; after the attempt read ante → 'stale_write'
 ```
 
 ### `revoke_passkey`
 
 ```text
-vault.revokePasskey()
-├─ await ensureTimely(Promptly)                      the gate in hand is refreshed first
-├─ the gate has no passkey                         answers the vault, nobody asked
+vault.revokePasskeyPrompt()
+├─ await ensureTimely(Promptly); demandPromptable    the gate in hand is refreshed first
+├─ the gate has no passkey                           answers the vault, nobody asked
 └─ Gating.launch('revoke_passkey', { listing, scope, vault, run })
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear })
@@ -430,15 +434,15 @@ gating.attempt({ passphraseClear })
 │    wrong → may re-enter
 └─ run({ ante, proved })                             ── no clear goes past here ──
    └─ vaultListing.<gate verb>, then vault.#unlockByProof(proved, stored.gate.gate_epoch)
-      commit: vaultListing.revokePasskey({ ...ante, gate: { passkey_wayin: null } })                ← the commit
-           revoked before the enter key → 'revoked', nothing moved; after it → 'stale_write'
+      commit: vaultListing.revokePasskey(ante)                              ← the commit
+           revoked before the attempt read ante → 'revoked', nothing moved; after it → 'stale_write'
 ```
 
 ### `del_vault`
 
 ```text
-vault.delVault()
-├─ await ensureTimely()
+vault.delVaultPrompt()
+├─ await ensureTimely(); demandPromptable
 └─ Gating.launch('del_vault', { listing, scope, vault, run })
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear })                  no lock check: a lock does not stop a delete
@@ -447,21 +451,26 @@ gating.attempt({ passphraseClear })                  no lock check: a lock does 
 ├─ proved = PassphraseProving.buildStored(gate, passphraseClear, world)
 │    wrong → may re-enter
 └─ run({ ante, proved })                             ── no clear goes past here ──
-   vault.#runDelVault(ante)
-   ├─ vault.lock()                                   sync, no throw: the lease vacated, the children locked
-   └─ vaultListing.del(ante), over ante's revision
-      ├─ vaultDB: a tombstone, its boxes cascading   ← the commit
-      │    moved → 'stale_write', nothing stored
-      └─ deliver → receive → adopt(tombstone)
-         ├─ vault.#revokeLease(bad news)             deviceDB refused → bad news; the tombstone stands
-         └─ boxListing.vacate()                      boxes disabled and delisted, nothing deleted; the vault stays in its slot, tombstoned
+   ├─ vault.lock()                                   sync, no throw: the lease revoked, the boxes aligned
+   └─ vault.del(ante)                                Storable's
+      ├─ await ensureDeletable()                     hydrates
+      ├─ demandDeletable                             enabled only: a lock does not stop a delete
+      ├─ vault.sparse consistent with ante           scope, vault_tok and revision; moved since the proof → 'stale_write', nothing sent
+      └─ vaultListing.del(vault.sparse) → tryDel
+         ├─ a vault listed of another vault_tok      → 'vault_mismatch', nothing sent
+         └─ Listing.tryDel: the tombstone at nextRevisionOf(the sparse record's revision)
+            ├─ vaultDB.tryDelVault(tombstone, { prior })    ← the commit: a tombstone, its boxes cascading
+            │    moved → 'stale_write', nothing stored
+            └─ deliver(answer, tombstone) → receive → adopt(tombstone)
+               ├─ vault.#revokeLease('tombstone')    refused → announced 'lease_revoke_failed'; the tombstone stands
+               └─ boxListing.vacate()                boxes disabled and delisted, nothing deleted; the vault stays in its slot, tombstoned
 ```
 
 The lock comes first because it is synchronous and safe: from there no box opens under a lease while
 the tombstone goes out. It is also a normal state, so a delete refused leaves a Vault reporting locked and
 nothing half done, and the cost is one passphrase, as the lock's vacate forgets the cached lease. The box listing's vacate
-comes last, as it cannot be walked back. The proof is drawn to match the gate changes; it opens nothing here, as no
-lease follows. Another device hears the tombstone, and its Vault goes the same way. A rebirth is a new
+comes last, as it cannot be walked back. The proof opens nothing here, as no lease follows: the delete goes over the
+revision `vault.del` hydrated to, not the attempt's `ante`. Another device hears the tombstone, and its Vault goes the same way. A rebirth is a new
 Vault.
 
 The vaultDB owns the cascade: removing a vault tombstones its box rows by scope and `vault_tok`, so no
@@ -469,18 +478,18 @@ client walks them. The `vault_tok` keeps a late or repeated cascade off a rebirt
 scope and not the token. The tombstone and the cascade share a transaction in every adapter we implement. A repeat:
 
 ```text
-the vaultDB's del(scope, vault_tok, revision)
-stored is live, this vault_tok, this revision    a tombstone, revision_tok and revision_seq moved; cascade
+vaultDB.delVault(tombstone, { prior })
+stored is live, this vault_tok, at prior         the tombstone written, revision_tok and revision_seq moved; cascade; 'deleted'
 stored is live, this vault_tok, revision moved   'stale_write'; no cascade
-stored is the tombstone of this vault_tok        nothing written, whatever the revision; cascade; `val` has the old tombstone
-stored is another vault_tok, or nothing          nothing written, whatever the revision; cascade; answers `void`, a sentinel tombstone
+stored is the tombstone of this vault_tok        nothing written, whatever the revision; cascade; 'gone', `val` the old tombstone
+stored is another vault_tok, or nothing          nothing written, whatever the revision; cascade; 'void', a sentinel tombstone
 ```
 
 Repeated deletes do not advance the revision. Whoever repeats it may not have the current token, having lost the first
 answer. Moving it would wake every device's watch for nothing, and could refuse a rebirth with that
 tombstone as its `prior`. This is no retry by the package: a repeat is the host calling the verb again,
-which its Vault can until the tombstone arrives. After that the front door cannot repeat it, as a
-tombstone has no gate; a direct call to the vaultDB still cascades.
+which its Vault can until the tombstone arrives. After that `vault.delVaultPrompt()` refuses, as the vault is not
+present; `vault.del(vault.scope)` still repeats it, over the tombstone's revision, and the vaultDB answers `gone` and cascades.
 
 A Box operation naming a stale or missing vault_tok will fail `vault_mismatch` (or `vault_empty` or `vault_gone`). The damaged_row field will contain a generated tombstone if one is found with that scope *and vault_tok*, null otherwise. In both cases the value is forensic: do not instantiate, do not delivere. (Discovering a row is exceptionally unlikely as they were to have been transactionally removed with the vault deletion. `bank.doctor()` will establish comfort if needed)
 
@@ -497,9 +506,11 @@ A Box operation naming a stale or missing vault_tok will fail `vault_mismatch` (
 * `adopt` ignores a record older by `revision_seq`.
 * `Promptly`, a constant: the timeliness an attempt asks of `ensureTimely`. `maxMillis: 0` is the customer's to ask, as an
   override from the inside is one the customer cannot.
-* `ifPresent` is customer-facing. Expect both `Storable` and the vaultDB to have a part in deciding it, as the implementer
-  finds (the Coach, 2026-11-03). Only `repl` saves. `fail` refuses `camped` with the corpse (`dbhas`, the request), not as a `stale_write`; `get` answers the live
-  row in place of the request, `declined`.
+* `ifPresent` is customer-facing, and `putVault` and `putBox` take it alike in `PutOpts`, with `ifAbsent` ('add' or
+  'fail'). Only `repl` saves, and only within the live row's own life: at its revision under another `vault_tok` or
+  `box_tok` it refuses `camped`. `fail` refuses `camped` with the corpse (`dbhas`, the request), not as a `stale_write`;
+  `get` answers the live row in place of the request, `declined`. `isVaultPutAllowed(ante, record, opts)` and
+  `isBoxPutAllowed(ante, record, opts)` decide inside each adapter's transaction.
 * Every box query names scope and `vault_tok`, and a box row under another `vault_tok` is no row. Only a
   fetch of a vault record has a reason to go by scope alone.
 
