@@ -25,7 +25,8 @@ import type { Capacity } from '../shapes/shapes-storage'
  *
  * A record that fails its checks is named for its direction, by a VaultDB and a vault alike. One
  * read from storage that fails them is `damaged_row`, on the way out, and a box that will not open
- * under the lease in hand is `damaged_box`, Zod's own error its `cause` where a check failed. One
+ * under the lease in hand is `damaged_box`, Zod's own error its `cause` where a check failed. A
+ * damaged row never indicates format drift: it is thrown by the vaultDB tied to the datastore. One
  * handed in is `bad_option`, on the way in; `bad_record` where one check serves both ways. A
  * storage adapter's answer that cannot be, one revision under two toks say, is `record_conflict`.
  *

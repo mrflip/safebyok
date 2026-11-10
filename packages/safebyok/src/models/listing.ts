@@ -1,5 +1,6 @@
 /** The base of a box listing and a vault listing: the live instances of one kind of thing, the watch on storage, and every storage call made for that kind of thing. */
 
+import { isEqual } from 'es-toolkit'
 import { verifyConsistent } from '../helpers/validator'
 import { oneAtATime } from '../helpers/one-at-a-time'
 import { nowMillis } from '../helpers/clock'
@@ -17,7 +18,7 @@ import { reportToPlatform } from '../refusals/report-error'
 import type { Storable } from './storable'
 
 /** SLOPDOC: The live instances of one kind of thing, by scope, each made once and enlisted, as its tombstone once gone. */
-export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>, DamagedT extends SX.DamagedRow = SX.DamagedRow> {
+export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>, DamagedT extends ScopeT & SX.DamagedRow = ScopeT & SX.DamagedRow> {
   // == [Props]: world, maxMillisSinceRefresh, vaultDB, bankFriend, #things, #fetchOfSlot, #listOnce, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
 
   readonly world: ListingWorld
@@ -184,15 +185,17 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       throw answer.err
     }
     const { listed, damaged_rows } = answer.val
+    const isDamageNews = ! isEqual(this.#damagedRows, damaged_rows)
     this.#damagedRows = Object.freeze(damaged_rows)
     for (const damaged of damaged_rows) { this.#listedAt(damaged)?.vacate() }
     this.bankFriend.tellBadNews(damaged_rows.map((damaged) => this.damagedStoredError(damaged)))
+    if (isDamageNews) { this.tellListeners() }
     return Promise.all(listed.map((row) => this.build(row)))
   }
 
   // A damaged row's address is storage's, under whatever labels it holds, so it is looked up as it is, never checked as a scope.
   /** The instance listed at a damaged row's address, or null. */
-  #listedAt(damaged: DamagedT): ThingT | null { return this.#things.get(this.scopepathOf(damaged as unknown as ScopeT)) ?? null }
+  #listedAt(damaged: DamagedT): ThingT | null { return this.#things.get(this.scopepathOf(damaged)) ?? null }
 
   /** The instance under `scoped`: the one listed, no older than `opts` allows, or fetched where none is; null under `ifAbsent: 'nil'`. */
   async get(scoped: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> { return demandGood(await this.tryGet(scoped, opts)).val }
