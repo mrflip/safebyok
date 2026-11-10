@@ -118,7 +118,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect(await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'vault_gone' })
     })
 
-    it("refuses as another life when the vault was deleted and born again", async () => {
+    it("answers stale_write with the new life when the vault was deleted and born again", async () => {
       const { vaultDB, vault } = await putWith()
       const twin = await twinOf(vaultDB)
       const tombstone = vaultTombstoneOf(vault)
@@ -126,7 +126,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         await twin.delVault(tombstone, { prior: priorOf(vault) })
         await twin.putVault(vaultAt(2, 'life2'), { prior: priorOf(tombstone) })
       })
-      expect(await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'vault_mismatch' })
+      expect(await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'stale_write', dbhas: vaultAt(2, 'life2') })
     })
   })
 

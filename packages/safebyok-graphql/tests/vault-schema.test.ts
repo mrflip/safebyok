@@ -132,7 +132,7 @@ const InputChecks = [
   ['safebyokGetVault',          'opts',      DB.ifAbsentOpts],
   ['safebyokGetBox',            'opts',      DB.ifAbsentOpts],
   ['safebyokPutVault',          'record',    DB.vaultRecord],
-  ['safebyokPutVault',          'opts',      DB.putVaultOpts],
+  ['safebyokPutVault',          'opts',      DB.putOpts],
   ['safebyokPutBox',            'record',    DB.boxRecord],
   ['safebyokPutBox',            'opts',      DB.putOpts],
   ['safebyokReplacePassphrase', 'record',    DB.vaultRecord],

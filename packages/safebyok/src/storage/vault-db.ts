@@ -12,7 +12,7 @@ import * as SX from '../shapes/shapes-storage'
 import * as CX from '../shapes/shapes-core'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
 import type { DelAct, GotAct, ListAct, PutAct } from '../shapes/shapes-enums'
-import type { AdapterVaultDBOpts, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, GateVerbOpts, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReqParams, VaultQuery, VaultRecord, VaultRow, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import type { AdapterVaultDBOpts, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, GateVerbOpts, IfAbsentOpts, PutOpts, PutOptsGiven, ReqParams, VaultQuery, VaultRecord, VaultRow, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
 
 // == [Answers]: GoodAnswer, BadAnswer, Answer, ListAct, GotAct, PutAct, DelAct, BankListed, BoxesListed, Tidied, Notice, answerOf
@@ -107,10 +107,10 @@ export interface VaultDB {
   getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>>
   /** Non-throwing form of {@link VaultDB.getBox}. */
   tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<Answer<BoxRecord | null, GotAct>>
-  /** Puts a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
-  putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>>
+  /** Puts a vault, as `opts` allow. */
+  putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>>
   /** Non-throwing form of {@link VaultDB.putVault}. */
-  tryPutVault(record: VaultRecord, opts: PutVaultOpts): Promise<Answer<VaultRow, PutAct>>
+  tryPutVault(record: VaultRecord, opts: PutOpts): Promise<Answer<VaultRow, PutAct>>
   /** Puts a box under a vault live at its `vault_tok`, as `opts` allow. */
   putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>>
   /** Non-throwing form of {@link VaultDB.putBox}. */
@@ -258,12 +258,12 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   // == [Puts]: putVault, tryPutVault, putBox, tryPutBox
 
-  /** Puts a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
-  async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
+  /** Puts a vault, as `opts` allow. */
+  async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
     const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
       const vaultRecord = SX.vaultRecord.parse(record)
-      const putOpts = SX.putVaultOpts.parse(opts)
+      const putOpts = SX.putOpts.parse(opts)
       SX.nextSeq.parse({ record: vaultRecord, prior: putOpts.prior })
       const { isWritten, ante } = await this.doPutVault(vaultRecord, putOpts)
       if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: vaultRecord, world: vaultRecord } }
@@ -274,12 +274,13 @@ export abstract class AdapterVaultDB implements VaultDB {
       if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.vaultGone(found) }
       if (found.am === 'x') { throw Refuse.staleWrite(found, found) }
       if (ifPresent === 'get') { return { ok: true, req_params, act: 'declined', val: found, world: found } }
-      throw Refuse.camped(found, found)
+      if (ifPresent === 'fail') { throw Refuse.camped(found, found) }
+      throw Refuse.staleWrite(found, found)
     } catch (err) { throw refusalOf(err, 'putVault', req_params) }
   }
 
   /** Non-throwing form of {@link putVault}. */
-  async tryPutVault(record: VaultRecord, opts: PutVaultOpts) { return answerOf(() => this.putVault(record, opts)) }
+  async tryPutVault(record: VaultRecord, opts: PutOpts) { return answerOf(() => this.putVault(record, opts)) }
 
   /** Puts a box under a vault live at its `vault_tok`, as `opts` allow. */
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> {
@@ -317,16 +318,13 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const vaultRecord = SX.vaultRecord.parse(record)
       const putOpts = SX.gateVerbOpts.parse(opts)
-      SX.nextSeq.parse({ record: vaultRecord, prior: putOpts.prior })
       const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
       if (! SX.isRowAt(stored, putOpts.prior)) { throw Refuse.staleWrite(stored, stored) }
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
       if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
       if (! isEqual(vaultRecord.gate.passkey_wayin, stored.gate.passkey_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
-      const { isWritten, ante } = await this.doPutVault(vaultRecord, { ...putOpts, ifAbsent: 'fail', ifPresent: 'repl' })
-      if (isWritten) { return { ok: true, req_params, act: 'replaced', val: vaultRecord, world: vaultRecord } }
-      const found = liveVaultOf(ante, vaultRecord)
-      throw Refuse.staleWrite(found, found)
+      await this.putVault(vaultRecord, { ...putOpts, ifAbsent: 'fail', ifPresent: 'repl' })
+      return { ok: true, req_params, act: 'replaced', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'replacePassphrase', req_params) }
   }
 
@@ -339,17 +337,14 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const vaultRecord = SX.passkeyAddRecord.parse(record)
       const putOpts = SX.gateVerbOpts.parse(opts)
-      SX.nextSeq.parse({ record: vaultRecord, prior: putOpts.prior })
       const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
       if (! SX.isRowAt(stored, putOpts.prior)) { throw Refuse.staleWrite(stored, stored) }
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
       if (stored.gate.passkey_wayin !== null) { throw Refuse.camped(stored, stored) }
       if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
       if (! isEqual(vaultRecord.gate.passphrase_wayin, stored.gate.passphrase_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
-      const { isWritten, ante } = await this.doPutVault(vaultRecord, { ...putOpts, ifAbsent: 'fail', ifPresent: 'repl' })
-      if (isWritten) { return { ok: true, req_params, act: 'added', val: vaultRecord, world: vaultRecord } }
-      const found = liveVaultOf(ante, vaultRecord)
-      throw Refuse.staleWrite(found, found)
+      await this.putVault(vaultRecord, { ...putOpts, ifAbsent: 'fail', ifPresent: 'repl' })
+      return { ok: true, req_params, act: 'added', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'addPasskey', req_params) }
   }
 
@@ -362,17 +357,14 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const vaultRecord = SX.passkeyRevokeRecord.parse(record)
       const putOpts = SX.gateVerbOpts.parse(opts)
-      SX.nextSeq.parse({ record: vaultRecord, prior: putOpts.prior })
       const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
       if (! SX.isRowAt(stored, putOpts.prior)) { throw Refuse.staleWrite(stored, stored) }
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
       if (stored.gate.passkey_wayin === null) { return { ok: true, req_params, act: 'revoked', val: stored, world: stored } }
       if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
       if (! isEqual(vaultRecord.gate.passphrase_wayin, stored.gate.passphrase_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
-      const { isWritten, ante } = await this.doPutVault(vaultRecord, { ...putOpts, ifAbsent: 'fail', ifPresent: 'repl' })
-      if (isWritten) { return { ok: true, req_params, act: 'revoked', val: vaultRecord, world: vaultRecord } }
-      const found = liveVaultOf(ante, vaultRecord)
-      throw Refuse.staleWrite(found, found)
+      await this.putVault(vaultRecord, { ...putOpts, ifAbsent: 'fail', ifPresent: 'repl' })
+      return { ok: true, req_params, act: 'revoked', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'revokePasskey', req_params) }
   }
 

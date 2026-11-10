@@ -87,7 +87,7 @@ ${[vaultRow, gate, ciphered, reqParams, err].join('\n')}`,
 }
 ${boxAnswerFragments}`,
 
-  putVault: `mutation SafebyokPutVault($record: SafebyokVaultRecordInput!, $opts: SafebyokPutVaultOptsInput!) {
+  putVault: `mutation SafebyokPutVault($record: SafebyokVaultRecordInput!, $opts: SafebyokPutOptsInput!) {
   safebyokPutVault(record: $record, opts: $opts) { ...SafebyokVaultAnswerFields }
 }
 ${vaultAnswerFragments}`,

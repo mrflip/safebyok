@@ -37,11 +37,11 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await vaultDB.putVault(reborn, { prior: priorOf(tombstone) })).to.deep.include({ act: 'reborn', val: reborn, world: reborn })
     })
 
-    it("refuses a live row at its revision: a vault row moves only by a gate verb", async () => {
+    it("replaces a live row at its revision by default, and answers stale_write over one at another", async () => {
       const { vaultDB, vault } = await putWith()
       const next = vaultAt(1)
-      expect(await vaultDB.tryPutVault(next, { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'camped' })
-      expect(await vaultDB.tryPutVault(next, { prior: priorOf(vault), ifPresent: 'repl' } as never)).to.deep.include({ ok: false })
+      expect(await vaultDB.putVault(next, { prior: priorOf(vault) })).to.deep.include({ act: 'replaced', val: next, world: next })
+      expect(await vaultDB.tryPutVault(vaultAt(1), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'stale_write', dbhas: next })
     })
 
     it("over a live row, ifPresent get answers it as declined, and fail refuses, neither saving", async () => {
@@ -53,9 +53,9 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
     })
 
-    it("refuses over a live row whatever its revision, with the row", async () => {
+    it("answers stale_write over a live row at another revision, with the row", async () => {
       const { vaultDB, vault } = await putWith()
-      expect(await vaultDB.tryPutVault(vaultAt(8), { prior: stale })).to.deep.include({ ok: false, act: 'camped', dbhas: vault, world: vault })
+      expect(await vaultDB.tryPutVault(vaultAt(8), { prior: stale })).to.deep.include({ ok: false, act: 'stale_write', dbhas: vault, world: vault })
     })
 
     it("refuses when the prior names a row that is void", async () => {

@@ -3,7 +3,7 @@ import type * as Z from 'zod'
 import * as DB from 'safebyok/storage'
 import type {
   Answer, BankListed, BankScope, BoxesListed, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelAct, DelOpts, GateVerbOpts, GoodAnswer, GotAct,
-  IfAbsentOpts, ListAct, Notice, PutAct, PutOpts, PutVaultOpts, ReqParams, VaultDB, VaultQuery,
+  IfAbsentOpts, ListAct, Notice, PutAct, PutOpts, ReqParams, VaultDB, VaultQuery,
   Tidied, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope,
 } from 'safebyok/storage'
 import { VaultOperations } from './vault-operations'
@@ -101,11 +101,11 @@ export class GraphQLVaultDB implements VaultDB {
   // == [Puts]: putVault, tryPutVault, putBox, tryPutBox
 
   /** Puts a vault's birth, or its rebirth over a tombstone. */
-  async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> { return goodAnswerOf(await this.tryPutVault(record, opts)) }
+  async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>> { return goodAnswerOf(await this.tryPutVault(record, opts)) }
 
-  async tryPutVault(record: VaultRecord, opts: PutVaultOpts): Promise<Answer<VaultRow, PutAct>> {
+  async tryPutVault(record: VaultRecord, opts: PutOpts): Promise<Answer<VaultRow, PutAct>> {
     return await answerOf('putVault', DB.reqParamsOf({ ...record, ...opts }), async () => {
-      const answer = await this.#told(VaultOperations.putVault, 'safebyokPutVault', { record: DB.vaultRecord.parse(record), opts: DB.putVaultOpts.parse(opts) })
+      const answer = await this.#told(VaultOperations.putVault, 'safebyokPutVault', { record: DB.vaultRecord.parse(record), opts: DB.putOpts.parse(opts) })
       return DB.putVaultAnswer.parse(rowAnswerOf(answer))
     })
   }

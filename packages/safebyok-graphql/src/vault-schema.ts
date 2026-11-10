@@ -60,11 +60,8 @@ enum SafebyokIfAbsent { fail nil }
 """What a put does over a row never stored or deleted: add the record, or fail."""
 enum SafebyokPutIfAbsent { add fail }
 
-"""What a box's put does over a live row: replace it, fail, or get it."""
+"""What a put does over a live row: replace it, fail, or get it."""
 enum SafebyokIfPresent { repl fail get }
-
-"""What a vault's put does over a live row: fail, or get it."""
-enum SafebyokPutVaultIfPresent { fail get }
 
 # Rows
 
@@ -279,18 +276,11 @@ input SafebyokIfAbsentOptsInput {
   ifAbsent: SafebyokIfAbsent
 }
 
-"""A box's put options: the revision it was made from, and each policy left out taking safebyok's default."""
+"""A put's options: the revision it was made from, and each policy left out taking safebyok's default."""
 input SafebyokPutOptsInput {
   prior:     SafebyokRevisionInput!
   ifAbsent:  SafebyokPutIfAbsent
   ifPresent: SafebyokIfPresent
-}
-
-"""A vault's put options: the revision it was made from, and each policy left out taking safebyok's default."""
-input SafebyokPutVaultOptsInput {
-  prior:     SafebyokRevisionInput!
-  ifAbsent:  SafebyokPutIfAbsent
-  ifPresent: SafebyokPutVaultIfPresent
 }
 
 """A gate verb's options: the revision its record was made from."""
@@ -313,7 +303,7 @@ type Query {
 }
 
 type Mutation {
-  safebyokPutVault(record: SafebyokVaultRecordInput!, opts: SafebyokPutVaultOptsInput!): SafebyokVaultAnswer!
+  safebyokPutVault(record: SafebyokVaultRecordInput!, opts: SafebyokPutOptsInput!): SafebyokVaultAnswer!
   safebyokPutBox(record: SafebyokBoxRecordInput!, opts: SafebyokPutOptsInput!): SafebyokBoxAnswer!
   safebyokReplacePassphrase(record: SafebyokVaultRecordInput!, opts: SafebyokGateVerbOptsInput!): SafebyokVaultAnswer!
   safebyokAddPasskey(record: SafebyokVaultRecordInput!, opts: SafebyokGateVerbOptsInput!): SafebyokVaultAnswer!

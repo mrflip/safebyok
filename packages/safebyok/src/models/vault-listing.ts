@@ -11,7 +11,7 @@ import * as SX from '../shapes/shapes-storage'
 import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import { type DelTombstone, type Fetched, type ListingOpts, type SlotFate, type ThingAnswer, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
-import type { BoxRow, DelOpts, GateVerbOpts, PutOpts, PutVaultOpts, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
+import type { BoxRow, DelOpts, GateVerbOpts, PutOpts, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { type Answer, type Notice, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
 import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
@@ -200,8 +200,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   protected doTryGet(scope: VaultScope) { return this.vaultDB.tryGetVault(scope, { ifAbsent: 'nil' }) }
 
-  /** The vaultDB refuses `repl` on a vault: a record moves only by a gate verb. */
-  protected doTryPut(record: VaultRecord, opts: PutOpts) { return this.vaultDB.tryPutVault(record, opts as PutVaultOpts) }
+  protected doTryPut(record: VaultRecord, opts: PutOpts) { return this.vaultDB.tryPutVault(record, opts) }
 
   protected doTryDel(tombstone: DelTombstone<VaultSparse>, opts: DelOpts) { return this.vaultDB.tryDelVault(tombstone, opts) }
 

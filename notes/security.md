@@ -55,6 +55,11 @@ added or folded into through the subagent, and no other entry changes.
   of a gate-moving write, as it already can for a put; storage no longer stamps them. Separately, `Listing.deliver` now refuses a good storage answer whose scope, life or
   revision differs from what was sent. A declined put and a `del` over a tombstone answer what storage has, and `deliver` pins only the scope; `revokePasskey` over a vault
   with no passkey answers the stored row and pins only the scope.
+  Amended 2026-11-10 (gate_mint): **`putVault` replaces a live vault row, gate included, without the gate verbs' checks.** `VaultDB.putVault` takes the same `PutOpts` as `putBox`
+  (`ifPresent` 'repl' by default, 'fail' or 'get'; it once refused 'repl', so that a live vault row moved only by a gate verb). A host calling `putVault(record, { prior })` directly
+  over a live vault at `prior` replaces it whole, with any `gate_epoch`, `registered_at` or wayins that parse; only the `prior` revision check applies, and a stale `prior` answers
+  `stale_write`. The gate verbs run the checks above and then put through `putVault` with `ifPresent: 'repl'`; the device's own code (`VaultListing`) changes the gate only through them.
+  The host is outside the threat model (it can already delete its user's vault) and the vaultDB holds only ciphertext.
 
 * 2026-11-09 (react_forms, branch `20261109-react_forms`): **`safebyok-react` hands a passkey answer to `gating.attempt` at once, whether or not the dialog or button is shown.**
   `PasskeyUnlockButton` (`components/passkey-unlock-button.tsx`) and the add-passkey modal (`modals/add-passkey-modal.tsx`) no longer zero, untried, an answer (`prfBytes`)

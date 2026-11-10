@@ -161,20 +161,19 @@ export const { passkeyAddRecord, passkeyRevokeRecord } = Checkers('bad_option', 
 })
 // --
 
-// == [Options]: ifAbsentOpts, putOpts, putVaultOpts, gateVerbOpts, delOpts, reqParams, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, GateVerbOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
+// == [Options]: ifAbsentOpts, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, GateVerbOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
 
 /** The checks of the options a vaultDB verb accepts, of a write's record against its prior revision, and of the safe metadata an answer carries. */
-export const { ifAbsentOpts, putOpts, putVaultOpts, gateVerbOpts, delOpts, reqParams, nextSeq } = Checkers('bad_option', ({ obj, oneof, box_tok }) => {
+export const { ifAbsentOpts, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq } = Checkers('bad_option', ({ obj, oneof, box_tok }) => {
   const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
   const putIfAbsent = oneof(EX.putIfAbsentVals).default('add')
   const putOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(EX.ifPresentVals).default('repl') })
-  const putVaultOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(['fail', 'get']).default('fail') })
   const gateVerbOpts = obj({ prior: revision })
   const delOpts = obj({ prior: revision })
 
   const reqParams = boxQuery.extend({ box_tok, ...revision.shape, prior: revision }).partial()
   const nextSeq = obj({ record: revision, prior: revision }).refine(({ record, prior }) => record.revision_seq === (prior.revision_seq + 1), Phrases.SeqNotNext)
-  return { ifAbsentOpts, putOpts, putVaultOpts, gateVerbOpts, delOpts, reqParams, nextSeq }
+  return { ifAbsentOpts, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq }
 }, [CX])
 
 /** The check of an AdapterVaultDB's options, refusing 'bad_option'. */
@@ -194,8 +193,6 @@ export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
 /** A put's options as parsed, defaults filled in: what a subclass's `doPutVault` and `doPutBox` receive. */
 export type PutOptsGiven = Readonly<Z.output<typeof putOpts>>
-/** A vault row is replaced only by a gate verb: `putVault` births one, or finds one in the way. */
-export type PutVaultOpts = Readonly<Z.input<typeof putVaultOpts>>
 /** What a gate verb is told beside its record: the revision the record replaces. */
 export type GateVerbOpts = Readonly<Z.input<typeof gateVerbOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>

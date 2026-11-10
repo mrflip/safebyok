@@ -17,7 +17,7 @@ export type VaultFieldArgs = {
   safebyokGetVault:          DB.VaultScope & { opts?: DB.IfAbsentOpts | null }
   safebyokListBoxes:         DB.VaultQuery
   safebyokGetBox:            DB.BoxQuery & { opts?: DB.IfAbsentOpts | null }
-  safebyokPutVault:          { record: DB.VaultRecord, opts: DB.PutVaultOpts }
+  safebyokPutVault:          { record: DB.VaultRecord, opts: DB.PutOpts }
   safebyokPutBox:            { record: DB.BoxRecord, opts: DB.PutOpts }
   safebyokReplacePassphrase: { record: DB.VaultRecord, opts: DB.GateVerbOpts }
   safebyokAddPasskey:        { record: DB.VaultRecord, opts: DB.GateVerbOpts }
