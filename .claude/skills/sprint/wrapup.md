@@ -10,7 +10,7 @@ into the done note.
    small ones adapt. In a worktree of your own (a name no other session uses), rebase each branch
    onto the one below with `--no-update-refs`. A conflict goes to a fresh `thread-worker`, handed
    the thread file and the new base, which resolves it, proves it, and pushes. When every rebase
-   is clean, run `pnpm justify` (and `pnpm size`) once, at the top, and let CI check the middle.
+   is clean, run `pnpm justify` once, at the top, and let CI check the middle.
    Push each branch with a lease on the SHA it replaces (`--force-with-lease=<branch>:<old sha>`),
    and rewrite each PR's first line to "Stacked on #N, in the line main → #A → #B → …". Check the
    bottom stands on today's `origin/main`, not on an unmerged PR whose commits `main` already

@@ -65,15 +65,6 @@ A thread is cut:
 The Coach merges a sprint as **one linear line**: each PR rebased onto the one below it, every
 PR's base still `main`, so merging the top merges them all. Making that line is your job (§5).
 
-**Size budgets.** Each thread keeps `.size-limit.json` in step with its own change. When what it
-built moves a line's measure far enough that the rule (PROCESS.md, *Size budgets*) gives that
-line another budget, up or down, the thread runs `pnpm size:budget --write` and commits the
-result with the change that moved it, its PR saying which lines moved and why. A thread that
-moves no line's budget leaves the file alone. The rule's round numbers keep most stacked threads
-off each other's lines; where two meet at a restack, rerun `pnpm size:budget --write` on the
-rebased branch rather than merge the digits by hand. Run `pnpm size:budget` while planning, and
-name in a thread's gloss any line it will likely move.
-
 **`<sprint_name>-progress.md`** -- yours alone: a curated summary of what the threads have taught,
 newer than the plan wherever they disagree, under about 3,000 words. You write each handoff from
 it; workers only look things up in it. Each worker keeps its own `thread-<N>-<label>.md` in the
@@ -126,7 +117,7 @@ Mode: <normal | YOLO>. Scratch files: <scratchpad>/<label>/.
 <the thread's text, verbatim>
 
 From the sprint: <the ground rules that bear on this thread; the decisions and discoveries of
-earlier threads it builds on or beside; its size-budget step, if any>.
+earlier threads it builds on or beside>.
 Look-ahead: <what later threads need from this one, if anything>.
 Read: <what this handoff does not already carry, by section>.
 ```

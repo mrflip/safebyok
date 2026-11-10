@@ -1,6 +1,6 @@
 ---
 name: restack-test-runner
-description: Runs a repo's test/size suite and returns a compact pass/fail report with counts and distilled failures. Used by /restacker to keep suite output out of the main context.
+description: Runs a repo's test suite and returns a compact pass/fail report with counts and distilled failures. Used by /restacker to keep suite output out of the main context.
 tools: Bash, Read, Grep
 model: sonnet
 ---

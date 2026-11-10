@@ -56,7 +56,7 @@ and the count lines, which keeps the suite out of context as well.
 
 Check repo docs for conflict, test, and push conventions (e.g.
 `PROCESS.md`); they override the defaults here. Default tests:
-`pnpm justify`, plus `pnpm size` if that script exists.
+`pnpm justify`.
 
 ```bash
 gh repo view --json nameWithOwner,url,defaultBranchRef
@@ -206,8 +206,8 @@ rebase is normal; triage it the same way.
 
 The test suite is the expensive step, and a clean rebase will very likely
 pass. Run it once per tranche, at the tip, before pushing — not after each
-PR. `pnpm install` if the lockfile changed, then `pnpm justify` (and
-`pnpm size`). Hand the run to `restack-test-runner` and work from its
+PR. `pnpm install` if the lockfile changed, then `pnpm justify`.
+Hand the run to `restack-test-runner` and work from its
 report; it keeps several thousand lines of suite output out of this
 context. Within that, use judgement: a tranche that differs from the last
 green tip only by a changeset/docs conflict or a few clean commits
@@ -290,7 +290,7 @@ state before you report.
 Report:
 - Per PR, one line: new tip SHA, and clean / what you resolved / why
   skipped or set aside.
-- Tests: justify and size results with test counts, and at which tip.
+- Tests: justify results with test counts, and at which tip.
 - Pushes: what, in what order, each under a named lease.
 - Set aside: files, both sides' intent, recommendation, and that the
   origin branch is untouched.
