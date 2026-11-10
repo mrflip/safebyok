@@ -5,22 +5,22 @@ a hole in an end-to-end encrypted vault. This note argues the opposite. A host t
 secret has it in the clear whatever we offer, so the choice isn't whether a clear copy exists. The
 choice is who holds it, for how long, and what puts it away.
 
-| Audience | What they use | Where else it is in the clear | What ends it |
-|---|---|---|---|
-| A script | `box.expose`, `box.whisper` | nowhere new | `unexpose`, a sweep, the process exiting |
-| A team wanting a raw DOM field | `BoxFields.of(box).bind` (`safebyok/dom`) | the element's `value` | the last field unbinding |
-| A React form | `box.whisper`, `box.patchWhisper` | the `value` prop and attribute, React's props | the form calling `unexpose` |
+| Audience                       | What they use                             | Where else it is in the clear                 | What ends it                             |
+| ------------------------------ | ----------------------------------------- | --------------------------------------------- | ---------------------------------------- |
+| A script                       | `box.expose`, `box.whisper`               | nowhere new                                   | `unexpose`, a sweep, the process exiting |
+| A team wanting a raw DOM field | `BoxFields.of(box).bind` (`safebyok/dom`) | the element's `value`                         | the last field unbinding                 |
+| A React form                   | `box.whisper`, `box.patchWhisper`         | the `value` prop and attribute, React's props | the form calling `unexpose`              |
 
 `BoxFields` and `box.patchWhisper` are in #505, which is still open and whose names may change.
 
 ## The risk is time, not exposure
 
-| Who | What holding the whisper on the box changes |
-|---|---|
-| A hostile script, vault unlocked | Nothing. It reads `input.value`, or calls `box.extractWhisper()` |
-| A hostile script, vault locked | Little. `box.whisper` answers a bag and `#exposed` is private. It can wait for an unlock, or wrap `Box.prototype.put` |
-| An accident: a log line, `JSON.stringify`, a spread | An improvement on a variable: none of them show it |
-| Someone with dev tools or a heap dump, after a lock | A loss. The value is still in memory, and a lock doesn't remove it |
+| Who                                                 | What holding the whisper on the box changes                                                                           |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| A hostile script, vault unlocked                    | Nothing. It reads `input.value`, or calls `box.extractWhisper()`                                                      |
+| A hostile script, vault locked                      | Little. `box.whisper` answers a bag and `#exposed` is private. It can wait for an unlock, or wrap `Box.prototype.put` |
+| An accident: a log line, `JSON.stringify`, a spread | An improvement on a variable: none of them show it                                                                    |
+| Someone with dev tools or a heap dump, after a lock | A loss. The value is still in memory, and a lock doesn't remove it                                                    |
 
 So exposure adds no reach to a script in the page. What it adds is time: the value stays in memory
 for as long as nothing ends it. That is why each row of the first table has an answer for what ends
