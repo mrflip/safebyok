@@ -136,7 +136,7 @@ jobs:
 
   # The VaultDB battery, its races and the box limit's, run over a real
   # Postgres: PGlite, which every other Postgres test uses, runs one statement at a time and cannot
-  # race (packages/safebyok-old/VAULTDB.md, Proving the races). The role is a superuser with no
+  # race (the old design's VAULTDB.md, Proving the races, at 100256bb7). The role is a superuser with no
   # password, the container reachable on this runner alone, and each test file makes a database
   # of its own. Which suites run here is the one list in e2e/tests/postgres/test-helpers.ts.
   # Not required by the ruleset until it has run a while.

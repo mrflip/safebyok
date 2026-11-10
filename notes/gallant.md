@@ -953,7 +953,7 @@ keeping goes in a `//` comment above the doc block: `// The lock first: no box o
 | The lock first, as it is synchronous and safe: no box opens under a lease while the tombstone goes out. The tombstone's answer, delivered, vacates the boxes. | Lock this vault and store its tombstone; the answer delivered vacates its boxes. |
 | Fetch this vault with what its get lists: a timely vault, its boxes held sparse, its damaged rows set aside, and the box listing's watch started. No box verb needs it; the host runs it for the list and the pushes. | List this vault's boxes and start its watch. |
 
-From the old tree (`packages/safebyok-old/src`), the Gallant column proposed, not the Coach's: a decision given as its reason, the
+From the old tree (`packages/safebyok-old/src`, removed 2026-11-10), the Gallant column proposed, not the Coach's: a decision given as its reason, the
 project rule the code answers echoed as its doc, and a look ahead.
 
 | Goofus | Gallant, proposed |

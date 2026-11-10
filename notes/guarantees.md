@@ -16,7 +16,7 @@ Last verified against the code 2026-10-27, on `main` after #302, with
 Rewritten for the published core (`packages/safebyok`) on 2026-11-06, against `main` at 4e63ae760, for
 [#528](https://github.com/mrflip/safebyok/pull/528), the guarantees_models thread: every site and test is the
 core's, and its paths are under `packages/safebyok/` unless they say otherwise. The old core
-(`packages/safebyok-old`, private and frozen) is no longer described here; where the core has no counterpart to one
+(`packages/safebyok-old`, removed 2026-11-10) is no longer described here; where the core has no counterpart to one
 of its sites, the note says so. A claim the code no longer bears is listed in #528's open questions.
 
 ## Where the guarantees are kept

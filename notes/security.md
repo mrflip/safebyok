@@ -423,8 +423,8 @@ added or folded into through the subagent, and no other entry changes.
   (7) The guarantee is tested: `packages/safebyok/tests/validators.test.ts` hands every exported validator, `Bank.make`, `bank.ensureVault` and its
   options, `optionsCheck`, `vault.hello`, `vault.putBox` and `parseKeyDeriverSpec` inputs carrying a marker as keys and values at two depths, and
   asserts no refusal's message, stack, meta or cause holds it. (amended 2026-10-27 (thread 17, validators_trim): this holds for every validator, in the `Validators` namespace or not; amended 2026-10-28 (validator_names): the namespace is gone, and this holds for every validator, exported from the main entry by name or not.)
-  (8) `safebyok-indexeddb`'s options are strict: `idbVaultDB` and `inspectIdbVaultDB` take `dbName` and `logger` and refuse any other field,
-  `bad_option`, checked with the core's `Validator`. Amended 2026-10-27 (tidy): the core's `idbOpts` (`src/shapes/device.ts`; amended 2026-10-28 (validator_names): `src/idb-opts.ts` when this was written) is strict too, so
+  (8) `safebyok-indexeddb`'s options are strict: `idbVaultDB` takes `dbName` and `maxBoxes` and refuses any other field,
+  `bad_option`, checked with the core's `Validator` (amended 2026-11-10 (retire_old): this read "`idbVaultDB` and `inspectIdbVaultDB` take `dbName` and `logger`" when written; `inspectIdbVaultDB` was removed with `safebyok-idb-old` on 2026-11-10, and the options are now the AdapterVaultDB's, `dbName` and `maxBoxes`, with no `logger` of its own). Amended 2026-10-27 (tidy): the core's `idbOpts` (`src/shapes/device.ts`; amended 2026-10-28 (validator_names): `src/idb-opts.ts` when this was written) is strict too, so
   `browserOpts`, `idbDeviceDB` and `inspectIdbDeviceDB` refuse an unknown option, counted and never named or quoted, where they ignored it;
   `safebyok-indexeddb`'s options extend the core's.
   (9) amended 2026-10-27 (parse_consistent, branch `20261027-parse_consistent`, stacked on PR #295; the Coach's loosening of STYLE.md's "a
@@ -3798,8 +3798,7 @@ added or folded into through the subagent, and no other entry changes.
   that rejects, never escapes: it goes to a logger as an error and to `globalThis.reportError`
   where the platform has one (`report-error.ts`, looked up at call time). The base class says it
   through the VaultDB's own `logger`. `ChangeBell.listen(bellname, listener)`, `memoryStore()`,
-  `domStore(webStorage, prefix)`, `inspectIdbDeviceDB({ dbName })` and
-  `inspectIdbVaultDB({ dbName })` take no logger, and say it through `DefaultLogger`, the
+  `domStore(webStorage, prefix)` and `inspectIdbDeviceDB({ dbName })` take no logger (amended 2026-11-10 (retire_old): `inspectIdbVaultDB({ dbName })` was on this list; it was removed with `safebyok-idb-old` on 2026-11-10), and say it through `DefaultLogger`, the
   page-wide default (next entry). `idbVaultDB`'s own watch passes the bell none: its listener is
   the base class's guarded one, which never throws. A listener that throws goes to
   `DefaultLogger.error(message, { call: 'ChangeBell' }, asError(err))` (`'StringStore'` for the
