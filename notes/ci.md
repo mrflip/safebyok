@@ -16,6 +16,17 @@ PR.
 Both run again on each push to main, one push at a time: a run in progress finishes, and one
 still waiting is replaced by a newer push, so a run of merges holds no more runners than one run.
 
+## What passes locally and fails in CI
+
+* **Build warnings.** Each package's `tsdown.config.ts` sets `failOnWarn: 'ci-only'`, so a build warning
+  (rolldown-plugin-dts, publint, attw) passes `pnpm justify` and fails `test-build` and `node-compat`. After changing what a
+  package exports, or moving a checker or type between modules, run `CI=true pnpm --filter <pkg> build`. When CI fails and
+  justify did not, suspect a warning first.
+* **Slow tests.** CI runs `test:coverage` on shared runners; `pnpm justify` runs plain `vitest run`. A CPU-bound test that
+  took 0.7 s locally took 2.2 s under coverage, and on the runner ran past vitest's 5 s timeout (#623). Keep a single CPU-bound
+  test under about 300 ms locally, and time a heavy one with `pnpm exec vitest run --coverage --reporter=verbose <file>`.
+  Shrink the enumeration before reaching for a timeout argument.
+
 ## Dependabot
 
 Dependabot opens grouped `deps:` PRs weekly; they get the same review as any other. One

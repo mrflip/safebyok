@@ -152,10 +152,20 @@ STYLE.md *Naming* is the source; these few shape code too deeply to fix in revie
 
 STYLE.md *Comments and doc blocks* is the source; `notes/gallant-docblocks.md` has the pairs, by tag.
 
-* **Write the first line before the body**: one sentence on the `/**`, saying what the member does for its caller. A
-  name that will not sit against that line is the wrong name.
-* **A doc block has no past** `#purpose-not-path`: not how the code came to be, what it replaced, the ruling or the request
-  behind it, or why it is built this way. A reason worth keeping is a `//` comment above it.
-* **A doc block does not read the body aloud** `#purpose-not-machinery`: not the steps, the helpers it calls, or what a
-  refusal leaves behind.
-* **No refusal catalog.** One kind a caller branches on in normal use (`stale_write`) may be named.
+* **Write plain english** `#plain-english`: Be concise, but above all clear. Describe what the member's name and signature don't, and what the caller might get wrong. Measure its length and register against docs of comparable methods from your memory, from training, or exemplars (Zod, Kysely, Rails, ...).
+* **Write the first line before the body**: a few words, up to one line, on the `/**`, saying what the member does for
+  its caller. A second fact gets a second line. If the name does not match that line, the name is wrong.
+* **Leave out the history** `#purpose-not-path`: how the code came to be, what it replaced, the ruling or the request
+  behind it, why it is built this way. A reason worth keeping is a `//` comment above the block.
+* **Leave out the mechanism** `#purpose-not-machinery`: the steps, the helpers it calls, the state left behind when it
+  refuses.
+
+Before and after:
+
+```ts
+/** The act a vault's get, put or del amounts to over `vaultRaw`, the row stored at its scope or null for none.
+ * Nothing is stored here: where {@link isWriteAct} holds of the act, the caller stores the request's record, in the atomic unit it fetched the row in.
+ */
+/** Classify a vault request's outcome, based on the stored row. */
+export const vaultActOf = (request: VaultRequest, vaultRaw: unknown): VaultAct =>
+```
