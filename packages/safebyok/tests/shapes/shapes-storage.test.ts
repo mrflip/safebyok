@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as SX from '../../src/shapes/shapes-storage'
+import { VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'
 import { boxAt, boxFlaws, boxTombstoneOf, priorOf, stale, vaultAt, vaultFlaws, vaultTombstoneOf } from '../test-helpers/storage-world'
 
@@ -70,6 +71,19 @@ describe("the row checks a VaultDB's conditional writes run", () => {
     expect(SX.isLifeOver({ ...vault, am: 'x' }, 'life1')).to.be.false
     expect(SX.isLifeOver({ ...vault, vault_tok: 'life2', smuggled: 'field' }, 'life1')).to.be.false
     expect(SX.isLifeOver({ garbage: true }, 'life1')).to.be.false
+  })
+})
+
+describe("the options a VaultDB's writes take", () => {
+  it("putOpts fills ifAbsent add and ifPresent repl, whether left out or sent as null", () => {
+    const filled = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'repl' }
+    expect(SX.putOpts.parse({ prior: SX.VoidRevision })).to.deep.equal(filled)
+    expect(SX.putOpts.parse({ prior: SX.VoidRevision, ifAbsent: null, ifPresent: null })).to.deep.equal(filled)
+  })
+
+  it("gateVerbOpts and delOpts take prior alone, refusing an ifAbsent or ifPresent offered", () => {
+    expect(() => SX.gateVerbOpts.parse({ prior: SX.VoidRevision, ifPresent: 'repl' })).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+    expect(() => SX.delOpts.parse({ prior: SX.VoidRevision, ifAbsent: 'add' })).to.throw(VaultError).with.property('refusalkind', 'bad_option')
   })
 })
 

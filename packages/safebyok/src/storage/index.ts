@@ -38,7 +38,7 @@ export { boxSparse, boxRecord, boxTombstone, boxRow, foundBoxRow } from '../shap
 export type { BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox } from '../shapes/shapes-storage'
 export type { Sidecar, WhisperJson } from '../shapes/shapes-core'
 export { passkeyAddRecord, passkeyRevokeRecord } from '../shapes/shapes-storage'
-export { ifAbsentOpts, putOpts, gateVerbOpts, delOpts, reqParams, adapterVaultDBOpts, memoryVaultDBOpts, capacity } from '../shapes/shapes-storage'
+export { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqParams, adapterVaultDBOpts, memoryVaultDBOpts, capacity } from '../shapes/shapes-storage'
 export type { AdapterVaultDBOpts, Capacity, DelOpts, GateVerbOpts, IfAbsentOpts, MemoryVaultDBOpts, PutOpts, PutOptsGiven, ReqParams } from '../shapes/shapes-storage'
 export { rowPeek, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
 export { isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow } from '../shapes/shapes-storage'

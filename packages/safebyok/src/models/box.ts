@@ -198,8 +198,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** {@link put}, answering the vaultDB's own answer with the box listed as its `val`. */
   async tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<ThingAnswer<Box>> {
     try {
-      const { ifAbsent, ifPresent, ...timely } = VX.boxPutOpts.parse(opts)
-      await this.ensurePuttable(patch, timely)
+      const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis } = VX.boxPutOpts.parse(opts)
+      await this.ensurePuttable(patch, { maxMillisSinceRefresh, maxWorldMillis })
       const given = this.demandPuttable(patch, { ifPresent })
       const { record, prior } = await this.#edit(given)
       this.demandPuttable(patch, { ifPresent })

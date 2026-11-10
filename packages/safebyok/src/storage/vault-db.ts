@@ -263,11 +263,10 @@ export abstract class AdapterVaultDB implements VaultDB {
     const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
       const vaultRecord = SX.vaultRecord.parse(record)
-      const putOpts = SX.putOpts.parse(opts)
-      SX.nextSeq.parse({ record: vaultRecord, prior: putOpts.prior })
-      const { isWritten, ante } = await this.doPutVault(vaultRecord, putOpts)
+      const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
+      SX.nextSeq.parse({ record: vaultRecord, prior })
+      const { isWritten, ante } = await this.doPutVault(vaultRecord, { prior, ifAbsent, ifPresent })
       if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: vaultRecord, world: vaultRecord } }
-      const { ifAbsent, ifPresent } = putOpts
       const found = foundVaultRowOf(ante, vaultRecord)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok)) }
       if (found === null) { throw Refuse.staleWrite(SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok), null) }
@@ -275,7 +274,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       if (found.am === 'x') { throw Refuse.staleWrite(found, found) }
       if (ifPresent === 'get') { return { ok: true, req_params, act: 'declined', val: found, world: found } }
       // A live row at `prior` that `repl` did not replace is of another life than the record.
-      if ((ifPresent === 'fail') || SX.isRowAt(found, putOpts.prior)) { throw Refuse.camped(found, found) }
+      if ((ifPresent === 'fail') || SX.isRowAt(found, prior)) { throw Refuse.camped(found, found) }
       throw Refuse.staleWrite(found, found)
     } catch (err) { throw refusalOf(err, 'putVault', req_params) }
   }
@@ -288,14 +287,13 @@ export abstract class AdapterVaultDB implements VaultDB {
     const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
       const boxRecord = SX.boxRecord.parse(record)
-      const putOpts = SX.putOpts.parse(opts)
-      SX.nextSeq.parse({ record: boxRecord, prior: putOpts.prior })
+      const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
+      SX.nextSeq.parse({ record: boxRecord, prior })
       const recordBytes = jsonBytes(boxRecord)
       if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
-      const { isWritten, ante, vault } = await this.doPutBox(boxRecord, putOpts)
+      const { isWritten, ante, vault } = await this.doPutBox(boxRecord, { prior, ifAbsent, ifPresent })
       const world = liveVaultOf(vault, boxRecord)
       if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: boxRecord, world } }
-      const { ifAbsent, ifPresent } = putOpts
       const found = foundBoxRowOf(ante, boxRecord)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.absentBox(world, null) }
       if (found === null) { throw Refuse.staleWrite(world, null) }
@@ -303,7 +301,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       if (found.am === 'x') { throw Refuse.staleWrite(world, found) }
       if (ifPresent === 'get') { return { ok: true, req_params, act: 'declined', val: found, world } }
       // A live row at `prior` that `repl` did not replace is of another life than the record.
-      if ((ifPresent === 'fail') || SX.isRowAt(found, putOpts.prior)) { throw Refuse.camped(world, found) }
+      if ((ifPresent === 'fail') || SX.isRowAt(found, prior)) { throw Refuse.camped(world, found) }
       throw Refuse.staleWrite(world, found)
     } catch (err) { throw refusalOf(err, 'putBox', req_params) }
   }
@@ -319,13 +317,13 @@ export abstract class AdapterVaultDB implements VaultDB {
     const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
       const vaultRecord = SX.vaultRecord.parse(record)
-      const putOpts = SX.gateVerbOpts.parse(opts)
+      const { prior } = SX.gateVerbOpts.parse(opts)
       const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
-      if (! SX.isRowAt(stored, putOpts.prior)) { throw Refuse.staleWrite(stored, stored) }
+      if (! SX.isRowAt(stored, prior)) { throw Refuse.staleWrite(stored, stored) }
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
       if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
       if (! isEqual(vaultRecord.gate.passkey_wayin, stored.gate.passkey_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
-      await this.putVault(vaultRecord, { ...putOpts, ifAbsent: 'fail', ifPresent: 'repl' })
+      await this.putVault(vaultRecord, { prior, ifAbsent: 'fail', ifPresent: 'repl' })
       return { ok: true, req_params, act: 'replaced', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'replacePassphrase', req_params) }
   }
@@ -338,14 +336,14 @@ export abstract class AdapterVaultDB implements VaultDB {
     const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
       const vaultRecord = SX.passkeyAddRecord.parse(record)
-      const putOpts = SX.gateVerbOpts.parse(opts)
+      const { prior } = SX.gateVerbOpts.parse(opts)
       const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
-      if (! SX.isRowAt(stored, putOpts.prior)) { throw Refuse.staleWrite(stored, stored) }
+      if (! SX.isRowAt(stored, prior)) { throw Refuse.staleWrite(stored, stored) }
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
       if (stored.gate.passkey_wayin !== null) { throw Refuse.camped(stored, stored) }
       if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
       if (! isEqual(vaultRecord.gate.passphrase_wayin, stored.gate.passphrase_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
-      await this.putVault(vaultRecord, { ...putOpts, ifAbsent: 'fail', ifPresent: 'repl' })
+      await this.putVault(vaultRecord, { prior, ifAbsent: 'fail', ifPresent: 'repl' })
       return { ok: true, req_params, act: 'added', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'addPasskey', req_params) }
   }
@@ -358,14 +356,14 @@ export abstract class AdapterVaultDB implements VaultDB {
     const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
       const vaultRecord = SX.passkeyRevokeRecord.parse(record)
-      const putOpts = SX.gateVerbOpts.parse(opts)
+      const { prior } = SX.gateVerbOpts.parse(opts)
       const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
-      if (! SX.isRowAt(stored, putOpts.prior)) { throw Refuse.staleWrite(stored, stored) }
+      if (! SX.isRowAt(stored, prior)) { throw Refuse.staleWrite(stored, stored) }
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
       if (stored.gate.passkey_wayin === null) { return { ok: true, req_params, act: 'revoked', val: stored, world: stored } }
       if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
       if (! isEqual(vaultRecord.gate.passphrase_wayin, stored.gate.passphrase_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
-      await this.putVault(vaultRecord, { ...putOpts, ifAbsent: 'fail', ifPresent: 'repl' })
+      await this.putVault(vaultRecord, { prior, ifAbsent: 'fail', ifPresent: 'repl' })
       return { ok: true, req_params, act: 'revoked', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'revokePasskey', req_params) }
   }
@@ -381,9 +379,9 @@ export abstract class AdapterVaultDB implements VaultDB {
     const req_params = SX.reqParamsOf({ ...tombstone, ...opts })
     try {
       const boxTombstone = SX.boxTombstone.parse(tombstone)
-      const delOpts = SX.delOpts.parse(opts)
-      SX.nextSeq.parse({ record: boxTombstone, prior: delOpts.prior })
-      const { isWritten, ante, vault } = await this.doDelBox(boxTombstone, delOpts)
+      const { prior } = SX.delOpts.parse(opts)
+      SX.nextSeq.parse({ record: boxTombstone, prior })
+      const { isWritten, ante, vault } = await this.doDelBox(boxTombstone, { prior })
       const world = liveVaultOf(vault, boxTombstone)
       if (isWritten) { return { ok: true, req_params, act: 'deleted', val: boxTombstone, world } }
       const found = foundBoxRowOf(ante, boxTombstone)
@@ -416,9 +414,9 @@ export abstract class AdapterVaultDB implements VaultDB {
     const req_params = SX.reqParamsOf({ ...tombstone, ...opts })
     try {
       const vaultTombstone = SX.vaultTombstone.parse(tombstone)
-      const delOpts = SX.delOpts.parse(opts)
-      SX.nextSeq.parse({ record: vaultTombstone, prior: delOpts.prior })
-      const { isWritten, ante } = await this.doDelVault(vaultTombstone, delOpts)
+      const { prior } = SX.delOpts.parse(opts)
+      SX.nextSeq.parse({ record: vaultTombstone, prior })
+      const { isWritten, ante } = await this.doDelVault(vaultTombstone, { prior })
       if (isWritten) { return { ok: true, req_params, act: 'deleted', val: vaultTombstone, world: vaultTombstone } }
       const found = foundVaultRowOf(ante, vaultTombstone)
       if (found === null) { return this.#answerDelVaultVoid(vaultTombstone, req_params) }

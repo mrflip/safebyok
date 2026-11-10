@@ -146,11 +146,11 @@ describe("vaultResolvers", () => {
     expect(DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, { ...TH.vaultScope, opts: { ifAbsent: 'nil' } }))).to.deep.include({ ok: true, val: null })
   })
 
-  it("refuses an option sent as null", async () => {
+  it("reads an option sent as null as its default", async () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver())
     const nulled = DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, { ...TH.vaultScope, opts: { ifAbsent: null } })) as DB.BadAnswer
-    expect(nulled.err.refusalkind).to.eq('bad_option')
+    expect(nulled.err.refusalkind).to.eq('vault_empty')
   })
 
   it("sends a refusal as the answer's err with nothing of what the VaultDB's driver said", async () => {

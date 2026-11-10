@@ -164,16 +164,17 @@ export const { passkeyAddRecord, passkeyRevokeRecord } = Checkers('bad_option', 
 // == [Options]: ifAbsentOpts, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, GateVerbOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
 
 /** The checks of the options a vaultDB verb accepts, of a write's record against its prior revision, and of the safe metadata an answer carries. */
-export const { ifAbsentOpts, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq } = Checkers('bad_option', ({ obj, oneof, box_tok }) => {
-  const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
-  const putIfAbsent = oneof(EX.putIfAbsentVals).default('add')
-  const putOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(EX.ifPresentVals).default('repl') })
-  const gateVerbOpts = obj({ prior: revision })
-  const delOpts = obj({ prior: revision })
+export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq } = Checkers('bad_option', ({ obj, oneof, orDefault, box_tok }) => {
+  const ifAbsentOpts = obj({ ifAbsent: orDefault(oneof(EX.ifAbsentVals), 'fail') })
+  const putOptsGiven = obj({ prior: revision, ifAbsent: oneof(EX.putIfAbsentVals), ifPresent: oneof(EX.ifPresentVals) })
+  const putOpts = obj({ ...putOptsGiven.shape, ifAbsent: orDefault(putOptsGiven.shape.ifAbsent, 'add'), ifPresent: orDefault(putOptsGiven.shape.ifPresent, 'repl') })
+  // A gate verb and a deletion say for themselves what a put over a missing or present row does: neither takes ifAbsent or ifPresent.
+  const gateVerbOpts = obj({ prior: revision }).strict()
+  const delOpts = obj({ prior: revision }).strict()
 
   const reqParams = boxQuery.extend({ box_tok, ...revision.shape, prior: revision }).partial()
   const nextSeq = obj({ record: revision, prior: revision }).refine(({ record, prior }) => record.revision_seq === (prior.revision_seq + 1), Phrases.SeqNotNext)
-  return { ifAbsentOpts, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq }
+  return { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq }
 }, [CX])
 
 /** The check of an AdapterVaultDB's options, refusing 'bad_option'. */
@@ -192,7 +193,7 @@ export const memoryVaultDBOpts = objCheck(({ uint }) => ({
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
 /** A put's options as parsed, defaults filled in: what a subclass's `doPutVault` and `doPutBox` receive. */
-export type PutOptsGiven = Readonly<Z.output<typeof putOpts>>
+export type PutOptsGiven = Readonly<Z.infer<typeof putOptsGiven>>
 /** What a gate verb is told beside its record: the revision the record replaces. */
 export type GateVerbOpts = Readonly<Z.input<typeof gateVerbOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>

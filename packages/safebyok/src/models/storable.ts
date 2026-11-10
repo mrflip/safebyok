@@ -169,7 +169,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Delete this thing through its listing. A thing gone is deleted again, over its tombstone's revision. */
   async del(opts: TimelyOpts = {}): Promise<this> {
-    await this.ensureDeletable(VX.timelyOpts.parse(opts)); this.demandDeletable()
+    const { maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)
+    await this.ensureDeletable({ maxMillisSinceRefresh, maxWorldMillis }); this.demandDeletable()
     await this.listing.del(this.sparse)
     return this
   }
