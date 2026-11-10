@@ -83,3 +83,32 @@ export type PutAct = typeof putActVals[number]
 export const delActVals = ['deleted', 'gone', 'void'] as const
 export type DelAct = typeof delActVals[number]
 // --
+
+// == [Classified acts]: writeActVals, WriteAct, foundActVals, FoundAct, boxRefusedActVals, BoxRefusedAct, vaultRefusedActVals, VaultRefusedAct, BoxAct, VaultAct
+
+/** The acts of a put or del that stored its record: `born` over nothing, `reborn` over a tombstone, `replaced` over a live row, or `deleted`. */
+export const writeActVals = ['born', 'reborn', 'replaced', 'deleted'] as const
+export type WriteAct = typeof writeActVals[number]
+
+/** The acts that answer what is stored and write nothing: a get's `got`, `void` or `gone`, and `passed` for a put told to get the live row it met. */
+export const foundActVals = ['got', 'void', 'gone', 'passed'] as const
+export type FoundAct = typeof foundActVals[number]
+
+/** The acts a box's get, put or del refuses with: its vault's four, then its own. */
+export const boxRefusedActVals = [
+  'vault_damaged', 'vault_void', 'vault_mismatch', 'vault_gone',
+  'box_damaged', 'box_void', 'box_gone', 'box_camped', 'box_dubdel', 'box_stale', 'box_reput', 'box_redel', 'box_retcon', 'box_clash', 'box_forked', 'box_ahead',
+] as const
+export type BoxRefusedAct = typeof boxRefusedActVals[number]
+
+/** The acts a vault's get, put or del refuses with. */
+export const vaultRefusedActVals = [
+  'vault_damaged', 'vault_void', 'vault_gone', 'vault_camped', 'vault_dubdel', 'vault_stale', 'vault_reput', 'vault_redel', 'vault_retcon', 'vault_clash', 'vault_forked', 'vault_ahead',
+] as const
+export type VaultRefusedAct = typeof vaultRefusedActVals[number]
+
+/** Every act a box's get, put or del is classified as. */
+export type BoxAct   = WriteAct | FoundAct | BoxRefusedAct
+/** Every act a vault's get, put or del is classified as. */
+export type VaultAct = WriteAct | FoundAct | VaultRefusedAct
+// --
