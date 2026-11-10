@@ -143,19 +143,19 @@ under a one-line headline they are a list a caller can scan.
 
 ```ts
 /** Stores `record` over the vault row standing at `prior`, landing where the row's revision_tok is `prior`'s or the row is void, else refusing `camped` under `ifPresent: 'fail'` over a live row, answering it `declined` under `'get'`, `vault_empty` or `vault_gone` under `ifAbsent: 'fail'` over a void or tombstoned row, and `stale_write` otherwise. */
-async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>>
+async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>>
 ```
 
 **Gallant:**
 
 ```ts
 /** Stores `record` over the vault row at revision `prior`, as one conditional write.
- * See docs for PutVaultOpts, but briefly:
+ * See docs for PutOpts, but briefly:
  * - live, under `ifPresent: 'fail'`: refused as `'camped'`; under `'get'`: answered with the stored row, act `'declined'`
  * - void or a tombstone, under `ifAbsent: 'fail'`: refused as `'vault_empty'` or `'vault_gone'`
  * - anything else: refused as `'stale_write'`; read the vault again and edit from the revision it answers.
  */
-async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>>
+async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>>
 ```
 
 **The tell: two facts glued.** A long first line is not wrong for being long; it is wrong when a "so" or an "as" joins the
@@ -501,7 +501,7 @@ The two values gapped behind a semicolon, each explained in a clause.
 ```ts
 // storage/vault-db-shapes.ts
 /** A vault row is replaced only by a gate verb: `putVault` births one, or finds one in the way. */
-export type PutVaultOpts = Readonly<Z.input<typeof putVaultOpts>>
+export type PutOpts = Readonly<Z.input<typeof putOpts>>
 ```
 
 The values told as policy prose.
