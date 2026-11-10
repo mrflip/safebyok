@@ -94,6 +94,7 @@ export type WriteAct = typeof writeActVals[number]
 export const foundActVals = ['got', 'void', 'gone', 'passed'] as const
 export type FoundAct = typeof foundActVals[number]
 
+// No 'vault_full' here: the cap on a vault's boxes is soft, refused by the vaultDB from a count the classifier is never handed (notes/answer-contract.md, *Soft caps*).
 /** The acts a box's get, put or del refuses with: its vault's four, then its own. */
 export const boxRefusedActVals = [
   'vault_damaged', 'vault_void', 'vault_mismatch', 'vault_gone',

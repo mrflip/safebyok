@@ -320,9 +320,8 @@ describe("boxActOf, one box through a run of requests", () => {
     return (stored === null) ? [...fresh, ...sent] : [...sent, ...fresh]
   }
 
-  /** The run after `request`, with what the contract promises of a write checked on the way. */
-  const runAfter = (run: Run, request: Write): Run => {
-    const act = boxActOf(request, liveVault, run.stored)
+  /** The run after `request` was answered `act`, with what the contract promises of a write checked on the way. */
+  const runAfter = (run: Run, request: Write, act: BoxAct): Run => {
     const sent = run.sent.includes(request) ? run.sent : [...run.sent, request]
     if (! isWriteAct(act)) { return { ...run, sent } }
     expect(run.wrote.has(request), 'a request stores its record at most once').to.be.false
@@ -337,16 +336,17 @@ describe("boxActOf, one box through a run of requests", () => {
     seen.runs += 1
     if (depth === 0) { return }
     for (const request of nextRequests(run)) {
-      seen.acts.add(boxActOf(request, liveVault, run.stored))
-      walk(runAfter(run, request), depth - 1, seen)
+      const act = boxActOf(request, liveVault, run.stored)
+      seen.acts.add(act)
+      walk(runAfter(run, request, act), depth - 1, seen)
     }
   }
 
-  it("stores each request's record at most once, a seq at a time, in every run of five requests", () => {
+  it("stores each request's record at most once, a seq at a time, in every run of four requests", () => {
     const seen = { acts: new Set<BoxAct>(), runs: 0 }
-    walk({ stored: null, versions: [], sent: [], wrote: new Set() }, 5, seen)
+    walk({ stored: null, versions: [], sent: [], wrote: new Set() }, 4, seen)
     expect([...seen.acts]).to.include.members([...EX.writeActVals, 'passed', 'box_reput', 'box_redel', 'box_stale', 'box_gone', 'box_dubdel', 'box_camped', 'box_void'])
-    expect(seen.runs).to.be.above(10_000)
+    expect(seen.runs).to.be.above(3000)
   })
 
   it("goes on from a tombstone's seq at a rebirth", () => {

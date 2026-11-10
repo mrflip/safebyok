@@ -57,6 +57,8 @@ the caller expected there would be a tombstone yet called `del` anyway
 
 A vaultDB may cap how many live boxes a vault holds, and refuse a put that would add one with `vault_full`. The cap is soft. The count behind it is not taken transactionally and is not guaranteed accurate: on some datastores an exact count would mean a lock on every writer. So a vault may come to hold more boxes than its cap, and a put may refuse a little under it. Where the cap's check falls among the other checks is not assured either: a put that would refuse for another reason may refuse `vault_full` instead, or the other way about. A host that requires a hard cap installs, and migrates, triggers of its own in its datastore.
 
+The classifier takes no part in the cap: it is handed no count, and `vault_full` is not among its acts. The vaultDB refuses it on its own, so no row of the tables below names it.
+
 ### Listings
 
 A listing answers, for each box it lists, what a get of that box would answer in the same atomic unit. A listing is not guaranteed to cursor, and may be capped in length: it need not list every box.
@@ -71,8 +73,9 @@ Precedence, first match wins, for a box:
 4. Vault life: the request's `vault_tok` must equal the stored `vault_tok`, else `vault_mismatch`; a tombstone carrying your `vault_tok` stops at `vault_gone`. Box ops never compare the vault's revision.
 5. Box damaged: every op returns `box_damaged` with the damaged row; a separate delRaw command clears it.
 6. Box at the proposed revision: `box_reput`, `box_redel`, or `box_retcon`.
-7. Box revision: mismatches refuse ahead / forked / clash / stale or box_gone. A token match whose cited life token or state is not the stored one is a clash too (C14).
-   1. Exception: a put to a live row, expecting an empty row or a current or future live row and `ifPresent=get`, returns the row with act `'passed'`
+7. Box revision: the expected revision is not the stored one. Refuses `box_ahead`, `box_forked`, `box_clash` or `box_stale`. A token match whose cited life token or state is not the stored one is a clash too (C14).
+   1. Exception: a stale put with `ifPresent=get` that meets a live row answers that row, with act `passed`. Stale here is the sentinel cited against a row, or an earlier seq under another token.
+   2. Exception: a stale del that meets a tombstone refuses `box_gone`, not `box_stale`.
 8. Revision matched: the stored state picks the flag (live consults ifPresent; void or tombstone consults ifAbsent) and the flag picks the outcome. Silly combinations arrive here and get the refusal they asked for.
 
 The soft cap stands outside this order: a put that would add a live box may refuse `vault_full` at any step past the first (*Soft caps*).
@@ -164,7 +167,7 @@ Coverage check: get sends no box revision, so 3 box states × 2 ifAbsent values 
 | PL12 |   eq    | equal    |  get  | *live* | `passed`     | **same**   |   🟰    |
 | PL13 |   eq    | equal    | fail  | *live* | `box_camped` | dbhas      |   🧨    |
 
-Coverage check: void has 2 seq values × 2 ifAbsent values = 4 cases in 3 rows. Gone has 9 `b_tok` × `b_seq` pairs, one split by ifAbsent, in 10 rows. Live has 9 pairs, three split by ifPresent, in 13 rows.
+Coverage check: void has 2 seq values × 2 ifAbsent values = 4 cases in 3 rows. Gone has 9 `b_tok` × `b_seq` pairs, one split by ifAbsent, in 10 rows. Live has 9 pairs, three split by ifPresent, in 15 rows.
 
 Soft cap: a put that would be `born` or `reborn` may refuse `vault_full` instead (err, 🔁). Its timing relative to the rows above is not assured (*Soft caps*).
 
@@ -200,9 +203,9 @@ pairs in 9 rows (eq with birth can't occur). del has no flags, so nothing splits
 
 ## Vault ops table
 
-Same ops, flags and conventions as the box table, applied to the vault row. Three differences:
+Same ops, flags and conventions as the box table, applied to the vault row. Two things to note:
 get sends no vault revision (how a new device bootstraps); del keeps `vault_tok` but,
-like every write, carries a next revision; vault put has no ifPresent=repl.
+like every write, carries a next revision.
 
 ### Unconditional errors (V1–V3)
 
@@ -258,17 +261,20 @@ Coverage check: vault get sends no vault revision, so 3 vault states × 2 flags 
 | VPL1  |  =next  | ≠next    |   @   | *live* | `vault_retcon` | dbhas      |   🌀    |
 | VPL2  |  =next  | =next    |   @   | *live* | `vault_reput`  | dbhas      |   🔁    |
 | VPL3  |  other  | birth    |  get  | *live* | `passed`       | **same**   |   🟰    |
+| VPL6  |  other  | stale    |  get  | *live* | `passed`       | **same**   |   🟰    |
+| VPL4r |  other  | birth    | repl  | *live* | `vault_stale`  | dbhas      |   🔁    |
+| VPL5r |  other  | stale    | repl  | *live* | `vault_stale`  | dbhas      |   🔁    |
 | VPL4  |  other  | birth    | fail  | *live* | `vault_stale`  | dbhas      |   🔁    |
 | VPL5  |  other  | stale    | fail  | *live* | `vault_stale`  | dbhas      |   🔁    |
-| VPL6  |  other  | stale    |  get  | *live* | `passed`       | **same**   |   🟰    |
 | VPL7  |   eq    | stale    |   @   | *live* | `vault_clash`  | dbhas      |   🌀    |
 | VPL8  |  other  | equal    |   @   | *live* | `vault_forked` | dbhas      |   🌀    |
 | VPL9  |  other  | ahead    |   @   | *live* | `vault_ahead`  | dbhas      |   🌀    |
 | VPL10 |   eq    | ahead    |   @   | *live* | `vault_ahead`  | dbhas      |   🌀    |
+| VPL13 |   eq    | equal    | repl  | *live* | `replaced`     | reqval     |   👍    |
 | VPL11 |   eq    | equal    |  get  | *live* | `passed`       | **same**   |   🟰    |
 | VPL12 |   eq    | equal    | fail  | *live* | `vault_camped` | dbhas      |   🧨    |
 
-Coverage check: void has 2 seq values × 2 ifAbsent values = 4 cases in 3 rows. Gone has 9 `v_tok` × `v_seq` pairs, one split by ifAbsent, in 10 rows. Live has 9 pairs, three split by ifPresent (get or fail; repl is refused by V1), in 12 rows.
+Coverage check: void has 2 seq values × 2 ifAbsent values = 4 cases in 3 rows. Gone has 9 `v_tok` × `v_seq` pairs, one split by ifAbsent, in 10 rows. Live has 9 pairs, three split by ifPresent, in 15 rows.
 
 ### Vault del
 
@@ -303,7 +309,7 @@ Where the vault differs from the box table, and why:
 
 - VPG1, VDG1, VDL1–VDL2: a vault delete writes a new revision, so a del whose proposed revision is already stored is recognized (`vault_redel`) as a box's is, and a tombstone at the revision your create would write is impossible (VPG1).
 - VPG10 and VPL12 return `dbhas`: the stored row is the ticket to re-create or retry.
-- V1: a vault's revision changes only on re-creation, so an in-place replace would be a write no revision guards. If vaults do get replaced, repl must mint a new token and bump the seq, as a box write does.
+- A vault put with `ifPresent=repl` replaces a live vault in place, as a box put does: a fresh `revision_tok`, seq + 1, the same `vault_tok` (C7). It touches no box, and it makes no box request stale, since a box request cites the vault's life token and never its revision.
 
 ## Roles
 
@@ -373,6 +379,7 @@ Each rule is one testable statement about what an adapter does. An atomic unit i
 - Vault delete sets state gone, writes a new revision (the proposed `revision_tok`, seq + 1) and leaves `vault_tok` unchanged; afterwards no box op under that `vault_scope` returns a live box until the vault has been re-created.
 - Vault delete removes every box of that vault life (box.`vault_tok` = the deleted `vault_tok`), in the same atomic unit where the datastore can. Where it can't, those boxes stay hidden behind the gate (C6) until tidyBoxes removes them, and are leftovers (C5) once the vault is re-created.
 - Vault re-create stores the proposed `vault_tok`, which differs from the tombstone's, with seq = stored seq + 1.
+- Vault replace stores the proposed revision and leaves `vault_tok` unchanged.
 - No write copies a new `vault_tok` onto existing boxes; a foreign key from (box.`vault_scope`, box.`vault_tok`) to the vault, where declared, never cascades updates.
 - A put or del writes at most once (C15): once its proposed revision is stored, or its expected revision is no longer the stored one, it writes nothing.
 - A put that would add a live box may refuse `vault_full` under the vaultDB's soft cap. The count is an estimate, taken outside any lock, and the check may run at any point in the atomic unit (*Soft caps*).
