@@ -1,4 +1,4 @@
-/** The classifier of the answer contract: the one act a get, put or del amounts to over the rows stored. Its tables are `notes/answer-contract.md`. */
+/** Classify a get, put or del against the stored rows, per the tables in `notes/answer-contract.md`. */
 
 import * as Phrases from '../helpers/phrases'
 import { verifyConsistent } from '../helpers/validator'
@@ -17,18 +17,28 @@ import type { BoxQuery, BoxRequest, BoxRow, Capacity, Revision, VaultRequest, Va
 /** What is stored at a scope: no row, a tombstone, or a live row. */
 type Presence = 'void' | 'gone' | 'live'
 
-/** The stored `revision_tok` against a write's: `=next` is the one the write would store, `eq` the one it expects, and `birth` the void revision expected where no row is stored. */
+/** The stored `revision_tok` compared with the request's.
+ * - `'birth'` -- expected an empty row, and none is stored
+ * - `'=next'` -- the stored row already has the token this request would write
+ * - `'eq'`    -- expected exactly the token the stored row has
+ * - `'neq'`   -- anything else
+ */
 type RevtokCmp = 'birth' | '=next' | 'eq' | 'neq'
 
-/** A write's expected `revision_seq` against the stored one: `birth` is the void revision's seq, and a seq expected of no row is otherwise `ahead`. */
+/** The request's expected `revision_seq` compared with the stored one.
+ * - `'birth'` -- expected an empty row
+ * - `'eq'`    -- expected exactly the seq the stored row has
+ * - `'stale'` -- expected an older revision: a write has intervened
+ * - `'ahead'` -- expected a higher revision (or a record where none exists): an impossible situation
+ */
 type RevseqCmp = 'birth' | 'eq' | 'stale' | 'ahead'
 
 type RevCmp = Readonly<{ revtokCmp: RevtokCmp, revseqCmp: RevseqCmp }>
 
-/** The policy that speaks to what is stored: a put's ifPresent over a live row, ifAbsent over a tombstone or no row. */
+/** The request's `ifPresent` or `ifAbsent` policy, whichever applies to the stored row. */
 type Opflag = EX.IfAbsent | EX.PutIfAbsent | EX.IfPresent
 
-/** What a comparison reads of a row, stored or expected: its revision, whether it is live, and its life tok. */
+/** The fields of a row, stored or expected, that classification compares. */
 type Peek = Readonly<Revision & { am: EX.Am, lifeTok: string }>
 
 const boxPeekOf   = ({ revision_tok, revision_seq, am, box_tok }:   Revision & { am: EX.Am, box_tok: string }):   Peek => ({ revision_tok, revision_seq, am, lifeTok: box_tok })
@@ -55,7 +65,7 @@ const revseqCmpOf = (expected: Revision, stored: Revision | null): RevseqCmp => 
 
 // == [Verdicts]: Verdict, BoxActs, VaultActs, Gate, GateActs
 
-/** What a classification finds, bare of its level: an act that stores or answers, or what a refusal is over. */
+/** A classification's outcome, before it is named for box or vault: store, answer, or a refusal's reason. */
 type Verdict = WriteAct | FoundAct | 'damaged' | 'void' | 'gone' | 'camped' | 'dubdel' | 'stale' | 'retcon' | 'clash' | 'forked' | 'ahead'
 
 const BoxActs: Readonly<Record<Verdict, BoxAct>> = {
@@ -72,7 +82,7 @@ const VaultActs: Readonly<Record<Verdict, VaultAct>> = {
   retcon:  'vault_retcon',  clash:   'vault_clash', forked:   'vault_forked', ahead:   'vault_ahead',
 }
 
-/** How a box request finds its vault: it goes on to its box only at `live`, and adds one only where the vault is not `full`. */
+/** The state of a box request's vault. Only a `live` vault lets the request reach its box. A `full` vault has no room for a new box. */
 type Gate = 'damaged' | 'void' | 'mismatch' | 'gone' | 'full' | 'live'
 
 const GateActs: Readonly<Record<Exclude<Gate, 'live'>, BoxAct>> = { damaged: 'vault_damaged', void: 'vault_void', mismatch: 'vault_mismatch', gone: 'vault_gone', full: 'vault_full' }
@@ -80,14 +90,14 @@ const GateActs: Readonly<Record<Exclude<Gate, 'live'>, BoxAct>> = { damaged: 'va
 
 // == [Tables]: getVerdictOf, putVerdictOf, delVerdictOf, WriteAsk, writeVerdictOf
 
-/** The verdict of a get: the note's get table. */
+/** Classify a get, per the contract's get table. */
 const getVerdictOf = (presence: Presence, opflag: Opflag): Verdict => {
   if (presence === 'live') { return 'gotlive' }
   if (presence === 'void') { return (opflag === 'nil') ? 'gotvoid' : 'void' }
   return (opflag === 'nil') ? 'gotgone' : 'gone'
 }
 
-/** The verdict of a put: the note's put table, in its order. */
+/** Classify a put, per the contract's put table. The first matching row wins. */
 const putVerdictOf = (presence: Presence, { revtokCmp, revseqCmp }: RevCmp, opflag: Opflag): Verdict => { // eslint-disable-line sonarjs/cognitive-complexity
   if (revtokCmp === '=next')                         { return 'retcon' }
   if (revseqCmp === 'ahead')                         { return 'ahead' }
@@ -101,7 +111,7 @@ const putVerdictOf = (presence: Presence, { revtokCmp, revseqCmp }: RevCmp, opfl
   return (opflag === 'get') ? 'passed' : 'camped'
 }
 
-/** The verdict of a del: the note's del table, in its order. */
+/** Classify a del, per the contract's del table. The first matching row wins. */
 const delVerdictOf = (presence: Presence, { revtokCmp, revseqCmp }: RevCmp): Verdict => {
   if (revtokCmp === '=next')                         { return 'retcon' }
   if (revseqCmp === 'ahead')                         { return 'ahead' }
@@ -112,10 +122,10 @@ const delVerdictOf = (presence: Presence, { revtokCmp, revseqCmp }: RevCmp): Ver
   return (presence === 'gone') ? 'dubdel' : 'deleted'
 }
 
-/** What a put or del brings to its table, at either level. */
+/** The parts of a box or vault put or del that classification uses. */
 type WriteAsk = Readonly<{ op: 'put', ifAbsent: EX.PutIfAbsent, ifPresent: EX.IfPresent, record: Revision } | { op: 'del', record: Revision }>
 
-/** The verdict of a put or del that expects `expected`, over `stored`. */
+/** Classify a put or del against the stored row. */
 const writeVerdictOf = (ask: WriteAsk, expected: Peek, stored: Peek | null): Verdict => {
   const presence = presenceOf(stored)
   const revCmp   = { revtokCmp: revtokCmpOf(expected, ask.record, stored), revseqCmp: revseqCmpOf(expected, stored) }
@@ -132,12 +142,12 @@ const writeVerdictOf = (ask: WriteAsk, expected: Peek, stored: Peek | null): Ver
 // Damaged is a judgment of the row taken alone: it fails its own checks. A row that is no object, or a
 // sound one filed at another address than it was asked for at, says the store or its adapter is not working: `storage_issue`.
 
-/** A row as storage answered it: null for none, `damaged` for one that fails its checks. */
+/** A stored row, null if none, or `damaged` if it fails its checks. */
 type Found<RowT> = RowT | null | 'damaged'
 
 const RowOfOtherAddress = { kind: 'storage_issue', message: Phrases.rowOfOtherAddress } as const
 
-/** Whether storage answered a row at all: null is its word for none, and anything else that is no object refuses `storage_issue`. */
+/** True when storage returned a row; throws `storage_issue` for anything but an object or null. */
 const isRowStored = (raw: unknown): boolean => {
   if (raw === null) { return false }
   if (! CX.isPlainBag(raw)) { throw Refuse.storageIssue() }
@@ -145,21 +155,21 @@ const isRowStored = (raw: unknown): boolean => {
 }
 
 // Checked against its scope and not its vault_tok: a vault row of another life is an answer the gate has a word for.
-/** The vault row storage answered for the scope of `asked`. */
+/** Validate the stored vault row against the request's scope. */
 const vaultRowAt = (vaultRaw: unknown, asked: VaultScope): Found<VaultRow> => {
   if (! isRowStored(vaultRaw)) { return null }
   const vault = SX.storedVaultRow.safeParse(vaultRaw)
   return vault.success ? verifyConsistent(vault.data, CX.vaultScope.parse(asked), RowOfOtherAddress) : 'damaged'
 }
 
-/** The box row storage answered for the scope and `vault_tok` of `asked`. */
+/** Validate the stored box row against the request's scope and `vault_tok`. */
 const boxRowAt = (boxRaw: unknown, asked: BoxQuery): Found<BoxRow> => {
   if (! isRowStored(boxRaw)) { return null }
   const box = SX.storedBoxRow.safeParse(boxRaw)
   return box.success ? verifyConsistent(box.data, SX.boxQuery.parse(asked), RowOfOtherAddress) : 'damaged'
 }
 
-/** How a box request citing `vault_tok` finds `vault`, its vault's row. */
+/** Classify the state of a box request's vault from its stored row. */
 const gateOf = (vault: Found<VaultRow>, vault_tok: string): Exclude<Gate, 'full'> => {
   if (vault === 'damaged')           { return 'damaged' }
   if (vault === null)                { return 'void' }
@@ -170,15 +180,13 @@ const gateOf = (vault: Found<VaultRow>, vault_tok: string): Exclude<Gate, 'full'
 
 // == [Acts]: isWriteAct, isBirthAct, boxActOf, vaultActOf, cappedActOf
 
-/** True when `act` says the request's record is to be stored. */
+/** True when the act tells the caller to store the request's record. */
 export const isWriteAct = (act: BoxAct | VaultAct): act is WriteAct => (EX.writeActVals as readonly string[]).includes(act)
 
-/** True when `act` stores a new life of its row: for a box, the acts that add a live box to its vault. */
+/** True when the act creates a row, or re-creates a deleted one. */
 export const isBirthAct = (act: BoxAct | VaultAct): boolean => (act === 'born') || (act === 'reborn')
 
-/** The act a box's get, put or del amounts to over `vaultRaw` and `boxRaw`, the rows stored at its scope, each null for none.
- * Nothing is stored here: where {@link isWriteAct} holds of the act, the caller stores the request's record, in the atomic unit it fetched the rows in.
- */
+/** Classify a box request's outcome, based on its stored vault and box rows. */
 export const boxActOf = (request: BoxRequest, vaultRaw: unknown, boxRaw: unknown): BoxAct => {
   const ask   = SX.boxRequest.parse(request)
   const asked = (ask.op === 'get') ? ask : ask.record
@@ -191,9 +199,7 @@ export const boxActOf = (request: BoxRequest, vaultRaw: unknown, boxRaw: unknown
   return BoxActs[writeVerdictOf(ask, boxPeekOf(ask.expected), stored)]
 }
 
-/** The act a vault's get, put or del amounts to over `vaultRaw`, the row stored at its scope or null for none.
- * Nothing is stored here: where {@link isWriteAct} holds of the act, the caller stores the request's record, in the atomic unit it fetched the row in.
- */
+/** Classify a vault request's outcome, based on the stored row. */
 export const vaultActOf = (request: VaultRequest, vaultRaw: unknown): VaultAct => {
   const ask   = SX.vaultRequest.parse(request)
   const vault = vaultRowAt(vaultRaw, (ask.op === 'get') ? ask : ask.record)
@@ -204,7 +210,7 @@ export const vaultActOf = (request: VaultRequest, vaultRaw: unknown): VaultAct =
 }
 
 // The cap is soft: `capacity` is a count taken outside any lock, as the write is about to be made. A write already made is never refused for it.
-/** `act` as a vault with room `capacity` allows it: `vault_full` where it would add a live box and there is no room, else `act` itself. */
+/** Replace an act that would add a box with `vault_full` when the vault is at its cap. */
 export const cappedActOf = (act: BoxAct, capacity: Capacity): BoxAct => {
   const { boxes } = SX.capacity.parse(capacity)
   return (isBirthAct(act) && (boxes.used >= boxes.max)) ? GateActs.full : act
