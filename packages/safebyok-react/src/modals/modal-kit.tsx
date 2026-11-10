@@ -64,7 +64,7 @@ export const textOf = (form: FormData, fieldname: PassphraseFieldname): string =
   return typeof typed === 'string' ? typed : ''
 }
 
-/** The form action for a gating's attempts, and the gripe to show of the last. `tried` answers null when there was nothing to try. */
+/** The form action for a gating's attempts, whether one runs, and the gripe to show of the last. `tried` answers null when there was nothing to try. */
 export const useAttemptAction = (
   gating:   AnyGating,
   source:   BoundarySource,
@@ -80,7 +80,7 @@ export const useAttemptAction = (
     if (gripeNow !== null) { fieldFor(gripeNow.refusalkind).current?.focus() }
     return gripeNow
   }, null)
-  return { gripe: isPending ? null : gripe, gripeId, action }
+  return { gripe: isPending ? null : gripe, gripeId, action, isPending }
 }
 
 const SubmitButton = ({ word, pendingWord, isSubmittable }: { word: string, pendingWord: string, isSubmittable: boolean }) => {
