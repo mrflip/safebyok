@@ -369,11 +369,13 @@ revokes it, without calling `lock()`. Decide whether it calls `lock()` itself (e
 gating, concluding `lockLanded`), taking care that the lock does not recurse into the call that
 met the damage.
 
-### "Whisper unchanged" in `putBox`
+### The sidecar out of the seal (next)
 
-The Coach (2026-10-22): a put that keeps the whisper reads and opens the box first
-(`putBox({ boxlabel, sidecar })`, a whisper left out). Decide whether an active sentinel, or a
-tighter entry point for a sidecar-only change, says so more plainly than an argument left out.
+The Coach (2026-11-10): "the sidecar is not supposed to be sealed, we should handle that next." Today the box's stamp, which both seals are
+bound to, holds the sidecar as stable JSON, so a sidecar-only `putBox` must open the whisper and seal it again (`Box.#edit`), and needs
+the vault unlocked. Take the sidecar out of the stamp. The core README says a sidecar is "authenticated but never encrypted", and only
+the stamp authenticates it: say whether that promise goes, or what authenticates it instead. This replaces the 2026-10-22 question of how a
+whisper left out of `putBox` is said.
 
 ### Who keeps the lease's expiry
 
@@ -425,6 +427,19 @@ user id, vaultlabel) alone, and its `vault_tok` is a field checked against the q
 checks it in the base, and `forget` leaves the check to the DeviceDB, one atomic step with its
 delete. A key that also held the `vault_tok` would make `forget` a delete at a key, with no check
 to run. The design question: which fields the key holds, and what it ameliorates beyond that.
+
+### A cached lease newer than the vault in hand refreshes the vault
+
+The Coach (2026-11-10): "We should not be dumb about loading from the cache." `Lease.buildFromCache` forgets a cached row of another
+`gate_epoch` or `vault_tok` and asks for a proof, though the row may be another tab's good lease over a vault this tab holds stale; that
+behaviour is broken, and marked so in `lease.ts`. Write the lease transactionally so that a stowed lease newer than the vault in hand, by
+`vault_tok`, `gate_epoch` or the vault's revision, has the vault refreshed and the lease taken up. A lease carries no revision today.
+
+### A wontfix test pool
+
+The Coach (2026-11-10): a pool of tests demonstrating that each row of `notes/wontfix.md` is what happens today, or the row is pulled.
+The file's header says what it lists is not tested; it changes when the pool lands. The pin of a vault row restored from before a
+passphrase change, deleted in [#617](https://github.com/mrflip/safebyok/pull/617), is the first to bring back from history.
 
 ### Should we offer `getWhisper` and `decryptWhisper`
 
