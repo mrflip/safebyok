@@ -98,7 +98,7 @@ const getVerdictOf = (presence: Presence, opflag: Opflag): Verdict => {
 }
 
 /** Classify a put, per the contract's put table. The first matching row wins. */
-const putVerdictOf = (presence: Presence, { revtokCmp, revseqCmp }: RevCmp, opflag: Opflag): Verdict => { // eslint-disable-line sonarjs/cognitive-complexity
+const putVerdictOf = (presence: Presence, { revtokCmp, revseqCmp }: RevCmp, opflag: Opflag): Verdict => {
   if (revtokCmp === '=next')                         { return 'retcon' }
   if (revseqCmp === 'ahead')                         { return 'ahead' }
   if ((revtokCmp === 'eq')  && (revseqCmp !== 'eq')) { return 'clash' }
