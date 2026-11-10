@@ -325,7 +325,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // == [Guards]: isLocked, isUnlocked, demandUnlocked, demandLease, demandPromptable, demandAttachable, demandHelloable, demandPresent, ensureTimely
 
   /** The vault's own lock, not its world's: the bank has none. */
-  override get isLocked(): boolean { return this.#lease === null }
+  get isLocked(): boolean { return this.#lease === null }
 
   /** True while this vault has a lease granted. */
   get isUnlocked(): boolean { return this.#lease !== null }

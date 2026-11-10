@@ -48,7 +48,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 
-  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper, exposure, isShowing, isVeiled, subscribe
+  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper, exposure, isShowing, isVeiled, isLocked, subscribe
 
   /** The storage format of the record in hand. */
   get fmt(): number { return this.central.fmt }
@@ -94,6 +94,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** True while {@link veil} hides the whisper exposed, whatever the lock; read live. */
   get isVeiled(): boolean { return this.#isVeiled }
+
+  /** Whether this box's vault is locked, read live. */
+  get isLocked(): boolean { return this.listing.isLocked }
 
   /** Public access to the unbound "make me a subscriber" callback, told of this box's changes and its vault's. */
   override get subscribe(): (listener: () => void) => (() => void) { return this.#subscribeWithVault }
