@@ -26,3 +26,11 @@ Open questions, as in the PR:
 10. **Note, the `=next` row of the comparison table** still contradicts the rows above it.
 11. **Note, the housekeeping carve-out**: your sentence stopped at "designed to remediate an"; it
     now ends "a state the primitives cannot mend".
+
+## Update, 2026-11-10, after the Coach's answers
+
+Settled: the classifier stays in the PR; an unknown op or policy refuses `bad_record`; a vault put takes `repl` (main has it since #621) and the note's vault tables say so; `vault_full` is no act of the classifier, said in the note's *Soft caps* and by the act list; step 7 of the precedence is reworded.
+
+Still open: a del that expects nothing (C8 against C13); a damaged box row of another vault life (damaged before leftover, as built); the `=next` row of the comparison table (a correction proposed in chat, not applied); C14 answering `*_clash`.
+
+CI: the run test timed out at 5s under coverage (46,053 runs, each request classified twice). Now runs of four, classified once: 110 ms under coverage here.
