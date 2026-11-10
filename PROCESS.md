@@ -139,9 +139,8 @@ dependency, so a `VaultError` is one class across them, and joins the `fixed` gr
 `.changeset/config.json` (a test refuses a public package left out). `safebyok-indexeddb`'s
 README is written as the template for a storage adapter.
 
-`safebyok-old` is the exception: the old design, private, kept until the demo and `safebyok-react`
-move to the new core. Until then they, and `safebyok-idb-old`, peer on it; the storage adapters and
-`safebyok-fastkey` peer on `safebyok`.
+`safebyok-old` is the exception: the old design, private, on its way out. Only `safebyok-idb-old`
+peers on it; every other package peers on `safebyok`.
 
 ## Releases
 
@@ -201,30 +200,6 @@ offering a **disciplined interface**.
   rather meet a hundred bugs in a conservative release than one vulnerability in a fresh one.
 
 The toolchain: TypeScript, Vitest, ESLint, tsdown.
-
-## Size budgets
-
-`.size-limit.json` holds one budget per import shape of the built packages, checked by `pnpm size`
-(`pnpm justify` and CI run it after the build). JSON has no comments, so the rule for setting a
-budget lives here. size-limit's `kB` is 1000 bytes, and it measures minified and brotlied.
-
-1. **Start from the measure** (`pnpm size`, or `npx size-limit --json` for exact bytes).
-2. **Add the room.** A bundle of 5 kB or more gets **+3 kB**; one under 5 kB gets **+50%**, and at
-   least +1 kB, so a small bundle is not given more room than its own size.
-3. **Round up to a round number**: two significant figures, never down (2.3 kB of measure is
-   3.5 kB of budget; 22.15 kB is 23 kB; 26.83 kB is 27 kB). Round numbers keep a stack of PRs
-   from fighting over digits.
-
-`pnpm size:budget` applies the rule: it prints each budget beside the rule's, and `--raise` or
-`--write` sets them (its header says how).
-
-The rule sets a budget; it may lower one as well as raise it. A bundle that shrank gets the
-smaller budget the rule gives, so a budget never sits looser than its measure earns.
-
-In a sprint, each thread moves the budgets its own change moves, up or down, with
-`pnpm size:budget --write` (`.claude/skills/sprint/SKILL.md`, *Size budgets*). Anyone else
-raising a budget follows the same rule, and says in the PR why the bundle grew. How an entry is measured is
-`notes/ci.md`, *Size checks*.
 
 ## Where things are written
 

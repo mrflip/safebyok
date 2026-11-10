@@ -119,7 +119,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   `passphraseUntilText` ("in 2 days"); `askPassphraseAt`'s doc block already hints at them.
 * **A forgetful user's start over clears only this device's copy** (the Coach, on #261: "low
   priority, make it a TODO"): without a passphrase, a user may forget the vault on this device
-  (`bank.clearCachedVault` is that clear), never delete it from the vaultDB, which needs the
+  (`vault.lock()` forgets the lease, and that is all a device keeps), never delete it from the vaultDB, which needs the
   passphrase (`vault.del()`).
 
 * **After the restyle (#273 to #283): two later changes.** Each changes a signature or a
@@ -311,17 +311,6 @@ and a wrapped logger handed to such code, and what each strips. *"Add "sensitive
 to refusals"*, above, stays open beside it: the flags say which refusals heard secret material,
 this says what a log line of them may carry.
 
-### A trial write at startup: `vault.probe`
-
-The Coach (2026-10-24, accepting that opening a vault now writes, in Postgres
-([#258](https://github.com/mrflip/safebyok/pull/258)): a birth's `vaultDB.ensureVault` clears a
-tombstone in the same statement, so a role without write grants can no longer open one): "TODO: add
-a customer vault.probe API call that the user can use to do a harmless trial write, read, and
-delete so that db error messages are given at startup". Decide where the trial lands so it is
-harmless (a scope of its own, never a real vault's), whether it is the Vault object's or the
-bank's, and which refusals it reports (`not_permitted`, `storage_unavailable`). The Postgres
-README's *Your database's own rules* already lists the grants a role needs to open a vault.
-
 ### Call-time work that could be composed once or memoized
 
 The Coach (2026-10-16), on thread 5b: `reportError` is checked at call time and stands, but review
@@ -397,16 +386,15 @@ kept the Vault object's; decide once the gating's chains settle.
 ### A policy for asking every time
 
 The Coach (on #261: "figure out how to give that policy"): a host may want the user asked at
-every call. `leaseHours` keeps its floor above zero, and a `renewMinutes` as long as the lease
-refuses `bad_option`; today the host calls `lock()` once done. Decide how a host says "ask every
-time", and what a lease of no length means for the DeviceDB.
+every call. `autolockMinutes` keeps its floor above zero; today the host calls `lock()` once done.
+Decide how a host says "ask every time", and what a lease of no length means for the DeviceDB.
 
 ### What "rollback" means
 
-The Coach (2026-10-26), on strict device records losing the rollback watermark: "We have a lot of
-things surrounding the very muddy meaning of rollback." The watermark, the device-record format
-rule in VAULTDB.md (#279), the vault epoch and `stale_write` each guard a different "going
-backwards". Settle one definition, say which mechanism guards which case, and name each for it.
+The Coach (2026-10-26): "We have a lot of things surrounding the very muddy meaning of rollback." The device watermark
+is gone, and storage that rolls a record back goes undetected past one session (`notes/wontfix.md`, 2026-11-07). What remains is
+`gate_epoch`, `revision_seq` and `stale_write`, each guarding a different "going backwards". Settle one definition, say which
+mechanism guards which case, and name each for it.
 
 ### An edit is never put to the device cache
 
@@ -440,12 +428,32 @@ checks it in the base, and `forget` leaves the check to the DeviceDB, one atomic
 delete. A key that also held the `vault_tok` would make `forget` a delete at a key, with no check
 to run. The design question: which fields the key holds, and what it ameliorates beyond that.
 
-### The demo's move to the new core must not share a `dbName` with the old
+### Should we offer `getWhisper` and `decryptWhisper`
 
-The new core's DeviceDB wipes, unread, every older database of its `dbName`, and `${dbName}:device_db`
-is the old core's live one. A demo that runs the old and the new DeviceDB under one `dbName` would
-have the new DeviceDB delete the old one's database from under it: give the new core a `dbName` of its own
-(or finish the move in one step) when the demo moves over.
+The old design's `vault.getWhisper` and `vault.useWhisper` answered a whisper in one call; today a host calls `getBox`, then
+`box.extractWhisper` or `expose`. Decide whether the one-call forms earn their place on the vault.
+
+### Should we offer finer-grained timing around lease expiry and timeliness
+
+The old design's `ensureUnlocked({ renewMinutes })` let a call say how much of the lease must remain. Today a host has `autolockMinutes` and
+`boxRefreshMinutes` for the whole bank, and nothing per call.
+
+### Other stores: `localVaultDB`, `domStore`, `memoryStore`
+
+The old design ran a vaultDB over any `StringStore`. The new one has `MemoryVaultDB` and `safebyok-indexeddb`. Decide whether a key-value
+vaultDB returns, likely with the `ShelfVaultDB` side quest above, for a host with only `localStorage` or a test wanting one.
+
+### The adapter contract, published
+
+`packages/safebyok-old/VAULTDB.md` is the only adapter contract written for readers outside the project, and it describes the old verbs.
+Write its successor for `AdapterVaultDB` (what each verb promises, and `describeVaultDBBattery` as its test) before `safebyok-old` goes;
+`notes/design-vaultdb.md` is internal, and `safebyok-indexeddb`'s README is a template rather than a contract. The old README's guides on errors, locking,
+logging, key derivation and passkey recipes have no new home either, and describe old behaviour, so each needs rewriting, not moving.
+
+### A size budget, when we want one
+
+`size-limit`, its `.size-limit.json` and `pnpm size:budget` were removed on 2026-11-09 as a distraction (the Coach: "we can add it later"). Removal took the CI
+step, and the per-thread budget rule in `PROCESS.md`.
 
 ## Potential Optimizations
 

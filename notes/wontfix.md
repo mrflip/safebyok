@@ -15,7 +15,7 @@ not as a settled ruling, and check it against the current design before relying 
   undefined behaviour, whether the handles are in one tab or in two. A device keeps one lease
   and one device mark per vault, shared by every handle on it, and each handle reads them by its
   own settings. Today, for the lease: an open with a shorter `leaseHours` than the lease was
-  granted under discards it (see `fetchLease` in `packages/safebyok/src/vault.ts`), so a tab
+  granted under discards it (see `Lease.buildFromCache` in `packages/safebyok/src/models/lease.ts`), so a tab
   opened with the shorter setting discards the lease a tab with the longer one granted, and every
   tab on the device asks for the passphrase again.
   That is the safe direction, and it is all we say of it. A host that varies a setting by route
@@ -141,3 +141,9 @@ not as a settled ruling, and check it against the current design before relying 
   to start from if that changes.
 
 * 2026-11-09 (the Coach, on the React forms thread: "the specific UI annoyance of clearing all three passwords is a wontfix by the library authors"): **a dialog's fields empty after each attempt.** React resets an uncontrolled form when its action ends, so a wrong current passphrase in the change-passphrase dialog clears all three fields, and a dismissed passkey prompt in the add-passkey dialog clears the passphrase typed before it. Keeping them would mean leaving React's form actions for hand-written submit handling. Pull requests accepted.
+* 2026-11-09 (the Coach, closing out the old design: "this was decided to be unnecessary"; "Apple requires the passphrase on the next login but doesn't
+  disable, we won't do either"): **a new passphrase leaves the passkey in place.** Replacing the passphrase changes the passphrase wayin alone: the passkey
+  wayin stays as stored and keeps opening the vault, and no passkey use afterward demands the passphrase. Someone who knew the old passphrase and added a
+  passkey keeps that access until the passkey is revoked, which is a separate gate change. Recorded as a decision in `notes/security.md`.
+* 2026-11-09 (the Coach, closing out the old design): **a vault has its bank's stores.** `ensureVault` takes no `vaultDB` or `deviceDB` of its own, as the old
+  design did. A host wanting a vault in other storage makes a second `Bank` over it.
