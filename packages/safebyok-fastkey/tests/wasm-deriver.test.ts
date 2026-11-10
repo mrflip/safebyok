@@ -5,19 +5,19 @@ import { Argon2idWebV1, argon2idDeriver, argon2idWebV1Deriver, type KeyDeriver, 
 import * as TH from 'safebyok/testing'
 import { argon2idWasmDeriver, argon2idWasmWebV1Deriver } from '../src/wasm-deriver'
 
-/** A spec of the host's own, cheap to derive under; no two of its counts alike, so a swap shows. */
+/** A host's own spec that is cheap to derive under. Its three counts all differ, so a test catches two of them being swapped. */
 const CheapSpec: KeyDeriverSpec = { ...Argon2idWebV1, key_deriver_label: 'acme_cheap_v1', memory_kib: 64, iterations: 2, parallelism: 4 }
 
-/** The deriver's fields without its function: the spec it carries. */
+/** The deriver's spec: its fields without `deriveKeyBytes`. */
 const specOf = ({ deriveKeyBytes: _dropped, ...spec }: { deriveKeyBytes: unknown }) => spec
 
-/** Salt bytes that are not all alike, so a byte read out of place would show. */
+/** Make `saltBytes` bytes of varied salt, so a test catches a byte read from the wrong position. */
 const saltOf = (saltBytes: number): Uint8Array => Uint8Array.from({ length: saltBytes }, (_unused, ii) => ((ii * 37) + 11) % 256)
 
-/** The message of the 'bad_option' refusal `attempt` throws. */
+/** The message of the `bad_option` refusal that `attempt` throws. */
 const refusalOf = (attempt: () => unknown): string => TH.expectSyncRefusal(attempt, 'bad_option').message
 
-/** What `attempt` rejects with; throws if it resolves instead. */
+/** Return what `attempt` rejects with. Throws if it resolves instead. */
 const rejectionOf = async (attempt: Promise<unknown>): Promise<unknown> => {
   try {
     await attempt
@@ -27,19 +27,19 @@ const rejectionOf = async (attempt: Promise<unknown>): Promise<unknown> => {
   throw new Error('expected a rejection, but the promise resolved')
 }
 
-/** Bytes as lowercase hex, as test vectors are written. */
+/** Format bytes as lowercase hex, the way test vectors are written. */
 const hexOf = (bytes: Uint8Array) => Buffer.from(bytes).toString('hex')
 
-/** A whisper, stored on one device and read on another; an obvious fake. */
+/** An obviously fake whisper, stored on one device and read on another. */
 const FakeWhisper = { apiKey: 'sk-fake-0000-not-a-real-key' }
 
-/** What Argon2id gives for 'correct horse battery staple' and `saltOf(16)` at the supplied spec's cost. */
+/** Argon2id's output for 'correct horse battery staple' and `saltOf(16)` under the supplied spec. */
 const SavedHex = 'efb4ef4c091ec9dacc4f1284c439742b414394599ffe4bbefc4dc300e4a4301b'
 
 TH.useBankWorlds()
 
-// The heart of the package: the same spec, passphrase and salt make the same bytes here as in the
-// core's @noble/hashes deriver, or a vault made on one device would not open on another.
+// The point of the package: the same spec, passphrase and salt must give the same bytes here as in the
+// core's @noble/hashes deriver. Otherwise a vault made on one device would not open on another.
 describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
   it("carries the supplied spec whole, frozen", () => {
     expect(specOf(argon2idWasmWebV1Deriver)).to.deep.equal(Argon2idWebV1)
@@ -47,7 +47,7 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
     expect(argon2idWasmWebV1Deriver).to.be.frozen
   })
 
-  // Two full derivations at 64 MiB and three passes: the core's alone takes about half a second.
+  // Slow: two full derivations at 64 MiB and three passes. The core's deriver alone takes about half a second.
   it("derives byte for byte what the core's deriver derives, for one fixed passphrase and salt", { timeout: 60_000 }, async () => {
     const saltBytes = saltOf(Argon2idWebV1.salt_bytes)
     const wasmBytes = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltBytes)
@@ -56,8 +56,8 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
     expect([...wasmBytes]).to.deep.equal([...nobleBytes])
   })
 
-  // The value was taken from hash-wasm's argon2id called directly (and agrees with noble's argon2idAsync), over the spec's
-  // memorySize 65_536, 3 iterations, 1 lane and 32 bytes, for the passphrase and saltOf(16) below; the core's browser.test.ts has its deriver to it too.
+  // The saved value came from calling hash-wasm's argon2id directly, and agrees with noble's argon2idAsync. Its parameters are the spec's:
+  // memorySize 65_536, 3 iterations, 1 lane and 32 bytes, with the passphrase and saltOf(16) below. The core's browser.test.ts checks its own deriver against the same value.
   it("derives the saved value for one fixed passphrase and salt, at the supplied spec's cost", { timeout: 60_000 }, async () => {
     const wasmBytes = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltOf(16))
     expect(hexOf(wasmBytes)).to.eq(SavedHex)
@@ -74,9 +74,9 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
 })
 
 // Argon2id's own test vector, from its reference implementation (phc-winner-argon2's test.c:
-// version 0x13, 2 passes, 64 MiB, one lane, "password" and "somesalt"). Its salt is 8 bytes, under the
-// 16 a keyDeriverSpec asks, so hash-wasm is asked directly with the vector's parameters; the core's
-// own tests check noble against the same vector, so neither implementation can agree with the other by
+// version 0x13, 2 passes, 64 MiB, one lane, "password" and "somesalt"). Its salt is 8 bytes, fewer than the
+// 16 a keyDeriverSpec requires, so this test calls hash-wasm directly with the vector's parameters. The core's
+// tests check noble against the same vector, so the two implementations cannot agree with each other merely by
 // sharing a mistake.
 describe("Argon2id's reference test vector", () => {
   const ReferenceHex = '09316115d5cf24ed5a15a31a3ba326e5cf32edc24702987c02b6566f61913cf7'
@@ -89,14 +89,13 @@ describe("Argon2id's reference test vector", () => {
   })
 })
 
-// Cheap specs, each pressing on a place two implementations could part: memory not a multiple of
-// four lanes' worth, several lanes, and passphrases past ASCII and
-// past one BLAKE2b block.
+// Cheap specs, each aimed at a place where two implementations could differ: memory that is not a multiple of
+// four lanes' worth, several lanes, non-ASCII passphrases, and passphrases longer than one BLAKE2b block.
 const SameBytesCases = [
   // regular usage:
   [{},                                                   "correct horse battery staple",  'a cheap spec of four lanes'],
   [{ parallelism: 1, iterations: 3 },                    "correct horse battery staple",  "one lane and three passes, the supplied spec's shape"],
-  // where two implementations could part:
+  // where two implementations could differ:
   [{ memory_kib: 100, parallelism: 3 },                  "correct horse battery staple",  'memory that does not divide into four segments a lane'],
   [{ memory_kib: 37, parallelism: 2, iterations: 1 },    "correct horse battery staple",  'an odd memory, two lanes and a single pass'],
   [{ memory_kib: 8, parallelism: 1, iterations: 1 },     "correct horse battery staple",  "Argon2id's least memory and one pass"],
@@ -172,8 +171,8 @@ describe("argon2idWasmDeriver", () => {
   })
 })
 
-// The core's parseKeyDeriverSpec is what both factories check with: these check the two against the
-// same refusals, word for word, rather than restating the bounds.
+// This package's factory and the core's `argon2idDeriver` both validate with the core's parseKeyDeriverSpec.
+// These tests compare their refusal messages word for word, instead of restating the bounds.
 const UnworkableSpecs = [
   [{ salt_bytes: 15 },                    'a salt of 15 bytes'],
   [{ salt_bytes: 32 },                    'a salt of 32 bytes'],
@@ -206,7 +205,7 @@ describe("argon2idWasmDeriver's bounds", () => {
   })
 })
 
-/** Two banks on one vaultDB, each on a device of its own, each opening vaults through its own key deriver. */
+/** Make two banks on one vaultDB, each on its own device with its own key deriver. */
 const twoDevices = (firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) => {
   const world = TH.makeBankWorld()
   return {
@@ -216,14 +215,14 @@ const twoDevices = (firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) => {
   }
 }
 
-/** Builds and unlocks the vault on `bank`, and stores {@link FakeWhisper} in a box of it. */
+/** Build and unlock the vault on `bank`, then store {@link FakeWhisper} in one of its boxes. */
 const putFakeBox = async (bank: Bank): Promise<void> => {
   await bank.hello()
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
   await vault.putBox({ boxlabel: 'openai', whisper: FakeWhisper })
 }
 
-/** Unlocks the vault `bank` has, asking the user as the world's dialog types, and checks the box the other device put is there. */
+/** Unlock the vault on `bank` (the test world's dialog types the passphrase), and check that the box the other device stored is there. */
 const expectWhisperOpens = async (bank: Bank): Promise<void> => {
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
   await vault.ensureUnlocked()
@@ -232,7 +231,7 @@ const expectWhisperOpens = async (bank: Bank): Promise<void> => {
   expect(box.whisper).to.deep.equal(FakeWhisper)
 }
 
-// Each runs the real Argon2id at the supplied spec on both devices.
+// Each test runs the real Argon2id at the supplied spec on both devices.
 describe("a vault shared between the two derivers", () => {
   it("is accepted by Bank.make under the supplied label", async () => {
     const bank = TH.makeBankWorld().bankOn({ keyDeriver: argon2idWasmWebV1Deriver })
@@ -286,7 +285,7 @@ describe("where WebAssembly cannot run", () => {
     }))
     vi.resetModules()
     const Fresh = await import('../src/wasm-deriver')
-    // A fresh import brings a fresh safebyok, whose VaultError is the one thrown.
+    // A fresh import also loads a fresh copy of safebyok, and the error thrown is that copy's VaultError.
     const FreshCore = await import('safebyok')
     const refusal = await rejectionOf(Fresh.argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltOf(16)))
     expect(FreshCore.isVaultError(refusal, 'bad_option')).to.be.true

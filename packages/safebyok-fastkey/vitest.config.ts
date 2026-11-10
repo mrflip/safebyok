@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config'
 
-// Node, whose WebAssembly and WebCrypto are the same globals a browser has.
+// The tests run under Node, which has the same WebAssembly and WebCrypto globals as a browser.
 export default defineConfig({
   test: {
     include:     ['tests/**/*.test.ts'],
