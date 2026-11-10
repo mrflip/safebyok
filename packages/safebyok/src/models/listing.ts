@@ -243,7 +243,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async #fetchSlot(scoped: ScopeT): Promise<Joined<ListingAnswer<RecordT, SparseT>, ThingT | null>> {
     const answer = await this.doTryGet(scoped)
     try {
-      return { answer, val: await this.deliver(answer) }
+      return { answer, val: await this.deliver(answer, scoped) }
     } catch (err) { return { answer, err } }
   }
 
@@ -267,7 +267,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       const checked = this.recordOf(record)
       this.demandEnabled()
       answer = await this.doTryPut(checked, { prior, ifAbsent, ifPresent })
-      return answerWithVal(answer, await this.deliver(answer))
+      return answerWithVal(answer, await this.deliver(answer, checked))
     } catch (err) { return refusedAnswerOf(err, answer) }
   }
 
@@ -281,8 +281,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       const sparse = this.sparseOf(record)
       this.demandEnabled()
       const prior = SX.revisionOf(sparse)
-      answer = await this.doTryDel({ ...sparse, ...SX.nextRevisionOf(prior, nowMillis()), am: 'x' as const }, { prior })
-      return answerWithVal(answer, await this.deliver(answer))
+      const tombstone = { ...sparse, ...SX.nextRevisionOf(prior, nowMillis()), am: 'x' as const }
+      answer = await this.doTryDel(tombstone, { prior })
+      return answerWithVal(answer, await this.deliver(answer, tombstone))
     } catch (err) { return refusedAnswerOf(err, answer) }
   }
 
@@ -291,16 +292,16 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // == [Delivering an answer]: deliver, deliverGood, receiveNothing, buildOrReceive, makeThingOf
 
   /** SLOPDOC: The pipeline every storage answer follows, from its world through the instance listed to the caller. */
-  protected deliver(answer: ListingPutAnswer<RecordT, SparseT>): Promise<ThingT>
-  protected deliver(answer: ListingAnswer<RecordT, SparseT>): Promise<ThingT | null>
-  protected async deliver(answer: ListingAnswer<RecordT, SparseT>): Promise<ThingT | null> {
+  protected deliver(answer: ListingPutAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Promise<ThingT>
+  protected deliver(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Promise<ThingT | null>
+  protected async deliver(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Promise<ThingT | null> {
     this.demandEnabled()
     if (answer.world !== null) { this.world.receiveWorld(answer.world) }
-    if (answer.ok) { return this.#deliverGood(answer) }
+    if (answer.ok) { return this.#deliverGood(answer, sent) }
     const stored = (answer.dbhas ?? null) as VaultRow | BoxRow | null
     if ((stored !== null) && this.isOwnRow(stored)) {
       const delivered = await outcomeOf(() => {
-        this.#demandRecordOfScope(stored, this.scopeOf(answer.req_params))
+        this.#demandRecordOfScope(stored, this.scopeOf(sent))
         return this.buildOrReceive(stored)
       })
       if (! delivered.ok) { this.bankFriend.tellBadNews([delivered.err]) }
@@ -309,12 +310,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     throw answer.err
   }
 
-  /** The instance a good answer leaves listed, or null where none is. */
-  #deliverGood(answer: GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>): ThingT | null {
-    const scope = this.scopeOf(answer.req_params)
+  /** The instance a good answer to `sent` leaves listed, or null where none is. */
+  #deliverGood(answer: GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null {
     const record = recordOfAnswer<RecordT, SparseT>(answer)
-    if (record !== null) { this.#demandRecordOfScope(record, scope) }
-    return (record === null) ? this.#receiveNothing(scope) : this.buildOrReceive(record)
+    // A declined put and a del over a tombstone answer what storage has, whose revision no one sent: only the scope is pinned.
+    const pins = ((answer.act === 'declined') || (answer.act === 'gone')) ? this.scopeOf(sent) : SX.reqParamsOf(sent)
+    if (record !== null) { verifyConsistent(record, pins, { kind: 'storage_issue' }) }
+    return (record === null) ? this.#receiveNothing(this.scopeOf(sent)) : this.buildOrReceive(record)
   }
 
   /** The instance listed under `scope`, told that nothing is stored there. */

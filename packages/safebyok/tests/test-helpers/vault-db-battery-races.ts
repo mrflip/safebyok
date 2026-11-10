@@ -7,7 +7,7 @@ import type { VaultRow, WatchScope } from '../../src/shapes/shapes-storage'
 import type { AdapterVaultDB, Notice, VaultDB } from '../../src/storage/vault-db'
 import { bankScope, vaultScope, boxscope, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, priorOf, vaultQuery, boxQuery } from './storage-world'
 import { aWhile, beforeNextCall } from './timing'
-import { gateParamsOf } from './vault-db-battery-puts'
+import { gateMoveOf } from './vault-db-battery-puts'
 import type { BatteryWorld } from './vault-db-battery'
 
 /** The answers that were written, and those refused. */
@@ -89,9 +89,9 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
     it("two gate verbs at one revision write one, the other refused with the winner", async () => {
       const { vaultDB, vault } = await putWith()
       const twin = await twinOf(vaultDB)
-      const ours = gateParamsOf(vault, { passkey_wayin: passkeyWayin })
-      const theirs = gateParamsOf(vault, { passphrase_wayin: { ...passphraseWayin, device_id: '00000000-0000-4000-8000-0000000000d2' } })
-      const { written, refused } = splitOf(await Promise.all([vaultDB.tryAddPasskey(ours), twin.tryReplacePassphrase(theirs)]))
+      const ours = gateMoveOf(vault, { passkey_wayin: passkeyWayin })
+      const theirs = gateMoveOf(vault, { passphrase_wayin: { ...passphraseWayin, device_id: '00000000-0000-4000-8000-0000000000d2' } })
+      const { written, refused } = splitOf(await Promise.all([vaultDB.tryAddPasskey(...ours), twin.tryReplacePassphrase(...theirs)]))
       expect([written.length, refused.length]).to.deep.equal([1, 1])
       expect(refused[0]).to.deep.include({ act: 'stale_write', dbhas: written[0]?.val })
       expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.deep.include({ revision_seq: 1 })
@@ -115,7 +115,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       const { vaultDB, vault } = await putWith()
       const twin = await twinOf(vaultDB)
       slipInFront(adapterOf(vaultDB), async () => await twin.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) }))
-      expect(await vaultDB.tryAddPasskey(gateParamsOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'vault_gone' })
+      expect(await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'vault_gone' })
     })
 
     it("refuses as another life when the vault was deleted and born again", async () => {
@@ -126,7 +126,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         await twin.delVault(tombstone, { prior: priorOf(vault) })
         await twin.putVault(vaultAt(2, 'life2'), { prior: priorOf(tombstone) })
       })
-      expect(await vaultDB.tryAddPasskey(gateParamsOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'vault_mismatch' })
+      expect(await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'vault_mismatch' })
     })
   })
 

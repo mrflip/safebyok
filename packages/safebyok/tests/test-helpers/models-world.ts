@@ -181,7 +181,7 @@ export type ModelsWorld = {
   /** Script the next `tryPutBox` calls to answer with `answers`, one each. */
   willPut(...answers: readonly Scripted<PutCall>[]): void
   /** Script the next `tryDelBox` calls to answer with `answers`, one each. */
-  willDel(...answers: readonly Scripted<{ scope: Boxscope, priorRevisionTok: string | null }>[]): void
+  willDel(...answers: readonly Scripted<{ scope: Boxscope, priorRevisionTok: string | null, tombstone: BoxTombstone }>[]): void
   /** The next `ensureTimely` runs `thunk` (async, so it may stay pending, or reject). */
   willEnsureTimely(...thunks: readonly ((maxMillis: number | undefined) => Promise<void> | void)[]): void
 
@@ -220,7 +220,7 @@ class Script<CallT> {
 
 type GetCall = { scope: Boxscope }
 type PutCall = { record: BoxRecord, priorRevisionTok: string | null, ifAbsent: PutOpts['ifAbsent'], ifPresent: PutOpts['ifPresent'] }
-type DelCall = { scope: Boxscope, priorRevisionTok: string | null }
+type DelCall = { scope: Boxscope, priorRevisionTok: string | null, tombstone: BoxTombstone }
 
 /** The `revision_tok` a call goes over: null for a birth. */
 const priorTokOf = ({ revision_tok }: Revision): string | null => ((revision_tok === SX.VoidRevisionTok) ? null : revision_tok)
@@ -255,7 +255,7 @@ export class TestableVaultDB extends MemoryVaultDB {
 
   /** Log this delete, then answer it from the script or, with the script empty, from storage. */
   override async tryDelBox(tombstone: BoxTombstone, opts: DelOpts) {
-    const call: DelCall = { scope: CX.boxscope.parse(tombstone), priorRevisionTok: priorTokOf(opts.prior) }
+    const call: DelCall = { scope: CX.boxscope.parse(tombstone), priorRevisionTok: priorTokOf(opts.prior), tombstone }
     this.#calls.push({ verb: 'del', ...call })
     const { scripted, answer } = this.scripts.del.take(call)
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryDelBox']>>) : super.tryDelBox(tombstone, opts)

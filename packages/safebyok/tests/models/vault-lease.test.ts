@@ -74,8 +74,8 @@ describe("A lease renewed through a gate change", () => {
     const { vault, opts: { vaultDB } } = born
     const epoch0 = vault.gate.gate_epoch
     const commit = vaultDB.tryReplacePassphrase.bind(vaultDB)
-    vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (params) => {
-      const written = await commit(params)
+    vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (record, opts) => {
+      const written = await commit(record, opts)
       vault.lock()
       return written
     })

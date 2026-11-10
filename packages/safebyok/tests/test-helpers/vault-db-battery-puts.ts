@@ -3,15 +3,19 @@
 import { describe, expect, it } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
 import * as SX from '../../src/shapes/shapes-storage'
-import type { VaultRecord } from '../../src/shapes/shapes-storage'
+import type { Gate, VaultRecord } from '../../src/shapes/shapes-storage'
 import { vaultScope, boxscope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, boxFlaws, vaultFlaws, vaultTombstoneOf, boxTombstoneOf, priorOf, stale, boxQuery } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
 
 const anyIfPresent = ['repl', 'fail', 'get'] as const
 const anyIfAbsent  = ['add', 'fail'] as const
 
-/** A gate verb's params: a vault record with a gate that has the wayin. */
-export const gateParamsOf = (vault: VaultRecord, gate: object) => ({ ...vault, gate }) as never
+/** A gate verb's arguments: the next record after `vault`, `moved` laid on its gate and its `gate_epoch` one up, and the revision it replaces. */
+export const gateMoveOf = (vault: VaultRecord, moved: Partial<Gate>) => {
+  const prior = priorOf(vault)
+  const record: VaultRecord = { ...vault, ...SX.nextRevisionOf(prior, Now + 1), gate: { ...vault.gate, gate_epoch: vault.gate.gate_epoch + 1, ...moved } }
+  return [record, { prior }] as const
+}
 
 /** Registers the puts' and gate verbs' cases over `world`. */
 export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: BatteryWorld): void => {
@@ -218,7 +222,7 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
 
     it("writes a gate verb, which takes no ifAbsent, over the live row it moves", async () => {
       const { vaultDB, vault } = await putWith()
-      expect(await vaultDB.tryRevokePasskey(gateParamsOf(vault, { passkey_wayin: null }))).to.deep.include({ ok: true })
+      expect(await vaultDB.tryRevokePasskey(...gateMoveOf(vault, { passkey_wayin: null }))).to.deep.include({ ok: true })
     })
   })
 
@@ -263,7 +267,7 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
     it("replacePassphrase lays the wayin on, moves gate_epoch and the revision each one up, and leaves the rest as stored", async () => {
       const { vaultDB, vault } = await putWith()
       const wayin = { ...passphraseWayin, device_id: '00000000-0000-4000-8000-0000000000d2' }
-      const { act, val, world } = await vaultDB.replacePassphrase(gateParamsOf(vault, { passphrase_wayin: wayin }))
+      const { act, val, world } = await vaultDB.replacePassphrase(...gateMoveOf(vault, { passphrase_wayin: wayin }))
       expect(act).to.eq('replaced')
       expect(world).to.deep.equal(val)
       expect(val).to.deep.include({ ...vaultScope, vault_tok: 'life1', registered_at: Now, fmt: SX.VaultFormat, revision_seq: 1, written_at: Now + 1 })
@@ -274,50 +278,86 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
 
     it("addPasskey adds over no passkey, and refuses over one stored, with the stored record", async () => {
       const { vaultDB, vault } = await putWith()
-      const { act, val } = await vaultDB.addPasskey(gateParamsOf(vault, { passkey_wayin: passkeyWayin }))
+      const { act, val } = await vaultDB.addPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))
       expect(act).to.eq('added')
       expect(val.gate).to.deep.equal({ gate_epoch: 2, passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin })
-      expect(await vaultDB.tryAddPasskey(gateParamsOf(val, { passkey_wayin: { ...passkeyWayin, device_id: '00000000-0000-4000-8000-0000000000d2' } }))).to.deep.include({ ok: false, act: 'camped', dbhas: val, world: val })
+      expect(await vaultDB.tryAddPasskey(...gateMoveOf(val, { passkey_wayin: { ...passkeyWayin, device_id: '00000000-0000-4000-8000-0000000000d2' } }))).to.deep.include({ ok: false, act: 'camped', dbhas: val, world: val })
     })
 
     it("revokePasskey nulls a passkey stored, and over none answers revoked with nothing moved", async () => {
       const { vaultDB, vault } = await putWith()
-      const { val: withPasskey } = await vaultDB.addPasskey(gateParamsOf(vault, { passkey_wayin: passkeyWayin }))
-      const { act, val } = await vaultDB.revokePasskey(gateParamsOf(withPasskey, { passkey_wayin: null }))
+      const { val: withPasskey } = await vaultDB.addPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))
+      const { act, val } = await vaultDB.revokePasskey(...gateMoveOf(withPasskey, { passkey_wayin: null }))
       expect(act).to.eq('revoked')
       expect(val.gate).to.deep.equal({ gate_epoch: 3, passphrase_wayin: passphraseWayin, passkey_wayin: null })
-      expect(await vaultDB.revokePasskey(gateParamsOf(val, { passkey_wayin: null }))).to.deep.include({ act: 'revoked', val, world: val })
+      expect(await vaultDB.revokePasskey(...gateMoveOf(val, { passkey_wayin: null }))).to.deep.include({ act: 'revoked', val, world: val })
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: val })
     })
 
     it("a gate verb refuses when the row moved past its params' revision, even a verb its row would otherwise refuse", async () => {
       const { vaultDB, vault } = await putWith()
-      const { val: moved } = await vaultDB.addPasskey(gateParamsOf(vault, { passkey_wayin: passkeyWayin }))
-      expect(await vaultDB.tryAddPasskey(gateParamsOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'stale_write', dbhas: moved })
-      expect(await vaultDB.tryRevokePasskey(gateParamsOf(vault, { passkey_wayin: null }))).to.deep.include({ ok: false, act: 'stale_write', dbhas: moved })
-      expect(await vaultDB.tryReplacePassphrase(gateParamsOf(vault, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'stale_write', dbhas: moved })
+      const { val: moved } = await vaultDB.addPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))
+      expect(await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'stale_write', dbhas: moved })
+      expect(await vaultDB.tryRevokePasskey(...gateMoveOf(vault, { passkey_wayin: null }))).to.deep.include({ ok: false, act: 'stale_write', dbhas: moved })
+      expect(await vaultDB.tryReplacePassphrase(...gateMoveOf(vault, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'stale_write', dbhas: moved })
     })
 
-    it("refuses a verb touching the other wayin, and params that disagree with the row", async () => {
+    it("refuses a verb moving the wayin it leaves alone", async () => {
       const { vaultDB, vault } = await putWith()
-      expect(await vaultDB.tryReplacePassphrase(gateParamsOf(vault, { passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false })
-      expect(await vaultDB.tryAddPasskey(gateParamsOf(vault, { passkey_wayin: passkeyWayin, passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false })
-      expect(await vaultDB.tryRevokePasskey(gateParamsOf(vault, { passkey_wayin: null, passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false })
-      expect(await vaultDB.tryReplacePassphrase(gateParamsOf({ ...vault, registered_at: Now + 5 }, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, world: vault })
+      const otherPassphrase = { ...passphraseWayin, device_id: '00000000-0000-4000-8000-0000000000d2' }
+      expect(await vaultDB.tryReplacePassphrase(...gateMoveOf(vault, { passphrase_wayin: otherPassphrase, passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'gate_issue', world: vault })
+      expect(await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin, passphrase_wayin: otherPassphrase }))).to.deep.include({ ok: false, act: 'gate_issue', world: vault })
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
+      const { val: withPasskey } = await vaultDB.addPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))
+      expect(await vaultDB.tryRevokePasskey(...gateMoveOf(withPasskey, { passkey_wayin: null, passphrase_wayin: otherPassphrase }))).to.deep.include({ ok: false, act: 'gate_issue', world: withPasskey })
+      expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: withPasskey })
+    })
+
+    it("refuses a record whose registered_at is not the stored one", async () => {
+      const { vaultDB, vault } = await putWith()
+      expect(await vaultDB.tryReplacePassphrase(...gateMoveOf({ ...vault, registered_at: Now + 5 }, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, act: 'gate_issue', world: vault })
+      expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
+    })
+
+    it.each([[0], [2]])("refuses a gate_epoch moved %i from the stored one", async (moved) => {
+      const { vaultDB, vault } = await putWith()
+      const [record, opts] = gateMoveOf(vault, { passkey_wayin: passkeyWayin })
+      const unepoched = { ...record, gate: { ...record.gate, gate_epoch: vault.gate.gate_epoch + moved } }
+      expect(await vaultDB.tryAddPasskey(unepoched, opts)).to.deep.include({ ok: false, act: 'gate_issue', world: vault })
+      expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
+    })
+
+    it("refuses a record whose revision_seq is not next after its prior", async () => {
+      const { vaultDB, vault } = await putWith()
+      const [record, opts] = gateMoveOf(vault, { passphrase_wayin: passphraseWayin })
+      expect(await vaultDB.tryReplacePassphrase({ ...record, revision_seq: record.revision_seq + 1 }, opts)).to.deep.include({ ok: false, act: 'bad_option' })
+      expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
+    })
+
+    it("refuses addPasskey a record with no passkey, and revokePasskey one with a passkey", async () => {
+      const { vaultDB, vault } = await putWith()
+      expect(await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: null }))).to.deep.include({ ok: false, act: 'bad_option' })
+      expect(await vaultDB.tryRevokePasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'bad_option' })
+    })
+
+    it("writes the record it was given, minting no revision of its own", async () => {
+      const { vaultDB, vault } = await putWith()
+      const [record, opts] = gateMoveOf(vault, { passphrase_wayin: passphraseWayin })
+      expect(await vaultDB.replacePassphrase(record, opts)).to.deep.include({ act: 'replaced', val: record, world: record })
+      expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: record })
     })
 
     it("refuses under this life's tombstone, and for another life", async () => {
       const { vaultDB, vault } = await putWith()
       const oldLife = vaultAt(0, 'oldlife')
-      expect(await vaultDB.tryReplacePassphrase(gateParamsOf(oldLife, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, dbhas: vault })
+      expect(await vaultDB.tryReplacePassphrase(...gateMoveOf(oldLife, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false, dbhas: vault })
       await vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) })
-      expect(await vaultDB.tryReplacePassphrase(gateParamsOf(vault, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false })
+      expect(await vaultDB.tryReplacePassphrase(...gateMoveOf(vault, { passphrase_wayin: passphraseWayin }))).to.deep.include({ ok: false })
     })
 
     it("carries no wayin in its request's safe metadata", async () => {
       const { vaultDB, vault } = await putWith()
-      const { req_params } = await vaultDB.replacePassphrase(gateParamsOf(vault, { passphrase_wayin: passphraseWayin }))
+      const { req_params } = await vaultDB.replacePassphrase(...gateMoveOf(vault, { passphrase_wayin: passphraseWayin }))
       expect(Object.keys(req_params)).to.not.include('gate')
     })
   })

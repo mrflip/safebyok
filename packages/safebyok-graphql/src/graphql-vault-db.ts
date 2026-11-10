@@ -2,8 +2,8 @@ import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql
 import type * as Z from 'zod'
 import * as DB from 'safebyok/storage'
 import type {
-  AddPasskeyParams, Answer, BankListed, BankScope, BoxesListed, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelAct, DelOpts, GoodAnswer, GotAct,
-  IfAbsentOpts, ListAct, Notice, PutAct, PutOpts, PutVaultOpts, ReplacePassphraseParams, ReqParams, RevokePasskeyParams, VaultDB, VaultQuery,
+  Answer, BankListed, BankScope, BoxesListed, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelAct, DelOpts, GateVerbOpts, GoodAnswer, GotAct,
+  IfAbsentOpts, ListAct, Notice, PutAct, PutOpts, PutVaultOpts, ReqParams, VaultDB, VaultQuery,
   Tidied, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope,
 } from 'safebyok/storage'
 import { VaultOperations } from './vault-operations'
@@ -123,32 +123,32 @@ export class GraphQLVaultDB implements VaultDB {
 
   // == [Gate verbs]: replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey
 
-  /** Lays the new passphrase wayin on the vault row at this revision, leaving its passkey wayin as stored. */
-  async replacePassphrase(params: ReplacePassphraseParams): Promise<GoodAnswer<VaultRecord, 'replaced'>> { return goodAnswerOf(await this.tryReplacePassphrase(params)) }
+  /** Puts `record`, the vault row at `opts.prior` with a new passphrase wayin and its `gate_epoch` one up. */
+  async replacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'replaced'>> { return goodAnswerOf(await this.tryReplacePassphrase(record, opts)) }
 
-  async tryReplacePassphrase(params: ReplacePassphraseParams): Promise<Answer<VaultRecord, 'replaced'>> {
-    return await answerOf('replacePassphrase', DB.reqParamsOf(params), async () => {
-      const answer = await this.#told(VaultOperations.replacePassphrase, 'safebyokReplacePassphrase', { params: DB.replacePassphraseParams.parse(params) })
+  async tryReplacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'replaced'>> {
+    return await answerOf('replacePassphrase', DB.reqParamsOf({ ...record, ...opts }), async () => {
+      const answer = await this.#told(VaultOperations.replacePassphrase, 'safebyokReplacePassphrase', { record: DB.vaultRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
       return DB.replacePassphraseAnswer.parse(rowAnswerOf(answer))
     })
   }
 
-  /** Lays a passkey wayin on a vault row with none. */
-  async addPasskey(params: AddPasskeyParams): Promise<GoodAnswer<VaultRecord, 'added'>> { return goodAnswerOf(await this.tryAddPasskey(params)) }
+  /** Puts `record`, the vault row at `opts.prior`, which has no passkey wayin, with one laid on and its `gate_epoch` one up. */
+  async addPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'added'>> { return goodAnswerOf(await this.tryAddPasskey(record, opts)) }
 
-  async tryAddPasskey(params: AddPasskeyParams): Promise<Answer<VaultRecord, 'added'>> {
-    return await answerOf('addPasskey', DB.reqParamsOf(params), async () => {
-      const answer = await this.#told(VaultOperations.addPasskey, 'safebyokAddPasskey', { params: DB.passkeyAddParams.parse(params) })
+  async tryAddPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'added'>> {
+    return await answerOf('addPasskey', DB.reqParamsOf({ ...record, ...opts }), async () => {
+      const answer = await this.#told(VaultOperations.addPasskey, 'safebyokAddPasskey', { record: DB.vaultRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
       return DB.addPasskeyAnswer.parse(rowAnswerOf(answer))
     })
   }
 
-  /** Takes the passkey wayin off the vault row. */
-  async revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>> { return goodAnswerOf(await this.tryRevokePasskey(params)) }
+  /** Puts `record`, the vault row at `opts.prior` with no passkey wayin and its `gate_epoch` one up; a row with none answers as stored. */
+  async revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked'>> { return goodAnswerOf(await this.tryRevokePasskey(record, opts)) }
 
-  async tryRevokePasskey(params: RevokePasskeyParams): Promise<Answer<VaultRecord, 'revoked'>> {
-    return await answerOf('revokePasskey', DB.reqParamsOf(params), async () => {
-      const answer = await this.#told(VaultOperations.revokePasskey, 'safebyokRevokePasskey', { params: DB.revokePasskeyParams.parse(params) })
+  async tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked'>> {
+    return await answerOf('revokePasskey', DB.reqParamsOf({ ...record, ...opts }), async () => {
+      const answer = await this.#told(VaultOperations.revokePasskey, 'safebyokRevokePasskey', { record: DB.vaultRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
       return DB.revokePasskeyAnswer.parse(rowAnswerOf(answer))
     })
   }

@@ -151,36 +151,30 @@ export const { foundVaultRow, foundBoxRow, storedVaultRow, storedBoxRow } = Chec
 }))
 // --
 
-// == [Gate verbs' params]: replacePassphraseParams, passkeyAddParams, revokePasskeyParams, ReplacePassphraseParams, AddPasskeyParams, RevokePasskeyParams
+// == [Gate verbs' records]: passkeyAddRecord, passkeyRevokeRecord
 
-/** The checks of the gate verbs' params: a vault record whose gate has only the wayin that the verb changes. */
-export const { replacePassphraseParams, passkeyAddParams, revokePasskeyParams } = Checkers('bad_option', ({ obj, lit }) => {
-  // A vault record with a gate that has only the wayin the verb moves.
-  const gateParams = vaultSparse.extend({ am: lit('a') })
-  const replacePassphraseParams = gateParams.extend({ gate: obj({ passphrase_wayin: passphraseWayinRecord }).strict() }).strict()
-  const passkeyAddParams        = gateParams.extend({ gate: obj({ passkey_wayin: passkeyWayinRecord }).strict() }).strict()
-  const revokePasskeyParams     = gateParams.extend({ gate: obj({ passkey_wayin: lit(null) }).strict() }).strict()
-  return { replacePassphraseParams, passkeyAddParams, revokePasskeyParams }
+/** The checks of the record `addPasskey` and `revokePasskey` are given: a vault record with a passkey wayin, and one with none. */
+export const { passkeyAddRecord, passkeyRevokeRecord } = Checkers('bad_option', ({ lit }) => {
+  const passkeyAddRecord    = vaultRecord.extend({ gate: gate.extend({ passkey_wayin: passkeyWayinRecord }).strict() }).strict()
+  const passkeyRevokeRecord = vaultRecord.extend({ gate: gate.extend({ passkey_wayin: lit(null) }).strict() }).strict()
+  return { passkeyAddRecord, passkeyRevokeRecord }
 })
-
-export type ReplacePassphraseParams = Readonly<Z.input<typeof replacePassphraseParams>>
-export type AddPasskeyParams        = Readonly<Z.input<typeof passkeyAddParams>>
-export type RevokePasskeyParams     = Readonly<Z.input<typeof revokePasskeyParams>>
 // --
 
-// == [Options]: ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
+// == [Options]: ifAbsentOpts, putOpts, putVaultOpts, gateVerbOpts, delOpts, reqParams, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, GateVerbOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
 
 /** The checks of the options a vaultDB verb accepts, of a write's record against its prior revision, and of the safe metadata an answer carries. */
-export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, nextSeq } = Checkers('bad_option', ({ obj, oneof, box_tok }) => {
+export const { ifAbsentOpts, putOpts, putVaultOpts, gateVerbOpts, delOpts, reqParams, nextSeq } = Checkers('bad_option', ({ obj, oneof, box_tok }) => {
   const ifAbsentOpts = obj({ ifAbsent: oneof(EX.ifAbsentVals).default('fail') })
   const putIfAbsent = oneof(EX.putIfAbsentVals).default('add')
   const putOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(EX.ifPresentVals).default('repl') })
   const putVaultOpts = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent: oneof(['fail', 'get']).default('fail') })
+  const gateVerbOpts = obj({ prior: revision })
   const delOpts = obj({ prior: revision })
 
   const reqParams = boxQuery.extend({ box_tok, ...revision.shape, prior: revision }).partial()
   const nextSeq = obj({ record: revision, prior: revision }).refine(({ record, prior }) => record.revision_seq === (prior.revision_seq + 1), Phrases.SeqNotNext)
-  return { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, nextSeq }
+  return { ifAbsentOpts, putOpts, putVaultOpts, gateVerbOpts, delOpts, reqParams, nextSeq }
 }, [CX])
 
 /** The check of an AdapterVaultDB's options, refusing 'bad_option'. */
@@ -202,6 +196,8 @@ export type PutOpts = Readonly<Z.input<typeof putOpts>>
 export type PutOptsGiven = Readonly<Z.output<typeof putOpts>>
 /** A vault row is replaced only by a gate verb: `putVault` births one, or finds one in the way. */
 export type PutVaultOpts = Readonly<Z.input<typeof putVaultOpts>>
+/** What a gate verb is told beside its record: the revision the record replaces. */
+export type GateVerbOpts = Readonly<Z.input<typeof gateVerbOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>
 export type ReqParams = Readonly<Z.infer<typeof reqParams>>
 /** What an AdapterVaultDB's constructor accepts. */

@@ -232,9 +232,9 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
   it("deletes at central's revision, gone once the answer is adopted", async () => {
     const { box } = await timelyBoxOf()
     const pending = makePending()
-    world.mw.willDel(async ({ scope }) => {
+    world.mw.willDel(async ({ scope, tombstone }) => {
       await pending.promise
-      return world.mw.answerOf(scope, world.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
+      return world.mw.answerOf(scope, tombstone)
     })
     const deleting = box.del()
     await vi.advanceTimersByTimeAsync(0)
@@ -242,7 +242,7 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
     expect(world.mw.callsOf('del')[0]?.priorRevisionTok).to.equal('rev-a1')
     pending.open()
     expect(await deleting).to.eq(box)
-    expect(box._cheat_central).to.deep.include({ am: 'x', revision_tok: 'rev-x2' })
+    expect(box._cheat_central).to.deep.include({ am: 'x', revision_seq: 2 })
   })
 
   it("deletes again a thing deleted, at its tombstone's revision, which stays", async () => {
@@ -260,7 +260,7 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
     const { box } = await timelyBoxOf()
     await box.del()
     const tombstone = box._cheat_central
-    world.mw.willDel(({ scope }) => world.mw.answerOf(scope, tombstone))
+    world.mw.willDel(({ scope }) => ({ ...world.mw.answerOf(scope, tombstone), act: 'gone' }))
     await expect(box.del()).resolves.to.eq(box)
     expect(box._cheat_central).to.eq(tombstone)
     expect(box.isPresent).to.be.false

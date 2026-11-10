@@ -170,6 +170,34 @@ describe("listing: an answer is for the scope the call asked about", () => {
     await TH.expectRefusal(listing.fetch(scopeOf('asked_box')))
     expect(listing.things).to.deep.equal([])
   })
+
+  it("refuses a put answered at a revision it did not send, the box unmoved", async () => {
+    const { listing, box, next } = await putable()
+    world.mw.willPut(world.mw.answerOf(box.scope, { ...next, revision_tok: 'rev-of-another' }))
+    await TH.expectRefusal(listing.put(next, { prior: box }), 'storage_issue')
+    expect(box._cheat_central).to.deep.equal(fullBoxRecord())
+  })
+
+  it("refuses a del answered with a tombstone it did not send, the box unmoved", async () => {
+    const { listing, box } = await putable()
+    world.mw.willDel(({ scope }) => world.mw.answerOf(scope, tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-of-another' })))
+    await TH.expectRefusal(listing.del(box.sparse), 'storage_issue')
+    expect(box._cheat_central).to.deep.equal(fullBoxRecord())
+  })
+
+  it("takes the record a declined put answers, at a revision it did not send", async () => {
+    const { listing, box, next } = await putable()
+    const stored = fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 })
+    world.mw.willPut({ ...world.mw.answerOf(box.scope, stored), act: 'declined' })
+    expect(await listing.put(next, { prior: box, ifPresent: 'get' })).to.eq(box)
+    expect(box._cheat_central).to.deep.equal(stored)
+  })
+
+  it("refuses a declined put answered with a record of another scope", async () => {
+    const { listing, box, next } = await putable()
+    world.mw.willPut({ ...world.mw.answerOf(box.scope, fullBoxRecord({ boxlabel: 'other_box' })), act: 'declined' })
+    await TH.expectRefusal(listing.put(next, { prior: box, ifPresent: 'get' }), 'storage_issue')
+  })
 })
 
 // == [ifPresent]: what the vaultDB decides over a live record, as the listing delivers it

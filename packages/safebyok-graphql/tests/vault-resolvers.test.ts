@@ -38,8 +38,11 @@ const sent = async (schema: GraphQLSchema, source: string, variableValues: objec
 /** A VaultDB's own answer as one crosses: dbhas null where it has none. */
 const asCrossed = (answer: DB.Answer<unknown, string, unknown>) => ({ ...answer, dbhas: answer.dbhas ?? null })
 
-/** The gate verbs' params: the vault record, its gate with only the wayin the verb moves. */
-const gateParamsOf = (vault: DB.VaultRecord, gate: object) => ({ ...vault, gate })
+/** A gate verb's arguments: the next record after `vault`, `moved` laid on its gate and its `gate_epoch` one up, and the revision it replaces. */
+const gateArgsOf = (vault: DB.VaultRecord, moved: object) => {
+  const prior = DB.revisionOf(vault)
+  return { record: { ...vault, ...DB.nextRevisionOf(prior, vault.written_at + 1), gate: { ...vault.gate, gate_epoch: vault.gate.gate_epoch + 1, ...moved } }, opts: { prior } }
+}
 
 /** A server whose watches are counted while they listen, and the VaultDB behind it. */
 const watchedServer = async () => {
@@ -85,9 +88,9 @@ describe("vaultResolvers", () => {
       [VaultOperations.getBox, TH.boxQuery, DB.getBoxAnswer],
       [VaultOperations.putVault, { record, opts }, DB.putVaultAnswer],
       [VaultOperations.putBox, { record: box, opts }, DB.putBoxAnswer],
-      [VaultOperations.replacePassphrase, { params: gateParamsOf(record, { passphrase_wayin: TH.passphraseWayin }) }, DB.replacePassphraseAnswer],
-      [VaultOperations.addPasskey, { params: gateParamsOf(record, { passkey_wayin: TH.passkeyWayin }) }, DB.addPasskeyAnswer],
-      [VaultOperations.revokePasskey, { params: gateParamsOf(record, { passkey_wayin: null }) }, DB.revokePasskeyAnswer],
+      [VaultOperations.replacePassphrase, gateArgsOf(record, { passphrase_wayin: TH.passphraseWayin }), DB.replacePassphraseAnswer],
+      [VaultOperations.addPasskey, gateArgsOf(record, { passkey_wayin: TH.passkeyWayin }), DB.addPasskeyAnswer],
+      [VaultOperations.revokePasskey, gateArgsOf(record, { passkey_wayin: null }), DB.revokePasskeyAnswer],
       [VaultOperations.delBox, { tombstone: TH.boxTombstoneOf(box), opts }, DB.delBoxAnswer],
       [VaultOperations.delVault, { tombstone: TH.vaultTombstoneOf(record), opts }, DB.delVaultAnswer],
       [VaultOperations.tidyGone, TH.bankScope, DB.tidyGoneAnswer],
@@ -119,11 +122,11 @@ describe("vaultResolvers", () => {
     expect(DB.getBoxAnswer.parse(await sent(schema, VaultOperations.getBox, TH.boxQuery))).to.deep.eq(asCrossed(await vaultDB.tryGetBox(TH.boxQuery)))
     expect(DB.listBoxesAnswer.parse(await sent(schema, VaultOperations.listBoxes, TH.vaultQuery))).to.deep.eq(asCrossed(await vaultDB.tryListBoxes(TH.vaultQuery)))
 
-    const replaced = DB.replacePassphraseAnswer.parse(await sent(schema, VaultOperations.replacePassphrase, { params: gateParamsOf(record, { passphrase_wayin: { ...TH.passphraseWayin, key_deriver_label: 'moved' } }) }))
+    const replaced = DB.replacePassphraseAnswer.parse(await sent(schema, VaultOperations.replacePassphrase, gateArgsOf(record, { passphrase_wayin: { ...TH.passphraseWayin, key_deriver_label: 'moved' } })))
     expect(replaced).to.deep.include({ ok: true, act: 'replaced' })
-    const added = DB.addPasskeyAnswer.parse(await sent(schema, VaultOperations.addPasskey, { params: gateParamsOf(replaced.val as DB.VaultRecord, { passkey_wayin: TH.passkeyWayin }) }))
+    const added = DB.addPasskeyAnswer.parse(await sent(schema, VaultOperations.addPasskey, gateArgsOf(replaced.val as DB.VaultRecord, { passkey_wayin: TH.passkeyWayin })))
     expect(added.val).to.have.nested.property('gate.passkey_wayin.credential_id', TH.passkeyWayin.credential_id)
-    const revoked = DB.revokePasskeyAnswer.parse(await sent(schema, VaultOperations.revokePasskey, { params: gateParamsOf(added.val as DB.VaultRecord, { passkey_wayin: null }) }))
+    const revoked = DB.revokePasskeyAnswer.parse(await sent(schema, VaultOperations.revokePasskey, gateArgsOf(added.val as DB.VaultRecord, { passkey_wayin: null })))
     expect(revoked.val).to.have.nested.property('gate.passkey_wayin', null)
 
     const goneBox = DB.delBoxAnswer.parse(await sent(schema, VaultOperations.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: DB.revisionOf(box) } }))

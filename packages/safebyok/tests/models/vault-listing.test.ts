@@ -11,7 +11,7 @@ import type { VaultRecord } from '../../src/shapes/shapes-storage'
 import { Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, byPassphrase, delTyping, makeBornVault, makeVaultWorld, storedVaultRecord, useVaultWorlds, buildTyping, hearingBadNews } from '../test-helpers/vault-world'
+import { Dna, Passphrase, byPassphrase, delTyping, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, useVaultWorlds, buildTyping, hearingBadNews } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -61,6 +61,67 @@ describe("listing.stampOfBirth and listing.recordOfBirth", () => {
     const record = listing.recordOfBirth(gate, { revision_tok: 'rev-gone', revision_seq: 4 })
     expect(record).to.deep.include({ ...gate.stamp, am: 'a', revision_seq: 5, written_at: nowMillis(), gate: gate.pickle() })
     expect(record.revision_tok).to.not.eq('rev-gone')
+  })
+})
+
+describe("listing's gate verbs: the record each sends the vaultDB", () => {
+  const MovedDevice = '00000000-0000-4000-8000-0000000000d2'
+
+  it("replacePassphrase sends the next revision with the new wayin and the epoch one up", async () => {
+    const { listing, vault, opts: { vaultDB } } = await makeBornVault()
+    const ante = vault.fullRecord
+    const passphrase_wayin = { ...ante.gate.passphrase_wayin, device_id: MovedDevice }
+    const replacing = vi.spyOn(vaultDB, 'tryReplacePassphrase')
+    const stored = await listing.replacePassphrase(ante, passphrase_wayin)
+    const [record, opts] = replacing.mock.calls[0]!
+    expect(record).to.deep.include({ registered_at: ante.registered_at, revision_seq: ante.revision_seq + 1, written_at: nowMillis(), gate: { ...ante.gate, gate_epoch: ante.gate.gate_epoch + 1, passphrase_wayin } })
+    expect(record.revision_tok).to.not.eq(ante.revision_tok)
+    expect(opts).to.deep.equal({ prior: SX.revisionOf(ante) })
+    expect(stored).to.deep.equal(record)
+  })
+
+  it("addPasskey sends the next revision with the passkey and the epoch one up", async () => {
+    const { listing, vault, opts: { vaultDB } } = await makeBornVault()
+    const ante = vault.fullRecord
+    const adding = vi.spyOn(vaultDB, 'tryAddPasskey')
+    const stored = await listing.addPasskey(ante, TH.passkeyWayin)
+    const [record, opts] = adding.mock.calls[0]!
+    expect(record).to.deep.include({ revision_seq: ante.revision_seq + 1, written_at: nowMillis(), gate: { ...ante.gate, gate_epoch: ante.gate.gate_epoch + 1, passkey_wayin: TH.passkeyWayin } })
+    expect(opts).to.deep.equal({ prior: SX.revisionOf(ante) })
+    expect(stored).to.deep.equal(record)
+  })
+
+  it("revokePasskey sends the next revision with no passkey and the epoch one up", async () => {
+    const { listing, vault, opts: { vaultDB } } = await makeBornVaultWithPasskey()
+    const ante = vault.fullRecord
+    const revoking = vi.spyOn(vaultDB, 'tryRevokePasskey')
+    const stored = await listing.revokePasskey(ante)
+    const [record, opts] = revoking.mock.calls[0]!
+    expect(record).to.deep.include({ revision_seq: ante.revision_seq + 1, written_at: nowMillis(), gate: { ...ante.gate, gate_epoch: ante.gate.gate_epoch + 1, passkey_wayin: null } })
+    expect(opts).to.deep.equal({ prior: SX.revisionOf(ante) })
+    expect(stored).to.deep.equal(record)
+  })
+
+  it("revokePasskey over no passkey answers the record stored", async () => {
+    const { listing, vault } = await makeBornVault()
+    const ante = vault.fullRecord
+    expect(await listing.revokePasskey(ante)).to.deep.equal(ante)
+    expect(vault.revision_seq).to.eq(ante.revision_seq)
+  })
+
+  it("refuses an answer that is not the record it sent", async () => {
+    const { listing, vault, opts: { vaultDB } } = await makeBornVault()
+    const commit = vaultDB.tryAddPasskey.bind(vaultDB)
+    vi.spyOn(vaultDB, 'tryAddPasskey').mockImplementationOnce(async (record, opts) => {
+      const answer = await commit(record, opts)
+      return answer.ok ? { ...answer, val: { ...answer.val, revision_tok: 'rev-of-another' } } : answer
+    })
+    await TH.expectRefusal(listing.addPasskey(vault.fullRecord, TH.passkeyWayin), 'storage_issue')
+  })
+
+  it("refuses an ante of another bank", async () => {
+    const { listing, vault } = await makeBornVault()
+    await TH.expectRefusal(listing.replacePassphrase({ ...vault.fullRecord, user_id: 'someone_else' }, vault.fullRecord.gate.passphrase_wayin))
   })
 })
 
@@ -465,7 +526,7 @@ describe("the gate verbs answer the vaultDB's own answer", () => {
   it("tryRevokePasskey answers the act, with the record written as its val", async () => {
     const { vault, listing, demandStored } = await makeBornVault()
     const ante = demandStored()
-    const answer = await listing.tryRevokePasskey({ ...SX.vaultSparse.parse(ante), am: 'a', gate: { passkey_wayin: null } })
+    const answer = await listing.tryRevokePasskey(SX.vaultRecord.parse(ante))
     expect(answer.ok).to.be.true
     expect(answer.act).to.be.a('string')
     expect(answer.val).to.deep.include({ vault_tok: vault.vault_tok })
@@ -475,7 +536,7 @@ describe("the gate verbs answer the vaultDB's own answer", () => {
     const { listing, demandStored, opts } = await makeBornVault()
     const tryRevokePasskey = vi.spyOn(opts.vaultDB, 'tryRevokePasskey')
     listing.sweep()
-    const answer = await listing.tryRevokePasskey({ ...SX.vaultSparse.parse(demandStored()), am: 'a', gate: { passkey_wayin: null } })
+    const answer = await listing.tryRevokePasskey(SX.vaultRecord.parse(demandStored()))
     expect(answer.err?.refusalkind).to.eq('disabled')
     expect(tryRevokePasskey).not.toHaveBeenCalled()
   })

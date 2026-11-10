@@ -143,8 +143,8 @@ describe("A gate change after its record is stored", () => {
   it.each(['sweep', 'vacate'] as const)("a %s as the answer comes back refuses, the row stored all the same", async (ending) => {
     const { vault, listing, demandStored, opts: { vaultDB } } = await makeBornVault()
     const commit = vaultDB.tryReplacePassphrase.bind(vaultDB)
-    vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (params) => {
-      const answer = await commit(params)
+    vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (record, opts) => {
+      const answer = await commit(record, opts)
       listing[ending]()
       return answer
     })

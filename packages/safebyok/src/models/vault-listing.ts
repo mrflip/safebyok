@@ -11,7 +11,7 @@ import * as SX from '../shapes/shapes-storage'
 import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import { type DelTombstone, type Fetched, type ListingOpts, type SlotFate, type ThingAnswer, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
-import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
+import type { BoxRow, DelOpts, GateVerbOpts, PutOpts, PutVaultOpts, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { type Answer, type Notice, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
 import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
@@ -76,32 +76,44 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form, gateVerbAnswered, tryDel
 
-  /** Lay a new passphrase wayin on the row, deliver what it writes to the vault listed, and answer that record. Nothing locks: the vaultKey does not change. */
-  async replacePassphrase(params: ReplacePassphraseParams): Promise<SX.VaultRecord> { return demandGood(await this.tryReplacePassphrase(params)).val }
+  /** Lay a new passphrase wayin on the vault at `ante`, and answer the record stored. Nothing locks: the vaultKey does not change. */
+  async replacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<VaultRecord> { return demandGood(await this.tryReplacePassphrase(ante, passphrase_wayin)).val }
 
   /** {@link replacePassphrase}, answering the vaultDB's own answer. */
-  tryReplacePassphrase(params: ReplacePassphraseParams): Promise<ThingAnswer<SX.VaultRecord>> { return this.#gateVerbAnswered(() => this.vaultDB.tryReplacePassphrase(params)) }
+  tryReplacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<ThingAnswer<VaultRecord>> {
+    return this.#gateVerbAnswered(ante, { passphrase_wayin }, (record, opts) => this.vaultDB.tryReplacePassphrase(record, opts))
+  }
 
-  /** Lay a passkey wayin on the row. */
-  async addPasskey(params: AddPasskeyParams): Promise<SX.VaultRecord> { return demandGood(await this.tryAddPasskey(params)).val }
+  /** Lay a passkey wayin on the vault at `ante`, and answer the record stored. */
+  async addPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<VaultRecord> { return demandGood(await this.tryAddPasskey(ante, passkey_wayin)).val }
 
   /** {@link addPasskey}, answering the vaultDB's own answer. */
-  tryAddPasskey(params: AddPasskeyParams): Promise<ThingAnswer<SX.VaultRecord>> { return this.#gateVerbAnswered(() => this.vaultDB.tryAddPasskey(params)) }
+  tryAddPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<ThingAnswer<VaultRecord>> {
+    return this.#gateVerbAnswered(ante, { passkey_wayin }, (record, opts) => this.vaultDB.tryAddPasskey(record, opts))
+  }
 
-  /** Null the row's passkey wayin. */
-  async revokePasskey(params: RevokePasskeyParams): Promise<SX.VaultRecord> { return demandGood(await this.tryRevokePasskey(params)).val }
+  /** Null the passkey wayin of the vault at `ante`, and answer the record stored. */
+  async revokePasskey(ante: VaultRecord): Promise<VaultRecord> { return demandGood(await this.tryRevokePasskey(ante)).val }
 
   /** {@link revokePasskey}, answering the vaultDB's own answer. */
-  tryRevokePasskey(params: RevokePasskeyParams): Promise<ThingAnswer<SX.VaultRecord>> { return this.#gateVerbAnswered(() => this.vaultDB.tryRevokePasskey(params)) }
+  tryRevokePasskey(ante: VaultRecord): Promise<ThingAnswer<VaultRecord>> {
+    return this.#gateVerbAnswered(ante, { passkey_wayin: null }, (record, opts) => this.vaultDB.tryRevokePasskey(record, opts), { isScopePinned: true })
+  }
 
   // The val is the record the verb wrote: the vault listed may have a newer one by the time the answer is delivered.
-  /** The answer `call` brings, its record delivered to the vault listed. */
-  async #gateVerbAnswered(call: () => Promise<Answer<SX.VaultRecord, string>>): Promise<ThingAnswer<SX.VaultRecord>> {
-    let answer: Answer<SX.VaultRecord, string> | null = null
+  // A revoke over a vault with no passkey answers as stored, not as sent: its scope is all that can be pinned.
+  /** The answer `call` brings for the vault at `ante` with `moved` laid on its gate, its record delivered to the vault listed. */
+  async #gateVerbAnswered(
+    ante: VaultRecord, moved: Partial<SX.Gate>, call: (record: VaultRecord, opts: GateVerbOpts) => Promise<Answer<VaultRecord, string>>, { isScopePinned = false } = {},
+  ): Promise<ThingAnswer<VaultRecord>> {
+    let answer: Answer<VaultRecord, string> | null = null
     try {
+      const checked = this.recordOf(ante)
       this.demandEnabled()
-      answer = await call()
-      await this.deliver(answer)
+      const prior = SX.revisionOf(checked)
+      const record: VaultRecord = { ...checked, ...SX.nextRevisionOf(prior, nowMillis()), gate: { ...checked.gate, ...moved, gate_epoch: checked.gate.gate_epoch + 1 } }
+      answer = await call(record, { prior })
+      await this.deliver(answer, isScopePinned ? this.scopeOf(record) : record)
       return answerWithVal(answer, valOf(answer))
     } catch (err) { return refusedAnswerOf(err, answer) }
   }
