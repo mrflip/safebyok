@@ -93,7 +93,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, delVaultPrompt, del, each with its try form
+  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, delVaultPrompt, each with its try form
 
   /** SLOPDOC: Replaces the passphrase through a gating; the passkey stays and no other device is locked. */
   async replacePassphrasePrompt(): Promise<this> {
@@ -127,7 +127,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link revokePasskeyPrompt}. */
   tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
 
-  /** SLOPDOC: Deletes this vault through a gating, leaving a tombstone in its slot and nothing of it on this device. */
+  /** Delete this vault through a del_vault gating, which asks for the passphrase, leaving a tombstone in its slot and nothing of it on this device. */
   async delVaultPrompt(): Promise<this> {
     await this.ensureTimely(); this.demandPromptable()
     await Gating.launch('del_vault', this.#launchArgs)
@@ -136,9 +136,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Non-throwing form of {@link delVaultPrompt}. */
   tryDelVaultPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.delVaultPrompt()) }
-
-  /** Delete this vault by {@link delVaultPrompt}, which accepts the passphrase's proof. */
-  override del(): Promise<this> { return this.delVaultPrompt() }
 
   // --
 
@@ -167,7 +164,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
   // --
 
-  // == [The lease]: lock, vacateLease, unlockByProof, attachLease
+  // == [The lease]: lock, revokeLease, unlockByProof, attachLease, alignBoxes
 
   /** Lock the vault and its boxes before returning, and forget the row cached on this device.
    * A failed revoke is announced as `lease_revoke_failed` and does not throw. A no-op on a vault discarded.
@@ -185,6 +182,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#lease = null
     const revoking = granted?.tryRevoke() ?? Lease.tryForget(this.#leaseFriend())
     this.align()
+    this.#alignBoxes()
     const revoked = await revoking
     if (! revoked.ok) { this.#bankFriend.announce({ kind: 'lease_revoke_failed', refusal: revoked.err, vault: this, where }) }
   }
@@ -202,6 +200,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#lease = lease
     await lease.cacheAsCacheCan()
     this.align()
+    this.#alignBoxes()
+  }
+
+  /** Bring each box listed up to this vault's lock, which its snapshot shows. */
+  #alignBoxes(): void {
+    const boxes = this.#boxListing?.things ?? []
+    for (const box of boxes) { box.align() }
   }
   // --
 
@@ -322,7 +327,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
   // --
 
-  // == [Guards]: isLocked, isUnlocked, demandLease, demandPromptable, demandAttachable, demandHelloable, demandPresent, ensureTimely
+  // == [Guards]: isLocked, isUnlocked, demandLease, demandDeletable, demandPromptable, demandAttachable, demandHelloable, demandPresent, ensureTimely
 
   /** The vault's own lock, not its world's: the bank has none. */
   get isLocked(): boolean { return this.#lease === null }
@@ -336,6 +341,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (this.#lease === null) { throw unlockFirst() }
     return this.#lease
   }
+
+  // The passphrase's proof is the del_vault gating's, and its run locks the vault before it deletes: a lock does not stop a delete.
+  /** A delete needs the vault enabled. */
+  override demandDeletable(): this { return this.demandEnabled() }
 
   /** A prompt needs the vault enabled and present. */
   demandPromptable(): this { return this.demandEnabled().demandPresent() }

@@ -317,7 +317,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     expect(Object.keys(box)).to.not.include('isLocked')
   })
 
-  it("works detached, as useSyncExternalStore takes them, telling a lock once and keeping the snapshot", async () => {
+  it("works detached, as useSyncExternalStore takes them, telling a lock once with a new snapshot", async () => {
     const box = await showingOf()
     const { subscribe, getSnapshot } = box
     const listener = vi.fn()
@@ -326,23 +326,30 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     world.mw.setLocked(true)
     expect(listener).toHaveBeenCalledTimes(1)
     expect(box.whisper).to.eq(LOCKED)
-    expect(getSnapshot()).to.eq(before)
+    expect(getSnapshot()).to.not.eq(before)
+    expect(getSnapshot()).to.deep.equal({ ...before, isLocked: true })
     unsubscribe()
     world.mw.setLocked(false)
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it("keeps the snapshot through a lock and an unlock, which are the vault's to show", async () => {
+  it("shows the vault's lock on the snapshot through a lock and an unlock, telling a listener once each", async () => {
     const box = await unexposedOf()
+    const listener = vi.fn()
+    box.subscribe(listener)
     const before = box.getSnapshot()
-    expect(before).to.not.have.property('isLocked')
+    expect(before.isLocked).to.be.false
     world.mw.setLocked(true)
-    expect(box.getSnapshot()).to.eq(before)
+    const locked = box.getSnapshot()
+    expect(locked).to.deep.equal({ ...before, isLocked: true })
+    expect(listener).toHaveBeenCalledTimes(1)
     world.mw.setLocked(false)
-    expect(box.getSnapshot()).to.eq(before)
+    expect(box.getSnapshot()).to.not.eq(locked)
+    expect(box.getSnapshot()).to.deep.equal(before)
+    expect(listener).toHaveBeenCalledTimes(2)
   })
 
-  it("unsubscribes from the box and the vault both", async () => {
+  it("tells an unsubscribed listener of nothing, a lock included", async () => {
     const box = await unexposedOf()
     const listener = vi.fn()
     const unsubscribe = box.subscribe(listener)

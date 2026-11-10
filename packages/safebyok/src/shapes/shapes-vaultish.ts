@@ -284,6 +284,8 @@ export interface BoxSnapshot extends Boxscope {
   readonly isExposed:     boolean
   /** True while `box.veil()` hides the whisper exposed. */
   readonly isVeiled:      boolean
+  /** True while the box's vault is locked. */
+  readonly isLocked:      boolean
 }
 
 // --

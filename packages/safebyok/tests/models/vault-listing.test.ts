@@ -196,7 +196,7 @@ describe("a box verb over a vault deleted elsewhere", () => {
   })
 })
 
-describe("vault.del()", () => {
+describe("vault.delVaultPrompt()", () => {
   it("lands on that same end state, the tombstone stored", async () => {
     const world = await makeBornVault()
     const boxes = world.vault.boxListing
@@ -207,6 +207,26 @@ describe("vault.del()", () => {
     await world.vault.ensureTimely(0)
     TH.expectSyncRefusal(() => world.vault.demandPresent())
   })
+})
+
+const DelCases = [
+  [false,  'deletes an unlocked vault with no prompt, landing on that same end state'],
+  [true,   'deletes a locked vault with no prompt, landing on that same end state'],
+] as const
+
+describe("vault.del()", () => {
+  for (const [isLocking, blurb] of DelCases) {
+    it(blurb, async () => {
+      const world = await makeBornVault()
+      const dialog = vi.fn()
+      world.fakeBank.requestCleartext = dialog
+      if (isLocking) { world.vault.lock() }
+      expect(await world.vault.del()).to.eq(world.vault)
+      await expectLandedGone(world.vault, world)
+      expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
+      expect(dialog).not.toHaveBeenCalled()
+    })
+  }
 })
 
 describe("a newer record of another vault_tok over a live vault", () => {

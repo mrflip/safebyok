@@ -19,7 +19,7 @@ import { refusedAnswerOf } from '../storage/vault-db'
 
 /** A box as this device has it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
-  // == [Props]: applabel, user_id, vaultlabel, boxlabel, world, listing, #exposed, #isVeiled, #subscribeWithVault
+  // == [Props]: applabel, user_id, vaultlabel, boxlabel, world, listing, #exposed, #isVeiled
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly applabel:   string
@@ -35,20 +35,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   #exposed: Whisper | null = null
   /** Whether {@link veil} is hiding the whisper exposed. */
   #isVeiled = false
-
-  /** Unbound callback to enroll the given listener for this box's changes and its vault's. */
-  readonly #subscribeWithVault = (listener: () => void): (() => void) => {
-    const unsubscribeBox = this.subscribeOwn(listener)
-    // Its own function, as a vault's listeners are a set: a listener on two boxes must survive leaving one.
-    const unsubscribeVault = this.world.subscribe(() => { listener() })
-    return () => {
-      unsubscribeBox()
-      unsubscribeVault()
-    }
-  }
   // --
 
-  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper, exposure, isShowing, isVeiled, isLocked, subscribe
+  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper, exposure, isShowing, isVeiled, isLocked
 
   /** The storage format of the record in hand. */
   get fmt(): number { return this.central.fmt }
@@ -97,9 +86,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** Whether this box's vault is locked, read live. */
   get isLocked(): boolean { return this.listing.isLocked }
-
-  /** Public access to the unbound "make me a subscriber" callback, told of this box's changes and its vault's. */
-  override get subscribe(): (listener: () => void) => (() => void) { return this.#subscribeWithVault }
   // --
 
   // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unexpose, #dropExposed, veil, unveil, patchWhisper, replaceExposed, unseal
@@ -307,6 +293,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       isPresent:     this.isPresent,
       isExposed:     this.#exposed !== null,
       isVeiled:      this.#isVeiled,
+      isLocked:      this.isLocked,
     })
   }
   // --

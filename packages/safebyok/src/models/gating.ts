@@ -194,11 +194,10 @@ const RunForGatingkind: { [KindT in Gatingkind]: Run<KindT> } = {
     return friend.unlockByProof(vault, proved, stored.gate.gate_epoch)
   },
 
-  del_vault: async ({ ante }, { listing, vault }) => {
+  del_vault: async (_proved, { vault }) => {
     // The lock first: no box opens under a lease while the tombstone goes out. The answer delivered vacates its boxes.
     vault.lock()
-    await listing.del(ante)
-    return vault
+    return vault.del()
   },
 }
 // --

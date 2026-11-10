@@ -1,10 +1,10 @@
 /** A vault's box verbs from the host's side, on real seals: hello, getBox, delBox, and a damaged record set aside. */
 
 import { omit } from 'es-toolkit'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { parseLogger } from '../../src/helpers/logger'
 import * as TH from '../test-helpers'
-import { Sidecar, Whisper, boxlabel, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, delTyping, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
+import { Passphrase, Sidecar, Whisper, boxlabel, byPassphrase, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, delTyping, storedVaultRecord, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -116,6 +116,21 @@ describe("the box verbs refuse a vault locked, or gone", () => {
     const err = await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }), 'vault_locked')
     expect(JSON.stringify(err.meta ?? {})).not.to.include(Whisper)
     expect(err.message).not.to.include(Whisper)
+  })
+})
+
+describe("a box listed, through its vault's lock and unlock", () => {
+  it("shows the vault's lock on its snapshot, telling its listener once each way", async () => {
+    const { vault, box } = await makeWorldWithBox()
+    const listener = vi.fn()
+    box.subscribe(listener)
+    expect(box.getSnapshot().isLocked).to.be.false
+    vault.lock()
+    expect(box.getSnapshot().isLocked).to.be.true
+    expect(listener).toHaveBeenCalledTimes(1)
+    await unlockTyping(vault, byPassphrase(Passphrase))
+    expect(box.getSnapshot().isLocked).to.be.false
+    expect(listener).toHaveBeenCalledTimes(2)
   })
 })
 

@@ -168,8 +168,10 @@ export type ModelsWorld = {
   setNow(ms: number): void
   /** Move the clock on by `ms` and, under fake timers, fire every timer that falls due, each with the clock at its due time. */
   advance(ms: number): Promise<void>
-  /** Lock or unlock the vault, telling the world's subscribers. */
+  /** Lock or unlock the vault, telling the world's subscribers, then aligning each box listed in a listing over this world, as a vault does. */
   setLocked(isLocked: boolean): void
+  /** The box listings made over this world by {@link boxListingOf}, whose boxes `setLocked` aligns. */
+  listings: Set<BoxListing>
   /** End the watches and put real timers back. Call it in `afterEach`. */
   dispose(): void
 
@@ -297,6 +299,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const clockNow = (): number => (fakeTimers ? Date.now() : now)
   let isLocked = opts.isLocked ?? false
   const worldListeners = new Set<() => void>()
+  const listings = new Set<BoxListing>()
   if (fakeTimers) { vi.useFakeTimers({ now }) }
   _cheat_clock(clockNow)
 
@@ -367,7 +370,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   }
 
   return {
-    world, vaultDB, calls, badnews, panics, announced, stored, watches,
+    world, vaultDB, calls, badnews, panics, announced, stored, watches, listings,
     worldWith: (overrides) => ({ ...world, get isLocked() { return isLocked }, ...overrides }),
     bankFriend: {
       panic:       brandGuarded((refusal: VaultError) => { panics.push(refusal) }),
@@ -387,6 +390,9 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       if (next === isLocked) { return }
       isLocked = next
       for (const listener of worldListeners) { listener() }
+      for (const listing of listings) {
+        for (const box of listing.things) { box.align() }
+      }
     },
     dispose,
 
@@ -485,10 +491,12 @@ const testableOf = (box: Box): TestableBox => {
 
 const nullOrTestableOf = (box: Box | null): TestableBox | null => (box === null ? null : testableOf(box))
 
-/** A {@link BoxListing} over the world's vault and vaultDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es. `overrides` replaces its world or any of its options; the horizon is ten minutes. */
+/** A {@link BoxListing} over the world's vault and vaultDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es, aligned at each `setLocked`. `overrides` replaces its world or any of its options; the horizon is ten minutes. */
 export const boxListingOf = (mw: ModelsWorld, overrides: BoxListingOverrides = {}): TestableBoxListing => {
   const { world = mw.world, scope = WorldVault.scope, vaultDB = mw.vaultDB, maxMillisSinceRefresh = 10 * 60_000, bankFriend = mw.bankFriend } = overrides
-  return new TestableBoxListing(world, { scope, vaultDB, maxMillisSinceRefresh, bankFriend })
+  const listing = new TestableBoxListing(world, { scope, vaultDB, maxMillisSinceRefresh, bankFriend })
+  mw.listings.add(listing)
+  return listing
 }
 
 /** What {@link boxListingOf} may be told in place of the world's own: the box listing's world, vault scope, vaultDB, horizon or the bank's friend. */
