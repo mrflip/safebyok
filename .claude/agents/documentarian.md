@@ -49,7 +49,7 @@ examples; `notes/gallant-docblocks.md` is the bestiary.
 ## Done
 
 * `pnpm --filter safebyok lint`, which flags a refusal catalog and a bare `/**`; then read each
-  block aloud and ask whether every sentence has a verb.
+  block aloud and ask whether you would say it that way to a colleague (`#plain-english`).
 * `pnpm justify` green.
 * Squash commits revisiting a file an earlier one changed. Many files go into a few commits
   grouped by folder, four at most.

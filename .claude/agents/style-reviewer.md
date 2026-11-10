@@ -37,7 +37,8 @@ report what you found and stop.
    - a rename an outside caller would see: an export, a stored field, a `refusalkind`;
    - a name whose verb promises more or less than its doc block's first line (*Naming*:
      `readBox` for a `getBox` wrapper, `ensureFoo` for an imperative creation);
-   - a doc block that narrates, restates the signature, or lacks its contract: name the member
+   - a doc block that narrates, restates the signature, lacks its contract, or is not plain English
+     (`#plain-english`): name the member
      (the `documentarian` rewrites blocks; you do not);
    - a test missing its `@example` twin, or an entrypoint tested only with clean input;
    - taste that neither the linter nor STYLE.md settles. Say nothing about it.
