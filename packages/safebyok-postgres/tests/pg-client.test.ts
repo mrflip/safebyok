@@ -1,11 +1,11 @@
-/** pgClientOf: a transaction on one connection checked out of a pg Pool. */
+/** pgClientOf: each transaction runs on one connection checked out of a pg Pool. */
 
 import { describe, expect, it } from 'vitest'
 import * as TH from './test-helpers'
 import { pgClientOf } from '../src/index'
 import type { PgPool } from '../src/index'
 
-/** A pool of one connection that logs each statement and release, and fails the statements `failing` names. */
+/** A fake pool with one connection. It logs each statement and release, and fails the statements listed in `failing`. */
 const poolOf = (failing: string[] = []) => {
   const said: string[] = []
   const runStatement = (text: string) => {

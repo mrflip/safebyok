@@ -1,4 +1,4 @@
-/** The shelf: the one object store of an IdbVaultDB's database, each row filed under an array scopepath. */
+/** The shelf: the single object store of an IdbVaultDB's database. Each row is keyed by an array scopepath. */
 
 import { promisifyRequest, type UseStore } from 'idb-keyval'
 import { VaultsDBVersion, versionedShelfOf } from 'safebyok/storage'
@@ -6,27 +6,27 @@ import type { BankScope, BoxQuery, VaultQuery, VaultScope } from 'safebyok/stora
 
 // == [Scopepaths]: VaultScopepath, BoxScopepath, vaultScopepathOf, boxScopepathOf, vaultlabelOf, boxPlaceOf, vaultsRangeOf, lifeRangeOf, bankBoxesRangeOf
 
-// The scopepaths are a stored contract: a vault already written is found by them. IndexedDB sorts
-// an array above every string, so `[...prefix, []]` closes the range of every scopepath under `prefix`.
+// The scopepaths are a stored contract: existing vaults are found by them, so changing one orphans stored rows.
+// IndexedDB sorts any array after every string, so `[...prefix, []]` is an upper bound for every scopepath that starts with `prefix`.
 
-/** Where the shelf files a vault row. */
+/** The shelf key of a vault row. */
 export type VaultScopepath = [tag: 'vault', applabel: string, user_id: string, vaultlabel: string]
 
-/** Where the shelf files a box row, under the life of its vault. */
+/** The shelf key of a box row. It includes the `vault_tok`, so each life of a vault has its own boxes. */
 export type BoxScopepath = [tag: 'box', applabel: string, user_id: string, vaultlabel: string, vault_tok: string, boxlabel: string]
 
 /** The scopepath of the vault row at `scope`. */
 export const vaultScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): VaultScopepath => ['vault', applabel, user_id, vaultlabel]
 
-/** The scopepath of the box row at `asked`, under its `vault_tok`. */
+/** The scopepath of the box row that `asked` names. */
 export const boxScopepathOf = ({ applabel, user_id, vaultlabel, vault_tok, boxlabel }: BoxQuery): BoxScopepath => (
   ['box', applabel, user_id, vaultlabel, vault_tok, boxlabel]
 )
 
-/** The vaultlabel a vault row is filed under at `scopepath`. */
+/** The vaultlabel in a vault row's `scopepath`. */
 export const vaultlabelOf = (scopepath: IDBValidKey): string => (scopepath as VaultScopepath)[3]
 
-/** The vaultlabel, life and boxlabel a box row is filed under at `scopepath`. */
+/** The vaultlabel, `vault_tok` and boxlabel in a box row's `scopepath`. */
 export const boxPlaceOf = (scopepath: IDBValidKey): { vaultlabel: string, vault_tok: string, boxlabel: string } => {
   const filed = scopepath as BoxScopepath
   return { vaultlabel: filed[3], vault_tok: filed[4], boxlabel: filed[5] }
@@ -41,21 +41,21 @@ export const vaultsRangeOf = ({ applabel, user_id }: BankScope): IDBKeyRange => 
 /** The key range of every box row under one life of a vault. */
 export const lifeRangeOf = ({ applabel, user_id, vaultlabel, vault_tok }: VaultQuery): IDBKeyRange => rangeUnder(['box', applabel, user_id, vaultlabel, vault_tok])
 
-/** The key range of every box row of the bank, of every vault and life. */
+/** The key range of every box row of the bank, across all its vaults and their lives. */
 export const bankBoxesRangeOf = ({ applabel, user_id }: BankScope): IDBKeyRange => rangeUnder(['box', applabel, user_id])
 // --
 
 // == [The database]: shelfOf, filedIn, Filed
 
-/** The shelf of the vault database of `dbName`. */
+/** The shelf of the vault database named `dbName`. */
 export const shelfOf = (dbName: string): UseStore => versionedShelfOf({
   dbName, dbstem: 'vaults', version: VaultsDBVersion, storename: 'rows', oldnames: [`${dbName}:vaults`],
 })
 
-/** A row as the shelf files it: its scopepath, and the row as stored. */
+/** A stored row, with its scopepath. */
 export type Filed = { scopepath: IDBValidKey, row: unknown }
 
-/** Every row filed in `range`, in scopepath order. */
+/** Every row in `range`, in scopepath order. */
 export const filedIn = async (store: IDBObjectStore, range: IDBKeyRange): Promise<Filed[]> => {
   const [scopepaths, rows] = await Promise.all([promisifyRequest(store.getAllKeys(range)), promisifyRequest<unknown[]>(store.getAll(range))])
   return scopepaths.map((scopepath, idx) => ({ scopepath, row: rows[idx] }))

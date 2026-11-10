@@ -1,4 +1,4 @@
-/** ConvexVaultDB: the battery every VaultDB runs, over a real ConvexClient, and the triage and options of its own. */
+/** ConvexVaultDB: the shared VaultDB battery run through a real ConvexClient, plus tests of its own refusals and options. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { anyApi } from 'convex/server'
@@ -12,8 +12,8 @@ import type { FakeDeployment, FakeHost } from '../src/testing'
 
 type ComponentDeployment = FakeDeployment<ReturnType<typeof TH.componentHost>>
 
-// Every deployment a test makes is closed after it, so no client keeps its socket's timers alive.
-// The battery refuses mutations on purpose, and a client logs each as an error: a spy keeps the output clean.
+// Each deployment a test makes is closed afterwards, so no client keeps its socket's timers alive.
+// The battery makes mutations fail on purpose, and a client logs each failure as an error, so a spy keeps the output clean.
 const deployments: FakeDeployment<FakeHost>[] = []
 const deploy = <Host extends FakeHost>(host: Host): FakeDeployment<Host> => {
   const deployment = fakeDeployment(host, { logger: TH.spyLogger().logger })
@@ -24,7 +24,7 @@ afterEach(async () => {
   await Promise.all(deployments.splice(0).map((deployment) => deployment.close()))
 })
 
-// The battery writes as several users, so its vaults reach the component directly, past the host's wrapper.
+// The battery writes as several users, so its vaultDBs call the component directly, without the host's wrapper.
 const madeOn = new WeakMap<ConvexVaultDB, { deployment: ComponentDeployment, client: ConvexClient, opts: VaultDBOnOpts }>()
 
 type VaultDBOnOpts = Omit<ConvexVaultDBOpts, 'client' | 'api'>
@@ -45,7 +45,7 @@ const madeOf = (vaultDB: ConvexVaultDB) => {
 const convexRowsOf = (vaultDB: ConvexVaultDB): TH.VaultDBRowCheats => {
   type ComponentBackend = ReturnType<ComponentDeployment['as']>
   const { deployment } = madeOf(vaultDB)
-  // Plants are changes the clients hear of, as a write from elsewhere would be.
+  // Plant through `arrange`, so the clients are notified of each planted change, as they would be of a write from elsewhere.
   const run: ComponentBackend['run'] = async (fn) => await deployment.arrange(async (backend) => await backend.run(fn))
   const findVaultDoc = async (db: Parameters<Parameters<ComponentBackend['run']>[0]>[0]['db'], { applabel, user_id, vaultlabel }: VaultScope) => (
     await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel)).unique()
@@ -58,7 +58,7 @@ const convexRowsOf = (vaultDB: ConvexVaultDB): TH.VaultDBRowCheats => {
         if (vaultDoc) { await db.replace('safebyok_vaults', vaultDoc._id, { applabel, user_id, vaultlabel, vault: row }) } else { await db.insert('safebyok_vaults', { applabel, user_id, vaultlabel, vault: row }) }
       })
     },
-    // A planted row is not tallied, so the life's tally is dropped, to be counted afresh.
+    // A planted row is not tallied, so the life's tally is deleted and the next put recounts it.
     plantBoxRow: async (scope: Boxscope, vault_tok, row) => {
       await run(async ({ db }) => {
         const { applabel, user_id, vaultlabel, boxlabel } = scope
@@ -86,7 +86,7 @@ const convexRowsOf = (vaultDB: ConvexVaultDB): TH.VaultDBRowCheats => {
   }
 }
 
-// The next query or mutation the vault's client makes fails as Convex reports a server error, its text the host's.
+// Make the client's next query or mutation fail the way Convex reports a server error, with `text` as its message.
 const failNextCall = (vaultDB: ConvexVaultDB, text = '[Request ID: 0123456789abcdef] Server Error'): void => {
   const calls = madeOf(vaultDB).client as unknown as Record<'query' | 'mutation', () => Promise<unknown>>
   const spies = [vi.spyOn(calls, 'query'), vi.spyOn(calls, 'mutation')]

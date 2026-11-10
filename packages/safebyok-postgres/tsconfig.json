@@ -1,8 +1,8 @@
 {
-  // The Postgres adapter: platform-neutral src/, which runs on the host's server (Node, Bun, Deno,
-  // an edge runtime) and touches nothing of any one of them; tests and configs run under Node,
+  // The Postgres adapter. src/ is platform-neutral: it runs on the host's server (Node, Bun, Deno,
+  // an edge runtime) and uses no API specific to any of them. Tests and configs run under Node,
   // with PGlite as the database. eslint keeps Node's modules and globals out of src/. The DOM lib
-  // is for the core, whose source the workspace reads: its WebCrypto types are the DOM's.
+  // is needed because the workspace reads the core's source, whose WebCrypto types come from it.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": [

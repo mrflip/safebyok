@@ -1,4 +1,4 @@
-/** GraphQLVaultDB over the resolvers in-process, a PostgresVaultDB on PGlite behind them: the battery every VaultDB runs. */
+/** GraphQLVaultDB calling the resolvers in-process, backed by a PostgresVaultDB on PGlite: the battery every VaultDB runs. */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Client, CombinedError } from '@urql/core'
@@ -38,11 +38,12 @@ describe("GraphQLVaultDB over the typed schema", () => {
 
 // == [A client of its own]: FakeResult, fakeClient, gotNotice, revokedNotice
 
-/** What one call of a fake client hands back, as urql's own `OperationResult` has it. */
+/** The result one call of a fake client returns, shaped like urql's `OperationResult`. */
 type FakeResult = { data?: unknown, error?: CombinedError, hasNext?: boolean }
 
-/** A GraphQLVaultDB over a fake urql Client whose queries and mutations answer `asked`, and each of whose subscriptions
- * hands the test its callback, first handing that callback `atOnce` where given; `unsubscribed` counts the stops.
+/** Make a GraphQLVaultDB on a fake urql Client. Queries and mutations resolve `asked`.
+ * Each subscription's callback is pushed to `streams` for the test to call, after first receiving `atOnce` if given.
+ * `counts.unsubscribed` counts the unsubscribes.
  */
 const fakeClient = (asked: FakeResult = {}, atOnce?: FakeResult) => {
   const streams: ((result: FakeResult) => void)[] = []
@@ -61,7 +62,7 @@ const fakeClient = (asked: FakeResult = {}, atOnce?: FakeResult) => {
   return { vaultDB: new GraphQLVaultDB({ client: client as never }), streams, counts }
 }
 
-/** A watch over a fake client, and the notices and bad news it tells. */
+/** Start a watch on a fake client, collecting its notices in `heard` and its bad news in `badnews`. */
 const watched = (atOnce?: FakeResult) => {
   const { vaultDB, streams, counts } = fakeClient({}, atOnce)
   const heard: DB.Notice[] = []

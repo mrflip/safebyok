@@ -10,7 +10,10 @@ import { bankBoxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, she
 
 // == [Options]: IdbVaultDBOpts, idbVaultDBOpts
 
-/** What an IdbVaultDB is made with: the AdapterVaultDB's options, `dbName` ('safebyok' if left out), and `maxBoxes`, a soft cap on one vault's live boxes. */
+/** Options for an IdbVaultDB: the AdapterVaultDB's options, plus
+ * - `dbName`   -- the IndexedDB database name (default: `'safebyok'`)
+ * - `maxBoxes` -- a soft cap on one vault's live boxes (default: the core's `DefaultMaxBoxes`)
+ */
 export type IdbVaultDBOpts = AdapterVaultDBOpts & { dbName?: string | undefined, maxBoxes?: number | undefined }
 
 const idbVaultDBOpts = DB.objCheck(({ str, uint }) => ({ ...DB.adapterVaultDBOpts.shape, dbName: str.min(1).optional(), maxBoxes: uint.optional() }), 'bad_option')
@@ -18,16 +21,16 @@ const idbVaultDBOpts = DB.objCheck(({ str, uint }) => ({ ...DB.adapterVaultDBOpt
 
 // == [Helpers]: Rung, isHeardBy
 
-/** What a write tells every watch on its database: the scope it wrote under, and the rows a watch hears. */
+/** A notice of one write, broadcast to every watch on the database: the scope written under, and the rows written. */
 type Rung = { scope: VaultScope, heard: Heard }
 
-/** True when a watch on `watched` hears a write under `scope`. */
+/** True when a write under `scope` falls within the `watched` scope. */
 const isHeardBy = (watched: WatchScope, scope: VaultScope): boolean => (
   (watched.applabel === scope.applabel) && (watched.user_id === scope.user_id) && ((watched.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
 )
 // --
 
-/** A vaultDB in this browser's IndexedDB, whose watch hears every tab's writes. */
+/** A vaultDB stored in this browser's IndexedDB. Its watch reports writes from every tab. */
 export class IdbVaultDB extends DB.AdapterVaultDB {
   // == [Props]: #shelf, #bellname, #maxBoxes
 
@@ -50,7 +53,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   // == [Room]: #demandRoom
 
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** Demands room in the vault for a new live box, under its soft cap `maxBoxes`. */
+  /** Demand that the vault has room for a new live box, under the soft cap `maxBoxes`. */
   async #demandRoom(store: IDBObjectStore, record: BoxRecord, ante: unknown): Promise<void> {
     if (DB.isLiveRow(ante)) { return }
     const boxes = await filedIn(store, lifeRangeOf(record))
@@ -115,7 +118,8 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
       const isOurs = DB.isLiveVaultRecord(ante, tombstone.vault_tok)
       const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
       const isWritten = isOurs && DB.isRowAt(ante, prior)
-      // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
+      // Stop here, leaving the boxes alone, when the vault row is damaged or is this life's live row at another revision.
+      // For any other row, go on to tombstone the boxes, so that a repeated del finishes the job.
       if ((! isWritten) && (isOurs || isDamaged)) { return { written: { isWritten, ante }, rungs: [] } }
       if (isWritten) { store.put(tombstone, vaultScopepathOf(tombstone)) }
       const vault = isWritten ? tombstone : ante
@@ -169,7 +173,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
 
   // == [Telling]: #ring
 
-  /** Tells every watch on this database, in this tab and every other, of rows a committed transaction wrote. */
+  /** Broadcast the rows a committed transaction wrote to every watch on this database, in every tab. */
   #ring(rungs: Rung[]): void {
     if (rungs.length === 0) { return }
     const channel = new BroadcastChannel(this.#bellname)
@@ -179,5 +183,5 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   // --
 }
 
-/** A vaultDB in this browser's IndexedDB, for an app with no backend. */
+/** Make an {@link IdbVaultDB}: a vaultDB in this browser's IndexedDB, for an app with no backend. */
 export const idbVaultDB = (opts?: IdbVaultDBOpts): IdbVaultDB => new IdbVaultDB(opts)

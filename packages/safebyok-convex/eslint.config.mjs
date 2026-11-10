@@ -1,6 +1,7 @@
-// eslint.config.mjs -- the Convex adapter's lint, cut from the core's (packages/safebyok/), which is
-// the authority on house style: where the two disagree, the core's is right and this one is the
-// bug. It differs only in what it ignores: Convex's codegen output and its agent skills.
+// eslint.config.mjs -- the Convex adapter's lint config, copied from the core's (packages/safebyok/).
+// The core's config is the authority on house style: where the two disagree, the bug is here.
+// The Convex-specific parts are the ignores (codegen output, agent skills) and two rule exceptions
+// for Convex's own file shapes.
 //
 import { defineConfig, globalIgnores } from 'eslint/config'
 import js                              from '@eslint/js'
@@ -55,9 +56,9 @@ export default defineConfig([
   globalIgnores([
     'dist/**',
     'coverage/**',
-    // Convex's codegen output, written by its templates and never edited by hand.
+    // Convex's codegen output: written by its templates, never edited by hand.
     'src/component/_generated/**',
-    // Convex's agent skills: Markdown, never run.
+    // Convex's agent skills: Markdown files that are never run.
     '.claude/**',
     '**/*.generated.*',
   ]),
@@ -279,10 +280,10 @@ export default defineConfig([
     },
   },
 
-  // Convex's own shapes. A component's schema.ts and convex.config.ts exist to make one call at the
-  // top level and export it, as a config file does. And a Convex function is registered, not
-  // declared (`export const getBox = query({...})`): its name is a verb because it is the
-  // function, called through the api as `api.vaults.getBox`.
+  // Exceptions for Convex's own file shapes. A component's schema.ts and convex.config.ts exist to
+  // make one top-level call and export the result, as a config file does. A Convex function is
+  // registered, not declared (`export const getBox = query({...})`), so the const has a verb name:
+  // it is the function clients call as `api.vaults.getBox`.
   {
     name: 'safebyok-convex/convex-definitions',
     files: ['src/component/schema.ts', 'src/component/convex.config.ts'],

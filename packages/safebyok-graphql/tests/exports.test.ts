@@ -1,4 +1,4 @@
-/** The two entry points: the browser's half and the server's, each exporting its own half alone. */
+/** The two entry points: `.` exports only the browser side, and `./server` only the server side. */
 
 import { describe, expect, it } from 'vitest'
 import * as Browser from '../src/index'

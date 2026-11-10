@@ -6,41 +6,43 @@ import { Base64, ConvexError, convexToJson, jsonToConvex } from 'convex/values'
 import type { JSONValue, Value } from 'convex/values'
 import { Checkers } from 'safebyok/storage'
 
-// It stands in for the network and a server, so it cannot prove them: calls run one at a time in
-// arrival order, every watched query reruns after each mutation, each socket is signed in as one
-// user from the start, and there is no reconnecting, ping or action. Its clients drop what they
-// `log`, and send `warn` and `error` to the console unless handed a logger.
-/** A Convex deployment in memory, running `host` under convex-test, reached by Convex clients over a fake WebSocket. */
+// The fake replaces the network and the server, so it tests neither. Calls run one at a time, in
+// arrival order. Every watched query reruns after each mutation. Each socket is signed in as one
+// user from the start. There is no reconnecting, ping or action. Clients discard `log` lines, and
+// send `warn` and `error` to the console unless given a logger.
+/** Make an in-memory Convex deployment that runs `host` under convex-test, for real Convex clients to reach over a fake WebSocket. */
 export const fakeDeployment = <Host extends FakeHost>(host: Host, opts: FakeDeploymentOpts = {}): FakeDeployment<Host> => new FakeDeployment(host, opts)
 
-/** What the clients of a {@link FakeDeployment} are given for `logger`: what they log, and where. */
+/** A logger for the clients of a {@link FakeDeployment}: `log`, `warn` and `error`, and optionally `logVerbose`. */
 export type FakeClientLogger = Pick<ConvexLogger, 'log' | 'warn' | 'error'> & Partial<Pick<ConvexLogger, 'logVerbose'>>
 
-/** The options of {@link fakeDeployment}. */
+/** Options for {@link fakeDeployment}. */
 export type FakeDeploymentOpts = {
-  /** Where each client's lines go, in place of the quiet default: `console` for all of them, a spy to catch them. */
+  /** Where every client's log lines go: pass `console` to see them all, or a spy to capture them.
+   * By default `log` lines are discarded, and `warn` and `error` go to the console.
+   */
   logger?: FakeClientLogger | undefined
 }
 
 type ConvexLogger = Exclude<NonNullable<ConvexClientOptions['logger']>, boolean>
 
-/** What {@link fakeDeployment} needs of a host: its `api`, and a backend that runs its functions. */
+/** The host handed to {@link fakeDeployment}: its `api`, and a `createTest` that makes the backend to run its functions. */
 export type FakeHost = {
   api:        unknown
   createTest: () => FakeBackend
 }
 
-/** The in-memory backend `convex-test` makes: it runs a function as a signed-in identity, or as no one. */
+/** The in-memory backend that `convex-test` makes. It runs a function as a signed-in identity, or as no one. */
 export type FakeBackend = {
   query:        (ref: FunctionReference<'query'>, args: Record<string, Value>) => Promise<unknown>
   mutation:     (ref: FunctionReference<'mutation'>, args: Record<string, Value>) => Promise<unknown>
   withIdentity: (identity: { subject: string }) => FakeBackend
 }
 
-/** What a Convex client's constructor is handed to reach the fake: `new ConvexReactClient(address, opts)`. */
+/** The options to pass a Convex client's constructor so that it reaches the fake: `new ConvexReactClient(address, opts)`. */
 export type FakeClientOpts = { webSocketConstructor: typeof WebSocket, unsavedChangesWarning: false, logger: ConvexLogger }
 
-/** The fake deployment's handle on one connected socket: the user it is signed in as, its watches. */
+/** The fake deployment's record of one connected socket: the user it is signed in as, and the queries it watches. */
 type Session = {
   socket:  FakeSocket
   subject: string | null
@@ -59,7 +61,7 @@ type QueryModification =
   | { type: 'QueryFailed', queryId: number, errorMessage: string, errorData?: JSONValue, logLines: string[], journal: null }
   | { type: 'QueryRemoved', queryId: number }
 
-// What the options and the host have, checked only: what is kept is the caller's own object, `this` and all.
+// These only validate the host and the options. The deployment keeps the caller's own objects, so their methods keep their `this`.
 const { fakeHost, fakeDeploymentOpts } = Checkers('bad_option', ({ obj, custom }) => {
   const fn = custom<(...args: never[]) => unknown>((candidate) => typeof candidate === 'function')
   const logger = obj({ log: fn, warn: fn, error: fn, logVerbose: fn.optional() })
@@ -69,7 +71,8 @@ const { fakeHost, fakeDeploymentOpts } = Checkers('bad_option', ({ obj, custom }
   }
 })
 
-// A client wants all four calls of a logger. Each given one is bound to its logger, so a logger built as a class keeps its `this`; verbose lines go nowhere unless it has them. Left out, `log` and `logVerbose` are dropped and `warn` and `error` reach the console.
+// A Convex client needs all four logger methods. Each method given is bound to its logger, so a logger built as a class keeps its `this`.
+// A logger without `logVerbose` discards verbose lines. With no logger at all, `log` and `logVerbose` are discarded and `warn` and `error` go to the console.
 const loggerFor = (logger: FakeClientLogger | undefined): ConvexLogger => (
   logger === undefined ? QuietLogger : {
     log:        logger.log.bind(logger),
@@ -79,22 +82,22 @@ const loggerFor = (logger: FakeClientLogger | undefined): ConvexLogger => (
   }
 )
 
-/** The logger a deployment's clients have unless given one. */
+/** The default logger for a deployment's clients. */
 const QuietLogger: ConvexLogger = {
   log:        () => undefined,
   logVerbose: () => undefined,
-  // eslint-disable-next-line no-console -- the quiet default's one job: a warning or error no test caught still reaches the console
+  // eslint-disable-next-line no-console -- the default logger must still show a warning or error that no test caught
   warn:       (...args: unknown[]) => { console.warn(...args) },
   // eslint-disable-next-line no-console -- see warn above
   error:      (...args: unknown[]) => { console.error(...args) },
 }
 
-// Any address will do: no socket ever reaches it.
+// Any address works: no socket ever connects to it.
 const FakeAddress = 'https://fake-deployment-123.convex.cloud'
 
 /** The deployment {@link fakeDeployment} makes. */
 export class FakeDeployment<Host extends FakeHost> {
-  /** The host's api, to call and to watch through a client. */
+  /** The host's `api`, for calling and watching its functions through a client. */
   readonly api: Host['api']
   private readonly backend: FakeBackend
   private readonly sessions = new Map<FakeSocket, Session>()
@@ -111,24 +114,26 @@ export class FakeDeployment<Host extends FakeHost> {
     this.logger = loggerFor(opts.logger)
   }
 
-  /** A real `ConvexClient` on this deployment, signed in as `subject`, or as no one. */
+  /** Make a real `ConvexClient` connected to this deployment, signed in as `subject`, or as no one when `subject` is null. */
   client(subject: string | null): ConvexClient {
     return this.connectWith(subject, (address, opts) => new ConvexClient(address, opts))
   }
 
-  /** A client made by `make`, such as a `ConvexReactClient`, on this deployment, signed in as `subject` or no one. */
+  /** Connect a client built by `make` (a `ConvexReactClient`, say) to this deployment, signed in as `subject`, or as no one when `subject` is null. */
   connectWith<Client extends { close: () => Promise<void> }>(subject: string | null, make: (address: string, opts: FakeClientOpts) => Client): Client {
     const client = make(FakeAddress, { webSocketConstructor: this.socketsFor(subject), unsavedChangesWarning: false, logger: this.logger })
     this.clients.push(client)
     return client
   }
 
-  /** The backend itself, called directly as `subject`: to arrange or inspect what is stored. */
+  /** Return the backend, acting as `subject`, to set up or inspect stored data directly.
+   * A change made this way is not pushed to watchers: use `arrange` for that.
+   */
   as(subject: string | null): ReturnType<Host['createTest']> {
     return this.backendAs(subject) as ReturnType<Host['createTest']>
   }
 
-  /** Run `change` on the backend, then push each watched query that now answers differently. */
+  /** Run `change` on the backend, then push every watched query whose result changed. */
   async arrange<T>(change: (backend: ReturnType<Host['createTest']>) => Promise<T>): Promise<T> {
     const answer = await this.enqueue(async () => {
       const changed = await change(this.backend as ReturnType<Host['createTest']>)
@@ -136,17 +141,17 @@ export class FakeDeployment<Host extends FakeHost> {
       await this.pushChanges()
       return changed
     })
-    // A socket delivers on a timer, so one more turn of it lands every push before the caller goes on.
+    // A socket delivers on a timer, so wait one timer turn for every push to arrive before returning.
     await new Promise((resolve) => { setTimeout(resolve) })
     return answer
   }
 
-  /** The functions every connected socket watches right now, by path: the live queries a client keeps open here. */
+  /** List the function path of every query a connected socket is watching right now. */
   watching(): string[] {
     return Array.from(this.sessions.values(), (session) => Array.from(session.watched.values(), (watch) => watch.udfPath)).flat()
   }
 
-  /** Sign every connected socket out, then push each watched query that now answers differently. */
+  /** Sign every connected socket out, then push every watched query whose result changed. */
   signOut(): void {
     void this.enqueue(async () => {
       for (const session of this.sessions.values()) { session.subject = null }
@@ -163,7 +168,7 @@ export class FakeDeployment<Host extends FakeHost> {
     return subject === null ? this.backend : this.backend.withIdentity({ subject })
   }
 
-  // Each socket the client constructs plugs into this deployment, signed in as `subject`.
+  // Returns a WebSocket class whose sockets connect to this deployment, signed in as `subject`.
   private socketsFor(subject: string | null): typeof WebSocket {
     const line: SocketLine = {
       opened:  (socket) => { this.sessions.set(socket, { socket, subject, version: { querySet: 0, ts: 0, identity: 0 }, watched: new Map() }) },
@@ -175,8 +180,8 @@ export class FakeDeployment<Host extends FakeHost> {
     } as unknown as typeof WebSocket
   }
 
-  // One message at a time, in arrival order: a fake failing is a bug in the test, so it rejects
-  // where vitest reports it, and the queue carries on.
+  // Runs jobs one at a time, in arrival order. A failing job means a bug in the test, so its promise
+  // rejects for vitest to report, and the queue goes on to the next job.
   private async enqueue<T>(job: () => Promise<T>): Promise<T> {
     const before = this.work
     const done = (async () => {
@@ -187,7 +192,7 @@ export class FakeDeployment<Host extends FakeHost> {
       try {
         await done
       } catch {
-        // The queue carries on past a failed job.
+        // A failed job does not stop the queue.
       }
     })()
     return await done
@@ -213,7 +218,7 @@ export class FakeDeployment<Host extends FakeHost> {
     } else if (message.type === 'Mutation') {
       await this.mutate(session, message)
     }
-    // Connect needs no answer; Authenticate, Action and Event are not spoken here.
+    // Connect needs no reply. Authenticate, Action and Event are not supported.
   }
 
   private async mutate(session: Session, message: Extract<ClientMessage, { type: 'Mutation' }>): Promise<void> {
@@ -229,8 +234,8 @@ export class FakeDeployment<Host extends FakeHost> {
     await this.pushChanges()
   }
 
-  // Every session hears of the latest timestamp -- after a mutation, the mutating one needs it to
-  // resolve its call -- with each watched query that now answers differently.
+  // Send every session the latest timestamp, with each watched query whose result changed. After a
+  // mutation, the session that made it needs that timestamp to resolve its call.
   private async pushChanges(): Promise<void> {
     for (const other of this.sessions.values()) {
       const changes: QueryModification[] = []
@@ -271,27 +276,27 @@ export class FakeDeployment<Host extends FakeHost> {
   }
 }
 
-/** A failed call as the protocol reports it: the message, and a ConvexError's data. */
+/** Format a failed call as the protocol reports it: the error message, plus the `data` of a ConvexError. */
 const failureOf = (err: unknown): { result: string, errorData?: JSONValue } => {
   const result = err instanceof Error ? err.message : String(err)
   return err instanceof ConvexError ? { result, errorData: convexToJson(err.data as Value) } : { result }
 }
 
-/** A timestamp as the protocol writes one: eight bytes, little-endian, in base64. */
+/** Encode a timestamp as the protocol does: eight bytes, little-endian, in base64. */
 const encodeTs = (ts: number): string => {
   const bytes = new Uint8Array(8)
   new DataView(bytes.buffer).setBigUint64(0, BigInt(ts), true)
   return Base64.fromByteArray(bytes)
 }
 
-/** How a fake socket reaches its deployment. */
+/** The callbacks a fake socket uses to reach its deployment. */
 type SocketLine = {
   opened(socket: FakeSocket): void
   heard(socket: FakeSocket, message: ClientMessage): void
   hungUp(socket: FakeSocket): void
 }
 
-/** Just enough of a WebSocket for a Convex client: it opens at once and delivers replies later. */
+/** Just enough of a WebSocket for a Convex client. It opens immediately and delivers each reply on a timer. */
 class FakeSocket {
   onopen:    ((event: object) => void) | null = null
   onmessage: ((event: { data: string }) => void) | null = null

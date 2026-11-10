@@ -1,6 +1,6 @@
-// eslint.config.mjs -- the Postgres adapter's lint, cut from the core's (packages/safebyok/), which
-// is the authority on house style: where the two disagree, the core's is right and this one is the
-// bug. It differs from the core's in nothing but its names, and in having no console-logger.
+// eslint.config.mjs -- the Postgres adapter's lint, copied from the core's (packages/safebyok/).
+// The core's config is the authority on house style: where the two disagree, the core's is right
+// and this file has the bug. It differs only in its config names and in having no console-logger.
 //
 import { defineConfig, globalIgnores } from 'eslint/config'
 import js                              from '@eslint/js'
@@ -220,15 +220,15 @@ export default defineConfig([
     },
   },
 
-  // And it costs the host little: Zod comes in as `zod`, classic, the flavour the core is built
-  // on, so a host bundles one Zod. `zod/mini` would bundle a second beside it, some 7 kB gzipped
-  // more; named and star imports shake alike.
+  // Keep the host's bundle small: import Zod as `zod` (classic), the flavour the core is built on,
+  // so a host bundles one Zod. `zod/mini` would add a second copy, about 7 kB gzipped. Named and
+  // star imports tree-shake equally well.
   {
     name: 'safebyok-postgres/zod-size',
     files: ['src/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
-        // `zod/v4` is classic too, under its version path, and `zod/v3` the classic before it.
+        // `zod/v4` is the same classic Zod under its versioned path, and `zod/v3` is the previous classic.
         paths: ['zod/mini', 'zod/v4', 'zod/v3'].map((otherPath) => ({
           name:    otherPath,
           message: "Import zod as `zod` (`import { object as obj } from 'zod'`): the core is built on classic Zod, and a second flavour would bundle beside it.",

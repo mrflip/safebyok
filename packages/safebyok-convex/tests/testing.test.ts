@@ -19,7 +19,7 @@ const putVaultArgs = { record: vault, opts: birth }
 const vaultAsked = { scope: TH.vaultScope }
 const watchRowsArgs = { scope: TH.bankScope }
 
-/** A mutation from a client signed in as no one, which the host refuses as identity_revoked. */
+/** Send a mutation from a client signed in as no one, which the host refuses as `identity_revoked`. */
 const refusedMutation = (deployment: ReturnType<typeof deploy>) => (
   deployment.client(null).mutation(deployment.api.safebyok.putVault, putVaultArgs)
 )
@@ -28,8 +28,8 @@ afterEach(async () => {
 })
 
 describe("fakeDeployment", () => {
-  // The fake socket answers the sync protocol as convex 1.48 speaks it. A bump of convex fails
-  // here, on purpose: check the fake against the new client's messages, then move this line.
+  // The fake socket implements the sync protocol of convex 1.48. Upgrading convex fails this test on
+  // purpose: check the fake against the new client's messages, then update the version here.
   it("follows the sync protocol of the convex it was written against, 1.48", () => {
     expect(convexVersion).to.match(/^1\.48\./)
   })

@@ -1,4 +1,4 @@
-/** This file's PGlite and the server over it, and the GraphQLVaultDBs and row backdoor the battery takes. */
+/** Test helpers: one PGlite per test file, a GraphQL server on it, GraphQLVaultDBs that call that server, and direct row access for the VaultDB battery. */
 
 import { afterAll, beforeAll } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
@@ -14,30 +14,30 @@ import type { PostgresListen, PostgresVaultDBOpts } from 'safebyok-postgres'
 import { GraphQLVaultDB } from '../src/index'
 import { VaultSchemaSdl, vaultResolvers } from '../src/server'
 
-// Everything the core's tests use too, so a test here star-imports this one module as TH.
+// Re-export the core's test helpers, so a test here imports this one module as TH.
 export * from 'safebyok/testing'
 
 // == [The database]: BootMillis, database, bootDatabaseFirst, emptyTables, listen
 
-// A PGlite's WebAssembly compiles cold on a CI runner in eight seconds or more, past a test's timeout.
+// On a CI runner, PGlite's WebAssembly can take eight seconds or more to compile from cold, longer than a test's default timeout.
 export const BootMillis = 60_000
 
 const made: { db?: Promise<PGlite> } = {}
 
-/** This file's PGlite, its tables made: one per file, as each takes seconds to boot. */
+/** Return this test file's PGlite with its tables created. One is shared per file, because each takes seconds to boot. */
 export const database = async (): Promise<PGlite> => {
   made.db ??= (async () => {
     const db = new PGlite()
     await db.exec(VaultTablesSql)
-    // The battery's user is listened for at boot: a PGlite's own listen takes its turn behind the statements already
-    // queued, so a write made just after a watch's first LISTEN would go unheard.
+    // Listen on the battery user's channel at boot. PGlite queues a LISTEN behind the statements already waiting,
+    // so a write made right after a watch's first LISTEN would be missed.
     await listenOn(db, vaultChannelOf(TH.bankScope.user_id))
     return db
   })()
   return await made.db
 }
 
-/** Boots this file's PGlite before its first test, and closes it after its last. */
+/** Boot this file's PGlite before its first test, and close it after its last. */
 export const bootDatabaseFirst = (): void => {
   beforeAll(async () => { await database() }, BootMillis)
   afterAll(async () => {
@@ -53,13 +53,13 @@ export const emptyTables = async (): Promise<void> => {
 
 const heedersOf = new Map<string, Set<(text: string) => void>>()
 
-/** Listens on `channel` the first time it is asked, and never stops, as safebyok-postgres's README recipe does. */
+/** Start listening on `channel` the first time it is asked for, and never stop, like safebyok-postgres's README recipe. Returns the channel's set of callbacks. */
 const listenOn = async (db: PGlite, channel: string): Promise<Set<(text: string) => void>> => {
   const heeders = heedersOf.get(channel)
   if (heeders !== undefined) { return heeders }
   const fresh = new Set<(text: string) => void>()
   heedersOf.set(channel, fresh)
-  // PGlite LISTENs on the identifier as given, so a channel keeps its case and characters only quoted; a user_id has no `"`.
+  // PGlite uses the channel identifier as written, so it must be quoted to keep its case and punctuation. A user_id never contains `"`.
   await db.listen(`"${channel}"`, (text) => { for (const onNotify of fresh) { onNotify(text) } })
   return fresh
 }
@@ -73,15 +73,15 @@ export const listen: PostgresListen = async (channel, onNotify) => {
 
 // == [The server]: TestContext, serverOver, schemaOver
 
-/** What the test server's context has for one request: the user its auth signed in, or null. */
+/** The test server's per-request context: the signed-in user's id, or null. */
 export type TestContext = { user_id: string | null }
 
-/** The server's PostgresVaultDB over this file's PGlite. */
+/** Make the server's PostgresVaultDB on this file's PGlite. */
 export const serverOver = async (opts: Omit<PostgresVaultDBOpts, 'client'> = {}): Promise<PostgresVaultDB> => (
   new PostgresVaultDB({ listen, ...opts, client: await database() })
 )
 
-/** The GraphQL schema over `vaultDB`, each request signed in as its context says. */
+/** Build the executable GraphQL schema for `vaultDB`. Each request is signed in as the user in its context. */
 export const schemaOver = (vaultDB: AdapterVaultDB): GraphQLSchema => makeExecutableSchema({
   typeDefs:  VaultSchemaSdl,
   resolvers: vaultResolvers({ vaultDB, userIdOf: ({ user_id }: TestContext) => user_id }),
@@ -90,22 +90,22 @@ export const schemaOver = (vaultDB: AdapterVaultDB): GraphQLSchema => makeExecut
 
 // == [The browser]: Signing, signedInAs, signedInAsAsked, browserOver
 
-/** How a test Client signs each operation in: the context the server sees for it. */
+/** A function that picks the context the server sees for each operation a test Client sends. */
 export type Signing = (operation: Operation) => TestContext
 
-/** Signs every operation in as `user_id`, or signed out for null. */
+/** Sign every operation in as `user_id`, or leave it signed out for null. */
 export const signedInAs = (user_id: string | null): Signing => () => ({ user_id })
 
-/** Signs each operation in as the user it asks for, so the server's gate stays on and lets the battery's users through. */
+/** Sign each operation in as the user named in its variables. The server's sign-in check stays on, and the battery's users pass it. */
 export const signedInAsAsked: Signing = ({ variables }) => {
   const { user_id, record, tombstone, params } = variables as { user_id?: string } & Partial<Record<'record' | 'tombstone' | 'params', { user_id?: string }>>
   return { user_id: user_id ?? record?.user_id ?? tombstone?.user_id ?? params?.user_id ?? null }
 }
 
-/** A GraphQLVaultDB whose next query or mutation can be made to fail as a dropped connection does. */
+/** A GraphQLVaultDB whose next query or mutation can be made to fail like a dropped connection. */
 export type FlakyVaultDB = GraphQLVaultDB & { failNext: () => void }
 
-/** A GraphQLVaultDB over its own urql Client, run in-process against `schema`, with urql's document cache in front, as an app's Client has. */
+/** Make a GraphQLVaultDB with its own urql Client that executes `schema` in-process. The Client uses urql's document cache, as an app's would. */
 export const browserOver = (schema: GraphQLSchema, signing: Signing = signedInAsAsked): FlakyVaultDB => {
   let isFailing = false
   const flaky = mapExchange({
@@ -127,7 +127,7 @@ export const browserOver = (schema: GraphQLSchema, signing: Signing = signedInAs
 
 const serversOf = new WeakMap<GraphQLVaultDB, { schema: GraphQLSchema, adapter: PostgresVaultDB }>()
 
-/** A fresh browser's VaultDB over emptied tables, its server's VaultDB made with `opts` and at most `maxBoxes` boxes to a vault. */
+/** Empty the tables and make a new browser-side VaultDB. Its server's VaultDB is made with `opts` and, if given, a cap of `maxBoxes` boxes per vault. */
 export const makeVaultDB = async (opts: AdapterVaultDBOpts = {}, maxBoxes?: number): Promise<FlakyVaultDB> => {
   await emptyTables()
   const adapter = await serverOver({ ...opts, ...((maxBoxes !== undefined) && { maxBoxes }) })
@@ -137,14 +137,14 @@ export const makeVaultDB = async (opts: AdapterVaultDBOpts = {}, maxBoxes?: numb
   return vaultDB
 }
 
-/** The server a VaultDB makeVaultDB made talks to. */
+/** Return the server behind a VaultDB that makeVaultDB or makeTwin made. */
 const serverOf = (vaultDB: GraphQLVaultDB): { schema: GraphQLSchema, adapter: PostgresVaultDB } => {
   const server = serversOf.get(vaultDB)
   if (server === undefined) { throw new Error('This takes a VaultDB makeVaultDB or makeTwin made') }
   return server
 }
 
-/** A second browser's VaultDB over the same server, as another device has. */
+/** Make a second browser-side VaultDB on the same server, to act as another device. */
 export const makeTwin = (vaultDB: GraphQLVaultDB): FlakyVaultDB => {
   const server = serverOf(vaultDB)
   const twin = browserOver(server.schema)
@@ -152,13 +152,13 @@ export const makeTwin = (vaultDB: GraphQLVaultDB): FlakyVaultDB => {
   return twin
 }
 
-/** The PostgresVaultDB behind a browser's VaultDB, for the battery's races. */
+/** Return the PostgresVaultDB behind a browser-side VaultDB, for the battery's race tests. */
 export const adapterOf = (vaultDB: GraphQLVaultDB): AdapterVaultDB => serverOf(vaultDB).adapter
 // --
 
 // == [Rows]: sql, rowsOf
 
-/** The battery's backdoor to the rows in a PGlite, by SQL. */
+/** Run SQL directly against the PGlite, for the battery's row checks. */
 const sql = async <RowT>(text: string, params: unknown[]): Promise<RowT[]> => {
   const db = await database()
   const { rows } = await db.query<RowT>(text, params)

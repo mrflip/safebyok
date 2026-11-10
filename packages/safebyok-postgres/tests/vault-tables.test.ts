@@ -1,4 +1,4 @@
-/** VaultTablesSql: the file a migration tool copies, and the tables it makes. */
+/** VaultTablesSql: it matches the shipped .sql file, and it creates the expected tables. */
 
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -9,7 +9,7 @@ import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
 
-/** Each column of `table` as information_schema describes it: its name, type and nullability. */
+/** List the columns of `table` from information_schema: each column's name, type and nullability. */
 const columnsOf = async (table: string): Promise<string[][]> => {
   const db = await TH.database()
   const { rows } = await db.query<{ column_name: string, data_type: string, is_nullable: string }>(
@@ -18,7 +18,7 @@ const columnsOf = async (table: string): Promise<string[][]> => {
   return rows.map(({ column_name, data_type, is_nullable }) => [column_name, data_type, is_nullable])
 }
 
-/** Each primary, unique, foreign or check key of `table`, as Postgres defines it. */
+/** List the primary-key, unique, foreign-key and check constraints of `table`, as Postgres defines them. */
 const keysOf = async (table: string): Promise<string[]> => {
   const db = await TH.database()
   const { rows } = await db.query<{ definition: string }>(
