@@ -4,8 +4,7 @@ An end-to-end encrypted vault for API keys and other small secrets a user brings
 Secrets are encrypted on the device, under keys that never leave it, and synchronized between
 devices through a storage layer the host plugs in.
 
-**This is a design in progress, and nothing has been released.** This package is the new design.
-The old one is `safebyok-old`, private, on its way out; its long README describes that design, not this one.
+**This is a design in progress, and nothing has been released.**
 
 ## What a host relies on
 

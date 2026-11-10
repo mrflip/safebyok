@@ -8,8 +8,7 @@ VOCABULARY.md.
 
 The second table, at the end, holds the old design's names that the new core does not have
 (the VOCABULARY sweep of 2026-11-06, `whiteboard/20261106-reform/thread-1-vocab_sweep.md`).
-`packages/safebyok-old`, and the adapters, `safebyok-react` and the demo that still run on it, use
-them until they move.
+`packages/safebyok-old` used them until it was removed on 2026-11-10.
 
 A name in the New column that also stands in the Old one was renamed again, by the rename pass of
 2026-10-19 (Box everywhere; get, put and del on every layer; `check` for a check): follow it down.

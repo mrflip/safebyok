@@ -204,7 +204,7 @@ saw vault props resolves `del()` without deleting anything, even if a vault has 
 "delete account" can report success while a vault is stored. And after a refused `del()`, an
 app's automatic retry deletes the vault that was made again in between. The Coach (2026-10-16):
 assess these once the contract is tight and the tests unified -- that is, against
-`packages/safebyok-old/VAULTDB.md` ([#107](https://github.com/mrflip/safebyok/pull/107)) and the
+the old design's [`VAULTDB.md`](https://github.com/mrflip/safebyok/blob/100256bb79797b80de9e7a9affd92073b49671f3/packages/safebyok-old/VAULTDB.md) ([#107](https://github.com/mrflip/safebyok/pull/107)) and the
 shared battery ([#114](https://github.com/mrflip/safebyok/pull/114)), after the Convex tests settle
 in their home ([#111](https://github.com/mrflip/safebyok/pull/111)). First check whether big_feats
 changed either.
@@ -465,9 +465,10 @@ vaultDB returns, likely with the `ShelfVaultDB` side quest above, for a host wit
 
 ### The adapter contract, published
 
-`packages/safebyok-old/VAULTDB.md` is the only adapter contract written for readers outside the project, and it describes the old verbs.
-Write its successor for `AdapterVaultDB` (what each verb promises, and `describeVaultDBBattery` as its test) before `safebyok-old` goes;
-`notes/design-vaultdb.md` is internal, and `safebyok-indexeddb`'s README is a template rather than a contract. The old README's guides on errors, locking,
+The old design's [`VAULTDB.md`](https://github.com/mrflip/safebyok/blob/100256bb79797b80de9e7a9affd92073b49671f3/packages/safebyok-old/VAULTDB.md) (removed with `safebyok-old`; the link is to the last commit that had it) is the only adapter
+contract written for readers outside the project, and it describes the old verbs. Write its successor for `AdapterVaultDB` (what each verb promises,
+and `describeVaultDBBattery` as its test);
+`notes/design-vaultdb.md` is internal, and `safebyok-indexeddb`'s README is a template rather than a contract. The [old README](https://github.com/mrflip/safebyok/blob/100256bb79797b80de9e7a9affd92073b49671f3/packages/safebyok-old/README.md)'s guides on errors, locking,
 logging, key derivation and passkey recipes have no new home either, and describe old behaviour, so each needs rewriting, not moving.
 
 ### A size budget, when we want one

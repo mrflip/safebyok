@@ -149,7 +149,7 @@ gets a family of rows below.
 * *Convex*: what safebyok-convex enforces. Each box is at most 1,048,576 bytes, a vault holds at most 8,000 boxes,
   and its box rows weigh at most 7,339,008 bytes (`MaxVaultBoxBytes`, half the 16 MiB read, less a document and the
   tally).
-* *Old*: the old design's `Bank.make` defaults, in packages/safebyok-old. A vault holds at most 100 boxes
+* *Old*: the old design's `Bank.make` defaults, in packages/safebyok-old (removed 2026-11-10). A vault holds at most 100 boxes
   (`MaxBoxes`), and a whisper and its sidecar together at most 40,444 bytes of JSON (`MaxWhisperBytes`).
 
 Both families take 8,192 as the 100% figure for vaults per bank. That is Convex's limit on the elements of any array,
