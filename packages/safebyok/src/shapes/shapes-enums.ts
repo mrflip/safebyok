@@ -94,17 +94,17 @@ export type WriteAct = typeof writeActVals[number]
 export const foundActVals = ['gotlive', 'gotvoid', 'gotgone', 'passed'] as const
 export type FoundAct = typeof foundActVals[number]
 
-// No 'vault_full' here: the cap on a vault's boxes is soft, refused by the vaultDB from a count the classifier is never handed (notes/answer-contract.md, *Soft caps*).
-/** The acts a box's get, put or del refuses with: its vault's four, then its own. */
+// 'vault_full' is the soft cap on a vault's boxes: where it falls among the others is no promise (notes/answer-contract.md, *Soft caps*).
+/** The acts a box's get, put or del refuses with: its vault's, then its own. */
 export const boxRefusedActVals = [
-  'vault_damaged', 'vault_void', 'vault_mismatch', 'vault_gone',
-  'box_damaged', 'box_void', 'box_gone', 'box_camped', 'box_dubdel', 'box_stale', 'box_reput', 'box_redel', 'box_retcon', 'box_clash', 'box_forked', 'box_ahead',
+  'vault_damaged', 'vault_void', 'vault_mismatch', 'vault_gone', 'vault_full',
+  'box_damaged', 'box_void', 'box_gone', 'box_camped', 'box_dubdel', 'box_stale', 'box_retcon', 'box_clash', 'box_forked', 'box_ahead',
 ] as const
 export type BoxRefusedAct = typeof boxRefusedActVals[number]
 
 /** The acts a vault's get, put or del refuses with. */
 export const vaultRefusedActVals = [
-  'vault_damaged', 'vault_void', 'vault_gone', 'vault_camped', 'vault_dubdel', 'vault_stale', 'vault_reput', 'vault_redel', 'vault_retcon', 'vault_clash', 'vault_forked', 'vault_ahead',
+  'vault_damaged', 'vault_void', 'vault_gone', 'vault_camped', 'vault_dubdel', 'vault_stale', 'vault_retcon', 'vault_clash', 'vault_forked', 'vault_ahead',
 ] as const
 export type VaultRefusedAct = typeof vaultRefusedActVals[number]
 
