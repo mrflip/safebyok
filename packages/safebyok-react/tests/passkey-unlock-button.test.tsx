@@ -176,12 +176,14 @@ describe("PassphraseModal, for a vault with a passkey", () => {
   })
 
   it("keeps the passphrase when the passkey meets misuse: the button goes, and the dialog says why", async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* React reports what its Boundary caught */ })
     await dialogFor()
     refusingAttempts(new VaultError('bad_option', 'misused'))
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await screen.findByText(Messages.passkeyTrouble)
     expect(screen.queryByText(Messages.passkeyButton)).to.be.null
     expect(document.activeElement).to.equal(screen.getByPlaceholderText('vault passphrase'))
+    expect(consoleError).toHaveBeenCalled()
   })
 
   it("offers no passkey to a user choosing the vault's first passphrase", async () => {

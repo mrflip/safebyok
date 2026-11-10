@@ -166,13 +166,15 @@ describe("BankProvider's bank", () => {
 
 describe("BankProvider's props", () => {
   it("keeps its bank when a prop it was made with changes", async () => {
-    const { props, rerender } = provided()
+    const spy = TH.spyLogger()
+    const { props, rerender } = provided({ logger: spy.logger })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
     rerender({ ...props, keyDeriver: { ...props.keyDeriver } })
     rerender({ ...props, autolockMinutes: 5 })
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(TH.seenBanks).to.have.lengthOf(1)
     expect(shown('bank')).to.eq('u1 ready')
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
   })
 
   it("says once, through the bank's logger, that a change to a prop it was made with is ignored", async () => {
@@ -362,11 +364,13 @@ describe("BankProvider's handlers", () => {
   it("leaves a vault whose lease survived its forget to be vacated when the host has no onLifecycle, as the core does", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
-    const { deviceDB } = await unlockedProvided()
+    const spy = TH.spyLogger()
+    const { deviceDB } = await unlockedProvided({ logger: spy.logger })
     refuseErase(deviceDB)
     fireEvent.click(screen.getByText('Lock'))
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(Refusal) })
     await waitFor(() => { expect(shown('vault')).to.not.eq('present locked') })
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['error', 'error'])
   })
 
   it("tells the next user's onLifecycle nothing of the bank it let go, whose vacate tells the last user's onLifecycle of the lease it cannot forget", async () => {
@@ -375,7 +379,8 @@ describe("BankProvider's handlers", () => {
     const next = vi.fn()
     const forgetting = TH.makePending()
     const previous = vi.fn()
-    const { props, rerender, deviceDB } = await unlockedProvided({ onLifecycle: previous })
+    const spy = TH.spyLogger()
+    const { props, rerender, deviceDB } = await unlockedProvided({ onLifecycle: previous, logger: spy.logger })
     vi.spyOn(deviceDB, 'forget').mockImplementation(async () => { await forgetting.promise; throw Refusal })
     fireEvent.click(screen.getByText('Lock'))
     rerender({ ...props, user_id: 'u2', onLifecycle: next })
@@ -386,6 +391,7 @@ describe("BankProvider's handlers", () => {
     expect(previous.mock.calls.map(([event]) => (event as { kind: string }).kind).filter((kind) => kind !== 'helloed')).to.deep.equal(['lease_revoke_failed', 'vacated'])
     expect(previous).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal, where: 'vacate' }))
     expect(next.mock.calls.map(([event]) => (event as { kind: string }).kind).filter((kind) => kind !== 'helloed')).to.deep.equal([])
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
   })
 })
 

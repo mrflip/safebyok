@@ -258,9 +258,9 @@ export const Whisper  = { apiKey: 'sk-test-0000' }
 /** The sidecar those worlds put beside it. */
 export const Sidecar  = Object.freeze({ note: 'work' })
 
-/** A born vault, and the rows of its boxes as the vaultDB puts them. */
-export const makeWorld = async () => {
-  const world = await makeBornVault()
+/** A born vault, and the rows of its boxes as the vaultDB puts them. `worldOverrides` says otherwise of the world. */
+export const makeWorld = async (worldOverrides: VaultWorldGiven = {}) => {
+  const world = await makeBornVault(byPassphrase(Passphrase), worldOverrides)
   const boxrows = world.vaultDB._cheat_boxRowsOf(world.vault.scope, world.vault.vault_tok)
   const tryListBoxes = vi.spyOn(world.vaultDB, 'tryListBoxes')
   const tryPutBox    = vi.spyOn(world.vaultDB, 'tryPutBox')
@@ -274,9 +274,9 @@ export const makeWorld = async () => {
   return { ...world, boxrows, tryListBoxes, tryPutBox, tryGetBox, openNextSession }
 }
 
-/** A world whose vault has a box stored, and a next session that has not yet listed it. */
-export const makeWorldWithBox = async () => {
-  const world = await makeWorld()
+/** A world whose vault has a box stored, and a next session that has not yet listed it. `worldOverrides` says otherwise of the world. */
+export const makeWorldWithBox = async (worldOverrides: VaultWorldGiven = {}) => {
+  const world = await makeWorld(worldOverrides)
   const box = await world.vault.putBox({ boxlabel, whisper: Whisper, sidecar: Sidecar })
   return { ...world, box }
 }

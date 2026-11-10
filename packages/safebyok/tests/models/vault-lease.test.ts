@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { ENCRYPTED } from '../../src/helpers/consts'
+import { parseLogger } from '../../src/helpers/logger'
 import { Vault } from '../../src/models/vault'
 import * as TH from '../test-helpers'
 import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultAndFriend, replaceTyping, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
@@ -110,21 +111,25 @@ describe("A refused forget of the row: lease_revoke_failed", () => {
   })
 
   describe("with no onLifecycle and no reportError", () => {
-    it("still vacates the vault", async () => {
-      const { vault, deviceDB } = await makeBornVault()
+    it("still vacates the vault, logging each refusal at error", async () => {
+      const spy = TH.spyLogger()
+      const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { logger: parseLogger(spy.logger) })
       deviceDB.forget.mockRejectedValue(Refusal)
       vault.lock()
       await TH.eventually(() => ! vault.isEnabled)
       expect(deviceDB.forget).toHaveBeenCalledTimes(2)
+      expect(spy.calls.map((call) => call.level)).to.deep.equal(['error', 'error'])
     })
   })
 
   it("with no onLifecycle reports it and vacates the vault; the vacate's own refusal finds that done", async () => {
     const reported = stubReportError()
-    const { vault, listing, deviceDB } = await makeBornVault()
+    const spy = TH.spyLogger()
+    const { vault, listing, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { logger: parseLogger(spy.logger) })
     deviceDB.forget.mockRejectedValue(Refusal)
     vault.lock()
     await TH.eventually(() => reported.mock.calls.length === 2)
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['error', 'error'])
     expect(reported).toHaveBeenCalledWith(Refusal)
     expect(vault.isEnabled).to.be.false
     expect(listing.at(vault.scope)).to.be.null
