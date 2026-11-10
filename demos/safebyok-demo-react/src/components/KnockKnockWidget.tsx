@@ -1,14 +1,14 @@
 import { useId, useState, type SyntheticEvent } from 'react'
 import { useBank, useBox, useVault, WhisperField } from 'safebyok-react'
 import { isQuietRefusal } from '../lib/refusals'
-import { ApiKeyVaultlabel, SealedApiKeyBoxlabel, extractSavedApiKey } from '../lib/saved-api-key'
+import { ApiKeyVaultlabel, WidgetApiKeyBoxlabel, extractSavedApiKey } from '../lib/saved-api-key'
 import { KnockForm } from './KnockForm'
 
-/** The knock-knock machine whose API key is only ever typed and sealed, never exposed: the form reads it back only to knock. */
-export const KnockKnockSealed = () => {
+/** The widget form: the knock-knock machine whose API key is only ever typed and sealed, never exposed: the form reads it back only to knock. */
+export const KnockKnockWidget = () => {
   const bank = useBank()
   const { stage, vault } = useVault(ApiKeyVaultlabel)
-  const box = useBox(ApiKeyVaultlabel, SealedApiKeyBoxlabel)
+  const box = useBox(ApiKeyVaultlabel, WidgetApiKeyBoxlabel)
   const fieldId = useId()
   const [gripe, setGripe] = useState<string | null>(null)
   const [isSaved, setIsSaved] = useState(false)
@@ -26,7 +26,7 @@ export const KnockKnockSealed = () => {
       if (bank === null) { return }
       const vaultNow = await bank.ensureVault({ vaultlabel: ApiKeyVaultlabel })
       await vaultNow.ensureUnlocked()
-      await vaultNow.putBox({ boxlabel: SealedApiKeyBoxlabel, whisper: { apiKey } }, { ifAbsent: 'add', ifPresent: 'repl' })
+      await vaultNow.putBox({ boxlabel: WidgetApiKeyBoxlabel, whisper: { apiKey } }, { ifAbsent: 'add', ifPresent: 'repl' })
       form.reset()
       setIsSaved(true)
     } catch (err) {
@@ -36,8 +36,8 @@ export const KnockKnockSealed = () => {
 
   return (
     <section className="flow knock-knock" aria-labelledby={`${fieldId}-title`}>
-      <h2 id={`${fieldId}-title`}>Knock-knock, with a sealed key</h2>
-      <p className="quiet">Your key goes from the field straight into the vault, and comes out only to knock.</p>
+      <h2 id={`${fieldId}-title`}>Widget form</h2>
+      <p className="quiet">Preassembled pieces from safebyok-react, landed in place. Your key goes in, and comes out only to knock.</p>
       <form className="api-key-slot" onSubmit={(evt) => { void save(evt) }}>
         <label htmlFor={fieldId}>Anthropic API key</label>
         <WhisperField id={fieldId} placeholder="sk-ant-…" />
@@ -48,7 +48,7 @@ export const KnockKnockSealed = () => {
         </div>
       </form>
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <KnockForm extractApiKey={() => extractSavedApiKey(vault, SealedApiKeyBoxlabel)} isReady={isReady} />
+      <KnockForm extractApiKey={() => extractSavedApiKey(vault, WidgetApiKeyBoxlabel)} isReady={isReady} />
     </section>
   )
 }

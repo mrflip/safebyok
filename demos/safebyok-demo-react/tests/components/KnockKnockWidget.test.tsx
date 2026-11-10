@@ -5,19 +5,19 @@ import { describe, expect, it, vi } from 'vitest'
 import { Bank } from 'safebyok'
 import { useBox } from 'safebyok-react'
 import type { MemoryVaultDB } from 'safebyok/storage'
-import { ApiKeyVaultlabel, SealedApiKeyBoxlabel } from '../../src/lib/saved-api-key'
-import { KnockKnockSealed } from '../../src/components/KnockKnockSealed'
+import { ApiKeyVaultlabel, WidgetApiKeyBoxlabel } from '../../src/lib/saved-api-key'
+import { KnockKnockWidget } from '../../src/components/KnockKnockWidget'
 import * as TH from '../test-helpers'
 
 const FakeApiKey = 'sk-ant-fake-knock-key'
 const Punchline = 'Banana who? Banana split, gotta run!'
 
 /** The flow beside the vault probe, in a bank for `u1`. */
-const renderFlow = () => TH.renderInBank(<><KnockKnockSealed /><TH.VaultProbe /></>)
+const renderFlow = () => TH.renderInBank(<><KnockKnockWidget /><TH.VaultProbe /></>)
 
 /** Shows whether the flow's box is `exposed`, or `sealed` (as it is when absent). */
 const ExposureProbe = () => {
-  const box = useBox(ApiKeyVaultlabel, SealedApiKeyBoxlabel)
+  const box = useBox(ApiKeyVaultlabel, WidgetApiKeyBoxlabel)
   const isExposed = box?.snapshot.isExposed ?? false
   return <span data-testid="exposure">{isExposed ? 'exposed' : 'sealed'}</span>
 }
@@ -55,7 +55,7 @@ const storedBoxRows = (vaultDB: MemoryVaultDB) => {
   return vaultDB._cheat_boxRowsOf({ applabel: 'acme', user_id: 'u1', vaultlabel: ApiKeyVaultlabel }, vaultrow.vault_tok)
 }
 
-describe("KnockKnockSealed", () => {
+describe("KnockKnockWidget", () => {
   it("shows no key saved before any Save", async () => {
     renderFlow()
     const field = await apiKeyField()
@@ -67,7 +67,7 @@ describe("KnockKnockSealed", () => {
     const { vaultDB } = renderFlow()
     await saveKey()
     const boxrows = storedBoxRows(vaultDB)
-    expect([...boxrows.keys()]).to.deep.equal([SealedApiKeyBoxlabel])
+    expect([...boxrows.keys()]).to.deep.equal([WidgetApiKeyBoxlabel])
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
@@ -84,7 +84,7 @@ describe("KnockKnockSealed", () => {
   })
 
   it("saves under StrictMode", async () => {
-    TH.renderInBank(<StrictMode><KnockKnockSealed /><TH.VaultProbe /></StrictMode>)
+    TH.renderInBank(<StrictMode><KnockKnockWidget /><TH.VaultProbe /></StrictMode>)
     await saveKey()
     await TH.expectProbe('present unlocked')
   })
@@ -134,7 +134,7 @@ describe("KnockKnockSealed", () => {
   })
 
   it("never exposes the key", async () => {
-    TH.renderInBank(<><KnockKnockSealed /><ExposureProbe /></>)
+    TH.renderInBank(<><KnockKnockWidget /><ExposureProbe /></>)
     await saveKey()
     await waitFor(() => { expect(screen.getByTestId('exposure').textContent).to.eq('sealed') })
   })

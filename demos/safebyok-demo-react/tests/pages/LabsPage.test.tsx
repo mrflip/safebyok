@@ -3,11 +3,11 @@
 import 'fake-indexeddb/auto'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../src/App'
-import { vaultDB } from '../src/lib/storage'
-import * as TH from './test-helpers'
+import { LabsPage } from '../../src/pages/LabsPage'
+import { vaultDB } from '../../src/lib/storage'
+import * as TH from '../test-helpers'
 
-// The App derives through the browser's Argon2id: 64 MiB for every passphrase typed, near a
+// The pages derive through the browser's Argon2id: 64 MiB for every passphrase typed, near a
 // second each here. What these tests click through is the page, not the deriver (the core's
 // tests keep to that), so the cheap test deriver stands in.
 vi.mock('safebyok/browser', async (importOriginal) => {
@@ -21,30 +21,30 @@ afterEach(() => {
   localStorage.clear()
 })
 
-describe("App", () => {
+describe("LabsPage", () => {
   it("shows the sign-in strip to a visitor, and no flow", () => {
-    render(<App />)
+    render(<LabsPage />)
     expect(screen.getByPlaceholderText('username')).to.not.be.null
     expect(screen.getByText('Sign in to keep a key and knock.')).to.not.be.null
     expect(screen.queryByRole('button', { name: 'Sign out' })).to.be.null
   })
 
   it("signs a user in to the flows, and out again", async () => {
-    render(<App />)
+    render(<LabsPage />)
     TH.signInAs('margo')
     await screen.findByText('margo')
-    expect(screen.getByRole('heading', { name: 'Knock-knock, with managed fields' })).to.not.be.null
-    expect(screen.getByRole('heading', { name: 'Knock-knock, with an exposed whisper' })).to.not.be.null
-    expect(screen.getByRole('heading', { name: 'Knock-knock, with a sealed key' })).to.not.be.null
+    await screen.findByRole('heading', { name: 'DOM form' })
+    const titles = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
+    expect(titles).to.deep.equal(['Widget form', 'Toolkit form', 'DOM form', 'Behind the scenes'])
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await screen.findByPlaceholderText('username')
     expect(screen.queryByText('margo')).to.be.null
   })
 
   it("says the backend is off while the outage switch is", async () => {
-    render(<App />)
+    render(<LabsPage />)
     TH.signInAs('margo')
-    const flow = within(await screen.findByRole('region', { name: 'Knock-knock, with managed fields' }))
+    const flow = within(await screen.findByRole('region', { name: 'DOM form' }))
     const adding = await flow.findByRole<HTMLButtonElement>('button', { name: 'Add key' })
     await waitFor(() => { expect(adding.disabled).to.be.false })
     const backend = screen.getByRole<HTMLInputElement>('checkbox', { name: 'Backend online' })

@@ -1,24 +1,21 @@
-import { useEffect, useId, useState } from 'react'
-import { useBank, useBox, useVault, useWhisper } from 'safebyok-react'
+import { useId, useState } from 'react'
+import { BoxFields } from 'safebyok/dom'
+import { BoxWhisperField, useBank, useBox, useVault } from 'safebyok-react'
 import { useIsShowing } from '../hooks/useIsShowing'
 import { isQuietRefusal } from '../lib/refusals'
-import { ApiKeyVaultlabel, ExposedApiKeyBoxlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
+import { ApiKeyVaultlabel, DomApiKeyBoxlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
 import { KnockForm } from './KnockForm'
 
-/** The knock-knock machine with its API key as an exposed whisper: safebyok keeps the working copy, the form just shows it. */
-export const KnockKnockExposed = () => {
+/** The DOM form: the knock-knock machine with its API key in a field safebyok fills and reads, so the key never passes through React. */
+export const KnockKnockDom = () => {
   const bank = useBank()
   const { stage, vault } = useVault(ApiKeyVaultlabel)
-  const box = useBox(ApiKeyVaultlabel, ExposedApiKeyBoxlabel)
-  const { apiKey } = useWhisper(box)
+  const box = useBox(ApiKeyVaultlabel, DomApiKeyBoxlabel)
   const isShowing = useIsShowing(box)
   const fieldId = useId()
   const [gripe, setGripe] = useState<string | null>(null)
   const [isSaved, setIsSaved] = useState(false)
   const isReady = (bank !== null) && (stage !== 'waiting')
-
-  // Leaving the form drops the working copy; Edit, on a click, brings it back.
-  useEffect(() => () => { box?.unexpose() }, [box])
 
   /** Runs a button's work, saying what refused unless the user cancelled. */
   const perform = async (work: () => unknown) => {
@@ -31,25 +28,26 @@ export const KnockKnockExposed = () => {
     }
   }
 
-  const edit = () => perform(async () => { if (bank !== null) { await ensureApiKeyBoxExposed(bank, ExposedApiKeyBoxlabel) } })
-  const save = () => perform(async () => { await box?.putExposed(); setIsSaved(true) })
+  // Each dialog opens on the click: building the vault, unlocking it.
+  const edit = () => perform(async () => { if (bank !== null) { await ensureApiKeyBoxExposed(bank, DomApiKeyBoxlabel) } })
+
+  const save = () => perform(async () => {
+    if (box === null) { return }
+    await BoxFields.of(box).put()
+    setIsSaved(true)
+  })
+
   const done = () => perform(() => box?.unexpose())
 
   return (
     <section className="flow knock-knock" aria-labelledby={`${fieldId}-title`}>
-      <h2 id={`${fieldId}-title`}>Knock-knock, with an exposed whisper</h2>
-      <p className="quiet">Your key stays open in safebyok while you edit, and put away when you leave.</p>
+      <h2 id={`${fieldId}-title`}>DOM form</h2>
+      <p className="quiet">Fields bound by the safebyok/dom export, so your key never passes through React.</p>
       <div className="api-key-slot">
         <label htmlFor={fieldId}>Anthropic API key</label>
         {box === null
           ? <span className="quiet">No key saved yet.</span>
-          : (
-            <input
-              id={fieldId} type="password" autoComplete="off" spellCheck={false} placeholder="sk-ant-…"
-              disabled={! isShowing} value={(typeof apiKey === 'string') ? apiKey : ''}
-              onChange={(evt) => { box.patchWhisper({ apiKey: evt.target.value }) }}
-            />
-          )}
+          : <BoxWhisperField id={fieldId} box={box} path="apiKey" placeholder="sk-ant-…" />}
       </div>
       <div className="row">
         {isShowing && (box !== null)
@@ -63,7 +61,7 @@ export const KnockKnockExposed = () => {
         {isSaved && <span className="quiet">Saved.</span>}
       </div>
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <KnockForm extractApiKey={() => extractSavedApiKey(vault, ExposedApiKeyBoxlabel)} isReady={isReady} />
+      <KnockForm extractApiKey={() => extractSavedApiKey(vault, DomApiKeyBoxlabel)} isReady={isReady} />
     </section>
   )
 }

@@ -6,6 +6,8 @@ import { defineConfig } from 'vitest/config'
 // renders under jsdom, by a `@vitest-environment jsdom` line at the top of its file.
 export default defineConfig({
   plugins: [react()],
+  // Two pages, each its own bundle: the landing page's holds none of the labs' developer tools.
+  build: { rolldownOptions: { input: { landing: 'index.html', labs: 'labs.html' } } },
   test: {
     include:     ['tests/**/*.test.{ts,tsx}'],
     environment: 'node',

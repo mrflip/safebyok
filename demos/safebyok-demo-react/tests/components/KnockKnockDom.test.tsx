@@ -5,19 +5,19 @@ import { describe, expect, it, vi } from 'vitest'
 import { Bank } from 'safebyok'
 import type { MemoryVaultDB } from 'safebyok/storage'
 import { useBox } from 'safebyok-react'
-import { ApiKeyVaultlabel, FieldsApiKeyBoxlabel } from '../../src/lib/saved-api-key'
-import { KnockKnockFields } from '../../src/components/KnockKnockFields'
+import { ApiKeyVaultlabel, DomApiKeyBoxlabel } from '../../src/lib/saved-api-key'
+import { KnockKnockDom } from '../../src/components/KnockKnockDom'
 import * as TH from '../test-helpers'
 
 const FakeApiKey = 'sk-ant-fake-knock-key'
 const Punchline = 'Banana who? Banana split, gotta run!'
 
 /** The flow beside the vault probe, in a bank for `u1`. */
-const renderFlow = () => TH.renderInBank(<><KnockKnockFields /><TH.VaultProbe /></>)
+const renderFlow = () => TH.renderInBank(<><KnockKnockDom /><TH.VaultProbe /></>)
 
 /** A Veil button for the box under the flow, which nothing on the page offers. */
 const BoxVeiler = () => {
-  const box = useBox(ApiKeyVaultlabel, FieldsApiKeyBoxlabel)
+  const box = useBox(ApiKeyVaultlabel, DomApiKeyBoxlabel)
   return <button type="button" onClick={() => { box?.veil() }}>Veil</button>
 }
 
@@ -54,7 +54,7 @@ const storedBoxRows = (vaultDB: MemoryVaultDB) => {
   return vaultDB._cheat_boxRowsOf({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }, vaultrow.vault_tok)
 }
 
-describe("KnockKnockFields", () => {
+describe("KnockKnockDom", () => {
   it("builds the vault and an empty box on Add key, and shows its field ready to type in", async () => {
     renderFlow()
     expect(screen.getByText('No key saved yet.')).to.not.be.null
@@ -65,7 +65,7 @@ describe("KnockKnockFields", () => {
   })
 
   it("keeps the field showing after Add key under StrictMode", async () => {
-    TH.renderInBank(<StrictMode><KnockKnockFields /><TH.VaultProbe /></StrictMode>)
+    TH.renderInBank(<StrictMode><KnockKnockDom /><TH.VaultProbe /></StrictMode>)
     const field = await addKey()
     fireEvent.change(field, { target: { value: FakeApiKey } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -77,7 +77,7 @@ describe("KnockKnockFields", () => {
     await saveKey()
     expect(document.body.outerHTML).to.not.contain(FakeApiKey)
     const boxrows = storedBoxRows(vaultDB)
-    expect([...boxrows.keys()]).to.deep.equal([FieldsApiKeyBoxlabel])
+    expect([...boxrows.keys()]).to.deep.equal([DomApiKeyBoxlabel])
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
@@ -128,7 +128,7 @@ describe("KnockKnockFields", () => {
   it("knocks with the saved key while the box is veiled", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
-    TH.renderInBank(<><KnockKnockFields /><BoxVeiler /><TH.VaultProbe /></>)
+    TH.renderInBank(<><KnockKnockDom /><BoxVeiler /><TH.VaultProbe /></>)
     await saveKey()
     fireEvent.click(screen.getByRole('button', { name: 'Veil' }))
     await screen.findByRole('button', { name: 'Edit key' })
