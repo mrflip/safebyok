@@ -7,12 +7,12 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** The passkey header a vault with the passkey `credential_id` keeps on its gate. */
+/** Return the passkey header that a vault with the passkey `credential_id` has on its gate. */
 const headerOf = (credential_id: string, prf_salt_b64: string): WayinHeader => ({
   wayinkind: 'passkey', credential_id, prf_salt_b64, device_id: TH.DeviceId, registered_at: 0,
 }) as WayinHeader
 
-/** The refusal `promise` rejects with. */
+/** Return the refusal that `promise` rejects with. */
 const refusalOf = async (promise: Promise<unknown>): Promise<VaultError> => {
   try {
     await promise
@@ -205,7 +205,7 @@ describe("askPasskey's header and options", () => {
     })
   }
 
-  // No vault the core read has such a salt: it came from the host.
+  // The core never reads a vault with a salt like this, so a header that has one came from the host.
   it("refuses a salt that is not base64url", async () => {
     const authenticator = TH.installFakeAuthenticator()
     const refused = await refusalOf(askPasskey(headerOf('AAAA', 'not base64url!')))

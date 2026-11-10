@@ -2,6 +2,7 @@ import { Component } from 'react'
 import { HostErrorSanitizer, VaultError, isVaultError } from 'safebyok'
 import type { BoundaryProps, BoundarySource } from '../shapes'
 
+/** An error boundary: render `fallback` once a child has thrown, and call `onCaught`. */
 export class Boundary extends Component<BoundaryProps, { caught: boolean }> {
   override state = { caught: false }
 
@@ -14,6 +15,9 @@ export class Boundary extends Component<BoundaryProps, { caught: boolean }> {
 
 const LeftOut = "It is left out of this report, as it may quote what the user typed"
 
+/** Convert an error a boundary caught into a VaultError that is safe to report.
+ * The error's cause is left out, because it may quote what the user typed.
+ */
 export const forBoundary = (err: unknown, source: BoundarySource): VaultError => {
   if (! isVaultError(err)) {
     return HostErrorSanitizer.refusalFor(err, 'unexpected_error', `Something inside safebyok-react's ${source} failed with an error that was not the vault's own. ${LeftOut}.`)

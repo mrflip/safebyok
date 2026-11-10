@@ -6,7 +6,7 @@ import { useBank } from '../hooks/hooks'
 import type { DevVaultDBInspectorProps, VaultRowLinesProps } from '../shapes'
 import { LastCallLine, jsonOf, timeOf, useLastCall, useListing } from './last-call'
 
-/** A table of the signed-in user's rows in `vaultDB` as its verbs answer them, with a raw button for each get and del it offers. */
+/** Render a table of the signed-in user's rows in `vaultDB`, as its list verbs return them, with a button for each raw get and del. */
 export const DevVaultDBInspector = ({ vaultDB }: DevVaultDBInspectorProps) => {
   const scope = useBank()?.scope ?? null
   return (
@@ -77,7 +77,7 @@ const BankRowsTable = ({ vaultDB, scope }: { vaultDB: VaultDB, scope: BankScope 
   )
 }
 
-// A damaged row is a scope: there is no revision or time to show for it.
+// A damaged row carries only its scope, so it has no revision or time to show.
 const RevisionCells = ({ row }: { row: VaultRow | BoxSparse | DamagedVault | DamagedBox }) => (
   (row.am === 'd') ? <><td /><td /></> : <><td>{row.revision_seq}</td><td>{timeOf(row.written_at)}</td></>
 )

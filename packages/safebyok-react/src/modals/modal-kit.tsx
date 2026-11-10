@@ -9,8 +9,8 @@ import type { BoundarySource, Gripe, ModalFormProps, PassphraseFieldname } from 
 
 // == [Dialog]: showWhileMounted, GatingDialog, DialogBoundary, DialogTrouble
 
-// The element is the modal for as long as it is mounted: the browser gives the focus to its first control, keeps Tab
-// inside it, and leaves the page behind inert.
+// Show the dialog as a modal for as long as it is mounted. The browser focuses its first control, keeps Tab
+// inside it, and makes the rest of the page inert.
 const showWhileMounted = (dialog: HTMLDialogElement) => {
   dialog.showModal()
   return () => { dialog.close() }
@@ -23,7 +23,7 @@ const GatingDialog = ({ gating, role, labelledBy, describedBy, children }: {
   describedBy: string
   children:    ReactNode
 }) => (
-  // The browser would close the dialog at Escape: the gating decides that, here as everywhere.
+  // The browser would close the dialog on Escape by itself. Prevent that and dismiss the gating instead, so the gating decides when the dialog closes.
   <dialog
     ref={showWhileMounted}
     className="modal"
@@ -36,7 +36,7 @@ const GatingDialog = ({ gating, role, labelledBy, describedBy, children }: {
   </dialog>
 )
 
-/** What a dialog's form is rendered inside: anything thrown by it shows as trouble, and dismisses the gating when closed. */
+/** Wrap a dialog's form in an error boundary. If the form throws, show an error dialog instead; closing that dialog dismisses the gating. */
 export const DialogBoundary = ({ gating, children }: { gating: AnyGating, children: ReactNode }) => (
   <Boundary fallback={<DialogTrouble gating={gating} />}>{children}</Boundary>
 )
@@ -58,13 +58,15 @@ const DialogTrouble = ({ gating }: { gating: AnyGating }) => {
 
 // == [Form]: textOf, useAttemptAction, SubmitButton, ModalForm, holdsFocus, unlockedFor
 
-/** The text typed in the field named `fieldname`, or '' with none. */
+/** Return the text typed in the field named `fieldname`, or '' when there is none. */
 export const textOf = (form: FormData, fieldname: PassphraseFieldname): string => {
   const typed = form.get(fieldname)
   return typeof typed === 'string' ? typed : ''
 }
 
-/** The form action for a gating's attempts, whether one runs, and the gripe to show of the last. `tried` answers null when there was nothing to try. */
+/** Return a form action that runs a gating attempt, with `isPending` and the gripe from the last attempt.
+ * `tried` runs the attempt, and resolves null when there was nothing to try. `fieldFor` picks the field to focus for a refusal kind.
+ */
 export const useAttemptAction = (
   gating:   AnyGating,
   source:   BoundarySource,
@@ -76,7 +78,7 @@ export const useAttemptAction = (
     const outcome = await tried(form)
     if (outcome === null || outcome.ok) { return null }
     const gripeNow = gripeOfRefusal(gating, outcome.err, source)
-    // The submit button, disabled while the attempt ran, has dropped the focus.
+    // The submit button was disabled during the attempt and lost focus, so move focus to the field at fault.
     if (gripeNow !== null) { fieldFor(gripeNow.refusalkind).current?.focus() }
     return gripeNow
   }, null)
@@ -88,6 +90,7 @@ const SubmitButton = ({ word, pendingWord, isSubmittable }: { word: string, pend
   return <button type="submit" disabled={pending || (! isSubmittable)}>{pending ? pendingWord : word}</button>
 }
 
+/** The layout every gating dialog shares: title, blurb, the fields passed as children, the error line, and the submit and cancel buttons. */
 export const ModalForm = ({ gating, title, blurb, submitWord, pendingWord, isSubmittable = true, gripeText, gripeId, footnote, formRef, action, onReset, children }: ModalFormProps) => {
   const titleId = useId()
   const blurbId = useId()
@@ -108,11 +111,12 @@ export const ModalForm = ({ gating, title, blurb, submitWord, pendingWord, isSub
   )
 }
 
+/** True when the focused element is inside `container`, a shadow root included. */
 export const holdsFocus = (container: HTMLElement | null): boolean => {
   if (container === null) { return false }
   const root = container.getRootNode()
-  // A document and a shadow root each know their own focused element; the document alone would
-  // name only the shadow host.
+  // Ask the container's own root for the focused element. Inside a shadow root, the document's
+  // activeElement is only the shadow host.
   const focused = root instanceof Document || root instanceof ShadowRoot ? root.activeElement : null
   return container.contains(focused)
 }
@@ -129,7 +133,7 @@ const leaseCount = (leaseMillis: number): { count: number, unit: Unit } => {
   return { count: minutes, unit: 'minute' }
 }
 
-// Each formatter is made at first use, after any polyfill the host imports has run.
+// Formatters are created on first use, so that any Intl polyfill the host imports has loaded by then.
 const relativeTimes = new Map<string, Intl.RelativeTimeFormat>()
 
 const relativeTimeIn = (locale: string): Intl.RelativeTimeFormat => {
@@ -138,8 +142,9 @@ const relativeTimeIn = (locale: string): Intl.RelativeTimeFormat => {
   return made
 }
 
+/** The sentence that tells the user how long the vault stays unlocked. `creating` picks the wording for a new vault. */
 export const unlockedFor = (leaseMillis: number, creating: boolean): string => {
-  // Never compared to ForeverMillis for equality: the far future is anything within a minute of it.
+  // Compare with a margin, not for equality: anything within a minute of ForeverMillis counts as forever.
   if (leaseMillis >= ForeverMillis - MinuteMillis) { return Messages.staysUnlocked }
   const { count, unit } = leaseCount(leaseMillis)
   const relative = relativeTimeIn(Locale).format(count, unit)
@@ -149,11 +154,13 @@ export const unlockedFor = (leaseMillis: number, creating: boolean): string => {
 
 // == [Passphrase field]: UsernameField, PassphraseField, useChosenPassphrase, ChosenPassphraseFields
 
+/** A hidden username field, so a password manager files the passphrase under the right account. */
 export const UsernameField = ({ username }: { username: string }) => (
-  // The inline display wins over a host's stylesheet, which can override [hidden].
+  // The inline `display: none` is needed because a host's stylesheet can override the [hidden] attribute.
   <input type="text" name="username" autoComplete="username" value={username} readOnly hidden style={{ display: 'none' }} />
 )
 
+/** A passphrase input with a show/hide button, a Caps Lock warning and an optional line of advice. */
 export const PassphraseField = ({ ref, fieldname, fieldlabel, advice, invalidBy, onChange }: {
   ref:        Ref<HTMLInputElement>
   fieldname:  PassphraseFieldname
@@ -163,7 +170,7 @@ export const PassphraseField = ({ ref, fieldname, fieldlabel, advice, invalidBy,
   onChange?:  ((typed: string) => void) | undefined
 }) => {
   const { pending } = useFormStatus()
-  // Masked again at each submit, so that a password manager sees a password field.
+  // Hide the passphrase again at each submit, so that a password manager sees a password field.
   const reveal = useRevealToggle(Messages.showPassphrase, Messages.hidePassphrase, ! pending)
   const [isCapsOn, setIsCapsOn] = useState(false)
   const watchCaps = (evt: KeyboardEvent) => { setIsCapsOn(evt.getModifierState('CapsLock')) }
@@ -195,21 +202,23 @@ export const PassphraseField = ({ ref, fieldname, fieldlabel, advice, invalidBy,
         />
         {reveal.button(fieldId)}
       </span>
-      {/* Mounted with the field, so that each word put in it is announced, politely. */}
+      {/* Rendered whenever the field takes advice, even while the advice is empty, so a screen reader announces each new message politely. */}
       {advice !== undefined && <p className="quiet" id={adviceId} role="status">{advice}</p>}
       <div role="status">{isCapsOn && <p className="quiet">{Messages.capsLockOn}</p>}</div>
     </>
   )
 }
 
-/** The live state of a form choosing a passphrase: its strength and its confirmation, as verdicts only, never the text. */
+/** Return the live state of a choose-a-passphrase form: strength advice, and whether the confirmation matches.
+ * React state holds only these verdicts, never the passphrase text.
+ */
 export const useChosenPassphrase = (gating: AnyGating, source: BoundarySource) => {
   const chosenRef = useRef<HTMLInputElement>(null)
   const confirmRef = useRef<HTMLInputElement>(null)
   const [advice, setAdvice] = useState<string | null>(null)
   const [isStrong, setIsStrong] = useState(false)
   const [confirmation, setConfirmation] = useState<'untyped' | 'differs' | 'matches'>('untyped')
-  // The error rides in an object, so a thrown null or undefined still reads as a failure.
+  // The error is wrapped in an object, so that a thrown null or undefined still counts as a failure.
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
   const asked = useRef(0)
   if (failure !== null) { throw forBoundary(failure.err, source) }
@@ -220,7 +229,7 @@ export const useChosenPassphrase = (gating: AnyGating, source: BoundarySource) =
     setConfirmation(confirming === chosenRef.current?.value ? 'matches' : 'differs')
   }
 
-  // The submit button stays disabled until the verdict is on the text now in the field.
+  // The submit button stays disabled until the strength check has finished for the text currently in the field.
   const hearChosen = async (typed: string) => {
     compare()
     asked.current += 1
@@ -237,7 +246,7 @@ export const useChosenPassphrase = (gating: AnyGating, source: BoundarySource) =
     }
   }
 
-  // React empties the fields after each attempt, and tells nobody's onChange.
+  // React clears the fields after each attempt without calling onChange, so this state is reset by hand.
   const forget = () => {
     asked.current += 1
     setAdvice(null)
@@ -248,6 +257,7 @@ export const useChosenPassphrase = (gating: AnyGating, source: BoundarySource) =
   return { chosenRef, confirmRef, advice, confirmation, isSubmittable: isStrong && confirmation === 'matches', hearChosen, compare, forget }
 }
 
+/** The new-passphrase field and its confirmation, with a line saying whether the two match. */
 export const ChosenPassphraseFields = ({ chosen, chosenRef, confirmRef, chosenLabel, confirmLabel, chosenInvalidBy }: {
   chosen:           Omit<ReturnType<typeof useChosenPassphrase>, 'chosenRef' | 'confirmRef'>
   chosenRef:        Ref<HTMLInputElement>

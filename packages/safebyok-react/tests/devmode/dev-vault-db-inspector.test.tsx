@@ -6,7 +6,7 @@ import * as TH from '../test-helpers'
 
 TH.sweepBankWorlds()
 
-/** The inspector over a world whose vault has `anthropic`, under a provider signed in as the world's user. */
+/** Render the inspector over a world whose vault has a box `anthropic`, under a provider signed in as the world's user. */
 const renderOverBox = async () => {
   const { world, vault } = await TH.makeBankWithVault()
   await vault.putBox({ boxlabel: 'anthropic', whisper: { apiKey: 'sk-ant-fake-stored' } }, { ifAbsent: 'add' })
@@ -15,7 +15,7 @@ const renderOverBox = async () => {
   return { world, vault }
 }
 
-/** The table's line for the box row under `boxlabel`. */
+/** Return the table row for the box named `boxlabel`. */
 const boxRow = (boxlabel: string) => screen.getByText(boxlabel).closest('tr') as HTMLElement
 const lastCall = () => screen.getByRole('status').textContent
 

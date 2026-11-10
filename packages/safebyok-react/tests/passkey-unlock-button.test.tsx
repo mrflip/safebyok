@@ -9,7 +9,7 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** An unlock_vault gating, kept open on another device, for a vault with a passkey the fake authenticator has; and the authenticator. */
+/** Open an unlock_vault gating on another device, for a vault with a passkey the fake authenticator has. Also returns the authenticator and the world. */
 const passkeyedUnlock = async () => {
   const authenticator = TH.installFakeAuthenticator()
   const world = TH.makeBankWorld()
@@ -19,17 +19,17 @@ const passkeyedUnlock = async () => {
   return { ...opened, gating: TH.gatingOfKind(opened.gating, 'unlock_vault'), authenticator, world }
 }
 
-/** The button for `gating`, what it told `onGripe`, and what React reported. */
+/** Render the button for `gating`. Returns the gripes it passed to `onGripe`, and the errors React reported. */
 const buttonFor = (gating: Gating<'unlock_vault'>, extra: { takesFocus?: boolean } = {}) => {
   const gripes: (string | null)[] = []
   const ui = <PasskeyUnlockButton gating={gating} onGripe={(gripe) => { gripes.push(gripe) }} {...extra} />
   return { ...TH.renderReporting(ui), ui, gripes }
 }
 
-/** The button's aria-disabled, 'true' while the browser asks. */
+/** Return the button's aria-disabled value. It is 'true' while the browser is asking for the passkey. */
 const asking = () => screen.getByText(Messages.passkeyButton).getAttribute('aria-disabled')
 
-/** A refusal for the gating's attempt to answer with, as the core would. */
+/** Make every gating attempt resolve with the refusal `err`, as the core would. */
 const refusingAttempts = (err: unknown) => vi.spyOn(Gating.prototype, 'attempt').mockResolvedValue({ ok: false, err } as never)
 
 describe("PasskeyUnlockButton", () => {
@@ -69,7 +69,7 @@ describe("PasskeyUnlockButton", () => {
     authenticator.refuseNext('NotAllowedError')
     fireEvent.click(button)
     await waitFor(() => { expect(asking()).to.eq('true') })
-    // jsdom keeps the focus on a disabled button, as browsers do not: that it is not disabled is the check.
+    // jsdom keeps focus on a disabled button, and browsers do not. So the real check is that the button is not disabled.
     expect(button).to.have.property('disabled', false)
     fireEvent.click(button)
     expect(document.activeElement).to.equal(button)
@@ -131,7 +131,7 @@ describe("PasskeyUnlockButton", () => {
   })
 })
 
-/** The unlock dialog for a vault with a passkey. */
+/** Render the unlock dialog for a vault that has a passkey. */
 const dialogFor = async () => {
   const opened = await passkeyedUnlock()
   render(<PassphraseModal gating={opened.gating} />)

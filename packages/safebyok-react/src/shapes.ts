@@ -3,25 +3,25 @@ import type { AnyGating, BadNewsHandler, Bank, BankOpts, Box, DeviceDB, Gating, 
 import { Checker, Checkers, bankOpts, type AssertEqual, type BoxesListed, type BoxSparse, type CheckerInput, type DamagedBox, type DamagedVault, type LeaseQuery, type LeaseScopepath, type VaultRow } from 'safebyok/storage'
 import { fromB64, type WhisperFieldAttributes } from 'safebyok/utils'
 
-// The types and checkers of safebyok-react, grouped by area. It imports types from no component or hook,
-// so nothing in it can make a cycle at run time.
+// The types and checkers of safebyok-react, grouped by area. This file imports nothing from a component or
+// hook, so it cannot be part of an import cycle at run time.
 
 // == [Provider]: BankProviderProps, providerProps, ProviderBankOpts, Handlers, ContextValue, TellBadNews, GatingModalProps, BoundaryProps, BoundarySource
 
-/** What BankProvider is handed: the Bank.make options but `device_id`, the signed-in `user_id`, and the dialogs' props. */
+/** BankProvider's props: the `Bank.make` options except `device_id`, plus the signed-in `user_id` and props for the dialogs. */
 export interface BankProviderProps extends Omit<BankOpts, 'user_id' | 'device_id' | 'requestCleartext'> {
-  /** The signed-in user, or null while nobody is. Call `bank.vacate()` at sign-out: a null leaves the leases. */
+  /** The signed-in user's id, or null while nobody is signed in. Null does not remove cached leases: call `bank.vacate()` at sign-out. */
   user_id:             string | null
-  /** What asks the user for a passphrase or passkey, in place of the provider's own dialogs, which follow the bank's snapshot. */
+  /** Your own function to ask the user for a passphrase or passkey. When omitted, the provider shows its built-in dialogs. */
   requestCleartext?:   RequestCleartext | undefined
-  /** What a password manager files a vault's passphrase under. */
+  /** The username a password manager saves the vault's passphrase under. */
   passphraseUsername?: string | undefined
-  /** The relying party the vault's passkey is made and asked under, if not the page's own domain. */
+  /** The WebAuthn relying-party id for the vault's passkey. Defaults to the page's own domain. */
   passkeyRpId?:        string | undefined
   children:            ReactNode
 }
 
-/** BankProvider's props: Bank.make's options but `device_id`, beside the signed-in user and the dialogs' props. */
+/** Checker for {@link BankProviderProps}. */
 export const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ device_id: true }).extend({
   user_id:            bankOpts.shape.user_id.nullable(),
   requestCleartext:   fn<RequestCleartext>().optional(),
@@ -30,74 +30,79 @@ export const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ de
   children:           custom<ReactNode>(),
 }), 'bad_option')
 
-// Hand-written for the doc comment a host sees on each prop, and matched to the checker so neither drifts.
+// The interface is written by hand so that each prop has a doc comment. This line fails to compile if it and the checker drift apart.
 true satisfies AssertEqual<BankProviderProps, CheckerInput<typeof providerProps>>
 
-/** The options a provider's bank is made from: Bank.make's, but `device_id` and the handlers, for a `user_id` that may be null. */
+/** The `Bank.make` options the provider passes through: all but `device_id` and the handlers, with a `user_id` that may be null. */
 export type ProviderBankOpts = Omit<BankOpts, 'user_id' | 'device_id' | 'onLifecycle' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
 
-/** The functions a provider's bank calls back, each as it was last rendered. */
+/** The host's callbacks for the provider's bank, as of the latest render. */
 export type Handlers = { onLifecycle: LifecycleHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext | undefined }
 
-/** What the provider hands down: the signed-in user's bank, the Vault objects a hook has called `tryHello` on, and how to tell the host's `onBadNews`. */
+/** The provider's context value: the signed-in user's bank, the vaults a hook has already called `tryHello` on, and a way to report bad news to the host. */
 export type ContextValue = { bank: Bank | null, helloedVaults: WeakSet<Vault>, tellBadNews: TellBadNews }
 
-/** Tell the host's `onBadNews` each refusal no caller waits on, while the bank is enabled. Never throws. */
+/** Report refusals that no caller is waiting on to the host's `onBadNews`. Does nothing once the bank is disabled. Never throws. */
 export type TellBadNews = (badnews: readonly VaultError[]) => void
 
-/** What GatingModal is handed: any gating, and the props its dialogs share. */
+/** GatingModal's props: a gating of any kind, and the props its dialogs share. */
 export type GatingModalProps = {
-  /** The gating the dialog answers, from `requestCleartext` or the bank's snapshot. */
+  /** The gating this dialog is for, from `requestCleartext` or the bank's snapshot. */
   gating:              AnyGating
-  /** The bank's `leaseMillis`, for the line saying how long an unlock lasts. */
+  /** The bank's `leaseMillis`, used for the line that says how long an unlock lasts. */
   leaseMillis?:        number | undefined
-  /** What a password manager files the passphrase under. */
+  /** The username a password manager saves the passphrase under. */
   passphraseUsername?: string | undefined
-  /** The relying party the vault's passkey is made and asked under, if not the page's own domain. */
+  /** The WebAuthn relying-party id for the vault's passkey. Defaults to the page's own domain. */
   passkeyRpId?:        string | undefined
 }
 
-/** What a {@link Boundary} is handed: what to show once something broke, and whom to tell. */
+/** {@link Boundary}'s props. */
 export type BoundaryProps = {
-  /** Shown in the children's place once one of them has thrown while rendering. */
+  /** Rendered instead of the children once one of them throws while rendering. */
   fallback:  ReactNode
-  /** Called once, when the boundary first catches. */
+  /** Called once, the first time the boundary catches an error. */
   onCaught?: (() => void) | undefined
   children:  ReactNode
 }
 
-/** The safebyok-react component a {@link forBoundary} report comes from, which its message names. */
+/** The component that a {@link forBoundary} error message names as its source. */
 export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'DelVaultModal' | 'AddPasskeyModal' | 'RevokePasskeyModal' | 'PasskeyUnlockButton'
 // --
 
 // == [Hooks]: VaultStage, VaultLifecycle
 
-/** Where the vault a hook names stands: `waiting`, `unborn`, `present`, or `spent` once its bank is swept or vacated. */
+/** The lifecycle stage of the vault a hook asked for.
+ * - `'waiting'` -- there is no bank yet, or it is not ready
+ * - `'unborn'`  -- the bank is ready and has no present vault under that vaultlabel
+ * - `'present'` -- the vault exists
+ * - `'spent'`   -- the bank was swept or vacated
+ */
 export type VaultStage = 'waiting' | 'unborn' | 'present' | 'spent'
 
-/** What {@link useVault} answers: the vault's stage, its Vault object while it is `present`, and why its bank ended once `spent`. */
+/** {@link useVault}'s return value: the vault's stage, the Vault object while `present`, and the reason the bank ended once `spent`. */
 export type VaultLifecycle = { stage: 'waiting' | 'unborn', vault: null } | { stage: 'present', vault: Vault } | { stage: 'spent', vault: null, cause: VaultError }
 // --
 
 // == [Helpers]: CreatePasskeyOpts, AskPasskeyOpts, PasskeyChecks
 
-/** What `createPasskey` asks of the host: how the authenticator shows the new passkey. */
+/** Options for `createPasskey`: how the authenticator labels the new passkey. */
 export type CreatePasskeyOpts = {
-  /** The relying party: the `name` the authenticator shows, and the `id` domain the passkey answers to. */
+  /** The relying party: the `name` the authenticator shows, and the `id` (a domain) the passkey is tied to. */
   rp:       { name: string, id?: string | undefined }
-  /** How the authenticator lists the passkey: an account `name` and a `displayName`. */
+  /** The account `name` and `displayName` the authenticator lists the passkey under. */
   user:     { name: string, displayName: string }
-  /** How long the browser waits for the user, in milliseconds. Defaults to the browser's own. */
+  /** Milliseconds the browser waits for the user. Defaults to the browser's own limit. */
   timeout?: number | undefined
 }
 
-/** What `askPasskey` may be told: the relying party's `rpId`, if the passkey was made under one, and a `timeout`. */
+/** Options for `askPasskey`: the `rpId` the passkey was created under, if it was not the page's own domain, and a `timeout` in milliseconds. */
 export type AskPasskeyOpts = {
   rpId?:    string | undefined
   timeout?: number | undefined
 }
 
-/** True for base64url text. */
+/** True when `text` is base64url. */
 const isB64 = (text: string): boolean => {
   try {
     fromB64(text)
@@ -107,9 +112,10 @@ const isB64 = (text: string): boolean => {
   }
 }
 
-// A passkey header's salt is checked here as base64url, as the core checks it when it reads the vault.
-// The core checks its credential_id only as text, so one that is not base64url refuses later, as a
-// damaged record (credentialBytesOf).
+// The header's salt is checked as base64url here, the same check the core makes when it reads the vault.
+// The core checks credential_id only as text, so one that is not base64url passes here and is refused
+// later as a damaged record (credentialBytesOf).
+/** Checkers for the arguments of the passkey helpers. */
 export const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, int, bytes, fn }) => {
   const timeout = int.positive().optional()
   const named = str.min(1)
@@ -125,8 +131,8 @@ export const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, i
       passkeyHeader: discrim('wayinkind', [passphraseHeader, passkeyHeader]).nullable(),
       opts:          obj({ rpId: named.optional(), timeout }).strict(),
     }),
-    // The attempt checks the rest of the answer.
-    /** The part of a passkey answer attemptOnce itself touches. */
+    // The gating's attempt validates the rest of the answer.
+    /** The only field of a passkey answer that attemptOnce reads. */
     attemptOnceAnswer:  obj({ prfBytes: bytes() }),
     attemptOnceAttempt: fn(),
   }
@@ -135,142 +141,142 @@ export const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, i
 
 // == [Components]: WhisperFieldProps, BoxWhisperFieldProps, PasskeyUnlockButtonProps, VaultControlProps
 
-/** What a WhisperField is handed: where each change goes, and any input attribute but a value. */
+/** WhisperField's props: an `onChange` for the text, and any `<input>` attribute except the value and the ones WhisperField sets itself. */
 export type WhisperFieldProps = Omit<ComponentPropsWithRef<'input'>, 'type' | 'name' | 'value' | 'defaultValue' | 'onChange' | keyof typeof WhisperFieldAttributes> & {
-  /** Hears the whole text after each change. */
+  /** Called with the field's full text after each change. */
   onChange?: ((whisperText: string) => void) | undefined
 }
 
-/** What a BoxWhisperField is handed: the box, the dotted path, and input attributes. */
+/** BoxWhisperField's props: the box, the dotted path into its whisper, and `<input>` attributes. */
 export type BoxWhisperFieldProps = Omit<ComponentPropsWithoutRef<'input'>, 'type' | 'name' | 'value' | 'defaultValue' | 'onChange' | keyof typeof WhisperFieldAttributes> & {
   box:  Box
   path: string
 }
 
-/** What PasskeyUnlockButton is handed. */
+/** PasskeyUnlockButton's props. */
 export type PasskeyUnlockButtonProps = {
-  /** The gating the passkey answers, as the bank handed it to `requestCleartext`. */
+  /** The unlock gating, as the bank passed it to `requestCleartext`. */
   gating:      Gating<'unlock_vault'>
-  /** What the button has to say, or null once what it said last no longer stands. */
+  /** Called with a message to show the user, or with null to clear the last message. */
   onGripe:     (gripe: string | null) => void
-  /** The relying party the passkey was made under, if not the page's own domain. */
+  /** The relying-party id the passkey was created under. Defaults to the page's own domain. */
   rpId?:       string | undefined
-  /** Whether the button takes the focus when it first shows. */
+  /** True to focus the button when it first renders. */
   takesFocus?: boolean | undefined
 }
 
-/** What a VaultLockControl or a CreateVaultButton is handed: the vaultlabel of the vault it acts on. */
+/** Props for VaultLockControl and CreateVaultButton: the vaultlabel of the vault to act on. */
 export type VaultControlProps = { vaultlabel: string }
 // --
 
 // == [Modals]: PassphraseFieldname, Gripe, ModalFormProps, PassphraseGating, PassphraseModalProps, ReplacePassphraseModalProps, AddPasskeyModalProps, RevokePasskeyModalProps, DelVaultModalProps
 
-/** The `name` of a passphrase field, which a password manager reads and the form action reads it by. */
+/** The `name` attribute of a passphrase field. Password managers read it, and the form action looks the field up by it. */
 export type PassphraseFieldname = 'current-password' | 'new-password' | 'confirm-password'
 
-/** What a dialog says of a refused attempt, and the refusal's kind, which names the field at fault. */
+/** The message a dialog shows for a refused attempt, with the refusal's kind, which identifies the field at fault. */
 export type Gripe = { text: string, refusalkind: string }
 
-/** What a {@link ModalForm} is handed. */
+/** {@link ModalForm}'s props. */
 export type ModalFormProps = {
-  /** The gating the dialog answers: Cancel and Escape dismiss it. */
+  /** The gating this dialog is for. Cancel and Escape dismiss it. */
   gating:         AnyGating
-  /** The heading, which names the dialog. */
+  /** The heading. It is also the dialog's accessible name. */
   title:          string
-  /** The paragraph under it, which describes the dialog. */
+  /** The paragraph under the heading. It is also the dialog's accessible description. */
   blurb:          string
-  /** The submit button's word. */
+  /** The submit button's label. */
   submitWord:     string
-  /** The submit button's word while an attempt runs. */
+  /** The submit button's label while an attempt runs. */
   pendingWord:    string
   /** False to keep the submit button disabled. */
   isSubmittable?: boolean | undefined
-  /** What to say in the live region, or null for nothing. */
+  /** The message for the live region, or null for none. */
   gripeText:      string | null
   /** The live region's id. */
   gripeId:        string
-  /** A quiet line under the live region: how long an unlock lasts. */
+  /** A muted line under the live region, saying how long an unlock lasts. */
   footnote?:      string | undefined
   formRef?:       Ref<HTMLFormElement> | undefined
-  /** The form's action, called with what was typed at each submit. */
+  /** The form's action, called with the form's data at each submit. */
   action:         (form: FormData) => void
-  /** Called once React has emptied the fields after an attempt. */
+  /** Called after React clears the fields following an attempt. */
   onReset?:       (() => void) | undefined
-  /** The fields, between the blurb and the live region. */
+  /** The fields, rendered between the blurb and the live region. */
   children:       ReactNode
 }
 
-/** The gatings the passphrase dialog answers: a vault's build, and an unlock. */
+/** The gatings PassphraseModal handles: building a vault, and unlocking one. */
 export type PassphraseGating = Gating<'build_vault'> | Gating<'unlock_vault'>
 
-/** What PassphraseModal is handed. */
+/** PassphraseModal's props. */
 export type PassphraseModalProps = {
-  /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
+  /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              PassphraseGating
-  /** The bank's `leaseMillis`, for the line saying how long an unlock lasts. */
+  /** The bank's `leaseMillis`, used for the line that says how long an unlock lasts. */
   leaseMillis?:        number | undefined
-  /** What a password manager files the passphrase under. */
+  /** The username a password manager saves the passphrase under. */
   passphraseUsername?: string | undefined
-  /** The relying party the vault's passkey was made under, if not the page's own domain. */
+  /** The relying-party id the vault's passkey was created under. Defaults to the page's own domain. */
   passkeyRpId?:        string | undefined
 }
 
-/** What ReplacePassphraseModal is handed. */
+/** ReplacePassphraseModal's props. */
 export type ReplacePassphraseModalProps = {
-  /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
+  /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              Gating<'replace_passphrase'>
-  /** What a password manager files the passphrase under. */
+  /** The username a password manager saves the passphrase under. */
   passphraseUsername?: string | undefined
 }
 
-/** What AddPasskeyModal is handed. */
+/** AddPasskeyModal's props. */
 export type AddPasskeyModalProps = {
-  /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
+  /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              Gating<'add_passkey'>
-  /** What a password manager files the passphrase under, and what the authenticator lists the passkey under. */
+  /** The username a password manager saves the passphrase under. The authenticator lists the new passkey under it too. */
   passphraseUsername?: string | undefined
-  /** The relying party the passkey is made under, if not the page's own domain. */
+  /** The relying-party id to create the passkey under. Defaults to the page's own domain. */
   passkeyRpId?:        string | undefined
 }
 
-/** What RevokePasskeyModal is handed. */
+/** RevokePasskeyModal's props. */
 export type RevokePasskeyModalProps = {
-  /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
+  /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              Gating<'revoke_passkey'>
-  /** What a password manager files the passphrase under. */
+  /** The username a password manager saves the passphrase under. */
   passphraseUsername?: string | undefined
 }
 
-/** What DelVaultModal is handed. */
+/** DelVaultModal's props. */
 export type DelVaultModalProps = {
-  /** The gating the dialog answers, as the bank handed it to `requestCleartext`. */
+  /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              Gating<'del_vault'>
-  /** What a password manager files the passphrase under. */
+  /** The username a password manager saves the passphrase under. */
   passphraseUsername?: string | undefined
 }
 // --
 
 // == [Devmode]: DevBoxInspectorProps, DevDeviceDBInspectorProps, DevVaultDBInspectorProps, LastCall, Listing, ListedLease, LeaseRowLineProps, VaultRowLinesProps
 
-/** What a DevBoxInspector is handed: the vaultlabel and boxlabel it opens on. */
+/** DevBoxInspector's props: the vaultlabel and boxlabel its fields start with. */
 export type DevBoxInspectorProps = { defaultVaultlabel?: string, defaultBoxlabel?: string }
 
-/** What a DevDeviceDBInspector is handed: the deviceDB whose rows it shows. */
+/** DevDeviceDBInspector's props: the deviceDB whose rows it shows. */
 export type DevDeviceDBInspectorProps = { deviceDB: DeviceDB }
 
-/** What a DevVaultDBInspector is handed: the vaultDB whose rows it shows. */
+/** DevVaultDBInspector's props: the vaultDB whose rows it shows. */
 export type DevVaultDBInspectorProps = { vaultDB: VaultDB }
 
-/** What a panel's last button answered: the verb it called, whether it refused, and what it said. */
+/** The result of a panel's last button press: the verb called, whether it succeeded, and the text to show. */
 export type LastCall = { verbname: string, isOk: boolean, said: string }
 
-/** What a panel's listing has: the rows last listed, null before the first, and the refusal of the last attempt. */
+/** A panel's listing state: the rows from the last listing, null before the first, and the error text if the last attempt failed. */
 export type Listing<ValT> = { val: ValT | null, trouble: string | null }
 
-/** A lease row as the table lists it, with the scopepath it is filed under where `listRawLeases` gave one. */
+/** A lease row for the table, with its scopepath when `listRawLeases` supplied one. */
 export type ListedLease = { row: Record<string, unknown>, scopepath: LeaseScopepath | null }
 
-/** What a lease row's line is handed: the row, where it is filed, and what its buttons call, null for a button it lacks. */
+/** Props for one lease row of the table: the row, its scopepath, and its button handlers. A null handler means the row has no such button. */
 export type LeaseRowLineProps = {
   row:       Record<string, unknown>
   scopepath: LeaseScopepath | null
@@ -278,7 +284,7 @@ export type LeaseRowLineProps = {
   onForgetRaw:  ((scopepath: LeaseScopepath) => Promise<void>) | null
 }
 
-/** What a vault row's lines are handed: the row, its boxes as listed, and what each button calls. */
+/** Props for one vault's rows of the table: the vault row, its listed boxes, and the button handlers. */
 export type VaultRowLinesProps = {
   vaultRow:   VaultRow | DamagedVault
   boxes:      BoxesListed | null

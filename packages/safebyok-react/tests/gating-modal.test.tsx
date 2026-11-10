@@ -7,10 +7,10 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** What the vault is before the gating is raised: absent, built, or built and with a passkey. */
+/** The vault's state before the gating is raised: absent, built, or built with a passkey. */
 type Before = 'absent' | 'built' | 'passkeyed'
 
-/** The gating `raise` opens, shown in a GatingModal (as `shown` makes it out to be). */
+/** Open a gating with `raise`, and render it in a GatingModal. `shown` may replace the gating that is rendered. */
 const shownFor = async (raise: (bank: Bank) => ReturnType<typeof TH.building>, before: Before, shown = (gating: AnyGating) => gating) => {
   const world = TH.makeBankWorld()
   if (before !== 'absent') {
@@ -22,7 +22,7 @@ const shownFor = async (raise: (bank: Bank) => ReturnType<typeof TH.building>, b
   return opened
 }
 
-/** `gating`, made out to be of a gatingkind this package has no dialog for, as one a newer core raises. */
+/** Return a copy of `gating` with a gatingkind this package has no dialog for, like one a newer core might raise. */
 const forged = (gating: AnyGating): AnyGating => Object.create(gating, { gatingkind: { value: 'forged_kind' }, dismiss: { value: () => { gating.dismiss() } } }) as AnyGating
 
 describe("GatingModal", () => {

@@ -11,7 +11,7 @@ beforeEach(() => { TH.seenBanks.length = 0 })
 
 const shown = (testid: 'bank' | 'vault') => screen.getByTestId(testid).textContent
 
-/** A MemoryVaultDB whose listBoxes refuses, once told to, while its listVaults still answers. */
+/** A MemoryVaultDB whose listBoxes refuses once `refusing` is set. Its listVaults keeps working. */
 class BoxRefusingVaultDB extends MemoryVaultDB {
   refusing = false
   protected override doListBoxes(asked: VaultQuery) {
@@ -20,13 +20,13 @@ class BoxRefusingVaultDB extends MemoryVaultDB {
   }
 }
 
-/** What useVault answers for the vault `main`: its stage, and the cause's kind once spent. */
+/** Render what useVault returns for the vault `main`: its stage, and the cause's refusal kind once spent. */
 const ShowsMain = () => {
   const main = useVault('main')
   return <span data-testid="main">{main.stage === 'spent' ? `spent ${main.cause.refusalkind}` : main.stage}</span>
 }
 
-/** Calls `hook` as it renders, and renders nothing. */
+/** Call `hook` during render, and render nothing. */
 const Calls = ({ hook }: { hook: () => unknown }) => { hook(); return null }
 
 describe("the hooks outside a BankProvider", () => {
@@ -138,19 +138,19 @@ describe("useVault and useVaultSnapshot", () => {
 
 // == [Box hooks]: typingPassphrase, BoxPage, seenBoxes, boxWorld
 
-/** A requestCleartext that types the test's passphrase into every dialog. */
+/** A requestCleartext that attempts every gating with the test's passphrase. */
 const typingPassphrase: RequestCleartext = async (gating) => { await gating.attempt(TH.byPassphrase(TH.Passphrase)) }
 
-/** What a page shows of a box's snapshot: its revision and whether it is exposed. */
+/** Return the text a page shows for a box's snapshot: its revision and whether it is exposed. */
 const boxWords = (snapshot: BoxSnapshot | null): string => {
   if (snapshot === null) { return 'none' }
   return `revision ${String(snapshot.revision_seq)}, ${snapshot.isExposed ? 'exposed' : 'sealed'}`
 }
 
-/** What a page shows of a whisper: its apiKey, and where it stands. */
+/** Return the text a page shows for a whisper: its apiKey and the box's exposure. */
 const whisperWords = (whisper: Whisper, exposure: BoxExposure): string => `${String(whisper['apiKey'] ?? '-')} ${exposure}`
 
-/** Shows what the box hooks say of no box. */
+/** Render what the box hooks return for a null box. */
 const NoBox = () => {
   const whisper = useWhisper(null)
   const snapshot = useBoxSnapshot(null)
@@ -159,10 +159,10 @@ const NoBox = () => {
   return <p>{`${String(Object.keys(whisper).length)} ${exposure} ${String(snapshot === null)} ${String(isShowing)}`}</p>
 }
 
-/** The Box objects every {@link BoxPage} has been handed, each once. */
+/** Every Box object a {@link BoxPage} has rendered with, each listed once. */
 const seenBoxes: Box[] = []
 
-/** What the box hooks say of `boxlabel` in the vault `main`, with the buttons a host's page would have. */
+/** Render what the box hooks return for `boxlabel` in the vault `main`, with the buttons a host's page would have. */
 const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
   const { vault } = useVault('main')
   const boxes = useBoxes('main')
@@ -191,7 +191,7 @@ const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
   )
 }
 
-/** Whether `anthropic` in the vault `main` shows, wears its veil and where its whisper stands, with the buttons that veil it, unexpose it and lock its vault. */
+/** Render whether `anthropic` in the vault `main` is showing and veiled, and its exposure, with buttons to veil it, unexpose it and lock its vault. */
 const VeilPage = () => {
   const { vault } = useVault('main')
   const box = useBox('main', 'anthropic')
@@ -218,7 +218,7 @@ const VeilPage = () => {
 
 const shownOfBox = (testid: 'boxes' | 'box' | 'whisper' | 'showing' | 'veil') => screen.getByTestId(testid).textContent
 
-/** A world whose vault `main` has `anthropic`, its apiKey a fake, put from another device; and that device's vault. */
+/** Make a world whose vault `main` has a box `anthropic` with a fake apiKey. Returns the world and the vault that put the box. */
 const boxWorld = async () => {
   const world = TH.makeBankWorld()
   const { vault } = await TH.makeBankWithVault(world)

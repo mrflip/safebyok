@@ -5,7 +5,7 @@ import { attemptOnce, createPasskey } from '../helpers/passkey'
 import type { AddPasskeyModalProps } from '../shapes'
 import { DialogBoundary, ModalForm, PassphraseField, UsernameField, textOf, useAttemptAction } from './modal-kit'
 
-/** The dialog for an `add_passkey` gating, which makes a passkey and adds it to the vault once the user proves its passphrase. */
+/** Render the dialog for an `add_passkey` gating: the user enters the vault's passphrase, then creates a passkey that is added to the vault. */
 export const AddPasskeyModal = (props: AddPasskeyModalProps) => (
   <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
     <AddPasskeyForm {...props} />

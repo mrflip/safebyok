@@ -2,13 +2,13 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { useRevealToggle } from '../src/hooks/reveal-toggle'
 
-/** Its example: an input, and the button that reveals it. */
+/** The hook's first example: an input and the button that reveals it. */
 const Revealed = () => {
   const reveal = useRevealToggle('Show', 'Hide')
   return <><input id="secret_field" aria-label="secret" type={reveal.fieldType} />{reveal.button('secret_field')}</>
 }
 
-/** Its second example: a field that shows only while `isFieldShowing`. */
+/** The hook's second example: a field that can be revealed only while `isFieldShowing`. */
 const RevealedWhile = ({ isFieldShowing }: { isFieldShowing: boolean }) => {
   const reveal = useRevealToggle('Show', 'Hide', isFieldShowing)
   return <><input id="secret_field" aria-label="secret" type={reveal.fieldType} />{reveal.button('secret_field')}</>

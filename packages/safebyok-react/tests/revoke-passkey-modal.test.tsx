@@ -7,7 +7,7 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** A revoke_passkey gating on a vault built under {@link TH.Passphrase} and with a passkey, shown in a RevokePasskeyModal. */
+/** Open a revoke_passkey gating on a vault built with {@link TH.Passphrase} that has a passkey, and render it in a RevokePasskeyModal. */
 const shownFor = async () => {
   const world = TH.makeBankWorld()
   const { vault } = await TH.makeBankWithVault(world)
@@ -17,7 +17,7 @@ const shownFor = async () => {
   return { ...opened }
 }
 
-/** Whether the vault in `bank` has a passkey. */
+/** True when `bank`'s vault has a passkey. */
 const hasPasskey = (bank: Bank) => bank.vaultAt(TH.VaultScopeGiven)?.gate.toJSON().passkey_wayin != null
 
 const alertText = () => screen.getByRole('alert').textContent

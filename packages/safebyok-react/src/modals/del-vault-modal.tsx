@@ -3,7 +3,7 @@ import { Messages } from '../helpers/messages'
 import type { DelVaultModalProps } from '../shapes'
 import { DialogBoundary, ModalForm, PassphraseField, UsernameField, textOf, useAttemptAction } from './modal-kit'
 
-/** The dialog for a `del_vault` gating, which deletes the vault once the user proves its passphrase. */
+/** Render the dialog for a `del_vault` gating: the user enters the vault's passphrase to delete the vault. */
 export const DelVaultModal = (props: DelVaultModalProps) => (
   <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
     <DelVaultForm {...props} />

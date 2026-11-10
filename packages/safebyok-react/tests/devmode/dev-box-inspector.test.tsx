@@ -11,10 +11,10 @@ TH.sweepBankWorlds()
 /** An obvious fake whisper, as stored. */
 const StoredKey = 'sk-ant-fake-stored'
 
-/** A requestCleartext that types the test's passphrase into every dialog. */
+/** A requestCleartext that attempts every gating with the test's passphrase. */
 const typingPassphrase: RequestCleartext = async (gating) => { await gating.attempt(TH.byPassphrase(TH.Passphrase)) }
 
-/** The inspector open on `anthropic`, under a provider on its own device, the vault with that box with its apiKey {@link StoredKey}. */
+/** Render the inspector with `boxlabel` selected, under a provider on its own device. The vault has a box `anthropic` whose apiKey is {@link StoredKey}. */
 const renderOverBox = async (boxlabel = 'anthropic') => {
   const { world, vault } = await TH.makeBankWithVault()
   await vault.putBox({ boxlabel: 'anthropic', whisper: { apiKey: StoredKey } }, { ifAbsent: 'add' })
@@ -23,8 +23,8 @@ const renderOverBox = async (boxlabel = 'anthropic') => {
       <BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><DevBoxInspector defaultBoxlabel={boxlabel} /></BankProvider>
     </StrictMode>,
   )
-  // `vault present` comes before the vault's own hello has listed its boxes, and the status says `box not listed` until then:
-  // the boxlabel suggestions name a box once listed, whichever boxlabel the inspector is open on.
+  // The status says `vault present` before the vault's own hello has listed its boxes, and `box not listed` until then.
+  // So wait for the boxlabel suggestions: they include a box once it is listed, whichever boxlabel is selected.
   await waitFor(() => { expect(status()).to.match(/^vault present/) })
   await waitFor(() => { expect(document.querySelector('datalist option[value="anthropic"]')).not.to.eq(null) })
   return { world, vault }
@@ -32,10 +32,10 @@ const renderOverBox = async (boxlabel = 'anthropic') => {
 
 const status = () => screen.getByTestId('dev-box-status').textContent
 const click = (buttonname: string) => { fireEvent.click(screen.getByRole('button', { name: buttonname })) }
-/** The block that shows the whisper under `caption`. */
+/** Return queries scoped to the block that shows the whisper under `caption`. */
 const whisperBlock = (caption: string) => within(screen.getByText(caption).parentElement!)
 const lastCall = () => screen.getByRole('status').textContent
-/** Clicks ensureUnlocked, and waits for the vault to say it is unlocked. */
+/** Click ensureUnlocked, and wait until the status says the vault is unlocked. */
 const unlocking = async () => {
   click('ensureUnlocked')
   await waitFor(() => { expect(status()).to.include(', unlocked;') })

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { WhisperFieldAttributes } from 'safebyok/utils'
 import { WhisperField } from '../src/components/whisper-field'
 
-/** A host hearing the whisper as typed through onChange, as the field's first examples do, and showing how long it is. */
+/** A host that receives the typed whisper through onChange, as in the field's first examples, and shows its length. */
 const Host = ({ placeholder }: { placeholder?: string }) => {
   const [keyText, setKeyText] = useState('')
   return (
@@ -17,13 +17,13 @@ const Host = ({ placeholder }: { placeholder?: string }) => {
   )
 }
 
-/** The field itself, found by the name its examples give it. */
+/** Return the field, found by the label its examples give it. */
 const theField = () => screen.getByLabelText<HTMLInputElement>('Anthropic API key')
 
 /** An obvious fake whisper. */
 const FakeWhisper = 'sk-ant-fake'
 
-/** Types the fake whisper into the field, as a user's keystrokes leave it. */
+/** Set the field's text to the fake whisper, as if the user had typed it. */
 const typeWhisper = () => { fireEvent.change(theField(), { target: { value: FakeWhisper } }) }
 
 describe("WhisperField", () => {

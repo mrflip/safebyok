@@ -1,5 +1,6 @@
-/** safebyok-react's test helpers: everything `safebyok/testing` has, a provider over a bank world, a render that hears what React reports, a promise pending until the test settles it, and a way to have Suspense hide what it renders.
- * Those that need JSX are in `test-helpers-react.tsx`, which it re-exports. Star-import it as `TH` (`import * as TH from './test-helpers'`).
+/** safebyok-react's test helpers. This file re-exports everything in `safebyok/testing`, and adds helpers for
+ * rendering, open gatings, typing in the dialogs, and a fake authenticator.
+ * Helpers that need JSX are in `test-helpers-react.tsx`, re-exported here. Star-import this file as `TH` (`import * as TH from './test-helpers'`).
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
@@ -12,19 +13,19 @@ import type { BankProviderProps, PassphraseGating } from '../src/shapes'
 export * from 'safebyok/testing'
 export * from './test-helpers-react'
 
-/** Sweep every bank a test made, after it: `useBankWorlds`, named so React's hook rules do not take it for a hook. */
+/** Sweep every bank a test made, once the test ends. This is `useBankWorlds`, under a name that React's hook lint does not mistake for a hook. */
 export const sweepBankWorlds = useBankWorlds
 
 // == [Rendering]: renderReporting, Catcher, makePending, Hider
 
-/** `ui` rendered as Testing Library's `render` does, and `reported`: each error a boundary caught, as React hands it to `onCaughtError`. */
+/** Render `ui` as Testing Library's `render` does, and also return `reported`: every error a boundary caught, as React passed it to `onCaughtError`. */
 export const renderReporting = (ui: ReactElement) => {
   const reported: unknown[] = []
   const rendered = render(ui, { onCaughtError: (err) => { reported.push(err) } })
   return { ...rendered, reported }
 }
 
-/** An error boundary that shows `caught: <message>` for what it caught, as a host's would. */
+/** An error boundary that shows `caught: <message>` for the error it caught, like a host's own boundary. */
 export class Catcher extends Component<{ children: ReactNode }, { caught: string | null }> {
   override state = { caught: null as string | null }
   static getDerivedStateFromError(err: unknown) { return { caught: err instanceof Error ? err.message : 'not an Error' } }
@@ -33,7 +34,7 @@ export class Catcher extends Component<{ children: ReactNode }, { caught: string
 
 const unsettled = () => { /* replaced before the promise's executor returns */ }
 
-/** A promise and the functions that settle it, for the test to settle when it chooses. */
+/** Return a promise with its `resolve` and `reject`, so the test can settle it when it chooses. */
 export const makePending = <ValT = undefined>() => {
   let resolve: (val: ValT) => void = unsettled
   let reject: (err: unknown) => void = unsettled
@@ -44,7 +45,7 @@ export const makePending = <ValT = undefined>() => {
   return { promise, resolve, reject }
 }
 
-/** Suspends the Suspense boundary around it while `hiding` is pending, and renders nothing; null suspends nothing. */
+/** Suspend the Suspense boundary around it while `hiding` is pending, and render nothing. A null `hiding` suspends nothing. */
 export const Hider = ({ hiding }: { hiding: Promise<unknown> | null }) => {
   if (hiding !== null) { use(hiding) }
   return null
@@ -53,10 +54,10 @@ export const Hider = ({ hiding }: { hiding: Promise<unknown> | null }) => {
 
 // == [Provider world]: DeviceId, providerPropsOf, withoutGesture
 
-/** A device_id for a test that writes one into a record by hand. */
+/** A device_id for tests that write one into a record by hand. */
 export const DeviceId = '00000000-0000-4000-8000-0000000000c1'
 
-/** A BankProvider's props over `world`'s vaultDB, signed in as the world's user, with a deviceDB of its own, so a vault the world's bank built is locked to the provider's.
+/** Return BankProvider props that use `world`'s vaultDB and user, with a new deviceDB. A vault the world's bank built is therefore locked for the provider's bank.
  *
  * @example
  *   const world = TH.makeBankWorld()
@@ -67,7 +68,7 @@ export const providerPropsOf = (world: BankWorld, overrides: Partial<Omit<BankPr
   keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, ...overrides,
 })
 
-/** From here until the test ends, the browser says the user's gesture is spent, as after a timer or a fetch. */
+/** Make the browser report no active user gesture until the test ends, as it would after a timer or a fetch. */
 export const withoutGesture = () => {
   const own = Object.getOwnPropertyDescriptor(navigator, 'userActivation')
   Object.defineProperty(navigator, 'userActivation', { configurable: true, value: { isActive: false, hasBeenActive: true } })
@@ -79,7 +80,8 @@ export const withoutGesture = () => {
 
 // == [Open gatings]: addPasskeyTo, openGatingOf, building, unlocking, replacing, deleting, addingPasskey, revokingPasskey, passphraseGatingOf, gatingOfKind
 
-/** Add a passkey to `vault`, a vault of `world`'s own bank, as its user would at the dialog: `passkeyClear`, or the passkey `passkeyOf('laptop')` makes.
+/** Add a passkey to `vault`, which belongs to `world`'s own bank, the way a user would in the dialog.
+ * Uses `passkeyClear`, or the passkey from `passkeyOf('laptop')` when none is given.
  *
  * @example await TH.addPasskeyTo(world, vault, await createPasskey(TH.PasskeyMaking))  // one the fake authenticator has
  */
@@ -93,10 +95,11 @@ export const addPasskeyTo = async (world: BankWorld, vault: Vault, passkeyClear?
   }
 }
 
-/** What a test hands `createPasskey`: a relying party and a user, as a host would name them. */
+/** `createPasskey` options for tests: a relying party and a user, named as a host would name them. */
 export const PasskeyMaking = { rp: { name: 'Acme' }, user: { name: 'u1 (main vault)', displayName: 'u1' } }
 
-/** The gating `raise` opens on a fresh bank over `world`'s vaultDB, on another device, kept open until it concludes or the test calls `close`, as a host's requestCleartext keeps it open while its dialog shows; and `raising`, the outcome of `raise`.
+/** Call `raise` on a new bank, on another device, over `world`'s vaultDB, and return the gating it opens.
+ * The gating stays open until it concludes or the test calls `close`, as it would while a host's dialog is showing. `raising` is the pending outcome of `raise`.
  *
  * @example
  *   await TH.makeBankWithVault(world)
@@ -117,47 +120,47 @@ export const openGatingOf = async (world: BankWorld, raise: (bank: Bank) => Prom
   return { gating, raising, bank, close: () => { closing.resolve(undefined) } }
 }
 
-/** What opens a `build_vault` gating on a bank whose vault is not built. */
+/** Open a `build_vault` gating on a bank whose vault is not built yet. */
 export const building = (bank: Bank) => bank.tryEnsureVault(VaultScopeGiven)
 
-/** What opens an `unlock_vault` gating on a bank whose vault is built and locked on its device. */
+/** Open an `unlock_vault` gating on a bank whose vault is built and locked on its device. */
 export const unlocking = async (bank: Bank) => {
   const vault = await bank.ensureVault(VaultScopeGiven)
   return vault.tryEnsureUnlocked()
 }
 
-/** What opens a `replace_passphrase` gating on a bank whose vault is built, locked or not. */
+/** Open a `replace_passphrase` gating on a bank whose vault is built, locked or not. */
 export const replacing = async (bank: Bank) => {
   const vault = await bank.ensureVault(VaultScopeGiven)
   return vault.tryReplacePassphrasePrompt()
 }
 
-/** What opens a `del_vault` gating on a bank whose vault is built, locked or not. */
+/** Open a `del_vault` gating on a bank whose vault is built, locked or not. */
 export const deleting = async (bank: Bank) => {
   const vault = await bank.ensureVault(VaultScopeGiven)
   return vault.tryDelVaultPrompt()
 }
 
-/** What opens an `add_passkey` gating on a bank whose vault is built and has no passkey. */
+/** Open an `add_passkey` gating on a bank whose vault is built and has no passkey. */
 export const addingPasskey = async (bank: Bank) => {
   const vault = await bank.ensureVault(VaultScopeGiven)
   return vault.tryAddPasskeyPrompt()
 }
 
-/** What opens a `revoke_passkey` gating on a bank whose vault is built and has a passkey. */
+/** Open a `revoke_passkey` gating on a bank whose vault is built and has a passkey. */
 export const revokingPasskey = async (bank: Bank) => {
   const vault = await bank.ensureVault(VaultScopeGiven)
   return vault.tryRevokePasskeyPrompt()
 }
 
-/** `gating`, which the test knows to be of `gatingkind`. */
+/** Return `gating`, typed as a gating of `gatingkind`. Throws if it is of another kind. */
 export const gatingOfKind = <KindT extends Gatingkind>(gating: AnyGating, gatingkind: KindT): Extract<AnyGating, { gatingkind: KindT }> => {
   const isOfKind = (some: AnyGating): some is Extract<AnyGating, { gatingkind: KindT }> => some.gatingkind === gatingkind
   if (isOfKind(gating)) { return gating }
   throw new Error(`not a ${gatingkind} gating: ${gating.gatingkind}`)
 }
 
-/** `gating`, which the test knows to be a `build_vault` or `unlock_vault` one. */
+/** Return `gating`, typed as a `build_vault` or `unlock_vault` gating. Throws if it is of another kind. */
 export const passphraseGatingOf = (gating: AnyGating): PassphraseGating => {
   if (gating.gatingkind === 'build_vault' || gating.gatingkind === 'unlock_vault') { return gating }
   throw new Error(`not a passphrase gating: ${gating.gatingkind}`)
@@ -166,26 +169,26 @@ export const passphraseGatingOf = (gating: AnyGating): PassphraseGating => {
 
 // == [Typing in the dialog]: submitPassphrase, submitNewPassphrase, submitReplacement, submitDeletion, submitPasskeyAdd, submitPasskeyRevoke
 
-/** Types the passphrase in the dialog and presses Unlock. */
+/** Type the passphrase into the dialog and press Unlock. */
 export const submitPassphrase = (passphrase: string) => {
   fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(screen.getByText('Unlock'))
 }
 
-/** Presses the button that says `word` once the strength checker and the confirmation have enabled it. */
+/** Press the button labelled `word`, once the strength checker and the confirmation have enabled it. */
 const pressOnceEnabled = async (word: string) => {
   await waitFor(() => { expect(screen.getByText<HTMLButtonElement>(word).disabled).to.be.false })
   fireEvent.click(screen.getByText(word))
 }
 
-/** Types a first passphrase and its confirmation, and presses Create vault once it can be. */
+/** Type a new passphrase and its confirmation, and press Create vault once it is enabled. */
 export const submitNewPassphrase = async (passphrase: string) => {
   fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.change(screen.getByPlaceholderText('confirm vault passphrase'), { target: { value: passphrase } })
   await pressOnceEnabled('Create vault')
 }
 
-/** Types the passphrase in use, a new one and its confirmation, and presses Change passphrase once it can be. */
+/** Type the current passphrase, a new passphrase and its confirmation, and press Change passphrase once it is enabled. */
 export const submitReplacement = async (antePassphrase: string, nextPassphrase: string) => {
   fireEvent.change(screen.getByPlaceholderText('current passphrase'), { target: { value: antePassphrase } })
   fireEvent.change(screen.getByPlaceholderText('new passphrase'), { target: { value: nextPassphrase } })
@@ -193,19 +196,19 @@ export const submitReplacement = async (antePassphrase: string, nextPassphrase: 
   await pressOnceEnabled('Change passphrase')
 }
 
-/** Types the passphrase in the deletion dialog and presses Delete vault. */
+/** Type the passphrase into the deletion dialog and press Delete vault. */
 export const submitDeletion = (passphrase: string) => {
   fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(screen.getByText('Delete vault'))
 }
 
-/** Types the passphrase in the add-passkey dialog and presses Add passkey. */
+/** Type the passphrase into the add-passkey dialog and press Add passkey. */
 export const submitPasskeyAdd = (passphrase: string) => {
   fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(screen.getByText('Add passkey'))
 }
 
-/** Types the passphrase in the remove-passkey dialog and presses Remove passkey. */
+/** Type the passphrase into the remove-passkey dialog and press Remove passkey. */
 export const submitPasskeyRevoke = (passphrase: string) => {
   fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(screen.getByText('Remove passkey'))
@@ -214,10 +217,13 @@ export const submitPasskeyRevoke = (passphrase: string) => {
 
 // == [Fake authenticator]: installFakeAuthenticator, FakeAuthenticatorOpts
 
-/** How the fake authenticator behaves: whether it offers PRF at all, and whether it answers as it makes a passkey. */
+/** Options for the fake authenticator.
+ * - `prf`         -- false for an authenticator with no PRF extension (default: true)
+ * - `prfAtCreate` -- false to return PRF output only on a later request, not when the passkey is created (default: true)
+ */
 export type FakeAuthenticatorOpts = { prf?: boolean, prfAtCreate?: boolean }
 
-/** A WebAuthn authenticator for one test, as `navigator.credentials` and `PublicKeyCredential`: same passkey and salt, same answer.
+/** Install a fake WebAuthn authenticator for one test, as `navigator.credentials` and `PublicKeyCredential`. The same passkey and salt always give the same answer.
  *
  * @example const authenticator = TH.installFakeAuthenticator()
  * @example const authenticator = TH.installFakeAuthenticator({ prfAtCreate: false })  // answers only when asked again
@@ -232,7 +238,7 @@ export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
   let refusal: string | null = null
   let waitingOn: Promise<unknown> | null = null
 
-  // Each call refuses as told, or waits as told, before it answers.
+  // Before it responds, each call first waits and then throws, if the test asked for either.
   const asTold = async () => {
     const [errname, waiting] = [refusal, waitingOn]
     refusal = null
@@ -240,9 +246,9 @@ export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
     if (waiting !== null) { await waiting }
     if (errname !== null) { throw new DOMException('The fake authenticator refused, as told.', errname) }
   }
-  /** A credential as the fake hands it back: what the helpers read of a PublicKeyCredential. */
+  /** A credential as the fake returns it: only the parts of a PublicKeyCredential that the helpers read. */
   type FakeCredential = { type: 'public-key', id: string, rawId: ArrayBuffer, getClientExtensionResults: () => AuthenticationExtensionsClientOutputs }
-  // `prf` is what the PRF extension answers: null for none, and its answer over `salt`, if given.
+  // `prf` describes the PRF extension's result: null for no result at all, otherwise an output computed over `salt` when one is given.
   const credentialOf = async (credential_id: string, prf: { enabled?: true, salt: BufferSource | undefined } | null): Promise<FakeCredential> => {
     const answered: AuthenticationExtensionsPRFOutputs = { ...(prf?.enabled && { enabled: true }) }
     if (prf?.salt !== undefined) {
@@ -284,27 +290,27 @@ export const installFakeAuthenticator = (opts: FakeAuthenticatorOpts = {}) => {
     calls,
     /** The credential ids (base64url) of every passkey the fake has. */
     credentialIds: () => [...secrets.keys()],
-    /** Every PRF answer the fake handed out, as the bytes it handed: what its caller should have zeroed once copied. */
+    /** Every PRF output the fake returned, as the same byte arrays it returned. Whoever received them should have zeroed them after copying. */
     answersHanded: () => [...handed],
-    /** Make the next call throw a DOMException named `errname`: `NotAllowedError` is a dismissal. */
+    /** Make the next call throw a DOMException named `errname`. `NotAllowedError` is what a dismissal throws. */
     refuseNext: (errname: string) => { refusal = errname },
-    /** Make the next call wait for `waiting` before it answers, as a user slow to touch the sensor. */
+    /** Make the next call wait for `waiting` before it responds, like a user who is slow to touch the sensor. */
     answerNextAfter: (waiting: Promise<unknown>) => { waitingOn = waiting },
   }
 }
 
-/** Stands in for the browser's PublicKeyCredential, whose presence says the browser offers WebAuthn. */
+/** A stand-in for the browser's PublicKeyCredential. Its presence is how code detects WebAuthn support. */
 class FakePublicKeyCredential {
   readonly type = 'public-key'
 }
 
-/** HMAC-SHA256 of `saltBytes` under `secretBytes`: the fake's PRF, as hmac-secret's is in spirit. */
+/** Return HMAC-SHA256 of `saltBytes` keyed by `secretBytes`. This is the fake's PRF, similar in spirit to hmac-secret. */
 const prfOf = async (secretBytes: Uint8Array<ArrayBuffer>, saltBytes: BufferSource): Promise<ArrayBuffer> => {
   const hmacKey = await crypto.subtle.importKey('raw', secretBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
   return crypto.subtle.sign('HMAC', hmacKey, saltBytes)
 }
 
-/** `source`'s bytes as base64url, whichever kind of buffer it is. */
+/** Return `source`'s bytes as base64url, for either kind of BufferSource. */
 const b64Of = (source: BufferSource): string => (
   toB64(ArrayBuffer.isView(source) ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength) : new Uint8Array(source))
 )

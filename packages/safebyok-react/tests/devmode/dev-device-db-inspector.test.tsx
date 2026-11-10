@@ -6,7 +6,7 @@ import * as TH from '../test-helpers'
 
 TH.sweepBankWorlds()
 
-/** The inspector over the deviceDB of a world whose bank built `main`, and so has its lease. */
+/** Render the inspector over the deviceDB of a world whose bank built `main`, so the deviceDB has that vault's lease. */
 const renderOverLease = async () => {
   const { world } = await TH.makeBankWithVault()
   render(<DevDeviceDBInspector deviceDB={world.deviceDB} />)
@@ -14,7 +14,7 @@ const renderOverLease = async () => {
   return { world }
 }
 
-/** The table's line for the lease row under `vaultlabel`. */
+/** Return the table row for the lease of the vault named `vaultlabel`. */
 const leaseRow = (vaultlabel: string) => screen.getByText(vaultlabel).closest('tr') as HTMLElement
 const includingDamaged = () => { fireEvent.click(screen.getByLabelText('Include damaged rows')) }
 
@@ -29,7 +29,7 @@ describe("DevDeviceDBInspector", () => {
   it("names the kind of a raw row's key fields, never their content", async () => {
     await renderOverLease()
     includingDamaged()
-    // The caption names listRawLeases as soon as the box is checked; its rows arrive after.
+    // The caption says listRawLeases as soon as the checkbox is ticked, and the raw rows arrive later.
     await waitFor(() => { expect(within(leaseRow('main')).getByText(/lease_key: <CryptoKey>/)).to.exist })
   })
 

@@ -16,7 +16,7 @@ type Props = Omit<BankProviderProps, 'children'>
 const shown = (testid: 'bank' | 'vault') => screen.getByTestId(testid).textContent
 const dialogShown = () => screen.queryByRole('dialog') !== null
 
-/** The world, the provider's props over it, and its render, with ShowsVault inside. */
+/** Render a BankProvider over `world` with ShowsVault inside. Returns the world, the props, and `rerender` and `unmount`. */
 const provided = (overrides: Partial<Props> = {}, world = TH.makeBankWorld()) => {
   const props = TH.providerPropsOf(world, overrides)
   const ui = (given: Props) => <BankProvider {...given}><TH.ShowsVault /></BankProvider>
@@ -24,7 +24,7 @@ const provided = (overrides: Partial<Props> = {}, world = TH.makeBankWorld()) =>
   return { world, props, rerender: (given: Props) => { rendered.rerender(ui(given)) }, unmount: rendered.unmount }
 }
 
-/** A MemoryDeviceDB whose ensureCachedBank for `user_id` waits until the test calls `answer`; every other user's answers at once. */
+/** Make a MemoryDeviceDB whose ensureCachedBank waits, for `user_id` only, until the test calls `answer`. Other users get their result at once. */
 const deviceDBPending = (user_id: string) => {
   const deviceDB = new MemoryDeviceDB()
   const answering = TH.makePending()
@@ -36,7 +36,7 @@ const deviceDBPending = (user_id: string) => {
   return { deviceDB, answer: () => { answering.resolve(undefined) } }
 }
 
-/** The users whose leases `deviceDB` caches. */
+/** Return the user_id of each lease cached in `deviceDB`. */
 const leaseUsers = async (deviceDB: MemoryDeviceDB) => {
   const rows = await deviceDB.listLeases()
   return rows.map(({ user_id }) => user_id)
@@ -91,8 +91,8 @@ describe("BankProvider's bank", () => {
     expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
   })
 
-  // StrictMode runs the effect twice at mount, while the device_id is still on its way: the effect makes
-  // its bank once, when the device_id lands.
+  // StrictMode runs the effect twice at mount, before the device_id has arrived. The effect makes its bank
+  // only once, when the device_id arrives.
   it("makes one bank under StrictMode, once the device_id lands", async () => {
     const making = vi.spyOn(Bank, 'make')
     render(<StrictMode><BankProvider {...TH.providerPropsOf(TH.makeBankWorld())}><TH.ShowsVault /></BankProvider></StrictMode>)
@@ -221,7 +221,7 @@ describe("BankProvider's props", () => {
   })
 })
 
-/** A provider over a vault another device built, unlocked from its dialog, with the deviceDB the provider's bank keeps its lease in. */
+/** Render a provider over a vault that another device built, and unlock it through the dialog. Also returns the deviceDB where the provider's bank caches its lease. */
 const unlockedProvided = async (overrides: Partial<Props> = {}) => {
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)
@@ -395,14 +395,14 @@ describe("BankProvider's handlers", () => {
   })
 })
 
-/** The one bank a provider has made. */
+/** Return the first bank the provider made. Throws if it has made none. */
 const onlyBank = (): Bank => {
   const [bank] = TH.seenBanks
   if (bank === undefined) { throw new Error('no bank seen') }
   return bank
 }
 
-/** The passphrase field on screen. */
+/** Return the passphrase field on screen. */
 const passphraseFieldOf = (): HTMLInputElement => screen.getByLabelText(Messages.passphraseField)
 
 describe("BankProvider's dialog", () => {
