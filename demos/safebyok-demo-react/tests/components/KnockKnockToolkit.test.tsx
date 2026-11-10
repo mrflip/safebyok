@@ -6,24 +6,24 @@ import { Bank } from 'safebyok'
 import type { MemoryVaultDB } from 'safebyok/storage'
 import { useBox } from 'safebyok-react'
 import { useIsShowing } from '../../src/hooks/useIsShowing'
-import { ApiKeyVaultlabel, ExposedApiKeyBoxlabel } from '../../src/lib/saved-api-key'
-import { KnockKnockExposed } from '../../src/components/KnockKnockExposed'
-import { KnockKnockFields } from '../../src/components/KnockKnockFields'
+import { ApiKeyVaultlabel, ToolkitApiKeyBoxlabel } from '../../src/lib/saved-api-key'
+import { KnockKnockToolkit } from '../../src/components/KnockKnockToolkit'
+import { KnockKnockDom } from '../../src/components/KnockKnockDom'
 import * as TH from '../test-helpers'
 
 const FakeApiKey = 'sk-ant-fake-knock-key'
 const Punchline = 'Banana who? Banana split, gotta run!'
 
 /** The flow beside the vault probe, in a bank for `u1`. */
-const renderFlow = () => TH.renderInBank(<><KnockKnockExposed /><TH.VaultProbe /></>)
+const renderFlow = () => TH.renderInBank(<><KnockKnockToolkit /><TH.VaultProbe /></>)
 
 /** Shows whether the box under the flow shows its whisper, as `showing` or `hidden`. */
-const ShowingProbe = () => <span data-testid="showing">{useIsShowing(useBox(ApiKeyVaultlabel, ExposedApiKeyBoxlabel)) ? 'showing' : 'hidden'}</span>
+const ShowingProbe = () => <span data-testid="showing">{useIsShowing(useBox(ApiKeyVaultlabel, ToolkitApiKeyBoxlabel)) ? 'showing' : 'hidden'}</span>
 
 /** The flow with a button that unmounts it, beside the showing probe. */
 const Host = () => {
   const [isMounted, setIsMounted] = useState(true)
-  return <>{isMounted && <KnockKnockExposed />}<ShowingProbe /><button type="button" onClick={() => { setIsMounted(false) }}>Unmount</button></>
+  return <>{isMounted && <KnockKnockToolkit />}<ShowingProbe /><button type="button" onClick={() => { setIsMounted(false) }}>Unmount</button></>
 }
 
 /** The API key field, once a box backs it. */
@@ -59,7 +59,7 @@ const storedBoxRows = (vaultDB: MemoryVaultDB) => {
   return vaultDB._cheat_boxRowsOf({ applabel: 'acme', user_id: 'u1', vaultlabel: ApiKeyVaultlabel }, vaultrow.vault_tok)
 }
 
-describe("KnockKnockExposed", () => {
+describe("KnockKnockToolkit", () => {
   it("shows an empty field on Add key", async () => {
     renderFlow()
     expect(screen.getByText('No key saved yet.')).to.not.be.null
@@ -69,7 +69,7 @@ describe("KnockKnockExposed", () => {
   })
 
   it("keeps the field showing after Add key under StrictMode", async () => {
-    TH.renderInBank(<StrictMode><KnockKnockExposed /><TH.VaultProbe /></StrictMode>)
+    TH.renderInBank(<StrictMode><KnockKnockToolkit /><TH.VaultProbe /></StrictMode>)
     const field = await addKey()
     fireEvent.change(field, { target: { value: FakeApiKey } })
     expect(field.value).to.eq(FakeApiKey)
@@ -79,7 +79,7 @@ describe("KnockKnockExposed", () => {
     const { vaultDB } = renderFlow()
     await saveKey()
     const boxrows = storedBoxRows(vaultDB)
-    expect([...boxrows.keys()]).to.deep.equal([ExposedApiKeyBoxlabel])
+    expect([...boxrows.keys()]).to.deep.equal([ToolkitApiKeyBoxlabel])
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
@@ -172,9 +172,9 @@ describe("KnockKnockExposed", () => {
   it("keeps a separate key in each flow", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
-    TH.renderInBank(<><KnockKnockFields /><KnockKnockExposed /><TH.VaultProbe /></>)
-    const managedFlow = within(await screen.findByRole('region', { name: 'Knock-knock, with managed fields' }))
-    const exposedFlow = within(await screen.findByRole('region', { name: 'Knock-knock, with an exposed whisper' }))
+    TH.renderInBank(<><KnockKnockDom /><KnockKnockToolkit /><TH.VaultProbe /></>)
+    const managedFlow = within(await screen.findByRole('region', { name: 'DOM form' }))
+    const exposedFlow = within(await screen.findByRole('region', { name: 'Toolkit form' }))
     fireEvent.click(await managedFlow.findByRole('button', { name: 'Add key' }))
     await TH.answerPassphraseDialog()
     await managedFlow.findByRole('button', { name: 'Save' })

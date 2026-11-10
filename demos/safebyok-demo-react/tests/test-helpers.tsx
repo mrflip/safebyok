@@ -44,7 +44,7 @@ export const memoryStorage = (): StringStorage => {
 /** A fake auth over fresh storages in memory. */
 export const makeAuth = (): Auth => createAuth({ applabel: 'acme', dbStorage: memoryStorage(), deviceStorage: memoryStorage() })
 
-/** The SessionBar as the App renders it, handed the live session of `auth`. */
+/** The SessionBar as a page renders it, handed the live session of `auth`. */
 export const LiveSessionBar = ({ auth }: { auth: Auth }) => <SessionBar auth={auth} session={useSession(auth)} />
 
 /** Types `userlabelText` into the sign-in strip and presses Sign in. */

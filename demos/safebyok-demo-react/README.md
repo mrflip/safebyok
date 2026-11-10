@@ -1,6 +1,6 @@
 # safebyok-demo-react
 
-A single-page React playground for the safebyok interface: a workspace package that is never
+A two-page React playground for the safebyok interface: a workspace package that is never
 published and never grows into its own repository.
 
 ```sh
@@ -18,7 +18,9 @@ ciphertext a backend would have. Only the fake auth's scaffolding rows sit in lo
 `device_id` each user's bank is made with is kept beside the leases, as the provider asks the
 deviceDB for it.
 
-## The page
+## The pages
+
+The landing page ([index.html](index.html), [src/pages/LandingPage.tsx](src/pages/LandingPage.tsx)) is the app with the DOM flow and no control panels. The labs page ([labs.html](labs.html), [src/pages/LabsPage.tsx](src/pages/LabsPage.tsx)) has all three flows, with the control panels below them.
 
 The Knock-Knock Machine: bring an Anthropic API key, say who's there, and Claude finishes the
 joke. Its header has the sign-in strip
@@ -31,24 +33,24 @@ confirmation), then the account. Under it,
 with *Change passphrase*, and a fingerprint button to add or remove a passkey. A dialog the user
 cancels changes nothing, and the page says nothing of it.
 
-Below the header sit the flows, side by side, each keeping a key of its own in its own box, so the
+On the labs page the flows sit side by side, each keeping a key of its own in its own box, so the
 ways compare side by side, and each knocking with its own key through [src/lib/anthropic.ts](src/lib/anthropic.ts):
 
-* **With managed fields** ([src/components/KnockKnockFields.tsx](src/components/KnockKnockFields.tsx)):
-  the key sits in a field that `safebyok/dom` fills and saves, so it never passes through React.
-  *Add key* builds and unlocks the vault as needed and shows the field; *Save* puts it; *Done*
-  hides it again.
-* **With an exposed whisper** ([src/components/KnockKnockExposed.tsx](src/components/KnockKnockExposed.tsx)):
-  an ordinary controlled field over `useWhisper(box)`; typing is `box.patchWhisper`, *Save* is
-  `box.putExposed`, and leaving the page is `box.unexpose`.
-* **With a sealed key** ([src/components/KnockKnockSealed.tsx](src/components/KnockKnockSealed.tsx)):
+* **Widget form** ([src/components/KnockKnockWidget.tsx](src/components/KnockKnockWidget.tsx)):
   the key is never exposed. An uncontrolled `WhisperField` takes it, *Save* is `vault.putBox`
   (building and unlocking the vault as needed) and clears the field, and only a knock reads it
   back, with `box.extractWhisper`.
+* **Toolkit form** ([src/components/KnockKnockToolkit.tsx](src/components/KnockKnockToolkit.tsx)):
+  an ordinary controlled field over `useWhisper(box)`; typing is `box.patchWhisper`, *Save* is
+  `box.putExposed`, and leaving the page is `box.unexpose`.
+* **DOM form** ([src/components/KnockKnockDom.tsx](src/components/KnockKnockDom.tsx)):
+  the key sits in a field that `safebyok/dom` fills and saves, so it never passes through React.
+  *Add key* builds and unlocks the vault as needed and shows the field; *Save* puts it; *Done*
+  hides it again.
 
-The aside, *Behind the scenes*, is for developers: its *Backend online* switch
+The labs page's aside, *Behind the scenes*, is for developers: its *Backend online* switch
 ([src/lib/outage-vault-db.ts](src/lib/outage-vault-db.ts)) takes the vaultDB offline, so every
-verb refuses as an unreachable backend does. Take the aside away and what is left could ship.
+verb refuses as an unreachable backend does. The landing page is what is left without it.
 
 ## Where the layers live
 

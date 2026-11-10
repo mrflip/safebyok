@@ -3,14 +3,14 @@ import type { Bank, Box, Vault } from 'safebyok'
 /** The vaultlabel the knock-knock flows keep their API key under. */
 export const ApiKeyVaultlabel = 'main'
 
-/** The boxlabel of the managed-fields flow's API key box in that vault. */
-export const FieldsApiKeyBoxlabel = 'anthropic_api_key_fields'
+/** The boxlabel of the DOM flow's API key box in that vault. */
+export const DomApiKeyBoxlabel = 'anthropic_api_key_fields'
 
-/** The boxlabel of the exposed-whisper flow's API key box in that vault. */
-export const ExposedApiKeyBoxlabel = 'anthropic_api_key_exposed'
+/** The boxlabel of the toolkit flow's API key box in that vault. */
+export const ToolkitApiKeyBoxlabel = 'anthropic_api_key_exposed'
 
-/** The boxlabel of the sealed flow's API key box in that vault. */
-export const SealedApiKeyBoxlabel = 'anthropic_api_key_sealed'
+/** The boxlabel of the widget flow's API key box in that vault. */
+export const WidgetApiKeyBoxlabel = 'anthropic_api_key_sealed'
 
 /** The API key as saved in `boxlabel`'s box of `vault`, unlocking it as needed, or null where there is none; the box's exposure is left as it was. */
 export const extractSavedApiKey = async (vault: Vault | null, boxlabel: string): Promise<string | null> => {
