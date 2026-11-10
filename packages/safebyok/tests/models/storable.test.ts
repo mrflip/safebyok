@@ -349,6 +349,14 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     TH.expectSyncRefusal(() => box.demandPuttable(Patch))
   })
 
+  it("demandPuttable takes a sparse record for a patch of both halves", async () => {
+    const box = await boxListingOf(world.mw).build(sparseBoxRecord())
+    const Both = { ...Patch, sidecar: { note: 'sent' } }
+    expect(box.demandPuttable(Both)).to.deep.include(Both)
+    world.mw.setLocked(true)
+    TH.expectSyncRefusal(() => box.demandPuttable(Both), 'vault_locked')
+  })
+
   it("demandPuttable under ifPresent 'fail' refuses a whole record, saying its data would be recycled", async () => {
     const box = await boxListingOf(world.mw).build(fullBoxRecord())
     const err = TH.expectSyncRefusal(() => box.demandPuttable({ ...fullBoxRecord() }, { ifPresent: 'fail' }))
@@ -369,11 +377,11 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
   it("ensurePuttable refreshes and demands nothing: it resolves while locked, where put refuses", async () => {
     const box = await builtBoxOf()
     world.mw.setLocked(true)
-    await expect(box.ensurePuttable()).resolves.to.eq(box)
+    await expect(box.ensurePuttable({ whisper: { apiKey: 'sk-test-0000' } })).resolves.to.eq(box)
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
   })
 
-  it("put ensures once, before its seal, and a bad patch heard after that ensure puts nothing", async () => {
+  it("put ensures once, before its seal, and a bad patch puts nothing", async () => {
     const box = await builtBoxOf()
     const putGuard = vi.spyOn(Box.prototype, 'ensurePuttable')
     await TH.expectRefusal(box.put({}))

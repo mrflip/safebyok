@@ -1,7 +1,7 @@
 /** A Box's put: rebirth over a tombstone, the lease's seal, the versioned replace, and a patch naming a half. */
 
 import { ENCRYPTED, VEILED } from '../../src/helpers/consts'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { type BoxHalves, type Fetched } from '../../src/shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
@@ -74,18 +74,29 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
     expect(box.revision_seq).to.eq(3)
   })
 
-  it("never seals over a sparse record", async () => {
+  it("seals a patch of both halves over a sparse record, fetching nothing and keeping the world timely", async () => {
     const box = await builtOf(sparseBoxRecord())
     world.mw.seedPut(fullBoxRecord())
-    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } })
-    expect(world.mw.callsOf('get')).to.have.lengthOf(1)
+    const ensuringWorld = vi.spyOn(world.mw.world, 'ensureTimely')
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } }, { maxWorldMillis: 5 })
+    expect(world.mw.callsOf('get')).to.deep.equal([])
+    expect(world.mw.callsOf('put')).to.have.lengthOf(1)
+    expect(ensuringWorld).toHaveBeenCalledWith(5)
     expect(box.sidecar).to.deep.equal({ account: 'home' })
+  })
+
+  it("fetches a sparse box first where the patch keeps the sidecar stored", async () => {
+    const box = await builtOf(sparseBoxRecord())
+    world.mw.seedPut(fullBoxRecord())
+    await box.put({ whisper: { apiKey: 'sk-test-0000' } })
+    expect(world.mw.callsOf('get')).to.have.lengthOf(1)
+    expect(box.sidecar).to.deep.equal(fullBoxRecord().sidecar)
   })
 
   it("refuses a live box still sparse once hydrated, saying so, putting nothing", async () => {
     const box = await builtOf(sparseBoxRecord())
     world.mw.willGet(world.mw.answerOf(box.scope, sparseBoxRecord()))
-    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } }))
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' } }))
     expect(world.mw.callsOf('put')).to.deep.equal([])
   })
 
@@ -231,11 +242,11 @@ describe("box.put checks its patch before it asks the lock", () => {
     expect(world.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("refuses an empty patch over a sparse box, after its one fetch", async () => {
+  it("refuses an empty patch over a sparse box, before any fetch", async () => {
     const box = await builtOf(sparseBoxRecord())
     world.mw.seedPut(fullBoxRecord())
     await TH.expectRefusal(box.put({}))
-    expect(world.mw.callsOf('get')).to.have.lengthOf(1)
+    expect(world.mw.callsOf('get')).to.deep.equal([])
     expect(world.mw.callsOf('put')).to.deep.equal([])
   })
 
