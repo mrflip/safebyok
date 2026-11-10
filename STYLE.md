@@ -201,7 +201,8 @@ is named for the act.
 
 | Name | Promises |
 | --- | --- |
-| `getFoo` | Reads foo, resolving it or null for none; one with no null form refuses instead, as `getWhisper` does. Changes nothing. |
+| `getFoo` | Reads foo by its unique key (a composite one is fine), resolving it or null for none; one with no null form refuses instead, as `getWhisper` does. Changes nothing. |
+| `findFoo` | Reads the first foo that meets a criterion, or null for none. Changes nothing. |
 | `putFoo` | Puts foo to storage, resolving it as stored. |
 | `delFoo` | Deletes foo. |
 | `ensureFoo` | Has foo or makes it so, idempotently, and hands it back. |
@@ -214,6 +215,11 @@ is named for the act.
 | `isFoo`, or the condition (`isUnlocked`) | Synchronous yes or no. Never throws. |
 | `fooOf(thing)` | Pure: the foo derived from `thing`. |
 | `tryFoo` | `foo`, resolving an `Outcome` instead of throwing. |
+
+**No function or method is named `read` or `write`** (the Coach, 2026-10-28). Those are the umbrella words for any view or
+any mutation (VOCABULARY.md), so a category may use them (`stale_write`, `written_at`); a function says which: `find`, `get`,
+`ensure`, or the mutation's own verb (`put`, `del`, `increment`). A `read` or `write` name met in the code is a rename to
+propose, not a precedent.
 
 **`make` and `build` say whether to await; the suffix says what comes back** (the Coach,
 2026-11-02). With no suffix, the name is the thing itself; a suffix says you get something else:
@@ -250,6 +256,11 @@ throws when it does not hold (`vault.demandUnlocked()`); and, only where a calle
 it, an async `ensureFoo` that makes it so (`vault.ensureUnlocked()`, which attaches the lease
 `demandUnlocked()` asks for). There is no `tryDemandFoo`: the
 query is the non-throwing form.
+
+**A guard that asks several things is named for what it asks, with `-able` where that reads well** (the Coach, 2026-11-04):
+`demandSendable`, `demandUnsealable`, `demandDeletable`, never `demandReadyToSend`; a plain phrase where `-able` reads badly
+(`demandBoxesUsable`). Its `ensure` takes the same name (`ensureSendable`). A guard that asks one thing states that one fact:
+`demandUnlocked`, `demandPresent`, `demandFull`.
 
 **`put` resolves what is stored.** On success, `putFoo` resolves the foo as storage now has it
 (the Coach, 2026-10-21): "putFoo should return the foo object as it is in the database (not what
@@ -742,16 +753,15 @@ rows with it.
 
 ## Comments and doc blocks
 
+**WRITE PLAIN ENGLISH** Sometimes: a sentence fragment. Usually, one line of readable prose describing the essentials; where warranted, describe important details on following lines. #plain-english
+
 `/** */` for doc blocks, `//` for a running clarification or commented-out code. Bulleted lists use `*` at the top level and
 `-` below, indented two spaces per level.
 
-**A doc block is as short as its purpose, and says what the member does for the one reading its signature.** Its first
-line is one whole sentence resting on the `/**`, however long, so it reads with the code folded; a member whose purpose will
-not go in a sentence is a smell to report. For length, measure it against the doc of a method of like complexity and
-flexibility in a library you trust from memory (the DOM, Node's `fs`, Zod): usually one line, rarely more than five. No
-count holds the length: a reviewer does. The first line runs long only while it is one fact a caller must know before
-calling `#one-sentence-headline`: `create` refusing a live box is that news and stays on the line; a put's stale-write
-criteria are a description under a short headline (the pairs: `notes/gallant-docblocks.md`).
+**A doc block is as short as its purpose, and together with its signature says what the contract delivers.** Its first
+line rests on the `/**`: a few words to a full line, so the essentials may be read with the code folded. Gauge its length and register against the doc of a method with similar complexity and flexibility from your memory or training: usually one line, rarely more than a few (library entrypoints excepted).
+The first line may run long to accommodate surprising behavior `#one-sentence-headline`, but it's rare for a function's line to be longer than its signature.
+A member that will not describe in a line is a smell: report it.
 
 * **Every export gets a doc block; a private member gets a phrase** `#a-helper-gets-a-phrase` (``/** The whisper of `record` */``). Both answer the caller's three questions and no others `#three-questions`: when
   do I call it, what do I get, what would I otherwise get wrong. Never who calls it, nor what a sibling does.
@@ -763,12 +773,12 @@ criteria are a description under a short headline (the pairs: `notes/gallant-doc
   it. The test: cover the body and ask of each sentence whether the caller still needs it.
 * **The first sentence names the act or the thing** `#name-the-act`. A function that puts, decrypts, asks the user or sends opens with that
   verb: `Create a new box for whisper (encrypted) and sidecar (readable), sealed against the box metadata`. A lookup, a type
-  or a constant opens with what it is or hands back: ``Vault **or tombstone** listed at `scope`, null if absent.`` Read the
+  or a constant opens with what it is or hands back: ``Vault **or tombstone** listed at `scope`, null if absent.`` When that
+  noun needs a clause to describe it, open with the verb instead: `Classify a vault request's outcome, based on the stored row`. Read the
   member's name against that sentence (*Naming*). It carries one qualifier at most; anything more is a sentence of its own.
-* **Every sentence has a subject and a finite verb, and says one thing** `#one-verb-one-fact`. The usual signs that one
-  doesn't: a semicolon joining two facts, a list with its verb gapped out (`a row or record, 'bad_record'; a cutoff,
+* **Replace multiple fragments with a sentence** `#use-sentences`. The usual signs: a semicolon joining two facts, a list with its verb gapped out (`a row or record, 'bad_record'; a cutoff,
   'bad_option'`), a clause hung on "as", "so", "once", "since" or "which", and "one" standing in for a noun you cut. Each
-  is a cue to write the second sentence, not a ban. A fact that will not go in a plain sentence is not a doc-block fact.
+  is a cue to rewrite as a sentence, not a ban.
 * **A member's block names no refusal catalog** `#no-refusal-catalog`. The thrower's doc and the `Outcome` type carry the
   kinds, and a class or module doc may say in one sentence what misuse refuses. The one kind worth naming is a condition the
   caller branches on in normal use: `stale_write` on a put, `wrong_passphrase` on an unlock. Before naming one, taste it
@@ -873,6 +883,10 @@ is tested beside that verb. Test and build artifacts never land in `src/`.
 * **For anything that holds a secret, test what must not happen**: that the wrong passphrase is
   refused, that tampered ciphertext is refused, that an error does not carry the secret, that
   locking forgets the key.
+* **A test's way past the API is named loudly, for what it returns, with a `_cheat_` prefix** (`_cheat_central`,
+  `_cheat_clock`), on a test-world subclass or a test-facing adapter such as the memory DBs. Never a coined verb that sounds
+  like the spec's (`keptOf`, `keepCopy`). On a class that holds keys, prefer a constructor seam, an optional callback handed
+  a typed cheater object, so nothing sits on the instance and production never passes one (the Coach, 2026-10-31, 2026-11-04).
 * **Never a real secret in a test, fixture or example**: generate one, or use an obvious fake
   that validates. Credentials for anything (npm, GitHub) come from the environment, not a file.
 * Test an entrypoint with generous, sloppy input: that is its job. Code past the validation

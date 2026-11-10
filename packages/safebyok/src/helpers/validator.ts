@@ -307,6 +307,10 @@ export interface ConsistencyRefusal extends Z.infer<typeof Checks.consistencyRef
 /** The words a refusal puts around the failures it names, neither quoting the input. */
 export interface Story extends Z.infer<typeof Checks.story> {}
 
-/** How an {@link objCheck} validator refuses, as a caller hands it in, defaults unapplied. */
+/** {@link objCheck} options:
+ * - `refusalkind`      -- the kind thrown (default: `'bad_record'`)
+ * - `extras: 'strict'` -- refuse a field the object does not take (default)
+ * - `extras: 'strip'`  -- drop it unread
+ */
 export interface ObjCheckOpts extends Z.input<typeof Checks.objCheckOpts> {}
 // --

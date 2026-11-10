@@ -2,18 +2,7 @@
 
 Doc blocks in pairs: Goofus, the slop, and Gallant, the block that replaces it, under the principle the pair shows. Each
 principle has a hashtag to cite in a review; `rg '#tag' notes/` finds the pair. The principle names the species, to hunt in
-the blocks this file doesn't cover. Four lessons live in `notes/gallant.md`, under *Words*, and are listed below so the
-bestiary stays whole.
-
-Contents:
-
-* **Here:** `#lead-with-the-job`, `#outcome-not-branches`, `#no-sibling-comparisons`, `#one-breath-contract`,
-  `#one-sentence-headline`, `#three-questions`, `#name-the-act`, `#one-verb-one-fact`, `#option-values-get-a-list`,
-  `#point-dont-redefine`, `#customer-first`, `#guard-names-its-predicates`, `#reason-goes-above`, `#facts-from-the-code`, and
-  a second specimen each for `#a-helper-gets-a-phrase`, `#purpose-not-machinery`, `#no-refusal-catalog`, `#say-what-to-do`,
-  `#say-the-guarantee`
-* **In `notes/gallant.md`, *Words*:** `#purpose-not-path`, `#purpose-not-machinery`; `#no-refusal-catalog` (`create`, `demandUnsealable`);
-  `#say-what-to-do` (`vaultAt`); `#say-the-guarantee` (`extractWhisper`); `#a-helper-gets-a-phrase` (`#unseal`)
+the blocks this file doesn't cover. Some lessons have their first pair in `notes/gallant.md`, under *Words*.
 
 ---
 
@@ -38,6 +27,25 @@ async hello(): Promise<void>
 ```ts
 /** Get-ready tasks: load packages, fetch the vault listing, start its watch */
 async hello(): Promise<void>
+```
+
+A second specimen, on a pure function. The second line is the adapter's story, not this call's: `boxActOf` beside it carried
+the same sentence, and `notes/answer-contract.md` already says it once.
+
+**Goofus:**
+
+```ts
+// storage/classifier.ts
+/** The act a vault's get, put or del amounts to over `vaultRaw`, the row stored at its scope or null for none.
+ * Nothing is stored here: where {@link isWriteAct} holds of the act, the caller stores the request's record, in the atomic unit it fetched the row in.
+ */
+export const vaultActOf = (request: VaultRequest, vaultRaw: unknown): VaultAct => {
+```
+
+**Gallant:**
+
+```ts
+/** Classify a vault request's outcome, based on the stored row. */
 ```
 
 ## The outcome, not the branch tour `#outcome-not-branches`
@@ -73,7 +81,7 @@ async ensureVault(scope: BankedVaultScope): Promise<Vault>
 **Gallant:**
 
 ```ts
-/** refuse if `'vault_locked'`, else no-op */
+/** refuse `'vault_locked'` if locked, else no-op */
 #demandUnlocked(): void
 ```
 
@@ -109,29 +117,29 @@ async put(patch: BoxPatch, opts: SendOpts = {}): Promise<this>
 async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this>
 ```
 
-## The first line is one sentence, as long as its one fact `#one-sentence-headline`
+## The first line is short; a surprise may lengthen it `#one-sentence-headline`
 
-The first line rests on the `/**` and is one whole sentence, so it reads with the code folded. It runs long only while it is
-still one fact a caller must know before calling; a second fact goes on a line below, under a short headline. The test:
-read the line aloud; a breath taken at "so", "as" or a semicolon marks where the second line begins.
+The first line rests on the `/**`: a few words to a full line, so the essentials read with the code folded. A second fact
+goes on a line below, under a short headline. The test: read the line aloud; a breath taken at "so", "as" or a semicolon
+marks where the second line begins.
 
-**Goes long: a refusal the caller meets in normal use is headline news.** `create` refusing a live box is what a
-caller checks before calling it, and with the file folded the first line is all they see.
+**A refusal the caller meets in normal use sits right under the headline.** `create` refusing a live box is what a
+caller checks before calling it: one line below the headline, not glued onto it.
 
 **Goofus:**
 
 ```ts
-/** Seals a new box and stores it.
- *
- * Refuses where a live box already stands under the scope, as `camped`. Answers the box listed.
- */
+/** Seal a new box and store it if no live box has its scope, refusing `'camped'` if one does; answers the box listed. */
 async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box>
 ```
 
 **Gallant:**
 
 ```ts
-/** Seals a new box and stores it if no live box has its scope, refusing `'camped'` if one does; answers the box listed. */
+/** Seal and store a new box, returning the listed instance.
+ * @see {@link put} for options; create defaults to `ifPresent: 'fail'`,
+ * throwing `camped` if a record is already present
+ */
 async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box>
 ```
 
@@ -142,14 +150,14 @@ under a one-line headline they are a list a caller can scan.
 **Goofus:**
 
 ```ts
-/** Stores `record` over the vault row standing at `prior`, landing where the row's revision_tok is `prior`'s or the row is void, else refusing `camped` under `ifPresent: 'fail'` over a live row, answering it `declined` under `'get'`, `vault_empty` or `vault_gone` under `ifAbsent: 'fail'` over a void or tombstoned row, and `stale_write` otherwise. */
+/** Store `record` over the vault row standing at `prior`, landing where the row's revision_tok is `prior`'s or the row is void, else refusing `camped` under `ifPresent: 'fail'` over a live row, answering it `declined` under `'get'`, `vault_empty` or `vault_gone` under `ifAbsent: 'fail'` over a void or tombstoned row, and `stale_write` otherwise. */
 async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>>
 ```
 
 **Gallant:**
 
 ```ts
-/** Stores `record` over the vault row at revision `prior`, as one conditional write.
+/** Store `record` over the vault row at revision `prior`, as one conditional write.
  * See docs for PutOpts, but briefly:
  * - live, under `ifPresent: 'fail'`: refused as `'camped'`; under `'get'`: answered with the stored row, act `'declined'`
  * - void or a tombstone, under `ifAbsent: 'fail'`: refused as `'vault_empty'` or `'vault_gone'`
@@ -165,39 +173,46 @@ and it gets its own line.
 **Goofus:**
 
 ```ts
-/** Seals `patch` over the record in hand as the next revision and stores it, so a lock landing once the write has begun neither interrupts nor reverses it, a sparse box being fetched first as a patch missing a half keeps the half stored. */
+/** Seal `patch` over the record in hand as the next revision and store it, so a lock landing once the write has begun neither interrupts nor reverses it, a sparse box being fetched first as a patch missing a half keeps the half stored. */
 async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box>
 ```
 
 **Gallant:**
 
 ```ts
-/** Seals `patch` over the record in hand as the next revision and stores it, answering the box.
+/** Merge `patch` over the record, seal it with the next revision, and store it, returning the listed box instance.
  *
- * A lock does not interrupt or reverse a put once its write has begun. A patch leaving out the whisper or the sidecar keeps
- * the stored half, so a box held sparse is fetched first.
+ * A lock will not interrupt or reverse a put once its write has begun.
+ * A patch that omits the whisper or the sidecar will not alter
+ * that field, but may force an early refresh to get the prior value.
+ * An empty patch will still be sent, updating the revision and so forth.
  */
 async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box>
 ```
 
 ## Answer the caller's three questions `#three-questions`
 
-When do I call it, what do I get, what would I otherwise get wrong. Never who calls it, nor who judges the answer.
+What do I get? How and when do I call it? What would I otherwise get wrong?
+A well-chosen function name and signature often does most of the work
+for you, so attend to that first: explain only what remains.
 
 **Goofus:**
 
 ```ts
 // device-db.ts
-  /** Read the lease of one vault, or null for none. The core reads it through `KeptLease.tryGet`, which checks it and holds it closed; the vault judges whether it still fits. */
-  async getLease(scope: VaultScope): Promise<KeptLeaseRow | null> {
+  /** Read the lease of one vault, or null for none. The core reads it through `KeptLease.tryPeek`, which checks it and holds it closed; the vault judges whether it still fits. */
+  async peekLease(scope: VaultScope): Promise<KeptLeaseRow | null> {
 ```
 
-Says who calls it and who judges the answer, not what the caller gets.
+From the signature: You get a lease; matching your scope; but sometimes null.
+Left for the doc block to clarify: the source of the lease (cache, not vaultdb
+or elsewhere) and the paths to each return (null when not found -- don't get
+that wrong!)
 
 **Gallant:**
 
 ```ts
-/** Get the lease cached for `scope`, or null for none. */
+/** The cached lease, or null for none. */
 ```
 
 **Goofus:**
@@ -208,12 +223,12 @@ Says who calls it and who judges the answer, not what the caller gets.
 export type WayinRecord = Z.infer<typeof wayinRecord>
 ```
 
-A semicolon tacks on who reads it.
+"What do I get?" -- a stored wayin, details delegated to the two alternatives; "how do I use it?" -- selects on the `wayinkind`
 
 **Gallant:**
 
 ```ts
-/** A wayin as stored: a {@link PassphraseWayinRecord} or a {@link PasskeyWayinRecord}, told apart by `wayinkind`. */
+/** A stored wayin: a tagged union on `wayinkind` of {@link PassphraseWayinRecord} and {@link PasskeyWayinRecord}. */
 ```
 
 **Goofus:**
@@ -224,12 +239,12 @@ A semicolon tacks on who reads it.
   #demandHeld(vaultScopepath: Scopepath.VaultScopepath, entry: HeldEntry) {
 ```
 
-Ends on its caller: "What a birth asks after each wait."
+Don't hypothesize a caller ("What a birth asks after each wait."): what does this method do for the caller?
 
 **Gallant:**
 
 ```ts
-/** Demand that the bank still holds `entry` for `vaultScopepath`. */
+/** Demand that the bank still holds `entry` at `vaultScopepath`. */
 ```
 
 ## A private helper gets a phrase, second specimen `#a-helper-gets-a-phrase`
@@ -272,7 +287,8 @@ The state left behind, as participial absolutes: "its expiry armed, the snapshot
 **Gallant:**
 
 ```ts
-/** Hold `lease` as the vault's own, unlocking it. */
+/** Attach `lease` to the vault and attend to any consequences (snapshot, expiry, notifications). */
+  attachLease:   (lease: Lease) => Lease
 ```
 
 **Goofus:**
@@ -291,7 +307,7 @@ Narrates when it demands relative to its one wait, with a "so" clause giving the
 **Gallant:**
 
 ```ts
-/** Demand that this proving opens the gate's current wayin at its slotlabel: a wrong proof refuses. */
+/** Demand that this proving opens the gate's current wayin at its slotlabel. */
 ```
 
 ## Name the act `#name-the-act`
@@ -311,7 +327,9 @@ The first sentence describes an event in the past tense, not the act the method 
 **Gallant:**
 
 ```ts
-/** End this pending gating because a lock landed or the vault is gone: every waiter refuses, and `lockLanded` settles. */
+/** End this pending gating (because vault `lock()`ed, or is gone, etc):
+ * promised waiters are refused, notifications sent, other cleanup.
+ */
 ```
 
 **Goofus:**
@@ -343,12 +361,12 @@ Attaches a property, but leads with what it returns.
 **Gallant:**
 
 ```ts
-/** Attach `val` to `obj` as the enumerable own property `propname`, and answer it. */
+/** Attach `val` to `obj` as the enumerable own property `propname`, then return the `val`. */
 ```
 
-## One verb, one fact `#one-verb-one-fact`
+## Replace multiple fragments with sentences `#use-sentences`
 
-Every sentence has a subject and a finite verb. A verb gapped out of a list, a stand-in "one", a trailing absolute: each is the cue to write the second sentence.
+The usual signs: a semicolon joining two facts, a list with its verb gapped out, a stand-in "one", a trailing absolute. Each is a cue to rewrite as a sentence, not a ban.
 
 **Goofus:**
 
@@ -363,7 +381,7 @@ The verb is gapped out of a semicolon list.
 **Gallant:**
 
 ```ts
-/** What this device keeps of each vault. Defaults to `browserOpts()` in a browser and `memoryDeviceDB()` elsewhere, unless a {@link BankVaultOpts} names another. */
+/** On-device cache interface -- selected from {@link BankVaultOpts}, or falls back to `browserOpts()` (in a browser) / `memoryDeviceDB()` (elsewhere). */
 ```
 
 **Goofus:**
@@ -379,7 +397,7 @@ A stand-in "one" inside a participle.
 **Gallant:**
 
 ```ts
-/** What a `putBox()` names: the boxlabel, and a sidecar. Leave the sidecar out to keep what is stored. */
+/** Payload of a `putBox()` operation: its boxlabel and replacement sidecar. Omitted fields will not be altered. */
 ```
 
 **Goofus:**
@@ -395,7 +413,7 @@ A participle lead, gapped refusals joined by a semicolon, and a trailing absolut
 **Gallant:**
 
 ```ts
-/** Parse `val`, or throw the call's kind with a message framed as `story` asks. */
+/** Parse `val`, or throw the call's kind with a message (templated using `story`). */
 ```
 
 ## Refusals are not a catalog, second specimen `#no-refusal-catalog`
@@ -427,7 +445,7 @@ Every refusal kind in throw order, chained with "then" and semicolons.
 
 ## Say what to do, the detailed specimen `#say-what-to-do`
 
-The small specimen is `vaultAt` in `notes/gallant.md`. This one runs long on purpose: a cap a host tunes calls for the recipe and the limits. The reason it is soft went above, as `#reason-goes-above` asks; "lowering it afterwards is undefined" is a `notes/wontfix.md` fact as well.
+A doc block may run long if it serves a purpose: a cap a host tunes calls for the recipe and the limits. We need the reason (`#reason-goes-above`); we need the refusals that the customer will act on (vault full); we need to establish a firm contract (promised: writes can be read. Not promised: the exact cap, or the ability to vary it).
 
 **Goofus:**
 
@@ -449,7 +467,7 @@ States the 'vault_full' a caller meets in normal use, and gives no recipe for it
 // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
 /** A soft cap on the boxes a vault holds. Default: the smaller of {@link MaxBoxes}, 100, and the `maxBoxes` the vaultDB adapter advises.
  * A box past it refuses `'vault_full'`: delete one first, or relaunch with a larger value. Replacing or reading a box is
- * always allowed, even over the limit. Lowering it afterwards is undefined.
+ * always allowed, even over the limit. Lowering it against a live datastore is unspecified behavior.
  */
 ```
 
@@ -470,29 +488,10 @@ Two options and their values gapped into one sentence, the default in parenthese
 **Gallant:**
 
 ```ts
-/** How an {@link objCheck} validator refuses.
+/** {@link objCheck} options:
  * - `refusalkind`      -- the kind thrown (default: `'bad_record'`)
  * - `extras: 'strict'` -- refuse a field the object does not take (default)
  * - `extras: 'strip'`  -- drop it unread
- */
-```
-
-**Goofus:**
-
-```ts
-// storage/vault-db-shapes.ts
-/** Why a row is in `damaged_records`: `format_mismatch`, written by a newer version of the app, so updating the app may read it; `damaged_record`, anything else. */
-export type Damagekind = typeof damagekindVals[number]
-```
-
-The two values gapped behind a semicolon, each explained in a clause.
-
-**Gallant:**
-
-```ts
-/** Why a row sits in `damaged_records`.
- * - `'format_mismatch'` -- written by a newer version of the app; updating may read it
- * - `'damaged_record'`  -- anything else
  */
 ```
 
@@ -602,9 +601,60 @@ not stored". Word it so both read it: none of our abbreviations, and no "it is o
  */
 ```
 
-## The guarantee, second specimen `#say-the-guarantee`
+## Plain English `#plain-english`
 
-The small specimen is `extractWhisper` in `notes/gallant.md`.
+Every word can be ordinary and the sentence still be one nobody would say. Say the line to someone who has not opened the
+file: if they would ask "meaning what?", write the answer to that question. `#customer-first` is about our jargon; this is
+about plain words in a private phrasing. The gallant line is usually shorter than the signature under it.
+
+**Goofus:**
+
+```ts
+// storage/classifier.ts
+/** The classifier of the answer contract: the one act a get, put or del amounts to over the rows stored. Its tables are `notes/answer-contract.md`. */
+```
+
+Two prepositions in a row ("amounts to over"), and "the one act" where "an act" was meant.
+
+**Gallant:**
+
+```ts
+/** Classify a get, put or del against the stored rows, per the tables in `notes/answer-contract.md`. */
+```
+
+**Goofus:**
+
+```ts
+// storage/classifier.ts
+/** What a classification finds, bare of its level: an act that stores or answers, or what a refusal is over. */
+type Verdict = WriteAct | FoundAct | 'damaged' | 'void' | 'gone' | 'camped' | 'dubdel' | 'stale' | 'retcon' | 'clash' | 'forked' | 'ahead'
+```
+
+Invented figures of speech: "bare of its level", "what a refusal is over". Nothing says "level" means box or vault.
+
+**Gallant:**
+
+```ts
+/** A classification's outcome, before it is named for box or vault: store, answer, or a refusal's reason. */
+```
+
+**Goofus:**
+
+```ts
+// storage/classifier.ts
+/** How a box request citing `vault_tok` finds `vault`, its vault's row. */
+const gateOf = (vault: Found<VaultRow>, vault_tok: string): Exclude<Gate, 'full'> => {
+```
+
+A "How a foo verbs" opening, its verb a metaphor: "finds" stands for "the state it is in".
+
+**Gallant:**
+
+```ts
+/** Classify the state of a box request's vault from its stored row. */
+```
+
+## The guarantee `#say-the-guarantee`
 
 **Goofus:**
 
@@ -617,12 +667,16 @@ The small specimen is `extractWhisper` in `notes/gallant.md`.
 export const leaseCtxOf = (vaultStamp: VaultStampButFormat, leaseStamp: LeaseStamp): Uint8Array => (
 ```
 
-Spent on how the ctx is made and a refusal; what the binding prevents goes unsaid.
+Words were spent on how the ctx is made and a refusal, while the purpose of the binding went unsaid:
 
 **Gallant:**
 
 ```ts
-/** The ctx a lease's wrap is bound to. The wrap unwraps only under the vault and lease stamps it was sealed with: a lease copied to another vault or epoch will not unwrap. */
+/** The metadata a lease's wrapped key is bound to.
+ * The key unwraps only if given the same vault and lease stamps
+ * that were sealed alongside it -- any drift (vault epoch, device)
+ * prevents unwrap.
+ */
 ```
 
 ## A guard names its predicates `#guard-names-its-predicates`
@@ -642,7 +696,7 @@ A guard written as a noun phrase, its predicates given as participles rather tha
 **Gallant:**
 
 ```ts
-/** The lease in force. Refuses if there is none, or if it is inconsistent with the picture. */
+/** The lease in force. Refuses if absent or inconsistent with the given props. */
 ```
 
 **Goofus:**
@@ -724,7 +778,7 @@ A maintainer's note on what is not checked here, and why.
 
 ```ts
 // The damaged listing's label comes from storage unchecked: it is part of what is reported.
-/** The tombstone of a vault row nothing holds. */
+/** A synthetic sentinel tombstone representing an absent ('void') row. */
 ```
 
 ## Facts come from the code `#facts-from-the-code`
