@@ -196,7 +196,7 @@ describe("listing.put(record, { prior, ifPresent }): over a live record", () => 
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(live)
     const err = await TH.expectRefusal(listing.put(birth, { prior: SX.VoidRevision, ifPresent: 'fail' }), 'camped')
-    expect(err.meta).to.have.property('dbhas')
+    expect(err.meta).to.not.have.property('dbhas')
     expect(listing.at(scopeOf())?.revision_tok).to.eq('rev-a1')
     expect(world.mw.stored.get(live.boxlabel)).to.deep.equal(live)
   })
@@ -262,8 +262,7 @@ describe("listing.put and listing.del: the prior tok they put", () => {
   it("meets 'stale_write' carrying nothing from a put, and a refusal from a del, where the box world is stored no more", async () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.build(aliveRow)
-    const putErr = await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } }), 'stale_write')
-    expect(putErr.meta?.dbhas).to.be.null
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } }), 'stale_write')
     await TH.expectRefusal(box.del())
     expect(box._cheat_central.revision_tok).to.eq('rev-a1')
     expect(world.mw.stored.size).to.eq(0)

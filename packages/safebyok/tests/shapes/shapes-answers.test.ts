@@ -60,7 +60,9 @@ describe("AX's answer checks", () => {
     expect(parsed.err).to.be.instanceOf(VaultError)
     expect(parsed.err.refusalkind).to.equal(answer.err.refusalkind)
     expect(parsed.err.message).to.equal(answer.err.message)
-    expect(parsed.err.meta).to.deep.include({ act: answer.act, world: answer.world, req_params: answer.req_params })
+    expect(parsed.err.meta).to.deep.include({ act: answer.act, req_params: answer.req_params })
+    expect(parsed.err.meta).to.not.have.any.keys('world', 'dbhas')
+    expect(parsed).to.deep.include({ world: answer.world })
     expect(parsed.err.cause).to.be.undefined
   })
 

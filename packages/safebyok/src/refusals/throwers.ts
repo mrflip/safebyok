@@ -253,37 +253,37 @@ export const strengthCheckerLoadFailed = (cause: unknown): VaultError => new Vau
 
 /** A `vault_empty` refusal: nothing is stored for this life of the vault. */
 export const vaultEmpty = (world: SX.VaultRow): VaultError => (
-  new VaultError('vault_empty', Phrases.VaultEmpty, { meta: { world, dbhas: null } })
+  new VaultError('vault_empty', Phrases.VaultEmpty, { rows: { world, dbhas: null } })
 )
 
 /** A `vault_mismatch` refusal: a live vault stands here under another vault_tok. */
 export const vaultMismatch = (stored: SX.VaultRow): VaultError => (
-  new VaultError('vault_mismatch', Phrases.VaultMismatch, { meta: { world: null, dbhas: stored } })
+  new VaultError('vault_mismatch', Phrases.VaultMismatch, { rows: { world: null, dbhas: stored } })
 )
 
 /** A `vault_gone` refusal: this vault was deleted. */
 export const vaultGone = (tombstone: SX.VaultRow): VaultError => (
-  new VaultError('vault_gone', Phrases.VaultGone, { meta: { world: tombstone, dbhas: tombstone } })
+  new VaultError('vault_gone', Phrases.VaultGone, { rows: { world: tombstone, dbhas: tombstone } })
 )
 
 /** A `stale_write` refusal: what is stored moved since this revision was read. */
 export const staleWrite = (world: SX.VaultRow, dbhas: SX.VaultRow | SX.BoxRow | null): VaultError => (
-  new VaultError('stale_write', Phrases.StaleWrite, { meta: { world, dbhas } })
+  new VaultError('stale_write', Phrases.StaleWrite, { rows: { world, dbhas } })
 )
 
 /** A `camped` refusal: a live record is stored here, and the call said not to replace it. */
 export const camped = (world: SX.VaultRow, dbhas: SX.VaultRow | SX.BoxRow): VaultError => (
-  new VaultError('camped', Phrases.Camped, { meta: { world, dbhas } })
+  new VaultError('camped', Phrases.Camped, { rows: { world, dbhas } })
 )
 
 /** An `absent_box` refusal from a vaultDB: no box is stored under that label. */
 export const absentBox = (world: SX.VaultRow, dbhas: SX.BoxRow | null): VaultError => (
-  new VaultError('absent_box', Phrases.AbsentBox, { meta: { act: (dbhas === null) ? 'void' : 'gone', world, dbhas } })
+  new VaultError('absent_box', Phrases.AbsentBox, { meta: { act: (dbhas === null) ? 'void' : 'gone' }, rows: { world, dbhas } })
 )
 
 /** A `gate_issue` refusal: a change of the gate was refused for the reason `why`. */
 export const gateIssue = (world: SX.VaultRow, why: string): VaultError => (
-  new VaultError('gate_issue', Phrases.gateIssue(why), { meta: { world, dbhas: world } })
+  new VaultError('gate_issue', Phrases.gateIssue(why), { rows: { world, dbhas: world } })
 )
 
 /** A `box_too_large` refusal: the record's `recordBytes` exceed `maxRecordBytes`. */

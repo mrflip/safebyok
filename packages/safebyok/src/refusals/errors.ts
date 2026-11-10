@@ -136,16 +136,21 @@ export type RefusalMeta = {
   call?:         string
   /** A vaultDB's refusal: what happened, when it is not said by the refusalkind alone. */
   act?:          string
-  /** A vaultDB's refusal: the vault row as read in the step that refused. */
-  world?:        unknown
-  /** A vaultDB's refusal: the row stored where the write was aimed, or null for none. */
-  dbhas?:        unknown
   /** A vaultDB's refusal: the request's scope, vault_tok and other safe metadata. */
   req_params?:   Readonly<Record<string, unknown>>
 }
 
+/** The rows `err` hands a vaultDB's answer, empty where it has none. */
+export const rowsOfRefusal = (err: VaultError): RefusalRows => (err as unknown as Record<symbol, RefusalRows | undefined>)[RowsOfRefusal] ?? {}
+
 /** The options of a VaultError beside its refusalkind and message: the `cause` behind it, and its `meta`. */
-export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
+export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta, rows?: RefusalRows }
+
+/** The rows a vaultDB's refusal hands its answer: the vault row as read in the step that refused, and the row stored where the write was aimed, or null for none. */
+export type RefusalRows = { world?: unknown, dbhas?: unknown }
+
+// A Symbol.for and not enumerable, so the rows reach the answer from whichever copy of safebyok, and never a log: they hold wrapped keys.
+const RowsOfRefusal = Symbol.for('safebyok.refusal.rows')
 
 /** Every refusal a safebyok call makes: a calm message, a `refusalkind` to branch on, and its `family`.
  * It never carries a whisper, a passphrase or any other secret material: not in the message, the
@@ -168,12 +173,13 @@ export class VaultError extends Error {
    * @param opts - `cause`, the lower-level failure kept for debugging, and `meta`. Neither may contain secret material.
    */
   constructor(refusalkind: Refusalkind, message: string, opts?: VaultErrorOpts) {
-    const { meta, ...errorOpts } = opts ?? {}
+    const { meta, rows, ...errorOpts } = opts ?? {}
     super(message, errorOpts)
     this.name = 'VaultError'
     this.refusalkind = refusalkind
     this.family = RefusalFamilyForKind[refusalkind]
     if (meta !== undefined) { this.meta = meta }
+    if (rows !== undefined) { Object.defineProperty(this, RowsOfRefusal, { value: rows }) }
   }
 
   /** Answers true, which marks a VaultError to {@link isVaultError}, from whichever copy of safebyok made it. */

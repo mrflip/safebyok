@@ -6,7 +6,7 @@ import type { Awaitable } from '../helpers/helpers'
 import { nowMillis } from '../helpers/clock'
 import * as Phrases from '../helpers/phrases'
 import { verifyConsistent } from '../helpers/validator'
-import type { VaultError } from '../refusals/errors'
+import { type VaultError, rowsOfRefusal } from '../refusals/errors'
 import { type BadOutcome, type GoodOutcome, outcomeOf, storageTroubleOf } from '../refusals/outcome'
 import * as SX from '../shapes/shapes-storage'
 import * as CX from '../shapes/shapes-core'
@@ -42,7 +42,8 @@ const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<
   const outcome = await outcomeOf(thunk)
   if (outcome.ok) { return outcome.val }
   const { err } = outcome
-  const { act = err.refusalkind, world = null, req_params = {}, dbhas } = err.meta ?? {}
+  const { act = err.refusalkind, req_params = {} } = err.meta ?? {}
+  const { world = null, dbhas } = rowsOfRefusal(err)
   return { ok: false, err, act, world, req_params, ...((dbhas !== undefined) && { dbhas }) }
 }
 // --
