@@ -9,7 +9,7 @@ const NextPassphrase = 'a whole new passphrase for the vault'
 
 afterEach(() => { vi.restoreAllMocks() })
 
-/** WaysIn beside the vault probe, in a bank for `u1`, with the vault built and unlocked. */
+/** Render WaysIn beside the vault probe in a bank for `u1`, then build and unlock the vault. */
 const renderBuilt = async () => {
   TH.renderInBank(<><WaysIn /><TH.VaultProbe /></>)
   await TH.expectProbe('unborn none')

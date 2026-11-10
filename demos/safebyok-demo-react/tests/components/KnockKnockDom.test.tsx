@@ -12,19 +12,19 @@ import * as TH from '../test-helpers'
 const FakeApiKey = 'sk-ant-fake-knock-key'
 const Punchline = 'Banana who? Banana split, gotta run!'
 
-/** The flow beside the vault probe, in a bank for `u1`. */
+/** Render the flow beside the vault probe, in a bank for `u1`. */
 const renderFlow = () => TH.renderInBank(<><KnockKnockDom /><TH.VaultProbe /></>)
 
-/** A Veil button for the box under the flow, which nothing on the page offers. */
+/** A button that veils the flow's box. The page itself offers no way to veil. */
 const BoxVeiler = () => {
   const box = useBox(ApiKeyVaultlabel, DomApiKeyBoxlabel)
   return <button type="button" onClick={() => { box?.veil() }}>Veil</button>
 }
 
-/** The API key field, once a box backs it. */
+/** Find the API key field, which appears once the box exists. */
 const apiKeyField = async () => await screen.findByLabelText<HTMLInputElement>('Anthropic API key')
 
-/** Presses Add key, builds the vault through the provider's dialog, and waits for the empty field. */
+/** Press Add key, build the vault through the provider's dialog, and wait for the empty field. */
 const addKey = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Add key' }))
   await TH.answerPassphraseDialog()
@@ -32,7 +32,7 @@ const addKey = async () => {
   return await apiKeyField()
 }
 
-/** Adds the key, types the fake one into its field, and saves it. */
+/** Add a key box, type the fake key into its field, and save it. */
 const saveKey = async () => {
   const field = await addKey()
   fireEvent.change(field, { target: { value: FakeApiKey } })
@@ -41,14 +41,14 @@ const saveKey = async () => {
   return field
 }
 
-/** Types who's there and knocks, once the flow is ready to. */
+/** Wait until the flow is ready, then type `whosThere` and knock. */
 const knockAs = async (whosThere: string) => {
   await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Knock' }).disabled).to.be.false })
   fireEvent.change(screen.getByPlaceholderText('Banana'), { target: { value: whosThere } })
   fireEvent.click(screen.getByRole('button', { name: 'Knock' }))
 }
 
-/** The rows `vaultDB` has for the box under 'main', by boxlabel. */
+/** The box rows `vaultDB` has stored for the 'main' vault, by boxlabel. */
 const storedBoxRows = (vaultDB: MemoryVaultDB) => {
   const vaultrow = vaultDB._cheat_vaultRowsOf({ applabel: 'acme', user_id: 'u1' }).get('main') as { vault_tok: string }
   return vaultDB._cheat_boxRowsOf({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }, vaultrow.vault_tok)

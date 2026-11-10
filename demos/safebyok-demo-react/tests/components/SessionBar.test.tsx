@@ -3,7 +3,7 @@ import { fireEvent, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import * as TH from '../test-helpers'
 
-/** The bar over a fresh fake auth, in a bank for `u1`. */
+/** Render the bar with a fresh fake auth, in a bank for `u1`. */
 const renderBar = () => {
   const auth = TH.makeAuth()
   TH.renderInBank(<TH.LiveSessionBar auth={auth} />)

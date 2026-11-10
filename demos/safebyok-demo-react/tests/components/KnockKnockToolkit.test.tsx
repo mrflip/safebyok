@@ -14,10 +14,10 @@ import * as TH from '../test-helpers'
 const FakeApiKey = 'sk-ant-fake-knock-key'
 const Punchline = 'Banana who? Banana split, gotta run!'
 
-/** The flow beside the vault probe, in a bank for `u1`. */
+/** Render the flow beside the vault probe, in a bank for `u1`. */
 const renderFlow = () => TH.renderInBank(<><KnockKnockToolkit /><TH.VaultProbe /></>)
 
-/** Shows whether the box under the flow shows its whisper, as `showing` or `hidden`. */
+/** A probe that shows whether the flow's box is showing its whisper, as `showing` or `hidden`. */
 const ShowingProbe = () => <span data-testid="showing">{useIsShowing(useBox(ApiKeyVaultlabel, ToolkitApiKeyBoxlabel)) ? 'showing' : 'hidden'}</span>
 
 /** The flow with a button that unmounts it, beside the showing probe. */
@@ -26,10 +26,10 @@ const Host = () => {
   return <>{isMounted && <KnockKnockToolkit />}<ShowingProbe /><button type="button" onClick={() => { setIsMounted(false) }}>Unmount</button></>
 }
 
-/** The API key field, once a box backs it. */
+/** Find the API key field, which appears once the box exists. */
 const apiKeyField = async () => screen.findByLabelText<HTMLInputElement>('Anthropic API key')
 
-/** Presses Add key, builds the vault through the provider's dialog, and waits for the empty field. */
+/** Press Add key, build the vault through the provider's dialog, and wait for the empty field. */
 const addKey = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Add key' }))
   await TH.answerPassphraseDialog()
@@ -37,7 +37,7 @@ const addKey = async () => {
   return apiKeyField()
 }
 
-/** Adds the key, types the fake one into its field, and saves it. */
+/** Add a key box, type the fake key into its field, and save it. */
 const saveKey = async () => {
   const field = await addKey()
   fireEvent.change(field, { target: { value: FakeApiKey } })
@@ -46,14 +46,14 @@ const saveKey = async () => {
   return field
 }
 
-/** Types Banana for who's there and knocks, once the flow is ready to. */
+/** Wait until the flow is ready, then type Banana for who's there and knock. */
 const knock = async () => {
   await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Knock' }).disabled).to.be.false })
   fireEvent.change(screen.getByPlaceholderText('Banana'), { target: { value: 'Banana' } })
   fireEvent.click(screen.getByRole('button', { name: 'Knock' }))
 }
 
-/** The rows `vaultDB` has for the box under the key's vaultlabel, by boxlabel. */
+/** The box rows `vaultDB` has stored for the API key's vault, by boxlabel. */
 const storedBoxRows = (vaultDB: MemoryVaultDB) => {
   const vaultrow = vaultDB._cheat_vaultRowsOf({ applabel: 'acme', user_id: 'u1' }).get(ApiKeyVaultlabel) as { vault_tok: string }
   return vaultDB._cheat_boxRowsOf({ applabel: 'acme', user_id: 'u1', vaultlabel: ApiKeyVaultlabel }, vaultrow.vault_tok)

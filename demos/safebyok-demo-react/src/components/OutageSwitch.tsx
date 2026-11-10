@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import type { OutageVaultDB } from '../lib/outage-vault-db'
 
-/** A checkbox that takes the demo's backend offline, to see how the page meets a vaultDB it cannot reach. */
+/** A checkbox that takes the demo's backend offline, to show how the page behaves when it cannot reach the vaultDB. */
 export const OutageSwitch = ({ vaultDB }: { vaultDB: OutageVaultDB }) => {
   const isOnline = useSyncExternalStore(vaultDB.subscribe, vaultDB.getSnapshot)
   return (

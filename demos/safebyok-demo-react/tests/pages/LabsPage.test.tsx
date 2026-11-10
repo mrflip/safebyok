@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// fake-indexeddb installs an indexedDB global before the demo's VaultDB and DeviceDB open their shelves.
+// Import fake-indexeddb first: it installs an indexedDB global before the demo's VaultDB and DeviceDB open their databases.
 import 'fake-indexeddb/auto'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -7,10 +7,10 @@ import { LabsPage } from '../../src/pages/LabsPage'
 import { vaultDB } from '../../src/lib/storage'
 import * as TH from '../test-helpers'
 
-// The pages derive through the browser's Argon2id: 64 MiB for every passphrase typed, near a
-// second each here. What these tests click through is the page, not the deriver (the core's
-// tests keep to that), so the cheap test deriver stands in, and the quiet logger with it: it
-// leaves out the notice of a `test_` deriver's label, which the console would otherwise get.
+// The real pages derive keys with the browser's Argon2id: 64 MiB for every passphrase typed, about a
+// second each here. These tests exercise the page, not the deriver (the core's tests cover that), so
+// they swap in the cheap test deriver. They also swap in the quiet logger, which skips the console
+// notice about a `test_` deriver label.
 vi.mock('safebyok/browser', async (importOriginal) => {
   const browser = await importOriginal<typeof import('safebyok/browser')>()
   const { quietLogger, testDeriver } = await import('safebyok/testing')

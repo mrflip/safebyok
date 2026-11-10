@@ -4,7 +4,9 @@ import { isQuietRefusal } from '../lib/refusals'
 import { ApiKeyVaultlabel, WidgetApiKeyBoxlabel, extractSavedApiKey } from '../lib/saved-api-key'
 import { KnockForm } from './KnockForm'
 
-/** The widget form: the knock-knock machine whose API key is only ever typed and sealed, never exposed: the form reads it back only to knock. */
+/** The widget form: a knock-knock machine built from safebyok-react's ready-made pieces.
+ * Its API key is typed in and sealed, and never exposed. The form reads it back only to tell a joke.
+ */
 export const KnockKnockWidget = () => {
   const bank = useBank()
   const { stage, vault } = useVault(ApiKeyVaultlabel)
@@ -14,7 +16,7 @@ export const KnockKnockWidget = () => {
   const [isSaved, setIsSaved] = useState(false)
   const isReady = (bank !== null) && (stage !== 'waiting')
 
-  // Each dialog opens on the click: building the vault, unlocking it.
+  // The dialogs that build or unlock the vault open from this click.
   const save = async (evt: SyntheticEvent<HTMLFormElement>) => {
     evt.preventDefault()
     const form = evt.currentTarget

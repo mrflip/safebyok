@@ -23,15 +23,12 @@ export type Auth = {
   deleteAccount(): Promise<void>
 }
 
-/**
- * Fake auth over the demo's two storages: accounts live in the pretend-remote `dbStorage` (a backend
- * would own them), the session lives in the on-device `deviceStorage` (a cookie would). Not a
- * pattern for production -- there is no password and no verification, by design: the vault
- * passphrase is deliberately a separate thing from signing in.
+/** Make a fake auth over the demo's two storages. Accounts live in the pretend-remote `dbStorage` (a backend
+ * would own them), and the session lives in the on-device `deviceStorage` (a cookie would hold it).
+ * Not a pattern for production: there is no password and no verification, by design. The vault
+ * passphrase is deliberately separate from signing in.
  *
- * @param opts - `applabel`, namespacing the rows; `dbStorage` and `deviceStorage`, where they live;
- *   and `clock`, which stamps a new account's `registered_at` in epoch milliseconds, rounded down
- *   (default: the wall clock).
+ * @param opts.clock - stamps a new account's `registered_at`, in epoch milliseconds, rounded down (default: the wall clock)
  *
  * @example
  *   const auth = createAuth({ applabel: 'acme', dbStorage, deviceStorage })
@@ -49,7 +46,7 @@ export const createAuth = (opts: { applabel: string, dbStorage: StringStorage, d
     registered_at: number
   }
 
-  /** A new account for `userlabel`, stamped with the clock's reading. */
+  /** Make a new account for `userlabel`, with `registered_at` read from the clock. */
   const newAccount = (userlabel: string): Account => ({ user_id: randomId(), userlabel, registered_at: Math.floor(clock.now()) })
 
   let session: Session | null = getSession()
@@ -108,17 +105,17 @@ export const createAuth = (opts: { applabel: string, dbStorage: StringStorage, d
   }
 }
 
-/** What the fake auth stamps a new account's time with: epoch milliseconds. */
+/** The clock the fake auth reads for a new account's `registered_at`, in epoch milliseconds. */
 export type AuthClock = { now: () => number }
 
 const WallClock: AuthClock = { now: () => Date.now() }
 
-/** True for a username the demo takes: 2 to 40 lowercase letters and digits, joined by single underscores, starting with a letter. */
+/** True when `userlabel` is a valid demo username: 2 to 40 lowercase letters and digits, joined by single underscores, starting with a letter. */
 const isUserlabel = (userlabel: string): boolean => (
   (userlabel.length >= 2) && (userlabel.length <= 40) && /^[a-z][\da-z]*(?:_[\da-z]+)*$/.test(userlabel)
 )
 
-/** Opaque id from the platform CSPRNG: sixteen hex characters under a `user_` prefix. */
+/** Make an opaque id from the platform CSPRNG: `user_` followed by sixteen hex characters. */
 const randomId = (): string => {
   const bytes = crypto.getRandomValues(new Uint8Array(8))
   return 'user_' + [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('')

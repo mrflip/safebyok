@@ -6,7 +6,7 @@ import { KnockKnockDom } from '../components/KnockKnockDom'
 import { OutageSwitch } from '../components/OutageSwitch'
 import { bankOpts, vaultDB } from '../lib/storage'
 
-/** The labs page: the three ways to build the machine side by side, and the control panels below them. */
+/** The labs page: the three ways to build the machine side by side, with developer control panels below them. */
 export const LabsPage = () => (
   <DemoShell
     otherPage={<a href="./">Back to the app</a>}

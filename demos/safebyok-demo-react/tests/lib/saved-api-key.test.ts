@@ -7,7 +7,7 @@ import { ApiKeyVaultlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '..
 const Boxlabel = 'anthropic_api_key_test'
 const FakeApiKey = 'sk-ant-fake-saved-key'
 
-/** A said-hello bank whose dialog types the right passphrase at once, over storage in memory. */
+/** Make a bank on in-memory storage, with `hello()` already called. Its dialog answers at once with the right passphrase. */
 const makeBank = async () => {
   const bank = Bank.make({
     applabel: 'acme', user_id: 'u1', device_id: '00000000-0000-4000-8000-0000000000d1',
@@ -19,7 +19,7 @@ const makeBank = async () => {
   return bank
 }
 
-/** The user's vault, built and unlocked. */
+/** Build and unlock the user's vault. */
 const makeVault = async (): Promise<Vault> => {
   const bank = await makeBank()
   const vault = await bank.ensureVault({ vaultlabel: ApiKeyVaultlabel })
@@ -27,7 +27,7 @@ const makeVault = async (): Promise<Vault> => {
   return vault
 }
 
-/** `vault` with a box at `Boxlabel` sealing `whisper`. */
+/** Store `whisper` in the `Boxlabel` box of `vault`. */
 const putWhisper = async (vault: Vault, whisper: object) => { await vault.putBox({ boxlabel: Boxlabel, whisper }) }
 
 describe("extractSavedApiKey", () => {

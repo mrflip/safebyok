@@ -1,4 +1,4 @@
 import { isVaultError } from 'safebyok'
 
-/** True for a refusal the page says nothing of: a dialog closed with nothing proved. */
+/** True when `err` is a refusal the page should stay quiet about: the user dismissed a dialog. */
 export const isQuietRefusal = (err: unknown): boolean => isVaultError(err, 'dismissed')
