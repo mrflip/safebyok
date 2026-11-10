@@ -151,8 +151,8 @@ Coverage check: get sends no box revision, so 3 box states × 2 ifAbsent values 
 | PG9  |   eq    | equal    |  add  | *gone* | `reborn`     | **reqval** |   👍    |
 | PG10 |   eq    | equal    | fail  | *gone* | `box_gone`   | dbhas      |   🧨    |
 |      |         |          |       |        |              |            |        |
-| PL1  |  =next  | ≠next    |   @   | *live* | `box_retcon` | dbhas      |   🌀    |
 | PL2  |  =next  | =next    |   @   | *live* | `box_reput`  | dbhas      |   🔁    |
+| PL1  |  =next  | ≠next    |   @   | *live* | `box_retcon` | dbhas      |   🌀    |
 | PL4r |  other  | birth    | repl  | *live* | `box_stale`  | dbhas      |   🔁    |
 | PL4f |  other  | birth    | fail  | *live* | `box_stale`  | dbhas      |   🔁    |
 | PL3  |  other  | birth    |  get  | *live* | `passed`     | **same**   |   🟰    |
@@ -188,8 +188,8 @@ Soft cap: a put that would be `born` or `reborn` may refuse `vault_full` instead
 | DG8  |   eq    | ahead    |       | *gone* | `box_ahead`  | dbhas         |   🌀    |
 | DG9  |   eq    | equal    |       | *gone* | `box_dubdel` | dbhas         |   🔁    |
 |      |         |          |       |        |              |               |        |
-| DL1  |  =next  | ≠next    |       | *live* | `box_retcon` | dbhas         |   🌀    |
 | DL2  |  =next  | =next    |       | *live* | `box_retcon` | dbhas         |   🌀    |
+| DL1  |  =next  | ≠next    |       | *live* | `box_retcon` | dbhas         |   🌀    |
 | DL3  |  other  | birth    |       | *live* | `box_stale`  | dbhas         |   🔁    |
 | DL4  |  other  | stale    |       | *live* | `box_stale`  | dbhas         |   🔁    |
 | DL5  |   eq    | stale    |       | *live* | `box_clash`  | dbhas         |   🌀    |
@@ -258,14 +258,14 @@ Coverage check: vault get sends no vault revision, so 3 vault states × 2 flags 
 | VPG9  |   eq    | equal    |  add  | *gone* | `reborn`       | **reqval** |   👍    |
 | VPG10 |   eq    | equal    | fail  | *gone* | `vault_gone`   | dbhas      |   🧨    |
 |       |         |          |       |        |                |            |        |
-| VPL1  |  =next  | ≠next    |   @   | *live* | `vault_retcon` | dbhas      |   🌀    |
 | VPL2  |  =next  | =next    |   @   | *live* | `vault_reput`  | dbhas      |   🔁    |
+| VPL1  |  =next  | ≠next    |   @   | *live* | `vault_retcon` | dbhas      |   🌀    |
+| VPL4r |  other  | birth    | repl  | *live* | `vault_stale`  | dbhas      |   🔁    |
+| VPL4  |  other  | birth    | fail  | *live* | `vault_stale`  | dbhas      |   🔁    |
+| VPL5r |  other  | stale    | repl  | *live* | `vault_stale`  | dbhas      |   🔁    |
+| VPL5  |  other  | stale    | fail  | *live* | `vault_stale`  | dbhas      |   🔁    |
 | VPL3  |  other  | birth    |  get  | *live* | `passed`       | **same**   |   🟰    |
 | VPL6  |  other  | stale    |  get  | *live* | `passed`       | **same**   |   🟰    |
-| VPL4r |  other  | birth    | repl  | *live* | `vault_stale`  | dbhas      |   🔁    |
-| VPL5r |  other  | stale    | repl  | *live* | `vault_stale`  | dbhas      |   🔁    |
-| VPL4  |  other  | birth    | fail  | *live* | `vault_stale`  | dbhas      |   🔁    |
-| VPL5  |  other  | stale    | fail  | *live* | `vault_stale`  | dbhas      |   🔁    |
 | VPL7  |   eq    | stale    |   @   | *live* | `vault_clash`  | dbhas      |   🌀    |
 | VPL8  |  other  | equal    |   @   | *live* | `vault_forked` | dbhas      |   🌀    |
 | VPL9  |  other  | ahead    |   @   | *live* | `vault_ahead`  | dbhas      |   🌀    |
@@ -293,8 +293,8 @@ Coverage check: void has 2 seq values × 2 ifAbsent values = 4 cases in 3 rows. 
 | VDG8 | eq      | ahead    |       | *gone* | `vault_ahead`       | dbhas         | 🌀      |
 | VDG9 | eq      | equal    |       | *gone* | `vault_dubdel`      | dbhas         | 🔁      |
 |      |         |          |       |        |                     |               |        |
-| VDL1 | =next   | ≠next    |       | *live* | `vault_retcon`      | dbhas         | 🌀      |
 | VDL2 | =next   | =next    |       | *live* | `vault_retcon`      | dbhas         | 🌀      |
+| VDL1 | =next   | ≠next    |       | *live* | `vault_retcon`      | dbhas         | 🌀      |
 | VDL3 | other   | birth    |       | *live* | `vault_stale`       | dbhas         | 🔁      |
 | VDL4 | other   | stale    |       | *live* | `vault_stale`       | dbhas         | 🔁      |
 | VDL5 | eq      | stale    |       | *live* | `vault_clash`       | dbhas         | 🌀      |
