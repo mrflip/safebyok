@@ -25,7 +25,7 @@ describe("EX.ifPresentVals", () => {
 describe("EX.writeActVals, EX.foundActVals, EX.boxRefusedActVals and EX.vaultRefusedActVals", () => {
   it("name the four acts that store and the four that answer what is stored", () => {
     expect(EX.writeActVals).to.deep.equal(['born', 'reborn', 'replaced', 'deleted'])
-    expect(EX.foundActVals).to.deep.equal(['got', 'void', 'gone', 'passed'])
+    expect(EX.foundActVals).to.deep.equal(['gotlive', 'gotvoid', 'gotgone', 'passed'])
   })
 
   it("name each refused act for the row it is about, and none twice", () => {

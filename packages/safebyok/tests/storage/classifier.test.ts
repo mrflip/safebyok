@@ -11,14 +11,14 @@ import { boxAt, boxFlaws, boxscope, boxscopeOf, vaultAt, vaultFlaws, vaultScope 
 const Seq = 5
 
 type Stored = 'void' | 'gone' | 'live'
-// How a request's toks stand against the stored row's revision_tok: its expected tok is it, its proposed tok is it, or neither.
-type TokCell = 'eq' | 'next' | 'other'
+// A cell of the note's `b_tok` column: the stored revision_tok is the one a request expects, the one it proposes, or neither; `birth` is the void revision over no row.
+type TokCell = 'birth' | 'eq' | '=next' | 'neq'
 // The seq a request expects: the void row's, one below the stored seq by two, the stored one, one that makes its proposed seq the stored one, or one above.
-type SeqCell = 'birth' | 'stale' | 'equal' | 'next' | 'ahead'
+type SeqCell = 'birth' | 'stale' | 'eq' | '=next' | 'ahead'
 type Policies = Readonly<{ ifAbsent: EX.PutIfAbsent, ifPresent: EX.IfPresent }>
 type Peeked = Readonly<{ revision_tok: string, revision_seq: number, am: EX.Am, vault_tok: string, lifeTok: string }>
 
-const ExpectedSeqs = { birth: SX.VoidRevisionSeq, stale: Seq - 2, equal: Seq, next: Seq - 1, ahead: Seq + 2 } as const
+const ExpectedSeqs = { birth: SX.VoidRevisionSeq, stale: Seq - 2, eq: Seq, '=next': Seq - 1, ahead: Seq + 2 } as const
 const Repl: Policies = { ifAbsent: 'add', ifPresent: 'repl' }
 
 const liveVault = vaultAt(Seq)
@@ -81,77 +81,77 @@ const citedOver = (level: Level, stored: Stored, tok: TokCell, seq: SeqCell): { 
   // What it expects has the life and liveness of the row stored, or of a live row where none is: only its revision is off.
   const base      = level.peekOf((seq === 'birth') ? null : (row ?? level.rows.live))
   const expected  = (seq === 'birth') ? base : { ...base, revision_seq: ExpectedSeqs[seq], revision_tok: (tok === 'eq') ? storedTok : 'elsewhere' }
-  return { expected, proposedTok: (tok === 'next') ? storedTok : 'proposed' }
+  return { expected, proposedTok: (tok === '=next') ? storedTok : 'proposed' }
 }
 
 const GetCases = [
-  ["void", "nil",  "void",     'answers that nothing is stored'],
+  ["void", "nil",  "gotvoid",  'answers that nothing is stored'],
   ["void", "fail", "box_void", 'refuses over nothing when told to fail'],
-  ["gone", "nil",  "gone",     'answers a tombstone'],
+  ["gone", "nil",  "gotgone",  'answers a tombstone'],
   ["gone", "fail", "box_gone", 'refuses over a tombstone when told to fail'],
-  ["live", "nil",  "got",      'gets a live row'],
-  ["live", "fail", "got",      'gets a live row whatever it was told of an absence'],
+  ["live", "nil",  "gotlive",  'gets a live row'],
+  ["live", "fail", "gotlive",  'gets a live row whatever it was told of an absence'],
 ] as const
 
 const PutCases = [
   // over nothing
-  ["void", "other", "birth", "add",  "repl", "born",       'is born over nothing'],
-  ["void", "other", "birth", "fail", "repl", "box_void",   'refuses over nothing when told to fail'],
-  ["void", "other", "equal", "add",  "repl", "box_ahead",  'expects a row where none is stored'],
+  ["void", "birth", "birth", "add",  "repl", "born",       'is born over nothing'],
+  ["void", "birth", "birth", "fail", "repl", "box_void",   'refuses over nothing when told to fail'],
+  ["void", "neq",   "ahead", "add",  "repl", "box_ahead",  'expects a row where none is stored'],
   // over a tombstone
-  ["gone", "next",  "next",  "add",  "repl", "box_retcon", 'finds a tombstone at the revision it would store a live row at'],
-  ["gone", "next",  "stale", "add",  "repl", "box_retcon", 'finds a tombstone under its proposed tok at another seq'],
-  ["gone", "other", "birth", "add",  "repl", "box_stale",  'expects nothing where a tombstone is stored'],
-  ["gone", "other", "stale", "add",  "repl", "box_stale",  'expects an earlier revision than the tombstone stored'],
+  ["gone", "=next", "=next", "add",  "repl", "box_retcon", 'finds a tombstone at the revision it would store a live row at'],
+  ["gone", "=next", "stale", "add",  "repl", "box_retcon", 'finds a tombstone under its proposed tok at another seq'],
+  ["gone", "neq",   "birth", "add",  "repl", "box_stale",  'expects nothing where a tombstone is stored'],
+  ["gone", "neq",   "stale", "add",  "repl", "box_stale",  'expects an earlier revision than the tombstone stored'],
   ["gone", "eq",    "stale", "add",  "repl", "box_clash",  'cites the tombstone by its tok at a lower seq'],
-  ["gone", "other", "equal", "add",  "repl", "box_forked", 'cites the tombstone by its seq under another tok'],
-  ["gone", "other", "ahead", "add",  "repl", "box_ahead",  'expects a later revision than the tombstone stored'],
+  ["gone", "neq",   "eq",    "add",  "repl", "box_forked", 'cites the tombstone by its seq under another tok'],
+  ["gone", "neq",   "ahead", "add",  "repl", "box_ahead",  'expects a later revision than the tombstone stored'],
   ["gone", "eq",    "ahead", "add",  "repl", "box_ahead",  'cites the tombstone by its tok at a higher seq'],
-  ["gone", "eq",    "equal", "add",  "repl", "reborn",     'is reborn over the tombstone it cites'],
-  ["gone", "eq",    "equal", "fail", "repl", "box_gone",   'refuses over the tombstone it cites when told to fail'],
+  ["gone", "eq",    "eq",    "add",  "repl", "reborn",     'is reborn over the tombstone it cites'],
+  ["gone", "eq",    "eq",    "fail", "repl", "box_gone",   'refuses over the tombstone it cites when told to fail'],
   // over a live row
-  ["live", "next",  "stale", "add",  "repl", "box_retcon", 'finds a live row under its proposed tok at another seq'],
-  ["live", "next",  "next",  "add",  "repl", "box_reput",  'finds a live row already at the revision it would store'],
-  ["live", "next",  "next",  "add",  "get",  "box_reput",  'finds a live row already at the revision it would store, though told to get'],
-  ["live", "other", "birth", "add",  "repl", "box_stale",  'expects nothing where a live row is stored'],
-  ["live", "other", "birth", "add",  "fail", "box_stale",  'expects nothing where a live row is stored, when told to fail'],
-  ["live", "other", "birth", "add",  "get",  "passed",     'gets the live row stored where it expected nothing'],
-  ["live", "other", "stale", "add",  "get",  "passed",     'gets the live row stored where it expected an earlier one'],
-  ["live", "other", "stale", "add",  "repl", "box_stale",  'expects an earlier revision than the live row stored'],
-  ["live", "other", "stale", "add",  "fail", "box_stale",  'expects an earlier revision than the live row stored, when told to fail'],
+  ["live", "=next", "stale", "add",  "repl", "box_retcon", 'finds a live row under its proposed tok at another seq'],
+  ["live", "=next", "=next", "add",  "repl", "box_reput",  'finds a live row already at the revision it would store'],
+  ["live", "=next", "=next", "add",  "get",  "box_reput",  'finds a live row already at the revision it would store, though told to get'],
+  ["live", "neq",   "birth", "add",  "repl", "box_stale",  'expects nothing where a live row is stored'],
+  ["live", "neq",   "birth", "add",  "fail", "box_stale",  'expects nothing where a live row is stored, when told to fail'],
+  ["live", "neq",   "birth", "add",  "get",  "passed",     'gets the live row stored where it expected nothing'],
+  ["live", "neq",   "stale", "add",  "get",  "passed",     'gets the live row stored where it expected an earlier one'],
+  ["live", "neq",   "stale", "add",  "repl", "box_stale",  'expects an earlier revision than the live row stored'],
+  ["live", "neq",   "stale", "add",  "fail", "box_stale",  'expects an earlier revision than the live row stored, when told to fail'],
   ["live", "eq",    "stale", "add",  "get",  "box_clash",  'cites the live row by its tok at a lower seq'],
-  ["live", "other", "equal", "add",  "get",  "box_forked", 'cites the live row by its seq under another tok'],
-  ["live", "other", "ahead", "add",  "get",  "box_ahead",  'expects a later revision than the live row stored'],
+  ["live", "neq",   "eq",    "add",  "get",  "box_forked", 'cites the live row by its seq under another tok'],
+  ["live", "neq",   "ahead", "add",  "get",  "box_ahead",  'expects a later revision than the live row stored'],
   ["live", "eq",    "ahead", "add",  "get",  "box_ahead",  'cites the live row by its tok at a higher seq'],
-  ["live", "eq",    "equal", "add",  "repl", "replaced",   'replaces the live row it cites'],
-  ["live", "eq",    "equal", "add",  "get",  "passed",     'gets the live row it cites when told to get'],
-  ["live", "eq",    "equal", "add",  "fail", "box_camped", 'refuses over the live row it cites when told to fail'],
+  ["live", "eq",    "eq",    "add",  "repl", "replaced",   'replaces the live row it cites'],
+  ["live", "eq",    "eq",    "add",  "get",  "passed",     'gets the live row it cites when told to get'],
+  ["live", "eq",    "eq",    "add",  "fail", "box_camped", 'refuses over the live row it cites when told to fail'],
 ] as const
 
 const DelCases = [
   // over nothing
-  ["void", "other", "birth", "box_void",   'refuses over nothing'],
-  ["void", "other", "equal", "box_ahead",  'expects a row where none is stored'],
+  ["void", "birth", "birth", "box_void",   'refuses over nothing'],
+  ["void", "neq",   "ahead", "box_ahead",  'expects a row where none is stored'],
   // over a tombstone
-  ["gone", "next",  "next",  "box_redel",  'finds a tombstone already at the revision it would store'],
-  ["gone", "next",  "stale", "box_retcon", 'finds a tombstone under its proposed tok at another seq'],
-  ["gone", "other", "birth", "box_gone",   'expects nothing where a tombstone is stored'],
-  ["gone", "other", "stale", "box_gone",   'expects an earlier revision than the tombstone stored'],
+  ["gone", "=next", "=next", "box_redel",  'finds a tombstone already at the revision it would store'],
+  ["gone", "=next", "stale", "box_retcon", 'finds a tombstone under its proposed tok at another seq'],
+  ["gone", "neq",   "birth", "box_gone",   'expects nothing where a tombstone is stored'],
+  ["gone", "neq",   "stale", "box_gone",   'expects an earlier revision than the tombstone stored'],
   ["gone", "eq",    "stale", "box_clash",  'cites the tombstone by its tok at a lower seq'],
-  ["gone", "other", "equal", "box_forked", 'cites the tombstone by its seq under another tok'],
-  ["gone", "other", "ahead", "box_ahead",  'expects a later revision than the tombstone stored'],
+  ["gone", "neq",   "eq",    "box_forked", 'cites the tombstone by its seq under another tok'],
+  ["gone", "neq",   "ahead", "box_ahead",  'expects a later revision than the tombstone stored'],
   ["gone", "eq",    "ahead", "box_ahead",  'cites the tombstone by its tok at a higher seq'],
-  ["gone", "eq",    "equal", "box_dubdel", 'refuses to delete the tombstone it cites'],
+  ["gone", "eq",    "eq",    "box_dubdel", 'refuses to delete the tombstone it cites'],
   // over a live row
-  ["live", "next",  "stale", "box_retcon", 'finds a live row under its proposed tok at another seq'],
-  ["live", "next",  "next",  "box_retcon", 'finds a live row at the revision it would store a tombstone at'],
-  ["live", "other", "birth", "box_stale",  'expects nothing where a live row is stored'],
-  ["live", "other", "stale", "box_stale",  'expects an earlier revision than the live row stored'],
+  ["live", "=next", "stale", "box_retcon", 'finds a live row under its proposed tok at another seq'],
+  ["live", "=next", "=next", "box_retcon", 'finds a live row at the revision it would store a tombstone at'],
+  ["live", "neq",   "birth", "box_stale",  'expects nothing where a live row is stored'],
+  ["live", "neq",   "stale", "box_stale",  'expects an earlier revision than the live row stored'],
   ["live", "eq",    "stale", "box_clash",  'cites the live row by its tok at a lower seq'],
-  ["live", "other", "equal", "box_forked", 'cites the live row by its seq under another tok'],
-  ["live", "other", "ahead", "box_ahead",  'expects a later revision than the live row stored'],
+  ["live", "neq",   "eq",    "box_forked", 'cites the live row by its seq under another tok'],
+  ["live", "neq",   "ahead", "box_ahead",  'expects a later revision than the live row stored'],
   ["live", "eq",    "ahead", "box_ahead",  'cites the live row by its tok at a higher seq'],
-  ["live", "eq",    "equal", "deleted",    'deletes the live row it cites'],
+  ["live", "eq",    "eq",    "deleted",    'deletes the live row it cites'],
 ] as const
 
 describe.each(Levels)("%s, the table of notes/answer-contract.md", (_fnname, level) => {
@@ -180,27 +180,27 @@ describe.each(Levels)("%s, the table of notes/answer-contract.md", (_fnname, lev
   })
 
   it("calls it a clash when the row cited by tok and seq is of another life", () => {
-    const { expected, proposedTok } = citedOver(level, 'live', 'eq', 'equal')
+    const { expected, proposedTok } = citedOver(level, 'live', 'eq', 'eq')
     const ofOtherLife = { ...expected, lifeTok: 'another-life' }
     expect(level.putAct(ofOtherLife, proposedTok, Repl, 'live')).to.eq(level.actName('box_clash'))
     expect(level.delAct(ofOtherLife, proposedTok, 'live')).to.eq(level.actName('box_clash'))
   })
 
   it("calls it a clash when the row cited by tok and seq is live where a tombstone was expected", () => {
-    const { expected, proposedTok } = citedOver(level, 'live', 'eq', 'equal')
+    const { expected, proposedTok } = citedOver(level, 'live', 'eq', 'eq')
     expect(level.putAct({ ...expected, am: 'x' }, proposedTok, Repl, 'live')).to.eq(level.actName('box_clash'))
   })
 })
 
 describe("the whole table of a put, a del and a get, cell by cell", () => {
   const Storeds  = ['void', 'gone', 'live'] as const
-  const TokCells = ['eq', 'next', 'other'] as const
-  const SeqCells = ['birth', 'stale', 'equal', 'next', 'ahead'] as const
+  const TokCells = ['eq', '=next', 'neq'] as const
+  const SeqCells = ['birth', 'stale', 'eq', '=next', 'ahead'] as const
   // The void row's revision is cited whole, so a birth is never cited by the stored tok; over nothing there is no stored tok to cite.
   const cells = Storeds.flatMap((stored) => TokCells.flatMap((tok) => SeqCells.map((seq) => ({ stored, tok, seq }))))
-    .filter(({ stored, tok, seq }) => (! ((tok === 'eq') && (seq === 'birth'))) && ((stored !== 'void') || (tok === 'other')))
+    .filter(({ stored, tok, seq }) => (! ((tok === 'eq') && (seq === 'birth'))) && ((stored !== 'void') || (tok === 'neq')))
   const policiesList = EX.putIfAbsentVals.flatMap((ifAbsent) => EX.ifPresentVals.map((ifPresent) => ({ ifAbsent, ifPresent })))
-  const isCited = ({ stored, tok, seq }: typeof cells[number]) => (stored === 'void') ? (seq === 'birth') : ((tok === 'eq') && (seq === 'equal'))
+  const isCited = ({ stored, tok, seq }: typeof cells[number]) => (stored === 'void') ? (seq === 'birth') : ((tok === 'eq') && (seq === 'eq'))
 
   describe.each(Levels)("%s", (_fnname, level) => {
     const refusedActs: readonly string[] = (level === BoxLevel) ? EX.boxRefusedActVals : EX.vaultRefusedActVals
@@ -231,7 +231,7 @@ describe("the whole table of a put, a del and a get, cell by cell", () => {
 
     it("stores a del's tombstone only over the live row it cites", () => {
       const wrote = dels.filter(({ act }) => isWriteAct(act as BoxAct | VaultAct))
-      expect(wrote.map(({ cell, act }) => ({ ...cell, act }))).to.deep.equal([{ stored: 'live', tok: 'eq', seq: 'equal', act: 'deleted' }])
+      expect(wrote.map(({ cell, act }) => ({ ...cell, act }))).to.deep.equal([{ stored: 'live', tok: 'eq', seq: 'eq', act: 'deleted' }])
     })
 
     it("passes a put only when it was told to get and a live row is stored", () => {
@@ -280,7 +280,7 @@ describe("boxActOf, its vault", () => {
 
   it("counts a box row of an earlier life of its vault as no row", () => {
     const leftover = boxAt(Seq, 'life0')
-    expect(boxActOf(get, liveVault, leftover)).to.eq('void')
+    expect(boxActOf(get, liveVault, leftover)).to.eq('gotvoid')
     expect(boxActOf(put, liveVault, leftover)).to.eq('born')
   })
 })

@@ -90,8 +90,8 @@ export type DelAct = typeof delActVals[number]
 export const writeActVals = ['born', 'reborn', 'replaced', 'deleted'] as const
 export type WriteAct = typeof writeActVals[number]
 
-/** The acts that answer what is stored and write nothing: a get's `got`, `void` or `gone`, and `passed` for a put told to get the live row it met. */
-export const foundActVals = ['got', 'void', 'gone', 'passed'] as const
+/** The acts that answer what is stored and write nothing: a get's `gotlive`, `gotvoid` or `gotgone`, and `passed` for a put told to get the live row it met. */
+export const foundActVals = ['gotlive', 'gotvoid', 'gotgone', 'passed'] as const
 export type FoundAct = typeof foundActVals[number]
 
 // No 'vault_full' here: the cap on a vault's boxes is soft, refused by the vaultDB from a count the classifier is never handed (notes/answer-contract.md, *Soft caps*).

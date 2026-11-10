@@ -14,8 +14,8 @@ op is get, put or del. Vault ops use the same three on the vault row.
 - **ifPresent** (put only): what to do when the box is live. repl replaces it; get returns it unchanged (passed); fail refuses (`box_camped`).
 - del takes no flags.
 - **`vault_tok`, `box_tok`**: unguessable random strings the device mints, so a token names one life of the row: minted when the row is created (over void or a tombstone) and unchanged by later writes, delete included. Separately, every write (create, update, delete) gives the row a new revision: a fresh `revision_tok` and `revision_seq + 1`. A box records its vault's `vault_tok` but never the vault's revision, and a vault write never touches its boxes' revisions. The token columns in the tables compare revision tokens.
-- In the `b_tok` column: eq = the stored token is the one you cited; =next = it is the one this request would write; other = neither; match = you cited the sentinel's token and the box is void, so there is no stored token to compare; — = not sent (get sends no box revision).
-- In the `b_seq` column: birth = you cited the sentinel's seq, `-1`; nonbirth = any other seq, cited against a void; stale, equal, ahead = the seq you cited is below, at or above the stored one; =next = the stored seq is the one this request would write.
+- In the `b_tok` column: eq = the stored token is the one you cited; =next = it is the one this request would write; neq = neither; birth = you cited the sentinel's token and the box is void, so there is no stored token to compare; — = not sent (get sends no box revision).
+- In the `b_seq` column: =next = the stored seq is the one this request would write; birth = you cited the sentinel's seq, `-1`; stale, eq, ahead = the seq you cited is below, at or above the stored one, and any seq but the sentinel's cited against a void is ahead. A seq is =next before it is birth or stale: under a token that is not =next, the rows for birth and stale answer for it.
 
 ## Rules
 
@@ -39,10 +39,10 @@ Revision tokens are minted fresh at every write, delete included: a `revision_to
 | birth against a row        | (no row has that token)     | stale (expected)            |
 | birth against void         | match                       | match                       |
 | stale                      | clash (impossible)          | stale (expected)            |
-| equal                      | match                       | forked (impossible)         |
+| eq                         | match                       | forked (impossible)         |
 | =next                      | (reput/redel/retcon, below) | (reput/redel/retcon, below) |
 | ahead                      | ahead (impossible)          | ahead (impossible)          |
-| nonbirth against void      | ahead (impossible)          | ahead (impossible)          |
+| other seq against void     | ahead (impossible)          | ahead (impossible)          |
 
 A clash is a cited `revision_tok` that is the stored one, while something else the request cites of that row is not what is stored: its seq, its life token, or whether it is live. A `revision_tok` names one exact row version, so the classifier checks all three on a token match.
 
@@ -122,13 +122,13 @@ Result: 🫱 / 🔲 / 🪦 got live / void / tombstone · 👍 saved (reqval) ·
 
 | abbr | `b_tok` | `b_seq` | flags | box    | act        | returning | result |
 | ---- | :-----: | ------- | :---: | ------ | ---------- | --------- | :----: |
-| GV1  |    —    | —       |  nil  | *void* | `void`     | null      |   🔲    |
+| GV1  |    —    | —       |  nil  | *void* | `gotvoid`  | null      |   🔲    |
 | GV2  |    —    | —       | fail  | *void* | `box_void` | dbnil     |   🧨    |
 |      |         |         |       |        |            |           |        |
-| GG1  |    —    | —       |  nil  | *gone* | `gone`     | tombstone |   🪦    |
+| GG1  |    —    | —       |  nil  | *gone* | `gotgone`  | tombstone |   🪦    |
 | GG2  |    —    | —       | fail  | *gone* | `box_gone` | dbhas     |   🧨    |
 |      |         |         |       |        |            |           |        |
-| GL1  |    —    | —       |   @   | *live* | `got`      | **same**  |   🫱    |
+| GL1  |    —    | —       |   @   | *live* | `gotlive`  | **same**  |   🫱    |
 
 Coverage check: get sends no box revision, so 3 box states × 2 ifAbsent values = 6 cases in 5 rows; ifAbsent doesn't matter on a live box.
 
@@ -136,36 +136,36 @@ Coverage check: get sends no box revision, so 3 box states × 2 ifAbsent values 
 
 | abbr | `b_tok` | `b_seq`  | flags |        | act          | returning  | result |
 | ---- | :-----: | -------- | :---: | ------ | ------------ | ---------- | :----: |
-| PV1  |  match  | birth    |  add  | *void* | `born`       | **reqval** |   👍    |
-| PV2  |  match  | birth    | fail  | *void* | `box_void`   | dbnil      |   🧨    |
-| PV3  |    @    | nonbirth |   @   | *void* | `box_ahead`  | dbnil      |   🌀    |
+| PV1  |  birth  | birth    |  add  | *void* | `born`       | **reqval** |   👍    |
+| PV2  |  birth  | birth    | fail  | *void* | `box_void`   | dbnil      |   🧨    |
+| PV3  |   neq   | ahead    |   @   | *void* | `box_ahead`  | dbnil      |   🌀    |
 |      |         |          |       |        |              |            |        |
 | PG1  |  =next  | =next    |   @   | *gone* | `box_retcon` | dbhas      |   🌀    |
 | PG2  |  =next  | ≠next    |   @   | *gone* | `box_retcon` | dbhas      |   🌀    |
-| PG3  |  other  | birth    |   @   | *gone* | `box_stale`  | dbhas      |   🔁    |
-| PG4  |  other  | stale    |   @   | *gone* | `box_stale`  | dbhas      |   🔁    |
+| PG3  |   neq   | birth    |   @   | *gone* | `box_stale`  | dbhas      |   🔁    |
+| PG4  |   neq   | stale    |   @   | *gone* | `box_stale`  | dbhas      |   🔁    |
 | PG5  |   eq    | stale    |   @   | *gone* | `box_clash`  | dbhas      |   🌀    |
-| PG6  |  other  | equal    |   @   | *gone* | `box_forked` | dbhas      |   🌀    |
-| PG7  |  other  | ahead    |   @   | *gone* | `box_ahead`  | dbhas      |   🌀    |
+| PG6  |   neq   | eq       |   @   | *gone* | `box_forked` | dbhas      |   🌀    |
+| PG7  |   neq   | ahead    |   @   | *gone* | `box_ahead`  | dbhas      |   🌀    |
 | PG8  |   eq    | ahead    |   @   | *gone* | `box_ahead`  | dbhas      |   🌀    |
-| PG9  |   eq    | equal    |  add  | *gone* | `reborn`     | **reqval** |   👍    |
-| PG10 |   eq    | equal    | fail  | *gone* | `box_gone`   | dbhas      |   🧨    |
+| PG9  |   eq    | eq       |  add  | *gone* | `reborn`     | **reqval** |   👍    |
+| PG10 |   eq    | eq       | fail  | *gone* | `box_gone`   | dbhas      |   🧨    |
 |      |         |          |       |        |              |            |        |
 | PL2  |  =next  | =next    |   @   | *live* | `box_reput`  | dbhas      |   🔁    |
 | PL1  |  =next  | ≠next    |   @   | *live* | `box_retcon` | dbhas      |   🌀    |
-| PL4r |  other  | birth    | repl  | *live* | `box_stale`  | dbhas      |   🔁    |
-| PL4f |  other  | birth    | fail  | *live* | `box_stale`  | dbhas      |   🔁    |
-| PL3  |  other  | birth    |  get  | *live* | `passed`     | **same**   |   🟰    |
-| PL6  |  other  | stale    |  get  | *live* | `passed`     | **same**   |   🟰    |
-| PL5r |  other  | stale    | repl  | *live* | `box_stale`  | dbhas      |   🔁    |
-| PL5f |  other  | stale    | fail  | *live* | `box_stale`  | dbhas      |   🔁    |
+| PL4r |   neq   | birth    | repl  | *live* | `box_stale`  | dbhas      |   🔁    |
+| PL4f |   neq   | birth    | fail  | *live* | `box_stale`  | dbhas      |   🔁    |
+| PL3  |   neq   | birth    |  get  | *live* | `passed`     | **same**   |   🟰    |
+| PL6  |   neq   | stale    |  get  | *live* | `passed`     | **same**   |   🟰    |
+| PL5r |   neq   | stale    | repl  | *live* | `box_stale`  | dbhas      |   🔁    |
+| PL5f |   neq   | stale    | fail  | *live* | `box_stale`  | dbhas      |   🔁    |
 | PL7  |   eq    | stale    |   @   | *live* | `box_clash`  | dbhas      |   🌀    |
-| PL8  |  other  | equal    |   @   | *live* | `box_forked` | dbhas      |   🌀    |
-| PL9  |  other  | ahead    |   @   | *live* | `box_ahead`  | dbhas      |   🌀    |
+| PL8  |   neq   | eq       |   @   | *live* | `box_forked` | dbhas      |   🌀    |
+| PL9  |   neq   | ahead    |   @   | *live* | `box_ahead`  | dbhas      |   🌀    |
 | PL10 |   eq    | ahead    |   @   | *live* | `box_ahead`  | dbhas      |   🌀    |
-| PL11 |   eq    | equal    | repl  | *live* | `replaced`   | reqval     |   👍    |
-| PL12 |   eq    | equal    |  get  | *live* | `passed`     | **same**   |   🟰    |
-| PL13 |   eq    | equal    | fail  | *live* | `box_camped` | dbhas      |   🧨    |
+| PL11 |   eq    | eq       | repl  | *live* | `replaced`   | reqval     |   👍    |
+| PL12 |   eq    | eq       |  get  | *live* | `passed`     | **same**   |   🟰    |
+| PL13 |   eq    | eq       | fail  | *live* | `box_camped` | dbhas      |   🧨    |
 
 Coverage check: void has 2 seq values × 2 ifAbsent values = 4 cases in 3 rows. Gone has 9 `b_tok` × `b_seq` pairs, one split by ifAbsent, in 10 rows. Live has 9 pairs, three split by ifPresent, in 15 rows.
 
@@ -175,28 +175,28 @@ Soft cap: a put that would be `born` or `reborn` may refuse `vault_full` instead
 
 | abbr | `b_tok` | `b_seq`  | flags | box    | act          | returning     | result |
 | ---- | :-----: | -------- | :---: | ------ | ------------ | ------------- | :----: |
-| DV1  |  match  | birth    |       | *void* | `box_void`   | dbnil         |   🔁    |
-| DV2  |    @    | nonbirth |       | *void* | `box_ahead`  | dbnil         |   🌀    |
+| DV1  |  birth  | birth    |       | *void* | `box_void`   | dbnil         |   🔁    |
+| DV2  |   neq   | ahead    |       | *void* | `box_ahead`  | dbnil         |   🌀    |
 |      |         |          |       |        |              |               |        |
 | DG1  |  =next  | =next    |       | *gone* | `box_redel`  | dbhas         |   🔁    |
 | DG2  |  =next  | ≠next    |       | *gone* | `box_retcon` | dbhas         |   🌀    |
-| DG3  |  other  | birth    |       | *gone* | `box_gone`   | dbhas         |   🔁    |
-| DG4  |  other  | stale    |       | *gone* | `box_gone`   | dbhas         |   🔁    |
+| DG3  |   neq   | birth    |       | *gone* | `box_gone`   | dbhas         |   🔁    |
+| DG4  |   neq   | stale    |       | *gone* | `box_gone`   | dbhas         |   🔁    |
 | DG5  |   eq    | stale    |       | *gone* | `box_clash`  | dbhas         |   🌀    |
-| DG6  |  other  | equal    |       | *gone* | `box_forked` | dbhas         |   🌀    |
-| DG7  |  other  | ahead    |       | *gone* | `box_ahead`  | dbhas         |   🌀    |
+| DG6  |   neq   | eq       |       | *gone* | `box_forked` | dbhas         |   🌀    |
+| DG7  |   neq   | ahead    |       | *gone* | `box_ahead`  | dbhas         |   🌀    |
 | DG8  |   eq    | ahead    |       | *gone* | `box_ahead`  | dbhas         |   🌀    |
-| DG9  |   eq    | equal    |       | *gone* | `box_dubdel` | dbhas         |   🔁    |
+| DG9  |   eq    | eq       |       | *gone* | `box_dubdel` | dbhas         |   🔁    |
 |      |         |          |       |        |              |               |        |
 | DL2  |  =next  | =next    |       | *live* | `box_retcon` | dbhas         |   🌀    |
 | DL1  |  =next  | ≠next    |       | *live* | `box_retcon` | dbhas         |   🌀    |
-| DL3  |  other  | birth    |       | *live* | `box_stale`  | dbhas         |   🔁    |
-| DL4  |  other  | stale    |       | *live* | `box_stale`  | dbhas         |   🔁    |
+| DL3  |   neq   | birth    |       | *live* | `box_stale`  | dbhas         |   🔁    |
+| DL4  |   neq   | stale    |       | *live* | `box_stale`  | dbhas         |   🔁    |
 | DL5  |   eq    | stale    |       | *live* | `box_clash`  | dbhas         |   🌀    |
-| DL6  |  other  | equal    |       | *live* | `box_forked` | dbhas         |   🌀    |
-| DL7  |  other  | ahead    |       | *live* | `box_ahead`  | dbhas         |   🌀    |
+| DL6  |   neq   | eq       |       | *live* | `box_forked` | dbhas         |   🌀    |
+| DL7  |   neq   | ahead    |       | *live* | `box_ahead`  | dbhas         |   🌀    |
 | DL8  |   eq    | ahead    |       | *live* | `box_ahead`  | dbhas         |   🌀    |
-| DL9  |   eq    | equal    |       | *live* | `deleted`    | **tombstone** |   ❎    |
+| DL9  |   eq    | eq       |       | *live* | `deleted`    | **tombstone** |   ❎    |
 
 Coverage check: void has 2 seq values in 2 rows. Gone and live each have 9 `b_tok` × `b_seq`
 pairs in 9 rows (eq with birth can't occur). del has no flags, so nothing splits further.
@@ -229,13 +229,13 @@ Every vault op passes these first, whatever revision it cites.
 
 | #    | `v_tok` | `v_seq` | flags | vault  | act          | returning     | result |
 | ---- | :-----: | ------- | :---: | ------ | ------------ | ------------- | :----: |
-| VGV1 |    —    | —       |  nil  | *void* | `void`       | **null**      |   🔲    |
+| VGV1 |    —    | —       |  nil  | *void* | `gotvoid`    | **null**      |   🔲    |
 | VGV2 |    —    | —       | fail  | *void* | `vault_void` | dbnil         |   🧨    |
 |      |         |         |       |        |              |               |        |
-| VGG1 |    —    | —       |  nil  | *gone* | `gone`       | **tombstone** |   🪦    |
+| VGG1 |    —    | —       |  nil  | *gone* | `gotgone`    | **tombstone** |   🪦    |
 | VGG2 |    —    | —       | fail  | *gone* | `vault_gone` | dbhas         |   🧨    |
 |      |         |         |       |        |              |               |        |
-| VGL1 |    —    | —       |   @   | *live* | `got`        | **same**      |   🫱    |
+| VGL1 |    —    | —       |   @   | *live* | `gotlive`    | **same**      |   🫱    |
 
 Coverage check: vault get sends no vault revision, so 3 vault states × 2 flags values = 6 cases in 5 rows; flags don't matter on a live vault.
 
@@ -243,36 +243,36 @@ Coverage check: vault get sends no vault revision, so 3 vault states × 2 flags 
 
 | #     | `v_tok` | `v_seq`  | flags | vault  | act            | returning  | result |
 | ----- | :-----: | -------- | :---: | ------ | -------------- | ---------- | :----: |
-| VPV1  |  match  | birth    |  add  | *void* | `born`         | **reqval** |   👍    |
-| VPV2  |  match  | birth    | fail  | *void* | `vault_void`   | dbnil      |   🧨    |
-| VPV3  |    @    | nonbirth |   @   | *void* | `vault_ahead`  | dbnil      |   🌀    |
+| VPV1  |  birth  | birth    |  add  | *void* | `born`         | **reqval** |   👍    |
+| VPV2  |  birth  | birth    | fail  | *void* | `vault_void`   | dbnil      |   🧨    |
+| VPV3  |   neq   | ahead    |   @   | *void* | `vault_ahead`  | dbnil      |   🌀    |
 |       |         |          |       |        |                |            |        |
 | VPG1  |  =next  | =next    |   @   | *gone* | `vault_retcon` | dbhas      |   🌀    |
 | VPG2  |  =next  | ≠next    |   @   | *gone* | `vault_retcon` | dbhas      |   🌀    |
-| VPG3  |  other  | birth    |   @   | *gone* | `vault_stale`  | dbhas      |   🔁    |
-| VPG4  |  other  | stale    |   @   | *gone* | `vault_stale`  | dbhas      |   🔁    |
+| VPG3  |   neq   | birth    |   @   | *gone* | `vault_stale`  | dbhas      |   🔁    |
+| VPG4  |   neq   | stale    |   @   | *gone* | `vault_stale`  | dbhas      |   🔁    |
 | VPG5  |   eq    | stale    |   @   | *gone* | `vault_clash`  | dbhas      |   🌀    |
-| VPG6  |  other  | equal    |   @   | *gone* | `vault_forked` | dbhas      |   🌀    |
-| VPG7  |  other  | ahead    |   @   | *gone* | `vault_ahead`  | dbhas      |   🌀    |
+| VPG6  |   neq   | eq       |   @   | *gone* | `vault_forked` | dbhas      |   🌀    |
+| VPG7  |   neq   | ahead    |   @   | *gone* | `vault_ahead`  | dbhas      |   🌀    |
 | VPG8  |   eq    | ahead    |   @   | *gone* | `vault_ahead`  | dbhas      |   🌀    |
-| VPG9  |   eq    | equal    |  add  | *gone* | `reborn`       | **reqval** |   👍    |
-| VPG10 |   eq    | equal    | fail  | *gone* | `vault_gone`   | dbhas      |   🧨    |
+| VPG9  |   eq    | eq       |  add  | *gone* | `reborn`       | **reqval** |   👍    |
+| VPG10 |   eq    | eq       | fail  | *gone* | `vault_gone`   | dbhas      |   🧨    |
 |       |         |          |       |        |                |            |        |
 | VPL2  |  =next  | =next    |   @   | *live* | `vault_reput`  | dbhas      |   🔁    |
 | VPL1  |  =next  | ≠next    |   @   | *live* | `vault_retcon` | dbhas      |   🌀    |
-| VPL4r |  other  | birth    | repl  | *live* | `vault_stale`  | dbhas      |   🔁    |
-| VPL4  |  other  | birth    | fail  | *live* | `vault_stale`  | dbhas      |   🔁    |
-| VPL5r |  other  | stale    | repl  | *live* | `vault_stale`  | dbhas      |   🔁    |
-| VPL5  |  other  | stale    | fail  | *live* | `vault_stale`  | dbhas      |   🔁    |
-| VPL3  |  other  | birth    |  get  | *live* | `passed`       | **same**   |   🟰    |
-| VPL6  |  other  | stale    |  get  | *live* | `passed`       | **same**   |   🟰    |
+| VPL4r |   neq   | birth    | repl  | *live* | `vault_stale`  | dbhas      |   🔁    |
+| VPL4  |   neq   | birth    | fail  | *live* | `vault_stale`  | dbhas      |   🔁    |
+| VPL5r |   neq   | stale    | repl  | *live* | `vault_stale`  | dbhas      |   🔁    |
+| VPL5  |   neq   | stale    | fail  | *live* | `vault_stale`  | dbhas      |   🔁    |
+| VPL3  |   neq   | birth    |  get  | *live* | `passed`       | **same**   |   🟰    |
+| VPL6  |   neq   | stale    |  get  | *live* | `passed`       | **same**   |   🟰    |
 | VPL7  |   eq    | stale    |   @   | *live* | `vault_clash`  | dbhas      |   🌀    |
-| VPL8  |  other  | equal    |   @   | *live* | `vault_forked` | dbhas      |   🌀    |
-| VPL9  |  other  | ahead    |   @   | *live* | `vault_ahead`  | dbhas      |   🌀    |
+| VPL8  |   neq   | eq       |   @   | *live* | `vault_forked` | dbhas      |   🌀    |
+| VPL9  |   neq   | ahead    |   @   | *live* | `vault_ahead`  | dbhas      |   🌀    |
 | VPL10 |   eq    | ahead    |   @   | *live* | `vault_ahead`  | dbhas      |   🌀    |
-| VPL13 |   eq    | equal    | repl  | *live* | `replaced`     | reqval     |   👍    |
-| VPL11 |   eq    | equal    |  get  | *live* | `passed`       | **same**   |   🟰    |
-| VPL12 |   eq    | equal    | fail  | *live* | `vault_camped` | dbhas      |   🧨    |
+| VPL13 |   eq    | eq       | repl  | *live* | `replaced`     | reqval     |   👍    |
+| VPL11 |   eq    | eq       |  get  | *live* | `passed`       | **same**   |   🟰    |
+| VPL12 |   eq    | eq       | fail  | *live* | `vault_camped` | dbhas      |   🧨    |
 
 Coverage check: void has 2 seq values × 2 ifAbsent values = 4 cases in 3 rows. Gone has 9 `v_tok` × `v_seq` pairs, one split by ifAbsent, in 10 rows. Live has 9 pairs, three split by ifPresent, in 15 rows.
 
@@ -280,28 +280,28 @@ Coverage check: void has 2 seq values × 2 ifAbsent values = 4 cases in 3 rows. 
 
 | #    | `v_tok` | `v_seq`  | flags | vault  | act                 | returning     | result |
 | ---- | ------- | -------- | :---: | ------ | ------------------- | ------------- | ------ |
-| VDV1 | match   | birth    |       | *void* | `vault_void`        | dbnil         | 🔁      |
-| VDV2 | @       | nonbirth |       | *void* | `vault_ahead`       | dbnil         | 🌀      |
+| VDV1 | birth   | birth    |       | *void* | `vault_void`        | dbnil         | 🔁      |
+| VDV2 | neq     | ahead    |       | *void* | `vault_ahead`       | dbnil         | 🌀      |
 |      |         |          |       |        |                     |               |        |
 | VDG1 | =next   | =next    |       | *gone* | `vault_redel`       | dbhas         | 🔁      |
 | VDG2 | =next   | ≠next    |       | *gone* | `vault_retcon`      | dbhas         | 🌀      |
-| VDG3 | other   | birth    |       | *gone* | `vault_gone`        | dbhas         | 🔁      |
-| VDG4 | other   | stale    |       | *gone* | `vault_gone`        | dbhas         | 🔁      |
+| VDG3 | neq     | birth    |       | *gone* | `vault_gone`        | dbhas         | 🔁      |
+| VDG4 | neq     | stale    |       | *gone* | `vault_gone`        | dbhas         | 🔁      |
 | VDG5 | eq      | stale    |       | *gone* | `vault_clash`       | dbhas         | 🌀      |
-| VDG6 | other   | equal    |       | *gone* | `vault_forked`      | dbhas         | 🌀      |
-| VDG7 | other   | ahead    |       | *gone* | `vault_ahead`       | dbhas         | 🌀      |
+| VDG6 | neq     | eq       |       | *gone* | `vault_forked`      | dbhas         | 🌀      |
+| VDG7 | neq     | ahead    |       | *gone* | `vault_ahead`       | dbhas         | 🌀      |
 | VDG8 | eq      | ahead    |       | *gone* | `vault_ahead`       | dbhas         | 🌀      |
-| VDG9 | eq      | equal    |       | *gone* | `vault_dubdel`      | dbhas         | 🔁      |
+| VDG9 | eq      | eq       |       | *gone* | `vault_dubdel`      | dbhas         | 🔁      |
 |      |         |          |       |        |                     |               |        |
 | VDL2 | =next   | =next    |       | *live* | `vault_retcon`      | dbhas         | 🌀      |
 | VDL1 | =next   | ≠next    |       | *live* | `vault_retcon`      | dbhas         | 🌀      |
-| VDL3 | other   | birth    |       | *live* | `vault_stale`       | dbhas         | 🔁      |
-| VDL4 | other   | stale    |       | *live* | `vault_stale`       | dbhas         | 🔁      |
+| VDL3 | neq     | birth    |       | *live* | `vault_stale`       | dbhas         | 🔁      |
+| VDL4 | neq     | stale    |       | *live* | `vault_stale`       | dbhas         | 🔁      |
 | VDL5 | eq      | stale    |       | *live* | `vault_clash`       | dbhas         | 🌀      |
-| VDL6 | other   | equal    |       | *live* | `vault_forked`      | dbhas         | 🌀      |
-| VDL7 | other   | ahead    |       | *live* | `vault_ahead`       | dbhas         | 🌀      |
+| VDL6 | neq     | eq       |       | *live* | `vault_forked`      | dbhas         | 🌀      |
+| VDL7 | neq     | ahead    |       | *live* | `vault_ahead`       | dbhas         | 🌀      |
 | VDL8 | eq      | ahead    |       | *live* | `vault_ahead`       | dbhas         | 🌀      |
-| VDL9 | eq      | equal    |       | *live* | `deleted` (+ boxes) | **tombstone** | ❎      |
+| VDL9 | eq      | eq       |       | *live* | `deleted` (+ boxes) | **tombstone** | ❎      |
 
 Coverage check: void has 2 seq values in 2 rows. Gone and live each have 9 `v_tok` × `v_seq` pairs in 9 rows.
 
