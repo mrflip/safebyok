@@ -51,7 +51,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   #snapshot: SnapshotT | null = null
   /** When storage last answered with a record not older than central that left the record in hand whole; null until it has. */
   #refreshedAt: number | null = null
-  /** The fetch under way, which every `fetch` made meanwhile joins. */
   readonly #listeners = new Set<() => void>()
 
   /** Unbound callback to acquire the snapshot */

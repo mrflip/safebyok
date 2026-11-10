@@ -28,7 +28,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected readonly bankFriend: BankFriend
 
   readonly #things    = new Map<string, ThingT>()
-  /** The fetch of each slot, joined while one runs, by scopepath: a slot may have no instance to key on. */
+  // Keyed by scopepath, not by instance: a slot may have no instance to key on.
+  /** The fetch of each slot, joined while one runs. */
   readonly #fetchOfSlot = new Map<string, () => Promise<Joined<ListingAnswer<RecordT, SparseT>, ThingT | null>>>()
   /** The listing of every row, joined while one runs. */
   readonly #listOnce = oneAtATime(() => this.#listRows())
