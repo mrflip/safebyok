@@ -157,6 +157,24 @@ mkdir /tmp/restored && tar -xzf <that dump> -C /tmp/restored
 Transcripts are not scrubbed: a dump holds whatever a session read or was told, so keep it off
 anything shared. The script's header says what it leaves out.
 
+## Test stderr under an agent
+
+Vitest picks a quiet reporter when it sees an agent (`CLAUDECODE` or `AI_AGENT` in the
+environment), and that reporter prints nothing of a passing test, its stderr included. A run that
+looks silent there is not: CI uses the default reporter and prints every `stderr |` block. To see
+what CI sees, name the reporter, per package (`pnpm test --reporter=default` reaches only the
+root suite, the wrapper script not passing it on):
+
+```sh
+CI=true pnpm -r --no-bail --stream --workspace-concurrency=1 exec vitest run --reporter=default | rg -n 'stderr \||stdout \|'
+```
+
+What it finds is a test's to quiet. A refusal a test provokes on purpose is logged through the
+bank's logger, so the test hands in `TH.spyLogger()` (the test worlds' `quietLogger` lets `warn`
+and `error` through, so a surprise stays visible) and asserts the levels it heard. What React or a
+host function writes to the console is caught with `vi.spyOn(console, 'error')`. Neither is
+`quietLogger` or a silenced console for a whole file.
+
 ## CLAUDE.md's long-file list
 
 CLAUDE.md's *Reading* names the files long enough that an agent should search them rather than
