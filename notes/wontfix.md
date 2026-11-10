@@ -55,7 +55,7 @@ not as a settled ruling, and check it against the current design before relying 
   lease forgets nothing, as it already dropped its record. The entry on a refused forget of a cached
   lease covers the refused forget on `Lease.buildFromCache`; this one covers `revoke()` itself. The deviceDB is
   a cache, and the next session asks for the passphrase. Pinned by
-  `packages/safebyok/tests/loosened/lease.test.ts` (its one test); the Coach, "yeah skip", on
+  `packages/safebyok/tests/models/lease.test.ts`, *a revoke whose forget is refused*; the Coach, "yeah skip", on
   retrying a refused forget.
 * 2026-11-02 (the Coach, unrace, `unrace-new_vault.md` at commit e135d0352, since deleted; not yet built):
   **a failed delete still locks the vault on this device.** `del_vault` locks first, as a lock is
@@ -85,10 +85,6 @@ not as a settled ruling, and check it against the current design before relying 
   the gating's check whole.** The gating replaces a foreign throw from a getter with `unexpected_error`, keeping nothing of it, but passes a
   `VaultError` as it came and does not inspect its text; one a host's getter throws with the passphrase in its
   message reaches the caller whole. The Coach: "Wontfix agreed".
-* 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Changing the gate*, and *Rows for
-  `notes/wontfix.md`*, since moved here): **a gate change leaves another device's session lease to run.** No device
-  locks on it: another device's session keeps its lease to its `lock()` or next `bank.autolock`, and its cached lease, of the
-  older `gate_epoch`, is forgotten at its next session.
 * 2026-11-03 (the Coach, unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *Rows for `notes/wontfix.md`*,
   since moved here): **cross-tab complications, all of them.** Tab A's `lock()` or
   vacate leaves tab B unlocked, and nothing tells it.
@@ -133,7 +129,7 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-11-07 (the Coach, on a proposal to chain each revision to its prior): **storage that rolls a record back.** Nothing detects it beyond one session,
   and nothing chains a revision to its prior. The Coach: there is no certainty the device is right and the server wrong or vice versa; a device
   that writes on top saw a working state, storage saw one, and a record that deciphers was sealed under a working key. Today a fetch below
-  the revision held is ignored as `older`; after a reload the older copy is taken as found.
+  the revision held is ignored as `older`; after a reload the older copy is taken as found, so a vault row restored from before a passphrase change opens to the replaced passphrase.
 * 2026-11-09 (the Coach, after designing it in `whiteboard/20261108-del_damaged/del_damaged-spec.md`: "I predict too many bug reports about
   non-bugs"; replaces the 2026-11-03 row that a damaged row stays until the customer names it): **the library does not delete a row that
   fails its check.** A damaged box row stays listed in `damaged_rows`, reads as `damaged_row`, and still counts toward `maxBoxes`; a damaged vault

@@ -2,14 +2,11 @@
 
 import { ENCRYPTED } from '../../src/helpers/consts'
 import { describe, expect, it, vi } from 'vitest'
-import { VaultError } from '../../src/refusals/errors'
 import type { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
-import { Proving } from '../../src/models/proving'
-import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
-import { Dna, NewPassphrase, Passphrase, buildTyping, byPassphrase, delTyping, makeBornVault, makeVaultWorld, replaceTyping, unlockTyping, useVaultWorlds, hearingBadNews } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, makeBornVault, replaceTyping, useVaultWorlds } from '../test-helpers/vault-world'
 import type { BoxWorld } from '../../src/shapes/shapes-vaultish'
 
 const world = useModelsWorld()
@@ -75,6 +72,33 @@ describe("A lock called during a box verb", () => {
     const box = (await vault.fetchBox('anthropic_api_key'))!
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
   })
+
+  it("during extractWhisper's fetch refuses 'vault_locked'", async () => {
+    const { vault, vaultDB } = await makeBornVault()
+    const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
+    const tryGetBox = vaultDB.tryGetBox.bind(vaultDB)
+    vi.spyOn(vaultDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.lock(); return tryGetBox(...args) })
+    await TH.expectRefusal(box.extractWhisper({ maxMillisSinceRefresh: 0 }), 'vault_locked')
+  })
+
+  it("during extractWhisper's decipher refuses 'vault_locked', handing back no whisper", async () => {
+    const { vault } = await makeBornVault()
+    const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle)
+    vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce((...args) => { vault.lock(); return decrypt(...args) })
+    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
+    vi.restoreAllMocks()
+  })
+
+  it("during delBox's del lands: the tombstone is stored, and the vault reports locked after", async () => {
+    const { vault, vaultDB } = await makeBornVault()
+    await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
+    const tryDelBox = vaultDB.tryDelBox.bind(vaultDB)
+    vi.spyOn(vaultDB, 'tryDelBox').mockImplementationOnce((...args) => { vault.lock(); return tryDelBox(...args) })
+    const gone = await vault.delBox('anthropic_api_key')
+    expect(gone?.isPresent).to.be.false
+    expect(vault.isLocked).to.be.true
+  })
 })
 
 /** A stored box whose next unseal runs `crossing` with the whisper opened, before it comes back to `box.expose`. */
@@ -129,17 +153,6 @@ describe("A gate change after its record is stored", () => {
     expect(vault.isUnlocked).to.be.false
   })
 
-  it("a crypto failure in buildLease rejects, the row stored, the vault on its new gate under the lease it world", async () => {
-    const { vault, demandStored, deviceDB } = await makeBornVault()
-    const failure = new VaultError('unexpected_error', "the platform said no")
-    vi.spyOn(Proving.prototype, 'buildLease').mockRejectedValueOnce(failure)
-    await expect(replaceTyping(vault, Passphrase, NewPassphrase)).rejects.to.eq(failure)
-    expect(demandStored().gate.gate_epoch).to.eq(2)
-    expect(vault.gate.gate_epoch).to.eq(2)
-    expect(vault.isUnlocked).to.be.true
-    expect(deviceDB.cachedNow()).to.include({ gate_epoch: 1 })
-  })
-
   it("leaves the vault unlocked on the new lease where a lock crossed its making, with no second forget", async () => {
     const { vault, deviceDB } = await makeBornVault()
     deviceDB.forget.mockClear()
@@ -148,48 +161,5 @@ describe("A gate change after its record is stored", () => {
     expect(vault.isUnlocked).to.be.true
     expect(deviceDB.cachedNow()).to.not.be.null
     expect(deviceDB.forget).toHaveBeenCalledOnce()
-  })
-
-  it("refuses as it attaches where a tombstone crossed the new lease's making, and leaves no row", async () => {
-    const { vault, demandStored, deviceDB, anotherSession } = await makeBornVault()
-    crossingGrant(async () => {
-      await delTyping(await anotherSession().build(demandStored()), NewPassphrase)
-      await TH.expectRefusal(vault.fetch())
-    })
-    await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase))
-    expect(vault.isPresent).to.be.false
-    expect(vault.isUnlocked).to.be.false
-    expect(deviceDB.cachedNow()).to.be.null
-  })
-
-  it("a tombstone crossing a birth's lease refuses as it attaches, and leaves no row", async () => {
-    const { listing, demandStored, deviceDB, anotherSession } = makeVaultWorld()
-    crossingGrant(async () => {
-      await delTyping(await anotherSession().build(demandStored()))
-      await TH.expectRefusal(listing.at(Dna)!.fetch())
-    })
-    await TH.expectRefusal(buildTyping(listing, Dna, byPassphrase(Passphrase)))
-    expect(listing.at(Dna)?.isPresent).to.be.false
-    expect(deviceDB.cachedNow()).to.be.null
-  })
-
-  it("a sweep crossing a birth's lease refuses at demandAttachable, the row stored, no lease cached", async () => {
-    const { listing, storedNow, deviceDB } = makeVaultWorld()
-    crossingGrant(() => listing.sweep())
-    await TH.expectRefusal(buildTyping(listing, Dna, byPassphrase(Passphrase)))
-    expect(storedNow()).to.include({ am: 'a' })
-    expect(deviceDB.cachedNow()).to.be.null
-  })
-
-  it("a refused tryStow during replacePassphrasePrompt resolves, unlocked, and tells onBadNews", async () => {
-    const onBadNews = vi.fn()
-    const { fakeBank, opts, deviceDB, demandStored } = await makeBornVault()
-    const vault = await new VaultListing(fakeBank, hearingBadNews(opts, onBadNews)).build(demandStored())
-    await unlockTyping(vault, byPassphrase(Passphrase))
-    const refusal = new VaultError('storage_unavailable', "the disk is full")
-    deviceDB.tryStow.mockResolvedValueOnce(TH.bad(refusal))
-    await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
-    expect(vault.isUnlocked).to.be.true
-    expect(onBadNews.mock.calls).to.deep.equal([[refusal]])
   })
 })

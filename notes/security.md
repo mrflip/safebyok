@@ -41,6 +41,12 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-10 (old_gaps, branch `20261109-old_gaps`): **Five possibilities whose pinning tests were deleted, on the Coach's ruling, as paranoia.**
+  (1) A VaultDB that answers a rebirth with the buried record's `registered_at`, as a database default might keep it, is adopted quietly, and the box's `registered_at` follows it.
+  (2) A crypto failure in `buildLease` during a gate change rejects, with the row stored and the vault on its new gate under the lease it held.
+  (3) A tombstone crossing the making of a gate change's new lease refuses as the lease attaches, and leaves no row.
+  (4) A tombstone crossing a birth's lease refuses as the lease attaches, and leaves no row.
+  (5) A sweep crossing a birth's lease refuses at `demandAttachable`, with the row stored and no lease cached.
 * 2026-11-09 (react_forms, branch `20261109-react_forms`): **`safebyok-react` hands a passkey answer to `gating.attempt` at once, whether or not the dialog or button is shown.**
   `PasskeyUnlockButton` (`components/passkey-unlock-button.tsx`) and the add-passkey modal (`modals/add-passkey-modal.tsx`) no longer zero, untried, an answer (`prfBytes`)
   that comes back while a React `<Activity>` or Suspense boundary hides them; the code that did so (`useWhenShown`, `when-shown.ts`) is removed. The Coach's rule: a valid request goes through if it was authorized at the start of its critical

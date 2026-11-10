@@ -211,11 +211,9 @@ changed either.
 
 ### Lock timing vs. work in flight: what is left of the policy
 
-The primitives sprint (2026-10-22 and 23) wrote the policy as a per-method contract: **a lock
-spares only the transactional part.** A VaultDB write once sent completes or refuses as storage
-decides; every step before it refuses `vault_locked`; a stale write refuses `stale_write`, never
-`vault_locked`. The core README's *Locking* and the Contract tab's *A lock landing mid-call* say
-it per call. What it leaves open, from the scenarios `softlock_gone` (2026-10-19) listed:
+`packages/safebyok/tests/models/halpimonfire.test.ts` pins what each verb does when a lock lands: a VaultDB write once sent
+completes or refuses as storage decides, a step before it refuses `vault_locked`, a read that would hand back a whisper refuses, and a lock and an unlock each do their own
+work, in order, so a lock landing during an unlock's proof ends unlocked. What is left open, from the scenarios `softlock_gone` (2026-10-19) listed:
 
 * **The DeviceDB throws when a lock revokes the lease** (`lock()` refuses `storage_blocked` or
   `storage_unavailable`, the vault locked in memory): the lease on disk survives, and the next

@@ -7,15 +7,30 @@ import { passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import type { VaultRecord } from '../../src/shapes/shapes-storage'
 import { Promptly } from '../../src/shapes/shapes-vaultish'
 import { PasskeyProving, PassphraseProving } from '../../src/models/proving'
+import { VaultListing } from '../../src/models/vault-listing'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import * as TH from '../test-helpers'
 import { isZeroed } from '../test-helpers/proving-world'
-import { NewPassphrase, Passphrase, addPasskeyTyping, byPassphrase, delTyping, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, replaceTyping, revokeTyping, storedVaultRecord, unlockTyping, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, addPasskeyTyping, byPassphrase, delTyping, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, replaceTyping, revokeTyping, hearingBadNews, storedVaultRecord, unlockTyping, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
+describe("a lease cache that refuses", () => {
+  it("leaves a passphrase replaced and the vault unlocked, telling onBadNews", async () => {
+    const onBadNews = vi.fn()
+    const { fakeBank, opts, deviceDB, demandStored } = await makeBornVault()
+    const vault = await new VaultListing(fakeBank, hearingBadNews(opts, onBadNews)).build(demandStored())
+    await unlockTyping(vault, byPassphrase(Passphrase))
+    const refusal = new VaultError('storage_unavailable', "the disk is full")
+    deviceDB.tryStow.mockResolvedValueOnce(TH.bad(refusal))
+    await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
+    expect(vault.isUnlocked).to.be.true
+    expect(onBadNews.mock.calls).to.deep.equal([[refusal]])
+  })
+})
+
 describe("a gate changed on another device", () => {
-  // notes/wontfix.md, 2026-11-03: the vaultKey did not change, so a lease in force stays in force.
+  // The vaultKey did not change, so a lease in force stays in force.
   it("taken from a received record leaves this vault unlocked, its lease still sealing", async () => {
     const record = await storedVaultRecord()
     const { listing, putBehindOurBack } = makeVaultWorld(record)
