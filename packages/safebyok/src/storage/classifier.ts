@@ -1,10 +1,14 @@
 /** The classifier of the answer contract: the one act a get, put or del amounts to over the rows stored. Its tables are `notes/answer-contract.md`. */
 
+import * as Phrases from '../helpers/phrases'
+import { verifyConsistent } from '../helpers/validator'
+import * as Refuse from '../refusals/throwers'
+import * as CX from '../shapes/shapes-core'
 import * as EX from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
-import type { Boxscope } from '../shapes/shapes-core'
+import type { VaultScope } from '../shapes/shapes-core'
 import type { BoxAct, FoundAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
-import type { BoxRequest, Capacity, Revision, VaultRequest } from '../shapes/shapes-storage'
+import type { BoxQuery, BoxRequest, BoxRow, Capacity, Revision, VaultRequest, VaultRow } from '../shapes/shapes-storage'
 
 // == [Columns]: Presence, RevtokCmp, RevseqCmp, RevCmp, Opflag, Peek, presenceOf, revtokCmpOf, revseqCmpOf
 
@@ -123,59 +127,68 @@ const writeVerdictOf = (ask: WriteAsk, expected: Peek, stored: Peek | null): Ver
 }
 // --
 
-// == [Rows stored]: BoxPlace, isBoxFiledAt, gateOf, storedBoxOf, isFull
+// == [Rows stored]: Found, RowOfOtherAddress, isRowStored, vaultRowAt, boxRowAt, gateOf
 
-type BoxPlace = Boxscope & { vault_tok: string }
+// Damaged is a judgment of the row taken alone: it fails its own checks. A row that is no object, or a
+// sound one filed at another address than it was asked for at, says the store or its adapter is not working: `storage_issue`.
 
-/** True when the row `box` is filed where `asked` names: at its scope, in its vault's life. */
-const isBoxFiledAt = (box: BoxPlace, asked: BoxPlace): boolean => (
-  (box.applabel === asked.applabel) && (box.user_id === asked.user_id) && (box.vaultlabel === asked.vaultlabel) && (box.vault_tok === asked.vault_tok) && (box.boxlabel === asked.boxlabel)
-)
+/** A row as storage answered it: null for none, `damaged` for one that fails its checks. */
+type Found<RowT> = RowT | null | 'damaged'
 
-/** How a box request citing `vault_tok` finds `vaultRaw`, its vault's row. */
-const gateOf = (vaultRaw: unknown, vault_tok: string): Exclude<Gate, 'full'> => {
-  const vault = SX.foundVaultRow.safeParse(vaultRaw)
-  if (! vault.success)                    { return 'damaged' }
-  if (vault.data === null)                { return 'void' }
-  if (vault.data.vault_tok !== vault_tok) { return 'mismatch' }
-  return (vault.data.am === 'a') ? 'live' : 'gone'
+const RowOfOtherAddress = { kind: 'storage_issue', message: Phrases.rowOfOtherAddress } as const
+
+/** Whether storage answered a row at all: null is its word for none, and anything else that is no object refuses `storage_issue`. */
+const isRowStored = (raw: unknown): boolean => {
+  if (raw === null) { return false }
+  if (! CX.isPlainBag(raw)) { throw Refuse.storageIssue() }
+  return true
 }
 
-/** What a comparison reads of `boxRaw`, the box row stored for `asked`: `damaged` for one that fails its checks or is filed elsewhere, null for none. */
-const storedBoxOf = (boxRaw: unknown, asked: BoxPlace): Peek | null | 'damaged' => {
-  const box = SX.foundBoxRow.safeParse(boxRaw)
-  if (! box.success)     { return 'damaged' }
-  if (box.data === null) { return null }
-  return isBoxFiledAt(box.data, asked) ? boxPeekOf(box.data) : 'damaged'
+// Checked against its scope and not its vault_tok: a vault row of another life is an answer the gate has a word for.
+/** The vault row storage answered for the scope of `asked`. */
+const vaultRowAt = (vaultRaw: unknown, asked: VaultScope): Found<VaultRow> => {
+  if (! isRowStored(vaultRaw)) { return null }
+  const vault = SX.storedVaultRow.safeParse(vaultRaw)
+  return vault.success ? verifyConsistent(vault.data, CX.vaultScope.parse(asked), RowOfOtherAddress) : 'damaged'
 }
 
-// The cap on a vault's boxes is soft: `capacity` is a count taken outside any lock, and where the cap falls among the other refusals is no promise.
-/** True when `verdict` would add a live box to a vault that `capacity` says has no room for one. */
-const isFull = (verdict: Verdict, capacity: Capacity | null): boolean => (
-  ((verdict === 'born') || (verdict === 'reborn')) && (capacity !== null) && (capacity.boxes.used >= capacity.boxes.max)
-)
+/** The box row storage answered for the scope and `vault_tok` of `asked`. */
+const boxRowAt = (boxRaw: unknown, asked: BoxQuery): Found<BoxRow> => {
+  if (! isRowStored(boxRaw)) { return null }
+  const box = SX.storedBoxRow.safeParse(boxRaw)
+  return box.success ? verifyConsistent(box.data, SX.boxQuery.parse(asked), RowOfOtherAddress) : 'damaged'
+}
+
+/** How a box request citing `vault_tok` finds `vault`, its vault's row. */
+const gateOf = (vault: Found<VaultRow>, vault_tok: string): Exclude<Gate, 'full'> => {
+  if (vault === 'damaged')           { return 'damaged' }
+  if (vault === null)                { return 'void' }
+  if (vault.vault_tok !== vault_tok) { return 'mismatch' }
+  return (vault.am === 'a') ? 'live' : 'gone'
+}
 // --
 
-// == [Acts]: isWriteAct, boxActOf, vaultActOf
+// == [Acts]: isWriteAct, isBirthAct, boxActOf, vaultActOf, cappedActOf
 
 /** True when `act` says the request's record is to be stored. */
 export const isWriteAct = (act: BoxAct | VaultAct): act is WriteAct => (EX.writeActVals as readonly string[]).includes(act)
 
+/** True when `act` stores a new life of its row: for a box, the acts that add a live box to its vault. */
+export const isBirthAct = (act: BoxAct | VaultAct): boolean => (act === 'born') || (act === 'reborn')
+
 /** The act a box's get, put or del amounts to over `vaultRaw` and `boxRaw`, the rows stored at its scope, each null for none.
- * `capacity` is the room its vault has for boxes, or null where none was counted.
  * Nothing is stored here: where {@link isWriteAct} holds of the act, the caller stores the request's record, in the atomic unit it fetched the rows in.
  */
-export const boxActOf = (request: BoxRequest, vaultRaw: unknown, boxRaw: unknown, capacity: Capacity | null): BoxAct => {
+export const boxActOf = (request: BoxRequest, vaultRaw: unknown, boxRaw: unknown): BoxAct => {
   const ask   = SX.boxRequest.parse(request)
-  const room  = (capacity === null) ? null : SX.capacity.parse(capacity)
   const asked = (ask.op === 'get') ? ask : ask.record
-  const gate  = gateOf(vaultRaw, asked.vault_tok)
-  if (gate !== 'live')      { return GateActs[gate] }
-  const stored = storedBoxOf(boxRaw, asked)
-  if (stored === 'damaged') { return BoxActs.damaged }
-  if (ask.op === 'get')     { return BoxActs[getVerdictOf(presenceOf(stored), ask.ifAbsent)] }
-  const verdict = writeVerdictOf(ask, boxPeekOf(ask.expected), stored)
-  return isFull(verdict, room) ? GateActs.full : BoxActs[verdict]
+  const gate  = gateOf(vaultRowAt(vaultRaw, asked), asked.vault_tok)
+  if (gate !== 'live')   { return GateActs[gate] }
+  const box = boxRowAt(boxRaw, asked)
+  if (box === 'damaged') { return BoxActs.damaged }
+  const stored = (box === null) ? null : boxPeekOf(box)
+  if (ask.op === 'get')  { return BoxActs[getVerdictOf(presenceOf(stored), ask.ifAbsent)] }
+  return BoxActs[writeVerdictOf(ask, boxPeekOf(ask.expected), stored)]
 }
 
 /** The act a vault's get, put or del amounts to over `vaultRaw`, the row stored at its scope or null for none.
@@ -183,10 +196,17 @@ export const boxActOf = (request: BoxRequest, vaultRaw: unknown, boxRaw: unknown
  */
 export const vaultActOf = (request: VaultRequest, vaultRaw: unknown): VaultAct => {
   const ask   = SX.vaultRequest.parse(request)
-  const vault = SX.foundVaultRow.safeParse(vaultRaw)
-  if (! vault.success)  { return VaultActs.damaged }
-  const stored = (vault.data === null) ? null : vaultPeekOf(vault.data)
-  if (ask.op === 'get') { return VaultActs[getVerdictOf(presenceOf(stored), ask.ifAbsent)] }
+  const vault = vaultRowAt(vaultRaw, (ask.op === 'get') ? ask : ask.record)
+  if (vault === 'damaged') { return VaultActs.damaged }
+  const stored = (vault === null) ? null : vaultPeekOf(vault)
+  if (ask.op === 'get')    { return VaultActs[getVerdictOf(presenceOf(stored), ask.ifAbsent)] }
   return VaultActs[writeVerdictOf(ask, vaultPeekOf(ask.expected), stored)]
+}
+
+// The cap is soft: `capacity` is a count taken outside any lock, as the write is about to be made. A write already made is never refused for it.
+/** `act` as a vault with room `capacity` allows it: `vault_full` where it would add a live box and there is no room, else `act` itself. */
+export const cappedActOf = (act: BoxAct, capacity: Capacity): BoxAct => {
+  const { boxes } = SX.capacity.parse(capacity)
+  return (isBirthAct(act) && (boxes.used >= boxes.max)) ? GateActs.full : act
 }
 // --

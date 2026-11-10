@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as EX from '../../src/shapes/shapes-enums'
 import * as SX from '../../src/shapes/shapes-storage'
 import { VaultError } from '../../src/refusals/errors'
-import { boxActOf, isWriteAct, vaultActOf } from '../../src/storage/classifier'
+import { boxActOf, cappedActOf, isBirthAct, isWriteAct, vaultActOf } from '../../src/storage/classifier'
 import type { BoxAct, VaultAct } from '../../src/shapes/shapes-enums'
 import type { BoxRequest, BoxRow, VaultRequest, VaultRow } from '../../src/shapes/shapes-storage'
 import { boxAt, boxFlaws, boxscope, boxscopeOf, vaultAt, vaultFlaws, vaultScope } from '../test-helpers/storage-world'
@@ -47,13 +47,13 @@ const boxProposed   = (expected: Peeked, revision_tok: string) => ({ revision_to
 const BoxLevel: Level = {
   rows:   { void: null, gone: goneBox, live: liveBox },
   peekOf: (row) => ((row === null) ? sentinelPeek : { ...SX.rowPeek.parse(row), lifeTok: (row as BoxRow).box_tok }),
-  getAct: (ifAbsent, stored) => boxActOf({ op: 'get', ifAbsent, ...boxscope, vault_tok: 'life1' }, liveVault, BoxLevel.rows[stored], null),
+  getAct: (ifAbsent, stored) => boxActOf({ op: 'get', ifAbsent, ...boxscope, vault_tok: 'life1' }, liveVault, BoxLevel.rows[stored]),
   putAct: (expected, proposedTok, policies, stored) => boxActOf({
     op: 'put', ...policies, expected: boxExpectedOf(expected), record: { ...liveBox, ...boxProposed(expected, proposedTok), box_tok: lifeTokOver(expected) },
-  }, liveVault, BoxLevel.rows[stored], null),
+  }, liveVault, BoxLevel.rows[stored]),
   delAct: (expected, proposedTok, stored) => boxActOf({
     op: 'del', expected: boxExpectedOf(expected), record: { ...goneBox, ...boxProposed(expected, proposedTok), box_tok: expected.lifeTok },
-  }, liveVault, BoxLevel.rows[stored], null),
+  }, liveVault, BoxLevel.rows[stored]),
   actName: (boxAct) => boxAct,
 }
 
@@ -261,61 +261,74 @@ describe("boxActOf, its vault", () => {
   for (const [vaultRaw, act, blurb] of VaultCases) {
     it(`stops at ${blurb}, whatever the box row and the request`, () => {
       for (const request of [get, put]) {
-        for (const boxRaw of [null, liveBox, goneBox, garbled]) { expect(boxActOf(request, vaultRaw, boxRaw, null)).to.eq(act) }
+        for (const boxRaw of [null, liveBox, goneBox, garbled]) { expect(boxActOf(request, vaultRaw, boxRaw)).to.eq(act) }
       }
     })
   }
 
   it.each(boxFlaws)("calls a box row with %s damaged", (_flawname, flawOf) => {
-    expect(boxActOf(get, liveVault, flawOf(liveBox), null)).to.eq('box_damaged')
-    expect(boxActOf(put, liveVault, flawOf(liveBox), null)).to.eq('box_damaged')
+    expect(boxActOf(get, liveVault, flawOf(liveBox))).to.eq('box_damaged')
+    expect(boxActOf(put, liveVault, flawOf(liveBox))).to.eq('box_damaged')
   })
 
-  it("calls a box row filed under another scope damaged", () => {
-    expect(boxActOf(get, liveVault, { ...liveBox, ...boxscopeOf('anthropic') }, null)).to.eq('box_damaged')
+})
+
+describe("boxActOf and vaultActOf, a row no working store could answer", () => {
+  const get: BoxRequest = { op: 'get', ifAbsent: 'nil', ...boxscope, vault_tok: 'life1' }
+  const vaultGet: VaultRequest = { op: 'get', ifAbsent: 'nil', ...vaultScope }
+  const elsewhere = boxscopeOf('anthropic')
+
+  it("refuses storage_issue for a sound box row filed under another scope, or another life of its vault", () => {
+    expect(() => boxActOf(get, liveVault, { ...liveBox, ...elsewhere })).to.throw(VaultError).with.property('refusalkind', 'storage_issue')
+    expect(() => boxActOf(get, liveVault, boxAt(Seq, 'life0'))).to.throw(VaultError).with.property('refusalkind', 'storage_issue')
   })
 
-  it("calls a box row of another life of its vault damaged: a box is fetched by its vault_tok", () => {
-    const ofOtherLife = boxAt(Seq, 'life0')
-    expect(boxActOf(get, liveVault, ofOtherLife, null)).to.eq('box_damaged')
-    expect(boxActOf(put, liveVault, ofOtherLife, null)).to.eq('box_damaged')
+  it("refuses storage_issue for a sound vault row filed under another scope", () => {
+    const otherVault = { ...liveVault, vaultlabel: 'elsewhere' }
+    expect(() => boxActOf(get, otherVault, liveBox)).to.throw(VaultError).with.property('refusalkind', 'storage_issue')
+    expect(() => vaultActOf(vaultGet, otherVault)).to.throw(VaultError).with.property('refusalkind', 'storage_issue')
+  })
+
+  it.each([['a string', 'row'], ['a number', 42], ['a list', [liveBox]]])("refuses storage_issue for a row that is %s", (_what, raw) => {
+    expect(() => boxActOf(get, liveVault, raw)).to.throw(VaultError).with.property('refusalkind', 'storage_issue')
+    expect(() => boxActOf(get, raw, liveBox)).to.throw(VaultError).with.property('refusalkind', 'storage_issue')
+    expect(() => vaultActOf(vaultGet, raw)).to.throw(VaultError).with.property('refusalkind', 'storage_issue')
   })
 })
 
 const roomOf = (used: number) => ({ boxes: { used, max: 3 }, bytes: { used: 0, max: 1000 } })
 
-describe("boxActOf, the soft cap on its vault's boxes", () => {
-  const born:     BoxRequest = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: SX.sentinelBoxOf(boxscope, 'life1'), record: boxAt(0) }
-  const reborn:   BoxRequest = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: goneBox, record: { ...boxAt(Seq + 1), box_tok: 'box2' } }
-  const replaced: BoxRequest = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: liveBox, record: boxAt(Seq + 1) }
-
-  it("refuses vault_full a put that would add a live box to a vault at its cap", () => {
-    expect(boxActOf(born, liveVault, null, roomOf(3))).to.eq('vault_full')
-    expect(boxActOf(reborn, liveVault, goneBox, roomOf(4))).to.eq('vault_full')
+describe("cappedActOf, the soft cap on a vault's boxes", () => {
+  it("answers vault_full for an act that would add a live box to a vault at its cap", () => {
+    expect(cappedActOf('born', roomOf(3))).to.eq('vault_full')
+    expect(cappedActOf('reborn', roomOf(4))).to.eq('vault_full')
   })
 
-  it("stores one where the vault has room, or where no room was counted", () => {
-    expect(boxActOf(born, liveVault, null, roomOf(2))).to.eq('born')
-    expect(boxActOf(reborn, liveVault, goneBox, roomOf(2))).to.eq('reborn')
-    expect(boxActOf(born, liveVault, null, null)).to.eq('born')
+  it("answers the act itself where the vault has room", () => {
+    expect(cappedActOf('born', roomOf(2))).to.eq('born')
+    expect(cappedActOf('reborn', roomOf(0))).to.eq('reborn')
   })
 
-  it("lets a put that adds no box, a del and a get through a full vault", () => {
-    const del: BoxRequest = { op: 'del', expected: liveBox, record: { ...goneBox, revision_tok: 'deleting', revision_seq: Seq + 1 } }
-    expect(boxActOf(replaced, liveVault, liveBox, roomOf(3))).to.eq('replaced')
-    expect(boxActOf(del, liveVault, liveBox, roomOf(3))).to.eq('deleted')
-    expect(boxActOf({ op: 'get', ifAbsent: 'nil', ...boxscope, vault_tok: 'life1' }, liveVault, liveBox, roomOf(3))).to.eq('gotlive')
+  it("answers the act itself, whatever the room, where it adds no live box", () => {
+    for (const act of ['replaced', 'deleted', 'gotlive', 'passed', 'box_stale'] as const) { expect(cappedActOf(act, roomOf(9))).to.eq(act) }
   })
 
   it("refuses a capacity that fails its check", () => {
-    expect(() => boxActOf(born, liveVault, null, { boxes: { used: -1, max: 3 }, bytes: { used: 0, max: 1000 } })).to.throw(VaultError)
+    expect(() => cappedActOf('born', { boxes: { used: -1, max: 3 }, bytes: { used: 0, max: 1000 } })).to.throw(VaultError)
+  })
+})
+
+describe("isBirthAct", () => {
+  it("holds of born and reborn alone", () => {
+    const acts = [...EX.writeActVals, ...EX.foundActVals, ...EX.boxRefusedActVals, ...EX.vaultRefusedActVals]
+    expect(acts.filter((act) => isBirthAct(act))).to.deep.equal(['born', 'reborn'])
   })
 })
 
 describe("boxActOf and vaultActOf, a request that fails its check", () => {
   it("refuses, storing and classifying nothing", () => {
     const seqSkipped: BoxRequest = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: SX.sentinelBoxOf(boxscope, 'life1'), record: boxAt(3) }
-    expect(() => boxActOf(seqSkipped, liveVault, null, null)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
+    expect(() => boxActOf(seqSkipped, liveVault, null)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
     const noPolicy = { op: 'get', ...vaultScope } as unknown as VaultRequest
     expect(() => vaultActOf(noPolicy, null)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
   })
@@ -363,7 +376,7 @@ describe("boxActOf, one box through a run of requests", () => {
     seen.runs += 1
     if (depth === 0) { return }
     for (const request of nextRequests(run)) {
-      const act = boxActOf(request, liveVault, run.stored, null)
+      const act = boxActOf(request, liveVault, run.stored)
       seen.acts.add(act)
       walk(runAfter(run, request, act), depth - 1, seen)
     }
@@ -380,9 +393,9 @@ describe("boxActOf, one box through a run of requests", () => {
     const born    = putCiting(sentinel, Repl)
     const deleted = delCiting(born.record)
     const reborn  = putCiting(deleted.record, Repl)
-    expect(boxActOf(born, liveVault, null, null)).to.eq('born')
-    expect(boxActOf(deleted, liveVault, born.record, null)).to.eq('deleted')
-    expect(boxActOf(reborn, liveVault, deleted.record, null)).to.eq('reborn')
+    expect(boxActOf(born, liveVault, null)).to.eq('born')
+    expect(boxActOf(deleted, liveVault, born.record)).to.eq('deleted')
+    expect(boxActOf(reborn, liveVault, deleted.record)).to.eq('reborn')
     expect([born, deleted, reborn].map((request) => request.record.revision_seq)).to.deep.equal([0, 1, 2])
   })
 })
