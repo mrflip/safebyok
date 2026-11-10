@@ -188,7 +188,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Seals `patch` over the record in hand and puts it, answering this box; a deleted box is reborn.
    *
    * A lock does not interrupt or reverse a put once its write has begun. A patch leaving out the whisper or the sidecar keeps
-   * the one stored, so a sparse box is fetched first. A patch carrying both fetches nothing: a box behind storage answers `stale_write`.
+   * the stored half, so a sparse box is fetched first unless the patch carries both; a box behind storage answers `stale_write`.
    */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
     demandGood(await this.tryPut(patch, opts))
@@ -268,7 +268,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   // A sparse box under a patch of both halves needs nothing fetched: the put's revision check is what catches a stale one.
   /** Bring this box and its vault timely enough for a put of `patch`, fetching a sparse record only where `patch` keeps part of it. */
   async ensurePuttable(patch: BoxPatch, opts: TimelyOpts = {}): Promise<this> {
-    if (this.isWholeRecord(this.central) || ! isOfBothHalves(this.#givenOf(patch))) { return this.hydrate(opts) }
+    const given = this.#givenOf(patch)
+    if (this.isWholeRecord(this.central) || ! isOfBothHalves(given)) { return this.hydrate(opts) }
     await this.listing.ensureTimelyWorld(VX.timelyOpts.parse(opts).maxWorldMillis)
     return this
   }
