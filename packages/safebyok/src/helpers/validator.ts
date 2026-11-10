@@ -74,7 +74,7 @@ export type Merged<SourcesT extends readonly object[]> =
  *
  * A validator also has `refusingAs(kind)`: the same schema again, its `parse` refusing `kind`. Where
  * one tier checks what another does and refuses in its own kind, it accepts the other's validator
- * and makes it so (`SX.vaultRow.refusingAs('damaged_row')`), rather than listing its fields twice.
+ * and makes it so (`SX.vaultRow.refusingAs('record_conflict')`), rather than listing its fields twice.
  *
  * A validator of an object also has `parseConsistent(val, other, refusal?)`: it parses `val`,
  * checks the result against `other` as {@link verifyConsistent} does, and returns the result. Where they

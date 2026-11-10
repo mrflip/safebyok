@@ -148,8 +148,8 @@ export const boxStoredDamaged = ({ boxlabel }: SX.DamagedBox): VaultError => new
 /** The refusal of a put that said only-if-new, handed a whole record. */
 export const recordForNewBox = (): VaultError => new VaultError('bad_option', Phrases.RecordForNewBox)
 
-/** A `damaged_box` refusal: the box opened, but what is inside is not a whisper this package can read. */
-export const undecodedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UndecodedWhisper)
+/** A `damaged_whisper` refusal: the box opened, but what is inside is not a whisper this package can read. */
+export const undecodedWhisper = (): VaultError => new VaultError('damaged_whisper', Phrases.UndecodedWhisper)
 
 /** The refusal of a call that works on the exposed whisper, on a box with none. */
 export const notExposedError = (): VaultError => new VaultError('bad_option', Phrases.NotExposed)
@@ -160,8 +160,8 @@ export const notExposedError = (): VaultError => new VaultError('bad_option', Ph
 /** A `damaged_lease` refusal: this device's lease will not open. */
 export const damagedLease = (): VaultError => new VaultError('damaged_lease', Phrases.DamagedLease)
 
-/** A `damaged_box` refusal: the whisper would not open under this vault's key. */
-export const unopenedWhisper = (): VaultError => new VaultError('damaged_box', Phrases.UnopenedWhisper)
+/** A `damaged_whisper` refusal: the whisper would not open under this vault's key. */
+export const unopenedWhisper = (): VaultError => new VaultError('damaged_whisper', Phrases.UnopenedWhisper)
 
 /** A `vault_locked` refusal: this lease is out of force. */
 export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)

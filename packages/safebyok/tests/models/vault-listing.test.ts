@@ -393,6 +393,21 @@ describe("a damaged row met by listing the bank's vaults", () => {
     await listing.list()
     expect(listing.damaged_rows).to.deep.equal([])
   })
+
+  it("tells its listeners when damaged_rows changes, and not when a listing finds the same", async () => {
+    const { listing, restoreRow, demandStored } = await makeBornVault()
+    const stored = demandStored()
+    restoreRow({ garbage: true } as never)
+    await listing.list()
+    const listener = vi.fn()
+    listing.subscribe(listener)
+    await listing.list()
+    expect(listener).not.toHaveBeenCalled()
+    restoreRow(tombstoneOver(stored))
+    await listing.list()
+    expect(listing.snapshot).to.deep.equal([])
+    expect(listener).toHaveBeenCalledOnce()
+  })
 })
 
 describe("the listing's verbs answer the vaultDB's own answer", () => {

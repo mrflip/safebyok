@@ -14,7 +14,7 @@
  * otherwise keep each whisper's text by the stamp it was sealed under and give it back for that
  * stamp alone: its sealed parts are the constants
  * {@link FakeBoxKeyWrapped} and {@link FakeWhisperCiphered}. A record it never sealed, as the
- * builders make, opens to a 'damaged_box', as under the real vault.
+ * builders make, opens to a 'damaged_whisper', as under the real vault.
  */
 
 import { afterEach, beforeEach, vi } from 'vitest'

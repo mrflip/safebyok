@@ -108,7 +108,7 @@ describe("each ctx binds every field of its stamps", () => {
       const stamp = await realBoxStamp()
       const { lease } = await leaseOver(await makeVaultKey())
       const sealed = await lease.sealWith(WhisperText, stamp)
-      await TH.expectRefusal(lease.unsealWith(sealed, { ...stamp, [fieldname]: changed(stamp[fieldname]) as string }), 'damaged_box')
+      await TH.expectRefusal(lease.unsealWith(sealed, { ...stamp, [fieldname]: changed(stamp[fieldname]) as string }), 'damaged_whisper')
     })
   }
 
@@ -119,7 +119,7 @@ describe("each ctx binds every field of its stamps", () => {
       const { lease } = await leaseOver(vaultKey)
       const sealed = await lease.sealWith(WhisperText, stamp)
       const { lease: other } = await leaseOver(vaultKey, { [fieldname]: changed(WorldStamp[fieldname]) })
-      await TH.expectRefusal(other.unsealWith(sealed, stamp), 'damaged_box')
+      await TH.expectRefusal(other.unsealWith(sealed, stamp), 'damaged_whisper')
     })
 
     it(`keeps a wayin shut under a vault stamp with another ${fieldname}`, async () => {

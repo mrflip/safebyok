@@ -1070,7 +1070,7 @@ refusals it can meet belong to the exported method that owns them, and are said 
 **Goofus:**
 
 ```ts
-/** The whisper of `record`, opened through the vault's seal verbs and held to {@link whisperHolder}; one that opens to anything else refuses 'damaged_box'. */
+/** The whisper of `record`, opened through the vault's seal verbs and held to {@link whisperHolder}; one that opens to anything else refuses 'damaged_whisper'. */
 async #unseal(record: BoxRecord): Promise<WhisperHolder>
 ```
 

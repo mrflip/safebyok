@@ -306,7 +306,7 @@ record has ciphertext, never a whisper; the `Box` itself can keep the value, aft
 *Caveat:* the JSON value itself cannot be zeroed, and the core has no `mask` to show one. Kept by: `models/box.ts`,
 `models/lease.ts`. Checked by: `tests/models/box-seal.test.ts` (*opens the whisper create sealed, and the one a
 later put sealed: the sealed parts carry none of it*), `tests/models/lease.test.ts` (*round-trips a whisper's text
-under the same stamp*, *refuses tampered ciphertext as 'damaged_box', quoting none of it*). No test checks that the
+under the same stamp*, *refuses tampered ciphertext as 'damaged_whisper', quoting none of it*). No test checks that the
 bytes are zeroed.
 
 **G7. The set of secrets is closed.** The eight values above are the secrets. A new one, or a new
@@ -334,7 +334,7 @@ A `keyDeriver`'s `load` and a strength checker's, which hear no passphrase, pass
 failure that a wrong key or an altered record explains is caught and replaced, its error never
 kept: the unwrap that proves a wayin (`Proving.checkOpens`, `wrongProof`), the unwrap of a lease's
 vaultKey (`Lease.#vaultKey`, `damaged_lease`), and the unwrap and decipher of a whisper
-(`Lease.#opened`, `damaged_box`). Each such catch has only WebCrypto calls, their ctx built before
+(`Lease.#opened`, `damaged_whisper`). Each such catch has only WebCrypto calls, their ctx built before
 it, so a bug in building the ctx never reads as a wrong proof or a damaged box. Where no wrong key or
 altered record can explain a failure, a WebCrypto error is not caught where it is thrown: in sealing
 a whisper (`Lease.sealWith`: `makeBoxKey`, `wrapKeyUnder`, `cipherBytes`), granting a lease
