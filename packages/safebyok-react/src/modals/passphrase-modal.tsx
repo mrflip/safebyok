@@ -44,7 +44,7 @@ const UnlockForm = ({ gating, leaseMillis, passphraseUsername, passkeyRpId }: Pa
   const fieldRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const [passkeyGripe, setPasskeyGripe] = useState<string | null>(null)
-  const { gripe, gripeId, action } = useAttemptAction(
+  const { gripe, gripeId, action, isPending } = useAttemptAction(
     gating,
     'PassphraseModal',
     (form) => {
@@ -68,7 +68,9 @@ const UnlockForm = ({ gating, leaseMillis, passphraseUsername, passkeyRpId }: Pa
       blurb={Messages.unlockBlurb}
       submitWord={Messages.unlockButton}
       pendingWord={Messages.unlockingButton}
-      gripeText={passkeyGripe ?? gripe?.text ?? null}
+      // React commits the action's setPasskeyGripe(null) only once the attempt answers: the submit
+      // takes the passkey's word away at once.
+      gripeText={(isPending ? null : passkeyGripe) ?? gripe?.text ?? null}
       gripeId={gripeId}
       footnote={leaseMillis === undefined ? undefined : unlockedFor(leaseMillis, false)}
       formRef={formRef}

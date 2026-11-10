@@ -171,8 +171,17 @@ describe("PassphraseModal, for a vault with a passkey", () => {
     await screen.findByText(Messages.passkeyAskFailed)
     fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'wrong' } })
     expect(screen.getByText(Messages.passkeyAskFailed)).to.exist
+    const running = TH.makePending()
+    vi.spyOn(Gating.prototype, 'attempt').mockImplementation(async () => {
+      await running.promise
+      return { ok: false, err: new VaultError('wrong_passphrase', 'Not that one.') } as never
+    })
     TH.submitPassphrase('wrong passphrase')
-    await waitFor(() => { expect(screen.queryByText(Messages.passkeyAskFailed)).to.be.null })
+    await screen.findByText(Messages.unlockingButton)
+    expect(screen.queryByText(Messages.passkeyAskFailed)).to.be.null
+    await act(async () => { running.resolve(undefined); await TH.wakeupAtNextTick() })
+    await waitFor(() => { expect(screen.getByText(Messages.unlockButton)).to.exist })
+    expect(screen.queryByText(Messages.passkeyAskFailed)).to.be.null
   })
 
   it("keeps the passphrase when the passkey meets misuse: the button goes, and the dialog says why", async () => {
