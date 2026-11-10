@@ -85,6 +85,14 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
     expect(box.sidecar).to.deep.equal({ account: 'home' })
   })
 
+  it("fetches a whole box past its refresh horizon first, even for a patch of both halves", async () => {
+    const box = await builtOf(fullBoxRecord())
+    world.mw.seedPut(fullBoxRecord())
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } }, { maxMillisSinceRefresh: 0 })
+    expect(world.mw.callsOf('get')).to.have.lengthOf(1)
+    expect(world.mw.callsOf('put')).to.have.lengthOf(1)
+  })
+
   it("fetches a sparse box first where the patch keeps the sidecar stored", async () => {
     const box = await builtOf(sparseBoxRecord())
     world.mw.seedPut(fullBoxRecord())

@@ -265,10 +265,10 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Hydrate this box so that its whisper can be unsealed. */
   ensureUnsealable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
-  // A patch of both halves takes nothing from the record in hand: the put's revision check is what catches a stale box.
-  /** Bring this box and its vault timely enough for a put of `patch`, fetching the record only where `patch` keeps part of it. */
+  // A sparse box under a patch of both halves needs nothing fetched: the put's revision check is what catches a stale one.
+  /** Bring this box and its vault timely enough for a put of `patch`, fetching a sparse record only where `patch` keeps part of it. */
   async ensurePuttable(patch: BoxPatch, opts: TimelyOpts = {}): Promise<this> {
-    if (! isOfBothHalves(this.#givenOf(patch))) { return this.hydrate(opts) }
+    if (this.isWholeRecord(this.central) || ! isOfBothHalves(this.#givenOf(patch))) { return this.hydrate(opts) }
     await this.listing.ensureTimelyWorld(VX.timelyOpts.parse(opts).maxWorldMillis)
     return this
   }
