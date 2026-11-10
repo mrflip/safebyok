@@ -15,7 +15,7 @@ import { stableJsonify } from '../helpers/stable-jsonify'
 import { absentBoxError, notExposedError, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
-import { badAnswerOf } from '../storage/vault-db'
+import { refusedAnswerOf } from '../storage/vault-db'
 
 /** A box as this device has it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
@@ -194,17 +194,16 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** {@link put}, answering the vaultDB's own answer with the box listed as its `val`. */
   async tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<ThingAnswer<Box>> {
-    const edited = await outcomeOf(async () => {
+    try {
       const { ifAbsent, ifPresent, ...timely } = VX.boxPutOpts.parse(opts)
       await this.ensurePuttable(timely)
       const given = this.demandPuttable(patch, { ifPresent })
       const { record, prior } = await this.#edit(given)
       this.demandPuttable(patch, { ifPresent })
-      return { record, putOpts: { prior, ifAbsent, ifPresent } }
-    })
-    if (! edited.ok) { return badAnswerOf(edited.err) }
-    return this.listing.tryPut(edited.val.record, edited.val.putOpts)
+      return await this.listing.tryPut(record, { prior, ifAbsent, ifPresent })
+    } catch (err) { return refusedAnswerOf(err, null) }
   }
+
 
   /** Seal the whisper exposed, veiled or not, and put it; `patch` may name a sidecar, never a whisper. */
   async putExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<this> {

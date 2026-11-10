@@ -112,7 +112,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const box = await listing.build(fullBoxRecord())
       world.mw.seedPut(fullBoxRecord())
       world.mw.clearCalls()
-      expect(await listing.del(box)).to.eq(box)
+      expect(await listing.del(box.sparse)).to.eq(box)
       expect(world.mw.callsOf('del')[0]?.priorRevisionTok).to.equal('rev-a1')
       expect(box.isPresent).to.be.false
       expect(box.am).to.eq('x')

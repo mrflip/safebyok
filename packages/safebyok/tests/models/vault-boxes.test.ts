@@ -289,3 +289,14 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.have.members(['rubble', 'revised'])
   })
 })
+
+describe("a damaged box row met by the box listing", () => {
+  it("is told as bad news, 'damaged_row', at each listing that finds it", async () => {
+    const { openNextSession, badnews } = await makeWorldWithRubble()
+    const next = await openNextSession()
+    badnews.length = 0
+    await next.hello()
+    expect(badnews.map((news) => news.refusalkind)).to.deep.equal(['damaged_row'])
+    expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['rubble'])
+  })
+})

@@ -6,7 +6,7 @@ import type { Awaitable } from '../helpers/helpers'
 import { nowMillis } from '../helpers/clock'
 import * as Phrases from '../helpers/phrases'
 import { verifyConsistent } from '../helpers/validator'
-import { type VaultError, rowsOfRefusal } from '../refusals/errors'
+import { type VaultError, isVaultError, rowsOfRefusal } from '../refusals/errors'
 import { type BadOutcome, type GoodOutcome, outcomeOf, storageTroubleOf } from '../refusals/outcome'
 import * as SX from '../shapes/shapes-storage'
 import * as CX from '../shapes/shapes-core'
@@ -42,6 +42,19 @@ const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<
   const outcome = await outcomeOf(thunk)
   return outcome.ok ? outcome.val : badAnswerOf(outcome.err)
 }
+
+/** `answer`'s act, world and request metadata, with `val`: what a listing hands on once it has delivered a good answer. */
+export const answerWithVal = <ValT>(answer: Answer<unknown, string, unknown>, val: ValT): GoodAnswer<ValT, string, unknown> => ({ ...carriedOf(answer), ok: true, val })
+
+// A refusal met delivering a good answer keeps its act, as storage did what it says.
+/** The bad answer `thrown` makes: on `answer`'s act and world where storage had answered, else on the refusal alone. */
+export const refusedAnswerOf = (thrown: unknown, answer: Answer<unknown, string, unknown> | null): BadAnswer => {
+  const err = isVaultError(thrown) ? thrown : Refuse.unexpectedError(thrown)
+  return (answer === null) ? badAnswerOf(err) : { ...carriedOf(answer), ok: false, err }
+}
+
+/** What an answer carries beside its val or err. */
+const carriedOf = ({ req_params, act, world, dbhas }: Answer<unknown, string, unknown>) => ({ req_params, act, world, ...((dbhas !== undefined) && { dbhas }) })
 
 /** The answer `err` stands for: its act, its request's metadata and the rows it carries, where it has them. */
 export const badAnswerOf = (err: VaultError): BadAnswer => {

@@ -201,7 +201,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
       await listing.fetch(scopeOf())
       expect(listing.snapshot).to.deep.equal([box.getSnapshot()])
-      await listing.del(box)
+      await listing.del(box.sparse)
       expect(listing.snapshot).to.deep.equal([])
     })
 

@@ -140,7 +140,10 @@ export const otherVaultTok = (): VaultError => new VaultError('record_conflict',
 export const shapeUnreconciled = (): VaultError => new VaultError('unexpected_error', Phrases.ShapeUnreconciled)
 // --
 
-// == [Box Throwers]: recordForNewBox, undecodedWhisper, notExposedError
+// == [Box Throwers]: boxStoredDamaged, recordForNewBox, undecodedWhisper, notExposedError
+
+/** A `damaged_row` refusal: this box is stored damaged and cannot be read. */
+export const boxStoredDamaged = ({ boxlabel }: SX.DamagedBox): VaultError => new VaultError('damaged_row', Phrases.boxStoredDamaged(boxlabel))
 
 /** The refusal of a put that said only-if-new, handed a whole record. */
 export const recordForNewBox = (): VaultError => new VaultError('bad_option', Phrases.RecordForNewBox)

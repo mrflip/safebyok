@@ -113,7 +113,7 @@ describe("BoxListing: an absent box", () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())
       world.mw.seedPut(fullBoxRecord())
-      expect(await listing.del(box)).to.eq(box)
+      expect(await listing.del(box.sparse)).to.eq(box)
     })
   })
 
@@ -190,7 +190,7 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await listedBox()
       const stale = world.mw.staleWriteOf(box.scope, fullBoxRecord(stored))
       world.mw.willDel(stale)
-      await TH.expectRefusal(listing.del(box), 'stale_write')
+      await TH.expectRefusal(listing.del(box.sparse), 'stale_write')
       expect(box.revision_seq).to.eq(5)
     })
 

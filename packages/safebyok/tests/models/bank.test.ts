@@ -467,6 +467,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     world.vaultDB._cheat_refuseGets('identity_revoked')
     const refusal = await TH.expectRefusal(vault.fetch(), 'identity_revoked')
     expect(bank.snapshot).to.include({ stage: 'disabled', err: refusal })
+    expect(onLifecycle).not.toHaveBeenCalled()
     await TH.eventually(() => onLifecycle.mock.calls.length > 0)
     expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: refusal, unrevoked: 0, bank })
     expect(world.leaseRows()).to.deep.equal([])

@@ -435,6 +435,13 @@ The Coach (2026-11-10): "We should not be dumb about loading from the cache." `L
 behaviour is broken, and marked so in `lease.ts`. Write the lease transactionally so that a stowed lease newer than the vault in hand, by
 `vault_tok`, `gate_epoch` or the vault's revision, has the vault refreshed and the lease taken up. A lease carries no revision today.
 
+### A fetch that meets a damaged row, and edge cases generally
+
+A `fetch` that meets a damaged row refuses `damaged_row` and leaves the instance listed standing, where a listing that meets one vacates it
+(#618). Making the two agree would put a branch in `deliver`, which takes renames and deletions only. The Coach (2026-11-10): "I hate how much of
+our code is given over to these edge cases. TODO it, there's got to be a better way." Look for the design that makes the listing's damaged-row,
+absent and gone cases one case rather than a branch each.
+
 ### A wontfix test pool
 
 The Coach (2026-11-10): a pool of tests demonstrating that each row of `notes/wontfix.md` is what happens today, or the row is pulled.
