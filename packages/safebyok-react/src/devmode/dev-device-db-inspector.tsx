@@ -23,22 +23,23 @@ const listedOfRaw = ({ scopepath, row }: { scopepath: LeaseScopepath, row: unkno
 
 const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
   const [isRaw, setIsRaw] = useState(false)
-  const list = useCallback(async (): Promise<readonly ListedLease[]> => {
+  // The listing names the verb that answered it: the checkbox flips at once, the rows after.
+  const list = useCallback(async (): Promise<{ listname: string, rows: readonly ListedLease[] }> => {
     if (! isRaw) {
       const rows = await deviceDB.listLeases()
-      return rows.map((row) => ({ row, scopepath: null }))
+      return { listname: 'listLeases', rows: rows.map((row) => ({ row, scopepath: null })) }
     }
     const raws = await deviceDB.listRawLeases()
-    return raws.map((raw) => listedOfRaw(raw))
+    return { listname: 'listRawLeases', rows: raws.map((raw) => listedOfRaw(raw)) }
   }, [deviceDB, isRaw])
-  const { val: rows, trouble, relist } = useListing<readonly ListedLease[]>(list)
+  const { val: listing, trouble, relist } = useListing(list)
   const { lastCall, call } = useLastCall()
 
   const callThenRelist = async (verbname: string, work: () => Promise<string>) => {
     await call(verbname, work)
     relist()
   }
-  const listname = isRaw ? 'listRawLeases' : 'listLeases'
+  const askedname = isRaw ? 'listRawLeases' : 'listLeases'
   return (
     <>
       <div className="row">
@@ -48,17 +49,17 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
           {' Include damaged rows'}
         </label>
       </div>
-      {trouble !== null && <p role="alert">{`${listname} refused: ${trouble}`}</p>}
-      {rows === null
+      {trouble !== null && <p role="alert">{`${askedname} refused: ${trouble}`}</p>}
+      {listing === null
         ? <p className="quiet">Listing…</p>
         : (
           <table>
-            <caption>{`Leases, as ${listname} answers them`}</caption>
+            <caption>{`Leases, as ${listing.listname} answers them`}</caption>
             <thead>
               <tr>{LeaseColumns.map((fieldname) => <th key={fieldname}>{fieldname}</th>)}<th>other fields</th><th>verbs</th></tr>
             </thead>
             <tbody>
-              {rows.map(({ row, scopepath }, ii) => (
+              {listing.rows.map(({ row, scopepath }, ii) => (
                 <LeaseRowLine
                   // A damaged row may lack the fields that would name it.
                   key={`${String(row['vaultlabel'])}/${String(row['vault_tok'])}/${String(ii)}`}

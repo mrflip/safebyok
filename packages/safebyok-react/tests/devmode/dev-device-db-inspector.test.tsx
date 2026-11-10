@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ckeyOf } from 'safebyok/storage'
 import { DevDeviceDBInspector } from '../../src/devmode'
 import * as TH from '../test-helpers'
@@ -29,8 +29,19 @@ describe("DevDeviceDBInspector", () => {
   it("names the kind of a raw row's key fields, never their content", async () => {
     await renderOverLease()
     includingDamaged()
+    // The caption names listRawLeases as soon as the box is checked; its rows arrive after.
+    await waitFor(() => { expect(within(leaseRow('main')).getByText(/lease_key: <CryptoKey>/)).to.exist })
+  })
+
+  it("keeps the caption of the rows shown until the next listing lands", async () => {
+    const { world } = await renderOverLease()
+    const listing = TH.makePending()
+    const listRaw = world.deviceDB.listRawLeases.bind(world.deviceDB)
+    vi.spyOn(world.deviceDB, 'listRawLeases').mockImplementation(async () => { await listing.promise; return listRaw() })
+    includingDamaged()
+    expect(screen.getByText(/as listLeases answers them/)).to.exist
+    listing.resolve(undefined)
     await waitFor(() => { expect(screen.getByText(/as listRawLeases answers them/)).to.exist })
-    expect(within(leaseRow('main')).getByText(/lease_key: <CryptoKey>/)).to.exist
   })
 
   it("forgets a lease", async () => {
