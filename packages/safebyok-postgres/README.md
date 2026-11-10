@@ -47,10 +47,10 @@ const vaultDB = new PostgresVaultDB({ client: pgClientOf(pool) })
 * **`listen`**, optional, is how `watch` hears writes made by other servers and devices; see
   below. Without it, a watch hears nothing, and a device learns of another's writes when it next
   reads.
-* **`maxBoxes`**, optional, is a best-effort cap on the live boxes in one vault: a put past it refuses as
+* **`maxBoxes`**, optional, 100 if left out, is a best-effort cap on the live boxes in one vault: a put past it refuses as
   `vault_full`. It is exact at moderate write rates; a strict cap would take concurrency machinery this
   package does not add.
-* **`maxRecordBytes`**, optional, as every vaultDB takes it.
+* **`maxRecordBytes`**, optional, as every vaultDB takes it: 5,600 bytes if left out, so a box's row fits a `NOTIFY`.
 
 `PostgresVaultDB` writes what it is handed under the scope it is handed. **Your route decides who
 may reach which bank**: check the signed-in user before a request reaches the vaultDB, and build

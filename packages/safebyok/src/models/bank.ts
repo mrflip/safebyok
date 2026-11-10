@@ -12,6 +12,7 @@ import { reportToPlatform } from '../refusals/report-error'
 import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bankedVaultScope } from '../shapes/shapes-core'
 import type { LeaseDated } from '../shapes/shapes-storage'
 import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gateish'
+import type { Box } from './box'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BadNewsHandler, BankAnnouncement, BankEvent, BankOpts, BankSnapshot, BankStage, GuardedLifecycleHandler, LifecycleHandler, VacateStory } from '../shapes/shapes-vaultish'
 import type { DeviceDB } from '../storage/device-db'
@@ -250,7 +251,7 @@ export class Bank {
   }
   // --
 
-  // == [Vaults]: vaultAt, ensureVault, tryEnsureVault
+  // == [Vaults]: vaultAt, ensureVault, tryEnsureVault, probe, tryProbe
 
   /** The vault listed for `scope`, a tombstone among them, or null. */
   vaultAt(scope: BankedVaultScope): Vault | null {
@@ -268,6 +269,23 @@ export class Bank {
 
   /** Non-throwing form of {@link ensureVault}. */
   tryEnsureVault(scope: BankedVaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(scope)) }
+
+  /** Trials this bank's whole path at startup, so storage's complaints come up front: replaces one box, fetches it back and opens it, asking the user if the vault needs it. */
+  async probe(asked: VX.ProbeAsked = {}, opts: VX.ProbeOpts = {}): Promise<Box> {
+    const { vaultlabel, boxlabel, whisper, sidecar } = VX.probeAsked.parse(asked)
+    const { maxRefreshMillis } = VX.probeOpts.parse(opts)
+    const vault = await this.ensureVault({ vaultlabel })
+    await vault.ensureUnlocked()
+    const timely = { maxMillisSinceRefresh: maxRefreshMillis, maxWorldMillis: maxRefreshMillis }
+    // A device that has not listed the box would otherwise put over it as if none stood there.
+    await vault.getBox(boxlabel, { ...timely, ifAbsent: 'nil' })
+    const box = await vault.putBox({ boxlabel, whisper, sidecar }, { ...timely, ifAbsent: 'add', ifPresent: 'repl' })
+    await box.extractWhisper({ maxMillisSinceRefresh: 0 })
+    return box
+  }
+
+  /** Non-throwing form of {@link probe}. */
+  tryProbe(asked: VX.ProbeAsked = {}, opts: VX.ProbeOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.probe(asked, opts)) }
   // --
 
   // == [Snapshot]: remakeSnapshot, makeSnapshot

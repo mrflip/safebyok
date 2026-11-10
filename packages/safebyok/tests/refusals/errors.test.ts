@@ -115,6 +115,8 @@ const FamilyCases = [
   ["record_conflict",     "condition", 'storage and this device disagreeing about one revision is for the app to tell the user of; fetching again does not mend it'],
   ["identity_revoked",    "bad_news",  'a signed-out user signs in again'],
   ["storage_unavailable", "condition", 'unreachable storage is tried again shortly'],
+  ["storage_blocked", "condition", 'a browser that withholds its storage is told so, as a retry will not mend it'],
+  ["gate_made_elsewhere", "condition", 'a vault made first elsewhere is told to the user who typed another passphrase'],
   ["vault_gone",          "condition", 'a vault deleted while a call worked on it is a fact of syncing'],
   ["vault_mismatch",      "condition", 'a vault deleted or made anew on another device is a fact of syncing'],
   ["gating_concluded",    "condition", 'a gating ended while its attempt ran is the user moving on, not a fault'],

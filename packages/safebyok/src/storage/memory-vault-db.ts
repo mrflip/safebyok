@@ -1,6 +1,7 @@
 /** The vaultDB in memory. */
 
 import { type BoxesFetched, type BoxFetched, type BoxWritten, type Heard, type Written, type RowOfVault, type Tidied, AdapterVaultDB } from './vault-db'
+import { DefaultMaxBoxes } from '../helpers/consts'
 import { ckeyOf } from '../helpers/helpers'
 import * as Refuse from '../refusals/throwers'
 import * as SX from '../shapes/shapes-storage'
@@ -25,7 +26,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   // == [Construction]: constructor
 
   constructor(opts: MemoryVaultDBOpts = {}) {
-    const { maxBoxes = Infinity, ...adapterVaultDBOpts } = SX.memoryVaultDBOpts.parse(opts)
+    const { maxBoxes = DefaultMaxBoxes, ...adapterVaultDBOpts } = SX.memoryVaultDBOpts.parse(opts)
     super(adapterVaultDBOpts)
     this.#maxBoxes = maxBoxes
   }

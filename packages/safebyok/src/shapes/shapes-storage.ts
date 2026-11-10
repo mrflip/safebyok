@@ -181,14 +181,14 @@ export const { ifAbsentOpts, putOpts, putVaultOpts, delOpts, reqParams, nextSeq 
 
 /** The check of an AdapterVaultDB's options, refusing 'bad_option'. */
 export const adapterVaultDBOpts = objCheck(({ num }) => ({
-  /** The most bytes one stored record may weigh; no limit by default. */
+  /** The most bytes one stored box record may weigh; `DefaultMaxRecordBytes` by default. */
   maxRecordBytes: num.positive().optional(),
 }), 'bad_option')
 /** The check of a memory vaultDB's options, refusing 'bad_option'. */
 export const memoryVaultDBOpts = objCheck(({ uint }) => ({
   ...adapterVaultDBOpts.shape,
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** A soft cap on the live boxes one vault has; no limit by default. */
+  /** A soft cap on the live boxes one vault has; `DefaultMaxBoxes` by default. */
   maxBoxes: uint.optional(),
 }), 'bad_option')
 

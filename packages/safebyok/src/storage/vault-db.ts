@@ -1,7 +1,7 @@
 /** The vaultDB: the verbs the models call. A subclass writes only the generic `do*` calls, each one atomic step. */
 
 import type * as Z from 'zod'
-import { IsAdapterVaultDB, IsVaultDB } from '../helpers/consts'
+import { DefaultMaxRecordBytes, IsAdapterVaultDB, IsVaultDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
 import { nowMillis } from '../helpers/clock'
 import * as Phrases from '../helpers/phrases'
@@ -160,7 +160,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Construction]: constructor
 
   constructor(opts: AdapterVaultDBOpts = {}) {
-    const { maxRecordBytes = Infinity } = SX.adapterVaultDBOpts.parse(opts)
+    const { maxRecordBytes = DefaultMaxRecordBytes } = SX.adapterVaultDBOpts.parse(opts)
     this.#maxRecordBytes = maxRecordBytes
   }
   // --

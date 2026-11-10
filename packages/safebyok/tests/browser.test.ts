@@ -15,6 +15,13 @@ const mine = () => ({ strong: false, reason: 'Mine says no.' }) as const
 /** A fresh dbName, which no other test has touched. */
 const freshDbName = (): string => `test-${crypto.randomUUID()}`
 
+describe("argon2idDeriver and the reserved labels", () => {
+  it("refuses a label of the reserved namespace that safebyok does not supply, however well-formed the spec", () => {
+    const err = TH.expectSyncRefusal(() => argon2idDeriver({ ...CheapSpec, key_deriver_label: 'argon2id_web_v2' }), 'bad_option')
+    expect(err.message).to.match(/reserved/u)
+  })
+})
+
 const CheapSpec = {
   algorithm:         'argon2id',
   key_deriver_label: 'cheap_argon2id_v0',

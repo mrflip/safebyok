@@ -79,7 +79,7 @@ export type Aligned = Z.infer<typeof aligned>
 
 // --
 
-// == [Options]: Promptly, ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts
+// == [Options]: Promptly, ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener, probeAsked, probeOpts, ProbeAsked, ProbeOpts, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts
 
 /** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */
 export const Promptly = 2000
@@ -117,6 +117,25 @@ export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timel
   const listener      = fn<() => void>()
   return { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener }
 })
+
+/** The checks of what `bank.probe` is handed: where its trial box goes and what it holds, and how fresh its record must be. */
+export const { probeAsked, probeOpts } = Checkers('bad_option', ({ obj, vaultlabel, boxlabel }) => ({
+  probeAsked: obj({
+    vaultlabel: vaultlabel.default('home'),
+    boxlabel:   boxlabel.default('box1'),
+    whisper:    CX.whisper.default({ note: 'Shhh, this is a whisper' }),
+    sidecar:    CX.sidecar.default({ example: true }),
+  }),
+  probeOpts: obj({
+    /** How long ago, at most, the trial box's record was refreshed from the vaultDB; apart from the bank's own refresh settings. */
+    maxRefreshMillis: horizonMillis.default(1000),
+  }),
+}))
+
+/** Where `bank.probe` puts its trial box and what it holds, each with a default. */
+export type ProbeAsked = Z.input<typeof probeAsked>
+/** How fresh `bank.probe` needs its trial box's record. */
+export type ProbeOpts = Z.input<typeof probeOpts>
 
 /** How fresh the record in hand and the world must be before a verb goes on. */
 export type TimelyOpts = Z.infer<typeof timelyOpts>

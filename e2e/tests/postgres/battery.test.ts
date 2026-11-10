@@ -35,7 +35,7 @@ TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
   it("hears what another server puts, a box too large for a notice included", async () => {
     const db = getDb()
     const notices = watching(await TH.freshVaultDB(db))
-    const other = await TH.vaultDBOver(db)
+    const other = await TH.vaultDBOver(db, { maxRecordBytes: 20_000 })
     const vault = TH.vaultAt()
     const box = TH.boxAt(0, 'life1', { sidecar: { padding: 'x'.repeat(9000) } })
 

@@ -53,7 +53,7 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
     const listening = { count: 0 }
     await TH.freshServer(db)
     const watcher = TH.browserAt(await TH.serve(await TH.vaultDBListening(db, listening)))
-    const writer = TH.browserAt(await TH.serve(await TH.vaultDBOver(db)))
+    const writer = TH.browserAt(await TH.serve(await TH.vaultDBOver(db, { maxRecordBytes: 20_000 })))
     const notices = watching(watcher)
     await expect.poll(() => listening.count).to.eq(1)
     const vault = TH.vaultAt()

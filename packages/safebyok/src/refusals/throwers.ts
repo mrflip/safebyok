@@ -21,7 +21,7 @@ import type { Thrown } from './errors'
 import * as Phrases   from '../helpers/phrases'
 import type * as SX from '../shapes/shapes-storage'
 
-// == [Outcome Throwers]: sanitizeForeignError, storageUnavailable, unexpectedError
+// == [Outcome Throwers]: sanitizeForeignError, storageUnavailable, storageBlocked, unexpectedError
 
 /** The Error that stands as a refusal's cause for whatever was thrown: an Error as it is, anything else wrapped in one.
  * The header's rule on `meta` is advisory for the bag a thrower keeps: this function trims nothing it is handed.
@@ -49,6 +49,13 @@ export const sanitizeForeignError = (thrown: Thrown): Error => {
  */
 export const storageUnavailable = (cause: Thrown, message: string = Phrases.StorageUnavailable): VaultError => (
   new VaultError('storage_unavailable', message, { cause: sanitizeForeignError(cause) })
+)
+
+/** A `storage_blocked` refusal: the browser withholds its storage from this page, which a retry will not mend.
+ * @example if (err.name === 'SecurityError') { throw storageBlocked(err) }
+ */
+export const storageBlocked = (cause: Thrown, message: string = Phrases.StorageWithheld): VaultError => (
+  new VaultError('storage_blocked', message, { cause: sanitizeForeignError(cause) })
 )
 
 /** An `unexpected_error` refusal, `thrown` its cause: a bug, in safebyok or in a function the app handed it. */
@@ -160,7 +167,7 @@ export const unopenedWhisper = (): VaultError => new VaultError('damaged_box', P
 export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --
 
-// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gatingDismissed, gatingConcluded, attemptInFlight
+// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gateMadeElsewhere, gatingDismissed, gatingConcluded, attemptInFlight
 
 /** An `already_asking` refusal: a prompt is already open on this bank. */
 export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
@@ -179,6 +186,9 @@ export const gatingDismissed = (): VaultError => new VaultError('dismissed', Phr
 
 /** A `gating_concluded` refusal: an attempt reached a prompt that has already ended. */
 export const gatingConcluded = (): VaultError => new VaultError('gating_concluded', Phrases.GatingConcluded)
+
+/** A `gate_made_elsewhere` refusal: another device or tab made this vault first. */
+export const gateMadeElsewhere = (): VaultError => new VaultError('gate_made_elsewhere', Phrases.GateMadeElsewhere)
 
 /** An `attempt_in_flight` refusal: another attempt on this prompt is still running. */
 export const attemptInFlight = (): VaultError => new VaultError('attempt_in_flight', Phrases.AttemptInFlight)

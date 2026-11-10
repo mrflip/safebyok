@@ -101,6 +101,10 @@ TH.describeVaultDBBattery("ConvexVaultDB over a ConvexClient", {
   makeVaultDB:         (opts) => vaultDBOn(deploy(TH.componentHost()), opts),
   makeTwin:            (vaultDB) => vaultDBOn(madeOf(vaultDB).deployment, madeOf(vaultDB).opts),
   makeCappedVaultDB:   (maxBoxes) => vaultDBOn(deploy(TH.componentHost()), { maxBoxes }),
+  makeVaultDBFor:      () => {
+    const deployment = deploy(TH.hostWith(TH.bySubject))
+    return (user_id) => new ConvexVaultDB({ client: deployment.client(user_id), api: deployment.api.safebyok })
+  },
   _cheat_rowsOf:       convexRowsOf,
   _cheat_failNextCall: (vaultDB) => { failNextCall(vaultDB) },
 })

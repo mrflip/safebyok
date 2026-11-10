@@ -77,7 +77,7 @@ describe("PostgresVaultDB's refusals", () => {
 
 describe("PostgresVaultDB's watch", () => {
   it("hears a write whose rows will not fit in a notification as the rows then stand", async () => {
-    const vaultDB = await TH.makeVaultDB()
+    const vaultDB = await TH.makeVaultDB({ maxRecordBytes: 20_000 })
     const vault = TH.vaultAt()
     await vaultDB.putVault(vault, { prior: DB.VoidRevision })
     const notices = watching(vaultDB)
@@ -144,7 +144,7 @@ describe("PostgresVaultDB's notices", () => {
   })
 
   it("sends a box too long for a notification as its vault's props and its boxlabel", async () => {
-    const vaultDB = await TH.makeVaultDB()
+    const vaultDB = await TH.makeVaultDB({ maxRecordBytes: 20_000 })
     const vault = TH.vaultAt()
     await vaultDB.putVault(vault, { prior: DB.VoidRevision })
     const sent = await sentOn()

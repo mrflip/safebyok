@@ -35,8 +35,7 @@ export { epochMillis, type EpochMillis } from './primitives'
  * A token is plain text, as a host's adapter may write one by hand. A device's id is a UUID. A key deriver's label
  * and a passkey's credential id are plain text, not empty. A salt or a ciphered field is
  * branded for its role, since nothing but safebyok makes one. A passphrase's salt is base64url text of
- * {@link PassphraseSaltBytes} bytes, judged by its characters, its length and decoding it; a passkey's is text, not empty, and its length is judged where its
- * wayin is, so a salt of the wrong length is a damaged wayin while the vault's other wayin still opens.
+ * {@link PassphraseSaltBytes} bytes, judged by its characters, its length and decoding it; a passkey's is text, not empty, and {@link prfSalt} judges its length.
  */
 export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
   vault_tok:               str.min(1),
@@ -53,7 +52,7 @@ export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, c
   vault_key_lease_wrapped: ciphered.brand<'VaultKeyLeaseWrapped'>(),
 }))
 
-/** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltBytes} bytes, as the models' wayin record has it and a fresh passkey answer carries it. The stored field of the old vault record keeps the shape-only check, as its length was judged at use, not at read. */
+/** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltBytes} bytes, as a wayin record has it: a stored row with any other refuses 'damaged_row'. */
 export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltShape(PasskeySaltBytes)), 'bad_record')
 
 /** A passphrase wayin's passphraseSalt, its `salt_b64`: base64url text of the random bytes the key deriver takes beside the passphrase. */

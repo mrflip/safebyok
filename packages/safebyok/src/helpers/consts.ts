@@ -45,6 +45,13 @@ export const PassphraseKeyBytes = 32
 /** How many random bytes a passkey wayin's `prf_salt_b64` has: a new passkey's answer carries a fresh salt this long, and a stored salt of any other length fails its record's check. */
 export const PasskeySaltBytes = 32
 
+/** How many live boxes a vault holds, unless its vaultDB was made with another `maxBoxes`. */
+export const DefaultMaxBoxes = 100
+
+// About 95% of Postgres's 8,000-byte NOTIFY payload, less the 1,944 bytes of the Larger vault row in notes/reference-sizes.md, rounded down.
+/** How many bytes one stored box record may weigh, unless its vaultDB was made with another `maxRecordBytes`. */
+export const DefaultMaxRecordBytes = 5600
+
 // A brand is a `Symbol.for` key, so a second copy of safebyok (our ESM and CJS builds side by side, or one an adapter
 // bundles) wears and reads the same one, and a host may wear one on purpose. Non-enumerable, it stays out of a spread,
 // `Object.keys`, `JSON.stringify` and a log line.

@@ -15,11 +15,15 @@ import { boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, vaultScopepathOf } fr
 /** The database each VaultDB under test was made over, by VaultDB. */
 const dbNameOf = new WeakMap<IdbVaultDB, string>()
 
+/** The cap each VaultDB under test was made with, so its twin holds to the same one. */
+const maxBoxesOf = new WeakMap<IdbVaultDB, number>()
+
 /** A VaultDB over a database of its own, which no other test has touched. */
 const makeVaultDB = (opts: IdbVaultDBOpts = {}): IdbVaultDB => {
   const dbName = `test-${crypto.randomUUID()}`
   const vaultDB = new IdbVaultDB({ ...opts, dbName })
   dbNameOf.set(vaultDB, dbName)
+  if (opts.maxBoxes !== undefined) { maxBoxesOf.set(vaultDB, opts.maxBoxes) }
   return vaultDB
 }
 
@@ -39,7 +43,7 @@ const connectionOf = async (vaultDB: IdbVaultDB): Promise<unknown> => {
 const makeTwin = async (vaultDB: IdbVaultDB): Promise<IdbVaultDB> => {
   const dbName = dbNameOf.get(vaultDB)!
   TH._cheat_forgetShelf(`${dbName}:vaults-v${DB.VaultsDBVersion}`)
-  const twin = new IdbVaultDB({ dbName })
+  const twin = new IdbVaultDB({ dbName, maxBoxes: maxBoxesOf.get(vaultDB) })
   const [ours, theirs] = [await connectionOf(vaultDB), await connectionOf(twin)]
   expect(theirs, 'the twin on a connection of its own').to.be.instanceOf(IDBDatabase).and.not.eq(ours)
   return twin
@@ -95,6 +99,7 @@ TH.describeVaultDBBattery("IdbVaultDB", {
   makeVaultDB,
   makeTwin,
   _cheat_rowsOf:       idbRowsOf,
+  makeCappedVaultDB:   (maxBoxes) => makeVaultDB({ maxBoxes }),
   _cheat_failNextCall: failNextCall,
 })
 
@@ -183,7 +188,7 @@ describe("IdbVaultDB's refusals", () => {
   const TroubleCases = [
     ["QuotaExceededError", "vault_full",          /no room left/,     'refuses a write IndexedDB has no room for'],
     ["InvalidStateError",  "storage_unavailable", /closed under it/,  'refuses a call once the database is closed under it'],
-    ["SecurityError",      "storage_unavailable", /withholds/,        'refuses a call where the browser withholds IndexedDB'],
+    ["SecurityError",      "storage_blocked",     /withholds/,        'refuses a call where the browser withholds IndexedDB'],
     ["UnknownError",       "storage_unavailable", /IndexedDB failed/, 'refuses a call that fails in IndexedDB for any other reason'],
   ] as const
 
@@ -216,7 +221,7 @@ describe("IdbVaultDB's refusals", () => {
     it(blurb, async () => {
       const vaultDB = makeVaultDB()
       vi.stubGlobal('indexedDB', absent)
-      const refusal = await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'storage_unavailable')
+      const refusal = await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'storage_blocked')
       expect(refusal.message).to.match(/no IndexedDB/)
     })
   }
