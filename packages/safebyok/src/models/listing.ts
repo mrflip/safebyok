@@ -315,7 +315,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const record = recordOfAnswer<RecordT, SparseT>(answer)
     // A declined put and a del over a tombstone answer what storage has, whose revision no one sent: only the scope is pinned.
     const pins = ((answer.act === 'declined') || (answer.act === 'gone')) ? this.scopeOf(sent) : SX.reqParamsOf(sent)
-    if (record !== null) { verifyConsistent(record, pins, { kind: 'storage_issue' }) }
+    if (record !== null) { verifyConsistent(record, pins, { kind: 'storage_issue', message: Phrases.AnswerNotAsSent }) }
     return (record === null) ? this.#receiveNothing(this.scopeOf(sent)) : this.buildOrReceive(record)
   }
 

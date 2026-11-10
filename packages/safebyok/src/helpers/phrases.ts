@@ -205,6 +205,9 @@ export const OtherVaultTokAtBirth = "Storage delivered a record from a different
 /** Why a record delivered under one scope that names another is not adopted. */
 export const RecordOfOtherScope = "Storage delivered a misnamed record. This should not happen: report this as a bug."
 
+/** Why a good answer whose record differs from what was sent in scope, life or revision is not adopted. */
+export const AnswerNotAsSent = "Storage answered with a record other than the one it was asked about. This should not happen: report this as a bug."
+
 /** Why a pair of shapes no row of the reconcile table names is refused: a bug. */
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
