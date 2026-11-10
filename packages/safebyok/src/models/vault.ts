@@ -322,19 +322,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
   // --
 
-  // == [Guards]: isLocked, isUnlocked, demandUnlocked, demandLease, demandPromptable, demandAttachable, demandHelloable, demandPresent, ensureTimely
+  // == [Guards]: isLocked, isUnlocked, demandLease, demandPromptable, demandAttachable, demandHelloable, demandPresent, ensureTimely
 
   /** The vault's own lock, not its world's: the bank has none. */
-  override get isLocked(): boolean { return this.#lease === null }
+  get isLocked(): boolean { return this.#lease === null }
 
   /** True while this vault has a lease granted. */
   get isUnlocked(): boolean { return this.#lease !== null }
-
-  /** Refuses unless the vault is enabled, present and unlocked. */
-  override demandUnlocked(): this {
-    this.demandEnabled().demandPresent()
-    return super.demandUnlocked()
-  }
 
   #demandLease(stamp: CipherCtxRecord): Lease {
     this.demandEnabled().demandPresent()

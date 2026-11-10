@@ -63,6 +63,14 @@ const plantBoxes = (backend: Backend, boxes: (DB.BoxRecord | DB.BoxTombstone)[])
   }))
 })
 
+/** A vault row written straight over the one stored, as a life that ended with its box rows left behind. */
+const plantVault = (backend: Backend, vault: DB.VaultRecord) => backend.run(async ({ db }) => {
+  const { applabel, user_id, vaultlabel } = vault
+  const doc = await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel)).unique()
+  if (doc === null) { throw new Error(`No vault row to plant over for ${user_id}/${vaultlabel}`) }
+  await db.patch(doc._id, { vault })
+})
+
 /** The box rows `asked` lists, by boxlabel. */
 const listedBoxlabels = async (backend: Backend, asked: Life = life1) => {
   const { boxes } = await backend.query(api.listBoxes, { asked })
@@ -90,7 +98,7 @@ describe("watchRows", () => {
     await backend.mutation(api.putBox, { record: box, opts: birth })
     await backend.mutation(api.putVault, { record: other, opts: birth })
     await backend.mutation(api.putVault, { record: TH.vaultAt(0, 'lifeU', { user_id: 'u2' }), opts: birth })
-    await backend.mutation(api.putVault, { record: anew, opts: over(vault) })
+    await plantVault(backend, anew)
     expect(await backend.query(api.watchRows, { scope: TH.bankScope })).to.deep.equal({
       vaults: [{ vaultlabel: 'main', vault: anew }, { vaultlabel: 'other', vault: other }],
       boxes:  [{ vaultlabel: 'main', vault_tok: 'life1', boxlabel: 'openai', box }],
@@ -104,12 +112,12 @@ describe("tidyGone", () => {
     const backend = await withVault()
     await backend.mutation(api.putBox, { record: boxOf('anthropic'), opts: birth })
     await backend.mutation(api.putBox, { record: boxOf('openai'), opts: birth })
-    await backend.mutation(api.putVault, { record: TH.vaultAt(1, 'life2'), opts: over(vault) })
+    await plantVault(backend, TH.vaultAt(1, 'life2'))
     await backend.mutation(api.putBox, { record: boxOf('github', { vault_tok: 'life2' }), opts: birth })
     const theirs = TH.vaultAt(0, 'life1', { user_id: 'u2' })
     await backend.mutation(api.putVault, { record: theirs, opts: birth })
     await backend.mutation(api.putBox, { record: boxOf('gemini', { user_id: 'u2' }), opts: birth })
-    await backend.mutation(api.putVault, { record: TH.vaultAt(1, 'life2', { user_id: 'u2' }), opts: over(theirs) })
+    await plantVault(backend, TH.vaultAt(1, 'life2', { user_id: 'u2' }))
     expect(await talliedLives(backend)).to.have.members(['u1/life1', 'u1/life2', 'u2/life1'])
     //
     expect(await backend.mutation(api.tidyGone, { scope: TH.bankScope })).to.deep.equal({ totalCount: 1 })

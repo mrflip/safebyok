@@ -245,7 +245,6 @@ export const boxWorldOf = (vault: Vault): BoxWorld => ({
   get isLocked() { return vault.isLocked },
   ensureTimely: (opts) => vault.ensureTimely(opts),
   receiveWorld:    () => undefined,
-  demandUnlocked:   () => vault.demandUnlocked(),
   subscribe:        (listener) => vault.subscribe(listener),
   sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),
   unsealStampedString: (sealed, stamp) => vault.unsealStampedString(sealed, stamp),

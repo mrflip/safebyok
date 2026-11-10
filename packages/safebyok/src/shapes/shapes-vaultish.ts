@@ -85,7 +85,7 @@ export type Aligned = Z.infer<typeof aligned>
 export const Promptly = 2000
 
 /** SLOPDOC: The checks of the options a storable and its verbs accept. */
-export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, fn }) => {
+export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, orDefault, fn }) => {
   const ifPresent     = oneof(EX.ifPresentVals)
   const ifAbsent      = oneof(EX.ifAbsentVals)
   const putIfAbsent   = oneof(EX.putIfAbsentVals)
@@ -100,19 +100,19 @@ export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timel
   })
   const fetchOpts     = timelyOpts.extend({
     /** What an absent thing does: `fail`, the default, refuses with the listing's absent refusal; `nil` resolves null. */
-    ifAbsent: ifAbsent.default('fail'),
+    ifAbsent: orDefault(ifAbsent, 'fail'),
   })
   const boxPutOpts    = timelyOpts.extend({
     /** What an absent box does: `add`, the default, creates it. */
-    ifAbsent:  putIfAbsent.default('add'),
+    ifAbsent:  orDefault(putIfAbsent, 'add'),
     /** What a present box does: `repl`, the default, replaces it. */
-    ifPresent: ifPresent.default('repl'),
+    ifPresent: orDefault(ifPresent, 'repl'),
   })
   const boxCreateOpts = timelyOpts.extend({
     /** Always `add`: a create creates. */
-    ifAbsent:  lit('add').default('add'),
+    ifAbsent:  orDefault(lit('add'), 'add'),
     /** What a present box does: `fail`, the default, refuses. */
-    ifPresent: ifPresent.default('fail'),
+    ifPresent: orDefault(ifPresent, 'fail'),
   })
   const listener      = fn<() => void>()
   return { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener }
@@ -341,11 +341,11 @@ export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<Box
 
 /** The check of a box listing's world past {@link listingWorld}: the vault's `vault_tok`, its demand, and its seal verbs. Checks only. */
 export const boxWorld = Checker(({ fn, vault_tok }) => listingWorld.extend({
-  vault_tok, demandUnlocked: fn(), subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn(),
+  vault_tok, subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn(),
 }), 'bad_option', [CX])
 
 /** The vault, as far as its boxes reach into it. */
-export type BoxWorld = Pick<Vault, keyof ListingWorld | 'vault_tok' | 'demandUnlocked' | 'subscribe' | 'sealStampedString' | 'unsealStampedString'>
+export type BoxWorld = Pick<Vault, keyof ListingWorld | 'vault_tok' | 'subscribe' | 'sealStampedString' | 'unsealStampedString'>
 
 /** The check of a box listing's options: a listing's, and the scope of the vault it lists. Checks only. */
 export const boxListingOpts = Checker(({ vaultScope }) => listingOpts.extend({ scope: vaultScope }), 'bad_option', [CX])

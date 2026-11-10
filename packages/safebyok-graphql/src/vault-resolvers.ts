@@ -17,11 +17,11 @@ export type VaultFieldArgs = {
   safebyokGetVault:          DB.VaultScope & { opts?: DB.IfAbsentOpts | null }
   safebyokListBoxes:         DB.VaultQuery
   safebyokGetBox:            DB.BoxQuery & { opts?: DB.IfAbsentOpts | null }
-  safebyokPutVault:          { record: DB.VaultRecord, opts: DB.PutVaultOpts }
+  safebyokPutVault:          { record: DB.VaultRecord, opts: DB.PutOpts }
   safebyokPutBox:            { record: DB.BoxRecord, opts: DB.PutOpts }
-  safebyokReplacePassphrase: { params: DB.ReplacePassphraseParams }
-  safebyokAddPasskey:        { params: DB.AddPasskeyParams }
-  safebyokRevokePasskey:     { params: DB.RevokePasskeyParams }
+  safebyokReplacePassphrase: { record: DB.VaultRecord, opts: DB.GateVerbOpts }
+  safebyokAddPasskey:        { record: DB.VaultRecord, opts: DB.GateVerbOpts }
+  safebyokRevokePasskey:     { record: DB.VaultRecord, opts: DB.GateVerbOpts }
   safebyokDelBox:            { tombstone: DB.BoxTombstone, opts: DB.DelOpts }
   safebyokDelVault:          { tombstone: DB.VaultTombstone, opts: DB.DelOpts }
   safebyokTidyGone:          DB.BankScope
@@ -153,9 +153,9 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     Mutation: {
       safebyokPutVault:          async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryPutVault(record, opts)),
       safebyokPutBox:            async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryPutBox(record, opts)),
-      safebyokReplacePassphrase: async (_parent, { params }, context) => await served(context, params.user_id, params, async () => await vaultDB.tryReplacePassphrase(params)),
-      safebyokAddPasskey:        async (_parent, { params }, context) => await served(context, params.user_id, params, async () => await vaultDB.tryAddPasskey(params)),
-      safebyokRevokePasskey:     async (_parent, { params }, context) => await served(context, params.user_id, params, async () => await vaultDB.tryRevokePasskey(params)),
+      safebyokReplacePassphrase: async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryReplacePassphrase(record, opts)),
+      safebyokAddPasskey:        async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryAddPasskey(record, opts)),
+      safebyokRevokePasskey:     async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryRevokePasskey(record, opts)),
       safebyokDelBox:            async (_parent, { tombstone, opts }, context) => await served(context, tombstone.user_id, { ...tombstone, ...opts }, async () => await vaultDB.tryDelBox(tombstone, opts)),
       safebyokDelVault:          async (_parent, { tombstone, opts }, context) => await served(context, tombstone.user_id, { ...tombstone, ...opts }, async () => await vaultDB.tryDelVault(tombstone, opts)),
       safebyokTidyGone:          async (_parent, scope, context) => await served(context, scope.user_id, scope, async () => await vaultDB.tryTidyGone(scope)),

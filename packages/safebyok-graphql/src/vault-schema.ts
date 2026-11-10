@@ -60,11 +60,8 @@ enum SafebyokIfAbsent { fail nil }
 """What a put does over a row never stored or deleted: add the record, or fail."""
 enum SafebyokPutIfAbsent { add fail }
 
-"""What a box's put does over a live row: replace it, fail, or get it."""
+"""What a put does over a live row: replace it, fail, or get it."""
 enum SafebyokIfPresent { repl fail get }
-
-"""What a vault's put does over a live row: fail, or get it."""
-enum SafebyokPutVaultIfPresent { fail get }
 
 # Rows
 
@@ -269,33 +266,6 @@ input SafebyokBoxRecordInput {${boxSparseFields}
 input SafebyokBoxTombstoneInput {${boxSparseFields}
 }
 
-input SafebyokPassphraseGateInput {
-  passphrase_wayin: SafebyokPassphraseWayinInput!
-}
-
-input SafebyokPasskeyGateInput {
-  passkey_wayin: SafebyokPasskeyWayinInput!
-}
-
-input SafebyokRevokedGateInput {
-  passkey_wayin: SafebyokPasskeyWayinInput
-}
-
-"""The vault row a passphrase moves, at the revision it was read, its gate with the new passphrase wayin alone."""
-input SafebyokReplacePassphraseInput {${vaultSparseFields}
-  gate:          SafebyokPassphraseGateInput!
-}
-
-"""The vault row a passkey joins, at the revision it was read, its gate with the new passkey wayin alone."""
-input SafebyokAddPasskeyInput {${vaultSparseFields}
-  gate:          SafebyokPasskeyGateInput!
-}
-
-"""The vault row a passkey leaves, at the revision it was read, its gate with a null passkey_wayin alone."""
-input SafebyokRevokePasskeyInput {${vaultSparseFields}
-  gate:          SafebyokRevokedGateInput!
-}
-
 input SafebyokRevisionInput {
   revision_tok: String!
   revision_seq: Int!
@@ -306,18 +276,16 @@ input SafebyokIfAbsentOptsInput {
   ifAbsent: SafebyokIfAbsent
 }
 
-"""A box's put options: the revision it was made from, and each policy left out taking safebyok's default."""
+"""A put's options: the revision it was made from, and each policy left out taking safebyok's default."""
 input SafebyokPutOptsInput {
   prior:     SafebyokRevisionInput!
   ifAbsent:  SafebyokPutIfAbsent
   ifPresent: SafebyokIfPresent
 }
 
-"""A vault's put options: the revision it was made from, and each policy left out taking safebyok's default."""
-input SafebyokPutVaultOptsInput {
-  prior:     SafebyokRevisionInput!
-  ifAbsent:  SafebyokPutIfAbsent
-  ifPresent: SafebyokPutVaultIfPresent
+"""A gate verb's options: the revision its record was made from."""
+input SafebyokGateVerbOptsInput {
+  prior: SafebyokRevisionInput!
 }
 
 """A del's options: the revision it was made from."""
@@ -335,11 +303,11 @@ type Query {
 }
 
 type Mutation {
-  safebyokPutVault(record: SafebyokVaultRecordInput!, opts: SafebyokPutVaultOptsInput!): SafebyokVaultAnswer!
+  safebyokPutVault(record: SafebyokVaultRecordInput!, opts: SafebyokPutOptsInput!): SafebyokVaultAnswer!
   safebyokPutBox(record: SafebyokBoxRecordInput!, opts: SafebyokPutOptsInput!): SafebyokBoxAnswer!
-  safebyokReplacePassphrase(params: SafebyokReplacePassphraseInput!): SafebyokVaultAnswer!
-  safebyokAddPasskey(params: SafebyokAddPasskeyInput!): SafebyokVaultAnswer!
-  safebyokRevokePasskey(params: SafebyokRevokePasskeyInput!): SafebyokVaultAnswer!
+  safebyokReplacePassphrase(record: SafebyokVaultRecordInput!, opts: SafebyokGateVerbOptsInput!): SafebyokVaultAnswer!
+  safebyokAddPasskey(record: SafebyokVaultRecordInput!, opts: SafebyokGateVerbOptsInput!): SafebyokVaultAnswer!
+  safebyokRevokePasskey(record: SafebyokVaultRecordInput!, opts: SafebyokGateVerbOptsInput!): SafebyokVaultAnswer!
   safebyokDelBox(tombstone: SafebyokBoxTombstoneInput!, opts: SafebyokDelOptsInput!): SafebyokBoxAnswer!
   safebyokDelVault(tombstone: SafebyokVaultTombstoneInput!, opts: SafebyokDelOptsInput!): SafebyokVaultAnswer!
   safebyokTidyGone(applabel: String!, user_id: String!): SafebyokTidiedAnswer!

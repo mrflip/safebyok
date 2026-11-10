@@ -21,6 +21,13 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     expect(JSON.stringify(boxrows.get(boxlabel))).not.to.include(Whisper)
   })
 
+  it("answers stale_write for a patch of both halves over a box stored but not listed, nothing fetched", async () => {
+    const { next, tryGetBox, tryPutBox } = await nextUnlisted()
+    await TH.expectRefusal(next.putBox({ boxlabel, whisper: Whisper, sidecar: Sidecar }), 'stale_write')
+    expect(tryGetBox).not.toHaveBeenCalled()
+    expect(tryPutBox).toHaveBeenCalledOnce()
+  })
+
   it("takes a sidecar of {} where left out", async () => {
     const { vault } = await makeWorld()
     const box = await vault.putBox({ boxlabel, whisper: Whisper })

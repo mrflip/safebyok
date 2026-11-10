@@ -48,7 +48,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 
-  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper, exposure, isShowing, isVeiled, subscribe
+  // == [Getters]: fmt, box_tok, sidecar, box_key_wrapped, whisper_codec, whisper_schema_version, whisper_ciphered, whisper, exposure, isShowing, isVeiled, isLocked, subscribe
 
   /** The storage format of the record in hand. */
   get fmt(): number { return this.central.fmt }
@@ -94,6 +94,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** True while {@link veil} hides the whisper exposed, whatever the lock; read live. */
   get isVeiled(): boolean { return this.#isVeiled }
+
+  /** Whether this box's vault is locked, read live. */
+  get isLocked(): boolean { return this.listing.isLocked }
 
   /** Public access to the unbound "make me a subscriber" callback, told of this box's changes and its vault's. */
   override get subscribe(): (listener: () => void) => (() => void) { return this.#subscribeWithVault }
@@ -185,7 +188,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Seals `patch` over the record in hand and puts it, answering this box; a deleted box is reborn.
    *
    * A lock does not interrupt or reverse a put once its write has begun. A patch leaving out the whisper or the sidecar keeps
-   * the one stored, so a sparse box is fetched first.
+   * the stored half, so a sparse box is fetched first unless the patch carries both; a box behind storage answers `stale_write`.
    */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
     demandGood(await this.tryPut(patch, opts))
@@ -195,8 +198,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** {@link put}, answering the vaultDB's own answer with the box listed as its `val`. */
   async tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<ThingAnswer<Box>> {
     try {
-      const { ifAbsent, ifPresent, ...timely } = VX.boxPutOpts.parse(opts)
-      await this.ensurePuttable(timely)
+      const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis } = VX.boxPutOpts.parse(opts)
+      await this.ensurePuttable(patch, { maxMillisSinceRefresh, maxWorldMillis })
       const given = this.demandPuttable(patch, { ifPresent })
       const { record, prior } = await this.#edit(given)
       this.demandPuttable(patch, { ifPresent })
@@ -231,19 +234,23 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   #keptWhisper(): Promise<Whisper> { return this.#unseal(this.demandFullProps()) }
   // --
 
-  // == [Guards]: demandUnsealable, demandPuttable, demandExposable, demandPresent, ensureUnsealable, ensurePuttable
+  // == [Guards]: demandUnsealable, demandPuttable, #givenOf, demandExposable, demandPresent, ensureUnsealable, ensurePuttable
 
   /** Demands that the box be enabled and present, with a full record, and the vault unlocked. */
   demandUnsealable(): this { return this.demandEnabled().demandUnlocked().demandPresent().demandFull() }
 
   /** The parsed `patch`, refused unless a put of it under `opts` may go ahead now. */
   demandPuttable(patch: BoxPatch, { ifPresent }: BoxPutOpts = {}): BoxPatchGiven {
-    const patchCheck = (ifPresent === 'fail') ? VX.boxPatchNew : VX.boxPatch
-    const given = patchCheck.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
-    this.demandEnabled()
-    this.world.demandUnlocked()
-    this.demandWhole()
+    const given = this.#givenOf(patch, ifPresent)
+    this.demandEnabled().demandUnlocked()
+    if (! isOfBothHalves(given)) { this.demandWhole() }
     return given
+  }
+
+  /** `patch` parsed as one of this box's, for a put under `ifPresent`. */
+  #givenOf(patch: BoxPatch, ifPresent?: BoxPutOpts['ifPresent']): BoxPatchGiven {
+    const patchCheck = (ifPresent === 'fail') ? VX.boxPatchNew : VX.boxPatch
+    return patchCheck.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
   /** Keeping a whisper on the instance needs the box enabled and the vault unlocked. */
@@ -258,8 +265,14 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Hydrate this box so that its whisper can be unsealed. */
   ensureUnsealable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
-  /** Hydrate this box so that a put can seal over its full record. */
-  ensurePuttable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
+  // A sparse box under a patch of both halves needs nothing fetched: the put's revision check is what catches a stale one.
+  /** Bring this box and its vault timely enough for a put of `patch`, fetching a sparse record only where `patch` keeps part of it. */
+  async ensurePuttable(patch: BoxPatch, opts: TimelyOpts = {}): Promise<this> {
+    const given = this.#givenOf(patch)
+    if (this.isWholeRecord(this.central) || ! isOfBothHalves(given)) { return this.hydrate(opts) }
+    await this.listing.ensureTimelyWorld(VX.timelyOpts.parse(opts).maxWorldMillis)
+    return this
+  }
   // --
 
   // == [Protected, overriding Storable's]: adopt, sweepContents, vacateContents, isFullRecord, lifeTokPathOf, makeSnapshot
@@ -301,6 +314,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Answers 'box', which marks this model to a check: {@link Modelkind}. */
   get modelkind(): 'box' { return 'box' satisfies Modelkind }
 }
+
+// == [Patches]: isOfBothHalves
+
+/** Whether `given` carries both the whisper and the sidecar, so that a put of it needs nothing from the record stored. */
+const isOfBothHalves = ({ whisper, sidecar }: BoxPatchGiven): boolean => (whisper !== undefined) && (sidecar !== undefined)
+// --
 
 // == [Merging]: mergedOver
 

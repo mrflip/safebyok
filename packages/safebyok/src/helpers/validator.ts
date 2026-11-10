@@ -26,6 +26,8 @@ export const Kit = {
   discrim: Zod.discriminatedUnion,
   lit:     Zod.literal,
   lazy:    Zod.lazy,
+  /** `check`, reading null or a value left out as `fallback`: an option's default, filled whether the caller omits it or sends null. */
+  orDefault: <CheckT extends Zod.ZodType>(check: CheckT, fallback: Zod.output<CheckT>) => check.nullish().transform((given) => given ?? fallback),
   /** A check Zod has no maker for, as a predicate: a CryptoKey, bytes of one length. */
   custom:  Zod.custom,
   /** A function, as a host's verb or callback is checked, typed as the one meant: `fn<KeyDeriver['deriveKeyBytes']>()`. Nothing past its being one is judged. */

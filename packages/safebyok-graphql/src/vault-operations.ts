@@ -87,7 +87,7 @@ ${[vaultRow, gate, ciphered, reqParams, err].join('\n')}`,
 }
 ${boxAnswerFragments}`,
 
-  putVault: `mutation SafebyokPutVault($record: SafebyokVaultRecordInput!, $opts: SafebyokPutVaultOptsInput!) {
+  putVault: `mutation SafebyokPutVault($record: SafebyokVaultRecordInput!, $opts: SafebyokPutOptsInput!) {
   safebyokPutVault(record: $record, opts: $opts) { ...SafebyokVaultAnswerFields }
 }
 ${vaultAnswerFragments}`,
@@ -97,18 +97,18 @@ ${vaultAnswerFragments}`,
 }
 ${boxAnswerFragments}`,
 
-  replacePassphrase: `mutation SafebyokReplacePassphrase($params: SafebyokReplacePassphraseInput!) {
-  safebyokReplacePassphrase(params: $params) { ...SafebyokVaultAnswerFields }
+  replacePassphrase: `mutation SafebyokReplacePassphrase($record: SafebyokVaultRecordInput!, $opts: SafebyokGateVerbOptsInput!) {
+  safebyokReplacePassphrase(record: $record, opts: $opts) { ...SafebyokVaultAnswerFields }
 }
 ${vaultAnswerFragments}`,
 
-  addPasskey: `mutation SafebyokAddPasskey($params: SafebyokAddPasskeyInput!) {
-  safebyokAddPasskey(params: $params) { ...SafebyokVaultAnswerFields }
+  addPasskey: `mutation SafebyokAddPasskey($record: SafebyokVaultRecordInput!, $opts: SafebyokGateVerbOptsInput!) {
+  safebyokAddPasskey(record: $record, opts: $opts) { ...SafebyokVaultAnswerFields }
 }
 ${vaultAnswerFragments}`,
 
-  revokePasskey: `mutation SafebyokRevokePasskey($params: SafebyokRevokePasskeyInput!) {
-  safebyokRevokePasskey(params: $params) { ...SafebyokVaultAnswerFields }
+  revokePasskey: `mutation SafebyokRevokePasskey($record: SafebyokVaultRecordInput!, $opts: SafebyokGateVerbOptsInput!) {
+  safebyokRevokePasskey(record: $record, opts: $opts) { ...SafebyokVaultAnswerFields }
 }
 ${vaultAnswerFragments}`,
 

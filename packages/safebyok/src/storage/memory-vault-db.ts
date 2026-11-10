@@ -114,7 +114,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   protected doPutVault(record: VaultRecord, opts: PutOptsGiven): Written {
     const ante = this.#vaultRowOf(record)
-    const isWritten = SX.isVaultPutAllowed(ante, opts)
+    const isWritten = SX.isVaultPutAllowed(ante, record, opts)
     if (isWritten) { this.#writeVaultRow(record) }
     return { isWritten, ante: structuredClone(ante) }
   }
@@ -123,7 +123,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const vault = this.#vaultRowOf(record)
     const boxrows = this._cheat_boxRowsOf(record, record.vault_tok)
     const ante = boxrows.get(record.boxlabel) ?? null
-    const isWritten = SX.isLiveVaultRecord(vault, record.vault_tok) && SX.isBoxPutAllowed(ante, opts)
+    const isWritten = SX.isLiveVaultRecord(vault, record.vault_tok) && SX.isBoxPutAllowed(ante, record, opts)
     if (isWritten) {
       this.#demandRoom(boxrows, ante)
       this.#writeBoxRow(boxrows, vault, record)

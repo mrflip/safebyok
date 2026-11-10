@@ -6,12 +6,11 @@ import * as SX from '../../src/shapes/shapes-storage'
 import type { VaultDB } from '../../src/storage/vault-db'
 import { bankScope, boxAt, boxQuery, boxTombstoneOf, passkeyWayin, passphraseWayin, priorOf, vaultAt, vaultQuery, vaultScope, vaultTombstoneOf } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
+import { gateMoveOf } from './vault-db-battery-puts'
 
 const vault = vaultAt()
 const box = boxAt()
 const opts = { prior: SX.VoidRevision }
-
-const gateParamsOf = (gate: object) => ({ ...SX.vaultSparse.parse(vault), am: 'a' as const, gate }) as never
 
 /** Each verb of `vaultDB`, by name, called on u1's vault: all that a stranger must be refused. */
 const everyVerbOn = (vaultDB: VaultDB) => ({
@@ -21,9 +20,9 @@ const everyVerbOn = (vaultDB: VaultDB) => ({
   getBox:            () => vaultDB.getBox(boxQuery),
   putVault:          () => vaultDB.putVault(vault, opts),
   putBox:            () => vaultDB.putBox(box, opts),
-  replacePassphrase: () => vaultDB.replacePassphrase(gateParamsOf({ passphrase_wayin: passphraseWayin })),
-  addPasskey:        () => vaultDB.addPasskey(gateParamsOf({ passkey_wayin: passkeyWayin })),
-  revokePasskey:     () => vaultDB.revokePasskey(gateParamsOf({ passkey_wayin: null })),
+  replacePassphrase: () => vaultDB.replacePassphrase(...gateMoveOf(vault, { passphrase_wayin: passphraseWayin })),
+  addPasskey:        () => vaultDB.addPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin })),
+  revokePasskey:     () => vaultDB.revokePasskey(...gateMoveOf(vault, { passkey_wayin: null })),
   delBox:            () => vaultDB.delBox(boxTombstoneOf(box), { prior: priorOf(box) }),
   delVault:          () => vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) }),
 })

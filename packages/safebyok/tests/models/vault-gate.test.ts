@@ -134,10 +134,10 @@ const proveBy = ({ vault }: Born, passphrase: string) => PassphraseProving.build
 
 /** Moves the row past what the attempt read, as another device does just before `verb`'s commit reaches the vaultDB. */
 const movedBeforeCommit = ({ opts: { vaultDB }, demandStored, putBehindOurBack }: Born, verb: 'tryReplacePassphrase' | 'tryAddPasskey' | 'tryRevokePasskey') => {
-  const commit = vaultDB[verb].bind(vaultDB) as (params: never) => Promise<never>
-  const crossing = (params: never) => {
+  const commit = vaultDB[verb].bind(vaultDB) as (record: never, opts: never) => Promise<never>
+  const crossing = (record: never, opts: never) => {
     putBehindOurBack(demandStored())
-    return commit(params)
+    return commit(record, opts)
   }
   vi.spyOn(vaultDB, verb).mockImplementationOnce(crossing as never)
 }
@@ -207,8 +207,8 @@ describe("vault.replacePassphrasePrompt()", () => {
     const { vault, deviceDB, demandStored, putBehindOurBack, opts: { vaultDB } } = born
     const landedEpoch = demandStored().gate.gate_epoch + 1
     const commit = vaultDB.tryReplacePassphrase.bind(vaultDB)
-    vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (params) => {
-      const answer = await commit(params)
+    vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (record, opts) => {
+      const answer = await commit(record, opts)
       const stored = demandStored()
       putBehindOurBack({ ...stored, gate: { ...stored.gate, gate_epoch: landedEpoch + 1 } })
       await vault.fetch()
@@ -394,6 +394,13 @@ describe("a gate change on other sessions", () => {
 })
 
 describe("vault.delVaultPrompt()", () => {
+  it("demandUnlocked on a tombstoned vault says locked, and demandPresent says gone", async () => {
+    const { vault } = await makeBornVault()
+    await delTyping(vault)
+    TH.expectSyncRefusal(() => vault.demandUnlocked(), 'vault_locked')
+    TH.expectSyncRefusal(() => vault.demandPresent(), 'vault_gone')
+  })
+
   it("locks the vault, puts a tombstone with its boxes cascaded, forgets the row cached, and stays in its slot tombstoned", async () => {
     const { vault, listing, storedNow, deviceDB } = await makeBornVault()
     const boxes = vault.boxListing

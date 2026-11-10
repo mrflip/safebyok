@@ -1,9 +1,9 @@
 /** The vaultDB: the verbs the models call. A subclass writes only the generic `do*` calls, each one atomic step. */
 
+import { isEqual } from 'es-toolkit'
 import type * as Z from 'zod'
 import { DefaultMaxRecordBytes, IsAdapterVaultDB, IsVaultDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
-import { nowMillis } from '../helpers/clock'
 import * as Phrases from '../helpers/phrases'
 import { verifyConsistent } from '../helpers/validator'
 import { type VaultError, isVaultError, rowsOfRefusal } from '../refusals/errors'
@@ -12,7 +12,7 @@ import * as SX from '../shapes/shapes-storage'
 import * as CX from '../shapes/shapes-core'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
 import type { DelAct, GotAct, ListAct, PutAct } from '../shapes/shapes-enums'
-import type { AddPasskeyParams, AdapterVaultDBOpts, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, Gate, IfAbsentOpts, PutOpts, PutOptsGiven, PutVaultOpts, ReplacePassphraseParams, ReqParams, RevokePasskeyParams, VaultQuery, VaultRecord, VaultRow, VaultSparse, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import type { AdapterVaultDBOpts, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, GateVerbOpts, IfAbsentOpts, PutOpts, PutOptsGiven, ReqParams, VaultQuery, VaultRecord, VaultRow, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
 
 // == [Answers]: GoodAnswer, BadAnswer, Answer, ListAct, GotAct, PutAct, DelAct, BankListed, BoxesListed, Tidied, Notice, answerOf
@@ -107,26 +107,26 @@ export interface VaultDB {
   getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>>
   /** Non-throwing form of {@link VaultDB.getBox}. */
   tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<Answer<BoxRecord | null, GotAct>>
-  /** Puts a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
-  putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>>
+  /** Puts a vault, as `opts` allow. */
+  putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>>
   /** Non-throwing form of {@link VaultDB.putVault}. */
-  tryPutVault(record: VaultRecord, opts: PutVaultOpts): Promise<Answer<VaultRow, PutAct>>
+  tryPutVault(record: VaultRecord, opts: PutOpts): Promise<Answer<VaultRow, PutAct>>
   /** Puts a box under a vault live at its `vault_tok`, as `opts` allow. */
   putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>>
   /** Non-throwing form of {@link VaultDB.putBox}. */
   tryPutBox(record: BoxRecord, opts: PutOpts): Promise<Answer<BoxRow, PutAct>>
-  /** Lays the new passphrase wayin on the vault row at this revision, leaving its passkey wayin as stored. */
-  replacePassphrase(params: ReplacePassphraseParams): Promise<GoodAnswer<VaultRecord, 'replaced'>>
+  /** Puts `record`, the vault row at `opts.prior` with a new passphrase wayin and its `gate_epoch` one up. */
+  replacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'replaced'>>
   /** Non-throwing form of {@link VaultDB.replacePassphrase}. */
-  tryReplacePassphrase(params: ReplacePassphraseParams): Promise<Answer<VaultRecord, 'replaced'>>
-  /** Lays a passkey wayin on a vault row with none. */
-  addPasskey(params: AddPasskeyParams): Promise<GoodAnswer<VaultRecord, 'added'>>
+  tryReplacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'replaced'>>
+  /** Puts `record`, the vault row at `opts.prior`, which has no passkey wayin, with one laid on and its `gate_epoch` one up. */
+  addPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'added'>>
   /** Non-throwing form of {@link VaultDB.addPasskey}. */
-  tryAddPasskey(params: AddPasskeyParams): Promise<Answer<VaultRecord, 'added'>>
-  /** Removes the passkey wayin from the vault row; one with none answers as stored. */
-  revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>>
+  tryAddPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'added'>>
+  /** Puts `record`, the vault row at `opts.prior` with no passkey wayin and its `gate_epoch` one up; a row with none answers as stored. */
+  revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked'>>
   /** Non-throwing form of {@link VaultDB.revokePasskey}. */
-  tryRevokePasskey(params: RevokePasskeyParams): Promise<Answer<VaultRecord, 'revoked'>>
+  tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked'>>
   /** Deletes a box's live row at `prior`. */
   delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>>
   /** Non-throwing form of {@link VaultDB.delBox}. */
@@ -258,49 +258,50 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   // == [Puts]: putVault, tryPutVault, putBox, tryPutBox
 
-  /** Puts a vault's birth, or its rebirth over a tombstone; a live vault row moves only by a gate verb. */
-  async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
+  /** Puts a vault, as `opts` allow. */
+  async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
     const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
       const vaultRecord = SX.vaultRecord.parse(record)
-      const putOpts = SX.putVaultOpts.parse(opts)
-      SX.nextSeq.parse({ record: vaultRecord, prior: putOpts.prior })
-      const { isWritten, ante } = await this.doPutVault(vaultRecord, putOpts)
+      const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
+      SX.nextSeq.parse({ record: vaultRecord, prior })
+      const { isWritten, ante } = await this.doPutVault(vaultRecord, { prior, ifAbsent, ifPresent })
       if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: vaultRecord, world: vaultRecord } }
-      const { ifAbsent, ifPresent } = putOpts
       const found = foundVaultRowOf(ante, vaultRecord)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok)) }
       if (found === null) { throw Refuse.staleWrite(SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok), null) }
       if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.vaultGone(found) }
       if (found.am === 'x') { throw Refuse.staleWrite(found, found) }
       if (ifPresent === 'get') { return { ok: true, req_params, act: 'declined', val: found, world: found } }
-      throw Refuse.camped(found, found)
+      // A live row at `prior` that `repl` did not replace is of another life than the record.
+      if ((ifPresent === 'fail') || SX.isRowAt(found, prior)) { throw Refuse.camped(found, found) }
+      throw Refuse.staleWrite(found, found)
     } catch (err) { throw refusalOf(err, 'putVault', req_params) }
   }
 
   /** Non-throwing form of {@link putVault}. */
-  async tryPutVault(record: VaultRecord, opts: PutVaultOpts) { return answerOf(() => this.putVault(record, opts)) }
+  async tryPutVault(record: VaultRecord, opts: PutOpts) { return answerOf(() => this.putVault(record, opts)) }
 
   /** Puts a box under a vault live at its `vault_tok`, as `opts` allow. */
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> {
     const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
       const boxRecord = SX.boxRecord.parse(record)
-      const putOpts = SX.putOpts.parse(opts)
-      SX.nextSeq.parse({ record: boxRecord, prior: putOpts.prior })
+      const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
+      SX.nextSeq.parse({ record: boxRecord, prior })
       const recordBytes = jsonBytes(boxRecord)
       if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
-      const { isWritten, ante, vault } = await this.doPutBox(boxRecord, putOpts)
+      const { isWritten, ante, vault } = await this.doPutBox(boxRecord, { prior, ifAbsent, ifPresent })
       const world = liveVaultOf(vault, boxRecord)
       if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: boxRecord, world } }
-      const { ifAbsent, ifPresent } = putOpts
       const found = foundBoxRowOf(ante, boxRecord)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.absentBox(world, null) }
       if (found === null) { throw Refuse.staleWrite(world, null) }
       if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.absentBox(world, found) }
       if (found.am === 'x') { throw Refuse.staleWrite(world, found) }
       if (ifPresent === 'get') { return { ok: true, req_params, act: 'declined', val: found, world } }
-      if (ifPresent === 'fail') { throw Refuse.camped(world, found) }
+      // A live row at `prior` that `repl` did not replace is of another life than the record.
+      if ((ifPresent === 'fail') || SX.isRowAt(found, prior)) { throw Refuse.camped(world, found) }
       throw Refuse.staleWrite(world, found)
     } catch (err) { throw refusalOf(err, 'putBox', req_params) }
   }
@@ -309,69 +310,66 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryPutBox(record: BoxRecord, opts: PutOpts) { return answerOf(() => this.putBox(record, opts)) }
   // --
 
-  // == [Gate verbs]: replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey, #gateRowOf, #putMovedGate
+  // == [Gate verbs]: replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey
 
-  /** Lays the new passphrase wayin on the vault row at this revision, leaving its passkey wayin as stored. */
-  async replacePassphrase(params: ReplacePassphraseParams): Promise<GoodAnswer<VaultRecord, 'replaced'>> {
-    const req_params = SX.reqParamsOf(params)
+  /** Puts `record`, the vault row at `opts.prior` with a new passphrase wayin and its `gate_epoch` one up. */
+  async replacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'replaced'>> {
+    const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
-      const asked = SX.replacePassphraseParams.parse(params)
-      const stored = await this.#gateRowOf(asked)
-      const record = movedGateOf(stored, { passphrase_wayin: asked.gate.passphrase_wayin })
-      await this.#putMovedGate(record, stored)
-      return { ok: true, req_params, act: 'replaced', val: record, world: record }
+      const vaultRecord = SX.vaultRecord.parse(record)
+      const { prior } = SX.gateVerbOpts.parse(opts)
+      const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
+      if (! SX.isRowAt(stored, prior)) { throw Refuse.staleWrite(stored, stored) }
+      if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
+      if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
+      if (! isEqual(vaultRecord.gate.passkey_wayin, stored.gate.passkey_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
+      await this.putVault(vaultRecord, { prior, ifAbsent: 'fail', ifPresent: 'repl' })
+      return { ok: true, req_params, act: 'replaced', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'replacePassphrase', req_params) }
   }
 
   /** Non-throwing form of {@link replacePassphrase}. */
-  async tryReplacePassphrase(params: ReplacePassphraseParams) { return answerOf(() => this.replacePassphrase(params)) }
+  async tryReplacePassphrase(record: VaultRecord, opts: GateVerbOpts) { return answerOf(() => this.replacePassphrase(record, opts)) }
 
-  /** Lays a passkey wayin on a vault row with none. */
-  async addPasskey(params: AddPasskeyParams): Promise<GoodAnswer<VaultRecord, 'added'>> {
-    const req_params = SX.reqParamsOf(params)
+  /** Puts `record`, the vault row at `opts.prior`, which has no passkey wayin, with one laid on and its `gate_epoch` one up. */
+  async addPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'added'>> {
+    const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
-      const asked = SX.passkeyAddParams.parse(params)
-      const stored = await this.#gateRowOf(asked)
+      const vaultRecord = SX.passkeyAddRecord.parse(record)
+      const { prior } = SX.gateVerbOpts.parse(opts)
+      const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
+      if (! SX.isRowAt(stored, prior)) { throw Refuse.staleWrite(stored, stored) }
+      if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
       if (stored.gate.passkey_wayin !== null) { throw Refuse.camped(stored, stored) }
-      const record = movedGateOf(stored, { passkey_wayin: asked.gate.passkey_wayin })
-      await this.#putMovedGate(record, stored)
-      return { ok: true, req_params, act: 'added', val: record, world: record }
+      if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
+      if (! isEqual(vaultRecord.gate.passphrase_wayin, stored.gate.passphrase_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
+      await this.putVault(vaultRecord, { prior, ifAbsent: 'fail', ifPresent: 'repl' })
+      return { ok: true, req_params, act: 'added', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'addPasskey', req_params) }
   }
 
   /** Non-throwing form of {@link addPasskey}. */
-  async tryAddPasskey(params: AddPasskeyParams) { return answerOf(() => this.addPasskey(params)) }
+  async tryAddPasskey(record: VaultRecord, opts: GateVerbOpts) { return answerOf(() => this.addPasskey(record, opts)) }
 
-  /** Removes the passkey wayin from the vault row; one with none answers as stored. */
-  async revokePasskey(params: RevokePasskeyParams): Promise<GoodAnswer<VaultRecord, 'revoked'>> {
-    const req_params = SX.reqParamsOf(params)
+  /** Puts `record`, the vault row at `opts.prior` with no passkey wayin and its `gate_epoch` one up; a row with none answers as stored. */
+  async revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked'>> {
+    const req_params = SX.reqParamsOf({ ...record, ...opts })
     try {
-      const stored = await this.#gateRowOf(SX.revokePasskeyParams.parse(params))
+      const vaultRecord = SX.passkeyRevokeRecord.parse(record)
+      const { prior } = SX.gateVerbOpts.parse(opts)
+      const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
+      if (! SX.isRowAt(stored, prior)) { throw Refuse.staleWrite(stored, stored) }
+      if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
       if (stored.gate.passkey_wayin === null) { return { ok: true, req_params, act: 'revoked', val: stored, world: stored } }
-      const record = movedGateOf(stored, { passkey_wayin: null })
-      await this.#putMovedGate(record, stored)
-      return { ok: true, req_params, act: 'revoked', val: record, world: record }
+      if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
+      if (! isEqual(vaultRecord.gate.passphrase_wayin, stored.gate.passphrase_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
+      await this.putVault(vaultRecord, { prior, ifAbsent: 'fail', ifPresent: 'repl' })
+      return { ok: true, req_params, act: 'revoked', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'revokePasskey', req_params) }
   }
 
   /** Non-throwing form of {@link revokePasskey}. */
-  async tryRevokePasskey(params: RevokePasskeyParams) { return answerOf(() => this.revokePasskey(params)) }
-
-  /** The vault row a gate verb moves: live in this life, at the revision and registration `asked` names. */
-  async #gateRowOf(asked: VaultSparse): Promise<VaultRecord> {
-    const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(asked)), asked)
-    if (! SX.isRowAt(stored, asked)) { throw Refuse.staleWrite(stored, stored) }
-    if (stored.registered_at !== asked.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
-    return stored
-  }
-
-  /** Puts the moved gate's `record` over the row it was made from. */
-  async #putMovedGate(record: VaultRecord, stored: VaultRecord): Promise<void> {
-    const { isWritten, ante } = await this.doPutVault(record, { prior: SX.revisionOf(stored), ifAbsent: 'fail', ifPresent: 'repl' })
-    if (isWritten) { return }
-    const found = liveVaultOf(ante, record)
-    throw Refuse.staleWrite(found, found)
-  }
+  async tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts) { return answerOf(() => this.revokePasskey(record, opts)) }
   // --
 
   // == [Dels]: delBox, tryDelBox, #answerDelBoxVoid, #answerDelBoxGone, #answerDelBoxRecord, delVault, tryDelVault, #answerDelVaultVoid, #answerDelVaultGone, #answerDelVaultRecord, tidyGone, tryTidyGone
@@ -381,9 +379,9 @@ export abstract class AdapterVaultDB implements VaultDB {
     const req_params = SX.reqParamsOf({ ...tombstone, ...opts })
     try {
       const boxTombstone = SX.boxTombstone.parse(tombstone)
-      const delOpts = SX.delOpts.parse(opts)
-      SX.nextSeq.parse({ record: boxTombstone, prior: delOpts.prior })
-      const { isWritten, ante, vault } = await this.doDelBox(boxTombstone, delOpts)
+      const { prior } = SX.delOpts.parse(opts)
+      SX.nextSeq.parse({ record: boxTombstone, prior })
+      const { isWritten, ante, vault } = await this.doDelBox(boxTombstone, { prior })
       const world = liveVaultOf(vault, boxTombstone)
       if (isWritten) { return { ok: true, req_params, act: 'deleted', val: boxTombstone, world } }
       const found = foundBoxRowOf(ante, boxTombstone)
@@ -416,9 +414,9 @@ export abstract class AdapterVaultDB implements VaultDB {
     const req_params = SX.reqParamsOf({ ...tombstone, ...opts })
     try {
       const vaultTombstone = SX.vaultTombstone.parse(tombstone)
-      const delOpts = SX.delOpts.parse(opts)
-      SX.nextSeq.parse({ record: vaultTombstone, prior: delOpts.prior })
-      const { isWritten, ante } = await this.doDelVault(vaultTombstone, delOpts)
+      const { prior } = SX.delOpts.parse(opts)
+      SX.nextSeq.parse({ record: vaultTombstone, prior })
+      const { isWritten, ante } = await this.doDelVault(vaultTombstone, { prior })
       if (isWritten) { return { ok: true, req_params, act: 'deleted', val: vaultTombstone, world: vaultTombstone } }
       const found = foundVaultRowOf(ante, vaultTombstone)
       if (found === null) { return this.#answerDelVaultVoid(vaultTombstone, req_params) }
@@ -503,7 +501,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // --
 }
 
-// == [Helpers]: refusalOf, RowOfOtherAddress, isRowFound, foundVaultRowOf, foundBoxRowOf, listedRowOf, liveVaultOf, movedGateOf, listedBoxesOf, writeActOf, jsonBytes
+// == [Helpers]: refusalOf, RowOfOtherAddress, isRowFound, foundVaultRowOf, foundBoxRowOf, listedRowOf, liveVaultOf, listedBoxesOf, writeActOf, jsonBytes
 
 /** The refusal a verb's throw stands for: a refusal as it came, else `storage_unavailable`. */
 const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultError => {
@@ -552,13 +550,6 @@ const liveVaultOf = (raw: unknown, asked: VaultQuery): VaultRecord => {
   if (found.am === 'x') { throw Refuse.vaultGone(found) }
   return found
 }
-
-/** The next revision of `stored`, `wayin` laid on its gate and its `gate_epoch` moved up. */
-const movedGateOf = (stored: VaultRecord, wayin: Partial<Gate>): VaultRecord => ({
-  ...stored,
-  ...SX.nextRevisionOf(stored, nowMillis()),
-  gate: { ...stored.gate, ...wayin, gate_epoch: stored.gate.gate_epoch + 1 },
-})
 
 const listedBoxesOf = ({ vault_tok, ...scope }: VaultQuery, rows: RowOfBox[]): BoxesListed => {
   const listed: BoxesListed = { boxes: [], damaged_rows: [] }

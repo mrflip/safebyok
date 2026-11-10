@@ -205,6 +205,9 @@ export const OtherVaultTokAtBirth = "Storage delivered a record from a different
 /** Why a record delivered under one scope that names another is not adopted. */
 export const RecordOfOtherScope = "Storage delivered a misnamed record. This should not happen: report this as a bug."
 
+/** Why a good answer whose record differs from what was sent in scope, life or revision is not adopted. */
+export const AnswerNotAsSent = "Storage answered with a record other than the one it was asked about. This should not happen: report this as a bug."
+
 /** Why a pair of shapes no row of the reconcile table names is refused: a bug. */
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
@@ -369,7 +372,7 @@ export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed: c
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed: check your package and build settings."
 // --
 
-// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, boxTooLarge, VaultFull, StorageFull, SeqNotNext, deviceDBFailed, thrownNamed
+// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, GateEpochNotNext, OtherWayinMoved, boxTooLarge, VaultFull, StorageFull, SeqNotNext, deviceDBFailed, thrownNamed
 
 /** A well-formed row out of storage, whose own `fieldnames` are not the address it was asked for at. */
 export const rowOfOtherAddress = (fieldnames: readonly string[]): string => `The vault's storage answered with a row naming another ${fieldnames.join(' and ')} than the one asked for: the database or its storage adapter has filed it under the wrong address.`
@@ -397,6 +400,12 @@ export const gateIssue = (why: string): string => `This change of the gate was r
 
 /** Why a gate verb naming a registered_at the stored vault does not have is refused, as {@link gateIssue}'s `why`. */
 export const RegisteredAtNotStored = "its registered_at is not the stored one."
+
+/** Why a gate verb whose record does not move `gate_epoch` one up from the stored vault is refused, as {@link gateIssue}'s `why`. */
+export const GateEpochNotNext = "its gate_epoch is not one past the stored one."
+
+/** Why a gate verb whose record moves a wayin the verb leaves alone is refused, as {@link gateIssue}'s `why`. */
+export const OtherWayinMoved = "it moves a wayin this verb does not."
 
 /** A box record over the bytes its storage allows in one record. */
 export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): string => `That box weighs ${String(recordBytes)} bytes, over the ${String(maxRecordBytes)} its storage allows in one record.`

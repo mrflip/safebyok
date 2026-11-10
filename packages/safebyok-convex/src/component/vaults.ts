@@ -70,7 +70,7 @@ export const putVault = mutation({
   handler: async (ctx, { record, opts }) => {
     const anteDoc = await findVaultDoc(ctx.db, record)
     const ante = anteDoc?.vault ?? null
-    const isWritten = DB.isVaultPutAllowed(ante, opts)
+    const isWritten = DB.isVaultPutAllowed(ante, record, opts)
     if (isWritten) { await writeVaultDoc(ctx.db, anteDoc, record) }
     return { isWritten, ante }
   },
@@ -86,7 +86,7 @@ export const putBox = mutation({
     const life = lifeOf(record)
     const anteDoc = await findBoxDoc(ctx.db, life, record.boxlabel)
     const ante = anteDoc?.box ?? null
-    const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
+    const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, record, opts)
     if (! isWritten) { return { isWritten, ante, vault } }
     // Convex passes NaN as a number, and Math.min would carry it past the limit: no box count exceeds NaN.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)

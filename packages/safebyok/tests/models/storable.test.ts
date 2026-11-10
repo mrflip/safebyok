@@ -19,16 +19,19 @@ const builtBoxOf = (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Pr
 const followingPropsOf = (box: TestableBox) => ({ vault_tok: box.vault_tok, revision_tok: box.revision_tok, revision_seq: box.revision_seq, written_at: box.written_at })
 
 /** Script the VaultDB's next `del` pending until `release`, answering `tombstone`; `entered` resolves once the VaultDB has the call. The fake timers stay where they are: `vi.waitFor` would move them. */
-const pendingNextDel = (box: TestableBox, tombstone: ReturnType<typeof tombstoneBoxRecord>): { entered: Promise<void>, release: () => void } => {
+const pendingNextDel = (box: TestableBox): { entered: Promise<void>, release: () => void, sentTok: () => string | undefined } => {
   let release: (() => void) | undefined
-  const gate = new Promise<BoxAnswer>((resolve) => { release = () => { resolve(world.mw.answerOf(box.scope, tombstone)) } })
+  let sentTok: string | undefined
+  const gate = new Promise<void>((resolve) => { release = resolve })
   const entered = new Promise<void>((resolve) => {
-    world.mw.willDel(() => {
+    world.mw.willDel(async ({ tombstone }): Promise<BoxAnswer> => {
+      sentTok = tombstone.revision_tok
       resolve()
-      return gate
+      await gate
+      return world.mw.answerOf(box.scope, tombstone)
     })
   })
-  return { entered, release: () => { release?.() } }
+  return { entered, release: () => { release?.() }, sentTok: () => sentTok }
 }
 
 describe("cmpRevisions(ante, post)", () => {
@@ -142,13 +145,13 @@ describe("Storable own props", () => {
     it("follow the tombstone a del writes, once the VaultDB answers", async () => {
       const box = await builtBoxOf()
       world.mw.setNow(T0 + 500)
-      const { entered, release } = pendingNextDel(box, world.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2', written_at: T0 + 900 }))
+      const { entered, release, sentTok } = pendingNextDel(box)
       const deleting = box.del()
       await entered
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-a1', revision_seq: 1, written_at: T0 })
       release()
       await deleting
-      expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-x2', revision_seq: 2, written_at: T0 + 900 })
+      expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: sentTok(), revision_seq: 2, written_at: T0 + 500 })
     })
   })
 })
@@ -346,6 +349,14 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     TH.expectSyncRefusal(() => box.demandPuttable(Patch))
   })
 
+  it("demandPuttable takes a sparse record for a patch of both halves", async () => {
+    const box = await boxListingOf(world.mw).build(sparseBoxRecord())
+    const Both = { ...Patch, sidecar: { note: 'sent' } }
+    expect(box.demandPuttable(Both)).to.deep.include(Both)
+    world.mw.setLocked(true)
+    TH.expectSyncRefusal(() => box.demandPuttable(Both), 'vault_locked')
+  })
+
   it("demandPuttable under ifPresent 'fail' refuses a whole record, saying its data would be recycled", async () => {
     const box = await boxListingOf(world.mw).build(fullBoxRecord())
     const err = TH.expectSyncRefusal(() => box.demandPuttable({ ...fullBoxRecord() }, { ifPresent: 'fail' }))
@@ -366,11 +377,11 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
   it("ensurePuttable refreshes and demands nothing: it resolves while locked, where put refuses", async () => {
     const box = await builtBoxOf()
     world.mw.setLocked(true)
-    await expect(box.ensurePuttable()).resolves.to.eq(box)
+    await expect(box.ensurePuttable({ whisper: { apiKey: 'sk-test-0000' } })).resolves.to.eq(box)
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
   })
 
-  it("put ensures once, before its seal, and a bad patch heard after that ensure puts nothing", async () => {
+  it("put ensures once, before its seal, and a bad patch puts nothing", async () => {
     const box = await builtBoxOf()
     const putGuard = vi.spyOn(Box.prototype, 'ensurePuttable')
     await TH.expectRefusal(box.put({}))

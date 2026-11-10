@@ -65,9 +65,9 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   /** Seals a new box and puts it where no live record stands, answering the box listed. */
   async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box> {
-    const filled = VX.boxCreateOpts.parse(opts)
+    const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis } = VX.boxCreateOpts.parse(opts)
     const dna = boxDna.parse(input)
-    return this.puttable(input, filled).put(dna, filled)
+    return this.puttable(input, { ifAbsent }).put(dna, { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis })
   }
 
   /** Non-throwing form of {@link create}. */

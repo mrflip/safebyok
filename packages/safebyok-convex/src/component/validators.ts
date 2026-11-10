@@ -45,7 +45,7 @@ export const boxRecord = zodToConvex(DB.boxRecord) as unknown as Validator<DB.Bo
 export const boxTombstone = zodToConvex(DB.boxTombstone)
 
 /** A put's options, their defaults filled in. */
-export const putOptsGiven = zodOutputToConvex(DB.putOpts)
+export const putOptsGiven = zodToConvex(DB.putOptsGiven)
 
 /** A del's options. */
 export const delOpts = zodToConvex(DB.delOpts)

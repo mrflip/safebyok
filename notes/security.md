@@ -47,6 +47,22 @@ added or folded into through the subagent, and no other entry changes.
   (3) A tombstone crossing the making of a gate change's new lease refuses as the lease attaches, and leaves no row.
   (4) A tombstone crossing a birth's lease refuses as the lease attaches, and leaves no row.
   (5) A sweep crossing a birth's lease refuses at `demandAttachable`, with the row stored and no lease cached.
+
+* 2026-11-10 (gate_mint, branch `20261110-gate_mint`): **The device, not the storage adapter, mints the revision of `replacePassphrase`, `addPasskey` and `revokePasskey`.**
+  `VaultListing` builds the whole next `VaultRecord` (a new `revision_tok`, `revision_seq` one up, `written_at` from the device clock, `gate_epoch` one up, the wayin laid on)
+  and sends it with `{ prior }`. `AdapterVaultDB` writes that record after checking only that it parses, its `revision_seq` is next after `prior`, the stored row is live in this life
+  at `prior` with `registered_at` unchanged, `gate_epoch` is one up from stored, and only that verb's wayin moved. So a device can choose the `revision_tok` and `written_at`
+  of a gate-moving write, as it already can for a put; storage no longer stamps them. Separately, `Listing.deliver` now refuses a good storage answer whose scope, life or
+  revision differs from what was sent. A declined put and a `del` over a tombstone answer what storage has, and `deliver` pins only the scope; `revokePasskey` over a vault
+  with no passkey answers the stored row and pins only the scope.
+  Amended 2026-11-10 (gate_mint): **`putVault` replaces a live vault row, gate included, without the gate verbs' checks.** `VaultDB.putVault` takes the same `PutOpts` as `putBox`
+  (`ifPresent` 'repl' by default, 'fail' or 'get'; it once refused 'repl', so that a live vault row moved only by a gate verb). A host calling `putVault(record, { prior })` directly
+  over a live vault at `prior` replaces its gate, `gate_epoch`, `registered_at` and wayins with any that parse, but not its `vault_tok`: `isVaultPutAllowed` refuses a live row of another
+  life as `camped`, writing nothing (`isBoxPutAllowed` likewise by `box_tok`), so a new life is born only over a tombstone or nothing. Otherwise only the `prior` revision check applies, and a
+  stale `prior` answers `stale_write`. The gate verbs run the checks above and then put through `putVault` with `{ prior, ifAbsent: 'fail', ifPresent: 'repl' }`, which they supply themselves
+  (`gateVerbOpts` and `delOpts` refuse an offered `ifAbsent` or `ifPresent` as `bad_option`); the device's own code (`VaultListing`) changes the gate only through them.
+  The host is outside the threat model (it can already delete its user's vault) and the vaultDB holds only ciphertext.
+
 * 2026-11-09 (react_forms, branch `20261109-react_forms`): **`safebyok-react` hands a passkey answer to `gating.attempt` at once, whether or not the dialog or button is shown.**
   `PasskeyUnlockButton` (`components/passkey-unlock-button.tsx`) and the add-passkey modal (`modals/add-passkey-modal.tsx`) no longer zero, untried, an answer (`prfBytes`)
   that comes back while a React `<Activity>` or Suspense boundary hides them; the code that did so (`useWhenShown`, `when-shown.ts`) is removed. The Coach's rule: a valid request goes through if it was authorized at the start of its critical
