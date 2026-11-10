@@ -138,7 +138,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   async tryAddPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'added'>> {
     return await answerOf('addPasskey', DB.reqParamsOf({ ...record, ...opts }), async () => {
-      const answer = await this.#told(VaultOperations.addPasskey, 'safebyokAddPasskey', { record: DB.vaultRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
+      const answer = await this.#told(VaultOperations.addPasskey, 'safebyokAddPasskey', { record: DB.passkeyAddRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
       return DB.addPasskeyAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -148,7 +148,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   async tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked'>> {
     return await answerOf('revokePasskey', DB.reqParamsOf({ ...record, ...opts }), async () => {
-      const answer = await this.#told(VaultOperations.revokePasskey, 'safebyokRevokePasskey', { record: DB.vaultRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
+      const answer = await this.#told(VaultOperations.revokePasskey, 'safebyokRevokePasskey', { record: DB.passkeyRevokeRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
       return DB.revokePasskeyAnswer.parse(rowAnswerOf(answer))
     })
   }
