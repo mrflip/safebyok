@@ -2,6 +2,7 @@
 
 import { omit } from 'es-toolkit'
 import { describe, expect, it } from 'vitest'
+import { parseLogger } from '../../src/helpers/logger'
 import * as TH from '../test-helpers'
 import { Sidecar, Whisper, boxlabel, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, delTyping, storedVaultRecord, useVaultWorlds } from '../test-helpers/vault-world'
 
@@ -55,19 +56,23 @@ describe("vault.hello: the host's call for the list and the pushes", () => {
   })
 
   it("refuses for a vault deleted elsewhere, listing nothing", async () => {
-    const { openNextSession, vault } = await makeWorldWithBox()
+    const spy = TH.spyLogger()
+    const { openNextSession, vault } = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
     const next = await openNextSession()
     await delTyping(vault)
     await TH.expectRefusal(next.hello())
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
     expect(next.isPresent).to.be.false
     expect(next.boxListing.things).to.deep.equal([])
   })
 
   it("passes a listing's failure up, and the next hello lists the boxes", async () => {
-    const { openNextSession, tryListBoxes } = await makeWorldWithBox()
+    const spy = TH.spyLogger()
+    const { openNextSession, tryListBoxes } = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
     const next = await openNextSession()
     tryListBoxes.mockRejectedValueOnce(new Error('the wire is down'))
     const refusal = await TH.expectRefusal(next.hello(), 'unexpected_error')
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
     expect(refusal.cause).to.have.property('message', 'the wire is down')
     await expect(next.hello()).resolves.to.eq(next)
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
@@ -233,10 +238,12 @@ describe("a row no listing can set aside", () => {
   ] as const
 
   it.each(Unlistable)("fails the whole of vault.hello where one %s", async (_blurb, rowOf, refusalkind) => {
-    const { openNextSession, boxrows } = await makeWorldWithBox()
+    const spy = TH.spyLogger()
+    const { openNextSession, boxrows } = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
     boxrows.set(boxlabel, rowOf(boxrows.get(boxlabel) as object))
     const next = await openNextSession()
     await TH.expectRefusal(next.hello(), refusalkind)
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
   })
 })
 

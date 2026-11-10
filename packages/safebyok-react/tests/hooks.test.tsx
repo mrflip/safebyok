@@ -56,10 +56,12 @@ describe("useVault and useVaultSnapshot", () => {
 
   it("read waiting while the bank's hello is refused, its snapshot still made", async () => {
     const world = TH.makeBankWorld()
+    const spy = TH.spyLogger()
     world.vaultDB._cheat_refuseGets('storage_unavailable')
-    render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /></BankProvider>)
+    render(<BankProvider {...TH.providerPropsOf(world, { logger: spy.logger })}><TH.ShowsVault /></BankProvider>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })
     expect(shown('vault')).to.eq('waiting none')
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
   })
 
   it("read waiting while the bank's hello is still on its way", async () => {
@@ -79,12 +81,14 @@ describe("useVault and useVaultSnapshot", () => {
     await seeding.hello()
     await seeding.ensureVault(TH.VaultScopeGiven)
     seeding.sweep()
-    render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsMain /></BankProvider>)
+    const spy = TH.spyLogger()
+    render(<BankProvider {...TH.providerPropsOf(world, { logger: spy.logger })}><TH.ShowsVault /><ShowsMain /></BankProvider>)
     await waitFor(() => { expect(screen.getByTestId("main").textContent).to.eq('present') })
     const cause = new VaultError('identity_revoked', 'signed out')
     await act(async () => { await TH.seenBanks[0]?.vacate({ cause }) })
     expect(screen.getByTestId("main").textContent).to.eq('spent identity_revoked')
     expect(shown('vault')).to.eq('spent none')
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
   })
 
   it("read a vault deleted elsewhere as unborn", async () => {

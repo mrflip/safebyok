@@ -338,7 +338,8 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
   })
 
   it("disables the bank at once, before it forgets its rows: every call refuses, and the snapshot reads refused with the cause", async () => {
-    const { world, bank } = await makeBankWithVault()
+    const spy = TH.spyLogger()
+    const { world, bank } = await makeBankWithVault(makeBankWorld(), { logger: spy.logger })
     const listing = TH.pendingNextCall(world.deviceDB, 'tryListLeases')
     const cause = new VaultError('identity_revoked', 'signed out')
     const vacating = bank.vacate({ cause })
@@ -352,6 +353,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     listing.release()
     await vacating
     expect(world.leaseRows()).to.deep.equal([])
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
   })
 
   it("tells the host nothing past the disable but its vacate's refusals, a vault's own forget going to the platform", async () => {
@@ -519,18 +521,21 @@ describe("a bank past a vacate", () => {
   type Vacating = Awaited<ReturnType<typeof makeBankWithVault>>
 
   it.each([
-    ['a plain vacate', async ({ bank }: Vacating) => { await bank.vacate() }],
-    ['identity_revoked', async ({ world, vault }: Vacating) => {
+    ['a plain vacate', [], async ({ bank }: Vacating) => { await bank.vacate() }],
+    ['identity_revoked', ['error'], async ({ world, vault }: Vacating) => {
       world.vaultDB._cheat_refuseGets('identity_revoked')
       await TH.expectRefusal(vault.fetch(), 'identity_revoked')
       world.vaultDB._cheat_refuseGets(null)
     }],
-  ] as const)("refuses ensureVault, vaultAt and hello, and opens no gating, after %s, and the next bank answers the stored vault with nobody asked", async (_label, vacating) => {
+  ] as const)("refuses ensureVault, vaultAt and hello, and opens no gating, after %s, and the next bank answers the stored vault with nobody asked", async (_label, loggedLevels, vacating) => {
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const world = makeBankWorld()
-    const { bank, vault } = await makeBankWithVault(world, { requestCleartext })
+    const spy = TH.spyLogger()
+    const { bank, vault } = await makeBankWithVault(world, { requestCleartext, logger: spy.logger })
     requestCleartext.mockClear()
     await vacating({ world, bank, vault })
+    await TH.eventually(() => spy.calls.length >= loggedLevels.length)
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(loggedLevels)
     await expect(bank.ensureVault(VaultScopeGiven)).rejects.toThrow(Phrases.BankLetGo)
     expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(Phrases.BankLetGo)
     await expect(bank.hello()).rejects.toThrow(Phrases.BankLetGo)

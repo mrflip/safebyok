@@ -3,6 +3,7 @@
  */
 
 import { afterEach, describe, expect, it } from 'vitest'
+import type { VaultLogger } from '../../src/helpers/logger'
 import type { VaultError } from '../../src/refusals/errors'
 import type { Box } from '../../src/models/box'
 import type { Gatingkind } from '../../src/shapes/shapes-enums'
@@ -90,10 +91,10 @@ const makeDialog = () => {
 // --
 
 /** A bank past its `hello` with the vault of `VaultScopeGiven` built and unlocked, and the dialog that did it, cleared. */
-const buildHost = async () => {
+const buildHost = async (logger?: VaultLogger) => {
   const world = makeBankWorld()
   const dialog = makeDialog()
-  const bank = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
+  const bank = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews, ...(logger && { logger }) })
   await bank.hello()
   const vault = await bank.ensureVault(VaultScopeGiven)
   dialog.shown.length = 0
@@ -363,7 +364,8 @@ describe("the proof", () => {
   })
 
   it("the VaultDB goes out of reach: an unlocked vault keeps its lease, a refused hello changes nothing on screen, and the next one recovers", async () => {
-    const { world, bank, vault } = await buildHost()
+    const spy = TH.spyLogger()
+    const { world, bank, vault } = await buildHost(spy.logger)
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
 
@@ -373,6 +375,7 @@ describe("the proof", () => {
     await TH.expectRefusal(vault.ensureUnlocked(), 'storage_unavailable')
     expect(vault.isUnlocked).to.be.true
     await TH.expectRefusal(bank.hello(), 'storage_unavailable')
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
     bankUi.expectRenders([])
     expect(bank.snapshot.err).to.be.null
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)

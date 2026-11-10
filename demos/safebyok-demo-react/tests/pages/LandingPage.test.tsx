@@ -8,11 +8,12 @@ import * as TH from '../test-helpers'
 
 // The pages derive through the browser's Argon2id: 64 MiB for every passphrase typed, near a
 // second each here. What these tests click through is the page, not the deriver (the core's
-// tests keep to that), so the cheap test deriver stands in.
+// tests keep to that), so the cheap test deriver stands in, and the quiet logger with it: it
+// leaves out the notice of a `test_` deriver's label, which the console would otherwise get.
 vi.mock('safebyok/browser', async (importOriginal) => {
   const browser = await importOriginal<typeof import('safebyok/browser')>()
-  const { testDeriver } = await import('safebyok/testing')
-  return { ...browser, browserOpts: (opts: { dbName: string }) => ({ ...browser.browserOpts(opts), keyDeriver: testDeriver }) }
+  const { quietLogger, testDeriver } = await import('safebyok/testing')
+  return { ...browser, browserOpts: (opts: { dbName: string }) => ({ ...browser.browserOpts(opts), keyDeriver: testDeriver, logger: quietLogger }) }
 })
 
 afterEach(() => {
