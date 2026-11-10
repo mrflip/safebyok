@@ -10,9 +10,9 @@ import { type Outcome, demandGood, good, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
 import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bankedVaultScope } from '../shapes/shapes-core'
+import * as SX from '../shapes/shapes-storage'
 import type { LeaseDated } from '../shapes/shapes-storage'
 import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gateish'
-import type { Box } from './box'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BadNewsHandler, BankAnnouncement, BankEvent, BankOpts, BankSnapshot, BankStage, GuardedLifecycleHandler, LifecycleHandler, VacateStory } from '../shapes/shapes-vaultish'
 import type { DeviceDB } from '../storage/device-db'
@@ -251,7 +251,7 @@ export class Bank {
   }
   // --
 
-  // == [Vaults]: vaultAt, ensureVault, tryEnsureVault, probe, tryProbe
+  // == [Vaults]: vaultAt, ensureVault, tryEnsureVault, tryProbe, probe
 
   /** The vault listed for `scope`, a tombstone among them, or null. */
   vaultAt(scope: BankedVaultScope): Vault | null {
@@ -270,22 +270,27 @@ export class Bank {
   /** Non-throwing form of {@link ensureVault}. */
   tryEnsureVault(scope: BankedVaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(scope)) }
 
-  /** Trials this bank's whole path at startup, so storage's complaints come up front: replaces one box, fetches it back and opens it, asking the user if the vault needs it. */
-  async probe(asked: VX.ProbeAsked = {}, opts: VX.ProbeOpts = {}): Promise<Box> {
+  /** Trials this bank's storage end to end at startup and reports each step, asking the user if the vault needs it: replaces one box, fetches it back and opens it, surfacing nothing it held. */
+  tryProbe(asked: VX.ProbeAsked = {}, opts: VX.ProbeOpts = {}): Promise<Outcome<VX.ProbeReport>> { return outcomeOf(() => this.#probe(asked, opts)) }
+
+  async #probe(asked: VX.ProbeAsked, opts: VX.ProbeOpts): Promise<VX.ProbeReport> {
     const { vaultlabel, boxlabel, whisper, sidecar } = VX.probeAsked.parse(asked)
-    const { maxRefreshMillis } = VX.probeOpts.parse(opts)
+    const { maxMillisSinceRefresh } = VX.probeOpts.parse(opts)
     const vault = await this.ensureVault({ vaultlabel })
     await vault.ensureUnlocked()
-    const timely = { maxMillisSinceRefresh: maxRefreshMillis, maxWorldMillis: maxRefreshMillis }
+    const horizons = { maxMillisSinceRefresh, maxWorldMillis: maxMillisSinceRefresh }
+    await vault.hydrate(horizons)
     // A device that has not listed the box would otherwise put over it as if none stood there.
-    await vault.getBox(boxlabel, { ...timely, ifAbsent: 'nil' })
-    const box = await vault.putBox({ boxlabel, whisper, sidecar }, { ...timely, ifAbsent: 'add', ifPresent: 'repl' })
-    await box.extractWhisper({ maxMillisSinceRefresh: 0 })
-    return box
+    const found = await vault.getBox(boxlabel, { ...horizons, ifAbsent: 'nil' })
+    const timely = { box: found?.sparse ?? null, vault: vault.sparse, boxRefreshedAt: found?.refreshedAt ?? null, vaultRefreshedAt: vault.refreshedAt, timestamp: nowMillis() }
+    const boxscope = { ...vault.scope, boxlabel }
+    const replacing = { ifAbsent: 'add', ifPresent: 'repl' } as const
+    const put = probeStepOf(await vault.boxListing.puttable(boxscope, replacing).putAnswered({ whisper, sidecar }, { ...horizons, ...replacing }))
+    const { thing: box, answer } = await vault.boxListing.fetchAnswered(boxscope)
+    const fetch = probeStepOf(answer)
+    await box?.extractWhisper({ maxMillisSinceRefresh: Infinity })
+    return { timely, put, fetch, unseal: { ok: true, timestamp: nowMillis() } }
   }
-
-  /** Non-throwing form of {@link probe}. */
-  tryProbe(asked: VX.ProbeAsked = {}, opts: VX.ProbeOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.probe(asked, opts)) }
   // --
 
   // == [Snapshot]: remakeSnapshot, makeSnapshot
@@ -438,7 +443,12 @@ interface Handlers {
 const DefaultHandlers: Handlers = { onLifecycle: guardOnLifecycle(DefaultOnLifecycle), onBadNews: DefaultOnBadNews }
 // --
 
-// == [Helpers]: millisOf, checkSecureContext
+// == [Helpers]: millisOf, checkSecureContext, probeStepOf
+
+/** A storage verb's answer with no wrapped key or ciphertext left in it, and when it came back. */
+const probeStepOf = ({ act, req_params, val, world }: VX.ListingGoodAnswer<SX.BoxRecord, SX.BoxSparse>): VX.ProbeStep => (
+  { ok: true, act, req_params, val: SX.boxSparse.parse(val), world: SX.vaultSparse.parse(world), timestamp: nowMillis() }
+)
 
 // A host's Infinity minutes, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
 const millisOf = (minutes: number | undefined, fallback: number): number => (minutes === undefined ? fallback : Math.min(Math.round(minutes * MinuteMillis), ForeverMillis))

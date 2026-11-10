@@ -136,9 +136,10 @@ Easy to get wrong:
 
 ## Trying storage at startup
 
-`await bank.probe()` trials the whole path once: it replaces one box, `box1` in the vault `home`, fetches it back and opens it, so a missing grant or a blocked
-database refuses at startup, not at the user's first save. It asks the user if the vault is absent or locked. Each label, the whisper and the sidecar can be given, and
-`{ maxRefreshMillis }`, 1000 by default, sets how fresh the box's record must be apart from the bank's own refresh settings. The box stays, and counts toward the vault's `maxBoxes`.
+`await bank.tryProbe()` trials the whole path once: it replaces one box, `box1` in the vault `home`, fetches it back and opens it, so a missing grant or a blocked
+database shows up at startup, not at the user's first save. It answers an Outcome: on success, what each step found and when, with no whisper, ciphertext or wrapped key. It asks the
+user if the vault is absent or locked. Each label, the whisper and the sidecar can be given, and `{ maxMillisSinceRefresh }`, 1000 by default, sets how fresh the vault and box must be
+apart from the bank's own refresh settings. The box stays, and counts toward the vault's `maxBoxes`.
 
 ## Showing a whisper
 

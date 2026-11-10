@@ -8,7 +8,7 @@ import type { IfAbsent } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingOpts, ListingWorld, SlotFate, SparseBase, Thing } from '../shapes/shapes-vaultish'
+import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingGoodAnswer, ListingOpts, ListingWorld, SlotFate, SparseBase, Thing } from '../shapes/shapes-vaultish'
 import { disabledError, otherVaultTokAtBirth, putAnsweredNothing } from '../refusals/throwers'
 import * as Phrases from '../helpers/phrases'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
@@ -141,15 +141,23 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Storage verbs]: fetch, handleIfAbsent, put, del, delOver, each with its try form
+  // == [Storage verbs]: fetch, fetchAnswered, handleIfAbsent, put, putAnswered, del, delOver, each verb with its try form
 
   /** SLOPDOC: The instance under `scope` as it is now stored, built where none was listed. */
   async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> {
+    const { thing } = await this.fetchAnswered(scope, opts)
+    return thing
+  }
+
+  /** {@link fetch}, with the vaultDB's own answer beside the instance. */
+  async fetchAnswered(scope: ScopeT, opts: FetchOpts = {}): Promise<{ thing: ThingT | null, answer: ListingGoodAnswer<RecordT, SparseT> }> {
     const { ifAbsent, maxWorldMillis } = VX.fetchOpts.parse(opts)
     const asked = this.scopeOf(scope)
     await this.ensureTimelyWorld(maxWorldMillis)
     this.demandEnabled()
-    return this.handleIfAbsent(await this.deliver(await this.tryGetRow(asked)), asked, ifAbsent)
+    const answer = await this.tryGetRow(asked)
+    const thing = this.handleIfAbsent(await this.deliver(answer), asked, ifAbsent)
+    return { thing, answer: answer as ListingGoodAnswer<RecordT, SparseT> }  // deliver has thrown a refused one
   }
 
   /** Non-throwing form of {@link fetch}. */
@@ -166,12 +174,19 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Puts `record` over the revision `prior`, answering the instance listed. */
   async put(record: RecordT, opts: PutOpts): Promise<ThingT> {
+    const { thing } = await this.putAnswered(record, opts)
+    return thing
+  }
+
+  /** {@link put}, with the vaultDB's own answer beside the instance. */
+  async putAnswered(record: RecordT, opts: PutOpts): Promise<{ thing: ThingT, answer: ListingGoodAnswer<RecordT, SparseT> }> {
     const checked = this.recordOf(record)
     const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
     this.demandEnabled()
-    const thing = await this.deliver(await this.tryPutRow(checked, { prior, ifAbsent, ifPresent }))
+    const answer = await this.tryPutRow(checked, { prior, ifAbsent, ifPresent })
+    const thing = await this.deliver(answer)
     if (thing === null) { throw putAnsweredNothing() }
-    return thing
+    return { thing, answer: answer as ListingGoodAnswer<RecordT, SparseT> }  // deliver has thrown a refused one
   }
 
   /** Non-throwing form of {@link put}. */

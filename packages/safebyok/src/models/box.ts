@@ -9,7 +9,7 @@ import type { Sidecar, Boxscope, Whisper } from '../shapes/shapes-core'
 import type { BoxExposure } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxExposedPatch, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
+import { type BoxExposedPatch, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type Fetched, type ListingGoodAnswer, type TimelyOpts } from '../shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../shapes/shapes-storage'
 import { stableJsonify } from '../helpers/stable-jsonify'
 import { absentBoxError, notExposedError, undecodedWhisper } from '../refusals/throwers'
@@ -187,13 +187,19 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
    * the one stored, so a sparse box is fetched first.
    */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
+    await this.putAnswered(patch, opts)
+    return this
+  }
+
+  /** {@link put}, answering with the vaultDB's own answer. */
+  async putAnswered(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<ListingGoodAnswer<BoxRecord, BoxSparse>> {
     const { ifAbsent, ifPresent, ...timely } = VX.boxPutOpts.parse(opts)
     await this.ensurePuttable(timely)
     const given = this.demandPuttable(patch, { ifPresent })
     const { record, prior } = await this.#edit(given)
     this.demandPuttable(patch, { ifPresent })
-    await this.listing.put(record, { prior, ifAbsent, ifPresent })
-    return this
+    const { answer } = await this.listing.putAnswered(record, { prior, ifAbsent, ifPresent })
+    return answer
   }
 
   /** Non-throwing form of {@link put}. */
