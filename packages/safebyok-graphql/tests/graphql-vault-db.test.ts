@@ -14,6 +14,11 @@ describe("GraphQLVaultDB over the typed schema", () => {
     makeVaultDB:          async (opts) => await TH.makeVaultDB(opts),
     makeCappedVaultDB:    async (maxBoxes) => await TH.makeVaultDB({}, maxBoxes),
     makeTwin:             TH.makeTwin,
+    makeVaultDBFor:       async () => {
+      await TH.emptyTables()
+      const schema = TH.schemaOver(await TH.serverOver())
+      return (user_id) => TH.browserOver(schema, TH.signedInAs(user_id))
+    },
     _cheat_rowsOf:        () => TH.rowsOf(),
     _cheat_failNextCall:  (vaultDB) => { vaultDB.failNext() },
     _cheat_adapterOf:       TH.adapterOf,

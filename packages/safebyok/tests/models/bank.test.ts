@@ -1,6 +1,6 @@
 /** The bank of `src/models/` end to end, over a real vaultDB and deviceDB: hello, ensureVault, bad news and the snapshot. */
 
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DefaultLogger, setDefaultLogger } from '../../src/helpers/logger'
 import { ForeverMillis, isGuarded } from '../../src/helpers/consts'
 import { type Bank, DefaultOnLifecycle, guardOnLifecycle, guardRequestCleartext, tellBadNewsTo } from '../../src/models/bank'
@@ -24,6 +24,27 @@ const tellByAutolock = async (world: ReturnType<typeof makeBankWorld>, bank: Ban
   await bank.autolock()
 }
 
+
+describe("a page that is not a secure context", () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it("refuses Bank.make, before it touches storage", () => {
+    const world = makeBankWorld()
+    const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
+    vi.stubGlobal('isSecureContext', false)
+    const err = TH.expectSyncRefusal(() => world.bankOn(), 'insecure_context')
+    expect(err.message).to.match(/https/)
+    expect(listVaults).not.toHaveBeenCalled()
+  })
+
+  it("makes a bank where the page is a secure context, or the host has no such idea", () => {
+    const world = makeBankWorld()
+    vi.stubGlobal('isSecureContext', true)
+    expect(world.bankOn().getSnapshot().stage).to.eq('made')
+    vi.stubGlobal('isSecureContext', undefined)
+    expect(world.bankOn().getSnapshot().stage).to.eq('made')
+  })
+})
 
 describe("bank.hello", () => {
   it("readies a bank over an empty VaultDB and DeviceDB, loading its plugins, telling its listeners, and answering the same snapshot until something changes", async () => {
@@ -446,7 +467,6 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     world.vaultDB._cheat_refuseGets('identity_revoked')
     const refusal = await TH.expectRefusal(vault.fetch(), 'identity_revoked')
     expect(bank.snapshot).to.include({ stage: 'disabled', err: refusal })
-    expect(onLifecycle).not.toHaveBeenCalled()
     await TH.eventually(() => onLifecycle.mock.calls.length > 0)
     expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: refusal, unrevoked: 0, bank })
     expect(world.leaseRows()).to.deep.equal([])

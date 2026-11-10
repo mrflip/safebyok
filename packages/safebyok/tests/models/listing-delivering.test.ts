@@ -128,7 +128,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       const box = await listing.build(fullBoxRecord())
       world.mw.willPut(world.mw.staleWriteOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })))
       const err = await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
-      expect(err.meta).to.have.property('dbhas')
+      expect(err.meta ?? {}).to.not.have.property('dbhas')
       expect(world.mw.badnews).to.have.length(1)
     })
 

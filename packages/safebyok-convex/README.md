@@ -69,10 +69,10 @@ Hand `vaultDB` to the core, as its README's *A host* shows.
   `ConvexReactClient` you give `ConvexProvider`, so the vault shares its socket and its signed-in
   user. `safebyok-convex` imports nothing of React's.
 * **`api`** is `api.safebyok`, the functions above.
-* **`maxBoxes`**, optional, is a best-effort cap on the box rows in one vault, deleted boxes' tombstones
+* **`maxBoxes`**, optional, 100 if left out, is a best-effort cap on the box rows in one vault, deleted boxes' tombstones
   among them, under the component's own limit: a put past it refuses as `vault_full`. It is exact at
   moderate write rates; a strict cap would take concurrency machinery this package does not add.
-* **`maxRecordBytes`**, optional, as every vaultDB takes it, at most Convex's 1 MiB document.
+* **`maxRecordBytes`**, optional, as every vaultDB takes it: 5,600 bytes if left out, at most Convex's 1 MiB document.
 
 **Sign in first.** Open the vault once the Convex client is authenticated (in React, once
 `useConvexAuth()` says so): a call made before then refuses as `identity_revoked`.

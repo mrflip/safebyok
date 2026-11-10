@@ -64,6 +64,8 @@ export class Lease implements LeaseStamp {
       const checked = leaseRecord.safeParse(peeked)
       // The damaged row stands until the next lease is cached over it.
       if (! checked.success) { throw damagedLease() }
+      // Broken, as the to-do list says (*A cached lease newer than the vault in hand*): a row of a newer gate_epoch or another vault_tok may be another
+      // tab's good lease over a vault this one holds stale. It should refresh the vault; today it forgets the row.
       if (checked.data.gate_epoch !== epoch) {
         await friend.tryForgetLease()
         return null

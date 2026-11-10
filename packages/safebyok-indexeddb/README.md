@@ -27,7 +27,8 @@ Hand it to the core wherever a `VaultDB` is asked for.
 
 * **`dbName`** names the database, default `'safebyok'`; the rows go in `<dbName>:vaults-v001-001-001`, and a vault database of an older name is deleted unread. Two
   `IdbVaultDB`s made with one `dbName`, in one tab or two, share the rows.
-* **`maxRecordBytes`** is the AdapterVaultDB's own: the largest box record a `putBox` takes.
+* **`maxRecordBytes`** is the AdapterVaultDB's own: the largest box record a `putBox` takes, 5,600 bytes if left out.
+* **`maxBoxes`** is a best-effort cap on the live boxes in one vault, 100 if left out: a put past it refuses as `vault_full`.
 * An option it cannot use refuses with kind `bad_option`.
 
 ## What it promises

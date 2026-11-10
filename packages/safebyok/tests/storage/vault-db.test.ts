@@ -60,7 +60,7 @@ describe("AdapterVaultDB", () => {
   })
 
   describe("the plain verb and its try form", () => {
-    it("read the same: a refusal's act, world and dbhas in an answer are its meta in the error", async () => {
+    it("read the same, the answer alone carrying the world and dbhas: an error's meta has neither, so no wrapped key", async () => {
       const vaultDB = new MemoryVaultDB()
       const vault = vaultAt()
       await vaultDB.putVault(vault, { prior: SX.VoidRevision })
@@ -69,7 +69,11 @@ describe("AdapterVaultDB", () => {
       const thrown = await thrownBy(() => vaultDB.putVault(rival, { prior: SX.VoidRevision, ifPresent: 'fail' }))
       expect(isVaultError(thrown, 'camped')).to.be.true
       expect(thrown).to.deep.include({ refusalkind: answer.act })
-      expect((thrown as { meta: object }).meta).to.deep.include({ world: vault, dbhas: vault, req_params: answer.req_params, call: 'putVault' })
+      const { meta } = thrown as { meta: object }
+      expect(meta).to.deep.include({ req_params: answer.req_params, call: 'putVault' })
+      expect(meta).to.not.have.any.keys('world', 'dbhas')
+      expect(answer).to.deep.include({ world: vault, dbhas: vault })
+      expect(JSON.stringify({ ...(thrown as object), meta })).to.not.include(vault.gate.passphrase_wayin.vault_key_wayin_wrapped.ciphertext_b64)
     })
   })
 

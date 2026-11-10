@@ -164,7 +164,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   #dismissGatingOfGoneListing(): void { this.#openGating?.dismiss() }
   // --
 
-  // == [Defined by the vault listing]: vaultTokOfWorld, fateOver, scopepathOf, makeThing, nothingStoredError, tryGetRow, tryPutRow, tryDelRow, watchRows, isOwnRow
+  // == [Defined by the vault listing]: vaultTokOfWorld, fateOver, scopepathOf, makeThing, nothingStoredError, doTryGet, doTryPut, doTryDel, watchRows, isOwnRow
 
   protected vaultTokOfWorld(): null { return null }
 
@@ -187,12 +187,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   protected nothingStoredError(scope: VaultScope): VaultError { return absentVaultError(scope) }
 
-  protected tryGetRow(scope: VaultScope) { return this.vaultDB.tryGetVault(scope, { ifAbsent: 'nil' }) }
+  protected doTryGet(scope: VaultScope) { return this.vaultDB.tryGetVault(scope, { ifAbsent: 'nil' }) }
 
   /** The vaultDB refuses `repl` on a vault: a record moves only by a gate verb. */
-  protected tryPutRow(record: VaultRecord, opts: PutOpts) { return this.vaultDB.tryPutVault(record, opts as PutVaultOpts) }
+  protected doTryPut(record: VaultRecord, opts: PutOpts) { return this.vaultDB.tryPutVault(record, opts as PutVaultOpts) }
 
-  protected tryDelRow(tombstone: DelTombstone<VaultSparse>, opts: DelOpts) { return this.vaultDB.tryDelVault(tombstone, opts) }
+  protected doTryDel(tombstone: DelTombstone<VaultSparse>, opts: DelOpts) { return this.vaultDB.tryDelVault(tombstone, opts) }
 
   protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.vaultDB.watch(this.world.scope, onNotice, onBadNews) }
 

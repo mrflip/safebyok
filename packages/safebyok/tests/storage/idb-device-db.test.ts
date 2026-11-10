@@ -39,11 +39,11 @@ const idbRowsOf = (deviceDB: IdbDeviceDB): TH.DeviceDBRowCheats => {
 
 // The DeviceDB's databases are opened first, so neither upgrade transaction is the one to fail.
 /** Makes the next transaction any DeviceDB opens fail, as it does when the browser closes the database under the page. */
-const failNextCall = async (deviceDB: IdbDeviceDB): Promise<void> => {
+const failNextCall = async (deviceDB: IdbDeviceDB, errname = 'InvalidStateError'): Promise<void> => {
   await deviceDB.listLeases()
   await deviceDB.listRawBanks()
   vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementationOnce(() => {
-    throw new DOMException("The database connection is closing.", 'InvalidStateError')
+    throw new DOMException("The database connection is closing.", errname)
   })
 }
 
@@ -118,12 +118,29 @@ describe("IdbDeviceDB's database", () => {
     const deviceDB = makeDeviceDB()
     vi.stubGlobal('indexedDB', undefined)
     try {
-      const refusal = await TH.expectRefusal(deviceDB.listLeases(), 'storage_unavailable')
+      const refusal = await TH.expectRefusal(deviceDB.listLeases(), 'storage_blocked')
       expect(refusal.message).to.match(/no IndexedDB/)
     } finally {
       vi.unstubAllGlobals()
     }
   })
+
+  const Faults = [
+    ['QuotaExceededError', 'vault_full',          /no room|storage/iu],
+    ['SecurityError',      'storage_blocked',     /withholds/u],
+    ['AbortError',         'storage_unavailable', /abort/iu],
+    ['InvalidStateError',  'storage_unavailable', /closed under it/u],
+    ['UnknownError',       'storage_unavailable', /IndexedDB failed/u],
+  ] as const
+
+  for (const [errname, refusalkind, wording] of Faults) {
+    it(`says a browser's ${errname} as '${refusalkind}'`, async () => {
+      const deviceDB = makeDeviceDB()
+      await failNextCall(deviceDB, errname)
+      const refusal = await TH.expectRefusal(deviceDB.listLeases(), refusalkind)
+      expect(refusal.message).to.match(wording)
+    })
+  }
 })
 
 describe("IdbDeviceDB's wipe of the old databases", () => {

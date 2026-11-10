@@ -10,10 +10,10 @@ import { bankBoxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, she
 
 // == [Options]: IdbVaultDBOpts, idbVaultDBOpts
 
-/** What an IdbVaultDB is made with: the AdapterVaultDB's options, and `dbName` ('safebyok' if left out). */
-export type IdbVaultDBOpts = AdapterVaultDBOpts & { dbName?: string | undefined }
+/** What an IdbVaultDB is made with: the AdapterVaultDB's options, `dbName` ('safebyok' if left out), and `maxBoxes`, a soft cap on one vault's live boxes. */
+export type IdbVaultDBOpts = AdapterVaultDBOpts & { dbName?: string | undefined, maxBoxes?: number | undefined }
 
-const idbVaultDBOpts = DB.objCheck(({ str }) => ({ ...DB.adapterVaultDBOpts.shape, dbName: str.min(1).optional() }), 'bad_option')
+const idbVaultDBOpts = DB.objCheck(({ str, uint }) => ({ ...DB.adapterVaultDBOpts.shape, dbName: str.min(1).optional(), maxBoxes: uint.optional() }), 'bad_option')
 // --
 
 // == [Helpers]: Rung, isHeardBy
@@ -29,19 +29,33 @@ const isHeardBy = (watched: WatchScope, scope: VaultScope): boolean => (
 
 /** A vaultDB in this browser's IndexedDB, whose watch hears every tab's writes. */
 export class IdbVaultDB extends DB.AdapterVaultDB {
-  // == [Props]: #shelf, #bellname
+  // == [Props]: #shelf, #bellname, #maxBoxes
 
   readonly #shelf: UseStore
   readonly #bellname: string
+  readonly #maxBoxes: number
   // --
 
   // == [Construction]: constructor
 
   constructor(opts: IdbVaultDBOpts = {}) {
-    const { dbName = 'safebyok', ...adapterVaultDBOpts } = idbVaultDBOpts.parse(opts, { where: "In IdbVaultDB's options" })
+    const { dbName = 'safebyok', maxBoxes = DB.DefaultMaxBoxes, ...adapterVaultDBOpts } = idbVaultDBOpts.parse(opts, { where: "In IdbVaultDB's options" })
     super(adapterVaultDBOpts)
     this.#shelf = shelfOf(dbName)
     this.#bellname = `safebyok-indexeddb:${dbName}`
+    this.#maxBoxes = maxBoxes
+  }
+  // --
+
+  // == [Room]: #demandRoom
+
+  // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
+  /** Demands room in the vault for a new live box, under its soft cap `maxBoxes`. */
+  async #demandRoom(store: IDBObjectStore, record: BoxRecord, ante: unknown): Promise<void> {
+    if (DB.isLiveRow(ante)) { return }
+    const boxes = await filedIn(store, lifeRangeOf(record))
+    const used = boxes.filter(({ row }) => DB.isLiveRow(row)).length
+    if (used >= this.#maxBoxes) { throw DB.vaultFull({ boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }) }
   }
   // --
 
@@ -85,7 +99,10 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
     const written = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [vault, ante] = await Promise.all([DB.rowAt(store, vaultScopepathOf(record)), DB.rowAt(store, boxScopepathOf(record))])
       const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
-      if (isWritten) { store.put(record, boxScopepathOf(record)) }
+      if (isWritten) {
+        await this.#demandRoom(store, record, ante)
+        store.put(record, boxScopepathOf(record))
+      }
       return { isWritten, ante, vault }
     })
     if (written.isWritten) { this.#ring([{ scope: record, heard: { vault: written.vault, box: record } }]) }

@@ -6,7 +6,7 @@ import { ENCRYPTED, LOCKED } from '../../src/helpers/consts'
 import type { BoxSnapshot, Fetched } from '../../src/shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
-import { type TestableBox, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
 const world = useModelsWorld()
 
@@ -429,3 +429,14 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
   })
 })
 // --
+
+describe("registered_at over a rebirth", () => {
+  it("registers a box deleted and reborn at the rebirth's put, as a new life", async () => {
+    world.mw.seedPut(fullBoxRecord())
+    const box = await fakeSealBoxListingOf(world.mw).build(fullBoxRecord())
+    await box.del()
+    world.mw.setNow(T0 + 5000)
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} })
+    expect(box._cheat_central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })
+  })
+})

@@ -1,12 +1,12 @@
 /** The vaultDB: the verbs the models call. A subclass writes only the generic `do*` calls, each one atomic step. */
 
 import type * as Z from 'zod'
-import { IsAdapterVaultDB, IsVaultDB } from '../helpers/consts'
+import { DefaultMaxRecordBytes, IsAdapterVaultDB, IsVaultDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
 import { nowMillis } from '../helpers/clock'
 import * as Phrases from '../helpers/phrases'
 import { verifyConsistent } from '../helpers/validator'
-import type { VaultError } from '../refusals/errors'
+import { type VaultError, rowsOfRefusal } from '../refusals/errors'
 import { type BadOutcome, type GoodOutcome, outcomeOf, storageTroubleOf } from '../refusals/outcome'
 import * as SX from '../shapes/shapes-storage'
 import * as CX from '../shapes/shapes-core'
@@ -40,9 +40,13 @@ export type Notice = { act: 'got' | 'gone', val: VaultRow | BoxRow, world: Vault
 
 const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<GoodAnswer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
   const outcome = await outcomeOf(thunk)
-  if (outcome.ok) { return outcome.val }
-  const { err } = outcome
-  const { act = err.refusalkind, world = null, req_params = {}, dbhas } = err.meta ?? {}
+  return outcome.ok ? outcome.val : badAnswerOf(outcome.err)
+}
+
+/** The answer `err` stands for: its act, its request's metadata and the rows it carries, where it has them. */
+export const badAnswerOf = (err: VaultError): BadAnswer => {
+  const { act = err.refusalkind, req_params = {} } = err.meta ?? {}
+  const { world = null, dbhas } = rowsOfRefusal(err)
   return { ok: false, err, act, world, req_params, ...((dbhas !== undefined) && { dbhas }) }
 }
 // --
@@ -160,7 +164,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Construction]: constructor
 
   constructor(opts: AdapterVaultDBOpts = {}) {
-    const { maxRecordBytes = Infinity } = SX.adapterVaultDBOpts.parse(opts)
+    const { maxRecordBytes = DefaultMaxRecordBytes } = SX.adapterVaultDBOpts.parse(opts)
     this.#maxRecordBytes = maxRecordBytes
   }
   // --

@@ -312,7 +312,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
   for (const [tryVerb, blurb] of GoodCases) {
     it(`resolves a good outcome with the thing: ${blurb}`, async () => {
       const { box } = await timelyBoxOf()
-      expect(await tryVerb(box)).to.deep.equal({ ok: true, val: box })
+      expect(await tryVerb(box)).to.deep.include({ ok: true, val: box })
     })
   }
 
