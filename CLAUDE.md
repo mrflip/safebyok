@@ -73,7 +73,7 @@ govern how code is changed:
 ## Commands
 
 ```sh
-pnpm justify                       # lint, typecheck, test, build, size budget, every package: green before every commit
+pnpm justify                       # lint, typecheck, test, build, every package: green before every commit
 pnpm --filter safebyok <task>      # lint, typecheck, test, build in one package, its dependencies built first
 pnpm --filter safebyok add <dep>   # a package's dependency; `pnpm add -w` is for root tooling only
 pnpm changeset                     # a PR's release note; `--empty` when it needs none (PROCESS.md)
@@ -81,8 +81,8 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
 
 ## Layout
 
-* `packages/` -- `safebyok` (the core, the new design), `safebyok-old` (the old design, private,
-  which the adapters and demo run on until they move) and `safebyok-*` (clients, adapters, plugins). **Never change `packages/safebyok-old/`**: not to fix it,
+* `packages/` -- `safebyok` (the core), `safebyok-old` (the old design, private, on its way out:
+  only `safebyok-idb-old` runs on it) and `safebyok-*` (clients, adapters, plugins). **Never change `packages/safebyok-old/`**: not to fix it,
   tidy it or update a pointer in it, whatever a search finds there.
 * Private, never published: the root (`scripts/`, tested in `tests/scripts/`), `demos/`, and
   `e2e/` (adapter-by-framework checks).

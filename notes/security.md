@@ -41,6 +41,12 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-10 (old_gaps, branch `20261109-old_gaps`): **Five possibilities whose pinning tests were deleted, on the Coach's ruling, as paranoia.**
+  (1) A VaultDB that answers a rebirth with the buried record's `registered_at`, as a database default might keep it, is adopted quietly, and the box's `registered_at` follows it.
+  (2) A crypto failure in `buildLease` during a gate change rejects, with the row stored and the vault on its new gate under the lease it held.
+  (3) A tombstone crossing the making of a gate change's new lease refuses as the lease attaches, and leaves no row.
+  (4) A tombstone crossing a birth's lease refuses as the lease attaches, and leaves no row.
+  (5) A sweep crossing a birth's lease refuses at `demandAttachable`, with the row stored and no lease cached.
 * 2026-11-09 (react_forms, branch `20261109-react_forms`): **`safebyok-react` hands a passkey answer to `gating.attempt` at once, whether or not the dialog or button is shown.**
   `PasskeyUnlockButton` (`components/passkey-unlock-button.tsx`) and the add-passkey modal (`modals/add-passkey-modal.tsx`) no longer zero, untried, an answer (`prfBytes`)
   that comes back while a React `<Activity>` or Suspense boundary hides them; the code that did so (`useWhenShown`, `when-shown.ts`) is removed. The Coach's rule: a valid request goes through if it was authorized at the start of its critical
@@ -255,6 +261,11 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **`replacePassphrasePrompt` keeps the passkey.** A vault must always have a
   passphrase; the passkey is optional. Replacing the passphrase after a suspected compromise does not remove a passkey; a host wanting
   both gone calls `revokePasskeyPrompt` as well.
+  Amended 2026-11-09 (old_gaps, the Coach's ruling): the passkey wayin also stays as stored and still opens the vault, and the replacement asks for no
+  fresh passkey (the Coach: "Apple requires the passphrase on the next login but doesn't disable, we won't do either"); the vaultKey is not rotated.
+  Someone who knew the old passphrase and added a passkey before the change keeps access through that passkey; the user's remedy is `revokePasskeyPrompt`,
+  a gate change that itself needs the passphrase. The earlier design removed the passkey on replacement, and was judged unnecessary. Pinned by "keeps the
+  passkey wayin as stored, and the passkey still opens" in `packages/safebyok/tests/models/vault-gate.test.ts`.
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **A gate change is its params, with no client-side next gate.** The params
   spread the record read after a timely refresh (`vault.ensureTimely(MSX.Promptly)`, `timelyAnte` in `models/gating.ts`) inside the
   attempt, and land conditional on its revision at the vaultDB, so a change crossing another refuses `stale_write` and stores nothing.
@@ -1090,7 +1101,7 @@ added or folded into through the subagent, and no other entry changes.
   answer as the proof is refused `bad_option`), as `changePassphrase` and `addPasskey` did. A new
   passphrase as text replaces the passphrase (amended 2026-10-21 (wayin_rules): and removes the
   passkey, writing vault props with `passkey: null`; amended 2026-11-03 (cleanup): of the shipped core, `src/vault.ts`; in `src/models/` `replacePassphrasePrompt` leaves the passkey wayin alone, and the vaultDB refuses one carrying a `passkey_wayin` (`storage/vault-db.ts`), so a passkey added under the old passphrase no
-  longer opens the current vault props; the user adds a passkey again by proving the new passphrase;
+  longer opens the current vault props (amended 2026-11-10 (old_gaps, the Coach approving): this no longer holds; replacing the passphrase leaves the passkey wayin in place and it keeps opening the vault, so the user need not add a passkey again; see the 2026-11-03 (gate_changes) entry "`replacePassphrasePrompt` keeps the passkey", amended 2026-11-09); the user adds a passkey again by proving the new passphrase;
   removal, not revocation: a copy of older vault props still opens with it, as before); a passkey's
   answer (`PasskeyAnswer`) puts the passkey, replacing any. The passkey is now made by the host before the call and its answer handed in, so a
   passphrase the vault then refuses leaves a fresh passkey on the authenticator that opens nothing

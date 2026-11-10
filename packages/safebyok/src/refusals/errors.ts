@@ -16,7 +16,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
  *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `box_too_large`, `vault_full`,
- *   `stale_write`, `record_conflict`, `storage_unavailable`,
+ *   `stale_write`, `record_conflict`, `storage_unavailable`, `storage_blocked`, `gate_made_elsewhere`,
  *   `vault_gone`, `vault_mismatch`, `gating_concluded`, `attempt_in_flight`, `already_asking`, `dismissed`,
  *   `same_passphrase`, `camped`, `vault_empty`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
@@ -54,6 +54,7 @@ export const refusalkindVals = [
   'record_conflict',     // storage answered what cannot be: one revision under two toks, a record of another vault_tok than this device has, a put that answered nothing; a fetch again is worth one try, and if it remains the system is fundamentally not working
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it; its own error is the cause
+  'storage_blocked',     // the browser withholds its storage from this page -- site data blocked, a private window, IndexedDB switched off: a retry will not mend it
   'storage_issue',       // the storage backend answered with a row no working store could: no object at all, or naming another address than the one asked: the database is so broken we just can't, and a retry is unlikely to help
   'vault_gone',          // the vault a call was working on is no longer stored: deleted, here or elsewhere
   'vault_mismatch',      // a live vault stands where the call's vault stood, under another vault_tok than the call has
@@ -62,6 +63,7 @@ export const refusalkindVals = [
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
   'already_asking',      // a gating is open on this bank, so a second one was not launched: one dialog at a time, and no join
   'dismissed',           // the dialog was dismissed with no attempt under way, so nothing was done
+  'gate_made_elsewhere', // another device or tab made this vault first, so the passphrase just typed was not set and nothing was changed
   'same_passphrase',     // a new passphrase that is the one the vault already has
   'camped',              // a vaultDB put told not to replace a live row found one there
   'vault_empty',         // a vaultDB call named a vault_tok no row has, and no live row stands there: nothing of this life
@@ -98,6 +100,7 @@ export const RefusalFamilyForKind = {
   record_conflict:     'condition',
   identity_revoked:    'bad_news',
   storage_unavailable: 'condition',
+  storage_blocked:     'condition',
   storage_issue:       'bad_news',
   vault_gone:          'condition',
   vault_mismatch:      'condition',
@@ -106,6 +109,7 @@ export const RefusalFamilyForKind = {
   attempt_in_flight:   'condition',
   already_asking:      'condition',
   dismissed:           'condition',
+  gate_made_elsewhere: 'condition',
   same_passphrase:     'condition',
   camped:              'condition',
   vault_empty:         'condition',
@@ -132,16 +136,21 @@ export type RefusalMeta = {
   call?:         string
   /** A vaultDB's refusal: what happened, when it is not said by the refusalkind alone. */
   act?:          string
-  /** A vaultDB's refusal: the vault row as read in the step that refused. */
-  world?:        unknown
-  /** A vaultDB's refusal: the row stored where the write was aimed, or null for none. */
-  dbhas?:        unknown
   /** A vaultDB's refusal: the request's scope, vault_tok and other safe metadata. */
   req_params?:   Readonly<Record<string, unknown>>
 }
 
+/** The rows `err` hands a vaultDB's answer, empty where it has none. */
+export const rowsOfRefusal = (err: VaultError): RefusalRows => (err as unknown as Record<symbol, RefusalRows | undefined>)[RowsOfRefusal] ?? {}
+
 /** The options of a VaultError beside its refusalkind and message: the `cause` behind it, and its `meta`. */
-export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta }
+export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta, rows?: RefusalRows }
+
+/** The rows a vaultDB's refusal hands its answer: the vault row as read in the step that refused, and the row stored where the write was aimed, or null for none. */
+export type RefusalRows = { world?: unknown, dbhas?: unknown }
+
+// A Symbol.for and not enumerable, so the rows reach the answer from whichever copy of safebyok, and never a log: they hold wrapped keys.
+const RowsOfRefusal = Symbol.for('safebyok.refusal.rows')
 
 /** Every refusal a safebyok call makes: a calm message, a `refusalkind` to branch on, and its `family`.
  * It never carries a whisper, a passphrase or any other secret material: not in the message, the
@@ -164,12 +173,13 @@ export class VaultError extends Error {
    * @param opts - `cause`, the lower-level failure kept for debugging, and `meta`. Neither may contain secret material.
    */
   constructor(refusalkind: Refusalkind, message: string, opts?: VaultErrorOpts) {
-    const { meta, ...errorOpts } = opts ?? {}
+    const { meta, rows, ...errorOpts } = opts ?? {}
     super(message, errorOpts)
     this.name = 'VaultError'
     this.refusalkind = refusalkind
     this.family = RefusalFamilyForKind[refusalkind]
     if (meta !== undefined) { this.meta = meta }
+    if (rows !== undefined) { Object.defineProperty(this, RowsOfRefusal, { value: rows }) }
   }
 
   /** Answers true, which marks a VaultError to {@link isVaultError}, from whichever copy of safebyok made it. */

@@ -21,7 +21,7 @@ import type { Thrown } from './errors'
 import * as Phrases   from '../helpers/phrases'
 import type * as SX from '../shapes/shapes-storage'
 
-// == [Outcome Throwers]: sanitizeForeignError, storageUnavailable, unexpectedError
+// == [Outcome Throwers]: sanitizeForeignError, storageUnavailable, storageBlocked, unexpectedError
 
 /** The Error that stands as a refusal's cause for whatever was thrown: an Error as it is, anything else wrapped in one.
  * The header's rule on `meta` is advisory for the bag a thrower keeps: this function trims nothing it is handed.
@@ -49,6 +49,13 @@ export const sanitizeForeignError = (thrown: Thrown): Error => {
  */
 export const storageUnavailable = (cause: Thrown, message: string = Phrases.StorageUnavailable): VaultError => (
   new VaultError('storage_unavailable', message, { cause: sanitizeForeignError(cause) })
+)
+
+/** A `storage_blocked` refusal: the browser withholds its storage from this page, which a retry will not mend.
+ * @example if (err.name === 'SecurityError') { throw storageBlocked(err) }
+ */
+export const storageBlocked = (cause: Thrown, message: string = Phrases.StorageWithheld): VaultError => (
+  new VaultError('storage_blocked', message, { cause: sanitizeForeignError(cause) })
 )
 
 /** An `unexpected_error` refusal, `thrown` its cause: a bug, in safebyok or in a function the app handed it. */
@@ -88,10 +95,7 @@ export const delOfOtherLife = (): VaultError => new VaultError('vault_mismatch',
 export const vaultStoredDamaged = ({ vaultlabel }: SX.DamagedVault): VaultError => new VaultError('damaged_row', Phrases.vaultStoredDamaged(vaultlabel))
 // --
 
-// == [Listing Throwers]: putAnsweredNothing, otherVaultTokAtBirth
-
-/** A `record_conflict` refusal: a vaultDB answered a put with no record. */
-export const putAnsweredNothing = (): VaultError => new VaultError('record_conflict', Phrases.PutAnsweredNothing)
+// == [Listing Throwers]: otherVaultTokAtBirth
 
 /** A `record_conflict` refusal: storage gave a record under another vault_tok than this listing's vault. */
 export const otherVaultTokAtBirth = (): VaultError => new VaultError('record_conflict', Phrases.OtherVaultTokAtBirth)
@@ -160,7 +164,7 @@ export const unopenedWhisper = (): VaultError => new VaultError('damaged_box', P
 export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --
 
-// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gatingDismissed, gatingConcluded, attemptInFlight
+// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gateMadeElsewhere, gatingDismissed, gatingConcluded, attemptInFlight
 
 /** An `already_asking` refusal: a prompt is already open on this bank. */
 export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
@@ -179,6 +183,9 @@ export const gatingDismissed = (): VaultError => new VaultError('dismissed', Phr
 
 /** A `gating_concluded` refusal: an attempt reached a prompt that has already ended. */
 export const gatingConcluded = (): VaultError => new VaultError('gating_concluded', Phrases.GatingConcluded)
+
+/** A `gate_made_elsewhere` refusal: another device or tab made this vault first. */
+export const gateMadeElsewhere = (): VaultError => new VaultError('gate_made_elsewhere', Phrases.GateMadeElsewhere)
 
 /** An `attempt_in_flight` refusal: another attempt on this prompt is still running. */
 export const attemptInFlight = (): VaultError => new VaultError('attempt_in_flight', Phrases.AttemptInFlight)
@@ -243,37 +250,37 @@ export const strengthCheckerLoadFailed = (cause: unknown): VaultError => new Vau
 
 /** A `vault_empty` refusal: nothing is stored for this life of the vault. */
 export const vaultEmpty = (world: SX.VaultRow): VaultError => (
-  new VaultError('vault_empty', Phrases.VaultEmpty, { meta: { world, dbhas: null } })
+  new VaultError('vault_empty', Phrases.VaultEmpty, { rows: { world, dbhas: null } })
 )
 
 /** A `vault_mismatch` refusal: a live vault stands here under another vault_tok. */
 export const vaultMismatch = (stored: SX.VaultRow): VaultError => (
-  new VaultError('vault_mismatch', Phrases.VaultMismatch, { meta: { world: null, dbhas: stored } })
+  new VaultError('vault_mismatch', Phrases.VaultMismatch, { rows: { world: null, dbhas: stored } })
 )
 
 /** A `vault_gone` refusal: this vault was deleted. */
 export const vaultGone = (tombstone: SX.VaultRow): VaultError => (
-  new VaultError('vault_gone', Phrases.VaultGone, { meta: { world: tombstone, dbhas: tombstone } })
+  new VaultError('vault_gone', Phrases.VaultGone, { rows: { world: tombstone, dbhas: tombstone } })
 )
 
 /** A `stale_write` refusal: what is stored moved since this revision was read. */
 export const staleWrite = (world: SX.VaultRow, dbhas: SX.VaultRow | SX.BoxRow | null): VaultError => (
-  new VaultError('stale_write', Phrases.StaleWrite, { meta: { world, dbhas } })
+  new VaultError('stale_write', Phrases.StaleWrite, { rows: { world, dbhas } })
 )
 
 /** A `camped` refusal: a live record is stored here, and the call said not to replace it. */
 export const camped = (world: SX.VaultRow, dbhas: SX.VaultRow | SX.BoxRow): VaultError => (
-  new VaultError('camped', Phrases.Camped, { meta: { world, dbhas } })
+  new VaultError('camped', Phrases.Camped, { rows: { world, dbhas } })
 )
 
 /** An `absent_box` refusal from a vaultDB: no box is stored under that label. */
 export const absentBox = (world: SX.VaultRow, dbhas: SX.BoxRow | null): VaultError => (
-  new VaultError('absent_box', Phrases.AbsentBox, { meta: { act: (dbhas === null) ? 'void' : 'gone', world, dbhas } })
+  new VaultError('absent_box', Phrases.AbsentBox, { meta: { act: (dbhas === null) ? 'void' : 'gone' }, rows: { world, dbhas } })
 )
 
 /** A `gate_issue` refusal: a change of the gate was refused for the reason `why`. */
 export const gateIssue = (world: SX.VaultRow, why: string): VaultError => (
-  new VaultError('gate_issue', Phrases.gateIssue(why), { meta: { world, dbhas: world } })
+  new VaultError('gate_issue', Phrases.gateIssue(why), { rows: { world, dbhas: world } })
 )
 
 /** A `box_too_large` refusal: the record's `recordBytes` exceed `maxRecordBytes`. */

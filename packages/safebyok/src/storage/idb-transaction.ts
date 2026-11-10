@@ -4,7 +4,7 @@ import { promisifyRequest, type UseStore } from 'idb-keyval'
 import * as Phrases from '../helpers/phrases'
 import type { VaultError } from '../refusals/errors'
 import { isVaultError } from '../refusals/errors'
-import { storageFull, storageUnavailable } from '../refusals/throwers'
+import { storageBlocked, storageFull, storageUnavailable } from '../refusals/throwers'
 
 // == [The transaction]: inOneStep, workOrAbandon, abortOf, abandon, rowAt
 
@@ -63,12 +63,12 @@ export const rowAt = async (store: IDBObjectStore, scopepath: IDBValidKey): Prom
 const troubleOf = (err: unknown): VaultError => {
   if (isVaultError(err)) { return err }
   // A browser with IndexedDB switched off may have the global as null rather than leave it out.
-  if ((typeof indexedDB === 'undefined') || ((indexedDB as IDBFactory | null) === null)) { return storageUnavailable(err, Phrases.NoBrowserDatastore) }
+  if ((typeof indexedDB === 'undefined') || ((indexedDB as IDBFactory | null) === null)) { return storageBlocked(err, Phrases.NoBrowserDatastore) }
   const errname = (err instanceof Error) ? err.name : null
   if (errname === 'QuotaExceededError') { return storageFull(err) }
   if (errname === 'AbortError') { return storageUnavailable(err, Phrases.TransactionAborted) }
   if (errname === 'InvalidStateError') { return storageUnavailable(err, Phrases.DatabaseClosed) }
-  if (errname === 'SecurityError') { return storageUnavailable(err, Phrases.StorageWithheld) }
+  if (errname === 'SecurityError') { return storageBlocked(err) }
   return storageUnavailable(err, Phrases.BrowserDatastoreFailed)
 }
 // --

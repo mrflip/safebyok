@@ -181,7 +181,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   // == [Construction]: constructor
 
   constructor(opts: PostgresVaultDBOpts) {
-    const { client, listen, maxBoxes = Infinity, ...adapterVaultDBOpts } = postgresVaultDBOpts.parse(opts)
+    const { client, listen, maxBoxes = DB.DefaultMaxBoxes, ...adapterVaultDBOpts } = postgresVaultDBOpts.parse(opts)
     super(adapterVaultDBOpts)
     this.#client = client
     this.#listen = listen
@@ -206,7 +206,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
   /** Demands room in the vault for a new live box, under its soft cap `maxBoxes`. */
   async #demandRoom(tx: PostgresQueryable, record: BoxRecord, ante: unknown): Promise<void> {
-    if ((this.#maxBoxes === Infinity) || DB.isLiveRow(ante)) { return }
+    if (DB.isLiveRow(ante)) { return }
     const boxes = await boxesOfLife(tx, record, record.vault_tok)
     const used = boxes.filter(({ box }) => DB.isLiveRow(box)).length
     if (used >= this.#maxBoxes) { throw DB.vaultFull({ boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }) }

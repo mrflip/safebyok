@@ -119,7 +119,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   `passphraseUntilText` ("in 2 days"); `askPassphraseAt`'s doc block already hints at them.
 * **A forgetful user's start over clears only this device's copy** (the Coach, on #261: "low
   priority, make it a TODO"): without a passphrase, a user may forget the vault on this device
-  (`bank.clearCachedVault` is that clear), never delete it from the vaultDB, which needs the
+  (`vault.lock()` forgets the lease, and that is all a device keeps), never delete it from the vaultDB, which needs the
   passphrase (`vault.del()`).
 
 * **After the restyle (#273 to #283): two later changes.** Each changes a signature or a
@@ -211,11 +211,9 @@ changed either.
 
 ### Lock timing vs. work in flight: what is left of the policy
 
-The primitives sprint (2026-10-22 and 23) wrote the policy as a per-method contract: **a lock
-spares only the transactional part.** A VaultDB write once sent completes or refuses as storage
-decides; every step before it refuses `vault_locked`; a stale write refuses `stale_write`, never
-`vault_locked`. The core README's *Locking* and the Contract tab's *A lock landing mid-call* say
-it per call. What it leaves open, from the scenarios `softlock_gone` (2026-10-19) listed:
+`packages/safebyok/tests/models/halpimonfire.test.ts` pins what each verb does when a lock lands: a VaultDB write once sent
+completes or refuses as storage decides, a step before it refuses `vault_locked`, a read that would hand back a whisper refuses, and a lock and an unlock each do their own
+work, in order, so a lock landing during an unlock's proof ends unlocked. What is left open, from the scenarios `softlock_gone` (2026-10-19) listed:
 
 * **The DeviceDB throws when a lock revokes the lease** (`lock()` refuses `storage_blocked` or
   `storage_unavailable`, the vault locked in memory): the lease on disk survives, and the next
@@ -311,17 +309,6 @@ and a wrapped logger handed to such code, and what each strips. *"Add "sensitive
 to refusals"*, above, stays open beside it: the flags say which refusals heard secret material,
 this says what a log line of them may carry.
 
-### A trial write at startup: `vault.probe`
-
-The Coach (2026-10-24, accepting that opening a vault now writes, in Postgres
-([#258](https://github.com/mrflip/safebyok/pull/258)): a birth's `vaultDB.ensureVault` clears a
-tombstone in the same statement, so a role without write grants can no longer open one): "TODO: add
-a customer vault.probe API call that the user can use to do a harmless trial write, read, and
-delete so that db error messages are given at startup". Decide where the trial lands so it is
-harmless (a scope of its own, never a real vault's), whether it is the Vault object's or the
-bank's, and which refusals it reports (`not_permitted`, `storage_unavailable`). The Postgres
-README's *Your database's own rules* already lists the grants a role needs to open a vault.
-
 ### Call-time work that could be composed once or memoized
 
 The Coach (2026-10-16), on thread 5b: `reportError` is checked at call time and stands, but review
@@ -382,11 +369,13 @@ revokes it, without calling `lock()`. Decide whether it calls `lock()` itself (e
 gating, concluding `lockLanded`), taking care that the lock does not recurse into the call that
 met the damage.
 
-### "Whisper unchanged" in `putBox`
+### The sidecar out of the seal (next)
 
-The Coach (2026-10-22): a put that keeps the whisper reads and opens the box first
-(`putBox({ boxlabel, sidecar })`, a whisper left out). Decide whether an active sentinel, or a
-tighter entry point for a sidecar-only change, says so more plainly than an argument left out.
+The Coach (2026-11-10): "the sidecar is not supposed to be sealed, we should handle that next." Today the box's stamp, which both seals are
+bound to, holds the sidecar as stable JSON, so a sidecar-only `putBox` must open the whisper and seal it again (`Box.#edit`), and needs
+the vault unlocked. Take the sidecar out of the stamp. The core README says a sidecar is "authenticated but never encrypted", and only
+the stamp authenticates it: say whether that promise goes, or what authenticates it instead. This replaces the 2026-10-22 question of how a
+whisper left out of `putBox` is said.
 
 ### Who keeps the lease's expiry
 
@@ -397,16 +386,15 @@ kept the Vault object's; decide once the gating's chains settle.
 ### A policy for asking every time
 
 The Coach (on #261: "figure out how to give that policy"): a host may want the user asked at
-every call. `leaseHours` keeps its floor above zero, and a `renewMinutes` as long as the lease
-refuses `bad_option`; today the host calls `lock()` once done. Decide how a host says "ask every
-time", and what a lease of no length means for the DeviceDB.
+every call. `autolockMinutes` keeps its floor above zero; today the host calls `lock()` once done.
+Decide how a host says "ask every time", and what a lease of no length means for the DeviceDB.
 
 ### What "rollback" means
 
-The Coach (2026-10-26), on strict device records losing the rollback watermark: "We have a lot of
-things surrounding the very muddy meaning of rollback." The watermark, the device-record format
-rule in VAULTDB.md (#279), the vault epoch and `stale_write` each guard a different "going
-backwards". Settle one definition, say which mechanism guards which case, and name each for it.
+The Coach (2026-10-26): "We have a lot of things surrounding the very muddy meaning of rollback." The device watermark
+is gone, and storage that rolls a record back goes undetected past one session (`notes/wontfix.md`, 2026-11-07). What remains is
+`gate_epoch`, `revision_seq` and `stale_write`, each guarding a different "going backwards". Settle one definition, say which
+mechanism guards which case, and name each for it.
 
 ### An edit is never put to the device cache
 
@@ -440,12 +428,45 @@ checks it in the base, and `forget` leaves the check to the DeviceDB, one atomic
 delete. A key that also held the `vault_tok` would make `forget` a delete at a key, with no check
 to run. The design question: which fields the key holds, and what it ameliorates beyond that.
 
-### The demo's move to the new core must not share a `dbName` with the old
+### A cached lease newer than the vault in hand refreshes the vault
 
-The new core's DeviceDB wipes, unread, every older database of its `dbName`, and `${dbName}:device_db`
-is the old core's live one. A demo that runs the old and the new DeviceDB under one `dbName` would
-have the new DeviceDB delete the old one's database from under it: give the new core a `dbName` of its own
-(or finish the move in one step) when the demo moves over.
+The Coach (2026-11-10): "We should not be dumb about loading from the cache." `Lease.buildFromCache` forgets a cached row of another
+`gate_epoch` or `vault_tok` and asks for a proof, though the row may be another tab's good lease over a vault this tab holds stale; that
+behaviour is broken, and marked so in `lease.ts`. Write the lease transactionally so that a stowed lease newer than the vault in hand, by
+`vault_tok`, `gate_epoch` or the vault's revision, has the vault refreshed and the lease taken up. A lease carries no revision today.
+
+### A wontfix test pool
+
+The Coach (2026-11-10): a pool of tests demonstrating that each row of `notes/wontfix.md` is what happens today, or the row is pulled.
+The file's header says what it lists is not tested; it changes when the pool lands. The pin of a vault row restored from before a
+passphrase change, deleted in [#617](https://github.com/mrflip/safebyok/pull/617), is the first to bring back from history.
+
+### Should we offer `getWhisper` and `decryptWhisper`
+
+The old design's `vault.getWhisper` and `vault.useWhisper` answered a whisper in one call; today a host calls `getBox`, then
+`box.extractWhisper` or `expose`. Decide whether the one-call forms earn their place on the vault.
+
+### Should we offer finer-grained timing around lease expiry and timeliness
+
+The old design's `ensureUnlocked({ renewMinutes })` let a call say how much of the lease must remain. Today a host has `autolockMinutes` and
+`boxRefreshMinutes` for the whole bank, and nothing per call.
+
+### Other stores: `localVaultDB`, `domStore`, `memoryStore`
+
+The old design ran a vaultDB over any `StringStore`. The new one has `MemoryVaultDB` and `safebyok-indexeddb`. Decide whether a key-value
+vaultDB returns, likely with the `ShelfVaultDB` side quest above, for a host with only `localStorage` or a test wanting one.
+
+### The adapter contract, published
+
+`packages/safebyok-old/VAULTDB.md` is the only adapter contract written for readers outside the project, and it describes the old verbs.
+Write its successor for `AdapterVaultDB` (what each verb promises, and `describeVaultDBBattery` as its test) before `safebyok-old` goes;
+`notes/design-vaultdb.md` is internal, and `safebyok-indexeddb`'s README is a template rather than a contract. The old README's guides on errors, locking,
+logging, key derivation and passkey recipes have no new home either, and describe old behaviour, so each needs rewriting, not moving.
+
+### A size budget, when we want one
+
+`size-limit`, its `.size-limit.json` and `pnpm size:budget` were removed on 2026-11-09 as a distraction (the Coach: "we can add it later"). Removal took the CI
+step, and the per-thread budget rule in `PROCESS.md`.
 
 ## Potential Optimizations
 

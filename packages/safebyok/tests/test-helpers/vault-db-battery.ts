@@ -13,6 +13,7 @@ import { describeGets } from './vault-db-battery-gets'
 import { describePuts } from './vault-db-battery-puts'
 import { describeDels } from './vault-db-battery-dels'
 import { describeRaces } from './vault-db-battery-races'
+import { describeIdentity } from './vault-db-battery-identity'
 
 // == [The hooks a VaultDB hands the battery]: VaultDBRowCheats, VaultDBBatteryOpts
 
@@ -38,6 +39,8 @@ export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
   makeTwin?: (vaultDB: DBT) => Awaitable<VaultDB>
   /** A fresh, empty VaultDB with at most `maxBoxes` live boxes to a vault; without it, the cases of a cap are skipped. */
   makeCappedVaultDB?: (maxBoxes: number) => Awaitable<DBT>
+  /** A fresh backend, as a way to make a VaultDB over it signed in as a user, or signed out for null; without it, who may reach a vault is skipped. */
+  makeVaultDBFor?: () => Awaitable<(user_id: string | null) => VaultDB>
   /** Makes the VaultDB's next call to its storage fail as its storage would; without it, that case is skipped. */
   _cheat_failNextCall?: (vaultDB: DBT) => Awaitable<void>
   /** The AdapterVaultDB behind a client, where the battery slips a rival write in; without it, `vaultDB` itself. */
@@ -55,6 +58,7 @@ const batteryOpts = objCheck(({ fn, bool }) => ({
   _cheat_rowsOf:        fn<VaultDBBatteryOpts['_cheat_rowsOf']>(),
   makeTwin:             fn<NonNullable<VaultDBBatteryOpts['makeTwin']>>().optional(),
   makeCappedVaultDB:    fn<NonNullable<VaultDBBatteryOpts['makeCappedVaultDB']>>().optional(),
+  makeVaultDBFor:       fn<NonNullable<VaultDBBatteryOpts['makeVaultDBFor']>>().optional(),
   _cheat_failNextCall:  fn<NonNullable<VaultDBBatteryOpts['_cheat_failNextCall']>>().optional(),
   _cheat_adapterOf:       fn<NonNullable<VaultDBBatteryOpts['_cheat_adapterOf']>>().optional(),
   watches:              bool.optional(),
@@ -74,6 +78,9 @@ export type BatteryWorld = {
   /** Whether the VaultDB gave {@link VaultDBBatteryOpts.makeCappedVaultDB}; without it, `makeCapped` throws. */
   hasCap:               boolean
   makeCapped:           (maxBoxes: number) => Promise<VaultDB>
+  /** Whether the VaultDB gave {@link VaultDBBatteryOpts.makeVaultDBFor}; without it, `makeVaultDBFor` throws. */
+  hasIdentity:          boolean
+  makeVaultDBFor:       () => Promise<(user_id: string | null) => VaultDB>
   /** Whether the VaultDB gave {@link VaultDBBatteryOpts._cheat_failNextCall}; without it, `failNextCall` throws. */
   canFail:              boolean
   failNextCall:         (vaultDB: VaultDB) => Promise<void>
@@ -87,7 +94,7 @@ const notGiven = (hookname: string) => (): never => { throw new TypeError(`The V
 // Every VaultDB a world's hooks are handed is one its own factories made, so the narrowing to DBT has;
 // a world given no `_cheat_adapterOf` was handed AdapterVaultDBs.
 const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWorld => {
-  const { makeVaultDB, _cheat_rowsOf, makeTwin, makeCappedVaultDB, _cheat_failNextCall, _cheat_adapterOf, watches = true, boxNoticesCarryVault = true } = opts
+  const { makeVaultDB, _cheat_rowsOf, makeTwin, makeCappedVaultDB, makeVaultDBFor, _cheat_failNextCall, _cheat_adapterOf, watches = true, boxNoticesCarryVault = true } = opts
   const fresh = async (dbOpts?: AdapterVaultDBOpts): Promise<VaultDB> => await makeVaultDB(dbOpts)
   const putWith = async ({ box: withBox = false } = {}) => {
     const vaultDB = await fresh()
@@ -105,6 +112,8 @@ const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWor
     adapterOf:      (vaultDB) => (_cheat_adapterOf ? _cheat_adapterOf(vaultDB as DBT) : vaultDB as AdapterVaultDB),
     hasCap:       makeCappedVaultDB !== undefined,
     makeCapped:   makeCappedVaultDB ? async (maxBoxes) => await makeCappedVaultDB(maxBoxes) : notGiven('makeCappedVaultDB'),
+    hasIdentity:  makeVaultDBFor !== undefined,
+    makeVaultDBFor: makeVaultDBFor ? async () => await makeVaultDBFor() : notGiven('makeVaultDBFor'),
     canFail:      _cheat_failNextCall !== undefined,
     failNextCall: _cheat_failNextCall ? async (vaultDB) => { await _cheat_failNextCall(vaultDB as DBT) } : notGiven('_cheat_failNextCall'),
     watches,
@@ -127,6 +136,7 @@ export const describeVaultDBBattery = <DBT extends VaultDB>(label: string, opts:
     describePuts(world)
     describeDels(world)
     describeRaces(world)
+    describeIdentity(world)
   })
 }
 // --

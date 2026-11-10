@@ -14,7 +14,7 @@ import type { Storable } from '../models/storable'
 import type { Vault } from '../models/vault'
 import type { DeviceDB } from '../storage/device-db'
 import type { Outcome } from '../refusals/outcome'
-import { type Answer, type VaultDB, VaultDBVerbnames } from '../storage/vault-db'
+import { type Answer, type PutAct, type VaultDB, VaultDBVerbnames } from '../storage/vault-db'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
@@ -79,7 +79,7 @@ export type Aligned = Z.infer<typeof aligned>
 
 // --
 
-// == [Options]: Promptly, ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts
+// == [Options]: Promptly, ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener, probeAsked, probeOpts, ProbeAsked, ProbeOpts, ProbeStep, ProbeReport, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts
 
 /** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */
 export const Promptly = 2000
@@ -117,6 +117,36 @@ export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timel
   const listener      = fn<() => void>()
   return { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener }
 })
+
+/** The checks of what `bank.tryProbe` is handed: where its trial box goes and what it holds, and how fresh its record must be. */
+export const { probeAsked, probeOpts } = Checkers('bad_option', ({ obj, vaultlabel, boxlabel }) => ({
+  probeAsked: obj({
+    vaultlabel: vaultlabel.default('home'),
+    boxlabel:   boxlabel.default('box1'),
+    whisper:    CX.whisper.default({ note: 'Shhh, this is a whisper' }),
+    sidecar:    CX.sidecar.default({ example: true }),
+  }),
+  probeOpts: obj({
+    /** How long ago, at most, the trial's vault and box were refreshed from the vaultDB; apart from the bank's own refresh settings. */
+    maxMillisSinceRefresh: horizonMillis.default(1000),
+  }),
+}))
+
+/** Where `bank.tryProbe` puts its trial box and what it holds, each with a default. */
+export type ProbeAsked = Z.input<typeof probeAsked>
+/** How fresh `bank.tryProbe` needs its trial's vault and box. */
+export type ProbeOpts = Z.input<typeof probeOpts>
+
+/** One storage verb's answer as `bank.tryProbe` reports it: sparse rows, no wrapped key or ciphertext, and when it came back. */
+export type ProbeStep = Readonly<{ ok: true, act: string, req_params: SX.ReqParams, val: SX.BoxSparse, world: SX.VaultSparse, timestamp: number }>
+
+/** How `bank.tryProbe` went, step by step: the box and vault as found, the put, the fetch back, and that the box opened. */
+export type ProbeReport = Readonly<{
+  timely: Readonly<{ box: SX.BoxSparse | null, vault: SX.VaultSparse, boxRefreshedAt: number | null, vaultRefreshedAt: number | null, timestamp: number }>
+  put:    ProbeStep
+  fetch:  ProbeStep
+  unseal: Readonly<{ ok: true, timestamp: number }>
+}>
 
 /** How fresh the record in hand and the world must be before a verb goes on. */
 export type TimelyOpts = Z.infer<typeof timelyOpts>
@@ -207,6 +237,12 @@ export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extend
 
 /** The answer of a vaultDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
 export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, string, unknown>
+
+/** A put's {@link ListingAnswer}, whose good form always carries a record. */
+export type ListingPutAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT>, PutAct, unknown>
+
+/** What a listing's `tryPut` and `tryFetch` answer: the vaultDB's own answer, with the instance listed as its `val`. */
+export type ThingAnswer<ValT> = Answer<ValT, string, unknown>
 
 /** The tombstone `listing.del` hands the vaultDB: gone, at the revision after the one it goes over. */
 export type DelTombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>

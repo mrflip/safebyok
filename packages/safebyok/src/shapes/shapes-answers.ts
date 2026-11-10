@@ -2,7 +2,7 @@
 
 import type * as Z from 'zod'
 import { Checkers } from '../helpers/validator'
-import { VaultError, refusalkindVals, type RefusalMeta } from '../refusals/errors'
+import { VaultError, refusalkindVals, type RefusalMeta, type RefusalRows } from '../refusals/errors'
 import type { Outcome } from '../refusals/outcome'
 import type { Answer, Notice } from '../storage/vault-db'
 import * as EX from './shapes-enums'
@@ -56,7 +56,7 @@ const answerOfCrossed = <ValT, ActT extends string, WorldT>(crossed: Crossed<Val
   const req_params = reqParamsOfCrossed(crossed.req_params)
   if (crossed.ok) { return { ok: true, act: crossed.act, val: crossed.val, world: crossed.world, dbhas: crossed.dbhas, req_params } }
   const { act, world, dbhas } = crossed
-  return { ok: false, act, world, dbhas, req_params, err: vaultErrorOfCrossed(crossed.err, { act, world, dbhas, req_params }) }
+  return { ok: false, act, world, dbhas, req_params, err: vaultErrorOfCrossed(crossed.err, { act, req_params }, { world, dbhas }) }
 }
 
 /** What an answer's check parses before {@link answerOfCrossed} makes the answer of it. */
@@ -71,9 +71,9 @@ const reqParamsOfCrossed = (crossed: CrossedReqParams): ReqParams => (
 )
 
 /** The VaultError `crossed` stands for, its meta with what crossed and what the answer has. */
-const vaultErrorOfCrossed = ({ refusalkind, message, meta }: CrossedErr, answered: RefusalMeta): VaultError => {
+const vaultErrorOfCrossed = ({ refusalkind, message, meta }: CrossedErr, answered: RefusalMeta, rows: RefusalRows): VaultError => {
   const crossedMeta = Object.fromEntries(Object.entries(meta ?? {}).filter(([, field]) => field !== null)) as RefusalMeta
-  return new VaultError(refusalkind, message, { meta: { ...crossedMeta, ...answered } })
+  return new VaultError(refusalkind, message, { meta: { ...crossedMeta, ...answered }, rows })
 }
 
 /** The checks of each vaultDB verb's answer as it crosses the wire, and of a notice. */
@@ -103,7 +103,7 @@ export const {
     obj({ ok: lit(false), act: str, val: lit(null).default(null), world: lit(null).default(null), err: crossedErr }).strict(),
   ]).transform((crossed): Outcome<Notice> => {
     if (crossed.ok) { return { ok: true, val: { act: crossed.act, val: crossed.val, world: crossed.world } } }
-    return { ok: false, err: vaultErrorOfCrossed(crossed.err, { act: crossed.act }) }
+    return { ok: false, err: vaultErrorOfCrossed(crossed.err, { act: crossed.act }, {}) }
   })
 
   return {

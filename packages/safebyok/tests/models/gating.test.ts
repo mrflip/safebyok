@@ -38,6 +38,13 @@ const makeDialog = () => {
 /** A host's dialog that attempts {@link Passphrase}, never narrowing on the gating's kind. */
 const unnarrowedDialog: RequestCleartext = async (gating) => { await gating.attempt({ passphraseClear }) }
 
+/** A promise, and the function that resolves it. */
+const heldOpen = () => {
+  let release!: () => void
+  const held = new Promise<void>((resolve) => { release = resolve })
+  return { held, release }
+}
+
 /** A fresh world with a dialog, nothing stored. */
 const birthWorld = (worldOverrides: VaultWorldGiven = {}) => {
   const dialog = makeDialog()
@@ -150,17 +157,84 @@ describe("a birth through a gating", () => {
     expect(landed.isUnlocked).to.be.true
   })
 
-  it("answers another's vault that won the slot during the dialog, locked, a success, with no lease", async () => {
+  it("refuses gate_made_elsewhere where another's vault won the slot during the dialog, saying so, with their record kept and no lease", async () => {
     const theirs = await storedVaultRecord()
-    const { listing, gatingAt, restoreRow, deviceDB } = birthWorld()
-    const launched = listing.buildVault(Dna)
+    const { listing, gatingAt, restoreRow, storedNow, deviceDB } = birthWorld()
+    const launched = TH.expectRefusal(listing.buildVault(Dna), 'gate_made_elsewhere')
     const gating = await gatingAt<'build_vault'>()
     restoreRow(theirs)
-    const vault = await TH.expectGood(gating.attempt({ passphraseClear }))
-    expect(await launched).to.equal(vault)
-    expect(vault.vault_tok).to.eq(theirs.vault_tok)
-    expect(vault.isLocked).to.be.true
+    await TH.expectBad(gating.attempt({ passphraseClear }), 'gate_made_elsewhere')
+    const refusal = await launched
+    expect(refusal.message).to.match(/another device/)
+    expect(storedNow()).to.deep.equal(theirs)
     expect(deviceDB.tryStow).not.toHaveBeenCalled()
+  })
+
+  it("refuses gate_made_elsewhere whatever passphrase either chose: the loser's is never tried against the winner's gate", async () => {
+    const theirs = await storedVaultRecord('the passphrase chosen on the other device')
+    const { listing, gatingAt, restoreRow } = birthWorld()
+    const launched = TH.expectRefusal(listing.buildVault(Dna), 'gate_made_elsewhere')
+    const gating = await gatingAt<'build_vault'>()
+    restoreRow(theirs)
+    await TH.expectBad(gating.attempt({ passphraseClear }), 'gate_made_elsewhere')
+    await launched
+  })
+
+  it("refuses gate_made_elsewhere beside a new passkey, whose wayin is not stored", async () => {
+    const theirs = await storedVaultRecord()
+    const { listing, gatingAt, restoreRow, storedNow } = birthWorld()
+    const launched = TH.expectRefusal(listing.buildVault(Dna), 'gate_made_elsewhere')
+    const gating = await gatingAt<'build_vault'>()
+    restoreRow(theirs)
+    await TH.expectBad(gating.attempt({ passphraseClear, passkeyClear: await TH.passkeyOf('laptop') }), 'gate_made_elsewhere')
+    await launched
+    expect(storedNow()?.gate.passkey_wayin).to.equal(theirs.gate.passkey_wayin)
+  })
+
+  it("refuses gate_made_elsewhere where the winner lands while the passphrase is derived", async () => {
+    const theirs = await storedVaultRecord()
+    const { held, release } = heldOpen()
+    const keyDeriver = Object.assign(Object.create(TH.testDeriver) as typeof TH.testDeriver, {
+      deriveKeyBytes: async (...args: Parameters<typeof TH.testDeriver.deriveKeyBytes>) => {
+        await held
+        return TH.testDeriver.deriveKeyBytes(...args)
+      },
+    })
+    const { listing, gatingAt, restoreRow } = birthWorld({ keyDeriver })
+    const launched = TH.expectRefusal(listing.buildVault(Dna), 'gate_made_elsewhere')
+    const gating = await gatingAt<'build_vault'>()
+    const attempting = gating.attempt({ passphraseClear })
+    restoreRow(theirs)
+    release()
+    await TH.expectBad(attempting, 'gate_made_elsewhere')
+    await launched
+  })
+
+  it("concludes the gating on gate_made_elsewhere, which the user does not get to retry there", async () => {
+    const { listing, gatingAt, restoreRow } = birthWorld()
+    const launched = TH.expectRefusal(listing.buildVault(Dna), 'gate_made_elsewhere')
+    const gating = await gatingAt<'build_vault'>()
+    restoreRow(await storedVaultRecord())
+    await TH.expectBad(gating.attempt({ passphraseClear }), 'gate_made_elsewhere')
+    await launched
+    await TH.expectBad(gating.attempt({ passphraseClear }), 'gating_concluded')
+  })
+
+  it("leaves the winner's vault locked and listed after gate_made_elsewhere, opening to the passphrase chosen there", async () => {
+    const WinnersPassphrase = 'the passphrase chosen on the other device'
+    const { listing, gatingAt, restoreRow } = birthWorld()
+    const launched = TH.expectRefusal(listing.buildVault(Dna), 'gate_made_elsewhere')
+    const gating = await gatingAt<'build_vault'>()
+    restoreRow(await storedVaultRecord(WinnersPassphrase))
+    await TH.expectBad(gating.attempt({ passphraseClear }), 'gate_made_elsewhere')
+    await launched
+    const vault = (await listing.fetch(Dna))!
+    expect(vault.isLocked).to.be.true
+    const unlocking = vault.ensureUnlocked()
+    const asking = await gatingAt<'unlock_vault'>(1)
+    await TH.expectGood(asking.attempt({ passphraseClear: WinnersPassphrase }))
+    const unlocked = await unlocking
+    expect(unlocked.isUnlocked).to.be.true
   })
 
   it("attaches no lease to another life that overtook the put's own answer", async () => {
@@ -173,12 +247,10 @@ describe("a birth through a gating", () => {
       await listing.fetch(Dna)
       return answer
     })
-    const launched = listing.buildVault(Dna)
+    const launched = TH.expectRefusal(listing.buildVault(Dna), 'gate_made_elsewhere')
     const gating = await gatingAt<'build_vault'>()
-    const vault = await TH.expectGood(gating.attempt({ passphraseClear }))
-    expect(await launched).to.equal(vault)
-    expect(vault.vault_tok).to.eq(theirs.vault_tok)
-    expect(vault.isLocked).to.be.true
+    await TH.expectBad(gating.attempt({ passphraseClear }), 'gate_made_elsewhere')
+    await launched
     expect(deviceDB.tryStow).not.toHaveBeenCalled()
   })
 

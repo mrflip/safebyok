@@ -34,6 +34,20 @@ const friendWithRowOf = async (stamp: Partial<VaultStamp>): Promise<FakeLeaseFri
   return friend
 }
 
+describe("a revoke whose forget is refused", () => {
+  it("throws with the lease already gone from memory, and a second revoke asks nothing more, the row left for Lease.forget", async () => {
+    const friend = fakeLeaseFriendOf()
+    const lease = await makeGrantedLease(friend)
+    await lease.cacheAsCacheCan()
+    friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
+    await TH.expectRefusal(lease.revoke())
+    expect(lease.isPresent).to.be.false
+    await lease.revoke()
+    expect(friend.forgetLease).toHaveBeenCalledTimes(1)
+    expect(friend.cached).to.not.be.null
+  })
+})
+
 describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
   it("makes a record of the vault: fmt 7001, the vault's stamp, the epoch, proved_at and wayinkind, a leaseKey handle and the wrapped vaultKey", async () => {
     const { friend } = await grantedWorld({ gate_epoch: 3, wayinkind: 'passkey' })

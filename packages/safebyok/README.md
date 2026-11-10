@@ -5,8 +5,7 @@ Secrets are encrypted on the device, under keys that never leave it, and synchro
 devices through a storage layer the host plugs in.
 
 **This is a design in progress, and nothing has been released.** This package is the new design.
-The old one is `safebyok-old`, private, which `safebyok-react`, the storage adapters and the demo
-run on until they move here; its long README describes that design, not this one.
+The old one is `safebyok-old`, private, on its way out; its long README describes that design, not this one.
 
 ## What a host relies on
 
@@ -135,6 +134,13 @@ Easy to get wrong:
   one, and does not notice the change for you. On sign-out, or a sign-in as someone else, call
   `bank.vacate()`, then `Bank.make` for the new user.
 
+## Trying storage at startup
+
+`await bank.tryProbe()` trials the whole path once: it replaces one box, `box1` in the vault `home`, fetches it back and opens it, so a missing grant or a blocked
+database shows up at startup, not at the user's first save. It answers an Outcome: on success, what each step found and when, with no whisper, ciphertext or wrapped key. It asks the
+user if the vault is absent or locked. Each label, the whisper and the sidecar can be given, and `{ maxMillisSinceRefresh }`, 1000 by default, sets how fresh the vault and box must be
+apart from the bank's own refresh settings. The box stays, and counts toward the vault's `maxBoxes`.
+
 ## Showing a whisper
 
 `box.expose()` keeps a whisper on the box until `box.unexpose()`, a sweep, a vacate or a delete, and
@@ -198,13 +204,14 @@ merges deeply, and an array replaces.
 There are important considerations to building a form safely, and we have provided helpers to do so. See the
 [safebyok-react README](../safebyok-react/README.md) for details and react version compatibility.
 
-## Not done yet
+## Entry points
 
-**A host outside this repo cannot make a `Bank` yet.** The `safebyok` entry point exports `Bank`,
+The `safebyok` entry point exports `Bank`,
 `Box`, `Gating`, `Vault`, their snapshot types and `VaultError`, `safebyok/dom` exports `BoxFields`, and
 `safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. `safebyok/browser` exports the Argon2id derivers,
-`idbDeviceDB`, the device database in IndexedDB, `zxcvbnStrengthChecker`, and `browserOpts`, the three in one bag. Nothing in
-the core exports a `VaultDB`.
+`idbDeviceDB`, the device database in IndexedDB, `zxcvbnStrengthChecker`, and `browserOpts`, the three in one bag.
+`safebyok/storage` is what a storage adapter is written against: `AdapterVaultDB` and `MemoryVaultDB`. `safebyok-indexeddb`, `safebyok-postgres`, `safebyok-convex`
+and `safebyok-graphql` are the adapters.
 
 ## Next
 

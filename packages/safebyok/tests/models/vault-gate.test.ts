@@ -2,15 +2,114 @@ import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import type { Gating } from '../../src/models/gating'
 import type { Gatingkind } from '../../src/shapes/shapes-enums'
+import type { PrfSalt } from '../../src/shapes/shapes-core'
 import { passphraseCleartext } from '../../src/shapes/shapes-gateish'
+import type { VaultRecord } from '../../src/shapes/shapes-storage'
 import { Promptly } from '../../src/shapes/shapes-vaultish'
 import { PasskeyProving, PassphraseProving } from '../../src/models/proving'
+import { VaultListing } from '../../src/models/vault-listing'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import * as TH from '../test-helpers'
 import { isZeroed } from '../test-helpers/proving-world'
-import { NewPassphrase, Passphrase, addPasskeyTyping, delTyping, makeBornVault, makeBornVaultWithPasskey, replaceTyping, revokeTyping, storedVaultRecord, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, addPasskeyTyping, byPassphrase, delTyping, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, replaceTyping, revokeTyping, hearingBadNews, storedVaultRecord, unlockTyping, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
 
 useVaultWorlds()
+
+describe("a lease cache that refuses", () => {
+  it("leaves a passphrase replaced and the vault unlocked, telling onBadNews", async () => {
+    const onBadNews = vi.fn()
+    const { fakeBank, opts, deviceDB, demandStored } = await makeBornVault()
+    const vault = await new VaultListing(fakeBank, hearingBadNews(opts, onBadNews)).build(demandStored())
+    await unlockTyping(vault, byPassphrase(Passphrase))
+    const refusal = new VaultError('storage_unavailable', "the disk is full")
+    deviceDB.tryStow.mockResolvedValueOnce(TH.bad(refusal))
+    await expect(replaceTyping(vault, Passphrase, NewPassphrase)).resolves.to.eq(vault)
+    expect(vault.isUnlocked).to.be.true
+    expect(onBadNews.mock.calls).to.deep.equal([[refusal]])
+  })
+})
+
+describe("a gate changed on another device", () => {
+  // The vaultKey did not change, so a lease in force stays in force.
+  it("taken from a received record leaves this vault unlocked, its lease still sealing", async () => {
+    const record = await storedVaultRecord()
+    const { listing, putBehindOurBack } = makeVaultWorld(record)
+    const vault = await listing.build(record)
+    await unlockTyping(vault, byPassphrase(Passphrase))
+    const other = makeVaultWorld(record, { device_id: '00000000-0000-4000-8000-000000000002' })
+    const theirs = await other.listing.build(record)
+    await unlockTyping(theirs, byPassphrase(Passphrase))
+    await replaceTyping(theirs, Passphrase, NewPassphrase)
+    const received = putBehindOurBack(other.demandStored())
+    vault.receive(received)
+    expect(vault.gate.pickle()).to.deep.equal(received.gate)
+    expect(received.gate.passphrase_wayin).not.to.deep.equal(record.gate.passphrase_wayin)
+    expect(vault.isUnlocked).to.be.true
+    expect(await vaultRoundTrip(vault, vault)).to.eq('sk-test')
+  })
+
+  it("taken from a fetch leaves this vault unlocked, its lease in force", async () => {
+    const { vault, demandStored } = await makeBornVaultWithPasskey()
+    const other = makeVaultWorld(demandStored(), { device_id: '00000000-0000-4000-8000-000000000002' })
+    const theirs = await other.listing.build(demandStored())
+    await unlockTyping(theirs, byPassphrase(Passphrase))
+    await replaceTyping(vault, Passphrase, NewPassphrase)
+    other.putBehindOurBack(demandStored())
+    await theirs.fetch()
+    expect(theirs.gate.pickle().passphrase_wayin).to.deep.equal(demandStored().gate.passphrase_wayin)
+    expect(theirs.isUnlocked).to.be.true
+    expect(await vaultRoundTrip(theirs, theirs)).to.eq('sk-test')
+  })
+})
+
+describe("a vault record stored without its gate", () => {
+  it("refuses 'damaged_row' at hydrate, and writes nothing", async () => {
+    const { gate: _gate, ...gateless } = await storedVaultRecord()
+    const { listing, storedNow } = makeVaultWorld(gateless as VaultRecord)
+    const vault = await listing.build(listing.sparseOf(gateless))
+    await TH.expectRefusal(vault.hydrate(), 'damaged_row')
+    expect(vault.isFull).to.be.false
+    expect(storedNow()).to.equal(gateless)
+  })
+})
+
+describe("a passkey over a passphrase change", () => {
+  // A decision: notes/wontfix.md, 2026-11-09.
+  it("keeps the passkey wayin as stored, and the passkey still opens", async () => {
+    const { vault, demandStored } = await makeBornVaultWithPasskey()
+    const { passkey_wayin } = demandStored().gate
+    await replaceTyping(vault, Passphrase, NewPassphrase)
+    expect(demandStored().gate.passkey_wayin).to.deep.equal(passkey_wayin)
+    const proving = await PasskeyProving.buildStored(vault.gate, await TH.passkeyOf('laptop'))
+    expect(proving.wayinkind).to.eq('passkey')
+  })
+})
+
+/** A born vault's record with its passkey wayin's salt too short to be one. */
+const damagedOf = async (): Promise<VaultRecord> => {
+  const { demandStored } = await makeBornVaultWithPasskey()
+  const record = demandStored()
+  return { ...record, gate: { ...record.gate, passkey_wayin: { ...record.gate.passkey_wayin!, prf_salt_b64: 'short' as PrfSalt } } }
+}
+
+describe("a passkey wayin stored damaged", () => {
+  it("refuses 'damaged_row' at hydrate, a salt too short to be one failing the row's check, and writes nothing", async () => {
+    const damaged = await damagedOf()
+    const { listing, storedNow } = makeVaultWorld(damaged)
+    const vault = await listing.build(listing.sparseOf(damaged))
+    await TH.expectRefusal(vault.hydrate(), 'damaged_row')
+    expect(vault.isFull).to.be.false
+    expect(storedNow()).to.equal(damaged)
+  })
+
+  it("is told as 'damaged_row' from a listing of the bank's vaults, and listed no more", async () => {
+    const damaged = await damagedOf()
+    const { listing, badnews } = makeVaultWorld(damaged)
+    await listing.list()
+    expect(badnews.map((news) => news.refusalkind)).to.deep.equal(['damaged_row'])
+    expect(listing.things).to.deep.equal([])
+  })
+})
 
 type Born = Awaited<ReturnType<typeof makeBornVault>>
 

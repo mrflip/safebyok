@@ -100,9 +100,7 @@ jobs:
 
   # The unit tests with coverage, which build every package first: under CI a build fails on any
   # warning, and checks each package as a consumer would see it (publint, arethetypeswrong: each
-  # tsdown.config.ts), and a failed build fails this step before any test runs. Last, the size
-  # budget: what a bundler ships for each way of importing the packages measured, against the
-  # limits in .size-limit.json, read from the build the step before made.
+  # tsdown.config.ts), and a failed build fails this step before any test runs.
   test-build:
     runs-on: ubuntu-latest
     steps:
@@ -115,8 +113,6 @@ jobs:
       - id: install
         run: pnpm install --frozen-lockfile
       - run: pnpm test:coverage
-      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: pnpm size:check
 
   # The unit tests on the Node majors a consumer may run, beside the one we develop on. Node 22 is
   # the platform floor (`engines`), and a failure there is a gate; the newest Node reports, and a

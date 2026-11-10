@@ -9,9 +9,9 @@ implementation.
   removed on 2026-10-18 for a different plan); what waits is the UX, a device list, and, if the Coach
   wants rotation not to sign every other device out, a key pair per wayin (`TODO.md`, *Which wayins
   a rotation keeps*). The data it needs goes
-  in with rotation: a random `device_id` per vault per device, recorded on every wayin it adds.
-  * **What we record now.** `device_id` is random, minted per vault per device, never derived from
-    the device, so the backend can't link one device's vaults to each other. That reading follows
+  in with rotation: a random `device_id` per bank per device, recorded on every wayin it adds.
+  * **What we record now.** `device_id` is random, minted per bank per device, never derived from
+    the device; the backend can already link a user's vaults by `user_id`. That reading follows
     Apple's ban on fingerprinting and Google's guidance to use a privately stored random ID; it is
     the agents' reading, not legal advice, and the Coach is "pretty sure the device id is ok".
   * **What is permitted to retain about devices -- open.** The Coach: are we allowed to store
@@ -40,7 +40,7 @@ implementation.
   [#132](https://github.com/mrflip/safebyok/pull/132)), G499: "Leave conflict handler as NOTYET, so
   that when the idea keeps coming up there's some place to point to." There is none today: a write
   that lost is refused as `stale_write`, never merged or tried again, and the vault never clears
-  damage on its own, so `putBox()` over a box is the handler (`packages/safebyok-old/VAULTDB.md`). A host may one day want the say on a box
+  damage on its own, so `putBox()` over a box is the handler. A host may one day want the say on a box
   too damaged to name its epoch, meeting a healthy store.
 * **The Postgres adapter's own tests on a real server.** The Coach (2026-10-16, thread 11,
   [#131](https://github.com/mrflip/safebyok/pull/131)): the adapter's own tests

@@ -19,7 +19,7 @@ export { ckeyOf } from '../helpers/helpers'
 export { inOneStep, rowAt } from './idb-transaction'
 export { versionedShelfOf } from './idb-shelf'
 export type { VersionedShelfSpec } from './idb-shelf'
-export { VaultsDBVersion } from '../helpers/consts'
+export { DefaultMaxBoxes, DefaultMaxRecordBytes, VaultsDBVersion } from '../helpers/consts'
 // --
 
 // == [The rows]: sentinels, scopes, records, options and the helpers that read a row
@@ -61,7 +61,7 @@ export type { ConsistencyRefusal, ObjCheckOpts, Refusing, Story } from '../helpe
 // --
 
 // == [The refusals]: an adapter's throwers
-export { sanitizeForeignError, storageUnavailable, unexpectedError } from '../refusals/throwers'
+export { sanitizeForeignError, storageBlocked, storageUnavailable, unexpectedError } from '../refusals/throwers'
 export { vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, storageFull, seqNotNext, deviceDBFailed } from '../refusals/throwers'
 export { storageFailed, identityRevoked } from '../refusals/throwers'
 export { VaultError, isVaultError, refusalkindVals } from '../refusals/errors'

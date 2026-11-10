@@ -2,19 +2,20 @@ import { cloneDeep, mergeWith } from 'es-toolkit'
 import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
 import { ENCRYPTED, LOCKED, VEILED, type Modelkind } from '../helpers/consts'
-import { type Outcome, outcomeOf } from '../refusals/outcome'
+import { type Outcome, demandGood, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import * as CX from '../shapes/shapes-core'
 import type { Sidecar, Boxscope, Whisper } from '../shapes/shapes-core'
 import type { BoxExposure } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxExposedPatch, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type Fetched, type TimelyOpts } from '../shapes/shapes-vaultish'
+import { type BoxExposedPatch, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type Fetched, type ThingAnswer, type TimelyOpts } from '../shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../shapes/shapes-storage'
 import { stableJsonify } from '../helpers/stable-jsonify'
 import { absentBoxError, notExposedError, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
+import { badAnswerOf } from '../storage/vault-db'
 
 /** A box as this device has it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
@@ -187,17 +188,23 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
    * the one stored, so a sparse box is fetched first.
    */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
-    const { ifAbsent, ifPresent, ...timely } = VX.boxPutOpts.parse(opts)
-    await this.ensurePuttable(timely)
-    const given = this.demandPuttable(patch, { ifPresent })
-    const { record, prior } = await this.#edit(given)
-    this.demandPuttable(patch, { ifPresent })
-    await this.listing.put(record, { prior, ifAbsent, ifPresent })
+    demandGood(await this.tryPut(patch, opts))
     return this
   }
 
-  /** Non-throwing form of {@link put}. */
-  tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.put(patch, opts)) }
+  /** {@link put}, answering the vaultDB's own answer with the box listed as its `val`. */
+  async tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<ThingAnswer<Box>> {
+    const edited = await outcomeOf(async () => {
+      const { ifAbsent, ifPresent, ...timely } = VX.boxPutOpts.parse(opts)
+      await this.ensurePuttable(timely)
+      const given = this.demandPuttable(patch, { ifPresent })
+      const { record, prior } = await this.#edit(given)
+      this.demandPuttable(patch, { ifPresent })
+      return { record, putOpts: { prior, ifAbsent, ifPresent } }
+    })
+    if (! edited.ok) { return badAnswerOf(edited.err) }
+    return this.listing.tryPut(edited.val.record, edited.val.putOpts)
+  }
 
   /** Seal the whisper exposed, veiled or not, and put it; `patch` may name a sidecar, never a whisper. */
   async putExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<this> {

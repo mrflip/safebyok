@@ -107,7 +107,7 @@ box.send(patch)
 ├─ record = await #edit(patch, ante)                 laid over ante, returned, captured nowhere
 ├─ demandReadyToSend
 └─ listing.put(record, ante, { ifPresent })          over ante's revision, not whatever the instance has by then
-   ├─ tryPutRow(record, { prior, ifPresent })
+   ├─ doTryPut(record, { prior, ifPresent })
    │    moved → 'stale_write': the stored record delivered, then thrown
    └─ deliver → receive → adopt, align              send resolves at the end of receive
 ```

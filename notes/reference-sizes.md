@@ -142,8 +142,8 @@ Every box is in one vault, under distinct boxlabels of one length. *Full* is `{ 
 
 ## Bank sizes
 
-No limit on vaults per bank exists. The core sets no limit on boxes or record bytes: `maxRecordBytes` and the
-`maxBoxes` of the memory and Postgres stores default to `Infinity`. Two sets of defaults exist elsewhere, and each
+No limit on vaults per bank exists. The core's defaults are `DefaultMaxBoxes`, 100 live boxes to a vault, and `DefaultMaxRecordBytes`, 5,600 bytes
+to a box record: about 95% of Postgres's 8,000-byte `NOTIFY` payload, less the Larger vault row above, rounded down. Two other sets of limits exist, and each
 gets a family of rows below.
 
 * *Convex*: what safebyok-convex enforces. Each box is at most 1,048,576 bytes, a vault holds at most 8,000 boxes,

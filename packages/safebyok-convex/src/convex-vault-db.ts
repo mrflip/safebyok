@@ -64,13 +64,13 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 
   readonly #client: ConvexVaultClient
   readonly #api: SafebyokApi
-  readonly #maxBoxes: number | undefined
+  readonly #maxBoxes: number
   // --
 
   // == [Construction]: constructor
 
   constructor(opts: ConvexVaultDBOpts) {
-    const { client, api, maxBoxes, maxRecordBytes = ConvexDocumentBytes } = convexVaultDBOpts.parse(opts, { where: 'ConvexVaultDB', advice: Phrases.ConvexVaultDBAdvice })
+    const { client, api, maxBoxes = DB.DefaultMaxBoxes, maxRecordBytes = DB.DefaultMaxRecordBytes } = convexVaultDBOpts.parse(opts, { where: 'ConvexVaultDB', advice: Phrases.ConvexVaultDBAdvice })
     super({ maxRecordBytes: Math.min(maxRecordBytes, ConvexDocumentBytes) })
     this.#client = client
     this.#api = api
@@ -102,8 +102,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 
   // The component answers a full vault with its capacity rather than throwing, so the refusal is made here, where the core's throwers are.
   protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxWritten> {
-    const args = (this.#maxBoxes === undefined) ? { record, opts } : { record, opts, maxBoxes: this.#maxBoxes }
-    const answer = await reaching('doPutBox', () => this.#client.mutation(this.#api.putBox, args))
+    const answer = await reaching('doPutBox', () => this.#client.mutation(this.#api.putBox, { record, opts, maxBoxes: this.#maxBoxes }))
     if ('capacity' in answer) { throw DB.vaultFull(answer.capacity) }
     return answer
   }

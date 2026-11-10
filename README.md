@@ -7,10 +7,9 @@ ciphertext: unrecoverable even with a copy of the database, the application, and
 
 This repository is a pnpm workspace. Its packages:
 
-* [`safebyok`](packages/safebyok) -- the vault itself, in its new design, which nothing below has moved to yet.
-* [`safebyok-old`](packages/safebyok-old) -- the old design, private: what the packages below run on
-  until they move, with the IndexedDB device database in `safebyok-old/idb` and display helpers (`mask`)
-  in `safebyok-old/utils`.
+* [`safebyok`](packages/safebyok) -- the vault itself.
+* [`safebyok-old`](packages/safebyok-old) -- the old design, private, on its way out: only the private
+  `safebyok-idb-old` still runs on it.
 * [`safebyok-react`](packages/safebyok-react) -- the React binding: a provider, snapshot hooks,
   and a guard that asks for the passphrase on demand.
 * [`safebyok-convex`](packages/safebyok-convex) -- Convex storage: a Convex component, and the

@@ -12,7 +12,7 @@ import * as VX from '../shapes/shapes-vaultish'
 import type { VaultWorld } from '../shapes/shapes-vaultish'
 import * as SX from '../shapes/shapes-storage'
 import type { VaultRecord } from '../shapes/shapes-storage'
-import { attemptInFlight, clearsThrew, gatingDismissed, gatingConcluded, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
+import { attemptInFlight, clearsThrew, gateMadeElsewhere, gatingDismissed, gatingConcluded, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import { Gate } from './gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Vault } from './vault'
@@ -167,9 +167,9 @@ const RunForGatingkind: { [KindT in Gatingkind]: Run<KindT> } = {
     const record = listing.recordOfBirth(gate, prior)
     const vault  = await listing.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' })
 
-    // The row stored may be another's, born first: this proof opens only its own.
-    if (vault.vault_tok === record.vault_tok) { await friend.unlockByProof(vault, passphraseProving) }
-    return vault
+    // The row stored may be another's, born first: this proof opens only its own, and the user must hear that theirs was not set.
+    if (vault.vault_tok !== record.vault_tok) { throw gateMadeElsewhere() }
+    return friend.unlockByProof(vault, passphraseProving)
   },
 
   unlock_vault: ({ proved }, { vault, friend }) => friend.unlockByProof(vault, proved),

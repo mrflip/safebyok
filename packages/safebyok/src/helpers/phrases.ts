@@ -166,9 +166,6 @@ export const PartialLoad = "The record in hand is not full, so it cannot be open
 /** Why a birth makes nothing of a dna for a scope the listing already has alive. */
 export const AlreadyListed = "This listing already has an instance under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
 
-/** Why a put that storage answered with no record refuses: only a broken adapter answers that. */
-export const PutAnsweredNothing = "A put was answered with no record, which a vaultDB never does: the storage adapter needs a developer's look."
-
 /** Why an update of a box naming neither its whisper nor its sidecar writes nothing. */
 export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to write."
 
@@ -299,7 +296,7 @@ export const PasskeyAlreadyAdded = "This vault has a passkey already, and may ha
 export const DelOfOtherLife = "The vault listed in this slot is under another vault_tok than this Vault, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDismissed, AlreadyAsking, AttemptInFlight, GatingConcluded, RequestCleartextThrew, ClearsThrew, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDismissed, AlreadyAsking, AttemptInFlight, GateMadeElsewhere, GatingConcluded, RequestCleartextThrew, ClearsThrew, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
@@ -311,6 +308,8 @@ export const AlreadyAsking = "A prompt is already open on this bank, so this one
 
 
 export const AttemptInFlight = "An attempt is already under way on this prompt, so this one was not tried: disable the submit button until it answers."
+
+export const GateMadeElsewhere = "This vault's passphrase was just set on another device, so the one you entered was not set here, and nothing was changed. Enter the passphrase chosen there to unlock it."
 
 export const GatingConcluded = "This prompt has ended -- it was answered, dismissed, or refused for good -- so this attempt did nothing: ask again if the user still wants the vault."
 
