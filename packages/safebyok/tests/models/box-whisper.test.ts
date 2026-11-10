@@ -61,7 +61,7 @@ describe("box.extractWhisper(): what the lease opens that is no whisper", () => 
   for (const [blurb, text] of OpenedCases) {
     it(`refuses 'damaged_whisper' for ${blurb}, quoting none of it`, async () => {
       const base = world.mw.world
-      const leasedWorld: BoxWorld = { vault_tok: base.vault_tok, get isLocked() { return base.isLocked }, demandUnlocked: () => base.demandUnlocked(), receiveWorld: (taken) => { base.receiveWorld(taken) }, ensureTimely: (maxMillis) => base.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text), subscribe: (listener) => base.subscribe(listener) }
+      const leasedWorld: BoxWorld = { vault_tok: base.vault_tok, get isLocked() { return base.isLocked }, receiveWorld: (taken) => { base.receiveWorld(taken) }, ensureTimely: (maxMillis) => base.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text), subscribe: (listener) => base.subscribe(listener) }
       const box = await boxListingOf(world.mw, { world: leasedWorld }).build(fullBoxRecord())
       const err = await TH.expectRefusal(box.extractWhisper(), 'damaged_whisper')
       expect(err.message).to.eq(Phrases.UndecodedWhisper)

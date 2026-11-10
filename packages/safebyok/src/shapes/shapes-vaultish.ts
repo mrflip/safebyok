@@ -341,11 +341,11 @@ export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<Box
 
 /** The check of a box listing's world past {@link listingWorld}: the vault's `vault_tok`, its demand, and its seal verbs. Checks only. */
 export const boxWorld = Checker(({ fn, vault_tok }) => listingWorld.extend({
-  vault_tok, demandUnlocked: fn(), subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn(),
+  vault_tok, subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn(),
 }), 'bad_option', [CX])
 
 /** The vault, as far as its boxes reach into it. */
-export type BoxWorld = Pick<Vault, keyof ListingWorld | 'vault_tok' | 'demandUnlocked' | 'subscribe' | 'sealStampedString' | 'unsealStampedString'>
+export type BoxWorld = Pick<Vault, keyof ListingWorld | 'vault_tok' | 'subscribe' | 'sealStampedString' | 'unsealStampedString'>
 
 /** The check of a box listing's options: a listing's, and the scope of the vault it lists. Checks only. */
 export const boxListingOpts = Checker(({ vaultScope }) => listingOpts.extend({ scope: vaultScope }), 'bad_option', [CX])

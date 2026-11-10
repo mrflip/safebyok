@@ -243,9 +243,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   demandPuttable(patch: BoxPatch, { ifPresent }: BoxPutOpts = {}): BoxPatchGiven {
     const patchCheck = (ifPresent === 'fail') ? VX.boxPatchNew : VX.boxPatch
     const given = patchCheck.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
-    this.demandEnabled()
-    this.world.demandUnlocked()
-    this.demandWhole()
+    this.demandEnabled().demandUnlocked().demandWhole()
     return given
   }
 

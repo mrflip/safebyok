@@ -317,14 +317,13 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
   const demandFakeUnlocked = (): void => {
     if (isLocked) { throw Refuse.unlockFirst() }
   }
-  // The fake stands in for the vault, which `demandUnlocked` and `ensureTimely` answer; no box reads the answer.
+  // The fake stands in for the vault, which `ensureTimely` answers; no box reads the answer.
   const standIn = (): Vault => world as unknown as Vault
 
   const world: BoxWorld = {
     vault_tok:    WorldVault.vault_tok,
     get isLocked() { return isLocked },
     subscribe:    (listener) => { worldListeners.add(listener); return () => { worldListeners.delete(listener) } },
-    demandUnlocked: () => { if (isLocked) { throw Refuse.lockedError() } return standIn() },
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
       demandFakeUnlocked()

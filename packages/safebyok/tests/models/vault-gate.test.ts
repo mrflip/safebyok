@@ -394,6 +394,13 @@ describe("a gate change on other sessions", () => {
 })
 
 describe("vault.delVaultPrompt()", () => {
+  it("demandUnlocked on a tombstoned vault says locked, and demandPresent says gone", async () => {
+    const { vault } = await makeBornVault()
+    await delTyping(vault)
+    TH.expectSyncRefusal(() => vault.demandUnlocked(), 'vault_locked')
+    TH.expectSyncRefusal(() => vault.demandPresent(), 'vault_gone')
+  })
+
   it("locks the vault, puts a tombstone with its boxes cascaded, forgets the row cached, and stays in its slot tombstoned", async () => {
     const { vault, listing, storedNow, deviceDB } = await makeBornVault()
     const boxes = vault.boxListing
