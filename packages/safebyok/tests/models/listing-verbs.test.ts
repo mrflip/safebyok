@@ -280,3 +280,32 @@ describe("listing.put and listing.del: the prior tok they put", () => {
   })
 })
 // --
+
+describe("listing.tryPut and listing.tryFetch answer the vaultDB's own answer", () => {
+  it("carries the put's act, req_params and world, with the instance listed as its val", async () => {
+    const listing = boxListingOf(world.mw)
+    const box = await listing.build(fullBoxRecord())
+    world.mw.seedPut(fullBoxRecord())
+    const answer = await listing.tryPut(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }), { prior: box })
+    expect(answer).to.deep.include({ ok: true, val: box })
+    expect(answer).to.have.property('act')
+    expect(answer).to.have.property('world')
+    expect(answer.req_params).to.include({ boxlabel: box.boxlabel })
+  })
+
+  it("answers a refusal before the call as a bad answer, its act the refusalkind", async () => {
+    const listing = boxListingOf(world.mw)
+    const answer = await listing.tryPut({ garbage: true } as never, { prior: SX.VoidRevision })
+    expect(answer).to.deep.include({ ok: false, world: null, req_params: {} })
+    expect(answer.act).to.eq(answer.err?.refusalkind)
+  })
+
+  it("answers a fetch with the instance as its val, and the vaultDB's act", async () => {
+    const listing = boxListingOf(world.mw)
+    world.mw.seedPut(fullBoxRecord())
+    const answer = await listing.tryFetch(scopeOf())
+    expect(answer.ok).to.be.true
+    expect(answer.val).to.eq(listing.at(scopeOf()))
+    expect(answer).to.have.property('act')
+  })
+})

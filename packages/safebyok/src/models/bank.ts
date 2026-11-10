@@ -11,6 +11,8 @@ import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
 import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bankedVaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
+import type { GoodAnswer } from '../storage/vault-db'
+import type { Box } from './box'
 import type { LeaseDated } from '../shapes/shapes-storage'
 import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
@@ -285,10 +287,10 @@ export class Bank {
     const timely = { box: found?.sparse ?? null, vault: vault.sparse, boxRefreshedAt: found?.refreshedAt ?? null, vaultRefreshedAt: vault.refreshedAt, timestamp: nowMillis() }
     const boxscope = { ...vault.scope, boxlabel }
     const replacing = { ifAbsent: 'add', ifPresent: 'repl' } as const
-    const put = probeStepOf(await vault.boxListing.puttable(boxscope, replacing).putAnswered({ whisper, sidecar }, { ...horizons, ...replacing }))
-    const { thing: box, answer } = await vault.boxListing.fetchAnswered(boxscope)
-    const fetch = probeStepOf(answer)
-    await box?.extractWhisper({ maxMillisSinceRefresh: Infinity })
+    const put = probeStepOf(demandGood(await vault.boxListing.puttable(boxscope, replacing).tryPut({ whisper, sidecar }, { ...horizons, ...replacing })))
+    const fetched = demandGood(await vault.boxListing.tryFetch(boxscope))
+    const fetch = probeStepOf(fetched)
+    await fetched.val?.extractWhisper({ maxMillisSinceRefresh: Infinity })
     return { timely, put, fetch, unseal: { ok: true, timestamp: nowMillis() } }
   }
   // --
@@ -446,8 +448,8 @@ const DefaultHandlers: Handlers = { onLifecycle: guardOnLifecycle(DefaultOnLifec
 // == [Helpers]: millisOf, checkSecureContext, probeStepOf
 
 /** A storage verb's answer with no wrapped key or ciphertext left in it, and when it came back. */
-const probeStepOf = ({ act, req_params, val, world }: VX.ListingGoodAnswer<SX.BoxRecord, SX.BoxSparse>): VX.ProbeStep => (
-  { ok: true, act, req_params, val: SX.boxSparse.parse(val), world: SX.vaultSparse.parse(world), timestamp: nowMillis() }
+const probeStepOf = ({ act, req_params, val, world }: GoodAnswer<Box | null, string, unknown>): VX.ProbeStep => (
+  { ok: true, act, req_params, val: SX.boxSparse.parse(val?.sparse), world: SX.vaultSparse.parse(world), timestamp: nowMillis() }
 )
 
 // A host's Infinity minutes, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.

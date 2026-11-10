@@ -60,7 +60,7 @@ export const valOf = <ValT>(outcome: Outcome<ValT>): ValT => {
 }
 
 /** `outcome` itself when it is good, or its `err` thrown. */
-export const demandGood = <ValT>(outcome: Outcome<ValT>): GoodOutcome<ValT> => {
+export const demandGood = <OutcomeT extends Outcome<unknown>>(outcome: OutcomeT): Extract<OutcomeT, { ok: true }> => {
   if (! outcome.ok) { throw outcome.err }
-  return outcome
+  return outcome as Extract<OutcomeT, { ok: true }>  // narrowed by the ok just tested
 }

@@ -166,9 +166,6 @@ export const PartialLoad = "The record in hand is not full, so it cannot be open
 /** Why a birth makes nothing of a dna for a scope the listing already has alive. */
 export const AlreadyListed = "This listing already has an instance under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
 
-/** Why a put that storage answered with no record refuses: only a broken adapter answers that. */
-export const PutAnsweredNothing = "A put was answered with no record, which a vaultDB never does: the storage adapter needs a developer's look."
-
 /** Why an update of a box naming neither its whisper nor its sidecar writes nothing. */
 export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to write."
 

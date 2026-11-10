@@ -95,10 +95,7 @@ export const delOfOtherLife = (): VaultError => new VaultError('vault_mismatch',
 export const vaultStoredDamaged = ({ vaultlabel }: SX.DamagedVault): VaultError => new VaultError('damaged_row', Phrases.vaultStoredDamaged(vaultlabel))
 // --
 
-// == [Listing Throwers]: putAnsweredNothing, otherVaultTokAtBirth
-
-/** A `record_conflict` refusal: a vaultDB answered a put with no record. */
-export const putAnsweredNothing = (): VaultError => new VaultError('record_conflict', Phrases.PutAnsweredNothing)
+// == [Listing Throwers]: otherVaultTokAtBirth
 
 /** A `record_conflict` refusal: storage gave a record under another vault_tok than this listing's vault. */
 export const otherVaultTokAtBirth = (): VaultError => new VaultError('record_conflict', Phrases.OtherVaultTokAtBirth)

@@ -14,7 +14,7 @@ import type { Storable } from '../models/storable'
 import type { Vault } from '../models/vault'
 import type { DeviceDB } from '../storage/device-db'
 import type { Outcome } from '../refusals/outcome'
-import { type Answer, type GoodAnswer, type VaultDB, VaultDBVerbnames } from '../storage/vault-db'
+import { type Answer, type PutAct, type VaultDB, VaultDBVerbnames } from '../storage/vault-db'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
@@ -238,8 +238,11 @@ export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extend
 /** The answer of a vaultDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
 export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, string, unknown>
 
-/** A {@link ListingAnswer} the vaultDB did not refuse. */
-export type ListingGoodAnswer<RecordT, SparseT> = GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>
+/** A put's {@link ListingAnswer}, whose good form always carries a record. */
+export type ListingPutAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT>, PutAct, unknown>
+
+/** What a listing's `tryPut` and `tryFetch` answer: the vaultDB's own answer, with the instance listed as its `val`. */
+export type ThingAnswer<ValT> = Answer<ValT, string, unknown>
 
 /** The tombstone `listing.del` hands the vaultDB: gone, at the revision after the one it goes over. */
 export type DelTombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>

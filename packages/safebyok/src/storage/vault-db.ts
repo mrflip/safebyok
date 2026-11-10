@@ -40,8 +40,11 @@ export type Notice = { act: 'got' | 'gone', val: VaultRow | BoxRow, world: Vault
 
 const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<GoodAnswer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
   const outcome = await outcomeOf(thunk)
-  if (outcome.ok) { return outcome.val }
-  const { err } = outcome
+  return outcome.ok ? outcome.val : badAnswerOf(outcome.err)
+}
+
+/** The answer `err` stands for: its act, its request's metadata and the rows it carries, where it has them. */
+export const badAnswerOf = (err: VaultError): BadAnswer => {
   const { act = err.refusalkind, req_params = {} } = err.meta ?? {}
   const { world = null, dbhas } = rowsOfRefusal(err)
   return { ok: false, err, act, world, req_params, ...((dbhas !== undefined) && { dbhas }) }
