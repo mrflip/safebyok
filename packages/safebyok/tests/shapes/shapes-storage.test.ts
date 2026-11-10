@@ -32,31 +32,34 @@ describe("the row checks a VaultDB's conditional writes run", () => {
 
   it.each(boxFlaws)("isLiveBoxRecord and isBoxPutAllowed answer false for a row with %s", (_flawname, flawOf) => {
     expect(SX.isLiveBoxRecord(flawOf(box), 'life1')).to.be.false
-    expect(SX.isBoxPutAllowed(flawOf(box), { ...putOver, prior: priorOf(box) })).to.be.false
+    expect(SX.isBoxPutAllowed(flawOf(box), box, { ...putOver, prior: priorOf(box) })).to.be.false
   })
 
   it.each(vaultFlaws)("isLiveVaultRecord and isVaultPutAllowed answer false for a row with %s", (_flawname, flawOf) => {
     expect(SX.isLiveVaultRecord(flawOf(vault), 'life1')).to.be.false
-    expect(SX.isVaultPutAllowed(flawOf(vault), { ...putOver, prior: priorOf(vault) })).to.be.false
+    expect(SX.isVaultPutAllowed(flawOf(vault), vault, { ...putOver, prior: priorOf(vault) })).to.be.false
   })
 
-  it("isBoxPutAllowed follows prior, ifAbsent and ifPresent over no row, a tombstone and a live row", () => {
-    expect(SX.isBoxPutAllowed(null, putOver)).to.be.true
-    expect(SX.isBoxPutAllowed(null, { ...putOver, ifAbsent: 'fail' })).to.be.false
-    expect(SX.isBoxPutAllowed(null, { ...putOver, prior: stale })).to.be.false
+  it("isBoxPutAllowed follows prior, ifAbsent and ifPresent over no row, a tombstone and a live row, and refuses a live row of another life", () => {
+    expect(SX.isBoxPutAllowed(null, box, putOver)).to.be.true
+    expect(SX.isBoxPutAllowed(null, box, { ...putOver, ifAbsent: 'fail' })).to.be.false
+    expect(SX.isBoxPutAllowed(null, box, { ...putOver, prior: stale })).to.be.false
     const tombstone = boxTombstoneOf(box)
-    expect(SX.isBoxPutAllowed(tombstone, { ...putOver, prior: priorOf(tombstone) })).to.be.true
-    expect(SX.isBoxPutAllowed(tombstone, { ...putOver, prior: priorOf(tombstone), ifAbsent: 'fail' })).to.be.false
-    expect(SX.isBoxPutAllowed(box, { ...putOver, prior: priorOf(box) })).to.be.true
-    expect(SX.isBoxPutAllowed(box, { ...putOver, prior: priorOf(box), ifPresent: 'fail' })).to.be.false
-    expect(SX.isBoxPutAllowed(box, { ...putOver, prior: stale })).to.be.false
+    expect(SX.isBoxPutAllowed(tombstone, box, { ...putOver, prior: priorOf(tombstone) })).to.be.true
+    expect(SX.isBoxPutAllowed(tombstone, box, { ...putOver, prior: priorOf(tombstone), ifAbsent: 'fail' })).to.be.false
+    expect(SX.isBoxPutAllowed(box, box, { ...putOver, prior: priorOf(box) })).to.be.true
+    expect(SX.isBoxPutAllowed(box, box, { ...putOver, prior: priorOf(box), ifPresent: 'fail' })).to.be.false
+    expect(SX.isBoxPutAllowed(box, box, { ...putOver, prior: stale })).to.be.false
+    expect(SX.isBoxPutAllowed(box, { ...box, box_tok: 'life2' }, { ...putOver, prior: priorOf(box) })).to.be.false
   })
 
-  it("isVaultPutAllowed answers true at a tombstone's revision, and false over a live row a gate verb did not name", () => {
+  it("isVaultPutAllowed answers true at a tombstone's revision and over a live row of its life, and false over one of another life", () => {
     const tombstone = vaultTombstoneOf(vault)
-    expect(SX.isVaultPutAllowed(null, putOver)).to.be.true
-    expect(SX.isVaultPutAllowed(tombstone, { ...putOver, prior: priorOf(tombstone) })).to.be.true
-    expect(SX.isVaultPutAllowed(vault, { ...putOver, prior: priorOf(vault), ifPresent: 'fail' })).to.be.false
+    expect(SX.isVaultPutAllowed(null, vault, putOver)).to.be.true
+    expect(SX.isVaultPutAllowed(tombstone, vault, { ...putOver, prior: priorOf(tombstone) })).to.be.true
+    expect(SX.isVaultPutAllowed(vault, vault, { ...putOver, prior: priorOf(vault), ifPresent: 'fail' })).to.be.false
+    expect(SX.isVaultPutAllowed(vault, vault, { ...putOver, prior: priorOf(vault) })).to.be.true
+    expect(SX.isVaultPutAllowed(vault, { ...vault, vault_tok: 'life2' }, { ...putOver, prior: priorOf(vault) })).to.be.false
   })
 
   it("isLifeOver answers true for no row, a tombstone or another life's row, and false for this life's row and any row failing its check", () => {

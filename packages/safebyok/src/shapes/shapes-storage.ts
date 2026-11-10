@@ -269,16 +269,22 @@ export const isLiveBoxRecord = (raw: unknown, vault_tok: string): boolean => {
 }
 
 // A row that fails its check is never put over, whatever `prior` names: only `isRowAt` reads the peek, and it runs after the check.
-const isPutAllowedOver = (rowCheck: Z.ZodType<{ am: EX.Am } | null>, ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => {
-  const found = rowCheck.safeParse(ante)
-  return found.success && isRowAt(ante, prior) && ((found.data?.am === 'a') ? (ifPresent === 'repl') : (ifAbsent === 'add'))
+// A put replaces a live row only within its own life: a new life is born over a tombstone or nothing.
+const isPutAllowedOver = (found: { am: EX.Am } | null, isSameLife: boolean, ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
+  isRowAt(ante, prior) && ((found?.am === 'a') ? ((ifPresent === 'repl') && isSameLife) : (ifAbsent === 'add'))
+)
+
+/** True when `record` may be written over `ante`, the vault row stored there or null, under `opts`. */
+export const isVaultPutAllowed = (ante: unknown, record: VaultRecord, opts: PutOptsGiven): boolean => {
+  const found = foundVaultRow.safeParse(ante)
+  return found.success && isPutAllowedOver(found.data, found.data?.vault_tok === record.vault_tok, ante, opts)
 }
 
-/** True when a vault row's put under `opts` may be written over `ante`, the row stored there or null. */
-export const isVaultPutAllowed = (ante: unknown, opts: PutOptsGiven): boolean => isPutAllowedOver(foundVaultRow, ante, opts)
-
-/** True when a box row's put under `opts` may be written over `ante`, the row stored there or null. */
-export const isBoxPutAllowed = (ante: unknown, opts: PutOptsGiven): boolean => isPutAllowedOver(foundBoxRow, ante, opts)
+/** True when `record` may be written over `ante`, the box row stored there or null, under `opts`. */
+export const isBoxPutAllowed = (ante: unknown, record: BoxRecord, opts: PutOptsGiven): boolean => {
+  const found = foundBoxRow.safeParse(ante)
+  return found.success && isPutAllowedOver(found.data, found.data?.box_tok === record.box_tok, ante, opts)
+}
 
 /** True when `raw` is no row, a tombstone, or a row of another life, so the boxes under `vault_tok` belong to nothing. A row failing its checks might be theirs, and is false. */
 export const isLifeOver = (raw: unknown, vault_tok: string): boolean => {

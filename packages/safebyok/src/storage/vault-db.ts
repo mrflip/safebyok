@@ -274,7 +274,8 @@ export abstract class AdapterVaultDB implements VaultDB {
       if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.vaultGone(found) }
       if (found.am === 'x') { throw Refuse.staleWrite(found, found) }
       if (ifPresent === 'get') { return { ok: true, req_params, act: 'declined', val: found, world: found } }
-      if (ifPresent === 'fail') { throw Refuse.camped(found, found) }
+      // A live row at `prior` that `repl` did not replace is of another life than the record.
+      if ((ifPresent === 'fail') || SX.isRowAt(found, putOpts.prior)) { throw Refuse.camped(found, found) }
       throw Refuse.staleWrite(found, found)
     } catch (err) { throw refusalOf(err, 'putVault', req_params) }
   }
@@ -301,7 +302,8 @@ export abstract class AdapterVaultDB implements VaultDB {
       if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.absentBox(world, found) }
       if (found.am === 'x') { throw Refuse.staleWrite(world, found) }
       if (ifPresent === 'get') { return { ok: true, req_params, act: 'declined', val: found, world } }
-      if (ifPresent === 'fail') { throw Refuse.camped(world, found) }
+      // A live row at `prior` that `repl` did not replace is of another life than the record.
+      if ((ifPresent === 'fail') || SX.isRowAt(found, putOpts.prior)) { throw Refuse.camped(world, found) }
       throw Refuse.staleWrite(world, found)
     } catch (err) { throw refusalOf(err, 'putBox', req_params) }
   }

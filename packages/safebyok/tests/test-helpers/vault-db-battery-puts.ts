@@ -44,6 +44,12 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await vaultDB.tryPutVault(vaultAt(1), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'stale_write', dbhas: next })
     })
 
+    it("refuses as camped a replace at the row's revision under another vault_tok, leaving the row", async () => {
+      const { vaultDB, vault } = await putWith()
+      expect(await vaultDB.tryPutVault(vaultAt(1, 'life2'), { prior: priorOf(vault) })).to.deep.include({ ok: false, act: 'camped', dbhas: vault, world: vault })
+      expect(await vaultDB.getVault(vaultScope)).to.deep.include({ world: vault })
+    })
+
     it("over a live row, ifPresent get answers it as declined, and fail refuses, neither saving", async () => {
       const { vaultDB, vault } = await putWith()
       const rival = vaultAt(0, 'life2')
@@ -110,6 +116,12 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       const next = boxAt(1)
       expect(await vaultDB.putBox(next, { prior: priorOf(box), ifPresent: 'get' })).to.deep.include({ act: 'declined', val: box, world: vault })
       expect(await vaultDB.tryPutBox(next, { prior: priorOf(box), ifPresent: 'fail' })).to.deep.include({ ok: false, act: 'camped', dbhas: box, world: vault })
+    })
+
+    it("refuses as camped a replace at the row's revision under another box_tok, leaving the row", async () => {
+      const { vaultDB, vault, box } = await putWith({ box: true })
+      expect(await vaultDB.tryPutBox(boxAt(1, 'life1', { box_tok: 'box2' }), { prior: priorOf(box) })).to.deep.include({ ok: false, act: 'camped', dbhas: box, world: vault })
+      expect(await vaultDB.getBox(box)).to.deep.include({ val: box })
     })
 
     it("refuses over a row moved past its prior, with the row and leaving it", async () => {

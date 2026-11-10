@@ -87,7 +87,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Written> {
     const written = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const ante = await DB.rowAt(store, vaultScopepathOf(record))
-      const isWritten = DB.isVaultPutAllowed(ante, opts)
+      const isWritten = DB.isVaultPutAllowed(ante, record, opts)
       if (isWritten) { store.put(record, vaultScopepathOf(record)) }
       return { isWritten, ante }
     })
@@ -98,7 +98,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxWritten> {
     const written = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [vault, ante] = await Promise.all([DB.rowAt(store, vaultScopepathOf(record)), DB.rowAt(store, boxScopepathOf(record))])
-      const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
+      const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, record, opts)
       if (isWritten) {
         await this.#demandRoom(store, record, ante)
         store.put(record, boxScopepathOf(record))

@@ -236,7 +236,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Written> {
     return await this.#transact(async (tx) => {
       const ante = await lockedVaultRowOf(tx, record)
-      if (! DB.isVaultPutAllowed(ante, opts)) { return { isWritten: false, ante } }
+      if (! DB.isVaultPutAllowed(ante, record, opts)) { return { isWritten: false, ante } }
       if (! await writeVaultRow(tx, record, ante)) { return { isWritten: false, ante: await vaultRowOf(tx, record) } }
       await notify(tx, record, [noticeTextOf(record)])
       return { isWritten: true, ante }
@@ -247,7 +247,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return await this.#transact(async (tx) => {
       const vault = await lockedVaultRowOf(tx, record)
       const ante = await boxRowOf(tx, record, record.boxlabel)
-      const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, opts)
+      const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, record, opts)
       if (isWritten) {
         await this.#demandRoom(tx, record, ante)
         await writeBoxRow(tx, record, record.boxlabel, record)
