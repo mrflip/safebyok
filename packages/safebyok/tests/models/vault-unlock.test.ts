@@ -138,7 +138,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
   it("seals nothing another vault opens: the vaultKey and the vault's stamp are bound in", async () => {
     const { vault } = await makeBornVault()
     const { vault: other } = await makeBornVault()
-    await TH.expectRefusal(other.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), Stamp), 'damaged_box')
+    await TH.expectRefusal(other.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), Stamp), 'damaged_whisper')
   })
 })
 

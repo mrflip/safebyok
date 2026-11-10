@@ -20,15 +20,16 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   `vault_gone`, `vault_mismatch`, `gating_concluded`, `attempt_in_flight`, `already_asking`, `dismissed`,
  *   `same_passphrase`, `camped`, `vault_empty`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
- *   the user. `damaged_box`, `damaged_lease`, `newer_format`,
+ *   the user. `damaged_whisper`, `damaged_lease`, `newer_format`,
  *   `identity_revoked`, `damaged_row`, `storage_issue`.
  *
- * A record that fails its checks is named for its direction, by a VaultDB and a vault alike. One
- * read from storage that fails them is `damaged_row`, on the way out, and a box that will not open
- * under the lease in hand is `damaged_box`, Zod's own error its `cause` where a check failed. A
- * damaged row never indicates format drift: it is thrown by the vaultDB tied to the datastore. One
- * handed in is `bad_option`, on the way in; `bad_record` where one check serves both ways. A
- * storage adapter's answer that cannot be, one revision under two toks say, is `record_conflict`.
+ * A record that fails its checks is named for its direction. One read from storage that fails them
+ * is `damaged_row`, on the way out. A damaged row never indicates format drift: it is thrown by the
+ * vaultDB tied to the datastore. One handed in is `bad_option`, on the way in; `bad_record` where one
+ * check serves both ways. A whisper that will not open under the lease in hand, or opens to no
+ * whisper, is `damaged_whisper`, Zod's own error its `cause` where a check failed. A storage
+ * adapter's answer that cannot be, one revision under two toks or a world row failing its checks
+ * say, is `record_conflict`.
  *
  * `wrong_passphrase` and `wrong_passkey` are all a vault can tell even when the stored vault was
  * altered, since decryption fails alike; the message says so.
@@ -47,12 +48,12 @@ export const refusalkindVals = [
   'vault_full',          // a new box in a vault already at its maxBoxes (a best-effort cap), or a write storage has no room for
   'bad_option',          // an option, argument or record handed in that fails its check: Bank.make's, argon2idDeriver's, a vaultDB verb's, a putBox()'s sidecar
   'bad_record',          // a record that fails a check serving both ways, a record handed in and one read back
-  'damaged_box',         // a box's whisper would not open under the vault's lease, or opened to no whisper this package knows
+  'damaged_whisper',     // a box's whisper would not open under the vault's lease, or opened to no whisper this package knows
   'newer_format',        // a stored wayin naming a key deriver this handle was not built with: update safebyok
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
-  'record_conflict',     // storage answered what cannot be: one revision under two toks, a record of another vault_tok than this device has, a put that answered nothing; a fetch again is worth one try, and if it remains the system is fundamentally not working
+  'record_conflict',     // storage answered what cannot be: one revision under two toks, a record of another vault_tok than this device has, a world row failing its checks, a put that answered nothing; a fetch again is worth one try, and if it remains the system is fundamentally not working
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it; its own error is the cause
   'storage_blocked',     // the browser withholds its storage from this page -- site data blocked, a private window, IndexedDB switched off: a retry will not mend it
@@ -93,7 +94,7 @@ export const RefusalFamilyForKind = {
   vault_full:          'condition',
   bad_option:          'misuse',
   bad_record:          'misuse',
-  damaged_box:         'bad_news',
+  damaged_whisper:     'bad_news',
   newer_format:        'bad_news',
   insecure_context:    'misuse',
   unexpected_error:    'misuse',

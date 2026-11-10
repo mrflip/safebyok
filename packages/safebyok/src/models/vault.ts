@@ -266,7 +266,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
   // `receive` refuses `otherVaultTok` for a row of another life: the one consistency guard on this path.
-  receiveWorld(world: unknown): void { this.receive(SX.vaultRow.refusingAs('damaged_row').parse(world)) }
+  receiveWorld(world: unknown): void { this.receive(SX.vaultRow.refusingAs('record_conflict').parse(world)) }
   // --
 
   // == [Box verbs]: hello, bringUp, getBox, fetchBox, putBox, delBox, each with its try form

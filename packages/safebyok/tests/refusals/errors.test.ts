@@ -87,7 +87,7 @@ describe("RefusalFamilyForKind", () => {
     expect(RefusalFamilyForKind.bad_option).to.eq('misuse')
     expect(RefusalFamilyForKind.bad_record).to.eq('misuse')
     expect(RefusalFamilyForKind.storage_unavailable).to.eq('condition')
-    expect(RefusalFamilyForKind.damaged_box).to.eq('bad_news')
+    expect(RefusalFamilyForKind.damaged_whisper).to.eq('bad_news')
   })
 })
 
@@ -109,7 +109,7 @@ const FamilyCases = [
   ["absent_wayin",        "condition", 'a passkey removed on another device is a fact of syncing'],
   ["box_too_large",       "condition", "a box too heavy for one record is the user's whisper and note, not the code"],
   ["vault_full",          "condition", 'a full vault tells the user to remove a box'],
-  ["damaged_box",         "bad_news",  'a box stored damaged is told to the user, who may remove it'],
+  ["damaged_whisper",     "bad_news",  'a box stored damaged is told to the user, who may remove it'],
   ["newer_format",        "bad_news",  'a vault a newer version wrote is told to the user, who updates the app'],
   ["stale_write",         "condition", 'another device writing first is a fact of syncing'],
   ["record_conflict",     "condition", 'storage and this device disagreeing about one revision is for the app to tell the user of; fetching again does not mend it'],
@@ -146,7 +146,7 @@ describe("each kind's family", () => {
 const ConditionCases = [
   [new VaultError('storage_unavailable', 'The vault storage could not be reached.'), true,  'a condition VaultError'],
   [new VaultError('identity_revoked', 'Sign in to reach this vault.'),               true,  'a signed-out refusal, bad news the app shows'],
-  [new VaultError('damaged_box', 'That box is damaged.'),                            true,  'a damaged box, bad news too'],
+  [new VaultError('damaged_whisper', 'That box is damaged.'),                            true,  'a damaged box, bad news too'],
   [new VaultError('bad_scope', 'A label is 2-40 lowercase letters.'),                false, 'a misuse VaultError'],
   [new VaultError('unexpected_error', 'Something threw that is no refusal.'),       false, 'an unexpected error, misuse too'],
   [new Error('storage_unavailable'),                                                       false, 'a plain Error, even one whose message names a condition'],

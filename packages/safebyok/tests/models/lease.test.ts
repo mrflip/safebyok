@@ -419,35 +419,35 @@ describe("lease.sealWith(whisperText, stamp) and unsealWith(sealed, stamp)", () 
   ] as const
 
   for (const [wrong, blurb] of WrongStampCases) {
-    it(`refuses to open under ${blurb}, as 'damaged_box', and locks nothing`, async () => {
+    it(`refuses to open under ${blurb}, as 'damaged_whisper', and locks nothing`, async () => {
       const { friend, lease } = await grantedWorld()
       const sealed = await lease.sealWith(WhisperText, sealStampOf('b1'))
-      await TH.expectRefusal(lease.unsealWith(sealed, wrong), 'damaged_box')
+      await TH.expectRefusal(lease.unsealWith(sealed, wrong), 'damaged_whisper')
       expect(friend.lock).not.toHaveBeenCalled()
     })
   }
 
-  it("refuses to open the box key and whisper of one box laid under another's: 'damaged_box'", async () => {
+  it("refuses to open the box key and whisper of one box laid under another's: 'damaged_whisper'", async () => {
     const { lease } = await grantedWorld()
     const sealedOne = await lease.sealWith(WhisperText, sealStampOf('b1'))
     const sealedTwo = await lease.sealWith(WhisperText, sealStampOf('b2'))
-    await TH.expectRefusal(lease.unsealWith({ box_key_wrapped: sealedOne.box_key_wrapped, whisper_ciphered: sealedTwo.whisper_ciphered }, sealStampOf('b2')), 'damaged_box')
+    await TH.expectRefusal(lease.unsealWith({ box_key_wrapped: sealedOne.box_key_wrapped, whisper_ciphered: sealedTwo.whisper_ciphered }, sealStampOf('b2')), 'damaged_whisper')
   })
 
-  it("refuses to open what another vault sealed under the same box stamps, as 'damaged_box'", async () => {
+  it("refuses to open what another vault sealed under the same box stamps, as 'damaged_whisper'", async () => {
     const { lease } = await grantedWorld()
     const other = await makeGrantedLease(fakeLeaseFriendOf({ vault_tok: 'vault-tok-other' }))
     const stamp = sealStampOf('b1')
     const sealed = await other.sealWith(WhisperText, stamp)
-    await TH.expectRefusal(lease.unsealWith(sealed, stamp), 'damaged_box')
+    await TH.expectRefusal(lease.unsealWith(sealed, stamp), 'damaged_whisper')
   })
 
-  it("refuses tampered ciphertext as 'damaged_box', quoting none of it", async () => {
+  it("refuses tampered ciphertext as 'damaged_whisper', quoting none of it", async () => {
     const { lease } = await grantedWorld()
     const stamp = sealStampOf('b1')
     const sealed = await lease.sealWith(WhisperText, stamp)
     const tampered = { ...sealed, whisper_ciphered: { ...sealed.whisper_ciphered, ciphertext_b64: TH.tweakB64(sealed.whisper_ciphered.ciphertext_b64) } }
-    const err = await TH.expectRefusal(lease.unsealWith(tampered, stamp), 'damaged_box')
+    const err = await TH.expectRefusal(lease.unsealWith(tampered, stamp), 'damaged_whisper')
     expect(TH.thrownText(err)).to.not.include(tampered.whisper_ciphered.ciphertext_b64)
   })
 

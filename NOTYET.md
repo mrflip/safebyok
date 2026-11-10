@@ -40,7 +40,7 @@ implementation.
   [#132](https://github.com/mrflip/safebyok/pull/132)), G499: "Leave conflict handler as NOTYET, so
   that when the idea keeps coming up there's some place to point to." There is none today: a write
   that lost is refused as `stale_write`, never merged or tried again, and the vault never clears
-  damage on its own, so `putBox()` over a box is the handler. A host may one day want the say on a box
+  damage on its own, so the customer calling `putBox()` over a box from their code is the handler. A host may one day want the say on a box
   too damaged to name its epoch, meeting a healthy store.
 * **The Postgres adapter's own tests on a real server.** The Coach (2026-10-16, thread 11,
   [#131](https://github.com/mrflip/safebyok/pull/131)): the adapter's own tests

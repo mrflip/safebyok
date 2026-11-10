@@ -37,7 +37,7 @@ describe("box.extractWhisper(): refused from its guard", () => {
     [() => tombstoneBoxRecord({ revision_seq: 2 }),      true,    "vault_locked",     'a deleted box while the vault is locked'],
     [() => fullBoxRecord(),                              true,    "vault_locked",     'a full box while the vault is locked'],
     // present and full, past the guard to a lease that never sealed it:
-    [() => fullBoxRecord(),                              false,   "damaged_box",      'a full box whose whisper will not open'],
+    [() => fullBoxRecord(),                              false,   "damaged_whisper",  'a full box whose whisper will not open'],
   ] as const
   for (const [recordOf, isLocked, refusalkind, blurb] of RefusedCases) {
     it(`refuses '${refusalkind}' for ${blurb}`, async () => {
@@ -59,11 +59,11 @@ describe("box.extractWhisper(): what the lease opens that is no whisper", () => 
     ['JSON that is an array',           '["sk-test-SECRET"]'],
   ] as const
   for (const [blurb, text] of OpenedCases) {
-    it(`refuses 'damaged_box' for ${blurb}, quoting none of it`, async () => {
+    it(`refuses 'damaged_whisper' for ${blurb}, quoting none of it`, async () => {
       const base = world.mw.world
       const leasedWorld: BoxWorld = { vault_tok: base.vault_tok, get isLocked() { return base.isLocked }, demandUnlocked: () => base.demandUnlocked(), receiveWorld: (taken) => { base.receiveWorld(taken) }, ensureTimely: (maxMillis) => base.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text), subscribe: (listener) => base.subscribe(listener) }
       const box = await boxListingOf(world.mw, { world: leasedWorld }).build(fullBoxRecord())
-      const err = await TH.expectRefusal(box.extractWhisper(), 'damaged_box')
+      const err = await TH.expectRefusal(box.extractWhisper(), 'damaged_whisper')
       expect(err.message).to.eq(Phrases.UndecodedWhisper)
       expect(JSON.stringify({ meta: err.meta, cause: String(err.cause) })).to.not.include('SECRET')
     })

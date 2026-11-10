@@ -20,7 +20,7 @@ const SourceFiles = ['**/*.{js,mjs,cjs,ts,mts,cts}']
 const QuotedKind = "'[a-z]+_[a-z_]+'"
 
 /** The refusal kinds a customer checks for and reacts to: part of our API, so a test title may quote them. */
-const CustomerKinds = ['absent_box', 'damaged_box', 'damaged_row', 'identity_revoked', 'newer_format', 'stale_write', 'vault_locked', 'weak_passphrase', 'wrong_passphrase']
+const CustomerKinds = ['absent_box', 'damaged_whisper', 'damaged_row', 'identity_revoked', 'newer_format', 'stale_write', 'vault_locked', 'weak_passphrase', 'wrong_passphrase']
 
 /** A quoted refusal kind other than {@link CustomerKinds}, which a test title leaves to its assertions. */
 const UntitledKind = `'(?!(?:${CustomerKinds.join('|')})')[a-z]+_[a-z_]+'`

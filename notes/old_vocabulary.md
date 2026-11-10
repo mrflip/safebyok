@@ -99,7 +99,7 @@ To be deleted at 1.0.0.
 | lockboxKey, lockboxKeyWrapped, `lockboxKeyBytes`       | boxKey, boxKeyWrapped, `boxKeyBytes`                    |
 | `lockbox_key_wrapped` (stored)                         | `box_key_wrapped`                                       |
 | format `safebyok-lockbox-v5`                           | format `safebyok-box-v6`                                |
-| `damaged_lockbox`, `lockbox_too_large`                 | `damaged_box`, `box_too_large`                          |
+| `damaged_lockbox`, `lockbox_too_large`                 | `damaged_whisper`, `box_too_large`                      |
 | `maxLockboxes`, `MaxLockboxes`, the capacity `lockboxes` | `maxBoxes`, `MaxBoxes`, `boxes`                         |
 | `storeBox` (the vault), `updateBox` (a VaultDB)        | `putBox`, on both                                       |
 | `readBox`                                              | `getBox`                                                |
