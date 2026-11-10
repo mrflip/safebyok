@@ -1,23 +1,17 @@
 # Goofus and Gallant: doc blocks
 
-The Coach's rewrites of doc blocks the `unrace` sprint stripped, each beside the block it replaces, and the slop the pair shows.
-Each principle has a hashtag to refer to in a review. Code on #498 (`b8a28462`); the signatures are as the Coach wrote them.
-
-This file is for a documentarian. A block marked **Gallant** is the Coach's, and goes into `src` as written. The principle
-names the species, to hunt in the blocks this file doesn't cover. Four pairs that teach a lesson `notes/gallant.md` lacked
-live there, under *Words*, and are listed below so the bestiary stays whole. A review finding cites a tag; `rg '#tag' notes/`
-finds the pair.
-
-**Status**, every pair here: Planned, the documentarian run on `models/`. None of the Coach's blocks is in `src`; on #498
-each method carries a stripped one-liner, some marked `SLOPDOC:`.
+Doc blocks in pairs: Goofus, the slop, and Gallant, the block that replaces it, under the principle the pair shows. Each
+principle has a hashtag to cite in a review; `rg '#tag' notes/` finds the pair. The principle names the species, to hunt in
+the blocks this file doesn't cover. Four lessons live in `notes/gallant.md`, under *Words*, and are listed below so the
+bestiary stays whole.
 
 Contents:
 
-* **Here:** `#lead-with-the-job`, `#outcome-not-branches`, `#no-sibling-comparisons`, `#one-breath-contract`, `#one-sentence-headline`
-* **Here, from the old tree** (`packages/safebyok-old/src` at `b7bacb68`; the Coach accepted or wrote each Gallant, 2026-11-05):
-  `#three-questions`, `#name-the-act`, `#one-verb-one-fact`, `#option-values-get-a-list`, `#point-dont-redefine`,
-  `#customer-first`, `#guard-names-its-predicates`, `#reason-goes-above`, `#facts-from-the-code`, and a second specimen each
-  for `#a-helper-gets-a-phrase`, `#purpose-not-machinery`, `#no-refusal-catalog`, `#say-what-to-do`, `#say-the-guarantee`
+* **Here:** `#lead-with-the-job`, `#outcome-not-branches`, `#no-sibling-comparisons`, `#one-breath-contract`,
+  `#one-sentence-headline`, `#three-questions`, `#name-the-act`, `#one-verb-one-fact`, `#option-values-get-a-list`,
+  `#point-dont-redefine`, `#customer-first`, `#guard-names-its-predicates`, `#reason-goes-above`, `#facts-from-the-code`, and
+  a second specimen each for `#a-helper-gets-a-phrase`, `#purpose-not-machinery`, `#no-refusal-catalog`, `#say-what-to-do`,
+  `#say-the-guarantee`
 * **In `notes/gallant.md`, *Words*:** `#purpose-not-path`, `#purpose-not-machinery`; `#no-refusal-catalog` (`create`, `demandUnsealable`);
   `#say-what-to-do` (`vaultAt`); `#say-the-guarantee` (`extractWhisper`); `#a-helper-gets-a-phrase` (`#unseal`)
 
@@ -49,7 +43,7 @@ async hello(): Promise<void>
 ## The outcome, not the branch tour `#outcome-not-branches`
 
 A block that walks each path the method can take, with the state each leaves, is its control flow in prose. Say what the
-caller holds when it resolves, and the one case that bends it.
+caller holds when it resolves, and any case that bends it.
 
 **Goofus:**
 
@@ -67,9 +61,7 @@ async ensureVault(scope: BankedVaultScope): Promise<Vault>
 
 ## No sibling comparisons `#no-sibling-comparisons`
 
-"As X does" sends the reader to another method to learn what this one does, and goes stale the day X changes. Say the
-condition. `BoxListing` has no `#demandUnlocked` on #498 (a box calls `Storable.demandUnlocked` and its `BoxWorld`'s); the pair
-stands for the pattern.
+"As X does" sends the reader to another method to learn what this one does, and goes stale the day X changes. Say the condition.
 
 **Goofus:**
 
@@ -81,7 +73,7 @@ stands for the pattern.
 **Gallant:**
 
 ```ts
-/** refuse if 'vault_locked', else no-op */
+/** refuse if `'vault_locked'`, else no-op */
 #demandUnlocked(): void
 ```
 
@@ -105,9 +97,14 @@ async put(patch: BoxPatch, opts: SendOpts = {}): Promise<this>
 ```ts
 /** Create or update the whisper and sidecar, encrypting whisper and sealing the box metadata
  * See {@link sealedRecordOf} for what "encrypting ... and sealing" mean
- * - `ifPresent:repl` (default): replaces (if in correct sequence);
- * - `ifPresent:fail` replace a void/tombstoned box, else fail
- * - `ifPresent:get`  returns an existing box
+ * - `prior`         -- the expected stored revision (or the sentinel void revision for a birth)
+ * - `ifPresent`     -- how to handle a live row:
+ *   - `'fail'`         -- refuse `'camped'`
+ *   - `'get'`          -- return the existing stored record; act `'declined'`, ok `true`, nothing written
+ *   - `'repl'`         -- overwrite and return the newly-stored record; act `'replaced'` (default)
+ * - `ifAbsent`      -- how to handle a void / tombstoned row:
+ *   - `'add'`          -- overwrite and return the newly-stored record; act `'born'` / `'reborn'` (default)
+ *   - `'fail'`         -- refuse `'absent_box'`
  */
 async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this>
 ```
@@ -116,11 +113,9 @@ async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this>
 
 The first line rests on the `/**` and is one whole sentence, so it reads with the code folded. It runs long only while it is
 still one fact a caller must know before calling; a second fact goes on a line below, under a short headline. The test:
-read the line aloud; a breath taken at "so", "as" or a semicolon marks where the second line begins. Three pairs, from
-`models/box-listing.ts`, `storage/vault-db.ts` and `models/box.ts` on `main` at `fa7ff8e5`; the Gallant column is
-proposed.
+read the line aloud; a breath taken at "so", "as" or a semicolon marks where the second line begins.
 
-**Goes long: a refusal the caller meets in normal use is headline news.** `create` refusing a live box is the one thing a
+**Goes long: a refusal the caller meets in normal use is headline news.** `create` refusing a live box is what a
 caller checks before calling it, and with the file folded the first line is all they see.
 
 **Goofus:**
@@ -136,7 +131,7 @@ async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box>
 **Gallant:**
 
 ```ts
-/** Seals a new box and stores it where no live box stands, refusing one that does as `camped`; answers the box listed. */
+/** Seals a new box and stores it if no live box has its scope, refusing `'camped'` if one does; answers the box listed. */
 async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box>
 ```
 
@@ -154,13 +149,11 @@ async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<Vaul
 **Gallant:**
 
 ```ts
-/** Stores `record` over the vault row standing at `prior`, as one conditional write.
- *
- * The write lands when the row stands where `prior` says: void, or at `prior`'s revision_tok. Where it does not, the row as
- * found decides:
- * * live, under `ifPresent: 'fail'`: refused as `camped`; under `'get'`: answered as it stands, act `declined`
- * * void or a tombstone, under `ifAbsent: 'fail'`: refused as `vault_empty` or `vault_gone`
- * * anything else: refused as `stale_write`; read the vault again and edit from the revision it answers.
+/** Stores `record` over the vault row at revision `prior`, as one conditional write.
+ * See docs for PutVaultOpts, but briefly:
+ * - live, under `ifPresent: 'fail'`: refused as `'camped'`; under `'get'`: answered with the stored row, act `'declined'`
+ * - void or a tombstone, under `ifAbsent: 'fail'`: refused as `'vault_empty'` or `'vault_gone'`
+ * - anything else: refused as `'stale_write'`; read the vault again and edit from the revision it answers.
  */
 async putVault(record: VaultRecord, opts: PutVaultOpts): Promise<GoodAnswer<VaultRow, PutAct>>
 ```
@@ -182,16 +175,10 @@ async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box>
 /** Seals `patch` over the record in hand as the next revision and stores it, answering the box.
  *
  * A lock does not interrupt or reverse a put once its write has begun. A patch leaving out the whisper or the sidecar keeps
- * the one stored, so a box held sparse is fetched first.
+ * the stored half, so a box held sparse is fetched first.
  */
 async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<Box>
 ```
-
----
-
-# From the old tree
-
-Specimens an agent nominated from `packages/safebyok-old/src` at `b7bacb68`, one to three per tag; the Gallant is the one the Coach accepted or wrote on 2026-11-05. The paths are the old tree's.
 
 ## Answer the caller's three questions `#three-questions`
 
@@ -200,7 +187,7 @@ When do I call it, what do I get, what would I otherwise get wrong. Never who ca
 **Goofus:**
 
 ```ts
-// device-db.ts:45
+// device-db.ts
   /** Read the lease of one vault, or null for none. The core reads it through `KeptLease.tryGet`, which checks it and holds it closed; the vault judges whether it still fits. */
   async getLease(scope: VaultScope): Promise<KeptLeaseRow | null> {
 ```
@@ -216,7 +203,7 @@ Says who calls it and who judges the answer, not what the caller gets.
 **Goofus:**
 
 ```ts
-// shapes/vault.ts:141
+// shapes/vault.ts
 /** One wayin as stored, a {@link PassphraseWayinRecord} or a {@link PasskeyWayinRecord}, told apart by `wayinkind`; `Wayin.make` reads one. */
 export type WayinRecord = Z.infer<typeof wayinRecord>
 ```
@@ -232,7 +219,7 @@ A semicolon tacks on who reads it.
 **Goofus:**
 
 ```ts
-// bank.ts:582
+// bank.ts
   /** Refuse 'vault_gone' once `entry` is no longer the one the bank holds for `vaultScopepath`: let go, or let go and asked for anew. What a birth asks after each wait. */
   #demandHeld(vaultScopepath: Scopepath.VaultScopepath, entry: HeldEntry) {
 ```
@@ -242,7 +229,7 @@ Ends on its caller: "What a birth asks after each wait."
 **Gallant:**
 
 ```ts
-/** Demand that `entry` is still the one the bank holds for `vaultScopepath`. */
+/** Demand that the bank still holds `entry` for `vaultScopepath`. */
 ```
 
 ## A private helper gets a phrase, second specimen `#a-helper-gets-a-phrase`
@@ -252,7 +239,7 @@ The first specimen is `#unseal` in `notes/gallant.md`.
 **Goofus:**
 
 ```ts
-// vault.ts:1592
+// vault.ts
   /** The revision the listing names for the box under `boxlabel`, sound or damaged; null for none listed, or a damaged record that holds none.
    * Storage arbitrates a write that names it, so a listing gone stale costs a refusal and a second
    * store, never a record.
@@ -275,7 +262,7 @@ The first pairs are in `notes/gallant.md`. Here, the state left behind told as p
 **Goofus:**
 
 ```ts
-// proving.ts:66
+// proving.ts
   /** Hold `lease`, which this proving made of the record it just stored, as the vault's lease: its expiry armed, the snapshot replaced. */
   holdLease:   (lease: Lease) => Lease
 ```
@@ -291,7 +278,7 @@ The state left behind, as participial absolutes: "its expiry armed, the snapshot
 **Goofus:**
 
 ```ts
-// proving.ts:165
+// proving.ts
   /** Demand that the gate's current wayin at its slotlabel opens under this proving, keeping nothing: 'wrong_passphrase' or 'wrong_passkey' when it will not.
    * It demands on the proving before and after its one wait, so a gate that moved meanwhile refuses
    * as the demand does, never as a wrong proof.
@@ -314,7 +301,7 @@ A function that stores, wraps or attaches opens with that verb. A past-tense eve
 **Goofus:**
 
 ```ts
-// gating.ts:222
+// gating.ts
   /** A `lock()` landed, or the vault went gone, while it was pending: every waiter refuses 'vault_locked', or `told` when the lock was storage's refusal, and `lockLanded` settles. */
   landLock(told?: VaultError): void {
 ```
@@ -324,13 +311,13 @@ The first sentence describes an event in the past tense, not the act the method 
 **Gallant:**
 
 ```ts
-/** End this pending gating for a lock landed or a vault gone: every waiter refuses, and `lockLanded` settles. */
+/** End this pending gating because a lock landed or the vault is gone: every waiter refuses, and `lockLanded` settles. */
 ```
 
 **Goofus:**
 
 ```ts
-// proving.ts:157
+// proving.ts
   /** `vaultKey` wrapped under the wayinKey, bound to `visible`, a wayin's header in this vault: the wrap a wayin stores. */
   async wrappedWith(vaultKey: CryptoKey, visible: WayinHeader): Promise<VaultKeyWayinWrapped> {
 ```
@@ -346,7 +333,7 @@ Wraps a key, but opens with a participle phrase.
 **Goofus:**
 
 ```ts
-// helpers.ts:45
+// helpers.ts
 /** `val`, once attached to `obj` as the enumerable own property `propname`: {@link tattoo} for one prop. */
 export function tattooProp<VT>(obj: object, propname: string, val: VT, opts: TattooOpts = {}): VT {
 ```
@@ -366,7 +353,7 @@ Every sentence has a subject and a finite verb. A verb gapped out of a list, a s
 **Goofus:**
 
 ```ts
-// shapes/bank-opts.ts:72
+// shapes/bank-opts.ts
   /** What this device keeps of each vault, unless its {@link BankVaultOpts} names another: in a browser, from `browserOpts()`; elsewhere, `memoryDeviceDB()`. */
   deviceDB:   DeviceDB
 ```
@@ -382,7 +369,7 @@ The verb is gapped out of a semicolon list.
 **Goofus:**
 
 ```ts
-// vault.ts:1972
+// vault.ts
 /** The box `putBox()` seals, as its caller names it: its boxlabel, and its sidecar, left out to keep the one it has. */
 export type PutBoxProps = { boxlabel: string, sidecar?: Sidecar | undefined }
 ```
@@ -392,13 +379,13 @@ A stand-in "one" inside a participle.
 **Gallant:**
 
 ```ts
-/** What a `putBox()` names: the boxlabel, and a sidecar. Leave the sidecar out to keep the stored one. */
+/** What a `putBox()` names: the boxlabel, and a sidecar. Leave the sidecar out to keep what is stored. */
 ```
 
 **Goofus:**
 
 ```ts
-// checks/validator.ts:160
+// checks/validator.ts
   /** `val`, parsed: the call's kind otherwise, its message framed as `story` asks; 'bad_option' for a story that is none, whatever `val`. */
   parse: (val: unknown, story?: Story) => Z.output<SchemaT>
 ```
@@ -418,7 +405,7 @@ The first pairs (`create`, `demandUnsealable`) are in `notes/gallant.md`.
 **Goofus:**
 
 ```ts
-// vault-opts.ts:210
+// vault-opts.ts
 /** Bank.make's options, checked and read, before storage is touched.
  * Refuses 'insecure_context' first, in a page the browser says is not a secure context. Then
  * 'bad_option' for anything but a bag, or for an option it does not take, of the wrong type or out
@@ -440,12 +427,12 @@ Every refusal kind in throw order, chained with "then" and semicolons.
 
 ## Say what to do, the detailed specimen `#say-what-to-do`
 
-The small specimen is `vaultAt` in `notes/gallant.md`. This one the Coach wrote long on purpose: a cap a host tunes calls for the recipe and the limits. The reason it is soft went above, as `#reason-goes-above` asks; "lowering it afterwards is undefined" is a `notes/wontfix.md` fact as well.
+The small specimen is `vaultAt` in `notes/gallant.md`. This one runs long on purpose: a cap a host tunes calls for the recipe and the limits. The reason it is soft went above, as `#reason-goes-above` asks; "lowering it afterwards is undefined" is a `notes/wontfix.md` fact as well.
 
 **Goofus:**
 
 ```ts
-// shapes/bank-opts.ts:127
+// shapes/bank-opts.ts
   /** The most boxes the vault holds. Default: the smaller of {@link MaxBoxes}, 100, and the vaultDB's own `maxBoxes`.
    * `putBox()` refuses a new box past it as 'vault_full'. Replacing a box already there is always
    * allowed, and lowering it strands nothing stored. It may not exceed the vaultDB's `maxBoxes`, and
@@ -461,30 +448,30 @@ States the 'vault_full' a caller meets in normal use, and gives no recipe for it
 ```ts
 // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
 /** A soft cap on the boxes a vault holds. Default: the smaller of {@link MaxBoxes}, 100, and the `maxBoxes` the vaultDB adapter advises.
- * A box past it refuses 'vault_full': delete one first, or relaunch with a larger value. Replacing or reading a box is
+ * A box past it refuses `'vault_full'`: delete one first, or relaunch with a larger value. Replacing or reading a box is
  * always allowed, even over the limit. Lowering it afterwards is undefined.
  */
 ```
 
 ## Option values get a list `#option-values-get-a-list`
 
-One value a line, the default marked. Values gapped into a sentence, or told as policy prose, hide the one the caller is looking for. The `PutVaultOpts` Gallant is checked against `storage/vault-db.ts` and `memory-vault-db.ts` on `main`: a write lands only where the row stands at `prior`, a rebirth over a tombstone included, and `putVault` takes no `'repl'`.
+One value a line, the default marked. Values gapped into a sentence, or told as policy prose, hide the value the caller is looking for.
 
 **Goofus:**
 
 ```ts
-// checks/validator.ts:301
+// checks/validator.ts
 /** How an {@link objCheck} validator refuses: `refuseAs`, the kind, 'bad_record' unless given; and `extras`, 'strict' (the default) to refuse a field the object does not take, or 'strip' to drop it unread. */
 export interface ObjCheckOpts extends Z.input<typeof Checks.objCheckOpts> {}
 ```
 
-Two options and their values gapped into one sentence, the default in parentheses. (`refuseAs` is `refusalkind` since PR #510: `#its-name-is-its-doc`.)
+Two options and their values gapped into one sentence, the default in parentheses.
 
 **Gallant:**
 
 ```ts
 /** How an {@link objCheck} validator refuses.
- * - `refusalkind`      -- the kind thrown (default: 'bad_record')
+ * - `refusalkind`      -- the kind thrown (default: `'bad_record'`)
  * - `extras: 'strict'` -- refuse a field the object does not take (default)
  * - `extras: 'strip'`  -- drop it unread
  */
@@ -493,7 +480,7 @@ Two options and their values gapped into one sentence, the default in parenthese
 **Goofus:**
 
 ```ts
-// storage/vault-db-shapes.ts:141
+// storage/vault-db-shapes.ts
 /** Why a row is in `damaged_records`: `format_mismatch`, written by a newer version of the app, so updating the app may read it; `damaged_record`, anything else. */
 export type Damagekind = typeof damagekindVals[number]
 ```
@@ -504,31 +491,35 @@ The two values gapped behind a semicolon, each explained in a clause.
 
 ```ts
 /** Why a row sits in `damaged_records`.
- * - `format_mismatch` -- written by a newer version of the app; updating may read it
- * - `damaged_record`  -- anything else
+ * - `'format_mismatch'` -- written by a newer version of the app; updating may read it
+ * - `'damaged_record'`  -- anything else
  */
 ```
 
 **Goofus:**
 
 ```ts
-// storage/vault-db-shapes.ts:147
+// storage/vault-db-shapes.ts
 /** A vault row is replaced only by a gate verb: `putVault` births one, or finds one in the way. */
 export type PutVaultOpts = Readonly<Z.input<typeof putVaultOpts>>
 ```
 
-The values told as policy prose: neither one named, the default not marked. Proposed for `shapes-storage.ts`'s `PutVaultOpts` on the documentarian run.
+The values told as policy prose.
 
 **Gallant:**
 
 ```ts
-/** `putVault`'s options. The write lands only where the row stands at `prior`: void, or that exact revision.
- * - `prior`             -- the revision the row must stand at; the void revision for a first birth
- * - `ifPresent: 'fail'` -- a live row refuses 'camped' (default)
- * - `ifPresent: 'get'`  -- a live row is answered as it stands, act 'declined'; nothing is written
- * - `ifAbsent: 'add'`   -- a void or tombstoned row at `prior` is written over: a birth, or a rebirth (default)
- * - `ifAbsent: 'fail'`  -- a void row refuses 'vault_empty', a tombstone 'vault_gone'
- * A row not at `prior` refuses 'stale_write': a rebirth names the tombstone's revision, not the void one.
+/** `putVault`'s options enforce sequential writes (our edit never overwrites an edit made in between)
+ * - `prior`         -- the expected stored revision (or the sentinel void revision for a birth)
+ * - `ifPresent`     -- how to handle a live row:
+ *   - `'fail'`         -- refuse `'camped'`
+ *   - `'get'`          -- return the existing stored record; act `'declined'`, ok `true`, nothing written
+ *   - `'repl'`         -- overwrite and return the newly-stored record; act `'replaced'` (default)
+ * - `ifAbsent`      -- how to handle a void / tombstoned row:
+ *   - `'add'`          -- overwrite and return the newly-stored record; act `'born'` / `'reborn'` (default)
+ *   - `'fail'`         -- refuse `'vault_empty'` / `'vault_gone'`
+ *
+ * Refuses `'stale_write'` if the expected `prior` revision is not identical to the existing row's.
  */
 ```
 
@@ -539,7 +530,7 @@ A term with a home gets one `{@link}` or a pointer, never a second definition.
 **Goofus:**
 
 ```ts
-// box.ts:73
+// box.ts
   /** The app's own JSON beside the whisper, `{}` when none: stored in the clear, never encrypted. */
   readonly sidecar:                Sidecar
 ```
@@ -555,7 +546,7 @@ Redefines sidecar, which `Sidecar` in shapes/box.ts already defines.
 **Goofus:**
 
 ```ts
-// expectations.ts:25
+// expectations.ts
 /** True when a stored row is a tombstone, the mark a deleted vault leaves in its place: judged by its `format` alone.
  * A tombstone too damaged to parse still reads as one, so it is never taken for a vault record.
  */
@@ -573,7 +564,7 @@ A predicate redefines tombstone in an appositive.
 **Goofus:**
 
 ```ts
-// gate.ts:92
+// gate.ts
   /** The gate as the vault record holds it, its `gate`: each wayin's record, the passkey's or null. Its `gate_epoch` rides beside it in the record. */
   get record(): GateRecord {
 ```
@@ -588,12 +579,14 @@ Redefines the gate record, which `GateRecord` in shapes/vault.ts already defines
 
 ## Words all three audiences can read `#customer-first`
 
-Use words a front-end developer (the customer) or a regular person (the user) knows, that a security reviewer understands without ambiguity. For the reviewer, "Additional Associated Data"; for the developer, "bag of props turned into bytes, mixed in but not stored"; the doc says it so both read it. The Coach's pair; the Coach's "will not unwrap" stands: the specific verb, not "open".
+Use words a front-end developer (the customer) or a regular person (the user) knows, that a security reviewer understands without ambiguity.
+A security reviewer reads "additional associated data"; a developer reads "a bag of props turned into bytes, mixed in but
+not stored". Word it so both read it: none of our abbreviations, and no "it is one ... header" slop.
 
 **Goofus:**
 
 ```ts
-// wayin.ts:100
+// wayin.ts
   /** The ctx this wayin's wrap is bound to: the stamp of the vault record it is one of, its purpose, and its whole header. */
   get wayinCtx(): Uint8Array
 ```
@@ -605,18 +598,18 @@ Use words a front-end developer (the customer) or a regular person (the user) kn
 ```ts
 /** Serialized name/value pairs bound into the wrapped value as cryptographic context.
  * The value cannot be unwrapped unless the same bytes, unchanged, are independently provided along with the wrapping
- * key. Any change to that associated data, another user_id or a forged registered_at, will not unwrap.
+ * key. With any change to that associated data, such as another `user_id` or a forged `registered_at`, it will not unwrap.
  */
 ```
 
 ## The guarantee, second specimen `#say-the-guarantee`
 
-The small specimen is `extractWhisper` in `notes/gallant.md`. There is no `leaseCtxOf` in the new tree yet; the Gallant goes with the lease ctx when it is built.
+The small specimen is `extractWhisper` in `notes/gallant.md`.
 
 **Goofus:**
 
 ```ts
-// lease.ts:31
+// lease.ts
 /** The ctx a lease's wrap is bound to: its vault's stamp but for the format, the lease's own {@link LeaseStamp}, and the purpose.
  * Each stamp may come whole, a Vault object or a lease record: only its stamp fields are taken.
  * It refuses 'bad_record' for one missing any of them.
@@ -639,7 +632,7 @@ A guard says what it asks, linked where the predicate has a name; not the kinds 
 **Goofus:**
 
 ```ts
-// vault.ts:1200
+// vault.ts
   /** The lease in hand, for `call` about to use it, demanded consistent with the picture and in force: 'vault_locked' with none. */
   #demandLease(call: VaultCall): Lease {
 ```
@@ -649,13 +642,13 @@ A guard written as a noun phrase, its predicates given as participles rather tha
 **Gallant:**
 
 ```ts
-/** The lease in force. Refuses one absent, or inconsistent with the picture. */
+/** The lease in force. Refuses if there is none, or if it is inconsistent with the picture. */
 ```
 
 **Goofus:**
 
 ```ts
-// vault.ts:1135
+// vault.ts
   /** Refuse once this Vault object is gone: 'vault_remade' for a vault made anew, else 'vault_gone'. Ask it first in every call, and again after a wait with no thing in hand to demand. */
   #demandNotGone() {
 ```
@@ -670,12 +663,12 @@ Names the kinds it refuses, not the predicate it asks, then says who calls it.
 
 ## The reason goes above `#reason-goes-above`
 
-A maintainer's note, an invariant kept or a reason, is a `//` comment above the doc block; the doc block says what the member does. The `isAllZero` pair landed as PR #510.
+A maintainer's note, an invariant kept or a reason, is a `//` comment above the doc block; the doc block says what the member does.
 
 **Goofus:**
 
 ```ts
-// bank.ts:412
+// bank.ts
   /** Publish the snapshot the private state makes now, and tell every listener: the one place the snapshot is swapped. Call it only once something changed. */
   #publish() {
 ```
@@ -685,14 +678,14 @@ An invariant for maintainers inside the doc block.
 **Gallant:**
 
 ```ts
-// The one place the snapshot is swapped. Call it only once something changed.
+// Nothing else swaps the snapshot. Call it only once something changed.
 /** Publish the snapshot and tell every listener. */
 ```
 
 **Goofus:**
 
 ```ts
-// proving.ts:462
+// proving.ts
 /** True when every byte of `bytes` is zero, read with no early exit, as libsodium's `sodium_is_zero` does.
  * No JavaScript engine promises constant time, but nothing here branches on a byte: only the
  * verdict steers what follows, and the refusal of an all-zero output tells that anyway.
@@ -720,7 +713,7 @@ const isSafelyAllZero = (bytes: Uint8Array): boolean => {
 **Goofus:**
 
 ```ts
-// storage/vault-db-shapes.ts:201
+// storage/vault-db-shapes.ts
 /** The tombstone of a vault row nothing holds. A damaged listing's label comes from storage, and is not checked here: it is part of what is reported. */
 export const sentinelVaultOf = ({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone => ({
 ```
@@ -741,7 +734,7 @@ A doc states what the body does, never what the old prose or a test title claime
 **Goofus:**
 
 ```ts
-// proving.ts:146
+// proving.ts
   /** True when `vaultRecord`'s wayin at this proving's slotlabel carries its header: the proving opens the gate it holds. */
   isCarriedBy(vaultRecord: Pick<VaultRecord, 'gate'>): boolean {
 ```
