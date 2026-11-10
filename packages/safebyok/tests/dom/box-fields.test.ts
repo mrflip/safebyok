@@ -202,7 +202,7 @@ describe("fields.bind: into hiding and back", () => {
     await box.expose()
     const el = elOf()
     BoxFields.of(box).bind('apiKey')(el)
-    await box.del()
+    await box.del(box.scope)
     expect(el.value).to.eq('')
   })
 })

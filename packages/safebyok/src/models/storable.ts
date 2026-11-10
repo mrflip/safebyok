@@ -1,5 +1,7 @@
 import { isEqual } from 'es-toolkit'
 import { nowMillis } from '../helpers/clock'
+import * as Phrases from '../helpers/phrases'
+import { verifyConsistent } from '../helpers/validator'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type WhisperedBag, isWhisperedBag } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
@@ -8,6 +10,7 @@ import { disabledError, lockedError, oneRevisionTwoFates, oneRevisionTwoLives, o
 import type { Age, Am, RecordShape } from '../shapes/shapes-enums'
 import * as VX from '../shapes/shapes-vaultish'
 import type { Fetched, FetchOpts, ListingOf, ListingWorld, Reconciled, Aligned, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
+import * as SX from '../shapes/shapes-storage'
 import type { Revision } from '../shapes/shapes-storage'
 
 // == [Revisions]: cmpRevisions
@@ -167,16 +170,18 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Non-throwing form of {@link hydrate}. */
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
-  /** Delete this thing through its listing. A thing gone is deleted again, over its tombstone's revision. */
-  async del(opts: TimelyOpts = {}): Promise<this> {
+  /** Delete this thing through its listing where it is what `asked` names: a scope names whatever is there, a revision only that one, else `stale_write`. */
+  async del(asked: ScopeT | SparseT, opts: TimelyOpts = {}): Promise<this> {
+    const pins = { ...SX.reqParamsOf(asked), ...this.listing.scopeOf(asked) }
     const { maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)
     await this.ensureDeletable({ maxMillisSinceRefresh, maxWorldMillis }); this.demandDeletable()
+    verifyConsistent(this.sparse, pins, { kind: 'stale_write', message: Phrases.DelOfOtherRevision })
     await this.listing.del(this.sparse)
     return this
   }
 
   /** Non-throwing form of {@link del}. */
-  tryDel(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(opts)) }
+  tryDel(asked: ScopeT | SparseT, opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(asked, opts)) }
   // --
 
   // == [Receiving]: receive, tombstoneFor

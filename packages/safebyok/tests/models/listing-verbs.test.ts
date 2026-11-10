@@ -291,7 +291,7 @@ describe("listing.put and listing.del: the prior tok they put", () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.build(aliveRow)
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } }), 'stale_write')
-    await TH.expectRefusal(box.del())
+    await TH.expectRefusal(box.del(box.scope))
     expect(box._cheat_central.revision_tok).to.eq('rev-a1')
     expect(world.mw.stored.size).to.eq(0)
   })

@@ -232,14 +232,14 @@ describe("the endings of a box exposed", () => {
 
   it("a delete clears the value and the veil", async () => {
     const box = await veiledOf()
-    await box.del()
+    await box.del(box.scope)
     expect(box.isVeiled).to.be.false
     expect(box.getSnapshot().isVeiled).to.be.false
   })
 
   it("a delete clears the value", async () => {
     const box = await showingOf()
-    await box.del()
+    await box.del(box.scope)
     expect(box.isPresent).to.be.false
     expect(box.whisper).to.eq(ENCRYPTED)
     expect(box.getSnapshot().isExposed).to.be.false

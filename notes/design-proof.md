@@ -450,11 +450,12 @@ gating.attempt({ passphraseClear })                  no lock check: a lock does 
 ├─ ante = vault.fullRecord, gate = vault.gate        this attempt's, from here on
 ├─ proved = PassphraseProving.buildStored(gate, passphraseClear, world)
 │    wrong → may re-enter
-└─ run(proved)                                       ── no clear goes past here ──
+└─ run({ ante, proved })                             ── no clear goes past here ──
    ├─ vault.lock()                                   sync, no throw: the lease revoked, the boxes aligned
-   └─ vault.del()                                    Storable's
+   └─ vault.del(ante)                                Storable's
       ├─ await ensureDeletable()                     hydrates
       ├─ demandDeletable                             enabled only: a lock does not stop a delete
+      ├─ vault.sparse consistent with ante           scope, vault_tok and revision; moved since the proof → 'stale_write', nothing sent
       └─ vaultListing.del(vault.sparse) → tryDel
          ├─ a vault listed of another vault_tok      → 'vault_mismatch', nothing sent
          └─ Listing.tryDel: the tombstone at nextRevisionOf(the sparse record's revision)
@@ -488,7 +489,7 @@ Repeated deletes do not advance the revision. Whoever repeats it may not have th
 answer. Moving it would wake every device's watch for nothing, and could refuse a rebirth with that
 tombstone as its `prior`. This is no retry by the package: a repeat is the host calling the verb again,
 which its Vault can until the tombstone arrives. After that `vault.delVaultPrompt()` refuses, as the vault is not
-present; `vault.del()` still repeats it, over the tombstone's revision, and the vaultDB answers `gone` and cascades.
+present; `vault.del(vault.scope)` still repeats it, over the tombstone's revision, and the vaultDB answers `gone` and cascades.
 
 A Box operation naming a stale or missing vault_tok will fail `vault_mismatch` (or `vault_empty` or `vault_gone`). The damaged_row field will contain a generated tombstone if one is found with that scope *and vault_tok*, null otherwise. In both cases the value is forensic: do not instantiate, do not delivere. (Discovering a row is exceptionally unlikely as they were to have been transactionally removed with the vault deletion. `bank.doctor()` will establish comfort if needed)
 

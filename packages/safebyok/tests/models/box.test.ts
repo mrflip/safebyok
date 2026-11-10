@@ -43,7 +43,7 @@ describe("Box own props", () => {
     expect(Object.keys(box)).to.have.members(keys)
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'edited' } })
     expect(Object.keys(box)).to.have.members(keys)
-    await box.del()
+    await box.del(box.scope)
     expect(Object.keys(box)).to.have.members(keys)
   })
 
@@ -354,7 +354,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
     [(box: TestableBox) => box.put({ whisper, sidecar: {} }, { maxMillisSinceRefresh: -1 }),     'put with opts out of range'],
     [(box: TestableBox) => box.fetch({ ifAbsent: 'shrug' as never }),                             'fetch with an ifAbsent it does not accept'],
     [(box: TestableBox) => box.hydrate({ maxMillisSinceRefresh: -1 }),                            'hydrate with opts out of range'],
-    [(box: TestableBox) => box.del({ maxWorldMillis: -1 }),                                       'del with opts out of range'],
+    [(box: TestableBox) => box.del(box.scope, { maxWorldMillis: -1 }),                                       'del with opts out of range'],
     [(box: TestableBox) => box.extractWhisper({ maxWorldMillis: -1 }),                             'extractWhisper with opts out of range'],
     [(box: TestableBox) => box.expose({ maxWorldMillis: -1 }),                                    'expose with opts out of range'],
   ] as const
@@ -437,7 +437,7 @@ describe("registered_at over a rebirth", () => {
   it("registers a box deleted and reborn at the rebirth's put, as a new life", async () => {
     world.mw.seedPut(fullBoxRecord())
     const box = await fakeSealBoxListingOf(world.mw).build(fullBoxRecord())
-    await box.del()
+    await box.del(box.scope)
     world.mw.setNow(T0 + 5000)
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} })
     expect(box._cheat_central).to.deep.include({ am: 'a', registered_at: T0 + 5000 })

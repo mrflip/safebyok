@@ -182,7 +182,7 @@ describe("a box verb over a vault deleted elsewhere", () => {
   const Verbs = [
     ['box.extractWhisper', ({ box }) => box.extractWhisper(WorldNow)],
     ['box.put',           ({ box }) => box.put({ whisper: { apiKey: 'sk-new' }, sidecar: {} }, WorldNow)],
-    ['box.del',            ({ box }) => box.del(WorldNow)],
+    ['box.del',            ({ box }) => box.del(box.scope, WorldNow)],
     ['vault.getBox',       ({ vault, box }) => vault.getBox(box.boxlabel, { ...WorldNow, maxMillisSinceRefresh: 0 })],
     ['vault.delBox',       ({ vault, box }) => vault.delBox(box.boxlabel, WorldNow)],
   ] as const satisfies readonly (readonly [string, (world: { vault: Vault, box: Box }) => Promise<unknown>])[]
@@ -214,14 +214,14 @@ const DelCases = [
   [true,   'deletes a locked vault with no prompt, landing on that same end state'],
 ] as const
 
-describe("vault.del()", () => {
+describe("vault.del(vault.scope)", () => {
   for (const [isLocking, blurb] of DelCases) {
     it(blurb, async () => {
       const world = await makeBornVault()
       const dialog = vi.fn()
       world.fakeBank.requestCleartext = dialog
       if (isLocking) { world.vault.lock() }
-      expect(await world.vault.del()).to.eq(world.vault)
+      expect(await world.vault.del(world.vault.scope)).to.eq(world.vault)
       await expectLandedGone(world.vault, world)
       expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
       expect(dialog).not.toHaveBeenCalled()
@@ -266,12 +266,12 @@ describe("a newer record of another vault_tok over a live vault", () => {
 })
 
 describe("an old instance, replaced by the very call it made", () => {
-  it("vault.del() refuses, and the new life stored stands", async () => {
+  it("vault.del(vault.scope) refuses, and the new life stored stands", async () => {
     const { vault, restoreRow, storedNow } = await makeBornVault()
     const other = await otherLifeAt(5)
     restoreRow(other)
     await TH.expectRefusal(vault.fetch())
-    await TH.expectRefusal(vault.del())
+    await TH.expectRefusal(vault.del(vault.scope))
     expect(storedNow()).to.include({ am: 'a', vault_tok: other.vault_tok, revision_seq: 5 })
     TH.expectSyncRefusal(() => vault.demandDeletable())
   })

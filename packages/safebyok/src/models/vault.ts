@@ -319,7 +319,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Tombstones the box listed at `boxlabel` and answers it, or null where none is stored; {@link BoxListing.del} has the refusals. */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
-    const box = await this.boxListing.deletable({ ...this.scope, boxlabel }).del(opts)
+    const scope = { ...this.scope, boxlabel }
+    const box = await this.boxListing.deletable(scope).del(scope, opts)
     return SX.isRowAt(box, SX.VoidRevision) ? null : box
   }
 
