@@ -98,6 +98,8 @@ export type VaultTombstone = Readonly<Z.infer<typeof vaultTombstone>>
 export type VaultRow       = VaultRecord | VaultTombstone
 /** A vault row that failed validation, named by where it is stored: its scope, under whatever label storage has, and `am` 'd'. */
 export type DamagedVault   = Readonly<{ applabel: string, user_id: string, vaultlabel: string, am: 'd' }>
+/** A vault row or a box row that failed validation, named by where it is stored. */
+export type DamagedRow     = DamagedVault | DamagedBox
 // --
 
 // == [Box forms]: boxSparse, boxRecord, boxTombstone, boxRow, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox

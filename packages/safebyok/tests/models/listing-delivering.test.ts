@@ -194,7 +194,7 @@ describe("Listing's pipeline: what every answer takes", () => {
         await listing.fetch(scopeOf('fetched'))
         world.mw.seedPut(fullBoxRecord({ boxlabel: 'built' }))
         await listing.put(fullBoxRecord({ boxlabel: 'built', revision_tok: 'rev-a2', revision_seq: 2 }), { prior: fullBoxRecord({ boxlabel: 'built' }) })
-        await listing.del(box)
+        await listing.del(box.sparse)
         await world.mw.notify(fullBoxRecord({ boxlabel: 'noticed' }))
         await world.mw.notify(fullBoxRecord({ boxlabel: 'noticed' }))
         await world.mw.notify(fullBoxRecord({ boxlabel: 'fetched', revision_tok: 'rev-a2', revision_seq: 2 }))

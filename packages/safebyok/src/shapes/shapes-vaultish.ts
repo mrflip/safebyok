@@ -14,7 +14,7 @@ import type { Storable } from '../models/storable'
 import type { Vault } from '../models/vault'
 import type { DeviceDB } from '../storage/device-db'
 import type { Outcome } from '../refusals/outcome'
-import { type Answer, type PutAct, type VaultDB, VaultDBVerbnames } from '../storage/vault-db'
+import { type Answer, type GoodAnswer, type ListAct, type PutAct, type VaultDB, VaultDBVerbnames } from '../storage/vault-db'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
@@ -240,6 +240,12 @@ export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> |
 
 /** A put's {@link ListingAnswer}, whose good form always carries a record. */
 export type ListingPutAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT>, PutAct, unknown>
+
+/** A listing's answer from `listVaults` or `listBoxes`: the rows listed, and those set aside as damaged. */
+export type ListingListAnswer<RecordT, SparseT, DamagedT> = Answer<{ listed: readonly Fetched<RecordT, SparseT>[], damaged_rows: readonly DamagedT[] }, ListAct, unknown>
+
+/** What a listing's `tryGet` answers: the vaultDB's own answer where storage was asked, or the act `timely`, with no world, where the instance listed served it. */
+export type ListingGetAnswer<ValT> = ThingAnswer<ValT> | GoodAnswer<ValT, 'timely', null>
 
 /** What a listing's `tryPut` and `tryFetch` answer: the vaultDB's own answer, with the instance listed as its `val`. */
 export type ThingAnswer<ValT> = Answer<ValT, string, unknown>

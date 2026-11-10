@@ -3,7 +3,6 @@ import { nowMillis } from '../helpers/clock'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type WhisperedBag, isWhisperedBag } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import { oneAtATime } from '../helpers/one-at-a-time'
 import { reportToPlatform } from '../refusals/report-error'
 import { disabledError, lockedError, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoadError, shapeUnreconciled } from '../refusals/throwers'
 import type { Age, Am, RecordShape } from '../shapes/shapes-enums'
@@ -26,7 +25,7 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
 
 /** A vault or box in this tab, kept in step with its row in the vaultDB. */
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
-  // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #oneFetchAtATime, #listeners, #getSnapshot, #subscribe, isFUBag
+  // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #listeners, #getSnapshot, #subscribe, isFUBag
 
   /** Adorned in the constructor: readable, left out of enumeration and JSON. */
   declare readonly world:   ListingWorld
@@ -53,7 +52,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** When storage last answered with a record not older than central that left the record in hand whole; null until it has. */
   #refreshedAt: number | null = null
   /** The fetch under way, which every `fetch` made meanwhile joins. */
-  readonly #oneFetchAtATime = oneAtATime(() => this.listing.fetch(this.scope, { ifAbsent: 'nil' }))
   readonly #listeners = new Set<() => void>()
 
   /** Unbound callback to acquire the snapshot */
@@ -145,27 +143,25 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Storable ops]: fetch, hydrate, del, each with its try form
 
-  /** SLOPDOC: Refreshes this thing from storage through the listing, joining any fetch under way. */
+  /** SLOPDOC: Refreshes this thing from storage through the listing, which joins any fetch of its slot under way. */
   async fetch(opts: FetchOpts = {}): Promise<this> {
     const { ifAbsent, maxWorldMillis } = VX.fetchOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
     this.demandEnabled()
-    await this.#oneFetchAtATime()
+    await this.listing.fetch(this.scope, { ifAbsent: 'nil' })
     this.demandEnabled()
     if (ifAbsent === 'fail') { this.demandPresent() }
     return this
   }
 
   /** Non-throwing form of {@link fetch}. */
-  tryFetch(opts: FetchOpts = {}): Promise<Outcome<this>> {
-    return outcomeOf(() => this.fetch(opts))
-  }
+  tryFetch(opts: FetchOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.fetch(opts)) }
 
   /** This thing, its world timely and its record fetched unless timely within `opts.maxMillisSinceRefresh`. */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const { maxMillisSinceRefresh = this.listing.maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
-    if (this.#isWhole && this.#isRefreshedWithin(maxMillisSinceRefresh)) { return this }
+    if (this.isHydratedWithin(maxMillisSinceRefresh)) { return this }
     return this.fetch({ ifAbsent: 'nil' })
   }
 
@@ -175,7 +171,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Delete this thing through its listing. A thing gone is deleted again, over its tombstone's revision. */
   async del(opts: TimelyOpts = {}): Promise<this> {
     await this.ensureDeletable(VX.timelyOpts.parse(opts)); this.demandDeletable()
-    await this.listing.del(this)
+    await this.listing.del(this.sparse)
     return this
   }
 
@@ -301,7 +297,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Guards]: isEnabled, isLocked, isTimely, isRefreshedWithin, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, demandDeletable, demandUnlocked, demandEnabled, demandFull, demandWhole, demandFullProps, ensureDeletable
+  // == [Guards]: isEnabled, isLocked, isTimely, isHydratedWithin, isRefreshedWithin, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, demandDeletable, demandUnlocked, demandEnabled, demandFull, demandWhole, demandFullProps, ensureDeletable
 
   /** False past a sweep or a vacate, and from then on. */
   get isEnabled(): boolean { return this.#isEnabled }
@@ -311,6 +307,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Whether the record in hand was refreshed within the thing's horizon: never before storage has answered. */
   get isTimely(): boolean { return this.#isRefreshedWithin(this.listing.maxMillisSinceRefresh) }
+
+  /** Whether the whole record is in hand, refreshed within `maxMillis`: what `hydrate` takes as it is. */
+  isHydratedWithin(maxMillis: number): boolean { return this.#isWhole && this.#isRefreshedWithin(maxMillis) }
 
   #isRefreshedWithin(maxMillis: number): boolean {
     return this.#refreshedAt !== null && nowMillis() - this.#refreshedAt < maxMillis

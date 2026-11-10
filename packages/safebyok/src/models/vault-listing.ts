@@ -4,15 +4,15 @@ import { nowMillis } from '../helpers/clock'
 import type { Modelkind } from '../helpers/consts'
 import { makeLifeTok } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
-import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
+import { type Outcome, demandGood, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { type VaultScope, vaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import { type DelTombstone, type Fetched, type ListingOpts, type SlotFate, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
+import { type DelTombstone, type Fetched, type ListingOpts, type SlotFate, type ThingAnswer, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
 import type { AddPasskeyParams, BoxRow, DelOpts, PutOpts, PutVaultOpts, ReplacePassphraseParams, RevokePasskeyParams, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
-import type { Answer, Notice } from '../storage/vault-db'
+import { type Answer, type Notice, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
 import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
 import type { Gate } from './gate'
@@ -21,7 +21,7 @@ import { cmpRevisions } from './storable'
 import { Vault } from './vault'
 
 /** One bank's vaults, by vaultlabel. */
-export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, VaultSnapshot, Vault> {
+export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, VaultSnapshot, Vault, SX.DamagedVault> {
   // == [Props]: world, #openGating, openGating
 
   declare readonly world: VaultWorld
@@ -74,54 +74,45 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 
-  // == [Fetching]: list
-
-  /** Every vault and tombstone stored in the vaultDB for this bank, delivered: each meets its slot as a fetch's answer would. Boxes wait on their vault's listing. A damaged row is bad news. */
-  async list(): Promise<void> {
-    this.demandEnabled()
-    const answer = await this.vaultDB.tryListVaults(this.world.scope)
-    this.demandEnabled()
-    if (! answer.ok) {
-      this.panicIfRevoked(answer.err)
-      throw answer.err
-    }
-    const { vaults, damaged_rows } = answer.val
-    this.bankFriend.tellBadNews(damaged_rows.map((damaged) => vaultStoredDamaged(damaged)))
-    await Promise.all(vaults.map((record) => this.build(record)))
-  }
-  // --
-
-  // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, del
+  // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form, gateVerbAnswered, tryDel
 
   /** Lay a new passphrase wayin on the row, deliver what it writes to the vault listed, and answer that record. Nothing locks: the vaultKey does not change. */
-  async replacePassphrase(params: ReplacePassphraseParams): Promise<SX.VaultRecord> {
-    this.demandEnabled()
-    return this.#deliverStored(await this.vaultDB.tryReplacePassphrase(params))
-  }
+  async replacePassphrase(params: ReplacePassphraseParams): Promise<SX.VaultRecord> { return demandGood(await this.tryReplacePassphrase(params)).val }
+
+  /** {@link replacePassphrase}, answering the vaultDB's own answer. */
+  tryReplacePassphrase(params: ReplacePassphraseParams): Promise<ThingAnswer<SX.VaultRecord>> { return this.#gateVerbAnswered(() => this.vaultDB.tryReplacePassphrase(params)) }
 
   /** Lay a passkey wayin on the row. */
-  async addPasskey(params: AddPasskeyParams): Promise<SX.VaultRecord> {
-    this.demandEnabled()
-    return this.#deliverStored(await this.vaultDB.tryAddPasskey(params))
-  }
+  async addPasskey(params: AddPasskeyParams): Promise<SX.VaultRecord> { return demandGood(await this.tryAddPasskey(params)).val }
+
+  /** {@link addPasskey}, answering the vaultDB's own answer. */
+  tryAddPasskey(params: AddPasskeyParams): Promise<ThingAnswer<SX.VaultRecord>> { return this.#gateVerbAnswered(() => this.vaultDB.tryAddPasskey(params)) }
 
   /** Null the row's passkey wayin. */
-  async revokePasskey(params: RevokePasskeyParams): Promise<SX.VaultRecord> {
-    this.demandEnabled()
-    return this.#deliverStored(await this.vaultDB.tryRevokePasskey(params))
+  async revokePasskey(params: RevokePasskeyParams): Promise<SX.VaultRecord> { return demandGood(await this.tryRevokePasskey(params)).val }
+
+  /** {@link revokePasskey}, answering the vaultDB's own answer. */
+  tryRevokePasskey(params: RevokePasskeyParams): Promise<ThingAnswer<SX.VaultRecord>> { return this.#gateVerbAnswered(() => this.vaultDB.tryRevokePasskey(params)) }
+
+  // The val is the record the verb wrote: the vault listed may have a newer one by the time the answer is delivered.
+  /** The answer `call` brings, its record delivered to the vault listed. */
+  async #gateVerbAnswered(call: () => Promise<Answer<SX.VaultRecord, string>>): Promise<ThingAnswer<SX.VaultRecord>> {
+    let answer: Answer<SX.VaultRecord, string> | null = null
+    try {
+      this.demandEnabled()
+      answer = await call()
+      await this.deliver(answer)
+      return answerWithVal(answer, valOf(answer))
+    } catch (err) { return refusedAnswerOf(err, answer) }
   }
 
-  /** The record a gate verb wrote: the vault listed may have a newer one by the time its answer is delivered. */
-  async #deliverStored(answer: Answer<SX.VaultRecord, string>): Promise<SX.VaultRecord> {
-    await this.deliver(answer)
-    return valOf(answer)
-  }
-
-  /** SLOPDOC: Deletes the vault `ante` names over its own revision; its boxes cascade in the vaultDB. */
-  override async del(ante: VaultSparse | Vault): Promise<Vault | null> {
-    const listed = this.at(this.scopeOf(ante))
-    if ((listed !== null) && (listed.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
-    return this.delOver(this.sparseOf(ante))
+  /** {@link Listing.tryDel}, refusing first a delete that names another life than the vault listed; its boxes cascade in the vaultDB. */
+  override async tryDel(ante: VaultSparse): Promise<ThingAnswer<Vault | null>> {
+    try {
+      const listed = this.at(ante)
+      if ((listed !== null) && (listed.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
+    } catch (err) { return refusedAnswerOf(err, null) }
+    return super.tryDel(ante)
   }
   // --
 
@@ -164,7 +155,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   #dismissGatingOfGoneListing(): void { this.#openGating?.dismiss() }
   // --
 
-  // == [Defined by the vault listing]: vaultTokOfWorld, fateOver, scopepathOf, makeThing, nothingStoredError, doTryGet, doTryPut, doTryDel, watchRows, isOwnRow
+  // == [Defined by the vault listing]: vaultTokOfWorld, fateOver, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, doTryDel, watchRows, isOwnRow
 
   protected vaultTokOfWorld(): null { return null }
 
@@ -186,6 +177,14 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   protected nothingStoredError(scope: VaultScope): VaultError { return absentVaultError(scope) }
+
+  // A bank's listing has its scope for a world, no row, so it has nothing for the bank to receive.
+  protected async doTryList() {
+    const answer = await this.vaultDB.tryListVaults(this.world.scope)
+    return answer.ok ? { ...answer, world: null, val: { listed: answer.val.vaults, damaged_rows: answer.val.damaged_rows } } : answer
+  }
+
+  protected damagedStoredError(damaged: SX.DamagedVault): VaultError { return vaultStoredDamaged(damaged) }
 
   protected doTryGet(scope: VaultScope) { return this.vaultDB.tryGetVault(scope, { ifAbsent: 'nil' }) }
 

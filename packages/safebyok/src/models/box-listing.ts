@@ -3,20 +3,20 @@
 import { VaultError } from '../refusals/errors'
 import type { Modelkind } from '../helpers/consts'
 import { tattoo } from '../helpers/helpers'
-import { absentBoxError, notListedBoxError } from '../refusals/throwers'
+import { absentBoxError, boxStoredDamaged, notListedBoxError } from '../refusals/throwers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxCreateOpts, type BoxDna, type BoxListingOpts, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type DelTombstone, type Fetched, type FetchOpts, boxDna } from '../shapes/shapes-vaultish'
+import { type BoxCreateOpts, type BoxDna, type BoxListingOpts, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type DelTombstone, type Fetched, boxDna } from '../shapes/shapes-vaultish'
 import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow, BoxRecord, BoxSparse } from '../shapes/shapes-storage'
 import type { Notice } from '../storage/vault-db'
 import { Box } from './box'
 import { Listing } from './listing'
 
 /** One vault's boxes, by boxlabel. */
-export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnapshot, Box> {
-  // == [Props]: applabel, user_id, vaultlabel, scope, world, #damagedRows, damaged_rows
+export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnapshot, Box, DamagedBox> {
+  // == [Props]: applabel, user_id, vaultlabel, scope, world
 
   /** The scope of the vault listed, tattooed on by the constructor. */
   declare readonly applabel:   string
@@ -25,11 +25,6 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   readonly scope:              VaultScope
   declare readonly world:      BoxWorld
 
-  /** The rows the vaultDB's listing set aside as damaged. */
-  #damagedRows: readonly DamagedBox[] = Object.freeze([])
-
-  /** The rows of this vault found damaged at its last listing. */
-  get damaged_rows(): readonly DamagedBox[] { return this.#damagedRows }
   // --
 
   // == [Construction]: constructor, scopeOf, sparseOf, recordOf
@@ -54,34 +49,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   recordOf(duck: unknown): BoxRecord { return SX.boxRecord.parseConsistent(duck, this.scope) }
   // --
 
-  // == [Methods]: list, get, tryGet, puttable, create, tryCreate, shellFor
-
-  /** Enlist every box the vaultDB lists for this vault, sparse, and set its damaged rows aside. */
-  async list(): Promise<void> {
-    this.demandEnabled()
-    const answer = await this.vaultDB.tryListBoxes({ ...this.scope, vault_tok: this.world.vault_tok })
-    this.demandEnabled()
-    if (answer.world !== null) { this.world.receiveWorld(answer.world) }
-    if (! answer.ok) {
-      this.panicIfRevoked(answer.err)
-      throw answer.err
-    }
-    const { boxes, damaged_rows } = answer.val
-    this.#damagedRows = Object.freeze(damaged_rows)
-    for (const { boxlabel } of damaged_rows) { this.things.find((listed) => listed.boxlabel === boxlabel)?.vacate() }
-    await Promise.all(boxes.map((box) => this.build(box)))
-  }
-
-  /** The box under `scoped`, no older than `opts` allows, or null under `ifAbsent: 'nil'`. */
-  async get(scoped: Boxscope, opts: FetchOpts = {}): Promise<Box | null> {
-    const listed = this.at(scoped)
-    if (listed === null) { return this.fetch(scoped, opts) }
-    const { ifAbsent, ...timely } = VX.fetchOpts.parse(opts)
-    return this.handleIfAbsent(await listed.hydrate(timely), scoped, ifAbsent)
-  }
-
-  /** Non-throwing form of {@link get}. */
-  tryGet(scoped: Boxscope, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.get(scoped, opts)) }
+  // == [Methods]: puttable, create, tryCreate, shellFor
 
   /** The box a put of `scoped` goes through: the one listed, or a void one made for an empty slot. */
   puttable(scoped: unknown, opts: BoxPutOpts = {}): Box {
@@ -109,7 +77,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.sentinelBoxOf(scope, this.world.vault_tok)) }
   // --
 
-  // == [Defined by the box listing]: vaultTokOfWorld, scopepathOf, makeThing, nothingStoredError, doTryGet, doTryPut, doTryDel, watchRows, isOwnRow
+  // == [Defined by the box listing]: vaultTokOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, doTryDel, watchRows, isOwnRow
 
   protected vaultTokOfWorld(): string { return this.world.vault_tok }
 
@@ -122,6 +90,13 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   protected nothingStoredError(scope: Boxscope): VaultError { return absentBoxError(scope) }
+
+  protected async doTryList() {
+    const answer = await this.vaultDB.tryListBoxes({ ...this.scope, vault_tok: this.world.vault_tok })
+    return answer.ok ? { ...answer, val: { listed: answer.val.boxes, damaged_rows: answer.val.damaged_rows } } : answer
+  }
+
+  protected damagedStoredError(damaged: DamagedBox): VaultError { return boxStoredDamaged(damaged) }
 
   protected doTryGet(scope: Boxscope) { return this.vaultDB.tryGetBox({ ...scope, vault_tok: this.world.vault_tok }, { ifAbsent: 'nil' }) }
 

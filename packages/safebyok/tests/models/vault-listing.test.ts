@@ -372,3 +372,131 @@ describe("a damaged row", () => {
     expect(vault.isLocked).to.be.false
   })
 })
+
+describe("a damaged row met by listing the bank's vaults", () => {
+  it("vacates the vault listed in its slot, keeps the row in damaged_rows, and tells it as bad news", async () => {
+    const { vault, listing, restoreRow, badnews } = await makeBornVault()
+    restoreRow({ garbage: true } as never)
+    await listing.list()
+    expect(listing.damaged_rows).to.deep.equal([{ ...omit(Dna, []), am: 'd' }])
+    expect(listing.at(Dna)).to.be.null
+    expect(vault.isEnabled).to.be.false
+    expect(badnews.map((news) => news.refusalkind)).to.include('damaged_row')
+  })
+
+  it("clears damaged_rows at the next listing that finds none", async () => {
+    const { listing, restoreRow, demandStored } = await makeBornVault()
+    const stored = demandStored()
+    restoreRow({ garbage: true } as never)
+    await listing.list()
+    restoreRow(stored)
+    await listing.list()
+    expect(listing.damaged_rows).to.deep.equal([])
+  })
+})
+
+describe("the listing's verbs answer the vaultDB's own answer", () => {
+  it("tryList answers the act, with the vaults listed as its val", async () => {
+    const { vault, listing } = await makeBornVault()
+    const answer = await TH.expectGood(listing.tryList())
+    expect(answer).to.deep.equal([vault])
+    expect(await listing.tryList()).to.deep.include({ ok: true, act: 'got' })
+  })
+
+  it("tryDel answers the del's act, with the vault deleted as its val", async () => {
+    const { vault, listing } = await makeBornVault()
+    vault.lock()
+    const answer = await listing.tryDel(vault.sparse)
+    expect(answer).to.deep.include({ ok: true, val: vault })
+    expect(answer.act).to.be.a('string')
+    expect(vault.isPresent).to.be.false
+  })
+
+  it("tryDel answers a delete naming another life than the vault listed as bad, deleting nothing", async () => {
+    const { vault, listing, storedNow } = await makeBornVault()
+    const before = storedNow()
+    const answer = await listing.tryDel({ ...listing.sparseOf(vault), vault_tok: 'another-life' })
+    expect(answer).to.deep.include({ ok: false, world: null })
+    expect(answer.err?.refusalkind).to.eq('vault_mismatch')
+    expect(storedNow()).to.deep.equal(before)
+  })
+
+  it("get answers the vault listed, and fetches one that is not", async () => {
+    const { vault, listing } = await makeBornVault()
+    expect(await listing.get(Dna)).to.eq(vault)
+    const { listing: fresh } = makeVaultWorld(await storedVaultRecord())
+    const fetched = await fresh.get(Dna)
+    expect(fetched?.vaultlabel).to.eq(Dna.vaultlabel)
+  })
+})
+
+describe("listing.tryGet: the act says where the instance came from", () => {
+  it("answers 'timely', with no world, where the instance listed is fresh enough, and asks storage nothing", async () => {
+    const { vault, listing, opts } = await makeBornVault()
+    const tryGetVault = vi.spyOn(opts.vaultDB, 'tryGetVault')
+    const answer = await listing.tryGet(Dna, { maxMillisSinceRefresh: Infinity })
+    expect(answer).to.deep.include({ ok: true, act: 'timely', val: vault, world: null })
+    expect(tryGetVault).not.toHaveBeenCalled()
+  })
+
+  it("answers the vaultDB's own act where it asked storage", async () => {
+    const { vault, listing } = await makeBornVault()
+    const answer = await listing.tryGet(Dna, { maxMillisSinceRefresh: 0 })
+    expect(answer).to.deep.include({ ok: true, act: 'got', val: vault })
+  })
+})
+
+describe("the gate verbs answer the vaultDB's own answer", () => {
+  it("tryRevokePasskey answers the act, with the record written as its val", async () => {
+    const { vault, listing, demandStored } = await makeBornVault()
+    const ante = demandStored()
+    const answer = await listing.tryRevokePasskey({ ...SX.vaultSparse.parse(ante), am: 'a', gate: { passkey_wayin: null } })
+    expect(answer.ok).to.be.true
+    expect(answer.act).to.be.a('string')
+    expect(answer.val).to.deep.include({ vault_tok: vault.vault_tok })
+  })
+
+  it("answers a disabled listing as bad, asking storage nothing", async () => {
+    const { listing, demandStored, opts } = await makeBornVault()
+    const tryRevokePasskey = vi.spyOn(opts.vaultDB, 'tryRevokePasskey')
+    listing.sweep()
+    const answer = await listing.tryRevokePasskey({ ...SX.vaultSparse.parse(demandStored()), am: 'a', gate: { passkey_wayin: null } })
+    expect(answer.err?.refusalkind).to.eq('disabled')
+    expect(tryRevokePasskey).not.toHaveBeenCalled()
+  })
+})
+
+describe("a listing asks storage once for what callers ask at once", () => {
+  it("joins fetches of one slot made while one runs, the instance's own among them, into one get", async () => {
+    const { vault, listing, opts } = await makeBornVault()
+    const tryGetVault = vi.spyOn(opts.vaultDB, 'tryGetVault')
+    const [fetched, refetched, own] = await Promise.all([listing.fetch(Dna), listing.fetch(Dna), vault.fetch()])
+    expect([fetched, refetched, own]).to.deep.equal([vault, vault, vault])
+    expect(tryGetVault).toHaveBeenCalledOnce()
+  })
+
+  it("joins two gets of a stale box into one get of its row", async () => {
+    const { vault, opts } = await makeBornVault()
+    await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
+    const tryGetBox = vi.spyOn(opts.vaultDB, 'tryGetBox')
+    const stale = { maxMillisSinceRefresh: 0 }
+    const [one, two] = await Promise.all([vault.getBox('anthropic_api_key', stale), vault.getBox('anthropic_api_key', stale)])
+    expect(one).to.eq(two)
+    expect(tryGetBox).toHaveBeenCalledOnce()
+  })
+
+  it("starts a fresh get for a fetch asked once the last has settled", async () => {
+    const { listing, opts } = await makeBornVault()
+    const tryGetVault = vi.spyOn(opts.vaultDB, 'tryGetVault')
+    await listing.fetch(Dna)
+    await listing.fetch(Dna)
+    expect(tryGetVault).toHaveBeenCalledTimes(2)
+  })
+
+  it("joins lists made while one runs into one listing", async () => {
+    const { listing, opts } = await makeBornVault()
+    const tryListVaults = vi.spyOn(opts.vaultDB, 'tryListVaults')
+    await Promise.all([listing.list(), listing.list()])
+    expect(tryListVaults).toHaveBeenCalledOnce()
+  })
+})
