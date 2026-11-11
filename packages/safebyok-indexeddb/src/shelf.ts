@@ -16,47 +16,49 @@ export type VaultScopepath = [tag: 'vault', applabel: string, user_id: string, v
 export type BoxScopepath = [tag: 'box', applabel: string, user_id: string, vaultlabel: string, vault_tok: string, boxlabel: string]
 
 /** The scopepath of the vault row at `scope`. */
-export const vaultScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): VaultScopepath => ['vault', applabel, user_id, vaultlabel]
+export function vaultScopepathOf({ applabel, user_id, vaultlabel }: VaultScope): VaultScopepath { return ['vault', applabel, user_id, vaultlabel] }
 
 /** The scopepath of the box row that `asked` names. */
-export const boxScopepathOf = ({ applabel, user_id, vaultlabel, vault_tok, boxlabel }: BoxQuery): BoxScopepath => (
-  ['box', applabel, user_id, vaultlabel, vault_tok, boxlabel]
-)
+export function boxScopepathOf({ applabel, user_id, vaultlabel, vault_tok, boxlabel }: BoxQuery): BoxScopepath {
+  return ['box', applabel, user_id, vaultlabel, vault_tok, boxlabel]
+}
 
 /** The vaultlabel in a vault row's `scopepath`. */
-export const vaultlabelOf = (scopepath: IDBValidKey): string => (scopepath as VaultScopepath)[3]
+export function vaultlabelOf(scopepath: IDBValidKey): string { return (scopepath as VaultScopepath)[3] }
 
 /** The vaultlabel, `vault_tok` and boxlabel in a box row's `scopepath`. */
-export const boxPlaceOf = (scopepath: IDBValidKey): { vaultlabel: string, vault_tok: string, boxlabel: string } => {
+export function boxPlaceOf(scopepath: IDBValidKey): { vaultlabel: string, vault_tok: string, boxlabel: string } {
   const filed = scopepath as BoxScopepath
   return { vaultlabel: filed[3], vault_tok: filed[4], boxlabel: filed[5] }
 }
 
 /** The key range of every scopepath beginning with `prefix`. */
-const rangeUnder = (prefix: string[]): IDBKeyRange => IDBKeyRange.bound(prefix, [...prefix, []])
+function rangeUnder(prefix: string[]): IDBKeyRange { return IDBKeyRange.bound(prefix, [...prefix, []]) }
 
 /** The key range of every vault row of the bank. */
-export const vaultsRangeOf = ({ applabel, user_id }: BankScope): IDBKeyRange => rangeUnder(['vault', applabel, user_id])
+export function vaultsRangeOf({ applabel, user_id }: BankScope): IDBKeyRange { return rangeUnder(['vault', applabel, user_id]) }
 
 /** The key range of every box row under one life of a vault. */
-export const lifeRangeOf = ({ applabel, user_id, vaultlabel, vault_tok }: VaultQuery): IDBKeyRange => rangeUnder(['box', applabel, user_id, vaultlabel, vault_tok])
+export function lifeRangeOf({ applabel, user_id, vaultlabel, vault_tok }: VaultQuery): IDBKeyRange { return rangeUnder(['box', applabel, user_id, vaultlabel, vault_tok]) }
 
 /** The key range of every box row of the bank, across all its vaults and their lives. */
-export const bankBoxesRangeOf = ({ applabel, user_id }: BankScope): IDBKeyRange => rangeUnder(['box', applabel, user_id])
+export function bankBoxesRangeOf({ applabel, user_id }: BankScope): IDBKeyRange { return rangeUnder(['box', applabel, user_id]) }
 // --
 
 // == [The database]: shelfOf, filedIn, Filed
 
 /** The shelf of the vault database named `dbName`. */
-export const shelfOf = (dbName: string): UseStore => versionedShelfOf({
-  dbName, dbstem: 'vaults', version: VaultsDBVersion, storename: 'rows', oldnames: [`${dbName}:vaults`],
-})
+export function shelfOf(dbName: string): UseStore {
+  return versionedShelfOf({
+    dbName, dbstem: 'vaults', version: VaultsDBVersion, storename: 'rows', oldnames: [`${dbName}:vaults`],
+  })
+}
 
 /** A stored row, with its scopepath. */
 export type Filed = { scopepath: IDBValidKey, row: unknown }
 
 /** Every row in `range`, in scopepath order. */
-export const filedIn = async (store: IDBObjectStore, range: IDBKeyRange): Promise<Filed[]> => {
+export async function filedIn(store: IDBObjectStore, range: IDBKeyRange): Promise<Filed[]> {
   const [scopepaths, rows] = await Promise.all([promisifyRequest(store.getAllKeys(range)), promisifyRequest<unknown[]>(store.getAll(range))])
   return scopepaths.map((scopepath, idx) => ({ scopepath, row: rows[idx] }))
 }
