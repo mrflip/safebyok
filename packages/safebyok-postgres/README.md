@@ -162,7 +162,13 @@ connect and LISTEN: this package grants nothing and creates no role or policy.
 
 Each write is one conditional `INSERT` or `UPDATE`, which takes effect only if the stored row still
 has the revision the write expects at that moment. A box write locks only its box row, and reads its
-vault row without a lock.
+vault row without a lock, so writers under one vault do not wait for each other. Two things follow:
+
+* A box written while its vault is deleted or created anew may land in the life that has ended. No
+  read returns it, and the vault's next write or `tidyGone` deletes it. If you write boxes heavily
+  under vaults that get deleted and are not written again, call `tidyGone` now and then.
+* The box cap is soft. Writers racing to add their first box can pass it together, and `tidyGone`
+  does not trim the rows they add.
 
 ## On Supabase
 
