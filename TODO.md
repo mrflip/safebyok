@@ -48,6 +48,12 @@ Small irritants, each a few lines, picked up by whoever is nearby.
   ([#130](https://github.com/mrflip/safebyok/pull/130)): the job blocks a merge on Node 22, the platform
   floor (`engines`), and only reports on the newest Node. A workflow cannot make a check
   required; the ruleset is the Coach's to change.
+* **Unlocking with an empty passphrase appears to refuse `unexpected_error`.** Found 2026-11-11
+  (#647's README pass): `passphraseCleartext` (`shapes/shapes-gateish.ts`) is a bare string, so an
+  empty passphrase on unlock reaches the key deriver. The fastkey deriver throws `wrong_passphrase`
+  for it (`wasm-deriver.ts`, whose comment says a vault never passes one), but the vault turns any
+  throw from a deriver into `keyDeriverThrew`'s `unexpected_error`. Either refuse an empty passphrase
+  before the deriver, or let a deriver's `wrong_passphrase` through. Confirm with a test first.
 * **The vaultDB throwers' banner names the wrong field.** Found 2026-11-11
   ([#645](https://github.com/mrflip/safebyok/pull/645), the storage prose pass): the
   `/* The refusals of a vaultDB ... */` comment under `[VaultDB Throwers]` in

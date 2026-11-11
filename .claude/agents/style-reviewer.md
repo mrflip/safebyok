@@ -18,9 +18,12 @@ report what you found and stop.
 
 ## The job
 
-1. **Read** STYLE.md whole, once. Then `git diff <base>...<tip> --stat`, and each changed `.ts`
-   or `.tsx` file's diff with the code around it. Look up in VOCABULARY.md each term of the cast
-   the diff names.
+1. **Read** `git diff <base>...<tip> --stat`, and each changed `.ts` or `.tsx` file's diff with
+   the code around it. Then read STYLE.md by section (`rg -n '^## ' STYLE.md`, then `sed -n`):
+   *Naming* and *Comments and doc blocks* in every review, and each other section the diff gives
+   reason to, such as *Validation* for a validator, *Tests* for a test file, or *Stateful objects
+   and snapshots* for a class that keeps state. Look up in VOCABULARY.md each term of the cast the
+   diff names.
 2. **Check what the diff adds** against STYLE.md section by section: *Imports*, *Naming* and
    *Tags*, *Variables and functions*, *Braces and layout*, *Strings*, *Validation*, *Control flow
    and refusals*, *Comments and doc blocks*, *Tests*. A line the diff did not touch is not yours,

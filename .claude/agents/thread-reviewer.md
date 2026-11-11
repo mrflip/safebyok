@@ -52,8 +52,8 @@ about to make. Chain each onto the command it heralds.
    foreground with your worktree path, the branch and the same range, and with the `model` your
    handoff's *Style pass* names, if it names one (its own pin, `sonnet`, otherwise). It fixes the
    hand-kept mechanical rules and commits them in your worktree; the findings it leaves join yours
-   in step 2, judged the same way. If it bails, do its job by hand: read STYLE.md whole and check
-   what the diff adds.
+   in step 2, judged the same way. If it bails, do its job by hand: read STYLE.md's sections as
+   `style-reviewer.md`'s step 1 says, and check what the diff adds.
 
    **Secret material** has its own check. When the range touches a file `notes/guarantees.md`
    names under *Where the guarantees are kept*, read that note's *The guarantees* section and
