@@ -115,7 +115,7 @@ type VaultAnswered = VaultFetched & { ok?: boolean, act?: unknown, presence?: un
 type BoxAnswered = BoxFetched & { ok?: boolean, act?: unknown, presence?: unknown, boxcount?: number }
 
 const { storedVerdict } = DB.Checkers('storage_issue', ({ obj, oneof }) => ({
-  storedVerdict: obj({ act: oneof(DB.writeActVals), presence: oneof(['void', 'gone', 'live'] as const) }),
+  storedVerdict: obj({ act: oneof(DB.writeActVals), presence: oneof(DB.presenceVals) }),
 }))
 
 const worldRow = DB.storedVaultRow.refusingAs('damaged_vault')

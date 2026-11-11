@@ -10,7 +10,7 @@ import * as Phrases from './phrases'
 import type { SafebyokErrorData } from './refusals'
 
 export type { ComponentApi } from './component-api'
-export { safebyokErrorKindVals, isSafebyokErrorData } from './refusals'
+export { safebyokErrorKindVals, safebyokErrorData, isSafebyokErrorData } from './refusals'
 export type { SafebyokErrorData, SafebyokErrorKind } from './refusals'
 
 // == [Options]: GetUserId, SafebyokApiOpts
@@ -48,7 +48,7 @@ export class SafebyokComponent {
   }
 
   /** Build the public functions a `ConvexVaultDB` calls. Export them, under these names, from one module of the host's `convex/`.
-   * Each one refuses `identity_revoked` unless the caller is signed in as the `user_id` its arguments name.
+   * Each one refuses `identity_revoked` unless the caller is signed in as the `user_id` its scope or its ask names.
    */
   api<DataModel extends GenericDataModel>(opts: SafebyokApiOpts<DataModel>) {
     // Validate only, and keep using `opts` itself: `getUserId` is called on the host's own object, so one that relies on `this` still works.
@@ -99,33 +99,33 @@ export class SafebyokComponent {
       }),
       putVault: publicMutation({
         args:    CVX.putVaultArgs,
-        returns: CVX.written,
+        returns: CVX.vaultClassified,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.record.user_id)
+          await demandCaller(ctx, args.ask.user_id)
           return await ctx.runMutation(vaults.putVault, args)
         },
       }),
       putBox: publicMutation({
         args:    CVX.putBoxArgs,
-        returns: CVX.putBoxAnswer,
+        returns: CVX.boxClassified,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.record.user_id)
+          await demandCaller(ctx, args.ask.user_id)
           return await ctx.runMutation(vaults.putBox, args)
         },
       }),
       delVault: publicMutation({
         args:    CVX.delVaultArgs,
-        returns: CVX.written,
+        returns: CVX.vaultClassified,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.tombstone.user_id)
+          await demandCaller(ctx, args.ask.user_id)
           return await ctx.runMutation(vaults.delVault, args)
         },
       }),
       delBox: publicMutation({
         args:    CVX.delBoxArgs,
-        returns: CVX.boxWritten,
+        returns: CVX.boxClassified,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.tombstone.user_id)
+          await demandCaller(ctx, args.ask.user_id)
           return await ctx.runMutation(vaults.delBox, args)
         },
       }),

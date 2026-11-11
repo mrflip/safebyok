@@ -10,7 +10,7 @@ import type { VaultScope } from '../shapes/shapes-core'
 import type { BoxAct, BoxVaultAct, OkAct, RefusedAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
 import type { BoxAsk, BoxQuery, BoxRow, BoxSparse, Capacity, Revision, VaultAsk, VaultRecord, VaultRow } from '../shapes/shapes-storage'
 
-// == [Asked and stored]: Meta, Asked, GetAsked, PutAsked, DelAsked, Presence, Stored
+// == [Asked and stored]: Meta, Asked, GetAsked, PutAsked, DelAsked, presenceVals, Presence, Stored
 // Every function below takes what was asked first, and what is stored second.
 
 /** The fields of a row, stored or expected, that the tables compare. */
@@ -23,7 +23,8 @@ type PutAsked = Readonly<{ op: 'put', ifAbsent: EX.PutIfAbsent, ifPresent: EX.If
 type DelAsked = Readonly<{ op: 'del', expected: Meta, record: Revision }>
 
 /** What is stored at a scope: no row, a tombstone, or a live row. */
-export type Presence = 'void' | 'gone' | 'live'
+export const presenceVals = ['void', 'gone', 'live'] as const
+export type Presence = typeof presenceVals[number]
 
 /** The row stored at a scope, null where none is, under its {@link Presence}. */
 type Stored<RowT extends Meta = Meta> = Readonly<{ presence: 'void', row: null } | { presence: Exclude<Presence, 'void'>, row: RowT }>

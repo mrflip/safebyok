@@ -1,17 +1,22 @@
 import * as DB from 'safebyok/storage'
 import type { VaultScope, WatchScope } from 'safebyok/storage'
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
+import type { Value } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc } from './_generated/dataModel'
+import { sentenceKindVals } from '../refusals'
+import type { SafebyokErrorData } from '../refusals'
 import * as Tallies from './tallies'
 import type { BoxDocGiven, Life } from './tallies'
 import * as CVX from './validators'
 
 // One function for each of AdapterVaultDB's generic calls. They are called through the host's
 // wrapper, which has already checked that the caller is the user the call names. Convex runs a
-// mutation as one serializable transaction, so each put and del reads its rows, decides with the
-// core's own predicates, and writes (or not) atomically. A query reads from one snapshot.
+// mutation as one serializable transaction, so each put and del is the vaultDB's one atomic step:
+// it checks its ask with the core's own checker, reads the rows, has the core's classifier name
+// what the ask comes to, and stores the ask's record where that is a write. A get only reads, from
+// one snapshot, and the client classifies what it read.
 
 // == [Gets]: listVaults, getVault, listBoxes, getBox
 
@@ -63,89 +68,85 @@ export const getBox = query({
 
 // == [Puts]: putVault, putBox
 
-/** Put a vault row if `opts` allow it over the stored row. Returns whether it was written, and the row it found. */
+/** Store a vault put's record where the classifier names a write over the row stored. Returns what the classifier answered. */
 export const putVault = mutation({
   args:    CVX.putVaultArgs,
-  returns: CVX.written,
-  handler: async (ctx, { record, opts }) => {
-    const anteDoc = await findVaultDoc(ctx.db, record)
-    const ante = anteDoc?.vault ?? null
-    const isWritten = DB.isVaultPutAllowed(ante, record, opts)
-    if (isWritten) { await writeVaultDoc(ctx.db, anteDoc, record) }
-    return { isWritten, ante }
+  returns: CVX.vaultClassified,
+  handler: async (ctx, { ask: sent }) => {
+    const ask = crossing(() => DB.vaultPut.parse(sent))
+    const anteDoc = await findVaultDoc(ctx.db, ask)
+    const vault = anteDoc?.vault ?? null
+    const classified = crossing(() => DB.classifyVault(ask, { vault }), vault)
+    if (DB.isWriteAct(classified.act)) { await writeVaultDoc(ctx.db, anteDoc, ask, ask.record) }
+    return classified
   },
 })
 
-/** Put a box row if its vault is live and `opts` allow it over the stored row.
- * Returns whether it was written, or the vault's capacity when there is no room for it.
- */
+// The cap the client asks for is soft, and counts box rows, tombstones among them, as the tally does. The component's own
+// limits are hard: a write the classifier names that would take the life past them is not stored, and answers `vault_full`.
+/** Store a box put's record where the classifier names a write over the rows stored and the vault's room. Returns what the classifier answered. */
 export const putBox = mutation({
   args:    CVX.putBoxArgs,
-  returns: CVX.putBoxAnswer,
-  handler: async (ctx, { record, opts, maxBoxes = Tallies.MaxVaultBoxes }) => {
-    const vaultDoc = await findVaultDoc(ctx.db, record)
-    const vault = vaultDoc?.vault ?? null
-    const life = lifeOf(record)
-    const anteDoc = await findBoxDoc(ctx.db, life, record.boxlabel)
-    const ante = anteDoc?.box ?? null
-    const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, record, opts)
-    if (! isWritten) { return { isWritten, ante, vault } }
+  returns: CVX.boxClassified,
+  handler: async (ctx, { ask: sent, maxBoxes = Tallies.MaxVaultBoxes }) => {
+    const ask = crossing(() => DB.boxPut.parse(sent))
+    const life = lifeOf(ask)
+    const vaultDoc = await findVaultDoc(ctx.db, ask)
+    const anteDoc = await findBoxDoc(ctx.db, life, ask.boxlabel)
+    const reckoning = await Tallies.reckon(ctx.db, life)
     // Convex accepts NaN as a number. Math.min would return it, and no count is greater than NaN, so the limit would never apply.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
-    const boxDoc = { ...life, boxlabel: record.boxlabel, box: record }
+    const capacity = Tallies.capacityOf(reckoning.tally, cap)
+    const classified = crossing(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity }))
+    if (! DB.isWriteAct(classified.act)) { return classified }
+    const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
     // A put over a tombstone replaces that row, so only a new boxlabel adds to the count.
     const growth = { box_count: (anteDoc === null ? 1 : 0), box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) }
-    const reckoning = await Tallies.reckon(ctx.db, life)
-    if (Tallies.refuses(reckoning.tally, growth, cap)) { return { capacity: Tallies.capacityOf(reckoning.tally, cap) } }
+    if (Tallies.refuses(reckoning.tally, growth, cap)) { return roomlessOf(classified, anteDoc, capacity) }
     await writeBoxDoc(ctx.db, anteDoc, boxDoc)
     await Tallies.record(ctx.db, life, reckoning, growth)
-    return { isWritten, ante, vault }
+    return classified
   },
 })
 // --
 
 // == [Dels]: delVault, delBox
 
-/** Replace a vault's live row with its tombstone when the row is at revision `opts.prior`, then tombstone that life's boxes.
- * Returns whether the vault row was written.
- */
+/** Store a vault del's tombstone where the classifier names a write over the row stored, and delete the box rows of the life it ends. Returns what the classifier answered. */
 export const delVault = mutation({
   args:    CVX.delVaultArgs,
-  returns: CVX.written,
-  handler: async (ctx, { tombstone, opts: { prior } }) => {
-    const anteDoc = await findVaultDoc(ctx.db, tombstone)
-    const ante = anteDoc?.vault ?? null
-    const isOurs = DB.isLiveVaultRecord(ante, tombstone.vault_tok)
-    const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
-    const isWritten = isOurs && DB.isRowAt(ante, prior)
-    // Stop, leaving the boxes alone, when this life's live row is at another revision or the row is damaged.
-    // In every other case go on, so that a repeated del can finish tombstoning the boxes.
-    if ((! isWritten) && (isOurs || isDamaged)) { return { isWritten, ante } }
-    if (isWritten) { await writeVaultDoc(ctx.db, anteDoc, tombstone) }
-    await tombstoneBoxes(ctx.db, lifeOf(tombstone), tombstone.written_at)
-    return { isWritten, ante }
+  returns: CVX.vaultClassified,
+  handler: async (ctx, { ask: sent }) => {
+    const ask = crossing(() => DB.vaultDel.parse(sent))
+    const anteDoc = await findVaultDoc(ctx.db, ask)
+    const vault = anteDoc?.vault ?? null
+    const classified = crossing(() => DB.classifyVault(ask, { vault }), vault)
+    if (DB.isWriteAct(classified.act)) {
+      await writeVaultDoc(ctx.db, anteDoc, ask, ask.record)
+      // A vault's boxes end with its life: nothing reads a box row of a life that is over.
+      await deleteBoxes(ctx.db, lifeOf({ ...ask, vault_tok: ask.expected.vault_tok }))
+    }
+    return classified
   },
 })
 
-/** Replace a box's live row with its tombstone when the row is at revision `opts.prior` and its vault is live. Returns whether it was written. */
+/** Store a box del's tombstone where the classifier names a write over the rows stored. Returns what the classifier answered. */
 export const delBox = mutation({
   args:    CVX.delBoxArgs,
-  returns: CVX.boxWritten,
-  handler: async (ctx, { tombstone, opts: { prior } }) => {
-    const vaultDoc = await findVaultDoc(ctx.db, tombstone)
-    const vault = vaultDoc?.vault ?? null
-    const life = lifeOf(tombstone)
-    const anteDoc = await findBoxDoc(ctx.db, life, tombstone.boxlabel)
-    const ante = anteDoc?.box ?? null
-    const isDeletable = DB.isLiveBoxRecord(ante, tombstone.vault_tok) && DB.isRowAt(ante, prior)
-    const isWritten = DB.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
-    if (isWritten) {
-      const boxDoc = { ...life, boxlabel: tombstone.boxlabel, box: tombstone }
+  returns: CVX.boxClassified,
+  handler: async (ctx, { ask: sent }) => {
+    const ask = crossing(() => DB.boxDel.parse(sent))
+    const life = lifeOf(ask)
+    const vaultDoc = await findVaultDoc(ctx.db, ask)
+    const anteDoc = await findBoxDoc(ctx.db, life, ask.boxlabel)
+    const classified = crossing(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null }))
+    if (DB.isWriteAct(classified.act)) {
+      const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
       await writeBoxDoc(ctx.db, anteDoc, boxDoc)
       // The tombstone replaces the row and still counts as one box row. Only the bytes change.
       await Tallies.forget(ctx.db, life, { box_count: 0, box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) })
     }
-    return { isWritten, ante, vault }
+    return classified
   },
 })
 // --
@@ -186,70 +187,100 @@ export const watchRows = query({
 })
 // --
 
-// == [Helpers]: lifeOf, findVaultDoc, findBoxDoc, writeVaultDoc, writeBoxDoc, tombstoneBoxes, listVaultDocs, listBoxDocs, listTallyDocs, VaultDoc, BoxDoc
+// == [Asks and refusals]: crossing, crossingOf, roomlessOf
 
-/** Return the life a record belongs to: its vault's scope and `vault_tok`. */
-const lifeOf = ({ applabel, user_id, vaultlabel, vault_tok }: Life): Life => ({ applabel, user_id, vaultlabel, vault_tok })
+// Anyone signed in may call these functions with an ask of their own making, so each mutation parses its ask again here,
+// with the core's own checker, before a row is read, and goes on with what the parse answers.
+
+/** `step`'s answer; a refusal it throws of a kind that crosses is thrown as the ConvexError that carries it. `world` is the vault row stored, for a `gate_issue`. */
+function crossing<ValT>(step: () => ValT, world: unknown = null): ValT {
+  try {
+    return step()
+  } catch (err) {
+    throw crossingOf(err, world)
+  }
+}
+
+// A ConvexError's `data` reaches the client whole, on any deployment, where another error's text is withheld or may quote
+// the call's arguments. The message is the core's own sentence, which quotes no value (notes/guarantees.md, G8). A
+// `gate_issue` carries the vault row it tested, as the core's refusal does; the caller may read that row with `getVault`.
+/** The ConvexError that carries `thrown`, a refusal of a kind that crosses; anything else as it came. */
+function crossingOf(thrown: unknown, world: unknown): unknown {
+  if (! DB.isVaultError(thrown)) { return thrown }
+  const { refusalkind: kind, message } = thrown
+  // The row came out of the table, so it is a Convex value.
+  if (kind === 'gate_issue') { return new ConvexError<SafebyokErrorData>({ kind, message, world: world as Value }) }
+  const sentenceKind = sentenceKindVals.find((crossed) => crossed === kind)
+  return (sentenceKind === undefined) ? thrown : new ConvexError<SafebyokErrorData>({ kind: sentenceKind, message })
+}
+
+/** What a box put the classifier named a write comes to where the life has no room for it: `vault_full`, over the row stored. */
+function roomlessOf(classified: DB.BoxClassified, anteDoc: BoxDoc | null, capacity: DB.Capacity): DB.BoxClassified {
+  const box = DB.foundBoxRow.parse(anteDoc?.box ?? null)
+  return { ok: false, act: 'vault_full', world: classified.world, box, presence: classified.presence, capacity }
+}
+// --
+
+// == [Helpers]: lifeOf, findVaultDoc, findBoxDoc, writeVaultDoc, writeBoxDoc, deleteBoxes, listVaultDocs, listBoxDocs, listTallyDocs, VaultDoc, BoxDoc
+
+/** Return the life an ask or a record belongs to: its vault's scope and `vault_tok`. */
+function lifeOf({ applabel, user_id, vaultlabel, vault_tok }: Life): Life { return { applabel, user_id, vaultlabel, vault_tok } }
 
 // `.unique()` throws if it finds two documents. A document is inserted only when none was found in
 // the same transaction, so two would mean damage, and that should fail loudly.
-const findVaultDoc = async (db: DatabaseReader, { applabel, user_id, vaultlabel }: VaultScope): Promise<VaultDoc | null> => (
-  await db.query('safebyok_vaults')
+async function findVaultDoc(db: DatabaseReader, { applabel, user_id, vaultlabel }: VaultScope): Promise<VaultDoc | null> {
+  return await db.query('safebyok_vaults')
     .withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel))
     .unique()
-)
+}
 
-const findBoxDoc = async (db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life, boxlabel: string): Promise<BoxDoc | null> => (
-  await db.query('safebyok_boxes')
+async function findBoxDoc(db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life, boxlabel: string): Promise<BoxDoc | null> {
+  return await db.query('safebyok_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok).eq('boxlabel', boxlabel))
     .unique()
-)
+}
 
-/** Write `vault` in place of `anteDoc`, or as a new document. */
-const writeVaultDoc = async (db: DatabaseWriter, anteDoc: VaultDoc | null, vault: DB.VaultRecord | DB.VaultTombstone): Promise<void> => {
-  const { applabel, user_id, vaultlabel } = vault
+/** Write `vault` at `scope`, in place of `anteDoc`, or as a new document. */
+async function writeVaultDoc(db: DatabaseWriter, anteDoc: VaultDoc | null, { applabel, user_id, vaultlabel }: VaultScope, vault: DB.VaultRecord | DB.VaultTombstone): Promise<void> {
   if (anteDoc) { await db.replace('safebyok_vaults', anteDoc._id, { applabel, user_id, vaultlabel, vault }) } else { await db.insert('safebyok_vaults', { applabel, user_id, vaultlabel, vault }) }
 }
 
 /** Write `boxDoc` in place of `anteDoc`, or as a new document. */
-const writeBoxDoc = async (db: DatabaseWriter, anteDoc: BoxDoc | null, boxDoc: BoxDocGiven): Promise<void> => {
+async function writeBoxDoc(db: DatabaseWriter, anteDoc: BoxDoc | null, boxDoc: BoxDocGiven): Promise<void> {
   if (anteDoc) { await db.replace('safebyok_boxes', anteDoc._id, boxDoc) } else { await db.insert('safebyok_boxes', boxDoc) }
 }
 
-/** Tombstone every live box row of `life`, and drop its tally. */
-const tombstoneBoxes = async (db: DatabaseWriter, life: Life, written_at: number): Promise<void> => {
+/** Delete every box row of `life`, and its tally. */
+async function deleteBoxes(db: DatabaseWriter, life: Life): Promise<void> {
   const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(db, life).collect()
-  await Promise.all(boxDocs.map(async (boxDoc) => {
-    const boxTombstone = DB.boxTombstoneOf(boxDoc.box, written_at)
-    if (boxTombstone !== null) { await db.patch('safebyok_boxes', boxDoc._id, { box: boxTombstone }) }
-  }))
+  await Promise.all(boxDocs.map(({ _id }) => db.delete('safebyok_boxes', _id)))
   await Tallies.drop(db, life)
 }
 
 /** List the vault documents of a bank, or of one vault when the scope has a `vaultlabel`. */
-const listVaultDocs = async (db: DatabaseReader, { applabel, user_id, vaultlabel }: WatchScope): Promise<VaultDoc[]> => (
-  await db.query('safebyok_vaults').withIndex('by_scope', (idx) => {
+async function listVaultDocs(db: DatabaseReader, { applabel, user_id, vaultlabel }: WatchScope): Promise<VaultDoc[]> {
+  return await db.query('safebyok_vaults').withIndex('by_scope', (idx) => {
     const bank = idx.eq('user_id', user_id).eq('applabel', applabel)
     return (vaultlabel === undefined) ? bank : bank.eq('vaultlabel', vaultlabel)
   }).collect()
-)
+}
 
 /** List the box documents of a bank, or of one vault when the scope has a `vaultlabel`, across every life. */
-const listBoxDocs = async (db: DatabaseReader, { applabel, user_id, vaultlabel }: WatchScope): Promise<BoxDoc[]> => (
-  await db.query('safebyok_boxes').withIndex('by_box', (idx) => {
+async function listBoxDocs(db: DatabaseReader, { applabel, user_id, vaultlabel }: WatchScope): Promise<BoxDoc[]> {
+  return await db.query('safebyok_boxes').withIndex('by_box', (idx) => {
     const bank = idx.eq('user_id', user_id).eq('applabel', applabel)
     return (vaultlabel === undefined) ? bank : bank.eq('vaultlabel', vaultlabel)
   }).collect()
-)
+}
 
 /** List the tally documents of a bank. */
-const listTallyDocs = async (db: DatabaseReader, { applabel, user_id }: WatchScope): Promise<Doc<'safebyok_tallies'>[]> => (
-  await db.query('safebyok_tallies').withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel)).collect()
-)
+async function listTallyDocs(db: DatabaseReader, { applabel, user_id }: WatchScope): Promise<Doc<'safebyok_tallies'>[]> {
+  return await db.query('safebyok_tallies').withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel)).collect()
+}
 
-/** A vault document. Its `vault` row is `unknown` until the core's predicates have checked it. */
+/** A vault document. Its `vault` row is `unknown` until the core has checked it. */
 type VaultDoc = Omit<Doc<'safebyok_vaults'>, 'vault'> & { vault: unknown }
 
-/** A box document. Its `box` row is `unknown` until the core's predicates have checked it. */
+/** A box document. Its `box` row is `unknown` until the core has checked it. */
 type BoxDoc = Omit<Doc<'safebyok_boxes'>, 'box'> & { box: unknown }
 // --

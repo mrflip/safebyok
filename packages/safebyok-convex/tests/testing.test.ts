@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { version as convexVersion } from 'convex'
 import { ConvexClient } from 'convex/browser'
-import * as DB from 'safebyok/storage'
 import * as TH from './test-helpers'
 import { fakeDeployment } from '../src/testing'
 import type { FakeDeploymentOpts } from '../src/testing'
@@ -14,8 +13,7 @@ const deploy = (opts?: FakeDeploymentOpts) => {
 }
 
 const vault = TH.vaultAt()
-const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
-const putVaultArgs = { record: vault, opts: birth }
+const putVaultArgs = TH.putVaultArgs(vault)
 const vaultAsked = { scope: TH.vaultScope }
 const watchRowsArgs = { scope: TH.bankScope }
 
@@ -164,7 +162,7 @@ describe("fakeDeployment", () => {
     await vi.waitFor(() => { expect(heard).toHaveBeenCalledTimes(1) })
     expect(await client.query(deployment.api.safebyok.getVault, vaultAsked)).to.be.null
     const answer = await deployment.arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyok.putVault, putVaultArgs))
-    expect(answer).to.deep.equal({ isWritten: true, ante: null })
+    expect(answer).to.deep.include({ ok: true, act: 'born', vault })
     expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ vaults: [{ vaultlabel: vault.vaultlabel, vault }] })
     expect(await client.query(deployment.api.safebyok.getVault, vaultAsked)).to.deep.equal(vault)
   })

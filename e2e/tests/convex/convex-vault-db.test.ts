@@ -5,7 +5,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConvexReactClient } from 'convex/react'
 import type { Boxscope, Notice, VaultScope } from 'safebyok/storage'
-import * as DB from 'safebyok/storage'
 import { ConvexVaultDB } from 'safebyok-convex'
 import type { ConvexVaultDBOpts } from 'safebyok-convex'
 import { fakeDeployment } from 'safebyok-convex/testing'
@@ -118,24 +117,23 @@ const hostedVaultDB = (subject: string | null) => {
   return { deployment, vaultDB: new ConvexVaultDB({ client: connectReact(deployment, subject), api: deployment.api.safebyok }) }
 }
 
-const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
-
 describe("ConvexVaultDB over a ConvexReactClient, on a host's functions", () => {
   it("serves the user signed in", async () => {
     const { vaultDB } = hostedVaultDB('u1')
-    await TH.expectGood(vaultDB.tryPutVault(TH.vaultAt(), birth))
-    expect(await vaultDB.getVault(TH.vaultScope)).to.deep.include({ act: 'got', world: TH.vaultAt() })
+    const ask = TH.vaultPutAskOf(TH.vaultAt())
+    await TH.expectGood(vaultDB.tryPutVault(ask))
+    expect(await vaultDB.getVault(TH.vaultGetAskOf())).to.deep.include({ act: 'gotlive', world: TH.vaultAt() })
   })
 
   it("is refused when no one is signed in, or someone else is", async () => {
-    await TH.expectBad(hostedVaultDB(null).vaultDB.tryGetVault(TH.vaultScope), 'identity_revoked')
+    await TH.expectBad(hostedVaultDB(null).vaultDB.tryGetVault(TH.vaultGetAskOf()), 'identity_revoked')
     await TH.expectBad(hostedVaultDB('u2').vaultDB.tryListVaults(TH.bankScope), 'identity_revoked')
   })
 
   it("is refused again for a query the client already has the refusal of", async () => {
     const { vaultDB } = hostedVaultDB('u2')
-    await TH.expectBad(vaultDB.tryGetVault(TH.vaultScope), 'identity_revoked')
-    await TH.expectBad(vaultDB.tryGetVault(TH.vaultScope), 'identity_revoked')
+    await TH.expectBad(vaultDB.tryGetVault(TH.vaultGetAskOf()), 'identity_revoked')
+    await TH.expectBad(vaultDB.tryGetVault(TH.vaultGetAskOf()), 'identity_revoked')
   })
 
   it("notifies a second watch of a change in rows the client already watches", async () => {
@@ -145,7 +143,7 @@ describe("ConvexVaultDB over a ConvexReactClient, on a host's functions", () => 
     const unwatchFirst = vaultDB.watch(TH.bankScope, (notice) => { first.push(notice) })
     await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
     const unwatchSecond = vaultDB.watch(TH.bankScope, (notice) => { second.push(notice) })
-    await deployment.arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyok.putVault, { record: TH.vaultAt(), opts: birth }))
+    await deployment.arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyok.putVault, TH.putVaultArgs(TH.vaultAt())))
     await vi.waitFor(() => { expect(second.map(({ act }) => act)).to.include('got') })
     expect(first.map(({ act }) => act)).to.include('got')
     unwatchFirst()
