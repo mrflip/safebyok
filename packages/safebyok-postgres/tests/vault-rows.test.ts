@@ -1,10 +1,7 @@
 /** The rows in their tables on PGlite: a record is answered as it was stored, each field is in a column of its own, and the tables hold only rows their columns can. */
 
 import { beforeEach, describe, expect, it } from 'vitest'
-import {
-  ClaimVaultSql, BoxAndRoomSql, BoxesOfLifeSql, BoxLivesSql, GetBoxSql, GetBoxWithVaultSql, GetVaultSql, ListBoxesWithVaultSql, ListVaultsSql, LockVaultSql,
-  WriteBoxSql, WriteVaultSql,
-} from '../src/vault-queries'
+import { BoxLivesSql, GetBoxWithVaultSql, GetVaultSql, ListBoxesWithVaultSql, ListVaultsSql } from '../src/vault-queries'
 import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
@@ -33,13 +30,33 @@ async function storedVault(): Promise<unknown> {
 }
 
 async function storedBox(): Promise<unknown> {
-  const [row] = await rowsFrom<{ box: unknown }>(GetBoxSql, BoxAddress)
+  const [row] = await rowsFrom<{ box: unknown }>(GetBoxWithVaultSql, BoxAddress)
   return row?.box ?? null
 }
 
-async function storeVault(record: unknown): Promise<void> { await rowsFrom(WriteVaultSql, [JSON.stringify(record)]) }
+// A row is stored here as it is, whatever is stored already: PostgresVaultDB itself stores only through its functions, which test the row first.
+const StoreVaultSql = `
+  INSERT INTO safebyok_vaults
+  SELECT * FROM jsonb_populate_record(NULL::safebyok_vaults, $1::text::jsonb)
+  ON CONFLICT (applabel, user_id, vaultlabel)
+  DO UPDATE SET
+    fmt = EXCLUDED.fmt, am = EXCLUDED.am, revision_tok = EXCLUDED.revision_tok, revision_seq = EXCLUDED.revision_seq,
+    registered_at = EXCLUDED.registered_at, written_at = EXCLUDED.written_at, vault_tok = EXCLUDED.vault_tok, gate = EXCLUDED.gate
+`
+const StoreBoxSql = `
+  INSERT INTO safebyok_boxes
+  SELECT * FROM jsonb_populate_record(NULL::safebyok_boxes, $1::text::jsonb)
+  ON CONFLICT (applabel, user_id, vaultlabel, vault_tok, boxlabel)
+  DO UPDATE SET
+    fmt = EXCLUDED.fmt, am = EXCLUDED.am, revision_tok = EXCLUDED.revision_tok, revision_seq = EXCLUDED.revision_seq,
+    registered_at = EXCLUDED.registered_at, written_at = EXCLUDED.written_at, box_tok = EXCLUDED.box_tok,
+    whisper_codec = EXCLUDED.whisper_codec, whisper_schema_version = EXCLUDED.whisper_schema_version,
+    sidecar = EXCLUDED.sidecar, box_key_wrapped = EXCLUDED.box_key_wrapped, whisper_ciphered = EXCLUDED.whisper_ciphered
+`
 
-async function storeBox(record: unknown): Promise<void> { await rowsFrom(WriteBoxSql, [JSON.stringify(record)]) }
+async function storeVault(record: unknown): Promise<void> { await rowsFrom(StoreVaultSql, [JSON.stringify(record)]) }
+
+async function storeBox(record: unknown): Promise<void> { await rowsFrom(StoreBoxSql, [JSON.stringify(record)]) }
 
 /** The SQLSTATE Postgres refuses `storing` with, or null where it stores. */
 async function refusalCodeOf(storing: () => unknown): Promise<string | null> {
@@ -85,26 +102,15 @@ describe("a record stored in its table", () => {
     await storeBox(box)
     const { boxlabel } = TH.boxscope
     expect(await rowsFrom(ListVaultsSql, VaultAddress.slice(0, 2))).to.deep.equal([{ vaultlabel: 'main', vault }])
-    expect(await rowsFrom(LockVaultSql, VaultAddress)).to.deep.equal([{ vault }])
-    expect(await rowsFrom(BoxesOfLifeSql, LifeAddress)).to.deep.equal([{ boxlabel, box }])
-    expect(await rowsFrom(BoxAndRoomSql, BoxAddress)).to.deep.equal([{ box, used: 1 }])
+    expect(await rowsFrom(GetVaultSql, VaultAddress)).to.deep.equal([{ vault }])
     expect(await rowsFrom(GetBoxWithVaultSql, BoxAddress)).to.deep.equal([{ world: vault, box }])
     expect(await rowsFrom(ListBoxesWithVaultSql, LifeAddress)).to.deep.equal([{ vault, boxes: [{ boxlabel, box }] }])
   })
 
   it("is answered as null or an empty list where no row is stored", async () => {
     expect(await rowsFrom(GetVaultSql, VaultAddress)).to.deep.equal([])
-    expect(await rowsFrom(BoxAndRoomSql, BoxAddress)).to.deep.equal([{ box: null, used: 0 }])
     expect(await rowsFrom(GetBoxWithVaultSql, BoxAddress)).to.deep.equal([{ world: null, box: null }])
     expect(await rowsFrom(ListBoxesWithVaultSql, LifeAddress)).to.deep.equal([{ vault: null, boxes: [] }])
-  })
-})
-
-describe("ClaimVaultSql", () => {
-  it("stores a record over no row, and answers no row and stores nothing over a row stored", async () => {
-    expect(await rowsFrom(ClaimVaultSql, [JSON.stringify(vault)])).to.deep.equal([{ vaultlabel: 'main' }])
-    expect(await rowsFrom(ClaimVaultSql, [JSON.stringify(passkeyVault)])).to.deep.equal([])
-    expect(await storedVault()).to.deep.equal(vault)
   })
 })
 
@@ -140,11 +146,10 @@ describe("the columns of a row", () => {
     ])
   })
 
-  it("count a vault life's live boxes by am, and its box rows whatever their am", async () => {
+  it("count a vault life's box rows whatever their am", async () => {
     await storeVault(vault)
     await storeBox(box)
     await storeBox(TH.boxTombstoneOf(secondBox))
-    expect(await rowsFrom(BoxAndRoomSql, BoxAddress)).to.deep.equal([{ box, used: 1 }])
     expect(await rowsFrom(BoxLivesSql, VaultAddress.slice(0, 2))).to.deep.equal([{ vaultlabel: 'main', vault_tok: 'life1', boxcount: 2 }])
   })
 })
