@@ -88,44 +88,44 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
   protected async doListVaults(scope: BankScope): Promise<RowOfVault[]> {
-    return await reaching('doListVaults', () => this.#client.query(this.#api.listVaults, { scope }))
+    return await runOrRefuse('doListVaults', () => this.#client.query(this.#api.listVaults, { scope }))
   }
 
   // A get reads its rows in one query, from one snapshot, and the client classifies them: a get stores nothing, so it needs no mutation.
   protected async doGetVault(ask: VaultGetAsk): Promise<VaultClassified> {
-    const vault: unknown = await reaching('doGetVault', () => this.#client.query(this.#api.getVault, { scope: DB.vaultScope.parse(ask) }))
+    const vault: unknown = await runOrRefuse('doGetVault', () => this.#client.query(this.#api.getVault, { scope: DB.vaultScope.parse(ask) }))
     return this.classifyVault(ask, { vault })
   }
 
   protected async doListBoxes(asked: VaultQuery): Promise<BoxesFetched> {
-    return await reaching('doListBoxes', () => this.#client.query(this.#api.listBoxes, { asked }))
+    return await runOrRefuse('doListBoxes', () => this.#client.query(this.#api.listBoxes, { asked }))
   }
 
   protected async doGetBox(ask: BoxGetAsk): Promise<BoxClassified> {
-    const { vault, box } = await reaching('doGetBox', () => this.#client.query(this.#api.getBox, { asked: DB.boxQuery.parse(ask) }))
+    const { vault, box } = await runOrRefuse('doGetBox', () => this.#client.query(this.#api.getBox, { asked: DB.boxQuery.parse(ask) }))
     return this.classifyBox(ask, { world: vault, box })
   }
 
   // A put or del is one mutation, so one transaction: the component checks the ask, fetches the rows, classifies the ask,
   // and stores the record if the act is a write. It returns the classifier's outcome, which is checked here.
   protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
-    return vaultClassified.parse(await reaching('doPutVault', () => this.#client.mutation(this.#api.putVault, { ask })))
+    return vaultClassified.parse(await runOrRefuse('doPutVault', () => this.#client.mutation(this.#api.putVault, { ask })))
   }
 
   protected async doPutBox(ask: BoxPutAsk): Promise<BoxClassified> {
-    return boxClassified.parse(await reaching('doPutBox', () => this.#client.mutation(this.#api.putBox, { ask, maxBoxes: this.#maxBoxes })))
+    return boxClassified.parse(await runOrRefuse('doPutBox', () => this.#client.mutation(this.#api.putBox, { ask, maxBoxes: this.#maxBoxes })))
   }
 
   protected async doDelVault(ask: VaultDelAsk): Promise<VaultClassified> {
-    return vaultClassified.parse(await reaching('doDelVault', () => this.#client.mutation(this.#api.delVault, { ask })))
+    return vaultClassified.parse(await runOrRefuse('doDelVault', () => this.#client.mutation(this.#api.delVault, { ask })))
   }
 
   protected async doDelBox(ask: BoxDelAsk): Promise<BoxClassified> {
-    return boxClassified.parse(await reaching('doDelBox', () => this.#client.mutation(this.#api.delBox, { ask })))
+    return boxClassified.parse(await runOrRefuse('doDelBox', () => this.#client.mutation(this.#api.delBox, { ask })))
   }
 
   protected async doTidyGone(scope: BankScope): Promise<Tidied> {
-    return await reaching('doTidyGone', () => this.#client.mutation(this.#api.tidyGone, { scope }))
+    return await runOrRefuse('doTidyGone', () => this.#client.mutation(this.#api.tidyGone, { scope }))
   }
 
   // Convex re-sends a watched query's whole result each time it changes, so `hear` gets only the
@@ -176,14 +176,14 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Helpers]: reaching, refusalOf, refusalOfCrossed, changesOf, latestOf, isConvexClient, isSafebyokApi, convexVaultDBOpts, vaultClassified, boxClassified
+// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, changesOf, latestOf, isConvexClient, isSafebyokApi, convexVaultDBOpts, vaultClassified, boxClassified
 
 /** Convex's size limit for one document, in bytes. */
 const ConvexDocumentSize = 1_048_576
 
 // Takes a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
 /** Run `call`, converting anything it throws into a safebyok refusal. */
-async function reaching<ValT>(callname: string, call: () => Promise<ValT>): Promise<ValT> {
+async function runOrRefuse<ValT>(callname: string, call: () => Promise<ValT>): Promise<ValT> {
   try {
     return await call()
   } catch (err) {

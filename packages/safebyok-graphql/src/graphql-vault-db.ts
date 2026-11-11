@@ -62,7 +62,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link listVaults}. */
   async tryListVaults(scope: BankScope): Promise<Answer<BankListed, ListAct, BankScope>> {
     return await answerOf('listVaults', () => DB.reqParams.parse(DB.bankScope.parse(scope)), async () => {
-      const answer = await this.#asked(VaultOperations.listVaults, 'safebyokListVaults', DB.bankScope.parse(scope))
+      const answer = await this.#runQuery(VaultOperations.listVaults, 'safebyokListVaults', DB.bankScope.parse(scope))
       return DB.listVaultsAnswer.parse(listedAnswerOf(answer))
     })
   }
@@ -75,7 +75,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link getVault}. */
   async tryGetVault(ask: VaultGetAsk): Promise<VaultAnswer> {
     return await answerOf('getVault', () => DB.reqParamsOf(DB.vaultGet.parse(ask)), async () => {
-      const answer = await this.#asked(VaultOperations.getVault, 'safebyokGetVault', { ask: DB.vaultGet.parse(ask) })
+      const answer = await this.#runQuery(VaultOperations.getVault, 'safebyokGetVault', { ask: DB.vaultGet.parse(ask) })
       return DB.getVaultAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -86,7 +86,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link listBoxes}. */
   async tryListBoxes(asked: VaultQuery): Promise<Answer<BoxesListed, ListAct>> {
     return await answerOf('listBoxes', () => DB.reqParams.parse(DB.vaultQuery.parse(asked)), async () => {
-      const answer = await this.#asked(VaultOperations.listBoxes, 'safebyokListBoxes', DB.vaultQuery.parse(asked))
+      const answer = await this.#runQuery(VaultOperations.listBoxes, 'safebyokListBoxes', DB.vaultQuery.parse(asked))
       return DB.listBoxesAnswer.parse(listedAnswerOf(answer))
     })
   }
@@ -99,7 +99,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link getBox}. */
   async tryGetBox(ask: BoxGetAsk): Promise<BoxAnswer> {
     return await answerOf('getBox', () => DB.reqParamsOf(DB.boxGet.parse(ask)), async () => {
-      const answer = await this.#asked(VaultOperations.getBox, 'safebyokGetBox', { ask: DB.boxGet.parse(ask) })
+      const answer = await this.#runQuery(VaultOperations.getBox, 'safebyokGetBox', { ask: DB.boxGet.parse(ask) })
       return DB.getBoxAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -115,7 +115,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link putVault}. */
   async tryPutVault(ask: VaultPutAsk): Promise<VaultAnswer> {
     return await answerOf('putVault', () => DB.reqParamsOf(DB.vaultPut.parse(ask)), async () => {
-      const answer = await this.#told(VaultOperations.putVault, 'safebyokPutVault', { ask: DB.vaultPut.parse(ask) })
+      const answer = await this.#runMutation(VaultOperations.putVault, 'safebyokPutVault', { ask: DB.vaultPut.parse(ask) })
       return DB.putVaultAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -128,7 +128,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link putBox}. */
   async tryPutBox(ask: BoxPutAsk): Promise<BoxAnswer> {
     return await answerOf('putBox', () => DB.reqParamsOf(DB.boxPut.parse(ask)), async () => {
-      const answer = await this.#told(VaultOperations.putBox, 'safebyokPutBox', { ask: DB.boxPut.parse(ask) })
+      const answer = await this.#runMutation(VaultOperations.putBox, 'safebyokPutBox', { ask: DB.boxPut.parse(ask) })
       return DB.putBoxAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -142,7 +142,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link replacePassphrase}. */
   async tryReplacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'replaced'>> {
     return await answerOf('replacePassphrase', () => DB.reqParams.parse({ ...DB.vaultRecord.parse(record), ...DB.gateVerbOpts.parse(opts) }), async () => {
-      const answer = await this.#told(VaultOperations.replacePassphrase, 'safebyokReplacePassphrase', { record: DB.vaultRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
+      const answer = await this.#runMutation(VaultOperations.replacePassphrase, 'safebyokReplacePassphrase', { record: DB.vaultRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
       return DB.replacePassphraseAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -153,7 +153,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link addPasskey}. */
   async tryAddPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'added'>> {
     return await answerOf('addPasskey', () => DB.reqParams.parse({ ...DB.passkeyAddRecord.parse(record), ...DB.gateVerbOpts.parse(opts) }), async () => {
-      const answer = await this.#told(VaultOperations.addPasskey, 'safebyokAddPasskey', { record: DB.passkeyAddRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
+      const answer = await this.#runMutation(VaultOperations.addPasskey, 'safebyokAddPasskey', { record: DB.passkeyAddRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
       return DB.addPasskeyAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -166,7 +166,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link revokePasskey}. */
   async tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked'>> {
     return await answerOf('revokePasskey', () => DB.reqParams.parse({ ...DB.passkeyRevokeRecord.parse(record), ...DB.gateVerbOpts.parse(opts) }), async () => {
-      const answer = await this.#told(VaultOperations.revokePasskey, 'safebyokRevokePasskey', { record: DB.passkeyRevokeRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
+      const answer = await this.#runMutation(VaultOperations.revokePasskey, 'safebyokRevokePasskey', { record: DB.passkeyRevokeRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
       return DB.revokePasskeyAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -180,7 +180,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link delBox}. */
   async tryDelBox(ask: BoxDelAsk): Promise<BoxAnswer> {
     return await answerOf('delBox', () => DB.reqParamsOf(DB.boxDel.parse(ask)), async () => {
-      const answer = await this.#told(VaultOperations.delBox, 'safebyokDelBox', { ask: DB.boxDel.parse(ask) })
+      const answer = await this.#runMutation(VaultOperations.delBox, 'safebyokDelBox', { ask: DB.boxDel.parse(ask) })
       return DB.delBoxAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -191,7 +191,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link delVault}. */
   async tryDelVault(ask: VaultDelAsk): Promise<VaultAnswer> {
     return await answerOf('delVault', () => DB.reqParamsOf(DB.vaultDel.parse(ask)), async () => {
-      const answer = await this.#told(VaultOperations.delVault, 'safebyokDelVault', { ask: DB.vaultDel.parse(ask) })
+      const answer = await this.#runMutation(VaultOperations.delVault, 'safebyokDelVault', { ask: DB.vaultDel.parse(ask) })
       return DB.delVaultAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -202,7 +202,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link tidyGone}. */
   async tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>> {
     return await answerOf('tidyGone', () => DB.reqParams.parse(DB.bankScope.parse(scope)), async () => {
-      const answer = await this.#told(VaultOperations.tidyGone, 'safebyokTidyGone', DB.bankScope.parse(scope))
+      const answer = await this.#runMutation(VaultOperations.tidyGone, 'safebyokTidyGone', DB.bankScope.parse(scope))
       return DB.tidyGoneAnswer.parse(tidiedAnswerOf(answer))
     })
   }
@@ -246,15 +246,15 @@ export class GraphQLVaultDB implements VaultDB {
   }
   // --
 
-  // == [Operations]: #asked, #told
+  // == [Operations]: #runQuery, #runMutation
 
   /** Run a query against the server, bypassing any cache, and return its `fieldname` field. */
-  async #asked(document: string, fieldname: string, variables: AnyVariables): Promise<unknown> {
+  async #runQuery(document: string, fieldname: string, variables: AnyVariables): Promise<unknown> {
     return fieldOf(await this.#client.query(document, variables, { requestPolicy: 'network-only' }).toPromise(), fieldname)
   }
 
   /** Run a mutation and return its `fieldname` field. */
-  async #told(document: string, fieldname: string, variables: AnyVariables): Promise<unknown> {
+  async #runMutation(document: string, fieldname: string, variables: AnyVariables): Promise<unknown> {
     return fieldOf(await this.#client.mutation(document, variables).toPromise(), fieldname)
   }
   // --

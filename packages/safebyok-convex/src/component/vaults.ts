@@ -75,10 +75,10 @@ export const putVault = mutation({
   args:    CVX.putVaultArgs,
   returns: CVX.vaultClassified,
   handler: async (ctx, { ask: sent }) => {
-    const ask = crossing(() => DB.vaultPut.parse(sent))
+    const ask = runForClient(() => DB.vaultPut.parse(sent))
     const anteDoc = await getVaultDoc(ctx.db, ask)
     const vault = anteDoc?.vault ?? null
-    const classified = crossing(() => DB.classifyVault(ask, { vault }), vault)
+    const classified = runForClient(() => DB.classifyVault(ask, { vault }), vault)
     if (DB.isWriteAct(classified.act)) { await writeVaultDoc(ctx.db, anteDoc, ask, ask.record) }
     return classified
   },
@@ -94,7 +94,7 @@ export const putBox = mutation({
   args:    CVX.putBoxArgs,
   returns: CVX.boxClassified,
   handler: async (ctx, { ask: sent, maxBoxes = Tallies.MaxVaultBoxes }) => {
-    const ask = crossing(() => DB.boxPut.parse(sent))
+    const ask = runForClient(() => DB.boxPut.parse(sent))
     const life = lifeOf(ask)
     const vaultDoc = await getVaultDoc(ctx.db, ask)
     const anteDoc = await getBoxDoc(ctx.db, life, ask.boxlabel)
@@ -102,7 +102,7 @@ export const putBox = mutation({
     // Convex accepts NaN as a number. Math.min would return it, and no count is greater than NaN, so the limit would never apply.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
     const capacity = Tallies.capacityOf(reckoning.tally, cap)
-    const classified = crossing(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity }))
+    const classified = runForClient(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity }))
     if (! DB.isWriteAct(classified.act)) { return classified }
     const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
     // A put over a tombstone replaces that row, so only a new boxlabel adds to `all_count`.
@@ -124,10 +124,10 @@ export const delVault = mutation({
   args:    CVX.delVaultArgs,
   returns: CVX.vaultClassified,
   handler: async (ctx, { ask: sent }) => {
-    const ask = crossing(() => DB.vaultDel.parse(sent))
+    const ask = runForClient(() => DB.vaultDel.parse(sent))
     const anteDoc = await getVaultDoc(ctx.db, ask)
     const vault = anteDoc?.vault ?? null
-    const classified = crossing(() => DB.classifyVault(ask, { vault }), vault)
+    const classified = runForClient(() => DB.classifyVault(ask, { vault }), vault)
     if (DB.isWriteAct(classified.act)) {
       await writeVaultDoc(ctx.db, anteDoc, ask, ask.record)
       // A vault's boxes end with its life: nothing reads a box row of a life that is over.
@@ -142,11 +142,11 @@ export const delBox = mutation({
   args:    CVX.delBoxArgs,
   returns: CVX.boxClassified,
   handler: async (ctx, { ask: sent }) => {
-    const ask = crossing(() => DB.boxDel.parse(sent))
+    const ask = runForClient(() => DB.boxDel.parse(sent))
     const life = lifeOf(ask)
     const vaultDoc = await getVaultDoc(ctx.db, ask)
     const anteDoc = await getBoxDoc(ctx.db, life, ask.boxlabel)
-    const classified = crossing(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null }))
+    const classified = runForClient(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null }))
     if (DB.isWriteAct(classified.act)) {
       const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
       await writeBoxDoc(ctx.db, anteDoc, boxDoc)
@@ -194,7 +194,7 @@ export const watchRows = query({
 })
 // --
 
-// == [Asks and refusals]: crossing, crossingOf, roomlessOf
+// == [Asks and refusals]: runForClient, crossingOf, roomlessOf
 
 // Anyone signed in may call these functions with an ask of their own making, so each mutation parses its ask again here,
 // with the core's own checker, before a row is read, and continues with what the parse returns.
@@ -202,7 +202,7 @@ export const watchRows = query({
 /** Return what `step` returns, rethrowing a refusal the client must see as a ConvexError.
  * `world` is the stored vault row, sent along with a `gate_issue`.
  */
-function crossing<ValT>(step: () => ValT, world: unknown = null): ValT {
+function runForClient<ValT>(step: () => ValT, world: unknown = null): ValT {
   try {
     return step()
   } catch (err) {
