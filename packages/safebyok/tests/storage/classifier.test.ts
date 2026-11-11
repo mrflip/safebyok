@@ -52,7 +52,7 @@ const BoxLevel: Level = {
     op: 'put', ...policies, expected: boxExpectedOf(expected), record: { ...liveBox, ...boxProposed(expected, proposedTok), box_tok: lifeTokOver(expected) },
   }, liveVault, BoxLevel.rows[stored]),
   delAct: (expected, proposedTok, stored) => boxActOf({
-    op: 'del', expected: boxExpectedOf(expected), record: { ...goneBox, ...boxProposed(expected, proposedTok), box_tok: expected.lifeTok },
+    op: 'del', expected: boxExpectedOf(expected), record: { ...goneBox, ...boxProposed(expected, proposedTok), box_tok: 'lifeended' },
   }, liveVault, BoxLevel.rows[stored]),
 }
 
@@ -66,7 +66,7 @@ const VaultLevel: Level = {
     op: 'put', ...policies, expected: vaultExpectedOf(expected), record: { ...liveVault, ...boxProposed(expected, proposedTok), vault_tok: lifeTokOver(expected) },
   }, VaultLevel.rows[stored]),
   delAct: (expected, proposedTok, stored) => vaultActOf({
-    op: 'del', expected: vaultExpectedOf(expected), record: { ...goneVault, ...boxProposed(expected, proposedTok), vault_tok: expected.lifeTok },
+    op: 'del', expected: vaultExpectedOf(expected), record: { ...goneVault, ...boxProposed(expected, proposedTok), vault_tok: 'lifeended' },
   }, VaultLevel.rows[stored]),
 }
 
@@ -374,7 +374,7 @@ describe("boxActOf, one box through a run of requests", () => {
     record: { ...liveBox, revision_tok: mint('rev'), revision_seq: expected.revision_seq + 1, box_tok: (expected.am === 'a') ? expected.box_tok : mint('life') },
   })
   const delCiting = (expected: Row): Write => ({
-    op: 'del', expected, record: { ...goneBox, revision_tok: mint('rev'), revision_seq: expected.revision_seq + 1, box_tok: expected.box_tok },
+    op: 'del', expected, record: { ...goneBox, revision_tok: mint('rev'), revision_seq: expected.revision_seq + 1, box_tok: mint('life') },
   })
 
   /** Every request worth sending next: a put or del citing nothing, the row stored or the one before it, and each request sent before, again. */

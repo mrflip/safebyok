@@ -15,7 +15,8 @@ const Del  = { op: 'del' } as const
 /** The tombstone that deletes `row`, at the next revision. */
 function goneOf(row: BoxRecord | VaultRecord, revision_tok: string) {
   const sparse = ('boxlabel' in row) ? SX.boxSparse.parse(row) : SX.vaultSparse.parse(row)
-  return { ...sparse, revision_tok, revision_seq: row.revision_seq + 1, am: 'x' as const }
+  const lifeTok = ('boxlabel' in row) ? { box_tok: `${row.box_tok}x` } : { vault_tok: `${row.vault_tok}x` }
+  return { ...sparse, ...lifeTok, revision_tok, revision_seq: row.revision_seq + 1, am: 'x' as const }
 }
 
 async function vaultDBWithVault(opts = {}): Promise<MemoryVaultDB> {
@@ -69,7 +70,7 @@ describe("a vaultDB's get, put and del, each given one ask", () => {
     expect(camped.ok ? null : camped.err.refusalkind).to.eq('camped')
     const tombstone = goneOf(boxAt(0), 'brev1') as BoxTombstone
     await vaultDB.delBox({ ...Del, expected: boxAt(0), record: tombstone })
-    const again = await vaultDB.tryDelBox({ ...Del, expected: tombstone, record: { ...tombstone, revision_tok: 'brev2', revision_seq: 2 } })
+    const again = await vaultDB.tryDelBox({ ...Del, expected: tombstone, record: { ...tombstone, revision_tok: 'brev2', revision_seq: 2, box_tok: 'box1xx' } })
     expect(again).to.deep.include({ ok: false, act: 'dubdel', dbhas: tombstone })
     expect(again.ok ? null : again.err.refusalkind).to.eq('absent_box')
   })

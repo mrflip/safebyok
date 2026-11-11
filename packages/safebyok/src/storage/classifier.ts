@@ -220,17 +220,17 @@ export function classifyVault(ask: VaultAsk, { vault }: VaultFetched): VaultClas
 }
 
 /** Classify a box's checked ask against the rows an adapter fetched. Throws for a row that fails its checks. */
-export function classifyBox(ask: BoxAsk, rawAnswer: BoxFetched): BoxClassified {
-  // const { world, row, capacity } = rawAnswer
-  // const boxQuery  = SX.boxQueryOf(ask)
-  // fine-slicing damaged_vault vs damaged_row isn't worth the extra param
-  // the return value of vaultRowAt should be a perfectly good row
-  // const vaultRow  = vaultRowAt(ask, vault, boxVaultRow)
-  // const world     = vaultRow.row ?? SX.sentinelVaultOf(boxQuery)
-  const world     = vaultRowOf(ask, rawAnswer.world)
-  // have this throw
+export function classifyBox(ask: BoxAsk, { vault, box, capacity }: BoxFetched): BoxClassified {
+  // Coach, to come back to once Postgres is squared away:
+  // - name the fetched parts { world, row, capacity }
+  // - fine-slicing damaged_vault vs damaged_row isn't worth the extra param
+  // - the return value of vaultRowAt should be a perfectly good row
+  // - (the vault check may stay an answer; it need not throw)
+  const boxQuery  = SX.boxQueryOf(ask)
+  const vaultRow  = vaultRowAt(boxQuery, vault, boxVaultRow)
+  const world     = vaultRow.row ?? SX.sentinelVaultOf(boxQuery)
   const vaultAct  = boxVaultActOf(boxQuery, vaultRow)
-  // if (vaultAct !== null) { return { ok: false, act: vaultAct, world, row: null, write: null, presence: null, capacity: null } }
+  if (vaultAct !== null) { return { ok: false, act: vaultAct, world, row: null, write: null, presence: null, capacity: null } }
   const stored    = boxRowAt(boxQuery, box)
   const uncapped  = rowActOf(ask, stored)
   const act       = (capacity === undefined) ? uncapped : cappedActOf(uncapped, capacity)

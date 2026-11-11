@@ -32,7 +32,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   }
   // --
 
-  // == [Rows]: _cheat_vaultRowsOf, _cheat_boxRowsOf, #vaultRowOf, #writeVaultRow, #writeBoxRow, #roomIn, #tombstoneBoxes, #tell
+  // == [Rows]: _cheat_vaultRowsOf, _cheat_boxRowsOf, #vaultRowOf, #writeVaultRow, #writeBoxRow, #roomIn, #tell
 
   /** For tests: the bank's own map of vault rows, by vaultlabel. */
   _cheat_vaultRowsOf({ applabel, user_id }: BankScope): Map<string, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
@@ -73,16 +73,6 @@ export class MemoryVaultDB extends AdapterVaultDB {
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }
 
-  /** Tombstones every live box row of the life `tombstone` ends. */
-  #tombstoneBoxes(tombstone: VaultTombstone): void {
-    const boxrows = this._cheat_boxRowsOf(tombstone, tombstone.vault_tok)
-    for (const [boxlabel, box] of boxrows) {
-      const boxTombstone = SX.boxTombstoneOf(box, tombstone.written_at)
-      if (boxTombstone === null) { continue }
-      boxrows.set(boxlabel, boxTombstone)
-      this.#tell(tombstone, { vault: this.#vaultRowOf(tombstone), box: boxTombstone })
-    }
-  }
 
   // Each heeder hears on a later tick, so that nothing it does touches the transaction that told it.
   /** Tell each heeder of `scope` what was `heard`. */
@@ -133,7 +123,8 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const classified = this.classifyVault(ask, { vault: this.#vaultRowOf(ask.record) })
     if (classified.write !== null) {
       this.#writeVaultRow(classified.write)
-      this.#tombstoneBoxes(ask.record)
+      // A vault's boxes end with its life: nothing reads a box row of a life that is over.
+      this._cheat_boxRowsOf(ask.record, ask.expected.vault_tok).clear()
     }
     return classified
   }
