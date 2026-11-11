@@ -67,7 +67,9 @@ export class GraphQLVaultDB implements VaultDB {
     })
   }
 
-  /** The vault at a scope, whatever its life. Over none stored, `ifAbsent: 'nil'` answers null, and over a tombstone, the tombstone. */
+  /** Get the vault row at a scope, whatever its life.
+   * With `ifAbsent: 'nil'`, `val` is null if no row is stored, or the tombstone if one is. Otherwise both refuse.
+   */
   async getVault(ask: VaultGetAsk): Promise<GoodAnswer<VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryGetVault(ask)) }
 
   /** Non-throwing form of {@link getVault}. */
@@ -89,7 +91,9 @@ export class GraphQLVaultDB implements VaultDB {
     })
   }
 
-  /** The box under this `vault_tok`, with its vault row as `world`. Over none stored, `ifAbsent: 'nil'` answers null, and over a tombstone, the tombstone. */
+  /** Get the box row under this `vault_tok`, with its vault row as `world`.
+   * With `ifAbsent: 'nil'`, `val` is null if no row is stored, or the tombstone if one is. Otherwise both refuse.
+   */
   async getBox(ask: BoxGetAsk): Promise<GoodAnswer<BoxRow | null, OkAct>> { return goodAnswerOf(await this.tryGetBox(ask)) }
 
   /** Non-throwing form of {@link getBox}. */
@@ -103,7 +107,9 @@ export class GraphQLVaultDB implements VaultDB {
 
   // == [Puts]: putVault, tryPutVault, putBox, tryPutBox
 
-  /** Stores `ask.record` over the vault row `ask.expected`, as its policies allow. `passed` answers the live row found. */
+  /** Store `ask.record` over the vault row `ask.expected`, as `ifPresent` and `ifAbsent` allow.
+   * Under the `passed` act, nothing is stored, and `val` is the live row found.
+   */
   async putVault(ask: VaultPutAsk): Promise<GoodAnswer<VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryPutVault(ask)) }
 
   /** Non-throwing form of {@link putVault}. */
@@ -114,7 +120,9 @@ export class GraphQLVaultDB implements VaultDB {
     })
   }
 
-  /** Stores `ask.record` over the box row `ask.expected`, under a vault live at its `vault_tok`, as its policies allow. `passed` answers the live row found. */
+  /** Store `ask.record` over the box row `ask.expected`, in a vault live under its `vault_tok`, as `ifPresent` and `ifAbsent` allow.
+   * Under the `passed` act, nothing is stored, and `val` is the live row found.
+   */
   async putBox(ask: BoxPutAsk): Promise<GoodAnswer<BoxRow | null, OkAct>> { return goodAnswerOf(await this.tryPutBox(ask)) }
 
   /** Non-throwing form of {@link putBox}. */
@@ -166,7 +174,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   // == [Dels]: delBox, tryDelBox, delVault, tryDelVault, tidyGone, tryTidyGone
 
-  /** Stores the tombstone `ask.record` over the live box row `ask.expected`. */
+  /** Store the tombstone `ask.record` over the live box row `ask.expected`. */
   async delBox(ask: BoxDelAsk): Promise<GoodAnswer<BoxRow | null, OkAct>> { return goodAnswerOf(await this.tryDelBox(ask)) }
 
   /** Non-throwing form of {@link delBox}. */
@@ -177,7 +185,7 @@ export class GraphQLVaultDB implements VaultDB {
     })
   }
 
-  /** Stores the tombstone `ask.record` over the live vault row `ask.expected`, and deletes the boxes of its life. */
+  /** Store the tombstone `ask.record` over the live vault row `ask.expected`, and delete the boxes of that vault life. */
   async delVault(ask: VaultDelAsk): Promise<GoodAnswer<VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryDelVault(ask)) }
 
   /** Non-throwing form of {@link delVault}. */
@@ -255,7 +263,9 @@ export class GraphQLVaultDB implements VaultDB {
 
 // == [Answers]: answerOf, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, heedNotice
 
-/** Run `ask` and return its answer, turning a thrown refusal into a bad answer; a request whose `checked` refuses is never sent. */
+/** Run `ask` and return its answer, converting a thrown refusal into a bad answer.
+ * A request that `checked` refuses is never sent.
+ */
 const answerOf = async <ValT, ActT extends string, WorldT>(call: string, checked: () => ReqParams, ask: () => Promise<Answer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
   const asked = await DB.outcomeOf(checked)
   if (! asked.ok) { return DB.badAnswerOf(asked.err) }

@@ -1,5 +1,5 @@
 // Each document includes exactly the fragments it uses, as GraphQL validation requires. None asks for
-// `__typename`, so a response holds only the fields the core's answer checkers expect.
+// `__typename`, so a response has only the fields the core's answer checkers expect.
 
 const vaultSparseFields = 'applabel user_id vaultlabel fmt revision_tok revision_seq registered_at written_at am vault_tok'
 const boxSparseFields = 'applabel user_id vaultlabel boxlabel fmt revision_tok revision_seq registered_at written_at am vault_tok box_tok whisper_codec whisper_schema_version'

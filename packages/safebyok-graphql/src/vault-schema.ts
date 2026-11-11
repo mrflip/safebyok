@@ -48,7 +48,7 @@ const answerFields = `
 export const VaultSchemaSdl = `"""Any JSON value, passed through unchanged: a box's sidecar, a damaged row, or a refusal's meta."""
 scalar SafebyokJson
 
-"""A time in integer UTC epoch milliseconds. Any safe integer is allowed, which GraphQL's 32-bit Int cannot hold."""
+"""A time in integer UTC epoch milliseconds. Any safe integer is allowed, which GraphQL's 32-bit Int cannot represent."""
 scalar SafebyokEpochMillis
 
 """safebyok's name for the reason a call was refused."""
@@ -59,16 +59,16 @@ enum SafebyokRefusalkind {
 """The verb an ask is for: a get, a put or a del."""
 enum SafebyokOp { get put del }
 
-"""What a get does when the row was never stored or is deleted: fail with a refusal, or return null."""
+"""A get's policy for a row that was never stored or is deleted: fail with a refusal, or return null."""
 enum SafebyokIfAbsent { fail nil }
 
-"""What a put does when the row was never stored or is deleted: add the record, or fail."""
+"""A put's policy for a row that was never stored or is deleted: add the record, or fail."""
 enum SafebyokPutIfAbsent { add fail }
 
-"""What a put does when a live row exists: replace it, fail, or return the existing row."""
+"""A put's policy for a live row: replace it, fail, or return the existing row."""
 enum SafebyokIfPresent { repl fail get }
 
-"""The gate verb a vault's put is for, whose tests the server's vaultDB adds over the live row it replaces."""
+"""The gate verb a vault's put is for. The server's vaultDB applies that verb's checks when the put replaces a live row."""
 enum SafebyokGateVerb { replacePassphrase addPasskey revokePasskey }
 
 # Rows
@@ -284,7 +284,7 @@ input SafebyokGateVerbOptsInput {
   prior: SafebyokRevisionInput!
 }
 
-"""The vault row an ask's caller holds, read as its meta, or the sentinel row where it holds none."""
+"""The metadata of the vault row the caller expects to find, or of the sentinel row if it expects none."""
 input SafebyokVaultExpectedInput {
   revision_tok: String!
   revision_seq: Int!
@@ -292,7 +292,7 @@ input SafebyokVaultExpectedInput {
   vault_tok:    String!
 }
 
-"""The box row an ask's caller holds, read as its meta, or the sentinel row where it holds none."""
+"""The metadata of the box row the caller expects to find, or of the sentinel row if it expects none."""
 input SafebyokBoxExpectedInput {
   revision_tok: String!
   revision_seq: Int!
@@ -301,7 +301,7 @@ input SafebyokBoxExpectedInput {
   box_tok:      String!
 }
 
-"""What getVault asks: the vault's scope, what to answer over no row, and the row its caller holds."""
+"""A getVault request: the vault's scope, what to return if no row is stored, and the row the caller expects to find."""
 input SafebyokVaultGetAskInput {
   op:         SafebyokOp!
   applabel:   String!
@@ -311,7 +311,7 @@ input SafebyokVaultGetAskInput {
   expected:   SafebyokVaultExpectedInput!
 }
 
-"""What putVault asks: the vault's scope, its policies, the row it expects to find, the record to store, and the gate verb it is for, if any."""
+"""A putVault request: the vault's scope, its policies, the row it expects to find, the record to store, and the gate verb it is for, if any."""
 input SafebyokVaultPutAskInput {
   op:         SafebyokOp!
   applabel:   String!
@@ -324,7 +324,7 @@ input SafebyokVaultPutAskInput {
   gateVerb:   SafebyokGateVerb
 }
 
-"""What delVault asks: the vault's scope, the row it expects to find, and the tombstone to store."""
+"""A delVault request: the vault's scope, the row it expects to find, and the tombstone to store."""
 input SafebyokVaultDelAskInput {
   op:         SafebyokOp!
   applabel:   String!
@@ -334,7 +334,7 @@ input SafebyokVaultDelAskInput {
   record:     SafebyokVaultTombstoneInput!
 }
 
-"""What getBox asks: the box's address, what to answer over no row, and the row its caller holds."""
+"""A getBox request: the box's address, what to return if no row is stored, and the row the caller expects to find."""
 input SafebyokBoxGetAskInput {
   op:         SafebyokOp!
   applabel:   String!
@@ -346,7 +346,7 @@ input SafebyokBoxGetAskInput {
   expected:   SafebyokBoxExpectedInput!
 }
 
-"""What putBox asks: the box's address, its policies, the row it expects to find, and the record to store."""
+"""A putBox request: the box's address, its policies, the row it expects to find, and the record to store."""
 input SafebyokBoxPutAskInput {
   op:         SafebyokOp!
   applabel:   String!
@@ -360,7 +360,7 @@ input SafebyokBoxPutAskInput {
   record:     SafebyokBoxRecordInput!
 }
 
-"""What delBox asks: the box's address, the row it expects to find, and the tombstone to store."""
+"""A delBox request: the box's address, the row it expects to find, and the tombstone to store."""
 input SafebyokBoxDelAskInput {
   op:         SafebyokOp!
   applabel:   String!

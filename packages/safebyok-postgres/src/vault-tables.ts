@@ -4,8 +4,8 @@ export const VaultTablesSql = `-- safebyok-postgres: the two tables safebyok sto
 --
 -- Each row is the record safebyok wrote, with a column for each of its fields. A field that is an object is a jsonb column.
 -- am is 'a' for a live row. A deleted vault or box leaves its row as a tombstone, am 'x', with the nullable columns null.
--- The checks hold each table to rows of that shape: a row they refuse is one safebyok could not read back.
--- They do not judge fmt: a row of a later format may be stored beside these, and the functions store nothing over it.
+-- The CHECK constraints refuse a row of any other shape, which safebyok could not read back.
+-- They do not check fmt: a row in a later format may sit beside these, and the functions never overwrite it.
 -- Each time is UTC epoch milliseconds. Every secret field of a record is ciphertext.
 
 CREATE TABLE IF NOT EXISTS safebyok_vaults (
@@ -29,9 +29,9 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
     AND jsonb_typeof(gate->'passkey_wayin')    IN ('object', 'null'), false))
 );
 
--- A box row is keyed by its vault's vault_tok, which changes each time the vault is created anew.
--- Its foreign key is to the vault row at its scope, whatever that vault's vault_tok: the box rows of an ended
--- vault life are never read again, and stay until tidyGone removes them.
+-- A box row's key includes its vault's vault_tok, which changes each time the vault is created anew.
+-- Its foreign key references the vault row at its scope, whatever that row's vault_tok. The box rows of an ended
+-- vault life are never read again, and stay until the vault's next write, or tidyGone, deletes them.
 -- The fillfactor leaves room in each page for a box's next revision to be stored beside the last.
 CREATE TABLE IF NOT EXISTS safebyok_boxes (
   applabel               text    NOT NULL,
@@ -64,8 +64,8 @@ CREATE TABLE IF NOT EXISTS safebyok_boxes (
     AND jsonb_typeof(whisper_ciphered->'ciphertext_b64') = 'string', false))
 ) WITH (fillfactor = 85);
 
--- Row-level security is on, with no policy. The role that owns the tables (the one your server
--- connects as) can reach every row. No other role can reach any, including Supabase's Data API roles.
+-- Row-level security is on, with no policy. The role that owns the tables, which your server
+-- connects as, can reach every row. No other role can reach any, including Supabase's Data API roles.
 ALTER TABLE safebyok_vaults ENABLE ROW LEVEL SECURITY;
 ALTER TABLE safebyok_boxes  ENABLE ROW LEVEL SECURITY;
 `

@@ -5,18 +5,18 @@ safebyok's vaultDB over [GraphQL](https://graphql.org), in two halves:
 * **On your server**, `safebyok-graphql/server`: **`VaultSchemaSdl`**, the schema as SDL, and
   **`vaultResolvers({ vaultDB, userIdOf })`**. Each operation is one of the vaultDB's own verbs,
   called on the vaultDB your server hosts ([`safebyok-postgres`](../safebyok-postgres)'s, or your
-  own), and answers what that verb answers, for the signed-in user's bank alone.
+  own), and returns that verb's answer, for the signed-in user's bank only.
 * **In the browser**, `safebyok-graphql`: **`new GraphQLVaultDB({ client })`**, the vaultDB over
   your app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `Bank.make`.
   It takes the Client alone. Limits such as `maxBoxes` and `maxRecordBytes` are set on the vaultDB
-  your server hosts and hands to `vaultResolvers`; the browser half sets none.
+  your server hosts and hands to `vaultResolvers`. The browser half sets none.
 
 **Deploy the two halves together.** The browser half sends the documents the server half's schema
-serves, and checks each answer against its own copy of safebyok, refusing as `unexpected_error`
-what a server of another version answers.
+serves, and checks each answer against its own copy of safebyok. An answer that fails those checks,
+such as one from a server on another version, refuses as `unexpected_error`.
 
-Your server and your database have ciphertext and the few plain fields a row is found by; neither
-ever sees a whisper, a passphrase, or a key that opens one.
+Your server and your database have ciphertext and the few unencrypted fields a row is found by.
+Neither ever sees a whisper, a passphrase, or a key that could decipher one.
 
 ## Install
 
@@ -35,7 +35,7 @@ module or realm". `pnpm why graphql` shows how many copies you have.
 ## The recipe: Yoga on Next.js, Postgres behind
 
 `tests/yoga-recipe.test.ts` runs this recipe, with Yoga's error masking on, through the battery
-every vaultDB passes; the workspace's `e2e/tests/graphql/` runs it again over real sockets and a
+every vaultDB passes. The workspace's `e2e/tests/graphql/` runs it again over real sockets and a
 real Postgres.
 
 The route, `app/api/graphql/route.ts`:
@@ -79,25 +79,27 @@ const client = new Client({ url: '/api/graphql', exchanges: [fetchExchange], fet
 const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB: new GraphQLVaultDB({ client }), ... })
 ```
 
-Your app's own Client serves: `GraphQLVaultDB` asks every query `network-only`, so a document
+Your app's own Client works: `GraphQLVaultDB` sends every query `network-only`, so a document
 cache in front of it changes nothing. `fetchSubscriptions: true` carries `watch` over server-sent
-events; a Client with a WebSocket exchange for subscriptions serves as well. A watch's stream that
-ends by a closing result, an error or a refusal is told once, as bad news, to the bank's `onBadNews`
-(`storage_unavailable`, `unexpected_error` for a GraphQL error, or the refusal itself), and is not subscribed again:
-whether to start over is yours, and a watch that has ended starts again on `goodbye()` then `hello()`. A stream that ends refused as `identity_revoked` tells nothing more.
-Over a WebSocket exchange (urql's `subscriptionExchange` with graphql-ws), a stream that ends before
-its first result, or on a graphql-ws error, sends no closing result, so its end goes untold.
+events, and a Client with a WebSocket exchange for subscriptions works as well. When a watch's
+stream ends, by a closing result, an error or a refusal, the bank's `onBadNews` is called once:
+with `storage_unavailable`, with `unexpected_error` for a GraphQL error, or with the refusal itself.
+The watch does not subscribe again. Whether to start over is up to you, and a watch that has ended
+starts again on `goodbye()` then `hello()`. A stream that ends with an `identity_revoked` refusal
+reports nothing. Over a WebSocket exchange (urql's `subscriptionExchange` with graphql-ws), a stream
+that ends before its first result, or on a graphql-ws error, sends no closing result, so its end
+goes unreported.
 
 ## Who reaches which bank
 
-One vaultDB serves every request. **`userIdOf(context)`** answers the user your own auth signed
+One vaultDB serves every request. **`userIdOf(context)`** returns the user your own auth signed
 in for this request, or null. Each operation names the bank it reaches (its `user_id`, its ask's,
-or a gate verb's record's), and the resolvers serve it only when that is the signed-in user's;
-anything else answers refused as `identity_revoked`, without calling the vaultDB. A put's or del's
-record must stand at its ask's address, which the vaultDB's own check of the ask holds it to before
-anything is read.
-A `watch` subscription asks `userIdOf` again at each change it would send. Once the answer is no
-longer the user it subscribed as, its last notice is the `identity_revoked` refusal, the stream
+or a gate verb's record's), and the resolvers serve it only when that is the signed-in user's bank.
+Any other request gets an answer refused as `identity_revoked`, and the vaultDB is not called. A
+put's or del's record must be at its ask's address, and the vaultDB's own check of the ask enforces
+that before anything is read.
+A `watch` subscription calls `userIdOf` again at each change it would send. Once it returns anyone
+other than the user it subscribed as, its last notice is the `identity_revoked` refusal, the stream
 ends, and the browser does not subscribe again. A `userIdOf` that looks the session up live,
 rather than reading what the request carried, is what lets a revoked session's stream end. An
 idle stream stays open until its next change.
@@ -109,7 +111,7 @@ one. On sign-out, or a sign-in as someone else, call `bank.vacate()` and make a 
 that is all they do about it.
 
 `tidyGone`, which removes the box rows of deleted vaults and counts those left, is an operation like
-the rest, behind the same gate: a host calls `tidyGone({ applabel, user_id })` on its
+the rest, behind the same sign-in check: a host calls `tidyGone({ applabel, user_id })` on its
 `GraphQLVaultDB`, and the vaultDB behind your resolvers tidies the signed-in user's bank.
 
 The vaultDB the resolvers call checks what it is sent, as the browser's vaultDB checks it before
@@ -119,11 +121,11 @@ runs before anything is read.
 
 ## What crosses the wire
 
-Every operation answers a typed object, the same fields as its verb's `try*` answer: `ok`, `act`,
-`val`, `world`, `dbhas`, `req_params` and `err`. Rows are typed, a live row and a tombstone each a
-type of a union. A box's sidecar, a damaged row and a refusal's meta are `SafebyokJson`, carried
-whole; times are `SafebyokEpochMillis`, integer UTC epoch milliseconds beyond GraphQL's 32-bit
-`Int`. A get, put or del takes one argument, `ask`: an input whose fields are those of the core's
+Every operation returns a typed object with the same fields as its verb's `try*` answer: `ok`, `act`,
+`val`, `world`, `dbhas`, `req_params` and `err`. Rows are typed: a live row and a tombstone are each a
+member of a union. A box's sidecar, a damaged row and a refusal's meta are `SafebyokJson`, carried
+whole. Times are `SafebyokEpochMillis`, integer UTC epoch milliseconds beyond the range of GraphQL's
+32-bit `Int`. A get, put or del takes one argument, `ask`: an input whose fields are those of the core's
 ask (`op`, the address, `ifAbsent` and `ifPresent`, the row it `expected`, read as that row's
 revision, `am` and tokens, the `record` to store, and a vault put's `gateVerb`). A listing takes
 its scope as typed arguments, and a gate verb its `record` and `opts`. So your logs and allowlists
@@ -131,11 +133,11 @@ see whose bank each operation reaches. Every name the schema adds begins `safeby
 `VaultOperations` has the documents `GraphQLVaultDB` sends, for a server that allows only the
 operations it knows.
 
-**A refusal is the answer's `err` field, never a GraphQL error**: its `refusalkind`, its message,
-and in `meta` the `capacity` of a `vault_full`, the `fieldnames` it names and the `call` it
-refused. The browser throws it again as that VaultError. The box cap is the `maxBoxes` of the
+**A refusal is the answer's `err` field, never a GraphQL error.** It carries its `refusalkind`, its
+message, and in `meta` the `capacity` of a `vault_full`, the `fieldnames` it names and the `call` it
+refused. The browser rethrows it as a VaultError of that kind. The box cap is the `maxBoxes` of the
 vaultDB behind your resolvers, a best-effort limit: exact at moderate write rates, never a strict
-one. **Nothing else of a refusal crosses**, not its cause: a driver's message stays on your server.
+one. **Nothing else of a refusal is sent**, not even its cause, so a driver's message stays on your server.
 
 In the browser, a failed fetch is `storage_unavailable`, its cause naming only the error, the HTTP
 status and a code such as `ECONNREFUSED`, never a message or a response's body. A GraphQL error, or an answer the core's
@@ -144,9 +146,9 @@ checks refuse, is `unexpected_error`: a server out of step with this copy of saf
 ## Developing this package
 
 `pnpm justify` here runs its lint, typecheck, tests and build, with publint and arethetypeswrong.
-The tests run in-process, with no database or GraphQL server to stand up: the battery runs over a
+The tests run in-process, with no database or GraphQL server to stand up. The battery runs over a
 `GraphQLVaultDB` whose urql Client executes against the resolvers, over a `PostgresVaultDB` on
-[PGlite](https://pglite.dev), with a second Client as another device; and again through Yoga over
-fetch, as in the recipe. A drift test checks every type the schema sends or takes against the core check
+[PGlite](https://pglite.dev), with a second Client as another device. It runs again through Yoga
+over fetch, as in the recipe. A drift test checks every type the schema sends or takes against the core check
 that reads it. Before running `vitest` by hand, run `pnpm build:deps`: the tests read
 the core and `safebyok-postgres` from their `dist/`.

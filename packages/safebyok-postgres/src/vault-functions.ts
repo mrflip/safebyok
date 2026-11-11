@@ -2,35 +2,36 @@
 export const VaultFunctionsSql = `-- safebyok-postgres: the functions PostgresVaultDB calls to write a vault row or a box row. For Postgres 14 or later.
 -- Run it after the tables, and again with each upgrade of safebyok-postgres: each run replaces the functions.
 --
--- Each function tests a record against what is stored and stores it, in one call. It raises nothing where it stores
--- nothing: it answers one row, which says whether it stored the record (ok), what that came to (act: born, replaced,
--- deleted or reborn), the rows as they now stand, and what was stored before (presence: void, live or gone).
--- A function holds no policy: its caller calls it only where it may store the record over the row it expects.
--- It stores nothing over a row of another fmt than the record's, nor a box under a vault row of another fmt than
--- this file's (6001): a row of a later format is one this version of safebyok cannot read.
--- Every write function takes the record to store and the row its caller expects, each as JSON; a box's birth takes the cap besides.
+-- Each write function checks a record against the stored row and stores it, in one call. It does not throw when it
+-- stores nothing. It returns one row, which says whether it stored the record (ok), what happened (act: born,
+-- replaced, deleted or reborn), the rows as they are now, and what was stored before (presence: void, live or gone).
+-- The functions decide no policy: PostgresVaultDB calls one only when the record may replace the row it expects.
+-- A function never overwrites a row whose fmt differs from the record's, and never stores a box under a vault row
+-- whose fmt is not 6001. A row in a later format is one this version of safebyok cannot read.
+-- Each write function takes the record to store and the row the caller expects, both as JSON. The box functions
+-- also take the cap on box rows.
 --
--- A box's write locks nothing but the box row it stores. It reads its vault row without a lock, so a box written as its
--- vault is deleted or created anew may land in a vault life that has ended: nothing reads such a row again, and the
--- vault's next write or tidyGone removes it.
--- Each statement of a function sees what is committed as it starts, so the rows answered where nothing was stored
--- are the rows as they stand after any wait for another writer.
+-- A box write locks only the box row. It reads the vault row without a lock, so a box written while its vault is
+-- deleted or created anew may be written into a vault life that has ended. Nothing reads such a row again, and the vault's
+-- next write, or tidyGone, deletes it.
+-- Each statement sees what was committed when it started. So when nothing is stored, the rows returned are the rows
+-- as they stand after any wait on another writer.
 --
--- A function that stores a record tells the user's channel of it, in the same transaction: see safebyok_tell.
+-- A function that stores a record notifies the user's channel in the same transaction (see safebyok_tell).
 --
--- The functions run as the role that calls them, and no other role may call them.
+-- The functions run with the caller's privileges, and only their owner, the role that ran this file, may call them.
 
--- A row as the record it was stored from: a field for each column that is not null. Null for no row.
--- Only the top level is stripped: a null inside gate or sidecar is part of the record.
+-- Convert a row to the record it was stored from, dropping the columns that are null. Returns null for no row.
+-- Only top-level nulls are dropped: a null inside gate or sidecar is part of the record.
 CREATE OR REPLACE FUNCTION safebyok_record(stored jsonb) RETURNS jsonb
 LANGUAGE sql IMMUTABLE AS $$
   SELECT jsonb_object_agg(col.key, col.value) FROM jsonb_each(stored) AS col WHERE col.value <> 'null'::jsonb
 $$;
 
--- Tell the listeners of a user's channel, safebyok_<user_id>, of a row just stored: a vault row, or a box row with its
--- vault row beside it. A notice is one JSON object: at, the address of the row stored, and the rows under vault and box.
--- Postgres refuses a notice of 8000 bytes or more. One too heavy sheds a box's vault row first, and then every row:
--- a listener told only an address fetches what is stored there.
+-- Notify the user's channel, safebyok_<user_id>, of a row just stored: a vault row, or a box row with its vault row.
+-- The notice is a JSON object with the stored row's address under at, and the rows under vault and box.
+-- Postgres refuses a notice of 8000 bytes or more. A notice that is too large drops a box's vault row first, then
+-- every row. A listener that gets only an address fetches the row itself.
 CREATE OR REPLACE FUNCTION safebyok_tell(vault jsonb, box jsonb) RETURNS void
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -45,7 +46,7 @@ BEGIN
   PERFORM pg_notify('safebyok_' || (stored->>'user_id'), notice);
 END $$;
 
--- Store a vault's first record, where no vault row is stored at its scope. It expects no row, and reads nothing of expected_row.
+-- Store a vault's first record, if no vault row exists at its scope. expected_row is not read.
 CREATE OR REPLACE FUNCTION safebyok_birth_vault(new_record jsonb, expected_row jsonb)
 RETURNS TABLE (ok boolean, act text, vault jsonb, presence text, swept integer)
 LANGUAGE plpgsql AS $$
@@ -71,10 +72,11 @@ BEGIN
   RETURN NEXT;
 END $$;
 
--- Store a vault's next record over the row its caller expects, live or a tombstone: a replace, a del, or a put over a tombstone.
--- It is stored where the stored row has the expected revision_tok, am and vault_tok, and the record is one revision_seq past it.
--- A tombstone is never stored over a tombstone.
--- The box rows of the vault's other lives are deleted with it, but for any another writer holds; swept is their number.
+-- Store a vault's next record over the expected row, live or a tombstone: a replace, a del, or a put over a tombstone.
+-- The record is stored only if the stored row has the expected revision_tok, am and vault_tok, and the record's
+-- revision_seq is one past the row's. A tombstone never replaces a tombstone.
+-- The same write deletes the box rows of the vault's other lives, skipping any row another transaction has locked.
+-- swept is the number of box rows deleted.
 CREATE OR REPLACE FUNCTION safebyok_revise_vault(new_record jsonb, expected_row jsonb)
 RETURNS TABLE (ok boolean, act text, vault jsonb, presence text, swept integer)
 LANGUAGE plpgsql AS $$
@@ -120,9 +122,9 @@ BEGIN
   RETURN NEXT;
 END $$;
 
--- Store a box's first record, where no box row is stored at its address, in a live vault of the box's life with room under the cap.
--- The cap counts every box row of the life, live and tombstone alike: boxcount is that count, taken without a lock.
--- It expects no row, and reads nothing of expected_row.
+-- Store a box's first record, if no box row exists at its address, its vault is live in the box's life, and that
+-- vault life has room under the cap. The cap counts every box row of the vault life, live or tombstone.
+-- boxcount is that count, taken without a lock. expected_row is not read.
 CREATE OR REPLACE FUNCTION safebyok_birth_box(new_record jsonb, expected_row jsonb, maxboxes integer)
 RETURNS TABLE (ok boolean, act text, world jsonb, box jsonb, presence text, boxcount integer)
 LANGUAGE plpgsql AS $$
@@ -161,11 +163,11 @@ BEGIN
   RETURN NEXT;
 END $$;
 
--- Store a box's next record over the row its caller expects, live or a tombstone: a replace, a del, or a put over a tombstone.
--- It is stored where the stored row has the expected revision_tok, am and box_tok, the record is one revision_seq past it,
--- and the vault is live in the box's life. It adds no box row, so the cap does not bear on it:
--- maxboxes is taken so that both box functions are called alike, and is not read.
--- A tombstone is never stored over a tombstone.
+-- Store a box's next record over the expected row, live or a tombstone: a replace, a del, or a put over a tombstone.
+-- The record is stored only if the stored row has the expected revision_tok, am and box_tok, the record's
+-- revision_seq is one past the row's, and the vault is live in the box's life. A tombstone never replaces a tombstone.
+-- It adds no box row, so the cap does not apply. It takes maxboxes only so that both box functions take the same
+-- arguments, and does not read it.
 CREATE OR REPLACE FUNCTION safebyok_revise_box(new_record jsonb, expected_row jsonb, maxboxes integer)
 RETURNS TABLE (ok boolean, act text, world jsonb, box jsonb, presence text)
 LANGUAGE plpgsql AS $$

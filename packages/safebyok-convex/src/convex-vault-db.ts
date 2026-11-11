@@ -49,7 +49,9 @@ export type ConvexVaultDBOpts = AdapterVaultDBOpts & {
   client: ConvexVaultClient
   /** The app's safebyok functions: `api.safebyok`, not the whole `api`. */
   api: SafebyokApi
-  /** A soft cap on a vault life's box rows, tombstones included: a put of a new boxlabel past it refuses `vault_full`. Defaults to `DefaultMaxBoxes`, and never exceeds the component's own limit. */
+  /** A soft cap on a vault life's box rows, tombstones included. A put of a new boxlabel past it refuses `vault_full`.
+   * Defaults to `DefaultMaxBoxes`, and never exceeds the component's own limit.
+   */
   maxBoxes?: number | undefined
 }
 
@@ -104,8 +106,8 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     return this.classifyBox(ask, { world: vault, box })
   }
 
-  // A put or del is one mutation: the component checks the ask, fetches the rows, classifies, and stores the record where
-  // the act is a write, all in one transaction. What it answers is the classifier's, checked here once.
+  // A put or del is one mutation, so one transaction: the component checks the ask, fetches the rows, classifies the ask,
+  // and stores the record if the act is a write. It returns the classifier's outcome, which is checked here.
   protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
     return vaultClassified.parse(await reaching('doPutVault', () => this.#client.mutation(this.#api.putVault, { ask })))
   }
@@ -153,7 +155,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 
   // == [Watching]: #subscribe
 
-  // A failing watch is told to `fail`, and carries on: when it recovers, its next result is compared
+  // A failing watch reports to `fail` and keeps running. When it recovers, its next result is compared
   // with the last one it received.
   #subscribe({ vaultlabel, ...bankScope }: WatchScope, heed: (rows: RowsWatched) => void, fail: (thrown: unknown) => void): () => void {
     const args = { scope: (vaultlabel === undefined) ? bankScope : { ...bankScope, vaultlabel } }
@@ -190,14 +192,14 @@ async function reaching<ValT>(callname: string, call: () => Promise<ValT>): Prom
 }
 
 // On a dev deployment Convex's error text may quote the call's arguments, so its message is never
-// passed on. A refusal that crosses is recognized by its `data`, which this package's functions alone make.
-/** The refusal `thrown` stands for: one that crossed as itself, anything else as `storage_unavailable` naming `callname`. */
+// passed on. A refusal from the host's safebyok functions is recognized by its `data`, which only they make.
+/** The refusal for `thrown`: one sent by the host's safebyok functions is rebuilt as itself, and anything else becomes `storage_unavailable`, naming `callname`. */
 function refusalOf(callname: string, thrown: unknown): VaultError {
   if ((thrown instanceof ConvexError) && isSafebyokErrorData(thrown.data)) { return refusalOfCrossed(thrown.data) }
   return DB.storageFailed(callname, thrown)
 }
 
-/** The VaultError a crossed refusal's `data` carries: its kind and the core's sentence, and on `gate_issue` the vault row it tested. */
+/** Rebuild the VaultError a `ConvexError`'s `data` describes, with the core's message and, for a `gate_issue`, the stored vault row. */
 function refusalOfCrossed(data: unknown): VaultError {
   const crossed = safebyokErrorData.parse(data)
   if (crossed.kind === 'identity_revoked') { return DB.identityRevoked() }
@@ -269,7 +271,7 @@ const convexVaultDBOpts = DB.objCheck(({ custom, int }) => ({
 const OkActVals = [...DB.writeActVals, ...DB.foundActVals] as const
 
 // A failed check here is a component out of step with this copy of safebyok, never a damaged row: the classifier checked the rows.
-/** Validators for what a put's or del's mutation answers: what the classifier made of a vault's ask, and of a box's. */
+/** Validators for the result of a put or del mutation: the classifier's outcome for a vault ask, and for a box ask. */
 const { vaultClassified, boxClassified } = DB.Checkers('unexpected_error', ({ obj, union, lit, oneof }) => {
   const presence = oneof(DB.presenceVals)
   const vaultParts = { world: DB.vaultRow, vault: DB.vaultRow.nullable(), presence }

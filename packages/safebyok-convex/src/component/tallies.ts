@@ -56,7 +56,7 @@ export const weigh = (boxDoc: BoxDocGiven | null): number => {
   return getDocumentSize({ applabel, user_id, vaultlabel, vault_tok, boxlabel, box: box as Value })
 }
 
-/** The tally of `boxDoc` alone; null tallies nothing. */
+/** The tally of `boxDoc` alone, or an empty tally for null. */
 export function tallyOf(boxDoc: BoxDocGiven | null): Tally {
   const size = weigh(boxDoc)
   const isLive = DB.isLiveRow(boxDoc?.box)
@@ -87,7 +87,7 @@ export async function reckon(db: DatabaseReader, life: Life): Promise<Reckoning>
   return { kept: null, tally }
 }
 
-/** True when a put that grows the life by `growth` would pass `maxBoxes` or the byte limit, each a limit on every box row. */
+/** True when a put that grows the life by `growth` would pass `maxBoxes` or the byte limit. Both limits count every box row, tombstones included. */
 export function refuses(tally: Tally | null, growth: Tally, maxBoxes: number): boolean {
   if (tally === null) { return (growth.all_count > 0) || (growth.all_size > 0) }
   const after = plus(tally, growth)
