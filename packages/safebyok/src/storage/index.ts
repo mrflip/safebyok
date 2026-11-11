@@ -2,9 +2,10 @@
 /** `safebyok/storage`: what a storage adapter is written against, the AdapterVaultDB and the DeviceDB. */
 
 // == [The databases]: AdapterVaultDB, VaultDB, DeviceDB, their brands, and the two in memory
-export { AdapterVaultDB } from './vault-db'
+export { AdapterVaultDB } from './adapter-vault-db'
 export type { Answer, BadAnswer, BankListed, BoxesListed, DelAct, GoodAnswer, GotAct, ListAct, Notice, PutAct, Tidied } from './vault-db'
-export type { BoxAnswer, BoxesFetched, Heard, OkAct, RowOfBox, RowOfVault, VaultAnswer, VaultDB } from './vault-db'
+export type { BoxAnswer, OkAct, VaultAnswer, VaultDB } from './vault-db'
+export type { BoxesFetched, Heard, RowOfBox, RowOfVault } from './adapter-vault-db'
 export { boxActOf, boxVaultActOf, boxWorldOf, cappedActOf, classifyBox, classifyVault, isBirthAct, isOkAct, isWriteAct, presenceVals, vaultActOf } from './classifier'
 export type { BoxClassified, BoxFetched, Presence, VaultClassified, VaultFetched } from './classifier'
 export type { BoxAsk, BoxDelAsk, BoxGetAsk, BoxPutAsk, VaultAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk } from '../shapes/shapes-storage'
