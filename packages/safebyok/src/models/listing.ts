@@ -17,7 +17,10 @@ import { demandGood, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
 import type { Storable } from './storable'
 
-/** SLOPDOC: The live instances of one kind of thing, by scope, each made once and enlisted, as its tombstone once gone. */
+/** Administers a list of instances while coordinating updates to its world (the vault) and coordinating its listed instances.
+ * It acts as the hub for vaultDB requests because it owns instantiating,
+ * listing, disabling, remaking, and delisting its storable instances.
+ */
 export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>, DamagedT extends ScopeT & SX.DamagedRow = ScopeT & SX.DamagedRow> {
   // == [Props]: world, maxMillisSinceRefresh, vaultDB, bankFriend, #things, #fetchOfSlot, #listOnce, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
 
@@ -293,7 +296,18 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Delivering an answer]: deliver, deliverGood, receiveNothing, buildOrReceive
 
-  /** SLOPDOC: The pipeline every storage answer follows, from its world through the instance listed to the caller. */
+  /** The pipeline every storage answer follows, from its world through the instance listed to the caller.
+   * Delivers updated records to: (! = unconventional practice)
+   * - the vault that owns it (!),
+   *   - possibly replacing / deleting / vacating / disabling it (!) and by consequence itself (!),
+   * - in service of either:
+   *   - updating a record it has, or
+   *   - deleting it (!) by updating it (!) but not removing it (!) (except for vault(!), which it does(!))
+   *   - ~~or building a new instance from scratch with the props~~,
+   *   - or making a shell (!) and updating it (!)
+   * - and finally notifying listeners, sharing bad news, and returning the appropriate instance
+   *
+  */
   protected deliver(answer: ListingPutAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Promise<ThingT>
   protected deliver(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Promise<ThingT | null>
   protected async deliver(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Promise<ThingT | null> {
