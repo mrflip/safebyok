@@ -24,6 +24,11 @@ from one is a `VaultError` to the other.
 run again. Until 1.0 there is no migration: a release that changes the tables says so in its
 changelog, and you drop them and run it again.
 
+The tables hold a column for each field of a row, and check each row's shape: its `am`, the columns
+a live row has and a tombstone lacks, and the outline of each `jsonb` field. A row they refuse
+(SQLSTATE `23514`) is one safebyok could not have read back. They do not judge `fmt`: a row of a
+later format may sit beside these, and the functions store nothing over it.
+
 `VaultFunctionsSql` is the SQL of the functions `PostgresVaultDB` calls to write a row, shipped as
 `vault-functions.sql`. Run it after the tables, and **again with each upgrade of this package**:
 each run replaces the functions. They run as the role that calls them, and no other role may call
