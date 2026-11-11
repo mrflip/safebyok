@@ -84,7 +84,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     return gating.#launch(checked.askUser)
   }
 
-  /** Ask the user for a new vault's passphrase, build the vault under `scope` over the row `expected`, and answer it unlocked. */
+  /** Ask the user for a new vault's passphrase, build the vault under `scope` over the row `expected`, and return it unlocked. */
   static async launchBirth(listing: VaultListing, scope: VaultScope, expected: VaultSparse, unlockByProof: UnlockByProof, askUser: AskUser | null): Promise<Vault> {
     const checked = GX.gatingLaunchBirthArgs.parse({ listing, scope, expected, unlockByProof, askUser })
     const act: Act = (cleartexts) => buildVault(checked.listing, checked.scope, checked.expected, cleartexts, checked.unlockByProof)

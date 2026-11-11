@@ -19,7 +19,7 @@ export interface IdbDeviceDBOpts {
   dbName?: string | undefined
 }
 
-/** The check of an IdbDeviceDB's options, and of `browserOpts`'s, which are the same. */
+/** Validator of an IdbDeviceDB's options, which `browserOpts` takes too. */
 export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_option')
 // --
 
@@ -38,8 +38,8 @@ const deviceShelfOf = (dbName: string): UseStore => versionedShelfOf({
   dbName, dbstem: 'device', version: DeviceDBVersion, storename: 'leases', oldnames: [`${dbName}:device_db`, `${dbName}:device-v1`],
 })
 
-// A database of its own, as a versioned shelf has one object store: a second object store in the device database would move its
-// version on, and every device would forget its leases.
+// A separate database, because a versioned shelf has a single object store: adding a second object store to the device
+// database would change its version, and every device would forget its leases.
 /** The shelf of the bank database of `dbName`, which has the bank rows. */
 const bankShelfOf = (dbName: string): UseStore => versionedShelfOf({
   dbName, dbstem: 'bank', version: BankDBVersion, storename: 'bank', oldnames: [],
@@ -112,7 +112,7 @@ export class IdbDeviceDB extends DeviceDB {
   // --
 }
 
-/** A device database in this browser's IndexedDB, what a browser app hands `Bank.make`. */
+/** A device database in this browser's IndexedDB, for a browser app to pass to `Bank.make`. */
 export const idbDeviceDB = (opts?: IdbDeviceDBOpts): IdbDeviceDB => new IdbDeviceDB(opts)
 
 true satisfies Z.core.util.AssertEqual<IdbDeviceDBOpts, Z.input<typeof idbDeviceDBOpts>>

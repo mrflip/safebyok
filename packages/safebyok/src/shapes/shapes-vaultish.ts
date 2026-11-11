@@ -241,10 +241,10 @@ export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> |
 /** A put's {@link ListingAnswer}, whose good form always carries a record. */
 export type ListingPutAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT>, string, unknown>
 
-/** What a listing's put asks of the vaultDB beside its record: the row it expects to find, in its sparse form, and what to do over none or over a live one. */
+/** A listing put's options besides its record: the row it expects to find, in sparse form, and `ifPresent` and `ifAbsent`, for a live row or none. */
 export type ListingPutOpts<SparseT> = Readonly<{ expected: SparseT, ifAbsent: EX.PutIfAbsent, ifPresent: EX.IfPresent }>
 
-/** What a listing's del asks of the vaultDB beside its tombstone: the row it expects to find, in its sparse form. */
+/** A listing del's options besides its tombstone: the row it expects to find, in sparse form. */
 export type ListingDelOpts<SparseT> = Readonly<{ expected: SparseT }>
 
 /** A listing's answer from `listVaults` or `listBoxes`: the rows listed, and those set aside as damaged. */
@@ -256,7 +256,7 @@ export type ListingGetAnswer<ValT> = ThingAnswer<ValT> | GoodAnswer<ValT, 'timel
 /** What a listing's `tryPut` and `tryFetch` answer: the vaultDB's own answer, with the instance listed as its `val`. */
 export type ThingAnswer<ValT> = Answer<ValT, string, unknown>
 
-/** The tombstone `listing.del` hands the vaultDB: gone, at the revision after the one it goes over, in a life of its own. */
+/** The tombstone `listing.del` sends the vaultDB: at the revision after the row it replaces, with a life token of its own. */
 export type DelTombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
 
 /** The fate of a record meeting the thing in its slot: `receive` judges it, `lose` drops it unheard, and `replace` gives the slot a new instance of it. */

@@ -8,7 +8,7 @@ import type { BankRow, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '..
 
 /** The scopepath of the lease row at `scope`. */
 const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath => [applabel, user_id, vaultlabel]
-/** The ckey the lease row filed under `scopepath` is stored at. */
+/** The ckey of the lease row filed under `scopepath`. */
 const leaseCkeyOf = (scopepath: LeaseScopepath): string => ckeyOf(...scopepath)
 const bankCkeyOf = ({ applabel, user_id }: BankScope): string => ckeyOf(applabel, user_id)
 
@@ -22,7 +22,7 @@ export class MemoryDeviceDB extends DeviceDB {
 
   // == [Rows]: _cheat_leaseRows, _cheat_bankRows
 
-  /** For tests: the map of lease rows, each beside its scopepath, by scope. */
+  /** For tests: the map of lease rows, each with its scopepath, by scope. */
   _cheat_leaseRows(): Map<string, RawLease> { return this.#leaserows } // eslint-disable-line unicorn/prefer-private-class-fields
   /** For tests: the map of bank rows, by bank scope. */
   _cheat_bankRows(): Map<string, unknown> { return this.#bankrows } // eslint-disable-line unicorn/prefer-private-class-fields

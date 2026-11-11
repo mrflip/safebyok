@@ -302,7 +302,7 @@ export const { gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphra
   vaultDelCleartexts:          obj({ passphraseClear: passphraseCleartext }).strict(),
 }))
 
-/** What launches a gating on a born vault: its kind, the vault, the vault's unlock, and the bank's dialog or null. */
+/** The arguments that launch a gating on a stored vault: its kind, the vault, the vault's `unlockByProof`, and the bank's dialog or null. */
 export const gatingLaunchOnArgs = objStrict(({ oneof, custom, fn }) => ({
   gatingkind:    oneof(EX.gatingkindVals).exclude(['build_vault']),
   vault:         custom<Vault>((val) => hasModelkind(val, 'vault'), Phrases.VaultExpected),
@@ -310,7 +310,7 @@ export const gatingLaunchOnArgs = objStrict(({ oneof, custom, fn }) => ({
   askUser:       custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
 
-/** What launches a gating that builds a vault: its listing, its scope and the row it is put over, the unlock, and the bank's dialog or null. */
+/** The arguments that launch a `build_vault` gating: the vault listing, the scope and the row the vault is put over, `unlockByProof`, and the bank's dialog or null. */
 export const gatingLaunchBirthArgs = objStrict(({ custom, fn }) => ({
   listing:       custom<VaultListing>((val) => hasModelkind(val, 'vault_listing'), Phrases.ListingExpected),
   scope:         vaultScope,
