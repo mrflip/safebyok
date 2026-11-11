@@ -266,7 +266,7 @@ export class FakeDeployment<Host extends FakeHost> {
   private transition(session: Session, modifications: QueryModification[], querySet: number) {
     const startVersion = session.version
     const endVersion = { querySet, ts: this.ts, identity: startVersion.identity }
-    session.version = endVersion
+    session.version = endVersion // eslint-disable-line no-param-reassign -- the fake's own session
     session.socket.deliver({
       type:         'Transition',
       startVersion: { ...startVersion, ts: encodeTs(startVersion.ts) },

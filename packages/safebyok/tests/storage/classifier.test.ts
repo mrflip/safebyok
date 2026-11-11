@@ -401,7 +401,7 @@ describe("boxActOf, one box through a run of requests", () => {
   }
 
   const walk = (run: Run, depth: number, seen: { acts: Set<BoxAct>, runs: number }): void => {
-    seen.runs += 1
+    seen.runs += 1 // eslint-disable-line no-param-reassign -- the walk's own tally
     if (depth === 0) { return }
     for (const request of nextRequests(run)) {
       const act = boxActOf(request, liveVault, run.stored)

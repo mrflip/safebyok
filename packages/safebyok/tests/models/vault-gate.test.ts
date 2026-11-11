@@ -116,7 +116,7 @@ type Born = Awaited<ReturnType<typeof makeBornVault>>
 /** Leaves the world's dialog up until the gating concludes, and shows the gating to the test. */
 const dialogOf = (world: Born) => {
   const shown: unknown[] = []
-  world.fakeBank.requestCleartext = (gating) => {
+  world.fakeBank.requestCleartext = (gating) => { // eslint-disable-line no-param-reassign -- the test's own fake bank
     shown.push(gating)
     return gating.whenConcluded
   }

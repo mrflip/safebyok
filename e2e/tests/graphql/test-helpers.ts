@@ -57,9 +57,9 @@ export const vaultDBListening = async (db: TH.FileDatabase, listening: { count: 
   const listen = await TH.listenOver(db)
   const counted: PostgresListen = async (channel, onNotify) => {
     const unlisten = await listen(channel, onNotify)
-    listening.count += 1
+    listening.count += 1 // eslint-disable-line no-param-reassign -- the helper's own count of listeners
     return () => {
-      listening.count -= 1
+      listening.count -= 1 // eslint-disable-line no-param-reassign -- the helper's own count of listeners
       return unlisten()
     }
   }

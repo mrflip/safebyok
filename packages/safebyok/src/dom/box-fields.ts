@@ -91,7 +91,7 @@ export class BoxFields {
 
   #unbindField(field: BoundField): void {
     this.#fields.delete(field)
-    field.el.value = ''
+    field.el.value = '' // eslint-disable-line no-param-reassign -- the field's element is one the host bound to this BoxFields, and unbinding clears it
     if (this.#fields.size > 0) { return }
     this.#stopHearing?.()
     this.#stopHearing = null
