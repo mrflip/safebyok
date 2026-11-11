@@ -25,5 +25,5 @@ export type { BankSnapshot, BoxExposedPatch, BoxPutOpts, BoxSnapshot, VaultSnaps
 export type { Awaitable } from './helpers/helpers'
 export type { BankScope, Boxscope, Sidecar } from './shapes/shapes-core'
 export type { Capacity } from './shapes/shapes-storage'
-export type { ClearsForGatingkind, VaultForGatingkind } from './shapes/shapes-gateish'
+export type { CleartextsForGatingkind, VaultForGatingkind } from './shapes/shapes-gateish'
 export type { BoxHalves, BoxPatch, BoxPut, FetchOpts, ProbeAsked, ProbeOpts, ProbeReport, ProbeStep, TimelyOpts } from './shapes/shapes-vaultish'

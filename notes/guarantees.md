@@ -31,7 +31,7 @@ deriver and the strength checker's wrapper. A change to one of them is a change 
 | `packages/safebyok/src/helpers/crypto.ts` | every call into WebCrypto: key makers, import, HKDF, wrap, unwrap, cipher, decipher, randomness, ctx |
 | `packages/safebyok/src/shapes/shapes-gateish.ts`, `shapes-core.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
 | `packages/safebyok/src/models/proving.ts` | the wayinKey; the vaultKey, which is unwrapped per call, passed from one proving to another inside `buildWayin(source)`, and handed only to `Lease.buildGranted`; the PRF bytes, which it reads to derive the passkeyKey and leaves for the gating to zero |
-| `packages/safebyok/src/models/gating.ts` | the chain that carries a passphrase or an answer from the host's dialog to a proving; `checkedClears`; `spendClears`, the only place the PRF bytes are zeroed; each kind's act, which proves the cleartexts and then makes its change, passing them only to `checkedClears` and a `Proving` builder |
+| `packages/safebyok/src/models/gating.ts` | the chain that carries a passphrase or an answer from the host's dialog to a proving; `checkedCleartexts`; `spendCleartexts`, the only place the PRF bytes are zeroed; each kind's act, which proves the cleartexts and then makes its change, passing them only to `checkedCleartexts` and a `Proving` builder |
 | `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the vaultKey wrapped under it, unwrapped per call in `#vaultKey`; every seal and unseal of a box's whisper; `evict` and `vacate` |
 | `packages/safebyok/src/models/gate.ts` | has no key: it has wayin pickles and the vault's stamp; the passphrase proving made by a gating that builds a new vault is dropped once the `buildVault` act has built its lease |
 | `packages/safebyok/src/models/box.ts` | has no key: it hands the lease the whisper's JSON text and a stamp, through the Vault's seal verbs, and gets text back; it makes no bytes to zero, and the text cannot be zeroed (G6) |
@@ -40,8 +40,8 @@ deriver and the strength checker's wrapper. A change to one of them is a change 
 | `packages/safebyok/src/helpers/passphrase-strength.ts` | `guardStrengthChecker`, whose wrapper takes the new passphrase as an argument, parses the host checker's verdict inside the wrapper, and passes anything the checker throws to `HostErrorSanitizer.refusalFor` (G1, G8, G9) |
 
 Besides these files, three host functions handle the passphrase. Each is wrapped once, in `Bank`'s constructor, and from
-there on the core has the wrapper and never the host's own function. A proving's world and a bank's friend each refuse a
-function that lacks the wrapper's brand (`isGuarded`, `helpers/consts.ts`). The brand is a
+there on the core has the wrapper and never the host's own function. A proving's world, a bank's friend and a gating's
+launch (`GX.gatingLaunchOnArgs`, `gatingLaunchBirthArgs`) each refuse a function that lacks the wrapper's brand (`isGuarded`, `helpers/consts.ts`). The brand is a
 `Symbol.for`, which any code can set, so it catches mistakes in the core's own wiring and is not a security barrier:
 `Bank`'s constructor wraps every host function regardless. `keyDeriver` is wrapped by `guardKeyDeriver`
 (`models/proving.ts`), whose `deriveKeyBytes` replaces anything thrown with `keyDeriverThrew`. `strengthChecker` is
@@ -117,7 +117,7 @@ Three layers have key material, and the words for each matter.
 
 So for the strong key the minimal path is as follows. The deriver's bytes exist until `passphraseKeyOf` has
 imported them into a non-extractable handle and zeroed them. The authenticator's bytes exist until `PasskeyProving`'s
-static methods have derived a non-extractable handle from them and the gating's `spendClears` has zeroed them, once the
+static methods have derived a non-extractable handle from them and the gating's `spendCleartexts` has zeroed them, once the
 attempt is over (G2 says when a correctable refusal leaves them to the host). The handle exists in
 `Proving.#wayinKey` until the proving is dropped. Nothing of either is ever stored. Outside the core,
 `safebyok-react`'s `bytesOf` (the package runs on the old core until it moves) copies the browser's PRF
@@ -133,7 +133,7 @@ Eight values are secret. Everything else safebyok writes or shows is either publ
 | Value | Form | Where it may exist | For how long | Who touches it |
 |---|---|---|---|---|
 | passphrase | JS string | function arguments and locals of one gating's chain; the host's dialog | the call | the gating chain, `PassphraseProving.buildNovel`, `buildStored`, `passphraseKeyOf`; the host's `keyDeriver`, `strengthChecker` and dialog |
-| passkey PRF answer | `Uint8Array` in the host's `PasskeyAnswer` | the answer object, until its attempt zeroes it: `spendClears` does so whether or not a proving was derived from it (G2) | one attempt | `PasskeyProving`'s static methods, `spendClears`; the host's `askPasskey` |
+| passkey PRF answer | `Uint8Array` in the host's `PasskeyAnswer` | the answer object, until its attempt zeroes it: `spendCleartexts` does so whether or not a proving was derived from it (G2) | one attempt | `PasskeyProving`'s static methods, `spendCleartexts`; the host's `askPasskey` |
 | passphraseKey bytes | the deriver's `Uint8Array` | a local in `passphraseKeyOf`, zeroed after import | one import | `passphraseKeyOf`; the host's `keyDeriver` |
 | wayinKey | `CryptoKey`, non-extractable, `wrapKey`/`unwrapKey` | `Proving.#wayinKey` | the proving, which lives for its gating's chain | `Proving` |
 | vaultKey | `CryptoKey` | locals only; stored only wrapped | one method | `Proving`, `Lease` |
@@ -157,8 +157,8 @@ bytes. Everything not listed never sees the value. Private methods are named wit
 **Passphrase.** Naked: the host's dialog (`safebyok-react`'s `modals/passphrase-modal.tsx` and
 `provider/gating-modal.tsx`, on the old core until the package moves, keep what was typed in component state) →
 `gating.attempt` → `#attemptOnce`, inside the gating's `outcomeOf` → its kind's act (`buildVault`, `unlockVault`,
-`replacePassphrase`, `addPasskey`, `revokePasskey`, `delVault`, `models/gating.ts`) → `checkedClears` (`GX.vaultBuildClears`, `vaultUnlockClears`, `passphraseReplaceClears`,
-`passkeyAddClears`, `passkeyRevokeClears`, `vaultDelClears`: shape only, `passphraseCleartext`) → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
+`replacePassphrase`, `addPasskey`, `revokePasskey`, `delVault`, `models/gating.ts`) → `checkedCleartexts` (`GX.vaultBuildCleartexts`, `vaultUnlockCleartexts`, `passphraseReplaceCleartexts`,
+`passkeyAddCleartexts`, `passkeyRevokeCleartexts`, `vaultDelCleartexts`: shape only, `passphraseCleartext`) → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
 `buildNovel` → `Proving.checkStrength` → the world's `strengthChecker`, as `guardStrengthChecker`
 (`helpers/passphrase-strength.ts`) wraps it → the host's `strengthChecker`; both → `passphraseKeyOf` → the world's
 `keyDeriver.deriveKeyBytes`, as `guardKeyDeriver` wraps it → `deriveKeyBytes` → the host's `keyDeriver.deriveKeyBytes`
@@ -168,9 +168,9 @@ Operates on it without having it: nothing; a passphrase has no handle form.
 
 **Passkey PRF answer.** Naked: `safebyok-react`'s `createPasskey`, `askPasskey` → `answerOf`,
 `bytesOf` (a copy of the authenticator's result) → the host → `gating.attempt` → `#attemptOnce` → its kind's
-prove → `checkedClears` (`passkeyAnswer`, `freshPasskeyAnswer`; `passkeyAnswer`'s `prfBytes` check refuses all-zero
+prove → `checkedCleartexts` (`passkeyAnswer`, `freshPasskeyAnswer`; `passkeyAnswer`'s `prfBytes` check refuses all-zero
 bytes by an inline `reduce`) → `PasskeyProving.buildNovel`, `buildStored` → `deriveWrappingKey`
-(`subtle.importKey` as HKDF input, then `subtle.deriveKey`), none of which zeroes them. `spendClears`
+(`subtle.importKey` as HKDF input, then `subtle.deriveKey`), none of which zeroes them. `spendCleartexts`
 (`models/gating.ts`) finds the `passkeyClear.prfBytes` in whatever the attempt was handed, whether or not it was
 checked and whether it is a view or a bare `ArrayBuffer`, and zeroes it with `fill(0)`. It does so in `gating.attempt`
 for an attempt refused before it starts, and in `#attemptOnce` for an attempt that concludes its gating. In
@@ -228,8 +228,8 @@ whisper out → `Box.#unseal` → `vault.unsealStampedString` → `Lease.unsealW
 ## The guarantees
 
 **G1. A passphrase is never a field.** Inside the core a passphrase is only ever a function
-argument or a local. The gating's `attempt` passes the cleartexts (`clears`) to `#attemptOnce`, which passes them to its
-kind's act (`models/gating.ts`), whose `checkedClears` reads them. The act passes the
+argument or a local. The gating's `attempt` passes the cleartexts to `#attemptOnce`, which passes them to its
+kind's act (`models/gating.ts`), whose `checkedCleartexts` reads them. The act passes the
 passphrase to `PassphraseProving.buildNovel` or `buildStored`; `buildNovel` passes it to `Proving.checkStrength`; and
 each of the two passes it to `passphraseKeyOf`, which passes it, through the `guardKeyDeriver` wrapper and
 `deriveKeyBytes`, to the host's `keyDeriver.deriveKeyBytes` (`models/proving.ts`).
@@ -249,7 +249,7 @@ passphrase in no `same_passphrase` refusal.
 **G2. The strong key's bytes are locals, zeroed; its handle is non-extractable.** The deriver's
 output is a view over the deriver's own buffer, imported non-extractable with `wrapKey`/
 `unwrapKey` only, and zeroed in a `finally`, whether it was imported or refused (`passphraseKeyOf`,
-`importWrappingKeyBytes`). No proving zeroes a passkey's PRF bytes: `spendClears` (`models/gating.ts`) does, both for
+`importWrappingKeyBytes`). No proving zeroes a passkey's PRF bytes: `spendCleartexts` (`models/gating.ts`) does, both for
 an attempt refused before it starts (while another runs, or after the gating is concluded) and for one that concludes
 its gating, whether or not a proving was derived from them. So an answer is single-use, and an answer handed in again is
 refused as `bad_option` because its bytes are all zero (`passkeyAnswer`, `shapes-gateish.ts`). The bytes are left
@@ -349,8 +349,8 @@ the wrappers `Bank`'s constructor makes for them: `guardKeyDeriver`'s
 `deriveKeyBytes` (`models/proving.ts`, `keyDeriverThrew`), `guardStrengthChecker` (`helpers/passphrase-strength.ts`)
 through `HostErrorSanitizer.refusalFor`, and `guardRequestCleartext` (`models/bank.ts`), which discards what was thrown
 and returns false, so that `Gating.#askHost` refuses with `requestCleartextThrew`, an `unexpected_error`. The gating's
-`checkedClears` does the same for a getter or proxy of the host's that throws while an attempt's cleartexts are read:
-the refusal is `clearsThrew`, an `unexpected_error` with no cause. A `VaultError` that a getter throws passes through
+`checkedCleartexts` does the same for a getter or proxy of the host's that throws while an attempt's cleartexts are read:
+the refusal is `cleartextsThrew`, an `unexpected_error` with no cause. A `VaultError` that a getter throws passes through
 unchanged (`notes/wontfix.md`).
 A `keyDeriver`'s `load` and a strength checker's `load` are given no passphrase. A `VaultError` that either throws
 passes through unchanged, and any other throw is kept as the cause of `keyDeriverLoadFailed` or

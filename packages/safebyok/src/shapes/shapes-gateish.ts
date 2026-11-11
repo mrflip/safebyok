@@ -13,6 +13,7 @@ import type { GuardedStrengthChecker, StrengthChecker } from '../helpers/passphr
 import type { Gating } from '../models/gating'
 import type { GuardedKeyDeriver, NOVEL, Proving } from '../models/proving'
 import type { Vault } from '../models/vault'
+import type { VaultListing } from '../models/vault-listing'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type VaultScope, vaultScope } from './shapes-core'
@@ -282,46 +283,55 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
 
 // --
 
-// == [The gating's forms]: gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears, callGatingByKind, ClearsForGatingkind
+// == [The gating's forms]: gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, vaultDelCleartexts, gatingLaunchOnArgs, gatingLaunchBirthArgs, CleartextsForGatingkind
 
-/** What the user hands an attempt, by the kind of gating; a clear is only ever checked here, in the attempt's own call. */
-export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplaceClears, passkeyAddClears, passkeyRevokeClears, vaultDelClears } = Checkers('bad_option', ({ oneof, obj }) => ({
+/** What the user hands an attempt, by the kind of gating; a cleartext is only ever checked here, in the attempt's own call. */
+export const { gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, vaultDelCleartexts } = Checkers('bad_option', ({ oneof, obj }) => ({
   gatingkind:              oneof(EX.gatingkindVals),
-  vaultBuildClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
-  vaultUnlockClears:       obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
+  vaultBuildCleartexts:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
+  vaultUnlockCleartexts:       obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
     .transform(({ passphraseClear, passkeyClear }, ctx) => {
       if (passphraseClear !== undefined) { return { passphraseClear } }
       if (passkeyClear) { return { passkeyClear } }
       ctx.addIssue({ code: 'custom', message: Phrases.ProofMissing })
       return NEVER
     }),
-  passphraseReplaceClears: obj({ antePassphraseClear: passphraseCleartext, nextPassphraseClear: passphraseCleartext }).strict(),
-  passkeyAddClears:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer }).strict(),
-  passkeyRevokeClears:     obj({ passphraseClear: passphraseCleartext }).strict(),
-  vaultDelClears:          obj({ passphraseClear: passphraseCleartext }).strict(),
+  passphraseReplaceCleartexts: obj({ antePassphraseClear: passphraseCleartext, nextPassphraseClear: passphraseCleartext }).strict(),
+  passkeyAddCleartexts:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer }).strict(),
+  passkeyRevokeCleartexts:     obj({ passphraseClear: passphraseCleartext }).strict(),
+  vaultDelCleartexts:          obj({ passphraseClear: passphraseCleartext }).strict(),
 }))
 
-/** What an attempt of a gating on a born vault hands its act: the clears pass unread, for the act's own check. */
-export const callGatingByKind = objStrict(({ oneof, custom, fn, unk }) => ({
+/** What launches a gating on a born vault: its kind, the vault, the vault's unlock, and the bank's dialog or null. */
+export const gatingLaunchOnArgs = objStrict(({ oneof, custom, fn }) => ({
   gatingkind:    oneof(EX.gatingkindVals).exclude(['build_vault']),
   vault:         custom<Vault>((val) => hasModelkind(val, 'vault'), Phrases.VaultExpected),
-  clears:        unk,
   unlockByProof: fn<UnlockByProof>(),
+  askUser:       custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
 
-export type ClearsForGatingkind = {
-  build_vault:        Z.input<typeof vaultBuildClears>
-  unlock_vault:       Z.input<typeof vaultUnlockClears>
-  replace_passphrase: Z.input<typeof passphraseReplaceClears>
-  add_passkey:        Z.input<typeof passkeyAddClears>
-  revoke_passkey:     Z.input<typeof passkeyRevokeClears>
-  del_vault:          Z.input<typeof vaultDelClears>
+/** What launches a gating that builds a vault: its listing, its scope and the revision it is put over, the unlock, and the bank's dialog or null. */
+export const gatingLaunchBirthArgs = objStrict(({ custom, fn }) => ({
+  listing:       custom<VaultListing>((val) => hasModelkind(val, 'vault_listing'), Phrases.ListingExpected),
+  scope:         vaultScope,
+  prior:         SX.revision,
+  unlockByProof: fn<UnlockByProof>(),
+  askUser:       custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
+}), 'bad_option')
+
+export type CleartextsForGatingkind = {
+  build_vault:        Z.input<typeof vaultBuildCleartexts>
+  unlock_vault:       Z.input<typeof vaultUnlockCleartexts>
+  replace_passphrase: Z.input<typeof passphraseReplaceCleartexts>
+  add_passkey:        Z.input<typeof passkeyAddCleartexts>
+  revoke_passkey:     Z.input<typeof passkeyRevokeCleartexts>
+  del_vault:          Z.input<typeof vaultDelCleartexts>
 }
 // --
 
 // == [Given to a gating]: RequestCleartext, AskUser, AnyGating, GatingSnapshot, VaultForGatingkind, VaultGatingkind, UnlockByProof
 
-/** The host's dialog: shown with this gating, resolving once it closes. It hands the user's clears to `gating.attempt`, and its returning with no attempt under way dismisses. */
+/** The host's dialog: shown with this gating, resolving once it closes. It hands the user's cleartexts to `gating.attempt`, and its returning with no attempt under way dismisses. */
 export type RequestCleartext = (gating: AnyGating) => unknown
 
 /** The host's dialog as a bank keeps it, wrapped by `guardRequestCleartext`: true once the dialog closes, false if it threw. Never throws. */

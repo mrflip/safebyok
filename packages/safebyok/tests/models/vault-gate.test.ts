@@ -257,7 +257,7 @@ describe("vault.replacePassphrasePrompt()", () => {
   })
 })
 
-describe("gating.attempt of another kind's clears", () => {
+describe("gating.attempt of another kind's cleartexts", () => {
   const WrongKindCases = [
     ["replacePassphrasePrompt",  'refuses a passphrase alone where an ante and a next are asked'],
     ["addPasskeyPrompt",         'refuses a passphrase alone where a passkey is asked beside it'],

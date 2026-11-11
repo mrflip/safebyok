@@ -167,7 +167,7 @@ export const unopenedWhisper = (): VaultError => new VaultError('damaged_whisper
 export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
 // --
 
-// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, clearsThrew, samePassphrase, gateMadeElsewhere, gatingDismissed, gatingConcluded, attemptInFlight
+// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, cleartextsThrew, samePassphrase, gateMadeElsewhere, gatingDismissed, gatingConcluded, attemptInFlight
 
 /** An `already_asking` refusal: a prompt is already open on this bank. */
 export const alreadyAsking = (): VaultError => new VaultError('already_asking', Phrases.AlreadyAsking)
@@ -176,7 +176,7 @@ export const alreadyAsking = (): VaultError => new VaultError('already_asking', 
 export const requestCleartextThrew = (): VaultError => new VaultError('unexpected_error', Phrases.RequestCleartextThrew)
 
 /** An `unexpected_error` refusal that keeps nothing of what reading an attempt's cleartext threw. */
-export const clearsThrew = (): VaultError => new VaultError('unexpected_error', Phrases.ClearsThrew)
+export const cleartextsThrew = (): VaultError => new VaultError('unexpected_error', Phrases.CleartextsThrew)
 
 /** A `same_passphrase` refusal: the new passphrase matches the current passphrase. */
 export const samePassphrase = (): VaultError => new VaultError('same_passphrase', Phrases.SamePassphrase)

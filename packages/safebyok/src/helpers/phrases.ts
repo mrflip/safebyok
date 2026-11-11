@@ -299,7 +299,7 @@ export const DelOfOtherRevision = "This thing is not at the life or revision the
 export const DelOfOtherLife = "The vault listed in this slot is under another vault_tok than this Vault, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 
-// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDismissed, AlreadyAsking, AttemptInFlight, GateMadeElsewhere, GatingConcluded, RequestCleartextThrew, ClearsThrew, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, TestDeriverNotice
+// == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDismissed, AlreadyAsking, AttemptInFlight, GateMadeElsewhere, GatingConcluded, RequestCleartextThrew, CleartextsThrew, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, TestDeriverNotice
 
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
@@ -318,7 +318,7 @@ export const GatingConcluded = "This prompt has ended -- it was answered, dismis
 
 export const RequestCleartextThrew = "The requestCleartext handed to Bank.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
 
-export const ClearsThrew = "Reading what was handed to this attempt threw, so nothing was tried. What it threw is left out, as it may quote the passphrase: hand attempt a plain object."
+export const CleartextsThrew = "Reading what was handed to this attempt threw, so nothing was tried. What it threw is left out, as it may quote the passphrase: hand attempt a plain object."
 
 
 export const StrengthCheckerThrew = "The strengthChecker handed to Bank.make threw, or answered a verdict that throws when read. What it threw is left out, as it heard the passphrase: have it catch its own failures."
