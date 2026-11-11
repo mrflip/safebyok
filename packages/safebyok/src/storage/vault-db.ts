@@ -2,7 +2,7 @@
 
 import { isEqual } from 'es-toolkit'
 import type * as Z from 'zod'
-import { DefaultMaxRecordBytes, IsAdapterVaultDB, IsVaultDB } from '../helpers/consts'
+import { DefaultMaxRecordBytes, IsAdapterVaultDB, IsVaultDB, UNANSWERED } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
 import * as Phrases from '../helpers/phrases'
 import { verifyConsistent } from '../helpers/validator'
@@ -47,10 +47,10 @@ const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<
 export const answerWithVal = <ValT>(answer: Answer<unknown, string, unknown>, val: ValT): GoodAnswer<ValT, string, unknown> => ({ ...carriedOf(answer), ok: true, val })
 
 // A refusal met delivering a good answer keeps its act, as storage did what it says.
-/** The bad answer `thrown` makes: on `answer`'s act and world where storage had answered, else on the refusal alone. */
-export const refusedAnswerOf = (thrown: unknown, answer: Answer<unknown, string, unknown> | null): BadAnswer => {
+/** The bad answer `thrown` makes: on `answer`'s act and world where storage had answered, else, for {@link UNANSWERED}, on the refusal alone. */
+export const refusedAnswerOf = (thrown: unknown, answer: Answer<unknown, string, unknown> | typeof UNANSWERED): BadAnswer => {
   const err = isVaultError(thrown) ? thrown : Refuse.unexpectedError(thrown)
-  return (answer === null) ? badAnswerOf(err) : { ...carriedOf(answer), ok: false, err }
+  return (answer === UNANSWERED) ? badAnswerOf(err) : { ...carriedOf(answer), ok: false, err }
 }
 
 /** What an answer carries beside its val or err. */

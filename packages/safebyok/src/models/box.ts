@@ -1,7 +1,7 @@
 import { cloneDeep, mergeWith } from 'es-toolkit'
 import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, makeLifeTok } from '../helpers/crypto'
-import { ENCRYPTED, LOCKED, VEILED, type Modelkind } from '../helpers/consts'
+import { ENCRYPTED, LOCKED, UNANSWERED, VEILED, type Modelkind } from '../helpers/consts'
 import { type Outcome, demandGood, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import * as CX from '../shapes/shapes-core'
@@ -190,7 +190,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       const { record, prior } = await this.#edit(given)
       this.demandPuttable(patch, { ifPresent })
       return await this.listing.tryPut(record, { prior, ifAbsent, ifPresent })
-    } catch (err) { return refusedAnswerOf(err, null) }
+    } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
   }
 
 
