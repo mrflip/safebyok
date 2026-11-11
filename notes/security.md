@@ -41,6 +41,14 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-11 (vaultdb_classifier, package `safebyok`): **A gate verb's tests are made over the vault row the adapter fetched in the step that stores the record.**
+  `replacePassphrase`, `addPasskey` and `revokePasskey` are each a vault put that names its verb (`gateVerb` on the ask); the vaultDB no longer reads the vault row beforehand and tests the record against that earlier read.
+  The verb's tests (the record keeps the stored `registered_at`, moves `gate_epoch` up by exactly one, and leaves the other wayin as stored; a passkey is added only where none is stored) are made by the classifier
+  (`classifyVault`) over the row the adapter fetched in the same atomic step that stores the record. A record that fails them is refused `gate_issue` and nothing is stored.
+  In `safebyok-postgres` that step is two calls with no transaction: the vault row is fetched and classified, then `safebyok_revise_vault` stores the record only where the stored row still has the expected
+  `revision_tok`, `am`, `vault_tok` and the `revision_seq` one below the record's, so the row the tests ran over is the row replaced, or nothing is stored.
+  Every ask is checked in `AdapterVaultDB` before an adapter is called, and an adapter is handed the checked ask.
+
 * 2026-11-11 (vaultdb_classifier, package `safebyok-postgres`): **`safebyok-postgres` writes vault and box rows through stored functions its setup SQL creates, run as the calling role.**
   `VaultFunctionsSql` (`packages/safebyok-postgres/src/vault-functions.ts`, shipped as `vault-functions.sql`) creates six functions: `safebyok_record`, `safebyok_tell`, `safebyok_birth_vault`,
   `safebyok_revise_vault`, `safebyok_birth_box` and `safebyok_revise_box`. None is `SECURITY DEFINER`: each is `SECURITY INVOKER`, Postgres's default, so it runs with the privileges of the role
@@ -57,6 +65,12 @@ added or folded into through the subagent, and no other entry changes.
   leaving only the address, `at`. A notification is not protected by row-level security, and in Postgres `LISTEN` needs no privilege: any role able to connect to the database may listen on a user's channel
   and read what a notification carries (see the 2026-10-15 entry and the package README). That is only what the tables hold, ciphertext and wrapped keys. Before this amendment a vault's notification
   already carried the vault row and a box's already carried the box row; what is new is that the vault row also goes out with each box write.
+  amended 2026-11-11 (vaultdb_classifier): `safebyok_revise_vault` and `safebyok_revise_box` store nothing over a stored row whose `fmt` differs from the record's, and the two box functions store nothing
+  under a vault row whose `fmt` is not 6001. Otherwise the functions do not judge the content of the stored row: a put or del that cites the exact revision of a row garbled deeper than the table checks
+  (next) reach would be stored over it. The core's classifier refuses such a row on every read.
+  amended 2026-11-11 (vaultdb_classifier): the two tables in `vault-tables.sql` now have CHECK constraints. They hold `am` to 'a' or 'x'; a live row to having the columns a tombstone lacks (a vault's `gate`;
+  a box's `sidecar`, `box_key_wrapped`, `whisper_ciphered`) and a tombstone to lacking them; and each `jsonb` field to its outline (the gate's `gate_epoch` a number, `passphrase_wayin` an object,
+  `passkey_wayin` an object or null; each ciphered field an object with two strings). They do not judge `fmt`, and they do not look inside a wayin, so a row garbled deeper than the outline can still be stored.
   Every secret field the functions handle is ciphertext as stored; they log nothing and raise nothing that quotes a value.
 
 * 2026-11-10 (old_gaps, branch `20261109-old_gaps`): **Five possibilities whose pinning tests were deleted, on the Coach's ruling, as paranoia.**
