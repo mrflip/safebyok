@@ -197,6 +197,7 @@ handful of named subsets of it (STYLE.md, *Shapes and duck typing*).
 | **scope**     | The composite id: the names its scopepath is made of (`VaultScope`, `BankScope`, and `Boxscope`, the only one that smushes its two words).                                     |
 | **dna**       | A type's required and optional props, plus the props the factory controls, which are accepted and ignored. It is what a caller passes to `create`. Its validator is the type's duckish, described below. |
 | **tombstone** | The record a deletion leaves behind (`VaultTombstone`, `BoxTombstone`).                                                                                                                  |
+| **void**      | An item that is missing altogether, rather than tombstoned; a vacant row. |
 | **dated**     | A row's scope, `vault_tok` and the time it is judged by, without the rest of the row. For a cached lease the time is its `proved_at` (`LeaseDated`), and this is the shape the deviceDB's `listLeases` returns. |
 | **snapshot**  | For a stateful thing, what a host renders: its sparse shape plus the state that changes alongside it (`VaultSnapshot`). It is frozen plain data that keeps its identity until something changes. |
 
