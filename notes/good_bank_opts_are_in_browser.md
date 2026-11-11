@@ -1,12 +1,12 @@
 # The good Bank options are in `safebyok/browser`, on purpose
 
 `Bank.make` takes its `keyDeriver`, `deviceDB` and `strengthChecker` from the host, and gives none
-of them a working default. The strength checker's default refuses every passphrase. The good
-answers for a browser, a pinned Argon2id deriver, an IndexedDB device store and the zxcvbn checker,
-come from a subpath of the core, `safebyok/browser`, as one bag: `...browserOpts()`.
+of them a working default. The strength checker's default refuses every passphrase. Good choices
+for a browser (a pinned Argon2id deriver, an IndexedDB deviceDB and the zxcvbn checker) come from a
+subpath of the core, `safebyok/browser`, in one bag: `...browserOpts()`.
 
 This looks like an oversight in three ways, and agents keep trying to "fix" it. It isn't one. Don't
-change it without a Coach's say.
+change it unless a Coach agrees.
 
 ## Why not a default in `Bank.make`
 
@@ -27,9 +27,9 @@ Three settings together make "what you never import never ships" true:
 * The package is marked `sideEffects: false`, so a bundler may drop any module the host's imports
   never reach.
 
-The zxcvbn dictionary goes one step further: the checker's `load` fetches it with a dynamic
-`import()`, as a chunk of its own, at the bank's `hello()`, never at import. If the chunk won't load,
-the hello fails loudly, and no vault is born until a later hello loads it.
+The zxcvbn dictionary goes one step further. The checker's `load` fetches it with a dynamic
+`import()`, as a separate chunk, when the bank's `hello()` runs, never at import. If the chunk won't
+load, the hello fails loudly, and no vault is born until a later hello loads it.
 
 Breaking any of the three, for example importing a `safebyok/browser` module from the main entry
 "for convenience", puts the batteries in every bundle.
@@ -37,8 +37,8 @@ Breaking any of the three, for example importing a `safebyok/browser` module fro
 ## Why the default checker refuses everything
 
 It is the contract, not a bug (`notes/configuration.md`, *Pluggable Passphrase Strength
-Checker*). The core won't guess how strong a passphrase a host's users need, and a length-only
-checker is no checker. The refusal's message tells the user, and the developer, that a checker must
+Checker*). The core won't guess how strong a passphrase a host's users need, and a checker that
+only counts characters is no checker. The refusal's message tells the user, and the developer, that a checker must
 be chosen. A host gets a good one by spreading `browserOpts()`, or brings its own.
 
 ## Why not a package of its own
