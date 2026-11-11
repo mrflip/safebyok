@@ -1,6 +1,7 @@
 /** The vaultDB in memory. */
 
-import { type BoxesFetched, type Heard, type RowOfVault, type Tidied, AdapterVaultDB } from './vault-db'
+import { type Tidied } from './vault-db'
+import { type BoxesFetched, type Heard, type RowOfVault, AdapterVaultDB } from './adapter-vault-db'
 import { isWriteAct } from './classifier'
 import type { BoxClassified, VaultClassified } from './classifier'
 import { DefaultMaxBoxes } from '../helpers/consts'

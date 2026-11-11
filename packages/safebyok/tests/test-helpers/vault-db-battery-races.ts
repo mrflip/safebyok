@@ -3,7 +3,8 @@
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
 import type { VaultRow, WatchScope } from '../../src/shapes/shapes-storage'
-import type { AdapterVaultDB, Notice, VaultDB } from '../../src/storage/vault-db'
+import type { Notice, VaultDB } from '../../src/storage/vault-db'
+import type { AdapterVaultDB } from '../../src/storage/adapter-vault-db'
 import {
   bankScope, vaultScope, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, vaultQuery, gateMoveOf,
   vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf,

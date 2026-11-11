@@ -78,7 +78,7 @@ up a `limits` string) padded through a `notes` string to exactly that length, al
   16-byte tag, each base64url without padding: 56 + ceil((W + 16) × 4 / 3) bytes for a whisper of W. Computed from the
   measured rule above. The box's other ciphered field, `box_key_wrapped`, adds 136 bytes whatever the whisper.
 * **The core's measure** is the size `box_too_large` compares against `maxRecordBytes`, from `jsonBytes` in
-  `vault-db.ts`: `new TextEncoder().encode(JSON.stringify(boxRecord)).length`. It equals the JSON length whenever the
+  `adapter-vault-db.ts`: `new TextEncoder().encode(JSON.stringify(boxRecord)).length`. It equals the JSON length whenever the
   sidecar is ASCII. **Convex weighs** is safebyok-convex's `weigh`: Convex's `getDocumentSize` of the stored document
   with its label columns. That is what counts toward `MaxVaultBoxBytes`.
 * **Reading "minimum validatable size".** The labels and user_id are at their minimum: 2 characters, and 1 for the
