@@ -79,7 +79,7 @@ async getBox(boxlabel, opts = {}) {
   await this.#ensureGreeted(); this.demandBoxesUsable()
   if (box?.isPresent === true) { return box }
   if (ifAbsent === 'nil') { return null }
-  throw boxAbsent(scope)
+  throw absentBoxError(scope)
 }
 ```
 
@@ -269,7 +269,7 @@ throw a bad outcome and discard the answer, use `demandGood`.
 **Goofus:** an outcome built only to be unbuilt, and a `valOf` whose value nobody takes.
 
 ```ts
-valOf(await outcomeOf(() => unwrapKeyUnder(this.#wayinKey, wrapped, ctx, CheckUsage), wrongCleartext))
+valOf(await outcomeOf(() => unwrapKeyUnder(this.#wayinKey, wrapped, ctx, CheckUsage), wrongProof))
 
 const hello = await outcomeOf(() => this.#bringUp())
 this.#announce({ kind: 'helloed', outcome: hello })
@@ -282,7 +282,7 @@ valOf(hello)
 try {
   await unwrapKeyUnder(this.#wayinKey, wrapped, ctx, CheckUsage)
 } catch {
-  throw wrongCleartext()
+  throw wrongProof()
 }
 
 const hello = await outcomeOf(() => this.#bringUp())
@@ -409,7 +409,7 @@ puttable(scoped, opts = {}) {
   const { ifAbsent } = MSX.boxPutOpts.parse(opts)
   const scope = this.scopeOf(scoped)
   const held = this.at(scope)
-  if ((held === null) && (ifAbsent === 'fail')) { throw boxNotListed(scope) }
+  if ((held === null) && (ifAbsent === 'fail')) { throw notListedBoxError(scope) }
   return held ?? this.#shellFor(scope)
 }
 
@@ -468,7 +468,7 @@ opinion, with a refusal that doesn't carry the frontier.
 
 ```ts
 protected demandNotListed(scope) {
-  if (this.at(scope) !== null) { throw alreadyListed() }
+  if (this.at(scope) !== null) { throw alreadyListedError() }
 }
 ```
 
@@ -524,7 +524,7 @@ return { proved }
 
 ```ts
 if (passphraseClear !== undefined) { return { proved: await PassphraseProving.buildStored(gate, passphraseClear, world) } }
-if (! passkeyClear) { throw new VaultError('unexpected_error', Phrases.CleartextMissing) }
+if (! passkeyClear) { throw new VaultError('unexpected_error', Phrases.ProofMissing) }
 return { proved: await PasskeyProving.buildStored(gate, passkeyClear) }
 ```
 
@@ -879,7 +879,7 @@ const prior = listing.demandBirthSlot(checked) ?? VS.VoidRevision
 demandBirthSlot(scope) {
   this.demandEnabled()
   const listed = this.at(scope)
-  if (listed?.isPresent === true) { throw alreadyListed() }
+  if (listed?.isPresent === true) { throw alreadyListedError() }
   return listed
 }
 ensureVault(record, prior) { return this.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' }) }
@@ -891,7 +891,7 @@ ensureVault(record, prior) { return this.put(record, { prior, ifAbsent: 'add', i
 // Vault.launchBirth
 listing.demandEnabled()
 const listed = listing.at(checked)
-if (listed?.isPresent === true) { throw alreadyListed() }
+if (listed?.isPresent === true) { throw alreadyListedError() }
 const prior = VS.revisionOf(listed ?? VS.VoidRevision)
 ```
 
@@ -907,7 +907,7 @@ Every read of a negative boolean is a double negative, and guards read worst of 
 #isDisabled = false
 if (! this.#isDisabled) { this.align() }
 
-demandEnabled(): this { if (this.#isDisabled) { throw instanceDisabled() } return this }
+demandEnabled(): this { if (this.#isDisabled) { throw disabledError() } return this }
 ```
 
 **Gallant:**
@@ -916,7 +916,7 @@ demandEnabled(): this { if (this.#isDisabled) { throw instanceDisabled() } retur
 #isEnabled = true
 if (this.#isEnabled) { this.align() }
 
-demandEnabled():    this { if (! this.#isEnabled) { throw instanceDisabled() } return this }
+demandEnabled():    this { if (! this.#isEnabled) { throw disabledError() } return this }
 ```
 
 ## Guards chain to the caller or the receiver `#chain-guards`
@@ -933,7 +933,7 @@ demandBoxesUsable(): this { return this.demandUsable().demandUnlocked() }     //
 **Gallant:**
 
 ```ts
-demandEnabled():    this { if (! this.#isEnabled) { throw instanceDisabled() } return this } // one test, direct
+demandEnabled():    this { if (! this.#isEnabled) { throw disabledError() } return this } // one test, direct
 demandPromptable(): this { return this.demandEnabled().demandPresent() }                  // one recipe, chained
 // demandBoxesUsable -- moved to Box and renamed for its callers                          // belongs near callers, as per its name
 ```
