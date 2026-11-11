@@ -103,7 +103,9 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     return (signedIn.val === user_id) ? null : DB.identityRevoked()
   }
 
-  /** Run `verb` if the request is signed in as `user_id`, and return its answer in wire form. Otherwise return the refusal in wire form, or the request's own where `asked` fails its checks. */
+  /** Run `verb` if the request is signed in as `user_id`, and return its answer in wire form.
+   * Otherwise return a bad answer in wire form: the refusal from checking `asked` if it fails, else the sign-in refusal.
+   */
   const served = async (context: ContextT, user_id: string, asked: object, verb: () => Promise<DB.Answer<unknown, string, unknown>>): Promise<CrossingAnswer> => {
     const refusal = await gateRefusalOf(context, user_id)
     if (refusal === null) { return crossingOf(await verb()) }
@@ -189,7 +191,7 @@ const epochMillisOf = (val: unknown): number => {
   throw new GraphQLError('SafebyokEpochMillis is a time in integer UTC epoch milliseconds')
 }
 
-/** `SafebyokEpochMillis`: a time in integer UTC epoch milliseconds. GraphQL's own Int is 32-bit, too small to hold one. */
+/** `SafebyokEpochMillis`: a time in integer UTC epoch milliseconds. GraphQL's own Int is 32-bit, too small for one. */
 const safebyokEpochMillis = new GraphQLScalarType<number, number>({
   name:               'SafebyokEpochMillis',
   coerceOutputValue:  epochMillisOf,

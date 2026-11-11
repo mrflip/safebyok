@@ -29,7 +29,7 @@ const isHeardBy = (watched: WatchScope, scope: VaultScope): boolean => (
   (watched.applabel === scope.applabel) && (watched.user_id === scope.user_id) && ((watched.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
 )
 
-/** The vault scope alone of an ask or a row. */
+/** The vault scope of an ask or a row, without its other fields. */
 function scopeOf({ applabel, user_id, vaultlabel }: VaultScope): VaultScope { return { applabel, user_id, vaultlabel } }
 // --
 
@@ -56,7 +56,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   // == [Room]: #roomIn
 
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** The room of the vault life `asked` names, under the soft cap `maxBoxes`: its count of box rows, live and deleted, taken inside the caller's transaction. */
+  /** The capacity of the vault life `asked` names: its box rows, live and deleted, counted in the caller's transaction, against the soft cap `maxBoxes`. */
   async #roomIn(store: IDBObjectStore, asked: VaultQuery): Promise<Capacity> {
     const used = await promisifyRequest(store.count(lifeRangeOf(asked)))
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
@@ -70,8 +70,8 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
     return filed.map(({ scopepath, row }) => ({ vaultlabel: vaultlabelOf(scopepath), vault: row }))
   }
 
-  // A get, put or del is one IndexedDB transaction: it fetches the rows, the classifier names what the ask comes to over them,
-  // and where that is a write the ask's record is stored, all before the transaction ends.
+  // Each get, put or del is one IndexedDB transaction. It fetches the rows, classifies the ask against them, and, if the
+  // classifier finds a write, stores the ask's record before the transaction ends.
   protected async doGetVault(ask: VaultGetAsk): Promise<VaultClassified> {
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => (
       this.classifyVault(ask, { vault: await DB.rowAt(store, vaultScopepathOf(ask)) })

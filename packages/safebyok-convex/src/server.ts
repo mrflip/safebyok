@@ -48,7 +48,7 @@ export class SafebyokComponent {
   }
 
   /** Build the public functions a `ConvexVaultDB` calls. Export them, under these names, from one module of the host's `convex/`.
-   * Each one refuses `identity_revoked` unless the caller is signed in as the `user_id` its scope or its ask names.
+   * Each one refuses `identity_revoked` unless the caller is signed in as the `user_id` named in its scope or `ask`.
    */
   api<DataModel extends GenericDataModel>(opts: SafebyokApiOpts<DataModel>) {
     // Validate only, and keep using `opts` itself: `getUserId` is called on the host's own object, so one that relies on `this` still works.
