@@ -122,8 +122,7 @@ describe("the README's Yoga recipe, its browser half", () => {
     makeCappedVaultDB:    async (maxBoxes) => await makeVaultDB({}, maxBoxes),
     makeTwin,
     _cheat_rowsOf:        () => TH.rowsOf(),
-    _cheat_adapterOf:       (vaultDB) => serverOf(vaultDB).adapter,
-    boxNoticesCarryVault: false,
+    _cheat_adapterOf:     (vaultDB) => serverOf(vaultDB).adapter,
   })
 })
 
@@ -132,7 +131,8 @@ describe("the README's Yoga recipe", () => {
     await TH.emptyTables()
     const route = vaultRoute(await TH.serverOver(), byHeader)
     const intruder = browserFor(route, () => 'u2')
-    await TH.expectRefusal(intruder.putVault(TH.vaultAt(), { prior: DB.VoidRevision }), 'identity_revoked')
+    const born = TH.vaultPutAskOf(TH.vaultAt())
+    await TH.expectRefusal(intruder.putVault(born), 'identity_revoked')
     await TH.expectRefusal(browserFor(route, () => null).listVaults(TH.bankScope), 'identity_revoked')
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })
@@ -158,10 +158,11 @@ describe("the README's Yoga recipe", () => {
     const driverError = new Error('password authentication failed for user "vault_owner"')
     const client: PostgresClient = { query: () => Promise.reject(driverError), transaction: () => Promise.reject(driverError) }
     const route = vaultRoute(new PostgresVaultDB({ client }), () => Promise.resolve('u1'), true)
+    const variables = { ask: DB.vaultGet.parse(TH.vaultGetAskOf()) }
     const response = await route(new Request('https://app.example.test/api/graphql', {
       method:  'POST',
       headers: { 'content-type': 'application/json' },
-      body:    JSON.stringify({ query: VaultOperations.getVault, variables: TH.vaultScope }),
+      body:    JSON.stringify({ query: VaultOperations.getVault, variables }),
     }))
     const sent = await response.text()
     expect(sent).to.include('storage_unavailable')

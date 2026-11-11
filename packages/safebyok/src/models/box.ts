@@ -185,9 +185,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis } = VX.boxPutOpts.parse(opts)
       await this.ensurePuttable(patch, { maxMillisSinceRefresh, maxWorldMillis })
       const given = this.demandPuttable(patch, { ifPresent })
-      const { record, prior } = await this.#edit(given)
+      const { record, expected } = await this.#edit(given)
       this.demandPuttable(patch, { ifPresent })
-      return await this.listing.tryPut(record, { prior, ifAbsent, ifPresent })
+      return await this.listing.tryPut(record, { expected, ifAbsent, ifPresent })
     } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
   }
 
@@ -202,16 +202,16 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Non-throwing form of {@link putExposed}. */
   tryPutExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.putExposed(patch, opts)) }
 
-  /** The next record `patch` makes, sealed and not put, and the revision it goes over. */
-  async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, prior: SX.Revision }> {
-    const prior = this.central
+  /** The next record `patch` makes, sealed and not put, and the row in hand it goes over. */
+  async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, expected: BoxSparse }> {
+    const expected = this.central
     const written_at = nowMillis()
-    const next = { ...prior, ...SX.nextRevisionOf(prior, written_at), am: 'a' as const }
+    const next = { ...expected, ...SX.nextRevisionOf(expected, written_at), am: 'a' as const }
     // A whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
-    const record = this.isTombstoneRecord(prior)
+    const record = this.isTombstoneRecord(expected)
       ? await sealedRecordOf(this.world, { ...next, registered_at: written_at, box_tok: makeLifeTok() }, sidecar ?? {}, whisper ?? {})
       : await sealedRecordOf(this.world, next, sidecar ?? this.demandFullProps().sidecar, whisper ?? await this.#keptWhisper())
-    return { record, prior: SX.revisionOf(prior) }
+    return { record, expected }
   }
 
   /** The whisper a patch left out, opened from the record in hand. */

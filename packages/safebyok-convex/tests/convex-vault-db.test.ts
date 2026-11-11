@@ -113,7 +113,7 @@ describe("ConvexVaultDB's refusals", () => {
   it("revoke the identity when the host's functions refuse the caller", async () => {
     const deployment = deploy(TH.hostWith(TH.bySubject))
     const vaultDB = new ConvexVaultDB({ client: deployment.client('u2'), api: deployment.api.safebyok })
-    await TH.expectBad(vaultDB.tryGetVault(TH.vaultScope), 'identity_revoked')
+    await TH.expectBad(vaultDB.tryGetVault(TH.vaultGetAskOf()), 'identity_revoked')
     await TH.expectBad(vaultDB.tryListVaults(TH.bankScope), 'identity_revoked')
   })
 
@@ -149,7 +149,7 @@ describe("ConvexVaultDB's constructor", () => {
 
   it("refuses a maxBoxes it cannot use", () => {
     const deployment = deploy(TH.componentHost())
-    for (const maxBoxes of [-1, 1.5, NaN]) {
+    for (const maxBoxes of [-1, 0, 1.5, NaN]) {
       TH.expectSyncRefusal(() => new ConvexVaultDB({ client: deployment.client(null), api: TH.rootApi, maxBoxes }), 'bad_option')
     }
   })

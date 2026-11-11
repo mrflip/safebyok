@@ -220,13 +220,13 @@ describe("vault.replacePassphrasePrompt()", () => {
     expect(deviceDB.cachedNow()).to.include({ gate_epoch: landedEpoch })
   })
 
-  it("refuses a vault deleted since the last fetch, the vault tombstoned before the refusal is thrown", async () => {
-    const { vault, demandStored, anotherSession } = await makeBornVault()
+  it("refuses a vault deleted since the last fetch, its tombstone listed in its slot before the refusal is thrown", async () => {
+    const { vault, listing, demandStored, anotherSession } = await makeBornVault()
     await delTyping(await anotherSession().build(demandStored()))
     expect(vault.isPresent).to.be.true
     await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase))
-    expect(vault.isPresent).to.be.false
-    expect(vault.revision_seq).to.eq(demandStored().revision_seq)
+    expect(vault.isEnabled).to.be.false
+    expect(listing.at(vault.scope)).to.include({ isPresent: false, vault_tok: demandStored().vault_tok, revision_seq: demandStored().revision_seq })
   })
 
   it("refuses a vault of another life stored since the last fetch, that life replacing the vault in its slot", async () => {
@@ -395,20 +395,23 @@ describe("a gate change on other sessions", () => {
 
 describe("vault.delVaultPrompt()", () => {
   it("demandUnlocked on a tombstoned vault says locked, and demandPresent says gone", async () => {
-    const { vault } = await makeBornVault()
+    const { vault, listing } = await makeBornVault()
     await delTyping(vault)
-    TH.expectSyncRefusal(() => vault.demandUnlocked(), 'vault_locked')
-    TH.expectSyncRefusal(() => vault.demandPresent(), 'vault_gone')
+    const gone = listing.at(vault.scope)
+    TH.expectSyncRefusal(() => gone?.demandUnlocked(), 'vault_locked')
+    TH.expectSyncRefusal(() => gone?.demandPresent(), 'vault_gone')
   })
 
   it("deletes the vault and its boxes, and forgets the cached lease", async () => {
     const { vault, listing, storedNow, deviceDB } = await makeBornVault()
     const boxes = vault.boxListing
     expect(await delTyping(vault)).to.equal(vault)
-    expect(storedNow()).to.include({ am: 'x', vault_tok: vault.vault_tok })
+    const tombstone = storedNow()
+    expect(tombstone).to.include({ am: 'x' })
+    expect(tombstone?.vault_tok).to.not.eq(vault.vault_tok)
     expect(vault.isLocked).to.be.true
-    expect(vault.isPresent).to.be.false
-    expect(listing.at(vault.scope)).to.equal(vault)
+    expect(vault.isEnabled).to.be.false
+    expect(listing.at(vault.scope)).to.include({ isPresent: false, isLocked: true, vault_tok: tombstone?.vault_tok })
     await TH.eventually(() => deviceDB.cachedNow() === null)
     await TH.expectRefusal(boxes.fetch({ ...vault.scope, boxlabel: 'anthropic_api_key' }))
   })

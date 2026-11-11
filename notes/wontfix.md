@@ -148,3 +148,7 @@ not as a settled ruling, and check it against the current design before relying 
   the vault row once for each before the box's own get.
 * 2026-11-10 (the Coach, on the review of #618: "an eventual gc mechanism"): **a listing's joined fetches are never collected.** Each slot a listing
   has fetched keeps a small entry joining its fetches, absent slots included, for the listing's life. Collecting them waits on a gc mechanism.
+* 2026-11-11 (the Coach, on #639: "This is paranoiac coding, you have validated the record correctness before writing it"): **a row garbled
+  past the vaultDB may be stored over.** Postgres stores a put or del in one call that compares the stored row's revision, state, life token
+  and `fmt`, and reads nothing else of it. Its tables refuse a flawed row one level into each `jsonb` field. A row a direct write garbled deeper
+  than that is thrown as damaged by every get, and a put or del citing its exact revision stores over it.

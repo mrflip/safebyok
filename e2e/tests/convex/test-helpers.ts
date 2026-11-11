@@ -1,5 +1,7 @@
 import { anyApi, defineSchema } from 'convex/server'
 import { convexTest, defineTestApp } from 'convex-test'
+import * as DB from 'safebyok/storage'
+import { vaultPutAskOf } from 'safebyok/testing'
 import type { SafebyokApi } from 'safebyok-convex'
 import { SafebyokComponent } from 'safebyok-convex/server'
 import type { GetUserId } from 'safebyok-convex/server'
@@ -24,4 +26,10 @@ export const hostWith = (getUserId: GetUserId) => {
 export const bySubject: GetUserId = async (ctx) => {
   const identity = await ctx.auth.getUserIdentity()
   return identity?.subject ?? null
+}
+
+/** The args of `putVault`: the put of `record` over no row, its `expected` cut to the meta the core's check keeps, as a client sends it. */
+export const putVaultArgs = (record: DB.VaultRecord) => {
+  const ask = vaultPutAskOf(record)
+  return { ask: { ...ask, expected: DB.rowMeta.parse(ask.expected) } }
 }

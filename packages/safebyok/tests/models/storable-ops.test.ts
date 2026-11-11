@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import { cmpRevisions } from '../../src/models/storable'
 import * as Phrases from '../../src/helpers/phrases'
+import * as Refuse from '../../src/refusals/throwers'
 import * as TH from '../test-helpers'
 import { TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
@@ -217,7 +218,7 @@ describe("storable.put(patch): seal, then put", () => {
     const [put] = world.mw.callsOf('put')
     expect(put?.record).to.deep.include({ revision_seq: 2, sidecar: { note: 'sent' } })
     expect(put?.record.revision_tok).to.not.eq('rev-a1')
-    expect(put?.priorRevisionTok).to.equal('rev-a1')
+    expect(put?.expectedRevisionTok).to.equal('rev-a1')
     expect(resolved).to.be.false
     pending.open()
     expect(await putting).to.eq(box)
@@ -239,7 +240,7 @@ describe("storable.del()", () => {
     const deleting = box.del(box.scope)
     await vi.advanceTimersByTimeAsync(0)
     expect(box.isPresent).to.be.true
-    expect(world.mw.callsOf('del')[0]?.priorRevisionTok).to.equal('rev-a1')
+    expect(world.mw.callsOf('del')[0]?.expectedRevisionTok).to.equal('rev-a1')
     pending.open()
     expect(await deleting).to.eq(box)
     expect(box._cheat_central).to.deep.include({ am: 'x', revision_seq: 2 })
@@ -252,7 +253,7 @@ describe("storable.del()", () => {
     expect(world.mw.callsOf('del')).to.deep.equal([])
     expect(box.isPresent).to.be.true
     await expect(box.del(asked)).resolves.to.eq(box)
-    expect(world.mw.callsOf('del')[0]?.priorRevisionTok).to.equal(asked.revision_tok)
+    expect(world.mw.callsOf('del')[0]?.expectedRevisionTok).to.equal(asked.revision_tok)
   })
 
   it("refuses a malformed scope, deleting nothing", async () => {
@@ -273,26 +274,26 @@ describe("storable.del()", () => {
     const { box } = await timelyBoxOf()
     const { revision_tok } = box
     await expect(box.del(box)).resolves.to.eq(box)
-    expect(world.mw.callsOf('del')[0]?.priorRevisionTok).to.equal(revision_tok)
+    expect(world.mw.callsOf('del')[0]?.expectedRevisionTok).to.equal(revision_tok)
   })
 
-  it("deletes a deleted thing again at its tombstone's revision", async () => {
+  it("sends a delete of a deleted thing expecting its tombstone, which the vaultDB refuses", async () => {
     const { box } = await timelyBoxOf()
     await box.del(box.scope)
     const tombstone = box._cheat_central
     world.mw.clearCalls()
-    await expect(box.del(box.scope)).resolves.to.eq(box)
+    await TH.expectRefusal(box.del(box.scope), 'absent_box')
     const [del] = world.mw.callsOf('del')
-    expect(del?.priorRevisionTok).to.equal(tombstone.revision_tok)
+    expect(del?.expectedRevisionTok).to.equal(tombstone.revision_tok)
     expect(box._cheat_central).to.deep.include({ am: 'x', revision_seq: tombstone.revision_seq })
   })
 
-  it("keeps its tombstone when a repeat delete returns the same one", async () => {
+  it("keeps its tombstone when a repeat delete is refused with the same one", async () => {
     const { box } = await timelyBoxOf()
     await box.del(box.scope)
     const tombstone = box._cheat_central
-    world.mw.willDel(({ scope }) => ({ ...world.mw.answerOf(scope, tombstone), act: 'gone' }))
-    await expect(box.del(box.scope)).resolves.to.eq(box)
+    world.mw.willDel(({ scope }) => ({ ...world.mw.refusalOf(scope, Refuse.actRefused('box', 'dubdel'), null, tombstone), act: 'dubdel' }))
+    await TH.expectRefusal(box.del(box.scope), 'absent_box')
     expect(box._cheat_central).to.eq(tombstone)
     expect(box.isPresent).to.be.false
     expect(box.revision_seq).to.eq(tombstone.revision_seq)

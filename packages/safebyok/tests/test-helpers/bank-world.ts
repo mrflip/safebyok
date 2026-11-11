@@ -6,7 +6,8 @@ import { VaultError, type Refusalkind } from '../../src/refusals/errors'
 import { Bank } from '../../src/models/bank'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import type { BankScope, VaultScope } from '../../src/shapes/shapes-core'
+import type { BankScope } from '../../src/shapes/shapes-core'
+import type { VaultGetAsk } from '../../src/shapes/shapes-storage'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import type { BankOpts, BankSnapshot } from '../../src/shapes/shapes-vaultish'
 import { anyStrengthChecker, testDeriver } from './builders'
@@ -40,9 +41,9 @@ export class RefusingVaultDB extends MemoryVaultDB {
     return super.doListVaults(scope)
   }
 
-  protected override doGetVault(scope: VaultScope) {
+  protected override doGetVault(ask: VaultGetAsk) {
     this.#demandAnswering()
-    return super.doGetVault(scope)
+    return super.doGetVault(ask)
   }
 
   #demandAnswering(): void {

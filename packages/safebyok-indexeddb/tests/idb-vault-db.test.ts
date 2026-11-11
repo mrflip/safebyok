@@ -120,7 +120,7 @@ describe("IdbVaultDB's databases", () => {
   it("keeps the rows of each dbName apart", async () => {
     const vaultDB = makeVaultDB()
     const other = makeVaultDB()
-    await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+    await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
     const { val: otherListed } = await other.listVaults(TH.bankScope)
     const twin = await makeTwin(vaultDB)
     const { val: twinListed } = await twin.listVaults(TH.bankScope)
@@ -131,9 +131,9 @@ describe("IdbVaultDB's databases", () => {
   it("keeps apart the rows of users whose ids share a beginning", async () => {
     const vaultDB = makeVaultDB()
     const longer = { ...TH.bankScope, user_id: `${TH.bankScope.user_id}0` }
-    await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
-    await vaultDB.putVault(TH.vaultAt(0, 'life1', longer), { prior: DB.VoidRevision })
-    await vaultDB.putBox(TH.boxAt(0, 'life1', longer), { prior: DB.VoidRevision })
+    await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
+    await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt(0, 'life1', longer)))
+    await vaultDB.putBox(TH.boxPutAskOf(TH.boxAt(0, 'life1', longer)))
     const { val: listed } = await vaultDB.listVaults(TH.bankScope)
     const { val: boxesListed } = await vaultDB.listBoxes({ ...TH.vaultScope, vault_tok: 'life1' })
     const { val: tidied } = await vaultDB.tidyGone(TH.bankScope)
@@ -147,7 +147,7 @@ describe("IdbVaultDB's databases", () => {
     const notices: unknown[] = []
     const unwatch = vaultDB.watch(TH.bankScope, (notice) => { notices.push(notice) })
     const twin = await makeTwin(vaultDB)
-    await twin.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+    await twin.putVault(TH.vaultPutAskOf(TH.vaultAt()))
     await TH.eventually(() => notices.length > 0)
     expect(notices).to.have.lengthOf(1)
     unwatch()
@@ -196,7 +196,8 @@ describe("IdbVaultDB's refusals", () => {
     it(blurb, async () => {
       const vaultDB = makeVaultDB()
       vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementationOnce(() => { throw new DOMException('IndexedDB says no.', errname) })
-      const refusal = await TH.expectRefusal(vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision }), refusalkind)
+      const putting = vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
+      const refusal = await TH.expectRefusal(putting, refusalkind)
       expect(refusal.message).to.match(said)
       expect(refusal.cause).to.have.property('name', errname)
     })
@@ -208,7 +209,8 @@ describe("IdbVaultDB's refusals", () => {
       this.transaction.abort()
       return undefined as never
     })
-    await TH.expectRefusal(vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision }), 'storage_unavailable')
+    const putting = vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
+    await TH.expectRefusal(putting, 'storage_unavailable')
     expect(await idbRowsOf(vaultDB).vaultRowOf(TH.vaultScope)).to.be.null
   })
 
@@ -221,7 +223,7 @@ describe("IdbVaultDB's refusals", () => {
     it(blurb, async () => {
       const vaultDB = makeVaultDB()
       vi.stubGlobal('indexedDB', absent)
-      const refusal = await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'storage_blocked')
+      const refusal = await TH.expectRefusal(vaultDB.getVault(TH.vaultGetAskOf()), 'storage_blocked')
       expect(refusal.message).to.match(/no IndexedDB/)
     })
   }

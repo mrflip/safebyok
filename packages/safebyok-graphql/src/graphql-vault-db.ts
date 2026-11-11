@@ -2,9 +2,8 @@ import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql
 import type * as Z from 'zod'
 import * as DB from 'safebyok/storage'
 import type {
-  Answer, BankListed, BankScope, BoxesListed, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelAct, DelOpts, GateVerbOpts, GoodAnswer, GotAct,
-  IfAbsentOpts, ListAct, Notice, PutAct, PutOpts, ReqParams, VaultDB, VaultQuery,
-  Tidied, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope,
+  Answer, BankListed, BankScope, BoxAnswer, BoxDelAsk, BoxesListed, BoxGetAsk, BoxPutAsk, BoxRow, GateVerbOpts, GoodAnswer, ListAct, Notice, OkAct,
+  ReqParams, Tidied, VaultAnswer, VaultDB, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultQuery, VaultRecord, VaultRow, WatchScope,
 } from 'safebyok/storage'
 import { VaultOperations } from './vault-operations'
 
@@ -68,13 +67,13 @@ export class GraphQLVaultDB implements VaultDB {
     })
   }
 
-  /** Get the vault at `scope`, whichever life (`vault_tok`) it is on. With `ifAbsent: 'nil'`, a missing or deleted vault returns `val: null`. */
-  async getVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<GoodAnswer<VaultRecord | null, GotAct>> { return goodAnswerOf(await this.tryGetVault(scope, opts)) }
+  /** The vault at a scope, whatever its life. Over none stored, `ifAbsent: 'nil'` answers null, and over a tombstone, the tombstone. */
+  async getVault(ask: VaultGetAsk): Promise<GoodAnswer<VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryGetVault(ask)) }
 
   /** Non-throwing form of {@link getVault}. */
-  async tryGetVault(scope: VaultScope, opts: IfAbsentOpts = {}): Promise<Answer<VaultRecord | null, GotAct>> {
-    return await answerOf('getVault', () => DB.reqParams.parse(DB.vaultScope.parse(scope)), async () => {
-      const answer = await this.#asked(VaultOperations.getVault, 'safebyokGetVault', { ...DB.vaultScope.parse(scope), opts: DB.ifAbsentOpts.parse(opts) })
+  async tryGetVault(ask: VaultGetAsk): Promise<VaultAnswer> {
+    return await answerOf('getVault', () => DB.reqParamsOf(DB.vaultGet.parse(ask)), async () => {
+      const answer = await this.#asked(VaultOperations.getVault, 'safebyokGetVault', { ask: DB.vaultGet.parse(ask) })
       return DB.getVaultAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -90,13 +89,13 @@ export class GraphQLVaultDB implements VaultDB {
     })
   }
 
-  /** Get one box of the vault life `vault_tok`. The answer's `world` is its vault row. With `ifAbsent: 'nil'`, a missing box returns `val: null`. */
-  async getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>> { return goodAnswerOf(await this.tryGetBox(asked, opts)) }
+  /** The box under this `vault_tok`, with its vault row as `world`. Over none stored, `ifAbsent: 'nil'` answers null, and over a tombstone, the tombstone. */
+  async getBox(ask: BoxGetAsk): Promise<GoodAnswer<BoxRow | null, OkAct>> { return goodAnswerOf(await this.tryGetBox(ask)) }
 
   /** Non-throwing form of {@link getBox}. */
-  async tryGetBox(asked: BoxQuery, opts: IfAbsentOpts = {}): Promise<Answer<BoxRecord | null, GotAct>> {
-    return await answerOf('getBox', () => DB.reqParams.parse(DB.boxQuery.parse(asked)), async () => {
-      const answer = await this.#asked(VaultOperations.getBox, 'safebyokGetBox', { ...DB.boxQuery.parse(asked), opts: DB.ifAbsentOpts.parse(opts) })
+  async tryGetBox(ask: BoxGetAsk): Promise<BoxAnswer> {
+    return await answerOf('getBox', () => DB.reqParamsOf(DB.boxGet.parse(ask)), async () => {
+      const answer = await this.#asked(VaultOperations.getBox, 'safebyokGetBox', { ask: DB.boxGet.parse(ask) })
       return DB.getBoxAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -104,24 +103,24 @@ export class GraphQLVaultDB implements VaultDB {
 
   // == [Puts]: putVault, tryPutVault, putBox, tryPutBox
 
-  /** Store a vault record, subject to `opts`. */
-  async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>> { return goodAnswerOf(await this.tryPutVault(record, opts)) }
+  /** Stores `ask.record` over the vault row `ask.expected`, as its policies allow. `passed` answers the live row found. */
+  async putVault(ask: VaultPutAsk): Promise<GoodAnswer<VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryPutVault(ask)) }
 
   /** Non-throwing form of {@link putVault}. */
-  async tryPutVault(record: VaultRecord, opts: PutOpts): Promise<Answer<VaultRow, PutAct>> {
-    return await answerOf('putVault', () => DB.reqParams.parse({ ...DB.vaultRecord.parse(record), ...DB.putOpts.parse(opts) }), async () => {
-      const answer = await this.#told(VaultOperations.putVault, 'safebyokPutVault', { record: DB.vaultRecord.parse(record), opts: DB.putOpts.parse(opts) })
+  async tryPutVault(ask: VaultPutAsk): Promise<VaultAnswer> {
+    return await answerOf('putVault', () => DB.reqParamsOf(DB.vaultPut.parse(ask)), async () => {
+      const answer = await this.#told(VaultOperations.putVault, 'safebyokPutVault', { ask: DB.vaultPut.parse(ask) })
       return DB.putVaultAnswer.parse(rowAnswerOf(answer))
     })
   }
 
-  /** Store a box in the live vault that its `vault_tok` names, subject to `opts`. */
-  async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> { return goodAnswerOf(await this.tryPutBox(record, opts)) }
+  /** Stores `ask.record` over the box row `ask.expected`, under a vault live at its `vault_tok`, as its policies allow. `passed` answers the live row found. */
+  async putBox(ask: BoxPutAsk): Promise<GoodAnswer<BoxRow | null, OkAct>> { return goodAnswerOf(await this.tryPutBox(ask)) }
 
   /** Non-throwing form of {@link putBox}. */
-  async tryPutBox(record: BoxRecord, opts: PutOpts): Promise<Answer<BoxRow, PutAct>> {
-    return await answerOf('putBox', () => DB.reqParams.parse({ ...DB.boxRecord.parse(record), ...DB.putOpts.parse(opts) }), async () => {
-      const answer = await this.#told(VaultOperations.putBox, 'safebyokPutBox', { record: DB.boxRecord.parse(record), opts: DB.putOpts.parse(opts) })
+  async tryPutBox(ask: BoxPutAsk): Promise<BoxAnswer> {
+    return await answerOf('putBox', () => DB.reqParamsOf(DB.boxPut.parse(ask)), async () => {
+      const answer = await this.#told(VaultOperations.putBox, 'safebyokPutBox', { ask: DB.boxPut.parse(ask) })
       return DB.putBoxAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -167,24 +166,24 @@ export class GraphQLVaultDB implements VaultDB {
 
   // == [Dels]: delBox, tryDelBox, delVault, tryDelVault, tidyGone, tryTidyGone
 
-  /** Delete a box: replace its live row at revision `prior` with `tombstone`. */
-  async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> { return goodAnswerOf(await this.tryDelBox(tombstone, opts)) }
+  /** Stores the tombstone `ask.record` over the live box row `ask.expected`. */
+  async delBox(ask: BoxDelAsk): Promise<GoodAnswer<BoxRow | null, OkAct>> { return goodAnswerOf(await this.tryDelBox(ask)) }
 
   /** Non-throwing form of {@link delBox}. */
-  async tryDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<Answer<BoxTombstone, DelAct>> {
-    return await answerOf('delBox', () => DB.reqParams.parse({ ...DB.boxTombstone.parse(tombstone), ...DB.delOpts.parse(opts) }), async () => {
-      const answer = await this.#told(VaultOperations.delBox, 'safebyokDelBox', { tombstone: DB.boxTombstone.parse(tombstone), opts: DB.delOpts.parse(opts) })
+  async tryDelBox(ask: BoxDelAsk): Promise<BoxAnswer> {
+    return await answerOf('delBox', () => DB.reqParamsOf(DB.boxDel.parse(ask)), async () => {
+      const answer = await this.#told(VaultOperations.delBox, 'safebyokDelBox', { ask: DB.boxDel.parse(ask) })
       return DB.delBoxAnswer.parse(rowAnswerOf(answer))
     })
   }
 
-  /** Delete a vault: replace its live row at revision `prior` with `tombstone`, and delete the boxes of that life. */
-  async delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>> { return goodAnswerOf(await this.tryDelVault(tombstone, opts)) }
+  /** Stores the tombstone `ask.record` over the live vault row `ask.expected`, and deletes the boxes of its life. */
+  async delVault(ask: VaultDelAsk): Promise<GoodAnswer<VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryDelVault(ask)) }
 
   /** Non-throwing form of {@link delVault}. */
-  async tryDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Answer<VaultTombstone, DelAct>> {
-    return await answerOf('delVault', () => DB.reqParams.parse({ ...DB.vaultTombstone.parse(tombstone), ...DB.delOpts.parse(opts) }), async () => {
-      const answer = await this.#told(VaultOperations.delVault, 'safebyokDelVault', { tombstone: DB.vaultTombstone.parse(tombstone), opts: DB.delOpts.parse(opts) })
+  async tryDelVault(ask: VaultDelAsk): Promise<VaultAnswer> {
+    return await answerOf('delVault', () => DB.reqParamsOf(DB.vaultDel.parse(ask)), async () => {
+      const answer = await this.#told(VaultOperations.delVault, 'safebyokDelVault', { ask: DB.vaultDel.parse(ask) })
       return DB.delVaultAnswer.parse(rowAnswerOf(answer))
     })
   }
@@ -356,7 +355,7 @@ const rowsOf: Drop = (val) => (Array.isArray(val) ? val.map((row) => rowOf(row))
 /** The drop for a listing: its rows, but not its `damaged_rows`. */
 const listedOf: Drop = (val) => dropTypename(val, { vaults: rowsOf, boxes: rowsOf })
 
-const reqParamsOf: Drop = (val) => dropTypename(val, { prior: dropTypename })
+const reqParamsOf: Drop = (val) => dropTypename(val, { expected: dropTypename })
 
 /** Make the drop for an answer or a notice, using `valDrop` for its `val`. */
 const answerDrop = (valDrop: Drop): Drop => (val) => dropTypename(val, { val: valDrop, world: rowOf, dbhas: rowOf, req_params: reqParamsOf, err: dropTypename })

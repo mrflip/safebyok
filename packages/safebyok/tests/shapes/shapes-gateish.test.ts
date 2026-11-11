@@ -6,7 +6,7 @@ import { PasskeySaltBytes } from '../../src/helpers/consts'
 import { parseLogger } from '../../src/helpers/logger'
 import { guardRequestCleartext } from '../../src/models/bank'
 import * as GX from '../../src/shapes/shapes-gateish'
-import { VoidRevision } from '../../src/shapes/shapes-storage'
+import { VoidRevision, sentinelVaultOf } from '../../src/shapes/shapes-storage'
 import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
 
@@ -57,16 +57,16 @@ describe("gatingLaunchBirthArgs", () => {
   const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
   const unlockByProof = () => Promise.resolve(listing)
   const askUser = guardRequestCleartext(() => undefined)
-  const args = { listing, scope, prior: VoidRevision, unlockByProof, askUser }
+  const args = { listing, scope, expected: sentinelVaultOf(scope), unlockByProof, askUser }
 
-  it("passes a vault listing, a scope, the revision put over, the unlock and the bank's dialog, handing on the listing it was given", () => {
+  it("passes a vault listing, a scope, the row put over, the unlock and the bank's dialog, handing on the listing it was given", () => {
     expect(GX.gatingLaunchBirthArgs.parse(args).listing).to.eq(listing)
     expect(GX.gatingLaunchBirthArgs.parse({ ...args, askUser: null }).askUser).to.be.null
   })
 
-  it("refuses what is no vault listing, a scope that is none, a prior that is no revision, an unlock that is no function, and a dialog the bank did not wrap", () => {
+  it("refuses what is no vault listing, a scope that is none, an expected that is no vault row, an unlock that is no function, and a dialog the bank did not wrap", () => {
     for (const bad of [
-      { ...args, listing: { modelkind: 'box_listing' } }, { ...args, scope: { applabel: 'acme' } }, { ...args, prior: { revision_seq: 'one' } },
+      { ...args, listing: { modelkind: 'box_listing' } }, { ...args, scope: { applabel: 'acme' } }, { ...args, expected: { revision_seq: 'one' } },
       { ...args, unlockByProof: 'unlock' }, { ...args, askUser: () => Promise.resolve(true) },
     ]) {
       TH.expectSyncRefusal(() => GX.gatingLaunchBirthArgs.parse(bad), 'bad_option')

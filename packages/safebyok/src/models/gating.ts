@@ -10,7 +10,7 @@ import * as GX from '../shapes/shapes-gateish'
 import type { AnyGating, AskUser, CleartextsForGatingkind, GatingSnapshot, UnlockByProof, VaultForGatingkind, VaultGatingkind, WayinHeader } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import * as SX from '../shapes/shapes-storage'
-import type { Revision, VaultRecord } from '../shapes/shapes-storage'
+import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { attemptInFlight, cleartextsThrew, gateMadeElsewhere, gatingDismissed, gatingConcluded, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import { Gate } from './gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
@@ -84,10 +84,10 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     return gating.#launch(checked.askUser)
   }
 
-  /** Ask the user for a new vault's passphrase, build the vault under `scope` over `prior`, and answer it unlocked. */
-  static async launchBirth(listing: VaultListing, scope: VaultScope, prior: Revision, unlockByProof: UnlockByProof, askUser: AskUser | null): Promise<Vault> {
-    const checked = GX.gatingLaunchBirthArgs.parse({ listing, scope, prior, unlockByProof, askUser })
-    const act: Act = (cleartexts) => buildVault(checked.listing, checked.scope, checked.prior, cleartexts, checked.unlockByProof)
+  /** Ask the user for a new vault's passphrase, build the vault under `scope` over the row `expected`, and answer it unlocked. */
+  static async launchBirth(listing: VaultListing, scope: VaultScope, expected: VaultSparse, unlockByProof: UnlockByProof, askUser: AskUser | null): Promise<Vault> {
+    const checked = GX.gatingLaunchBirthArgs.parse({ listing, scope, expected, unlockByProof, askUser })
+    const act: Act = (cleartexts) => buildVault(checked.listing, checked.scope, checked.expected, cleartexts, checked.unlockByProof)
     const gating = new Gating('build_vault', checked.listing, checked.scope, null, act)
     return gating.#launch(checked.askUser)
   }
@@ -175,7 +175,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 // change hears provings, and comes to the vault's private unlock by unlockByProof (G9).
 
 /** Build a vault under `scope` using the passphrase and (if given) passkey; unlock once built. */
-const buildVault = async (listing: VaultListing, scope: VaultScope, prior: Revision, cleartexts: unknown, unlockByProof: UnlockByProof): Promise<Vault> => {
+const buildVault = async (listing: VaultListing, scope: VaultScope, expected: VaultSparse, cleartexts: unknown, unlockByProof: UnlockByProof): Promise<Vault> => {
   const { passphraseClear, passkeyClear } = checkedCleartexts(GX.vaultBuildCleartexts, cleartexts)
   // A birth's stamp is minted here, one per attempt.
   const stamp             = listing.stampOfBirth(scope)
@@ -185,8 +185,8 @@ const buildVault = async (listing: VaultListing, scope: VaultScope, prior: Revis
   const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
   const passkeyWayin    = await passkeyProving?.buildWayin(passphraseProving) ?? null
   const gate   = Gate.make(passphraseProving.stamp, passphraseWayin, passkeyWayin)
-  const record = listing.recordOfBirth(gate, prior)
-  const vault  = await listing.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' })
+  const record = listing.recordOfBirth(gate, expected)
+  const vault  = await listing.put(record, { expected, ifAbsent: 'add', ifPresent: 'get' })
 
   // The row stored may be another's, born first: this proof opens only its own, and the user must hear that theirs was not set.
   if (vault.vault_tok !== record.vault_tok) { throw gateMadeElsewhere() }

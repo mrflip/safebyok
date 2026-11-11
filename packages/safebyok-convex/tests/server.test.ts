@@ -1,7 +1,6 @@
 /** SafebyokComponent: each of the host's functions serves the user its call names, and no one else. */
 
 import { describe, expect, it } from 'vitest'
-import * as DB from 'safebyok/storage'
 import { SafebyokComponent } from '../src/server'
 import * as TH from './test-helpers'
 
@@ -13,15 +12,14 @@ type Caller = ReturnType<Backend['withIdentity']>
 const vault = TH.vaultAt()
 const box = TH.boxAt()
 const otherBox = TH.boxAt(0, vault.vault_tok, { boxlabel: 'other' })
-const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
 const vaultQuery = { ...TH.vaultScope, vault_tok: vault.vault_tok }
 
 /** Make a backend where u1 has a vault with one box, both written as u1. */
 const seeded = async (): Promise<Backend> => {
   const backend = createTest()
   const asOwner = backend.withIdentity({ subject: 'u1' })
-  await asOwner.mutation(api.safebyok.putVault, { record: vault, opts: birth })
-  await asOwner.mutation(api.safebyok.putBox, { record: box, opts: birth })
+  await asOwner.mutation(api.safebyok.putVault, TH.putVaultArgs(vault))
+  await asOwner.mutation(api.safebyok.putBox, TH.putBoxArgs(box))
   return backend
 }
 
@@ -31,10 +29,10 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['getVault',   (caller) => caller.query(api.safebyok.getVault, { scope: TH.vaultScope })],
   ['listBoxes',  (caller) => caller.query(api.safebyok.listBoxes, { asked: vaultQuery })],
   ['getBox',     (caller) => caller.query(api.safebyok.getBox, { asked: { ...vaultQuery, boxlabel: box.boxlabel } })],
-  ['putVault',   (caller) => caller.mutation(api.safebyok.putVault, { record: vault, opts: birth })],
-  ['putBox',     (caller) => caller.mutation(api.safebyok.putBox, { record: otherBox, opts: birth })],
-  ['delBox',     (caller) => caller.mutation(api.safebyok.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: DB.revisionOf(box) } })],
-  ['delVault',   (caller) => caller.mutation(api.safebyok.delVault, { tombstone: TH.vaultTombstoneOf(vault), opts: { prior: DB.revisionOf(vault) } })],
+  ['putVault',   (caller) => caller.mutation(api.safebyok.putVault, TH.putVaultArgs(vault))],
+  ['putBox',     (caller) => caller.mutation(api.safebyok.putBox, TH.putBoxArgs(otherBox))],
+  ['delBox',     (caller) => caller.mutation(api.safebyok.delBox, TH.delBoxArgs(box))],
+  ['delVault',   (caller) => caller.mutation(api.safebyok.delVault, TH.delVaultArgs(vault))],
   ['tidyGone',   (caller) => caller.mutation(api.safebyok.tidyGone, { scope: TH.bankScope })],
   ['watchRows',  (caller) => caller.query(api.safebyok.watchRows, { scope: TH.bankScope })],
 ]
@@ -58,7 +56,48 @@ describe("SafebyokComponent.api, for the user a call names", () => {
     const asOwner = backend.withIdentity({ subject: 'u1' })
     expect(await asOwner.query(api.safebyok.getVault, { scope: TH.vaultScope })).to.deep.equal(vault)
     expect(await asOwner.query(api.safebyok.getBox, { asked: { ...vaultQuery, boxlabel: box.boxlabel } })).to.deep.equal({ vault, box })
-    expect(await asOwner.mutation(api.safebyok.putVault, { record: vault, opts: birth })).to.deep.equal({ isWritten: false, ante: vault })
+    const next = TH.vaultAt(1)
+    expect(await asOwner.mutation(api.safebyok.putVault, TH.putVaultArgs(next, vault))).to.deep.equal({ ok: true, act: 'replaced', world: next, vault: next, presence: 'live' })
+  })
+})
+
+describe("SafebyokComponent.api, for an ask the core's checker refuses", () => {
+  const otherUsers = TH.vaultAt(1, 'life1', { user_id: 'u2' })
+  const BadAskCases: [string, (caller: Caller) => Promise<unknown>][] = [
+    ['a vault put whose record is not one revision past the row it expects', (caller) => caller.mutation(api.safebyok.putVault, TH.putVaultArgs(TH.vaultAt(2), vault))],
+    ["a vault put whose record is at another user's address than the ask names", (caller) => caller.mutation(api.safebyok.putVault, { ask: { ...TH.putVaultArgs(TH.vaultAt(1), vault).ask, record: otherUsers } })],
+    ['a box put whose expected row is of another life than the ask names', (caller) => caller.mutation(api.safebyok.putBox, { ask: { ...TH.putBoxArgs(TH.boxAt(1), box).ask, vault_tok: 'life2' } })],
+    ['a box del whose tombstone keeps the life token of the row it deletes', (caller) => caller.mutation(api.safebyok.delBox, { ask: { ...TH.delBoxArgs(box).ask, record: { ...TH.boxTombstoneOf(box), box_tok: box.box_tok } } })],
+    ['a vault del whose tombstone is not one revision past the row it expects', (caller) => caller.mutation(api.safebyok.delVault, { ask: { ...TH.delVaultArgs(vault).ask, record: { ...TH.vaultTombstoneOf(vault), revision_seq: 5 } } })],
+  ]
+
+  for (const [blurb, call] of BadAskCases) {
+    it(`refuses ${blurb} as bad_record, and stores nothing`, async () => {
+      const backend = await seeded()
+      const before = await storedIn(backend)
+      const refusal = await TH.convexRefusalOf(call(backend.withIdentity({ subject: 'u1' })))
+      expect(refusal).to.have.property('kind', 'bad_record')
+      expect(await storedIn(backend)).to.deep.equal(before)
+    })
+  }
+
+  it("refuses an ask naming another user's user_id as identity_revoked, before its checker sees it", async () => {
+    const backend = await seeded()
+    const before = await storedIn(backend)
+    const theirs = TH.putVaultArgs(TH.vaultAt(0, 'life1', { user_id: 'u2' }))
+    expect(await TH.convexRefusalOf(backend.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putVault, theirs))).to.deep.equal({ kind: 'identity_revoked' })
+    const misfit = { ask: { ...theirs.ask, record: { ...theirs.ask.record, revision_seq: 5 } } }
+    expect(await TH.convexRefusalOf(backend.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putVault, misfit))).to.deep.equal({ kind: 'identity_revoked' })
+    expect(await storedIn(backend)).to.deep.equal(before)
+  })
+
+  it("carries a refusal the classifier throws inside the component across, with its kind, its sentence and the row it tested", async () => {
+    const backend = await seeded()
+    const [record] = TH.gateMoveOf({ ...vault, registered_at: vault.registered_at + 5 }, { passkey_wayin: TH.passkeyWayin })
+    const ask = { ...TH.putVaultArgs(record, vault).ask, ifAbsent: 'fail', ifPresent: 'repl', gateVerb: 'addPasskey' } as const
+    const refusal = await TH.convexRefusalOf(backend.withIdentity({ subject: 'u1' }).mutation(api.safebyok.putVault, { ask }))
+    expect(refusal).to.deep.include({ kind: 'gate_issue', world: vault })
+    expect(refusal).to.have.property('message').that.is.a('string')
   })
 })
 

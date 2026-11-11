@@ -4,8 +4,8 @@ import * as SX from '../../src/shapes/shapes-storage'
 import { VaultError } from '../../src/refusals/errors'
 import { boxActOf, cappedActOf, isBirthAct, isWriteAct, vaultActOf } from '../../src/storage/classifier'
 import type { BoxAct, VaultAct } from '../../src/shapes/shapes-enums'
-import type { BoxRequest, BoxRow, VaultRequest, VaultRow } from '../../src/shapes/shapes-storage'
-import { boxAt, boxFlaws, boxscope, boxscopeOf, vaultAt, vaultFlaws, vaultScope } from '../test-helpers/storage-world'
+import type { BoxAsk, BoxRow, VaultAsk, VaultRow } from '../../src/shapes/shapes-storage'
+import { boxAt, boxFlaws, boxQuery, boxscope, boxscopeOf, vaultAt, vaultFlaws, vaultScope } from '../test-helpers/storage-world'
 
 // The stored row every comparison is made against stands at this seq, so a request can cite one below it and one above.
 const Seq = 5
@@ -20,6 +20,9 @@ type Meta = Readonly<{ revision_tok: string, revision_seq: number, am: EX.Am, va
 
 const ExpectedSeqs = { birth: SX.VoidRevisionSeq, stale: Seq - 1, eq: Seq, ahead: Seq + 2 } as const
 const Repl: Policies = { ifAbsent: 'add', ifPresent: 'repl' }
+
+const noVaultYet = SX.sentinelVaultOf(vaultScope)
+const noBoxYet   = SX.sentinelBoxOf(boxscope, 'life1')
 
 const liveVault = vaultAt(Seq)
 function goneVaultOf(lifeTok: string) { return SX.vaultTombstone.parse({ ...SX.vaultSparse.parse(vaultAt(Seq, lifeTok)), am: 'x' }) }
@@ -47,12 +50,12 @@ const boxProposed   = (expected: Meta, revision_tok: string) => ({ revision_tok,
 const BoxLevel: Level = {
   rows:   { void: null, gone: goneBox, live: liveBox },
   metaOf: (row) => ((row === null) ? sentinelMeta : { ...SX.rowMeta.parse(row), lifeTok: (row as BoxRow).box_tok }),
-  getAct: (ifAbsent, stored) => boxActOf({ op: 'get', ifAbsent, ...boxscope, vault_tok: 'life1' }, liveVault, BoxLevel.rows[stored]),
+  getAct: (ifAbsent, stored) => boxActOf({ op: 'get', ...boxQuery, ifAbsent, expected: noBoxYet }, liveVault, BoxLevel.rows[stored]),
   putAct: (expected, proposedTok, policies, stored) => boxActOf({
-    op: 'put', ...policies, expected: boxExpectedOf(expected), record: { ...liveBox, ...boxProposed(expected, proposedTok), box_tok: lifeTokOver(expected) },
+    op: 'put', ...boxQuery, ...policies, expected: boxExpectedOf(expected), record: { ...liveBox, ...boxProposed(expected, proposedTok), box_tok: lifeTokOver(expected) },
   }, liveVault, BoxLevel.rows[stored]),
   delAct: (expected, proposedTok, stored) => boxActOf({
-    op: 'del', expected: boxExpectedOf(expected), record: { ...goneBox, ...boxProposed(expected, proposedTok), box_tok: expected.lifeTok },
+    op: 'del', ...boxQuery, expected: boxExpectedOf(expected), record: { ...goneBox, ...boxProposed(expected, proposedTok), box_tok: 'lifeended' },
   }, liveVault, BoxLevel.rows[stored]),
 }
 
@@ -61,12 +64,12 @@ const vaultExpectedOf = ({ lifeTok, ...meta }: Meta) => ({ ...meta, vault_tok: l
 const VaultLevel: Level = {
   rows:   { void: null, gone: goneVault, live: liveVault },
   metaOf: (row) => ((row === null) ? { ...sentinelMeta, vault_tok: SX.VoidLifeTok } : { ...SX.rowMeta.parse(row), lifeTok: row.vault_tok }),
-  getAct: (ifAbsent, stored) => vaultActOf({ op: 'get', ifAbsent, ...vaultScope }, VaultLevel.rows[stored]),
+  getAct: (ifAbsent, stored) => vaultActOf({ op: 'get', ...vaultScope, ifAbsent, expected: noVaultYet }, VaultLevel.rows[stored]),
   putAct: (expected, proposedTok, policies, stored) => vaultActOf({
-    op: 'put', ...policies, expected: vaultExpectedOf(expected), record: { ...liveVault, ...boxProposed(expected, proposedTok), vault_tok: lifeTokOver(expected) },
+    op: 'put', ...vaultScope, ...policies, expected: vaultExpectedOf(expected), record: { ...liveVault, ...boxProposed(expected, proposedTok), vault_tok: lifeTokOver(expected) },
   }, VaultLevel.rows[stored]),
   delAct: (expected, proposedTok, stored) => vaultActOf({
-    op: 'del', expected: vaultExpectedOf(expected), record: { ...goneVault, ...boxProposed(expected, proposedTok), vault_tok: expected.lifeTok },
+    op: 'del', ...vaultScope, expected: vaultExpectedOf(expected), record: { ...goneVault, ...boxProposed(expected, proposedTok), vault_tok: 'lifeended' },
   }, VaultLevel.rows[stored]),
 }
 
@@ -245,8 +248,8 @@ describe("the whole table of a put, a del and a get, cell by cell", () => {
 })
 
 describe("boxActOf, its vault", () => {
-  const get: BoxRequest = { op: 'get', ifAbsent: 'nil', ...boxscope, vault_tok: 'life1' }
-  const put: BoxRequest = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: SX.sentinelBoxOf(boxscope, 'life1'), record: boxAt(0) }
+  const get: BoxAsk = { op: 'get', ...boxQuery, ifAbsent: 'nil', expected: noBoxYet }
+  const put: BoxAsk = { op: 'put', ...boxQuery, ifAbsent: 'add', ifPresent: 'repl', expected: noBoxYet, record: boxAt(0) }
   const garbled = { smuggled: 'field' }
   const VaultCases = [
     [null,                  "vault_void",   'no vault row'],
@@ -271,9 +274,9 @@ const damagedRowOf = (classify: () => unknown): VaultError => {
 }
 
 describe("boxActOf and vaultActOf, a row that fails its checks", () => {
-  const get: BoxRequest = { op: 'get', ifAbsent: 'nil', ...boxscope, vault_tok: 'life1' }
-  const put: BoxRequest = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: SX.sentinelBoxOf(boxscope, 'life1'), record: boxAt(0) }
-  const vaultGet: VaultRequest = { op: 'get', ifAbsent: 'nil', ...vaultScope }
+  const get: BoxAsk = { op: 'get', ...boxQuery, ifAbsent: 'nil', expected: noBoxYet }
+  const put: BoxAsk = { op: 'put', ...boxQuery, ifAbsent: 'add', ifPresent: 'repl', expected: noBoxYet, record: boxAt(0) }
+  const vaultGet: VaultAsk = { op: 'get', ...vaultScope, ifAbsent: 'nil', expected: noVaultYet }
   it.each(boxFlaws)("refuses damaged_row for a box row with %s", (_flawname, flawOf) => {
     expect(() => boxActOf(get, liveVault, flawOf(liveBox))).to.throw(VaultError).with.property('refusalkind', 'damaged_row')
     expect(() => boxActOf(put, liveVault, flawOf(liveBox))).to.throw(VaultError).with.property('refusalkind', 'damaged_row')
@@ -300,8 +303,8 @@ describe("boxActOf and vaultActOf, a row that fails its checks", () => {
 })
 
 describe("boxActOf and vaultActOf, a row no working store could answer", () => {
-  const get: BoxRequest = { op: 'get', ifAbsent: 'nil', ...boxscope, vault_tok: 'life1' }
-  const vaultGet: VaultRequest = { op: 'get', ifAbsent: 'nil', ...vaultScope }
+  const get: BoxAsk = { op: 'get', ...boxQuery, ifAbsent: 'nil', expected: noBoxYet }
+  const vaultGet: VaultAsk = { op: 'get', ...vaultScope, ifAbsent: 'nil', expected: noVaultYet }
   const elsewhere = boxscopeOf('anthropic')
 
   it("refuses storage_issue for a sound box row filed under another scope, or another life of its vault", () => {
@@ -325,18 +328,17 @@ describe("boxActOf and vaultActOf, a row no working store could answer", () => {
 const roomOf = (used: number) => ({ boxes: { used, max: 3 }, bytes: { used: 0, max: 1000 } })
 
 describe("cappedActOf, the soft cap on a vault's boxes", () => {
-  it("answers vault_full for an act that would add a live box to a vault at its cap", () => {
+  it("answers vault_full for a born in a vault at its cap", () => {
     expect(cappedActOf('born', roomOf(3))).to.eq('vault_full')
-    expect(cappedActOf('reborn', roomOf(4))).to.eq('vault_full')
+    expect(cappedActOf('born', roomOf(4))).to.eq('vault_full')
   })
 
-  it("answers the act itself where the vault has room", () => {
+  it("answers born where the vault has room", () => {
     expect(cappedActOf('born', roomOf(2))).to.eq('born')
-    expect(cappedActOf('reborn', roomOf(0))).to.eq('reborn')
   })
 
-  it("answers the act itself, whatever the room, where it adds no live box", () => {
-    for (const act of ['replaced', 'deleted', 'gotlive', 'passed', 'stale'] as const) { expect(cappedActOf(act, roomOf(9))).to.eq(act) }
+  it("answers the act itself, whatever the room, where it adds no box row", () => {
+    for (const act of ['reborn', 'replaced', 'deleted', 'gotlive', 'passed', 'stale'] as const) { expect(cappedActOf(act, roomOf(9))).to.eq(act) }
   })
 
   it("refuses a capacity that fails its check", () => {
@@ -353,15 +355,15 @@ describe("isBirthAct", () => {
 
 describe("boxActOf and vaultActOf, a request that fails its check", () => {
   it("refuses, storing and classifying nothing", () => {
-    const seqSkipped: BoxRequest = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: SX.sentinelBoxOf(boxscope, 'life1'), record: boxAt(3) }
+    const seqSkipped: BoxAsk = { op: 'put', ...boxQuery, ifAbsent: 'add', ifPresent: 'repl', expected: noBoxYet, record: boxAt(3) }
     expect(() => boxActOf(seqSkipped, liveVault, null)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
-    const noPolicy = { op: 'get', ...vaultScope } as unknown as VaultRequest
+    const noPolicy = { op: 'get', ...vaultScope } as unknown as VaultAsk
     expect(() => vaultActOf(noPolicy, null)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
   })
 })
 
 describe("boxActOf, one box through a run of requests", () => {
-  type Write = Extract<BoxRequest, { op: 'put' | 'del' }>
+  type Write = Extract<BoxAsk, { op: 'put' | 'del' }>
   // A row as a request carries it: the record it would store, which is the row stored once it has.
   type Row = Write['record']
   type Run = Readonly<{ stored: Row | null, versions: readonly Row[], sent: readonly Write[], wrote: ReadonlySet<Write> }>
@@ -370,11 +372,11 @@ describe("boxActOf, one box through a run of requests", () => {
   const mint = (stem: string): string => { minted += 1; return `${stem}${String(minted)}` }
 
   const putCiting = (expected: Row, policies: Policies): Write => ({
-    op: 'put', ...policies, expected,
+    op: 'put', ...boxQuery, ...policies, expected,
     record: { ...liveBox, revision_tok: mint('rev'), revision_seq: expected.revision_seq + 1, box_tok: (expected.am === 'a') ? expected.box_tok : mint('life') },
   })
   const delCiting = (expected: Row): Write => ({
-    op: 'del', expected, record: { ...goneBox, revision_tok: mint('rev'), revision_seq: expected.revision_seq + 1, box_tok: expected.box_tok },
+    op: 'del', ...boxQuery, expected, record: { ...goneBox, revision_tok: mint('rev'), revision_seq: expected.revision_seq + 1, box_tok: mint('life') },
   })
 
   /** Every request worth sending next: a put or del citing nothing, the row stored or the one before it, and each request sent before, again. */
@@ -394,7 +396,7 @@ describe("boxActOf, one box through a run of requests", () => {
     expect(request.record.revision_seq, 'a write is one seq past the row it replaces').to.eq((run.stored?.revision_seq ?? SX.VoidRevisionSeq) + 1)
     expect(run.versions.map((version) => version.revision_tok), 'no revision_tok is stored twice').not.to.include(request.record.revision_tok)
     const isNewLife = (request.record.box_tok !== run.stored?.box_tok)
-    expect(isNewLife, 'a life begins at a birth and at nothing else').to.eq((act === 'born') || (act === 'reborn'))
+    expect(isNewLife, 'a life tok is new at a birth and at a delete, and kept by a replace').to.eq(act !== 'replaced')
     return { stored: request.record, versions: [...run.versions, request.record], sent, wrote: new Set([...run.wrote, request]) }
   }
 

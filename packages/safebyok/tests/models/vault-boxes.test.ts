@@ -60,10 +60,11 @@ describe("vault.hello", () => {
     const { openNextSession, vault } = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
     const next = await openNextSession()
     await delTyping(vault)
-    await TH.expectRefusal(next.hello())
+    await TH.expectRefusal(next.hello(), 'absent_vault')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
-    expect(next.isPresent).to.be.false
+    expect(next.isEnabled).to.be.false
     expect(next.boxListing.things).to.deep.equal([])
+    expect(next.listing.at(next.scope)?.isPresent).to.be.false
   })
 
   it("passes a listing's failure up, and the next hello lists the boxes", async () => {
@@ -233,10 +234,18 @@ describe("vault.delBox", () => {
     await expect(dead?.extractWhisper()).rejects.toThrow()
   })
 
-  it("resolves null for nothing stored, deleting nothing", async () => {
+  it("refuses 'absent_box' for nothing stored, deleting nothing", async () => {
     const { vault, boxrows } = await makeWorld()
-    expect(await vault.delBox(boxlabel)).to.be.null
+    await TH.expectRefusal(vault.delBox(boxlabel), 'absent_box')
     expect(boxrows.has(boxlabel)).to.be.false
+  })
+
+  it("refuses 'absent_box' for a box already deleted, its tombstone left as it was", async () => {
+    const { vault, boxrows } = await makeWorldWithBox()
+    await vault.delBox(boxlabel)
+    const tombstone = boxrows.get(boxlabel)
+    await TH.expectRefusal(vault.delBox(boxlabel), 'absent_box')
+    expect(boxrows.get(boxlabel)).to.deep.equal(tombstone)
   })
 
   it("refuses a boxlabel that fails its check", async () => {

@@ -14,7 +14,7 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     const { vault, boxrows, tryPutBox } = await makeWorld()
     const box = await vault.putBox({ boxlabel, whisper: Whisper, sidecar: Sidecar })
     expect(tryPutBox).toHaveBeenCalledOnce()
-    expect(tryPutBox.mock.calls[0]?.[1]).to.deep.include({ prior: SX.VoidRevision })
+    expect(tryPutBox.mock.calls[0]?.[0]).to.deep.include({ expected: SX.sentinelBoxOf({ ...vault.scope, boxlabel }, vault.vault_tok) })
     expect(box.isPresent).to.be.true
     expect(box.sidecar).to.deep.equal(Sidecar)
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
@@ -166,12 +166,14 @@ describe("a void instance, then a put: no hello, no fetch", () => {
     expect(tryGetBox).not.toHaveBeenCalled()
   })
 
-  it("refuses under ifPresent 'fail' over a stored row, leaving the row as it was", async () => {
+  it("refuses under ifPresent 'fail' over a stored row, as stale until the row is listed and as camped from then on, leaving the row as it was", async () => {
     const { next, box, boxrows } = await nextUnlisted()
     const before = boxrows.get(boxlabel)
-    await TH.expectRefusal(next.putBox({ boxlabel, whisper: { apiKey: 'sk-test-0001' } }, { ifPresent: 'fail' }), 'camped')
+    await TH.expectRefusal(next.putBox({ boxlabel, whisper: { apiKey: 'sk-test-0001' } }, { ifPresent: 'fail' }), 'stale_write')
     expect(boxrows.get(boxlabel)).to.deep.equal(before)
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.revision_seq).to.eq(box.revision_seq)
+    await TH.expectRefusal(next.putBox({ boxlabel, whisper: { apiKey: 'sk-test-0001' } }, { ifPresent: 'fail' }), 'camped')
+    expect(boxrows.get(boxlabel)).to.deep.equal(before)
   })
 
   it("over a box deleted, comes back on a plain put at the next seq, under a new box_tok", async () => {
@@ -243,13 +245,14 @@ describe("vault.putBox over a live box", () => {
     expect(box.revision_seq).to.eq(reborn?.revision_seq)
   })
 
-  it("under ifAbsent 'fail' over a box deleted elsewhere, refuses 'absent_box' with the tombstone delivered", async () => {
+  it("under ifAbsent 'fail' over a box deleted elsewhere, refuses 'stale_write' with the tombstone delivered, and 'absent_box' from then on", async () => {
     const { next, box } = await nextUnlisted()
     const elsewhere = await next.getBox(boxlabel)
     const deleted = await elsewhere?.del(elsewhere.scope)
-    await TH.expectRefusal(box.put({ whisper: Whisper }, { ifAbsent: 'fail' }), 'absent_box')
+    await TH.expectRefusal(box.put({ whisper: Whisper }, { ifAbsent: 'fail' }), 'stale_write')
     expect(box.isPresent).to.eq(false)
     expect(box.revision_seq).to.eq(deleted?.revision_seq)
+    await TH.expectRefusal(box.put({ whisper: Whisper }, { ifAbsent: 'fail' }), 'absent_box')
   })
 
   const IfPresentCases = [

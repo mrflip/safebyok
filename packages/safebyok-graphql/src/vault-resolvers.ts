@@ -14,16 +14,16 @@ export type VaultResolversOpts<ContextT> = {
 /** Each root field's arguments, as GraphQL coerced them, keyed by the field's name. */
 export type VaultFieldArgs = {
   safebyokListVaults:        DB.BankScope
-  safebyokGetVault:          DB.VaultScope & { opts?: DB.IfAbsentOpts | null }
+  safebyokGetVault:          { ask: DB.VaultGetAsk }
   safebyokListBoxes:         DB.VaultQuery
-  safebyokGetBox:            DB.BoxQuery & { opts?: DB.IfAbsentOpts | null }
-  safebyokPutVault:          { record: DB.VaultRecord, opts: DB.PutOpts }
-  safebyokPutBox:            { record: DB.BoxRecord, opts: DB.PutOpts }
+  safebyokGetBox:            { ask: DB.BoxGetAsk }
+  safebyokPutVault:          { ask: DB.VaultPutAsk }
+  safebyokPutBox:            { ask: DB.BoxPutAsk }
   safebyokReplacePassphrase: { record: DB.VaultRecord, opts: DB.GateVerbOpts }
   safebyokAddPasskey:        { record: DB.VaultRecord, opts: DB.GateVerbOpts }
   safebyokRevokePasskey:     { record: DB.VaultRecord, opts: DB.GateVerbOpts }
-  safebyokDelBox:            { tombstone: DB.BoxTombstone, opts: DB.DelOpts }
-  safebyokDelVault:          { tombstone: DB.VaultTombstone, opts: DB.DelOpts }
+  safebyokDelBox:            { ask: DB.BoxDelAsk }
+  safebyokDelVault:          { ask: DB.VaultDelAsk }
   safebyokTidyGone:          DB.BankScope
   safebyokWatch:             DB.BankScope & { vaultlabel?: string | null }
 }
@@ -107,7 +107,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   const served = async (context: ContextT, user_id: string, asked: object, verb: () => Promise<DB.Answer<unknown, string, unknown>>): Promise<CrossingAnswer> => {
     const refusal = await gateRefusalOf(context, user_id)
     if (refusal === null) { return crossingOf(await verb()) }
-    const checked = await DB.outcomeOf(() => DB.reqParams.parse(asked))
+    const checked = await DB.outcomeOf(() => DB.reqParamsOf(asked))
     if (! checked.ok) { return crossingOf(DB.badAnswerOf(checked.err)) }
     return crossingOf({ ok: false, err: refusal, act: refusal.refusalkind, world: null, req_params: checked.val })
   }
@@ -148,18 +148,18 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     SafebyokRow:         { __resolveType: typenameOf },
     Query: {
       safebyokListVaults: async (_parent, scope, context) => await served(context, scope.user_id, scope, async () => await vaultDB.tryListVaults(scope)),
-      safebyokGetVault:   async (_parent, { opts, ...scope }, context) => await served(context, scope.user_id, scope, async () => await vaultDB.tryGetVault(scope, opts ?? undefined)),
+      safebyokGetVault:   async (_parent, { ask }, context) => await served(context, ask.user_id, ask, async () => await vaultDB.tryGetVault(ask)),
       safebyokListBoxes:  async (_parent, asked, context) => await served(context, asked.user_id, asked, async () => await vaultDB.tryListBoxes(asked)),
-      safebyokGetBox:     async (_parent, { opts, ...asked }, context) => await served(context, asked.user_id, asked, async () => await vaultDB.tryGetBox(asked, opts ?? undefined)),
+      safebyokGetBox:     async (_parent, { ask }, context) => await served(context, ask.user_id, ask, async () => await vaultDB.tryGetBox(ask)),
     },
     Mutation: {
-      safebyokPutVault:          async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryPutVault(record, opts)),
-      safebyokPutBox:            async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryPutBox(record, opts)),
+      safebyokPutVault:          async (_parent, { ask }, context) => await served(context, ask.user_id, ask, async () => await vaultDB.tryPutVault(ask)),
+      safebyokPutBox:            async (_parent, { ask }, context) => await served(context, ask.user_id, ask, async () => await vaultDB.tryPutBox(ask)),
       safebyokReplacePassphrase: async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryReplacePassphrase(record, opts)),
       safebyokAddPasskey:        async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryAddPasskey(record, opts)),
       safebyokRevokePasskey:     async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryRevokePasskey(record, opts)),
-      safebyokDelBox:            async (_parent, { tombstone, opts }, context) => await served(context, tombstone.user_id, { ...tombstone, ...opts }, async () => await vaultDB.tryDelBox(tombstone, opts)),
-      safebyokDelVault:          async (_parent, { tombstone, opts }, context) => await served(context, tombstone.user_id, { ...tombstone, ...opts }, async () => await vaultDB.tryDelVault(tombstone, opts)),
+      safebyokDelBox:            async (_parent, { ask }, context) => await served(context, ask.user_id, ask, async () => await vaultDB.tryDelBox(ask)),
+      safebyokDelVault:          async (_parent, { ask }, context) => await served(context, ask.user_id, ask, async () => await vaultDB.tryDelVault(ask)),
       safebyokTidyGone:          async (_parent, scope, context) => await served(context, scope.user_id, scope, async () => await vaultDB.tryTidyGone(scope)),
     },
     Subscription: {

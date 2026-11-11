@@ -29,7 +29,6 @@ TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
     makeCappedVaultDB:    async (maxBoxes) => remembered(await TH.freshVaultDB(getDb(), { maxBoxes }), { maxBoxes }),
     makeTwin:             async (vaultDB) => await TH.vaultDBOver(getDb(), optsOf.get(vaultDB)),
     _cheat_rowsOf:        () => TH.rowsOf(getDb()),
-    boxNoticesCarryVault: false,
   })
 
   it("hears what another server puts, a box too large for a notice included", async () => {
@@ -39,8 +38,8 @@ TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
     const vault = TH.vaultAt()
     const box = TH.boxAt(0, 'life1', { sidecar: { padding: 'x'.repeat(9000) } })
 
-    await other.putVault(vault, { prior: DB.VoidRevision })
-    await other.putBox(box, { prior: DB.VoidRevision })
+    await other.putVault(TH.vaultPutAskOf(vault))
+    await other.putBox(TH.boxPutAskOf(box))
 
     await vi.waitFor(() => { expect(notices).to.have.lengthOf(2) })
     expect(notices.map(({ act, val }) => [act, val])).to.deep.equal([['got', vault], ['got', box]])
@@ -53,7 +52,7 @@ TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
     await TH.aWhile()  // a watch's first LISTEN races the writes made just after it
     const vault = TH.vaultAt(0, 'life1', { user_id })
     const other = await TH.vaultDBOver(db)
-    await other.putVault(vault, { prior: DB.VoidRevision })
+    await other.putVault(TH.vaultPutAskOf(vault))
     await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'got', val: vault, world: vault }]) })
   })
 })

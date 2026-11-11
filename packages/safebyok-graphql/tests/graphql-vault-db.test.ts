@@ -21,17 +21,16 @@ describe("GraphQLVaultDB over the typed schema", () => {
     },
     _cheat_rowsOf:        () => TH.rowsOf(),
     _cheat_failNextCall:  (vaultDB) => { vaultDB.failNext() },
-    _cheat_adapterOf:       TH.adapterOf,
-    boxNoticesCarryVault: false,
+    _cheat_adapterOf:     TH.adapterOf,
   })
 
   it("keeps a sidecar's own __typename while dropping the ones urql's cache adds", async () => {
     const vaultDB = await TH.makeVaultDB()
-    await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+    await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
     const sidecar = { __typename: 'Recipe', nested: { __typename: 'Step' } }
-    await vaultDB.putBox(TH.boxAt(0, 'life1', { sidecar }), { prior: DB.VoidRevision })
-    const { val, world } = await vaultDB.getBox(TH.boxQuery)
-    expect(val?.sidecar).to.deep.eq(sidecar)
+    await vaultDB.putBox(TH.boxPutAskOf(TH.boxAt(0, 'life1', { sidecar })))
+    const { val, world } = await vaultDB.getBox(TH.boxGetAskOf())
+    expect(val).to.have.deep.property('sidecar', sidecar)
     expect(world).to.deep.eq(TH.vaultAt())
   })
 })
@@ -95,19 +94,20 @@ describe("GraphQLVaultDB's answers off the wire", () => {
   it("refuses a GraphQL error with no cause", async () => {
     const combined = new CombinedError({ graphQLErrors: [new GraphQLError('Cannot query field "safebyokGetVault" on type "Query".')] })
     const { vaultDB } = fakeClient({ error: combined })
-    const answer = await vaultDB.tryGetVault(TH.vaultScope)
-    expect(answer).to.deep.include({ ok: false, act: 'unexpected_error', world: null, req_params: TH.vaultScope })
+    const answer = await vaultDB.tryGetVault(TH.vaultGetAskOf())
+    expect(answer).to.deep.include({ ok: false, act: 'unexpected_error', world: null })
+    expect(answer.req_params).to.deep.include(TH.vaultScope)
     expect(DB.isVaultError(answer.err, 'unexpected_error')).to.be.true
     expect(answer.err?.cause).to.be.undefined
     expect(answer.err?.meta).to.deep.include({ call: 'getVault' })
-    await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'unexpected_error')
+    await TH.expectRefusal(vaultDB.getVault(TH.vaultGetAskOf()), 'unexpected_error')
   })
 
   it("refuses a failed request with a cause that carries only the error's name, HTTP status and code", async () => {
     const networkError = new Error('{"whisper_ciphered":"the record sent"}', { cause: { code: 'ECONNRESET', detail: 'the record sent' } })
     const combined = new CombinedError({ networkError, response: { status: 502, body: 'the record sent' } })
     const { vaultDB } = fakeClient({ error: combined })
-    const { err } = await vaultDB.tryGetVault(TH.vaultScope)
+    const { err } = await vaultDB.tryGetVault(TH.vaultGetAskOf())
     expect(DB.isVaultError(err, 'storage_unavailable')).to.be.true
     const cause = err?.cause as Error
     expect(cause).not.to.be.instanceOf(CombinedError)
@@ -118,7 +118,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
 
   it("names only the error a request failed on, where it has no status or code", async () => {
     const { vaultDB } = fakeClient({ error: new CombinedError({ networkError: new TypeError('Failed to fetch') }) })
-    const { err } = await vaultDB.tryGetVault(TH.vaultScope)
+    const { err } = await vaultDB.tryGetVault(TH.vaultGetAskOf())
     expect(err?.cause).to.deep.include({ thrownName: 'TypeError', message: 'A request to the GraphQL server failed: TypeError.' })
     expect(err?.cause).not.to.have.any.keys('status', 'code')
   })
@@ -128,9 +128,9 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     await TH.expectRefusal(vaultDB.listVaults(TH.bankScope), 'unexpected_error')
   })
 
-  it("refuses a malformed request before sending it", async () => {
+  it("refuses a malformed ask before sending it", async () => {
     const { vaultDB } = fakeClient({ data: null })
-    await TH.expectRefusal(vaultDB.getVault({ ...TH.vaultScope, vaultlabel: '' }), 'bad_scope')
+    await TH.expectRefusal(vaultDB.getVault({ ...TH.vaultGetAskOf(), vaultlabel: '' }), 'bad_record')
   })
 })
 

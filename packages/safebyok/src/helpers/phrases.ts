@@ -375,7 +375,7 @@ export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed: c
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed: check your package and build settings."
 // --
 
-// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultReborn, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, GateEpochNotNext, OtherWayinMoved, boxTooLarge, VaultFull, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVault, deviceDBFailed, thrownNamed
+// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultReborn, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, GateEpochNotNext, OtherWayinMoved, boxTooLarge, VaultFull, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVault, GateVerbRecordMismatch, RecordOfOtherAddress, deviceDBFailed, thrownNamed
 
 /** A well-formed row out of storage, whose own `fieldnames` are not the address it was asked for at. */
 export const rowOfOtherAddress = (fieldnames: readonly string[]): string => `The vault's storage answered with a row naming another ${fieldnames.join(' and ')} than the one asked for: the database or its storage adapter has filed it under the wrong address.`
@@ -429,10 +429,16 @@ export const RevisionTokNotNew = "A record's revision_tok must be new: neither t
 export const ExpectedHalfVoid = "The revision a write expects is the void row's, tok and seq together, or neither of them."
 
 /** Why a write's record is refused for its life tok: a life begins over a tombstone or nothing, and lasts until it is deleted. */
-export const LifeTokMisplaced = "A record keeps the life tok of the live row it expects, a tombstone keeps its row's, and a record over a tombstone or nothing brings a new one."
+export const LifeTokMisplaced = "A record keeps the life tok of the live row it replaces. A tombstone, and a record over a tombstone or nothing, brings a new one."
 
-/** Why a box's write is refused for the row it expects: both are filed under one life of the vault. */
-export const ExpectedOfOtherVault = "A box's record and the row it expects name the same vault_tok."
+/** Why a box's ask is refused for the row it expects: both are filed under one life of the vault. */
+export const ExpectedOfOtherVault = "A box's ask and the row it expects name the same vault_tok."
+
+/** Why a gate verb's put is refused for its record: `addPasskey` lays a passkey wayin on, and `revokePasskey` takes it off. */
+export const GateVerbRecordMismatch = "addPasskey's record has a passkey wayin, and revokePasskey's has none."
+
+/** Why a put or del is refused for its record: an ask names one address, and its record is the row for it. */
+export const RecordOfOtherAddress = "A put's or del's record is at the address its ask names."
 
 /** A device database's failure in `call`, `named` the sentence naming what it threw, or blank. */
 export const deviceDBFailed = (call: string, named: string): string => `This device's own storage failed in ${call}: try again.${named}`

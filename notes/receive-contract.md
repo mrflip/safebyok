@@ -106,8 +106,9 @@ After preflight, the record is delivered to the receiver. First match wins. The 
 | R2  | `same`  | `same`  | `full` | `sparse`        | `fill`   | has `rcvd`                                                                                       |
 | R3  | `same`  | `same`  | @      | @               | `same`   | as it was                                                                                        |
 | R4  | —       | —       | `none` | `void` · `gone` | `same`   | as it was                                                                                        |
-| R5  | `newer` | `other` | @      | @               | `reborn` | A box has `rcvd`, with its new `box_tok` and `registered_at`. A Vault never meets this row (S2). |
-| R6  | `newer` | `same`  | `gone` | @               | `gone`   | has the tombstone, and has dropped its secrets (L6)                                              |
+| R5  | `newer` | `other` | `gone` | @               | `gone`   | A box has the tombstone, under the tombstone's own `box_tok`, and has dropped its secrets (L6). A Vault never meets this row (S2). |
+| R5  | `newer` | `other` | *live* | @               | `reborn` | A box has `rcvd`, with its new `box_tok` and `registered_at`. A Vault never meets this row (S2). |
+| R6  | `newer` | `same`  | `gone` | `void`          | `gone`   | A stand-in has the tombstone. No other instance meets this row: a tombstone carries a life token of its own. |
 | R7  | `newer` | `same`  | *live* | @               | `adopt`  | has `rcvd`                                                                                       |
 
 Coverage: `rev` has four values. `forked` is F4. `older` is R1, whatever else holds. `same` leaves only pairs of one life that are both gone or both live (F5): R2 is the one that changes anything, and R3 is the rest. `newer` splits on `life`, then on whether `rcvd` is gone, with F7 taken out. `none` has no revision: F6 or R4. A stand-in is `void` in `rcvd`'s life, so it meets R6 or R7.
@@ -125,22 +126,20 @@ A box answer or notice typically carries its vault's row as `world`. The bank's 
 | W3  | a row of this `vault_tok`, older                | @      | R1     | as it was                                                                                                     | the answer's own act |
 | W3  | a row of this `vault_tok`, at the same revision | @      | R2, R3 | as it was, or filled where it was `sparse`                                                                    | the answer's own act |
 | W3  | a live row of this `vault_tok`, newer           | live   | R7     | has the world: a gate changed on another device arrives here                                                  | the answer's own act |
-| W3  | a tombstone of this `vault_tok`, newer          | live   | R6     | The vault locks, forgets its lease and vacates its boxes, the box listing that brought the answer among them. | `vault_gone`         |
 
-W2 is how this device learns from a box answer alone that its vault's life is over. The Vault object of that life is vacated at once, so it never stays unlocked until the vault listing next asks for its own row. A world of another life that is older is R1, and one at the same revision is F5.
+W2 is how this device learns from a box answer alone that its vault's life is over. A vault's tombstone carries a `vault_tok` of its own, so a deletion always arrives as W2, never as a row of this `vault_tok`. The Vault object of that life is vacated at once, so it never stays unlocked until the vault listing next asks for its own row. A world of another life that is older is R1, and one at the same revision is F5.
 
 ## Where this differs from the code today
 
 1. **`fateOver` is S2, and `SlotFate` goes.** `lose` is R1 and `replace` is S2. `Listing.buildOrReceive` keeps selection alone.
-2. **One table, read once.** Today a vault row is judged by `VaultListing.fateOver`, then by `Storable.reconcileCentral`, and the two do not agree: `reconcileCentral` checks `vault_tok` before age, so an older row of another life is dropped at the listing and throws at `Vault.receiveWorld`.
-3. **A box row of another `vault_tok`** is refused `storage_issue` by its listing, as F3 says (`rowOfOtherVaultTok` in `Listing.buildOrReceive`). An instance handed one directly still throws `record_conflict` (`otherVaultTok` in `reconcileCentral`), and a vault reaches that from `Vault.receiveWorld`, where deliverWorld hands the row to the vault listing (W2).
-4. **W2 does not arise today**, because the vaultDB sends no world with `vault_reborn`: the other life's row is in `dbhas`, and the box listing drops it as no row of its own. Run against the memory vaultDB, a `fetchBox` under a vault row of another life answers `vault_reborn`. The answer contract makes that row the world (C12). `Vault.receiveWorld` as it stands would then throw `record_conflict` on it inside `Listing.deliver`, and the caller would hear that in place of the answer's own refusal, which the classifier names `vault_gone` or `vault_reborn`.
+2. **One table, read once.** Today a vault row is judged by `VaultListing.fateOver`, then by `Storable.reconcileCentral`, and the two do not agree: `reconcileCentral` checks `vault_tok` before age, so an older row of another life is dropped at the listing, and would throw at an instance handed it directly.
+3. **A box row of another `vault_tok`** is refused `storage_issue` by its listing, as F3 says (`rowOfOtherVaultTok` in `Listing.buildOrReceive`). An instance handed one directly still throws `record_conflict` (`otherVaultTok` in `reconcileCentral`).
+4. **W1 tells no bad news.** `Vault.receiveWorld` hands the world to the vault listing, so W2 and W3 hold. The sentinel is `older` there and is dropped as R1, where F6 would tell the host.
 5. **F4, F5 and F6** are three throwers and three sentences today (`oneRevisionTwoToks`, `oneRevisionTwoLives`, `oneRevisionTwoFates`).
 6. **F7 is new as a refusal.** Today a vault is replaced there (`isRebirth` in `fateOver`), and a box adopts.
 7. **`shapeUnreconciled` cannot be reached** and goes.
 8. **`none` is a tag**, and what is received for it is the sentinel tombstone. Today `Storable.receive(null)` makes a tombstone at the revision in hand so that `reconcileCentral` has something to compare.
-9. **deliverWorld is `Vault.receiveWorld` today**: the Vault that owns the box listing receives the world itself, with no selection.
-10. **What an answer carries** waits on the classifier's acts. Today `recordOfAnswer` and `Listing#deliverGood` tell the cases apart by the old acts `void`, `declined` and `gone`.
+9. **What an answer carries** waits on the classifier's acts. Today `recordOfAnswer` and `Listing#deliverGood` tell the cases apart by the old acts `void`, `declined` and `gone`.
 
 ## Not in this note
 

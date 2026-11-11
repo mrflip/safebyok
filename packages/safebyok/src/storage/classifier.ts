@@ -1,15 +1,16 @@
 /** Classify a get, put or del against the stored rows, per the tables in `notes/answer-contract.md`. */
 
+import { isEqual } from 'es-toolkit'
 import * as Phrases from '../helpers/phrases'
 import * as Refuse from '../refusals/throwers'
 import * as CX from '../shapes/shapes-core'
 import * as EX from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { VaultScope } from '../shapes/shapes-core'
-import type { BoxAct, BoxVaultAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
-import type { BoxQuery, BoxRequest, BoxRow, BoxSparse, Capacity, Revision, VaultRequest, VaultRow } from '../shapes/shapes-storage'
+import type { BoxAct, BoxVaultAct, OkAct, RefusedAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
+import type { BoxAsk, BoxQuery, BoxRow, BoxSparse, Capacity, Revision, VaultAsk, VaultRecord, VaultRow } from '../shapes/shapes-storage'
 
-// == [Asked and stored]: Meta, Asked, GetAsked, PutAsked, DelAsked, Presence, Stored
+// == [Asked and stored]: Meta, Asked, GetAsked, PutAsked, DelAsked, presenceVals, Presence, Stored
 // Every function below takes what was asked first, and what is stored second.
 
 /** The fields of a row, stored or expected, that the tables compare. */
@@ -22,7 +23,8 @@ type PutAsked = Readonly<{ op: 'put', ifAbsent: EX.PutIfAbsent, ifPresent: EX.If
 type DelAsked = Readonly<{ op: 'del', expected: Meta, record: Revision }>
 
 /** What is stored at a scope: no row, a tombstone, or a live row. */
-type Presence = 'void' | 'gone' | 'live'
+export const presenceVals = ['void', 'gone', 'live'] as const
+export type Presence = typeof presenceVals[number]
 
 /** The row stored at a scope, null where none is, under its {@link Presence}. */
 type Stored<RowT extends Meta = Meta> = Readonly<{ presence: 'void', row: null } | { presence: Exclude<Presence, 'void'>, row: RowT }>
@@ -120,7 +122,7 @@ function rowActOf(asked: Asked, stored: Stored): VaultAct {
 }
 // --
 
-// == [Rows stored]: boxVaultRow, vaultRowAt, boxRowAt, classifyBoxVault
+// == [Rows stored]: boxVaultRow, vaultRowAt, boxRowAt, boxWorldOf, boxVaultActOf
 
 // Both faults of a row are thrown, each with the words of the check that found it. Damaged is a judgment of the row
 // taken alone: it fails its own checks. The row asked for refuses `damaged_row`, and the vault above a box asked for
@@ -145,16 +147,20 @@ function boxRowAt(boxQuery: BoxQuery, boxRaw: unknown): Stored<BoxRow> {
   return { presence: (row.am === 'a') ? 'live' : 'gone', row }
 }
 
+/** The vault row above a box's ask, as stored at its scope: the sentinel row for none. Throws `damaged_vault` for a row that fails its checks. */
+export function boxWorldOf(vaultScope: VaultScope, vaultRaw: unknown): VaultRow {
+  return vaultRowAt(vaultScope, vaultRaw, boxVaultRow).row ?? SX.sentinelVaultOf(vaultScope)
+}
+
 /** The act a box request refuses with for its vault's stored row, or null where the vault is live in the life asked for. */
-function classifyBoxVault(boxQuery: BoxQuery, vaultRaw: unknown): BoxVaultAct | null {
-  const vault = vaultRowAt(boxQuery, vaultRaw, boxVaultRow)
-  if (vault.presence === 'void') { return 'vault_void' }
-  if (vault.presence === 'gone') { return 'vault_gone' }
-  return (vault.row.vault_tok === boxQuery.vault_tok) ? null : 'vault_reborn'
+export function boxVaultActOf({ vault_tok }: Pick<BoxQuery, 'vault_tok'>, world: VaultRow): BoxVaultAct | null {
+  if (world.revision_seq === SX.VoidRevisionSeq) { return 'vault_void' }
+  if (world.am !== 'a')                          { return 'vault_gone' }
+  return (world.vault_tok === vault_tok) ? null : 'vault_reborn'
 }
 // --
 
-// == [Acts]: isWriteAct, isBirthAct, boxActOf, vaultActOf, cappedActOf
+// == [Acts]: isWriteAct, isBirthAct, isOkAct, cappedActOf
 
 /** True when the act tells the caller to store the request's record. */
 export function isWriteAct(act: BoxAct | VaultAct): act is WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
@@ -162,27 +168,139 @@ export function isWriteAct(act: BoxAct | VaultAct): act is WriteAct { return (EX
 /** True when the act creates a row, or re-creates a deleted one. */
 export function isBirthAct(act: BoxAct | VaultAct): boolean { return (act === 'born') || (act === 'reborn') }
 
-/** Classify a box request's outcome, based on its stored vault and box rows. */
-export function boxActOf(request: BoxRequest, vaultRaw: unknown, boxRaw: unknown): BoxAct {
-  const asked    = SX.boxRequest.parse(request)
-  const boxQuery = (asked.op === 'get') ? asked : asked.record
-  const vaultAct = classifyBoxVault(boxQuery, vaultRaw)
-  if (vaultAct !== null) { return vaultAct }
-  const stored   = boxRowAt(boxQuery, boxRaw)
-  return rowActOf(asked, stored)
+/** True when the act is a good answer's: the record was stored, or the row found is answered. */
+export function isOkAct(act: BoxAct | VaultAct): act is OkAct { return isWriteAct(act) || (EX.foundActVals as readonly string[]).includes(act) }
+
+// The cap is soft: `capacity` is a count taken outside any lock, as the write is about to be made. A write already made is never refused for it.
+/** The act, or `vault_full` for a `born` in a vault at its cap: no other act adds a box row to the count. */
+export function cappedActOf(act: BoxAct, capacity: Capacity): BoxAct {
+  const { boxes } = SX.capacity.parse(capacity)
+  return ((act === 'born') && (boxes.used >= boxes.max)) ? 'vault_full' : act
+}
+// --
+
+// == [Gate verbs]: replacePassphraseActOf, addPasskeyActOf, revokePasskeyActOf, GateActOf
+// A gate verb is a put of the vault's record over its live row. Each has tests of its own, of the record against the gate stored:
+// they run here, over the row the adapter fetched in the step that stores the record, and never over a row a caller read earlier.
+// Each answers `replaced` for a record to store, or the act that stops it, and throws `gate_issue` for a record that changes more than its verb does.
+
+function replacePassphraseActOf(record: VaultRecord, stored: VaultRecord): VaultAct {
+  if (stored.registered_at !== record.registered_at)                      { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
+  if (record.gate.gate_epoch !== (stored.gate.gate_epoch + 1))            { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
+  if (! isEqual(record.gate.passkey_wayin, stored.gate.passkey_wayin))    { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
+  return 'replaced'
+}
+
+// `camped`: a passkey wayin is already laid on.
+function addPasskeyActOf(record: VaultRecord, stored: VaultRecord): VaultAct {
+  if (stored.registered_at !== record.registered_at)                           { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
+  if (stored.gate.passkey_wayin !== null)                                      { return 'camped' }
+  if (record.gate.gate_epoch !== (stored.gate.gate_epoch + 1))                 { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
+  if (! isEqual(record.gate.passphrase_wayin, stored.gate.passphrase_wayin))   { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
+  return 'replaced'
+}
+
+// `passed`: there is no passkey wayin to take off, and the row stored is the answer.
+function revokePasskeyActOf(record: VaultRecord, stored: VaultRecord): VaultAct {
+  if (stored.registered_at !== record.registered_at)                           { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
+  if (stored.gate.passkey_wayin === null)                                      { return 'passed' }
+  if (record.gate.gate_epoch !== (stored.gate.gate_epoch + 1))                 { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
+  if (! isEqual(record.gate.passphrase_wayin, stored.gate.passphrase_wayin))   { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
+  return 'replaced'
+}
+
+const GateActOf: Readonly<Record<EX.GateVerb, (record: VaultRecord, stored: VaultRecord) => VaultAct>> = {
+  replacePassphrase: replacePassphraseActOf, addPasskey: addPasskeyActOf, revokePasskey: revokePasskeyActOf,
+}
+// --
+
+// == [Classifying]: VaultFetched, BoxFetched, VaultClassified, BoxClassified, classifyVault, classifyBox, vaultActOf, boxActOf
+// The classifier checks each stored row once, and hands back every part of the answer it has made on the way.
+// A row that fails its checks is thrown, for the vaultDB's handler to tell of.
+
+/** The vault row an adapter fetched for a vault's ask, as stored and unchecked: null for none. */
+export type VaultFetched = { vault: unknown }
+
+/** The rows an adapter fetched for a box's ask, as stored and unchecked: its vault row as `world` and the box row, each null for none, and the vault's room where the adapter gauged it. */
+export type BoxFetched = Readonly<{ world: unknown, box: unknown, capacity?: Capacity | null }>
+
+/** What a vault's ask comes to over the row stored. `ok` is true for a good answer and false for a refusal, and `act` says which. */
+export type VaultClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct }) & {
+  /** The vault row as this ask leaves it: the record it stores, else the row stored, else the sentinel for none. */
+  world:    VaultRow
+  /** A good answer's `val`, or a refusal's `dbhas`: the record this ask stores, else the vault row stored, null for none. */
+  vault:    VaultRow | null
+  /** What was stored at the vault's scope before any write. */
+  presence: Presence
+}>
+
+/** What a box's ask comes to over the vault and box rows stored. `ok` is true for a good answer and false for a refusal, and `act` says which. */
+export type BoxClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct | BoxVaultAct }) & {
+  /** The vault row stored, or the sentinel for none. */
+  world:    VaultRow
+  /** A good answer's `val`, or a refusal's `dbhas`: the record this ask stores, else the box row stored, null for none or where its vault refused. */
+  box:      BoxRow | null
+  /** What was stored at the box's scope before any write; null where its vault refused, and the box row was not judged. */
+  presence: Presence | null
+  /** The vault's room as the adapter gauged it, null where it gauged none. */
+  capacity: Capacity | null
+}>
+
+// The whole of a vault's ask is settled here, top to bottom, as a box's is in `classifyBox`.
+/** What a vault's ask comes to over the row an adapter fetched for it, per the tables of `notes/answer-contract.md`.
+ * Where `isWriteAct` holds of the act, the adapter stores `ask.record`, in the step it fetched the row in.
+ * Throws for a row that fails its checks, or that is not at the scope asked for, and `gate_issue` for a gate verb's record that fails that verb's tests.
+ */
+export function classifyVault(ask: VaultAsk, { vault }: VaultFetched): VaultClassified {
+  const stored   = vaultRowAt(ask, vault, SX.storedVaultRow)
+  const { presence, row } = stored
+  const world    = row ?? SX.sentinelVaultOf(ask)
+  const tabled   = rowActOf(ask, stored)
+
+  // A gate verb's put has tests of its own, of its record against the gate of the live row it would replace.
+  const isGatePut = (ask.op === 'put') && (ask.gateVerb !== undefined) && (tabled === 'replaced') && (row?.am === 'a')
+  const act      = isGatePut ? GateActOf[ask.gateVerb](ask.record, row) : tabled
+
+  if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, world: ask.record, vault: ask.record, presence } }
+  return isOkAct(act) ? { ok: true, act, world, vault: row, presence } : { ok: false, act, world, vault: row, presence }
+}
+
+/** What is stored where `row` is a row or none. */
+function presenceOf(row: Meta | null): Presence {
+  if (row === null) { return 'void' }
+  return (row.am === 'a') ? 'live' : 'gone'
+}
+
+// The whole of a box's ask is settled here, top to bottom: each row fetched is checked once, as it is first read,
+// and past that the rows are sound and typed and are only read.
+/** What a box's ask comes to over the rows an adapter fetched for it, per the tables of `notes/answer-contract.md`.
+ * Throws for a row that fails its checks, or that is not at the address asked for.
+ */
+export function classifyBox(ask: BoxAsk, fetched: BoxFetched): BoxClassified {
+  const world    = boxWorldOf(ask, fetched.world)
+  const capacity = fetched.capacity ?? null
+
+  // The vault first. Under a vault that is not live in the life asked for, the box row is not read, whatever is stored for the box.
+  const vaultAct = boxVaultActOf(ask, world)
+  if (vaultAct !== null) { return { ok: false, act: vaultAct, world, box: null, presence: null, capacity: null } }
+
+  const box      = boxRowAt(ask, fetched.box).row
+  const presence = presenceOf(box)
+  const stored: Stored<BoxRow> = (box === null) ? { presence: 'void', row: null } : { presence: presence as 'live' | 'gone', row: box }
+  const uncapped = rowActOf(ask, stored)
+  const act      = (capacity === null) ? uncapped : cappedActOf(uncapped, capacity)
+  if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, world, box: ask.record, presence, capacity } }
+  return isOkAct(act) ? { ok: true, act, world, box, presence, capacity } : { ok: false, act, world, box, presence, capacity }
 }
 
 /** Classify a vault request's outcome, based on the stored row. */
-export function vaultActOf(request: VaultRequest, vaultRaw: unknown): VaultAct {
-  const asked  = SX.vaultRequest.parse(request)
-  const stored = vaultRowAt((asked.op === 'get') ? asked : asked.record, vaultRaw, SX.storedVaultRow)
-  return rowActOf(asked, stored)
+export function vaultActOf(request: VaultAsk, vaultRaw: unknown): VaultAct {
+  return classifyVault(SX.vaultAsk.parse(request), { vault: vaultRaw }).act
 }
 
-// The cap is soft: `capacity` is a count taken outside any lock, as the write is about to be made. A write already made is never refused for it.
-/** Replace an act that would add a box with `vault_full` when the vault is at its cap. */
-export function cappedActOf(act: BoxAct, capacity: Capacity): BoxAct {
-  const { boxes } = SX.capacity.parse(capacity)
-  return (isBirthAct(act) && (boxes.used >= boxes.max)) ? 'vault_full' : act
+/** Classify a box request's outcome, based on its stored vault and box rows. */
+export function boxActOf(request: BoxAsk, vaultRaw: unknown, boxRaw: unknown): BoxAct {
+  const ask = SX.boxAsk.parse(request)
+  return classifyBox(ask, { world: vaultRaw, box: boxRaw }).act
 }
 // --
