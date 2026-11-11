@@ -5,7 +5,7 @@ import * as SX from '../../src/shapes/shapes-storage'
 import type { VaultDB } from '../../src/storage/vault-db'
 import { omitting } from './refusals'
 import {
-  vaultScope, boxscope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, boxFlaws, vaultFlaws, ExtraFieldFlaw, vaultTombstoneOf, boxTombstoneOf, gateMoveOf,
+  vaultScope, boxscope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, boxFlaws, vaultFlaws, LaterFmtFlaw, vaultTombstoneOf, boxTombstoneOf, gateMoveOf, vaultDamageFor,
   vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf, boxDelAskOf,
 } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
@@ -64,7 +64,7 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped, plant
   }
 
   /** True for a flaw this VaultDB's storage cannot be planted with. */
-  const isUnplantable = (flawname: string): boolean => (! plantsAnyRow) && (flawname === ExtraFieldFlaw)
+  const isUnplantable = (flawname: string): boolean => (! plantsAnyRow) && (flawname !== LaterFmtFlaw)
 
   /** The box row `openai` of the vault's life `life1`, as stored. */
   const storedBoxOf = async (vaultDB: VaultDB): Promise<unknown> => {
@@ -418,7 +418,7 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped, plant
   describe("box writes under a vault row failing its checks", () => {
     it("refuse and change nothing, whether the row is damaged or of a later fmt", async () => {
       const { vaultDB, vault } = await putWith({ box: true })
-      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, gate: 'rubble' })
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...vaultDamageFor(plantsAnyRow).damage })
       expect(await vaultDB.tryPutBox(boxPutAskOf(nextBox, box))).to.deep.include({ ok: false, act: 'damaged_vault' })
       expect(await vaultDB.tryDelBox(boxDelAskOf(box))).to.deep.include({ ok: false, act: 'damaged_vault' })
       const otherBox = boxAt(0, 'life1', { boxlabel: 'other' })

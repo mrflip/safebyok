@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, describe } from 'vitest'
 import { Client, Pool, escapeIdentifier } from 'pg'
 import type { Boxscope, VaultScope } from 'safebyok/storage'
 import * as TH from 'safebyok/testing'
-import { PostgresVaultDB, VaultTablesSql, pgClientOf, vaultChannelOf } from 'safebyok-postgres'
+import { PostgresVaultDB, VaultFunctionsSql, VaultTablesSql, pgClientOf, vaultChannelOf } from 'safebyok-postgres'
 import type { PostgresListen, PostgresVaultDBOpts } from 'safebyok-postgres'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
@@ -100,6 +100,7 @@ export const useFileDatabase = (): (() => FileDatabase) => {
       }
     }
     await host.query(VaultTablesSql)
+    await host.query(VaultFunctionsSql)
     const devices: { end: () => Promise<void> }[] = []
     made.db = {
       host,
@@ -180,25 +181,52 @@ export const freshVaultDB = async (db: FileDatabase, opts: VaultDBOverOpts = {})
 }
 // --
 
-// == [Rows]: rowsOf
+// == [Rows]: recordOf, rowsOf
 
-/** The battery's backdoor to the rows in `db`, by SQL on the host's pool. */
+/** The record a table row was stored from: each column a field, a null column left out. */
+const recordOf = (row: Record<string, unknown>): Record<string, unknown> => (
+  Object.fromEntries(Object.entries(row).filter(([, val]) => val !== null))
+)
+
+// A vault row is planted by an upsert, never a delete and an insert: deleting a vault row deletes its box rows.
+const PlantVaultSql = `
+  INSERT INTO safebyok_vaults
+  SELECT * FROM jsonb_populate_record(NULL::safebyok_vaults, $4::text::jsonb || jsonb_build_object('applabel', $1::text, 'user_id', $2::text, 'vaultlabel', $3::text))
+  ON CONFLICT (applabel, user_id, vaultlabel)
+  DO UPDATE SET (fmt, am, revision_tok, revision_seq, registered_at, written_at, vault_tok, gate)
+    = (EXCLUDED.fmt, EXCLUDED.am, EXCLUDED.revision_tok, EXCLUDED.revision_seq, EXCLUDED.registered_at, EXCLUDED.written_at, EXCLUDED.vault_tok, EXCLUDED.gate)
+`
+const UnplantBoxSql = 'DELETE FROM safebyok_boxes WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3 AND vault_tok = $4 AND boxlabel = $5'
+const PlantBoxSql = `
+  INSERT INTO safebyok_boxes
+  SELECT * FROM jsonb_populate_record(NULL::safebyok_boxes, $6::text::jsonb
+    || jsonb_build_object('applabel', $1::text, 'user_id', $2::text, 'vaultlabel', $3::text, 'vault_tok', $4::text, 'boxlabel', $5::text))
+`
+
+/** The battery's backdoor to the rows in `db`, by SQL on the host's pool.
+ * A planted row's address is the scope's, whatever the row names, and a field with no column is dropped.
+ * The tables refuse a row failing its checks, a row of a later fmt excepted, and a box row with no vault row at its scope.
+ */
 export const rowsOf = (db: FileDatabase): TH.VaultDBRowCheats => ({
   plantVaultRow: async ({ applabel, user_id, vaultlabel }: VaultScope, row: unknown) => {
-    await db.host.query(`INSERT INTO safebyok_vaults VALUES ($1, $2, $3, $4::text::jsonb)
-      ON CONFLICT (applabel, user_id, vaultlabel) DO UPDATE SET vault = EXCLUDED.vault`, [applabel, user_id, vaultlabel, JSON.stringify(row)])
+    await db.host.query(PlantVaultSql, [applabel, user_id, vaultlabel, JSON.stringify(row)])
   },
   plantBoxRow: async ({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string, row: unknown) => {
-    await db.host.query(`INSERT INTO safebyok_boxes VALUES ($1, $2, $3, $4, $5, $6::text::jsonb)
-      ON CONFLICT (applabel, user_id, vaultlabel, vault_tok, boxlabel) DO UPDATE SET box = EXCLUDED.box`, [applabel, user_id, vaultlabel, vault_tok, boxlabel, JSON.stringify(row)])
+    const address = [applabel, user_id, vaultlabel, vault_tok, boxlabel]
+    await db.host.query(UnplantBoxSql, address)
+    await db.host.query(PlantBoxSql, [...address, JSON.stringify(row)])
   },
   vaultRowOf: async ({ applabel, user_id, vaultlabel }: VaultScope) => {
-    const { rows } = await db.host.query<{ vault: unknown }>('SELECT vault FROM safebyok_vaults WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3', [applabel, user_id, vaultlabel])
-    return rows[0]?.vault ?? null
+    const { rows } = await db.host.query<{ vault: Record<string, unknown> }>(
+      'SELECT to_jsonb(stored) AS vault FROM safebyok_vaults AS stored WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3', [applabel, user_id, vaultlabel],
+    )
+    return (rows[0] === undefined) ? null : recordOf(rows[0].vault)
   },
   boxRowsOf: async ({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string) => {
-    const { rows } = await db.host.query<{ boxlabel: string, box: unknown }>('SELECT boxlabel, box FROM safebyok_boxes WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3 AND vault_tok = $4', [applabel, user_id, vaultlabel, vault_tok])
-    return new Map(rows.map(({ boxlabel, box }) => [boxlabel, box]))
+    const { rows } = await db.host.query<{ boxlabel: string, box: Record<string, unknown> }>(
+      'SELECT boxlabel, to_jsonb(stored) AS box FROM safebyok_boxes AS stored WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3 AND vault_tok = $4', [applabel, user_id, vaultlabel, vault_tok],
+    )
+    return new Map(rows.map(({ boxlabel, box }) => [boxlabel, recordOf(box)]))
   },
 })
 // --

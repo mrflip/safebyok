@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import * as SX from '../../src/shapes/shapes-storage'
 import {
-  bankScope, vaultScope, boxscope, vaultScopeOf, vaultAt, boxAt, boxFlaws, vaultFlaws, ExtraFieldFlaw, vaultTombstoneOf, boxTombstoneOf, boxQuery,
+  bankScope, vaultScope, boxscope, vaultScopeOf, vaultAt, boxAt, boxFlaws, vaultFlaws, LaterFmtFlaw, vaultTombstoneOf, boxTombstoneOf, boxQuery,
   boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf, boxDelAskOf,
 } from './storage-world'
 import type { VaultDB } from '../../src/storage/vault-db'
@@ -15,7 +15,7 @@ const Rival = { revision_tok: 'rival' }
 const noVaultYet = SX.sentinelVaultOf(vaultScope)
 const noBoxYet   = SX.sentinelBoxOf(boxscope, 'life1')
 
-/** Flaws a vault row may have that leave its boxes' life in doubt, each one any storage can hold. */
+/** Flaws a vault row may have that leave its boxes' life in doubt. */
 const VaultRowsInDoubt = [
   ['of a later fmt',                    { fmt: SX.VaultFormat + 1 }],
   ['that reads as a tombstone',         { am: 'x' }],
@@ -31,7 +31,7 @@ export const describeDels = ({ putWith, rowsOf, plantsAnyRow }: BatteryWorld): v
   }
 
   /** True for a flaw this VaultDB's storage cannot be planted with. */
-  const isUnplantable = (flawname: string): boolean => (! plantsAnyRow) && (flawname === ExtraFieldFlaw)
+  const isUnplantable = (flawname: string): boolean => (! plantsAnyRow) && (flawname !== LaterFmtFlaw)
 
   describe("delBox", () => {
     it("stores the tombstone over a live row at its revision", async () => {
@@ -241,12 +241,14 @@ export const describeDels = ({ putWith, rowsOf, plantsAnyRow }: BatteryWorld): v
       expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
     })
 
-    it.each(VaultRowsInDoubt)("keeps the boxes under a vault row failing its checks %s", async (_blurb, flaw) => {
-      const { vaultDB, vault, box } = await putWith({ box: true })
-      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...flaw })
-      expect(await vaultDB.tidyGone(bankScope)).to.deep.include({ val: { totalCount: 1 } })
-      expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
-    })
+    for (const [blurb, flaw] of VaultRowsInDoubt) {
+      it.skipIf((! plantsAnyRow) && (! ('fmt' in flaw)))(`keeps the boxes under a vault row failing its checks ${blurb}`, async () => {
+        const { vaultDB, vault, box } = await putWith({ box: true })
+        await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...flaw })
+        expect(await vaultDB.tidyGone(bankScope)).to.deep.include({ val: { totalCount: 1 } })
+        expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
+      })
+    }
 
     it.skipIf(! plantsAnyRow)("keeps the boxes under a vault row that lacks the fields every row has", async () => {
       const { vaultDB, box } = await putWith({ box: true })

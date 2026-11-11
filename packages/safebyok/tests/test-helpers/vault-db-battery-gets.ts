@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import * as SX from '../../src/shapes/shapes-storage'
 import {
-  bankScope, vaultScope, boxscope, vaultScopeOf, boxscopeOf, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, vaultQuery, boxQuery,
+  bankScope, vaultScope, boxscope, vaultScopeOf, boxscopeOf, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, vaultQuery, boxQuery, vaultDamageFor,
   vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf, boxDelAskOf,
 } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
@@ -163,7 +163,7 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf, plantsAnyRow }: B
       await vaultDB.putVault(vaultPutAskOf(deleted))
       await vaultDB.delVault(vaultDelAskOf(deleted))
       await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('newer'), { ...vaultAt(9, 'life9', { vaultlabel: 'newer' }), fmt: SX.VaultFormat + 1 })
-      await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('broken'), { ...vaultAt(9, 'life9', { vaultlabel: 'broken' }), gate: 'rubble' })
+      await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('broken'), { ...vaultAt(9, 'life9', { vaultlabel: 'broken' }), ...vaultDamageFor(plantsAnyRow).damage })
       const { act, val } = await vaultDB.listVaults(bankScope)
       expect(act).to.eq('got')
       expect(val.vaults).to.have.deep.members([vault, vaultTombstoneOf(deleted)])
@@ -377,11 +377,12 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf, plantsAnyRow }: B
 
     it("refuses under a vault row failing its checks, whatever the box row", async () => {
       const { vaultDB, vault } = await putWith({ box: true })
-      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, gate: 'rubble' })
+      const { damage, fieldname } = vaultDamageFor(plantsAnyRow)
+      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...damage })
       for (const boxlabel of ['openai', 'never_put']) {
         const answer = await vaultDB.tryGetBox(boxGetAskOf({ ...boxQuery, boxlabel }, 'nil'))
         expect(answer).to.deep.include({ ok: false, act: 'damaged_vault' })
-        expect(answer.err?.meta?.fieldnames).to.deep.equal(['gate'])
+        expect(answer.err?.meta?.fieldnames).to.deep.equal([fieldname])
       }
     })
   })

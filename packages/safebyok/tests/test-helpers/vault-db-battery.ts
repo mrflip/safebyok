@@ -48,8 +48,9 @@ export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
   watches?: boolean
   /** False for a VaultDB whose box notices come without their vault row, which a watch then hears with a null world. */
   boxNoticesCarryVault?: boolean
-  /** False for a VaultDB whose storage has a column for each field of a row, so that none can be planted that is no object, lacks a field every row has,
-   * has a field no row has, names another address than it is filed at, or is a box row under no vault row; the cases of such rows are then skipped.
+  /** False for a VaultDB whose storage refuses a row failing its checks, a row of a later fmt excepted: of the battery's flaws it holds only `LaterFmtFlaw`.
+   * It holds no row that is no object, lacks a field every row has, names another address than it is filed at, or is a box row under no vault row;
+   * the cases of such rows, and of the other flaws, are then skipped, and a case that wants only some failing row plants a later fmt.
    */
   plantsAnyRow?: boolean
 }

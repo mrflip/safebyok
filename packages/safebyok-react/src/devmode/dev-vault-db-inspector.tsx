@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import type { VaultDB } from 'safebyok'
-import { nextRevisionOf, revisionOf } from 'safebyok/storage'
-import type { BankListed, BankScope, BoxesListed, BoxSparse, DamagedBox, DamagedVault, VaultRecord, VaultRow } from 'safebyok/storage'
+import { makeLifeTok, nextRevisionOf, sentinelBoxOf, sentinelVaultOf } from 'safebyok/storage'
+import type { BankListed, BankScope, BoxesListed, BoxSparse, DamagedBox, DamagedVault, VaultRecord, VaultRow, VaultScope } from 'safebyok/storage'
 import { useBank } from '../hooks/hooks'
 import type { DevVaultDBInspectorProps, VaultRowLinesProps } from '../shapes'
 import { LastCallLine, jsonOf, timeOf, useLastCall, useListing } from './last-call'
@@ -64,8 +64,8 @@ const BankRowsTable = ({ vaultDB, scope }: { vaultDB: VaultDB, scope: BankScope 
                   key={vaultRow.vaultlabel}
                   vaultRow={vaultRow}
                   boxes={rows.boxesOf.get(vaultRow.vaultlabel) ?? null}
-                  onGetVault={() => call('getVault', async () => jsonOf(await vaultDB.getVault({ ...scope, vaultlabel: vaultRow.vaultlabel }, { ifAbsent: 'nil' })))}
-                  onGetBox={(boxRow) => call('getBox', async () => jsonOf(await vaultDB.getBox({ ...scope, vaultlabel: boxRow.vaultlabel, boxlabel: boxRow.boxlabel, vault_tok: boxRow.vault_tok }, { ifAbsent: 'nil' })))}
+                  onGetVault={() => call('getVault', async () => jsonOf(await getVaultRow(vaultDB, { ...scope, vaultlabel: vaultRow.vaultlabel })))}
+                  onGetBox={(boxRow) => call('getBox', async () => jsonOf(await getBoxRow(vaultDB, boxRow)))}
                   onDelBox={(boxRow) => callThenRelist('delBox', async () => jsonOf(await delBoxRow(vaultDB, boxRow)))}
                 />
               ))}
@@ -105,7 +105,19 @@ const VaultRowLines = ({ vaultRow, boxes, onGetVault, onGetBox, onDelBox }: Vaul
   )
 }
 
-const delBoxRow = (vaultDB: VaultDB, boxRow: BoxSparse) => (
-  vaultDB.delBox({ ...boxRow, ...nextRevisionOf(boxRow, Date.now()), am: 'x' }, { prior: revisionOf(boxRow) })
+// The inspector holds no row of what it gets, so each get expects the sentinel for none.
+const getVaultRow = (vaultDB: VaultDB, scope: VaultScope) => (
+  vaultDB.getVault({ op: 'get', ...scope, ifAbsent: 'nil', expected: sentinelVaultOf(scope) })
 )
+
+const getBoxRow = (vaultDB: VaultDB, { applabel, user_id, vaultlabel, boxlabel, vault_tok }: BoxSparse | DamagedBox) => (
+  vaultDB.getBox({ op: 'get', applabel, user_id, vaultlabel, boxlabel, vault_tok, ifAbsent: 'nil', expected: sentinelBoxOf({ applabel, user_id, vaultlabel, boxlabel }, vault_tok) })
+)
+
+// The listed row is the one the del expects, and its tombstone carries a new life token.
+const delBoxRow = (vaultDB: VaultDB, boxRow: BoxSparse) => {
+  const { applabel, user_id, vaultlabel, boxlabel, vault_tok } = boxRow
+  const record = { ...boxRow, ...nextRevisionOf(boxRow, Date.now()), am: 'x' as const, box_tok: makeLifeTok() }
+  return vaultDB.delBox({ op: 'del', applabel, user_id, vaultlabel, boxlabel, vault_tok, expected: boxRow, record })
+}
 // --
