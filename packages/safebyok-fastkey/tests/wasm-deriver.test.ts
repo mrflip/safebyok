@@ -9,16 +9,16 @@ import { makeArgon2idWasmDeriver, argon2idWasmWebV1Deriver } from '../src/wasm-d
 const CheapSpec: KeyDeriverSpec = { ...Argon2idWebV1, key_deriver_label: 'acme_cheap_v1', memory_kib: 64, iterations: 2, parallelism: 4 }
 
 /** The deriver's spec: its fields without `deriveKeyBytes`. */
-const specOf = ({ deriveKeyBytes: _dropped, ...spec }: { deriveKeyBytes: unknown }) => spec
+function specOf({ deriveKeyBytes: _dropped, ...spec }: { deriveKeyBytes: unknown }) { return spec }
 
 /** Make `saltBytes` bytes of varied salt, so a test catches a byte read from the wrong position. */
-const saltOf = (saltBytes: number): Uint8Array => Uint8Array.from({ length: saltBytes }, (_unused, ii) => ((ii * 37) + 11) % 256)
+function saltOf(saltBytes: number): Uint8Array { return Uint8Array.from({ length: saltBytes }, (_unused, ii) => ((ii * 37) + 11) % 256) }
 
 /** The message of the `bad_option` refusal that `attempt` throws. */
-const refusalOf = (attempt: () => unknown): string => TH.expectSyncRefusal(attempt, 'bad_option').message
+function refusalOf(attempt: () => unknown): string { return TH.expectSyncRefusal(attempt, 'bad_option').message }
 
 /** Return what `attempt` rejects with. Throws if it resolves instead. */
-const rejectionOf = async (attempt: Promise<unknown>): Promise<unknown> => {
+async function rejectionOf(attempt: Promise<unknown>): Promise<unknown> {
   try {
     await attempt
   } catch (err) {
@@ -28,7 +28,7 @@ const rejectionOf = async (attempt: Promise<unknown>): Promise<unknown> => {
 }
 
 /** Format bytes as lowercase hex, the way test vectors are written. */
-const hexOf = (bytes: Uint8Array) => Buffer.from(bytes).toString('hex')
+function hexOf(bytes: Uint8Array) { return Buffer.from(bytes).toString('hex') }
 
 /** An obviously fake whisper, stored on one device and read on another. */
 const FakeWhisper = { apiKey: 'sk-fake-0000-not-a-real-key' }
@@ -206,7 +206,7 @@ describe("makeArgon2idWasmDeriver's bounds", () => {
 })
 
 /** Make two banks on one vaultDB, each on its own device with its own key deriver. */
-const twoDevices = (firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) => {
+function twoDevices(firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) {
   const world = TH.makeBankWorld()
   return {
     world,
@@ -216,14 +216,14 @@ const twoDevices = (firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) => {
 }
 
 /** Build and unlock the vault on `bank`, then store {@link FakeWhisper} in one of its boxes. */
-const putFakeBox = async (bank: Bank): Promise<void> => {
+async function putFakeBox(bank: Bank): Promise<void> {
   await bank.hello()
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
   await vault.putBox({ boxlabel: 'openai', whisper: FakeWhisper })
 }
 
 /** Unlock the vault on `bank` (the test world's dialog types the passphrase), and check that the box the other device stored is there. */
-const expectWhisperOpens = async (bank: Bank): Promise<void> => {
+async function expectWhisperOpens(bank: Bank): Promise<void> {
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
   await vault.ensureUnlocked()
   const box = (await vault.getBox('openai'))!
