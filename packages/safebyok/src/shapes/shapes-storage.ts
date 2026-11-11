@@ -1,7 +1,7 @@
 /** What the vaultDB and the deviceDB write and accept, and their helpers. Imported as `SX`. */
 
 import type * as Z from 'zod'
-import { Checker, Checkers, objCheck } from '../helpers/validator'
+import { Checker, Checkers, objCheck, objStrip } from '../helpers/validator'
 import * as Phrases from '../helpers/phrases'
 import { randomId } from '../helpers/crypto'
 import * as EX from './shapes-enums'
@@ -223,12 +223,10 @@ export const capacity = objCheck(({ obj, union, int, uint, lit }) => {
 export type Capacity = Z.infer<typeof capacity>
 // --
 
-// == [Row helpers]: rowPeek, reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf
+// == [Row helpers]: rowMeta, reqParamsOf, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf
 
 /** The check that reads a row's revision and liveness without judging the rest. */
-export const { rowPeek } = Checkers('bad_option', ({ obj, vault_tok }) => ({
-  rowPeek: obj({ ...revision.shape, am, vault_tok }),
-}), [CX])
+export const rowMeta = objStrip(({ vault_tok }) => ({ ...revision.shape, am, vault_tok }), 'bad_option', [CX])
 
 /** The request's safe metadata, for an answer to carry; empty when any of it fails its check, as a bad field may be anything. */
 export const reqParamsOf = (args: unknown): ReqParams => {
@@ -242,20 +240,20 @@ export const revisionOf = ({ revision_tok, revision_seq }: Revision): Revision =
 /** Fresh revision fields for the next write, written at `written_at`. */
 export const nextRevisionOf = ({ revision_seq }: Revision, written_at: number) => ({ revision_tok: randomId(), revision_seq: revision_seq + 1, written_at })
 
-const peekOf = (raw: unknown) => {
-  const parsed = rowPeek.safeParse(raw)
+const metaOf = (raw: unknown) => {
+  const parsed = rowMeta.safeParse(raw)
   return parsed.success ? parsed.data : null
 }
 
 /** True when `raw`, a stored row or null for a void one, stands at `prior`. Storage's conditional put is atomic on this. */
 export const isRowAt = (raw: unknown, prior: Revision): boolean => {
   if (raw === null) { return (prior.revision_tok === VoidRevisionTok) && (prior.revision_seq === VoidRevisionSeq) }
-  const peek = peekOf(raw)
-  return (peek?.revision_tok === prior.revision_tok) && (peek.revision_seq === prior.revision_seq)
+  const meta = metaOf(raw)
+  return (meta?.revision_tok === prior.revision_tok) && (meta.revision_seq === prior.revision_seq)
 }
 
 /** True when `raw` is a live row. */
-export const isLiveRow = (raw: unknown): boolean => (peekOf(raw)?.am === 'a')
+export const isLiveRow = (raw: unknown): boolean => (metaOf(raw)?.am === 'a')
 
 /** True when `raw` passes a vault row's checks, live in the life `vault_tok`. */
 export const isLiveVaultRecord = (raw: unknown, vault_tok: string): boolean => {
@@ -269,7 +267,7 @@ export const isLiveBoxRecord = (raw: unknown, vault_tok: string): boolean => {
   return parsed.success && (parsed.data.am === 'a') && (parsed.data.vault_tok === vault_tok)
 }
 
-// A row that fails its check is never put over, whatever `prior` names: only `isRowAt` reads the peek, and it runs after the check.
+// A row that fails its check is never put over, whatever `prior` names: only `isRowAt` reads its meta, and it runs after the check.
 // A put replaces a live row only within its own life: a new life is born over a tombstone or nothing.
 const isPutAllowedOver = (found: { am: EX.Am } | null, isSameLife: boolean, ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
   isRowAt(ante, prior) && ((found?.am === 'a') ? ((ifPresent === 'repl') && isSameLife) : (ifAbsent === 'add'))
@@ -295,7 +293,7 @@ export const isLifeOver = (raw: unknown, vault_tok: string): boolean => {
 }
 
 /** True when `raw` is the tombstone of a deleted row. */
-export const isTombstoneRow = (raw: unknown): boolean => (peekOf(raw)?.am === 'x')
+export const isTombstoneRow = (raw: unknown): boolean => (metaOf(raw)?.am === 'x')
 
 const sentinelTimes = { registered_at: VoidTime, written_at: VoidTime }
 

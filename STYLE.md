@@ -444,7 +444,7 @@ naturally, or a comparison with what the callee has.
   several arguments does fit: check one object built from them, with `.refine` across its fields.
 
 **Validators are made inside a `Checkers(kind, kit => { ... }, sources?)` call**, or one of its
-one-validator forms, `Checker` and `objCheck` (`helpers/validator.ts`), never in plain Zod. It hands the builder Zod's makers under short names
+one-validator forms, `Checker`, `objCheck`, `objStrict` and `objStrip` (`helpers/validator.ts`), never in plain Zod. It hands the builder Zod's makers under short names
 (`obj`, `arr`, `tuple`, `oneof`, `union`, `discrim`, `lit`, `lazy`, `custom`), its scalars
 ready made (`str`, `num`, `int`, `uint`, `bool`, `unk`), and the shared primitives (`label`,
 `user_id`, `epochMillis`, ...); and it wraps each schema it returns, so a failed `parse` throws a
@@ -467,7 +467,9 @@ returns that one validator; its `kind` comes after the builder, and is `'bad_rec
 given. `objCheck(kit => fields, opts?, sources?)` is a `Checker` whose builder returns an
 object's fields, the object strict unless `opts` says `extras: 'strip'`; `opts` is the kind, or
 `{ refusalkind, extras }`. Strict is the default, as a stored record or a bag a person typed wants
-it; a shape taken out of whatever carries it says `'strip'`. A check of the object whole
+it; a shape taken out of whatever carries it says `'strip'`. `objStrict(kit => fields, kind?, sources?)`
+and `objStrip(...)` are `objCheck` with `extras` fixed, their `kind` alone or `{ refusalkind }`;
+a validator made alone of one object is made in one of them. A check of the object whole
 (`.refine()`, `.readonly()`, a sentence of its own) goes inside a `Checker`: chained onto the
 validator a call returns, it would refuse as Zod does. `Checkers` stays for validators made
 together, sharing locals or built one from another.

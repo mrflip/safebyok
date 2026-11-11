@@ -2,7 +2,7 @@
 
 import { NEVER } from 'zod'
 import type * as Z from 'zod'
-import { Checker, Checkers, objCheck } from '../helpers/validator'
+import { Checker, Checkers, objCheck, objStrip } from '../helpers/validator'
 import type { VaultError } from '../refusals/errors'
 import type { Outcome } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
@@ -153,16 +153,14 @@ export type VaultStamp = Z.infer<typeof vaultStamp>
 // == [What a proving is handed]: provingWorld, stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate, Novel
 
 /** The check of what a proving hears of the bank, refusing 'bad_option'. */
-export const { provingWorld } = Checkers('bad_option', ({ obj, custom, device_id }) => ({
-  provingWorld: obj({
-    /** The bank's key deriver, guarded: it turns a passphrase into key bytes. */
-    keyDeriver:      custom<GuardedKeyDeriver>(isGuarded, Phrases.GuardedExpected),
-    /** The bank's strength checker, guarded: it judges a new passphrase. */
-    strengthChecker: custom<GuardedStrengthChecker>(isGuarded, Phrases.GuardedExpected),
-    /** This device's id, written into the wayin header a proving mints. */
-    device_id,
-  }),
-}), [CX])
+export const provingWorld = objStrip(({ custom, device_id }) => ({
+  /** The bank's key deriver, guarded: it turns a passphrase into key bytes. */
+  keyDeriver:      custom<GuardedKeyDeriver>(isGuarded, Phrases.GuardedExpected),
+  /** The bank's strength checker, guarded: it judges a new passphrase. */
+  strengthChecker: custom<GuardedStrengthChecker>(isGuarded, Phrases.GuardedExpected),
+  /** This device's id, written into the wayin header a proving mints. */
+  device_id,
+}), 'bad_option', [CX])
 
 /** What a proving hears of the bank: its two guarded host functions and this device's id. */
 export type ProvingWorld = Z.infer<typeof provingWorld>
