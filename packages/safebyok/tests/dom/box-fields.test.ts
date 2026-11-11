@@ -18,7 +18,7 @@ async function unexposedOf(): Promise<TestableBox> {
   return box.put({ whisper: Stored })
 }
 
-function elOf(text = ''): { value: string } { return { value: text } }
+const elOf = (text = ''): { value: string } => ({ value: text })
 
 describe("BoxFields.of", () => {
   it("returns one instance per box", async () => {
