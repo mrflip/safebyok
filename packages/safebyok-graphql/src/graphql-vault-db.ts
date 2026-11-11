@@ -2,7 +2,7 @@ import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql
 import type * as Z from 'zod'
 import * as DB from 'safebyok/storage'
 import type {
-  Answer, BadAnswer, BankListed, BankScope, BoxAnswer, BoxDelAsk, BoxesListed, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, GateVerbOpts, GoodAnswer, ListAct, Notice, OkAct,
+  Answer, BadAnswer, BankListed, BankScope, BoxAnswer, BoxDelAsk, BoxesListed, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxTidyAsk, GateVerbOpts, GoodAnswer, ListAct, Notice, OkAct,
   Tidied, VaultAnswer, VaultDB, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultRecord, VaultRow, WatchScope,
 } from 'safebyok/storage'
 import { VaultOperations } from './vault-operations'
@@ -212,15 +212,15 @@ export class GraphQLVaultDB implements VaultDB {
   }
 
   /** For hosts: remove the box rows left by vault lives that have ended, and count the box rows that remain. */
-  async tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>> { return goodAnswerOf(await this.tryTidyGone(scope)) }
+  async tidyGone(ask: BoxTidyAsk): Promise<GoodAnswer<Tidied, 'tidied', BankScope>> { return goodAnswerOf(await this.tryTidyGone(ask)) }
 
   /** Non-throwing form of {@link tidyGone}. */
-  async tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>> {
+  async tryTidyGone(ask: BoxTidyAsk): Promise<Answer<Tidied, 'tidied', BankScope>> {
     try {
-      const bankScope = DB.bankScope.parse(scope)
-      const crossed = await this.#runMutation(VaultOperations.tidyGone, 'safebyokTidyGone', bankScope)
+      const { applabel, user_id } = DB.boxTidy.parse(ask)
+      const crossed = await this.#runMutation(VaultOperations.tidyGone, 'safebyokTidyGone', { applabel, user_id })
       return DB.tidyGoneAnswer.parse(tidiedAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'tidyGone', scope) }
+    } catch (err) { return answerForRefusal(err, 'tidyGone', ask) }
   }
   // --
 
@@ -253,7 +253,7 @@ export class GraphQLVaultDB implements VaultDB {
       if (refusal !== null) {
         end(DB.isVaultError(refusal, 'identity_revoked') ? null : refusal)
       } else if (! result.hasNext) {
-        end(new DB.VaultError('storage_unavailable', DB.WatchEnded, { meta: { call: 'watch' } }))
+        end(new DB.VaultError('storage_unavailable', DB.WatchEnded, { meta: { oplabel: 'watch' } }))
       }
     })
     // If the stream ended synchronously inside subscribe(), `end` ran before `watching.subscription` was set. Unsubscribe now.
@@ -281,13 +281,13 @@ export class GraphQLVaultDB implements VaultDB {
 
 // Every throw in a verb ends up here: an ask that fails its check, a server out of reach, or an answer that fails its own.
 /** The bad answer for a verb that threw: a refusal as it came, anything else `unexpected_error`.
- * Its meta names `callerlabel` as `call`, and carries what it may of the ask as `ask`.
+ * Its meta names the `oplabel`, and carries what it may of the ask as `ask`.
  */
-function answerForRefusal(thrown: unknown, callerlabel: string, ask: unknown): BadAnswer {
+function answerForRefusal(thrown: unknown, oplabel: string, ask: unknown): BadAnswer {
   const refusal = DB.isVaultError(thrown) ? thrown : DB.unexpectedError(thrown)
   // An ask that failed its check has no metadata to trust: its refusal carries none.
   const loggableAsk = DB.loggableAsk.safeParse(ask)
-  return DB.badAnswerOf(Object.assign(refusal, { meta: { ...refusal.meta, call: callerlabel, ask: loggableAsk.success ? loggableAsk.data : {} } }))
+  return DB.badAnswerOf(Object.assign(refusal, { meta: { ...refusal.meta, oplabel, ask: loggableAsk.success ? loggableAsk.data : {} } }))
 }
 
 /** Return a good answer, or throw a bad answer's refusal. */

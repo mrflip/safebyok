@@ -119,7 +119,7 @@ export class Bank {
     this.#vaultListing = new VaultListing(this, { vaultDB, maxMillisSinceRefresh, bankFriend: { panic, announce: this.#announce, tellBadNews: this.#tellBadNews, askUser } })
     this.#vaultListing.subscribe(this.#remakeSnapshot)
     this.#snapshot = this.#makeSnapshot()
-    if (isTestDeriver(keyDeriver)) { this.logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
+    if (isTestDeriver(keyDeriver)) { this.logger.warn(Phrases.TestDeriverNotice, { oplabel: 'Bank.make' }) }
     Object.freeze(this)
   }
 
@@ -353,7 +353,7 @@ const HostChecks = Checkers('bad_option', ({ fn }) => ({
 
 /** The `onBadNews` a bank has when given none: each news to the bank's logger. */
 export const DefaultOnBadNews: BadNewsHandler = ({ news, bank }) => {
-  bank.logger.warn(news.message, { call: 'Bank.onBadNews', refusalkind: news.refusalkind })
+  bank.logger.warn(news.message, { oplabel: 'Bank.onBadNews', refusalkind: news.refusalkind })
 }
 
 /** Tell `onBadNews` each of `badnews` that reached `bank`, awaiting none: the handler's throw or rejection reaches only the platform. */
@@ -374,7 +374,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, bank: Bank, badnews: re
 // The logger too, as a platform with no reportError (Node, SSR) would hear nothing of it.
 /** `refusal` to `bank`'s logger at error, and to the platform. */
 function reportAtError(refusal: VaultError, bank: Bank): void {
-  bank.logger.error(refusal.message, { call: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
+  bank.logger.error(refusal.message, { oplabel: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
   reportToPlatform(refusal)
 }
 
@@ -382,7 +382,7 @@ function reportAtError(refusal: VaultError, bank: Bank): void {
 /** The default's answer to a cached lease that outlived its revoke. */
 function heedRevokeFailed({ refusal, vault, where, bank }: Extract<BankEvent, { kind: 'lease_revoke_failed' }>): void {
   if (where === 'tombstone' || where === 'undeleted') {
-    bank.logger.warn(refusal.message, { call: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
+    bank.logger.warn(refusal.message, { oplabel: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
     return
   }
   reportAtError(refusal, bank)
@@ -402,7 +402,7 @@ export const DefaultOnLifecycle: LifecycleHandler = (event) => {
   }
   case 'helloed': {
     const { outcome, bank } = event
-    if (! outcome.ok && outcome.err.refusalkind !== 'disabled') { bank.logger.warn(outcome.err.message, { call: 'Bank.onLifecycle', refusalkind: outcome.err.refusalkind }) }
+    if (! outcome.ok && outcome.err.refusalkind !== 'disabled') { bank.logger.warn(outcome.err.message, { oplabel: 'Bank.onLifecycle', refusalkind: outcome.err.refusalkind }) }
     break
   }
   }

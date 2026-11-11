@@ -185,7 +185,7 @@ describe("BankProvider's props", () => {
     rerender({ ...props, keyDeriver: { ...props.keyDeriver } })
     rerender({ ...props, autolockMinutes: 5 })
     await act(async () => { await TH.wakeupAtNextTick() })
-    expect(spy.calls.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { call: 'BankProvider', props: ['keyDeriver'] }]])
+    expect(spy.calls.map(({ level, story }) => [level, story])).to.deep.equal([['warn', { oplabel: 'BankProvider', props: ['keyDeriver'] }]])
     expect(spy.calls[0]?.message).to.match(/^BankProvider ignored a change to its keyDeriver/)
   })
 
@@ -194,7 +194,7 @@ describe("BankProvider's props", () => {
     const { props, rerender } = provided({ logger: spy.logger })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
     rerender({ ...props, keyDeriver: { ...props.keyDeriver }, deviceDB: new MemoryDeviceDB() })
-    expect(spy.calls[0]?.story).to.deep.equal({ call: 'BankProvider', props: ['deviceDB', 'keyDeriver'] })
+    expect(spy.calls[0]?.story).to.deep.equal({ oplabel: 'BankProvider', props: ['deviceDB', 'keyDeriver'] })
   })
 
   it("says nothing of handlers written inline at each render", async () => {

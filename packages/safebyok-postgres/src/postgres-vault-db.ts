@@ -2,7 +2,7 @@
 
 import * as DB from 'safebyok/storage'
 import type {
-  AdapterVaultDBOpts, Awaitable, BankScope, BoxAsk, BoxDelAsk, BoxesFetched, BoxesStored, BoxFetched, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxQuery, BoxStored, Capacity, Heard,
+  AdapterVaultDBOpts, Awaitable, BoxAsk, BoxDelAsk, BoxesFetched, BoxesStored, BoxFetched, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, BoxQuery, BoxStored, Capacity, Heard,
   RowOfVault, Tidied, VaultAsk, VaultDelAsk, VaultError, VaultFetched, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultScope, VaultsStored, VaultStored, WatchScope,
 } from 'safebyok/storage'
 import {
@@ -285,7 +285,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return await this.#writeBox(ask, ReviseBoxSql)
   }
 
-  protected async doTidyGone({ applabel, user_id }: BankScope): Promise<Tidied> {
+  protected async doTidyGone({ applabel, user_id }: BoxTidyAsk): Promise<Tidied> {
     return await this.#transact(async (tx) => {
       /** The number of box rows stored for one vault life. */
       type BoxLife = { vaultlabel: string, vault_tok: string, boxcount: number }

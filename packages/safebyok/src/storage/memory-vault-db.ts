@@ -8,7 +8,7 @@ import { DefaultMaxBoxes } from '../helpers/consts'
 import { ckeyOf } from '../helpers/helpers'
 import * as SX from '../shapes/shapes-storage'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
-import type { BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRecord, BoxTombstone, Capacity, MemoryVaultDBOpts, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultRecord, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import type { BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, BoxRecord, BoxTombstone, Capacity, MemoryVaultDBOpts, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultRecord, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 export type { MemoryVaultDBOpts } from '../shapes/shapes-storage'
 
 
@@ -146,10 +146,10 @@ export class MemoryVaultDB extends AdapterVaultDB {
     return stored
   }
 
-  protected doTidyGone(scope: BankScope): Tidied {
+  protected doTidyGone(ask: BoxTidyAsk): Tidied {
     let totalCount = 0
     for (const [ckey, { scope: vaultScope, vault_tok, boxrows }] of this.#boxLives) {
-      if ((vaultScope.applabel !== scope.applabel) || (vaultScope.user_id !== scope.user_id)) { continue }
+      if ((vaultScope.applabel !== ask.applabel) || (vaultScope.user_id !== ask.user_id)) { continue }
       if (SX.isLifeOver(this.#vaultRowOf(vaultScope), vault_tok)) { this.#boxLives.delete(ckey) } else { totalCount += boxrows.size }
     }
     return { totalCount }

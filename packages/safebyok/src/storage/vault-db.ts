@@ -7,7 +7,7 @@ import type { BadOutcome, GoodOutcome } from '../refusals/outcome'
 import type { BankScope } from '../shapes/shapes-core'
 import type { OkAct, ListAct } from '../shapes/shapes-enums'
 import type {
-  BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxSparse, DamagedBox, DamagedVault,
+  BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxTidyAsk, BoxSparse, DamagedBox, DamagedVault,
   GateVerbOpts, LoggableAsk, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultRecord, VaultRow, VaultTombstone, WatchScope,
 } from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
@@ -76,7 +76,7 @@ export interface VaultDB {
   /** Non-throwing form of {@link VaultDB.listVaults}. */
   tryListVaults(ask: VaultListAsk): Promise<Answer<BankListed, ListAct, BankScope>>
   /** Get the vault row at a scope, whatever its life.
-   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone; otherwise both refuse.
+   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone stored; otherwise both refuse.
    */
   getVault(ask: VaultGetAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.getVault}. */
@@ -88,7 +88,7 @@ export interface VaultDB {
   /** Non-throwing form of {@link VaultDB.listBoxes}. When the vault row refuses, `world` is that stored row. */
   tryListBoxes(ask: BoxListAsk): Promise<Answer<BoxesListed, ListAct>>
   /** Get a box row, with its vault row as `world`. Refuses when the vault is not live under `vault_tok`.
-   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone; otherwise both refuse.
+   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone stored; otherwise both refuse.
    */
   getBox(ask: BoxGetAsk): Promise<GoodAnswer<BoxRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.getBox}. */
@@ -130,9 +130,9 @@ export interface VaultDB {
   /** Non-throwing form of {@link VaultDB.delVault}. */
   tryDelVault(ask: VaultDelAsk): Promise<VaultAnswer>
   /** Housekeeping for hosts: delete the box rows whose vault is missing, tombstoned or reborn, and count the box rows left. */
-  tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
+  tidyGone(ask: BoxTidyAsk): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
   /** Non-throwing form of {@link VaultDB.tidyGone}. */
-  tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>>
+  tryTidyGone(ask: BoxTidyAsk): Promise<Answer<Tidied, 'tidied', BankScope>>
   /** Watch a bank or a vault: call `onNotice` with each changed row, and `onBadNews` with trouble in the watch.
    * Returns a function that stops the watch. Notices are best effort: never count on one arriving.
    * After bad news, the watch may go on or may have ended.

@@ -52,12 +52,12 @@ export type Revision = Readonly<Z.infer<typeof revision>>
 export type Times    = Readonly<Z.infer<typeof times>>
 // --
 
-// == [Scopes]: vaultQuery, boxQuery, watchScope, vaultList, boxList, VaultQuery, BoxQuery, WatchScope, VaultListAsk, BoxListAsk
+// == [Scopes]: vaultQuery, boxQuery, watchScope, vaultList, boxList, boxTidy, VaultQuery, BoxQuery, WatchScope, VaultListAsk, BoxListAsk, BoxTidyAsk
 
-// A scope's validator is CX's, frozen; `unwrap()` is its object, to extend. A listing's ask is its scope and its `op`, so it
-// refuses as a scope does.
-/** The checks of a vault or box scope under its `vault_tok`, the scope of a watch, and the asks of `listVaults` and `listBoxes`. */
-export const { vaultQuery, boxQuery, watchScope, vaultList, boxList } = Checkers('bad_scope', ({ lit, vaultlabel, vault_tok, bankScope, vaultScope, boxscope }) => {
+// A scope's validator is CX's, frozen; `unwrap()` is its object, to extend. A listing's or tidying's ask is its scope and its
+// `op`, so it refuses as a scope does.
+/** The checks of a vault or box scope under its `vault_tok`, the scope of a watch, and the asks of `listVaults`, `listBoxes` and `tidyGone`. */
+export const { vaultQuery, boxQuery, watchScope, vaultList, boxList, boxTidy } = Checkers('bad_scope', ({ lit, vaultlabel, vault_tok, bankScope, vaultScope, boxscope }) => {
   const vaultQuery = vaultScope.unwrap().extend({ vault_tok })
   return {
     vaultQuery,
@@ -65,6 +65,7 @@ export const { vaultQuery, boxQuery, watchScope, vaultList, boxList } = Checkers
     watchScope: bankScope.unwrap().extend({ vaultlabel: vaultlabel.optional() }),
     vaultList:  bankScope.unwrap().extend({ op: lit('list') }),
     boxList:    vaultQuery.extend({ op: lit('list') }),
+    boxTidy:    bankScope.unwrap().extend({ op: lit('tidy_gone') }),
   }
 }, [CX])
 
@@ -75,6 +76,8 @@ export type WatchScope = Readonly<Z.input<typeof watchScope>>
 export type VaultListAsk = Readonly<Z.output<typeof vaultList>>
 /** A `listBoxes` ask: the vault's scope and the `vault_tok` of the life whose boxes are listed. */
 export type BoxListAsk   = Readonly<Z.output<typeof boxList>>
+/** A `tidyGone` ask: the bank's scope. */
+export type BoxTidyAsk   = Readonly<Z.output<typeof boxTidy>>
 // --
 
 // == [Wayins and gate]: passphraseWayinRecord, passkeyWayinRecord, gate, Gate

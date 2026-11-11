@@ -166,7 +166,7 @@ type SafebyokAskRow {
   box_tok:      String
 }
 
-"""A refusal: its kind and its message. Its meta may carry capacity, fieldnames and call."""
+"""A refusal: its kind and its message. Its meta may carry capacity, fieldnames and oplabel."""
 type SafebyokErr {
   refusalkind: SafebyokRefusalkind!
   message:     String!

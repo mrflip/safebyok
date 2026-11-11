@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import * as SX from '../../src/shapes/shapes-storage'
 import {
-  bankScope, vaultScope, boxscope, vaultScopeOf, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, boxQuery,
+  bankScope, vaultScope, boxscope, vaultScopeOf, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, boxQuery, boxTidyAsk,
   boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf, boxDelAskOf,
 } from './storage-world'
 import type { VaultDB } from '../../src/storage/vault-db'
@@ -170,14 +170,14 @@ export function describeDels({ putWith, rowsOf }: BatteryWorld): void {
     it("removes the box rows of a life that is over, and counts the rows left in the bank", async () => {
       const { vaultDB, vault, box } = await putWith({ box: true })
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'oldlife', boxAt(0, 'oldlife'))
-      expect(await vaultDB.tidyGone(bankScope)).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 1 }, world: bankScope })
+      expect(await vaultDB.tidyGone(boxTidyAsk)).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 1 }, world: bankScope })
       expect(await rowsOf(vaultDB).boxRowsOf(vaultScope, 'oldlife')).to.have.property('size', 0)
       expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
 
       // A box row under the life a tombstone ended: one a store that cannot delete a life's boxes with its vault would leave.
       await vaultDB.delVault(vaultDelAskOf(vault))
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', box)
-      expect(await vaultDB.tidyGone(bankScope)).to.deep.include({ val: { totalCount: 0 } })
+      expect(await vaultDB.tidyGone(boxTidyAsk)).to.deep.include({ val: { totalCount: 0 } })
       expect(await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')).to.have.property('size', 0)
     })
   })

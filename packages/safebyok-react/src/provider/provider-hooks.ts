@@ -41,7 +41,7 @@ export const useWarnOfIgnoredOpts = (bank: Bank | null, wasOpts: ProviderBankOpt
     const changed = changedFieldnames(wasOpts, nowOpts)
     if (changed.length === 0) { return }
     toldOfIgnored.current = true
-    bank.logger.warn(`BankProvider ignored a change to its ${changed.join(' and ')}: it makes its bank once per applabel and user_id, from the props it has then. Define each prop once, outside the component, or memoize it.`, { call: 'BankProvider', props: changed })
+    bank.logger.warn(`BankProvider ignored a change to its ${changed.join(' and ')}: it makes its bank once per applabel and user_id, from the props it has then. Define each prop once, outside the component, or memoize it.`, { oplabel: 'BankProvider', props: changed })
   })
 }
 // --

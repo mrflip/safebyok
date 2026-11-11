@@ -6,7 +6,7 @@ import type { Awaitable } from '../../src/helpers/helpers'
 import type { VaultScope } from '../../src/shapes/shapes-core'
 import type { Tidied, VaultDB } from '../../src/storage/vault-db'
 import {
-  bankScope, vaultScope, boxscope, vaultListAsk, boxListAsk, boxQuery, vaultScopeOf, boxscopeOf, vaultAt, boxAt, FlawedVaultRows, FlawedBoxRows,
+  vaultScope, boxscope, vaultListAsk, boxListAsk, boxTidyAsk, boxQuery, vaultScopeOf, boxscopeOf, vaultAt, boxAt, FlawedVaultRows, FlawedBoxRows,
   vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf, boxDelAskOf,
 } from './storage-world'
 import type { FlawRefusal } from './storage-world'
@@ -53,7 +53,7 @@ async function boxRowOf(rows: VaultDBRowCheats, scope: VaultScope, vault_tok: st
 
 /** What tidyGone answers over the world's bank: the count of box rows it leaves, or the act it refuses with. */
 async function tidiedOf(vaultDB: VaultDB): Promise<Tidied | string> {
-  const tidied = await vaultDB.tryTidyGone(bankScope)
+  const tidied = await vaultDB.tryTidyGone(boxTidyAsk)
   return tidied.ok ? tidied.val : tidied.act
 }
 

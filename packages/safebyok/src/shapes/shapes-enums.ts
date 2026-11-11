@@ -25,7 +25,7 @@ export type CentralPolicy = typeof centralPolicyVals[number]
 // == [Policies]: askOpVals, AskOp, ifPresentVals, IfPresent, ifAbsentVals, IfAbsent, putIfAbsentVals, PutIfAbsent
 
 /** What a vaultDB ask asks for, the tag every ask carries as its `op`. */
-export const askOpVals = ['get', 'put', 'del', 'list'] as const
+export const askOpVals = ['get', 'put', 'del', 'list', 'tidy_gone'] as const
 export type AskOp = typeof askOpVals[number]
 
 /** The policies for a put over a live record: `repl`, the default, replaces it; `fail` refuses `camped`; `get` answers it. */

@@ -3,7 +3,7 @@
 import { promisifyRequest, type UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type {
-  AdapterVaultDBOpts, BankScope, BoxDelAsk, BoxesStored, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxStored, Capacity, Heard,
+  AdapterVaultDBOpts, BoxDelAsk, BoxesStored, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, BoxStored, Capacity, Heard,
   Tidied, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultQuery, VaultScope, VaultsStored, VaultStored, WatchScope,
 } from 'safebyok/storage'
 import { bankBoxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, shelfOf, vaultlabelOf, vaultScopepathOf, vaultsRangeOf } from './shelf'
@@ -143,9 +143,9 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
     return stored
   }
 
-  protected async doTidyGone(scope: BankScope): Promise<Tidied> {
+  protected async doTidyGone(ask: BoxTidyAsk): Promise<Tidied> {
     return await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const [vaults, boxes] = await Promise.all([filedIn(store, vaultsRangeOf(scope)), filedIn(store, bankBoxesRangeOf(scope))])
+      const [vaults, boxes] = await Promise.all([filedIn(store, vaultsRangeOf(ask)), filedIn(store, bankBoxesRangeOf(ask))])
       const vaultOfLabel = new Map(vaults.map(({ scopepath, row }) => [vaultlabelOf(scopepath), row]))
       let totalCount = 0
       for (const { scopepath } of boxes) {

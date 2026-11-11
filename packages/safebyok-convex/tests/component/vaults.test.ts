@@ -136,7 +136,7 @@ describe("tidyGone", () => {
     await plantVault(backend, TH.vaultAt(1, 'life2', { user_id: 'u2' }))
     expect(await talliedLives(backend)).to.have.members(['u1/life1', 'u1/life2', 'u2/life1'])
     //
-    expect(await backend.mutation(api.tidyGone, { scope: TH.bankScope })).to.deep.equal({ totalCount: 1 })
+    expect(await backend.mutation(api.tidyGone, { ask: TH.boxTidyAsk })).to.deep.equal({ totalCount: 1 })
     expect(await listedBoxlabels(backend)).to.deep.equal([])
     expect(await listedBoxlabels(backend, { ...life1, vault_tok: 'life2' })).to.deep.equal(['github'])
     expect(await listedBoxlabels(backend, { ...life1, user_id: 'u2' })).to.deep.equal(['gemini'])
@@ -302,7 +302,7 @@ describe("putBox's count cap", () => {
     await backend.mutation(api.delVault, TH.delVaultArgs(vault))
     await backend.mutation(api.putVault, TH.putVaultArgs(TH.vaultAt(2, 'life2'), tombstone))
     expect(await putBoxIn(backend, boxOf('openai', { vault_tok: 'life2' }), null, 1)).to.deep.include({ act: 'born' })
-    expect(await backend.mutation(api.tidyGone, { scope: TH.bankScope })).to.deep.equal({ totalCount: 1 })
+    expect(await backend.mutation(api.tidyGone, { ask: TH.boxTidyAsk })).to.deep.equal({ totalCount: 1 })
   })
 })
 

@@ -5,7 +5,7 @@ import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex
 import { ConvexError } from 'convex/values'
 import * as DB from 'safebyok/storage'
 import type {
-  AdapterVaultDBOpts, BankScope, BoxDelAsk, BoxesStored, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxStored, Heard, Tidied,
+  AdapterVaultDBOpts, BoxDelAsk, BoxesStored, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, BoxStored, Heard, Tidied,
   VaultDelAsk, VaultError, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultsStored, VaultStored, WatchScope,
 } from 'safebyok/storage'
 import * as Phrases from './phrases'
@@ -130,8 +130,8 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     return boxStored.parse(stored)
   }
 
-  protected async doTidyGone(scope: BankScope): Promise<Tidied> {
-    return await runOrRefuse('doTidyGone', () => this.#client.mutation(this.#api.tidyGone, { scope }))
+  protected async doTidyGone(ask: BoxTidyAsk): Promise<Tidied> {
+    return await runOrRefuse('doTidyGone', () => this.#client.mutation(this.#api.tidyGone, { ask }))
   }
 
   // Convex re-sends a watched query's whole result each time it changes, so `hear` gets only the
@@ -188,21 +188,21 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 const ConvexDocumentSize = 1_048_576
 
 // Takes a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
-/** Run `call`, converting anything it throws into a safebyok refusal. */
-async function runOrRefuse<ValT>(callname: string, call: () => Promise<ValT>): Promise<ValT> {
+/** Run `thunk`, converting anything it throws into a safebyok refusal. */
+async function runOrRefuse<ValT>(oplabel: string, thunk: () => Promise<ValT>): Promise<ValT> {
   try {
-    return await call()
+    return await thunk()
   } catch (err) {
-    throw refusalOf(callname, err)
+    throw refusalOf(oplabel, err)
   }
 }
 
 // On a dev deployment Convex's error text may quote the call's arguments, so its message is never
 // passed on. A refusal from the host's safebyok functions is recognized by its `data`, which only they make.
-/** The refusal for `thrown`: one sent by the host's safebyok functions is rebuilt as itself, and anything else becomes `storage_unavailable`, naming `callname`. */
-function refusalOf(callname: string, thrown: unknown): VaultError {
+/** The refusal for `thrown`: one sent by the host's safebyok functions is rebuilt as itself, and anything else becomes `storage_unavailable`, naming `oplabel`. */
+function refusalOf(oplabel: string, thrown: unknown): VaultError {
   if ((thrown instanceof ConvexError) && isSafebyokErrorData(thrown.data)) { return refusalOfCrossed(thrown.data) }
-  return DB.storageFailed(callname, thrown)
+  return DB.storageFailed(oplabel, thrown)
 }
 
 /** Rebuild the VaultError a `ConvexError`'s `data` describes, with the core's message and, for a `gate_issue`, the stored vault row. */

@@ -57,7 +57,7 @@ describe("AdapterVaultDB", () => {
       await expect(vaultDB.listVaults(vaultListAsk)).rejects.toSatisfy((err) => isVaultError(err, 'storage_unavailable'))
       const answer = await vaultDB.tryListVaults(vaultListAsk)
       expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null, ask: vaultListAsk })
-      expect(answer.err?.meta).to.deep.include({ call: 'listVaults' })
+      expect(answer.err?.meta).to.deep.include({ oplabel: 'listVaults' })
       expect((answer.err?.cause as Error).message).to.eq('socket closed')
     })
 
@@ -80,7 +80,7 @@ describe("AdapterVaultDB", () => {
       expect(isVaultError(thrown, 'camped')).to.be.true
       expect(thrown).to.deep.include({ refusalkind: answer.act })
       const { meta } = thrown as { meta: object }
-      expect(meta).to.deep.include({ ask: answer.ask, call: 'putVault' })
+      expect(meta).to.deep.include({ ask: answer.ask, oplabel: 'putVault' })
       expect(meta).to.not.have.any.keys('world', 'dbhas')
       expect(answer).to.deep.include({ world: vault, dbhas: vault })
       expect(JSON.stringify({ ...(thrown as object), meta })).to.not.include(vault.gate.passphrase_wayin.vault_key_wayin_wrapped.ciphertext_b64)

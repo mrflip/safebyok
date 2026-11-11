@@ -133,7 +133,7 @@ export class SafebyokComponent {
         args:    CVX.tidyGoneArgs,
         returns: CVX.tidied,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.scope.user_id)
+          await demandCaller(ctx, args.ask.user_id)
           return await ctx.runMutation(vaults.tidyGone, args)
         },
       }),

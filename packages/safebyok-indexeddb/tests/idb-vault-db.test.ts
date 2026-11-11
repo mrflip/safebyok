@@ -136,7 +136,7 @@ describe("IdbVaultDB's databases", () => {
     await vaultDB.putBox(TH.boxPutAskOf(TH.boxAt(0, 'life1', longer)))
     const { val: listed } = await vaultDB.listVaults(TH.vaultListAsk)
     const { val: boxesListed } = await vaultDB.listBoxes({ op: 'list', ...TH.vaultScope, vault_tok: 'life1' })
-    const { val: tidied } = await vaultDB.tidyGone(TH.bankScope)
+    const { val: tidied } = await vaultDB.tidyGone(TH.boxTidyAsk)
     expect(listed.vaults).to.have.lengthOf(1)
     expect(boxesListed.boxes).to.be.empty
     expect(tidied.totalCount).to.eq(0)

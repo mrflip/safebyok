@@ -116,7 +116,7 @@ describe("bank.tryProbe", () => {
     await TH.expectGood(bank.tryProbe())
     vi.spyOn(world.vaultDB as unknown as { doPutBox: () => unknown }, 'doPutBox').mockImplementationOnce(() => { throw new VaultError('storage_blocked', 'blocked for the test') })
     const err = await TH.expectBad(bank.tryProbe({ whisper: { note: 'refused' } }), 'storage_blocked')
-    expect(err.meta?.call).to.eq('putBox')
+    expect(err.meta?.oplabel).to.eq('putBox')
   })
 
   it("returns a bad Outcome before hello, and for an invalid label or horizon", async () => {

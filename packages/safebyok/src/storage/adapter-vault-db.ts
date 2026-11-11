@@ -5,7 +5,6 @@ import type { Awaitable } from '../helpers/helpers'
 import type { VaultError } from '../refusals/errors'
 import { storageRefusalOf } from '../refusals/outcome'
 import * as SX from '../shapes/shapes-storage'
-import * as CX from '../shapes/shapes-core'
 import type { BankScope } from '../shapes/shapes-core'
 import type { GateVerb, ListAct } from '../shapes/shapes-enums'
 import {
@@ -14,7 +13,7 @@ import {
 } from './classifier'
 import { type Answer, type BadAnswer, type BankListed, type BoxAnswer, type BoxesListed, type GoodAnswer, type Notice, type Tidied, type VaultAnswer, type VaultDB, badAnswerOf } from './vault-db'
 import type {
-  AdapterVaultDBOpts, BoxAsk, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, GateVerbOpts, VaultAsk, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultRecord, VaultRow, WatchScope,
+  AdapterVaultDBOpts, BoxAsk, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, GateVerbOpts, VaultAsk, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultRecord, VaultRow, WatchScope,
 } from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
 
@@ -71,8 +70,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Make a bad answer for a verb that threw: a refusal unchanged, anything else as `storage_unavailable`.
    * A subclass may override it to distinguish one refusal from another.
    */
-  protected answerForRefusal(err: unknown, callerlabel: string, ask: unknown): BadAnswer {
-    return badAnswerOf(refusalOf(err, callerlabel, ask))
+  protected answerForRefusal(err: unknown, oplabel: string, ask: unknown): BadAnswer {
+    return badAnswerOf(refusalOf(err, oplabel, ask))
   }
   // --
 
@@ -106,7 +105,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const stored      = await this.doGetVault(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.vault, world: stored.world } }
-      const refusal = Refuse.actRefused('vault', stored.act, { call: 'getVault', ask: loggableAsk })
+      const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'getVault', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, dbhas: stored.vault, err: refusal }
     } catch (err) { return this.answerForRefusal(err, 'getVault', ask) }
   }
@@ -123,7 +122,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const stored      = await this.doListBoxes(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.listed, world: stored.world } }
-      const refusal = Refuse.actRefused('box', stored.act, { call: 'listBoxes', ask: loggableAsk })
+      const refusal = Refuse.actRefused('box', stored.act, { oplabel: 'listBoxes', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, err: refusal }
     } catch (err) { return this.answerForRefusal(err, 'listBoxes', ask) }
   }
@@ -140,7 +139,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const stored      = await this.doGetBox(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.box, world: stored.world } }
-      const refusal = Refuse.actRefused('box', stored.act, { call: 'getBox', ask: loggableAsk })
+      const refusal = Refuse.actRefused('box', stored.act, { oplabel: 'getBox', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, dbhas: stored.box, err: refusal }
     } catch (err) { return this.answerForRefusal(err, 'getBox', ask) }
   }
@@ -160,7 +159,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const stored      = await this.doPutVault(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.vault, world: stored.world } }
-      const refusal = Refuse.actRefused('vault', stored.act, { call: 'putVault', ask: loggableAsk })
+      const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'putVault', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, dbhas: stored.vault, err: refusal }
     } catch (err) { return this.answerForRefusal(err, 'putVault', ask) }
   }
@@ -186,7 +185,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const loggableAsk = SX.loggableAsk.parse(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.box, world: stored.world } }
       const capacity = ((stored.act === 'vault_full') && (stored.capacity !== null)) ? { capacity: stored.capacity } : {}
-      const refusal  = Refuse.actRefused('box', stored.act, { call: 'putBox', ask: loggableAsk, ...capacity })
+      const refusal  = Refuse.actRefused('box', stored.act, { oplabel: 'putBox', ask: loggableAsk, ...capacity })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, dbhas: stored.box, err: refusal }
     } catch (err) { return this.answerForRefusal(err, 'putBox', ask) }
   }
@@ -252,7 +251,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const stored      = await this.doDelBox(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.box, world: stored.world } }
-      const refusal = Refuse.actRefused('box', stored.act, { call: 'delBox', ask: loggableAsk })
+      const refusal = Refuse.actRefused('box', stored.act, { oplabel: 'delBox', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, dbhas: stored.box, err: refusal }
     } catch (err) { return this.answerForRefusal(err, 'delBox', ask) }
   }
@@ -267,22 +266,23 @@ export abstract class AdapterVaultDB implements VaultDB {
       const stored      = await this.doDelVault(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.vault, world: stored.world } }
-      const refusal = Refuse.actRefused('vault', stored.act, { call: 'delVault', ask: loggableAsk })
+      const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'delVault', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, dbhas: stored.vault, err: refusal }
     } catch (err) { return this.answerForRefusal(err, 'delVault', ask) }
   }
 
-  // Housekeeping takes the bank's scope, not an ask: its answer's `ask` is that scope, with no `op`.
   /** Housekeeping for hosts: delete the box rows whose vault is missing, tombstoned or reborn, and count the box rows left. */
-  async tidyGone(scope: BankScope) { return goodOrThrow(await this.tryTidyGone(scope)) }
+  async tidyGone(ask: BoxTidyAsk) { return goodOrThrow(await this.tryTidyGone(ask)) }
 
   /** Non-throwing form of {@link tidyGone}. */
-  async tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>> {
+  async tryTidyGone(ask: BoxTidyAsk): Promise<Answer<Tidied, 'tidied', BankScope>> {
     try {
-      const bankScope = CX.bankScope.parse(scope)
-      const val       = await this.doTidyGone(bankScope)
-      return { ok: true, ask: SX.loggableAsk.parse(bankScope), act: 'tidied', val, world: bankScope }
-    } catch (err) { return this.answerForRefusal(err, 'tidyGone', scope) }
+      const checked     = SX.boxTidy.parse(ask)
+      const val         = await this.doTidyGone(checked)
+      const loggableAsk = SX.loggableAsk.parse(checked)
+      const { applabel, user_id } = checked
+      return { ok: true, ask: loggableAsk, act: 'tidied', val, world: { applabel, user_id } }
+    } catch (err) { return this.answerForRefusal(err, 'tidyGone', ask) }
   }
   // --
 
@@ -326,7 +326,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** In one step: fetch the vault row and the box row at `ask`'s address, classify, and store `ask.record` if the act is a write. */
   protected abstract doDelBox(ask: BoxDelAsk): Awaitable<BoxStored>
   /** Delete the box rows whose vault is missing, tombstoned or reborn, and count the box rows left in the bank. */
-  protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
+  protected abstract doTidyGone(ask: BoxTidyAsk): Awaitable<Tidied>
   /** Start a watch: call `hear` with each changed row, and `onBadNews` with trouble, whether or not it ends the watch.
    * Returns a function that stops it. This default, for storage with no watch, calls neither.
    */
@@ -343,13 +343,13 @@ function goodOrThrow<ValT, ActT extends string, WorldT>(answer: Answer<ValT, Act
 }
 
 /** Select the appropriate refusal for a thrown error. A VaultError is returned directly. Other errors become `storage_unavailable`.
- * Either way, its meta names the `callerlabel` as `call`, with what it may carry of the ask as `ask`.
+ * Either way, its meta names the `oplabel`, with what it may carry of the ask as `ask`.
  */
-function refusalOf(thrown: unknown, callerlabel: string, ask: unknown): VaultError {
+function refusalOf(thrown: unknown, oplabel: string, ask: unknown): VaultError {
   const refusal = storageRefusalOf(thrown)
   // An ask that failed its check has no metadata to trust: its refusal carries none.
   const loggableAsk = SX.loggableAsk.safeParse(ask)
-  return Object.assign(refusal, { meta: { ...refusal.meta, call: callerlabel, ask: loggableAsk.success ? loggableAsk.data : {} } })
+  return Object.assign(refusal, { meta: { ...refusal.meta, oplabel, ask: loggableAsk.success ? loggableAsk.data : {} } })
 }
 
 /** The put ask of a gate verb: `record` over the live vault row at `opts.prior`, in the same life, tagged with the verb. */

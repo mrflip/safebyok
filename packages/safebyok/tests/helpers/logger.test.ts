@@ -19,11 +19,11 @@ describe("parseLogger", () => {
     const logger = parseLogger(spy.logger)
     const err = new Error('the storage adapter failed')
     logger.log('opened')
-    logger.warn('a refresh failed', { call: 'refresh' }, err)
+    logger.warn('a refresh failed', { oplabel: 'refresh' }, err)
     logger.error(undefined, undefined, null)
     expect(spy.calls).to.deep.equal([
       { level: 'log',   message: 'opened',          story: undefined,           err: undefined },
-      { level: 'warn',  message: 'a refresh failed', story: { call: 'refresh' }, err },
+      { level: 'warn',  message: 'a refresh failed', story: { oplabel: 'refresh' }, err },
       { level: 'error', message: undefined,         story: undefined,           err: null },
     ])
   })
@@ -37,8 +37,8 @@ describe("parseLogger", () => {
   // parseLogger @example
   it("falls back to the console when given none", () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
-    parseLogger(undefined).warn('a refresh failed', { call: 'refresh' })
-    expect(warn).toHaveBeenCalledWith('safebyok: a refresh failed', { call: 'refresh' })
+    parseLogger(undefined).warn('a refresh failed', { oplabel: 'refresh' })
+    expect(warn).toHaveBeenCalledWith('safebyok: a refresh failed', { oplabel: 'refresh' })
     warn.mockRestore()
   })
 
@@ -163,7 +163,7 @@ describe("setDefaultLogger", () => {
     const fallback = parseLogger(undefined)
     const telemetry = TH.spyLogger()
     setDefaultLogger(telemetry.logger)
-    fallback.warn('a refresh failed', { call: 'refresh' })
+    fallback.warn('a refresh failed', { oplabel: 'refresh' })
     DefaultLogger.error('a listener threw')
     expect(telemetry.calls.map((call) => [call.level, call.message])).to.deep.equal([['warn', 'a refresh failed'], ['error', 'a listener threw']])
   })
@@ -216,7 +216,7 @@ describe("VaultLogger", () => {
 
   it("takes a story of any plain facts, nested ones too", () => {
     const spy = TH.spyLogger()
-    const story = { call: 'putBox', attempt: 2, retried: true, when: null, detail: { kinds: ['stale_write'] } }
+    const story = { oplabel: 'putBox', attempt: 2, retried: true, when: null, detail: { kinds: ['stale_write'] } }
     spy.logger.warn('a datastore retried', story)
     expect(spy.calls[0]?.story).to.deep.equal(story)
   })
