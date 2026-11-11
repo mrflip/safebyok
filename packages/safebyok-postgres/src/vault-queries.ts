@@ -22,12 +22,12 @@ export const GetVaultSql = `
 
 // == [A vault's write]: BirthVaultSql, ReviseVaultSql
 // Each calls a function of `vault-functions.ts`, which tests the record against what is stored and stores it.
-// It answers one row: `ok`, `act`, `vault`, `presence` and `swept`.
+// It answers one row: `ok`, `act`, `vault`, `presence` and `swept`. Where it stores the record it sends the notice of it too.
 
-/** Store a vault's first record. Parameters: the record as JSON text, then the channel and text of its notice. */
-export const BirthVaultSql = 'SELECT * FROM safebyok_birth_vault($1::text::jsonb, $2, $3)'
-/** Store a vault's next record over the row expected. Parameters: those of {@link BirthVaultSql}, then the expected `revision_tok` and `am`. */
-export const ReviseVaultSql = 'SELECT * FROM safebyok_revise_vault($1::text::jsonb, $2, $3, $4, $5)'
+/** Store a vault's first record. Parameters: the record as JSON text. */
+export const BirthVaultSql = 'SELECT * FROM safebyok_birth_vault($1::text::jsonb)'
+/** Store a vault's next record over the row expected. Parameters: the record as JSON text, then the expected `revision_tok` and `am`. */
+export const ReviseVaultSql = 'SELECT * FROM safebyok_revise_vault($1::text::jsonb, $2, $3)'
 // --
 
 // == [Box rows]: GetBoxWithVaultSql, ListBoxesWithVaultSql
@@ -59,10 +59,10 @@ export const ListBoxesWithVaultSql = `
 // == [A box's write]: BirthBoxSql, ReviseBoxSql
 // Each calls a function of `vault-functions.ts`. It answers one row: `ok`, `act`, `world`, `box`, `presence` and `boxcount`.
 
-/** Store a box's first record. Parameters: the record as JSON text, the channel and text of its notice, then the cap on live boxes. */
-export const BirthBoxSql = 'SELECT * FROM safebyok_birth_box($1::text::jsonb, $2, $3, $4)'
+/** Store a box's first record. Parameters: the record as JSON text, then the cap on live boxes. */
+export const BirthBoxSql = 'SELECT * FROM safebyok_birth_box($1::text::jsonb, $2)'
 /** Store a box's next record over the row expected. Parameters: those of {@link BirthBoxSql}, then the expected `revision_tok` and `am`. */
-export const ReviseBoxSql = 'SELECT * FROM safebyok_revise_box($1::text::jsonb, $2, $3, $4, $5, $6)'
+export const ReviseBoxSql = 'SELECT * FROM safebyok_revise_box($1::text::jsonb, $2, $3, $4)'
 // --
 
 // == [Tidying]: BoxLivesSql, DeleteBoxLifeSql

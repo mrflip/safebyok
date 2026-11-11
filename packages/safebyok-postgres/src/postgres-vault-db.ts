@@ -2,8 +2,8 @@
 
 import * as DB from 'safebyok/storage'
 import type {
-  AdapterVaultDBOpts, Awaitable, BankScope, BoxAsk, BoxClassified, BoxDelAsk, BoxesFetched, BoxFetched, BoxGetAsk, BoxPutAsk, BoxQuery, BoxRecord, BoxRow, Capacity, Heard,
-  RowOfVault, Tidied, VaultAsk, VaultClassified, VaultDelAsk, VaultError, VaultFetched, VaultGetAsk, VaultPutAsk, VaultQuery, VaultRow, VaultScope, WatchScope,
+  AdapterVaultDBOpts, Awaitable, BankScope, BoxAsk, BoxClassified, BoxDelAsk, BoxesFetched, BoxFetched, BoxGetAsk, BoxPutAsk, BoxQuery, Capacity, Heard,
+  RowOfVault, Tidied, VaultAsk, VaultClassified, VaultDelAsk, VaultError, VaultFetched, VaultGetAsk, VaultPutAsk, VaultQuery, VaultScope, WatchScope,
 } from 'safebyok/storage'
 import {
   BirthBoxSql, BirthVaultSql, BoxLivesSql, DeleteBoxLifeSql, GetBoxWithVaultSql, GetVaultSql, ListBoxesWithVaultSql, ListVaultsSql, ReviseBoxSql, ReviseVaultSql,
@@ -42,7 +42,7 @@ const postgresVaultDBOpts = DB.objCheck(({ custom, fn, int }) => ({
 }), 'bad_option')
 // --
 
-// == [Notices]: vaultChannelOf, VaultWhereFields, BoxWhereFields, BoxPropFields, noticeTextOf, toldOf
+// == [Notices]: vaultChannelOf, channelOf, Told, toldOf
 
 const vaultChannelOfInput = DB.Checker(({ user_id }) => user_id, 'bad_option')
 
@@ -53,69 +53,25 @@ export const vaultChannelOf = (user_id: string): string => channelOf(vaultChanne
 /** The notification channel for `user_id`. */
 const channelOf = (user_id: string): string => `safebyok_${user_id}`
 
-// A vault notice is the vault row as stored. A box notice is one JSON array, [...the box's address, ...its other props], in the order of
-// these lists: it is made of the box row alone, so a box's write can send it in the statement that stores the row.
-// A box tombstone's props stop at whisper_schema_version. A ciphered field is sent as [cipher_iv_b64, ciphertext_b64].
-// A notice too large for Postgres carries only the row's address: a vault's as an array of its three labels.
-const VaultWhereFields = ['applabel', 'user_id', 'vaultlabel'] as const
-const BoxWhereFields = [...VaultWhereFields, 'vault_tok', 'boxlabel'] as const
-const BoxPropFields = ['am', 'fmt', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'box_tok', 'whisper_codec', 'whisper_schema_version', 'sidecar', 'box_key_wrapped', 'whisper_ciphered'] as const
-const CipheredFields: ReadonlySet<string> = new Set(['box_key_wrapped', 'whisper_ciphered'])
+// The database sends each notice, from `safebyok_tell` in `vault-functions.ts`: one JSON object, with the address of the row
+// stored under `at`, and under `vault` and `box` the rows it had room for.
 
-// Postgres rejects a notification payload of 8000 bytes or more.
-const NoticeMaxBytes = 7999
-
-/** A parsed notice: the scope of the write, plus the written rows when the notice was small enough to carry them. */
+/** A parsed notice: the address of the row stored, plus the rows the notice had room for. */
 type Told = VaultScope & { vault_tok?: string | undefined, boxlabel?: string | undefined, heard?: Heard | undefined }
 
 const toldWhere = DB.objCheck(({ applabel, user_id, vaultlabel, str }) => ({
   applabel, user_id, vaultlabel, vault_tok: str.optional(), boxlabel: str.optional(),
 }), { refusalkind: 'bad_record', extras: 'strip' })
 
-/** Build the notification text for a write of `row`, a vault row or a box row.
- * A notice too large for Postgres carries only the row's address. {@link toldOf} parses it back.
- */
-function noticeTextOf(row: VaultRow | BoxRow): string {
-  const fields: Record<string, unknown> = row
-  const isBox = 'boxlabel' in row
-  const where = (isBox ? BoxWhereFields : VaultWhereFields).map((field) => fields[field])
-  const text = JSON.stringify(isBox ? [...where, ...boxPropsOf(row)] : row)
-  return (new TextEncoder().encode(text).length <= NoticeMaxBytes) ? text : JSON.stringify(where)
-}
-
 /** Parse a notification's text into a {@link Told}, or return null if it is not one of our notices. */
 function toldOf(text: string): Told | null {
-  const sent = jsonOrNull(text)
-  if (! Array.isArray(sent)) {
-    const where = toldWhere.safeParse(sent)
-    return where.success ? { ...scopeOf(where.data), heard: { vault: sent } } : null
-  }
-  const props: unknown[] = sent
-  const where = toldWhere.safeParse(fieldsOf(BoxWhereFields, props))
-  if (! where.success) { return null }
-  const boxProps = props.slice(BoxWhereFields.length)
-  if (boxProps.length === 0) { return where.data }
-  return { ...where.data, heard: { box: { ...where.data, ...fieldsOf(BoxPropFields, boxProps) } } }
+  const sent = jsonOrNull(text) as { at?: unknown, vault?: unknown, box?: unknown } | null
+  const where = toldWhere.safeParse(sent?.at)
+  if ((sent === null) || (! where.success)) { return null }
+  const { vault, box } = sent
+  if ((vault === undefined) && (box === undefined)) { return where.data }
+  return { ...where.data, heard: { vault, box } }
 }
-
-const boxPropsOf = (box: BoxRow): unknown[] => {
-  const fields: Record<string, unknown> = box
-  return BoxPropFields.filter((field) => fields[field] !== undefined).map((field) => {
-    if (! CipheredFields.has(field)) { return fields[field] }
-    const { cipher_iv_b64, ciphertext_b64 } = fields[field] as BoxRecord['whisper_ciphered']
-    return [cipher_iv_b64, ciphertext_b64]
-  })
-}
-
-/** Zip `props` with `fieldnames` into an object, restoring each ciphered field from its [iv, ciphertext] pair. */
-const fieldsOf = (fieldnames: readonly string[], props: unknown[]): Record<string, unknown> => (
-  Object.fromEntries(props.slice(0, fieldnames.length).map((prop, idx) => {
-    const field = fieldnames[idx] ?? ''
-    if (! (CipheredFields.has(field) && Array.isArray(prop))) { return [field, prop] }
-    const [cipher_iv_b64, ciphertext_b64] = prop as unknown[]
-    return [field, { cipher_iv_b64, ciphertext_b64 }]
-  }))
-)
 
 const jsonOrNull = (text: string): unknown => {
   try {
@@ -222,17 +178,15 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }
 
-  /** Run a vault's write function `text`, with `cited` the expected fields it tests after the write's own parameters. */
+  /** Run a vault's write function `text` for the ask's record, with `cited` the expected fields it tests. */
   async #writeVault(ask: VaultPutAsk | VaultDelAsk, text: string, cited: unknown[]): Promise<VaultClassified> {
-    const params = [JSON.stringify(ask.record), channelOf(ask.record.user_id), noticeTextOf(ask.record)]
-    const [answer] = await this.#query(text, [...params, ...cited]) as [VaultAnswered]
+    const [answer] = await this.#query(text, [JSON.stringify(ask.record), ...cited]) as [VaultAnswered]
     return this.classifyVault(ask, answer)
   }
 
-  /** Run a box's write function `text`, with `cited` the expected fields it tests after the write's own parameters. */
+  /** Run a box's write function `text` for the ask's record, with `cited` the expected fields it tests. */
   async #writeBox(ask: BoxPutAsk | BoxDelAsk, text: string, cited: unknown[]): Promise<BoxClassified> {
-    const params = [JSON.stringify(ask.record), channelOf(ask.record.user_id), noticeTextOf(ask.record), this.#maxBoxes]
-    const [answer] = await this.#query(text, [...params, ...cited]) as [BoxAnswered]
+    const [answer] = await this.#query(text, [JSON.stringify(ask.record), this.#maxBoxes, ...cited]) as [BoxAnswered]
     return this.classifyBox(ask, answer)
   }
   // --
@@ -393,14 +347,13 @@ const unlistenOnceListening = async (listening: Promise<(() => unknown) | null>)
 }
 // --
 
-// == [Rows and asks]: rowsFrom, scopeOf, mayPutOver
+// == [Rows and asks]: rowsFrom, mayPutOver
 
 async function rowsFrom(queryable: PostgresQueryable, text: string, params: unknown[]): Promise<unknown[]> {
   const { rows } = await queryable.query(text, params)
   return rows
 }
 
-function scopeOf({ applabel, user_id, vaultlabel }: VaultScope): VaultScope { return { applabel, user_id, vaultlabel } }
 
 /** True where a put's policies let it store its record over the row it expects: over none or a tombstone under `ifAbsent: 'add'`, over a live row under `ifPresent: 'repl'`. */
 function mayPutOver({ expected, ifAbsent, ifPresent }: BoxPutAsk | VaultPutAsk): boolean {

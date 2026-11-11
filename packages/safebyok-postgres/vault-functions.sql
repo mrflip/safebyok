@@ -12,6 +12,8 @@
 -- Each statement of a function sees what is committed as it starts, so the rows answered where nothing was stored
 -- are the rows as they stand after any wait for another writer.
 --
+-- A function that stores a record tells the user's channel of it, in the same transaction: see safebyok_tell.
+--
 -- The functions run as the role that calls them, and no other role may call them.
 
 -- A row as the record it was stored from: a field for each column that is not null. Null for no row.
@@ -21,8 +23,26 @@ LANGUAGE sql IMMUTABLE AS $$
   SELECT jsonb_object_agg(col.key, col.value) FROM jsonb_each(stored) AS col WHERE col.value <> 'null'::jsonb
 $$;
 
+-- Tell the listeners of a user's channel, safebyok_<user_id>, of a row just stored: a vault row, or a box row with its
+-- vault row beside it. A notice is one JSON object: at, the address of the row stored, and the rows under vault and box.
+-- Postgres refuses a notice of 8000 bytes or more. One too heavy sheds a box's vault row first, and then every row:
+-- a listener told only an address fetches what is stored there.
+CREATE OR REPLACE FUNCTION safebyok_tell(vault jsonb, box jsonb) RETURNS void
+LANGUAGE plpgsql AS $$
+DECLARE
+  stored jsonb := COALESCE(box, vault);
+  at     jsonb := safebyok_record(jsonb_build_object(
+    'applabel', stored->'applabel', 'user_id', stored->'user_id', 'vaultlabel', stored->'vaultlabel',
+    'vault_tok', box->'vault_tok', 'boxlabel', box->'boxlabel'));
+  notice text  := safebyok_record(jsonb_build_object('at', at, 'vault', vault, 'box', box))::text;
+BEGIN
+  IF octet_length(notice) >= 8000 AND box IS NOT NULL THEN notice := jsonb_build_object('at', at, 'box', box)::text; END IF;
+  IF octet_length(notice) >= 8000 THEN notice := jsonb_build_object('at', at)::text; END IF;
+  PERFORM pg_notify('safebyok_' || (stored->>'user_id'), notice);
+END $$;
+
 -- Store a vault's first record, where no vault row is stored at its scope.
-CREATE OR REPLACE FUNCTION safebyok_birth_vault(new_record jsonb, channel text, notice text)
+CREATE OR REPLACE FUNCTION safebyok_birth_vault(new_record jsonb)
 RETURNS TABLE (ok boolean, act text, vault jsonb, presence text, swept integer)
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -36,8 +56,8 @@ BEGIN
   END IF;
 
   IF ok THEN
-    PERFORM pg_notify(channel, notice);
     act := 'born';  presence := 'void';  vault := safebyok_record(to_jsonb(new_vault));
+    PERFORM safebyok_tell(vault, NULL);
     RETURN NEXT;  RETURN;
   END IF;
 
@@ -51,7 +71,7 @@ END $$;
 -- It is stored where the stored row has the expected revision_tok and am, and the record is one revision_seq past it.
 -- A tombstone is never stored over a tombstone.
 -- The box rows of the vault's other lives are deleted with it, but for any another writer holds; swept is their number.
-CREATE OR REPLACE FUNCTION safebyok_revise_vault(new_record jsonb, channel text, notice text, expected_tok text, expected_am text)
+CREATE OR REPLACE FUNCTION safebyok_revise_vault(new_record jsonb, expected_tok text, expected_am text)
 RETURNS TABLE (ok boolean, act text, vault jsonb, presence text, swept integer)
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -80,10 +100,10 @@ BEGIN
     WHERE  (b.applabel, b.user_id, b.vaultlabel, b.vault_tok, b.boxlabel)
          = (doomed.applabel, doomed.user_id, doomed.vaultlabel, doomed.vault_tok, doomed.boxlabel);
     GET DIAGNOSTICS swept = ROW_COUNT;
-    PERFORM pg_notify(channel, notice);
     act      := CASE WHEN expected_am <> 'a' THEN 'reborn' WHEN new_vault.am = 'a' THEN 'replaced' ELSE 'deleted' END;
     presence := CASE WHEN expected_am = 'a' THEN 'live' ELSE 'gone' END;
     vault    := safebyok_record(to_jsonb(new_vault));
+    PERFORM safebyok_tell(vault, NULL);
     RETURN NEXT;  RETURN;
   END IF;
 
@@ -94,7 +114,7 @@ BEGIN
 END $$;
 
 -- Store a box's first record, where no box row is stored at its address, in a live vault of the box's life with room under the cap.
-CREATE OR REPLACE FUNCTION safebyok_birth_box(new_record jsonb, channel text, notice text, maxboxes integer)
+CREATE OR REPLACE FUNCTION safebyok_birth_box(new_record jsonb, maxboxes integer)
 RETURNS TABLE (ok boolean, act text, world jsonb, box jsonb, presence text, boxcount integer)
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -117,9 +137,9 @@ BEGIN
   END IF;
 
   IF ok THEN
-    PERFORM pg_notify(channel, notice);
     act := 'born';  presence := 'void';
     world := safebyok_record(to_jsonb(its_vault));  box := safebyok_record(to_jsonb(new_box));
+    PERFORM safebyok_tell(world, box);
     RETURN NEXT;  RETURN;
   END IF;
 
@@ -137,7 +157,7 @@ END $$;
 -- It is stored where the stored row has the expected revision_tok and am, the record is one revision_seq past it,
 -- and the vault is live in the box's life. A live record over a tombstone also needs room under the cap.
 -- A tombstone is never stored over a tombstone.
-CREATE OR REPLACE FUNCTION safebyok_revise_box(new_record jsonb, channel text, notice text, maxboxes integer, expected_tok text, expected_am text)
+CREATE OR REPLACE FUNCTION safebyok_revise_box(new_record jsonb, maxboxes integer, expected_tok text, expected_am text)
 RETURNS TABLE (ok boolean, act text, world jsonb, box jsonb, presence text, boxcount integer)
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -167,10 +187,10 @@ BEGIN
   END IF;
 
   IF ok THEN
-    PERFORM pg_notify(channel, notice);
     act      := CASE WHEN expected_am <> 'a' THEN 'reborn' WHEN new_box.am = 'a' THEN 'replaced' ELSE 'deleted' END;
     presence := CASE WHEN expected_am = 'a' THEN 'live' ELSE 'gone' END;
     world := safebyok_record(to_jsonb(its_vault));  box := safebyok_record(to_jsonb(new_box));
+    PERFORM safebyok_tell(world, box);
     RETURN NEXT;  RETURN;
   END IF;
 
@@ -184,8 +204,9 @@ BEGIN
   RETURN NEXT;
 END $$;
 
-REVOKE ALL ON FUNCTION safebyok_record(jsonb)                                          FROM PUBLIC;
-REVOKE ALL ON FUNCTION safebyok_birth_vault(jsonb, text, text)                         FROM PUBLIC;
-REVOKE ALL ON FUNCTION safebyok_revise_vault(jsonb, text, text, text, text)            FROM PUBLIC;
-REVOKE ALL ON FUNCTION safebyok_birth_box(jsonb, text, text, integer)                  FROM PUBLIC;
-REVOKE ALL ON FUNCTION safebyok_revise_box(jsonb, text, text, integer, text, text)     FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_record(jsonb)                              FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_tell(jsonb, jsonb)                         FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_birth_vault(jsonb)                         FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_revise_vault(jsonb, text, text)            FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_birth_box(jsonb, integer)                  FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_revise_box(jsonb, integer, text, text)     FROM PUBLIC;

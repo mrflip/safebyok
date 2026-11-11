@@ -1,8 +1,9 @@
-/** BirthBoxSql and ReviseBoxSql on PGlite: a box's first record stored over no row, and its next record over the row a caller expects. Each answers what it found, and stores nothing where a test fails. */
+/** BirthBoxSql and ReviseBoxSql on PGlite: a box's first record stored over no row, and its next record over the row a caller expects. Each answers what it found, and stores nothing where a test fails. And safebyok_tell, the notice each sends. */
 
 import { describe, expect, it } from 'vitest'
 import * as DB from 'safebyok/storage'
 import type { BoxRecord, BoxRow, BoxTombstone } from 'safebyok/storage'
+import { vaultChannelOf } from '../src/postgres-vault-db'
 import { BirthBoxSql, ReviseBoxSql } from '../src/vault-queries'
 import * as TH from './test-helpers'
 
@@ -15,7 +16,7 @@ type BoxWriteAnswer = { ok: boolean, act: string | null, world: unknown, box: un
 
 async function writeBox(text: string, record: BoxRow, rest: unknown[]): Promise<BoxWriteAnswer> {
   const db = await TH.database()
-  const { rows } = await db.query<BoxWriteAnswer>(text, [JSON.stringify(record), 'safebyok_unheard', 'a notice', ...rest])
+  const { rows } = await db.query<BoxWriteAnswer>(text, [JSON.stringify(record), ...rest])
   expect(rows).to.have.length(1)
   return rows[0]!
 }
@@ -158,5 +159,37 @@ describe('ReviseBoxSql', () => {
     await vaultDB.delVault({ op: 'del', expected: TH.vaultAt(0), record: vaultTombstone })
     const swept = await storedBox()
     expect(await reviseBox(TH.boxAt(1), TH.boxAt(0))).to.deep.include({ ok: false, world: vaultTombstone, box: swept })
+  })
+})
+
+/** The notice `safebyok_tell` sends for a vault row, or for a box row and its vault row. */
+async function noticeOf(vault: object, box: object | null): Promise<unknown> {
+  const texts: string[] = []
+  const unlisten = await TH.listen(vaultChannelOf(TH.vaultScope.user_id), (text) => { texts.push(text) })
+  const db = await TH.database()
+  await db.query('SELECT safebyok_tell($1::text::jsonb, $2::text::jsonb)', [JSON.stringify(vault), (box === null) ? null : JSON.stringify(box)])
+  await expect.poll(() => texts).to.have.length(1)
+  await unlisten()
+  return JSON.parse(texts[0]!)
+}
+
+/** A field that weighs `bytes`. */
+function pad(bytes: number): { pad: string } { return { pad: 'x'.repeat(bytes) } }
+
+describe('safebyok_tell', () => {
+  it('tells of a vault row by its scope, and of a box row by its address with its vault row beside it', async () => {
+    expect(await noticeOf(TH.vaultAt(0), null)).to.deep.equal({ at: TH.vaultScope, vault: TH.vaultAt(0) })
+    expect(await noticeOf(TH.vaultAt(0), TH.boxAt(0))).to.deep.equal({ at: TH.boxQuery, vault: TH.vaultAt(0), box: TH.boxAt(0) })
+  })
+
+  it('sheds the vault row of a box notice too heavy for Postgres, and then the box row', async () => {
+    const vault = { ...TH.vaultAt(0), ...pad(4000) }
+    const box   = { ...TH.boxAt(0), ...pad(5000) }
+    expect(await noticeOf(vault, box)).to.deep.equal({ at: TH.boxQuery, box })
+    expect(await noticeOf(vault, { ...TH.boxAt(0), ...pad(9000) })).to.deep.equal({ at: TH.boxQuery })
+  })
+
+  it('sheds the row of a vault notice too heavy for Postgres', async () => {
+    expect(await noticeOf({ ...TH.vaultAt(0), ...pad(9000) }, null)).to.deep.equal({ at: TH.vaultScope })
   })
 })

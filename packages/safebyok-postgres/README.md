@@ -17,18 +17,25 @@ pnpm add safebyok safebyok-postgres
 `safebyok` is a peer dependency, so the adapter and your app share one copy, and a `VaultError`
 from one is a `VaultError` to the other.
 
-## Make the tables
+## Make the tables and the functions
 
-`VaultTablesSql` is the SQL, for Postgres 14 or later; the package also ships it as
+`VaultTablesSql` is the SQL of the tables, for Postgres 14 or later; the package also ships it as
 `vault-tables.sql`, to copy into your migrations. It creates only what is missing, so it is safe to
 run again. Until 1.0 there is no migration: a release that changes the tables says so in its
 changelog, and you drop them and run it again.
 
+`VaultFunctionsSql` is the SQL of the functions `PostgresVaultDB` calls to write a row, shipped as
+`vault-functions.sql`. Run it after the tables, and **again with each upgrade of this package**:
+each run replaces the functions. They run as the role that calls them, and no other role may call
+them, so run both files as the role your pool connects as, or grant it `EXECUTE`.
+
 ```ts
-import { VaultTablesSql } from 'safebyok-postgres'
+import { VaultFunctionsSql, VaultTablesSql } from 'safebyok-postgres'
 
 await pool.query(VaultTablesSql)    // pg runs several statements in one query without parameters
+await pool.query(VaultFunctionsSql)
 await pglite.exec(VaultTablesSql)
+await pglite.exec(VaultFunctionsSql)
 ```
 
 ## Use
@@ -62,11 +69,15 @@ missing table or privilege (a code in class `42`) refuses as `unexpected_error`,
 ## Hearing other writes
 
 Each write sends a notification on its user's channel, `vaultChannelOf(user_id)`, which is
-`safebyok_` and the user_id, as it commits. A vault's notification is its row as stored; a box's
-is one JSON array, its vault's fields but the wayins and then its own; a row too long for a
-notification is told by where it is, and the listener reads it afresh. `listen(channel, onNotify)`
-hands each notification's text on that channel to `onNotify`, as it came, and answers how to stop.
-A watch hears a box with a null `world`: the vault's own notifications bring it.
+`safebyok_` and the user_id, as it commits. The database makes it, in the function `safebyok_tell`:
+one JSON object, with the address of the row written under `at`, a vault's row under `vault`, and
+a box's row under `box` with its vault's row beside it. Postgres takes no notification of 8,000
+bytes or more: one too heavy leaves out a box's vault row first, and then every row, and the
+listener fetches what is stored at the address. `listen(channel, onNotify)` hands each
+notification's text on that channel to `onNotify`, as it came, and answers how to stop.
+A watch hears a box with its vault's row as `world`, or a null `world` where the notification had
+no room for it. Any role that can connect to the database can `LISTEN` on a channel, and so reads
+the rows a notification carries: they hold what the tables hold, ciphertext and wrapped keys.
 
 LISTEN needs a connection of its own for as long as it listens, so share one among every watch.
 This recipe LISTENs on a channel the first time a watch asks for it and **never UNLISTENs**: the

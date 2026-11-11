@@ -102,7 +102,18 @@ describe("PostgresVaultDB's get, put and del, each given one ask", () => {
     await vaultDB.putBox({ ...Add, expected: noBoxYet, record: TH.boxAt(0) })
     await vaultDB.delVault({ ...Del, expected: TH.vaultAt(0), record: TH.vaultTombstoneOf(TH.vaultAt(0)) })
     await expect.poll(() => notices.map(({ act }) => act)).to.deep.equal(['got', 'gone'])
+    expect(notices[0]).to.deep.equal({ act: 'got', val: TH.boxAt(0), world: TH.vaultAt(0) })
     expect(await TH.rowsOf().boxRowsOf(TH.vaultScope, 'life1')).to.have.property('size', 0)
+    unwatch()
+  })
+
+  it('tells a watch of a box too heavy for a notice, whose rows the watch fetches', async () => {
+    const vaultDB = await vaultDBWithVault({ maxRecordBytes: 20_000 })
+    const notices: Notice[] = []
+    const unwatch = vaultDB.watch(TH.vaultScope, (notice) => { notices.push(notice) })
+    const heavy = TH.boxAt(0, 'life1', { sidecar: { remark: 'x'.repeat(9000) } })
+    await vaultDB.putBox({ ...Add, expected: noBoxYet, record: heavy })
+    await expect.poll(() => notices).to.deep.equal([{ act: 'got', val: heavy, world: TH.vaultAt(0) }])
     unwatch()
   })
 })
