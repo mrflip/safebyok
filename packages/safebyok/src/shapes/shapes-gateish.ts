@@ -2,7 +2,7 @@
 
 import { NEVER } from 'zod'
 import type * as Z from 'zod'
-import { Checker, Checkers, objCheck, objStrip } from '../helpers/validator'
+import { Checker, Checkers, objCheck, objStrict, objStrip } from '../helpers/validator'
 import type { VaultError } from '../refusals/errors'
 import type { Outcome } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
@@ -302,7 +302,7 @@ export const { gatingkind, vaultBuildClears, vaultUnlockClears, passphraseReplac
 }))
 
 /** What an attempt of a gating on a born vault hands its act: the clears pass unread, for the act's own check. */
-export const callGatingByKind = objCheck(({ oneof, custom, fn, unk }) => ({
+export const callGatingByKind = objStrict(({ oneof, custom, fn, unk }) => ({
   gatingkind:    oneof(EX.gatingkindVals).exclude(['build_vault']),
   vault:         custom<Vault>((val) => hasModelkind(val, 'vault'), Phrases.VaultExpected),
   clears:        unk,
