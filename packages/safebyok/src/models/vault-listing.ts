@@ -13,7 +13,7 @@ import * as VX from '../shapes/shapes-vaultish'
 import { type DelTombstone, type Fetched, type ListingDelOpts, type ListingOpts, type ListingPutOpts, type SlotFate, type ThingAnswer, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
 import type { BoxRow, GateVerbOpts, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { type Answer, type Notice, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
-import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
+import { vaultAbsent, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
 import type { Gate } from './gate'
 import { Listing } from './listing'
@@ -188,7 +188,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return new Vault(this.world, this, central, this.bankFriend)
   }
 
-  protected nothingStoredError(scope: VaultScope): VaultError { return absentVaultError(scope) }
+  protected nothingStoredError(scope: VaultScope): VaultError { return vaultAbsent(scope) }
 
   // A bank's listing has its scope for a world, no row, so it has nothing for the bank to receive.
   protected async doTryList() {

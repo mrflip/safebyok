@@ -10,7 +10,7 @@ import type { AskUser, GateProps, LeaseFriend, SealedWhisper, UnlockByProving } 
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, BoxPut, BoxPutOpts, RevokeSite, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
-import { alreadyListedError, deletedVaultError, unlockFirst } from '../refusals/throwers'
+import { alreadyListed, deletedVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
@@ -86,7 +86,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const checked = listing.scopeOf(scope)
     listing.demandEnabled()
     const listed = listing.at(checked)
-    if (listed?.isPresent === true) { throw alreadyListedError() }
+    if (listed?.isPresent === true) { throw alreadyListed() }
     const expected = listed?.sparse ?? SX.sentinelVaultOf(checked)
     return Gating.launchBirth(listing, checked, expected, Vault.#unlockVaultByProving, askUser)
   }
@@ -355,7 +355,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Demand that this vault is present. */
   demandPresent(): this {
-    if (! this.isPresent) { throw deletedVaultError() }
+    if (! this.isPresent) { throw deletedVault() }
     return this
   }
 

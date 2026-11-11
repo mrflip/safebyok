@@ -5,7 +5,7 @@ import { Checker } from '../helpers/validator'
 import type { Box } from '../models/box'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import { notExposedError } from '../refusals/throwers'
+import { notExposed } from '../refusals/throwers'
 import type { Whisper } from '../shapes/shapes-core'
 import type { BoxPutOpts } from '../shapes/shapes-vaultish'
 
@@ -70,7 +70,7 @@ export class BoxFields {
   async put(opts: BoxPutOpts = {}): Promise<Box> {
     if (this.#fields.size === 0) { throw noFieldsBound() }
     const { isExposed, isVeiled } = this.box.snapshot
-    if (! isExposed) { throw notExposedError() }
+    if (! isExposed) { throw notExposed() }
     if (isVeiled) { throw puttingVeiledFields() }
     this.#readFields()
     return this.box.putExposed({}, opts)

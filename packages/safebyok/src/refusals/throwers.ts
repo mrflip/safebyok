@@ -77,10 +77,10 @@ export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases
 export const bankDisabled = (): VaultError => new VaultError('disabled', Phrases.BankLetGo)
 // --
 
-// == [Vault Throwers]: lockedError, unlockFirst
+// == [Vault Throwers]: needUnlocked, unlockFirst
 
 /** A `vault_locked` refusal: the vault is locked, and `ensureUnlocked()` will ask the user. */
-export const lockedError      = () => new VaultError('vault_locked', Phrases.VaultLocked)
+export const needUnlocked = (): VaultError => new VaultError('vault_locked', Phrases.VaultLocked)
 
 /** A `vault_locked` refusal: the vault has no lease for a seal or unseal to use. */
 export const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
@@ -102,28 +102,28 @@ export const vaultStoredDamaged = ({ vaultlabel }: SX.DamagedVault): VaultError 
 export const rowOfOtherVaultTok = (): VaultError => new VaultError('storage_issue', Phrases.rowOfOtherAddress(['vault_tok']))
 // --
 
-// == [Storable Throwers]: partialLoadError, alreadyListedError, disabledError, absentBoxError, notListedBoxError, absentVaultError, deletedVaultError, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
+// == [Storable Throwers]: partialLoad, alreadyListed, instanceDisabled, boxAbsent, boxNotListed, vaultAbsent, deletedVault, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
 
 /** A `bad_option` refusal: the record in hand is not full, and needs hydrating first. */
-export const partialLoadError = () => new VaultError('bad_option', Phrases.PartialLoad)
+export const partialLoad = (): VaultError => new VaultError('bad_option', Phrases.PartialLoad)
 
 /** A `bad_option` refusal: the listing already has an instance under the dna's scope. */
-export const alreadyListedError    = () => new VaultError('bad_option', Phrases.AlreadyListed)
+export const alreadyListed = (): VaultError => new VaultError('bad_option', Phrases.AlreadyListed)
 
 /** A `disabled` refusal: this object was let go by a sweep, a vacate or a delete. */
-export const disabledError    = () => new VaultError('disabled', Phrases.LetGoInstance)
+export const instanceDisabled = (): VaultError => new VaultError('disabled', Phrases.LetGoInstance)
 
 /** An `absent_box` refusal: no box is stored under the label given. */
-export const absentBoxError   = ({ boxlabel }: { boxlabel: string }) => new VaultError('absent_box', Phrases.boxAbsent(boxlabel))
+export const boxAbsent = ({ boxlabel }: { boxlabel: string }): VaultError => new VaultError('absent_box', Phrases.boxAbsent(boxlabel))
 
 /** An `absent_box` refusal: no box is listed under the label given, though one may be stored. */
-export const notListedBoxError = ({ boxlabel }: { boxlabel: string }) => new VaultError('absent_box', Phrases.boxNotListed(boxlabel))
+export const boxNotListed = ({ boxlabel }: { boxlabel: string }): VaultError => new VaultError('absent_box', Phrases.boxNotListed(boxlabel))
 
 /** An `absent_vault` refusal: no vault is stored under the label given. */
-export const absentVaultError = ({ vaultlabel }: { vaultlabel: string }) => new VaultError('absent_vault', Phrases.vaultAbsent(vaultlabel))
+export const vaultAbsent = ({ vaultlabel }: { vaultlabel: string }): VaultError => new VaultError('absent_vault', Phrases.vaultAbsent(vaultlabel))
 
 /** A `vault_gone` refusal: this vault was deleted. */
-export const deletedVaultError = () => new VaultError('vault_gone', Phrases.VaultDeleted)
+export const deletedVault = (): VaultError => new VaultError('vault_gone', Phrases.VaultDeleted)
 
 /** A `record_conflict` refusal: this revision_seq is stored under another revision_tok. */
 export const oneRevisionTwoToks = (): VaultError => new VaultError('record_conflict', Phrases.OneRevisionTwoToks)
@@ -141,7 +141,7 @@ export const otherVaultTok = (): VaultError => new VaultError('record_conflict',
 export const shapeUnreconciled = (): VaultError => new VaultError('unexpected_error', Phrases.ShapeUnreconciled)
 // --
 
-// == [Box Throwers]: boxStoredDamaged, recordForNewBox, undecodedWhisper, notExposedError
+// == [Box Throwers]: boxStoredDamaged, recordForNewBox, undecodedWhisper, notExposed
 
 /** A `damaged_row` refusal: this box is stored damaged and cannot be read. */
 export const boxStoredDamaged = ({ boxlabel }: SX.DamagedBox): VaultError => new VaultError('damaged_row', Phrases.boxStoredDamaged(boxlabel))
@@ -153,7 +153,7 @@ export const recordForNewBox = (): VaultError => new VaultError('bad_option', Ph
 export const undecodedWhisper = (): VaultError => new VaultError('damaged_whisper', Phrases.UndecodedWhisper)
 
 /** The refusal of a call that works on the exposed whisper, on a box with none. */
-export const notExposedError = (): VaultError => new VaultError('bad_option', Phrases.NotExposed)
+export const notExposed = (): VaultError => new VaultError('bad_option', Phrases.NotExposed)
 // --
 
 // == [Lease Throwers]: damagedLease, undecipheredWhisper, leaseNotInForce

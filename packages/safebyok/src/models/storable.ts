@@ -6,7 +6,7 @@ import { adorn, tattoo } from '../helpers/helpers'
 import { type WhisperedBag, isWhisperedBag } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
-import { disabledError, lockedError, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoadError, shapeUnreconciled } from '../refusals/throwers'
+import { instanceDisabled, needUnlocked, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoad, shapeUnreconciled } from '../refusals/throwers'
 import type { Age, Am, RecordShape } from '../shapes/shapes-enums'
 import * as VX from '../shapes/shapes-vaultish'
 import type { Fetched, FetchOpts, ListingOf, ListingWorld, Reconciled, Aligned, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
@@ -346,21 +346,21 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   demandDeletable(): this { return this.demandEnabled().demandUnlocked() }
 
   /** Demand that this thing's vault is unlocked. */
-  demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
+  demandUnlocked(): this { if (this.isLocked)    { throw needUnlocked() }                               return this }
 
   /** Demand that this thing is still enabled. */
-  demandEnabled():  this { if (! this.#isEnabled) { throw disabledError() }                            return this }
+  demandEnabled():  this { if (! this.#isEnabled) { throw instanceDisabled() }                            return this }
 
   /** Demand that the record in hand is full. */
-  demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
+  demandFull():     this { if (! this.isFull)    { throw partialLoad() }                          return this }
 
   /** Demand that the record in hand is whole: full, or a tombstone. */
-  demandWhole():    this { if (! this.#isWhole)  { throw partialLoadError() }                          return this }
+  demandWhole():    this { if (! this.#isWhole)  { throw partialLoad() }                          return this }
 
   /** The full record in hand. */
   protected demandFullProps(): RecordT {
     if (this.full !== null) { return this.full }
-    throw partialLoadError()
+    throw partialLoad()
   }
 
   /** Hydrate this thing so that a delete can act on it. */

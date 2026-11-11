@@ -12,7 +12,7 @@ import * as VX from '../shapes/shapes-vaultish'
 import { type BoxExposedPatch, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type Fetched, type ThingAnswer, type TimelyOpts } from '../shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../shapes/shapes-storage'
 import { stableJsonify } from '../helpers/stable-jsonify'
-import { absentBoxError, notExposedError, undecodedWhisper } from '../refusals/throwers'
+import { boxAbsent, notExposed, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 import { refusedAnswerOf } from '../storage/vault-db'
@@ -135,7 +135,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
    * See notes/expose_improves_security.md
    */
   unveil(): this {
-    if (this.#exposed === null) { throw notExposedError() }
+    if (this.#exposed === null) { throw notExposed() }
     this.#isVeiled = false
     this.align()
     return this
@@ -145,7 +145,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   patchWhisper(patch: Whisper): this {
     const given = VX.whisperPatch.parse(patch)
     this.demandEnabled()
-    if (this.#exposed === null) { throw notExposedError() }
+    if (this.#exposed === null) { throw notExposed() }
     this.#replaceExposed(mergedOver(this.#exposed, given))
     return this
   }
@@ -195,7 +195,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Seal the whisper exposed, veiled or not, and put it; `patch` may name a sidecar, never a whisper. */
   async putExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<this> {
     const { sidecar } = VX.boxExposedPatch.parse(patch)
-    if (this.#exposed === null) { throw notExposedError() }
+    if (this.#exposed === null) { throw notExposed() }
     return this.put({ whisper: this.#exposed, sidecar }, opts)
   }
 
@@ -242,7 +242,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** Demand that this box is present. */
   demandPresent(): this {
-    if (! this.isPresent) { throw absentBoxError(this) }
+    if (! this.isPresent) { throw boxAbsent(this) }
     return this
   }
 

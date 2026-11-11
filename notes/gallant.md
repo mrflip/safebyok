@@ -79,7 +79,7 @@ async getBox(boxlabel, opts = {}) {
   await this.#ensureGreeted(); this.demandBoxesUsable()
   if (box?.isPresent === true) { return box }
   if (ifAbsent === 'nil') { return null }
-  throw absentBoxError(scope)
+  throw boxAbsent(scope)
 }
 ```
 
@@ -409,7 +409,7 @@ puttable(scoped, opts = {}) {
   const { ifAbsent } = MSX.boxPutOpts.parse(opts)
   const scope = this.scopeOf(scoped)
   const held = this.at(scope)
-  if ((held === null) && (ifAbsent === 'fail')) { throw notListedBoxError(scope) }
+  if ((held === null) && (ifAbsent === 'fail')) { throw boxNotListed(scope) }
   return held ?? this.#shellFor(scope)
 }
 
@@ -468,7 +468,7 @@ opinion, with a refusal that doesn't carry the frontier.
 
 ```ts
 protected demandNotListed(scope) {
-  if (this.at(scope) !== null) { throw alreadyListedError() }
+  if (this.at(scope) !== null) { throw alreadyListed() }
 }
 ```
 
@@ -879,7 +879,7 @@ const prior = listing.demandBirthSlot(checked) ?? VS.VoidRevision
 demandBirthSlot(scope) {
   this.demandEnabled()
   const listed = this.at(scope)
-  if (listed?.isPresent === true) { throw alreadyListedError() }
+  if (listed?.isPresent === true) { throw alreadyListed() }
   return listed
 }
 ensureVault(record, prior) { return this.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' }) }
@@ -891,7 +891,7 @@ ensureVault(record, prior) { return this.put(record, { prior, ifAbsent: 'add', i
 // Vault.launchBirth
 listing.demandEnabled()
 const listed = listing.at(checked)
-if (listed?.isPresent === true) { throw alreadyListedError() }
+if (listed?.isPresent === true) { throw alreadyListed() }
 const prior = VS.revisionOf(listed ?? VS.VoidRevision)
 ```
 
@@ -907,7 +907,7 @@ Every read of a negative boolean is a double negative, and guards read worst of 
 #isDisabled = false
 if (! this.#isDisabled) { this.align() }
 
-demandEnabled(): this { if (this.#isDisabled) { throw disabledError() } return this }
+demandEnabled(): this { if (this.#isDisabled) { throw instanceDisabled() } return this }
 ```
 
 **Gallant:**
@@ -916,7 +916,7 @@ demandEnabled(): this { if (this.#isDisabled) { throw disabledError() } return t
 #isEnabled = true
 if (this.#isEnabled) { this.align() }
 
-demandEnabled():    this { if (! this.#isEnabled) { throw disabledError() } return this }
+demandEnabled():    this { if (! this.#isEnabled) { throw instanceDisabled() } return this }
 ```
 
 ## Guards chain to the caller or the receiver `#chain-guards`
@@ -933,7 +933,7 @@ demandBoxesUsable(): this { return this.demandUsable().demandUnlocked() }     //
 **Gallant:**
 
 ```ts
-demandEnabled():    this { if (! this.#isEnabled) { throw disabledError() } return this } // one test, direct
+demandEnabled():    this { if (! this.#isEnabled) { throw instanceDisabled() } return this } // one test, direct
 demandPromptable(): this { return this.demandEnabled().demandPresent() }                  // one recipe, chained
 // demandBoxesUsable -- moved to Box and renamed for its callers                          // belongs near callers, as per its name
 ```

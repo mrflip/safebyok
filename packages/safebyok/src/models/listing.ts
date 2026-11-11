@@ -11,7 +11,7 @@ import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingDelOpts, ListingListAnswer, ListingPutAnswer, ListingPutOpts, ListingOpts, ListingWorld, ListingGetAnswer, SlotFate, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
-import { disabledError, rowOfOtherVaultTok, storageIssue } from '../refusals/throwers'
+import { instanceDisabled, rowOfOtherVaultTok, storageIssue } from '../refusals/throwers'
 import * as Phrases from '../helpers/phrases'
 import { demandGood, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
@@ -406,7 +406,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Demands that this listing be enabled: not past a sweep or a vacate. */
   demandEnabled(): this {
-    if (! this.#isEnabled) { throw disabledError() }
+    if (! this.#isEnabled) { throw instanceDisabled() }
     return this
   }
 
