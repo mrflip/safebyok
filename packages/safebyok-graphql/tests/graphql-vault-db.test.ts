@@ -22,7 +22,6 @@ describe("GraphQLVaultDB over the typed schema", () => {
     _cheat_rowsOf:        () => TH.rowsOf(),
     _cheat_failNextCall:  (vaultDB) => { vaultDB.failNext() },
     _cheat_adapterOf:     TH.adapterOf,
-    plantsAnyRow:         false,
   })
 
   it("keeps a sidecar's own __typename while dropping the ones urql's cache adds", async () => {

@@ -9,9 +9,9 @@ import { type VaultError, isVaultError, rowsOfRefusal } from '../refusals/errors
 import { type BadOutcome, type GoodOutcome, outcomeOf, storageTroubleOf } from '../refusals/outcome'
 import * as SX from '../shapes/shapes-storage'
 import * as CX from '../shapes/shapes-core'
-import type { BankScope, VaultScope } from '../shapes/shapes-core'
+import type { BankScope } from '../shapes/shapes-core'
 import type { GateVerb, ListAct, OkAct } from '../shapes/shapes-enums'
-import { type BoxClassified, type BoxFetched, type VaultClassified, type VaultFetched, classifyBox, classifyVault } from './classifier'
+import { type BoxClassified, type BoxFetched, type VaultClassified, type VaultFetched, boxVaultActOf, boxWorldOf, classifyBox, classifyVault } from './classifier'
 import type {
   AdapterVaultDBOpts, BoxAsk, BoxDelAsk, BoxGetAsk, BoxPutAsk, BoxRow, BoxSparse, DamagedBox, DamagedVault,
   GateVerbOpts, ReqParams, VaultAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultQuery, VaultRecord, VaultRow, VaultTombstone, WatchScope,
@@ -101,7 +101,7 @@ export interface VaultDB {
   tryGetVault(ask: VaultGetAsk): Promise<VaultAnswer>
   /** The boxes under this `vault_tok`, sparse, with its vault row as `world`. */
   listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, ListAct>>
-  /** Non-throwing form of {@link VaultDB.listBoxes}. */
+  /** Non-throwing form of {@link VaultDB.listBoxes}. Where it refuses for its vault, `world` is the vault row stored. */
   tryListBoxes(asked: VaultQuery): Promise<Answer<BoxesListed, ListAct>>
   /** The box under this `vault_tok`, with its vault row as `world`. Over none stored, `ifAbsent: 'nil'` answers null, and over a tombstone, the tombstone. */
   getBox(ask: BoxGetAsk): Promise<GoodAnswer<BoxRow | null, OkAct>>
@@ -252,18 +252,20 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
 
   /** The boxes under this `vault_tok`, sparse, with its vault row as `world`. */
-  async listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, ListAct>> {
-    const vaultQuery = SX.vaultQuery.parse(asked)
-    const req_params = SX.reqParams.parse(vaultQuery)
-    try {
-      const { vault, boxes } = await this.doListBoxes(vaultQuery)
-      const world = liveVaultOf(foundVaultRowOf(vault, vaultQuery), vaultQuery)
-      return { ok: true, req_params, act: (boxes.length > 0) ? 'got' : 'gotvoid', val: listedBoxesOf(vaultQuery, boxes), world }
-    } catch (err) { throw refusalOf(err, 'listBoxes', req_params) }
-  }
+  async listBoxes(asked: VaultQuery) { return goodOrThrow(await this.tryListBoxes(asked)) }
 
-  /** Non-throwing form of {@link listBoxes}. */
-  async tryListBoxes(asked: VaultQuery) { return answerOf(() => this.listBoxes(asked)) }
+  /** Non-throwing form of {@link listBoxes}. Where it refuses for its vault, `world` is the vault row stored. */
+  async tryListBoxes(asked: VaultQuery): Promise<Answer<BoxesListed, ListAct>> {
+    try {
+      const vaultQuery = SX.vaultQuery.parse(asked)
+      const req_params = SX.reqParamsOf(vaultQuery)
+      const { vault, boxes } = await this.doListBoxes(vaultQuery)
+      const world = boxWorldOf(vaultQuery, vault)
+      const act = boxVaultActOf(vaultQuery, world)
+      if (act !== null) { return { ok: false, req_params, act, world, err: Refuse.actRefused('box', act, { call: 'listBoxes', req_params }) } }
+      return { ok: true, req_params, act: (boxes.length > 0) ? 'got' : 'gotvoid', val: listedBoxesOf(vaultQuery, boxes), world }
+    } catch (err) { return this.answerThrown(err, 'listBoxes', asked) }
+  }
 
   /** The box under this `vault_tok`, with its vault row as `world`. Over none stored, `ifAbsent: 'nil'` answers null, and over a tombstone, the tombstone. */
   async getBox(ask: BoxGetAsk) { return goodOrThrow(await this.tryGetBox(ask)) }
@@ -434,7 +436,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // --
 }
 
-// == [Helpers]: goodOrThrow, refusalOf, gateAskOf, RowOfOtherAddress, demandVaultObject, foundVaultRowOf, listedRowOf, liveVaultOf, listedBoxesOf, jsonBytes
+// == [Helpers]: goodOrThrow, refusalOf, gateAskOf, RowOfOtherAddress, listedRowOf, liveVaultOf, listedBoxesOf, jsonBytes
 
 /** `answer` where it is good; else throws its refusal. */
 function goodOrThrow<ValT, ActT extends string, WorldT>(answer: Answer<ValT, ActT, WorldT>): GoodAnswer<ValT, ActT, WorldT> {
@@ -456,18 +458,6 @@ function gateAskOf(gateVerb: GateVerb, record: VaultRecord, opts: GateVerbOpts):
 }
 
 const RowOfOtherAddress = { kind: 'storage_issue', message: Phrases.rowOfOtherAddress } as const
-
-function demandVaultObject(asked: VaultScope, raw: unknown): VaultRow {
-  if (! CX.isPlainBag(raw)) { throw Refuse.storageIssue() }
-  return SX.storedVaultRow.parseConsistent(raw, CX.vaultScope.parse(asked), RowOfOtherAddress)
-}
-
-// Checked against its scope and not its vault_tok: a vault row of another life is an answer the verbs have words for.
-/** The vault row storage answered for `asked`'s scope, null for none. */
-function foundVaultRowOf(raw: unknown, asked: VaultScope): VaultRow | null {
-  if (raw === null) { return null }
-  return demandVaultObject(asked, raw)
-}
 
 /** A listing's row, checked against the `address` it is listed at; null for one that is to be set aside as damaged. */
 function listedRowOf<RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknown, address: object): RowT | null {

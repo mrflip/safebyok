@@ -45,7 +45,6 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
     makeTwin:             twinOf,
     _cheat_rowsOf:        () => TH.rowsOf(getDb()),
     _cheat_adapterOf:     (browser) => serverOf.get(browser)!.vaultDB,
-    plantsAnyRow:         false,
   })
 
   it("hears what a browser of another server puts, a box too large for a notice included", async () => {

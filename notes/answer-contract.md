@@ -66,13 +66,13 @@ The adapter gauges the room as it is about to write a new live box, and the clas
 
 ### Listings
 
-A listing answers, for each box it lists, what a get of that box would answer in the same atomic unit. A listing is not guaranteed to cursor, and may be capped in length: it need not list every box.
+A listing answers, for each box it lists, what a get of that box would answer in the same atomic unit. Where a listing refuses for its vault, it carries that vault's row as its world, as a box's get does. A listing is not guaranteed to cursor, and may be capped in length: it need not list every box.
 
 ### Operational Checks
 
 Precedence, first match wins, for a box:
 
-1. Request shape, before any operation: `bad_op`; `bad_record` (malformed payload, or next seq not prior seq + 1, or next `revision_tok` equal to the expected one, or a half-sentinel expected revision, or a life token changed or kept against C7 or C8, or a record that would be stored damaged, C13).
+1. Request shape, before any operation: `bad_record` (an unknown op or flag, or a malformed scope or payload, or next seq not prior seq + 1, or next `revision_tok` equal to the expected one, or a half-sentinel expected revision, or a life token changed or kept against C7 or C8, or a record that would be stored damaged, C13).
 2. Vault damaged: thrown, as `damaged_vault`.
 3. Vault void: no vault row stops at `vault_void`. Box ops never create a vault.
 4. Vault life: a vault tombstone stops at `vault_gone`, whatever its `vault_tok`; a live vault under another `vault_tok` than the request's stops at `vault_reborn`. Box ops never compare the vault's revision.
@@ -105,7 +105,7 @@ Every box op passes these tests first. On return, the vault is verified as healt
 
 | #   |    op    | flags   | `v_tok` | vault   | box | act                                                                      | returning | result |
 | --- | :------: | ------- | :-----: | ------- | --- | ------------------------------------------------------------------------ | :-------: | ------ |
-| G1  |    @     | invalid |    @    | @       | @   | `bad_op`        (unknown op or flags, or no `vault_tok`)                 |    err    | 🌀      |
+| G1  |    @     | invalid |    @    | @       | @   | `bad_record`    (unknown op or flags, or no `vault_tok`)                 |    err    | 🌀      |
 | G2  | put, del | valid   |    @    | @       | @   | `bad_record`    (malformed reqval)                                       |    err    | 🌀      |
 | G2  | put, del | valid   |    @    | @       | @   | `bad_record`    (next `revision_tok` = cited `revision_tok`)             |    err    | 🌀      |
 | G2  | put, del | valid   |    @    | @       | @   | `bad_record`    (next seq ≠ prior + 1)                                   |    err    | 🌀      |
@@ -218,7 +218,7 @@ Every vault op passes these first, whatever revision it cites.
 
 | #   |    op    | flags   |  vault  | act         |                                                     | returning | result |
 | --- | :------: | ------- | :-----: | ----------- | --------------------------------------------------- | --------- | :----: |
-| V1  |    @     | invalid |    @    | bad_op      |                                                     | err       |   🌀    |
+| V1  |    @     | invalid |    @    | bad_record  | unknown op or flags, or a malformed scope           | err       |   🌀    |
 | V2  | put, del | @       |    @    | bad_record  | malformed request record                            | err       |   🌀    |
 | V2  | put, del | @       |    @    | bad_record  | next seq ≠ prior + 1                                | err       |   🌀    |
 | V2  | put, del | @       |    @    | bad_record  | next revision_tok = cited revision_tok              | err       |   🌀    |
@@ -317,7 +317,7 @@ Where the vault differs from the box table, and why:
 
 Three roles take part in every call, and each rule below names the one it binds.
 
-- **vaultDB**: the core's `VaultDB`, the interface a model calls. It checks the request's shape before anything is fetched (`bad_op`, `bad_record`), and it answers: `act`, `val`, `world`, `dbhas`. It owns the **classifier**, the shared pure function that takes the request and the rows fetched, names the `act`, and says what to write, if anything. Every judgment in the tables above is the classifier's.
+- **vaultDB**: the core's `VaultDB`, the interface a model calls. It checks the request's shape before anything is fetched (`bad_record`), and it answers: `act`, `val`, `world`, `dbhas`. It owns the **classifier**, the shared pure function that takes the request and the rows fetched, names the `act`, and says what to write, if anything. Every judgment in the tables above is the classifier's.
 - **adapter**: the package that carries a vaultDB call to one kind of datastore. It opens the atomic unit, fetches the rows, hands them to the classifier, writes what the classifier said, and hands the rows back. It judges nothing.
 - **datastore**: the engine that holds the vault and box rows: Postgres, IndexedDB, a host's backend. It must offer a unique key per scope, and an atomic unit that spans a fetch and a write. It may also take part, with constraints, foreign keys or stored procedures that enforce these same invariants and checks a second time. That is allowed and never required, it decides no outcome in the tables, and its detail is outside this note.
 
@@ -330,7 +330,7 @@ Two primary keys locate every row, and the datastore enforces them. Every other 
 
 | #   | Invariant                                                                                            | Enforced by                                                            | Check                                                                                                                                                                                                                                                                            | On failure                                                                                                                         |
 | --- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| C1  | `vault_scope` and boxlabel in a request are well formed                                              | vaultDB, before anything is fetched                                    | parse and validate                                                                                                                                                                                                                                                               | `bad_op`                                                                                                                           |
+| C1  | `vault_scope` and boxlabel in a request are well formed                                              | vaultDB, before anything is fetched                                    | parse and validate                                                                                                                                                                                                                                                               | `bad_record`, or `bad_scope` for a listing                                                                                         |
 | C2  | One vault row per `vault_scope`, kept as a tombstone after delete                                    | datastore primary key                                                  | vault create is an insert-if-absent                                                                                                                                                                                                                                              | `stale`                                                                                                                            |
 | C3  | One box row per `box_scope` in one life of its vault, kept as a tombstone after delete               | datastore primary key                                                  | born is an insert-if-absent                                                                                                                                                                                                                                                      | `stale`                                                                                                                            |
 | C4  | A stored row's `vault_scope`, and a box's `vault_tok` and boxlabel, match the key it was found under | datastore key; the classifier checks the rows it is handed             | compare the stored scope fields, and a box's `vault_tok`, with the request                                                                                                                                                                                                       | `storage_issue`, thrown: the row is sound and the store or its adapter is not                                                      |
@@ -399,6 +399,7 @@ Each rule is one testable statement about what an adapter does. An atomic unit i
 - Required: a unique key per scope. `vault_scope` keys the vault table and (`vault_scope`, `vault_tok`, boxlabel) keys the box table, so a scope never has two rows in one vault life.
 - Required: an atomic unit that spans the fetch and the write of a get, put or del. tidyBoxes asks for none beyond each conditioned delete.
 - Allowed, never required: the datastore enforces an invariant itself, by a foreign key (C5), a check constraint, a condition on the write, or a stored procedure that runs these checks. Such a check agrees with the classifier, or the adapter has a defect; it never decides an outcome.
+- Allowed: the datastore refuses to hold a row the classifier would refuse. So a flawed row meets one of two ends: the datastore does not hold it, or the classifier throws it, as `storage_issue` where its scope is not the one it is filed under, and as damaged otherwise.
 
 ### tidyBoxes tests
 

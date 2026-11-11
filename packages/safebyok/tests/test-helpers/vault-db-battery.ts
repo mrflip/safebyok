@@ -13,14 +13,19 @@ import { describePuts } from './vault-db-battery-puts'
 import { describeDels } from './vault-db-battery-dels'
 import { describeRaces } from './vault-db-battery-races'
 import { describeIdentity } from './vault-db-battery-identity'
+import { describeFlaws } from './vault-db-battery-flaws'
 
 // == [The hooks a VaultDB hands the battery]: VaultDBRowCheats, VaultDBBatteryOpts
 
 /** A VaultDB's raw rows, past its verbs: the test backdoor the battery plants a row by, damaged or not, and reads one back by. */
 export type VaultDBRowCheats = {
-  /** Writes `row` as the vault row at `scope`, unchecked. */
+  /** Writes `row` as the vault row at `scope`, unchecked.
+   * Where the store cannot hold `row`, it may throw or store something else: the battery reads the row back to tell.
+   */
   plantVaultRow: (scope: VaultScope, row: unknown) => Awaitable<void>
-  /** Writes `row` as the box row at `scope` under the life `vault_tok`, unchecked, whether or not a vault row stands over it. */
+  /** Writes `row` as the box row at `scope` under the life `vault_tok`, unchecked, whether or not a vault row stands over it.
+   * Where the store cannot hold `row`, it may throw or store something else, as for a vault row.
+   */
   plantBoxRow: (scope: Boxscope, vault_tok: string, row: unknown) => Awaitable<void>
   /** The vault row at `scope` as stored, or null. */
   vaultRowOf: (scope: VaultScope) => Awaitable<unknown>
@@ -36,23 +41,18 @@ export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
   _cheat_rowsOf: (vaultDB: DBT) => VaultDBRowCheats
   /** A second VaultDB over the same rows, as another device has; without it, the races run over one VaultDB. */
   makeTwin?: (vaultDB: DBT) => Awaitable<VaultDB>
-  /** A fresh, empty VaultDB with at most `maxBoxes` live boxes to a vault; without it, the cases of a cap are skipped. */
+  /** A fresh, empty VaultDB with at most `maxBoxes` live boxes to a vault; without it, the battery has no cases of a cap. */
   makeCappedVaultDB?: (maxBoxes: number) => Awaitable<DBT>
-  /** A fresh backend, as a way to make a VaultDB over it signed in as a user, or signed out for null; without it, who may reach a vault is skipped. */
+  /** A fresh backend, as a way to make a VaultDB over it signed in as a user, or signed out for null; without it, the battery has no cases of who may reach a vault. */
   makeVaultDBFor?: () => Awaitable<(user_id: string | null) => VaultDB>
-  /** Makes the VaultDB's next call to its storage fail as its storage would; without it, that case is skipped. */
+  /** Makes the VaultDB's next call to its storage fail as its storage would; without it, the battery has no case of that failure. */
   _cheat_failNextCall?: (vaultDB: DBT) => Awaitable<void>
   /** The AdapterVaultDB behind a client, where the battery slips a rival write in; without it, `vaultDB` itself. */
   _cheat_adapterOf?: (vaultDB: DBT) => AdapterVaultDB
-  /** False for a VaultDB whose watch hears nothing; its cases are then skipped. */
+  /** False for a VaultDB whose watch hears nothing; the battery then has no cases of a watch. */
   watches?: boolean
   /** False for a VaultDB whose box notices come without their vault row, which a watch then hears with a null world. */
   boxNoticesCarryVault?: boolean
-  /** False for a VaultDB whose storage refuses a row failing its checks, a row of a later fmt excepted: of the battery's flaws it holds only `LaterFmtFlaw`.
-   * It holds no row that is no object, lacks a field every row has, names another address than it is filed at, or is a box row under no vault row;
-   * the cases of such rows, and of the other flaws, are then skipped, and a case that wants only some failing row plants a later fmt.
-   */
-  plantsAnyRow?: boolean
 }
 // --
 
@@ -67,7 +67,6 @@ const batteryOpts = objCheck(({ fn, bool }) => ({
   _cheat_adapterOf:       fn<NonNullable<VaultDBBatteryOpts['_cheat_adapterOf']>>().optional(),
   watches:              bool.optional(),
   boxNoticesCarryVault: bool.optional(),
-  plantsAnyRow:         bool.optional(),
 }), 'bad_option')
 
 // == [The world the cases share]: BatteryWorld, worldOf
@@ -91,16 +90,15 @@ export type BatteryWorld = {
   failNextCall:         (vaultDB: VaultDB) => Promise<void>
   watches:              boolean
   boxNoticesCarryVault: boolean
-  plantsAnyRow:         boolean
 }
 
-/** Stands in for a hook the VaultDB did not give, in a case that is skipped without it. */
+/** Stands in for a hook the VaultDB did not give, in a case not registered without it. */
 const notGiven = (hookname: string) => (): never => { throw new TypeError(`The VaultDB gave the battery no ${hookname}.`) }
 
 // Every VaultDB a world's hooks are handed is one its own factories made, so the narrowing to DBT has;
 // a world given no `_cheat_adapterOf` was handed AdapterVaultDBs.
 const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWorld => {
-  const { makeVaultDB, _cheat_rowsOf, makeTwin, makeCappedVaultDB, makeVaultDBFor, _cheat_failNextCall, _cheat_adapterOf, watches = true, boxNoticesCarryVault = true, plantsAnyRow = true } = opts
+  const { makeVaultDB, _cheat_rowsOf, makeTwin, makeCappedVaultDB, makeVaultDBFor, _cheat_failNextCall, _cheat_adapterOf, watches = true, boxNoticesCarryVault = true } = opts
   const fresh = async (dbOpts?: AdapterVaultDBOpts): Promise<VaultDB> => await makeVaultDB(dbOpts)
   const putWith = async ({ box: withBox = false } = {}) => {
     const vaultDB = await fresh()
@@ -124,7 +122,6 @@ const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWor
     failNextCall: _cheat_failNextCall ? async (vaultDB) => { await _cheat_failNextCall(vaultDB as DBT) } : notGiven('_cheat_failNextCall'),
     watches,
     boxNoticesCarryVault,
-    plantsAnyRow,
   }
 }
 // --
@@ -144,6 +141,7 @@ export const describeVaultDBBattery = <DBT extends VaultDB>(label: string, opts:
     describeDels(world)
     describeRaces(world)
     describeIdentity(world)
+    describeFlaws(world)
   })
 }
 // --

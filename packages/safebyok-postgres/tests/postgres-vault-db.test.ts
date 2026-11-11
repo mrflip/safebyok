@@ -29,7 +29,6 @@ TH.describeVaultDBBattery("PostgresVaultDB", {
   makeTwin:             TH.makeTwin,
   _cheat_rowsOf:        () => TH.rowsOf(),
   _cheat_failNextCall:  TH.failNextCall,
-  plantsAnyRow:         false,
 })
 
 describe("PostgresVaultDB's constructor", () => {

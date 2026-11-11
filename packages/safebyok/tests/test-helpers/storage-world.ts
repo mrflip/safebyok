@@ -1,4 +1,4 @@
-/** The scopes, records and asks a vaultDB's tests share: a vault and a box at a revision, their tombstones, and a get, put or del of either. */
+/** The scopes, records and asks a vaultDB's tests share: a vault and a box at a revision, their tombstones, the flawed rows its verbs must refuse, and a get, put or del of either. */
 
 import * as SX from '../../src/shapes/shapes-storage'
 import type { Boxscope, VaultScope } from '../../src/shapes/shapes-core'
@@ -48,33 +48,74 @@ export const boxAt = (revision_seq = 0, vault_tok = 'life1', extra: object = {})
   ...extra,
 })
 
-/** The flaw of {@link boxFlaws} and {@link vaultFlaws} that a store with a column for each field cannot hold. */
-export const ExtraFieldFlaw = 'an extra field'
-
-/** The only flaw of {@link boxFlaws} and {@link vaultFlaws} that a store which refuses rows failing their checks can hold. */
-export const LaterFmtFlaw = 'a later fmt'
-
 /** Flaws that leave a box row's `am` and revision readable and fail its check, each named. */
 export const boxFlaws = [
-  [LaterFmtFlaw,                    (box: BoxRecord) => ({ ...box, fmt: SX.BoxFormat + 1 })],
-  [ExtraFieldFlaw,                  (box: BoxRecord) => ({ ...box, smuggled: 'field' })],
-  ['garbled ciphertext',            (box: BoxRecord) => ({ ...box, whisper_ciphered: 'garbled' })],
+  ['a later fmt',                (box: BoxRecord) => ({ ...box, fmt: SX.BoxFormat + 1 })],
+  ['an extra field',             (box: BoxRecord) => ({ ...box, smuggled: 'field' })],
+  ['garbled ciphertext',         (box: BoxRecord) => ({ ...box, whisper_ciphered: 'garbled' })],
   ['a tombstone with a whisper', (box: BoxRecord) => ({ ...box, am: 'x' })],
 ] as const
 
 /** Flaws that leave a vault row's `am` and revision readable and fail its check, each named. */
 export const vaultFlaws = [
-  [LaterFmtFlaw,                 (vault: VaultRecord) => ({ ...vault, fmt: SX.VaultFormat + 1 })],
-  [ExtraFieldFlaw,               (vault: VaultRecord) => ({ ...vault, smuggled: 'field' })],
-  ['a garbled gate',             (vault: VaultRecord) => ({ ...vault, gate: 'rubble' })],
+  ['a later fmt',             (vault: VaultRecord) => ({ ...vault, fmt: SX.VaultFormat + 1 })],
+  ['an extra field',          (vault: VaultRecord) => ({ ...vault, smuggled: 'field' })],
+  ['a garbled gate',          (vault: VaultRecord) => ({ ...vault, gate: 'rubble' })],
   ['a tombstone with a gate', (vault: VaultRecord) => ({ ...vault, am: 'x' })],
 ] as const
 
-/** A damage to a vault row, and the field it fails on: a garbled gate, or a later fmt where `plantsAnyRow` is false and a store holds no other. */
-export const vaultDamageFor = (plantsAnyRow: boolean) => (plantsAnyRow
-  ? { damage: { gate: 'rubble' }, fieldname: 'gate' }
-  : { damage: { fmt: SX.VaultFormat + 1 }, fieldname: 'fmt' }
-)
+/** How the verbs must refuse a flawed row: as `storage_issue`, or as damaged, the row asked for or a box op's vault. */
+export type FlawRefusal = 'storage_issue' | 'damaged'
+
+/** A row the verbs must refuse, how they must refuse it, the fields their refusal names, and what is wrong with it. */
+export type FlawedRow = readonly [row: unknown, refusal: FlawRefusal, fieldnames: readonly string[] | undefined, blurb: string]
+
+const soundVault = vaultAt()
+const soundBox   = boxAt()
+
+/** The fields a vault row has beside its revision and its life. */
+const VaultFieldsBeyondRevision = ["applabel", "user_id", "vaultlabel", "fmt", "registered_at", "written_at", "gate"]
+
+/** Vault rows the verbs must refuse, each filed at the world's vault and standing at its revision where it has one. */
+export const FlawedVaultRows: readonly FlawedRow[] = [
+  // a sound row filed at another address than it names:
+  [{ ...soundVault, user_id: "u2" },                                                    "storage_issue", ["user_id"],                'naming another user_id'],
+  [{ ...soundVault, vaultlabel: "other" },                                              "storage_issue", ["vaultlabel"],             'naming another vaultlabel'],
+  // no object:
+  [["rubble"],                                                                          "storage_issue", undefined,                  'that is an array'],
+  ["rubble",                                                                            "storage_issue", undefined,                  'that is a string'],
+  [12,                                                                                  "storage_issue", undefined,                  'that is a number'],
+  // lacking the fields every row has:
+  [{ garbage: true },                                                                   "damaged",       ["am"],                     'with none of the fields every row has'],
+  [{ fmt: SX.VaultFormat + 1, revision_seq: 9 },                                        "damaged",       ["am"],                     'with a later fmt and a revision_seq alone'],
+  [{ revision_tok: "r9", revision_seq: 9, am: "a", vault_tok: "life9", garbage: true }, "damaged",       VaultFieldsBeyondRevision,  'with a revision and a life and no other field'],
+  // whole, and failing its check:
+  [{ ...soundVault, fmt: SX.VaultFormat + 1 },                                          "damaged",       ["fmt"],                    'of a later fmt'],
+  [{ ...soundVault, smuggled: "field" },                                                "damaged",       [],                         'with an extra field'],
+  [{ ...soundVault, gate: "rubble" },                                                   "damaged",       ["gate"],                   'with a garbled gate'],
+  [{ ...soundVault, am: "x" },                                                          "damaged",       [],                         'that is a tombstone with a gate'],
+  [{ ...soundVault, vault_tok: "life2", gate: "rubble" },                               "damaged",       ["gate"],                   'of another life, with a garbled gate'],
+]
+
+/** Box rows the verbs must refuse, each filed at the world's box and standing at its revision where it has one. */
+export const FlawedBoxRows: readonly FlawedRow[] = [
+  // a sound row filed at another address than it names:
+  [{ ...soundBox, user_id: "u2" },                 "storage_issue", ["user_id"],           'naming another user_id'],
+  [{ ...soundBox, vault_tok: "life2" },            "storage_issue", ["vault_tok"],         'naming another vault_tok'],
+  [{ ...soundBox, boxlabel: "other" },             "storage_issue", ["boxlabel"],          'naming another boxlabel'],
+  // no object:
+  [["rubble"],                                     "storage_issue", undefined,             'that is an array'],
+  ["rubble",                                       "storage_issue", undefined,             'that is a string'],
+  [12,                                             "storage_issue", undefined,             'that is a number'],
+  // lacking the fields every row has:
+  [{ garbage: true },                              "damaged",       ["am"],                'with none of the fields every row has'],
+  [{ fmt: SX.BoxFormat + 1, revision_seq: 9 },     "damaged",       ["am"],                'with a later fmt and a revision_seq alone'],
+  // whole, and failing its check:
+  [{ ...soundBox, fmt: SX.BoxFormat + 1 },         "damaged",       ["fmt"],               'of a later fmt'],
+  [{ ...soundBox, smuggled: "field" },             "damaged",       [],                    'with an extra field'],
+  [{ ...soundBox, whisper_ciphered: "garbled" },   "damaged",       ["whisper_ciphered"],  'with garbled ciphertext'],
+  [{ ...soundBox, am: "x" },                       "damaged",       [],                    'that is a tombstone with a whisper'],
+]
 
 const tombstoneFieldsOf = ({ revision_tok, revision_seq }: Revision) => ({ revision_tok: `${revision_tok}x`, revision_seq: revision_seq + 1, am: 'x' as const })
 

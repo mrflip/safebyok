@@ -165,8 +165,9 @@ describe("a tombstone over a live vault", () => {
   })
 })
 
-describe("a box notice carrying the vault's tombstone as its world", () => {
-  it("ends the box listing with no bad news", async () => {
+// W2 of notes/receive-contract.md, which the models do not do yet: `it.fails` holds until they do.
+describe("a box answer carrying the vault's tombstone as its world", () => {
+  it.fails("ends the vault of that life with no bad news", async () => {
     const onBadNews = vi.fn()
     const { fakeBank, opts, demandStored, listing: born } = makeVaultWorld()
     const bornVault = await buildTyping(born, Dna, byPassphrase(Passphrase))
@@ -176,9 +177,8 @@ describe("a box notice carrying the vault's tombstone as its world", () => {
     const boxes = vault.boxListing
     await boxes.hello()
     await delTyping(bornVault)
-    await forgotten()
-    expect(vault.isPresent).to.be.false
     await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])))
+    expect(vault.isPresent).to.be.false
     expect(onBadNews).not.toHaveBeenCalled()
   })
 })

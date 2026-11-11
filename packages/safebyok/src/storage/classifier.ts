@@ -122,7 +122,7 @@ function rowActOf(asked: Asked, stored: Stored): VaultAct {
 }
 // --
 
-// == [Rows stored]: boxVaultRow, vaultRowAt, boxRowAt, boxVaultActOf
+// == [Rows stored]: boxVaultRow, vaultRowAt, boxRowAt, boxWorldOf, boxVaultActOf
 
 // Both faults of a row are thrown, each with the words of the check that found it. Damaged is a judgment of the row
 // taken alone: it fails its own checks. The row asked for refuses `damaged_row`, and the vault above a box asked for
@@ -147,8 +147,13 @@ function boxRowAt(boxQuery: BoxQuery, boxRaw: unknown): Stored<BoxRow> {
   return { presence: (row.am === 'a') ? 'live' : 'gone', row }
 }
 
+/** The vault row above a box's ask, as stored at its scope: the sentinel row for none. Throws `damaged_vault` for a row that fails its checks. */
+export function boxWorldOf(vaultScope: VaultScope, vaultRaw: unknown): VaultRow {
+  return vaultRowAt(vaultScope, vaultRaw, boxVaultRow).row ?? SX.sentinelVaultOf(vaultScope)
+}
+
 /** The act a box request refuses with for its vault's stored row, or null where the vault is live in the life asked for. */
-function boxVaultActOf({ vault_tok }: Pick<BoxQuery, 'vault_tok'>, world: VaultRow): BoxVaultAct | null {
+export function boxVaultActOf({ vault_tok }: Pick<BoxQuery, 'vault_tok'>, world: VaultRow): BoxVaultAct | null {
   if (world.revision_seq === SX.VoidRevisionSeq) { return 'vault_void' }
   if (world.am !== 'a')                          { return 'vault_gone' }
   return (world.vault_tok === vault_tok) ? null : 'vault_reborn'
@@ -272,7 +277,7 @@ function presenceOf(row: Meta | null): Presence {
  * Throws for a row that fails its checks, or that is not at the address asked for.
  */
 export function classifyBox(ask: BoxAsk, fetched: BoxFetched): BoxClassified {
-  const world    = vaultRowAt(ask, fetched.world, boxVaultRow).row ?? SX.sentinelVaultOf(ask)
+  const world    = boxWorldOf(ask, fetched.world)
   const capacity = fetched.capacity ?? null
 
   // The vault first. Under a vault that is not live in the life asked for, the box row is not read, whatever is stored for the box.

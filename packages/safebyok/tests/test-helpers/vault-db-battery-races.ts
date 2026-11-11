@@ -102,18 +102,20 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.deep.equal(written[0]?.val)
     })
 
-    it.skipIf(! hasCap)("writers racing for a vault's last place under a cap write one", async () => {
-      const vaultDB = await makeCapped(2)
-      const twin = await twinOf(vaultDB)
-      await vaultDB.putVault(vaultPutAskOf(vaultAt()))
-      await vaultDB.putBox(boxPutAskOf(boxAt()))
-      const racers = ['racer_a', 'racer_b', 'racer_c', 'racer_d'].map((boxlabel, ii) => ((ii % 2) ? twin : vaultDB).tryPutBox(boxPutAskOf(boxAt(0, 'life1', { boxlabel }))))
-      const { written, refused } = splitOf(await Promise.all(racers))
-      expect([written.length, refused.length]).to.deep.equal([1, 3])
-      expect(refused.map(({ act }) => act)).to.deep.equal(['vault_full', 'vault_full', 'vault_full'])
-      const boxrows = await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')
-      expect([...boxrows.values()].filter((row) => SX.isLiveRow(row))).to.have.lengthOf(2)
-    })
+    if (hasCap) {
+      it("writers racing for a vault's last place under a cap write one", async () => {
+        const vaultDB = await makeCapped(2)
+        const twin = await twinOf(vaultDB)
+        await vaultDB.putVault(vaultPutAskOf(vaultAt()))
+        await vaultDB.putBox(boxPutAskOf(boxAt()))
+        const racers = ['racer_a', 'racer_b', 'racer_c', 'racer_d'].map((boxlabel, ii) => ((ii % 2) ? twin : vaultDB).tryPutBox(boxPutAskOf(boxAt(0, 'life1', { boxlabel }))))
+        const { written, refused } = splitOf(await Promise.all(racers))
+        expect([written.length, refused.length]).to.deep.equal([1, 3])
+        expect(refused.map(({ act }) => act)).to.deep.equal(['vault_full', 'vault_full', 'vault_full'])
+        const boxrows = await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')
+        expect([...boxrows.values()].filter((row) => SX.isLiveRow(row))).to.have.lengthOf(2)
+      })
+    }
   })
 
   describe("a vault changed while a gate verb runs", () => {
@@ -143,74 +145,78 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
     })
   })
 
-  describe.skipIf(! watches)("watch", () => {
-    it("notifies of a box written and its vault deleted, each as stored", async () => {
-      const { vaultDB, vault, box } = await putWith()
-      const { notices } = watching(vaultDB, vaultScope)
-      await vaultDB.putBox(boxPutAskOf(box))
-      const tombstone = vaultTombstoneOf(vault)
-      await vaultDB.delVault(vaultDelAskOf(vault))
-      await vi.waitFor(() => {
-        expect(notices).to.deep.include.members([{ act: 'got', val: box, world: boxWorld(vault) }, { act: 'gone', val: tombstone, world: tombstone }])
+  if (watches) {
+    describe("watch", () => {
+      it("notifies of a box written and its vault deleted, each as stored", async () => {
+        const { vaultDB, vault, box } = await putWith()
+        const { notices } = watching(vaultDB, vaultScope)
+        await vaultDB.putBox(boxPutAskOf(box))
+        const tombstone = vaultTombstoneOf(vault)
+        await vaultDB.delVault(vaultDelAskOf(vault))
+        await vi.waitFor(() => {
+          expect(notices).to.deep.include.members([{ act: 'got', val: box, world: boxWorld(vault) }, { act: 'gone', val: tombstone, world: tombstone }])
+        })
+      })
+
+      it("notifies of what another device writes", async () => {
+        const { vaultDB, vault, box } = await putWith()
+        const twin = await twinOf(vaultDB)
+        const { notices } = watching(vaultDB, vaultScope)
+        await twin.putBox(boxPutAskOf(box))
+        await vi.waitFor(() => { expect(notices).to.deep.include({ act: 'got', val: box, world: boxWorld(vault) }) })
+      })
+
+      it("notifies of its own vault under a vault's scope, and of every vault of its bank under a bank's", async () => {
+        const { vaultDB, box } = await putWith()
+        const bankwide = watching(vaultDB, bankScope)
+        const vaultwide = watching(vaultDB, vaultScope)
+        const other = vaultAt(0, 'life2', { vaultlabel: 'other' })
+        await vaultDB.putVault(vaultPutAskOf(other))
+        await vaultDB.putVault(vaultPutAskOf(vaultAt(0, 'life3', { user_id: 'u2' })))
+        await vaultDB.putBox(boxPutAskOf(box))
+        await vi.waitFor(() => {
+          expect(bankwide.notices.map(({ val }) => val)).to.deep.include.members([other, box])
+          expect(vaultwide.notices.map(({ val }) => val)).to.deep.include(box)
+        })
+        await aWhile()
+        expect(bankwide.notices.filter(({ val }) => val.user_id !== 'u1')).to.deep.equal([])
+        expect(vaultwide.notices.filter(({ val }) => val.vaultlabel !== 'main')).to.deep.equal([])
+      })
+
+      it("notifies of nothing once stopped", async () => {
+        const { vaultDB, box } = await putWith()
+        const { notices, unwatch } = watching(vaultDB, vaultScope)
+        await vaultDB.putBox(boxPutAskOf(box))
+        await vi.waitFor(() => { expect(notices).to.have.lengthOf(1) })
+        unwatch()
+        await vaultDB.putBox(boxPutAskOf(boxAt(1), box))
+        await aWhile()
+        expect(notices).to.have.lengthOf(1)
+      })
+
+      it("is safe to stop twice", async () => {
+        const { vaultDB, box } = await putWith()
+        const { notices, unwatch } = watching(vaultDB, vaultScope)
+        unwatch()
+        expect(() => { unwatch() }).not.to.throw()
+        await vaultDB.putBox(boxPutAskOf(box))
+        await aWhile()
+        expect(notices).to.deep.equal([])
       })
     })
+  }
 
-    it("notifies of what another device writes", async () => {
-      const { vaultDB, vault, box } = await putWith()
-      const twin = await twinOf(vaultDB)
-      const { notices } = watching(vaultDB, vaultScope)
-      await twin.putBox(boxPutAskOf(box))
-      await vi.waitFor(() => { expect(notices).to.deep.include({ act: 'got', val: box, world: boxWorld(vault) }) })
-    })
-
-    it("notifies of its own vault under a vault's scope, and of every vault of its bank under a bank's", async () => {
-      const { vaultDB, box } = await putWith()
-      const bankwide = watching(vaultDB, bankScope)
-      const vaultwide = watching(vaultDB, vaultScope)
-      const other = vaultAt(0, 'life2', { vaultlabel: 'other' })
-      await vaultDB.putVault(vaultPutAskOf(other))
-      await vaultDB.putVault(vaultPutAskOf(vaultAt(0, 'life3', { user_id: 'u2' })))
-      await vaultDB.putBox(boxPutAskOf(box))
-      await vi.waitFor(() => {
-        expect(bankwide.notices.map(({ val }) => val)).to.deep.include.members([other, box])
-        expect(vaultwide.notices.map(({ val }) => val)).to.deep.include(box)
+  if (canFail) {
+    describe("a VaultDB's own failure", () => {
+      it("refuses the call its storage failed, and completes the next", async () => {
+        const { vaultDB, vault } = await putWith()
+        await failNextCall(vaultDB)
+        const answer = await vaultDB.tryGetVault(vaultGetAskOf())
+        expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null })
+        expect(answer.req_params).to.deep.include(vaultScope)
+        expect(isVaultError(answer.err, 'storage_unavailable')).to.be.true
+        expect(await vaultDB.getVault(vaultGetAskOf())).to.deep.include({ val: vault })
       })
-      await aWhile()
-      expect(bankwide.notices.filter(({ val }) => val.user_id !== 'u1')).to.deep.equal([])
-      expect(vaultwide.notices.filter(({ val }) => val.vaultlabel !== 'main')).to.deep.equal([])
     })
-
-    it("notifies of nothing once stopped", async () => {
-      const { vaultDB, box } = await putWith()
-      const { notices, unwatch } = watching(vaultDB, vaultScope)
-      await vaultDB.putBox(boxPutAskOf(box))
-      await vi.waitFor(() => { expect(notices).to.have.lengthOf(1) })
-      unwatch()
-      await vaultDB.putBox(boxPutAskOf(boxAt(1), box))
-      await aWhile()
-      expect(notices).to.have.lengthOf(1)
-    })
-
-    it("is safe to stop twice", async () => {
-      const { vaultDB, box } = await putWith()
-      const { notices, unwatch } = watching(vaultDB, vaultScope)
-      unwatch()
-      expect(() => { unwatch() }).not.to.throw()
-      await vaultDB.putBox(boxPutAskOf(box))
-      await aWhile()
-      expect(notices).to.deep.equal([])
-    })
-  })
-
-  describe("a VaultDB's own failure", () => {
-    it.skipIf(! canFail)("refuses the call its storage failed, and completes the next", async () => {
-      const { vaultDB, vault } = await putWith()
-      await failNextCall(vaultDB)
-      const answer = await vaultDB.tryGetVault(vaultGetAskOf())
-      expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null })
-      expect(answer.req_params).to.deep.include(vaultScope)
-      expect(isVaultError(answer.err, 'storage_unavailable')).to.be.true
-      expect(await vaultDB.getVault(vaultGetAskOf())).to.deep.include({ val: vault })
-    })
-  })
+  }
 }

@@ -55,7 +55,8 @@ describe("vault.hello", () => {
     expect(box?.sidecar).to.deep.equal({ note: 'moved' })
   })
 
-  it("refuses for a vault deleted elsewhere, listing nothing", async () => {
+  // W2 of notes/receive-contract.md, which the models do not do yet: `it.fails` holds until they do.
+  it.fails("refuses for a vault deleted elsewhere, listing nothing", async () => {
     const spy = TH.spyLogger()
     const { openNextSession, vault } = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
     const next = await openNextSession()

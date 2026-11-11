@@ -5,7 +5,7 @@
 export { AdapterVaultDB } from './vault-db'
 export type { Answer, BadAnswer, BankListed, BoxesListed, DelAct, GoodAnswer, GotAct, ListAct, Notice, PutAct, Tidied } from './vault-db'
 export type { BoxAnswer, BoxesFetched, Heard, OkAct, RowOfBox, RowOfVault, VaultAnswer, VaultDB } from './vault-db'
-export { boxActOf, cappedActOf, classifyBox, classifyVault, isBirthAct, isOkAct, isWriteAct, presenceVals, vaultActOf } from './classifier'
+export { boxActOf, boxVaultActOf, boxWorldOf, cappedActOf, classifyBox, classifyVault, isBirthAct, isOkAct, isWriteAct, presenceVals, vaultActOf } from './classifier'
 export type { BoxClassified, BoxFetched, Presence, VaultClassified, VaultFetched } from './classifier'
 export type { BoxAsk, BoxDelAsk, BoxGetAsk, BoxPutAsk, VaultAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk } from '../shapes/shapes-storage'
 export { boxVaultActVals, foundActVals, gateVerbVals, refusedActVals, writeActVals } from '../shapes/shapes-enums'

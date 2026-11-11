@@ -123,7 +123,6 @@ describe("the README's Yoga recipe, its browser half", () => {
     makeTwin,
     _cheat_rowsOf:        () => TH.rowsOf(),
     _cheat_adapterOf:     (vaultDB) => serverOf(vaultDB).adapter,
-    plantsAnyRow:         false,
   })
 })
 

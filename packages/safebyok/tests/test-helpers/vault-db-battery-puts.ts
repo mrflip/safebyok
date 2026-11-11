@@ -5,7 +5,7 @@ import * as SX from '../../src/shapes/shapes-storage'
 import type { VaultDB } from '../../src/storage/vault-db'
 import { omitting } from './refusals'
 import {
-  vaultScope, boxscope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, boxFlaws, vaultFlaws, LaterFmtFlaw, vaultTombstoneOf, boxTombstoneOf, gateMoveOf, vaultDamageFor,
+  vaultScope, boxscope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, gateMoveOf,
   vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf, boxDelAskOf,
 } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
@@ -54,7 +54,7 @@ const UnstorableBoxAsks = [
 ] as const
 
 /** Registers the puts' and gate verbs' cases over `world`. */
-export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped, plantsAnyRow }: BatteryWorld): void => {
+export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: BatteryWorld): void => {
   /** A box deleted, and the rebirth that would stand on its tombstone. */
   const withBoxTombstone = async () => {
     const world = await putWith({ box: true })
@@ -62,9 +62,6 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped, plant
     await world.vaultDB.delBox(boxDelAskOf(world.box))
     return { ...world, tombstone, reborn: boxAt(tombstone.revision_seq + 1, 'life1', { box_tok: 'box2' }) }
   }
-
-  /** True for a flaw this VaultDB's storage cannot be planted with. */
-  const isUnplantable = (flawname: string): boolean => (! plantsAnyRow) && (flawname !== LaterFmtFlaw)
 
   /** The box row `openai` of the vault's life `life1`, as stored. */
   const storedBoxOf = async (vaultDB: VaultDB): Promise<unknown> => {
@@ -264,18 +261,20 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped, plant
       expect(await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')).to.have.property('size', 0)
     })
 
-    it.skipIf(! hasCap)("refuses a new box past its VaultDB's cap, and replaces one stored", async () => {
-      const vaultDB = await makeCapped(1)
-      const vault = vaultAt()
-      await vaultDB.putVault(vaultPutAskOf(vault))
-      await vaultDB.putBox(boxPutAskOf(box))
-      const full = await vaultDB.tryPutBox(boxPutAskOf(boxAt(0, 'life1', { boxlabel: 'other' })))
-      expect(full).to.deep.include({ ok: false, act: 'vault_full', world: vault })
-      expect(full.err?.refusalkind).to.eq('vault_full')
-      expect(full.err?.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
-      expect(full.req_params).to.include({ boxlabel: 'other' })
-      expect(await vaultDB.putBox(boxPutAskOf(nextBox, box))).to.deep.include({ act: 'replaced' })
-    })
+    if (hasCap) {
+      it("refuses a new box past its VaultDB's cap, and replaces one stored", async () => {
+        const vaultDB = await makeCapped(1)
+        const vault = vaultAt()
+        await vaultDB.putVault(vaultPutAskOf(vault))
+        await vaultDB.putBox(boxPutAskOf(box))
+        const full = await vaultDB.tryPutBox(boxPutAskOf(boxAt(0, 'life1', { boxlabel: 'other' })))
+        expect(full).to.deep.include({ ok: false, act: 'vault_full', world: vault })
+        expect(full.err?.refusalkind).to.eq('vault_full')
+        expect(full.err?.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
+        expect(full.req_params).to.include({ boxlabel: 'other' })
+        expect(await vaultDB.putBox(boxPutAskOf(nextBox, box))).to.deep.include({ act: 'replaced' })
+      })
+    }
   })
 
   describe("a put's answer, by the row it finds and its ifAbsent and ifPresent", () => {
@@ -386,47 +385,6 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped, plant
     it("writes a gate verb over the live row, with no ifAbsent", async () => {
       const { vaultDB, vault } = await putWith()
       expect(await vaultDB.tryRevokePasskey(...gateMoveOf(vault, { passkey_wayin: null }))).to.deep.include({ ok: true })
-    })
-  })
-
-  describe("a put over a row failing its check, at that row's own revision", () => {
-    for (const [flawname, flawOf] of boxFlaws) {
-      it.skipIf(isUnplantable(flawname))(`refuses a box put over a row with ${flawname}, whatever its ifPresent, and leaves the row`, async () => {
-        const { vaultDB } = await putWith({ box: true })
-        const flawed = flawOf(box)
-        await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', flawed)
-        for (const ifPresent of anyIfPresent) {
-          expect(await vaultDB.tryPutBox(boxPutAskOf(nextBox, box, { ifPresent }))).to.deep.include({ ok: false, act: 'damaged_row' })
-        }
-        expect(await storedBoxOf(vaultDB)).to.deep.equal(flawed)
-      })
-    }
-
-    for (const [flawname, flawOf] of vaultFlaws) {
-      it.skipIf(isUnplantable(flawname))(`refuses a vault put over a row with ${flawname}, whatever its ifPresent, and leaves the row`, async () => {
-        const { vaultDB, vault } = await putWith()
-        const flawed = flawOf(vault)
-        await rowsOf(vaultDB).plantVaultRow(vaultScope, flawed)
-        for (const ifPresent of anyIfPresent) {
-          expect(await vaultDB.tryPutVault(vaultPutAskOf(nextVault, vault, { ifPresent }))).to.deep.include({ ok: false, act: 'damaged_row' })
-        }
-        expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.deep.equal(flawed)
-      })
-    }
-  })
-
-  describe("box writes under a vault row failing its checks", () => {
-    it("refuse and change nothing, whether the row is damaged or of a later fmt", async () => {
-      const { vaultDB, vault } = await putWith({ box: true })
-      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, ...vaultDamageFor(plantsAnyRow).damage })
-      expect(await vaultDB.tryPutBox(boxPutAskOf(nextBox, box))).to.deep.include({ ok: false, act: 'damaged_vault' })
-      expect(await vaultDB.tryDelBox(boxDelAskOf(box))).to.deep.include({ ok: false, act: 'damaged_vault' })
-      const otherBox = boxAt(0, 'life1', { boxlabel: 'other' })
-      expect(await vaultDB.tryPutBox(boxPutAskOf(otherBox))).to.deep.include({ ok: false, act: 'damaged_vault' })
-      await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, fmt: SX.VaultFormat + 1 })
-      expect(await vaultDB.tryPutBox(boxPutAskOf(nextBox, box))).to.deep.include({ ok: false, act: 'damaged_vault' })
-      const boxrows = await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')
-      expect([...boxrows]).to.deep.equal([['openai', box]])
     })
   })
 

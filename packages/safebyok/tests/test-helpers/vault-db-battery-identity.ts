@@ -29,21 +29,23 @@ const everyVerbOn = (vaultDB: VaultDB) => ({
 
 /** Registers the cases of who may reach a vault over `world`. */
 export const describeIdentity = ({ hasIdentity, makeVaultDBFor }: BatteryWorld): void => {
-  describe.runIf(hasIdentity)("who may reach a vault", () => {
-    for (const [blurb, user_id] of [['another user', 'u2'], ['no one signed in', null]] as const) {
-      it(`refuses ${blurb} every verb on a vault as identity_revoked, changing nothing`, async () => {
-        const vaultDBFor = await makeVaultDBFor()
-        const owner = vaultDBFor('u1')
-        await owner.putVault(vaultPutAskOf(vault))
-        await owner.putBox(boxPutAskOf(box))
-        const stranger = everyVerbOn(vaultDBFor(user_id))
-        for (const [verbname, call] of Object.entries(stranger)) {
-          await expect(call(), verbname).rejects.toSatisfy((err) => isVaultError(err, 'identity_revoked'))
-        }
-        const [storedVault, storedBox] = await Promise.all([owner.getVault(vaultGetAskOf()), owner.getBox(boxGetAskOf())])
-        expect(storedVault.val).to.deep.equal(vault)
-        expect(storedBox.val).to.deep.equal(box)
-      })
-    }
-  })
+  if (hasIdentity) {
+    describe("who may reach a vault", () => {
+      for (const [blurb, user_id] of [['another user', 'u2'], ['no one signed in', null]] as const) {
+        it(`refuses ${blurb} every verb on a vault as identity_revoked, changing nothing`, async () => {
+          const vaultDBFor = await makeVaultDBFor()
+          const owner = vaultDBFor('u1')
+          await owner.putVault(vaultPutAskOf(vault))
+          await owner.putBox(boxPutAskOf(box))
+          const stranger = everyVerbOn(vaultDBFor(user_id))
+          for (const [verbname, call] of Object.entries(stranger)) {
+            await expect(call(), verbname).rejects.toSatisfy((err) => isVaultError(err, 'identity_revoked'))
+          }
+          const [storedVault, storedBox] = await Promise.all([owner.getVault(vaultGetAskOf()), owner.getBox(boxGetAskOf())])
+          expect(storedVault.val).to.deep.equal(vault)
+          expect(storedBox.val).to.deep.equal(box)
+        })
+      }
+    })
+  }
 }

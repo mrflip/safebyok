@@ -29,7 +29,6 @@ TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
     makeCappedVaultDB:    async (maxBoxes) => remembered(await TH.freshVaultDB(getDb(), { maxBoxes }), { maxBoxes }),
     makeTwin:             async (vaultDB) => await TH.vaultDBOver(getDb(), optsOf.get(vaultDB)),
     _cheat_rowsOf:        () => TH.rowsOf(getDb()),
-    plantsAnyRow:         false,
   })
 
   it("hears what another server puts, a box too large for a notice included", async () => {
