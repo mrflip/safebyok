@@ -80,7 +80,7 @@ describe("createAuth", () => {
     expect(auth.getSnapshot()).to.be.null
   })
 
-  it("the session survives in device storage, as a page reload would see it", async () => {
+  it("the session survives a page reload", async () => {
     const { auth, dbStorage, deviceStorage } = makeWorld()
     const session = await auth.signIn('margo')
     const reloaded = createAuth({ applabel: 'acme', dbStorage, deviceStorage })

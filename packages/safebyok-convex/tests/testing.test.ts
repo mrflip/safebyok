@@ -34,7 +34,7 @@ describe("fakeDeployment", () => {
     expect(convexVersion).to.match(/^1\.48\./)
   })
 
-  it("answers a ConvexClient's query and mutation, signed in as the subject it was given", async () => {
+  it("serves a ConvexClient's query and mutation, signed in as the subject it was given", async () => {
     const deployment = deploy()
     const client = deployment.client('u1')
     await client.mutation(deployment.api.safebyok.putVault, putVaultArgs)
@@ -63,7 +63,7 @@ describe("fakeDeployment", () => {
     expect(closed).toHaveBeenCalledOnce()
   })
 
-  it("logs quietly by default: a client's log is dropped, and its refused mutation reaches the console as the error it is", async () => {
+  it("by default drops a client's log, and sends its refused mutation to console.error", async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => { /* kept out of the test output */ })
@@ -76,7 +76,7 @@ describe("fakeDeployment", () => {
     expect(consoleLog).toHaveBeenCalledTimes(0)
   })
 
-  it("gives every client the logger it was handed, so a test hears the refusal the client would have printed, as its third example shows", async () => {
+  it("gives every client the logger it was given", async () => {
     const spy = TH.spyLogger()
     const deployment = deploy({ logger: spy.logger })
     const refusal = await TH.convexRefusalOf(refusedMutation(deployment))
@@ -94,7 +94,7 @@ describe("fakeDeployment", () => {
     expect(opts.unsavedChangesWarning).to.eq(false)
   })
 
-  it("calls a logger as its methods, so a logger built as a class keeps its this, and takes one with no verbose line", async () => {
+  it("accepts a logger that is a class instance with no verbose method", async () => {
     class Tally {
       heard: string[] = []
       log() { this.heard.push('log') }
@@ -108,7 +108,7 @@ describe("fakeDeployment", () => {
     expect(tally.heard).to.deep.equal(['error'])
   })
 
-  it("says all it hears to the console when handed the console itself", async () => {
+  it("logs to the console when given the console itself", async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
     const deployment = deploy({ logger: console })
     const refusal = await TH.convexRefusalOf(refusedMutation(deployment))
@@ -116,7 +116,7 @@ describe("fakeDeployment", () => {
     expect(consoleError).toHaveBeenCalledOnce()
   })
 
-  it("refuses a host or options it cannot run, as 'bad_option', quoting none of what it was handed", () => {
+  it("refuses a host or options it cannot run, quoting none of what it was given", () => {
     const host = TH.hostWith(TH.bySubject)
     const refuse = (attempt: () => unknown) => TH.thrownText(TH.expectSyncRefusal(attempt, 'bad_option'))
     refuse(() => fakeDeployment({ api: host.api } as never))
@@ -148,7 +148,7 @@ describe("fakeDeployment", () => {
     await vi.waitFor(() => { expect(heard.mock.calls.length).to.be.greaterThan(1) })
   })
 
-  it("signs every socket out, so a watched safebyok query is refused", async () => {
+  it("refuses a watched safebyok query once every socket is signed out", async () => {
     const deployment = deploy()
     const failed = vi.fn()
     deployment.client('u1').onUpdate(deployment.api.safebyok.watchRows, watchRowsArgs, () => undefined, failed)
@@ -156,7 +156,7 @@ describe("fakeDeployment", () => {
     deployment.signOut()
     await vi.waitFor(() => { expect(failed).toHaveBeenCalled() })
   })
-  it("arranges the backend in turn with its clients, and has pushed the change to every watcher and cache when it answers", async () => {
+  it("has pushed a backend change to every watcher and cache by the time arrange returns", async () => {
     const deployment = deploy()
     const client = deployment.client('u1')
     const heard = vi.fn()

@@ -79,7 +79,7 @@ const listedBoxlabels = async (backend: Backend, asked: Life = life1) => {
 }
 
 describe("the component's gets", () => {
-  it("answer each row exactly as it was put, with none of Convex's fields", async () => {
+  it("return each row exactly as it was put, with none of Convex's fields", async () => {
     const backend = await withVault()
     const box = boxOf('openai')
     await backend.mutation(api.putBox, { record: box, opts: birth })
@@ -109,7 +109,7 @@ describe("watchRows", () => {
 })
 
 describe("tidyGone", () => {
-  it("removes the box rows and tallies of every life of the bank that has ended, answering how many box rows remain", async () => {
+  it("removes the box rows and tallies of every ended vault life in the bank, and returns how many box rows remain", async () => {
     const backend = await withVault()
     await backend.mutation(api.putBox, { record: boxOf('anthropic'), opts: birth })
     await backend.mutation(api.putBox, { record: boxOf('openai'), opts: birth })
@@ -159,7 +159,7 @@ describe("a life's tally", () => {
     expect(await keptTally(backend)).to.have.property('box_count', 12)
   })
 
-  it("goes with its life when the vault is deleted, and a life begun anew keeps one of its own", async () => {
+  it("is removed when its vault is deleted, and a new life gets a tally of its own", async () => {
     const backend = await withVault()
     await backend.mutation(api.putBox, { record: boxOf('anthropic'), opts: birth })
     const tombstone = TH.vaultTombstoneOf(vault)
@@ -185,7 +185,7 @@ describe("a life's tally", () => {
     expect(await keptTally(backend, theirs)).to.have.property('box_count', 1)
   })
 
-  it("is counted, for a life planted without one, at its next box put, the life reading as ever until then", async () => {
+  it("is counted at the next box put, for a life that has none", async () => {
     const backend = await withVault()
     await plantBoxes(backend, [boxOf('anthropic'), boxOf('openai')])
     expect(await keptTally(backend)).to.be.null
@@ -196,7 +196,7 @@ describe("a life's tally", () => {
     expect(await keptTally(backend)).to.have.property('box_count', 2)
   })
 
-  it("is not counted by a del, which never reads the whole life", async () => {
+  it("is not counted by a del", async () => {
     const backend = await withVault()
     await plantBoxes(backend, [boxOf('anthropic'), boxOf('openai')])
     await backend.mutation(api.delBox, { tombstone: TH.boxTombstoneOf(boxOf('anthropic')), opts: { prior: DB.revisionOf(boxOf('anthropic')) } })
@@ -208,7 +208,7 @@ describe("a life's tally", () => {
 })
 
 describe("putBox's count cap", () => {
-  it("has a life to the client's maxBoxes, answering how full it is, and never refuses a replacement", async () => {
+  it("refuses a new box past the client's maxBoxes, but never a replacement", async () => {
     const backend = await withVault()
     await backend.mutation(api.putBox, { record: boxOf('anthropic'), opts: birth, maxBoxes: 2 })
     await backend.mutation(api.putBox, { record: boxOf('openai'), opts: birth, maxBoxes: 2 })
@@ -218,7 +218,7 @@ describe("putBox's count cap", () => {
     expect(await backend.mutation(api.putBox, replacement)).to.deep.include({ isWritten: true })
   })
 
-  it("has a life to the component's own count limit, whatever cap the client asks", async () => {
+  it("refuses a new box past the component's own count limit, whatever cap the client asks for", async () => {
     const backend = await withVault()
     await backend.run(async ({ db }) => { await db.insert('safebyok_tallies', { ...life1, box_count: MaxVaultBoxes, box_bytes: 1000 }) })
     const full = { capacity: { boxes: { used: MaxVaultBoxes, max: MaxVaultBoxes }, bytes: { used: 1000, max: MaxVaultBoxBytes } } }
@@ -271,14 +271,14 @@ const nearlyFull = async () => {
 }
 
 describe("putBox's weight limit", () => {
-  it("refuses a new box that would take the life past it, answering how full it is, and lets in one that fits", async () => {
+  it("refuses a new box that would exceed it, and accepts one that fits", async () => {
     const { backend, room } = await nearlyFull()
     const capacity = { boxes: { used: 8, max: MaxVaultBoxes }, bytes: { used: MaxVaultBoxBytes - room, max: MaxVaultBoxBytes } }
     expect(await backend.mutation(api.putBox, { record: boxOf('big', { cipherBytes: room }), opts: birth })).to.deep.equal({ capacity })
     expect(await backend.mutation(api.putBox, { record: boxOf('small'), opts: birth })).to.deep.include({ isWritten: true })
   })
 
-  it("lets a replacement grow the life up to it exactly, then refuses one byte more, and lets a lighter one in", async () => {
+  it("lets a replacement reach it exactly but not exceed it", async () => {
     const { backend, room } = await nearlyFull()
     const grown = boxOf('heavy_0', { revision_seq: 1, cipherBytes: 900_000 + room })
     const growth = { record: grown, opts: over(boxOf('heavy_0')) }
@@ -288,7 +288,7 @@ describe("putBox's weight limit", () => {
     expect(await backend.mutation(api.putBox, { record: boxOf('heavy_0', { revision_seq: 2 }), opts: over(grown) })).to.deep.include({ isWritten: true })
   })
 
-  it("keeps a life too large to read whole deletable, a box at a time, its puts refused as full", async () => {
+  it("lets a life too large to read whole be deleted a box at a time", async () => {
     const backend = await withVault(true)
     // Twenty boxes of 900,000 bytes are more than one transaction may read, so they are planted in four batches, each within the limits.
     const heavies = Array.from({ length: 20 }, (_slot, ii) => boxOf(`heavy_${String(ii).padStart(2, '0')}`, { cipherBytes: 900_000 }))

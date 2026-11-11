@@ -128,7 +128,7 @@ describe("the README's Yoga recipe, its browser half", () => {
 })
 
 describe("the README's Yoga recipe", () => {
-  it("refuses a browser signed in as one user the bank of another", async () => {
+  it("refuses a browser that asks for another user's bank", async () => {
     await TH.emptyTables()
     const route = vaultRoute(await TH.serverOver(), byHeader)
     const intruder = browserFor(route, () => 'u2')

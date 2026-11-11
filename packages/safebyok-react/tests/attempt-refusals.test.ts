@@ -13,13 +13,13 @@ describe("gripeOfRefusal", () => {
     }
   })
 
-  it("says nothing of a second attempt while one runs: the first answers", () => {
+  it("says nothing of a second attempt while one runs", () => {
     expect(gripeOf(Open, new VaultError('attempt_in_flight', 'A refusal.'))).to.be.null
   })
 
   const ConcludedKinds: readonly Refusalkind[] = ['absent_wayin', 'gating_concluded', 'dismissed', 'storage_unavailable', 'vault_gone', 'bad_option']
   for (const refusalkind of ConcludedKinds) {
-    it(`says nothing of ${refusalkind} on a gating it concluded: the gating's outcome tells it`, () => {
+    it(`says nothing of ${refusalkind} on a concluded gating`, () => {
       expect(gripeOf(Concluded, new VaultError(refusalkind, 'A refusal.'))).to.be.null
     })
   }

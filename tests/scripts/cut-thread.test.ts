@@ -79,7 +79,7 @@ describe('scripts/cut-thread', () => {
     expect(git('config', `branch.${Today}-deriver_shim.sprintbase`)).to.eq(tip)
   })
 
-  it('refuses a label that is not one, a base that names no commit, and a worktree that exists', () => {
+  it('refuses an invalid label, a base that names no commit, and a worktree that exists', () => {
     expect(cut('Deriver-Shim').status).to.eq(2)
     expect(cut('deriver_shim', 'no_such_branch').status).to.eq(1)
     mkdirSync(path.join(scratch, 'byok-taken'))

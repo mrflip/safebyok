@@ -112,7 +112,7 @@ describe("SafebyokComponent.api, with the host's getUserId", () => {
     expect(await TH.convexRefusalOf(caller.query(host.api.safebyok.getVault, { scope: TH.vaultScope }))).to.deep.equal({ kind: 'identity_revoked' })
   })
 
-  it("calls getUserId as a method of the bag it was handed, so one that leans on this works", async () => {
+  it("calls getUserId as a method, keeping its this", async () => {
     const { app, component } = TH.installedComponent()
     const host = app.defineModules({ safebyok: component.api(new SignedInAs('u1')) })
     expect(await host.createTest().query(host.api.safebyok.getVault, { scope: TH.vaultScope })).to.be.null
@@ -130,14 +130,14 @@ describe("SafebyokComponent, at setup", () => {
   ] as const
 
   for (const [opts, blurb] of BadOptsCases) {
-    it(`refuses ${blurb} with a bad_option that says what to pass`, () => {
+    it(`refuses ${blurb}, saying what to pass`, () => {
       const refusal = TH.expectSyncRefusal(() => component.api(opts as never), 'bad_option')
       expect(refusal.message).to.include('{ getUserId }')
     })
   }
 
   for (const [forgotten, blurb] of [[undefined, 'undefined'], [null, 'null'], ['safebyok', 'text']] as const) {
-    it(`refuses ${blurb} for the component with a bad_option that says how to install it`, () => {
+    it(`refuses ${blurb} for the component, saying how to install it`, () => {
       const refusal = TH.expectSyncRefusal(() => new SafebyokComponent(forgotten as never), 'bad_option')
       expect(refusal.message).to.include('app.use(safebyok)')
     })

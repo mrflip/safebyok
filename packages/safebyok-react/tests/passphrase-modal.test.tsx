@@ -27,7 +27,7 @@ const typeIn = (placeholder: string, typed: string) => { fireEvent.change(field(
 const submitButton = (word: string) => screen.getByText<HTMLButtonElement>(word)
 
 describe("PassphraseModal, building a vault", () => {
-  it("chooses the first passphrase, filed under the user and the vault", async () => {
+  it("chooses the first passphrase, naming the user and the vault", async () => {
     const { raising } = await shownFor(TH.building)
     expect(screen.getByText(Messages.chooseTitle)).to.exist
     expect(screen.getByDisplayValue('u1 (main vault)')).to.exist
@@ -35,7 +35,7 @@ describe("PassphraseModal, building a vault", () => {
     expect(await raising).to.include({ ok: true })
   })
 
-  it("names its two fields apart, for a password manager", async () => {
+  it("gives its two fields distinct names for password managers", async () => {
     await shownFor(TH.building)
     expect(field('vault passphrase').name).to.eq('new-password')
     expect(field('confirm vault passphrase').name).to.eq('confirm-password')

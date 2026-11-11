@@ -18,7 +18,7 @@ const shownFor = async () => {
 const alertText = () => screen.getByRole('alert').textContent
 
 describe("DelVaultModal", () => {
-  it("deletes the vault on its passphrase, filed under the user and the vault, and the gating concludes", async () => {
+  it("deletes the vault on its passphrase, naming the user and the vault, and the gating concludes", async () => {
     const { bank, raising } = await shownFor()
     expect(screen.getByText(Messages.delVaultTitle)).to.exist
     expect(screen.getByDisplayValue('u1 (main vault)')).to.exist

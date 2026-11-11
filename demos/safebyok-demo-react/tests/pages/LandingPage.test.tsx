@@ -21,7 +21,7 @@ afterEach(() => {
 })
 
 describe("LandingPage", () => {
-  it("shows a signed-in user the widget form alone, with no control panels, and links to the labs", async () => {
+  it("shows a signed-in user only the widget form, and a link to the labs", async () => {
     render(<LandingPage />)
     TH.signInAs('margo')
     await screen.findByRole('heading', { name: 'Widget form' })

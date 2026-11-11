@@ -37,7 +37,7 @@ describe("Boundary", () => {
     expect(reported[0]).to.equal(fell)
   })
 
-  it("tells onCaught once, and a null fallback leaves nothing in the children's place", () => {
+  it("calls onCaught once, and renders nothing for a null fallback", () => {
     const told: string[] = []
     const { container, reported } = TH.renderReporting(<Boundary fallback={null} onCaught={() => { told.push('caught') }}><Thrower failure={{ err: new Error('fell over') }} /></Boundary>)
     expect(container.childNodes).to.have.lengthOf(0)
@@ -65,7 +65,7 @@ const ForBoundaryThrower = ({ err }: { err: unknown }) => { throw forBoundary(er
 describe("forBoundary", () => {
   const meta = { capacity: { boxes: { used: 1, max: 100 }, bytes: { used: 48, max: 1000 } } }
 
-  it("hands React a VaultError's kind, message and meta but not its cause, thrown in render, as its example shows", () => {
+  it("gives React a VaultError's kind, message and meta, but not its cause", () => {
     const misuse = new VaultError('bad_option', 'A bad option.', { cause: new Error('could not derive from pw-the-passphrase'), meta })
     const { reported } = TH.renderReporting(<Boundary fallback={<p>Something went wrong.</p>}><ForBoundaryThrower err={misuse} /></Boundary>)
     expect(screen.queryByText('Something went wrong.')).to.not.be.null
@@ -77,15 +77,15 @@ describe("forBoundary", () => {
     expect(told.cause).to.be.undefined
   })
 
-  it("hands back a VaultError with no cause as itself", () => {
+  it("returns a VaultError with no cause unchanged", () => {
     const misuse = new VaultError('bad_option', 'A bad option.', { meta })
     expect(forBoundary(misuse, 'PassphraseModal')).to.equal(misuse)
   })
 
   const ForeignCases = [
-    [new TypeError('could not judge pw-the-passphrase'),  'turns an Error that quotes what it was handed into a fixed unexpected_error quoting none of it'],
-    ["pw-the-passphrase",                                 'turns a bare string into a fixed unexpected_error quoting none of it'],
-    [null,                                                'turns null into a fixed unexpected_error'],
+    [new TypeError('could not judge pw-the-passphrase'),  'replaces an Error that quotes its input with a fixed refusal quoting none of it'],
+    ["pw-the-passphrase",                                 'replaces a bare string with a fixed refusal quoting none of it'],
+    [null,                                                'replaces null with a fixed refusal'],
   ] as const
 
   for (const [thrown, blurb] of ForeignCases) {

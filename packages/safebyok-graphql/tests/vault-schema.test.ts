@@ -153,25 +153,25 @@ describe("VaultSchemaSdl", () => {
     expect(schemaDriftOf(buildSchema(VaultSchemaSdl))).to.deep.equal([])
   })
 
-  it("is caught missing a field a check reads", () => {
+  it("fails the drift check when it lacks a field a check reads", () => {
     const shorted = buildSchema(VaultSchemaSdl.replace('  cipher_iv_b64:  String!\n', ''))
     const drift = schemaDriftOf(shorted)
     expect(drift).to.not.be.empty
     expect(drift.join('\n')).to.include('cipher_iv_b64')
   })
 
-  it("is caught with a field no check reads", () => {
+  it("fails the drift check when it has a field no check reads", () => {
     const padded = buildSchema(VaultSchemaSdl.replace('  message:     String!\n', '  message:     String!\n  hint:        String\n'))
     expect(schemaDriftOf(padded).join('\n')).to.include('hint')
   })
 
-  it("is caught sending an object where a check reads a scalar", () => {
+  it("fails the drift check when it sends an object where a check reads a scalar", () => {
     const deepened = buildSchema(VaultSchemaSdl.replace('  refusalkind: SafebyokRefusalkind!\n', '  refusalkind: SafebyokRevision!\n'))
     expect(schemaDriftOf(deepened).join('\n')).to.include('refusalkind')
   })
 })
 
-describe("the walk", () => {
+describe("the schema walk", () => {
   it("reads every root field and input object the schema has", () => {
     const rootFields = rootFieldsOf(buildSchema(VaultSchemaSdl))
     expect(AnswerChecks.map(([fieldname]) => fieldname)).to.have.members(rootFields.map((field) => field.name))

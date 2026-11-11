@@ -162,7 +162,7 @@ describe('scripts/git-survey.sh', () => {
     expect(rowsOf(repo.survey()).get('stray')).to.deep.equal({ verdict: 'active', rest: ['-', 'no PR yet'] })
   })
 
-  it('counts many commits with no match on main and names the newest three, then goes on to the next branch', () => {
+  it('names only the newest three of many commits with no match on main, then goes on to the next branch', () => {
     seedKinds(repo)
     repo.git('switch', '--quiet', 'extra')
     for (const nth of ['2', '3', '4', '5', '6']) { repo.commit(`extra-${nth}.md`, 'more\n', `feat: nobody took this either, ${nth}`) }
@@ -298,7 +298,7 @@ describe('scripts/git-survey.sh', () => {
       expect(repo.git('worktree', 'list')).to.include('wt-opened')
     })
 
-    it('holds back every prune, a finished branch\'s entry too, while one branch holds work', () => {
+    it('prunes nothing, not even a finished branch\'s entry, while any branch has unfinished work', () => {
       seedKinds(repo)
       strand(repo, scratch, 'opened')
       strand(repo, scratch, 'landed')

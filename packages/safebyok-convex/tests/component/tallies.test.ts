@@ -6,11 +6,11 @@ import { MaxVaultBoxBytes, MaxVaultBoxes, capacityOf, refuses, weigh } from '../
 const MiB = 1024 * 1024
 
 describe("the limits every vault is bound by", () => {
-  it("has at most 8000 box rows, half the documents a Convex transaction may write", () => {
+  it("has at most 8000 box rows", () => {
     expect(MaxVaultBoxes).to.eq(8000)
   })
 
-  it("has at most 7 MiB less 1 KiB of boxes: half the read budget, less a whole document of vault row and room for the tally", () => {
+  it("has at most 7 MiB less 1 KiB of boxes", () => {
     expect(MaxVaultBoxBytes).to.eq((7 * MiB) - 1024)
   })
 })
@@ -34,7 +34,7 @@ describe("weigh", () => {
     expect(weigh(boxDocOf('Y3Q'))).to.eq(getDocumentSize(boxDocOf('Y3Q')))
   })
 
-  it("weighs a heavier whisper heavier, byte for byte, and nothing as nothing", () => {
+  it("grows by one for each byte of ciphertext, and is zero for no document", () => {
     const [heavier, lighter] = [boxDocOf('c'.repeat(1000)), boxDocOf('c'.repeat(10))]
     expect(weigh(heavier) - weigh(lighter)).to.eq(990)
     expect(weigh(null)).to.eq(0)
@@ -47,7 +47,7 @@ describe("refuses", () => {
 
   const RefusalCases = [
     // by count:
-    [full,  { box_count: 1, box_bytes: 512 },    MaxVaultBoxes,  true,   'refuses a new box in a vault with its most'],
+    [full,  { box_count: 1, box_bytes: 512 },    MaxVaultBoxes,  true,   'refuses a new box in a vault at its count limit'],
     [full,  { box_count: 0, box_bytes: 512 },    MaxVaultBoxes,  false,  'never refuses a replacement for count, even in a full vault'],
     [{ box_count: 1, box_bytes: 4096 }, { box_count: 1, box_bytes: 512 }, 2, false, "lets the last box in under the client's cap"],
     [{ box_count: 2, box_bytes: 4096 }, { box_count: 1, box_bytes: 512 }, 2, true,  "refuses a box past the client's cap"],
@@ -71,11 +71,11 @@ describe("refuses", () => {
 })
 
 describe("capacityOf", () => {
-  it("answers a tally against the cap it is bound by and the component's weight limit", () => {
+  it("reports a tally against the given box cap and the component's weight limit", () => {
     expect(capacityOf({ box_count: 12, box_bytes: 48_000 }, 100)).to.deep.equal({ boxes: { used: 12, max: 100 }, bytes: { used: 48_000, max: MaxVaultBoxBytes } })
   })
 
-  it("answers a vault past a limit and left uncounted as full by both, as refuses treats it", () => {
+  it("reports an uncounted vault past a limit as full in both boxes and bytes", () => {
     expect(capacityOf(null, MaxVaultBoxes)).to.deep.equal({ boxes: { used: MaxVaultBoxes, max: MaxVaultBoxes }, bytes: { used: MaxVaultBoxBytes, max: MaxVaultBoxBytes } })
     expect(refuses(null, { box_count: 1, box_bytes: 0 }, MaxVaultBoxes)).to.be.true
   })

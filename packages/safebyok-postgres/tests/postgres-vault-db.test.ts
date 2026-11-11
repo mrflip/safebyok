@@ -56,7 +56,7 @@ describe("PostgresVaultDB's rows", () => {
 })
 
 describe("PostgresVaultDB's refusals", () => {
-  it("refuses a statement that failed for want of a table or a privilege as unexpected, and any other as the storage out of reach", async () => {
+  it("reports a missing table or privilege as an unexpected error, and any other failed statement as storage unavailable", async () => {
     const noTable = Object.assign(new Error('relation "safebyok_vaults" does not exist'), { code: '42P01' })
     const missing = new PostgresVaultDB({ client: throwingClient(noTable) })
     const dropped = new PostgresVaultDB({ client: throwingClient(new Error('Connection terminated unexpectedly')) })
@@ -76,7 +76,7 @@ describe("PostgresVaultDB's refusals", () => {
 })
 
 describe("PostgresVaultDB's watch", () => {
-  it("hears a write whose rows will not fit in a notification as the rows then stand", async () => {
+  it("delivers the stored rows for a write too large for a notification", async () => {
     const vaultDB = await TH.makeVaultDB({ maxRecordBytes: 20_000 })
     const vault = TH.vaultAt()
     await vaultDB.putVault(vault, { prior: DB.VoidRevision })
@@ -96,7 +96,7 @@ describe("PostgresVaultDB's watch", () => {
     await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'got', val: vault, world: vault }]) })
   })
 
-  it("hears nothing without a listen", async () => {
+  it("delivers nothing without a listen", async () => {
     await TH.emptyTables()
     const vaultDB = new PostgresVaultDB({ client: TH.flakyClientOf(await TH.database()) })
     const notices = watching(vaultDB)
@@ -153,7 +153,7 @@ describe("PostgresVaultDB's notices", () => {
     await vi.waitFor(() => { expect(sent).to.deep.equal([[...vaultPropsOf(vault), box.boxlabel]]) })
   })
 
-  it("hears a box and its tombstone as stored, with no vault row beside them", async () => {
+  it("delivers a box and its tombstone as stored, with no vault row beside them", async () => {
     const vaultDB = await TH.makeVaultDB()
     const notices = watching(vaultDB)
     const vault = TH.vaultAt()
@@ -208,7 +208,7 @@ describe("PostgresVaultDB's channels", () => {
     }
   })
 
-  it("hears a user_id of capitals and punctuation, its channel LISTENed as a quoted identifier", async () => {
+  it("delivers a write for a user_id with capitals and punctuation", async () => {
     const vaultDB = await TH.makeVaultDB()
     const user_id = 'Auth0|Ab.C@x.io~:-+%2B'
     // PGlite queues a first LISTEN behind the statements already waiting, so listen on the channel before writing.

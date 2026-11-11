@@ -23,7 +23,7 @@ const hasPasskey = (bank: Bank) => bank.vaultAt(TH.VaultScopeGiven)?.gate.toJSON
 const alertText = () => screen.getByRole('alert').textContent
 
 describe("RevokePasskeyModal", () => {
-  it("removes the passkey on the passphrase, filed under the user and the vault, and the gating concludes", async () => {
+  it("removes the passkey on the passphrase, naming the user and the vault, and the gating concludes", async () => {
     const { bank, raising } = await shownFor()
     expect(screen.getByText(Messages.revokePasskeyTitle)).to.exist
     expect(screen.getByDisplayValue('u1 (main vault)')).to.exist

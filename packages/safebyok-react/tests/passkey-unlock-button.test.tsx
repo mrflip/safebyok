@@ -51,7 +51,7 @@ describe("PasskeyUnlockButton", () => {
     expect(screen.queryByText(Messages.passkeyButton)).to.be.null
   })
 
-  it("says only that its last word no longer stands when the user dismisses the prompt, and takes a press again", async () => {
+  it("clears its message when the user dismisses the prompt, and can be pressed again", async () => {
     const { gating, authenticator } = await passkeyedUnlock()
     const { gripes } = buttonFor(gating)
     authenticator.refuseNext('NotAllowedError')
@@ -79,13 +79,13 @@ describe("PasskeyUnlockButton", () => {
     expect(authenticator.calls.get).to.have.lengthOf(1)
   })
 
-  it("takes the focus when asked to, as a dialog's first choice", async () => {
+  it("takes the focus when asked to", async () => {
     const { gating } = await passkeyedUnlock()
     buttonFor(gating, { takesFocus: true })
     expect(document.activeElement).to.equal(screen.getByText(Messages.passkeyButton))
   })
 
-  it("hands a browser's failure to onGripe in calm words, and says nothing of a refusal on a gating that has concluded", async () => {
+  it("reports a browser failure to onGripe in calm words, and nothing once the gating has concluded", async () => {
     const { gating, authenticator } = await passkeyedUnlock()
     const { gripes } = buttonFor(gating)
     authenticator.refuseNext('UnknownError')
@@ -99,7 +99,7 @@ describe("PasskeyUnlockButton", () => {
     expect(gripes).to.have.lengthOf(3)
   })
 
-  it("leaves an attempt under way to answer when pressed during it", async () => {
+  it("says nothing when pressed while an attempt is running", async () => {
     const { gating } = await passkeyedUnlock()
     const { gripes } = buttonFor(gating)
     refusingAttempts(new VaultError('attempt_in_flight', 'busy'))
@@ -108,7 +108,7 @@ describe("PasskeyUnlockButton", () => {
     expect(gripes).to.deep.equal([null])
   })
 
-  it("meets misuse by taking itself away and pointing to the passphrase, reporting the very error to React", async () => {
+  it("on misuse, hides itself, points to the passphrase, and reports the error to React", async () => {
     const { gating } = await passkeyedUnlock()
     const misuse = new VaultError('bad_option', 'misused')
     refusingAttempts(misuse)
@@ -119,7 +119,7 @@ describe("PasskeyUnlockButton", () => {
     expect(reported).to.deep.equal([misuse])
   })
 
-  it("tries a passkey the user touched while an Activity hid it: the press authorized it", async () => {
+  it("tries a passkey the user touched while an Activity hid it", async () => {
     const { gating, authenticator, raising } = await passkeyedUnlock()
     const touching = TH.makePending()
     authenticator.answerNextAfter(touching.promise)
@@ -164,7 +164,7 @@ describe("PassphraseModal, for a vault with a passkey", () => {
     await waitFor(() => { expect(asking()).to.eq('false') })
   })
 
-  it("keeps the passkey's word while the user types the passphrase, until they submit", async () => {
+  it("keeps the passkey's message while the user types the passphrase, until they submit", async () => {
     const { authenticator } = await dialogFor()
     authenticator.refuseNext('UnknownError')
     fireEvent.click(screen.getByText(Messages.passkeyButton))
