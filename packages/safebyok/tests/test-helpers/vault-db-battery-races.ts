@@ -185,11 +185,13 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         const { vaultDB, box } = await putWith()
         const { notices, unwatch } = watching(vaultDB, vaultScope)
         await vaultDB.putBox(boxPutAskOf(box))
-        await vi.waitFor(() => { expect(notices).to.have.lengthOf(1) })
+        await vi.waitFor(() => { expect(notices.map(({ val }) => val)).to.deep.include(box) })
+        // A store may still be delivering the notice of putWith's own vault put, so count from the box's notice, which follows it.
+        const heard = notices.length
         unwatch()
         await vaultDB.putBox(boxPutAskOf(boxAt(1), box))
         await aWhile()
-        expect(notices).to.have.lengthOf(1)
+        expect(notices).to.have.lengthOf(heard)
       })
 
       it("is safe to stop twice", async () => {
