@@ -1,23 +1,26 @@
 # Old vocabulary
 
-The names the reform of October 2026 retired, each beside the one that replaced it. It is for
-whoever reads older code, a CHANGELOG, `winboard/` or a released changeset and meets a word
-the current cast does not use. Nothing current uses the first table's names: not the code, the docs, the
-stored records or the tests, and a new thing is never named from this page. The current cast is
+The names the reform of October 2026 retired, each beside the name that replaced it. This page is
+for whoever reads older code, a CHANGELOG, `winboard/` or a released changeset and meets a word the
+current cast does not use. Nothing current uses the first table's names: not the code, the docs, the
+stored records or the tests. Never name a new thing from this page. The current cast is in
 VOCABULARY.md.
 
-The second table, at the end, holds the old design's names that the new core does not have
-(the VOCABULARY sweep of 2026-11-06, `whiteboard/20261106-reform/thread-1-vocab_sweep.md`).
+The second table, at the end, lists the old design's names that the new core does not have (from
+the VOCABULARY sweep of 2026-11-06, `whiteboard/20261106-reform/thread-1-vocab_sweep.md`).
 `packages/safebyok-old` used them until it was removed on 2026-11-10.
 
-A name in the New column that also stands in the Old one was renamed again, by the rename pass of
-2026-10-19 (Box everywhere; get, put and del on every layer; `check` for a check): follow it down.
-The two rows on `vault_id` and `unlock_epoch` are from the rename of 2026-10-21 (better_paths,
-streamline thread 1); the rows after them, from the primitives sprint of 2026-10-22 and 23
-(`winboard/20261022-primitives/`); the rows after `TH.makeLatch`, from the restyle of 2026-10-26
-(`winboard/20261025-restyle/`); the rows on standing, from the fixup sprint of 2026-10-27
-(`winboard/20261027-fixup_sprint/unstanding.md`); the rows on the stores' verbs, from the catchsweep sprint of
-2026-10-28 (`winboard/20261027-catchsweep/`).
+A name in the New column that also appears in the Old column was renamed again by the rename pass
+of 2026-10-19 (Box everywhere; get, put and del on every layer; `check` for a check): follow it down
+the table. The rows come from these passes, in order:
+
+* The two rows on `vault_id` and `unlock_epoch`: the rename of 2026-10-21 (better_paths, streamline
+  thread 1).
+* The rows after them: the primitives sprint of 2026-10-22 and 23 (`winboard/20261022-primitives/`).
+* The rows after `TH.makeLatch`: the restyle of 2026-10-26 (`winboard/20261025-restyle/`).
+* The rows on standing: the fixup sprint of 2026-10-27 (`winboard/20261027-fixup_sprint/unstanding.md`).
+* The rows on the storage interfaces' verbs: the catchsweep sprint of 2026-10-28
+  (`winboard/20261027-catchsweep/`).
 
 To be deleted at 1.0.0.
 
@@ -121,7 +124,7 @@ To be deleted at 1.0.0.
 | files `lockbox.ts`, `retire-damaged-vault.ts`          | `box.ts`, `del-damaged-vault.ts`                        |
 | `vault_id`, `vaultId` (and `vaultIdMeets`, `Expectations.vaultIdMeets`; GraphQL, Convex and Postgres fields and columns of the same name) | `vault_tok`, `vaultTok`, `vaultTokMeets` |
 | `unlock_epoch`, `unlockEpoch` (stored, wire and column names alike) | `gate_epoch`, `gateEpoch`                               |
-| `Vault.make(opts)`, a vault's own options              | `Bank.make(opts)`, then `bank.ensureVault({ userId, vaultlabel })`: the bank holds the options, the draft names the vault |
+| `Vault.make(opts)`, a vault's own options              | `Bank.make(opts)`, then `bank.ensureVault({ userId, vaultlabel })`: the bank has the options, the draft names the vault |
 | handle (a `Vault` instance), `close()`, `tryClose()`, kind `vault_closed` | Vault object; `bank.closeVault(choice)`; kind `vault_gone` |
 | state `opening` (no read yet), state `absent` (never made) | none: a Vault object is born from a read, and a vault never made is born `novel` |
 | `Proof`, `PassphraseProof`, `Proof.parse`, a proof (what the user presents) | cleartext (what the user hands a gating's attempt), made into a `Proving` (`PassphraseProving`, `PasskeyProving`) |
@@ -132,7 +135,7 @@ To be deleted at 1.0.0.
 | `ask.attempt(proof, { wayinId? })`                     | the gating's typed attempt: `attempt`, `attemptPassphrase`, `attemptPasskey` |
 | `vault.unlock(proof)`, `tryUnlock`                     | `vault.ensureUnlocked()`, whose `unlock_vault` gating takes the cleartext |
 | `ensureLease`, `tryEnsureLease`                        | `ensureUnlocked`, `tryEnsureUnlocked`                   |
-| `vault.putWayin(proof, newProof, { wayinlabel })`, `vault.delWayin(proof, wayinId)` | `vault.putWayin(slotlabel)`, `vault.delWayin(slotlabel)`: each raises a gating |
+| `vault.putWayin(proof, newProof, { wayinlabel })`, `vault.delWayin(proof, wayinId)` | `vault.putWayin(slotlabel)`, `vault.delWayin(slotlabel)`: each starts a gating |
 | `wayin_id`, `wayinlabel`, `wayinId`                    | `slotlabel` (`'passphrase'` or `'passkey'`): a vault holds one of each |
 | `getProof`'s throw, `unexpected_error` with its cause  | `requestCleartext`'s throw, `unexpected_error` carrying nothing of it |
 | device mark, `DeviceMark`, `safebyok-mark-v5`, `getMark`, `putMark`, `delMark`, the seen vault | device record, `DeviceRecord`, `safebyok-device-v1`, `getDeviceRecord`, `raiseDeviceRecord`, `delDeviceRecord` |
@@ -158,7 +161,7 @@ To be deleted at 1.0.0.
 | the gating standing; a lease standing                  | the pending gating; a lease in force                    |
 | `#checkStanding()`, `StandingGating`, `standsBeside`    | `#demandNotGone()`, `OutsideGating`, `leavesInForce`    |
 | `VaultDB.getVault`, `ensureVault`, `getVaultRecords`, `ensureVaultRecords`, `putVaultRecord`, `getBox`, `putBox`, `getCapacity`, `delBox`, `delVault`, `delDamagedVault`, each resolving an `Outcome` | `tryGetVault`, `tryEnsureVault`, ... resolve the `Outcome`; `getVault`, `ensureVault`, ... resolve the answer or throw the refusal |
-| `DeviceDB.getLease`, `putLease`, `delLease`, `getDeviceRecord`, `raiseDeviceRecord`, `delDeviceRecord`, `delAll`, each resolving an `Outcome` | `tryGetLease`, `tryPutLease`, ... resolve the `Outcome`; `getLease`, `putLease`, ... resolve the answer or throw what the store threw |
+| `DeviceDB.getLease`, `putLease`, `delLease`, `getDeviceRecord`, `raiseDeviceRecord`, `delDeviceRecord`, `delAll`, each resolving an `Outcome` | `tryGetLease`, `tryPutLease`, ... resolve the `Outcome`; `getLease`, `putLease`, ... resolve the answer or throw what the datastore threw |
 | `HeededVaultDB`'s `Thrown<>` mapping; `ProvingTools.putLease` | `Pick<VaultDB, ...>` of the throwing forms, then (2026-10-28, heed_inline) gone: `RefusalPolicy.heed` is deleted, and the vault calls each `VaultDB` `try` form itself; `ProvingTools.tryPutLease` |
 | `StringStore.read`, `write`, `erase`; `readJson`         | `StringStore.get`, `put`, `del`; `getJson` (the rename pass of 2026-10-28: no operation is a `read` or a `write`) |
 | `KeptLease.tryRead`                                    | `KeptLease.tryGet`                                      |
@@ -169,15 +172,15 @@ To be deleted at 1.0.0.
 ## The old design's names the new core does not have
 
 These rows moved from VOCABULARY.md in the sweep of 2026-11-06. A row whose New column says "none yet" names
-a thing the new core has not built. Where VOCABULARY.md's row was about the old design alone, it
-stands here whole.
+a thing the new core has not built. Where VOCABULARY.md's row was about the old design alone, it is
+copied here whole.
 
 | Old                                                    | New                                                     |
 | ------------------------------------------------------ | ------------------------------------------------------- |
 | `box.record`                                           | none: a `Box` hands out no record                       |
-| A Vault object born from one read of storage and this device's store; one never made born `novel` | `bank.ensureVault` answers a listed vault, or builds one through a `build_vault` gating; no Vault object stands for an absent vault |
+| A Vault object born from one read of storage and this device's store; one never made born `novel` | `bank.ensureVault` returns a listed vault, or builds one through a `build_vault` gating; no Vault object stands for an absent vault |
 | `putWayin('passphrase')`, which replaced the passphrase and removed the passkey | a `replace_passphrase` gating, which leaves the passkey wayin |
-| `putWayin('passkey')`, which put or replaced the passkey; `delWayin('passkey')` | an `add_passkey` gating, which refuses `camped` while one is held; a `revoke_passkey` gating |
+| `putWayin('passkey')`, which put or replaced the passkey; `delWayin('passkey')` | an `add_passkey` gating, which refuses `camped` while a passkey wayin is stored; a `revoke_passkey` gating |
 | a gate's two slots, named by `slotlabel` (`'passphrase'`, `'passkey'`) | the gate's `passphrase_wayin` and `passkey_wayin`        |
 | the snapshot's `gate` (`GateSparse`), each wayin's sparse shape (`PassphraseWayinSparse`, `PasskeyWayinSparse`) | none: `VaultSnapshot` shows no gate; a wayin's `WayinHeader` is all of it but its wrap |
 | `WayinSummary`, a wayin's sparse shape and `vault_tok` in a log line | none yet                                                |
@@ -194,13 +197,13 @@ stands here whole.
 | **vaultEpoch**: a counter on the vault that the store moves, never a writer: up by one on every write of the vault record and on `delVault`, and carried by the tombstone into the next life (`vault_epoch`). Standard term: rollback counter. | none: the new core keeps no vault epoch; `revision_seq` counts a record's revisions |
 | **behind**: said of a vault storage serves at a lower vaultEpoch than this device's record has seen in its scope. | none                                                    |
 | a deviceId minted per vault scope, the first time the device reads or makes it, kept across the vault's lives; "one per vault, so it links nothing the vault does not already link" | one `device_id` per bank scope, minted by `Bank.make` unless given, cached at the bank's `hello()` |
-| **Made under**: each Box, Lease, Gate and Proving holds the scope, `vault_tok` and epochs of the vault it was made under (`VaultMadeUnder`), as the vault handed them in, and `vault.demandConsistentWith(thing)` compares them with the vault record it holds: the vault gone (`vault_gone`) or another life (`vault_mismatch`). A Vault object's own fields are its stamp alone, which `vault.stamp` hands out as one frozen plain object. `consistentWith` asks. | none by that name: a `Gate` holds its `stamp`; `vault_gone` and `vault_mismatch` remain refusals |
+| **Made under**: each Box, Lease, Gate and Proving holds the scope, `vault_tok` and epochs of the vault it was made under (`VaultMadeUnder`), as the vault handed them in, and `vault.demandConsistentWith(thing)` compares them with the vault record it holds: the vault gone (`vault_gone`) or another life (`vault_mismatch`). A Vault object's own fields are its stamp alone, which `vault.stamp` hands out as one frozen plain object. `consistentWith` asks. | none by that name: a `Gate` has its `stamp`; `vault_gone` and `vault_mismatch` remain refusals |
 | `UserId` (a type)                                      | none: `user_id`, `UserIdPattern`, `MaxUserIdChars`      |
 | `getWhisper`, `useWhisper` (taking a boxlabel)         | `box.extractWhisper()`; `useWhisper` lives in `safebyok-react`, on the old design |
-| a sidecar counted toward `maxWhisperBytes`              | counted with the whisper toward what storage holds in one record (`box_too_large`) |
+| a sidecar counted toward `maxWhisperBytes`              | counted with the whisper toward what storage keeps in one record (`box_too_large`) |
 | the snapshot's `damagedBoxes`, each a `BoxDamaged` (`{ boxlabel, revision_tok, damage }`, its revision null when the record held none as text, its `damage` `damaged` or `newer_format`) | `damaged_rows`, each a `DamagedBox` with a `damagekind` (`damaged_row`, `format_mismatch`) |
 | `putBox()` writes a fresh box over a damaged one; `delBox()` removes it | nothing in the library deletes one; `getBox()` and `delBox()` refuse it `damaged_row` |
-| a box under a name the validators refuse "is not damaged: it lists and reads as any other" | listed among the damaged rows, under whatever boxlabel storage holds |
+| a box under a name the validators refuse "is not damaged: it lists and reads as any other" | listed among the damaged rows, under whatever boxlabel storage has for it |
 | the vault record's format `safebyok-vault-v6`; its vaultEpoch; its gate `GateRecord`, null while `novel`, the gateEpoch 0 exactly then; "formerly the vault props" | `fmt` 6001; no vault epoch; the gate always present, `gate_epoch` from 1 |
 | the lease record's format `safebyok-lease-v1`; its `ask_passphrase_at`; `KeptLease`, the record held closed until `kept.leaseOn(vault)` | `fmt` 7001; `proved_at`; the deviceDB's `peek`, then `Lease.buildFromCache` |
 | **device record**: what a device kept of a vault's scope, locked or not, across the vault's lives (`DeviceRecord`, format `safebyok-device-v1`): its own deviceId for the scope, and the highest vaultEpoch it had seen. Raised at every read and every write of this device's own (`raiseDeviceRecord`, a store-side max), never lowered; `lock()` and `del()` left it, and `bank.clearCachedVault` erased it. | `{ applabel, user_id, device_id }` per bank scope, cached by `cacheDeviceRecord` |

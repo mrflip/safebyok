@@ -1,11 +1,12 @@
 # Crossings: events and their timescales
 
-This note lists how long each event takes, in milliseconds, so that we can judge which crossings can
-happen in practice.
+How long each event takes, in milliseconds, so that we can judge which crossings can happen in practice. A
+crossing is one operation called while another is still in flight.
 
-**Measured** is one throwaway run on 2026-11-03: Node 24 under vitest, in a Linux VM on Apple Silicon. The code
-is the current `packages/safebyok/src`, so it uses today's verbs, not the design's. Each figure is the median of
-20 runs, or 5 for anything over 100 ms. **Estimate** is from memory, with nothing measured.
+**Measured** is one throwaway run on 2026-11-03: Node 24 under vitest, in a Linux VM on Apple Silicon, over
+`packages/safebyok/src` as it was that day. The table uses that day's names, not the design's (*Names*, below),
+and several have changed since. Each figure is the median of 20 runs, or of 5 for anything over 100 ms.
+**Estimate** is from memory, with nothing measured.
 
 | Event                                      | ms                  | Source    | What it covers                                                                                    |
 | ------------------------------------------ | ------------------- | --------- | ------------------------------------------------------------------------------------------------- |
@@ -30,75 +31,78 @@ is the current `packages/safebyok/src`, so it uses today's verbs, not the design
 
 ## How far to trust these
 
-* **Derive against attempt:** an attempt contains a derive, so it cannot take less. These are separate small samples
-  whose ranges overlap (derive 634 to 655, check 620 to 634, attempt 626 to 644): read them all as about 640.
+* **Derive against attempt:** an attempt includes a derive, so it cannot take less. These are separate small
+  samples whose ranges overlap (derive 634 to 655, check 620 to 634, attempt 626 to 644): read them all as about
+  640.
 * **deviceDB:** the measured figures ran against fake-indexeddb, which never commits to disk, so they say nothing
-  about a browser. Real IndexedDB waits on a transaction commit and is the figure to reason with. The memory
-  deviceDB runs at 0.003 to 0.018.
-* **Argon2id:** a phone runs this slower, likely 2 to 5 times (estimate), and it may hit memory limits.
+  about a browser. Real IndexedDB waits on a transaction commit, and its estimate is the figure to reason with.
+  The memory deviceDB runs at 0.003 to 0.018.
+* **Argon2id:** a phone runs it slower, likely 2 to 5 times (estimate), and may hit memory limits.
 * **Safari:** Apple publishes no figure for this. Timers are throttled or stopped once the tab is hidden, and a
   suspended page can be discarded with no further event. Treat any `await` as possibly never resuming.
-* **Names:** the design's `buildStored`, `buildLease`, `tryCacheLease`, `peekLease` and `tryUncacheLease` are
-  today's `Proving.attempt` (through `gate.attemptProof`), `makeLease`, `tryPutLease`, `tryGetLease` and
+* **Names:** the design's `buildStored`, `buildLease`, `tryCacheLease`, `peekLease` and `tryUncacheLease` were,
+  on 2026-11-03, `Proving.attempt` (through `gate.attemptProof`), `makeLease`, `tryPutLease`, `tryGetLease` and
   `tryDelLease`.
 
 ## Crossings raised
 
-One sentence each. The goal is that when lock is called, nothing crosses it, and we get there with simple code analyzed in
+One sentence each. The goal is that nothing crosses a `lock()`, and that we get there with simple code analyzed in
 context, not by fine-tuning each of these.
 
-* A `lock()` that lands during `lease.peek` (0.5 to 5 ms) does not take effect: the vault ends up unlocked, with its cached row
-  forgotten, until the next `lock()`.
+* A `lock()` called during `lease.peek` (0.5 to 5 ms) does not take effect: the vault ends up unlocked, with its cached
+  row forgotten, until the next `lock()`.
 
 ## A gate change rejecting after its record is stored
 
-The vaultDB is the ground truth. In each of these, the verb's caller gets a refusal although the record was stored. The next
-fetch brings this device up to date, and nothing guards against them. Each has a test in `tests/models/halpimonfire.test.ts`.
+The vaultDB is the ground truth. In each of these, the verb's caller gets a refusal although the record was stored. The
+next fetch brings this device up to date, and nothing guards against them. When this was written, each had a test in
+`tests/models/halpimonfire.test.ts`. That file's *A gate change after its record is stored* now has one case: a `lock()`
+called while the new lease is made.
 
 * A `sweep` or `vacate` of the listing while the vaultDB's answer is on its way back: delivering the answer refuses with
-  `disabled`. The new passphrase opens the vault from then on, and the next `hello` lists the row.
+  `disabled`. From then on the new passphrase unlocks the vault, and the next `hello` lists the row.
 * A crypto failure in `proved.buildLease`, which the test stages with a mock: the verb rejects with the failure. The vault has
   the new gate and the old lease, and it stays unlocked and able to seal. Its cached row is of the old epoch, so the next
   session asks for a proof.
 * Only **a birth** can have `demandReadyToAttach` refuse after a tombstone or a sweep crosses it. It refuses with `vault_gone`
-  or `disabled`, and the new lease is vacated. A gate change cannot reach that refusal: the tombstone or sweep drops the lease
-  the vault had, `#renewLease` sees that it was forgotten and leaves the new lease unattached, and the verb *resolves*, although
-  the vault is by then deleted or swept.
+  or `disabled`, and the new lease is vacated. A gate change cannot reach that refusal. The tombstone or sweep drops the
+  vault's lease, `#renewLease` sees that it was forgotten and leaves the new lease unattached, and the verb *resolves*,
+  although the vault is by then deleted or swept.
 * A refused stow in `cacheAsCacheCan` does not reject: the verb resolves with the vault unlocked, and the refusal goes to
   `onBadNews`.
 
 ## Crossings the sprint's threads raised
 
-Copied from `unrace-progress.md` at the sprint's end. The names are as they were when each was raised (`tidy` is now
+Copied from `unrace-progress.md` at the sprint's end. The names are as they were when each was found (`tidy` is now
 `bank.autolock`).
 
-* A lock during `listing.put` does not stop it: the put lands anyway (thread 1).
+* A lock during `listing.put` does not stop it: the put is written anyway (thread 1).
 * A `box.del` checks the lock only at entry (thread 1).
 * A vaultDB watch stopped in the same tick still receives a queued notice (thread 2).
-* A `lock()` that lands while `vault.ensureUnlocked` is proving leaves the vault unlocked, with its lease cached; ruled in
-  `noted.md` (thread 3).
-* `uncacheForgotten` deletes by scope outside the lease's chores, so its delete can land after an unlock's put, and the next
-  session then has to prove again (thread 3's review).
+* A `lock()` called while `vault.ensureUnlocked` is proving leaves the vault unlocked, with its lease cached. The ruling
+  is in `noted.md` (thread 3).
+* `uncacheForgotten` deletes by scope outside the lease's chores, so its delete can be written after an unlock's put, and the
+  next session then has to prove again (thread 3's review).
 * `ensureTimely(0)` can join a `get` begun before the call and resolve with the older record, which is how the spec draws the
   join (thread 5's review).
-* `box.expose` assigns `#exposed` after its await, so a sweep of that box alone leaves a whisper on a swept box; `expose` is
-  postponed this sprint (thread 7's review).
+* `box.expose` assigns `#exposed` after its await, so a sweep of that box alone leaves a whisper on a swept box. `expose`
+  was postponed that sprint (thread 7's review).
 * When `create`'s put answer loses to a delete and a new life, `create` returns another vault; thread 10's `#runBirth` ended this.
-* A `lock()` during the `ensureTimely` in `delBox`'s no-box-held path lets the tombstone land on a vault that is by then locked (thread 9's review).
+* A `lock()` during the `ensureTimely` in `delBox`'s path for no box in memory lets the tombstone be written for a vault that is by then locked (thread 9's review).
 * If an instance arrives during `putBox`'s `ensureTimely`, the birth reaches `demandNotHeld`, which refuses with `bad_option` (thread 9's review).
 * A second `attempt` with the same answer, made while the first is running, zeroes the bytes in use, so the first refuses with `bad_option` (thread 10's review).
-* A tombstone or sparse record that lands during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).
-* When a `del_vault`'s `lock()` has its forget refused and there is no `onPanic`, the vault is vacated during the delete, and `listing.del` still lands (thread 11).
-* A tombstone or discard that lands between the gate verb and the lease concludes the gating as failed, although the row moved (thread 11's review).
+* A tombstone or sparse record that arrives during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).
+* When a `del_vault`'s `lock()` has its forget refused and there is no `onPanic`, the vault is vacated during the delete, and `listing.del` is still written (thread 11).
+* A tombstone or discard that arrives between the gate verb and the lease concludes the gating as failed, although the row moved (thread 11's review).
 * A gate verb refused with `vault_gone` or `vault_reborn` delivers nothing, so the Vault still reports present until its next fetch, box answer or notice (thread 11's review).
 * When two `hello`s cross, the last one answered sets the stage (thread 12).
 * A record changed between `getBank` and the watch's start isn't seen until the next fetch (thread 12).
 * A listed live vault whose row is void in `getBank` stays listed until its next fetch (thread 12).
-* A lease in force whose cache row never landed, or was forgotten by another page's `tidy`, isn't found by `tidy`, so the vault stays unlocked past autolock; a lease that should be dropped is kept (thread 12 and its review; a Coach's row).
-* A birth that is past the enter key when `bank.vacate` runs still finishes, and caches its lease after the vacate; a lease that should be dropped is kept (thread 12's review).
-* A swept `hello` that lands late marks a fresh listing `refused` (thread 12).
-* A `getBank` or plugin load that never returns blocks `tidy`; a lease that should be dropped is kept (thread 12's rework).
+* A lease in force whose cache row was never written, or was forgotten by another page's `tidy`, isn't found by `tidy`, so the vault stays unlocked past autolock: a lease that should be dropped is kept (thread 12 and its review; a Coach's row).
+* A birth that is past the enter key when `bank.vacate` runs still finishes, and caches its lease after the vacate: a lease that should be dropped is kept (thread 12's review).
+* A swept `hello` that returns late marks a fresh listing `refused` (thread 12).
+* A `getBank` or plugin load that never returns blocks `tidy`: a lease that should be dropped is kept (thread 12's rework).
 * A `hello` that crosses `bank.vacate` marks the emptied listing `ready`, which reopens the false prompt; found by reading (thread 12's rework and second review).
 * The watch stays on past a vacate, so a notice can list a vault on a bank that is not ready; found by reading (thread 12's rework).
-* A `hello` in flight when `bank.vacate` runs lands on the same listing, so after a sign-out it can mark the bank `ready` and list the vaults, locked; it holds no lease (thread 13, by reading).
+* A `hello` in flight when `bank.vacate` runs is delivered to the same listing, so after a sign-out it can mark the bank `ready` and list the vaults, locked. It has no lease (thread 13, by reading).
 * `demandBirthSlot` sees only what this session has listed, so a birth for a vault that is stored but not yet fetched still asks the user and runs the KDF, then returns that vault, locked (thread 15's second review).

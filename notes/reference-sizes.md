@@ -1,22 +1,25 @@
 # Sizes: records, notices, banks and the limits they meet
 
-How many bytes each stored record, notice and bank takes, against the limits of the transports and stores in our
-horizon, to judge where data volume is an issue.
+How many bytes each stored record, notice and bank takes, against the limits of the transports and datastores we
+may meet, to judge where data volume is an issue.
 
-**Lead.** Even the simplest notice fits, easily. The Postgres adapter's notice for a box write (box row, vault row as
-`world`, scope) is 1.6 KB for a mini box and 2.1 to 2.5 KB for a medium one, against pg_notify's 8,000 bytes (the
-adapter caps it at 7,999). It stops fitting once the box row passes about 6.6 KB, whisper and sidecar together. An
-RSA-2048 keypair with a 1 KB sidecar fits (6.2 KB). An RSA-4096 keypair with one does not (8.4 KB), nor does an mTLS
-identity with a 4 KB sidecar (19.4 KB). Past that size the adapter sends a header of about 300 bytes, and each listener
-calls `getBox`: slower, not broken. No call against a default-limit bank exceeds a Convex transaction, as
-safebyok-convex holds a vault to 7.3 MB. But no limit on vaults per bank exists, so `listVaults` fails at 8,192 vaults.
-A typical bank is 8 kB, a 75%-limit bank 19 to 44 GB: volume is an issue only at the limits, so ratchet them down.
+**Lead.** A typical notice fits easily. The Postgres adapter's notice for a box write (box row, vault row as `world`,
+scope) is 1.6 KB for a mini box and 2.1 to 2.5 KB for a medium one, against pg_notify's 8,000 bytes (the adapter caps
+it at 7,999). It stops fitting once the box row, which includes the whisper and sidecar, passes about 6.6 KB. An
+RSA-2048 keypair with a 1 KB sidecar fits (6.2 KB). An RSA-4096 keypair with one does not (8.4 KB), and neither does
+an mTLS identity with a 4 KB sidecar (19.4 KB). Past that size the adapter sends a header of about 300 bytes, and each
+listener calls `getBox`: slower, not broken. No call against a default-limit bank exceeds a Convex transaction,
+because safebyok-convex caps a vault at 7.3 MB. But nothing limits the vaults per bank, so `listVaults` fails past
+8,192 vaults.
+A typical bank is 8 kB, and a bank at 75% of the limits is 19 to 44 GB. Volume is an issue only at the limits, so
+lower them.
 
-**Measured** is one throwaway run on 2026-11-06: Node 24, the core's `src/` at `byok-closerlook-pg`
-(fb6d281d3), and safebyok-convex at `byok-closerlook-cvx` (bdfe5aa9b). Each record was sealed with real WebCrypto
-through the core's own `wrapKeyUnder`, `cipherBytes` and `stableJsonify`, and each passed `SX.vaultRecord` or
-`SX.boxRecord`. **Computed** is arithmetic on measured figures. **Documented** is from an official page, fetched
-2026-11-06 (*Sources*). **Estimate** is from memory, a vendor's forum, or a source file rather than docs.
+**Measured** is one throwaway run on 2026-11-06: Node 24, the core's `src/` at `byok-closerlook-pg` (fb6d281d3), and
+safebyok-convex at `byok-closerlook-cvx` (bdfe5aa9b). The adapters have changed since, so each figure describes the
+code at those commits. Each record was sealed with real WebCrypto through the core's own `wrapKeyUnder`,
+`cipherBytes` and `stableJsonify`, and each passed `SX.vaultRecord` or `SX.boxRecord`. **Computed** is arithmetic on
+measured figures. **Documented** is from an official page, fetched 2026-11-06 (*Sources*). **Estimate** is from
+memory, a vendor's forum, or a source file rather than docs.
 
 ## What a record is made of
 
@@ -47,16 +50,17 @@ Every field is ASCII, except a host's sidecar, which may not be.
 
 Typical labels are `acme_chat`, `auth0|` plus 24 hex characters, `main`, and a 26-character `device_id`.
 
-* **Reading "a slightly larger key".** The vaultKey and boxKey are already AES-256, the largest key AES has. So the
-  row grows in two ways. Each wrapped key is 512 bits, as an AES-256-SIV or HMAC-SHA-512 key would be: +43 bytes per
-  wayin. The passphraseSalt is 32 bytes, +21 bytes. Both are overkill: RFC 9106 recommends a 16-byte Argon2 salt.
+* **Reading "a slightly larger key".** The vaultKey and boxKey are already AES-256, the largest key AES has, so the
+  *Larger* row grows in two other ways. Each wrapped key is 512 bits, as an AES-256-SIV or HMAC-SHA-512 key would be:
+  +43 bytes per wayin. The passphraseSalt is 32 bytes: +21 bytes. Both are overkill: RFC 9106 recommends a 16-byte
+  Argon2 salt.
 * **Reading "two more wayins the size of a passphrase".** The gate check allows exactly one passphrase wayin and at
-  most one passkey wayin. So two more passphrase wayins were added after the check passed, as extra gate fields.
+  most one passkey wayin. So the two extra passphrase wayins were added as extra gate fields after the check passed.
 
 ## Box rows
 
-The whisper of mini and medium is `{"anthropic":"sk-ant-api03-…"}`, holding a 108-character key in the shape of an
-Anthropic API key. Its JSON is 124 bytes. **The sidecar sizes are the Coach's chosen estimates**: 2, 150, 1,000,
+The whisper of mini and medium is `{"anthropic":"sk-ant-api03-…"}`, containing a 108-character string in the shape
+of an Anthropic API key. Its JSON is 124 bytes. **The sidecar sizes are the Coach's chosen estimates**: 2, 150, 1,000,
 1,000 and 4,000 bytes of JSON. Each is a plausible host bag (`account_id`, `calls`, `tokens`, `model`, at 1,000 and
 up a `limits` string) padded through a `notes` string to exactly that length, all ASCII.
 
@@ -69,17 +73,17 @@ up a `limits` string) padded through a `notes` string to exactly that length, al
 | xl      | an mTLS identity: RSA-4096 leaf key, leaf and issuing certs, root cert | 9,921 | 13,306 | 4,000 | 18,000 | 18,000 | 18,265        | Measured |
 | any     | its tombstone                                   | n/a          | n/a               | n/a          | 366 to 524     | same        | n/a           | Measured |
 
-* **Whisper encrypted** is the `whisper_ciphered` field as it sits in the box's JSON:
+* **Whisper encrypted** is the `whisper_ciphered` field as it appears in the box's JSON:
   `{"cipher_iv_b64":"…","ciphertext_b64":"…"}`, the 16-character IV and the ciphertext of the whisper's JSON plus its
   16-byte tag, each base64url without padding: 56 + ceil((W + 16) × 4 / 3) bytes for a whisper of W. Computed from the
   measured rule above. The box's other ciphered field, `box_key_wrapped`, adds 136 bytes whatever the whisper.
-* **The core's measure** is what `box_too_large` judges against `maxRecordBytes`, in `vault-db-new.ts` `jsonBytes`:
-  `new TextEncoder().encode(JSON.stringify(boxRecord)).length`. It equals the JSON length whenever the sidecar is
-  ASCII. **Convex weighs** is safebyok-convex's `weigh`, Convex's `getDocumentSize` of the stored document with its
-  label columns. That is what counts toward `MaxVaultBoxBytes`.
+* **The core's measure** is the size `box_too_large` compares against `maxRecordBytes`, from `jsonBytes` in
+  `vault-db.ts`: `new TextEncoder().encode(JSON.stringify(boxRecord)).length`. It equals the JSON length whenever the
+  sidecar is ASCII. **Convex weighs** is safebyok-convex's `weigh`: Convex's `getDocumentSize` of the stored document
+  with its label columns. That is what counts toward `MaxVaultBoxBytes`.
 * **Reading "minimum validatable size".** The labels and user_id are at their minimum: 2 characters, and 1 for the
-  user_id. The tokens, times and ciphered fields are as the core mints them (UUIDs, 13-digit times, real ciphertext),
-  since their checks accept one character but no box ever holds that. Medium, large and xl have their labels at
+  user_id. The tokens, times and ciphered fields are as the core mints them (UUIDs, 13-digit times, real ciphertext):
+  their checks accept a single character, but no real box has one that short. Medium, large and xl have their labels at
   75% of maximum (30) and the user_id at 75 characters. Beside the sidecar, the labels and the user_id are the only
   fields that vary.
 * **Rule of thumb:** a box is about 600 bytes of fixed fields at minimum labels, or 750 at 75% labels, plus its
@@ -87,9 +91,11 @@ up a `limits` string) padded through a `notes` string to exactly that length, al
 
 ## The Postgres notice for a box write
 
-`safebyok-postgres` sends `{applabel, user_id, vaultlabel, vault_tok, boxlabel, heard: {vault, box}}` through
-`pg_notify`. If that JSON is over `NoticeMaxBytes` (7,999), it sends the same header without `heard`, and each
-listener fetches the box afresh with `doGetBox` (`toldTextOf`, `#heardOrNull`).
+At the measured commit, `safebyok-postgres` sent `{applabel, user_id, vaultlabel, vault_tok, boxlabel, heard:
+{vault, box}}` through `pg_notify`. If that JSON was over `NoticeMaxBytes` (7,999), it sent the same header without
+`heard`, and each listener fetched the box again with `doGetBox` (`toldTextOf`, `#heardOrNull`). The adapter has
+changed since: today `safebyok_tell` in `vault-functions.sql` sends `{at, vault, box}`, and a notice of 8,000 bytes or
+more drops the box's vault row first, then every row.
 
 | Box        | Notice, passphrase vault | Notice, passphrase and passkey vault | Notice, larger vault | Header alone | Source   |
 | ---------- | ------------------------ | ------------------------------------ | -------------------- | ------------ | -------- |
@@ -106,7 +112,7 @@ listener fetches the box afresh with `doGetBox` (`toldTextOf`, `#heardOrNull`).
 | medium fields and sidecar, passphrase and passkey vault | 4,242       | 6,578       | Measured |
 | medium fields and sidecar, larger vault        | 3,556                | 5,663       | Measured |
 
-The edge is a box size: each byte of sidecar takes the room of about 0.75 bytes of whisper JSON.
+The limit is on the box's size: each byte of sidecar costs as much as about 0.75 bytes of whisper JSON.
 
 A vault write's notice carries only the vault row, 0.7 to 2.2 KB, so it always fits. A vault deletion sends one notice
 per box, each about 1 KB, in one transaction. A vault of 8,000 boxes would queue about 8 MB of notices, against the
@@ -128,10 +134,11 @@ Every box is in one vault, under distinct boxlabels of one length. *Full* is `{ 
 | xl         | 0 / 50 / 0                            | 6 / 853 / 6                                         | 18,001 / 138 / 17,527             | Measured |
 
 * **Reading "without sidecar or any whisper fields".** The whisper fields are `whisper_codec`,
-  `whisper_schema_version`, `whisper_ciphered` and `box_key_wrapped`: a boxKey is there only to open its whisper. So
-  *hint* says only that a box changed. Its size depends only on the length of the boxlabel, which is why large and
-  xl match medium.
-* The tuple saves the repeated field names and labels: about 45% of a medium box, falling to 3% for xl, where the ciphertext dominates.
+  `whisper_schema_version`, `whisper_ciphered` and `box_key_wrapped`, since a boxKey exists only to decipher its
+  whisper. So *hint* says only that a box changed. Its size depends only on the length of the boxlabel, which is why
+  large and xl match medium.
+* The tuple saves the repeated field names and labels: about 45% of a medium box, falling to 3% for xl, where the
+  ciphertext dominates.
 
 | `{ device_id: <SHA-256 hex>, vaults: [<vault rows>] }`                | pg_notify 7,200 B | 128 KiB | Bytes per vault | Source   |
 | --------------------------------------------------------------------- | ----------------- | ------- | --------------- | -------- |
@@ -142,20 +149,20 @@ Every box is in one vault, under distinct boxlabels of one length. *Full* is `{ 
 
 ## Bank sizes
 
-No limit on vaults per bank exists. The core's defaults are `DefaultMaxBoxes`, 100 live boxes to a vault, and `DefaultMaxRecordBytes`, 5,600 bytes
-to a box record: about 95% of Postgres's 8,000-byte `NOTIFY` payload, less the Larger vault row above, rounded down. Two other sets of limits exist, and each
-gets a family of rows below.
+Nothing limits the vaults per bank. The core's defaults are `DefaultMaxBoxes`, 100 live boxes to a vault, and
+`DefaultMaxRecordBytes`, 5,600 bytes to a box record: about 95% of Postgres's 8,000-byte `NOTIFY` payload, less the
+Larger vault row above, rounded down. Two other sets of limits exist, and each gets a family of rows below.
 
-* *Convex*: what safebyok-convex enforces. Each box is at most 1,048,576 bytes, a vault holds at most 8,000 boxes,
-  and its box rows weigh at most 7,339,008 bytes (`MaxVaultBoxBytes`, half the 16 MiB read, less a document and the
+* *Convex*: what safebyok-convex enforces. Each box is at most 1,048,576 bytes, a vault has at most 8,000 boxes, and
+  its box rows weigh at most 7,339,008 bytes (`MaxVaultBoxBytes`: half the 16 MiB read, less a document and the
   tally).
-* *Old*: the old design's `Bank.make` defaults, in packages/safebyok-old (removed 2026-11-10). A vault holds at most 100 boxes
-  (`MaxBoxes`), and a whisper and its sidecar together at most 40,444 bytes of JSON (`MaxWhisperBytes`).
+* *Old*: the old design's `Bank.make` defaults, in packages/safebyok-old (removed 2026-11-10). A vault had at most 100
+  boxes (`MaxBoxes`), and a whisper and its sidecar together at most 40,444 bytes of JSON (`MaxWhisperBytes`).
 
 Both families take 8,192 as the 100% figure for vaults per bank. That is Convex's limit on the elements of any array,
-which `listVaults`' return meets. Each vault row is the maximum-label row, 1,441 bytes as Convex weighs it. Each
-dimension is set to the given percentage independently. *Clipped* holds each vault to `MaxVaultBoxBytes`, as
-safebyok-convex does.
+which applies to the array `listVaults` returns. Each vault row is the maximum-label row, 1,441 bytes as Convex weighs
+it. Each dimension is set to the given percentage independently. *Boxes after the clip* caps each vault at
+`MaxVaultBoxBytes`, as safebyok-convex does.
 
 | Family, % of each limit | Vaults | Boxes per vault | Box (Convex) | Naive bank | Boxes after the clip | Per vault | Bank      | Source   |
 | ----------------------- | ------ | --------------- | ------------ | ---------- | -------------------- | --------- | --------- | -------- |
@@ -182,7 +189,7 @@ safebyok-convex does.
   * a Durable Object legacy value (128 KiB);
   * Express's default `express.json` body (100 kB), which caps a `putBox` sent through safebyok-graphql on Express.
 
-  A full Convex-capped vault (7.3 MB) answered whole is over a Vercel Function response (4.5 MB) and a synchronous
+  A full Convex-capped vault (7.3 MB) returned whole is over a Vercel Function response (4.5 MB) and a synchronous
   Lambda response (6 MB). The old default box (55 kB) is under every one of these.
 
 ## Limits in our horizon
@@ -238,8 +245,8 @@ safebyok-convex does.
 | `packages/` as text: 441 tracked files / without safebyok-old / the core's `src/` | 6,360,673 / 3,521,738 / 407,792 | n/a | Measured |
 | `packages/` as tar.gz / without safebyok-old           | 1,632,844 / 944,611 | n/a | Measured   |
 
-A binary blob in a whisper is base64 inside JSON and then base64 again as ciphertext, so its box is about 1.78 times
-the blob. The photo-like PNG (1.7 MB) would be a box of about 3 MB. That is over a Convex document, and so over
+A binary blob in a whisper is base64-encoded inside the JSON, and then base64-encoded again as ciphertext, so its box
+is about 1.78 times the blob. The photo-like PNG (1.7 MB) would be a box of about 3 MB. That is over a Convex document, and so over
 safebyok-convex's `maxRecordBytes`.
 
 ## Convex cost to poll, per 1,000 devices a month
@@ -270,15 +277,15 @@ The rates are the Professional plan's overage prices: $2 per million calls and $
 
 ## Ratcheting
 
-* **Notice whole, box limit of about 6 KiB.** A box row of 6,144 bytes keeps every box notice whole under today's
-  vault rows. The larger vault needs 5.5 KiB. Either holds an RSA-2048 keypair with its 1 KB sidecar (a 4.7 KB box),
-  or an RSA-4096 PGP public key with a 150-byte sidecar (about 5.2 KB). Neither holds an RSA-4096 keypair with a 1 KB
-  sidecar (7.3 KB), or an mTLS identity.
-* **Notice degraded, box limit of 16 to 20 KiB.** 16 KiB holds every box here but xl, which is 18.0 KB with its 4 KB
-  sidecar. 20 KiB holds xl too. Boxes over about 6.6 KB get the header and a `getBox` per listener.
-* **Vaults per bank.** Today none is set, and Convex's 8,192 is the de facto limit, set by a failure. Any cap from 8
+* **Notice whole, box limit of about 6 KiB.** A box row limit of 6,144 bytes keeps every box notice whole with the
+  measured vault rows. The larger vault needs 5.5 KiB. Either limit fits an RSA-2048 keypair with its 1 KB sidecar (a
+  4.7 KB box), or an RSA-4096 PGP public key with a 150-byte sidecar (about 5.2 KB). Neither fits an RSA-4096 keypair
+  with a 1 KB sidecar (7.3 KB), or an mTLS identity.
+* **Notice degraded, box limit of 16 to 20 KiB.** 16 KiB fits every box here but xl, which is 18.0 KB with its 4 KB
+  sidecar. 20 KiB fits xl too. Boxes over about 6.6 KB get the header and a `getBox` per listener.
+* **Vaults per bank.** None is set, and Convex's 8,192 is the de facto limit, enforced by a failure. Any cap from 8
   to 64 keeps `listVaults` far inside one transaction.
-* **Boxes per vault.** At 32 or 64, a full vault answered whole stays at 1.1 MB or less, under every response limit in
+* **Boxes per vault.** At 32 or 64, a full vault returned whole stays at 1.1 MB or less, under every response limit in
   the table.
 
 ## The Coach's Postgres payload shapes
@@ -295,8 +302,8 @@ it on real sealed rows.
   * The box props are `boxlabel, am, fmt, revision_tok, revision_seq, registered_at, written_at, box_tok,
     whisper_codec, whisper_schema_version, sidecar, box_key_wrapped, whisper_ciphered`. Each ciphered field goes as
     `[iv, ciphertext]`, and a tombstone's array ends at `whisper_schema_version`.
-* **Over 7,999 bytes**, a vault notice goes as `[...vault props]`, a box notice as `[...vault props, boxlabel]`, and the
-  listener re-reads.
+* **Over 7,999 bytes**, a vault notice is sent as `[...vault props]` and a box notice as `[...vault props, boxlabel]`,
+  and the listener fetches the row itself.
 
 | Box (sidecar)      | Box row | Built notice | Sent        | Today's notice, passphrase and passkey vault | Source   |
 | ------------------ | ------- | ------------ | ----------- | -------------------------------------------- | -------- |
@@ -306,8 +313,8 @@ it on real sealed rows.
 | large-4096 (1,000) | 7,329   | 7,118        | whole       | **8,750: header**                            | Measured |
 | xl (4,000)         | 18,000  | **17,789**   | 297, header | **19,421: header**                           | Measured |
 
-* A built box notice is its box row less 211 bytes, at any label length. The keys it drops outweigh the vault props it
-  adds. So it stays whole up to a box row of 8,210 bytes, where today's notice stops near 6,600.
+* A built box notice is its box row less 211 bytes, at any label length, because the keys it drops outweigh the vault
+  props it adds. So it stays whole up to a box row of 8,210 bytes, where the measured notice stops near 6,600.
 * The header fallback is 139 bytes at minimum labels and 297 at 75%. A box tombstone's notice is 268 or 426.
 * A vault notice is 669 to 1,237 bytes (passphrase, and passphrase and passkey, up to maximum labels). Its tombstone
   is 286 to 423. Every vault notice is sent whole.
@@ -319,7 +326,9 @@ The batched boxes shape, `[...vault props, [[...box props], …]]`, was specifie
 | as specified  | 137 / 267               | 438 / 614 / 4,267 / 6,856 / 17,527                     | 16 / 11 / 1 / 1 / 0 | 269 / 191 / 27 / 17 / 6 | Computed |
 
 The xl variants have medium's labels and keep xl's 4,000-byte sidecar bag, with the certificates added to it.
-* **xl (a)**: the whisper holds only the RSA-4096 private key. The leaf, issuing and root certificates move to the sidecar.
+
+* **xl (a)**: the whisper contains only the RSA-4096 private key. The leaf, issuing and root certificates move to the
+  sidecar.
 * **xl (b)**: as (a), but the root certificate is dropped. A SHA-256 fingerprint of it, 64 hex characters, goes in
   the whisper as a pointer.
 * **xl (c)**: as (b), but the issuing certificate in the sidecar is replaced by its SHA-256 fingerprint.
@@ -331,9 +340,9 @@ The xl variants have medium's labels and keep xl's 4,000-byte sidecar bag, with 
 | xl (b) | 3,421        | 8,583        | 13,916: yes            | 13,705: no, header         | Measured |
 | xl (c) | 3,421        | 6,496        | 11,829: yes            | 11,618: no, header         | Measured |
 
-A certificate moved from the whisper to the sidecar saves about a third of its size: the sidecar is stored as plain
-JSON, while the whisper is sealed and base64-encoded. No xl variant carries its rows in a notice. That needs a box row
-of 8,210 bytes or less, about 3,600 bytes less than (c).
+A certificate moved from the whisper to the sidecar saves about a third of its size: the sidecar is stored as
+unencrypted JSON, while the whisper is sealed and base64-encoded. No xl variant carries its rows in a notice. That
+needs a box row of 8,210 bytes or less, about 3,600 bytes less than (c).
 
 ## How far to trust these
 
@@ -343,8 +352,8 @@ of 8,210 bytes or less, about 3,600 bytes less than (c).
   billed I/O is not published, so the cost table assumes billed bytes equal document bytes.
 * **The notice.** It was rebuilt from `toldTextOf` and `boxToldOf`, not captured from a live Postgres. The vault row
   in a real notice has come back through `jsonb`, which reorders keys but keeps the compact length.
-* **The vault defaults.** No adapter or core option names a limit on vaults per bank. Convex's array limit stands in
-  for one, so the 10%, 75% and 100% vault counts are this report's reading, not a setting.
+* **The vault defaults.** No adapter or core option sets a limit on vaults per bank. Convex's array limit stands in
+  for one, so the 10%, 75% and 100% vault counts are this report's choice, not a setting.
 * **Prices and limits.** They were fetched on 2026-11-06 and change without notice. The Supabase, AppSync and Yoga
   figures come from docs pages or published typings, not from a test.
 * **The PNGs.** Generated images bracket the range: a gradient compresses to almost nothing, and fractal noise
@@ -383,17 +392,17 @@ of 8,210 bytes or less, about 3,600 bytes less than (c).
 
 ## A bank hello on Convex: 10 vaults of 100 boxes
 
-What one page load of a jumbo bank costs on Convex: 10 vaults, each holding 100 boxes, with the passphrase-wayin
-vault row (674 bytes) and the medium box (1,355 bytes) as Convex weighs them. The bank is compared as it stands and
-with each listing watching only its own rows: the bank's listing watches the vault rows, and each vault's listing
-watches its box rows. The first answer of each watch is its list, so no `listVaults` or `listBoxes` call is made.
+What one page load of a jumbo bank costs on Convex: 10 vaults of 100 boxes each, with the passphrase-wayin vault row
+(674 bytes) and the medium box (1,355 bytes) as Convex weighs them. The bank as it stands is compared with one where
+each listing watches only its own rows: the bank's listing watches the vault rows, and each vault's listing watches
+its box rows. In that design each watch's first result is its list, so no `listVaults` or `listBoxes` call is made.
 **Traced** means read from the code at ae1655c22: the core's `bank.hello` and `vault.hello`, and the
 safebyok-convex component's queries.
 
-**Lead.** Today a hello reads every box three times. Listings that each read their own rows read it once: 2.99 times
-fewer bytes and half the calls, about $72 a month instead of $236 for 1,000 users at 10 loads a day. A box write
-costs 11 times less: each subscribed client re-reads one vault, not the whole bank and that vault. A hello is no
-faster: two round trips either way.
+**Lead.** At ae1655c22, a hello reads every box three times. Listings that each read their own rows read it once:
+2.99 times fewer bytes and half the calls, about $72 a month instead of $236 for 1,000 users at 10 loads a day. A box
+write costs 11 times less, because each subscribed client re-reads one vault, not the whole bank and that vault. A
+hello is no faster: two round trips either way.
 
 | Call, per hello                                                          | Rows it reads              | Today | Own-rows listings | Source |
 | ------------------------------------------------------------------------ | -------------------------- | ----- | ----------------- | ------ |
@@ -416,7 +425,7 @@ faster: two round trips either way.
 | A box write, re-read by each subscribed client                           | 1.50 MB, $0.0003 | 0.14 MB, $0.00003 | Computed |
 | Round trips before the boxes are listed                                  | 2, 100 to 600 ms | 2, 100 to 600 ms  | Computed |
 
-* **Assumptions.** Each hello is cold, and reads every byte of the rows it names. No vault holds tombstones. Rates
+* **Assumptions.** Each hello is cold, and reads every byte of the rows it names. No vault has tombstones. Rates
   and allowances are those of *Convex cost to poll*: $2 per million calls, $0.20 per GB, and Pro's 25M calls and
   50 GB included, which net subtracts. Each round trip takes 50 to 300 ms (reference-timings.md, an Estimate).
 * **A box write.** Today it re-runs the bank-wide watch (10 vault rows and 1,000 boxes) and the vault's own watch (1
@@ -425,7 +434,7 @@ faster: two round trips either way.
 * **One bank-wide watch alone**, the other way to read each row once, makes one call and reads 1.36 MB per hello. But
   every box write then re-reads the whole bank, 1.36 MB per client: as costly as today's.
 * **Round trips.** Today the bank awaits `listVaults` before any vault's hello starts, and the 10 hellos then run in
-  parallel. Own-rows listings keep that shape: the bank's watch answers first, and then the vault watches start.
+  parallel. Own-rows listings keep that shape: the bank's watch returns first, and then the vault watches start.
 * **What it would take.** safebyok-convex's `watchRows` over a bank reads its boxes too
   (`component/vaults.ts`). A watch over the vault rows alone needs a scope or query of its own.
 * **A sparse answer saves no I/O; sparse rows stored apart do.** A listing keeps the sparse box: everything but
@@ -434,5 +443,5 @@ faster: two round trips either way.
   I/O shrinks if each box's sparse fields are a row of their own, which the listings watch, and only `getBox` reads
   the rest. A medium box's sparse row is about 790 bytes as Convex weighs it: the 75%-label tombstone (524) plus
   the 268 bytes of label columns Convex adds to a medium box (Estimate). Per hello that reads 0.80 MB, about $38 a
-  month net, and a box write 0.08 MB per client. Convex's 1 KB rounding would raise that to 1.04 MB and $53. The
+  month net, and a box write 0.08 MB per client. Convex's 1 KB rounding would increase that to 1.04 MB and $53. The
   gain grows with the box: a large box (5,005 bytes) keeps a sparse row of about 790, about 6 times less.
