@@ -49,7 +49,7 @@ export type Reckoning = { kept: Doc<'safebyok_tallies'> | null, tally: Tally | n
 export type BoxDocGiven = Omit<WithoutSystemFields<Doc<'safebyok_boxes'>>, 'box'> & { box: unknown }
 
 /** Return the bytes `boxDoc` counts toward its life's limit, by Convex's `getDocumentSize` with its allowance for system fields. Null counts 0. */
-export const weigh = (boxDoc: BoxDocGiven | null): number => {
+export function weigh(boxDoc: BoxDocGiven | null): number {
   if (boxDoc === null) { return 0 }
   const { applabel, user_id, vaultlabel, vault_tok, boxlabel, box } = boxDoc
   // The box row came through a Convex validator or out of the table, so it is a Convex value.
@@ -95,20 +95,20 @@ export function refuses(tally: Tally | null, growth: Tally, maxBoxes: number): b
 }
 
 /** Add a put's `growth` to the life's tally, inserting the tally row the first time. A life past a limit gets no tally row. */
-export const record = async (db: DatabaseWriter, life: Life, { kept, tally }: Reckoning, growth: Tally): Promise<void> => {
+export async function record(db: DatabaseWriter, life: Life, { kept, tally }: Reckoning, growth: Tally): Promise<void> {
   if (tally === null) { return }
   if (kept) { await db.patch('safebyok_tallies', kept._id, plus(tally, growth)) } else { await db.insert('safebyok_tallies', { ...life, ...plus(tally, growth) }) }
 }
 
 // A del never recounts a life: a life too large to read in one transaction must still be able to shrink, one box at a time.
 /** Add a del's `growth` to the life's tally, if it has one. */
-export const forget = async (db: DatabaseWriter, life: Life, growth: Tally): Promise<void> => {
+export async function forget(db: DatabaseWriter, life: Life, growth: Tally): Promise<void> {
   const kept = await getTallyRow(db, life)
   if (kept) { await db.patch('safebyok_tallies', kept._id, plus(kept, growth)) }
 }
 
 /** Delete the life's tally row, if it has one. */
-export const drop = async (db: DatabaseWriter, life: Life): Promise<void> => {
+export async function drop(db: DatabaseWriter, life: Life): Promise<void> {
   const kept = await getTallyRow(db, life)
   if (kept) { await db.delete('safebyok_tallies', kept._id) }
 }
@@ -128,15 +128,19 @@ function negated({ all_count, live_count, all_size, live_size }: Tally): Tally {
 
 // `.unique()` throws if it finds two rows. A tally is inserted only when none was found in the same
 // transaction, so two would mean damage, and that should fail loudly.
-const getTallyRow = (db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life) => (
-  db.query('safebyok_tallies')
-    .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
-    .unique()
-)
+function getTallyRow(db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life) {
+  return (
+    db.query('safebyok_tallies')
+      .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+      .unique()
+  )
+}
 
 /** Query the box rows of one life, in boxlabel order. */
-export const lifeBoxQuery = (db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life) => (
-  db.query('safebyok_boxes')
-    .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
-)
+export function lifeBoxQuery(db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life) {
+  return (
+    db.query('safebyok_boxes')
+      .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+  )
+}
 // --

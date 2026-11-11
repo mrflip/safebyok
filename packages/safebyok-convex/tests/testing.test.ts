@@ -6,7 +6,7 @@ import { fakeDeployment } from '../src/testing'
 import type { FakeDeploymentOpts } from '../src/testing'
 
 const deployments: ReturnType<typeof fakeDeployment>[] = []
-const deploy = (opts?: FakeDeploymentOpts) => {
+function deploy(opts?: FakeDeploymentOpts) {
   const deployment = fakeDeployment(TH.hostWith(TH.bySubject), opts)
   deployments.push(deployment)
   return deployment
@@ -18,9 +18,9 @@ const vaultAsked = { scope: TH.vaultScope }
 const watchRowsArgs = { scope: TH.bankScope }
 
 /** Send a mutation from a client signed in as no one, which the host refuses as `identity_revoked`. */
-const refusedMutation = (deployment: ReturnType<typeof deploy>) => (
-  deployment.client(null).mutation(deployment.api.safebyok.putVault, putVaultArgs)
-)
+function refusedMutation(deployment: ReturnType<typeof deploy>) {
+  return deployment.client(null).mutation(deployment.api.safebyok.putVault, putVaultArgs)
+}
 afterEach(async () => {
   await Promise.all(deployments.splice(0).map((deployment) => deployment.close()))
 })
@@ -116,7 +116,7 @@ describe("fakeDeployment", () => {
 
   it("refuses a host or options it cannot run, quoting none of what it was given", () => {
     const host = TH.hostWith(TH.bySubject)
-    const refuse = (attempt: () => unknown) => TH.thrownText(TH.expectSyncRefusal(attempt, 'bad_option'))
+    function refuse(attempt: () => unknown) { return TH.thrownText(TH.expectSyncRefusal(attempt, 'bad_option')) }
     refuse(() => fakeDeployment({ api: host.api } as never))
     refuse(() => fakeDeployment({ createTest: host.createTest } as never))
     refuse(() => fakeDeployment(null as never))

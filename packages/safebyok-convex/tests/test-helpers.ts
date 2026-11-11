@@ -18,25 +18,25 @@ export const vaults = anyApi['vaults'] as unknown as ComponentApi['vaults']
 export const rootApi = anyApi['vaults'] as unknown as SafebyokApi
 
 /** Make a fresh in-memory backend with only the component, its functions at the root. Pass true to enforce Convex's transaction limits. */
-export const componentTest = (transactionLimits = false) => convexTest({ schema, modules, transactionLimits })
+export function componentTest(transactionLimits = false) { return convexTest({ schema, modules, transactionLimits }) }
 
 /** Make a host with only the component, its functions at the root, for a fake deployment whose clients may write as any user. */
-export const componentHost = () => ({ api: anyApi, createTest: () => componentTest() })
+export function componentHost() { return { api: anyApi, createTest: () => componentTest() } }
 
 /** Make a host app set up as the README shows: the component installed as `safebyok`, and its functions served from `convex/safebyok.ts` using `getUserId`. */
-export const hostWith = (getUserId: GetUserId) => {
+export function hostWith(getUserId: GetUserId) {
   const { app, component } = installedComponent()
   return app.defineModules({ safebyok: component.api({ getUserId }) })
 }
 
 /** Make a host app with the component installed as `safebyok`, and the SafebyokComponent that wraps it. */
-export const installedComponent = () => {
+export function installedComponent() {
   const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
   return { app, component: new SafebyokComponent(app.components.safebyok) }
 }
 
 /** Return the `data` of the ConvexError that `operation` rejects with. Fails the test if `operation` resolves. */
-export const convexRefusalOf = async (operation: Promise<unknown>): Promise<SafebyokErrorData> => {
+export async function convexRefusalOf(operation: Promise<unknown>): Promise<SafebyokErrorData> {
   try {
     await operation
   } catch (err) {
@@ -60,15 +60,17 @@ export function sentAskOf<AskT extends DB.VaultPutAsk | DB.VaultDelAsk | DB.BoxP
 }
 
 /** The args of `putVault`: the put of `record` over the row `ante`, or over none. */
-export const putVaultArgs = (record: DB.VaultRecord, ante: DB.VaultRow | null = null) => ({ ask: sentAskOf(vaultPutAskOf(record, ante)) })
+export function putVaultArgs(record: DB.VaultRecord, ante: DB.VaultRow | null = null) { return { ask: sentAskOf(vaultPutAskOf(record, ante)) } }
 
 /** The args of `putBox`: the put of `record` over the row `ante`, or over none, under the soft cap `maxBoxes` where given. */
-export const putBoxArgs = (record: DB.BoxRecord, ante: DB.BoxRow | null = null, maxBoxes?: number) => ({
-  ask: sentAskOf(boxPutAskOf(record, ante)), ...((maxBoxes !== undefined) && { maxBoxes }),
-})
+export function putBoxArgs(record: DB.BoxRecord, ante: DB.BoxRow | null = null, maxBoxes?: number) {
+  return {
+    ask: sentAskOf(boxPutAskOf(record, ante)), ...((maxBoxes !== undefined) && { maxBoxes }),
+  }
+}
 
 /** The args of `delVault`: the del of the vault row `ante`. */
-export const delVaultArgs = (ante: DB.VaultRow) => ({ ask: sentAskOf(vaultDelAskOf(ante)) })
+export function delVaultArgs(ante: DB.VaultRow) { return { ask: sentAskOf(vaultDelAskOf(ante)) } }
 
 /** The args of `delBox`: the del of the box row `ante`. */
-export const delBoxArgs = (ante: DB.BoxRow) => ({ ask: sentAskOf(boxDelAskOf(ante)) })
+export function delBoxArgs(ante: DB.BoxRow) { return { ask: sentAskOf(boxDelAskOf(ante)) } }

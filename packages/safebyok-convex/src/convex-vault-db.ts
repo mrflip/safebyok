@@ -223,7 +223,7 @@ function changesOf(seen: RowsWatched, rows: RowsWatched): Heard[] {
 }
 
 /** Return a React watch's latest result, or undefined while it has none or is failing, telling `fail` what it throws. */
-const latestOf = (watch: { localQueryResult(): RowsWatched | undefined }, fail: (thrown: unknown) => void): RowsWatched | undefined => {
+function latestOf(watch: { localQueryResult(): RowsWatched | undefined }, fail: (thrown: unknown) => void): RowsWatched | undefined {
   try {
     return watch.localQueryResult()
   } catch (err) {

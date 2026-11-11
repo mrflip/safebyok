@@ -15,7 +15,7 @@ const otherBox = TH.boxAt(0, vault.vault_tok, { boxlabel: 'other' })
 const vaultQuery = { ...TH.vaultScope, vault_tok: vault.vault_tok }
 
 /** Make a backend where u1 has a vault with one box, both written as u1. */
-const seeded = async (): Promise<Backend> => {
+async function seeded(): Promise<Backend> {
   const backend = createTest()
   const asOwner = backend.withIdentity({ subject: 'u1' })
   await asOwner.mutation(api.safebyok.putVault, TH.putVaultArgs(vault))
@@ -38,7 +38,7 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
 ]
 
 /** List what u1 has stored, as the component itself reports it. */
-const storedIn = async (backend: Backend) => {
+async function storedIn(backend: Backend) {
   const asOwner = backend.withIdentity({ subject: 'u1' })
   return await asOwner.query(api.safebyok.watchRows, { scope: TH.bankScope })
 }

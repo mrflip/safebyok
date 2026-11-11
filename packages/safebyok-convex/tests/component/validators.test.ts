@@ -11,15 +11,17 @@ const vault = TH.vaultAt()
 const box = TH.boxAt()
 
 /** List every document in the component's tables, without system fields. */
-const storedRows = (backend: Backend) => backend.run(async ({ db }) => {
-  const vaultDocs = await db.query('safebyok_vaults').collect()
-  const boxDocs = await db.query('safebyok_boxes').collect()
-  const tallyDocs = await db.query('safebyok_tallies').collect()
-  return { vaults: vaultDocs.map(({ vault: row }): unknown => row), boxes: boxDocs.map(({ box: row }): unknown => row), tallies: tallyDocs.length }
-})
+function storedRows(backend: Backend) {
+  return backend.run(async ({ db }) => {
+    const vaultDocs = await db.query('safebyok_vaults').collect()
+    const boxDocs = await db.query('safebyok_boxes').collect()
+    const tallyDocs = await db.query('safebyok_tallies').collect()
+    return { vaults: vaultDocs.map(({ vault: row }): unknown => row), boxes: boxDocs.map(({ box: row }): unknown => row), tallies: tallyDocs.length }
+  })
+}
 
 /** Make a backend with the live vault that every box put needs. */
-const withVault = async (): Promise<Backend> => {
+async function withVault(): Promise<Backend> {
   const backend = TH.componentTest()
   await backend.mutation(api.putVault, TH.putVaultArgs(vault))
   return backend

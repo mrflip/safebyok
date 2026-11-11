@@ -16,7 +16,7 @@ describe("the limits every vault is bound by", () => {
 })
 
 /** Make a box document whose ciphertext is `ciphertext_b64`. */
-const boxDocOf = (ciphertext_b64: string) => {
+function boxDocOf(ciphertext_b64: string) {
   const box = TH.boxAt(0, 'life1', { whisper_ciphered: { cipher_iv_b64: 'aXY', ciphertext_b64 } })
   return { ...TH.vaultScope, vault_tok: box.vault_tok, boxlabel: box.boxlabel, box }
 }
@@ -42,7 +42,7 @@ describe("weigh", () => {
 })
 
 /** A tally with these `all_*` figures, its live figures zero: `refuses` and `capacityOf` read no live figure. */
-const allOf = (all_count: number, all_size: number) => ({ all_count, live_count: 0, all_size, live_size: 0 })
+function allOf(all_count: number, all_size: number) { return { all_count, live_count: 0, all_size, live_size: 0 } }
 
 describe("tallyOf and growthOf", () => {
   const live = boxDocOf('Y3Q')
