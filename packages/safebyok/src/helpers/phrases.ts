@@ -199,9 +199,6 @@ export const OneRevisionTwoLives = "Storage and this device disagree about a rec
 /** Why a record under another vault_tok than the instance has is not adopted. */
 export const OtherVaultTok = "Storage delivered a record from a deleted vault. This should not happen: report this as a bug."
 
-/** Why a record under another vault_tok than the vault its listing lies in is not made into an instance. */
-export const OtherVaultTokAtBirth = "Storage delivered a record from a different version of the vault. This should not happen: report this as a bug."
-
 /** Why a record delivered under one scope that names another is not adopted. */
 export const RecordOfOtherScope = "Storage delivered a misnamed record. This should not happen: report this as a bug."
 
