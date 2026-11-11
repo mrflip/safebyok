@@ -12,9 +12,9 @@ export default defineConfig({
   entry:      ['src/index.ts', 'src/devmode/index.ts'],
   root:       'src',
   format:     ['esm', 'cjs'],
-  // This package is React components and hooks, so unlike the core it targets browsers only (and the
-  // frameworks that render for them).
-  platform:   'browser',
+  // 'browser' would be ignored for the CommonJS build, which tsdown 0.23.5 reports as an error. Nothing
+  // here bundles code that varies by platform, so 'neutral' builds the same files.
+  platform:   'neutral',
   target:     'es2022',
   dts:        true,
   sourcemap:  true,
