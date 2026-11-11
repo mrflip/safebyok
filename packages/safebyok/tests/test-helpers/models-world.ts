@@ -85,11 +85,8 @@ export const fullBoxRecord = (overrides: Partial<BoxRecord> = {}): BoxRecord => 
 /** The sparse form of a box record: {@link fullBoxRecord} less its sidecar and sealed parts. `overrides` says otherwise; a sidecar or sealed part it names is stripped. */
 export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse => SX.boxSparse.parse({ ...fullBoxRecord(), ...overrides })
 
-/** The tombstone of a box record: exactly its sparse form, as {@link sparseBoxRecord} makes it, with `am` 'x' for a deletion or 'd' for damage, and nothing more (no sidecar, no sealed parts). `overrides` says otherwise, but for `am`.
- *
- * @example tombstoneBoxRecord({ revision_seq: 2 }, 'd')   // an entry of a `damaged_rows`
- */
-export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' | 'x' = 'x'): Tombstone<BoxSparse> => ({ ...sparseBoxRecord(overrides), am })
+/** The tombstone of a box record: exactly its sparse form, as {@link sparseBoxRecord} makes it, with `am` 'x', and nothing more (no sidecar, no sealed parts). `overrides` says otherwise, but for `am`. */
+export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}): Tombstone<BoxSparse> => ({ ...sparseBoxRecord(overrides), am: 'x' })
 
 /** The row a put or del expects to find where no box is stored under `boxlabel`: the shell, in {@link WorldVault}. */
 export const shellBoxRecord = (boxlabel = 'anthropic_api_key'): BoxTombstone => SX.shellBoxOf({ ...WorldVault.scope, boxlabel }, WorldVault.vault_tok)
@@ -205,7 +202,7 @@ export type ModelsWorld = {
   /** {@link sparseBoxRecord}, in this world's vault. */
   sparseBoxRecord(overrides?: Partial<BoxSparse>): BoxSparse
   /** {@link tombstoneBoxRecord}, in this world's vault. */
-  tombstoneBoxRecord(overrides?: Partial<BoxSparse>, am?: 'd' | 'x'): Tombstone<BoxSparse>
+  tombstoneBoxRecord(overrides?: Partial<BoxSparse>): Tombstone<BoxSparse>
   /** The scope of the box `boxlabel` in this world's vault. */
   boxscope(boxlabel: string): Boxscope
 }
@@ -426,7 +423,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
 
     fullBoxRecord:      (overrides) => fullBoxRecord(overrides),
     sparseBoxRecord:    (overrides) => sparseBoxRecord(overrides),
-    tombstoneBoxRecord: (overrides, am) => tombstoneBoxRecord(overrides, am),
+    tombstoneBoxRecord: (overrides) => tombstoneBoxRecord(overrides),
     boxscope:           scopeFor,
   }
 }

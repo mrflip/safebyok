@@ -35,9 +35,9 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 // == [Record forms]: liveness, tombstone, isTombstone, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna
 
 /** The checks of a record's `am`, and of a tombstone's fields. */
-export const { liveness, tombstone } = Checkers('bad_record', ({ obj, oneof }) => ({
+export const { liveness, tombstone } = Checkers('bad_record', ({ obj, lit }) => ({
   liveness:  obj({ am: SX.am }),
-  tombstone: SX.sparseBase.extend({ am: oneof(EX.tombstoneAmVals) }),
+  tombstone: SX.sparseBase.extend({ am: lit('x') }),
 }))
 
 /** Whether a record is alive, damaged or gone: its `am`. */
@@ -49,8 +49,8 @@ export type Vaulted = Readonly<Z.infer<typeof SX.vaulted>>
 /** The least a sparse form carries: the scope, and what {@link SX.sparseBase} checks, the revision, the times, whether it is alive and the vault it lies in. */
 export type SparseBase<ScopeT> = ScopeT & SX.Revision & SX.Times & Liveness & Vaulted
 
-/** SLOPDOC: The sparse form of a thing damaged or gone: its sparse props stay on it, the user's content goes. */
-export type Tombstone<SparseT> = SparseT & Readonly<{ am: typeof EX.tombstoneAmVals[number] }>
+/** The sparse form of a deleted thing: its sparse props stay, and the user's content is gone. */
+export type Tombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
 
 /** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link SX.sparseBase} checks what the base knows of any of the three. */
 export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
@@ -58,8 +58,8 @@ export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 /** The DNA of a storable, what a caller hands `listing.create`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
 export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[Prop] | undefined }
 
-/** True for a record whose `am` says damaged or gone. */
-export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched is Tombstone<SparseT> => (fetched.am === 'd' || fetched.am === 'x')
+/** True for a deleted record: its `am` is 'x'. */
+export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched is Tombstone<SparseT> => (fetched.am === 'x')
 
 // --
 
