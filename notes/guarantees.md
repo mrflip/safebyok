@@ -223,7 +223,7 @@ their `try*` forms → `box.put` → `demandPuttable` (`VX.boxPatch` or `VX.boxP
 (`GX.leaseSealArgs`) → `Lease.sealWith` → `TextEncoder`, `cipherBytes`, the bytes zeroed in a `finally`.
 Out: `box.extractWhisper`, `tryExtractWhisper`, `box.expose`, and `#keptWhisper` for a put that leaves the
 whisper out → `Box.#unseal` → `vault.unsealStampedString` → `Lease.unsealWith` → `#opened` (`decipherBytes`) →
-`TextDecoder`, the bytes zeroed in a `finally` → `parseJsonOrNull` → `CX.whisper` → the host, or `Box.#exposed`
+`TextDecoder`, the bytes zeroed in a `finally` → `deserializeWhisper` (`CX.whisper`) → the host, or `Box.#exposed`
 (*Open items*, 1). The core has no `mask` to show an outline of one.
 
 ## The guarantees
@@ -318,7 +318,7 @@ end of its method.
 string, which passes from `Box` to `Lease` through the Vault's seal verbs (`vault.sealStampedString`,
 `unsealStampedString`). `Lease.sealWith` encodes the text and zeroes the bytes afterwards, whether the seal succeeded or
 was refused; `Lease.unsealWith` decodes the deciphered bytes and zeroes them; `Box.#unseal` parses the text
-(`parseJsonOrNull`), checks it against `CX.whisper`, and hands the value to the host (`extractWhisper`) or keeps it
+(`deserializeWhisper`), checks it against `CX.whisper`, and hands the value to the host (`extractWhisper`) or keeps it
 (`expose`). `Box` makes no bytes of its own. So the whisper's bytes are zeroed, and the copies of its text live
 until garbage-collected, as a passphrase's do (G1). The core does not measure a whisper's size, so it has no copy made
 for measuring to zero. A `Box`'s

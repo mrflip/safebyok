@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
+import * as TH from '../test-helpers'
 
 describe("stableJsonify", () => {
   // stableJsonify @example
@@ -20,6 +21,9 @@ describe("stableJsonify", () => {
     expect(stableJsonify('hi')).to.eq('"hi"')
     expect(stableJsonify(null)).to.eq('null')
     expect(stableJsonify(42)).to.eq('42')
-    expect(stableJsonify(undefined)).to.eq(undefined)
+  })
+
+  it("refuses a value with no JSON text", () => {
+    for (const val of [undefined, () => 1, Symbol('one')]) { TH.expectSyncRefusal(() => stableJsonify(val), 'unexpected_error') }
   })
 })

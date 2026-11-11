@@ -163,9 +163,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     const { sidecar, box_key_wrapped, whisper_ciphered } = record
     const stamp = boxStampOf(SX.boxSparse.parse(record), sidecar)
     const whisperText = await this.world.unsealStampedString({ box_key_wrapped, whisper_ciphered }, stamp)
-    const parsed = CX.whisper.safeParse(parseJsonOrNull(whisperText))
-    if (! parsed.success) { throw undecodedWhisper() }
-    return parsed.data
+    return deserializeWhisper(whisperText)
   }
   // --
 
@@ -316,25 +314,30 @@ const mergedOver = (whisper: Whisper, patch: Whisper): Whisper => (
 )
 // --
 
-// == [The seal]: sealedRecordOf, boxStampOf, parseJsonOrNull
+// == [The seal]: sealedRecordOf, boxStampOf, deserializeWhisper
 
 /** The full record of `base` with `sidecar`, `whisper` sealed through `world`: as json_v1, bound with its key to the box's stamp. Of `base`, only its sparse fields are taken. */
 const sealedRecordOf = async (world: Pick<BoxWorld, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: Whisper): Promise<BoxRecord> => {
   const sparse = SX.boxSparse.parse(base)
   const stamp = boxStampOf(sparse, sidecar)
-  const { box_key_wrapped, whisper_ciphered } = await world.sealStampedString(stableJsonify(whisper) ?? '', stamp)
+  const { box_key_wrapped, whisper_ciphered } = await world.sealStampedString(stableJsonify(whisper), stamp)
   return SX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })
 }
 
 /** The box's stamp, which the lease binds both sealed parts to: every sparse field of the record, and its sidecar as stable JSON. */
-const boxStampOf = (sparse: BoxSparse, sidecar: Sidecar): CipherCtxRecord => ({ ...sparse, sidecar: stableJsonify(sidecar) ?? '' })
+const boxStampOf = (sparse: BoxSparse, sidecar: Sidecar): CipherCtxRecord => ({ ...sparse, sidecar: stableJsonify(sidecar) })
 
-/** `text` parsed as JSON, or null where it is none: a SyntaxError can quote what it failed on. */
-const parseJsonOrNull = (text: string): unknown => {
+// What JSON.parse throws is replaced, never kept as a cause: a SyntaxError can quote the text it failed on.
+/** The whisper `text` holds as JSON; `damaged_whisper` where it holds none, or holds what is not a whisper. */
+function deserializeWhisper(text: string): Whisper {
+  let parsed: unknown
   try {
-    return JSON.parse(text)
+    parsed = JSON.parse(text)
   } catch {
-    return null
+    throw undecodedWhisper()
   }
+  const checked = CX.whisper.safeParse(parsed)
+  if (! checked.success) { throw undecodedWhisper() }
+  return checked.data
 }
 // --

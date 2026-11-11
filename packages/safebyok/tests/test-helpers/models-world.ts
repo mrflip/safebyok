@@ -330,13 +330,13 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
       demandFakeUnlocked()
-      sealedTexts.set(String(stableJsonify(stamp)), whisperText)
+      sealedTexts.set(stableJsonify(stamp), whisperText)
       return { box_key_wrapped: FakeBoxKeyWrapped, whisper_ciphered: FakeWhisperCiphered }
     },
     unsealStampedString: async (_sealed, stamp) => {
       await Promise.resolve()
       demandFakeUnlocked()
-      const whisperText = sealedTexts.get(String(stableJsonify(stamp)))
+      const whisperText = sealedTexts.get(stableJsonify(stamp))
       if (whisperText === undefined) { throw Refuse.unopenedWhisper() }
       return whisperText
     },

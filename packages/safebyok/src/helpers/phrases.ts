@@ -344,7 +344,7 @@ export const vaultStoredDamaged = (vaultlabel: string): string => `The vault ${v
 export const boxStoredDamaged = (boxlabel: string): string => `The box ${boxlabel} is stored damaged, so it can't be read. It was left as it is.`
 // --
 
-// == [Refusals: outcomes and helpers]: NoErrorGiven, nonErrorThrown, StorageUnavailable, UnexpectedError, UnboundCipherCtx, StrengthCheckerMisanswered, StrengthCheckerLoadFailed, KeyDeriverLoadFailed
+// == [Refusals: outcomes and helpers]: NoErrorGiven, nonErrorThrown, StorageUnavailable, UnexpectedError, UnboundCipherCtx, NoJsonText, StrengthCheckerMisanswered, StrengthCheckerLoadFailed, KeyDeriverLoadFailed
 
 /** The cause's message where what failed threw null or undefined. */
 export const NoErrorGiven = "What failed threw nothing: null or undefined, not an Error."
@@ -360,6 +360,9 @@ export const UnexpectedError = "Something went wrong that safebyok did not expec
 
 /** A cipher ctx handed no stamp, or a part or field that is undefined or null. */
 export const UnboundCipherCtx = "A cipher ctx was handed no stamp, or a part or a field of one that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it."
+
+/** A value with no JSON text handed to be serialized. */
+export const NoJsonText = "A value with no JSON text (undefined, a function or a symbol) was handed to be serialized, so nothing was sealed or bound. This is a bug in the code calling it."
 
 /** The host's strengthChecker answering no verdict. */
 export const StrengthCheckerMisanswered = "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text."
