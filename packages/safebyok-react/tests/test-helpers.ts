@@ -87,11 +87,11 @@ export const withoutGesture = () => {
  */
 export const addPasskeyTo = async (world: BankWorld, vault: Vault, passkeyClear?: PasskeyAnswer | null) => {
   const { typing } = world.dialog
-  world.dialog.typing = { passphraseClear: Passphrase, passkeyClear: passkeyClear ?? await passkeyOf('laptop') } // eslint-disable-line no-param-reassign -- the test's own world, put back in the finally
+  world.dialog.typing = { passphraseClear: Passphrase, passkeyClear: passkeyClear ?? await passkeyOf('laptop') }
   try {
     await vault.addPasskeyPrompt()
   } finally {
-    world.dialog.typing = typing // eslint-disable-line no-param-reassign -- the test's own world, put back
+    world.dialog.typing = typing
   }
 }
 

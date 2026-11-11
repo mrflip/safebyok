@@ -309,8 +309,6 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
   Never `var`.
 * Functional style is strongly preferred: `map`, `filter`, `reduce` over index loops.
 * Arrow functions for inline lambdas; their params always parenthesized: `(val) => val.label`.
-* Don't write to objects you don't own (`no-param-reassign`). When it is right, disable the rule
-  on that line and say why.
 * `return await` inside a `try` or `catch`, nowhere else -- unless you want the current function
   kept in the stack trace.
 

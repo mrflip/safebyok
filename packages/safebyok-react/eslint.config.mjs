@@ -165,8 +165,6 @@ export default defineConfig([
       'no-negated-condition':                      ['error'],
       // STYLE.md: const by default, let where genuinely reassigned, never var.
       'no-var':                                    ['error'],
-      // STYLE.md: never write to an object you don't own; a line that must disables the rule and says why.
-      'no-param-reassign':                         ['error', { props: true }],
       'no-unsafe-negation':                        ['error', { enforceForOrderingRelations: true }],
       'prefer-destructuring':                      ['warn', { object: true, array: false }],
 

@@ -41,10 +41,10 @@ const watched = (promise: Promise<void>): Seen => {
 const settleInto = async (seen: Seen, promise: Promise<void>) => {
   try {
     await promise
-    seen.settled = 'resolved' // eslint-disable-line no-param-reassign -- the test's own record of how the promise settled
+    seen.settled = 'resolved'
   } catch (err) {
-    seen.settled = 'rejected' // eslint-disable-line no-param-reassign -- the test's own record of how the promise settled
-    seen.err = err // eslint-disable-line no-param-reassign -- the test's own record of how the promise settled
+    seen.settled = 'rejected'
+    seen.err = err
   }
 }
 
