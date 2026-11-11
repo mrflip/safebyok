@@ -204,10 +204,10 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** The answer of a box's `call`, made of what its ask came to. */
   protected boxAnswerOf(call: string, ask: BoxAsk, classified: BoxClassified): BoxAnswer {
     const req_params = SX.reqParamsOf(ask)
-    const { act, world, row, capacity } = classified
-    if (classified.ok) { return { ok: true, req_params, act: classified.act, val: row, world } }
+    const { act, world, box, capacity } = classified
+    if (classified.ok) { return { ok: true, req_params, act: classified.act, val: box, world } }
     const meta = { call, req_params, ...((act === 'vault_full') && (capacity !== null) && { capacity }) }
-    return { ok: false, req_params, act, world, dbhas: row, err: Refuse.actRefused('box', classified.act, meta) }
+    return { ok: false, req_params, act, world, dbhas: box, err: Refuse.actRefused('box', classified.act, meta) }
   }
 
   // Every throw under a get, put or del lands here: an ask that fails its checks, a stored row that fails its own, a store that is down.

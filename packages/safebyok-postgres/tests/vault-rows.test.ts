@@ -88,14 +88,14 @@ describe("a record stored in its table", () => {
     expect(await rowsFrom(LockVaultSql, VaultAddress)).to.deep.equal([{ vault }])
     expect(await rowsFrom(BoxesOfLifeSql, LifeAddress)).to.deep.equal([{ boxlabel, box }])
     expect(await rowsFrom(BoxAndRoomSql, BoxAddress)).to.deep.equal([{ box, used: 1 }])
-    expect(await rowsFrom(GetBoxWithVaultSql, BoxAddress)).to.deep.equal([{ vault, box }])
+    expect(await rowsFrom(GetBoxWithVaultSql, BoxAddress)).to.deep.equal([{ world: vault, box }])
     expect(await rowsFrom(ListBoxesWithVaultSql, LifeAddress)).to.deep.equal([{ vault, boxes: [{ boxlabel, box }] }])
   })
 
   it("is answered as null or an empty list where no row is stored", async () => {
     expect(await rowsFrom(GetVaultSql, VaultAddress)).to.deep.equal([])
     expect(await rowsFrom(BoxAndRoomSql, BoxAddress)).to.deep.equal([{ box: null, used: 0 }])
-    expect(await rowsFrom(GetBoxWithVaultSql, BoxAddress)).to.deep.equal([{ vault: null, box: null }])
+    expect(await rowsFrom(GetBoxWithVaultSql, BoxAddress)).to.deep.equal([{ world: null, box: null }])
     expect(await rowsFrom(ListBoxesWithVaultSql, LifeAddress)).to.deep.equal([{ vault: null, boxes: [] }])
   })
 })

@@ -33,12 +33,12 @@ export const ReviseVaultSql = 'SELECT * FROM safebyok_revise_vault($1::text::jso
 // == [Box rows]: GetBoxWithVaultSql, ListBoxesWithVaultSql
 // A read of a box together with its vault is one statement, so both rows come from the same snapshot.
 
-/** A box row and its vault row. */
+/** A box row, and its vault row as `world`. */
 export const GetBoxWithVaultSql = `
   SELECT (
     SELECT safebyok_record(to_jsonb(vault)) FROM safebyok_vaults AS vault
     WHERE  (applabel, user_id, vaultlabel) = ($1, $2, $3)
-  ) AS vault, (
+  ) AS world, (
     SELECT safebyok_record(to_jsonb(box)) FROM safebyok_boxes AS box
     WHERE  (applabel, user_id, vaultlabel, vault_tok, boxlabel) = ($1, $2, $3, $4, $5)
   ) AS box

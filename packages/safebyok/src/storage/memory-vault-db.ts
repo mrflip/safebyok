@@ -1,6 +1,7 @@
 /** The vaultDB in memory. */
 
 import { type BoxesFetched, type Heard, type RowOfVault, type Tidied, AdapterVaultDB } from './vault-db'
+import { isWriteAct } from './classifier'
 import type { BoxClassified, VaultClassified } from './classifier'
 import { DefaultMaxBoxes } from '../helpers/consts'
 import { ckeyOf } from '../helpers/helpers'
@@ -101,7 +102,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   protected doGetBox(ask: BoxGetAsk): BoxClassified {
     const box = this._cheat_boxRowsOf(ask, ask.vault_tok).get(ask.boxlabel) ?? null
-    return this.classifyBox(ask, { vault: this.#vaultRowOf(ask), box })
+    return this.classifyBox(ask, { world: this.#vaultRowOf(ask), box })
   }
 
   protected doPutVault(ask: VaultPutAsk): VaultClassified {
@@ -114,8 +115,8 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const boxrows = this._cheat_boxRowsOf(ask.record, ask.record.vault_tok)
     const vault = this.#vaultRowOf(ask.record)
     const box = boxrows.get(ask.record.boxlabel) ?? null
-    const classified = this.classifyBox(ask, { vault, box, capacity: this.#roomIn(boxrows) })
-    if (classified.write !== null) { this.#writeBoxRow(boxrows, vault, classified.write) }
+    const classified = this.classifyBox(ask, { world: vault, box, capacity: this.#roomIn(boxrows) })
+    if (isWriteAct(classified.act)) { this.#writeBoxRow(boxrows, vault, ask.record) }
     return classified
   }
 
@@ -133,8 +134,8 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const boxrows = this._cheat_boxRowsOf(ask.record, ask.record.vault_tok)
     const vault = this.#vaultRowOf(ask.record)
     const box = boxrows.get(ask.record.boxlabel) ?? null
-    const classified = this.classifyBox(ask, { vault, box })
-    if (classified.write !== null) { this.#writeBoxRow(boxrows, vault, classified.write) }
+    const classified = this.classifyBox(ask, { world: vault, box })
+    if (isWriteAct(classified.act)) { this.#writeBoxRow(boxrows, vault, ask.record) }
     return classified
   }
 

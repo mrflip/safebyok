@@ -8,7 +8,7 @@ import * as EX from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { VaultScope } from '../shapes/shapes-core'
 import type { BoxAct, BoxVaultAct, OkAct, RefusedAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
-import type { BoxAsk, BoxDelAsk, BoxPutAsk, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, Capacity, Revision, VaultAsk, VaultDelAsk, VaultPutAsk, VaultRecord, VaultRow, VaultTombstone } from '../shapes/shapes-storage'
+import type { BoxAsk, BoxQuery, BoxRow, BoxSparse, Capacity, Revision, VaultAsk, VaultDelAsk, VaultPutAsk, VaultRecord, VaultRow, VaultTombstone } from '../shapes/shapes-storage'
 
 // == [Asked and stored]: Meta, Asked, GetAsked, PutAsked, DelAsked, Presence, Stored
 // Every function below takes what was asked first, and what is stored second.
@@ -147,10 +147,10 @@ function boxRowAt(boxQuery: BoxQuery, boxRaw: unknown): Stored<BoxRow> {
 }
 
 /** The act a box request refuses with for its vault's stored row, or null where the vault is live in the life asked for. */
-function boxVaultActOf(boxQuery: BoxQuery, vault: Stored<VaultRow>): BoxVaultAct | null {
-  if (vault.presence === 'void') { return 'vault_void' }
-  if (vault.presence === 'gone') { return 'vault_gone' }
-  return (vault.row.vault_tok === boxQuery.vault_tok) ? null : 'vault_reborn'
+function boxVaultActOf({ vault_tok }: Pick<BoxQuery, 'vault_tok'>, world: VaultRow): BoxVaultAct | null {
+  if (world.revision_seq === SX.VoidRevisionSeq) { return 'vault_void' }
+  if (world.am !== 'a')                          { return 'vault_gone' }
+  return (world.vault_tok === vault_tok) ? null : 'vault_reborn'
 }
 // --
 
@@ -180,8 +180,10 @@ export function cappedActOf(act: BoxAct, capacity: Capacity): BoxAct {
 /** The vault row an adapter fetched for a vault's ask, as stored and unchecked: null for none. */
 export type VaultFetched = { vault: unknown }
 
-/** The rows an adapter fetched for a box's ask, as stored and unchecked, null for none; and the vault's room, where it gauged it. */
-export type BoxFetched = { vault: unknown, box: unknown, capacity?: Capacity }
+/** What a datastore answers for a box's ask, as it comes, unchecked: the vault row and the box row, null for none, and the vault's room where it gauged it.
+ * A datastore that tested the ask and stored its record itself also answers `ok`, the `act` that came to, and the `presence` of what was stored before.
+ */
+export type BoxFetched = Readonly<{ world: unknown, box: unknown, capacity?: Capacity | null, ok?: unknown, act?: unknown, presence?: unknown }>
 
 /** What a vault's ask comes to over the row stored. `ok` is true for a good answer and false for a refusal, and `act` says which. */
 export type VaultClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct }) & {
@@ -199,10 +201,8 @@ export type VaultClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, 
 export type BoxClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct | BoxVaultAct }) & {
   /** The vault row stored, or the sentinel for none. */
   world:    VaultRow
-  /** A good answer's `val`, or a refusal's `dbhas`: the record this request stores, else the box row stored, null for none or where its vault refused. */
-  row:      BoxRow | null
-  /** The record for the adapter to store, null where nothing is written. */
-  write:    BoxRecord | BoxTombstone | null
+  /** A good answer's `val`, or a refusal's `dbhas`: the record this ask stores, else the box row stored, null for none or where its vault refused. */
+  box:      BoxRow | null
   /** What was stored at the box's scope before any write; null where its vault refused, and the box row was not judged. */
   presence: Presence | null
   /** The vault's room as the adapter gauged it, null where it gauged none. */
@@ -220,25 +220,44 @@ export function classifyVault(ask: VaultAsk, { vault }: VaultFetched): VaultClas
   return isOkAct(act) ? { ...found, ok: true, act } : { ...found, ok: false, act }
 }
 
-/** Classify a box's checked ask against the rows an adapter fetched. Throws for a row that fails its checks. */
-export function classifyBox(ask: BoxAsk, { vault, box, capacity }: BoxFetched): BoxClassified {
-  // Coach, to come back to once Postgres is squared away:
-  // - name the fetched parts { world, row, capacity }
-  // - fine-slicing damaged_vault vs damaged_row isn't worth the extra param
-  // - the return value of vaultRowAt should be a perfectly good row
-  // - (the vault check may stay an answer; it need not throw)
-  const boxQuery  = SX.boxQueryOf(ask)
-  const vaultRow  = vaultRowAt(boxQuery, vault, boxVaultRow)
-  const world     = vaultRow.row ?? SX.sentinelVaultOf(boxQuery)
-  const vaultAct  = boxVaultActOf(boxQuery, vaultRow)
-  if (vaultAct !== null) { return { ok: false, act: vaultAct, world, row: null, write: null, presence: null, capacity: null } }
-  const stored    = boxRowAt(boxQuery, box)
-  const uncapped  = rowActOf(ask, stored)
-  const act       = (capacity === undefined) ? uncapped : cappedActOf(uncapped, capacity)
-  const judged    = { world, presence: stored.presence, capacity: capacity ?? null }
-  if ((ask.op !== 'get') && isWriteAct(act)) { return { ...judged, ok: true, act, row: ask.record, write: ask.record } }
-  const found     = { ...judged, row: stored.row, write: null }
-  return isOkAct(act) ? { ...found, ok: true, act } : { ...found, ok: false, act }
+const { foundVerdict } = Checkers('storage_issue', ({ obj, bool, oneof }) => ({
+  foundVerdict: obj({
+    ok:       bool.default(false),
+    act:      oneof(EX.writeActVals).nullable().default(null),
+    presence: oneof(['void', 'gone', 'live'] as const).nullable().default(null),
+  }).refine(({ ok, act }) => ok === (act !== null), 'A datastore names an act for the record it stored, and for nothing else.'),
+}))
+
+/** What is stored where `row` is a row or none. */
+function presenceOf(row: Meta | null): Presence {
+  if (row === null) { return 'void' }
+  return (row.am === 'a') ? 'live' : 'gone'
+}
+
+// The whole of a box's ask is settled here, top to bottom: what the datastore answered is checked once, at the top,
+// and past that the rows are sound and typed and are only read.
+/** What a box's ask comes to over what the datastore answered for it. Throws for a row that fails its checks, or that is not at the address asked for.
+ * A record the datastore stored itself (`fetched.ok`) is the answer as it stands; else the act is named from the rows, per the tables of `notes/answer-contract.md`.
+ */
+export function classifyBox(ask: BoxAsk, fetched: BoxFetched): BoxClassified {
+  const boxQuery = SX.boxQueryOf(ask)
+  const world    = vaultRowAt(boxQuery, fetched.world, boxVaultRow).row ?? SX.sentinelVaultOf(boxQuery)
+  const capacity = fetched.capacity ?? null
+  const verdict  = foundVerdict.parse(fetched)
+
+  // The vault first. Under a vault that is not live in the life asked for, the box row is not read, whatever is stored for the box.
+  const vaultAct = boxVaultActOf(boxQuery, world)
+  if (vaultAct !== null) { return { ok: false, act: vaultAct, world, box: null, presence: null, capacity: null } }
+
+  const box      = boxRowAt(boxQuery, fetched.box).row
+  if (verdict.ok && (verdict.act !== null)) { return { ok: true, act: verdict.act, world, box, presence: verdict.presence ?? presenceOf(box), capacity } }
+
+  const presence = presenceOf(box)
+  const stored: Stored<BoxRow> = (box === null) ? { presence: 'void', row: null } : { presence: presence as 'live' | 'gone', row: box }
+  const uncapped = rowActOf(ask, stored)
+  const act      = (capacity === null) ? uncapped : cappedActOf(uncapped, capacity)
+  if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, world, box: ask.record, presence, capacity } }
+  return isOkAct(act) ? { ok: true, act, world, box, presence, capacity } : { ok: false, act, world, box, presence, capacity }
 }
 
 /** Classify a vault request's outcome, based on the stored row. */
@@ -248,31 +267,21 @@ export function vaultActOf(request: VaultAsk, vaultRaw: unknown): VaultAct {
 
 /** Classify a box request's outcome, based on its stored vault and box rows. */
 export function boxActOf(request: BoxAsk, vaultRaw: unknown, boxRaw: unknown): BoxAct {
-  return classifyBox(SX.boxAsk.parse(request), { vault: vaultRaw, box: boxRaw }).act
+  const ask = SX.boxAsk.parse(request)
+  return classifyBox(ask, { world: vaultRaw, box: boxRaw }).act
 }
 // --
 
-// == [A write the datastore made]: BoxWritten, VaultWritten, boxWrittenOf, vaultWrittenOf
+// == [A vault write the datastore made]: VaultWritten, vaultWrittenOf
 // An adapter whose datastore tests an ask and stores its record in one step hands back what it stored.
 // Its parts are checked here, and nothing is classified again.
 
-/** What a datastore answers for a box record it stored: the act, the vault row, the row now stored, what was stored before, and the vault's room. Unchecked. */
-export type BoxWritten = Readonly<{ act: unknown, world: unknown, box: unknown, presence: unknown, capacity?: Capacity }>
 /** What a datastore answers for a vault record it stored: the act, the row now stored, and what was stored before. Unchecked. */
 export type VaultWritten = Readonly<{ act: unknown, vault: unknown, presence: unknown }>
 
 const { writtenAct, writtenPresence } = Checkers('storage_issue', ({ oneof }) => ({
   writtenAct: oneof(EX.writeActVals), writtenPresence: oneof(['void', 'gone', 'live'] as const),
 }))
-
-/** The classified answer of a box write the datastore made. Throws for a part that fails its checks. */
-export function boxWrittenOf(ask: BoxPutAsk | BoxDelAsk, { act, world, box, presence, capacity }: BoxWritten): BoxClassified {
-  const boxQuery = SX.boxQueryOf(ask)
-  const vaultRow = vaultRowAt(boxQuery, world, boxVaultRow)
-  const stored   = boxRowAt(boxQuery, box)
-  if ((vaultRow.row === null) || (stored.row === null)) { throw Refuse.storageIssue() }
-  return { ok: true, act: writtenAct.parse(act), world: vaultRow.row, row: stored.row, write: null, presence: writtenPresence.parse(presence), capacity: capacity ?? null }
-}
 
 /** The classified answer of a vault write the datastore made. Throws for a part that fails its checks. */
 export function vaultWrittenOf(ask: VaultPutAsk | VaultDelAsk, { act, vault, presence }: VaultWritten): VaultClassified {
