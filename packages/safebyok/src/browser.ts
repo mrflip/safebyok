@@ -8,7 +8,7 @@ import type { StrengthChecker } from './helpers/passphrase-strength'
 import { zxcvbnStrengthChecker } from './helpers/zxcvbn-strength-checker'
 import { type IdbDeviceDB, idbDeviceDB, idbDeviceDBOpts, type IdbDeviceDBOpts } from './storage/idb-device-db'
 
-export { argon2idDeriver, argon2idWebV1Deriver } from './deriver/argon2id-webv1'
+export { makeArgon2idDeriver, argon2idWebV1Deriver } from './deriver/argon2id-webv1'
 export { parseKeyDeriverSpec } from './deriver/basederiver'
 export type { Argon2idKeyDeriver, KeyDeriver } from './deriver/basederiver'
 export { PassphraseSaltSize } from './helpers/consts'

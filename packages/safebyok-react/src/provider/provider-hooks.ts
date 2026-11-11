@@ -26,10 +26,10 @@ export const useDeviceId = (deviceDB: BankOpts['deviceDB'], applabel: string, us
 }
 // --
 
-// == [Ignored options]: changedKeys, useWarnOfIgnoredOpts
+// == [Ignored options]: changedFieldnames, useWarnOfIgnoredOpts
 
 /** The fields whose values differ between `was` and `now`. */
-const changedKeys = (was: Record<string, unknown>, now: Record<string, unknown>): string[] => (
+const changedFieldnames = (was: Record<string, unknown>, now: Record<string, unknown>): string[] => (
   Object.keys({ ...was, ...now }).filter((ckey) => (! Object.is(was[ckey], now[ckey])))
 )
 
@@ -38,7 +38,7 @@ export const useWarnOfIgnoredOpts = (bank: Bank | null, wasOpts: ProviderBankOpt
   const toldOfIgnored = useRef(false)
   useEffect(() => {
     if (bank === null || toldOfIgnored.current) { return }
-    const changed = changedKeys(wasOpts, nowOpts)
+    const changed = changedFieldnames(wasOpts, nowOpts)
     if (changed.length === 0) { return }
     toldOfIgnored.current = true
     bank.logger.warn(`BankProvider ignored a change to its ${changed.join(' and ')}: it makes its bank once per applabel and user_id, from the props it has then. Define each prop once, outside the component, or memoize it.`, { call: 'BankProvider', props: changed })

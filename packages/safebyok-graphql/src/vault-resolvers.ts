@@ -8,7 +8,7 @@ export type VaultResolversOpts<ContextT> = {
   /** The vaultDB that serves every request, such as a `PostgresVaultDB`. */
   vaultDB:  DB.AdapterVaultDB
   /** Return the `user_id` your own auth signed this request in as, or null when signed out. */
-  userIdOf: (context: ContextT) => DB.Awaitable<string | null>
+  getUserId: (context: ContextT) => DB.Awaitable<string | null>
 }
 
 /** Each root field's arguments, as GraphQL coerced them, keyed by the field's name. */
@@ -89,16 +89,16 @@ export type VaultResolvers<ContextT> = {
 
 const vaultResolversOpts = DB.objCheck(({ custom, fn }) => ({
   vaultDB:  custom<DB.AdapterVaultDB>(DB.isAdapterVaultDB, 'Expected an AdapterVaultDB from safebyok/storage'),
-  userIdOf: fn<VaultResolversOpts<unknown>['userIdOf']>(),
+  getUserId: fn<VaultResolversOpts<unknown>['getUserId']>(),
 }), 'bad_option')
 
 /** Make the resolvers for `VaultSchemaSdl`. A request can reach only the bank of the user it is signed in as. */
 export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): VaultResolvers<ContextT> => {
-  const { vaultDB, userIdOf } = vaultResolversOpts.parse(opts)
+  const { vaultDB, getUserId } = vaultResolversOpts.parse(opts)
 
   /** Return null if the request is signed in as `user_id`, else the refusal to send back. */
   const signInRefusalOf = async (context: ContextT, user_id: string): Promise<DB.VaultError | null> => {
-    const signedIn = await DB.outcomeOf(() => userIdOf(context))
+    const signedIn = await DB.outcomeOf(() => getUserId(context))
     if (! signedIn.ok) { return signedIn.err }
     return (signedIn.val === user_id) ? null : DB.identityRevoked()
   }

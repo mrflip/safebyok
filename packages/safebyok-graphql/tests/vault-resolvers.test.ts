@@ -177,10 +177,10 @@ describe("vaultResolvers", () => {
     expect(JSON.stringify(crossed)).not.to.include('hunter2')
   })
 
-  it("sends nothing from the error a userIdOf throws", async () => {
+  it("sends nothing from the error a getUserId throws", async () => {
     const schema = makeExecutableSchema({
       typeDefs:  VaultSchemaSdl,
-      resolvers: vaultResolvers({ vaultDB: await TH.serverOver(), userIdOf: () => { throw new Error('session cookie s3cr3t-cookie is malformed') } }),
+      resolvers: vaultResolvers({ vaultDB: await TH.serverOver(), getUserId: () => { throw new Error('session cookie s3cr3t-cookie is malformed') } }),
     })
     const crossed = await sentAsk(schema, VaultOperations.getVault, vaultGetAsk)
     expect((DB.getVaultAnswer.parse(crossed) as DB.BadAnswer).err.refusalkind).to.eq('unexpected_error')
@@ -214,10 +214,10 @@ describe("vaultResolvers", () => {
     expect(full.err.meta?.capacity).to.deep.eq({ boxes: { used: 1, max: 1 }, bytes: { used: 0, max: Number.MAX_SAFE_INTEGER } })
   })
 
-  it("refuses a vaultDB or userIdOf it cannot use, including a browser-side GraphQLVaultDB", async () => {
+  it("refuses a vaultDB or getUserId it cannot use, including a browser-side GraphQLVaultDB", async () => {
     const vaultDB = await TH.serverOver()
     const client = new GraphQLVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] }) })
-    const unusable = [{}, { vaultDB }, { vaultDB: {}, userIdOf: () => 'u1' }, { vaultDB, userIdOf: 'u1' }, { vaultDB: client, userIdOf: () => 'u1' }]
+    const unusable = [{}, { vaultDB }, { vaultDB: {}, getUserId: () => 'u1' }, { vaultDB, getUserId: 'u1' }, { vaultDB: client, getUserId: () => 'u1' }]
     for (const opts of unusable) { TH.expectSyncRefusal(() => vaultResolvers(opts as never), 'bad_option') }
   })
 })
@@ -260,7 +260,7 @@ describe("vaultResolvers' watch", () => {
     }
   })
 
-  it("ends with a refusal that carries nothing from the error its userIdOf throws", async () => {
+  it("ends with a refusal that carries nothing from the error its getUserId throws", async () => {
     await TH.emptyTables()
     const { listening, vaultDB, schema } = await watchedServer()
     const session: TH.TestContext = { user_id: 'u1' }

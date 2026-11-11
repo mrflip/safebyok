@@ -24,7 +24,7 @@ const vaultRoute = (vaultDB: PostgresVaultDB, signedInUserId: (request: Request)
   type VaultContext = { user_id: string | null }
   const schema = createSchema<VaultContext>({
     typeDefs:  [VaultSchemaSdl],
-    resolvers: [vaultResolvers({ vaultDB, userIdOf: ({ user_id }: VaultContext) => user_id })],
+    resolvers: [vaultResolvers({ vaultDB, getUserId: ({ user_id }: VaultContext) => user_id })],
   })
   const { handleRequest } = createYoga<object, VaultContext>({
     schema,

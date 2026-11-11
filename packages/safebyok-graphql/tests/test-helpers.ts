@@ -85,7 +85,7 @@ export const serverOver = async (opts: Omit<PostgresVaultDBOpts, 'client'> = {})
 /** Build the executable GraphQL schema for `vaultDB`. Each request is signed in as the user in its context. */
 export const schemaOver = (vaultDB: AdapterVaultDB): GraphQLSchema => makeExecutableSchema({
   typeDefs:  VaultSchemaSdl,
-  resolvers: vaultResolvers({ vaultDB, userIdOf: ({ user_id }: TestContext) => user_id }),
+  resolvers: vaultResolvers({ vaultDB, getUserId: ({ user_id }: TestContext) => user_id }),
 })
 // --
 

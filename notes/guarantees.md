@@ -162,7 +162,7 @@ bytes. Everything not listed never sees the value. Private methods are named wit
 `buildNovel` → `Proving.judgeStrength` → the world's `strengthChecker`, as `guardStrengthChecker`
 (`helpers/passphrase-strength.ts`) wraps it → the host's `strengthChecker`; both → `passphraseKeyOf` → the world's
 `keyDeriver.deriveKeyBytes`, as `guardKeyDeriver` wraps it → `deriveKeyBytes` → the host's `keyDeriver.deriveKeyBytes`
-(`argon2idDeriver`'s, from `deriver/argon2id-webv1.ts`, or the host's own). As the user types, before any attempt:
+(`makeArgon2idDeriver`'s, from `deriver/argon2id-webv1.ts`, or the host's own). As the user types, before any attempt:
 `gating.judgeStrength` → `Proving.judgeStrength`, as above.
 Operates on it without having it: nothing; a passphrase has no handle form.
 
@@ -424,18 +424,18 @@ the crypto imports.
   `info` is its wayin's ctx, so the same bytes under another purpose make another key.
 * *A memory-hard, labelled, salted derivation.* Argon2id under a stored `key_deriver_label` whose spec is fixed
   (`Argon2idWebV1`, `deriver/shapes.ts`: 64 MiB, 3 passes, 1 lane, 16-byte salt, 32-byte key), made by
-  `argon2idDeriver` (`deriver/argon2id-webv1.ts`, over `@noble/hashes`); a fresh random salt per wayin
+  `makeArgon2idDeriver` (`deriver/argon2id-webv1.ts`, over `@noble/hashes`); a fresh random salt per wayin
   (`mintPassphraseHeader`, `models/proving.ts`); a wayin under another label is refused as `newer_format`
   (`PassphraseProving.buildStored`), so there is no silent downgrade (`tests/models/proving.test.ts`, *refuses a
-  wayin made under another key deriver as 'newer_format', before the world's is asked*). A deriver that `argon2idDeriver`
-  makes under a supplied label must carry exactly that label's supplied parameters, and `argon2idDeriver` makes none
+  wayin made under another key deriver as 'newer_format', before the world's is asked*). A deriver that `makeArgon2idDeriver`
+  makes under a supplied label must carry exactly that label's supplied parameters, and `makeArgon2idDeriver` makes none
   under another label with the reserved prefix `argon2id_web_`. These are the refines of `keyDeriverSpec`
-  (`deriver/shapes.ts`), which only `argon2idDeriver` reaches, through `parseKeyDeriverSpec`. A host's own deriver is
+  (`deriver/shapes.ts`), which only `makeArgon2idDeriver` reaches, through `parseKeyDeriverSpec`. A host's own deriver is
   checked once, by `keyDeriverShape`
   (`shapes/shapes-core.ts`) in `guardKeyDeriver` as `Bank`'s constructor wraps it: by its interface, and by its
   `salt_size`, which every deriver's spec and every stored salt keep at 16 (`PassphraseSaltSize`, `helpers/consts.ts`),
   but not by its other parameters, as a host bent on weak ones would find a way (`#the-host-is-not-our-threat-model`, the Coach, 2026-11-06). `safebyok/browser`
-  exports `argon2idDeriver` and `argon2idWebV1Deriver` (the main entry point, `safebyok`, exports neither), and
+  exports `makeArgon2idDeriver` and `argon2idWebV1Deriver` (the main entry point, `safebyok`, exports neither), and
   `tests/browser.test.ts` runs both, the refines through `parseKeyDeriverSpec`;
   safebyok-fastkey's hash-wasm deriver runs on the old core.
 * *Randomness* from `crypto.getRandomValues`, `crypto.randomUUID` and `subtle.generateKey` alone (`randomBytes`,

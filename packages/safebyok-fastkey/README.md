@@ -6,8 +6,8 @@ about four times faster.
 
 * `argon2idWasmWebV1Deriver` -- Argon2id at the supplied `Argon2idWebV1` spec, under its label
   `argon2id_web_v1`: a drop-in replacement for the core's `argon2idWebV1Deriver`.
-* `argon2idWasmDeriver(spec)` -- Argon2id at a spec of your own, checked exactly as the core's
-  `argon2idDeriver` checks it.
+* `makeArgon2idWasmDeriver(spec)` -- Argon2id at a spec of your own, checked exactly as the core's
+  `makeArgon2idDeriver` checks it.
 
 ## Install
 
@@ -40,13 +40,13 @@ A spec of your own works the same way, through either implementation:
 
 ```ts
 import { Argon2idWebV1 } from 'safebyok/browser'
-import { argon2idWasmDeriver } from 'safebyok-fastkey'
+import { makeArgon2idWasmDeriver } from 'safebyok-fastkey'
 
 const spec = { ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 }
-const keyDeriver = argon2idWasmDeriver(spec)  // derives what argon2idDeriver(spec) does
+const keyDeriver = makeArgon2idWasmDeriver(spec)  // derives what makeArgon2idDeriver(spec) does
 ```
 
-`argon2idWasmDeriver` refuses with `bad_option` exactly the specs the core's factory refuses: a spec
+`makeArgon2idWasmDeriver` refuses with `bad_option` exactly the specs the core's factory refuses: a spec
 Argon2id cannot run, or one that has a supplied spec's label but other parameters. It calls the
 core's `parseKeyDeriverSpec` (from `safebyok/browser`), so its messages are the core's own.
 
@@ -80,7 +80,7 @@ own: choose one per platform yourself, as `keyDeriver`.
 
 ## Errors
 
-* `bad_option` -- from `argon2idWasmDeriver(spec)`, for a spec it cannot run (the message names the
+* `bad_option` -- from `makeArgon2idWasmDeriver(spec)`, for a spec it cannot run (the message names the
   field). From `deriveKeyBytes` called directly, when the platform has no WebAssembly, or when a
   Content-Security-Policy lacks `'wasm-unsafe-eval'` (the platform's `CompileError` is its `cause`).
   Through the vault, this arrives as `unexpected_error`, with no `cause`.

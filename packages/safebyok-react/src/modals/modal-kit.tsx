@@ -4,7 +4,7 @@ import { ForeverMillis, MinuteMillis, type AnyGating } from 'safebyok'
 import { gripeOfRefusal } from '../helpers/attempt-refusals'
 import { Doing, Locale, Messages } from '../helpers/messages'
 import { useRevealToggle } from '../hooks/reveal-toggle'
-import { Boundary, forBoundary } from '../provider/boundary'
+import { Boundary, boundaryRefusalOf } from '../provider/boundary'
 import type { BoundarySource, Gripe, ModalFormProps, PassphraseFieldname } from '../shapes'
 
 // == [Dialog]: showWhileMounted, GatingDialog, DialogBoundary, DialogTrouble
@@ -221,7 +221,7 @@ export const useChosenPassphrase = (gating: AnyGating, source: BoundarySource) =
   // The error is wrapped in an object, so that a thrown null or undefined still counts as a failure.
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
   const asked = useRef(0)
-  if (failure !== null) { throw forBoundary(failure.err, source) }
+  if (failure !== null) { throw boundaryRefusalOf(failure.err, source) }
 
   const compare = () => {
     const confirming = confirmRef.current?.value ?? ''

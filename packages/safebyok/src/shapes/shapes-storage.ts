@@ -161,7 +161,7 @@ export const { passkeyAddRecord, passkeyRevokeRecord } = Checkers('bad_option', 
 })
 // --
 
-// == [Options]: ifAbsentOpts, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, GateVerbOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
+// == [Options]: ifAbsentOpts, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsParsed, GateVerbOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
 
 /** The checks of the options a vaultDB verb accepts, of a write's record against its prior revision, and of the safe metadata an answer carries. */
 export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq } = Checkers('bad_option', ({ obj, oneof, orDefault, box_tok }) => {
@@ -195,7 +195,7 @@ export const memoryVaultDBOpts = objCheck(({ int }) => ({
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
 /** A put's options as parsed, defaults filled in: what a subclass's `doPutVault` and `doPutBox` receive. */
-export type PutOptsGiven = Readonly<Z.infer<typeof putOptsGiven>>
+export type PutOptsParsed = Readonly<Z.infer<typeof putOptsGiven>>
 /** What a gate verb is told beside its record: the revision the record replaces. */
 export type GateVerbOpts = Readonly<Z.input<typeof gateVerbOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>
@@ -275,18 +275,18 @@ export const isLiveBoxRecord = (raw: unknown, vault_tok: string): boolean => {
 
 // A row that fails its check is never put over, whatever `prior` names: only `isRowAt` reads its meta, and it runs after the check.
 // A put replaces a live row only within its own life: a new life is born over a tombstone or nothing.
-const isPutAllowedOver = (stored: { am: EX.Am } | null, isSameLife: boolean, ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
+const isPutAllowedOver = (stored: { am: EX.Am } | null, isSameLife: boolean, ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsParsed): boolean => (
   isRowAt(ante, prior) && ((stored?.am === 'a') ? ((ifPresent === 'repl') && isSameLife) : (ifAbsent === 'add'))
 )
 
 /** True when `record` may be written over `ante`, the vault row stored there or null, under `opts`. */
-export const isVaultPutAllowed = (ante: unknown, record: VaultRecord, opts: PutOptsGiven): boolean => {
+export const isVaultPutAllowed = (ante: unknown, record: VaultRecord, opts: PutOptsParsed): boolean => {
   const stored = storedVaultRowOrNull.safeParse(ante)
   return stored.success && isPutAllowedOver(stored.data, stored.data?.vault_tok === record.vault_tok, ante, opts)
 }
 
 /** True when `record` may be written over `ante`, the box row stored there or null, under `opts`. */
-export const isBoxPutAllowed = (ante: unknown, record: BoxRecord, opts: PutOptsGiven): boolean => {
+export const isBoxPutAllowed = (ante: unknown, record: BoxRecord, opts: PutOptsParsed): boolean => {
   const stored = storedBoxRowOrNull.safeParse(ante)
   return stored.success && isPutAllowedOver(stored.data, stored.data?.box_tok === record.box_tok, ante, opts)
 }

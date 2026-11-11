@@ -1,5 +1,5 @@
 import { correctablekindVals, isVaultError, type AnyGating } from 'safebyok'
-import { forBoundary } from '../provider/boundary'
+import { boundaryRefusalOf } from '../provider/boundary'
 import type { BoundarySource, Gripe } from '../shapes'
 
 const CorrectableKinds: ReadonlySet<string> = new Set(correctablekindVals)
@@ -10,5 +10,5 @@ const CorrectableKinds: ReadonlySet<string> = new Set(correctablekindVals)
 export const gripeOfRefusal = (gating: AnyGating, err: unknown, source: BoundarySource): Gripe | null => {
   if (isVaultError(err) && CorrectableKinds.has(err.refusalkind)) { return { text: err.message, refusalkind: err.refusalkind } }
   if ((! gating.isOpen) || isVaultError(err, 'attempt_in_flight')) { return null }
-  throw forBoundary(err, source)
+  throw boundaryRefusalOf(err, source)
 }

@@ -296,7 +296,7 @@ export interface BoxSnapshot extends Boxscope {
 
 // --
 
-// == [What a box is handed]: boxDna, boxPatch, boxExposedPatch, whisperPatch, BoxHalves, BoxPatchGiven, BoxPatch, BoxExposedPatch, BoxPut, BoxDna
+// == [What a box is handed]: boxDna, boxPatch, boxExposedPatch, whisperPatch, BoxHalves, BoxPatchParsed, BoxPatch, BoxExposedPatch, BoxPut, BoxDna
 
 /** Both halves of a box, the whisper and the sidecar: what every update of a box names, and what it seals. */
 export type BoxHalves = { whisper: Whisper, sidecar: Sidecar }
@@ -332,7 +332,7 @@ export type BoxExposedPatch = Z.input<typeof boxExposedPatch>
 export const whisperPatch = Checker(() => CX.whisper, 'bad_option')
 
 /** A box's patch as {@link boxPatch} hands it back: the whisper and the sidecar, each undefined where kept, and the scope's fields as given. */
-export type BoxPatchGiven = Z.output<typeof boxPatch>
+export type BoxPatchParsed = Z.output<typeof boxPatch>
 
 /** A host's patch for `put`: one or both {@link BoxHalves}, the other kept; any other prop of the box's record is ignored. */
 export type BoxPatch = Omit<Z.input<typeof boxPatch>, keyof BoxHalves> & { [Prop in keyof BoxHalves]?: BoxHalves[Prop] | undefined }

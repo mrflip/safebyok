@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto'
 import { argon2idAsync } from '@noble/hashes/argon2.js'
 import { describe, expect, it } from 'vitest'
-import { Argon2idWebV1, IdbDeviceDB, PassphraseSaltSize, argon2idDeriver, argon2idWebV1Deriver, browserOpts, parseKeyDeriverSpec, zxcvbnStrengthChecker } from '../src/browser'
+import { Argon2idWebV1, IdbDeviceDB, PassphraseSaltSize, makeArgon2idDeriver, argon2idWebV1Deriver, browserOpts, parseKeyDeriverSpec, zxcvbnStrengthChecker } from '../src/browser'
 import * as Front from '../src/index'
 import * as Phrases from '../src/helpers/phrases'
 import * as TH from './test-helpers'
@@ -15,9 +15,9 @@ const mine = () => ({ strong: false, reason: 'Mine says no.' }) as const
 /** A fresh dbName, which no other test has touched. */
 const freshDbName = (): string => `test-${crypto.randomUUID()}`
 
-describe("argon2idDeriver and the reserved labels", () => {
+describe("makeArgon2idDeriver and the reserved labels", () => {
   it("refuses a label of the reserved namespace that safebyok does not supply, however well-formed the spec", () => {
-    const err = TH.expectSyncRefusal(() => argon2idDeriver({ ...CheapSpec, key_deriver_label: 'argon2id_web_v2' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => makeArgon2idDeriver({ ...CheapSpec, key_deriver_label: 'argon2id_web_v2' }), 'bad_option')
     expect(err.message).to.match(/reserved/u)
   })
 })
@@ -40,7 +40,7 @@ const FullStrengthDeriveMillis = 30_000
 // Argon2id's own test vector, from its reference implementation (phc-winner-argon2's test.c: version 0x13, 2 passes,
 // 64 MiB, one lane, "password" and "somesalt"). Its salt is 8 bytes, under the 16 a keyDeriverSpec asks, so noble is asked directly.
 describe("Argon2id's reference test vector", () => {
-  it("is what noble derives, the library argon2idDeriver runs on", { timeout: FullStrengthDeriveMillis }, async () => {
+  it("is what noble derives, the library makeArgon2idDeriver runs on", { timeout: FullStrengthDeriveMillis }, async () => {
     const derived = await argon2idAsync('password', new TextEncoder().encode('somesalt'), { m: 65_536, t: 2, p: 1, dkLen: 32 }) // eslint-disable-line id-length -- noble's option names
     expect(Buffer.from(derived).toString('hex')).to.eq('09316115d5cf24ed5a15a31a3ba326e5cf32edc24702987c02b6566f61913cf7')
   })
@@ -67,15 +67,15 @@ describe("safebyok/browser", () => {
     expect(keyBytes).to.have.lengthOf(32)
   })
 
-  it("is deterministic in passphrase and salt with argon2idDeriver", async () => {
-    const deriver = argon2idDeriver(CheapSpec)
+  it("is deterministic in passphrase and salt with makeArgon2idDeriver", async () => {
+    const deriver = makeArgon2idDeriver(CheapSpec)
     const first = await deriver.deriveKeyBytes('a short passphrase', salt)
     expect(first).to.have.lengthOf(32)
     expect(await deriver.deriveKeyBytes('a short passphrase', salt)).to.deep.eq(first)
   })
 
-  it("derives other bytes for another passphrase with argon2idDeriver", async () => {
-    const deriver = argon2idDeriver(CheapSpec)
+  it("derives other bytes for another passphrase with makeArgon2idDeriver", async () => {
+    const deriver = makeArgon2idDeriver(CheapSpec)
     const first = await deriver.deriveKeyBytes('a short passphrase', salt)
     expect(await deriver.deriveKeyBytes('another passphrase', salt)).to.not.deep.eq(first)
   })
@@ -95,7 +95,7 @@ describe("safebyok/browser", () => {
   })
 
   it("is not on the front door", () => {
-    for (const exportname of ['argon2idWebV1Deriver', 'argon2idDeriver', 'idbDeviceDB', 'zxcvbnStrengthChecker', 'browserOpts']) {
+    for (const exportname of ['argon2idWebV1Deriver', 'makeArgon2idDeriver', 'idbDeviceDB', 'zxcvbnStrengthChecker', 'browserOpts']) {
       expect(Front).to.not.have.property(exportname)
     }
   })

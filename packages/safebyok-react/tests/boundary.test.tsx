@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react'
 import { Component, type ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
 import { VaultError } from 'safebyok'
-import { Boundary, forBoundary } from '../src/provider/boundary'
+import { Boundary, boundaryRefusalOf } from '../src/provider/boundary'
 import * as TH from './test-helpers'
 
 /** A child that throws `failure.err` while rendering, or shows "fine" when it has no failure. */
@@ -59,10 +59,10 @@ describe("Boundary", () => {
   })
 })
 
-/** A child that fails the way a dialog does: it throws `err` during render, wrapped by forBoundary. */
-const ForBoundaryThrower = ({ err }: { err: unknown }) => { throw forBoundary(err, 'PassphraseModal') }
+/** A child that fails the way a dialog does: it throws `err` during render, wrapped by boundaryRefusalOf. */
+const ForBoundaryThrower = ({ err }: { err: unknown }) => { throw boundaryRefusalOf(err, 'PassphraseModal') }
 
-describe("forBoundary", () => {
+describe("boundaryRefusalOf", () => {
   const meta = { capacity: { boxes: { used: 1, max: 100 }, bytes: { used: 48, max: 1000 } } }
 
   it("gives React a VaultError's kind, message and meta, but not its cause", () => {
@@ -79,7 +79,7 @@ describe("forBoundary", () => {
 
   it("returns a VaultError with no cause unchanged", () => {
     const misuse = new VaultError('bad_option', 'A bad option.', { meta })
-    expect(forBoundary(misuse, 'PassphraseModal')).to.equal(misuse)
+    expect(boundaryRefusalOf(misuse, 'PassphraseModal')).to.equal(misuse)
   })
 
   const ForeignCases = [
@@ -90,7 +90,7 @@ describe("forBoundary", () => {
 
   for (const [thrown, blurb] of ForeignCases) {
     it(blurb, () => {
-      const told = forBoundary(thrown, 'PassphraseModal')
+      const told = boundaryRefusalOf(thrown, 'PassphraseModal')
       expect(told).to.be.instanceOf(VaultError).and.to.include({ refusalkind: 'unexpected_error' })
       expect(told.message).to.not.include('pw-the-passphrase')
       expect(told.cause).to.be.undefined
@@ -98,7 +98,7 @@ describe("forBoundary", () => {
   }
 
   it("names the component a foreign throw came from", () => {
-    const { message } = forBoundary(new TypeError('fell over'), 'DelVaultModal')
+    const { message } = boundaryRefusalOf(new TypeError('fell over'), 'DelVaultModal')
     expect(message).to.include("safebyok-react's DelVaultModal")
   })
 })

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Bank, DefaultOnBadNews, DefaultOnLifecycle, tellBadNewsTo, type Vault } from 'safebyok'
-import { providerProps } from '../shapes'
+import { bankProviderProps } from '../shapes'
 import type { BankProviderProps, ContextValue, GatingModalProps, Handlers, ProviderBankOpts, TellBadNews } from '../shapes'
 import { GatingModal } from './gating-modal'
 import { useDeviceId, useWarnOfIgnoredOpts } from './provider-hooks'
@@ -73,7 +73,7 @@ const useProviderBank = (opts: ProviderBankOpts, device_id: string | null, handl
  * It also shows the built-in passphrase and passkey dialogs, unless `requestCleartext` is given.
  */
 export const BankProvider = (props: BankProviderProps) => {
-  const { applabel, user_id, deviceDB } = providerProps.parse(props, { where: 'BankProvider' })
+  const { applabel, user_id, deviceDB } = bankProviderProps.parse(props, { where: 'BankProvider' })
   const device_id = useDeviceId(deviceDB, applabel, user_id)
   const userkey = JSON.stringify([applabel, user_id])
 

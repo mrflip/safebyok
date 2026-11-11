@@ -36,7 +36,7 @@ export const serve = async (vaultDB: PostgresVaultDB): Promise<Server> => {
   const yoga = createYoga<object, VaultContext>({
     schema: createSchema<VaultContext>({
       typeDefs:  [VaultSchemaSdl],
-      resolvers: [vaultResolvers({ vaultDB, userIdOf: ({ user_id }: VaultContext) => user_id })],
+      resolvers: [vaultResolvers({ vaultDB, getUserId: ({ user_id }: VaultContext) => user_id })],
     }),
     graphqlEndpoint: '/api/graphql',
     context:         ({ request }) => ({ user_id: request.headers.get('x-test-user') }),
