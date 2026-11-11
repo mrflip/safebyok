@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { PasskeySaltSize, PrfAnswerSize, VaultError, type WayinHeader } from 'safebyok'
 import { fromB64 } from 'safebyok/utils'
 import { Messages } from '../src/helpers/messages'
-import { askPasskey, attemptOnce, createPasskey, passkeysAvailable } from '../src/helpers/passkey'
+import { askPasskey, attemptThenZero, createPasskey, passkeysAvailable } from '../src/helpers/passkey'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
@@ -221,40 +221,40 @@ describe("askPasskey's header and options", () => {
   })
 })
 
-describe("attemptOnce's answer", () => {
+describe("attemptThenZero's answer", () => {
   it("refuses an answer without bytes, never calling the attempt", async () => {
     const attempt = vi.fn(() => Promise.resolve(true))
     for (const passkey of [null, {}, { credential_id: 'AAAA', prfBytes: [1, 2, 3] }]) {
-      expect(await refusalOf(attemptOnce(passkey as never, attempt))).to.include({ refusalkind: 'bad_option', family: 'misuse' })
+      expect(await refusalOf(attemptThenZero(passkey as never, attempt))).to.include({ refusalkind: 'bad_option', family: 'misuse' })
     }
     expect(attempt).not.toHaveBeenCalled()
   })
 
   it("zeroes the answer's bytes when it refuses an attempt that is no function", async () => {
     const passkey = { credential_id: 'AAAA', prf_salt_b64: 'AAAA', prfBytes: crypto.getRandomValues(new Uint8Array(PrfAnswerSize)) }
-    expect(await refusalOf(attemptOnce(passkey, 'attempt' as never))).to.include({ refusalkind: 'bad_option' })
+    expect(await refusalOf(attemptThenZero(passkey, 'attempt' as never))).to.include({ refusalkind: 'bad_option' })
     expect(passkey.prfBytes.every((byte) => byte === 0)).to.be.true
   })
 
   it("quotes none of a malformed answer in its refusal", async () => {
     const passkey = { credential_id: 'AAAA', prf_salt_b64: 'AAAA', prfBytes: 'sentinel-not-a-secret' }
-    const refused = await refusalOf(attemptOnce(passkey as never, () => Promise.resolve(true)))
+    const refused = await refusalOf(attemptThenZero(passkey as never, () => Promise.resolve(true)))
     expect(refused.message).to.not.include('sentinel')
     expect(JSON.stringify(refused)).to.not.include('sentinel')
   })
 })
 
-describe("attemptOnce", () => {
+describe("attemptThenZero", () => {
   it("zeroes the answer's bytes once its attempt settles, ok or not", async () => {
     TH.installFakeAuthenticator()
     const made = await createPasskey(TH.PasskeyMaking)
     if (made === null) { throw new Error('dismissed') }
-    const live = await attemptOnce(made, (passkey) => Promise.resolve(passkey.prfBytes.some((byte) => byte !== 0)))
+    const live = await attemptThenZero(made, (passkey) => Promise.resolve(passkey.prfBytes.some((byte) => byte !== 0)))
     expect(live).to.be.true
     expect(made.prfBytes.every((byte) => byte === 0)).to.be.true
     const again = await createPasskey(TH.PasskeyMaking)
     if (again === null) { throw new Error('dismissed') }
-    const attempting = attemptOnce(again, () => Promise.reject(new VaultError('wrong_passkey', 'refused')))
+    const attempting = attemptThenZero(again, () => Promise.reject(new VaultError('wrong_passkey', 'refused')))
     expect(await refusalOf(attempting)).to.include({ refusalkind: 'wrong_passkey' })
     expect(again.prfBytes.every((byte) => byte === 0)).to.be.true
   })

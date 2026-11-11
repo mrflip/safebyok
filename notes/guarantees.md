@@ -120,10 +120,10 @@ imported them into a non-extractable handle and zeroed them. The authenticator's
 static methods have derived a non-extractable handle from them and the gating's `spendCleartexts` has zeroed them, once the
 attempt is over (G2 says when a correctable refusal leaves them to the host). The handle exists in
 `Proving.#wayinKey` until the proving is dropped. Nothing of either is ever stored. Outside the core,
-`safebyok-react`'s `bytesOf` (the package runs on the old core until it moves) copies the browser's PRF
+`safebyok-react`'s `copyThenZero` (the package runs on the old core until it moves) copies the browser's PRF
 result into the answer and zeroes the buffer it copied from, so the answer's bytes are the only copy.
 Its dialogs attempt an answer as soon as it comes back, whether or not they are hidden, and zero it once its single
-attempt is done (`attemptOnce`).
+attempt is done (`attemptThenZero`).
 
 ## The secret values
 
@@ -166,8 +166,8 @@ bytes. Everything not listed never sees the value. Private methods are named wit
 `gating.judgeStrength` → `Proving.judgeStrength`, as above.
 Operates on it without having it: nothing; a passphrase has no handle form.
 
-**Passkey PRF answer.** Naked: `safebyok-react`'s `createPasskey`, `askPasskey` → `answerOf`,
-`bytesOf` (a copy of the authenticator's result) → the host → `gating.attempt` → `#attemptOnce` → its kind's
+**Passkey PRF answer.** Naked: `safebyok-react`'s `createPasskey`, `askPasskey` → `makePasskeyAnswer`,
+`copyThenZero` (a copy of the authenticator's result) → the host → `gating.attempt` → `#attemptOnce` → its kind's
 prove → `checkedCleartexts` (`passkeyAnswer`, `freshPasskeyAnswer`; `passkeyAnswer`'s `prfBytes` check refuses all-zero
 bytes by an inline `reduce`) → `PasskeyProving.buildNovel`, `buildStored` → `deriveWrappingKey`
 (`subtle.importKey` as HKDF input, then `subtle.deriveKey`), none of which zeroes them. `spendCleartexts`
@@ -175,7 +175,7 @@ bytes by an inline `reduce`) → `PasskeyProving.buildNovel`, `buildStored` → 
 checked and whether it is a view or a bare `ArrayBuffer`, and zeroes it with `fill(0)`. It does so in `gating.attempt`
 for an attempt refused before it starts, and in `#attemptOnce` for an attempt that concludes its gating. In
 `safebyok-react`, `PasskeyUnlockButton` and `GatingModal`'s `put_passkey` form pass it on at once, whether or not an
-Activity has hidden them, and `attemptOnce` zeroes it after its attempt.
+Activity has hidden them, and `attemptThenZero` zeroes it after its attempt.
 
 **passphraseKey bytes.** Naked: `keyDeriver.deriveKeyBytes` → `passphraseKeyOf`
 (`isSharedMemory`, `isSafelyAllZero`, the length check) → `importWrappingKeyBytes`
@@ -256,7 +256,7 @@ refused as `bad_option` because its bytes are all zero (`passkeyAnswer`, `shapes
 un-zeroed in one case only: the attempt ends in a refusal the user can correct (`wrong_passkey` is one) and is not the
 gating's last attempt. That is so even when a key was already derived from them. The host may then hand the answer in
 again, or zero it, and the gating keeps no reference with which to zero them later. *Caveat:* in that case the zeroing
-is the host's to do; `safebyok-react`'s dialogs do it (`attemptOnce`). The passkeyKey is HKDF-SHA256 of those bytes, with
+is the host's to do; `safebyok-react`'s dialogs do it (`attemptThenZero`). The passkeyKey is HKDF-SHA256 of those bytes, with
 the wayin's whole ctx as its `info`, derived non-extractable (`deriveWrappingKey`). The result, the
 wayinKey, is not a local: it is `Proving.#wayinKey`, private, for the proving's life, and no
 method returns it or a vaultKey (`models/proving.ts`). Bytes refused before import: anything but

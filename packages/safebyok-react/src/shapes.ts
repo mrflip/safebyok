@@ -132,9 +132,9 @@ export const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, i
       opts:          obj({ rpId: named.optional(), timeout }).strict(),
     }),
     // The gating's attempt validates the rest of the answer.
-    /** The only field of a passkey answer that attemptOnce reads. */
-    attemptOnceAnswer:  obj({ prfBytes: bytes() }),
-    attemptOnceAttempt: fn(),
+    /** The only field of a passkey answer that attemptThenZero reads. */
+    attemptThenZeroAnswer:  obj({ prfBytes: bytes() }),
+    attemptThenZeroAttempt: fn(),
   }
 })
 // --

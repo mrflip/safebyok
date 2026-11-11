@@ -3,7 +3,7 @@ import { useFormStatus } from 'react-dom'
 import type { AnyGating } from 'safebyok'
 import { gripeOfRefusal } from '../helpers/attempt-refusals'
 import { Messages } from '../helpers/messages'
-import { askPasskey, attemptOnce, passkeysAvailable } from '../helpers/passkey'
+import { askPasskey, attemptThenZero, passkeysAvailable } from '../helpers/passkey'
 import { Boundary } from '../provider/boundary'
 import type { PasskeyUnlockButtonProps } from '../shapes'
 
@@ -36,7 +36,7 @@ const PasskeyPress = ({ gating, onGripe, rpId, takesFocus }: PasskeyUnlockButton
     try {
       const answer = await askPasskey(gating.passkeyHeader, { rpId })
       if (answer === null) { return }
-      const { ok, err } = await attemptOnce(answer, (passkeyClear) => gating.attempt({ passkeyClear }))
+      const { ok, err } = await attemptThenZero(answer, (passkeyClear) => gating.attempt({ passkeyClear }))
       if (! ok) { hear(err) }
     } catch (err) {
       hear(err)

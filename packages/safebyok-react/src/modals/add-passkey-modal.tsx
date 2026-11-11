@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import type { PasskeyAnswer } from 'safebyok'
 import { Messages } from '../helpers/messages'
-import { attemptOnce, createPasskey } from '../helpers/passkey'
+import { attemptThenZero, createPasskey } from '../helpers/passkey'
 import type { AddPasskeyModalProps } from '../shapes'
 import { DialogBoundary, ModalForm, PassphraseField, UsernameField, textOf, useAttemptAction } from './modal-kit'
 
@@ -25,7 +25,7 @@ const AddPasskeyForm = ({ gating, passphraseUsername, passkeyRpId }: AddPasskeyM
       return { ok: false, err }
     }
     if (made === null) { return null }
-    return attemptOnce(made, (passkeyClear) => gating.attempt({ passphraseClear, passkeyClear }))
+    return attemptThenZero(made, (passkeyClear) => gating.attempt({ passphraseClear, passkeyClear }))
   }
 
   const { gripe, gripeId, action } = useAttemptAction(gating, 'AddPasskeyModal', addPasskey, () => fieldRef)
