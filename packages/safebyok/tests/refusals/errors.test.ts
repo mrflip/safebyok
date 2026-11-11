@@ -128,6 +128,7 @@ const FamilyCases = [
   ["camped",              "condition", 'a put told not to replace a live record takes up the one stored'],
   ["vault_empty",         "condition", 'a vault_tok that matches no stored vault life is a normal part of syncing'],
   ["damaged_row",         "bad_news",  'a row from storage that fails its checks is set aside and reported'],
+  ["damaged_vault",       "bad_news",  'the vault row above a box asked for failing its checks is told of'],
   ["storage_issue",       "bad_news",  'a row that is not an object, or is stored at the wrong address, will not be fixed by a retry'],
   ["gate_issue",          "misuse",    'gate params at odds with the stored row are a bug in the caller'],
   ["disabled",            "misuse",    'calling an object let go by a sweep, a vacate or a delete is a bug: ask the bank for it again'],
