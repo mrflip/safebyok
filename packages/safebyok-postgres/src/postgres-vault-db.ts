@@ -56,7 +56,7 @@ const channelOf = (user_id: string): string => `safebyok_${user_id}`
 // Each notice comes from `safebyok_tell` in `vault-functions.ts`: a JSON object with the stored row's address under `at`,
 // and under `vault` and `box` whichever rows fit.
 
-/** A parsed notice: the stored row's address, and the rows that fit in the notice. */
+/** A parsed notice: the stored row's address, and the rows that fit the byte-size limit. */
 type Told = VaultScope & { vault_tok?: string | undefined, boxlabel?: string | undefined, heard?: Heard | undefined }
 
 const toldWhere = DB.objCheck(({ applabel, user_id, vaultlabel, str }) => ({

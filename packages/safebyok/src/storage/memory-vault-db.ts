@@ -74,8 +74,8 @@ export class MemoryVaultDB extends AdapterVaultDB {
   }
 
 
-  // Each heeder is called on a later microtask, so nothing it does runs inside the write that notified it.
-  /** Notify each heeder watching `scope` of `heard`. */
+  // Each listener is called on a later microtask, so nothing it does runs inside the write that notified it.
+  /** Notify each listener watching `scope` of `heard`. */
   #tell(scope: VaultScope, heard: Heard): void {
     for (const { scope: heardScope, hear } of this.#heeders) {
       const isHeard = (heardScope.applabel === scope.applabel) && (heardScope.user_id === scope.user_id) && ((heardScope.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)

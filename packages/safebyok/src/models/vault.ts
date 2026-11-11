@@ -262,8 +262,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.#demandLease(checked.stamp).unsealWith(checked.sealed, checked.stamp)
   }
 
-  // The vault listing receives it like any vault row: a gate changed on another device comes with it, and a newer row from
-  // another life replaces this Vault in the listing.
+  // The vault listing receives the `world` as it would a row from any vault request:
+  // a gate changed on another device comes with it, and a newer row from another life
+  // replaces this Vault in the listing.
   /** Deliver the vault row a box answer carries. */
   receiveWorld(world: unknown): void { this.listing.receiveRow(SX.vaultRow.refusingAs('record_conflict').parse(world)) }
   // --

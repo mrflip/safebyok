@@ -123,7 +123,7 @@ export const listBoxesArgs  = { asked: vaultQuery }
 export const getBoxArgs     = { asked: boxQuery }
 /** `putVault` takes a vault's put ask. */
 export const putVaultArgs   = { ask: vaultPutAsk }
-/** `putBox` takes a box's put ask, and an optional soft cap on the vault's live boxes. */
+/** `putBox` takes a box's put ask, and an optional soft cap on the box rows of the vault life, tombstones included. */
 export const putBoxArgs     = { ask: boxPutAsk, maxBoxes: v.optional(v.number()) }
 /** `delVault` takes a vault's del ask. */
 export const delVaultArgs   = { ask: vaultDelAsk }

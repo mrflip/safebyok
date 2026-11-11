@@ -13,10 +13,12 @@ import * as CVX from './validators'
 
 // One function for each of AdapterVaultDB's generic calls. They are called through the host's
 // wrapper, which has already checked that the caller is the user the call names. Convex runs a
-// mutation as one serializable transaction, so each put and del is atomic: it checks its ask with
-// the core's own checker, reads the stored rows, classifies the ask with the core's classifier, and
-// stores the ask's record if the outcome is a write. A get only reads, from one snapshot, and the
-// client classifies what it read.
+// mutation as one serializable transaction, so each put and del is atomic. In one mutation, it will:
+// * check its ask with the core's checker,
+// * read the stored rows,
+// * classify the ask with the core's classifier, then
+// * store the ask's record if the classifier instructs it to write.
+// A get only reads, from one snapshot, and the client classifies what it read.
 
 // == [Gets]: listVaults, getVault, listBoxes, getBox
 
@@ -82,8 +84,9 @@ export const putVault = mutation({
   },
 })
 
-// The cap the client sends is soft. Like the tally's `all_count`, it counts every box row, tombstones included. The component's own
-// limits are hard: a write that would take the life past them is not stored, and the put returns `vault_full` instead.
+// The cap the client sends is a soft cap, as every vaultDB's is. Like the tally's `all_count`, it counts every box row, tombstones
+// included. This component currently enforces it and its own limits exactly, inside the mutation: a write that would take the life
+// past one is not stored, and the put returns `vault_full` instead. Nothing promises that exactness.
 /** Classify a box put against the stored rows and the vault's capacity, and store its record if the outcome is a write.
  * Returns the classifier's outcome, or `vault_full` if the write would pass a limit.
  */

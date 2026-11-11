@@ -32,7 +32,8 @@ Hand it to the core wherever a `VaultDB` is asked for.
   left out.
 * **`maxBoxes`** is a best-effort cap on the box rows of one vault life, 100 if left out. A put of a new box past it is
   refused with `vault_full`. A deleted box's tombstone still counts, so deleting a box frees no room. A vault made anew
-  starts at zero.
+  starts at zero. This adapter currently enforces the cap exactly, because IndexedDB runs one readwrite transaction at a
+  time, but the contract is a soft cap: do not rely on that.
 * An option it cannot use is refused with `bad_option`.
 
 ## What it promises
