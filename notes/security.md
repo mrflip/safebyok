@@ -41,6 +41,16 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-11 (vaultdb_classifier, package `safebyok-postgres`): **`safebyok-postgres` writes vault and box rows through stored functions its setup SQL creates, run as the calling role.**
+  `VaultFunctionsSql` (`packages/safebyok-postgres/src/vault-functions.ts`, shipped as `vault-functions.sql`) creates `safebyok_record`, `safebyok_birth_vault`, `safebyok_revise_vault`,
+  `safebyok_birth_box` and `safebyok_revise_box`. None is `SECURITY DEFINER`: each is `SECURITY INVOKER`, Postgres's default, so it runs with the privileges of the role that calls it,
+  and the tables' row-level security (on, with no policy) still decides which rows that role reaches. None sets a `search_path`; each names its tables unqualified. The setup SQL ends with
+  `REVOKE ALL ON FUNCTION ... FROM PUBLIC` for each of the five, since Postgres grants EXECUTE to PUBLIC by default and a hosted Postgres that serves functions over an HTTP data API
+  (Supabase's) would otherwise offer them to its anonymous and authenticated roles; the role that owns them, the one the host's server connects as, keeps EXECUTE.
+  The functions take the record as jsonb and the notice as text and build no SQL from them: none contains dynamic SQL (`EXECUTE`). Each of the four write functions calls
+  `pg_notify(channel, notice)` once it has stored a record, and a notification is not protected by row-level security: any role able to connect may LISTEN on a user's channel,
+  as before (see the 2026-10-15 entry and the package README). Every secret field they handle is ciphertext as stored; they log nothing and raise nothing that quotes a value.
+
 * 2026-11-10 (old_gaps, branch `20261109-old_gaps`): **Five possibilities whose pinning tests were deleted, on the Coach's ruling, as paranoia.**
   (1) A VaultDB that answers a rebirth with the buried record's `registered_at`, as a database default might keep it, is adopted quietly, and the box's `registered_at` follows it.
   (2) A crypto failure in `buildLease` during a gate change rejects, with the row stored and the vault on its new gate under the lease it held.
