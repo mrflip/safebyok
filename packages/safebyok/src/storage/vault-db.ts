@@ -489,12 +489,14 @@ function goodOrThrow<ValT, ActT extends string, WorldT>(answer: Answer<ValT, Act
   return answer
 }
 
-/** The refusal for a verb's throw, tagged with the call and the request's metadata. A throw that is not a refusal becomes `storage_unavailable`. */
-const refusalOf = (thrown: unknown, call: string, ask: unknown): VaultError => {
+/** Select the appropriate refusal for a thrown error. A VaultError is returned directly. Other errors become `storage_unavailable`.
+ * Either way, its meta names the `callerlabel` as `call`, with the ask's safe metadata as `req_params`.
+ */
+const refusalOf = (thrown: unknown, callerlabel: string, ask: unknown): VaultError => {
   const refusal = storageTroubleOf(thrown)
   // A request that failed its check has no metadata to trust: its refusal carries none.
   const params = SX.requestParams.safeParse(ask)
-  return Object.assign(refusal, { meta: { ...refusal.meta, call, req_params: params.success ? params.data : {} } })
+  return Object.assign(refusal, { meta: { ...refusal.meta, call: callerlabel, req_params: params.success ? params.data : {} } })
 }
 
 /** The put request of a gate verb: `record` over the live vault row at `opts.prior`, in the same life, tagged with the verb. */
@@ -506,7 +508,7 @@ function gateAskOf(gateVerb: GateVerb, record: VaultRecord, opts: GateVerbOpts):
 
 const RowOfOtherAddress = { kind: 'storage_issue', message: Phrases.rowOfOtherAddress } as const
 
-/** A listed row, checked against the `address` it is listed at, or null for a damaged row to set aside. */
+/** Return a listing row if healthy and consistent with the listing, or null if it is damaged. Refuse otherwise, as appropriate for its flaws. */
 function listedRowOf<RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknown, address: object): RowT | null {
   if (! CX.isPlainBag(raw)) { throw Refuse.storageIssue() }
   const parsed = rowCheck.safeParse(raw)
