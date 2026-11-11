@@ -40,7 +40,7 @@ which rebases in a clone of its own, tests once at the tip, and force-pushes onl
 Doc blocks are brought to STYLE.md's rules by the `documentarian` agent
 (`.claude/agents/documentarian.md`), on a target a Coach names.
 Comments, doc blocks and READMEs across a whole target are brought to plain English by `/gallantdocs`
-(`.claude/skills/gallantdocs/SKILL.md`), a housekeeping pass that also harvests Goofus/Gallant pairs for the Coach to edit.
+(`.claude/skills/gallantdocs/SKILL.md`), a housekeeping pass that also reports names that jar with their doc blocks and harvests Goofus/Gallant pairs for the Coach to edit.
 
 ## The history we keep
 
