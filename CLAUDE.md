@@ -46,7 +46,6 @@ passphrase, the customer integrating the package, and the security reviewer read
   matters. Cleverness is rarely called for; if it seems to be, propose it.
 * **Validate at each module entrypoint**, every export, then write confident, paranoia-free code
   past it: a private helper trusts its exported caller.
-* **A validator a module exports is made in a `Checkers`, `Checker` or `objCheck`/`objStrict`/`objStrip` call** (STYLE.md, *Validation*), not in plain Zod.
 * **Security first.** Where the stronger measure (Argon2id, say) is not available on every
   platform, implement it first anyway, and make it pluggable second.
 * **Secret material never leaves through a side door**: beware leakage via error objects or logging.
@@ -108,10 +107,9 @@ file's are its headings, `rg -n '^#' <file>`. A file past about 800 lines is sea
 read through.
 
 Search files with `rg`, not `grep`, and always name a path, `.` for the whole tree: with none,
-it waits on the shell's input. It skips what `.gitignore` and the `.ignore` files name
-(dependencies, builds, changelogs, `.changeset/`, `human/`, `notes/security.md`, `whiteboard/`,
-`winboard/`), so it needs no `--exclude-dir`, and still searches a path you name. Trace a name
-through the whole tree with `rg -l` first, then open the hits that matter.
+it waits on the shell's input. It skips what `.gitignore` and the `.ignore` files name, so it
+needs no `--exclude-dir`, and still searches a path you name. Trace a name through the whole tree
+with `rg -l` first, then open the hits that matter.
 
 ## Notable files
 
@@ -126,12 +124,10 @@ through the whole tree with `rg -l` first, then open the hits that matter.
   validation, shapes and tests: specific, unguessable, and only partly linted. **Writing code,
   read *Naming* once; read *Comments and doc blocks*, *Tests*, *Validation* or *Shapes and duck
   typing* when you write a doc block, a test, a validator, or a type or class that keeps state.**
-  Every export has a doc block written for its caller and tests in proportion.
-* `packages/safebyok/eslint.config.mjs` -- the final authority on formatting; the other configs
-  are cut from it. Where it and a prose document disagree, flag the bug. `@ts-expect-error`,
-  `eslint-disable-line` and the other safety hatches are allowed as the correct compromise;
-  **report each one you add**, in chat (STYLE.md, *Safety hatches*).
-* `tsconfig.base.json` -- every strictness flag, extended by every tsconfig; its comments say why.
+* `packages/safebyok/eslint.config.mjs` -- the final authority on formatting. Where it and a prose
+  document disagree, flag the bug. `@ts-expect-error`, `eslint-disable-line` and the other safety
+  hatches are allowed as the correct compromise; **report each one you add**, in chat (STYLE.md,
+  *Safety hatches*).
 * **Claude Docs** (a `claude.ai/.../artifact/<id>` link). For a tab's text alone, spawn the
   `doc-tab-reader` agent with the URL and follow its description. To edit or comment, or for what
   markdown drops (diagrams, charts, highlights, comments), load the docs skill.

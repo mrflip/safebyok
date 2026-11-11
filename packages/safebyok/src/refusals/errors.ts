@@ -1,4 +1,7 @@
-/** The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts. */
+/** The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts.
+ * A new refusalkind goes in `refusalkindVals` and in `RefusalFamilyForKind`; if the core throws it inside the Convex
+ * component, in safebyok-convex's `safebyokErrorKindVals` too. GraphQL's schema takes its enum from `refusalkindVals`.
+ */
 
 import { IsVaultError, brandOf } from '../helpers/consts'
 import type { Capacity } from '../shapes/shapes-storage'
