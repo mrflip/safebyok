@@ -2,8 +2,8 @@
 
 import * as DB from 'safebyok/storage'
 import type {
-  AdapterVaultDBOpts, Awaitable, BankScope, BoxClassified, BoxDelAsk, BoxesFetched, BoxFetched, BoxGetAsk, BoxPutAsk, BoxQuery, BoxRecord, BoxRow, Capacity, Heard,
-  RowOfVault, Tidied, VaultClassified, VaultDelAsk, VaultError, VaultFetched, VaultGetAsk, VaultPutAsk, VaultQuery, VaultRow, VaultScope, WatchScope,
+  AdapterVaultDBOpts, Awaitable, BankScope, BoxAsk, BoxClassified, BoxDelAsk, BoxesFetched, BoxFetched, BoxGetAsk, BoxPutAsk, BoxQuery, BoxRecord, BoxRow, Capacity, Heard,
+  RowOfVault, Tidied, VaultAsk, VaultClassified, VaultDelAsk, VaultError, VaultFetched, VaultGetAsk, VaultPutAsk, VaultQuery, VaultRow, VaultScope, WatchScope,
 } from 'safebyok/storage'
 import {
   BirthBoxSql, BirthVaultSql, BoxLivesSql, DeleteBoxLifeSql, GetBoxWithVaultSql, GetVaultSql, ListBoxesWithVaultSql, ListVaultsSql, ReviseBoxSql, ReviseVaultSql,
@@ -148,6 +148,27 @@ const codeOf = (thrown: unknown): string | undefined => (
 )
 // --
 
+// == [What the database answers]: VaultAnswered, BoxAnswered, storedVerdict, worldRow, RowOfOtherAddress
+// A plain fetch answers rows alone. A write function also answers whether it stored the record (`ok`), and where it did,
+// the `act` that came to and the `presence` of what was stored before.
+
+/** What the database answers for a vault's ask, as it comes: the vault row, and a write function's verdict. */
+type VaultAnswered = VaultFetched & { ok?: boolean, act?: unknown, presence?: unknown }
+
+/** What the database answers for a box's ask, as it comes: the vault row and the box row, and a write function's verdict and its count of the vault's live boxes. */
+type BoxAnswered = BoxFetched & { ok?: boolean, act?: unknown, presence?: unknown, boxcount?: number }
+
+const { storedVerdict } = DB.Checkers('storage_issue', ({ obj, oneof }) => ({
+  storedVerdict: obj({ act: oneof(DB.writeActVals), presence: oneof(['void', 'gone', 'live'] as const) }),
+}))
+
+const worldRow = DB.storedVaultRow.refusingAs('damaged_vault')
+
+const RowOfOtherAddress = { kind: 'storage_issue', message: DB.rowOfOtherAddress } as const
+
+const StoredNothing = 'The database stored nothing for a write its rows allow.'
+// --
+
 /** The vault row a one-row answer has, null for none. */
 const vaultOf = (rows: unknown[]): unknown => ((rows[0] as { vault?: unknown } | undefined)?.vault ?? null)
 
@@ -201,31 +222,49 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }
 
-  // One call tests the ask and stores its record. Where it stored, its answer is checked and is the answer.
-  // Where it did not, it answers the rows as they now stand, and the classifier names the refusal from them.
-  /** Run a vault's write `text`, with `cited` the expected fields it tests after the write's own parameters. */
+  /** Run a vault's write function `text`, with `cited` the expected fields it tests after the write's own parameters. */
   async #writeVault(ask: VaultPutAsk | VaultDelAsk, text: string, cited: unknown[]): Promise<VaultClassified> {
     const params = [JSON.stringify(ask.record), channelOf(ask.record.user_id), noticeTextOf(ask.record)]
-    /** The one row a vault's write statement answers. */
-    type VaultWriteAnswer = { ok: boolean, act: unknown, vault: unknown, presence: unknown }
-    const [answer] = await this.#query(text, [...params, ...cited]) as [VaultWriteAnswer]
-    if (answer.ok) { return DB.vaultWrittenOf(ask, answer) }
-    const classified = this.classifyVault(ask, { vault: answer.vault })
-    if (classified.write !== null) { throw DB.unexpectedError(new Error('The database stored nothing for a write its rows allow.')) }
-    return classified
+    const [answer] = await this.#query(text, [...params, ...cited]) as [VaultAnswered]
+    return this.classifyVault(ask, answer)
   }
 
-  // The chain of a box's put or del: the function tests the ask and stores its record, and the classifier is handed what it answers.
-  // The classifier checks that once. A record the function stored is the answer as it stands; else the classifier names the refusal.
-  /** Run a box's write `text`, with `cited` the expected fields it tests after the write's own parameters. */
+  /** Run a box's write function `text`, with `cited` the expected fields it tests after the write's own parameters. */
   async #writeBox(ask: BoxPutAsk | BoxDelAsk, text: string, cited: unknown[]): Promise<BoxClassified> {
-    /** The one row a box's write function answers. */
-    type BoxWriteAnswer = { ok: boolean, act: unknown, world: unknown, box: unknown, presence: unknown, boxcount: number }
     const params = [JSON.stringify(ask.record), channelOf(ask.record.user_id), noticeTextOf(ask.record), this.#maxBoxes]
-    const [answer] = await this.#query(text, [...params, ...cited]) as [BoxWriteAnswer]
-    const classified = this.classifyBox(ask, { ...answer, capacity: this.#roomAt(answer.boxcount) })
-    if ((! answer.ok) && DB.isWriteAct(classified.act)) { throw DB.unexpectedError(new Error('The database stored nothing for a write its rows allow.')) }
-    return classified
+    const [answer] = await this.#query(text, [...params, ...cited]) as [BoxAnswered]
+    return this.classifyBox(ask, answer)
+  }
+  // --
+
+  // == [Classifying]: classifyVault, classifyBox
+  // A write function tests an ask and stores its record in one call. A record it stored is the answer as it stands, once its parts are checked:
+  // nothing is classified. Where it stored nothing, or the ask was only fetched for, the core's classifier names what the ask comes to over the rows answered.
+
+  protected override classifyVault(ask: VaultAsk, answered: VaultAnswered): VaultClassified {
+    if ((answered.ok !== true) || (ask.op === 'get')) {
+      const classified = super.classifyVault(ask, answered)
+      if (classified.write !== null) { throw DB.unexpectedError(new Error(StoredNothing)) }
+      return classified
+    }
+    const { act, presence } = storedVerdict.parse(answered)
+    const { record } = ask
+    const vault = DB.storedVaultRow.parseConsistent(answered.vault, { ...DB.vaultScope.parse(record), revision_tok: record.revision_tok }, RowOfOtherAddress)
+    return { ok: true, act, world: vault, row: vault, write: null, presence }
+  }
+
+  protected override classifyBox(ask: BoxAsk, answered: BoxAnswered): BoxClassified {
+    const capacity = (answered.boxcount === undefined) ? null : this.#roomAt(answered.boxcount)
+    if ((answered.ok !== true) || (ask.op === 'get')) {
+      const classified = super.classifyBox(ask, { world: answered.world, box: answered.box, capacity })
+      if (DB.isWriteAct(classified.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
+      return classified
+    }
+    const { act, presence } = storedVerdict.parse(answered)
+    const { record } = ask
+    const world = worldRow.parseConsistent(answered.world, DB.vaultScope.parse(record), RowOfOtherAddress)
+    const box   = DB.storedBoxRow.parseConsistent(answered.box, { ...DB.boxQuery.parse(record), revision_tok: record.revision_tok }, RowOfOtherAddress)
+    return { ok: true, act, world, box, presence, capacity }
   }
   // --
 
