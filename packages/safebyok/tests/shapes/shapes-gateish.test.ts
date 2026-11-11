@@ -6,7 +6,7 @@ import { PasskeySaltBytes } from '../../src/helpers/consts'
 import { parseLogger } from '../../src/helpers/logger'
 import { guardRequestCleartext } from '../../src/models/bank'
 import * as GX from '../../src/shapes/shapes-gateish'
-import { VoidRevision, sentinelVaultOf } from '../../src/shapes/shapes-storage'
+import { VoidRevision, shellVaultOf } from '../../src/shapes/shapes-storage'
 import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
 
@@ -57,7 +57,7 @@ describe("gatingLaunchBirthArgs", () => {
   const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
   const unlockByProving = () => Promise.resolve(listing)
   const askUser = guardRequestCleartext(() => undefined)
-  const args = { listing, scope, expected: sentinelVaultOf(scope), unlockByProving, askUser }
+  const args = { listing, scope, expected: shellVaultOf(scope), unlockByProving, askUser }
 
   it("passes a vault listing, a scope, the row put over, the unlock and the bank's dialog, handing on the listing it was given", () => {
     expect(GX.gatingLaunchBirthArgs.parse(args).listing).to.eq(listing)

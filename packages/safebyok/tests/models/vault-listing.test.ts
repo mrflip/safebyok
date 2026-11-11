@@ -423,7 +423,7 @@ describe("building over a tombstone", () => {
   it("a birth's listing.put with nothing ever stored is written", async () => {
     const { listing } = makeVaultWorld()
     const record = await birthOver(SX.VoidRevision)
-    const born = await listing.put(record, { expected: SX.sentinelVaultOf(Dna), ifAbsent: 'add', ifPresent: 'get' })
+    const born = await listing.put(record, { expected: SX.shellVaultOf(Dna), ifAbsent: 'add', ifPresent: 'get' })
     expect(born.vault_tok).to.eq(record.vault_tok)
   })
 
@@ -452,7 +452,7 @@ describe("building over a tombstone", () => {
 describe("the entrypoints, given malformed input", () => {
   it("a birth's listing.put refuses a malformed record, putting nothing", async () => {
     const { listing, storedNow } = makeVaultWorld()
-    await TH.expectRefusal(listing.put({ garbage: true } as never, { expected: SX.sentinelVaultOf(Dna), ifAbsent: 'add', ifPresent: 'get' }))
+    await TH.expectRefusal(listing.put({ garbage: true } as never, { expected: SX.shellVaultOf(Dna), ifAbsent: 'add', ifPresent: 'get' }))
     expect(storedNow()).to.be.null
   })
 
@@ -567,12 +567,12 @@ describe("listing.tryGet", () => {
     expect(tryGetVault).not.toHaveBeenCalled()
   })
 
-  it("expects the sentinel row for a vault not listed, and the listed vault's own row from then on", async () => {
+  it("expects the shell row for a vault not listed, and the listed vault's own row from then on", async () => {
     const { listing, opts } = makeVaultWorld(await storedVaultRecord())
     const tryGetVault = vi.spyOn(opts.vaultDB, 'tryGetVault')
     const vault = await listing.get(Dna, { maxMillisSinceRefresh: 0 })
     await listing.get(Dna, { maxMillisSinceRefresh: 0 })
-    expect(tryGetVault.mock.calls.map(([ask]) => ask.expected)).to.deep.equal([SX.sentinelVaultOf(Dna), vault?.sparse])
+    expect(tryGetVault.mock.calls.map(([ask]) => ask.expected)).to.deep.equal([SX.shellVaultOf(Dna), vault?.sparse])
   })
 
   it("returns the vaultDB's own act when it asked storage", async () => {

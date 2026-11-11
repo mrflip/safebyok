@@ -199,7 +199,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   protected damagedStoredError(damaged: SX.DamagedVault): VaultError { return vaultStoredDamaged(damaged) }
 
   protected doTryGet(scope: VaultScope) {
-    const expected = this.at(scope)?.sparse ?? SX.sentinelVaultOf(scope)
+    const expected = this.at(scope)?.sparse ?? SX.shellVaultOf(scope)
     return this.vaultDB.tryGetVault({ op: 'get', ...scope, ifAbsent: 'nil', expected })
   }
 

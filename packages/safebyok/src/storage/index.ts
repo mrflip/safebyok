@@ -29,7 +29,7 @@ export type { VersionedShelfSpec } from './idb-shelf'
 export { DefaultMaxBoxes, DefaultMaxRecordBytes, VaultsDBVersion } from '../helpers/consts'
 // --
 
-// == [The rows]: sentinels, scopes, records, options and the helpers that read a row
+// == [The rows]: shells, scopes, records, options and the helpers that read a row
 export { BoxFormat, VaultFormat, VoidLifeTok, VoidRevision, VoidRevisionSeq, VoidRevisionTok, VoidTime } from '../shapes/shapes-storage'
 export { am, revision, times, vaulted, sparseBase } from '../shapes/shapes-storage'
 export type { Revision, Times } from '../shapes/shapes-storage'
@@ -50,7 +50,7 @@ export type { AdapterVaultDBOpts, Capacity, DelOpts, GateVerbOpts, IfAbsentOpts,
 export { rowMeta, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
 export { makeLifeTok } from '../helpers/crypto'
 export { isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow } from '../shapes/shapes-storage'
-export { sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf } from '../shapes/shapes-storage'
+export { shellVaultOf, shellBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf } from '../shapes/shapes-storage'
 export { leaseQuery, leaseDated, leaseRow, leaseScopepath, bankRow } from '../shapes/shapes-storage'
 export type { BankRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 // --

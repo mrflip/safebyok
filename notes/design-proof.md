@@ -146,7 +146,7 @@ own verbs (*Changing the gate*). The patch hooks belong to `Box`.
 * The goal: when lock is called, nothing crosses it. We get there with simple code that can be analyzed in context, so a
   crossing is stated in one sentence (`whiteboard/20261102-newdesign/reference-timings.md`), not fine-tuned
 * A box birth: when no box is listed, `vault.putBox` lists a void box (`boxListing.puttable`). That box's `box.put` makes
-  the record with the sentinel as its prior, seals it and puts it (`born` or `reborn`), and the answer is delivered. A
+  the record with the shell as its prior, seals it and puts it (`born` or `reborn`), and the answer is delivered. A
   `box.put` of only a sidecar unseals and reseals, because the box stamp binds the sidecar
 * A cached lease that clearly must be removed is never left in place quietly. When a user who has proved authority and
   intent to unlock crosses something that says lock, the case is ambiguous, and we settle it with clear code and a stated
@@ -486,7 +486,7 @@ vaultDB.delVault(tombstone, { prior })
 stored is live, this vault_tok, at prior         the tombstone written, revision_tok and revision_seq moved; cascade; 'deleted'
 stored is live, this vault_tok, revision moved   'stale_write'; no cascade
 stored is the tombstone of this vault_tok        nothing written, whatever the revision; cascade; 'gone', `val` the old tombstone
-stored is another vault_tok, or nothing          nothing written, whatever the revision; cascade; 'void', a sentinel tombstone
+stored is another vault_tok, or nothing          nothing written, whatever the revision; cascade; 'void', a shell tombstone
 ```
 
 Repeated deletes do not advance the revision. Whoever repeats a delete may not have the current token, having lost the first
@@ -505,7 +505,7 @@ A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or
 * The deviceDB has `cache`, `peek` and `vacate`, by scope and `vault_tok`: `vacate` and `del_vault` both need a removal.
 * Every put validates `prior.revision_tok` and `prior.revision_seq` against the row, and that the record's `revision_seq`
   is `prior.revision_seq` plus one. A birth where no row is stored sends `VS.NeverStored`, which has a known `revision_tok` and a
-  `revision_seq` of -1. The sentinel is a value and not a null, so the invariant applies to it too.
+  `revision_seq` of -1. The shell is a value and not a null, so the invariant applies to it too.
 * The deviceDB also has `leasesProvedBefore(cutoff)`, an index range scan over its cached leases, for `bank.autolock`.
 * `adopt` ignores a record older by `revision_seq`.
 * `Promptly`, a constant: the timeliness an attempt asks of `ensureTimely`. `maxMillis: 0` is the customer's to ask, as an

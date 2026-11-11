@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import type { VaultDB } from 'safebyok'
-import { makeLifeTok, nextRevisionOf, sentinelBoxOf, sentinelVaultOf } from 'safebyok/storage'
+import { makeLifeTok, nextRevisionOf, shellBoxOf, shellVaultOf } from 'safebyok/storage'
 import type { BankListed, BankScope, BoxesListed, BoxSparse, DamagedBox, DamagedVault, VaultRecord, VaultRow, VaultScope } from 'safebyok/storage'
 import { useBank } from '../hooks/hooks'
 import type { DevVaultDBInspectorProps, VaultRowLinesProps } from '../shapes'
@@ -105,13 +105,13 @@ const VaultRowLines = ({ vaultRow, boxes, onGetVault, onGetBox, onDelBox }: Vaul
   )
 }
 
-// The inspector holds no row of what it gets, so each get expects the sentinel for none.
+// The inspector holds no row of what it gets, so each get expects the shell for none.
 const getVaultRow = (vaultDB: VaultDB, scope: VaultScope) => (
-  vaultDB.getVault({ op: 'get', ...scope, ifAbsent: 'nil', expected: sentinelVaultOf(scope) })
+  vaultDB.getVault({ op: 'get', ...scope, ifAbsent: 'nil', expected: shellVaultOf(scope) })
 )
 
 const getBoxRow = (vaultDB: VaultDB, { applabel, user_id, vaultlabel, boxlabel, vault_tok }: BoxSparse | DamagedBox) => (
-  vaultDB.getBox({ op: 'get', applabel, user_id, vaultlabel, boxlabel, vault_tok, ifAbsent: 'nil', expected: sentinelBoxOf({ applabel, user_id, vaultlabel, boxlabel }, vault_tok) })
+  vaultDB.getBox({ op: 'get', applabel, user_id, vaultlabel, boxlabel, vault_tok, ifAbsent: 'nil', expected: shellBoxOf({ applabel, user_id, vaultlabel, boxlabel }, vault_tok) })
 )
 
 // The listed row is the one the del expects, and its tombstone carries a new life token.

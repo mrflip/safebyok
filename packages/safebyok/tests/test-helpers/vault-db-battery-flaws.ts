@@ -22,8 +22,8 @@ const box        = boxAt()
 const nextVault  = vaultAt(1)
 const nextBox    = boxAt(1)
 const otherBox   = boxAt(0, 'life1', { boxlabel: 'other' })
-const noVaultYet = SX.sentinelVaultOf(vaultScope)
-const noBoxYet   = SX.sentinelBoxOf(boxscope, 'life1')
+const noVaultYet = SX.shellVaultOf(vaultScope)
+const noBoxYet   = SX.shellBoxOf(boxscope, 'life1')
 
 /** Plants `row` by `plant`: true where the plant went through and `readBack` then gives `row`, false where the store did not hold it. */
 async function isHeld(row: unknown, plant: () => Awaitable<void>, readBack: () => Awaitable<unknown>): Promise<boolean> {

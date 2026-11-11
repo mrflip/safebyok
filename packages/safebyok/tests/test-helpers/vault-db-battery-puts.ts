@@ -24,8 +24,8 @@ const AsGateVerb = { ifAbsent: 'fail', ifPresent: 'repl' } as const
 
 const box = boxAt()
 const boxTombstone = boxTombstoneOf(box)
-const noBoxYet = SX.sentinelBoxOf(boxscope, 'life1')
-const noVaultYet = SX.sentinelVaultOf(vaultScope)
+const noBoxYet = SX.shellBoxOf(boxscope, 'life1')
+const noVaultYet = SX.shellVaultOf(vaultScope)
 
 /** The records that replace the world's vault and box, one revision on. */
 const nextVault = vaultAt(1)
@@ -41,12 +41,12 @@ const UnstorableBoxAsks = [
   [boxPutAskOf(boxAt(2), box),                                                       'a put two seqs past the row it expects'],
   [boxDelAskOf(box, { ...boxTombstone, revision_seq: 0 }),                           'a del at the seq of the row it expects'],
   [boxPutAskOf(boxAt(1, "life1", { revision_tok: box.revision_tok }), box),          'a put that keeps the revision_tok of the row it expects'],
-  [boxPutAskOf(boxAt(0, "life1", { revision_tok: SX.VoidRevisionTok })),             'a put that brings the revision_tok of the sentinel'],
-  [boxPutAskOf(boxAt(6), { ...noBoxYet, revision_seq: 5 }),                          'a put expecting the revision_tok of the sentinel at another seq'],
-  [boxPutAskOf(boxAt(0), { ...noBoxYet, ...Rival }),                                 'a put expecting the seq of the sentinel under another revision_tok'],
+  [boxPutAskOf(boxAt(0, "life1", { revision_tok: SX.VoidRevisionTok })),             'a put that brings the revision_tok of the shell'],
+  [boxPutAskOf(boxAt(6), { ...noBoxYet, revision_seq: 5 }),                          'a put expecting the revision_tok of the shell at another seq'],
+  [boxPutAskOf(boxAt(0), { ...noBoxYet, ...Rival }),                                 'a put expecting the seq of the shell under another revision_tok'],
   // the life of the record against the row expected:
   [boxPutAskOf(boxAt(1, "life1", { box_tok: "box2" }), box),                         'a put over a live row under another box_tok'],
-  [boxPutAskOf(boxAt(0, "life1", { box_tok: SX.VoidLifeTok })),                      'a first put that brings the box_tok of the sentinel'],
+  [boxPutAskOf(boxAt(0, "life1", { box_tok: SX.VoidLifeTok })),                      'a first put that brings the box_tok of the shell'],
   [boxPutAskOf(boxAt(2, "life1", { box_tok: boxTombstone.box_tok }), boxTombstone),  'a put over a tombstone that keeps its box_tok'],
   [boxDelAskOf(box, { ...boxTombstone, box_tok: box.box_tok }),                      'a del that keeps the box_tok of the row it deletes'],
   [{ ...boxPutAskOf(nextBox, box), record: boxTombstone },                           'a put of a tombstone'],
@@ -165,7 +165,7 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await vaultDB.getBox(boxGetAskOf())).to.deep.include({ val: box })
     })
 
-    it("refuses a row expected that is half the sentinel", async () => {
+    it("refuses a row expected that is half the shell", async () => {
       const vaultDB = await fresh()
       const halves = [vaultPutAskOf(vaultAt(6), { ...noVaultYet, revision_seq: 5 }), vaultPutAskOf(vaultAt(0), { ...noVaultYet, ...Rival })]
       for (const ask of halves) { expect(await vaultDB.tryPutVault(ask)).to.deep.include({ ok: false, act: 'bad_record' }) }

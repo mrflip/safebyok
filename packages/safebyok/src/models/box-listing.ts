@@ -76,7 +76,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
   /** A void box listed under `scope`. */
-  #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.sentinelBoxOf(scope, this.world.vault_tok)) }
+  #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.shellBoxOf(scope, this.world.vault_tok)) }
   // --
 
   // == [Defined by the box listing]: vaultTokOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
@@ -102,7 +102,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   protected doTryGet(scope: Boxscope) {
     const { vault_tok } = this.world
-    const expected = this.at(scope)?.sparse ?? SX.sentinelBoxOf(scope, vault_tok)
+    const expected = this.at(scope)?.sparse ?? SX.shellBoxOf(scope, vault_tok)
     return this.vaultDB.tryGetBox({ op: 'get', ...scope, vault_tok, ifAbsent: 'nil', expected })
   }
 

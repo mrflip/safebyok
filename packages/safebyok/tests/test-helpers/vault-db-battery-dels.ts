@@ -12,7 +12,7 @@ import type { BatteryWorld } from './vault-db-battery'
 /** A revision_tok no other record here has: what another device's write at the same seq would bring. */
 const Rival = { revision_tok: 'rival' }
 
-const noBoxYet = SX.sentinelBoxOf(boxscope, 'life1')
+const noBoxYet = SX.shellBoxOf(boxscope, 'life1')
 
 /** Registers the dels' and tidyGone's cases over `world`. */
 export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
@@ -149,9 +149,9 @@ export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
 
     it("refuses over a void row", async () => {
       const { vaultDB } = await putWith()
-      const sentinel = SX.sentinelVaultOf(vaultScopeOf('never'))
-      const answer = await vaultDB.tryDelVault(vaultDelAskOf(sentinel))
-      expect(answer).to.deep.include({ ok: false, act: 'void', dbhas: null, world: sentinel })
+      const shell = SX.shellVaultOf(vaultScopeOf('never'))
+      const answer = await vaultDB.tryDelVault(vaultDelAskOf(shell))
+      expect(answer).to.deep.include({ ok: false, act: 'void', dbhas: null, world: shell })
       expect(answer.err?.refusalkind).to.eq('absent_vault')
       expect(await rowsOf(vaultDB).vaultRowOf(vaultScopeOf('never'))).to.be.null
     })

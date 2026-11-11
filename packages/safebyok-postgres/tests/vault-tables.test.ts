@@ -41,7 +41,7 @@ describe("VaultTablesSql", () => {
 
   it("is safe to run again, keeping the rows already stored", async () => {
     const vaultDB = await TH.makeVaultDB()
-    await vaultDB.putVault({ op: 'put', ...TH.vaultScope, ifAbsent: 'add', ifPresent: 'fail', expected: DB.sentinelVaultOf(TH.vaultScope), record: TH.vaultAt() })
+    await vaultDB.putVault({ op: 'put', ...TH.vaultScope, ifAbsent: 'add', ifPresent: 'fail', expected: DB.shellVaultOf(TH.vaultScope), record: TH.vaultAt() })
     const db = await TH.database()
     await db.exec(VaultTablesSql)
     expect(await vaultDB.getVault({ op: 'get', ...TH.vaultScope, ifAbsent: 'fail', expected: TH.vaultAt() })).to.deep.include({ act: 'gotlive', val: TH.vaultAt() })

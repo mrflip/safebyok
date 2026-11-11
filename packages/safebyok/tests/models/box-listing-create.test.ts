@@ -6,7 +6,7 @@ import { Box } from '../../src/models/box'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { BoxDna } from '../../src/shapes/shapes-vaultish'
 import * as TH from '../test-helpers'
-import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBoxRecord, sentinelBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBoxRecord, shellBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
 const world = useModelsWorld()
 
@@ -88,7 +88,7 @@ describe("BoxListing", () => {
 
     it("refuses a put of another vault's record, putting nothing", async () => {
       const listing = boxListingOf(world.mw)
-      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, { expected: sentinelBoxRecord() }))
+      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, { expected: shellBoxRecord() }))
       expect(world.mw.callsOf('put')).to.deep.equal([])
     })
 

@@ -29,18 +29,18 @@ The op is get, put or del. Vault ops use the same three on the vault row.
   - `eq` -- the stored token is the one you cited
   - `=next` -- the stored token is the one this request would write
   - `neq` -- neither
-  - `birth` -- you cited the sentinel's token and the box is void, so there is no stored token to compare
+  - `birth` -- you cited the shell's token and the box is void, so there is no stored token to compare
   - `—` -- not compared: a get names the row its caller has, and gets back what is stored, whatever that row is
 - The `b_seq` column:
-  - `birth` -- you cited the sentinel's seq, `-1`
-  - `stale`, `eq`, `ahead` -- the seq you cited is below, at or above the stored one. Any seq but the sentinel's, cited against a void, is `ahead`.
+  - `birth` -- you cited the shell's seq, `-1`
+  - `stale`, `eq`, `ahead` -- the seq you cited is below, at or above the stored one. Any seq but the shell's, cited against a void, is `ahead`.
   - `@` -- any seq
 
 ## Rules
 
 ### Revisions
 
-Every request has one shape, whatever its op: the op, the address of the row asked for, its flags, and the row its caller expects to find (the sentinel row if the caller has none). A put or del also carries the record it would write, filed at the same address. A get's expected row travels with it and is not compared: a get is never refused because of the row its caller has.
+Every request has one shape, whatever its op: the op, the address of the row asked for, its flags, and the row its caller expects to find (the shell row if the caller has none). A put or del also carries the record it would write, filed at the same address. A get's expected row travels with it and is not compared: a get is never refused because of the row its caller has.
 
 Each box request names its vault's life token (`vault_tok`), never the vault's revision. Each vault put or del names the vault's revision.
 
@@ -51,7 +51,7 @@ Each modification (put or del) also names:
 
 The two sequence numbers must be integers and differ by one.
 
-The sentinel row stands for a void, and a request over a void cites it as the expected row. Its revision is seq `-1` with a crafted `revision_tok`: one fixed value that no mint produces. That request's proposed revision is seq `0` with a random `revision_tok`, never equal to the crafted one. A stored seq is 0 or more (C11), so no stored row carries the sentinel's revision. An expected revision cites the sentinel whole or not at all: the crafted `revision_tok` with any seq but `-1`, or seq `-1` with any other `revision_tok`, is a half-sentinel and refuses `bad_record`.
+The shell row stands for a void, and a request over a void cites it as the expected row. Its revision is seq `-1` with a crafted `revision_tok`: one fixed value that no mint produces. That request's proposed revision is seq `0` with a random `revision_tok`, never equal to the crafted one. A stored seq is 0 or more (C11), so no stored row carries the shell's revision. An expected revision cites the shell whole or not at all: the crafted `revision_tok` with any seq but `-1`, or seq `-1` with any other `revision_tok`, is a half-shell and refuses `bad_record`.
 
 Revision tokens are minted fresh at every write, delete included: a `revision_tok` names one exact row version. Life tokens (`vault_tok`, `box_tok`) change when the row is created and when it is deleted. If the expected and proposed revision tokens are the same, the request refuses `bad_record`. The proposed revision travels unencrypted as well as sealed, so that it can be stored and compared.
 
@@ -86,14 +86,14 @@ A listing answers, for each box it lists, what a get of that box would answer in
 
 Precedence, first match wins, for a box:
 
-1. Request shape, before any operation: `bad_record` (an unknown op or flag, or a malformed scope or payload, or next seq not prior seq + 1, or next `revision_tok` equal to the expected one, or a half-sentinel expected revision, or a life token changed or kept against C7 or C8, or a record that would be stored damaged, C13).
+1. Request shape, before any operation: `bad_record` (an unknown op or flag, or a malformed scope or payload, or next seq not prior seq + 1, or next `revision_tok` equal to the expected one, or a half-shell expected revision, or a life token changed or kept against C7 or C8, or a record that would be stored damaged, C13).
 2. Vault damaged: thrown, as `damaged_vault`.
 3. Vault void: no vault row stops at `vault_void`. Box ops never create a vault.
 4. Vault life: a vault tombstone stops at `vault_gone`, whatever its `vault_tok`. A live vault under another `vault_tok` than the request's stops at `vault_reborn`. Box ops never compare the vault's revision.
 5. Box damaged: every op throws `damaged_row`. The library does not delete such a row: the customer clears it with their own datastore's tools (`notes/wontfix.md`).
 6. Box under the proposed revision token: `retcon`.
 7. Box revision: the expected revision is not the stored one. Refuses `ahead`, `forked`, `clash` or `stale`. A token match whose cited life token or state is not the stored one is a clash too (C14).
-   1. Exception: a stale put with `ifPresent=get` that meets a live row returns that row, with act `passed`. Stale here is the sentinel cited against a row, or an earlier seq under another token.
+   1. Exception: a stale put with `ifPresent=get` that meets a live row returns that row, with act `passed`. Stale here is the shell cited against a row, or an earlier seq under another token.
    2. Exception: a stale del that meets a tombstone refuses `gone`, not `stale`.
 8. Revision matched: the stored state picks the flag (ifPresent for a live row, ifAbsent for a void or tombstone), and the flag picks the outcome. Silly combinations arrive here and get the refusal they asked for.
 
@@ -106,7 +106,7 @@ Returning:
 - An ok result returns the actual stored value in `val`
 - Many refusals return the actual stored value in a separate `dbhas` field, which the caller can use to try again. `void` returns dbnil.
 - A row that fails its checks gets no act: it is thrown, as `damaged_row` for the row asked for and `damaged_vault` for a box op's vault. The refusal names the fields that failed, and quotes nothing of the row.
-- Every response, ok or refused, carries the world back: the whole vault row, or the sentinel row where the vault is void.
+- Every response, ok or refused, carries the world back: the whole vault row, or the shell row where the vault is void.
 - A vault-level refusal of a box op returns no `dbhas` (`err` in the tables): the vault row it met is its world.
 
 ## Box ops table
@@ -123,9 +123,9 @@ Every box op passes these tests first. On return, the vault is verified as healt
 | G2  | put, del | valid   |    @    | @       | @   | `bad_record`    (malformed reqval)                                       |    err    | 🌀      |
 | G2  | put, del | valid   |    @    | @       | @   | `bad_record`    (next `revision_tok` = cited `revision_tok`)             |    err    | 🌀      |
 | G2  | put, del | valid   |    @    | @       | @   | `bad_record`    (next seq ≠ prior + 1)                                   |    err    | 🌀      |
-| G2  | put, del | valid   |    @    | @       | @   | `bad_record`    (half-sentinel cited revision)                           |    err    | 🌀      |
+| G2  | put, del | valid   |    @    | @       | @   | `bad_record`    (half-shell cited revision)                           |    err    | 🌀      |
 | G2  | put, del | valid   |    @    | @       | @   | `bad_record`    (record's scope or `vault_tok` is not the one addressed) |    err    | 🌀      |
-| G2  | put, del | valid   |    @    | @       | @   | `bad_record`    (a proposed token is the sentinel's)                     |    err    | 🌀      |
+| G2  | put, del | valid   |    @    | @       | @   | `bad_record`    (a proposed token is the shell's)                     |    err    | 🌀      |
 | G2  | put, del | valid   |    @    | @       | @   | `bad_record`    (a put proposing a tombstone, or a del a live record)    |    err    | 🌀      |
 | G3  |    @     | @       |    @    | damaged | @   | `damaged_vault`                                                          |  thrown   | 🌀      |
 | G4  |    @     | @       |    @    | void    | @   | `vault_void`    (impossible: no vault has ever had this scope)           |    err    | 🌀      |
@@ -224,7 +224,7 @@ cases in 8 rows (eq with birth can't occur). del has no flags, so nothing splits
 
 Same ops, flags and conventions as the box table, applied to the vault row. Two things to note:
 
-- A get's expected row is not compared: a new device, which has no row, cites the sentinel.
+- A get's expected row is not compared: a new device, which has no row, cites the shell.
 - A del, like every write, carries a next revision, and its tombstone carries a life token of its own.
 
 ### Unconditional errors (V1–V3)
@@ -237,10 +237,10 @@ Every vault op passes these first, whatever revision it cites.
 | V2  | put, del | @       |    @    | bad_record  | malformed request record                            | err       |   🌀    |
 | V2  | put, del | @       |    @    | bad_record  | next seq ≠ prior + 1                                | err       |   🌀    |
 | V2  | put, del | @       |    @    | bad_record  | next revision_tok = cited revision_tok              | err       |   🌀    |
-| V2  | put, del | @       |    @    | bad_record  | sentinel revision_tok but seq != -1                 | err       |   🌀    |
-| V2  | put, del | @       |    @    | bad_record  | non-sentinel revision_tok but seq = -1              | err       |   🌀    |
+| V2  | put, del | @       |    @    | bad_record  | shell revision_tok but seq != -1                 | err       |   🌀    |
+| V2  | put, del | @       |    @    | bad_record  | non-shell revision_tok but seq = -1              | err       |   🌀    |
 | V2  | put, del | @       |    @    | bad_record  | record's scope is not the one addressed             | err       |   🌀    |
-| V2  | put, del | @       |    @    | bad_record  | a proposed token is the sentinel's                  | err       |   🌀    |
+| V2  | put, del | @       |    @    | bad_record  | a proposed token is the shell's                  | err       |   🌀    |
 | V2  | put, del | @       |    @    | bad_record  | a put proposing a tombstone, or a del a live record | err       |   🌀    |
 | V2  |   put    | @       |    @    | bad_record  | (gating checks)                                     | err       |   🌀    |
 | V3  |    @     | @       | damaged | damaged_row |                                                     | thrown    |   🌀    |
@@ -357,16 +357,16 @@ Two primary keys locate every row, and the datastore enforces them. Every other 
 | C4  | A stored row's `vault_scope`, and a box's `vault_tok` and boxlabel, match the key it was found under | datastore key; the classifier checks the rows it is handed             | compare the stored scope fields, and a box's `vault_tok`, with the request                                                                                                                                                                                                       | `storage_issue`, thrown: the row is sound and the store or its adapter is not                                                      |
 | C5  | A box is met only in the life of its vault that its request cites                                    | the box key carries `vault_tok`, and the fetch is by key               | —                                                                                                                                                                                                                                                                                | a box of an earlier life is never fetched, and tidyBoxes removes it; one handed to the classifier anyway is a `storage_issue` (C4) |
 | C6  | A box is reachable only under a live vault                                                           | classifier: the vault checks run before any box check                  | vault state is live                                                                                                                                                                                                                                                              | `vault_gone` (G5, G6)                                                                                                              |
-| C7  | `vault_tok` changes on every vault create and every vault delete, and on nothing else                | vaultDB, in the request                                                | create, re-create or del: proposed `vault_tok` ≠ expected `vault_tok`, and is not the sentinel's; update: proposed = expected                                                                                                                                                    | `bad_record`                                                                                                                       |
-| C8  | `box_tok` changes on every box create (born, reborn) and every box delete, and on nothing else       | vaultDB, in the request                                                | born, reborn or del: proposed `box_tok` ≠ expected `box_tok`, and is not the sentinel's; replace: proposed = expected                                                                                                                                                            | `bad_record`                                                                                                                       |
+| C7  | `vault_tok` changes on every vault create and every vault delete, and on nothing else                | vaultDB, in the request                                                | create, re-create or del: proposed `vault_tok` ≠ expected `vault_tok`, and is not the shell's; update: proposed = expected                                                                                                                                                    | `bad_record`                                                                                                                       |
+| C8  | `box_tok` changes on every box create (born, reborn) and every box delete, and on nothing else       | vaultDB, in the request                                                | born, reborn or del: proposed `box_tok` ≠ expected `box_tok`, and is not the shell's; replace: proposed = expected                                                                                                                                                            | `bad_record`                                                                                                                       |
 | C9  | Every write gets a fresh `revision_tok`, and `revision_seq` rises by exactly one, a rebirth included | vaultDB, in the request                                                | proposed seq = expected seq + 1, and proposed `revision_tok` ≠ expected `revision_tok`                                                                                                                                                                                           | `bad_record`                                                                                                                       |
 | C9  | Every write gets a fresh `revision_tok`, and `revision_seq` rises by exactly one, a rebirth included | classifier                                                             | stored revision = expected revision                                                                                                                                                                                                                                              | `stale`, or a defect of step 7                                                                                                     |
 | C10 | The write lands on the row the classifier saw                                                        | the atomic unit: the adapter fetches, classifies and writes inside one | —                                                                                                                                                                                                                                                                                | impossible, by the atomic unit; a write that misses is an adapter defect, and throws                                               |
 | C11 | A stored row is well formed: tokens present, seq an integer >= 0, live or gone                       | classifier, on every row it is handed                                  | shape check                                                                                                                                                                                                                                                                      | thrown: `damaged_row`, or `damaged_vault` for a box op's vault                                                                     |
 | C12 | Every response carries the world back: the whole vault row                                           | vaultDB, on every response                                             | —                                                                                                                                                                                                                                                                                | —                                                                                                                                  |
-| C13 | A write never stores a row the next fetch would judge damaged                                        | vaultDB, in the request                                                | the proposed record's scope and `vault_tok` are those addressed; no proposed `revision_tok` is the sentinel's, nor is a new life token (a del citing the sentinel brings a life token of its own like any other, and can never be written); a put proposes a live record and a del a tombstone | `bad_record`                                                                                                                       |
+| C13 | A write never stores a row the next fetch would judge damaged                                        | vaultDB, in the request                                                | the proposed record's scope and `vault_tok` are those addressed; no proposed `revision_tok` is the shell's, nor is a new life token (a del citing the shell brings a life token of its own like any other, and can never be written); a put proposes a live record and a del a tombstone | `bad_record`                                                                                                                       |
 | C14 | The row a request expects is the row stored                                                          | classifier, on a `revision_tok` match                                  | expected seq, life token and state = the stored row's                                                                                                                                                                                                                            | `clash`                                                                                                                            |
-| C15 | A put or del writes at most once                                                                     | fresh revision tokens, and tombstones                                  | once its proposed revision is stored, or its expected revision is no longer the stored one, the request writes nothing                                                                                                                                                           | none: it refuses as the tables say. delRaw returns a scope to void, and ends this for a request citing the sentinel                |
+| C15 | A put or del writes at most once                                                                     | fresh revision tokens, and tombstones                                  | once its proposed revision is stored, or its expected revision is no longer the stored one, the request writes nothing                                                                                                                                                           | none: it refuses as the tables say. delRaw returns a scope to void, and ends this for a request citing the shell                |
 
 Why boxes carry `vault_tok`: so that nothing has to touch a vault's boxes when the vault changes. A delete gives the
 tombstone a `vault_tok` of its own, so a box still stored under the deleted life stays inaccessible (C6). A re-create

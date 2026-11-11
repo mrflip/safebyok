@@ -87,7 +87,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     listing.demandEnabled()
     const listed = listing.at(checked)
     if (listed?.isPresent === true) { throw alreadyListed() }
-    const expected = listed?.sparse ?? SX.sentinelVaultOf(checked)
+    const expected = listed?.sparse ?? SX.shellVaultOf(checked)
     return Gating.launchBirth(listing, checked, expected, Vault.#unlockVaultByProving, askUser)
   }
   // --

@@ -7,8 +7,8 @@ import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
 
-const noVaultYet = DB.sentinelVaultOf(TH.vaultScope)
-const noBoxYet   = DB.sentinelBoxOf(TH.boxscope, 'life1')
+const noVaultYet = DB.shellVaultOf(TH.vaultScope)
+const noBoxYet   = DB.shellBoxOf(TH.boxscope, 'life1')
 const Add  = { op: 'put', ifAbsent: 'add',  ifPresent: 'fail' } as const
 const Repl = { op: 'put', ifAbsent: 'fail', ifPresent: 'repl' } as const
 const Get  = { op: 'get' } as const
@@ -84,7 +84,7 @@ describe("PostgresVaultDB's get, put and del, each given one ask", () => {
     const vaultDB = await vaultDBWithVault({ maxBoxes: 1 })
     await vaultDB.putBox({ ...Add, ...TH.boxQuery, expected: noBoxYet, record: TH.boxAt(0) })
     const second = TH.boxscopeOf('anthropic')
-    const full = await vaultDB.tryPutBox({ ...Add, ...TH.boxQuery, ...second, expected: DB.sentinelBoxOf(second, 'life1'), record: TH.boxAt(0, 'life1', second) })
+    const full = await vaultDB.tryPutBox({ ...Add, ...TH.boxQuery, ...second, expected: DB.shellBoxOf(second, 'life1'), record: TH.boxAt(0, 'life1', second) })
     expect(full).to.deep.include({ ok: false, act: 'vault_full', dbhas: null })
     expect(full.ok ? null : full.err.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
 

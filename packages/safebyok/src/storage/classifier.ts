@@ -148,11 +148,11 @@ function boxRowAt(boxQuery: BoxQuery, boxRaw: unknown): Stored<BoxRow> {
   return { presence: (row.am === 'a') ? 'live' : 'gone', row }
 }
 
-/** The stored vault row of a box request, or the sentinel row for none.
+/** The stored vault row of a box request, or the shell row for none.
  * Throws `damaged_vault` for a row that fails its checks.
  */
 export function boxWorldOf(vaultScope: VaultScope, vaultRaw: unknown): VaultRow {
-  return vaultRowAt(vaultScope, vaultRaw, boxVaultRow).row ?? SX.sentinelVaultOf(vaultScope)
+  return vaultRowAt(vaultScope, vaultRaw, boxVaultRow).row ?? SX.shellVaultOf(vaultScope)
 }
 
 /** Classify a box request's vault row: the act it refuses with, or null when the vault is live in the requested life. */
@@ -238,7 +238,7 @@ export type BoxFetched = Readonly<{ world: unknown, box: unknown, capacity?: Cap
  * - `act` -- directs how to route and handle the answer
  */
 export type VaultClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct }) & {
-  /** The vault row after this request: the record it stores, else the stored row, else the sentinel for none. */
+  /** The vault row after this request: the record it stores, else the stored row, else the shell for none. */
   world:    VaultRow
   /** A good answer's `val`, or a refusal's `dbhas`: the record this request stores, else the stored vault row, or null for none. */
   vault:    VaultRow | null
@@ -251,7 +251,7 @@ export type VaultClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, 
  * - `act` -- directs how to route and handle the answer
  */
 export type BoxClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct | BoxVaultAct }) & {
-  /** The vault row stored, or the sentinel for none. */
+  /** The vault row stored, or the shell for none. */
   world:    VaultRow
   /** A good answer's `val`, or a refusal's `dbhas`: the record this request stores, else the stored box row, or null for none or when the vault row refused. */
   box:      BoxRow | null
@@ -269,7 +269,7 @@ export type BoxClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, ac
 export function classifyVault(ask: VaultAsk, { vault }: VaultFetched): VaultClassified {
   const stored   = vaultRowAt(ask, vault, SX.storedVaultRow)
   const { presence, row } = stored
-  const world    = row ?? SX.sentinelVaultOf(ask)
+  const world    = row ?? SX.shellVaultOf(ask)
   const tabled   = rowActOf(ask, stored)
 
   // A gate verb's put also checks its record against the gate of the live row it would replace.

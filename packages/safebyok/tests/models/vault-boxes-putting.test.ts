@@ -14,7 +14,7 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     const { vault, boxrows, tryPutBox } = await makeWorld()
     const box = await vault.putBox({ boxlabel, whisper: Whisper, sidecar: Sidecar })
     expect(tryPutBox).toHaveBeenCalledOnce()
-    expect(tryPutBox.mock.calls[0]?.[0]).to.deep.include({ expected: SX.sentinelBoxOf({ ...vault.scope, boxlabel }, vault.vault_tok) })
+    expect(tryPutBox.mock.calls[0]?.[0]).to.deep.include({ expected: SX.shellBoxOf({ ...vault.scope, boxlabel }, vault.vault_tok) })
     expect(box.isPresent).to.be.true
     expect(box.sidecar).to.deep.equal(Sidecar)
     expect(await box.extractWhisper()).to.deep.equal(Whisper)

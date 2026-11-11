@@ -276,7 +276,7 @@ describe("a launcher reached through a live gating", () => {
     const gating = await gatingAt<'build_vault'>()
     const launchers = gating.constructor as typeof Gating
     await TH.expectRefusal(launchers.launchOn({} as never, 'unlock_vault', neverUnlocks, null), 'bad_option')
-    await TH.expectRefusal(launchers.launchBirth({} as never, Dna, SX.sentinelVaultOf(Dna), neverUnlocks, null), 'bad_option')
+    await TH.expectRefusal(launchers.launchBirth({} as never, Dna, SX.shellVaultOf(Dna), neverUnlocks, null), 'bad_option')
     expect(listing.openGating).to.eq(gating)
     gating.dismiss()
     await first

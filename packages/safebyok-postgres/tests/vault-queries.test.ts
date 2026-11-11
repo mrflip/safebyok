@@ -23,7 +23,7 @@ async function writeBox(text: string, record: BoxRow, expected: BoxRow, ...more:
 
 /** Run BirthBoxSql for `record`. */
 async function birthBox(record: BoxRecord, maxBoxes = 100): Promise<BoxWriteAnswer> {
-  return await writeBox(BirthBoxSql, record, DB.sentinelBoxOf(record, record.vault_tok), maxBoxes)
+  return await writeBox(BirthBoxSql, record, DB.shellBoxOf(record, record.vault_tok), maxBoxes)
 }
 
 /** Run ReviseBoxSql for `record`, over the row the caller expects to find stored. */
@@ -38,7 +38,7 @@ async function storedBox(): Promise<unknown> {
 
 async function vaultDBWithVault() {
   const vaultDB = await TH.makeVaultDB()
-  await vaultDB.putVault({ ...Add, ...TH.vaultScope, expected: DB.sentinelVaultOf(TH.vaultScope), record: TH.vaultAt(0) })
+  await vaultDB.putVault({ ...Add, ...TH.vaultScope, expected: DB.shellVaultOf(TH.vaultScope), record: TH.vaultAt(0) })
   return vaultDB
 }
 
@@ -73,7 +73,7 @@ describe('BirthBoxSql', () => {
     await vaultDBWithVault()
     expect(await birthBox(TH.boxAt(1))).to.deep.include({ ok: false, box: null })
     const tombstone = { ...TH.boxTombstoneOf(TH.boxAt(0)), revision_seq: 0 }
-    expect(await writeBox(BirthBoxSql, tombstone, DB.sentinelBoxOf(tombstone, 'life1'), 100)).to.deep.include({ ok: false, box: null })
+    expect(await writeBox(BirthBoxSql, tombstone, DB.shellBoxOf(tombstone, 'life1'), 100)).to.deep.include({ ok: false, box: null })
     expect(await storedBox()).to.be.null
   })
 
