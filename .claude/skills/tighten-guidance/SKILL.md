@@ -49,10 +49,11 @@ unconditional "read X once". One an agent cannot recognize ("a term you do not r
 only when the text it points at is too long to inline. A pointer names a section as its file
 spells the heading: check with `rg -n '^#' <file>`.
 
-## 4. Tighten the words
+## 4. Keep the words plain
 
-Say each remaining line with fewer tokens, keeping its rule and its one best example. Keep the
-house voice: plain sentences, the cast's names, no hedges.
+Cut a line, or leave it whole: do not compress it. Agents copy the register of the guidance they read, so a
+line that stays is a plain sentence someone would say aloud, with its rule and its one best example, in the
+cast's names and without hedges.
 
 ## 5. Finish each move
 

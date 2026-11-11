@@ -1,4 +1,4 @@
-/** VaultSchemaSdl against the core's checks: each type the schema sends or takes has the fields its check reads, no more and no fewer. */
+/** VaultSchemaSdl compared with the core's checks: every schema type has exactly the fields its check expects. */
 
 import { describe, expect, it } from 'vitest'
 import { buildSchema, getNamedType, isInputObjectType, isLeafType, isObjectType, isUnionType } from 'graphql'
@@ -9,13 +9,13 @@ import { VaultSchemaSdl } from '../src/server'
 
 // == [The walk]: schemaDriftOf, driftOf
 
-/** A zod check, as the walk takes it apart. */
+/** A zod check. */
 type Check = Z.core.$ZodType
 
-/** The fields of a check's object, by name. */
+/** An object check's fields, by name. */
 type CheckShape = Record<string, Check>
 
-/** The parts of a zod check's definition the walk reads. */
+/** The parts of a zod check's definition that the walk uses. */
 type CheckDef = {
   type:       string
   innerType?: Check
@@ -25,20 +25,20 @@ type CheckDef = {
   shape?:     CheckShape
 }
 
-/** A schema type with fields: a type an answer sends, or an input a verb takes. */
+/** A schema type that has fields: an object type in an answer, or an input object. */
 type FieldedType = GraphQLObjectType | GraphQLInputObjectType
 
-/** `check`'s definition, as the walk reads it. */
+/** The definition of `check`, typed as {@link CheckDef}. */
 const defOf = (check: Check): CheckDef => check._zod.def
 
-/** The check that has `check`'s fields: past each nullable, default and readonly, a transform's input and a list's element. */
+/** Unwrap `check` to the check that holds its fields: through nullable, default and readonly wrappers, a transform's input, and a list's element. */
 const unwrapped = (check: Check): Check => {
   const def = defOf(check)
   const inner = def.innerType ?? def.in ?? def.element
   return inner ? unwrapped(inner) : check
 }
 
-/** The checks `check` may stand for, a union taken apart, and a null literal (an answer's field a refusal empties) dropped. */
+/** List the alternatives of `check`, flattening unions. Literal and null alternatives are left out: a refusal sets some answer fields to null. */
 const choicesOf = (check: Check): Check[] => {
   const inner = unwrapped(check)
   const def = defOf(inner)
@@ -47,19 +47,19 @@ const choicesOf = (check: Check): Check[] => {
   return [inner]
 }
 
-/** The types `named` may send or take: a union's members, or itself. */
+/** List the fielded types of `named`: a union's members, or the type itself. */
 const fieldedTypesOf = (named: GraphQLNamedType): readonly FieldedType[] => {
   if (isUnionType(named)) { return named.getTypes() }
   return (isObjectType(named) || isInputObjectType(named)) ? [named] : []
 }
 
-/** Each mismatch between `check` and the schema type `gqltype` at `path`, as a line a failing test names. */
+/** List the mismatches between `check` and the schema type `gqltype` at `path`, one message each. */
 const driftOf = (check: Check, gqltype: GraphQLOutputType | GraphQLInputType, path: string): string[] => {
   const named = getNamedType(gqltype)
   const choices = choicesOf(check)
   const shapes = choices.map((choice) => defOf(choice).shape).filter((shape) => shape !== undefined)
   if (isLeafType(named)) {
-    // SafebyokJson carries a sidecar, a damaged row or a refusal's meta whole, whatever fields the check gives it.
+    // SafebyokJson passes a sidecar, a damaged row or a refusal's meta through untyped, so the check's fields are not compared.
     if (named.name === 'SafebyokJson' || shapes.length === 0) { return [] }
     return [`${path}: the schema sends a ${named.name}, the check an object`]
   }
@@ -67,10 +67,10 @@ const driftOf = (check: Check, gqltype: GraphQLOutputType | GraphQLInputType, pa
   return shapes.flatMap((shape) => shapeDriftOf(shape, fieldedTypesOf(named), path))
 }
 
-/** Each mismatch between the check's `shape` and whichever of `fieldedTypes` has its fields, at `path`. */
+/** List the mismatches between the check's `shape` and the one of `fieldedTypes` whose fields match it, at `path`. */
 const shapeDriftOf = (shape: CheckShape, fieldedTypes: readonly FieldedType[], path: string): string[] => {
   const fieldnames = Object.keys(shape)
-  // A field the check has only ever null (listVaults' dbhas) the schema may leave out: its default fills it.
+  // The schema may leave out a field that the check only ever allows to be null (such as listVaults' dbhas): the check's default fills it in.
   const optional = new Set(fieldnames.filter((fieldname) => choicesOf(shape[fieldname]!).length === 0))
   const fits = (gqlnames: string[]) => (
     gqlnames.every((gqlname) => fieldnames.includes(gqlname)) && fieldnames.every((fieldname) => gqlnames.includes(fieldname) || optional.has(fieldname))
@@ -84,20 +84,20 @@ const shapeDriftOf = (shape: CheckShape, fieldedTypes: readonly FieldedType[], p
   return Object.values(fields).flatMap((field) => driftOf(shape[field.name]!, field.type, `${path}.${field.name}`))
 }
 
-/** `schema`'s root field `fieldname`, of Query, Mutation or Subscription. */
+/** Return the root field `fieldname` of `schema`, from Query, Mutation or Subscription. */
 const rootFieldOf = (schema: GraphQLSchema, fieldname: string): GraphQLField<unknown, unknown> => {
   const field = rootFieldsOf(schema).find((each) => each.name === fieldname)
   if (! field) { throw new Error(`the schema has no root field ${fieldname}`) }
   return field
 }
 
-/** Every root field of `schema`, of Query, Mutation and Subscription. */
+/** List every root field of `schema`: Query, Mutation and Subscription. */
 const rootFieldsOf = (schema: GraphQLSchema): GraphQLField<unknown, unknown>[] => {
   const roots = [schema.getQueryType(), schema.getMutationType(), schema.getSubscriptionType()]
   return roots.flatMap((root) => Object.values(root?.getFields() ?? {}))
 }
 
-/** Each mismatch between the core's checks and `schema`, at every root field's answer and every input object it takes. */
+/** List the mismatches between the core's checks and `schema`, over every root field's answer and every input object. */
 const schemaDriftOf = (schema: GraphQLSchema): string[] => [
   ...AnswerChecks.flatMap(([fieldname, check]) => driftOf(check, rootFieldOf(schema, fieldname).type, fieldname)),
   ...InputChecks.flatMap(([fieldname, argname, check]) => {
@@ -110,7 +110,7 @@ const schemaDriftOf = (schema: GraphQLSchema): string[] => [
 
 // == [The checks]: AnswerChecks, InputChecks
 
-// The answer check each root field's answer is parsed with by GraphQLVaultDB.
+// The check GraphQLVaultDB parses each root field's answer with.
 const AnswerChecks = [
   ['safebyokListVaults',        DB.listVaultsAnswer],
   ['safebyokGetVault',          DB.getVaultAnswer],
@@ -127,7 +127,7 @@ const AnswerChecks = [
   ['safebyokWatch',             DB.crossedNotice],
 ] as const
 
-// The check each input object is parsed with by GraphQLVaultDB before it is sent.
+// The check GraphQLVaultDB parses each input object with before sending it.
 const InputChecks = [
   ['safebyokGetVault',          'opts',      DB.ifAbsentOpts],
   ['safebyokGetBox',            'opts',      DB.ifAbsentOpts],

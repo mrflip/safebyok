@@ -3,11 +3,11 @@ import * as DB from 'safebyok/storage'
 
 // == [Types]: VaultResolversOpts, VaultFieldArgs, CrossingAnswer, CrossingNotice, VaultFieldResolver, VaultResolvers
 
-/** What {@link vaultResolvers} is made with, once, at your server's start. */
+/** Options for {@link vaultResolvers}, which you call once when your server starts. */
 export type VaultResolversOpts<ContextT> = {
-  /** The vaultDB every request is served from, such as a `PostgresVaultDB`. */
+  /** The vaultDB that serves every request, such as a `PostgresVaultDB`. */
   vaultDB:  DB.AdapterVaultDB
-  /** The user_id your own auth signed this request in as, or null when signed out. */
+  /** Return the `user_id` your own auth signed this request in as, or null when signed out. */
   userIdOf: (context: ContextT) => DB.Awaitable<string | null>
 }
 
@@ -28,7 +28,7 @@ export type VaultFieldArgs = {
   safebyokWatch:             DB.BankScope & { vaultlabel?: string | null }
 }
 
-/** A verb's answer as it crosses the wire: every field its answer type names, null where it has none. */
+/** A vaultDB answer in wire form: every field of its schema type is present, and null where the answer has no value. */
 export type CrossingAnswer = {
   ok:         boolean
   act:        string
@@ -39,7 +39,7 @@ export type CrossingAnswer = {
   err:        DB.CrossedErr | null
 }
 
-/** A watch's notice as it crosses the wire, or the refusal that ends the watch. */
+/** A watch notice in wire form, or the refusal that ends the watch. */
 export type CrossingNotice = {
   ok:    boolean
   act:   string
@@ -48,12 +48,12 @@ export type CrossingNotice = {
   err:   DB.CrossedErr | null
 }
 
-/** One query's or mutation's resolver, as every GraphQL server calls it. */
+/** The resolver for one query or mutation field, taking the standard GraphQL resolver arguments. */
 export type VaultFieldResolver<ContextT, FieldnameT extends keyof VaultFieldArgs> = (
   parent: unknown, args: VaultFieldArgs[FieldnameT], context: ContextT,
 ) => Promise<CrossingAnswer>
 
-/** The resolvers {@link vaultResolvers} makes, keyed as `VaultSchemaSdl` names its types and root fields. */
+/** The resolver map {@link vaultResolvers} returns, keyed by the type and root field names in `VaultSchemaSdl`. */
 export type VaultResolvers<ContextT> = {
   SafebyokJson:        GraphQLScalarType
   SafebyokEpochMillis: GraphQLScalarType<number, number>
@@ -92,29 +92,29 @@ const vaultResolversOpts = DB.objCheck(({ custom, fn }) => ({
   userIdOf: fn<VaultResolversOpts<unknown>['userIdOf']>(),
 }), 'bad_option')
 
-/** The resolvers for `VaultSchemaSdl`, serving each request its signed-in user's bank alone. */
+/** Make the resolvers for `VaultSchemaSdl`. A request can reach only the bank of the user it is signed in as. */
 export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): VaultResolvers<ContextT> => {
   const { vaultDB, userIdOf } = vaultResolversOpts.parse(opts)
 
-  /** The refusal a request gets unless it is signed in as `user_id`, or null. */
+  /** Return null if the request is signed in as `user_id`, else the refusal to send back. */
   const gateRefusalOf = async (context: ContextT, user_id: string): Promise<DB.VaultError | null> => {
     const signedIn = await DB.outcomeOf(() => userIdOf(context))
     if (! signedIn.ok) { return signedIn.err }
     return (signedIn.val === user_id) ? null : DB.identityRevoked()
   }
 
-  /** What `verb` answers, as it crosses, once the request is shown signed in as `user_id`. */
+  /** Run `verb` if the request is signed in as `user_id`, and return its answer in wire form. Otherwise return the refusal in wire form. */
   const served = async (context: ContextT, user_id: string, asked: object, verb: () => Promise<DB.Answer<unknown, string, unknown>>): Promise<CrossingAnswer> => {
     const refusal = await gateRefusalOf(context, user_id)
     if (refusal === null) { return crossingOf(await verb()) }
     return crossingOf({ ok: false, err: refusal, act: refusal.refusalkind, world: null, req_params: DB.reqParamsOf(asked) })
   }
 
-  /** Watches `scope` for the notices that cross, while the request stays signed in as its user. */
+  /** Watch `scope` and yield its notices in wire form, for as long as the request stays signed in as that user. */
   const watchNotices = async (context: ContextT, scope: DB.WatchScope): Promise<AsyncIterableIterator<CrossingNotice>> => {
     const refusal = await gateRefusalOf(context, scope.user_id)
     if (refusal !== null) { return endingWith(refusal) }
-    // A watch's own refusal, bad_scope, is thrown from the stream's start, and the stream's constructor throws it on.
+    // vaultDB.watch throws `bad_scope` inside the stream's `start`, and the ReadableStream constructor rethrows it.
     const watched = await DB.outcomeOf(() => openWatch(vaultDB, scope))
     if (! watched.ok) { return endingWith(watched.err) }
     const reader = watched.val
@@ -122,8 +122,8 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
       next: async () => {
         const read = await reader.read()
         if (read.done) { return read }
-        // Asked again at each notice, so a session revoked since it subscribed hears no more of its bank:
-        // its last notice carries the refusal, and the read after it finds the stream cancelled.
+        // Check the sign-in again at every notice. A session revoked after it subscribed gets one last notice
+        // carrying the refusal. The stream is cancelled, so the read after that is done.
         const revoked = await gateRefusalOf(context, scope.user_id)
         if (revoked === null) { return { done: false, value: { ok: true, ...read.value, err: null } } }
         await reader.cancel()
@@ -162,7 +162,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     },
     Subscription: {
       safebyokWatch: {
-        // A vaultlabel sent as null asks for the whole bank, as one left out does.
+        // A null vaultlabel means the whole bank, the same as leaving it out.
         subscribe: async (_parent, { vaultlabel, ...bank }, context) => await watchNotices(context, (typeof vaultlabel === 'string') ? { ...bank, vaultlabel } : bank),
         resolve:   (notice) => notice,
       },
@@ -173,7 +173,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
 
 // == [Scalars]: safebyokJson, safebyokEpochMillis
 
-/** `SafebyokJson`: any JSON value, carried whole for the vaultDB at each end to check. */
+/** `SafebyokJson`: any JSON value, passed through unchanged. The vaultDB at each end validates it. */
 const safebyokJson = new GraphQLScalarType({
   name:               'SafebyokJson',
   coerceOutputValue:  (val) => val,
@@ -181,13 +181,13 @@ const safebyokJson = new GraphQLScalarType({
   coerceInputLiteral: (ast) => valueFromASTUntyped(ast),
 })
 
-/** `val` as a time in epoch milliseconds, refused unless a safe integer. */
+/** Return `val` if it is a safe integer, else throw a GraphQLError. */
 const epochMillisOf = (val: unknown): number => {
   if (Number.isSafeInteger(val)) { return val as number }
   throw new GraphQLError('SafebyokEpochMillis is a time in integer UTC epoch milliseconds')
 }
 
-/** `SafebyokEpochMillis`: a time as integer UTC epoch milliseconds, beyond GraphQL's own 32-bit Int. */
+/** `SafebyokEpochMillis`: a time in integer UTC epoch milliseconds. GraphQL's own Int is 32-bit, too small to hold one. */
 const safebyokEpochMillis = new GraphQLScalarType<number, number>({
   name:               'SafebyokEpochMillis',
   coerceOutputValue:  epochMillisOf,
@@ -198,7 +198,7 @@ const safebyokEpochMillis = new GraphQLScalarType<number, number>({
 
 // == [Helpers]: crossingOf, crossedErrOf, badNoticeOf, endingWith, openWatch, typenameOf
 
-/** `answer` as it crosses, each field the schema names. */
+/** Convert `answer` to wire form. */
 const crossingOf = (answer: DB.Answer<unknown, string, unknown>): CrossingAnswer => ({
   ok:         answer.ok,
   act:        answer.act,
@@ -209,9 +209,9 @@ const crossingOf = (answer: DB.Answer<unknown, string, unknown>): CrossingAnswer
   err:        answer.ok ? null : crossedErrOf(answer.err),
 })
 
-/** A refusal as it crosses, never its cause. */
+/** Convert a refusal to wire form. Its `cause` is never sent. */
 const crossedErrOf = ({ refusalkind, message, meta }: DB.VaultError): DB.CrossedErr => {
-  // Checked for the wire: a limit of Infinity, which JSON cannot carry, becomes the largest safe integer.
+  // Parse the capacity before sending it: JSON cannot carry Infinity, so the check turns an infinite limit into the largest safe integer.
   const capacity = DB.capacity.safeParse(meta?.capacity)
   return {
     refusalkind,
@@ -224,10 +224,10 @@ const crossedErrOf = ({ refusalkind, message, meta }: DB.VaultError): DB.Crossed
   }
 }
 
-/** The notice that ends a watch, carrying its refusal. */
+/** Make the notice that ends a watch, carrying `refusal`. */
 const badNoticeOf = (refusal: DB.VaultError): CrossingNotice => ({ ok: false, act: refusal.refusalkind, val: null, world: null, err: crossedErrOf(refusal) })
 
-/** A watch refused before it began: its one notice carries the refusal. */
+/** Make the iterator for a watch refused before it started: it yields one notice carrying the refusal, then ends. */
 const endingWith = (refusal: DB.VaultError): AsyncIterableIterator<CrossingNotice> => {
   const notices = [badNoticeOf(refusal)].values()
   const iterator: AsyncIterableIterator<CrossingNotice> = {
@@ -238,16 +238,16 @@ const endingWith = (refusal: DB.VaultError): AsyncIterableIterator<CrossingNotic
   return iterator
 }
 
-/** Opens a watch of `scope` on `vaultDB`, as a reader whose cancel stops it. */
+/** Start watching `scope` on `vaultDB` and return a stream reader. Cancelling the reader stops the watch. */
 const openWatch = (vaultDB: DB.AdapterVaultDB, scope: DB.WatchScope): ReadableStreamDefaultReader<DB.Notice> => {
-  // Read through a reader, not the stream's own iterator: that one's `return` waits for a pending
-  // `next`, which for a quiet bank is forever, so a subscriber gone while it waited would keep the
-  // watch open. A reader's `cancel` ends the pending read at once.
+  // Use a reader, not the stream's own async iterator. The iterator's `return` waits for a pending
+  // `next`, which on a quiet bank never resolves, so a subscriber that left would keep the watch
+  // open. A reader's `cancel` ends the pending read immediately.
   let unwatch = noUnwatching
   const notices = new ReadableStream<DB.Notice>({
     start: (controller) => {
       unwatch = vaultDB.watch(scope, (notice) => {
-        // None once the stream has closed; every one before, however many wait to be read.
+        // Enqueue every notice while the stream is open, however many are unread. Drop notices once it has closed.
         if ((controller.desiredSize ?? 0) > 0) { controller.enqueue(notice) }
       })
     },
@@ -258,7 +258,7 @@ const openWatch = (vaultDB: DB.AdapterVaultDB, scope: DB.WatchScope): ReadableSt
 
 const noUnwatching = (): void => undefined
 
-/** The schema's name for a row's type: a vault's or a box's, live or deleted. */
+/** The schema typename for a row: `SafebyokVaultRecord`, `SafebyokVaultTombstone`, `SafebyokBoxRecord` or `SafebyokBoxTombstone`. */
 const typenameOf = (row: DB.VaultRow | DB.BoxRow): string => {
   const thing = ('boxlabel' in row) ? 'Box' : 'Vault'
   return `Safebyok${thing}${(row.am === 'x') ? 'Tombstone' : 'Record'}`

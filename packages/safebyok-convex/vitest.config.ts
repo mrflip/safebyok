@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config'
 
-// convex-test runs the component's functions in-process, under the edge runtime Convex's own
-// isolates resemble; it must be inlined so that its `import.meta.glob` is transformed.
+// convex-test runs the component's functions in-process, in the edge runtime, which resembles
+// Convex's own isolates. It must be inlined so that its `import.meta.glob` is transformed.
 export default defineConfig({
   test: {
     include:     ['tests/**/*.test.ts'],

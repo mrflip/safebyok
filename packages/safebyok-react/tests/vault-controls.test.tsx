@@ -9,7 +9,7 @@ TH.sweepBankWorlds()
 
 afterEach(() => { vi.restoreAllMocks() })
 
-/** A requestCleartext that types the test's passphrase into every dialog, and the gatingkinds it was asked for. */
+/** Return a requestCleartext that attempts every gating with the test's passphrase, and the list of gatingkinds it was asked for. */
 const typingPassphrase = () => {
   const asked: string[] = []
   const requestCleartext: RequestCleartext = async (gating) => {
@@ -19,7 +19,7 @@ const typingPassphrase = () => {
   return { asked, requestCleartext }
 }
 
-/** What the control says of the lock, or null where it shows no state. */
+/** Return the control's lock text ('Vault locked' or 'Vault unlocked'), or null when it shows neither. */
 const lockWords = () => screen.queryByText(/^Vault (un)?locked$/)?.textContent ?? null
 
 describe("VaultLockControl", () => {

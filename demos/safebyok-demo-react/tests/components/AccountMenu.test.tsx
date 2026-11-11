@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Vault } from 'safebyok'
 import * as TH from '../test-helpers'
 
-/** The session bar over a fresh fake auth, beside the vault probe, in a bank for `u1`, signed in as margo. */
+/** Render the session bar with a fresh fake auth beside the vault probe, in a bank for `u1`, and sign in as margo. */
 const renderSignedIn = async () => {
   const auth = TH.makeAuth()
   const { vaultDB } = TH.renderInBank(<><TH.LiveSessionBar auth={auth} /><TH.VaultProbe /></>)
@@ -14,7 +14,7 @@ const renderSignedIn = async () => {
   return { auth, vaultDB }
 }
 
-/** Signs in as margo, and builds and unlocks her vault through the provider's dialog. */
+/** Sign in as margo, then build and unlock her vault through the provider's dialog. */
 const renderWithVault = async () => {
   const world = await renderSignedIn()
   fireEvent.click(screen.getByRole('button', { name: 'Open' }))

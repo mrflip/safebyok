@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { TroubleBoundary } from '../../src/components/TroubleBoundary'
 
-/** A child that throws while rendering, as misuse thrown by the provider does. */
+/** A child that throws while rendering, the way the provider does on misuse. */
 const Broken = (): never => { throw new Error('a bad label') }
 
 describe("TroubleBoundary", () => {

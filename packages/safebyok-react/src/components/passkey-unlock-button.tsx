@@ -7,8 +7,7 @@ import { askPasskey, attemptOnce, passkeysAvailable } from '../helpers/passkey'
 import { Boundary } from '../provider/boundary'
 import type { PasskeyUnlockButtonProps } from '../shapes'
 
-/**
- * A button that unlocks with the vault's passkey, shown only where a passkey can be used.
+/** Render a button that unlocks the vault with its passkey. It renders nothing where a passkey cannot be used.
  * @example <PasskeyUnlockButton gating={gating} onGripe={setGripe} />
  */
 export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
@@ -17,14 +16,14 @@ export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
   </Boundary>
 )
 
-/** True when the passkey button shows for `gating`. */
+/** True when this browser supports passkeys and `gating`'s vault has one. */
 export const offersPasskey = (gating: AnyGating): boolean => (
   passkeysAvailable() && gating.passkeyHeader?.wayinkind === 'passkey'
 )
 
 const PasskeyPress = ({ gating, onGripe, rpId, takesFocus }: PasskeyUnlockButtonProps) => {
   const [isAsking, startAsking] = useTransition()
-  // False outside a form, as for a host's own dialog.
+  // `pending` is false when the button is outside a form, as in a host's own dialog.
   const { pending: isFormPending } = useFormStatus()
   if (! offersPasskey(gating)) { return null }
 
@@ -44,7 +43,7 @@ const PasskeyPress = ({ gating, onGripe, rpId, takesFocus }: PasskeyUnlockButton
     }
   }
 
-  // Inside the transition, what hear throws reaches the Boundary above.
+  // askAndAttempt runs inside the transition, so an error thrown by `hear` reaches the Boundary above.
   const press = () => {
     if (isAsking || isFormPending) { return }
     onGripe(null)
@@ -52,8 +51,8 @@ const PasskeyPress = ({ gating, onGripe, rpId, takesFocus }: PasskeyUnlockButton
   }
 
   return (
-    // aria-disabled, not disabled: a disabled button drops the focus, and the user's place in the dialog with it.
-    // eslint-disable-next-line jsx-a11y/no-autofocus -- only where a dialog makes the passkey its first choice: the WAI-ARIA dialog pattern moves focus to a dialog's first control
+    // Use aria-disabled, not disabled: a disabled button loses focus, and the user loses their place in the dialog.
+    // eslint-disable-next-line jsx-a11y/no-autofocus -- used only where a dialog offers the passkey first: the WAI-ARIA dialog pattern moves focus to a dialog's first control
     <button type="button" autoFocus={takesFocus} aria-disabled={isAsking || isFormPending} onClick={press}>
       {Messages.passkeyButton}
     </button>

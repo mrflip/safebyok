@@ -1,6 +1,6 @@
-// eslint.config.mjs -- the React binding's lint, cut from the core's (packages/safebyok/), which is
-// the authority on house style: where the two disagree, the core's is right and this one is the
-// bug. What this one adds is React's layer (hooks, JSX, accessibility) and .tsx files.
+// eslint.config.mjs -- the React binding's lint config, copied from the core's (packages/safebyok/).
+// The core's is the authority on house style: where the two disagree, the core's is right and this
+// file has the bug. This file adds React's rules (hooks, JSX, accessibility) and lints .tsx files.
 //
 import { defineConfig, globalIgnores } from 'eslint/config'
 import js                              from '@eslint/js'
@@ -105,11 +105,11 @@ export default defineConfig([
       reactHooks.configs.flat.recommended,
       jsxA11y.flatConfigs.recommended,
     ],
-    // 'detect' would be righter, but eslint-plugin-react 7.37.5 detects via an API eslint 10
-    // removed (context.getFilename); pin the version until the plugin catches up.
-    // As of 2026-10-16 neither plugin has a release that declares eslint 10: eslint-plugin-react
+    // 'detect' would be better, but eslint-plugin-react 7.37.5 detects through an API that eslint 10
+    // removed (context.getFilename). Pin the version until the plugin catches up.
+    // As of 2026-10-16 neither plugin has a release that declares eslint 10 support: eslint-plugin-react
     // 7.37.5 allows up to ^9.7 and eslint-plugin-jsx-a11y 6.10.2 up to ^9, so `pnpm peers check`
-    // reports both as unmet. They lint under eslint 10 here; raise them when either releases.
+    // reports both as unmet. Both work under eslint 10 here. Raise them when either releases.
     settings: { react: { version: '19.3' } },
     rules: {
       'react-hooks/exhaustive-deps': 'error',
@@ -374,8 +374,7 @@ export default defineConfig([
       // Same ground as vitest/expect-expect above, but with no way to name our own assertion
       // helpers. One rule enforcing this is enough, and that one is the one we can configure.
       'sonarjs/assertions-in-tests': 'off',
-      // STYLE.md mandates bulk example lists, whose `it(blurb, ...)` title is a variable by
-      // construction.
+      // STYLE.md requires bulk example lists, and their `it(blurb, ...)` title is necessarily a variable.
       'vitest/valid-title': 'off',
     },
   },

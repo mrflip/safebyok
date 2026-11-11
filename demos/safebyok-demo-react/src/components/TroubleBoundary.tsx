@@ -1,11 +1,8 @@
 import { Component, type ReactNode } from 'react'
 
-/**
- * The demo's error boundary, around the provider and the page, as safebyok-react's README has a
- * host place one: misuse -- a bad label or option, a bug in the demo's own code -- is thrown to
- * it while rendering, and it shows a calm word with a way to start again in place of the page.
- * React reports what it caught through the root's `onCaughtError`, the console by default. Keyed
- * on the signed-in user, so another user, or a sign-out and back in, gets a fresh attempt.
+/** The demo's error boundary, wrapped around the provider and the page as safebyok-react's README advises.
+ * Misuse (a bad label or option, or a bug in the demo's own code) throws while rendering. The boundary then shows
+ * a calm message and a Reload button in place of the page. Key it on the signed-in user, so a new sign-in starts fresh.
  *
  * @example
  *   <TroubleBoundary key={user_id ?? 'signed-out'}>

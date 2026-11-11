@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     include:     ['tests/**/*.test.{ts,tsx}'],
     environment: 'jsdom',
-    // Every spy is put back before each test, and tests/setup.ts unmounts each test's render.
+    // Restore every spy before each test. tests/setup.ts unmounts each test's render.
     restoreMocks: true,
     setupFiles:   ['tests/setup.ts'],
     coverage: {

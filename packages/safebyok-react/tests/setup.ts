@@ -1,12 +1,12 @@
-// Each test's render is unmounted after it. Testing Library does this by itself only where
-// vitest's globals are on, which these tests leave off.
+// Unmount each test's render after the test. Testing Library does this automatically only when
+// vitest's globals are on, and these tests leave them off.
 import { cleanup } from '@testing-library/react'
 import { afterEach } from 'vitest'
 
 afterEach(cleanup)
 
-// jsdom has no showModal or close. These open and shut the element and focus its first control, and no more: Tab, Escape
-// and the inert page need a browser.
+// jsdom has no showModal or close. These stand-ins open and close the element and focus its first control, nothing
+// more. Tab trapping, Escape and the inert page need a real browser.
 class DialogInTests extends HTMLDialogElement {
   override showModal() {
     this.open = true

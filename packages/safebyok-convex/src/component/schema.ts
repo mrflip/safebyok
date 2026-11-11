@@ -1,12 +1,12 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 
-// Each row is stored whole, as the core wrote it, under the labels it is found by: the component
-// writes what it is handed and judges a row only through the core's own predicates, so a row the
-// core would call damaged is kept as it is and read back as it is. `user_id` leads every index, so
-// one user's rows are one range.
+// Each row is stored whole, exactly as the core wrote it, beside the labels used to find it. The
+// component writes what it is given and checks a row only with the core's own predicates, so a row
+// the core would call damaged is stored and returned unchanged. `user_id` leads every index, so one
+// user's rows form a single index range.
 
-/** The component's own tables: ciphertext and the labels that find it. */
+/** The component's tables: ciphertext rows, the labels used to find them, and a tally per vault life. */
 export default defineSchema({
   safebyok_vaults: defineTable({
     applabel:   v.string(),

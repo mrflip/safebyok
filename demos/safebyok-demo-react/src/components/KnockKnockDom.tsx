@@ -6,7 +6,7 @@ import { isQuietRefusal } from '../lib/refusals'
 import { ApiKeyVaultlabel, DomApiKeyBoxlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
 import { KnockForm } from './KnockForm'
 
-/** The DOM form: the knock-knock machine with its API key in a field safebyok fills and reads, so the key never passes through React. */
+/** The DOM form: a knock-knock machine whose API key field is filled and read by safebyok itself, so the key never passes through React. */
 export const KnockKnockDom = () => {
   const bank = useBank()
   const { stage, vault } = useVault(ApiKeyVaultlabel)
@@ -17,7 +17,7 @@ export const KnockKnockDom = () => {
   const [isSaved, setIsSaved] = useState(false)
   const isReady = (bank !== null) && (stage !== 'waiting')
 
-  /** Runs a button's work, saying what refused unless the user cancelled. */
+  /** Run a button's action, and show the error message unless the user cancelled. */
   const perform = async (work: () => unknown) => {
     setGripe(null)
     setIsSaved(false)
@@ -28,7 +28,7 @@ export const KnockKnockDom = () => {
     }
   }
 
-  // Each dialog opens on the click: building the vault, unlocking it.
+  // The dialogs that build or unlock the vault open from this click.
   const edit = () => perform(async () => { if (bank !== null) { await ensureApiKeyBoxExposed(bank, DomApiKeyBoxlabel) } })
 
   const save = () => perform(async () => {

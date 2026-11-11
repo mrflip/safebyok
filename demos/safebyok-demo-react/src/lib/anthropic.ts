@@ -16,12 +16,9 @@ export const buildJokePrompt = (whosThere: string): string => (
   `Knock, knock! / Who's there? / ${whosThere} / ${whosThere} who?`
 )
 
-/**
- * One knock-knock joke from Claude, as plain text.
+/** Ask Claude for one knock-knock joke, and return it as plain text.
  *
- * @param apiKey - The user's Anthropic API key, fresh from the vault.
- * @param whosThere - Whoever the user typed into "Who's there?".
- * @param fetchFn - Test seam: a fetch to use in place of the global one.
+ * @param fetchFn - test seam: a fetch to use in place of the global one
  *
  * @example await tellKnockKnockJoke(apiKeyWhisper, 'Banana')
  */
@@ -45,7 +42,7 @@ export const tellKnockKnockJoke = async (apiKey: string, whosThere: string, fetc
     .trim()
 }
 
-/** A calm, actionable line for whatever went wrong telling the joke. */
+/** Turn an error from telling the joke into a calm message that says what to do next. */
 export const gripeForJokeErr = (err: unknown): string => {
   if (err instanceof Anthropic.AuthenticationError) {
     return "Anthropic refused that API key. Check it and save a fresh one below."

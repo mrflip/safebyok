@@ -5,7 +5,9 @@ import { isQuietRefusal } from '../lib/refusals'
 import { ApiKeyVaultlabel, ToolkitApiKeyBoxlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
 import { KnockForm } from './KnockForm'
 
-/** The toolkit form: the knock-knock machine with its API key as an exposed whisper: safebyok keeps the working copy, the form just shows it. */
+/** The toolkit form: a knock-knock machine assembled by hand from safebyok-react's hooks.
+ * Its API key is an exposed whisper: safebyok holds the working copy, and the form only displays it.
+ */
 export const KnockKnockToolkit = () => {
   const bank = useBank()
   const { stage, vault } = useVault(ApiKeyVaultlabel)
@@ -17,10 +19,10 @@ export const KnockKnockToolkit = () => {
   const [isSaved, setIsSaved] = useState(false)
   const isReady = (bank !== null) && (stage !== 'waiting')
 
-  // Leaving the form drops the working copy; Edit, on a click, brings it back.
+  // Unexpose the box when the form unmounts, which drops the working copy. Clicking Edit exposes it again.
   useEffect(() => () => { box?.unexpose() }, [box])
 
-  /** Runs a button's work, saying what refused unless the user cancelled. */
+  /** Run a button's action, and show the error message unless the user cancelled. */
   const perform = async (work: () => unknown) => {
     setGripe(null)
     setIsSaved(false)

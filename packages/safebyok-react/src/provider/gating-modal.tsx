@@ -23,7 +23,7 @@ const NoDialog = ({ gating }: { gating: AnyGating }) => {
   return null
 }
 
-/** The dialog for any gating, by its `gatingkind`. */
+/** Render the dialog that matches the gating's `gatingkind`. A gating of a kind with no dialog is dismissed. */
 export const GatingModal = ({ gating, ...rest }: GatingModalProps) => {
   const Dialog = DialogForGatingkind[gating.gatingkind] as ComponentType<GatingModalProps> | undefined
   if (Dialog === undefined) { return <NoDialog gating={gating} /> }

@@ -1,10 +1,12 @@
-// Every word safebyok-react shows a user lives here. A sentence with a varying part is one frame, so
-// a translation may reorder it. What the developer reads stays beside the code that says it.
+// All the text safebyok-react shows to a user is in this file. A sentence with a variable part is one template
+// function, so a translation can reorder it. Messages meant for developers stay next to the code that uses them.
 
 import type { Gatingkind } from 'safebyok'
 
+/** The locale of the built-in dialogs' text. */
 export const Locale = 'en'
 
+/** The text of the built-in dialogs. */
 export const Messages = {
   chooseTitle:       'Choose a vault passphrase',
   unlockTitle:       'Unlock your vault',
@@ -66,6 +68,7 @@ export const Messages = {
   lockButton:        'Lock',
 } as const
 
+/** A phrase for what each kind of gating does, to finish a sentence such as "Could not ...". */
 export const Doing: Record<Gatingkind, string> = {
   build_vault:        'create your vault',
   unlock_vault:       'unlock your vault',

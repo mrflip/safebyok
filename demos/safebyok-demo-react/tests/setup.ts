@@ -1,13 +1,13 @@
-// Each test's render is unmounted after it, and with it each provider's bank swept. Testing
-// Library unmounts by itself only where vitest's globals are on, which these tests leave off.
+// Unmount what each test rendered, which also sweeps each provider's bank. Testing Library only
+// does this automatically when vitest's globals are on, and these tests leave them off.
 import { cleanup, configure } from '@testing-library/react'
 import { afterEach } from 'vitest'
 
 afterEach(cleanup)
 
-// jsdom has no showModal or close. These open and shut the element and focus its first control, and no more: Tab, Escape
-// and the inert page need a browser.
-// The tests of tests/lib run with no DOM.
+// jsdom has no showModal or close. These stand-ins open and close the dialog and focus its first control, nothing more:
+// Tab, Escape and making the rest of the page inert need a real browser.
+// The typeof check is there because the tests in tests/lib run with no DOM.
 if (typeof HTMLDialogElement !== 'undefined') {
   class DialogInTests extends HTMLDialogElement {
     override showModal() {
@@ -21,7 +21,7 @@ if (typeof HTMLDialogElement !== 'undefined') {
   Object.defineProperties(HTMLDialogElement.prototype, { showModal, close })
 }
 
-// A findBy or waitFor returns the moment its condition has, so its ceiling costs nothing when
-// the test passes. What it waits on includes making a vault (its keys, the rows it puts and stows), which on a
-// loaded CI machine outlasts the default second; the test's own ceiling (vite.config.ts) is higher.
+// A findBy or waitFor returns as soon as its condition holds, so a longer timeout costs nothing when
+// the test passes. Some waits include making a vault (deriving its keys and storing its rows), which can take
+// longer than the default one second on a loaded CI machine. The test's own timeout (vite.config.ts) is higher still.
 configure({ asyncUtilTimeout: 5000 })

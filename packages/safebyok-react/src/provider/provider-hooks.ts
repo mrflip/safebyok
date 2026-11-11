@@ -21,7 +21,7 @@ export const useDeviceId = (deviceDB: BankOpts['deviceDB'], applabel: string, us
 
   // Throw errors during render, so the nearest error boundary hears it.
   if (refused !== null) { throw refused.err }
-  // Until the deviceDB answers for a newly signed-in user, the last user's device_id is still in state, and is not theirs.
+  // Right after a new user signs in, state still has the previous user's device_id. Return null until the deviceDB responds for the new user.
   return (found?.applabel === applabel && found.user_id === user_id) ? found.device_id : null
 }
 // --
@@ -33,7 +33,7 @@ const changedKeys = (was: Record<string, unknown>, now: Record<string, unknown>)
   Object.keys({ ...was, ...now }).filter((ckey) => (! Object.is(was[ckey], now[ckey])))
 )
 
-/** Warn once, through `bank`'s logger, of each option changed since `madeFrom`, which the bank ignores. */
+/** Warn once, through `bank`'s logger, when options have changed since the bank was made. The bank ignores such changes. */
 export const useWarnOfIgnoredOpts = (bank: Bank | null, wasOpts: ProviderBankOpts, nowOpts: ProviderBankOpts): void => {
   const toldOfIgnored = useRef(false)
   useEffect(() => {

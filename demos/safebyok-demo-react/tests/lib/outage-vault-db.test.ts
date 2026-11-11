@@ -5,7 +5,7 @@ import { OutageVaultDB } from '../../src/lib/outage-vault-db'
 
 const Scope = { applabel: 'acme', user_id: 'u1' }
 
-/** A fresh OutageVaultDB, in a database of its own. */
+/** Make an OutageVaultDB on a fresh database. */
 const makeOutage = () => new OutageVaultDB({ dbName: `outage_${crypto.randomUUID()}` })
 
 describe("OutageVaultDB", () => {

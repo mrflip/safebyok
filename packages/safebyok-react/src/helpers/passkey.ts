@@ -3,18 +3,17 @@ import { fromB64, toB64 } from 'safebyok/utils'
 import { PasskeyChecks, type AskPasskeyOpts, type CreatePasskeyOpts } from '../shapes'
 import { Messages } from './messages'
 
-// These passkeys are not logins: each is a fresh credential under a random user handle, its challenge is random, and
-// no server checks the assertion. What matters is the PRF extension's answer, which only the authenticator gives, and
-// only after the user's fingerprint, face or PIN. Every call asks for user verification, since an authenticator answers
-// differently without it.
+// These passkeys are not used to sign in. Each is a fresh credential under a random user handle, with a random
+// challenge, and no server checks the assertion. The part that matters is the PRF extension's output, which only
+// the authenticator can produce, and only after the user's fingerprint, face or PIN. Every call requires user
+// verification, because an authenticator gives a different PRF output without it.
 
-/** True when this browser offers WebAuthn at all: whether to show a passkey button. */
+/** True when this browser supports WebAuthn. Use it to decide whether to show a passkey button. */
 export const passkeysAvailable = (): boolean => (
   typeof PublicKeyCredential === 'function' && typeof navigator === 'object' && 'credentials' in navigator
 )
 
-/**
- * Make a new passkey and return its first answer, or null when the user dismisses the prompt.
+/** Create a new passkey and return its first answer. Returns null when the user dismisses the prompt.
  * @example
  *   const passkeyClear = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
  *   if (passkeyClear !== null) { await gating.attempt({ passphraseClear, passkeyClear }) }   // null: dismissed
@@ -26,8 +25,8 @@ export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAn
   const created = await askAuthenticator(() => navigator.credentials.create({
     publicKey: {
       rp:                     { name: opts.rp.name, ...optional('id', opts.rp.id) },
-      // A random handle, never the host's own user id: an authenticator with a passkey for the
-      // same site and handle would replace it, and the host's sign-in passkey with it.
+      // Use a random handle, never the host's own user id. An authenticator replaces any passkey it already has
+      // for the same site and handle, which would overwrite the host's sign-in passkey.
       user:                   { ...opts.user, id: crypto.getRandomValues(new Uint8Array(16)) },
       challenge:              crypto.getRandomValues(new Uint8Array(32)),
       pubKeyCredParams:       [{ type: 'public-key', alg: -8 }, { type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
@@ -41,7 +40,7 @@ export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAn
   const { prf } = created.getClientExtensionResults()
   if (prf?.results !== undefined) { return answerOf(credential_id, prfSaltBytes, prf.results.first) }
   if (prf?.enabled !== true) { throw noPrf() }
-  // Many authenticators turn PRF on as they make the passkey, and answer only when asked again.
+  // Many authenticators enable PRF when they create the passkey, but return its output only on a later request.
   const asked = await askAuthenticator(() => navigator.credentials.get({
     publicKey: {
       challenge:        crypto.getRandomValues(new Uint8Array(32)),
@@ -58,8 +57,7 @@ export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAn
   return answerOf(credential_id, prfSaltBytes, answer)
 }
 
-/**
- * Ask the passkey of `passkeyHeader` for its answer, or null when the user dismisses the prompt.
+/** Ask the passkey named in `passkeyHeader` for its answer. Returns null when the user dismisses the prompt.
  * @example
  *   const passkeyClear = await askPasskey(gating.passkeyHeader)
  *   if (passkeyClear !== null) { await gating.attempt({ passkeyClear }) }
@@ -85,15 +83,15 @@ export const askPasskey = async (passkeyHeader: WayinHeader | null, given: AskPa
   const answer = asked.getClientExtensionResults().prf?.results?.first
   if (answer === undefined) { throw noPrf() }
   const passkeyClear = answerOf(credential_id, saltBytes, answer)
-  // A browser answers only for the credential it was offered. An answer for another has nothing to unlock.
+  // The browser should respond only with the credential it was asked for. A response from any other credential cannot unlock this vault.
   if (toB64(new Uint8Array(asked.rawId)) !== credential_id) { passkeyClear.prfBytes.fill(0); throw new VaultError('passkey_unavailable', Messages.passkeyAskFailed) }
   return passkeyClear
 }
 
-/** Hand `passkey` to `attempt`, then zero its bytes whatever the attempt did. */
+/** Pass `passkey` to `attempt`, then zero the passkey's bytes, whether the attempt succeeded or threw. */
 export const attemptOnce = async <ValT>(passkey: PasskeyAnswer, attempt: (passkey: PasskeyAnswer) => Promise<ValT>): Promise<ValT> => {
   PasskeyChecks.attemptOnceAnswer.parse(passkey, { where: "In attemptOnce's passkey" })
-  // `attempt` is checked inside the try, so an answer refused for its attempt is zeroed all the same.
+  // `attempt` is validated inside the try, so the passkey's bytes are zeroed even when `attempt` is not a function.
   try {
     PasskeyChecks.attemptOnceAttempt.parse(attempt, { where: "In attemptOnce's attempt" })
     return await attempt(passkey)
@@ -116,9 +114,9 @@ const answerOf = (credential_id: string, saltBytes: Uint8Array, answer: BufferSo
   prfBytes:     bytesOf(answer),
 })
 
-/** Zero `source` after copying its bytes, so the answer's bytes are the only copy. */
+/** Copy `source`'s bytes and zero the original, so the returned bytes are the only copy. */
 const bytesOf = (source: BufferSource): Uint8Array<ArrayBuffer> => {
-  // ArrayBuffer.isView, not instanceof, stays true across realms (an iframe's buffers, say).
+  // ArrayBuffer.isView works across realms (an iframe's buffers, for example). instanceof does not.
   const handed = ArrayBuffer.isView(source) ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength) : new Uint8Array(source)
   const copied = Uint8Array.from(handed)
   handed.fill(0)
@@ -140,7 +138,7 @@ const askAuthenticator = async (call: () => Promise<Credential | null>): Promise
   try {
     credential = await call()
   } catch (err) {
-    // The browser says NotAllowedError for a dismissal, a timeout and "none of these here" alike, by design.
+    // By design, the browser reports NotAllowedError for a dismissal, a timeout and "no matching passkey" alike.
     if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')) { return null }
     if (err instanceof DOMException && err.name === 'SecurityError') {
       throw new VaultError('bad_option', "The browser refused the passkey's relying party: its id must be this page's domain, or one it belongs to.", { cause: err })

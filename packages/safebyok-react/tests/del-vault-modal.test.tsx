@@ -6,7 +6,7 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** A del_vault gating on a vault built under {@link TH.Passphrase}, shown in a DelVaultModal. */
+/** Open a del_vault gating on a vault built with {@link TH.Passphrase}, and render it in a DelVaultModal. */
 const shownFor = async () => {
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)

@@ -1,6 +1,6 @@
-/** IdbVaultDB: the battery every VaultDB runs, and what is its own: options, separate databases and users, and IndexedDB's failures. */
+/** Tests for IdbVaultDB: the battery every VaultDB must pass, then what is specific to this adapter (options, separate databases and users, IndexedDB failures). */
 
-// fake-indexeddb installs IndexedDB's globals before the adapter loads: real transactions and structured clone, with no browser.
+// Import fake-indexeddb first: it installs IndexedDB's globals before the adapter loads, with real transactions and structured clone but no browser.
 import 'fake-indexeddb/auto'
 import { createStore, promisifyRequest } from 'idb-keyval'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -12,13 +12,13 @@ import { boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, vaultScopepathOf } fr
 
 // == [World]: makeVaultDB, idbRowsOf, failNextCall, dbNamesNow, plantClosedDB
 
-/** The database each VaultDB under test was made over, by VaultDB. */
+/** The database name each VaultDB under test was made with. */
 const dbNameOf = new WeakMap<IdbVaultDB, string>()
 
-/** The cap each VaultDB under test was made with, so its twin holds to the same one. */
+/** The `maxBoxes` each VaultDB under test was made with, so its twin gets the same cap. */
 const maxBoxesOf = new WeakMap<IdbVaultDB, number>()
 
-/** A VaultDB over a database of its own, which no other test has touched. */
+/** Make a VaultDB on a fresh database that no other test has touched. */
 const makeVaultDB = (opts: IdbVaultDBOpts = {}): IdbVaultDB => {
   const dbName = `test-${crypto.randomUUID()}`
   const vaultDB = new IdbVaultDB({ ...opts, dbName })
@@ -27,7 +27,7 @@ const makeVaultDB = (opts: IdbVaultDBOpts = {}): IdbVaultDB => {
   return vaultDB
 }
 
-/** The connection a VaultDB makes its transactions on, caught as it lists a bank. */
+/** The IndexedDB connection a VaultDB runs its transactions on, captured during a `listVaults` call. */
 const connectionOf = async (vaultDB: IdbVaultDB): Promise<unknown> => {
   const transaction = vi.spyOn(IDBDatabase.prototype, 'transaction')
   try {
@@ -38,8 +38,8 @@ const connectionOf = async (vaultDB: IdbVaultDB): Promise<unknown> => {
   }
 }
 
-// The twin's connection is compared, not its shelf: a forgotten shelf whose name drifted would share the page's connection unseen.
-/** A second VaultDB over the same database, on a connection of its own, as another tab has. */
+// Compare connections, not shelves: if the forgotten shelf's name were wrong, the twin would quietly share the first connection.
+/** Make a second VaultDB on the same database with its own connection, as another tab would have. */
 const makeTwin = async (vaultDB: IdbVaultDB): Promise<IdbVaultDB> => {
   const dbName = dbNameOf.get(vaultDB)!
   TH._cheat_forgetShelf(`${dbName}:vaults-v${DB.VaultsDBVersion}`)
@@ -49,7 +49,7 @@ const makeTwin = async (vaultDB: IdbVaultDB): Promise<IdbVaultDB> => {
   return twin
 }
 
-/** The backdoor to a VaultDB's rows, through a connection of its own to the VaultDB's database. */
+/** Test backdoors to a VaultDB's stored rows, through a separate connection to its database. */
 const idbRowsOf = (vaultDB: IdbVaultDB): TH.VaultDBRowCheats => {
   const shelf = createStore(`${dbNameOf.get(vaultDB)!}:vaults-v${DB.VaultsDBVersion}`, 'rows')
   return {
@@ -63,21 +63,21 @@ const idbRowsOf = (vaultDB: IdbVaultDB): TH.VaultDBRowCheats => {
   }
 }
 
-/** Makes the next transaction any VaultDB opens fail, as it does when the browser closes the database under the page. */
+/** Make the next transaction any VaultDB opens fail, as it does when the browser closes the database while the page is using it. */
 const failNextCall = (): void => {
   vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementationOnce(() => {
     throw new DOMException('The database connection is closing.', 'InvalidStateError')
   })
 }
 
-/** The name of every database IndexedDB has stored now. */
+/** The names of all databases IndexedDB currently has. */
 const dbNamesNow = async (): Promise<string[]> => {
   const dbs = await indexedDB.databases()
   return dbs.map((db) => db.name).filter((dbname) => dbname !== undefined)
 }
 
-// idb-keyval has its connection open for the page's life, as an old tab would; this one closes, as a closed tab has.
-/** Makes the database `dbname` with one row in an object store, and closes it. */
+// idb-keyval keeps its connection open for the life of the page, like a tab left open. This helper closes its connection, like a closed tab.
+/** Create the database `dbname` with one row in an object store, then close it. */
 const plantClosedDB = async (dbname: string): Promise<void> => {
   const storename = 'rows'
   const opening = indexedDB.open(dbname)

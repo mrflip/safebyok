@@ -15,7 +15,7 @@ describe("the limits every vault is bound by", () => {
   })
 })
 
-/** A box document whose whisper's ciphertext is `ciphertext_b64`. */
+/** Make a box document whose ciphertext is `ciphertext_b64`. */
 const boxDocOf = (ciphertext_b64: string) => {
   const box = TH.boxAt(0, 'life1', { whisper_ciphered: { cipher_iv_b64: 'aXY', ciphertext_b64 } })
   return { ...TH.vaultScope, vault_tok: box.vault_tok, boxlabel: box.boxlabel, box }
@@ -59,7 +59,7 @@ describe("refuses", () => {
     [heavy, { box_count: 0, box_bytes: 99 },     MaxVaultBoxes,  false,  'lets a replacement grow the vault within its weight'],
     [{ box_count: 10, box_bytes: MaxVaultBoxBytes + 5000 }, { box_count: 0, box_bytes: -10 }, MaxVaultBoxes, false, 'lets a replacement shrink a vault already past its weight'],
     [{ box_count: 10, box_bytes: MaxVaultBoxBytes + 5000 }, { box_count: 0, box_bytes: 0 },   MaxVaultBoxes, false, 'lets a replacement of the same weight into a vault past its weight'],
-    // a vault counted only as far as a limit:
+    // a vault past a limit, so never fully counted:
     [null,  { box_count: 1, box_bytes: 512 },    MaxVaultBoxes,  true,   'refuses a new box in a vault past a limit, uncounted'],
     [null,  { box_count: 0, box_bytes: 1 },      MaxVaultBoxes,  true,   'refuses a heavier replacement in a vault past a limit, uncounted'],
     [null,  { box_count: 0, box_bytes: -512 },   MaxVaultBoxes,  false,  'lets a lighter replacement into a vault past a limit, uncounted'],

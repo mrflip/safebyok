@@ -1,4 +1,4 @@
-/** This file's PGlite, made once, and the PostgresVaultDBs and row backdoor the battery takes over it. */
+/** Test helpers: one PGlite per test file, PostgresVaultDBs on it, and direct row access for the VaultDB battery. */
 
 import { afterAll, beforeAll } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
@@ -7,30 +7,30 @@ import * as TH from 'safebyok/testing'
 import { PostgresVaultDB, VaultTablesSql, vaultChannelOf } from '../src/index'
 import type { PostgresClient, PostgresListen, PostgresVaultDBOpts } from '../src/index'
 
-// Everything the core's tests use too, so a test here star-imports this one module as TH.
+// Re-export the core's test helpers, so a test here imports this one module as TH.
 export * from 'safebyok/testing'
 
 // == [The database]: BootMillis, database, bootDatabaseFirst
 
-// A PGlite's WebAssembly compiles cold on a CI runner in eight seconds or more, past a test's timeout.
+// On a CI runner, PGlite's WebAssembly can take eight seconds or more to compile from cold, longer than a test's default timeout.
 export const BootMillis = 60_000
 
 const made: { db?: Promise<PGlite> } = {}
 
-/** This file's PGlite, its tables made: one per file, as each takes seconds to boot. */
+/** Return this test file's PGlite with its tables created. One is shared per file, because each takes seconds to boot. */
 export const database = async (): Promise<PGlite> => {
   made.db ??= (async () => {
     const db = new PGlite()
     await db.exec(VaultTablesSql)
-    // The battery's user is listened for at boot: a PGlite's own listen takes its turn behind the statements already
-    // queued, so a write made just after a watch's first LISTEN would go unheard.
+    // Listen on the battery user's channel at boot. PGlite queues a LISTEN behind the statements already waiting,
+    // so a write made right after a watch's first LISTEN would be missed.
     await listenOn(db, vaultChannelOf(TH.bankScope.user_id))
     return db
   })()
   return await made.db
 }
 
-/** Boots this file's PGlite before its first test, and closes it after its last. */
+/** Boot this file's PGlite before its first test, and close it after its last. */
 export const bootDatabaseFirst = (): void => {
   beforeAll(async () => { await database() }, BootMillis)
   afterAll(async () => {
@@ -42,7 +42,7 @@ export const bootDatabaseFirst = (): void => {
 
 // == [VaultDBs]: FlakyClient, flakyClientOf, listen, vaultDBOver, makeVaultDB, emptyTables, makeTwin, failNextCall
 
-/** A client over a PGlite whose next statement can be made to fail as a dropped connection does. */
+/** A PGlite client whose next statement can be made to fail like a dropped connection. */
 export type FlakyClient = PostgresClient & { failNext: () => void }
 
 export const flakyClientOf = (db: PGlite): FlakyClient => {
@@ -60,13 +60,13 @@ export const flakyClientOf = (db: PGlite): FlakyClient => {
 
 const heedersOf = new Map<string, Set<(text: string) => void>>()
 
-/** Listens on `channel` the first time it is asked, and never stops, as the README's recipe does. */
+/** Start listening on `channel` the first time it is asked for, and never stop, like the README's recipe. Returns the channel's set of callbacks. */
 const listenOn = async (db: PGlite, channel: string): Promise<Set<(text: string) => void>> => {
   const heeders = heedersOf.get(channel)
   if (heeders !== undefined) { return heeders }
   const fresh = new Set<(text: string) => void>()
   heedersOf.set(channel, fresh)
-  // PGlite LISTENs on the identifier as given, so a channel keeps its case and characters only quoted; a user_id has no `"`.
+  // PGlite uses the channel identifier as written, so it must be quoted to keep its case and punctuation. A user_id never contains `"`.
   await db.listen(`"${channel}"`, (text) => { for (const onNotify of fresh) { onNotify(text) } })
   return fresh
 }
@@ -82,7 +82,7 @@ const optsOf = new WeakMap<PostgresVaultDB, VaultDBOverOpts>()
 
 type VaultDBOverOpts = Omit<PostgresVaultDBOpts, 'client'>
 
-/** A PostgresVaultDB over this file's PGlite, listening on it. */
+/** Make a PostgresVaultDB on this file's PGlite, with `listen` wired up. */
 export const vaultDBOver = async (opts: VaultDBOverOpts = {}): Promise<PostgresVaultDB> => {
   const db = await database()
   const client = flakyClientOf(db)
@@ -92,7 +92,7 @@ export const vaultDBOver = async (opts: VaultDBOverOpts = {}): Promise<PostgresV
   return vaultDB
 }
 
-/** A fresh VaultDB over emptied tables. */
+/** Empty the tables and make a new VaultDB. */
 export const makeVaultDB = async (opts?: AdapterVaultDBOpts & { maxBoxes?: number }): Promise<PostgresVaultDB> => {
   await emptyTables()
   return await vaultDBOver(opts)
@@ -103,7 +103,7 @@ export const emptyTables = async (): Promise<void> => {
   await db.exec('TRUNCATE safebyok_vaults, safebyok_boxes')
 }
 
-/** A second VaultDB over the same tables and opts as `vaultDB`, as another device has. */
+/** Make a second VaultDB on the same tables with the same opts as `vaultDB`, to act as another device. */
 export const makeTwin = async (vaultDB: PostgresVaultDB): Promise<PostgresVaultDB> => await vaultDBOver(optsOf.get(vaultDB))
 
 export const failNextCall = (vaultDB: PostgresVaultDB): void => { clientsOf.get(vaultDB)?.failNext() }
@@ -111,7 +111,7 @@ export const failNextCall = (vaultDB: PostgresVaultDB): void => { clientsOf.get(
 
 // == [Rows]: sql, rowsOf
 
-/** The battery's backdoor to the rows in a PGlite, by SQL. */
+/** Run SQL directly against the PGlite, for the battery's row checks. */
 const sql = async <RowT>(text: string, params: unknown[]): Promise<RowT[]> => {
   const db = await database()
   const { rows } = await db.query<RowT>(text, params)

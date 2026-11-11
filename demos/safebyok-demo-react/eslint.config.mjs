@@ -1,8 +1,7 @@
-// eslint.config.mjs -- the demo's lint, cut from the core's (packages/safebyok/), which is the
-// authority on house style: where the two disagree, the core's is right and this one is the bug.
-// What this one adds is React's layer (hooks, JSX, accessibility, Vite's fast refresh), .tsx files,
-// and React's own file naming: a component's file is named for the component, a hook's for the
-// hook.
+// eslint.config.mjs -- lint rules for the demo, copied from the core's (packages/safebyok/). The core's
+// config is the authority on house style: where the two disagree, the core's is right and this one has
+// the bug. This copy adds React's rules (hooks, JSX, accessibility, Vite's fast refresh), .tsx files, and
+// React's file naming: a component's file is named for the component, and a hook's file for the hook.
 //
 import { defineConfig, globalIgnores } from 'eslint/config'
 import js                              from '@eslint/js'
@@ -108,11 +107,11 @@ export default defineConfig([
       reactHooks.configs.flat.recommended,
       jsxA11y.flatConfigs.recommended,
     ],
-    // 'detect' would be righter, but eslint-plugin-react 7.37.5 detects via an API eslint 10
-    // removed (context.getFilename); pin the version until the plugin catches up.
+    // 'detect' would be better, but eslint-plugin-react 7.37.5 detects through an API that eslint 10
+    // removed (context.getFilename). Pin the version until the plugin catches up.
     // As of 2026-10-16 neither plugin has a release that declares eslint 10: eslint-plugin-react
     // 7.37.5 allows up to ^9.7 and eslint-plugin-jsx-a11y 6.10.2 up to ^9, so `pnpm peers check`
-    // reports both as unmet. They lint under eslint 10 here; raise them when either releases.
+    // reports both as unmet. Both work under eslint 10 here. Bump them when either publishes a release for it.
     settings: { react: { version: '19.3' } },
     rules: {
       'react-hooks/exhaustive-deps': 'error',
@@ -281,8 +280,8 @@ export default defineConfig([
       // of one would be a translation layer, and it fights `prefer-destructuring`, which is on.
       'unicorn/consistent-boolean-name': 'off',
       'unicorn/filename-case': ['error', { cases: { kebabCase: true } }],
-      // React names a component's file for the component (VaultDashboard.tsx), and a hook's for
-      // the hook (useSession.ts); everything else is kebab-case, as in the core.
+      // React convention: a component's file is named for the component (VaultDashboard.tsx), and a hook's
+      // for the hook (useSession.ts). Everything else is kebab-case, as in the core.
       // Taste: `type FooT = Z.output<...>` cannot be an interface, so its neighbours should not
       // have to be either.
       '@typescript-eslint/consistent-type-definitions': 'off',
@@ -314,7 +313,7 @@ export default defineConfig([
 
   {
     name: 'safebyok-demo/react-filenames',
-    // A component's test is named for it too: tests/ mirrors src/ path for path.
+    // A component's test file takes the component's name too: tests/ mirrors src/ path for path.
     files: ['src/pages/**/*.tsx', 'src/components/**/*.tsx', 'tests/pages/**/*.test.tsx', 'tests/components/**/*.test.tsx'],
     // VaultDB and DeviceDB are the vocabulary's names (VOCABULARY.md), not `VaultDb`.
     rules: { 'unicorn/filename-case': ['error', { cases: { pascalCase: true }, checkDirectories: false, ignore: [/DB/u] }] },

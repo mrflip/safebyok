@@ -4,13 +4,13 @@ import type { Auth, Session } from '../lib/auth'
 import { isQuietRefusal } from '../lib/refusals'
 import { WaysIn } from './WaysIn'
 
-/** The signed-in user's account menu: who is signed in, the vault's lock and its ways in, sign-out and account deletion. */
+/** The signed-in user's account menu: who is signed in, the vault's lock control, its ways in, and buttons to sign out or delete the account. */
 export const AccountMenu = ({ auth, session }: { auth: Auth, session: Session }) => {
   const bank = useBank()
   const { stage, vault } = useVault('main')
   const [gripe, setGripe] = useState<string | null>(null)
 
-  // Signing out locks the user's vaults on this device, and leaves them stored.
+  // Signing out locks the user's vaults on this device. Nothing stored is deleted.
   const signOut = () => {
     bank?.lock()
     auth.signOut()
@@ -18,11 +18,12 @@ export const AccountMenu = ({ auth, session }: { auth: Auth, session: Session })
 
   const deleteAccount = async () => {
     setGripe(null)
-    // Until the bank has heard from storage, nobody knows whether a vault is there to delete.
+    // Until the bank has loaded from storage, we can't tell whether there is a vault to delete.
     if (stage === 'waiting') { setGripe('Your vault is still loading: try again in a moment.'); return }
     if (stage === 'present') {
-      // The vault's own dialog is the confirmation: it asks for the passphrase. A confirm() before
-      // it could outlast the click's activation, and the dialog would then be dismissed unasked.
+      // The vault's own dialog is the confirmation, because it asks for the passphrase. Don't put a confirm()
+      // before it: the click's user activation could expire while confirm() waits, and the dialog would
+      // then be dismissed without asking the user.
       const deleted = await vault.tryDelVaultPrompt()
       if (! deleted.ok) {
         if (! isQuietRefusal(deleted.err)) { setGripe(deleted.err.message) }

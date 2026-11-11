@@ -13,11 +13,11 @@ export const Applabel = 'safebyok_demo'
 /** The vault's storage: this browser's IndexedDB, behind the demo's outage switch. */
 export const vaultDB = new OutageVaultDB({ dbName: Applabel })
 
-/** What the provider makes each user's bank with, but the user: the browser's batteries and the vaultDB. */
+/** The BankProvider's options for every user, apart from `user_id`: the browser defaults and the vaultDB. */
 export const bankOpts = { ...browserOpts({ dbName: Applabel }), applabel: Applabel, vaultDB }
 
-/** The fake auth's account rows: pretend-backend scaffolding, beside the vault's rows. */
+/** Storage for the fake auth's account rows: scaffolding that stands in for a backend. */
 export const dbStorage: StringStorage = prefixedStorage('safebyok-demo:db:')
 
-/** The fake auth's session: stands in for a cookie; never leaves the browser. */
+/** Storage for the fake auth's session. It stands in for a cookie and never leaves the browser. */
 export const deviceStorage: StringStorage = prefixedStorage('safebyok-demo:device:')

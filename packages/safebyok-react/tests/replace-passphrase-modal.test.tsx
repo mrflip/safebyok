@@ -9,10 +9,10 @@ TH.sweepBankWorlds()
 
 const NextPassphrase = 'a whole new passphrase for the vault'
 
-/** A strength checker that finds a passphrase under 12 characters weak. */
+/** A strength checker that calls any passphrase under 12 characters weak. */
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
-/** A replace_passphrase gating on a vault built under {@link TH.Passphrase}, shown in a ReplacePassphraseModal. */
+/** Open a replace_passphrase gating on a vault built with {@link TH.Passphrase}, and render it in a ReplacePassphraseModal. */
 const shownFor = async (opts: { bankOpts?: Partial<BankOpts> } = {}) => {
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)
@@ -21,7 +21,7 @@ const shownFor = async (opts: { bankOpts?: Partial<BankOpts> } = {}) => {
   return { ...opened, world }
 }
 
-/** Whether `passphrase` unlocks the world's vault, asked from a device that has no lease on it. */
+/** True when `passphrase` unlocks the world's vault from a device that has no lease for it. */
 const unlocksWith = async (world: TH.BankWorld, passphrase: string): Promise<boolean> => {
   const bank = world.bankOnAnotherDevice({ device_id: '00000000-0000-4000-8000-0000000000b3', requestCleartext: async (gating) => { await gating.attempt({ passphraseClear: passphrase }) } })
   await bank.hello()

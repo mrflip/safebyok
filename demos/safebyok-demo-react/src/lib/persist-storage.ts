@@ -1,6 +1,6 @@
-/** Asks the browser not to evict this origin's storage under pressure, as a host keeping its vaults in IndexedDB should.
- * Resolves true when storage is (or already was made) persistent, false when the browser declines or has no
- * such API: the vault works either way, so a refusal is never an error.
+/** Ask the browser not to evict this origin's storage under pressure. A host that keeps its vaults in IndexedDB should do the same.
+ * Resolves true when storage is (or already was) persistent, and false when the browser declines or has no such API.
+ * The vault works either way, so false is not an error.
  *
  * @example
  *   await keepStorage()  // true in a browser that grants it

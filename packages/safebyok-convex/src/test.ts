@@ -11,7 +11,7 @@ export const modules = import.meta.glob('./component/**/*.ts')
 /** The component's schema, for `convex-test`. */
 export { default as schema } from './component/schema'
 
-/** Install the safebyok component in a `convex-test` instance, answering it as `components.safebyok`.
+/** Install the safebyok component in a `convex-test` instance, and return its `components.safebyok` reference.
  *
  * @example
  *   const app = defineTestApp({ schema, components: { safebyok: { register } } })
@@ -22,6 +22,6 @@ export const register = <ComponentPath extends string = 'safebyok'>(
   componentPath: ComponentPath = 'safebyok' as ComponentPath,
 ): ComponentApi<ComponentPath> => {
   testRoot.registerComponent(componentPath, schema, modules)
-  // What the host's generated `components` is at runtime; its type comes from the functions.
+  // This is what the host's generated `components` object is at runtime. Its type is derived from the component's functions.
   return (componentsGeneric() as Record<string, unknown>)[componentPath] as ComponentApi<ComponentPath>
 }

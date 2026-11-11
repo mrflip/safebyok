@@ -1,10 +1,10 @@
 import { useSyncExternalStore } from 'react'
 import type { Box } from 'safebyok'
 
-const unsubscribeFromNothing = () => { /* nothing was heard */ }
+const unsubscribeFromNothing = () => { /* nothing to unsubscribe from */ }
 const subscribeToNothing = () => unsubscribeFromNothing
 
-/** Whether `box` shows its whisper, read live; false for no box. */
+/** True while `box` is showing its whisper, and false when `box` is null. Re-renders when that changes. */
 export const useIsShowing = (box: Box | null): boolean => (
   useSyncExternalStore(box?.subscribe ?? subscribeToNothing, () => box?.isShowing ?? false)
 )

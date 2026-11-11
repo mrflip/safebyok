@@ -4,8 +4,7 @@ import { Messages } from '../helpers/messages'
 import { useRevealToggle } from '../hooks/reveal-toggle'
 import type { WhisperFieldProps } from '../shapes'
 
-/**
- * A field for the user to type or paste a whisper into, hidden as they type, with a Show / Hide button.
+/** Render an input for typing or pasting a whisper. The text is masked, with a Show / Hide button.
  * @example <WhisperField onChange={setKeyText} aria-label="Anthropic API key" />
  * @example <WhisperField onChange={setKeyText} placeholder="sk-ant-…" aria-label="Anthropic API key" />
  * @example
@@ -24,7 +23,7 @@ export const WhisperField = ({ onChange, ...passed }: WhisperFieldProps) => {
         id={fieldId}
         type={reveal.fieldType}
         name="whisper_text"
-        // Uncontrolled whatever a host slips past the types: React writes no whisper into the page.
+        // Force the input to be uncontrolled, even if a host gets `value` past the types, so React never writes the whisper into the page.
         value={undefined}
         defaultValue={undefined}
         {...WhisperFieldAttributes}

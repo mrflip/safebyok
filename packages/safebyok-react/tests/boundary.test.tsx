@@ -11,7 +11,7 @@ const Thrower = ({ failure }: { failure?: { err: unknown } }) => {
   return <p>fine</p>
 }
 
-/** A host's own boundary, above ours: shows "host caught" if anything reaches it. */
+/** A host's own boundary, placed above ours. It shows "host caught" if an error reaches it. */
 class HostBoundary extends Component<{ children: ReactNode }, { caught: boolean }> {
   override state = { caught: false }
   static getDerivedStateFromError() { return { caught: true } }
@@ -59,7 +59,7 @@ describe("Boundary", () => {
   })
 })
 
-/** A child that fails as the dialog does: `err` thrown in render through forBoundary. */
+/** A child that fails the way a dialog does: it throws `err` during render, wrapped by forBoundary. */
 const ForBoundaryThrower = ({ err }: { err: unknown }) => { throw forBoundary(err, 'PassphraseModal') }
 
 describe("forBoundary", () => {

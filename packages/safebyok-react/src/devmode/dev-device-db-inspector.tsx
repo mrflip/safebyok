@@ -5,7 +5,7 @@ import type { LeaseScopepath } from 'safebyok/storage'
 import type { DevDeviceDBInspectorProps, LeaseRowLineProps, ListedLease } from '../shapes'
 import { LastCallLine, timeOf, useLastCall, useListing } from './last-call'
 
-/** A table of the rows `deviceDB` keeps on this device as its verbs answer them, with a button to forget each. */
+/** Render a table of the rows `deviceDB` has on this device, as its list verbs return them, with a button to forget each row. */
 export const DevDeviceDBInspector = ({ deviceDB }: DevDeviceDBInspectorProps) => (
   <section className="dev-inspector dev-device-db-inspector" aria-label="DeviceDB inspector">
     <h3>DeviceDB rows</h3>
@@ -23,7 +23,7 @@ const listedOfRaw = ({ scopepath, row }: { scopepath: LeaseScopepath, row: unkno
 
 const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
   const [isRaw, setIsRaw] = useState(false)
-  // The listing names the verb that answered it: the checkbox flips at once, the rows after.
+  // The listing records which verb produced it, because the checkbox changes at once and the rows arrive later.
   const list = useCallback(async (): Promise<{ listname: string, rows: readonly ListedLease[] }> => {
     if (! isRaw) {
       const rows = await deviceDB.listLeases()
@@ -61,7 +61,7 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
             <tbody>
               {listing.rows.map(({ row, scopepath }, ii) => (
                 <LeaseRowLine
-                  // A damaged row may lack the fields that would name it.
+                  // The index is part of the key because a damaged row may lack the fields that identify it.
                   key={`${String(row['vaultlabel'])}/${String(row['vault_tok'])}/${String(ii)}`}
                   row={row}
                   scopepath={scopepath}
@@ -92,8 +92,8 @@ const LeaseRowLine = ({ row, scopepath, onForget, onForgetRaw }: LeaseRowLinePro
   )
 }
 
-// A raw row has the leaseKey and the vaultKeyLeaseWrapped: show each such field's kind, never its
-// content.
+// A raw row contains the leaseKey and the vaultKeyLeaseWrapped. For a field like these, show what kind of
+// value it is, never its content.
 const cellOf = (fieldname: string, val: unknown): string => {
   if (val === undefined) { return '–' }
   if ((fieldname === 'proved_at') && (typeof val === 'number')) { return timeOf(val) }

@@ -7,7 +7,7 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** An add_passkey gating on a vault built under {@link TH.Passphrase}, shown in an AddPasskeyModal; and the fake authenticator. */
+/** Open an add_passkey gating on a vault built with {@link TH.Passphrase}, and render it in an AddPasskeyModal. Also returns the fake authenticator. */
 const shownFor = async (opts: TH.FakeAuthenticatorOpts = {}) => {
   const authenticator = TH.installFakeAuthenticator(opts)
   const world = TH.makeBankWorld()
@@ -17,7 +17,7 @@ const shownFor = async (opts: TH.FakeAuthenticatorOpts = {}) => {
   return { ...opened, ...render(ui), ui, authenticator }
 }
 
-/** The credential id of the passkey the vault in `bank` has, or null. */
+/** Return the credential id of the passkey on `bank`'s vault, or null when it has none. */
 const passkeyOf = (bank: Bank) => {
   const wayin = bank.vaultAt(TH.VaultScopeGiven)?.gate.toJSON().passkey_wayin
   return wayin?.wayinkind === 'passkey' ? wayin.credential_id : null

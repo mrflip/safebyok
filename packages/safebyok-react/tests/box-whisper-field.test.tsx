@@ -12,7 +12,7 @@ TH.sweepBankWorlds()
 /** An obvious fake whisper, as stored. */
 const StoredKey = 'sk-ant-fake-stored'
 
-/** A vault, unlocked, with `anthropic`, its apiKey {@link StoredKey} and a dotted token beside it. */
+/** Make an unlocked vault with a box `anthropic`, whose whisper has the apiKey {@link StoredKey} and a nested session token. */
 const boxOfWorld = async (): Promise<{ vault: Vault, box: Box }> => {
   const { vault } = await TH.makeBankWithVault()
   const whisper = { apiKey: StoredKey, Credentials: { SessionToken: 'fake-session-token' } }
@@ -20,7 +20,7 @@ const boxOfWorld = async (): Promise<{ vault: Vault, box: Box }> => {
   return { vault, box }
 }
 
-/** The field, found by the label the tests give it. */
+/** Return the field, found by the label the tests give it. */
 const theField = () => screen.getByLabelText<HTMLInputElement>('Anthropic API key')
 
 const exposing = (box: Box) => act(async () => { await box.expose() })
@@ -148,7 +148,7 @@ describe("BoxWhisperField", () => {
       expect(box.snapshot.isExposed).to.be.false
     })
 
-    // The rehearsal unmount unbinds the last field, and BoxFields keeps no count of who else shows the box.
+    // StrictMode's rehearsal unmount unbinds the last field, and BoxFields does not count who else is showing the box.
     it("unexposes a box exposed before it mounts", async () => {
       const { box } = await boxOfWorld()
       await box.expose()

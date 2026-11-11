@@ -3,10 +3,13 @@ import { isVaultError } from 'safebyok'
 import { gripeForJokeErr, tellKnockKnockJoke } from '../lib/anthropic'
 import { isQuietRefusal } from '../lib/refusals'
 
-/** What a KnockForm is handed: how its flow extracts the saved API key at each knock, null where none is saved; and whether the flow can yet. */
+/** Props for a KnockForm.
+ * - `extractApiKey` -- called at each knock to get the saved API key; resolves null if none is saved
+ * - `isReady`       -- false until the flow's bank and vault have loaded
+ */
 export type KnockFormProps = { extractApiKey: () => Promise<string | null>, isReady: boolean }
 
-/** The knock-knock half of a flow: who's there, a Knock button, and Claude's punchline, told with the key the flow hands over. */
+/** The knock-knock half of each flow: a "Who's there?" field, a Knock button, and Claude's punchline. It uses the API key its flow supplies. */
 export const KnockForm = ({ extractApiKey, isReady }: KnockFormProps) => {
   const fieldId = useId()
   const [whosThereText, setWhosThereText] = useState('')

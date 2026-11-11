@@ -1,14 +1,11 @@
-/**
- * The helpers of safebyok-react's tests that build JSX, kept apart from `test-helpers.ts` because
- * a `.ts` file cannot contain JSX. `test-helpers.ts` re-exports them: reach them as `TH`
- * (`import * as TH from './test-helpers'`), never by this file's name.
+/** Test helpers that build JSX. They are in their own file because a `.ts` file cannot contain JSX.
+ * `test-helpers.ts` re-exports them, so import them as `TH` (`import * as TH from './test-helpers'`), never from this file.
  */
 import { Activity, useEffect, type ReactNode } from 'react'
 import type { Bank, VaultSnapshot } from 'safebyok'
 import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from '../src/hooks/hooks'
 
-/**
- * `shown` inside an Activity in `mode`, for `rerender` to hide and show again.
+/** Wrap `shown` in an Activity in `mode`, so a test can `rerender` to hide it and show it again.
  *
  * @example
  *   const { rerender } = render(TH.inActivity('visible', dialog))
@@ -16,16 +13,17 @@ import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from '../src/hoo
  */
 export const inActivity = (mode: 'visible' | 'hidden', shown: ReactNode) => <Activity mode={mode}>{shown}</Activity>
 
-/** `locked` or `unlocked` for a vault's snapshot, `none` for none. */
+/** Return `locked` or `unlocked` for a vault's snapshot, or `none` for a null snapshot. */
 export const lockWordOf = (snapshot: VaultSnapshot | null): string => {
   if (snapshot === null) { return 'none' }
   return snapshot.isLocked ? 'locked' : 'unlocked'
 }
 
-/** The banks a {@link ShowsVault} has seen, in the order it saw them, each once. */
+/** Every bank a {@link ShowsVault} has rendered with, in order, each listed once. */
 export const seenBanks: Bank[] = []
 
-/** What the hooks say of the bank and of the vault under `vaultlabel`, as text, with the buttons a host's page would have: Open builds or unlocks the vault from a click, Lock locks it.
+/** Render what the hooks report about the bank and the vault named `vaultlabel`, as text, with the buttons a host's page would have.
+ * Open builds or unlocks the vault from a click, and Lock locks it.
  *
  * @example
  *   render(<BankProvider {...props}><TH.ShowsVault /></BankProvider>)

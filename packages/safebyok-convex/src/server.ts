@@ -1,4 +1,4 @@
-/** The safebyok functions a host serves from its own `convex/`. */
+/** The safebyok functions a host app serves from its own `convex/` folder. */
 
 import { mutationGeneric, queryGeneric } from 'convex/server'
 import type { FunctionReference, GenericDataModel, GenericQueryCtx, MutationBuilder, QueryBuilder } from 'convex/server'
@@ -15,23 +15,23 @@ export type { SafebyokErrorData, SafebyokErrorKind } from './refusals'
 
 // == [Options]: GetUserId, SafebyokApiOpts
 
-/** The `user_id` signed in to the call, or null, undefined or empty for no one.
+/** A host function that returns the signed-in caller's `user_id`, or null, undefined or `''` when no one is signed in.
  *
  * @example async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null
  */
 export type GetUserId<DataModel extends GenericDataModel = GenericDataModel> =
   (ctx: GenericQueryCtx<DataModel>) => Promise<string | null | undefined> | string | null | undefined
 
-/** What {@link SafebyokComponent.api} needs of the host. */
+/** Options for {@link SafebyokComponent.api}. */
 export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataModel> = {
-  /** Who is calling. */
+  /** Identifies the caller of each function. */
   getUserId: GetUserId<DataModel>
 }
 // --
 
 // == [The wrapper]: SafebyokComponent, SafebyokApi
 
-/** The installed safebyok component, wrapped to serve its functions to signed-in users.
+/** A wrapper around the installed safebyok component that serves its functions to signed-in users.
  *
  * @example
  *   // convex/safebyok.ts
@@ -47,16 +47,18 @@ export class SafebyokComponent {
     this.#component = componentCheck.parse(component, { where: 'SafebyokComponent', advice: Phrases.SafebyokComponentAdvice })
   }
 
-  /** The functions a `ConvexVaultDB` calls, to export under these names from one module of the host's `convex/`. */
+  /** Build the public functions a `ConvexVaultDB` calls. Export them, under these names, from one module of the host's `convex/`.
+   * Each one refuses `identity_revoked` unless the caller is signed in as the `user_id` its arguments name.
+   */
   api<DataModel extends GenericDataModel>(opts: SafebyokApiOpts<DataModel>) {
-    // A check only: getUserId is called on the host's own bag, so one that leans on `this` works.
+    // Validate only, and keep using `opts` itself: `getUserId` is called on the host's own object, so one that relies on `this` still works.
     safebyokApiOpts.parse(opts, { where: 'SafebyokComponent.api', advice: Phrases.SafebyokApiAdvice })
     const { vaults } = this.#component
-    // Convex's builders, typed by the host's data model as its codegen types them, so each ctx is the one getUserId is written against.
+    // Convex's generic builders, typed with the host's data model as its codegen would type them, so each `ctx` has the type `getUserId` was written for.
     const publicQuery: QueryBuilder<DataModel, 'public'> = queryGeneric
     const publicMutation: MutationBuilder<DataModel, 'public'> = mutationGeneric
 
-    /** Refuses unless the caller is signed in as `user_id`. */
+    /** Throw `identity_revoked` unless the caller is signed in as `user_id`. */
     const demandCaller = async (ctx: GenericQueryCtx<DataModel>, user_id: string): Promise<void> => {
       const callerId = await opts.getUserId(ctx)
       if ((! callerId) || (callerId !== user_id)) { throw new ConvexError<SafebyokErrorData>({ kind: 'identity_revoked' }) }
@@ -147,7 +149,7 @@ export class SafebyokComponent {
   }
 }
 
-/** The host's safebyok functions as its clients reference them, `api.safebyok`. */
+/** The host's public safebyok functions as its clients reference them: the type of `api.safebyok`. */
 export type SafebyokApi = {
   [Fnname in keyof ComponentApi['vaults']]: ComponentApi['vaults'][Fnname] extends FunctionReference<infer Fnkind, infer _Visibility, infer ArgsT, infer ReturnT>
     ? FunctionReference<Fnkind, 'public', ArgsT, ReturnT>
@@ -157,9 +159,9 @@ export type SafebyokApi = {
 
 // == [Checks]: componentCheck, safebyokApiOpts
 
-/** The check of what {@link SafebyokComponent} wraps: the installed component, not undefined. */
+/** Validator for the component handed to {@link SafebyokComponent}: an object or a function, never undefined or null. */
 const componentCheck = DB.Checker(({ custom }) => custom<ComponentApi>((candidate) => ((typeof candidate === 'object') || (typeof candidate === 'function')) && (candidate !== null), Phrases.ComponentExpected), 'bad_option')
 
-/** The check of {@link SafebyokComponent.api}'s options. */
+/** Validator for {@link SafebyokApiOpts}. */
 const safebyokApiOpts = DB.objCheck(({ fn }) => ({ getUserId: fn<GetUserId>() }), 'bad_option')
 // --

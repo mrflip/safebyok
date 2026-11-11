@@ -1,4 +1,4 @@
-/** The vaultDB over Convex. */
+/** The vaultDB adapter for Convex. */
 
 import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
@@ -11,13 +11,13 @@ import type { SafebyokApi } from './server'
 
 // == [Clients]: ConvexCalls, ConvexWatchingClient, ConvexReactWatchingClient, ConvexVaultClient, ConvexVaultDBOpts
 
-/** The calls every Convex client makes alike: `ConvexClient` and `ConvexReactClient` both have them. */
+/** The `query` and `mutation` calls that `ConvexClient` and `ConvexReactClient` share. */
 export type ConvexCalls = {
   query<QueryRef extends FunctionReference<'query'>>(queryRef: QueryRef, args: FunctionArgs<QueryRef>): Promise<FunctionReturnType<QueryRef>>
   mutation<MutationRef extends FunctionReference<'mutation'>>(mutationRef: MutationRef, args: FunctionArgs<MutationRef>): Promise<FunctionReturnType<MutationRef>>
 }
 
-/** What a vault uses of a `ConvexClient`, from `convex/browser`. */
+/** The part of a `ConvexClient` (from `convex/browser`) that the adapter uses. */
 export type ConvexWatchingClient = ConvexCalls & {
   onUpdate<QueryRef extends FunctionReference<'query'>>(
     queryRef: QueryRef,
@@ -27,7 +27,7 @@ export type ConvexWatchingClient = ConvexCalls & {
   ): () => void
 }
 
-/** What a vault uses of a `ConvexReactClient`, from `convex/react`. */
+/** The part of a `ConvexReactClient` (from `convex/react`) that the adapter uses. */
 export type ConvexReactWatchingClient = ConvexCalls & {
   watchQuery<QueryRef extends FunctionReference<'query'>>(queryRef: QueryRef, args: FunctionArgs<QueryRef>): {
     onUpdate(callback: () => void): () => void
@@ -35,20 +35,20 @@ export type ConvexReactWatchingClient = ConvexCalls & {
   }
 }
 
-/** The Convex client a vault talks through: a `ConvexClient`, or the app's own `ConvexReactClient`. */
+/** A Convex client the adapter accepts: a `ConvexClient`, or the app's own `ConvexReactClient`. */
 export type ConvexVaultClient = ConvexWatchingClient | ConvexReactWatchingClient
 
-/** What a {@link ConvexVaultDB} is made with. */
+/** Options for {@link ConvexVaultDB}. */
 export type ConvexVaultDBOpts = AdapterVaultDBOpts & {
   /** The app's Convex client. */
   client: ConvexVaultClient
-  /** The safebyok functions the app serves, `api.safebyok`. */
+  /** The app's safebyok functions: `api.safebyok`, not the whole `api`. */
   api: SafebyokApi
-  /** A soft cap on the box rows a vault has, live or tombstoned, under the component's own limit. */
+  /** A soft cap on a vault's box rows, tombstones included. Defaults to `DefaultMaxBoxes`, and never exceeds the component's own limit. */
   maxBoxes?: number | undefined
 }
 
-/** Every vault row and box row under a watch's scope, as `watchRows` answers. */
+/** Every vault row and box row in a watch's scope, as `watchRows` returns them. */
 type RowsWatched = {
   vaults: { vaultlabel: string, vault: unknown }[],
   boxes:  { vaultlabel: string, vault_tok: string, boxlabel: string, box: unknown }[],
@@ -58,7 +58,7 @@ type RowsWatched = {
 
 // == [The vaultDB]: ConvexVaultDB
 
-/** A VaultDB whose rows live in the host's Convex deployment, reached through the app's Convex client. */
+/** A VaultDB that stores its rows in the host's Convex deployment, through the app's Convex client. */
 export class ConvexVaultDB extends DB.AdapterVaultDB {
   // == [Props]: #client, #api, #maxBoxes
 
@@ -100,7 +100,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     return await reaching('doPutVault', () => this.#client.mutation(this.#api.putVault, { record, opts }))
   }
 
-  // The component answers a full vault with its capacity rather than throwing, so the refusal is made here, where the core's throwers are.
+  // For a full vault the component returns its capacity instead of throwing, so `vault_full` is thrown here, with the core's thrower.
   protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxWritten> {
     const answer = await reaching('doPutBox', () => this.#client.mutation(this.#api.putBox, { record, opts, maxBoxes: this.#maxBoxes }))
     if ('capacity' in answer) { throw DB.vaultFull(answer.capacity) }
@@ -119,9 +119,9 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     return await reaching('doTidyGone', () => this.#client.mutation(this.#api.tidyGone, { scope }))
   }
 
-  // Convex sends a watched query's whole answer each time it changes, so a watch hears the rows
-  // that differ from the answer before. The first answer is what stood when the watch began, and
-  // is heard by no one.
+  // Convex re-sends a watched query's whole result each time it changes, so `hear` gets only the
+  // rows that differ from the previous result. The first result is the starting state, and is not
+  // reported.
   protected override doWatch(scope: WatchScope, hear: (heard: Heard) => void): () => void {
     let seen: RowsWatched | null = null
     let isWatching = true
@@ -131,8 +131,8 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
       seen = rows
     }
     const unsubscribe = this.#subscribe(scope, heed)
-    // Convex counts a query's watchers, and its unsubscribe counts down each time it is called: a
-    // second call would end another watch of the same rows on the same client.
+    // Convex counts a query's watchers, and each unsubscribe call lowers that count. A second call
+    // would end another watch of the same rows on the same client.
     return () => {
       if (! isWatching) { return }
       isWatching = false
@@ -143,8 +143,9 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 
   // == [Watching]: #subscribe
 
-  // A failing watch has no one to throw to: the next call meets the trouble itself, and a watch
-  // that recovers compares its next answer with the last it heard.
+  // A failing watch has nowhere to report its error, so the error is dropped: the next call will
+  // hit the same problem and throw. When the watch recovers, its next result is compared with the
+  // last one it received.
   #subscribe({ vaultlabel, ...bankScope }: WatchScope, heed: (rows: RowsWatched) => void): () => void {
     const args = { scope: (vaultlabel === undefined) ? bankScope : { ...bankScope, vaultlabel } }
     if ('watchQuery' in this.#client) {
@@ -154,7 +155,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
         if (rows !== undefined) { heed(rows) }
       }
       const unsubscribe = watch.onUpdate(heedLatest)
-      // A ConvexReactClient already watching these rows sends no first answer, only changes.
+      // A ConvexReactClient that is already watching these rows sends no first result, only changes.
       heedLatest()
       return unsubscribe
     }
@@ -166,11 +167,11 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 
 // == [Helpers]: reaching, refusalOf, changesOf, latestOf, isConvexClient, isSafebyokApi, convexVaultDBOpts
 
-/** Convex's most for one document, in bytes. */
+/** Convex's size limit for one document, in bytes. */
 const ConvexDocumentBytes = 1_048_576
 
-/** What `call` resolves, or the refusal that says what stopped it. */
-// A thunk, since ConvexReactClient.query throws at once a refusal it already has.
+// Takes a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
+/** Run `call`, converting anything it throws into a safebyok refusal. */
 const reaching = async <ValT>(callname: string, call: () => Promise<ValT>): Promise<ValT> => {
   try {
     return await call()
@@ -179,15 +180,15 @@ const reaching = async <ValT>(callname: string, call: () => Promise<ValT>): Prom
   }
 }
 
-// Convex's own error text may quote the call's arguments on a dev deployment, so nothing of it is
-// carried: only the wrapper's refusal is read, by its data.
+// On a dev deployment Convex's error text may quote the call's arguments, so its message is never
+// passed on. The wrapper's own refusal is recognized by its `data`.
 const refusalOf = (callname: string, thrown: unknown): VaultError => {
   if ((thrown instanceof ConvexError) && isSafebyokErrorData(thrown.data)) { return DB.identityRevoked() }
   return DB.storageFailed(callname, thrown)
 }
 
-/** The vault rows and box rows that differ between `seen` and `rows`. */
-// Both answers come from Convex's own serializer, so a row unchanged says itself the same way twice.
+// Both results come from Convex's own serializer, so an unchanged row serializes the same way twice.
+/** Return the vault rows and box rows in `rows` that are new or changed since `seen`. */
 const changesOf = (seen: RowsWatched, rows: RowsWatched): Heard[] => {
   const seenVaults = new Map(seen.vaults.map(({ vaultlabel, vault }) => [vaultlabel, JSON.stringify(vault)]))
   const seenBoxes = new Map(seen.boxes.map(({ vaultlabel, vault_tok, boxlabel, box }) => [DB.ckeyOf(vaultlabel, vault_tok, boxlabel), JSON.stringify(box)]))
@@ -201,7 +202,7 @@ const changesOf = (seen: RowsWatched, rows: RowsWatched): Heard[] => {
   return [...vaultsHeard, ...boxesHeard]
 }
 
-/** A React watch's latest answer, or undefined while it has none or is failing. */
+/** Return a React watch's latest result, or undefined while it has none or is failing. */
 const latestOf = (watch: { localQueryResult(): RowsWatched | undefined }): RowsWatched | undefined => {
   try {
     return watch.localQueryResult()
@@ -210,19 +211,20 @@ const latestOf = (watch: { localQueryResult(): RowsWatched | undefined }): RowsW
   }
 }
 
-/** True for a client with the calls a vault makes, and one way of watching. */
+/** True when `candidate` has `query`, `mutation`, and either `onUpdate` or `watchQuery`. */
 const isConvexClient = (candidate: unknown): candidate is ConvexVaultClient => {
   if ((typeof candidate !== 'object') || (candidate === null)) { return false }
   const calls = candidate as Partial<Record<'query' | 'mutation' | 'onUpdate' | 'watchQuery', unknown>>
   return (typeof calls.query === 'function') && (typeof calls.mutation === 'function') && ((typeof calls.onUpdate === 'function') || (typeof calls.watchQuery === 'function'))
 }
 
-/** The functions a vault calls, by name. */
+/** The names of the safebyok functions the adapter calls. */
 const SafebyokFnnames = ['listVaults', 'getVault', 'listBoxes', 'getBox', 'putVault', 'putBox', 'delVault', 'delBox', 'tidyGone', 'watchRows'] as const
 
-// Each function must name itself as `<module>:<function>`. The whole generated `api` answers any
-// property, so `api.getVault` exists, but names no module, and Convex refuses to name it.
-/** True for the module of safebyok functions, each under its own name. */
+// Each reference must have a name of the form `<module>:<function>`. The generated `api` returns a
+// reference for any property, so `api.getVault` exists, but it names no module and
+// `getFunctionName` throws on it.
+/** True when `candidate` is the module of safebyok functions (`api.safebyok`), not the whole `api`. */
 const isSafebyokApi = (candidate: unknown): candidate is SafebyokApi => {
   if ((typeof candidate !== 'object') || (candidate === null)) { return false }
   const fnRefs = candidate as Partial<Record<string, FunctionReference<'query' | 'mutation'>>>
@@ -237,7 +239,7 @@ const isSafebyokApi = (candidate: unknown): candidate is SafebyokApi => {
   })
 }
 
-/** The check of a {@link ConvexVaultDB}'s options. */
+/** Validator for {@link ConvexVaultDBOpts}. */
 const convexVaultDBOpts = DB.objCheck(({ custom, uint }) => ({
   ...DB.adapterVaultDBOpts.shape,
   client:   custom<ConvexVaultClient>(isConvexClient, Phrases.ClientExpected),

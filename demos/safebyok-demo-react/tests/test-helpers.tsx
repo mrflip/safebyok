@@ -1,4 +1,4 @@
-/** The demo's test helpers, star-imported as `TH`: everything `safebyok/testing` exports, and the means to render a component inside a BankProvider over storages in memory, to watch the vault beside it, to answer the dialogs the provider raises, and to stand in for Anthropic. */
+/** The demo's test helpers, star-imported as `TH`. Re-exports `safebyok/testing`, and adds helpers to render a component inside a BankProvider with in-memory storage, watch the vault beside it, fill in the provider's dialogs, and fake Anthropic. */
 import type { ReactNode } from 'react'
 import { expect, onTestFinished, vi, type MockInstance } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -14,7 +14,7 @@ import type { StringStorage } from '../src/lib/string-storage'
 
 export * from 'safebyok/testing'
 
-/** `ui` inside a BankProvider signed in as `user_id`, over a fresh vaultDB in memory, deriving through the cheap test deriver; and that `vaultDB`.
+/** Render `ui` inside a BankProvider signed in as `user_id`, with a fresh in-memory vaultDB and the cheap test deriver. Returns that `vaultDB`.
  *
  * @example TH.renderInBank(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
@@ -31,7 +31,7 @@ export const renderInBank = (ui: ReactNode, user_id: string | null = 'u1') => {
   return { vaultDB }
 }
 
-/** A StringStorage in memory, for the fake auth under test: each call a fresh, empty one. */
+/** Make a fresh, empty in-memory StringStorage for the fake auth under test. */
 export const memoryStorage = (): StringStorage => {
   const texts = new Map<string, string>()
   return {
@@ -41,19 +41,19 @@ export const memoryStorage = (): StringStorage => {
   }
 }
 
-/** A fake auth over fresh storages in memory. */
+/** Make a fake auth over fresh in-memory storage. */
 export const makeAuth = (): Auth => createAuth({ applabel: 'acme', dbStorage: memoryStorage(), deviceStorage: memoryStorage() })
 
-/** The SessionBar as a page renders it, handed the live session of `auth`. */
+/** The SessionBar as a page renders it, given the live session from `auth`. */
 export const LiveSessionBar = ({ auth }: { auth: Auth }) => <SessionBar auth={auth} session={useSession(auth)} />
 
-/** Types `userlabelText` into the sign-in strip and presses Sign in. */
+/** Type `userlabelText` into the sign-in strip and press Sign in. */
 export const signInAs = (userlabelText: string) => {
   fireEvent.change(screen.getByPlaceholderText('username'), { target: { value: userlabelText } })
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 }
 
-/** Answers the passphrase dialog once it shows: types `passphrase` and submits, typing it again where the dialog asks to confirm it. */
+/** Wait for the passphrase dialog, type `passphrase` (twice if the dialog asks to confirm it), and submit. */
 export const answerPassphraseDialog = async (passphrase = Passphrase) => {
   const field = await screen.findByPlaceholderText('vault passphrase')
   fireEvent.change(field, { target: { value: passphrase } })
@@ -64,7 +64,7 @@ export const answerPassphraseDialog = async (passphrase = Passphrase) => {
   fireEvent.submit(form)
 }
 
-/** Answers the dialog that replaces the passphrase once it shows: types `antePassphrase`, then `nextPassphrase` twice, and submits. */
+/** Wait for the change-passphrase dialog, type `antePassphrase`, then `nextPassphrase` twice, and submit. */
 export const answerReplacementDialog = async (antePassphrase: string, nextPassphrase: string) => {
   const field = await screen.findByPlaceholderText('current passphrase')
   fireEvent.change(field, { target: { value: antePassphrase } })
@@ -75,25 +75,25 @@ export const answerReplacementDialog = async (antePassphrase: string, nextPassph
   fireEvent.click(button)
 }
 
-/** Answers the dialog that deletes the vault once it shows: types `passphrase` and presses Delete vault. */
+/** Wait for the delete-vault dialog, type `passphrase`, and press Delete vault. */
 export const answerDeletionDialog = async (passphrase = Passphrase) => {
   fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete vault' }))
 }
 
-/** Answers the dialog that adds a passkey once it shows: types `passphrase` and presses Add passkey, the browser's prompt answered by {@link installFakeAuthenticator}. */
+/** Wait for the add-passkey dialog, type `passphrase`, and press Add passkey. {@link installFakeAuthenticator} answers the browser's own prompt. */
 export const answerPasskeyAddDialog = async (passphrase = Passphrase) => {
   fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add passkey' }))
 }
 
-/** Answers the dialog that removes the passkey once it shows: types `passphrase` and presses Remove passkey. */
+/** Wait for the remove-passkey dialog, type `passphrase`, and press Remove passkey. */
 export const answerPasskeyRevokeDialog = async (passphrase = Passphrase) => {
   fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove passkey' }))
 }
 
-/** A browser offering WebAuthn for one test, whose authenticator makes passkeys that answer the PRF extension at once, each with random bytes. */
+/** Make the browser appear to support WebAuthn for the current test. Its fake authenticator creates passkeys immediately, each with random PRF output. */
 export const installFakeAuthenticator = () => {
   vi.stubGlobal('PublicKeyCredential', FakePublicKeyCredential)
   Object.defineProperty(navigator, 'credentials', { value: { create }, configurable: true })
@@ -103,39 +103,34 @@ export const installFakeAuthenticator = () => {
   })
 }
 
-/** The fake authenticator's `navigator.credentials.create`: a new passkey, its PRF answer random. */
+/** The fake authenticator's `navigator.credentials.create`: resolves a new passkey with random PRF output. */
 const create = () => Promise.resolve({
   type:                      'public-key',
   rawId:                     crypto.getRandomValues(new Uint8Array(16)).buffer,
   getClientExtensionResults: () => ({ prf: { enabled: true, results: { first: crypto.getRandomValues(new Uint8Array(32)) } } }),
 })
 
-/** Stands in for the browser's PublicKeyCredential, whose presence says the browser offers WebAuthn. */
+/** A stand-in for the browser's PublicKeyCredential. Its presence is how code detects WebAuthn support. */
 class FakePublicKeyCredential {
   readonly type = 'public-key'
 }
 
-/** Waits, inside React's act, until each call `prompting` heard has settled and the handler that awaited it has heard. */
+/** Wait, inside React's act, until every call recorded by the `prompting` mock has settled and the handler awaiting it has run. */
 export const settlePrompts = async <PromptT extends () => Promise<unknown>>(prompting: MockInstance<PromptT>) => {
-  // The handler awaited each promise before this does, so it hears the outcome first.
+  // The handler awaited each promise before this helper did, so the handler's continuation runs first.
   await act(async () => { await Promise.allSettled(prompting.mock.results.map((result): unknown => result.value)) })
 }
 
-/** One request a {@link fakeAnthropic} heard: where it went, the API key it carried (the SDK sends it as a bearer token), its body. */
+/** One request recorded by {@link fakeAnthropic}: its URL, the API key it carried (the SDK sends it as a bearer token), and its body. */
 export type AnthropicRequest = {
   url:    string
   apiKey: string | null
   body:   { model: string, messages: unknown[] }
 }
 
-/**
- * Anthropic's messages endpoint, as `fetch` sees it: every request answered with `status` -- at
- * 200, a message whose text is `jokeText`; otherwise, an authentication error -- and recorded.
- * Hand its `fetchFn` to the code under test, or stub the global `fetch` with it.
- *
- * @param status - The status of every reply.
- * @param jokeText - The reply's text, at 200.
- * @returns `fetchFn`, the fake, and `seen`, each request it has answered so far.
+/** Make a fake of Anthropic's messages endpoint, as a `fetch` function. It records every request and replies with `status`:
+ * at 200 a message whose text is `jokeText`, and at any other status an authentication error.
+ * Pass its `fetchFn` to the code under test, or stub the global `fetch` with it. `seen` lists the requests so far.
  *
  * @example
  *   const anthropic = TH.fakeAnthropic(200, 'Banana who? Banana split, gotta run!')
@@ -164,13 +159,14 @@ export const fakeAnthropic = (status: number, jokeText = '') => {
   return { fetchFn, seen }
 }
 
-/** `locked` or `unlocked` for a vault's snapshot, `none` for none. */
+/** `'locked'` or `'unlocked'` for a vault snapshot, or `'none'` when there is no snapshot. */
 export const lockWordOf = (snapshot: VaultSnapshot | null): string => {
   if (snapshot === null) { return 'none' }
   return snapshot.isLocked ? 'locked' : 'unlocked'
 }
 
-/** The vault under 'main' as a page sees it, to render beside a component under test: its stage and lock as `<stage> <locked|unlocked>` (`none` with no vault), an Open button that builds or unlocks it, asking through the provider's dialog, and a Lock button.
+/** A probe to render beside a component under test. It shows the 'main' vault's stage and lock as `<stage> <locked|unlocked|none>`,
+ * with an Open button that builds or unlocks the vault through the provider's dialog, and a Lock button.
  *
  * @example TH.renderInBank(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
@@ -192,7 +188,7 @@ export const VaultProbe = () => {
   )
 }
 
-/** Waits until the {@link VaultProbe} shows `shown`, as `<stage> <locked|unlocked>`, failing if it never does. */
+/** Wait until the {@link VaultProbe} shows `shown` (such as `'present unlocked'`). Fails if it never does. */
 export const expectProbe = async (shown: string) => {
   await waitFor(() => { expect(screen.getByTestId('vault').textContent).to.eq(shown) })
 }

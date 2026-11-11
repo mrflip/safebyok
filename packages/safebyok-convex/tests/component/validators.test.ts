@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import * as DB from 'safebyok/storage'
 import * as TH from '../test-helpers'
 
-// The component's validators are converted from the core's checkers: these cases keep to the
-// conversion to its purpose, a record the core writes goes in whole and a misshapen one stops at the door.
+// The component's validators are converted from the core's checkers. These cases check that the
+// conversion does its job: a record the core writes is accepted whole, and a malformed one is rejected.
 
 type Backend = ReturnType<typeof TH.componentTest>
 
@@ -12,7 +12,7 @@ const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as 
 const vault = TH.vaultAt()
 const box = TH.boxAt()
 
-/** Every document of the component's tables, but their system fields. */
+/** List every document in the component's tables, without system fields. */
 const storedRows = (backend: Backend) => backend.run(async ({ db }) => {
   const vaultDocs = await db.query('safebyok_vaults').collect()
   const boxDocs = await db.query('safebyok_boxes').collect()
@@ -20,7 +20,7 @@ const storedRows = (backend: Backend) => backend.run(async ({ db }) => {
   return { vaults: vaultDocs.map(({ vault: row }): unknown => row), boxes: boxDocs.map(({ box: row }): unknown => row), tallies: tallyDocs.length }
 })
 
-/** A backend with the vault, live, as every box put needs. */
+/** Make a backend with the live vault that every box put needs. */
 const withVault = async (): Promise<Backend> => {
   const backend = TH.componentTest()
   await backend.mutation(api.putVault, { record: vault, opts: birth })

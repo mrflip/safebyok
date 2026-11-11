@@ -4,7 +4,9 @@ import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from '../hooks/h
 import { useProvided } from '../provider/bank-provider'
 import type { TellBadNews, VaultControlProps } from '../shapes'
 
-/** Whether the signed-in user's vault under `vaultlabel` is locked, with a Lock or Unlock button, or a Create vault button while it is unborn. */
+/** Render whether the signed-in user's vault named `vaultlabel` is locked, with a Lock or Unlock button.
+ * While the vault is unborn, it renders a Create vault button instead.
+ */
 export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
   const bank = useBank()
   const { tellBadNews } = useProvided('VaultLockControl')
@@ -12,7 +14,7 @@ export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
   const snapshot = useVaultSnapshot(vaultlabel)
   if (stage === 'unborn') { return <CreateVaultButton vaultlabel={vaultlabel} /> }
   if ((bank === null) || (vault === null) || (snapshot === null)) { return null }
-  // `vault.tryEnsureUnlocked()` on the vault in hand, never `bank.ensureVault`: an Unlock never builds a vault.
+  // Call `vault.tryEnsureUnlocked()` on this vault, never `bank.ensureVault`: pressing Unlock must never create a vault.
   const unlock = async () => { tellUnlessDismissed(tellBadNews, await vault.tryEnsureUnlocked()) }
   const { isLocked } = snapshot
   return (
@@ -25,7 +27,7 @@ export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
   )
 }
 
-/** A button that builds the signed-in user's vault under `vaultlabel`. */
+/** Render a button that creates the signed-in user's vault named `vaultlabel`. */
 export const CreateVaultButton = ({ vaultlabel }: VaultControlProps) => {
   const bank = useBank()
   const { tellBadNews } = useProvided('CreateVaultButton')

@@ -5,7 +5,7 @@ import { Messages } from '../helpers/messages'
 import type { PassphraseModalProps } from '../shapes'
 import { ChosenPassphraseFields, DialogBoundary, ModalForm, PassphraseField, UsernameField, holdsFocus, textOf, unlockedFor, useAttemptAction, useChosenPassphrase } from './modal-kit'
 
-/** The passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
+/** Render the passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
 export const PassphraseModal = (props: PassphraseModalProps) => (
   <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
     {props.gating.gatingkind === 'build_vault' ? <BuildForm {...props} gating={props.gating} /> : <UnlockForm {...props} gating={props.gating} />}
@@ -57,7 +57,7 @@ const UnlockForm = ({ gating, leaseMillis, passphraseUsername, passkeyRpId }: Pa
 
   const hearPasskey = (text: string | null) => {
     setPasskeyGripe(text)
-    // A passkey button that took itself away took the focus with it, so the focus goes back to the passphrase field.
+    // If the passkey button removed itself, focus was lost with it, so return focus to the passphrase field.
     if (text !== null && ! holdsFocus(formRef.current)) { fieldRef.current?.focus() }
   }
 
@@ -68,8 +68,8 @@ const UnlockForm = ({ gating, leaseMillis, passphraseUsername, passkeyRpId }: Pa
       blurb={Messages.unlockBlurb}
       submitWord={Messages.unlockButton}
       pendingWord={Messages.unlockingButton}
-      // React commits the action's setPasskeyGripe(null) only once the attempt answers: the submit
-      // takes the passkey's word away at once.
+      // React commits the action's setPasskeyGripe(null) only when the attempt finishes, so hide the
+      // passkey's message as soon as the submit starts.
       gripeText={(isPending ? null : passkeyGripe) ?? gripe?.text ?? null}
       gripeId={gripeId}
       footnote={leaseMillis === undefined ? undefined : unlockedFor(leaseMillis, false)}

@@ -5,14 +5,14 @@ import type { VaultLifecycle } from '../shapes'
 
 // == [Bank hooks]: useBank, useBankSnapshot, subscribeToNothing, getNothing
 
-const unsubscribeFromNothing = () => { /* nothing was heard */ }
+const unsubscribeFromNothing = () => { /* nothing to unsubscribe from */ }
 const subscribeToNothing = () => unsubscribeFromNothing
 const getNothing = () => null
 
-/** The signed-in user's bank the nearest BankProvider has, or null while it has none. */
+/** Return the signed-in user's bank from the nearest BankProvider, or null while there is none. */
 export const useBank = (): Bank | null => useProvided('useBank').bank
 
-/** The live snapshot of the signed-in user's bank, or null while the provider has no bank. */
+/** Return the live snapshot of the signed-in user's bank, or null while the provider has no bank. */
 export const useBankSnapshot = (): BankSnapshot | null => {
   const { bank } = useProvided('useBankSnapshot')
   return useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, bank?.getSnapshot ?? getNothing, getNothing)
@@ -24,16 +24,16 @@ export const useBankSnapshot = (): BankSnapshot | null => {
 const WaitingLifecycle: VaultLifecycle = Object.freeze({ stage: 'waiting', vault: null })
 const UnbornLifecycle: VaultLifecycle = Object.freeze({ stage: 'unborn', vault: null })
 
-/** The signed-in user's vault under `vaultlabel` and where it stands. */
+/** Return the signed-in user's vault named `vaultlabel`, with its lifecycle stage. */
 export const useVault = (vaultlabel: string): VaultLifecycle => useVaultFor('useVault', vaultlabel)
 
-/** The signed-in user's vault under `vaultlabel` and where it stands. `hookname` is the hook a missing-provider error names. */
+/** Same as {@link useVault}. `hookname` is the hook named in the error when there is no provider. */
 const useVaultFor = (hookname: string, vaultlabel: string): VaultLifecycle => {
   const { bank, helloedVaults } = useProvided(hookname)
   const snapshot = useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, bank?.getSnapshot ?? getNothing, getNothing)
   const lifecycle = useMemo((): VaultLifecycle => {
     if (bank === null || snapshot === null) { return WaitingLifecycle }
-    // A sweep or a vacate remakes the snapshot, its err the bank's end cause, so this memo hears the bank end.
+    // A sweep or a vacate publishes a new snapshot whose `err` is the reason the bank ended, so this memo runs again then.
     if ((! bank.isEnabled) && (snapshot.err !== null)) { return { stage: 'spent', vault: null, cause: snapshot.err } }
     if (snapshot.stage !== 'ready') { return WaitingLifecycle }
     const vault = bank.vaultAt({ vaultlabel })
@@ -43,13 +43,13 @@ const useVaultFor = (hookname: string, vaultlabel: string): VaultLifecycle => {
   useEffect(() => {
     if (bank === null || vault === null || helloedVaults.has(vault)) { return }
     helloedVaults.add(vault)
-    // The bank tells onLifecycle of the hello.
+    // Not awaited: the bank reports the hello to onLifecycle.
     void vault.tryHello()
   }, [bank, vault, helloedVaults])
   return lifecycle
 }
 
-/** The live snapshot of the signed-in user's vault under `vaultlabel`, or null while it is not `present`. */
+/** Return the live snapshot of the signed-in user's vault named `vaultlabel`, or null while the vault is not `present`. */
 export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
   const { vault } = useVaultFor('useVaultSnapshot', vaultlabel)
   return useSyncExternalStore(vault?.subscribe ?? subscribeToNothing, vault?.getSnapshot ?? getNothing, getNothing)
@@ -58,14 +58,14 @@ export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
 
 // == [Box hooks]: useBoxes, useBox, useBoxSnapshot, useBoxIsShowing, useBoxExposure, useWhisper
 
-/** The snapshots of the boxes in the signed-in user's vault under `vaultlabel`, or null while it is not `present`. */
+/** Return the snapshots of the boxes in the signed-in user's vault named `vaultlabel`, or null while the vault is not `present`. */
 export const useBoxes = (vaultlabel: string): readonly BoxSnapshot[] | null => {
   const { vault } = useVaultFor('useBoxes', vaultlabel)
   const boxes = vault?.boxListing ?? null
   return useSyncExternalStore(boxes?.subscribe ?? subscribeToNothing, boxes?.getSnapshot ?? getNothing, getNothing)
 }
 
-/** The Box under `boxlabel` in the signed-in user's vault under `vaultlabel`, or null until it is listed present. */
+/** Return the Box named `boxlabel` in the signed-in user's vault named `vaultlabel`, or null until the vault lists it as present. */
 export const useBox = (vaultlabel: string, boxlabel: string): Box | null => {
   const { vault } = useVaultFor('useBox', vaultlabel)
   const boxes = vault?.boxListing ?? null
@@ -77,26 +77,26 @@ export const useBox = (vaultlabel: string, boxlabel: string): Box | null => {
   return useSyncExternalStore(boxes?.subscribe ?? subscribeToNothing, presentBox, getNothing)
 }
 
-/** The live snapshot of `box`, or null for no box. */
+/** Return the live snapshot of `box`, or null when `box` is null. */
 export const useBoxSnapshot = (box: Box | null): BoxSnapshot | null => (
   useSyncExternalStore(box?.subscribe ?? subscribeToNothing, box?.getSnapshot ?? getNothing, getNothing)
 )
 
-/** True while `box` shows its whisper, and false where there is no box. */
+/** True while `box` is showing its whisper. False when `box` is null. */
 export const useBoxIsShowing = (box: Box | null): boolean => (
   useSyncExternalStore(box?.subscribe ?? subscribeToNothing, () => box?.isShowing ?? false, () => false)
 )
 
 const getUnexposed = (): BoxExposure => 'unexposed'
 
-/** Where `box`'s whisper stands, read live: `showing`, or why it hides; `unexposed` for no box. */
+/** Return `box`'s live exposure: `showing`, or the reason its whisper is hidden. Returns `unexposed` when `box` is null. */
 export const useBoxExposure = (box: Box | null): BoxExposure => (
   useSyncExternalStore(box?.subscribe ?? subscribeToNothing, () => box?.exposure ?? 'unexposed', getUnexposed)
 )
 
 const getEncrypted = (): Whisper => ENCRYPTED
 
-/** The live whisper `box` shows, a bag with no fields while it will not show or there is no box. */
+/** Return the whisper `box` is showing, live. While the whisper is hidden, or `box` is null, it returns a placeholder object with no fields. */
 export const useWhisper = (box: Box | null): Whisper => {
   const whisperOf = useCallback(() => box?.whisper ?? ENCRYPTED, [box])
   return useSyncExternalStore(box?.subscribe ?? subscribeToNothing, whisperOf, getEncrypted)

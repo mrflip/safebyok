@@ -1,7 +1,7 @@
-// The README's recipe, run: its route (Yoga over vaultResolvers and a PostgresVaultDB) and its
-// browser half (GraphQLVaultDB over an urql Client posting to it), with only the wiring a test
-// needs changed: the request's user comes from a header in place of a session cookie, the database
-// is a PGlite, and fetch calls the route in-process. Change one and the README changes with it.
+// Runs the README's recipe: the server route (Yoga with vaultResolvers and a PostgresVaultDB) and the
+// browser side (GraphQLVaultDB on an urql Client that posts to the route). Only the test wiring
+// differs: the user comes from a header instead of a session cookie, the database is a PGlite, and
+// fetch calls the route in-process. If you change the recipe here, change the README to match.
 
 import { describe, expect, it } from 'vitest'
 import { Client, fetchExchange } from '@urql/core'
@@ -18,9 +18,9 @@ TH.bootDatabaseFirst()
 
 // == [The recipe]: vaultRoute, browserVaultDB
 
-/** The README's route over `vaultDB`, its signed-in user found by `signedInUserId`. */
+/** Build the README's route for `vaultDB`. `signedInUserId` returns each request's signed-in user. */
 const vaultRoute = (vaultDB: PostgresVaultDB, signedInUserId: (request: Request) => Promise<string | null>, isDev = false) => {
-  /** What each request's resolvers know of it: the user your own auth signed in, or null. */
+  /** The per-request context the resolvers see: the user your own auth signed in, or null. */
   type VaultContext = { user_id: string | null }
   const schema = createSchema<VaultContext>({
     typeDefs:  [VaultSchemaSdl],
@@ -36,7 +36,7 @@ const vaultRoute = (vaultDB: PostgresVaultDB, signedInUserId: (request: Request)
   return async (request: Request): Promise<Response> => await handleRequest(request, {})
 }
 
-/** The README's browser half: a GraphQLVaultDB over an urql Client that posts to the route, and subscribes over it too. */
+/** Build the README's browser side: a GraphQLVaultDB on an urql Client that sends queries, mutations and subscriptions to the route by fetch. */
 const browserVaultDB = (fetcher: typeof fetch) => new GraphQLVaultDB({ client: new Client({
   url:                'https://app.example.test/api/graphql',
   exchanges:          [fetchExchange],
@@ -49,10 +49,10 @@ const browserVaultDB = (fetcher: typeof fetch) => new GraphQLVaultDB({ client: n
 
 type Route = (request: Request) => Promise<Response>
 
-/** The test's stand-in for a session: the request's `x-test-user` header. */
+/** Read the signed-in user from the request's `x-test-user` header, the test's substitute for a session. */
 const byHeader = (request: Request) => Promise.resolve(request.headers.get('x-test-user'))
 
-/** `response` as the browser receives it: as a network does, a fetch the browser aborts cancels the body the server is sending. */
+/** Wrap `response` so that aborting the request cancels the body the server is sending, as a real network connection would. */
 const overTheNetwork = (request: Request, response: Response): Response => {
   if (response.body === null) { return response }
   const sending = response.body.getReader()
@@ -66,7 +66,7 @@ const overTheNetwork = (request: Request, response: Response): Response => {
   return new Response(received, response)
 }
 
-/** A browser whose fetch reaches `route` in-process, signed in as `signedInAs` says of each operation's variables. */
+/** Make a browser-side VaultDB whose fetch calls `route` in-process. `signedInAs` picks each operation's user from its variables. */
 const browserFor = (route: Route, signedInAs: (variables: Record<string, unknown>) => string | null) => (
   browserVaultDB(async (url, init) => {
     const request = new Request(url, init)
@@ -76,21 +76,21 @@ const browserFor = (route: Route, signedInAs: (variables: Record<string, unknown
   })
 )
 
-/** The variables an operation was sent with: in the URL, as urql sends a query by GET, or in the body. */
+/** Read an operation's variables from the request: from the URL when urql sent a query by GET, otherwise from the body. */
 const variablesOf = async (request: Request): Promise<Record<string, unknown>> => {
   const inUrl = new URL(request.url).searchParams.get('variables')
   const sent = (inUrl === null) ? (await request.json() as { variables?: unknown }).variables : JSON.parse(inUrl) as unknown
   return (sent ?? {}) as Record<string, unknown>
 }
 
-/** Signs each operation in as the user it asks for, as TH.signedInAsAsked does in-process. */
+/** Sign each operation in as the user named in its variables, by the same rule as TH.signedInAsAsked. */
 const signedInAsAsked = (variables: Record<string, unknown>): string | null => (
   TH.signedInAsAsked({ variables } as unknown as Parameters<TH.Signing>[0]).user_id
 )
 
 const serversOf = new WeakMap<GraphQLVaultDB, { route: Route, adapter: PostgresVaultDB }>()
 
-/** A fresh browser over emptied tables, through its own route, its server's VaultDB made with `opts` and at most `maxBoxes` boxes to a vault. */
+/** Empty the tables and make a new browser-side VaultDB with its own route. Its server's VaultDB is made with `opts` and, if given, a cap of `maxBoxes` boxes per vault. */
 const makeVaultDB = async (opts: DB.AdapterVaultDBOpts = {}, maxBoxes?: number): Promise<GraphQLVaultDB> => {
   await TH.emptyTables()
   const adapter = await TH.serverOver({ ...opts, ...((maxBoxes !== undefined) && { maxBoxes }) })
@@ -100,14 +100,14 @@ const makeVaultDB = async (opts: DB.AdapterVaultDBOpts = {}, maxBoxes?: number):
   return vaultDB
 }
 
-/** The route and VaultDB behind a browser makeVaultDB or makeTwin made. */
+/** Return the route and the server's VaultDB behind a browser that makeVaultDB or makeTwin made. */
 const serverOf = (vaultDB: GraphQLVaultDB): { route: Route, adapter: PostgresVaultDB } => {
   const server = serversOf.get(vaultDB)
   if (server === undefined) { throw new Error('This takes a browser makeVaultDB or makeTwin made') }
   return server
 }
 
-/** A second browser through the same route, as another device has. */
+/** Make a second browser-side VaultDB on the same route, to act as another device. */
 const makeTwin = (vaultDB: GraphQLVaultDB): GraphQLVaultDB => {
   const server = serverOf(vaultDB)
   const twin = browserFor(server.route, signedInAsAsked)

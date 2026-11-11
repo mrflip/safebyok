@@ -2,7 +2,7 @@ import { StrictMode, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 
-/** The boot line every Vite + React app has, for each of the demo's pages. */
+/** Mount `page` at `#root` in StrictMode: the usual Vite + React boot, shared by the demo's pages. */
 export const mountPage = (page: ReactNode) => {
   const rootElement = document.querySelector('#root')
   if (rootElement === null) { throw new Error('the page lost its #root element') }

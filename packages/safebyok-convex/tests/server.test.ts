@@ -1,4 +1,4 @@
-/** SafebyokComponent: the host's functions serve each call to the user it names, and to no one else. */
+/** SafebyokComponent: each of the host's functions serves the user its call names, and no one else. */
 
 import { describe, expect, it } from 'vitest'
 import * as DB from 'safebyok/storage'
@@ -16,7 +16,7 @@ const otherBox = TH.boxAt(0, vault.vault_tok, { boxlabel: 'other' })
 const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as const
 const vaultQuery = { ...TH.vaultScope, vault_tok: vault.vault_tok }
 
-/** A backend where u1 has a vault and one box in it, written as u1. */
+/** Make a backend where u1 has a vault with one box, both written as u1. */
 const seeded = async (): Promise<Backend> => {
   const backend = createTest()
   const asOwner = backend.withIdentity({ subject: 'u1' })
@@ -25,7 +25,7 @@ const seeded = async (): Promise<Backend> => {
   return backend
 }
 
-/** One call of each of the host's functions, every one naming u1. */
+/** One call to each of the host's functions, each naming u1. */
 const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['listVaults', (caller) => caller.query(api.safebyok.listVaults, { scope: TH.bankScope })],
   ['getVault',   (caller) => caller.query(api.safebyok.getVault, { scope: TH.vaultScope })],
@@ -39,7 +39,7 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['watchRows',  (caller) => caller.query(api.safebyok.watchRows, { scope: TH.bankScope })],
 ]
 
-/** What u1 has stored, as the component itself lists it. */
+/** List what u1 has stored, as the component itself reports it. */
 const storedIn = async (backend: Backend) => {
   const asOwner = backend.withIdentity({ subject: 'u1' })
   return await asOwner.query(api.safebyok.watchRows, { scope: TH.bankScope })
@@ -144,7 +144,7 @@ describe("SafebyokComponent, at setup", () => {
   }
 })
 
-/** A getUserId bag whose method answers from the bag itself: it fails if called detached from it. */
+/** An options object whose `getUserId` reads from `this`, so it fails if called detached from the object. */
 class SignedInAs {
   readonly #user_id: string
 

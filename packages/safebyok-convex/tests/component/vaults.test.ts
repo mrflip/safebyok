@@ -5,9 +5,10 @@ import * as TH from '../test-helpers'
 import { MaxVaultBoxBytes, MaxVaultBoxes, capacityOf } from '../../src/component/tallies'
 import type { Life, Tally } from '../../src/component/tallies'
 
-// The VaultDB contract is the battery's, run over this component through a ConvexVaultDB and a fake
-// deployment. What is left here is the component's own: the rows a watch and a tidy reach, the
-// tally each life keeps, the caps a box put is limited by, and Convex's per-transaction limits.
+// The shared VaultDB battery tests the VaultDB contract, and runs against this component through a
+// ConvexVaultDB and a fake deployment. These tests cover what is specific to the component: which
+// rows a watch and a tidy reach, the tally for each life, the caps on a box put, and Convex's
+// per-transaction limits.
 
 type Backend = ReturnType<typeof TH.componentTest>
 
@@ -16,22 +17,22 @@ const birth = { prior: DB.VoidRevision, ifAbsent: 'add', ifPresent: 'fail' } as 
 const vault = TH.vaultAt()
 const life1: Life = { ...TH.vaultScope, vault_tok: 'life1' }
 
-/** The options of a put replacing the row `ante`. */
+/** Put options that replace the row `ante`. */
 const over = (ante: DB.Revision) => ({ prior: DB.revisionOf(ante), ifAbsent: 'fail', ifPresent: 'repl' }) as const
 
-/** The box `boxlabel` at `revision_seq`, in life1 unless `extra` says otherwise, its whisper's ciphertext `cipherBytes` long. */
+/** Make the box `boxlabel` at `revision_seq`, in life1 unless `extra` says otherwise, with ciphertext `cipherBytes` long. */
 const boxOf = (boxlabel: string, { revision_seq = 0, cipherBytes = 3, ...extra }: { revision_seq?: number, cipherBytes?: number, vault_tok?: string, user_id?: string } = {}) => (
   TH.boxAt(revision_seq, 'life1', { boxlabel, box_tok: `tok-${boxlabel}`, whisper_ciphered: { cipher_iv_b64: 'aXY', ciphertext_b64: 'c'.repeat(cipherBytes) }, ...extra })
 )
 
-/** A backend with `record` as u1's vault, live, as every box put needs. */
+/** Make a backend where `record` is u1's live vault, which every box put needs. */
 const withVault = async (transactionLimits = false, record = vault): Promise<Backend> => {
   const backend = TH.componentTest(transactionLimits)
   await backend.mutation(api.putVault, { record, opts: birth })
   return backend
 }
 
-/** The tally the component keeps for `life`, or null. */
+/** Read the tally row stored for `life`, or null. */
 const keptTally = (backend: Backend, { applabel, user_id, vaultlabel, vault_tok }: Life = life1) => backend.run(async ({ db }): Promise<Tally | null> => {
   const kept = await db.query('safebyok_tallies')
     .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
@@ -39,7 +40,7 @@ const keptTally = (backend: Backend, { applabel, user_id, vaultlabel, vault_tok 
   return kept && { box_count: kept.box_count, box_bytes: kept.box_bytes }
 })
 
-/** What `life`'s box rows really are: every row, live or tombstoned, counted and weighed as Convex reads it. */
+/** Count and weigh every box row of `life` directly, tombstones included, as Convex sizes them. */
 const weighedTally = (backend: Backend, { applabel, user_id, vaultlabel, vault_tok }: Life = life1) => backend.run(async ({ db }): Promise<Tally> => {
   const boxDocs = await db.query('safebyok_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
@@ -49,13 +50,13 @@ const weighedTally = (backend: Backend, { applabel, user_id, vaultlabel, vault_t
   return tally
 })
 
-/** The vault_tok of each life the component keeps a tally for. */
+/** List the lives that have a tally row, each as `user_id/vault_tok`. */
 const talliedLives = (backend: Backend) => backend.run(async ({ db }) => {
   const tallyDocs = await db.query('safebyok_tallies').collect()
   return tallyDocs.map(({ user_id, vault_tok }) => `${user_id}/${vault_tok}`)
 })
 
-/** Box rows written straight into their lives, untallied, as a component that kept no tallies left them. */
+/** Insert box rows directly, without tallying them, as a component version that kept no tallies would have left them. */
 const plantBoxes = (backend: Backend, boxes: (DB.BoxRecord | DB.BoxTombstone)[]) => backend.run(async ({ db }) => {
   await Promise.all(boxes.map((box) => {
     const { applabel, user_id, vaultlabel, vault_tok, boxlabel } = box
@@ -63,7 +64,7 @@ const plantBoxes = (backend: Backend, boxes: (DB.BoxRecord | DB.BoxTombstone)[])
   }))
 })
 
-/** A vault row written straight over the one stored, as a life that ended with its box rows left behind. */
+/** Overwrite the stored vault row directly, so the previous life ends with its box rows left behind. */
 const plantVault = (backend: Backend, vault: DB.VaultRecord) => backend.run(async ({ db }) => {
   const { applabel, user_id, vaultlabel } = vault
   const doc = await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel)).unique()
@@ -71,7 +72,7 @@ const plantVault = (backend: Backend, vault: DB.VaultRecord) => backend.run(asyn
   await db.patch(doc._id, { vault })
 })
 
-/** The box rows `asked` lists, by boxlabel. */
+/** List the boxlabels of the box rows in `asked`. */
 const listedBoxlabels = async (backend: Backend, asked: Life = life1) => {
   const { boxes } = await backend.query(api.listBoxes, { asked })
   return boxes.map(({ boxlabel }) => boxlabel)
@@ -259,7 +260,7 @@ describe("putBox's count cap", () => {
   })
 })
 
-/** A backend whose life1 has eight boxes of 900,000 bytes, a little under its weight limit, and the room left. */
+/** Make a backend whose life1 has eight boxes of 900,000 bytes each, just under the byte limit. Also returns the room left. */
 const nearlyFull = async () => {
   const backend = await withVault()
   for (let ii = 0; ii < 8; ii++) {
@@ -289,7 +290,7 @@ describe("putBox's weight limit", () => {
 
   it("keeps a life too large to read whole deletable, a box at a time, its puts refused as full", async () => {
     const backend = await withVault(true)
-    // Twenty of 900,000 bytes, more than one transaction may read: four plants, each within its limits.
+    // Twenty boxes of 900,000 bytes are more than one transaction may read, so they are planted in four batches, each within the limits.
     const heavies = Array.from({ length: 20 }, (_slot, ii) => boxOf(`heavy_${String(ii).padStart(2, '0')}`, { cipherBytes: 900_000 }))
     for (let batch = 0; batch < 4; batch++) { await plantBoxes(backend, heavies.slice(batch * 5, (batch + 1) * 5)) }
     await expect(backend.query(api.listBoxes, { asked: life1 })).rejects.toThrow(/read/i)
@@ -302,11 +303,11 @@ describe("putBox's weight limit", () => {
 })
 
 // A Convex transaction may read 16 MiB and write 16,000 documents. Listing and watching read a life
-// once; deleting the vault reads every box row of the life and writes each live one. The component
-// has every life to MaxVaultBoxes boxes and MaxVaultBoxBytes of box rows so that each of these
-// stays one transaction, beside a vault row as heavy as a document may be.
+// once. Deleting the vault reads every box row of the life and writes each live one. The component
+// limits every life to MaxVaultBoxes box rows and MaxVaultBoxBytes of them, so that each of these
+// fits in one transaction, even beside a vault row as large as a document may be.
 
-/** What listing, watching and deleting life1's vault find, each one whole transaction over it. */
+/** List, watch and delete life1's vault, each in one transaction, and return what each found. */
 const listWatchDel = async (backend: Backend) => {
   const listed = await listedBoxlabels(backend)
   const { boxes } = await backend.query(api.watchRows, { scope: TH.vaultScope })
@@ -317,7 +318,7 @@ const listWatchDel = async (backend: Backend) => {
   return { listedCount: listed.length, watchedCount: boxes.length, isWritten, liveCount }
 }
 
-/** A vault record as heavy as a Convex document may be, near enough. */
+/** Make a vault record padded to just under Convex's document size limit. */
 const wholeDocumentVault = () => {
   const padding = 1_048_576 - getDocumentSize({ ...TH.vaultScope, vault }) - 64
   const passphrase_wayin = { ...TH.passphraseWayin, key_deriver_label: TH.passphraseWayin.key_deriver_label + 'c'.repeat(padding) }

@@ -6,14 +6,18 @@ import { Applabel, bankOpts, dbStorage, deviceStorage } from '../lib/storage'
 import { SessionBar } from './SessionBar'
 import { TroubleBoundary } from './TroubleBoundary'
 
-// The demo's fake auth; a real app has its own (Google, Clerk, Convex...). All the vault needs
+// The demo's fake auth. A real app has its own (Google, Clerk, Convex...). All the vault needs
 // from it is a stable user_id.
 const auth = createAuth({ applabel: Applabel, dbStorage, deviceStorage })
 
-/** What a page hands the shell: the link to the other page, what a signed-in user sees, and anything below that. */
+/** Props for the DemoShell.
+ * - `otherPage` -- a link to the demo's other page
+ * - `children`  -- what a signed-in user sees
+ * - `below`     -- optional content under that, shown whether or not anyone is signed in
+ */
 export type DemoShellProps = { otherPage: ReactNode, children: ReactNode, below?: ReactNode }
 
-/** A demo page's frame: the bank, the header with its sign-in strip, and the page's own content once somebody is signed in. */
+/** The frame of each demo page: the BankProvider, the header with its sign-in strip, and the page's own content once someone is signed in. */
 export const DemoShell = ({ otherPage, children, below }: DemoShellProps) => {
   const session = useSession(auth)
   const user_id = session?.user_id ?? null

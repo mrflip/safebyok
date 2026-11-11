@@ -5,26 +5,26 @@ import type {
   RowOfVault, Tidied, VaultQuery, VaultRecord, VaultScope, VaultTombstone,
 } from 'safebyok/storage'
 
-/** What the outage switch's refusals say. */
+/** The message of every refusal while the outage switch is off. */
 const OutageMessage = "The demo's backend is switched off: switch it back on to reach the vault."
 
-/** The demo's vaultDB, in this browser's IndexedDB, with a switch that takes it offline: each verb then refuses as an unreachable backend does. */
+/** The demo's vaultDB: an IdbVaultDB with a switch that takes it offline. While offline, every call refuses the way an unreachable backend would. */
 export class OutageVaultDB extends IdbVaultDB {
   // == [The switch]: #isOnline, #listeners, isOnline, setOnline, subscribe, getSnapshot, #demandOnline
 
   #isOnline = true
   readonly #listeners = new Set<() => void>()
 
-  /** True while the vaultDB answers its verbs. */
+  /** True while the vaultDB is online. */
   get isOnline(): boolean { return this.#isOnline }
 
-  /** Take the vaultDB offline, or bring it back, and tell each subscriber. */
+  /** Take the vaultDB offline, or bring it back, and notify each subscriber. */
   setOnline(isOnline: boolean): void {
     this.#isOnline = isOnline
     for (const listener of this.#listeners) { listener() }
   }
 
-  /** Hear each flip of the switch, for useSyncExternalStore. */
+  /** Subscribe to changes of the switch, for useSyncExternalStore. */
   readonly subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(listener)
     return () => { this.#listeners.delete(listener) }

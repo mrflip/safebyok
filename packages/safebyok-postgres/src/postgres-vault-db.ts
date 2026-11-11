@@ -1,20 +1,24 @@
-/** The vaultDB over Postgres. */
+/** A vaultDB adapter that stores its rows in Postgres. */
 
 import * as DB from 'safebyok/storage'
 import type { AdapterVaultDBOpts, Awaitable, BankScope, BoxesFetched, BoxFetched, BoxWritten, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelOpts, Heard, Written, PutOptsGiven, RowOfBox, RowOfVault, Tidied, VaultError, VaultQuery, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
 
 // == [The driver]: PostgresQueryable, PostgresClient, PostgresListen, PostgresVaultDBOpts
 
-/** A pool or connection that runs one parameterized statement and hands back its rows. */
+/** A pool or connection that runs one parameterized statement and returns its rows. */
 export type PostgresQueryable = { query: (text: string, params?: unknown[]) => Promise<{ rows: unknown[] }> }
 
 /** A {@link PostgresQueryable} that also runs `work` as one transaction: a PGlite, or `pgClientOf(pool)`. */
 export type PostgresClient = PostgresQueryable & { transaction: <ValT>(work: (tx: PostgresQueryable) => Promise<ValT>) => Promise<ValT> }
 
-/** Calls `onNotify` with the text of each notification sent on `channel`, and answers how to stop. */
+/** A host's LISTEN: calls `onNotify` with the text of each notification on `channel`, and returns a function that stops listening. */
 export type PostgresListen = (channel: string, onNotify: (text: string) => void) => Awaitable<() => unknown>
 
-/** What a PostgresVaultDB is made with: the client it writes rows through, and the listen its watch hears by. */
+/** Options for `new PostgresVaultDB(opts)`, in addition to {@link AdapterVaultDBOpts}:
+ * - `client`   -- runs the queries and transactions
+ * - `listen`   -- subscribes to Postgres notifications, so `watch` hears other devices' writes; without it, `watch` hears nothing
+ * - `maxBoxes` -- soft cap on the live boxes in one vault (default: `DefaultMaxBoxes`)
+ */
 export type PostgresVaultDBOpts = Readonly<AdapterVaultDBOpts & { client: PostgresClient, listen?: PostgresListen, maxBoxes?: number }>
 
 const isPostgresClient = (candidate: unknown): candidate is PostgresClient => (
@@ -23,7 +27,7 @@ const isPostgresClient = (candidate: unknown): candidate is PostgresClient => (
   && ('transaction' in candidate) && (typeof candidate.transaction === 'function')
 )
 
-// `custom` and `fn` hand back the very client and listen given, so a driver's methods keep their `this`.
+// `custom` and `fn` return the same client and listen objects they were given, so the driver's methods keep their `this`.
 const postgresVaultDBOpts = DB.objCheck(({ custom, fn, uint }) => ({
   ...DB.adapterVaultDBOpts.shape,
   client:   custom<PostgresClient>(isPostgresClient, 'Expected a client with query and transaction functions'),
@@ -50,7 +54,7 @@ const BoxLivesSql = `SELECT vaultlabel, vault_tok, count(*)::int AS boxcount FRO
   GROUP BY vaultlabel, vault_tok ORDER BY vaultlabel, vault_tok`
 const DeleteBoxLifeSql = 'DELETE FROM safebyok_boxes WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3 AND vault_tok = $4'
 
-// Reads that pair a box with its vault are one statement, so both rows come from one snapshot.
+// A read of a box together with its vault is one statement, so both rows come from the same snapshot.
 const VaultOfScope = '(SELECT vault FROM safebyok_vaults WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3)'
 const GetBoxWithVaultSql = `SELECT ${VaultOfScope} AS vault, (${GetBoxSql}) AS box`
 const ListBoxesWithVaultSql = `SELECT ${VaultOfScope} AS vault, COALESCE((
@@ -65,38 +69,40 @@ const NotifySql = 'SELECT pg_notify($1, told) FROM unnest($2::text[]) AS told'
 
 const vaultChannelOfInput = DB.Checker(({ user_id }) => user_id, 'bad_option')
 
-/** The channel the notices of `user_id`'s writes are sent on, which a `PostgresListen` listens to. */
+/** Return the notification channel for `user_id`'s writes: the channel a `PostgresListen` subscribes to. */
 export const vaultChannelOf = (user_id: string): string => channelOf(vaultChannelOfInput.parse(user_id, { where: 'vaultChannelOf' }))
 
-// A user_id whose channel passes 63 bytes, Postgres's longest identifier, cannot be notified: a write under it that would send a notice refuses.
-/** The channel the notices of `user_id`'s writes are sent on. */
+// Postgres identifiers are at most 63 bytes. A user_id whose channel name is longer cannot be notified, so a write that would send a notice for it fails.
+/** The notification channel for `user_id`. */
 const channelOf = (user_id: string): string => `safebyok_${user_id}`
 
-// A vault's notice is its row as stored. A box's is one JSON array, [...vault props, ...box props], in the order of these lists:
-// the vault row without its wayins, then the box row without what the vault props already say. A box tombstone's props end at
-// whisper_schema_version, and a ciphered field is [cipher_iv_b64, ciphertext_b64].
+// A vault notice is the vault row as stored. A box notice is one JSON array, [...vault props, ...box props], in the order of
+// these lists: the vault row without its wayins, then the box row without the fields the vault props already carry.
+// A box tombstone's props stop at whisper_schema_version. A ciphered field is sent as [cipher_iv_b64, ciphertext_b64].
 const VaultPropFields = ['applabel', 'user_id', 'vaultlabel', 'fmt', 'am', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'vault_tok', 'gate_epoch'] as const
 const BoxPropFields = ['boxlabel', 'am', 'fmt', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'box_tok', 'whisper_codec', 'whisper_schema_version', 'sidecar', 'box_key_wrapped', 'whisper_ciphered'] as const
 const CipheredFields: ReadonlySet<string> = new Set(['box_key_wrapped', 'whisper_ciphered'])
 
-// Postgres refuses a notification of 8000 bytes or more.
+// Postgres rejects a notification payload of 8000 bytes or more.
 const NoticeMaxBytes = 7999
 
-/** What a notice tells its listeners: where the row was written, and the rows where they fit. */
+/** A parsed notice: the scope of the write, plus the written rows when the notice was small enough to carry them. */
 type Told = VaultScope & { vault_tok?: string | undefined, boxlabel?: string | undefined, heard?: Heard | undefined }
 
 const toldWhere = DB.objCheck(({ applabel, user_id, vaultlabel, str }) => ({
   applabel, user_id, vaultlabel, vault_tok: str.optional(), boxlabel: str.optional(),
 }), { refusalkind: 'bad_record', extras: 'strip' })
 
-/** The notification text for `vault`, or for `box` under it, as {@link toldOf} reads it back. */
+/** Build the notification text for a vault write, or for a write of `box` in that vault.
+ * A notice too large for Postgres carries only the row's address. {@link toldOf} parses it back.
+ */
 const noticeTextOf = (vault: VaultRow, box?: BoxRow): string => {
   const text = JSON.stringify((box === undefined) ? vault : [...vaultPropsOf(vault), ...boxPropsOf(box)])
   if (new TextEncoder().encode(text).length <= NoticeMaxBytes) { return text }
   return JSON.stringify((box === undefined) ? vaultPropsOf(vault) : [...vaultPropsOf(vault), box.boxlabel])
 }
 
-/** The {@link Told} in a notification's text, or null for text no write of ours sent. */
+/** Parse a notification's text into a {@link Told}, or return null if it is not one of our notices. */
 const toldOf = (text: string): Told | null => {
   const sent = jsonOrNull(text)
   if (! Array.isArray(sent)) {
@@ -126,7 +132,7 @@ const boxPropsOf = (box: BoxRow): unknown[] => {
   })
 }
 
-/** The fields `props` have, named in the order of `fieldnames`, a ciphered field's pair made whole again. */
+/** Zip `props` with `fieldnames` into an object, restoring each ciphered field from its [iv, ciphertext] pair. */
 const fieldsOf = (fieldnames: readonly string[], props: unknown[]): Record<string, unknown> => (
   Object.fromEntries(props.slice(0, fieldnames.length).map((prop, idx) => {
     const field = fieldnames[idx] ?? ''
@@ -149,14 +155,14 @@ const isHeardIn = (scope: WatchScope, told: Told): boolean => (
 
 // == [Refusals]: refusalOf, causeOf, codeOf
 
-/** The refusal a throw stands for: a VaultError as it came, a setup fault, or the database out of reach. */
+/** Convert a thrown value to a VaultError: a setup fault (SQLSTATE class 42) is an unexpected error, anything else is storage unavailable. */
 const refusalOf = (thrown: unknown): VaultError => {
   if (DB.isVaultError(thrown)) { return thrown }
   if (codeOf(thrown)?.startsWith('42')) { return DB.unexpectedError(causeOf(thrown)) }
   return DB.storageUnavailable(causeOf(thrown))
 }
 
-// A driver's error can carry the statement's parameters, a row among them, so the cause keeps only its message and code.
+// A driver's error can include the statement's parameters, which may include a row. Keep only its message and code.
 const causeOf = (thrown: unknown): Error => {
   const code = codeOf(thrown)
   return Object.assign(new Error(DB.sanitizeForeignError(thrown).message), (code === undefined) ? {} : { code })
@@ -169,7 +175,7 @@ const codeOf = (thrown: unknown): string | undefined => (
 
 const firstOf = (rows: unknown[], column: string): unknown => ((rows[0] as Record<string, unknown> | undefined)?.[column] ?? null)
 
-/** A vaultDB in your Postgres: `new PostgresVaultDB({ client: pgClientOf(pool) })`. */
+/** A vaultDB that stores its rows in your Postgres: `new PostgresVaultDB({ client: pgClientOf(pool) })`. */
 export class PostgresVaultDB extends DB.AdapterVaultDB {
   // == [Props]: #client, #listen, #maxBoxes
 
@@ -204,7 +210,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   }
 
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** Demands room in the vault for a new live box, under its soft cap `maxBoxes`. */
+  /** Throw `vault_full` if the put would add a live box to a vault that already has `maxBoxes` of them. */
   async #demandRoom(tx: PostgresQueryable, record: BoxRecord, ante: unknown): Promise<void> {
     if (DB.isLiveRow(ante)) { return }
     const boxes = await boxesOfLife(tx, record, record.vault_tok)
@@ -263,10 +269,12 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
       const isOurs = DB.isLiveVaultRecord(ante, tombstone.vault_tok)
       const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
       const isWritten = isOurs && DB.isRowAt(ante, prior)
-      // A live row of this life at another revision, or damage, stops the del whole; any other row lets a repeat sweep the boxes.
+      // Stop here, writing nothing, if the row is damaged or is this life's live row at another revision.
+      // For any other row (a tombstone, another life's row, or none) a repeated del still tombstones this life's boxes.
       if ((! isWritten) && (isOurs || isDamaged)) { return { isWritten, ante } }
       if (isWritten) { await writeVaultRow(tx, tombstone, ante) }
-      // Past the stop above, a row that is not ours is a tombstone, another life's row, or none; only a tombstone of this life tells its boxes.
+      // From here on, a row we did not write is a tombstone, another life's row, or absent.
+      // Box notices are sent only when the vault row is this life's tombstone.
       const vault = isWritten ? tombstone : ante as VaultRow | null
       const world = (vault?.vault_tok === tombstone.vault_tok) ? vault : null
       const texts = isWritten ? [noticeTextOf(tombstone)] : []
@@ -298,10 +306,10 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
 
   protected async doTidyGone({ applabel, user_id }: BankScope): Promise<Tidied> {
     return await this.#transact(async (tx) => {
-      /** One life's box rows in a bank, counted. */
+      /** The number of box rows stored for one vault life. */
       type BoxLife = { vaultlabel: string, vault_tok: string, boxcount: number }
 
-      // Lives before vaults: each statement reads its own snapshot, and a vault row read after its boxes is as new as they are or newer.
+      // Query the box lives before the vaults. Each statement reads its own snapshot, so a vault row read second is at least as new as the boxes counted first.
       const lives = await rowsFrom(tx, BoxLivesSql, [applabel, user_id]) as BoxLife[]
       const vaultrows = await rowsFrom(tx, ListVaultsSql, [applabel, user_id]) as RowOfVault[]
       const vaults = new Map(vaultrows.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
@@ -339,14 +347,14 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
 
   // == [Hearing]: #heardOrNull
 
-  /** The rows `told` carries, or the rows as they stand now where it carries none; null when unreadable. */
+  /** Return the rows a notice carried, or fetch them now if it carried none. Returns null if that fetch fails. */
   async #heardOrNull({ heard, vault_tok, boxlabel, ...scope }: Told): Promise<Heard | null> {
     if (heard !== undefined) { return heard }
     try {
       if ((vault_tok === undefined) || (boxlabel === undefined)) { return { vault: await this.doGetVault(scope) } }
       return await this.doGetBox({ ...scope, vault_tok, boxlabel })
     } catch {
-      return null  // a notice is a hint, and one that cannot be read afresh is let go
+      return null  // a notice is only a hint: if its rows cannot be fetched, drop it
     }
   }
   // --
@@ -354,7 +362,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
 
 // == [Listening]: listenOrNull, unlistenOnceListening
 
-/** Start `listen`, answering how to stop it, or null when it failed. */
+/** Start listening and return the function that stops it, or null if listening failed. */
 const listenOrNull = async (listen: PostgresListen, channel: string, onNotify: (text: string) => void): Promise<(() => unknown) | null> => {
   try {
     return await listen(channel, onNotify)
@@ -368,7 +376,7 @@ const unlistenOnceListening = async (listening: Promise<(() => unknown) | null>)
   try {
     await unlisten?.()
   } catch {
-    // the watch has already stopped hearing, whatever the driver's unlisten makes of it
+    // the watch already ignores notices, so a failed unlisten changes nothing
   }
 }
 // --
@@ -386,12 +394,12 @@ const vaultRowOf = async (tx: PostgresQueryable, { applabel, user_id, vaultlabel
   firstOf(await rowsFrom(tx, GetVaultSql, [applabel, user_id, vaultlabel]), 'vault')
 )
 
-// Every write locks its vault's row first, so writes under one vault take turns, and a compare-and-set checks the revision of the row it replaces as stored at that moment.
+// Every write first locks its vault's row (SELECT ... FOR UPDATE). Writes to one vault then run one at a time, and each compares revisions against the row as currently stored.
 const lockedVaultRowOf = async (tx: PostgresQueryable, { applabel, user_id, vaultlabel }: VaultScope): Promise<unknown> => (
   firstOf(await rowsFrom(tx, LockVaultSql, [applabel, user_id, vaultlabel]), 'vault')
 )
 
-/** Write `row` over `ante`, answering false where `ante` is null and another device's birth was written first. */
+/** Write the vault row. Returns false only when creating a vault (`ante` is null) and another writer's insert got there first. */
 const writeVaultRow = async (tx: PostgresQueryable, row: VaultRecord | VaultTombstone, ante: unknown): Promise<boolean> => {
   const params = [row.applabel, row.user_id, row.vaultlabel, JSON.stringify(row)]
   if (ante !== null) { await tx.query(WriteVaultSql, params); return true }
@@ -411,7 +419,7 @@ const writeBoxRow = async (tx: PostgresQueryable, { applabel, user_id, vaultlabe
   await tx.query(WriteBoxSql, [applabel, user_id, vaultlabel, vault_tok, boxlabel, JSON.stringify(row)])
 }
 
-// Notifications sent in a transaction go out when it commits, and not at all when it rolls back.
+// Postgres delivers a transaction's notifications when it commits, and discards them if it rolls back.
 const notify = async (tx: PostgresQueryable, { user_id }: BankScope, texts: string[]): Promise<void> => {
   if (texts.length === 0) { return }
   await tx.query(NotifySql, [channelOf(user_id), texts])

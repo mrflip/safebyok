@@ -9,10 +9,10 @@ TH.sweepBankWorlds()
 
 const WeekMillis = 7 * 24 * 60 * MinuteMillis
 
-/** A strength checker that finds a passphrase under 12 characters weak. */
+/** A strength checker that calls any passphrase under 12 characters weak. */
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
-/** The gating `raise` opens, shown in a PassphraseModal. */
+/** Open a gating with `raise`, and render it in a PassphraseModal. */
 const shownFor = async (raise: typeof TH.building, opts: { built?: boolean, bankOpts?: Parameters<typeof TH.openGatingOf>[2], leaseMillis?: number } = {}) => {
   const world = TH.makeBankWorld()
   if (opts.built === true) { await TH.makeBankWithVault(world) }

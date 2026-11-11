@@ -1,14 +1,14 @@
 import { defineConfig } from 'tsdown'
 
-// The same build as the core's: ESM and CommonJS, each with declarations and source maps;
-// `exports` writes package.json's entry points from what was built, with the `@safebyok/source`
-// condition the workspace's tsconfigs ask for; publint and attw read the package as a consumer
-// would, and fail the build on anything they find. `safebyok` is a peer, so it stays external and
-// the host's one copy is the one whose AdapterVaultDB and VaultError this adapter extends.
+// The same build as the core's: ESM and CommonJS, each with declarations and source maps.
+// `exports` writes package.json's entry points from what was built, and adds the `@safebyok/source`
+// condition that the workspace's tsconfigs resolve. publint and attw check the package as a consumer
+// would see it, and fail the build on any finding. `safebyok` is a peer dependency, so it stays
+// external: this adapter must extend the AdapterVaultDB and VaultError of the host's own copy.
 export default defineConfig({
   entry:      ['src/index.ts'],
   format:     ['esm', 'cjs'],
-  // Browser first, but nothing here is browser-only: anything with an `indexedDB` global runs it.
+  // Built for browsers, but not browser-only: it runs anywhere with an `indexedDB` global.
   platform:   'neutral',
   target:     'es2022',
   dts:        true,

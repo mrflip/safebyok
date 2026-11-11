@@ -1,6 +1,6 @@
 {
-  // The Convex adapter: its component runs in Convex's default runtime, a V8 isolate with the web
-  // platform's globals (fetch, WebCrypto), which the DOM lib types.
+  // The Convex adapter. Its component runs in Convex's default runtime: a V8 isolate with the web
+  // platform's globals (fetch, WebCrypto), which the DOM lib provides types for.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": [

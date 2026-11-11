@@ -1,4 +1,4 @@
-/** PostgresVaultDB over PGlite: the battery every VaultDB runs, and what is Postgres's own. */
+/** PostgresVaultDB on PGlite: the battery every VaultDB runs, plus tests of its Postgres-specific behavior. */
 
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as DB from 'safebyok/storage'
@@ -15,7 +15,7 @@ const throwingClient = (err: Error) => ({
   transaction: () => Promise.reject(err),
 })
 
-/** A watch on `vaultDB` at `scope`, closed when the test ends, and the notices it has heard so far. */
+/** Watch `scope` on `vaultDB` until the test ends. Returns the array that collects its notices. */
 const watching = (vaultDB: PostgresVaultDB, scope: DB.WatchScope = TH.vaultScope) => {
   const notices: Notice[] = []
   const unwatch = vaultDB.watch(scope, (notice) => { notices.push(notice) })
@@ -106,7 +106,7 @@ describe("PostgresVaultDB's watch", () => {
   })
 })
 
-/** The notifications sent on the test user's channel from now until the test ends, each parsed. */
+/** Collect the notifications sent on the test user's channel until the test ends, each parsed from JSON. */
 const sentOn = async (): Promise<unknown[]> => {
   const sent: unknown[] = []
   const unlisten = await TH.listen(vaultChannelOf(TH.bankScope.user_id), (text) => { sent.push(JSON.parse(text)) })
@@ -114,7 +114,7 @@ const sentOn = async (): Promise<unknown[]> => {
   return sent
 }
 
-/** The props a box notice opens with, for `vault`, in the order they are sent. */
+/** The vault props at the start of a box notice for `vault`, in the order they are sent. */
 const vaultPropsOf = (vault: DB.VaultRecord) => [
   vault.applabel, vault.user_id, vault.vaultlabel, vault.fmt, vault.am, vault.revision_tok, vault.revision_seq,
   vault.registered_at, vault.written_at, vault.vault_tok, vault.gate.gate_epoch,
@@ -211,7 +211,7 @@ describe("PostgresVaultDB's channels", () => {
   it("hears a user_id of capitals and punctuation, its channel LISTENed as a quoted identifier", async () => {
     const vaultDB = await TH.makeVaultDB()
     const user_id = 'Auth0|Ab.C@x.io~:-+%2B'
-    // A first LISTEN on PGlite takes its turn behind the queued statements, so the channel is listened for before the write.
+    // PGlite queues a first LISTEN behind the statements already waiting, so listen on the channel before writing.
     await TH.listen(vaultChannelOf(user_id), () => undefined)
     const notices = watching(vaultDB, { ...TH.bankScope, user_id })
     const vault = TH.vaultAt(0, 'life1', { user_id })
@@ -219,7 +219,7 @@ describe("PostgresVaultDB's channels", () => {
     await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'got', val: vault, world: vault }]) })
   })
 
-  // The channel is 'safebyok_' (9 bytes) and the user_id; Postgres refuses a channel past 63 bytes.
+  // The channel is 'safebyok_' (9 bytes) plus the user_id, and Postgres rejects a channel name longer than 63 bytes.
   it("refuses each write for a user_id past 54 bytes", async () => {
     const vaultDB = await TH.makeVaultDB()
     const longest = 'u'.repeat(54)

@@ -1,6 +1,7 @@
-// eslint.config.mjs -- the WebAssembly key deriver's lint, cut from the core's (packages/safebyok/),
-// which is the authority on house style: where the two disagree, the core's is right and this one
-// is the bug. It differs only in having no console logger of its own to exempt.
+// eslint.config.mjs -- lint rules for the WebAssembly key deriver, copied from the core's (packages/safebyok/).
+// The core's config is the authority on house style: where the two disagree, the core's is right and this
+// one has the bug. This copy has its own config names and no console logger to exempt, and it leaves out
+// the core's doc-block rules.
 //
 import { defineConfig, globalIgnores } from 'eslint/config'
 import js                              from '@eslint/js'

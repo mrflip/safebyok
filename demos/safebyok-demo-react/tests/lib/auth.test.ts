@@ -3,7 +3,7 @@ import { createAuth } from '../../src/lib/auth'
 import type { StringStorage } from '../../src/lib/string-storage'
 import { memoryStorage } from '../test-helpers'
 
-/** Two fresh storages, a clock the test moves by hand, and the auth over them. */
+/** Make two fresh storages, a clock the test advances by hand, and an auth that uses them. */
 const makeWorld = () => {
   const dbStorage = memoryStorage()
   const deviceStorage = memoryStorage()
@@ -14,7 +14,7 @@ const makeWorld = () => {
   return { dbStorage, deviceStorage, advance, auth }
 }
 
-/** The account row the fake auth keeps for margo, as it is stored: null if there is none. */
+/** The stored account row for margo, or null if there is none. */
 const margosAccount = (dbStorage: StringStorage): unknown => JSON.parse(dbStorage.get('account:acme:margo') ?? 'null')
 
 describe("createAuth", () => {

@@ -1,5 +1,5 @@
-// Each document carries the fragments it spreads and no others, as GraphQL's validation demands, and
-// never asks for `__typename`: what crosses is what the core's answer checkers read.
+// Each document includes exactly the fragments it uses, as GraphQL validation requires. None asks for
+// `__typename`, so a response holds only the fields the core's answer checkers expect.
 
 const vaultSparseFields = 'applabel user_id vaultlabel fmt revision_tok revision_seq registered_at written_at am vault_tok'
 const boxSparseFields = 'applabel user_id vaultlabel boxlabel fmt revision_tok revision_seq registered_at written_at am vault_tok box_tok whisper_codec whisper_schema_version'
@@ -48,11 +48,11 @@ const boxAnswer = `fragment SafebyokBoxAnswerFields on SafebyokBoxAnswer {
   err { ...SafebyokErrFields }
 }`
 
-// The fragments each family of operation spreads, all the way down.
+// The fragments each group of operations uses, nested ones included.
 const vaultAnswerFragments = [vaultAnswer, vaultRow, gate, ciphered, reqParams, err].join('\n')
 const boxAnswerFragments = [boxAnswer, row, boxRow, vaultRow, gate, ciphered, reqParams, err].join('\n')
 
-/** The operation documents a client of `safebyok-graphql/server` sends, one per verb and one for the watch. */
+/** The GraphQL documents a client sends to `safebyok-graphql/server`: one per vaultDB verb, and one for the watch subscription. */
 export const VaultOperations = {
   listVaults: `query SafebyokListVaults($applabel: String!, $user_id: String!) {
   safebyokListVaults(applabel: $applabel, user_id: $user_id) {

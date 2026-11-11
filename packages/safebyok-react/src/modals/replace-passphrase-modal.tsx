@@ -3,7 +3,7 @@ import { Messages } from '../helpers/messages'
 import type { ReplacePassphraseModalProps } from '../shapes'
 import { ChosenPassphraseFields, DialogBoundary, ModalForm, PassphraseField, UsernameField, textOf, useAttemptAction, useChosenPassphrase } from './modal-kit'
 
-/** The dialog for a `replace_passphrase` gating, which proves the passphrase in use and chooses the next. */
+/** Render the dialog for a `replace_passphrase` gating: the user enters the current passphrase and chooses a new one. */
 export const ReplacePassphraseModal = (props: ReplacePassphraseModalProps) => (
   <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
     <ReplacePassphraseForm {...props} />

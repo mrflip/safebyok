@@ -7,7 +7,7 @@ import { useRevealToggle } from '../hooks/reveal-toggle'
 import type { DevBoxInspectorProps } from '../shapes'
 import { LastCallLine, isLabel, jsonOf, useLastCall } from './last-call'
 
-/** A vaultlabel and a boxlabel to pick, and a button for each verb the shared Box and its Vault offer. */
+/** Render a dev panel: pick a vaultlabel and a boxlabel, then press a button for each verb of that Box and its Vault. */
 export const DevBoxInspector = ({ defaultVaultlabel = 'main', defaultBoxlabel = '' }: DevBoxInspectorProps) => {
   const [vaultlabel, setVaultlabel] = useState(defaultVaultlabel)
   const [boxlabel, setBoxlabel] = useState(defaultBoxlabel)
@@ -60,7 +60,7 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
   const isShowing = (exposure === 'showing')
   const { lastCall, call } = useLastCall()
   const [fieldname, setFieldname] = useState('apiKey')
-  // Kept off React's state, so the text typed never sits in a render.
+  // Held in a ref, not in React state, so the typed text is never part of a render.
   const whisperText = useRef('')
   const [extracted, setExtracted] = useState<Whisper | null>(null)
   const isLocked = vaultSnapshot?.isLocked ?? true

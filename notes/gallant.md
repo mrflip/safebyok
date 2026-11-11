@@ -950,7 +950,7 @@ keeping goes in a `//` comment above the doc block: `// The lock first: no box o
 
 | Goofus | Gallant |
 |---|---|
-| The lock first, as it is synchronous and safe: no box opens under a lease while the tombstone goes out. The tombstone's answer, delivered, vacates the boxes. | Lock this vault and store its tombstone; the answer delivered vacates its boxes. |
+| The lock first, as it is synchronous and safe: no box opens under a lease while the tombstone goes out. The tombstone's answer, delivered, vacates the boxes. | Lock this vault and store its tombstone. Its boxes are vacated once storage answers. |
 | Fetch this vault with what its get lists: a timely vault, its boxes held sparse, its damaged rows set aside, and the box listing's watch started. No box verb needs it; the host runs it for the list and the pushes. | List this vault's boxes and start its watch. |
 
 From the old tree (`packages/safebyok-old/src`, removed 2026-11-10), the Gallant column proposed, not the Coach's: a decision given as its reason, the
@@ -958,8 +958,8 @@ project rule the code answers echoed as its doc, and a look ahead.
 
 | Goofus | Gallant, proposed |
 |---|---|
-| A verdict that admits, frozen so that a checker may share it. | A verdict that admits. *(above it: `// Frozen: a checker may share it.`)* |
-| `Checkers`, `Checker` and `objCheck`, where every validator is made, and the {@link Kit} its builders are handed; and `consistent`, `demandConsistent` and `verifyConsistent`, which hold one bag to another, as a validator's `parseConsistent` does. | The validator builders, `Checkers`, `Checker` and `objCheck`, and the `consistent` family that holds one bag to another. |
+| A verdict that admits, frozen so that a checker may share it. | A passing verdict. *(above it: `// Frozen: a checker may share it.`)* |
+| `Checkers`, `Checker` and `objCheck`, where every validator is made, and the {@link Kit} its builders are handed; and `consistent`, `demandConsistent` and `verifyConsistent`, which hold one bag to another, as a validator's `parseConsistent` does. | The validator builders, `Checkers`, `Checker` and `objCheck`, and the `consistent` family, which checks one bag against another. |
 | Which generation of the whisper's own shape this box holds: 1, the only one so far. | Which generation of the whisper's own shape this box holds. |
 
 ## A doc block does not read the body aloud `#purpose-not-machinery`

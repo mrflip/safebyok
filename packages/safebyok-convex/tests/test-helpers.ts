@@ -6,34 +6,34 @@ import { SafebyokComponent } from '../src/server'
 import type { GetUserId, SafebyokApi, SafebyokErrorData } from '../src/server'
 import { modules, register, schema } from '../src/test'
 
-// Everything the core's tests use too, so a test here star-imports this one module as TH.
+// Re-export the core's test helpers, so a test here can star-import this one module as TH.
 export * from 'safebyok/testing'
 
-/** The component's functions, called directly as a root app's: no host wrapper, no auth. */
+/** The component's functions, called directly at the root: no host wrapper and no auth. */
 export const vaults = anyApi['vaults'] as unknown as ComponentApi['vaults']
 
-/** The component's functions at the root, as a client calls them: no host wrapper, no auth. */
+/** The same functions typed as a client calls them (`SafebyokApi`): no host wrapper and no auth. */
 export const rootApi = anyApi['vaults'] as unknown as SafebyokApi
 
-/** A fresh in-memory backend with only the component, its functions at the root, limited to Convex's transaction limits if asked. */
+/** Make a fresh in-memory backend with only the component, its functions at the root. Pass true to enforce Convex's transaction limits. */
 export const componentTest = (transactionLimits = false) => convexTest({ schema, modules, transactionLimits })
 
-/** A host of only the component, its functions at the root, for a fake deployment whose clients write as any user. */
+/** Make a host with only the component, its functions at the root, for a fake deployment whose clients may write as any user. */
 export const componentHost = () => ({ api: anyApi, createTest: () => componentTest() })
 
-/** A host app as the README has it: the component installed as `safebyok`, its functions served from `convex/safebyok.ts` through `getUserId`. */
+/** Make a host app set up as the README shows: the component installed as `safebyok`, and its functions served from `convex/safebyok.ts` using `getUserId`. */
 export const hostWith = (getUserId: GetUserId) => {
   const { app, component } = installedComponent()
   return app.defineModules({ safebyok: component.api({ getUserId }) })
 }
 
-/** A host app with the component installed as `safebyok`, and the SafebyokComponent wrapping it. */
+/** Make a host app with the component installed as `safebyok`, and the SafebyokComponent that wraps it. */
 export const installedComponent = () => {
   const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
   return { app, component: new SafebyokComponent(app.components.safebyok) }
 }
 
-/** The data of the ConvexError `operation` refused with, failing the test if it resolves. */
+/** Return the `data` of the ConvexError that `operation` rejects with. Fails the test if `operation` resolves. */
 export const convexRefusalOf = async (operation: Promise<unknown>): Promise<SafebyokErrorData> => {
   try {
     await operation
@@ -44,7 +44,7 @@ export const convexRefusalOf = async (operation: Promise<unknown>): Promise<Safe
   throw new Error('the call was not refused')
 }
 
-/** The README's getUserId: the signed-in identity's subject, or null when no one is. */
+/** The README's `getUserId`: returns the signed-in identity's subject, or null when no one is signed in. */
 export const bySubject: GetUserId = async (ctx) => {
   const identity = await ctx.auth.getUserIdentity()
   return identity?.subject ?? null
