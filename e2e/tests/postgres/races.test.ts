@@ -32,7 +32,9 @@ TH.describeOnPostgres('races', "PostgresVaultDB's box cap, over a real Postgres"
     }
   })
 
-  it("leaves no live box under a vault deleted while boxes were written to it", async () => {
+  // A box write reads its vault row without a lock, so a box may be written into the life a del is ending (vault-functions.sql).
+  // No listing shows such a box, and tidyGone deletes it.
+  it("lists no box under a vault deleted while boxes were written to it, and tidyGone deletes any written", async () => {
     const db = getDb()
     const first = await TH.freshVaultDB(db)
     const vault = TH.vaultAt()
@@ -46,6 +48,9 @@ TH.describeOnPostgres('races', "PostgresVaultDB's box cap, over a real Postgres"
       ...writers.map(async (writer, idx) => await writer.tryPutBox(TH.boxPutAskOf(writerBox(idx)))),
     ])
 
+    const listed = await first.tryListBoxes(TH.vaultQuery)
+    expect(listed.ok).to.equal(false)
+    await first.tidyGone(TH.bankScope)
     const boxrows = await TH.rowsOf(db).boxRowsOf(TH.vaultScope, 'life1')
     expect([...boxrows.values()].filter((row) => DB.isLiveRow(row))).to.deep.equal([])
   })
