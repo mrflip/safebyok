@@ -71,7 +71,7 @@ it; workers only look things up in it. Each worker keeps its own `thread-<N>-<la
 same directory of its own branch, so no two writers share a file.
 
 Commit both (`plan:`), push the sprint branch, and file it at once as a **draft** PR against
-`main`, with a `plan:` title: the *sprint PR*. It holds only what no thread writes -- the plan,
+`main`, with a `plan:` title: the *sprint PR*. It contains only what no thread writes -- the plan,
 the progress document, the resolutions, the sprint's `human/` entry -- so it never conflicts with
 a thread, and its commits never force a restack. It joins the line last, on top.
 
@@ -89,7 +89,7 @@ chat, and carry on.
 
 Post a short plan summary in chat -- threads, which run together and which wait, look-ahead
 calls -- and proceed. Wait for approval only if planning surfaced a *significant* question (one
-whose answer would change what gets built); that, ask now, before spawning anything.
+whose answer would change what gets built). Ask that question now, before spawning anything.
 
 ## 2. Run the threads
 
@@ -134,9 +134,9 @@ could not ask for) is re-run in the foreground, alone.
 
 **Review.** When the worker reports `ready`, spawn one `thread-reviewer` in the background with
 `isolation: "worktree"` and the thread's reviewer model and effort -- unless the review level
-is `none` or the thread's diff holds no code, in which case say so and go straight to filing.
-Isolated, the reviewer and every agent it starts work in a worktree of their own, kept by the
-harness from the main checkout.
+is `none` or the thread's diff contains no code, in which case say so and go straight to filing.
+With isolation, the reviewer and every agent it starts work in a worktree of their own, which the
+harness keeps apart from the main checkout.
 
 ```
 Review of thread <N> of sprint <sprint_name>. Thread worktree: <root>, branch <branch>, PR #<n>.
@@ -180,7 +180,7 @@ gets no review: the review follows the resume that finishes it.
 2. **Tell the Coach.** A line in chat -- thread, verdict, PR link -- and the thread's row in
    *Progress*. Each item of the report's *Open matters*, and each YOLO decision, becomes a
    `drafting` row of its own in *Open Matters* in the same pass -- one item, one row, never
-   rolled up -- tagged with where it was raised (`#N`, thread N); say in chat why you left any
+   rolled up -- tagged with where it was asked (`#N`, thread N); say in chat why you left any
    out. Start the row with **TOP** when the matter blocks other work, changes a contract or a
    lot of code, or is one the Coach would want first: with little time, they read those. The
    full account is the thread file and the PR: don't paste a report into chat or the doc.
@@ -191,8 +191,8 @@ gets no review: the review follows the resume that finishes it.
    leftover that later work clears away, and anything else that needs no decision but would need
    attention if the sprint ended today. When the Coach answers a row "your call", or a row is one
    they plainly would, the decision is yours: make it, move the row to *Your calls* with the call
-   and where it lands, and do it. Revisit what is already on *Cleanup* as rows come in, and tick
-   off what has landed.
+   and where the work goes, and do it. Revisit what is already on *Cleanup* as rows come in, and
+   tick off what has merged.
 
    A Closer Look, offered when the third thread of a sprint files or when the Coach asks for one,
    is run from `closer-look.md` beside this file: read it, and follow it.
@@ -215,7 +215,7 @@ gets no review: the review follows the resume that finishes it.
 Default rules, absent other guidance:
 
 * **Continue** past a `filed` thread with a `clean` or `fixed` review. Minor questions, and
-  minor findings the reviewer left, ride along in the PR and the documents.
+  minor findings the reviewer left, are recorded in the PR and the documents.
 * **A `flagged` review** -- a significant finding the reviewer may not act on -- is handled like
   a worker's blocking question. If the fix is a two-way door and you are in YOLO, hand it to a
   fresh worker with the rework handoff (§2); it builds on the branch as it now stands, and
@@ -225,14 +225,14 @@ Default rules, absent other guidance:
   Otherwise the finding is the Coach's: the thread waits, unfiled, in its worktree, with the
   reviewer's comment on its PR saying why.
 * **Resume** a `blocked` worker when you can supply what it lacks: an answer the plan or
-  progress document already holds, or -- in YOLO -- a judgment call you can make and record. A
+  progress document already contains, or -- in YOLO -- a judgment call you can make and record. A
   rebase conflict that takes judgment about which behaviour wins is the Coach's.
 * **A worker that compacts** is doing what its cap asks, until compaction starts to cost more
-  than it saves. The first: nothing to the worker; note it on the thread's *Progress* row and
-  in its review handoff, where the reviewer looks harder at what spans it. A second: the thread
-  outgrew one context, a planning lesson for the progress document; check later threads' glosses
-  for the same shape, and split any that have it. A third, or a second soon after the first:
-  the worker is thrashing. Resume it with a directive to commit what is sound, bring its thread
+  than it saves. On the first compaction, tell the worker nothing. Note it on the thread's
+  *Progress* row and in its review handoff, so the reviewer looks harder at the work that spans
+  it. A second compaction means the thread outgrew one context, which is a planning lesson for
+  the progress document: check later threads' glosses for the same shape, and split any that
+  have it. A third, or a second soon after the first, means the worker is thrashing. Resume it with a directive to commit what is sound, bring its thread
   file up to date, and report `blocked` with what remains; then a fresh worker continues from
   the thread file (the rework handoff, with *Continue* for *Act on*), or what remains becomes a
   thread of its own. A worker whose result reads *Autocompact is thrashing* was stopped by the
@@ -243,7 +243,7 @@ Default rules, absent other guidance:
   or, while the other thread's PR is filed but unmerged, amend it there. It needs no thread of
   its own, and no row.
 * **Pause the sprint** -- start no new threads, let those underway reach their next report and
-  hold them there, update the status lines and *Progress*, write
+  keep them there, update the status lines and *Progress*, write
   `human/YYYYMMDD-sprint_<name>_paused.md` in the sprint worktree saying exactly where things
   stand (which threads filed, which wait in which worktree, and why), commit and push, say so in
   chat, and end your turn -- when:
@@ -252,8 +252,8 @@ Default rules, absent other guidance:
   - a guardrail conflicts with the work (say so and propose the alternative, per CLAUDE.md);
   - a worktree or a branch is in a state neither you nor the reports explain (a `bailed`
     reviewer is this case);
-  - a thread's outcome invalidates other threads' premises. A stopped thread holds back the
-    threads stacked on it; independent threads may carry on.
+  - a thread's outcome invalidates other threads' premises. A stopped thread also stops the
+    threads stacked on it. Independent threads may carry on.
 * **Every remaining thread waits on a merge**: that is a pause too, naming the PRs the Coach
   would merge to free them.
 * **Stopping is cheap** outside YOLO: every thread's work is pushed to its PR, unfiled work also

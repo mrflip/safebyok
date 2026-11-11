@@ -11,7 +11,7 @@ The Coach's words after the command: `$ARGUMENTS`. They narrow the target or cla
 conflict with this file, they win.
 
 CLAUDE.md is in every agent's context on every turn. STYLE.md, PROCESS.md and VOCABULARY.md are
-read by section when a pointer says to. An agent or skill file is read by the one session that
+read by section when a pointer says to. An agent or skill file is read only by the session that
 runs it. A line is weighed by who pays for it and how often, against what it prevents.
 
 ## 1. Measure
@@ -52,12 +52,12 @@ spells the heading: check with `rg -n '^#' <file>`.
 ## 4. Keep the words plain
 
 Cut a line, or leave it whole: do not compress it. Agents copy the register of the guidance they read, so a
-line that stays is a plain sentence someone would say aloud, with its rule and its one best example, in the
+line that stays is a plain sentence someone would say aloud, with its rule and its single best example, in the
 cast's names and without hedges.
 
 ## 5. Finish each move
 
-A move is complete only when the destination says it: add the line there, in that file's voice,
+A move is not done until the destination says it: add the line there, in that file's voice,
 under its right heading, and fix every reference to the old place (`rg -n` the old section's
 title over `.`). A rule cut from CLAUDE.md that nothing
 else says is a decision for the Coach, not a silent loss: list it.

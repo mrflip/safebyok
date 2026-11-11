@@ -14,7 +14,7 @@ default branch, and the repo. Verify only; change nothing.
    `origin/<default>`.
 3. Each local branch equals its origin counterpart (`git rev-parse`).
 4. No branch contains a commit belonging to a PR that isn't below it:
-   `git log --oneline origin/<default>..origin/<branch>` should hold only
+   `git log --oneline origin/<default>..origin/<branch>` should list only
    that PR's commits plus those below it.
 5. `gh pr view <n> --json body -q .body | head -1` for each PR: exactly
    one stack line, correct order, every PR linked, `(this PR)` on the

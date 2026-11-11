@@ -47,7 +47,7 @@ about to make. Chain each onto the command it heralds.
    are confident of; at `high` or `max`, wider, uncertain findings included. Say which way the
    review ran.
 
-   **Style** is delegated, as workers do not front-load it. Once `/code-review` has returned and
+   **Style** is delegated, because workers do not front-load it. Once `/code-review` has returned and
    before you fix anything, spawn `style-reviewer` (`.claude/agents/style-reviewer.md`) in the
    foreground with your worktree path, the branch and the same range, and with the `model` your
    handoff's *Style pass* names, if it names one (its own pin, `sonnet`, otherwise). It fixes the
@@ -78,7 +78,7 @@ about to make. Chain each onto the command it heralds.
    - be one you cannot explain in a sentence.
 
    A finding you leave goes in your PR comment as *minor* (a note for the record) or
-   *significant* (below). One that does not hold up against the files is dropped, with a line in
+   *significant* (below). One that the files do not bear out is dropped, with a line in
    your report.
 3. **Prove it.** `pnpm justify`. A fix that turns it red and whose repair is not obvious is undone,
    not repaired: note it. Never commit red. Stop only processes you started, by PID.

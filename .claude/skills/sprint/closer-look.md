@@ -14,7 +14,7 @@ understand their context".
 Never run one unasked: it costs an `opus` context and a long read by the Coach. **Offer** it, in one
 line of chat, when the third thread of a sprint files, if the sprint has six or more threads and
 is building a new design rather than carrying out a settled one. Offer a second near two-thirds of
-the way through, scoped to what the first didn't cover. Don't hold the threads while it runs.
+the way through, scoped to what the first didn't cover. Don't pause the threads while it runs.
 
 ## Run it
 
@@ -23,9 +23,9 @@ the way through, scoped to what the first didn't cover. Don't hold the threads w
 2. **Pick a SHA:** the top of what has filed. Cut a clean, detached worktree there; a thread still
    building is out of scope, and the tab says so.
 3. **Spawn one `opus` agent** in the background with the brief below. Quote the rulings it should
-   not report as discoveries, and, on a second look, list what the first raised and how the Coach
-   answered, so it isn't raised again.
-4. **Birth a *Closer Look* tab** with the report as its text, eyebrows first, as their top items
+   not report as discoveries, and, on a second look, list what the first reported and how the Coach
+   answered, so it isn't reported again.
+4. **Birth a *Closer Look* tab** with the report as its text, eyebrows first, because their top items
    matter most. Open with what the reader saw and what it did not, the SHA, and the flavours.
 
 ## The brief
@@ -55,7 +55,7 @@ Report, in this order:
 
 2. Undergrowth, found by searching rather than by reading through:
    - Control primitives: queue, counter, generation, unique token, join, lock, a flag gating a
-     path, timer, abort controller, retry, a promise held in a field.
+     path, timer, abort controller, retry, a promise stored in a field.
    - New mechanisms: classes, files, or a nexus of related methods the design doesn't contemplate.
    - Non-standard JavaScript: a method's whole body in a functional wrapper, method names passed
      for later calling, parameterized helpers that could be inlined, anything more like code golf
@@ -88,8 +88,8 @@ every reply: what they are looking into themselves; what they said to do later; 
 ready when they say; and questions still open. Quote their words. Start work only on what they
 single out as urgent, and take later threads out of the running order only when they say so.
 
-* **Correct a premise in the same section.** In unrace a reply took new code for old; the item's
-  origin should have said, and the triage had to.
+* **Correct a premise in the same section.** In the unrace sprint, a reply took new code for old.
+  The item's origin should have said so, and the triage had to.
 * **Say what you took each reply to mean,** and ask where you stretched one. A remark that a thing
   was never contemplated is not yet an instruction to remove it.
 * **Answer their questions in the tab,** under a heading of their own, from a subagent that reads
