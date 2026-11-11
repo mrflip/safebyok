@@ -461,7 +461,7 @@ gating.attempt({ passphraseClear })                  no lock check: a lock does 
       ├─ demandDeletable                             enabled only: a lock does not stop a delete
       ├─ vault.sparse consistent with ante           scope, vault_tok and revision; moved since the proof → 'stale_write', nothing sent
       └─ vaultListing.del(vault.sparse) → tryDel
-         ├─ a vault listed of another vault_tok      → 'vault_mismatch', nothing sent
+         ├─ a vault listed of another vault_tok      → 'vault_reborn', nothing sent
          └─ Listing.tryDel: the tombstone at nextRevisionOf(the sparse record's revision)
             ├─ vaultDB.tryDelVault(tombstone, { prior })    ← the commit: a tombstone, its boxes cascading
             │    moved → 'stale_write', nothing stored
@@ -495,7 +495,7 @@ tombstone as its `prior` to be refused. The package does not retry: a repeat is 
 which its Vault allows until the tombstone arrives. After that `vault.delVaultPrompt()` refuses, because the vault is not
 present; `vault.del(vault.scope)` still repeats the delete, over the tombstone's revision, and the vaultDB answers `gone` and cascades.
 
-A Box operation naming a stale or missing vault_tok will fail `vault_mismatch` (or `vault_empty` or `vault_gone`). The damaged_row field will contain a generated tombstone if one is found with that scope *and vault_tok*, null otherwise. In both cases the value is forensic: do not instantiate, do not delivere. (Discovering a row is exceptionally unlikely as they were to have been transactionally removed with the vault deletion. `bank.doctor()` will establish comfort if needed)
+A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or `vault_empty` or `vault_gone`). The damaged_row field will contain a generated tombstone if one is found with that scope *and vault_tok*, null otherwise. In both cases the value is forensic: do not instantiate, do not delivere. (Discovering a row is exceptionally unlikely as they were to have been transactionally removed with the vault deletion. `bank.doctor()` will establish comfort if needed)
 
 ## Required of the parts not yet drawn
 

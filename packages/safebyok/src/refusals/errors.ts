@@ -17,7 +17,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `box_too_large`, `vault_full`,
  *   `stale_write`, `record_conflict`, `storage_unavailable`, `storage_blocked`, `gate_made_elsewhere`,
- *   `vault_gone`, `vault_mismatch`, `gating_concluded`, `attempt_in_flight`, `already_asking`, `dismissed`,
+ *   `vault_gone`, `vault_reborn`, `gating_concluded`, `attempt_in_flight`, `already_asking`, `dismissed`,
  *   `same_passphrase`, `camped`, `vault_empty`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_whisper`, `damaged_lease`, `newer_format`,
@@ -59,7 +59,7 @@ export const refusalkindVals = [
   'storage_blocked',     // the browser withholds its storage from this page -- site data blocked, a private window, IndexedDB switched off: a retry will not mend it
   'storage_issue',       // the storage backend answered with a row no working store could: no object at all, or naming another address than the one asked: the database is so broken we just can't, and a retry is unlikely to help
   'vault_gone',          // the vault a call was working on is no longer stored: deleted, here or elsewhere
-  'vault_mismatch',      // a live vault stands where the call's vault stood, under another vault_tok than the call has
+  'vault_reborn',        // a live vault stands where the call's vault stood, under another vault_tok than the call has: expected, and the vault is read again by its scope
   'gating_concluded',    // a proof under way was for a prompt that ended meanwhile -- it was answered or dismissed -- so it unlocked nothing
   'damaged_lease',       // this device's lease would not open under its leaseKey: it was forgotten, and the vault locked
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
@@ -106,7 +106,7 @@ export const RefusalFamilyForKind = {
   storage_blocked:     'condition',
   storage_issue:       'bad_news',
   vault_gone:          'condition',
-  vault_mismatch:      'condition',
+  vault_reborn:        'condition',
   gating_concluded:    'condition',
   damaged_lease:       'bad_news',
   attempt_in_flight:   'condition',

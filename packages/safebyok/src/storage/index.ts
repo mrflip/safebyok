@@ -61,7 +61,7 @@ export type { ConsistencyRefusal, ObjCheckOpts, RefusalOpts, Refusing, Story } f
 
 // == [The refusals]: an adapter's throwers
 export { sanitizeForeignError, storageBlocked, storageUnavailable, unexpectedError } from '../refusals/throwers'
-export { vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, storageFull, seqNotNext, deviceDBFailed } from '../refusals/throwers'
+export { vaultEmpty, vaultReborn, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, storageFull, seqNotNext, deviceDBFailed } from '../refusals/throwers'
 export { storageFailed, identityRevoked } from '../refusals/throwers'
 export { VaultError, isVaultError, refusalkindVals } from '../refusals/errors'
 export { IsVaultError, brand, brandOf } from '../helpers/consts'

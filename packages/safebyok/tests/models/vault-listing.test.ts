@@ -513,7 +513,7 @@ describe("the listing's methods return the vaultDB's answer", () => {
     const before = storedNow()
     const answer = await listing.tryDel({ ...listing.sparseOf(vault), vault_tok: 'another-life' })
     expect(answer).to.deep.include({ ok: false, world: null })
-    expect(answer.err?.refusalkind).to.eq('vault_mismatch')
+    expect(answer.err?.refusalkind).to.eq('vault_reborn')
     expect(storedNow()).to.deep.equal(before)
   })
 

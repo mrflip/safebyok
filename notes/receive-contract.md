@@ -94,7 +94,7 @@ Selection makes sure a receiver is listed at the record's scope. It delivers not
 | S2  | a Vault of another `vault_tok` than `rcvd`'s, and `rev` is `newer` | That Vault is vacated, which takes it off the list. Then S1.     |
 | S3  | any other instance                                                 | that instance                                                    |
 
-S2 is the one judgment selection makes of the record, and only a vault listing makes it: a Vault object is one life of its vault (L2). An older row of another life goes to the Vault listed, and is R1 there.
+S2 is the one judgment selection makes of the record, and only a vault listing makes it: a Vault object is one life of its vault (L2). An older row of another life goes to the Vault listed, and is R1 there (`older`: as it was). The seq at a scope goes on across a rebirth (`notes/answer-contract.md`, *Writing*), so a row of an earlier life that arrives late is `older`, and never replaces the life listed.
 
 ## The receive table
 
@@ -134,7 +134,7 @@ W2 is how this device learns from a box answer alone that its vault's life is ov
 1. **`fateOver` is S2, and `SlotFate` goes.** `lose` is R1 and `replace` is S2. `Listing.buildOrReceive` keeps selection alone.
 2. **One table, read once.** Today a vault row is judged by `VaultListing.fateOver`, then by `Storable.reconcileCentral`, and the two do not agree: `reconcileCentral` checks `vault_tok` before age, so an older row of another life is dropped at the listing and throws at `Vault.receiveWorld`.
 3. **A box row of another `vault_tok`** is refused `storage_issue` by its listing, as F3 says (`rowOfOtherVaultTok` in `Listing.buildOrReceive`). An instance handed one directly still throws `record_conflict` (`otherVaultTok` in `reconcileCentral`), and a vault reaches that from `Vault.receiveWorld`, where deliverWorld hands the row to the vault listing (W2).
-4. **W2 does not arise today**, because the vaultDB sends no world with `vault_mismatch`: the other life's row is in `dbhas`, and the box listing drops it as no row of its own. Run against the memory vaultDB, a `fetchBox` under a vault row of another life answers `vault_mismatch`. The answer contract makes that row the world (C12). `Vault.receiveWorld` as it stands would then throw `record_conflict` on it inside `Listing.deliver`, and the caller would hear that in place of the answer's own refusal, which the classifier names `vault_gone` or `vault_reborn`.
+4. **W2 does not arise today**, because the vaultDB sends no world with `vault_reborn`: the other life's row is in `dbhas`, and the box listing drops it as no row of its own. Run against the memory vaultDB, a `fetchBox` under a vault row of another life answers `vault_reborn`. The answer contract makes that row the world (C12). `Vault.receiveWorld` as it stands would then throw `record_conflict` on it inside `Listing.deliver`, and the caller would hear that in place of the answer's own refusal, which the classifier names `vault_gone` or `vault_reborn`.
 5. **F4, F5 and F6** are three throwers and three sentences today (`oneRevisionTwoToks`, `oneRevisionTwoLives`, `oneRevisionTwoFates`).
 6. **F7 is new as a refusal.** Today a vault is replaced there (`isRebirth` in `fateOver`), and a box adopts.
 7. **`shapeUnreconciled` cannot be reached** and goes.

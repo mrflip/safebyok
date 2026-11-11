@@ -45,7 +45,7 @@ This table lists, for each call, the request fields that must be consistent and 
 
 * **`vault_empty` means "nothing of this life", not "nothing in this scope".** A request with an old `vault_tok` finds no row. To see
   what is stored at the scope, call `getVault`, which looks up by scope alone.
-* **A live row of another life is refused as `vault_mismatch`** by any call that finds the vault row by scope and `vault_tok`. The exceptions are `delVault`, which returns `void`, and `putVault`, which refuses `camped` when `prior` is that row's revision and `stale_write` otherwise. Nothing is read or written, and `world` and `dbhas` are that row.
+* **A live row of another life is refused as `vault_reborn`** by any call that finds the vault row by scope and `vault_tok`. The exceptions are `delVault`, which returns `void`, and `putVault`, which refuses `camped` when `prior` is that row's revision and `stale_write` otherwise. Nothing is read or written, and `world` and `dbhas` are that row.
 * **`gate_epoch` does not narrow any query.** A matched revision already identifies the row, and only a gate verb changes `gate_epoch`.
 * **`prior` is a plain `Revision`**, `{ revision_tok, revision_seq }`, so it needs no new field names.
 
@@ -68,7 +68,7 @@ For every return value,
 | VPA  | write | stale_write      | 💣   | scope+vault_tok of request, world, database record, `dbhas`, and `val` are consistent |
 | VPA7 | all   | vault_gone       | 💣   | database row and `dbhas` equal tombstone                                              |
 | VPA7 | all   | vault_empty      | 💣   | database row empty, `dbhas` null, world a sentinel'ed tombstone                       |
-| VPA7 | all   | vault_mismatch   | 💣   | database row live under another vault_tok; `world` and `dbhas` equal that row         |
+| VPA7 | all   | vault_reborn     | 💣   | database row live under another vault_tok; `world` and `dbhas` equal that row         |
 | VPA7 | all   | vault_full       | 💣   | `req_params` holds scope, vault_tok, other safe metadata                                      |
 | VPA7 | all   | box_too_large    | 💣   | `req_params` holds scope, vault_tok, other safe metadata                                      |
 | VPA7 | all   | identity_revoked | 💣   | `req_params` holds scope, vault_tok, other safe metadata                                      |

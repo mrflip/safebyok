@@ -118,7 +118,7 @@ const FamilyCases = [
   ["storage_blocked", "condition", 'a browser that withholds its storage is reported to the user'],
   ["gate_made_elsewhere", "condition", 'a vault made first on another device is reported to the user who typed another passphrase'],
   ["vault_gone",          "condition", 'a vault deleted while a call worked on it is a normal part of syncing'],
-  ["vault_mismatch",      "condition", 'a vault deleted or made anew on another device is a normal part of syncing'],
+  ["vault_reborn",        "condition", 'a vault deleted or made anew on another device is a normal part of syncing'],
   ["gating_concluded",    "condition", 'a gating ended while its attempt ran is the user moving on, not a fault'],
   ["damaged_lease",       "bad_news",  'a lease damaged on this device is reported to the user, who unlocks again'],
   ["attempt_in_flight",   "condition", 'a second submit while the first attempt runs is the user being quick, not a fault'],

@@ -128,7 +128,7 @@ describe("demandGood", () => {
 describe("storageTroubleOf", () => {
   // storageTroubleOf @example
   it("returns a VaultError unchanged, and wraps anything else as the cause", () => {
-    const refusal = new VaultError('vault_mismatch', 'Another vault is stored there.')
+    const refusal = new VaultError('vault_reborn', 'Another vault is stored there.')
     expect(storageTroubleOf(refusal)).to.eq(refusal)
     const dropped = new Error('connection terminated unexpectedly')
     const trouble = storageTroubleOf(dropped)
