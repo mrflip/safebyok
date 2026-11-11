@@ -186,9 +186,9 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** The bank's vaults, full or tombstone, no boxes; a row failing validation goes in `damaged_rows`. */
   async listVaults(scope: BankScope): Promise<GoodAnswer<BankListed, ListAct, BankScope>> {
-    const req_params = SX.reqParamsOf(scope)
+    const bankScope = CX.bankScope.parse(scope)
+    const req_params = SX.reqParams.parse(bankScope)
     try {
-      const bankScope = CX.bankScope.parse(scope)
       const rows = await this.doListVaults(bankScope)
       const val: BankListed = { vaults: [], damaged_rows: [] }
       for (const { vaultlabel, vault } of rows) {
@@ -205,10 +205,10 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** The vault by scope alone, whatever its life. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
   async getVault(scope: VaultScope, opts: IfAbsentOpts = {}): Promise<GoodAnswer<VaultRecord | null, GotAct>> {
-    const req_params = SX.reqParamsOf(scope)
+    const vaultScope = CX.vaultScope.parse(scope)
+    const { ifAbsent } = SX.ifAbsentOpts.parse(opts)
+    const req_params = SX.reqParams.parse(vaultScope)
     try {
-      const vaultScope = CX.vaultScope.parse(scope)
-      const { ifAbsent } = SX.ifAbsentOpts.parse(opts)
       const found = foundVaultRowOf(await this.doGetVault(vaultScope), vaultScope)
       if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(vaultScope)) }
       if (found === null) { return { ok: true, req_params, act: 'gotvoid', val: null, world: SX.sentinelVaultOf(vaultScope), dbhas: null } }
@@ -223,9 +223,9 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** The boxes under this `vault_tok`, sparse, with its vault row as `world`. */
   async listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, ListAct>> {
-    const req_params = SX.reqParamsOf(asked)
+    const vaultQuery = SX.vaultQuery.parse(asked)
+    const req_params = SX.reqParams.parse(vaultQuery)
     try {
-      const vaultQuery = SX.vaultQuery.parse(asked)
       const { vault, boxes } = await this.doListBoxes(vaultQuery)
       const world = liveVaultOf(vault, vaultQuery)
       return { ok: true, req_params, act: (boxes.length > 0) ? 'got' : 'gotvoid', val: listedBoxesOf(vaultQuery, boxes), world }
@@ -237,10 +237,10 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** The box under this `vault_tok`, with its vault row as `world`; `ifAbsent: 'nil'` answers null over none. */
   async getBox(asked: BoxQuery, opts: IfAbsentOpts = {}): Promise<GoodAnswer<BoxRecord | null, GotAct>> {
-    const req_params = SX.reqParamsOf(asked)
+    const boxQuery = SX.boxQuery.parse(asked)
+    const { ifAbsent } = SX.ifAbsentOpts.parse(opts)
+    const req_params = SX.reqParams.parse(boxQuery)
     try {
-      const boxQuery = SX.boxQuery.parse(asked)
-      const { ifAbsent } = SX.ifAbsentOpts.parse(opts)
       const { vault, box } = await this.doGetBox(boxQuery)
       const world = liveVaultOf(vault, boxQuery)
       const found = foundBoxRowOf(box, boxQuery)
@@ -260,11 +260,11 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** Puts a vault, as `opts` allow. */
   async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
-    const req_params = SX.reqParamsOf({ ...record, ...opts })
+    const vaultRecord = SX.vaultRecord.parse(record)
+    const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
+    SX.nextSeq.parse({ record: vaultRecord, prior })
+    const req_params = SX.reqParams.parse({ ...vaultRecord, prior })
     try {
-      const vaultRecord = SX.vaultRecord.parse(record)
-      const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
-      SX.nextSeq.parse({ record: vaultRecord, prior })
       const { isWritten, ante } = await this.doPutVault(vaultRecord, { prior, ifAbsent, ifPresent })
       if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: vaultRecord, world: vaultRecord } }
       const found = foundVaultRowOf(ante, vaultRecord)
@@ -284,11 +284,11 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** Puts a box under a vault live at its `vault_tok`, as `opts` allow. */
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> {
-    const req_params = SX.reqParamsOf({ ...record, ...opts })
+    const boxRecord = SX.boxRecord.parse(record)
+    const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
+    SX.nextSeq.parse({ record: boxRecord, prior })
+    const req_params = SX.reqParams.parse({ ...boxRecord, prior })
     try {
-      const boxRecord = SX.boxRecord.parse(record)
-      const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
-      SX.nextSeq.parse({ record: boxRecord, prior })
       const recordBytes = jsonBytes(boxRecord)
       if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
       const { isWritten, ante, vault } = await this.doPutBox(boxRecord, { prior, ifAbsent, ifPresent })
@@ -314,10 +314,10 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** Puts `record`, the vault row at `opts.prior` with a new passphrase wayin and its `gate_epoch` one up. */
   async replacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'replaced'>> {
-    const req_params = SX.reqParamsOf({ ...record, ...opts })
+    const vaultRecord = SX.vaultRecord.parse(record)
+    const { prior } = SX.gateVerbOpts.parse(opts)
+    const req_params = SX.reqParams.parse({ ...vaultRecord, prior })
     try {
-      const vaultRecord = SX.vaultRecord.parse(record)
-      const { prior } = SX.gateVerbOpts.parse(opts)
       const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
       if (! SX.isRowAt(stored, prior)) { throw Refuse.staleWrite(stored, stored) }
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
@@ -333,10 +333,10 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** Puts `record`, the vault row at `opts.prior`, which has no passkey wayin, with one laid on and its `gate_epoch` one up. */
   async addPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'added'>> {
-    const req_params = SX.reqParamsOf({ ...record, ...opts })
+    const vaultRecord = SX.passkeyAddRecord.parse(record)
+    const { prior } = SX.gateVerbOpts.parse(opts)
+    const req_params = SX.reqParams.parse({ ...vaultRecord, prior })
     try {
-      const vaultRecord = SX.passkeyAddRecord.parse(record)
-      const { prior } = SX.gateVerbOpts.parse(opts)
       const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
       if (! SX.isRowAt(stored, prior)) { throw Refuse.staleWrite(stored, stored) }
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
@@ -353,10 +353,10 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** Puts `record`, the vault row at `opts.prior` with no passkey wayin and its `gate_epoch` one up; a row with none answers as stored. */
   async revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked'>> {
-    const req_params = SX.reqParamsOf({ ...record, ...opts })
+    const vaultRecord = SX.passkeyRevokeRecord.parse(record)
+    const { prior } = SX.gateVerbOpts.parse(opts)
+    const req_params = SX.reqParams.parse({ ...vaultRecord, prior })
     try {
-      const vaultRecord = SX.passkeyRevokeRecord.parse(record)
-      const { prior } = SX.gateVerbOpts.parse(opts)
       const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
       if (! SX.isRowAt(stored, prior)) { throw Refuse.staleWrite(stored, stored) }
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
@@ -376,11 +376,11 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** Deletes a box's live row at `prior`. */
   async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> {
-    const req_params = SX.reqParamsOf({ ...tombstone, ...opts })
+    const boxTombstone = SX.boxTombstone.parse(tombstone)
+    const { prior } = SX.delOpts.parse(opts)
+    SX.nextSeq.parse({ record: boxTombstone, prior })
+    const req_params = SX.reqParams.parse({ ...boxTombstone, prior })
     try {
-      const boxTombstone = SX.boxTombstone.parse(tombstone)
-      const { prior } = SX.delOpts.parse(opts)
-      SX.nextSeq.parse({ record: boxTombstone, prior })
       const { isWritten, ante, vault } = await this.doDelBox(boxTombstone, { prior })
       const world = liveVaultOf(vault, boxTombstone)
       if (isWritten) { return { ok: true, req_params, act: 'deleted', val: boxTombstone, world } }
@@ -411,11 +411,11 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** Deletes a vault's live row at `prior`, with the boxes of its life. */
   async delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>> {
-    const req_params = SX.reqParamsOf({ ...tombstone, ...opts })
+    const vaultTombstone = SX.vaultTombstone.parse(tombstone)
+    const { prior } = SX.delOpts.parse(opts)
+    SX.nextSeq.parse({ record: vaultTombstone, prior })
+    const req_params = SX.reqParams.parse({ ...vaultTombstone, prior })
     try {
-      const vaultTombstone = SX.vaultTombstone.parse(tombstone)
-      const { prior } = SX.delOpts.parse(opts)
-      SX.nextSeq.parse({ record: vaultTombstone, prior })
       const { isWritten, ante } = await this.doDelVault(vaultTombstone, { prior })
       if (isWritten) { return { ok: true, req_params, act: 'deleted', val: vaultTombstone, world: vaultTombstone } }
       const found = foundVaultRowOf(ante, vaultTombstone)
@@ -447,9 +447,9 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** For hosts: removes the box rows of tombstoned or vanished vaults, and counts those left. */
   async tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>> {
-    const req_params = SX.reqParamsOf(scope)
+    const bankScope = CX.bankScope.parse(scope)
+    const req_params = SX.reqParams.parse(bankScope)
     try {
-      const bankScope = CX.bankScope.parse(scope)
       const val = await this.doTidyGone(bankScope)
       return { ok: true, req_params, act: 'tidied', val, world: bankScope }
     } catch (err) { throw refusalOf(err, 'tidyGone', req_params) }

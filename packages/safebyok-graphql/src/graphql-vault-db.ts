@@ -62,7 +62,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   /** Non-throwing form of {@link listVaults}. */
   async tryListVaults(scope: BankScope): Promise<Answer<BankListed, ListAct, BankScope>> {
-    return await answerOf('listVaults', DB.reqParamsOf(scope), async () => {
+    return await answerOf('listVaults', () => DB.reqParams.parse(DB.bankScope.parse(scope)), async () => {
       const answer = await this.#asked(VaultOperations.listVaults, 'safebyokListVaults', DB.bankScope.parse(scope))
       return DB.listVaultsAnswer.parse(listedAnswerOf(answer))
     })
@@ -73,7 +73,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   /** Non-throwing form of {@link getVault}. */
   async tryGetVault(scope: VaultScope, opts: IfAbsentOpts = {}): Promise<Answer<VaultRecord | null, GotAct>> {
-    return await answerOf('getVault', DB.reqParamsOf(scope), async () => {
+    return await answerOf('getVault', () => DB.reqParams.parse(DB.vaultScope.parse(scope)), async () => {
       const answer = await this.#asked(VaultOperations.getVault, 'safebyokGetVault', { ...DB.vaultScope.parse(scope), opts: DB.ifAbsentOpts.parse(opts) })
       return DB.getVaultAnswer.parse(rowAnswerOf(answer))
     })
@@ -84,7 +84,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   /** Non-throwing form of {@link listBoxes}. */
   async tryListBoxes(asked: VaultQuery): Promise<Answer<BoxesListed, ListAct>> {
-    return await answerOf('listBoxes', DB.reqParamsOf(asked), async () => {
+    return await answerOf('listBoxes', () => DB.reqParams.parse(DB.vaultQuery.parse(asked)), async () => {
       const answer = await this.#asked(VaultOperations.listBoxes, 'safebyokListBoxes', DB.vaultQuery.parse(asked))
       return DB.listBoxesAnswer.parse(listedAnswerOf(answer))
     })
@@ -95,7 +95,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   /** Non-throwing form of {@link getBox}. */
   async tryGetBox(asked: BoxQuery, opts: IfAbsentOpts = {}): Promise<Answer<BoxRecord | null, GotAct>> {
-    return await answerOf('getBox', DB.reqParamsOf(asked), async () => {
+    return await answerOf('getBox', () => DB.reqParams.parse(DB.boxQuery.parse(asked)), async () => {
       const answer = await this.#asked(VaultOperations.getBox, 'safebyokGetBox', { ...DB.boxQuery.parse(asked), opts: DB.ifAbsentOpts.parse(opts) })
       return DB.getBoxAnswer.parse(rowAnswerOf(answer))
     })
@@ -109,7 +109,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   /** Non-throwing form of {@link putVault}. */
   async tryPutVault(record: VaultRecord, opts: PutOpts): Promise<Answer<VaultRow, PutAct>> {
-    return await answerOf('putVault', DB.reqParamsOf({ ...record, ...opts }), async () => {
+    return await answerOf('putVault', () => DB.reqParams.parse({ ...DB.vaultRecord.parse(record), ...DB.putOpts.parse(opts) }), async () => {
       const answer = await this.#told(VaultOperations.putVault, 'safebyokPutVault', { record: DB.vaultRecord.parse(record), opts: DB.putOpts.parse(opts) })
       return DB.putVaultAnswer.parse(rowAnswerOf(answer))
     })
@@ -120,7 +120,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   /** Non-throwing form of {@link putBox}. */
   async tryPutBox(record: BoxRecord, opts: PutOpts): Promise<Answer<BoxRow, PutAct>> {
-    return await answerOf('putBox', DB.reqParamsOf({ ...record, ...opts }), async () => {
+    return await answerOf('putBox', () => DB.reqParams.parse({ ...DB.boxRecord.parse(record), ...DB.putOpts.parse(opts) }), async () => {
       const answer = await this.#told(VaultOperations.putBox, 'safebyokPutBox', { record: DB.boxRecord.parse(record), opts: DB.putOpts.parse(opts) })
       return DB.putBoxAnswer.parse(rowAnswerOf(answer))
     })
@@ -134,7 +134,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   /** Non-throwing form of {@link replacePassphrase}. */
   async tryReplacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'replaced'>> {
-    return await answerOf('replacePassphrase', DB.reqParamsOf({ ...record, ...opts }), async () => {
+    return await answerOf('replacePassphrase', () => DB.reqParams.parse({ ...DB.vaultRecord.parse(record), ...DB.gateVerbOpts.parse(opts) }), async () => {
       const answer = await this.#told(VaultOperations.replacePassphrase, 'safebyokReplacePassphrase', { record: DB.vaultRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
       return DB.replacePassphraseAnswer.parse(rowAnswerOf(answer))
     })
@@ -145,7 +145,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   /** Non-throwing form of {@link addPasskey}. */
   async tryAddPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'added'>> {
-    return await answerOf('addPasskey', DB.reqParamsOf({ ...record, ...opts }), async () => {
+    return await answerOf('addPasskey', () => DB.reqParams.parse({ ...DB.passkeyAddRecord.parse(record), ...DB.gateVerbOpts.parse(opts) }), async () => {
       const answer = await this.#told(VaultOperations.addPasskey, 'safebyokAddPasskey', { record: DB.passkeyAddRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
       return DB.addPasskeyAnswer.parse(rowAnswerOf(answer))
     })
@@ -158,7 +158,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   /** Non-throwing form of {@link revokePasskey}. */
   async tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked'>> {
-    return await answerOf('revokePasskey', DB.reqParamsOf({ ...record, ...opts }), async () => {
+    return await answerOf('revokePasskey', () => DB.reqParams.parse({ ...DB.passkeyRevokeRecord.parse(record), ...DB.gateVerbOpts.parse(opts) }), async () => {
       const answer = await this.#told(VaultOperations.revokePasskey, 'safebyokRevokePasskey', { record: DB.passkeyRevokeRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
       return DB.revokePasskeyAnswer.parse(rowAnswerOf(answer))
     })
@@ -172,7 +172,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   /** Non-throwing form of {@link delBox}. */
   async tryDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<Answer<BoxTombstone, DelAct>> {
-    return await answerOf('delBox', DB.reqParamsOf({ ...tombstone, ...opts }), async () => {
+    return await answerOf('delBox', () => DB.reqParams.parse({ ...DB.boxTombstone.parse(tombstone), ...DB.delOpts.parse(opts) }), async () => {
       const answer = await this.#told(VaultOperations.delBox, 'safebyokDelBox', { tombstone: DB.boxTombstone.parse(tombstone), opts: DB.delOpts.parse(opts) })
       return DB.delBoxAnswer.parse(rowAnswerOf(answer))
     })
@@ -183,7 +183,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   /** Non-throwing form of {@link delVault}. */
   async tryDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Answer<VaultTombstone, DelAct>> {
-    return await answerOf('delVault', DB.reqParamsOf({ ...tombstone, ...opts }), async () => {
+    return await answerOf('delVault', () => DB.reqParams.parse({ ...DB.vaultTombstone.parse(tombstone), ...DB.delOpts.parse(opts) }), async () => {
       const answer = await this.#told(VaultOperations.delVault, 'safebyokDelVault', { tombstone: DB.vaultTombstone.parse(tombstone), opts: DB.delOpts.parse(opts) })
       return DB.delVaultAnswer.parse(rowAnswerOf(answer))
     })
@@ -194,7 +194,7 @@ export class GraphQLVaultDB implements VaultDB {
 
   /** Non-throwing form of {@link tidyGone}. */
   async tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>> {
-    return await answerOf('tidyGone', DB.reqParamsOf(scope), async () => {
+    return await answerOf('tidyGone', () => DB.reqParams.parse(DB.bankScope.parse(scope)), async () => {
       const answer = await this.#told(VaultOperations.tidyGone, 'safebyokTidyGone', DB.bankScope.parse(scope))
       return DB.tidyGoneAnswer.parse(tidiedAnswerOf(answer))
     })
@@ -256,8 +256,11 @@ export class GraphQLVaultDB implements VaultDB {
 
 // == [Answers]: answerOf, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, heedNotice
 
-/** Run `ask` and return its answer, turning a thrown refusal into a bad answer. */
-const answerOf = async <ValT, ActT extends string, WorldT>(call: string, req_params: ReqParams, ask: () => Promise<Answer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
+/** Run `ask` and return its answer, turning a thrown refusal into a bad answer; a request whose `checked` refuses is never sent. */
+const answerOf = async <ValT, ActT extends string, WorldT>(call: string, checked: () => ReqParams, ask: () => Promise<Answer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
+  const asked = await DB.outcomeOf(checked)
+  if (! asked.ok) { return DB.badAnswerOf(asked.err) }
+  const req_params = asked.val
   const outcome = await DB.outcomeOf(ask)
   if (outcome.ok) { return outcome.val }
   const err = Object.assign(outcome.err, { meta: { ...outcome.err.meta, call, req_params } })

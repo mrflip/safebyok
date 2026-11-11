@@ -208,7 +208,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       await this.ensureTimelyWorld(maxWorldMillis)
       const listed = this.at(scope)
       if (listed?.isHydratedWithin(maxMillisSinceRefresh) !== true) { return await this.tryFetch(scope, opts) }
-      return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), world: null, req_params: SX.reqParamsOf(scope) }
+      return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), world: null, req_params: SX.reqParams.parse(scope) }
     } catch (err) { return refusedAnswerOf(err, null) }
   }
 
@@ -314,7 +314,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   #deliverGood(answer: GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null {
     const record = recordOfAnswer<RecordT, SparseT>(answer)
     // A declined put and a del over a tombstone answer what storage has, whose revision no one sent: only the scope is pinned.
-    const pins = ((answer.act === 'declined') || (answer.act === 'gone')) ? this.scopeOf(sent) : SX.reqParamsOf(sent)
+    const pins = ((answer.act === 'declined') || (answer.act === 'gone')) ? this.scopeOf(sent) : SX.reqParams.parse(sent)
     if (record !== null) { verifyConsistent(record, pins, { kind: 'storage_issue', message: Phrases.AnswerNotAsSent }) }
     return (record === null) ? this.#receiveNothing(this.scopeOf(sent)) : this.buildOrReceive(record)
   }
