@@ -41,14 +41,14 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     Object.freeze(this)
   }
 
-  /** The scope of `duck`, which must be this vault's: no listing answers for another's. */
-  scopeOf(duck: unknown):  Boxscope  { return boxscope.parseConsistent(duck, this.scope) }
+  /** The scope of `boxish`, which must be this vault's: no listing answers for another's. */
+  scopeOf(boxish: unknown):  Boxscope  { return boxscope.parseConsistent(boxish, this.scope) }
 
-  /** Parse `duck` as a {@link BoxSparse}. */
-  sparseOf(duck: unknown): BoxSparse { return SX.boxSparse.parse(duck) }
+  /** Parse `boxish` as a {@link BoxSparse}. */
+  sparseOf(boxish: unknown): BoxSparse { return SX.boxSparse.parse(boxish) }
 
-  /** Parse `duck` as a {@link BoxRecord} of this vault. */
-  recordOf(duck: unknown): BoxRecord { return SX.boxRecord.parseConsistent(duck, this.scope) }
+  /** Parse `boxish` as a {@link BoxRecord} of this vault. */
+  recordOf(boxish: unknown): BoxRecord { return SX.boxRecord.parseConsistent(boxish, this.scope) }
   // --
 
   // == [Methods]: puttable, create, tryCreate, shellFor

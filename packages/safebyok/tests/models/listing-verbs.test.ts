@@ -115,7 +115,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     })
   })
 
-  describe("listing.del(duck)", () => {
+  describe("listing.del(record)", () => {
     it("deletes a box at central's revision, and delivers the tombstone to it", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())

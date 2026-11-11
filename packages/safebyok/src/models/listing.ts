@@ -99,9 +99,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [The listed things]: at, delist, enlist
 
-  /** The instance listed under the scope of `duck`, or null. */
-  at(duck: unknown): ThingT | null {
-    return this.#things.get(this.scopepathOf(this.scopeOf(duck))) ?? null
+  /** The instance listed under the scope of `recordish`, or null. */
+  at(recordish: unknown): ThingT | null {
+    return this.#things.get(this.scopepathOf(this.scopeOf(recordish))) ?? null
   }
 
   /** Delist `thing`, as its own discard asks: the slot empties only for this very instance. */
@@ -422,12 +422,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The `vault_tok` every record of this listing lies under, being the vault's own; null for a listing whose records make their own, as a vault's do. */
   protected abstract vaultTokOfWorld(): string | null
   protected abstract scopepathOf(scope: ScopeT): string
-  /** The scope of `duck`, a record in any form or a thing ducking as one. */
-  abstract scopeOf(duck: unknown): ScopeT
-  /** The sparse form of `duck`, a record in any form or a thing ducking as one, as a plain copy with the payload left out. */
-  abstract sparseOf(duck: unknown): SparseT
-  /** The full record `duck` is, as a plain copy. */
-  abstract recordOf(duck: unknown): RecordT
+  /** The scope of `recordish`, a record in any form or a thing ducking as one. */
+  abstract scopeOf(recordish: unknown): ScopeT
+  /** The sparse form of `recordish`, a record in any form or a thing ducking as one, as a plain copy with the payload left out. */
+  abstract sparseOf(recordish: unknown): SparseT
+  /** The full record `recordish` is, as a plain copy. */
+  abstract recordOf(recordish: unknown): RecordT
   protected abstract makeThing(central: Fetched<RecordT, SparseT>): ThingT
   /** The refusal for a scope where no row is stored and no instance is listed. */
   protected abstract nothingStoredError(scope: ScopeT): VaultError
