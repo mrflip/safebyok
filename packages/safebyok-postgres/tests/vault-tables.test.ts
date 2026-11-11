@@ -18,11 +18,12 @@ const columnsOf = async (table: string): Promise<string[][]> => {
   return rows.map(({ column_name, data_type, is_nullable }) => [column_name, data_type, is_nullable])
 }
 
-/** List the primary-key, unique, foreign-key and check constraints of `table`, as Postgres defines them. */
+// The checks are tested by the rows they refuse, in `vault-rows.test.ts`: Postgres rewrites a check's text as it stores it.
+/** List the primary-key, unique and foreign-key constraints of `table`, as Postgres defines them. */
 const keysOf = async (table: string): Promise<string[]> => {
   const db = await TH.database()
   const { rows } = await db.query<{ definition: string }>(
-    "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = $1::regclass AND contype IN ('p', 'u', 'f', 'c')", [table],
+    "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = $1::regclass AND contype IN ('p', 'u', 'f')", [table],
   )
   return rows.map(({ definition }) => definition)
 }

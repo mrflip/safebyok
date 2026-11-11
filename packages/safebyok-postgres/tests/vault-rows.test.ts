@@ -170,18 +170,34 @@ describe("what the tables hold of a row that fails its checks", () => {
     expect(await storedBox()).to.deep.equal(box)
   })
 
-  it("hold a later fmt, an am of any text, a garbled jsonb field, and a tombstone with a live row's fields or a live row without them", async () => {
-    const vaultFlaws = [{ ...vault, fmt: vault.fmt + 1 }, { ...vault, am: 'q' }, { ...vault, gate: 'rubble' }, { ...vault, am: 'x' }, { ...vaultTombstone, am: 'a' }]
-    for (const flawed of vaultFlaws) {
-      await TH.rowsOf().plantVaultRow(TH.vaultScope, flawed)
-      expect(await storedVault()).to.deep.equal(flawed)
-    }
+  it("hold a row of a later fmt", async () => {
+    const laterVault = { ...vault, fmt: vault.fmt + 1 }
+    await TH.rowsOf().plantVaultRow(TH.vaultScope, laterVault)
+    expect(await storedVault()).to.deep.equal(laterVault)
+    const laterBox = { ...box, fmt: box.fmt + 1 }
+    await TH.rowsOf().plantBoxRow(TH.boxscope, 'life1', laterBox)
+    expect(await storedBox()).to.deep.equal(laterBox)
+  })
+
+  // 23514 is check_violation.
+  it("refuse an am that is not 'a' or 'x', a garbled jsonb field, and a tombstone with a live row's fields or a live row without them", async () => {
+    const { gate } = vault
+    const vaultFlaws = [
+      { ...vault, am: 'q' }, { ...vault, gate: 'rubble' }, { ...vault, gate: { ...gate, gate_epoch: 'one' } }, { ...vault, gate: { ...gate, passphrase_wayin: 'rubble' } },
+      { ...vault, gate: { gate_epoch: 1, passphrase_wayin: gate.passphrase_wayin } }, { ...vault, am: 'x' }, { ...vaultTombstone, am: 'a' },
+    ]
+    for (const flawed of vaultFlaws) { expect(await vaultRefusalOf(flawed)).to.eq('23514') }
+    expect(await storedVault()).to.be.null
+
     await TH.rowsOf().plantVaultRow(TH.vaultScope, vault)
-    const boxFlaws = [{ ...box, fmt: box.fmt + 1 }, { ...box, whisper_ciphered: 'garbled' }, { ...box, am: 'x' }, { ...boxTombstone, am: 'a' }]
+    const boxFlaws = [
+      { ...box, am: 'q' }, { ...box, whisper_ciphered: 'garbled' }, { ...box, box_key_wrapped: { cipher_iv_b64: 'aXY' } }, { ...box, sidecar: ['a', 'list'] },
+      { ...box, am: 'x' }, { ...boxTombstone, am: 'a' },
+    ]
     for (const flawed of boxFlaws) {
-      await TH.rowsOf().plantBoxRow(TH.boxscope, 'life1', flawed)
-      expect(await storedBox()).to.deep.equal(flawed)
+      expect(await refusalCodeOf(() => TH.rowsOf().plantBoxRow(TH.boxscope, 'life1', flawed))).to.eq('23514')
     }
+    expect(await storedBox()).to.be.null
   })
 })
 

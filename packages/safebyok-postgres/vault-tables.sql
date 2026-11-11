@@ -2,7 +2,9 @@
 -- Safe to run again: it creates only what is missing.
 --
 -- Each row is the record safebyok wrote, with a column for each of its fields. A field that is an object is a jsonb column.
--- am is 'a' for a live row. A deleted vault or box leaves its row as a tombstone, with the nullable columns null.
+-- am is 'a' for a live row. A deleted vault or box leaves its row as a tombstone, am 'x', with the nullable columns null.
+-- The checks hold each table to rows of that shape: a row they refuse is one safebyok could not read back.
+-- They do not judge fmt: a row of a later format may be stored beside these, and the functions store nothing over it.
 -- Each time is UTC epoch milliseconds. Every secret field of a record is ciphertext.
 
 CREATE TABLE IF NOT EXISTS safebyok_vaults (
@@ -17,7 +19,13 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
   written_at    bigint  NOT NULL,
   vault_tok     text    NOT NULL,
   gate          jsonb,
-  PRIMARY KEY (applabel, user_id, vaultlabel)
+  PRIMARY KEY (applabel, user_id, vaultlabel),
+  CHECK (am IN ('a', 'x')),
+  CHECK ((am = 'a') = (gate IS NOT NULL)),
+  CHECK (gate IS NULL OR COALESCE(
+        jsonb_typeof(gate->'gate_epoch')       = 'number'
+    AND jsonb_typeof(gate->'passphrase_wayin') = 'object'
+    AND jsonb_typeof(gate->'passkey_wayin')    IN ('object', 'null'), false))
 );
 
 -- A box row is keyed by its vault's vault_tok, which changes each time the vault is created anew.
@@ -43,7 +51,16 @@ CREATE TABLE IF NOT EXISTS safebyok_boxes (
   box_key_wrapped        jsonb,
   whisper_ciphered       jsonb,
   PRIMARY KEY (applabel, user_id, vaultlabel, vault_tok, boxlabel),
-  FOREIGN KEY (applabel, user_id, vaultlabel) REFERENCES safebyok_vaults
+  FOREIGN KEY (applabel, user_id, vaultlabel) REFERENCES safebyok_vaults,
+  CHECK (am IN ('a', 'x')),
+  CHECK ((am = 'a') = (sidecar IS NOT NULL) AND (am = 'a') = (box_key_wrapped IS NOT NULL) AND (am = 'a') = (whisper_ciphered IS NOT NULL)),
+  CHECK (sidecar IS NULL OR jsonb_typeof(sidecar) = 'object'),
+  CHECK (box_key_wrapped IS NULL OR COALESCE(
+        jsonb_typeof(box_key_wrapped->'cipher_iv_b64')  = 'string'
+    AND jsonb_typeof(box_key_wrapped->'ciphertext_b64') = 'string', false)),
+  CHECK (whisper_ciphered IS NULL OR COALESCE(
+        jsonb_typeof(whisper_ciphered->'cipher_iv_b64')  = 'string'
+    AND jsonb_typeof(whisper_ciphered->'ciphertext_b64') = 'string', false))
 ) WITH (fillfactor = 85);
 
 -- The live boxes of a vault life, for the count a box's put takes against the cap.

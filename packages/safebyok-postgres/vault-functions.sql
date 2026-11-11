@@ -5,6 +5,8 @@
 -- nothing: it answers one row, which says whether it stored the record (ok), what that came to (act: born, replaced,
 -- deleted or reborn), the rows as they now stand, and what was stored before (presence: void, live or gone).
 -- A function holds no policy: its caller calls it only where it may store the record over the row it expects.
+-- It stores nothing over a row of another fmt than the record's, nor a box under a vault row of another fmt than
+-- this file's (6001): a row of a later format is one this version of safebyok cannot read.
 -- Every write function takes the record to store and the row its caller expects, each as JSON, so all four are called alike.
 --
 -- A box's write locks nothing but the box row it stores. It reads its vault row without a lock, so a box written as its
@@ -87,6 +89,7 @@ BEGIN
     AND  v.revision_tok = expected.revision_tok
     AND  v.am = expected.am
     AND  v.vault_tok = expected.vault_tok
+    AND  v.fmt = new_vault.fmt
     AND  v.revision_seq = new_vault.revision_seq - 1
     AND  (v.am = 'a' OR new_vault.am = 'a');
   ok := FOUND;
@@ -132,7 +135,7 @@ BEGIN
     AND  b.am = 'a';
 
   ok := false;
-  IF its_vault.am = 'a' AND its_vault.vault_tok = new_box.vault_tok
+  IF its_vault.am = 'a' AND its_vault.vault_tok = new_box.vault_tok AND its_vault.fmt = 6001
      AND new_box.am = 'a' AND new_box.revision_seq = 0
      AND boxcount < maxboxes THEN
     INSERT INTO safebyok_boxes VALUES (new_box.*)
@@ -176,7 +179,7 @@ BEGIN
     AND  b.am = 'a';
 
   ok := false;
-  IF its_vault.am = 'a' AND its_vault.vault_tok = new_box.vault_tok THEN
+  IF its_vault.am = 'a' AND its_vault.vault_tok = new_box.vault_tok AND its_vault.fmt = 6001 THEN
     UPDATE safebyok_boxes AS b
     SET    (fmt, am, revision_tok, revision_seq, registered_at, written_at, box_tok,
             whisper_codec, whisper_schema_version, sidecar, box_key_wrapped, whisper_ciphered)
@@ -186,6 +189,7 @@ BEGIN
       AND  b.revision_tok = expected.revision_tok
       AND  b.am = expected.am
       AND  b.box_tok = expected.box_tok
+      AND  b.fmt = new_box.fmt
       AND  b.revision_seq = new_box.revision_seq - 1
       AND  (b.am = 'a' OR new_box.am = 'a')
       AND  (b.am = 'a' OR new_box.am <> 'a' OR boxcount < maxboxes);
