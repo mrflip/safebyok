@@ -1,7 +1,6 @@
 import type { StringStorage } from './string-storage'
 
-/**
- * SCAFFOLDING a real host application replaces with its own auth (Google sign-in, Clerk, Convex
+/** SCAFFOLDING a real host application replaces with its own auth (Google sign-in, Clerk, Convex
  * auth...). What the vault layer needs from auth is only what Session carries: a stable opaque
  * user_id and a display userlabel. The demo fakes the rest: typing a userlabel signs you in,
  * creating the account on first sight.
@@ -11,6 +10,7 @@ export type Session = {
   userlabel: string
 }
 
+/** The demo's fake auth: the session as a store a component can subscribe to, with sign-in, sign-out and account deletion. */
 export type Auth = {
   /** Current session or null; same object until it changes (useSyncExternalStore-ready). */
   getSnapshot: () => Session | null

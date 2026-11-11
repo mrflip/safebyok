@@ -57,7 +57,7 @@ export type GatingModalProps = {
   passkeyRpId?:        string | undefined
 }
 
-/** {@link Boundary}'s props. */
+/** Props of the `Boundary` error boundary. */
 export type BoundaryProps = {
   /** Rendered instead of the children once one of them throws while rendering. */
   fallback:  ReactNode
@@ -66,7 +66,7 @@ export type BoundaryProps = {
   children:  ReactNode
 }
 
-/** The component that a {@link forBoundary} error message names as its source. */
+/** The component that a `forBoundary` error message names as its source. */
 export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'DelVaultModal' | 'AddPasskeyModal' | 'RevokePasskeyModal' | 'PasskeyUnlockButton'
 // --
 
@@ -80,7 +80,7 @@ export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'Del
  */
 export type VaultStage = 'waiting' | 'unborn' | 'present' | 'spent'
 
-/** {@link useVault}'s return value: the vault's stage, the Vault object while `present`, and the reason the bank ended once `spent`. */
+/** `useVault`'s return value: the vault's stage, the Vault object while `present`, and the reason the bank ended once `spent`. */
 export type VaultLifecycle = { stage: 'waiting' | 'unborn', vault: null } | { stage: 'present', vault: Vault } | { stage: 'spent', vault: null, cause: VaultError }
 // --
 
@@ -153,7 +153,7 @@ export type BoxWhisperFieldProps = Omit<ComponentPropsWithoutRef<'input'>, 'type
   path: string
 }
 
-/** PasskeyUnlockButton's props. */
+/** Props of the button that unlocks the vault with its passkey. */
 export type PasskeyUnlockButtonProps = {
   /** The unlock gating, as the bank passed it to `requestCleartext`. */
   gating:      Gating<'unlock_vault'>
@@ -177,7 +177,7 @@ export type PassphraseFieldname = 'current-password' | 'new-password' | 'confirm
 /** The message a dialog shows for a refused attempt, with the refusal's kind, which identifies the field at fault. */
 export type Gripe = { text: string, refusalkind: string }
 
-/** {@link ModalForm}'s props. */
+/** Props of `ModalForm`, the layout every gating dialog shares. */
 export type ModalFormProps = {
   /** The gating this dialog is for. Cancel and Escape dismiss it. */
   gating:         AnyGating
@@ -209,7 +209,7 @@ export type ModalFormProps = {
 /** The gatings PassphraseModal handles: building a vault, and unlocking one. */
 export type PassphraseGating = Gating<'build_vault'> | Gating<'unlock_vault'>
 
-/** PassphraseModal's props. */
+/** Props of the passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
 export type PassphraseModalProps = {
   /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              PassphraseGating
@@ -221,7 +221,7 @@ export type PassphraseModalProps = {
   passkeyRpId?:        string | undefined
 }
 
-/** ReplacePassphraseModal's props. */
+/** Props of the dialog for a `replace_passphrase` gating. */
 export type ReplacePassphraseModalProps = {
   /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              Gating<'replace_passphrase'>
@@ -229,7 +229,7 @@ export type ReplacePassphraseModalProps = {
   passphraseUsername?: string | undefined
 }
 
-/** AddPasskeyModal's props. */
+/** Props of the dialog for an `add_passkey` gating. */
 export type AddPasskeyModalProps = {
   /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              Gating<'add_passkey'>
@@ -239,7 +239,7 @@ export type AddPasskeyModalProps = {
   passkeyRpId?:        string | undefined
 }
 
-/** RevokePasskeyModal's props. */
+/** Props of the dialog for a `revoke_passkey` gating. */
 export type RevokePasskeyModalProps = {
   /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              Gating<'revoke_passkey'>
@@ -247,7 +247,7 @@ export type RevokePasskeyModalProps = {
   passphraseUsername?: string | undefined
 }
 
-/** DelVaultModal's props. */
+/** Props of the dialog for a `del_vault` gating. */
 export type DelVaultModalProps = {
   /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              Gating<'del_vault'>

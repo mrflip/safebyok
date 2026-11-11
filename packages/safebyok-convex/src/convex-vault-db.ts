@@ -13,7 +13,9 @@ import type { SafebyokApi } from './server'
 
 /** The `query` and `mutation` calls that `ConvexClient` and `ConvexReactClient` share. */
 export type ConvexCalls = {
+  /** Run a query function and return its result. */
   query<QueryRef extends FunctionReference<'query'>>(queryRef: QueryRef, args: FunctionArgs<QueryRef>): Promise<FunctionReturnType<QueryRef>>
+  /** Run a mutation function and return its result. */
   mutation<MutationRef extends FunctionReference<'mutation'>>(mutationRef: MutationRef, args: FunctionArgs<MutationRef>): Promise<FunctionReturnType<MutationRef>>
 }
 

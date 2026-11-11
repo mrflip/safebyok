@@ -60,6 +60,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** List the bank's vaults, tombstones included. Rows that fail validation are returned in `damaged_rows`. */
   async listVaults(scope: BankScope): Promise<GoodAnswer<BankListed, ListAct, BankScope>> { return goodAnswerOf(await this.tryListVaults(scope)) }
 
+  /** Non-throwing form of {@link listVaults}. */
   async tryListVaults(scope: BankScope): Promise<Answer<BankListed, ListAct, BankScope>> {
     return await answerOf('listVaults', DB.reqParamsOf(scope), async () => {
       const answer = await this.#asked(VaultOperations.listVaults, 'safebyokListVaults', DB.bankScope.parse(scope))
@@ -70,6 +71,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Get the vault at `scope`, whichever life (`vault_tok`) it is on. With `ifAbsent: 'nil'`, a missing or deleted vault returns `val: null`. */
   async getVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<GoodAnswer<VaultRecord | null, GotAct>> { return goodAnswerOf(await this.tryGetVault(scope, opts)) }
 
+  /** Non-throwing form of {@link getVault}. */
   async tryGetVault(scope: VaultScope, opts: IfAbsentOpts = {}): Promise<Answer<VaultRecord | null, GotAct>> {
     return await answerOf('getVault', DB.reqParamsOf(scope), async () => {
       const answer = await this.#asked(VaultOperations.getVault, 'safebyokGetVault', { ...DB.vaultScope.parse(scope), opts: DB.ifAbsentOpts.parse(opts) })
@@ -80,6 +82,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** List the boxes of the vault life `vault_tok`, in sparse form. Rows that fail validation are returned in `damaged_rows`. */
   async listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, ListAct>> { return goodAnswerOf(await this.tryListBoxes(asked)) }
 
+  /** Non-throwing form of {@link listBoxes}. */
   async tryListBoxes(asked: VaultQuery): Promise<Answer<BoxesListed, ListAct>> {
     return await answerOf('listBoxes', DB.reqParamsOf(asked), async () => {
       const answer = await this.#asked(VaultOperations.listBoxes, 'safebyokListBoxes', DB.vaultQuery.parse(asked))
@@ -90,6 +93,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Get one box of the vault life `vault_tok`. The answer's `world` is its vault row. With `ifAbsent: 'nil'`, a missing box returns `val: null`. */
   async getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>> { return goodAnswerOf(await this.tryGetBox(asked, opts)) }
 
+  /** Non-throwing form of {@link getBox}. */
   async tryGetBox(asked: BoxQuery, opts: IfAbsentOpts = {}): Promise<Answer<BoxRecord | null, GotAct>> {
     return await answerOf('getBox', DB.reqParamsOf(asked), async () => {
       const answer = await this.#asked(VaultOperations.getBox, 'safebyokGetBox', { ...DB.boxQuery.parse(asked), opts: DB.ifAbsentOpts.parse(opts) })
@@ -103,6 +107,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Store a vault record, subject to `opts`. */
   async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>> { return goodAnswerOf(await this.tryPutVault(record, opts)) }
 
+  /** Non-throwing form of {@link putVault}. */
   async tryPutVault(record: VaultRecord, opts: PutOpts): Promise<Answer<VaultRow, PutAct>> {
     return await answerOf('putVault', DB.reqParamsOf({ ...record, ...opts }), async () => {
       const answer = await this.#told(VaultOperations.putVault, 'safebyokPutVault', { record: DB.vaultRecord.parse(record), opts: DB.putOpts.parse(opts) })
@@ -113,6 +118,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Store a box in the live vault that its `vault_tok` names, subject to `opts`. */
   async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> { return goodAnswerOf(await this.tryPutBox(record, opts)) }
 
+  /** Non-throwing form of {@link putBox}. */
   async tryPutBox(record: BoxRecord, opts: PutOpts): Promise<Answer<BoxRow, PutAct>> {
     return await answerOf('putBox', DB.reqParamsOf({ ...record, ...opts }), async () => {
       const answer = await this.#told(VaultOperations.putBox, 'safebyokPutBox', { record: DB.boxRecord.parse(record), opts: DB.putOpts.parse(opts) })
@@ -126,6 +132,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Replace the vault's passphrase wayin. `record` is the vault row at `opts.prior` with the new wayin and its `gate_epoch` plus one. */
   async replacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'replaced'>> { return goodAnswerOf(await this.tryReplacePassphrase(record, opts)) }
 
+  /** Non-throwing form of {@link replacePassphrase}. */
   async tryReplacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'replaced'>> {
     return await answerOf('replacePassphrase', DB.reqParamsOf({ ...record, ...opts }), async () => {
       const answer = await this.#told(VaultOperations.replacePassphrase, 'safebyokReplacePassphrase', { record: DB.vaultRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
@@ -136,6 +143,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Add a passkey wayin to a vault that has none. `record` is the vault row at `opts.prior` with the passkey wayin and its `gate_epoch` plus one. */
   async addPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'added'>> { return goodAnswerOf(await this.tryAddPasskey(record, opts)) }
 
+  /** Non-throwing form of {@link addPasskey}. */
   async tryAddPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'added'>> {
     return await answerOf('addPasskey', DB.reqParamsOf({ ...record, ...opts }), async () => {
       const answer = await this.#told(VaultOperations.addPasskey, 'safebyokAddPasskey', { record: DB.passkeyAddRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
@@ -148,6 +156,7 @@ export class GraphQLVaultDB implements VaultDB {
    */
   async revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked'>> { return goodAnswerOf(await this.tryRevokePasskey(record, opts)) }
 
+  /** Non-throwing form of {@link revokePasskey}. */
   async tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked'>> {
     return await answerOf('revokePasskey', DB.reqParamsOf({ ...record, ...opts }), async () => {
       const answer = await this.#told(VaultOperations.revokePasskey, 'safebyokRevokePasskey', { record: DB.passkeyRevokeRecord.parse(record), opts: DB.gateVerbOpts.parse(opts) })
@@ -161,6 +170,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Delete a box: replace its live row at revision `prior` with `tombstone`. */
   async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> { return goodAnswerOf(await this.tryDelBox(tombstone, opts)) }
 
+  /** Non-throwing form of {@link delBox}. */
   async tryDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<Answer<BoxTombstone, DelAct>> {
     return await answerOf('delBox', DB.reqParamsOf({ ...tombstone, ...opts }), async () => {
       const answer = await this.#told(VaultOperations.delBox, 'safebyokDelBox', { tombstone: DB.boxTombstone.parse(tombstone), opts: DB.delOpts.parse(opts) })
@@ -171,6 +181,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** Delete a vault: replace its live row at revision `prior` with `tombstone`, and delete the boxes of that life. */
   async delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>> { return goodAnswerOf(await this.tryDelVault(tombstone, opts)) }
 
+  /** Non-throwing form of {@link delVault}. */
   async tryDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Answer<VaultTombstone, DelAct>> {
     return await answerOf('delVault', DB.reqParamsOf({ ...tombstone, ...opts }), async () => {
       const answer = await this.#told(VaultOperations.delVault, 'safebyokDelVault', { tombstone: DB.vaultTombstone.parse(tombstone), opts: DB.delOpts.parse(opts) })
@@ -181,6 +192,7 @@ export class GraphQLVaultDB implements VaultDB {
   /** For hosts: remove the box rows left by vault lives that have ended, and count the box rows that remain. */
   async tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>> { return goodAnswerOf(await this.tryTidyGone(scope)) }
 
+  /** Non-throwing form of {@link tidyGone}. */
   async tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>> {
     return await answerOf('tidyGone', DB.reqParamsOf(scope), async () => {
       const answer = await this.#told(VaultOperations.tidyGone, 'safebyokTidyGone', DB.bankScope.parse(scope))

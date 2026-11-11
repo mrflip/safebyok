@@ -17,9 +17,13 @@ import react                           from 'eslint-plugin-react'
 import reactHooks                      from 'eslint-plugin-react-hooks'
 import jsxA11y                         from 'eslint-plugin-jsx-a11y'
 import reactRefresh                    from 'eslint-plugin-react-refresh'
+import jsdoc                           from 'eslint-plugin-jsdoc'
 
 /** Everything we lint. */
 const SourceFiles = ['**/*.{js,mjs,cjs,ts,mts,cts,tsx}']
+
+/** A quoted snake_case refusal kind, such as `'stale_write'`: the underscore keeps out option values (`'gone'`). */
+const QuotedKind = "'[a-z]+_[a-z_]+'"
 
 /**
  * Every assertion method `expect` carries in `tests/`, read from vitest's chai registry
@@ -276,8 +280,9 @@ export default defineConfig([
       // `arr`, `props` -- and `err`, where the rule's replacement (`error`) is the one name
       // STYLE.md forbids outright.
       'unicorn/name-replacements': 'off',
-      // Booleans are named for what they say (`locked`, `stale`); an is- prefix on every binding
-      // of one would be a translation layer, and it fights `prefer-destructuring`, which is on.
+      // STYLE.md's `isFoo` is for a boolean on an instance or in a snapshot, and is kept by hand.
+      // This rule wants a prefix on every local and destructured binding too, which fights
+      // `prefer-destructuring`.
       'unicorn/consistent-boolean-name': 'off',
       'unicorn/filename-case': ['error', { cases: { kebabCase: true } }],
       // React convention: a component's file is named for the component (VaultDashboard.tsx), and a hook's
@@ -293,8 +298,8 @@ export default defineConfig([
       // Written for JavaScript, where a return type is only what the code happens to return. Here
       // it is declared, and a declared union (`WhisperJson`) is the contract, not an accident.
       'sonarjs/function-return-type': 'off',
-      // A second no-unused-vars, without the house's `_` for a binding left unused on purpose (a
-      // field dropped by destructuring): typescript-eslint's, configured above, is the one.
+      // A second no-unused-vars, which does not know the `_` prefix for a binding left unused on
+      // purpose (a field dropped by destructuring). typescript-eslint's rule, configured above, does.
       'sonarjs/no-unused-vars': 'off',
       // A shape's name says what it means even where two shapes are one type (`LeaseSparse =
       // LeaseStamp`): the rule calls that alias redundant, where the guidance asks for it.
@@ -364,6 +369,66 @@ export default defineConfig([
       '@typescript-eslint/ban-ts-comment':                'off',
       '@typescript-eslint/no-explicit-any':               'off',
       '@typescript-eslint/no-non-null-assertion':         'off',
+    },
+  },
+
+  // == [Doc blocks] ==
+  // STYLE.md *Comments and doc blocks*: only rules that remove content or fix the shape; no count caps. Every rule is at
+  // warn until the documentarian sweep has brought the code up to them.
+  {
+    name: 'safebyok-demo/doc-blocks',
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: { jsdoc },
+    rules: {
+      // #a-helper-gets-a-phrase: every export has a block -- functions, classes and their public methods and getters,
+      // consts, type aliases (one derived by `typeof`, beside the const or checker it names, is exempt), interfaces.
+      // publicOnly leaves out protected members: a subclass's author reads the code.
+      'jsdoc/require-jsdoc': ['warn', {
+        publicOnly:        true,
+        enableFixer:       false,   // the fixer inserts an empty block, which no-blank-blocks then refuses
+        checkConstructors: false,   // the class doc covers it
+        require:  { FunctionDeclaration: true, ClassDeclaration: true, MethodDefinition: true },
+        contexts: [
+          'ExportNamedDeclaration > VariableDeclaration',
+          'ExportNamedDeclaration > TSTypeAliasDeclaration:not(:has(TSTypeQuery))',
+          'ExportNamedDeclaration > TSInterfaceDeclaration',
+          'TSMethodSignature',
+        ],
+      }],
+      // The first line rests on the /** (never a bare /** on its own line), so the block reads with the code folded.
+      'jsdoc/no-restricted-syntax': ['warn', { contexts: [{
+        comment: String.raw`JsdocBlock[delimiterLineBreak="\n"]`,
+        message: 'The first line rests on the /**, so the block reads folded: STYLE.md, Comments and doc blocks',
+      }] }],
+      // The same shape at the other end: a multi-line block closes on a line of its own. noZeroLineText must be false:
+      // its default, true, refuses exactly the first-line-on-the-/** shape the house writes.
+      'jsdoc/multiline-blocks': ['warn', { noZeroLineText: false, noFinalLineText: true }],
+      // #no-refusal-catalog: no two quoted snake_case kinds in a member's description; class and module docs are not
+      // checked. The pattern needs an underscore, so it misses the one-word kinds: the full list is in src/, which this
+      // config does not import.
+      'jsdoc/match-description': ['warn', {
+        mainDescription: {
+          match:   String.raw`^(?![\s\S]*${QuotedKind}[\s\S]*${QuotedKind})`,
+          message: 'A doc block names no refusal catalog; one kind a caller branches on may stay: STYLE.md #no-refusal-catalog',
+        },
+        contexts: [
+          'MethodDefinition', 'FunctionDeclaration', 'VariableDeclaration', 'PropertyDefinition',
+          'TSPropertySignature', 'TSMethodSignature',
+        ],
+      }],
+      // #name-the-act: a block opens with its sentence, not with a tag; and a block is never empty.
+      'jsdoc/require-description': ['warn', { contexts: ['any'] }],
+      'jsdoc/no-blank-blocks':     'warn',
+      // #three-questions: a block that only restates the member's name says nothing a caller needs.
+      'jsdoc/informative-docs':    'warn',
+      // The {@link} bullet and #point-dont-redefine: a {@link} names something in scope in its file.
+      'jsdoc/no-undefined-types':  'warn',
+      // The @param/@returns bullet: no {Type} in a tag (TypeScript holds the types), and no misspelt or invented tag.
+      'jsdoc/no-types':            ['warn', { contexts: ['any'] }],
+      'jsdoc/check-tag-names':     ['warn', { typed: true }],
+      // Later lines start with ` * `, aligned under the first asterisk.
+      'jsdoc/require-asterisk-prefix': 'warn',
+      'jsdoc/check-alignment':         'warn',
     },
   },
 

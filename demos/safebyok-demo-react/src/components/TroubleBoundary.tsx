@@ -12,8 +12,10 @@ import { Component, type ReactNode } from 'react'
 export class TroubleBoundary extends Component<{ children: ReactNode, onReload?: () => void }, { caught: boolean }> {
   override state = { caught: false }
 
+  /** Mark the boundary as caught when a child throws. */
   static getDerivedStateFromError() { return { caught: true } }
 
+  /** Render the children, or the message and Reload button once one of them has thrown. */
   override render() {
     if (! this.state.caught) { return this.props.children }
     const reload = this.props.onReload ?? (() => { globalThis.location.reload() })
