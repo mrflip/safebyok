@@ -44,12 +44,12 @@ export const GetBoxWithVaultSql = `
     WHERE  (applabel, user_id, vaultlabel, vault_tok, boxlabel) = ($1, $2, $3, $4, $5)
   ) AS box
 `
-/** A vault row and the box rows of one of its lives, by boxlabel. */
+/** The box rows of one life of a vault, by boxlabel, and its vault row as `world`. */
 export const ListBoxesWithVaultSql = `
   SELECT (
     SELECT safebyok_record(to_jsonb(vault)) FROM safebyok_vaults AS vault
     WHERE  (applabel, user_id, vaultlabel) = ($1, $2, $3)
-  ) AS vault, COALESCE((
+  ) AS world, COALESCE((
     SELECT jsonb_agg(jsonb_build_object('boxlabel', boxlabel, 'box', safebyok_record(to_jsonb(box))) ORDER BY boxlabel)
     FROM   safebyok_boxes AS box
     WHERE  (applabel, user_id, vaultlabel, vault_tok) = ($1, $2, $3, $4)

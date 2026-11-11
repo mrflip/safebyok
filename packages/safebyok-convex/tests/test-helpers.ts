@@ -2,7 +2,7 @@ import { anyApi, defineSchema } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
 import * as DB from 'safebyok/storage'
-import { boxDelAskOf, boxPutAskOf, vaultDelAskOf, vaultPutAskOf } from 'safebyok/testing'
+import { boxDelAskOf, boxGetAskOf, boxPutAskOf, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultScope } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
 import { SafebyokComponent } from '../src/server'
 import type { GetUserId, SafebyokApi, SafebyokErrorData } from '../src/server'
@@ -53,11 +53,17 @@ export const bySubject: GetUserId = async (ctx) => {
 }
 
 /** `ask` as a client sends it once the core has checked it: its `expected` row cut to the meta the check keeps. */
-export function sentAskOf<AskT extends DB.VaultPutAsk | DB.VaultDelAsk | DB.BoxPutAsk | DB.BoxDelAsk>(ask: AskT): AskT {
+export function sentAskOf<AskT extends DB.VaultAsk | DB.BoxAsk>(ask: AskT): AskT {
   const { box_tok, ...expected }: Record<string, unknown> = ask.expected
   const meta = DB.rowMeta.parse(expected)
   return { ...ask, expected: (box_tok === undefined) ? meta : { ...meta, box_tok } }
 }
+
+/** The args of `getVault`: the get of the vault at `scope`, by a caller that holds no row of it. */
+export const getVaultArgs = (scope: DB.VaultScope = vaultScope) => ({ ask: sentAskOf(vaultGetAskOf(scope)) })
+
+/** The args of `getBox`: the get of the box `boxQuery` names, by a caller that holds no row of it. */
+export const getBoxArgs = (boxQuery: DB.BoxQuery) => ({ ask: sentAskOf(boxGetAskOf(boxQuery)) })
 
 /** The args of `putVault`: the put of `record` over the row `ante`, or over none. */
 export function putVaultArgs(record: DB.VaultRecord, ante: DB.VaultRow | null = null) { return { ask: sentAskOf(vaultPutAskOf(record, ante)) } }

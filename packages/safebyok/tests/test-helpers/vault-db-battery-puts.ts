@@ -117,7 +117,9 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       const { vaultDB, vault } = await putWith()
       const passed = await vaultDB.putVault(vaultPutAskOf(vaultAt(0, 'life2', Rival), null, { ifPresent: 'get' }))
       expect(passed).to.deep.include({ ok: true, act: 'passed', val: vault, world: vault })
-      expect(passed.req_params).to.deep.equal({ ...vaultScope, vault_tok: 'life2', revision_tok: 'rival', revision_seq: 0, expected: SX.VoidRevision })
+      expect(passed.ask).to.deep.include({ op: 'put', ...vaultScope, ifPresent: 'get' })
+      expect(passed.ask.record).to.deep.equal({ revision_tok: 'rival', revision_seq: 0, am: 'a', vault_tok: 'life2' })
+      expect(passed.ask.expected).to.deep.include(SX.VoidRevision)
       const camped = await vaultDB.tryPutVault(vaultPutAskOf(nextVault, vault, { ifPresent: 'fail' }))
       expect(camped).to.deep.include({ ok: false, act: 'camped', dbhas: vault, world: vault })
       expect(camped.err?.refusalkind).to.eq('camped')
@@ -148,9 +150,9 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await vaultDB.tryPutVault(vaultPutAskOf(unsequenced))).to.deep.include({ ok: false, act: 'bad_record' })
       const secretish = 'hunter2'
       const answer = await vaultDB.tryPutVault(vaultPutAskOf({ ...vaultAt(), vaultlabel: `${secretish}^^bad label` }))
-      expect(answer).to.deep.include({ ok: false, req_params: {} })
+      expect(answer).to.deep.include({ ok: false, ask: {} })
       expect(answer.err?.meta?.fieldnames).to.deep.equal(['vaultlabel', 'record.vaultlabel'])
-      expect(JSON.stringify([answer.err?.message, answer.req_params])).to.not.include(secretish)
+      expect(JSON.stringify([answer.err?.message, answer.ask])).to.not.include(secretish)
     })
 
     it("refuses a box record, a box tombstone or a vault tombstone failing its checks, naming the field and putting nothing", async () => {
@@ -273,7 +275,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(full).to.deep.include({ ok: false, act: 'vault_full', world: vault })
       expect(full.err?.refusalkind).to.eq('vault_full')
       expect(full.err?.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
-      expect(full.req_params).to.include({ boxlabel: 'other' })
+      expect(full.ask).to.include({ boxlabel: 'other' })
       expect(await vaultDB.putBox(boxPutAskOf(nextBox, box))).to.deep.include({ act: 'replaced' })
     })
 
@@ -535,10 +537,12 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(overGone.err?.refusalkind).to.eq('stale_write')
     })
 
-    it("carries no wayin in its request's safe metadata", async () => {
+    it("carries no wayin in what its answer carries of its ask", async () => {
       const { vaultDB, vault } = await putWith()
-      const { req_params } = await vaultDB.replacePassphrase(...gateMoveOf(vault, { passphrase_wayin: passphraseWayin }))
-      expect(Object.keys(req_params)).to.not.include('gate')
+      const { ask } = await vaultDB.replacePassphrase(...gateMoveOf(vault, { passphrase_wayin: passphraseWayin }))
+      expect(ask).to.deep.include({ op: 'put', gateVerb: 'replacePassphrase' })
+      expect(Object.keys(ask)).to.not.include('gate')
+      expect(Object.keys(ask.record ?? {})).to.not.include('gate')
     })
   })
 }

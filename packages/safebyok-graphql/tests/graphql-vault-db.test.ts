@@ -96,7 +96,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     const { vaultDB } = fakeClient({ error: combined })
     const answer = await vaultDB.tryGetVault(TH.vaultGetAskOf())
     expect(answer).to.deep.include({ ok: false, act: 'unexpected_error', world: null })
-    expect(answer.req_params).to.deep.include(TH.vaultScope)
+    expect(answer.ask).to.deep.include(TH.vaultScope)
     expect(DB.isVaultError(answer.err, 'unexpected_error')).to.be.true
     expect(answer.err?.cause).to.be.undefined
     expect(answer.err?.meta).to.deep.include({ call: 'getVault' })
@@ -125,7 +125,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
 
   it("refuses a server serving some other schema", async () => {
     const { vaultDB } = fakeClient({ data: { somethingElse: 1 } })
-    await TH.expectRefusal(vaultDB.listVaults(TH.bankScope), 'unexpected_error')
+    await TH.expectRefusal(vaultDB.listVaults(TH.vaultListAsk), 'unexpected_error')
   })
 
   it("refuses a malformed ask before sending it", async () => {

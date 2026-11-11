@@ -5,7 +5,7 @@ import { VaultError, isVaultError } from '../../src/refusals/errors'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { brandedVaultDB } from '../../src/shapes/shapes-vaultish'
 import { VaultDBVerbnames } from '../../src/storage/vault-db'
-import { bankScope, boxGetAskOf, boxQuery, vaultAt, vaultPutAskOf, vaultScope } from '../test-helpers/storage-world'
+import { bankScope, boxGetAskOf, boxQuery, vaultAt, vaultPutAskOf, vaultScope, vaultListAsk } from '../test-helpers/storage-world'
 import { omitting } from '../test-helpers/refusals'
 
 /** Each verb of `vaultDB`, bound, as a client of it would answer them. */
@@ -21,7 +21,7 @@ describe("AdapterVaultDB", () => {
     it("listBoxes refuses a query without its vault_tok, or under a vaultlabel failing its check", async () => {
       const vaultDB = new MemoryVaultDB()
       expect(await vaultDB.tryListBoxes(vaultScope as never)).to.deep.include({ ok: false, act: 'bad_scope' })
-      expect(await vaultDB.tryListBoxes({ ...vaultScope, vault_tok: 'life1', vaultlabel: 'No Good!' })).to.deep.include({ ok: false, act: 'bad_scope' })
+      expect(await vaultDB.tryListBoxes({ op: 'list', ...vaultScope, vault_tok: 'life1', vaultlabel: 'No Good!' })).to.deep.include({ ok: false, act: 'bad_scope' })
     })
 
     it("getBox refuses an ask without its vault_tok, or under a boxlabel failing its check, naming the field", async () => {
@@ -30,7 +30,7 @@ describe("AdapterVaultDB", () => {
       expect(tokless).to.deep.include({ ok: false })
       expect(tokless.err?.meta?.fieldnames).to.deep.equal(['vault_tok'])
       const mislabelled = await vaultDB.tryGetBox(boxGetAskOf({ ...boxQuery, boxlabel: 'No Good!' }))
-      expect(mislabelled).to.deep.include({ ok: false, req_params: {} })
+      expect(mislabelled).to.deep.include({ ok: false, ask: {} })
       expect(mislabelled.err?.meta?.fieldnames).to.deep.equal(['boxlabel'])
     })
 
@@ -54,9 +54,9 @@ describe("AdapterVaultDB", () => {
 
     it("is refused with the VaultDB's error as the cause, whether thrown or returned in an answer", async () => {
       const vaultDB = new FailingVaultDB()
-      await expect(vaultDB.listVaults(bankScope)).rejects.toSatisfy((err) => isVaultError(err, 'storage_unavailable'))
-      const answer = await vaultDB.tryListVaults(bankScope)
-      expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null, req_params: bankScope })
+      await expect(vaultDB.listVaults(vaultListAsk)).rejects.toSatisfy((err) => isVaultError(err, 'storage_unavailable'))
+      const answer = await vaultDB.tryListVaults(vaultListAsk)
+      expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null, ask: vaultListAsk })
       expect(answer.err?.meta).to.deep.include({ call: 'listVaults' })
       expect((answer.err?.cause as Error).message).to.eq('socket closed')
     })
@@ -65,7 +65,7 @@ describe("AdapterVaultDB", () => {
       class RefusingVaultDB extends MemoryVaultDB {
         protected override doListVaults(): never { throw new VaultError('storage_unavailable', 'Storage is down.') }
       }
-      expect(await new RefusingVaultDB().tryListVaults(bankScope)).to.deep.include({ ok: false, act: 'storage_unavailable', req_params: bankScope })
+      expect(await new RefusingVaultDB().tryListVaults(vaultListAsk)).to.deep.include({ ok: false, act: 'storage_unavailable', ask: vaultListAsk })
     })
   })
 
@@ -80,7 +80,7 @@ describe("AdapterVaultDB", () => {
       expect(isVaultError(thrown, 'camped')).to.be.true
       expect(thrown).to.deep.include({ refusalkind: answer.act })
       const { meta } = thrown as { meta: object }
-      expect(meta).to.deep.include({ req_params: answer.req_params, call: 'putVault' })
+      expect(meta).to.deep.include({ ask: answer.ask, call: 'putVault' })
       expect(meta).to.not.have.any.keys('world', 'dbhas')
       expect(answer).to.deep.include({ world: vault, dbhas: vault })
       expect(JSON.stringify({ ...(thrown as object), meta })).to.not.include(vault.gate.passphrase_wayin.vault_key_wayin_wrapped.ciphertext_b64)

@@ -117,7 +117,7 @@ describe("vaultResolvers", () => {
         const answer = answerCheck.parse(await sent(schema, source, variableValues, user_id)) as DB.BadAnswer
         expect(answer, source).to.deep.include({ ok: false, act: 'identity_revoked', world: null })
         expect(answer.err.refusalkind, source).to.eq('identity_revoked')
-        expect(answer.req_params, source).to.include(TH.bankScope)
+        expect(answer.ask, source).to.include(TH.bankScope)
       }
     }
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
@@ -137,13 +137,13 @@ describe("vaultResolvers", () => {
     const born = DB.putVaultAnswer.parse(await sentAsk(schema, VaultOperations.putVault, TH.vaultPutAskOf(record)))
     expect(born).to.deep.include({ ok: true, act: 'born', val: record })
     expect(DB.getVaultAnswer.parse(await sentAsk(schema, VaultOperations.getVault, vaultGetAsk))).to.deep.eq(asCrossed(await vaultDB.tryGetVault(vaultGetAsk)))
-    expect(DB.listVaultsAnswer.parse(await sent(schema, VaultOperations.listVaults, TH.bankScope))).to.deep.eq(asCrossed(await vaultDB.tryListVaults(TH.bankScope)))
+    expect(DB.listVaultsAnswer.parse(await sent(schema, VaultOperations.listVaults, TH.bankScope))).to.deep.eq(asCrossed(await vaultDB.tryListVaults(TH.vaultListAsk)))
 
     const box = TH.boxAt(0, 'life1', { sidecar: { note: 'work', 'nested key': [1, { deep: null }] } })
     const boxed = DB.putBoxAnswer.parse(await sentAsk(schema, VaultOperations.putBox, TH.boxPutAskOf(box)))
     expect(boxed).to.deep.include({ ok: true, act: 'born', val: box, world: record })
     expect(DB.getBoxAnswer.parse(await sentAsk(schema, VaultOperations.getBox, boxGetAsk))).to.deep.eq(asCrossed(await vaultDB.tryGetBox(boxGetAsk)))
-    expect(DB.listBoxesAnswer.parse(await sent(schema, VaultOperations.listBoxes, TH.vaultQuery))).to.deep.eq(asCrossed(await vaultDB.tryListBoxes(TH.vaultQuery)))
+    expect(DB.listBoxesAnswer.parse(await sent(schema, VaultOperations.listBoxes, TH.vaultQuery))).to.deep.eq(asCrossed(await vaultDB.tryListBoxes(TH.boxListAsk)))
 
     const replaced = DB.replacePassphraseAnswer.parse(await sent(schema, VaultOperations.replacePassphrase, gateArgsOf(record, { passphrase_wayin: { ...TH.passphraseWayin, key_deriver_label: 'moved' } })))
     expect(replaced).to.deep.include({ ok: true, act: 'replaced' })

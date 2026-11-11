@@ -270,7 +270,7 @@ const RefusalkindForVaultAct = { ...RefusalkindForBoxAct, void: 'absent_vault', 
 // No rows go on this error: the rows the refusal found are in its answer, as `world` and `dbhas`.
 /** The refusal for a get, put or del whose `act` is a refusal. Its message is its kind, and `meta.act` is the act.
  * @param rowkind - Whose call it was: a `box`'s or a `vault`'s.
- * @param meta    - Extra context: the `call`, its `req_params`, and for `vault_full` the `capacity`.
+ * @param meta    - Extra context: the `call`, its `ask`, and for `vault_full` the `capacity`.
  */
 export function actRefused(rowkind: 'box' | 'vault', act: EX.RefusedAct | EX.BoxVaultAct, meta: RefusalMeta = {}): VaultError {
   const refusalkind = ((rowkind === 'vault') ? RefusalkindForVaultAct : RefusalkindForBoxAct)[act]

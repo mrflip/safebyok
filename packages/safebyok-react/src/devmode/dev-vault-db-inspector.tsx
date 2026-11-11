@@ -24,10 +24,10 @@ export const DevVaultDBInspector = ({ vaultDB }: DevVaultDBInspectorProps) => {
 type BankRows = { listed: BankListed, boxesOf: ReadonlyMap<string, BoxesListed> }
 
 const listBankRows = async (vaultDB: VaultDB, scope: BankScope): Promise<BankRows> => {
-  const { val: listed } = await vaultDB.listVaults(scope)
+  const { val: listed } = await vaultDB.listVaults({ op: 'list', ...scope })
   const live = listed.vaults.filter((row): row is VaultRecord => row.am === 'a')
   const boxesListed = await Promise.all(live.map(async ({ vaultlabel, vault_tok }) => {
-    const { val } = await vaultDB.listBoxes({ ...scope, vaultlabel, vault_tok })
+    const { val } = await vaultDB.listBoxes({ op: 'list', ...scope, vaultlabel, vault_tok })
     return [vaultlabel, val] as const
   }))
   return { listed, boxesOf: new Map(boxesListed) }

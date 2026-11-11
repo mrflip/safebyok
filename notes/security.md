@@ -41,6 +41,15 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-11 (vaultdb_asks, package `safebyok`): **A vaultDB answer's `ask`, and a vaultDB refusal's `meta.ask`, never carry a record's payload.**
+  Every vaultDB answer (`GoodAnswer`, `BadAnswer`, `storage/vault-db.ts`) and every vaultDB refusal's `meta` (`RefusalMeta`, `refusals/errors.ts`) carries `ask: LoggableAsk`, where they carried `req_params: ReqParams`
+  (`ReqParams`, `reqParams`, `requestParams` and `reqParamsOf` no longer exist). `loggableAsk` (`shapes/shapes-storage.ts`) is where this is kept: an `objStrip` of optional fields, `op`, `applabel`, `user_id`, `vaultlabel`, `boxlabel`,
+  `vault_tok`, `ifAbsent`, `ifPresent` and `gateVerb`, and `expected` and `record`, each cut by a nested stripping object to `revision_tok`, `revision_seq`, `am`, `vault_tok` and `box_tok`. A record's gate and wayins,
+  `box_key_wrapped`, `whisper_ciphered` and sidecar are stripped, so they reach neither an answer nor a refusal through `ask`; what does carry them (`world`, `dbhas`) is as before.
+  `AdapterVaultDB` makes the `ask` of each answer by `loggableAsk.parse` of the checked ask; a refusal made from a throw (`refusalOf`) uses `loggableAsk.safeParse` and carries `ask: {}` when that fails, since an ask
+  that failed its check has no metadata to trust. Over GraphQL the answer's `ask` is the typed `SafebyokAsk` and `SafebyokAskRow` (`safebyok-graphql/src/vault-schema.ts`), where it was `SafebyokReqParams`; the
+  browser client drops `__typename` on `ask`, `ask.expected` and `ask.record` (`askOf`), and the core's wire check is `crossedAsk` (`shapes/shapes-answers.ts`), which replaced `crossedReqParams`.
+
 * 2026-11-11 (vaultdb_classifier, PR #639, package `safebyok`): **A box call's answer that carries the vault's row as its `world` can vacate the Vault of an ended life.**
   When the answer to a box get, put, del or listing, or a watch notice, carries the vault's row as its `world`, `Vault.receiveWorld` (`models/vault.ts`) hands that row to the bank's vault listing
   (`Listing.receiveRow`, `models/listing.ts`), which treats it as it treats any vault row (`notes/receive-contract.md`, row W2). A newer row of another life (another `vault_tok`: the vault was deleted,
@@ -54,7 +63,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-11-11 (vaultdb_classifier, package `safebyok`): **A gate verb's tests are made over the vault row the adapter fetched in the step that stores the record.**
   `replacePassphrase`, `addPasskey` and `revokePasskey` are each a vault put that names its verb (`gateVerb` on the ask); the vaultDB no longer reads the vault row beforehand and tests the record against that earlier read.
   The verb's tests (the record keeps the stored `registered_at`, moves `gate_epoch` up by exactly one, and leaves the other wayin as stored; a passkey is added only where none is stored) are made by the classifier
-  (`classifyVault`) over the row the adapter fetched in the same atomic step that stores the record. A record that fails them is refused `gate_issue` and nothing is stored.
+  (`classifyStoredVault`, `storage/classifier.ts`; amended 2026-11-11 (vaultdb_asks): `classifyVault` when this was written) over the row the adapter fetched in the same atomic step that stores the record. A record that fails them is refused `gate_issue` and nothing is stored.
   In `safebyok-postgres` that step is two calls with no transaction: the vault row is fetched and classified, then `safebyok_revise_vault` stores the record only where the stored row still has the expected
   `revision_tok`, `am`, `vault_tok` and the `revision_seq` one below the record's, so the row the tests ran over is the row replaced, or nothing is stored.
   Every ask is checked in `AdapterVaultDB` before an adapter is called, and an adapter is handed the checked ask.
@@ -533,7 +542,7 @@ added or folded into through the subagent, and no other entry changes.
   each damaged entry is parsed strictly (boxlabel a label (amended 2026-11-07 (graphql_schema): the answer checkers' `damagedVault` and `damagedBox` accept any string label, so a row listed under a label that fails the label check is still carried), `damage` one of the two values, revision a non-empty string or null, no other field), and an
   entry that fails refuses the whole read as `corrupt_record`. The worst a lying server does with that word is offer the user to delete or overwrite a
   box it could delete or overwrite anyway. The vault record is still refused `damaged_vault` when it names another scope than asked.
-  (3) The GraphQL browser adapter drops GraphQL's `__typename` before the strict parse (amended 2026-11-07 (graphql_schema): by explicit paths only, the selection's own and the typed fields each selection names (gate, wayins, ciphered fields, listing rows, `req_params.prior`, `err`), never inside a box's sidecar, a damaged row or a refusal's meta, which are carried whole as JSON; it then parses with the core's answer checkers; it used to rebuild each relayed record from its own fields).
+  (3) The GraphQL browser adapter drops GraphQL's `__typename` before the strict parse (amended 2026-11-07 (graphql_schema): by explicit paths only, the selection's own and the typed fields each selection names (gate, wayins, ciphered fields, listing rows, `req_params.prior` (amended 2026-11-11 (vaultdb_asks): the answer's `ask`, `ask.expected` and `ask.record`, `askOf` in `graphql-vault-db.ts`), `err`), never inside a box's sidecar, a damaged row or a refusal's meta, which are carried whole as JSON; it then parses with the core's answer checkers; it used to rebuild each relayed record from its own fields).
   (4) Names: a stale vault-record update's refusal now carries what is stored as `meta.vault_stored` (was `meta.vault_props_stored`), and `putVaultProps` is
   `putVaultRecord`; older entries that use the old names refer to these.
 * 2026-10-26 (thread cipher_ctx, branch `20261026-cipher_ctx`): **every ctx is now `cipherCtx(stamp, purpose, header)`: it binds the
@@ -637,6 +646,7 @@ added or folded into through the subagent, and no other entry changes.
   the wrapper passes the same validated `args` to the component. `ensureVault` and `putVaultProps` still check the record's own `user_id`.
   (2) A call still nesting `scope` is refused by Convex's argument validator before the check or the component runs; a call naming another
   user's existing vault is refused `identity_revoked` by every function and leaves that vault unchanged (tested on both).
+  Amended 2026-11-11 (vaultdb_asks): the Convex wrapper's `listVaults`, `getVault`, `listBoxes` and `getBox` (and the component's own) now take `{ ask }`, the checked list or get ask, where they took `{ scope }` or `{ asked }`, and the wrapper checks the caller against `args.ask.user_id` (`packages/safebyok-convex/src/server.ts`). `getBox` and `listBoxes` return `{ world, box }` and `{ world, boxes }`.
   (3) On GraphQL the server's VaultDB (e.g. `postgresVaultDB`, made for the signed-in user) still does the check; resolvers build the scope
   from the three arguments.
 * 2026-10-26 (restyle sprint, thread 4, branch `20261026-brands`): **salts, wraps and a parsed passphrase are branded types; a brand
@@ -1033,7 +1043,7 @@ added or folded into through the subagent, and no other entry changes.
   available on success or failure. Amended 2026-11-07 (docblock_trim): that wire was replaced (`a227cfe56`), and
   none of the names above survives. Every
   operation of `safebyok-graphql`'s schema now answers one typed object, the same fields as its verb's `try*` answer
-  (`ok`, `act`, `val`, `world`, `dbhas`, `req_params`, `err`), and a refusal of any kind is that answer's `err` field
+  (`ok`, `act`, `val`, `world`, `dbhas`, `req_params` (amended 2026-11-11 (vaultdb_asks): `ask`, a `SafebyokAsk` that never holds a record's payload; see the 2026-11-11 vaultdb_asks entry at the top), `err`), and a refusal of any kind is that answer's `err` field
   (`SafebyokErr`: `refusalkind`, `message`, and `meta` of `capacity`, `fieldnames` and `call` alone, never a record or
   a cause), not a GraphQL error; there are no `landed` flag, `SafebyokPutBoxAnswer`, `SafebyokPutVaultPropsAnswer` or
   `SafebyokStoredRecord` scalar (the mutations are `safebyokPutVault` and `safebyokPutBox`). On a `stale_write` the
@@ -2170,7 +2180,7 @@ added or folded into through the subagent, and no other entry changes.
   `{ boxlabel, damaged: true }` instead of making `listBoxes` -- so every `refresh()` and
   `hello()` -- refuse `corrupt_record` (amended 2026-10-21 (fault_kinds): `getBox` on such a row
   refuses `damaged_box` at the `VaultDB` layer, a record naming another boxlabel included). The boxlabel comes from where the row is stored (a
-  `VaultDB`'s `doListBoxes` now hands up `{ boxlabel, box }` pairs; the in-tree adapters read
+  `VaultDB`'s `doListBoxes` now hands up `{ boxlabel, box }` pairs (amended 2026-11-11 (vaultdb_asks): an adapter's `doListBoxes` fetches `{ world, boxes }`, `BoxesFetched`, each box such a pair, and returns `classifyStoredBoxes` of it, a `BoxesStored`); the in-tree adapters read
   it from the ckey, Convex from its column), never from the damaged record, and nothing else of
   the record reaches the snapshot. A row whose boxlabel the vault's `validators` refuse --
   stored under other checks, before a host narrowed them -- lists as damaged too, and `delBox()`
@@ -2657,7 +2667,7 @@ added or folded into through the subagent, and no other entry changes.
 * 2026-10-15: the Convex component (`packages/safebyok-convex`) authenticates in the host app,
   not inside the component (where `ctx.auth` does not exist): `SafebyokComponent.api({ getUserId })`
   builds the nine public functions the host re-exports, and each refuses unless the host's
-  `getUserId(ctx)` returns a non-empty id equal to the scope's or vault props' `user_id` (amended 2026-10-26 (restyle, thread 6): the scope's `user_id` is now a flat `args.user_id`; see the entry at the top). The
+  `getUserId(ctx)` returns a non-empty id equal to the scope's or vault props' `user_id` (amended 2026-10-26 (restyle, thread 6): the scope's `user_id` is now a flat `args.user_id`; see the entry at the top; amended 2026-11-11 (vaultdb_asks): it is now `args.ask.user_id`, the `user_id` of the ask each function takes). The
   component's own functions check no caller and trust their `user_id` argument; Convex lets only
   the host app call them, so a host that wraps them itself, without this check, exposes every
   user's rows.

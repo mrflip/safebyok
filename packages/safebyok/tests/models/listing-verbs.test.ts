@@ -346,7 +346,7 @@ describe("listing.put and listing.del: the row they say they expect", () => {
 // --
 
 describe("listing.tryPut and listing.tryFetch return the vaultDB's answer", () => {
-  it("carries the put's act, req_params and world, with the instance listed as its val", async () => {
+  it("carries the put's act, ask and world, with the instance listed as its val", async () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.build(fullBoxRecord())
     world.mw.seedPut(fullBoxRecord())
@@ -354,13 +354,13 @@ describe("listing.tryPut and listing.tryFetch return the vaultDB's answer", () =
     expect(answer).to.deep.include({ ok: true, val: box })
     expect(answer).to.have.property('act')
     expect(answer).to.have.property('world')
-    expect(answer.req_params).to.include({ boxlabel: box.boxlabel })
+    expect(answer.ask).to.include({ boxlabel: box.boxlabel })
   })
 
   it("returns a refusal made before the call as a bad answer whose act is the refusal kind", async () => {
     const listing = boxListingOf(world.mw)
     const answer = await listing.tryPut({ garbage: true } as never, { expected: shellBoxRecord() })
-    expect(answer).to.deep.include({ ok: false, world: null, req_params: {} })
+    expect(answer).to.deep.include({ ok: false, world: null, ask: {} })
     expect(answer.act).to.eq(answer.err?.refusalkind)
   })
 

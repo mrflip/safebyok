@@ -64,7 +64,7 @@ describe("PostgresVaultDB's refusals", () => {
     const birth = TH.vaultPutAskOf(TH.vaultAt())
     await TH.expectRefusal(missing.getVault(TH.vaultGetAskOf()), 'unexpected_error')
     await TH.expectRefusal(missing.putVault(birth), 'unexpected_error')
-    await TH.expectRefusal(dropped.listVaults(TH.bankScope), 'storage_unavailable')
+    await TH.expectRefusal(dropped.listVaults(TH.vaultListAsk), 'storage_unavailable')
   })
 
   it("keeps a driver error's name, message and code as the cause, and none of the statement's parameters", async () => {

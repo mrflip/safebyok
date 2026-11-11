@@ -94,7 +94,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   protected nothingStoredError(scope: Boxscope): VaultError { return boxAbsent(scope) }
 
   protected async doTryList() {
-    const answer = await this.vaultDB.tryListBoxes({ ...this.scope, vault_tok: this.world.vault_tok })
+    const answer = await this.vaultDB.tryListBoxes({ op: 'list', ...this.scope, vault_tok: this.world.vault_tok })
     return answer.ok ? { ...answer, val: { listed: answer.val.boxes, damaged_rows: answer.val.damaged_rows } } : answer
   }
 
@@ -107,7 +107,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   protected doTryPut(record: BoxRecord, { expected, ifAbsent, ifPresent }: ListingPutOpts<BoxSparse>) {
-    return this.vaultDB.tryPutBox({ op: 'put', ...SX.boxQuery.parse(record), ifAbsent, ifPresent, expected, record })
+    const { applabel, user_id, vaultlabel, boxlabel, vault_tok } = record
+    return this.vaultDB.tryPutBox({ op: 'put', applabel, user_id, vaultlabel, boxlabel, vault_tok, ifAbsent, ifPresent, expected, record })
   }
 
   protected tombstoneOver(expected: BoxSparse): DelTombstone<BoxSparse> {
@@ -115,7 +116,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   protected doTryDel(tombstone: DelTombstone<BoxSparse>, { expected }: ListingDelOpts<BoxSparse>) {
-    return this.vaultDB.tryDelBox({ op: 'del', ...SX.boxQuery.parse(tombstone), expected, record: tombstone })
+    const { applabel, user_id, vaultlabel, boxlabel, vault_tok } = tombstone
+    return this.vaultDB.tryDelBox({ op: 'del', applabel, user_id, vaultlabel, boxlabel, vault_tok, expected, record: tombstone })
   }
 
   protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.vaultDB.watch(this.scope, onNotice, onBadNews) }

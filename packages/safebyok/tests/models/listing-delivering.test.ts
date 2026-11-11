@@ -35,7 +35,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     it("passes a refusal through unchanged when its answer names no scope", async () => {
       const listing = boxListingOf(world.mw)
       const err = new VaultError('unexpected_error', "A bug.")
-      world.mw.willGet({ ...world.mw.refusalOf(scopeOf(), err), req_params: {} })
+      world.mw.willGet({ ...world.mw.refusalOf(scopeOf(), err), ask: {} })
       const outcome = await listing.tryFetch(scopeOf())
       expect(outcome.err).to.eq(err)
     })
