@@ -50,7 +50,7 @@ describe("BoxListing", () => {
       expect(world.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely', 'put', 'receiveWorld'])
     })
 
-    it("leaves a void box in the slot where the put is refused with no record, out of the snapshot, and the scope free for another create", async () => {
+    it("leaves the scope free for another create when the put is refused", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.willPut(world.mw.staleWriteOf(scope(), undefined))
       await TH.expectRefusal(listing.create(dna()), 'stale_write')
@@ -63,7 +63,7 @@ describe("BoxListing", () => {
       expect(again.revision_seq).to.eq(0)
     })
 
-    it("hears the vaultDB's 'camped' over a live row it does not have, delivered before it is thrown", async () => {
+    it("refuses 'camped' over a live row it does not have, and lists that row", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.seedPut(fullBoxRecord(stored))
       await TH.expectRefusal(listing.create(dna()), 'camped')
@@ -77,7 +77,7 @@ describe("BoxListing", () => {
       expect(world.mw.calls.map(({ verb }) => verb)).to.deep.equal([])
     })
 
-    it("refuses to answer for another vault's box, asking storage nothing", async () => {
+    it("refuses another vault's box, asking storage nothing", async () => {
       const listing = boxListingOf(world.mw)
       const { whisper: _whisper, sidecar: _sidecar, ...scope } = dna()
       const mary = { ...scope, vaultlabel: 'mary' }
@@ -92,7 +92,7 @@ describe("BoxListing", () => {
       expect(world.mw.callsOf('put')).to.deep.equal([])
     })
 
-    it("over a live box world hears the vaultDB's 'camped', the box world kept", async () => {
+    it("refuses 'camped' over a live box it already lists, leaving that box unchanged", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.create(dna())
       await TH.expectRefusal(listing.create(dna()), 'camped')
@@ -108,7 +108,7 @@ describe("BoxListing", () => {
       expect(box.sidecar).to.deep.equal({})
     })
 
-    it("tells the listener of the snapshot once", async () => {
+    it("notifies the snapshot's listener once", async () => {
       const listing = boxListingOf(world.mw)
       let told = 0
       listing.subscribe(() => { told += 1 })
@@ -116,7 +116,7 @@ describe("BoxListing", () => {
       expect(told).to.eq(1)
     })
 
-    it("creates two boxes, each world under its own boxlabel", async () => {
+    it("creates two boxes, each listed under its own boxlabel", async () => {
       const listing = boxListingOf(world.mw)
       const one = await listing.create(dna('one'))
       const two = await listing.create(dna('two'))
@@ -135,8 +135,8 @@ describe("BoxListing", () => {
   })
 })
 
-describe("BoxListing: create has a dna to boxDna at its door", () => {
-  it("refuses a one-letter boxlabel, naming boxlabel, having nothing and calling nothing", async () => {
+describe("BoxListing: create checks its dna with boxDna", () => {
+  it("refuses a one-letter boxlabel, naming boxlabel, listing and calling nothing", async () => {
     const listing = boxListingOf(world.mw)
     const err = await TH.expectRefusal(listing.create({ ...dna(), boxlabel: 'B' }))
     expect(err.meta?.fieldnames).to.deep.equal(['boxlabel'])
@@ -172,7 +172,7 @@ describe("BoxListing: create has a dna to boxDna at its door", () => {
     await TH.expectRefusal(boxListingOf(world.mw).create({ ...dna(), revision_seq: 3 } as never))
   })
 
-  it("gives each box born a box_tok of its own, its birthday gift", async () => {
+  it("gives each new box its own box_tok", async () => {
     const listing = boxListingOf(world.mw)
     const one = await listing.create(dna())
     const two = await listing.create({ ...dna(), boxlabel: 'openai_api_key' })
@@ -198,7 +198,7 @@ describe("boxListing.create(dna, opts)", () => {
     expect(listing.things).to.deep.equal([])
   })
 
-  it("refuses ifAbsent 'fail': a create that must find a box is not a create", async () => {
+  it("refuses ifAbsent 'fail'", async () => {
     const listing = boxListingOf(world.mw)
     await TH.expectRefusal(listing.create(dna(), { ifAbsent: 'fail' } as never))
     expect(listing.things).to.deep.equal([])
@@ -213,7 +213,7 @@ describe("boxListing.create(dna, opts)", () => {
     expect(world.mw.callsOf('get')).to.deep.equal([])
   })
 
-  it("answers its refusal through tryCreate as an Outcome", async () => {
+  it("tryCreate returns a refusal as an Outcome", async () => {
     const listing = boxListingOf(world.mw)
     await listing.create(dna())
     expect(await listing.tryCreate(dna())).to.deep.include({ ok: false })
@@ -223,7 +223,7 @@ describe("boxListing.create(dna, opts)", () => {
 // == [Sealed at birth]: create, boxDna, the vault's lease
 
 describe("boxListing.create(dna): the box is sealed at birth", () => {
-  it("puts a full record at revision 0 over no record, its sealed parts the fake lease's", async () => {
+  it("puts a full record at revision 0, sealed by the vault's lease", async () => {
     const box = await boxListingOf(world.mw).create(dna())
     expect(box.isFull).to.be.true
     expect(box.revision_seq).to.eq(0)
@@ -249,13 +249,13 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
     expect(world.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
   })
 
-  it("builds of a record while the vault is locked", async () => {
+  it("builds from a record while the vault is locked", async () => {
     world.mw.setLocked(true)
     const box = await boxListingOf(world.mw).build(fullBoxRecord())
     expect(box.revision_seq).to.eq(1)
   })
 
-  it("refuses a dna carrying sealed parts, having nothing", async () => {
+  it("refuses a dna carrying sealed parts, listing nothing", async () => {
     const listing = boxListingOf(world.mw)
     const { box_key_wrapped, whisper_ciphered } = fullBoxRecord()
     await TH.expectRefusal(listing.create({ ...dna(), box_key_wrapped, whisper_ciphered } as never))
@@ -264,7 +264,7 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
 })
 
 describe("boxListing.create(dna): no secret material", () => {
-  it("leaves none of the whisper in the record in hand, the snapshots or the listing", async () => {
+  it("leaves none of the whisper in the cached record, the snapshots or the listing", async () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.create({ ...dna(), whisper: { key: 'sk-test-SECRET' } })
     for (const form of [box.toJSON(), box._cheat_central, box.snapshot, listing.snapshot, world.mw.calls]) {
@@ -293,14 +293,14 @@ describe("boxListing.create(dna): a whisper and a sidecar, each defaulting", () 
   ] as const
 
   for (const [lacks, blurb] of DnaCases) {
-    it(`makes a box present of a dna with ${blurb}`, async () => {
+    it(`creates a box from a dna with ${blurb}`, async () => {
       const box = await boxListingOf(world.mw).create({ ...dna(), ...lacks } as unknown as BoxDna)
       expect(box.isPresent).to.be.true
       expect(world.mw.callsOf('put')).to.have.lengthOf(1)
     })
   }
 
-  it("makes a box present of a dna of the scope alone, its sidecar {}", async () => {
+  it("creates a box from a dna of the scope alone, with sidecar {}", async () => {
     const box = await boxListingOf(world.mw).create(world.mw.boxscope('anthropic_api_key'))
     expect(box.isPresent).to.be.true
     expect(box.sidecar).to.deep.equal({})
@@ -318,7 +318,7 @@ describe("boxListing.create(dna): the whisper", () => {
   ] as const
 
   for (const [whisper, fieldnames, blurb] of BadWhisperCases) {
-    it(`refuses a dna whose whisper is ${blurb}, naming the field, quoting nothing, having and saving nothing`, async () => {
+    it(`refuses a dna whose whisper is ${blurb}`, async () => {
       const listing = boxListingOf(world.mw)
       const err = await TH.expectRefusal(listing.create({ ...dna(), whisper: whisper as never }))
       expect(err.meta?.fieldnames).to.deep.equal([...fieldnames])

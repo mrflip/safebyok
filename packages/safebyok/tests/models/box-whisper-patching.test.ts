@@ -20,7 +20,7 @@ const unexposedOf = async (): Promise<TestableBox> => {
 }
 
 describe("box.patchWhisper", () => {
-  it("deep-merges into a new object, its arrays replaced, leaving the old one be and putting nothing", async () => {
+  it("deep-merges into a new object, replacing arrays", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -34,7 +34,7 @@ describe("box.patchWhisper", () => {
     expect(await box.extractWhisper()).to.deep.equal(Stored)
   })
 
-  it("tells each subscriber once, leaving the snapshot, which has nothing of the value, as it was", async () => {
+  it("notifies each subscriber once without changing the snapshot", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -46,7 +46,7 @@ describe("box.patchWhisper", () => {
     expect(box.getSnapshot()).to.eq(was)
   })
 
-  it("is what box.putExposed then puts", async () => {
+  it("sets the value that box.putExposed then puts", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -70,7 +70,7 @@ describe("box.patchWhisper", () => {
     expect(err.message).to.eq(Phrases.NotExposed)
   })
 
-  it("merges while locked, showing nothing and putting nothing, and the unlock shows it", async () => {
+  it("merges while locked, and shows the result after unlock", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -102,7 +102,7 @@ describe("box.patchWhisper", () => {
     ['an array',            ['sk-test'] as never],
   ] as const
   for (const [blurb, patch] of BadPatches) {
-    it(`refuses ${blurb}, the value left as it was`, async () => {
+    it(`refuses ${blurb}, leaving the value as it was`, async () => {
       const box = await unexposedOf()
 
       await box.expose()
@@ -114,7 +114,7 @@ describe("box.patchWhisper", () => {
 })
 
 describe("box.expose, repeated", () => {
-  it("tells the subscribers of the new object, though the snapshot's fields do not move", async () => {
+  it("notifies the subscribers of the new object, though the snapshot's fields do not change", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -128,7 +128,7 @@ describe("box.expose, repeated", () => {
 })
 
 describe("the identity useSyncExternalStore reads", () => {
-  it("box.whisper answers one object until something moves, in every state, so a hook does not loop", async () => {
+  it("box.whisper returns the same object until it changes, in every state", async () => {
     const box = await unexposedOf()
 
     expect(box.whisper).to.eq(box.whisper)

@@ -26,7 +26,7 @@ const passkeyOf = (bank: Bank) => {
 const alertText = () => screen.getByRole('alert').textContent
 
 describe("AddPasskeyModal", () => {
-  it("makes a passkey under the app's name and the user's, adds it on the passphrase, and the gating concludes", async () => {
+  it("adds a passkey named for the app and the user", async () => {
     const { bank, gating, raising, authenticator } = await shownFor()
     expect(screen.getByText(Messages.addPasskeyTitle)).to.exist
     TH.submitPasskeyAdd(TH.Passphrase)

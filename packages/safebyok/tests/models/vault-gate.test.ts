@@ -16,7 +16,7 @@ import { NewPassphrase, Passphrase, addPasskeyTyping, byPassphrase, delTyping, m
 useVaultWorlds()
 
 describe("a lease cache that refuses", () => {
-  it("leaves a passphrase replaced and the vault unlocked, telling onBadNews", async () => {
+  it("leaves the passphrase replaced and the vault unlocked, and reports to onBadNews", async () => {
     const onBadNews = vi.fn()
     const { fakeBank, opts, deviceDB, demandStored } = await makeBornVault()
     const vault = await new VaultListing(fakeBank, hearingBadNews(opts, onBadNews)).build(demandStored())
@@ -93,7 +93,7 @@ const damagedOf = async (): Promise<VaultRecord> => {
 }
 
 describe("a passkey wayin stored damaged", () => {
-  it("refuses 'damaged_row' at hydrate, a salt too short to be one failing the row's check, and writes nothing", async () => {
+  it("refuses 'damaged_row' at hydrate for a salt that is too short", async () => {
     const damaged = await damagedOf()
     const { listing, storedNow } = makeVaultWorld(damaged)
     const vault = await listing.build(listing.sparseOf(damaged))
@@ -102,7 +102,7 @@ describe("a passkey wayin stored damaged", () => {
     expect(storedNow()).to.equal(damaged)
   })
 
-  it("is told as 'damaged_row' from a listing of the bank's vaults, and listed no more", async () => {
+  it("is reported as 'damaged_row' by a listing of the bank's vaults, and left out of the list", async () => {
     const damaged = await damagedOf()
     const { listing, badnews } = makeVaultWorld(damaged)
     await listing.list()
@@ -143,7 +143,7 @@ const movedBeforeCommit = ({ opts: { vaultDB }, demandStored, putBehindOurBack }
 }
 
 describe("vault.replacePassphrasePrompt()", () => {
-  it("lays the next wayin and keeps the passkey: the next passphrase opens, the ante refuses 'wrong_passphrase', the passkey still opens", async () => {
+  it("replaces the passphrase wayin and keeps the passkey", async () => {
     const born = await makeBornVaultWithPasskey()
     const { vault, demandStored } = born
     const { gate: anteGate, revision_seq } = demandStored()
@@ -192,7 +192,7 @@ describe("vault.replacePassphrasePrompt()", () => {
     expect(vault.isUnlocked).to.be.true
   })
 
-  it("refuses 'stale_write' a row moved since the attempt read it, overwriting nothing, the vault adopting the row stored and staying unlocked", async () => {
+  it("refuses 'stale_write' a row moved since the attempt read it", async () => {
     const born = await makeBornVault()
     const { vault, demandStored } = born
     movedBeforeCommit(born, 'tryReplacePassphrase')
@@ -202,7 +202,7 @@ describe("vault.replacePassphrasePrompt()", () => {
     await proveBy(born, Passphrase)
   })
 
-  it("renews the lease under the epoch it wrote, not a newer one delivered before its answer, so the next session asks a proof", async () => {
+  it("renews the lease under the epoch it wrote, not a newer one that arrived meanwhile", async () => {
     const born = await makeBornVault()
     const { vault, deviceDB, demandStored, putBehindOurBack, opts: { vaultDB } } = born
     const landedEpoch = demandStored().gate.gate_epoch + 1
@@ -237,7 +237,7 @@ describe("vault.replacePassphrasePrompt()", () => {
     expect(listing.at(vault.scope)?.vault_tok).to.eq(other.vault_tok)
   })
 
-  it("spreads the record the attempt read, not the live vault: a record delivered during the proving refuses 'stale_write', overwriting nothing", async () => {
+  it("refuses 'stale_write' when a record arrives during the proving", async () => {
     const born = await makeBornVault()
     const { vault, demandStored, putBehindOurBack, fakeBank: world } = born
     world.strengthChecker = guardStrengthChecker(async () => {
@@ -250,7 +250,7 @@ describe("vault.replacePassphrasePrompt()", () => {
     await proveBy(born, Passphrase)
   })
 
-  it("the try form answers the refusal", async () => {
+  it("the try form returns the refusal", async () => {
     const born = await makeBornVault()
     born.fakeBank.requestCleartext = (gating) => { gating.dismiss() }
     await TH.expectBad(born.vault.tryReplacePassphrasePrompt(), 'dismissed')
@@ -281,7 +281,7 @@ describe("gating.attempt of another kind's clears", () => {
 })
 
 describe("vault.addPasskeyPrompt()", () => {
-  it("lays the passkey's wayin and keeps the passphrase's: both open, and the passphrase's lease stays granted", async () => {
+  it("adds the passkey wayin and keeps the passphrase's", async () => {
     const born = await makeBornVault()
     const { vault, demandStored } = born
     const { gate: anteGate } = demandStored()
@@ -294,14 +294,14 @@ describe("vault.addPasskeyPrompt()", () => {
     await expect(PasskeyProving.buildStored(vault.gate, await TH.passkeyOf('laptop'))).resolves.to.be.instanceOf(PasskeyProving)
   })
 
-  it("refuses where a passkey is stored, nobody asked", async () => {
+  it("refuses without showing a dialog when a passkey is already stored", async () => {
     const born = await makeBornVaultWithPasskey()
     const { shown } = dialogOf(born)
     await TH.expectRefusal(born.vault.addPasskeyPrompt())
     expect(shown).to.have.lengthOf(0)
   })
 
-  it("leaves a wrong passphrase's answer unspent for the next attempt, and spends it as the gating concludes", async () => {
+  it("keeps the passkey answer's PRF bytes after a wrong passphrase, and zeroes them when the gating concludes", async () => {
     const born = await makeBornVault()
     const { vault } = born
     const { gatingAt } = dialogOf(born)
@@ -315,7 +315,7 @@ describe("vault.addPasskeyPrompt()", () => {
     expect(isZeroed(passkeyClear.prfBytes)).to.be.true
   })
 
-  it("spends a bare ArrayBuffer of PRF bytes in refusing it", async () => {
+  it("zeroes a bare ArrayBuffer of PRF bytes when refusing it", async () => {
     const born = await makeBornVault()
     const { gatingAt } = dialogOf(born)
     const adding = TH.expectRefusal(born.vault.addPasskeyPrompt())
@@ -327,7 +327,7 @@ describe("vault.addPasskeyPrompt()", () => {
     expect(isZeroed(new Uint8Array(buffer))).to.be.true
   })
 
-  it("refuses 'stale_write' a row moved since the attempt read it, a passkey revoked or added elsewhere never overwritten", async () => {
+  it("refuses 'stale_write' a row moved since the attempt read it", async () => {
     const born = await makeBornVault()
     const { vault, demandStored } = born
     movedBeforeCommit(born, 'tryAddPasskey')
@@ -337,7 +337,7 @@ describe("vault.addPasskeyPrompt()", () => {
 })
 
 describe("vault.revokePasskeyPrompt()", () => {
-  it("nulls the passkey's wayin and keeps the passphrase's, the vault unlocked: no key turns over", async () => {
+  it("removes the passkey wayin and keeps the passphrase's", async () => {
     const { vault, demandStored } = await makeBornVaultWithPasskey()
     const { gate: anteGate } = demandStored()
     expect(await revokeTyping(vault, Passphrase)).to.equal(vault)
@@ -358,7 +358,7 @@ describe("vault.revokePasskeyPrompt()", () => {
     expect(storedNow()).to.equal(ante)
   })
 
-  it("refreshes before it answers at once: a passkey added elsewhere, within the vault's horizon, is asked for and revoked", async () => {
+  it("revokes a passkey that another session added since the last fetch", async () => {
     const { vault, demandStored, anotherSession, advance } = await makeBornVault()
     await addPasskeyTyping(await anotherSession().build(demandStored()), Passphrase, 'laptop')
     advance(Promptly)
@@ -367,7 +367,7 @@ describe("vault.revokePasskeyPrompt()", () => {
     expect(demandStored().gate.passkey_wayin).to.be.null
   })
 
-  it("refuses 'wrong_passphrase' the user of a passkey who cannot prove the passphrase, the wayin left", async () => {
+  it("refuses 'wrong_passphrase' for a wrong passphrase, leaving the passkey wayin stored", async () => {
     const { vault, demandStored } = await makeBornVaultWithPasskey()
     await TH.expectRefusal(revokeTyping(vault, 'not it'), 'wrong_passphrase')
     expect(demandStored().gate.passkey_wayin).not.to.be.null
@@ -382,7 +382,7 @@ describe("vault.revokePasskeyPrompt()", () => {
 })
 
 describe("a gate change on other sessions", () => {
-  it("locks no other device: the session with the older gate stays unlocked as it adopts the new, and its next session asks the new passphrase", async () => {
+  it("leaves another session unlocked as it fetches the new gate", async () => {
     const { vault, demandStored, anotherSession } = await makeBornVault()
     const theirs = await anotherSession().build(demandStored())
     await unlockTyping(theirs, { passphraseClear: Passphrase })
@@ -401,7 +401,7 @@ describe("vault.delVaultPrompt()", () => {
     TH.expectSyncRefusal(() => vault.demandPresent(), 'vault_gone')
   })
 
-  it("locks the vault, puts a tombstone with its boxes cascaded, forgets the row cached, and stays in its slot tombstoned", async () => {
+  it("deletes the vault and its boxes, and forgets the cached lease", async () => {
     const { vault, listing, storedNow, deviceDB } = await makeBornVault()
     const boxes = vault.boxListing
     expect(await delTyping(vault)).to.equal(vault)
@@ -429,7 +429,7 @@ describe("vault.delVaultPrompt()", () => {
     expect(storedNow()).to.include({ am: 'x' })
   })
 
-  it("ignores a lock: a lock does not stop a delete, and the gating stays open", async () => {
+  it("is not stopped by a lock", async () => {
     const born = await makeBornVault()
     const { vault, storedNow } = born
     const { gatingAt } = dialogOf(born)
@@ -442,7 +442,7 @@ describe("vault.delVaultPrompt()", () => {
     expect(storedNow()).to.include({ am: 'x' })
   })
 
-  it("concludes an asking on the listing's goodbye: nothing outlives the listing, a delete's dialog neither", async () => {
+  it("refuses when the listing is swept while its dialog is open", async () => {
     const born = await makeBornVault()
     const { vault, listing, storedNow } = born
     const ante = storedNow()
@@ -454,7 +454,7 @@ describe("vault.delVaultPrompt()", () => {
     expect(storedNow()).to.equal(ante)
   })
 
-  it("refuses 'stale_write' a row moved since the attempt read it: nothing deleted, the vault left locked and its row adopted", async () => {
+  it("refuses 'stale_write' a row moved since the attempt read it", async () => {
     const born = await makeBornVault()
     const { vault, demandStored, storedNow, putBehindOurBack, opts: { vaultDB } } = born
     const tryDelVault = vaultDB.tryDelVault.bind(vaultDB)
@@ -469,7 +469,7 @@ describe("vault.delVaultPrompt()", () => {
     expect(vault.revision_seq).to.eq(demandStored().revision_seq)
   })
 
-  it("tells of a refused forget and lets the tombstone stand", async () => {
+  it("reports a refused forget through onLifecycle and keeps the tombstone", async () => {
     const onLifecycle = vi.fn()
     const { vault, storedNow, deviceDB } = await makeBornVault({ passphraseClear: Passphrase }, { onLifecycle })
     deviceDB.forget.mockRejectedValue(new VaultError('storage_unavailable', 'the disk is full'))
@@ -479,7 +479,7 @@ describe("vault.delVaultPrompt()", () => {
     expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', vault }))
   })
 
-  it("refuses a vault found gone, nobody asked", async () => {
+  it("refuses a deleted vault without showing a dialog", async () => {
     const born = await makeBornVault()
     const { vault, demandStored, anotherSession } = born
     await delTyping(await anotherSession().build(demandStored()))
@@ -490,8 +490,8 @@ describe("vault.delVaultPrompt()", () => {
   })
 })
 
-describe("listing.del(ante): the delete names one life at one revision", () => {
-  it("goes over the revision handed, not the slot's: a stale copy of this life refuses 'stale_write'", async () => {
+describe("listing.del(ante)", () => {
+  it("refuses 'stale_write' for a stale record, even when the listed vault is current", async () => {
     const { vault, listing, demandStored, storedNow, putBehindOurBack } = await makeBornVault()
     const ante = vault.fullRecord
     putBehindOurBack(demandStored())
@@ -500,7 +500,7 @@ describe("listing.del(ante): the delete names one life at one revision", () => {
     expect(storedNow()).to.include({ am: 'a' })
   })
 
-  it("refuses a stale instance of another life than the slot's, asking the vaultDB nothing, and the slot's vault stands", async () => {
+  it("refuses a record of another vault life without calling the vaultDB", async () => {
     const { vault, listing, opts: { vaultDB }, demandStored, storedNow } = await makeBornVault()
     const stale = { ...vault.fullRecord, vault_tok: 'vault-tok-of-a-life-gone' }
     const tryDelVault = vi.spyOn(vaultDB, 'tryDelVault')

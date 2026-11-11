@@ -1,7 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-/**
- * The knock-knock machine's one Anthropic call. The API key arrives as text from whichever flow
+/** The knock-knock machine's one Anthropic call. The API key arrives as text from whichever flow
  * knocks, and is handed straight to the SDK client: it never reaches React state, a store, or
  * storage. The request goes browser-to-Anthropic, which is the whole point of BYOK -- no server
  * of ours ever sees the key.

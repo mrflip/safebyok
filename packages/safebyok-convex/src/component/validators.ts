@@ -91,14 +91,24 @@ export const rowsWatched = v.object({ vaults: v.array(rowOfVault), boxes: v.arra
 
 // == [Arguments]: the args of each function, shared by the component and the host's wrapper
 
+/** `listVaults` takes a bank's scope. */
 export const listVaultsArgs = { scope: bankScope }
+/** `getVault` takes a vault's scope. */
 export const getVaultArgs   = { scope: vaultScope }
+/** `listBoxes` takes one life of a vault. */
 export const listBoxesArgs  = { asked: vaultQuery }
+/** `getBox` takes one box of one life of a vault. */
 export const getBoxArgs     = { asked: boxQuery }
+/** `putVault` takes a vault record and the put's options. */
 export const putVaultArgs   = { record: vaultRecord, opts: putOptsGiven }
+/** `putBox` takes a box record, the put's options, and an optional cap on the vault's boxes. */
 export const putBoxArgs     = { record: boxRecord, opts: putOptsGiven, maxBoxes: v.optional(v.number()) }
+/** `delVault` takes a vault's tombstone and the del's options. */
 export const delVaultArgs   = { tombstone: vaultTombstone, opts: delOpts }
+/** `delBox` takes a box's tombstone and the del's options. */
 export const delBoxArgs     = { tombstone: boxTombstone, opts: delOpts }
+/** `tidyGone` takes a bank's scope. */
 export const tidyGoneArgs   = { scope: bankScope }
+/** `watchRows` takes a watch's scope. */
 export const watchRowsArgs  = { scope: watchScope }
 // --

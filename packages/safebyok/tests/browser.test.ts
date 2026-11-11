@@ -45,7 +45,7 @@ describe("Argon2id's reference test vector", () => {
     expect(Buffer.from(derived).toString('hex')).to.eq('09316115d5cf24ed5a15a31a3ba326e5cf32edc24702987c02b6566f61913cf7')
   })
 
-  it("is out of reach of a keyDeriverSpec, which asks for a salt of 16 bytes", () => {
+  it("has a salt too short for a keyDeriverSpec", () => {
     expect(() => parseKeyDeriverSpec({ ...CheapSpec, salt_bytes: 8 })).to.throw(/salt_bytes/u)
   })
 })
@@ -80,7 +80,7 @@ describe("safebyok/browser", () => {
     expect(await deriver.deriveKeyBytes('another passphrase', salt)).to.not.deep.eq(first)
   })
 
-  it("hands another deriver what it needs to wear the same specs: the supplied spec and its parse", () => {
+  it("exports the supplied spec and its parser for other derivers", () => {
     expect(argon2idWebV1Deriver).to.include({ ...Argon2idWebV1 })
     expect(parseKeyDeriverSpec(CheapSpec)).to.deep.equal(CheapSpec)
     expect(() => parseKeyDeriverSpec({ ...Argon2idWebV1, iterations: 4 })).to.throw(/argon2id_web_v1/u)
@@ -102,7 +102,7 @@ describe("safebyok/browser", () => {
 })
 
 describe("browserOpts", () => {
-  it("answers a frozen bag of the Argon2id deriver, a DeviceDB in IndexedDB and the zxcvbn checker", () => {
+  it("returns frozen options with the Argon2id deriver, an IndexedDB DeviceDB and the zxcvbn checker", () => {
     const bag = browserOpts({ dbName: freshDbName() })
     expect(Object.isFrozen(bag)).to.be.true
     expect(bag).to.have.all.keys('keyDeriver', 'deviceDB', 'strengthChecker')
@@ -111,14 +111,14 @@ describe("browserOpts", () => {
     expect(bag.strengthChecker).to.eq(zxcvbnStrengthChecker)
   })
 
-  it("answers the same bag for the same dbName, so it is safe to call during render", () => {
+  it("returns the same object for the same dbName", () => {
     const dbName = freshDbName()
     expect(browserOpts({ dbName })).to.eq(browserOpts({ dbName }))
     expect(browserOpts()).to.eq(browserOpts({}))
     expect(browserOpts()).to.eq(browserOpts({ dbName: 'safebyok' }))
   })
 
-  it("answers another DeviceDB for another dbName, the deriver and checker shared", () => {
+  it("returns a separate DeviceDB for each dbName, sharing the deriver and checker", () => {
     const [one, other] = [browserOpts({ dbName: freshDbName() }), browserOpts({ dbName: freshDbName() })]
     expect(one.deviceDB).to.not.eq(other.deviceDB)
     expect(one.keyDeriver).to.eq(other.keyDeriver)

@@ -40,7 +40,7 @@ describe("changesetText", () => {
     expect(Dependabot.changesetText([])).to.be.undefined
   })
 
-  it("keeps whatever the pull request spelled from ending a code span or a line", () => {
+  it("replaces any character from the pull request that would end a code span or a line", () => {
     const text = Dependabot.changesetText([{ ...Bumped, depname: 'evil`\n---\n"other": major', post: '^6.4.0`\n# heading' }]) ?? ''
     expect(text.split('\n')).to.have.lengthOf(8)
     expect(text).to.include('`evil??---?"other": major`')

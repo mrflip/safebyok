@@ -52,7 +52,7 @@ describe("VaultLockControl", () => {
     expect(screen.getByText('Vault locked').parentElement?.dataset['locked']).to.eq('true')
   })
 
-  it("unlocks the vault in hand, never asking the bank to ensure one", async () => {
+  it("unlocks the vault it has without asking the bank to ensure one", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
     const ensuring = vi.spyOn(Bank.prototype, 'ensureVault')
@@ -64,7 +64,7 @@ describe("VaultLockControl", () => {
     expect(ensuring).not.toHaveBeenCalled()
   })
 
-  it("stays locked, and tells nobody, when the user dismisses the dialog", async () => {
+  it("stays locked, and reports nothing, when the user dismisses the dialog", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
     const news: VaultError[] = []

@@ -33,7 +33,7 @@ const unlocksWith = async (world: TH.BankWorld, passphrase: string): Promise<boo
 const alertText = () => screen.getByRole('alert').textContent
 
 describe("ReplacePassphraseModal", () => {
-  it("replaces the passphrase, filed under the user and the vault, and the gating concludes", async () => {
+  it("replaces the passphrase, naming the user and the vault, and the gating concludes", async () => {
     const { world, raising } = await shownFor()
     expect(screen.getByText(Messages.changeTitle)).to.exist
     expect(screen.getByDisplayValue('u1 (main vault)')).to.exist

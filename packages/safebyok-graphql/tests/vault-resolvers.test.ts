@@ -106,7 +106,7 @@ describe("vaultResolvers", () => {
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })
 
-  it("answers each verb as the VaultDB's own try* verb does", async () => {
+  it("returns for each verb what the VaultDB's own try* verb returns", async () => {
     await TH.emptyTables()
     const vaultDB = await TH.serverOver()
     const schema = TH.schemaOver(vaultDB)
@@ -153,7 +153,7 @@ describe("vaultResolvers", () => {
     expect(nulled.err.refusalkind).to.eq('vault_empty')
   })
 
-  it("sends a refusal as the answer's err with nothing of what the VaultDB's driver said", async () => {
+  it("sends a refusal as the answer's err, without the driver's own error", async () => {
     const crossed = await sent(TH.schemaOver(unreachable()), VaultOperations.getVault, TH.vaultScope)
     const answer = DB.getVaultAnswer.parse(crossed) as DB.BadAnswer
     expect(answer.err.refusalkind).to.eq('storage_unavailable')
@@ -161,7 +161,7 @@ describe("vaultResolvers", () => {
     expect(JSON.stringify(crossed)).not.to.include('hunter2')
   })
 
-  it("sends nothing of what a throwing userIdOf said", async () => {
+  it("sends nothing from the error a userIdOf throws", async () => {
     const schema = makeExecutableSchema({
       typeDefs:  VaultSchemaSdl,
       resolvers: vaultResolvers({ vaultDB: await TH.serverOver(), userIdOf: () => { throw new Error('session cookie s3cr3t-cookie is malformed') } }),
@@ -195,7 +195,7 @@ describe("vaultResolvers", () => {
     expect(full.err.meta?.capacity).to.deep.eq({ boxes: { used: 1, max: 1 }, bytes: { used: 0, max: Number.MAX_SAFE_INTEGER } })
   })
 
-  it("refuses a vaultDB or userIdOf it cannot use, a client of a vaultDB among them", async () => {
+  it("refuses a vaultDB or userIdOf it cannot use, including a browser-side GraphQLVaultDB", async () => {
     const vaultDB = await TH.serverOver()
     const client = new GraphQLVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] }) })
     const unusable = [{}, { vaultDB }, { vaultDB: {}, userIdOf: () => 'u1' }, { vaultDB, userIdOf: 'u1' }, { vaultDB: client, userIdOf: () => 'u1' }]
@@ -204,7 +204,7 @@ describe("vaultResolvers", () => {
 })
 
 describe("vaultResolvers' watch", () => {
-  it("hears each row that changes while the session that subscribed stays signed in as its user", async () => {
+  it("sends each row that changes while the session that subscribed stays signed in as its user", async () => {
     await TH.emptyTables()
     const { listening, vaultDB, schema } = await watchedServer()
     const { stream, nextNotice } = await watching(schema, { user_id: 'u1' })
@@ -216,7 +216,7 @@ describe("vaultResolvers' watch", () => {
     await stream.return(undefined)
   })
 
-  it("lets go of its listen when ended", async () => {
+  it("stops listening when ended", async () => {
     await TH.emptyTables()
     const { listening, schema } = await watchedServer()
     const { stream } = await watching(schema, { user_id: 'u1' })
@@ -241,7 +241,7 @@ describe("vaultResolvers' watch", () => {
     }
   })
 
-  it("ends with a refusal carrying nothing of what its throwing userIdOf said", async () => {
+  it("ends with a refusal that carries nothing from the error its userIdOf throws", async () => {
     await TH.emptyTables()
     const { listening, vaultDB, schema } = await watchedServer()
     const session: TH.TestContext = { user_id: 'u1' }
@@ -255,7 +255,7 @@ describe("vaultResolvers' watch", () => {
     await vi.waitFor(() => { expect(listening.size).to.eq(0) })
   })
 
-  it("ends a watch it refuses after one notice", async () => {
+  it("ends a refused watch after one notice", async () => {
     const { listening, schema } = await watchedServer()
     for (const [context, scope, refusalkind] of [[{ user_id: 'u2' }, TH.bankScope, 'identity_revoked'], [{ user_id: 'u1' }, { ...TH.bankScope, applabel: '' }, 'bad_scope']] as const) {
       const { nextNotice } = await watching(schema, context, scope)
@@ -269,7 +269,7 @@ describe("vaultResolvers' watch", () => {
 describe("VaultSchemaSdl", () => {
   const schema = buildSchema(VaultSchemaSdl)
 
-  it("builds alone, every root field it adds named safebyok...", () => {
+  it("builds on its own, with every root field it adds named safebyok...", () => {
     const rootFields = [schema.getQueryType(), schema.getMutationType(), schema.getSubscriptionType()]
       .flatMap((root) => (isObjectType(root) ? Object.keys(root.getFields()) : []))
     expect(rootFields).to.have.lengthOf(13)

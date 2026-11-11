@@ -209,8 +209,9 @@ export default defineConfig([
       // `arr`, `props` -- and `err`, where the rule's replacement (`error`) is the one name
       // STYLE.md forbids outright.
       'unicorn/name-replacements': 'off',
-      // Booleans are named for what they say (`locked`, `stale`); an is- prefix on every binding
-      // of one would be a translation layer, and it fights `prefer-destructuring`, which is on.
+      // STYLE.md's `isFoo` is for a boolean on an instance or in a snapshot, and is kept by hand.
+      // This rule wants a prefix on every local and destructured binding too, which fights
+      // `prefer-destructuring`.
       'unicorn/consistent-boolean-name': 'off',
       'unicorn/filename-case': ['error', { cases: { kebabCase: true } }],
       // Taste: `type FooT = Z.output<...>` cannot be an interface, so its neighbours should not
@@ -224,8 +225,8 @@ export default defineConfig([
       // Written for JavaScript, where a return type is only what the code happens to return. Here
       // it is declared, and a declared union (`WhisperJson`) is the contract, not an accident.
       'sonarjs/function-return-type': 'off',
-      // A second no-unused-vars, without the house's `_` for a binding left unused on purpose (a
-      // field dropped by destructuring): typescript-eslint's, configured above, is the one.
+      // A second no-unused-vars, which does not know the `_` prefix for a binding left unused on
+      // purpose (a field dropped by destructuring). typescript-eslint's rule, configured above, does.
       'sonarjs/no-unused-vars': 'off',
       // A shape's name says what it means even where two shapes are one type (`LeaseSparse =
       // LeaseStamp`): the rule calls that alias redundant, where the guidance asks for it.

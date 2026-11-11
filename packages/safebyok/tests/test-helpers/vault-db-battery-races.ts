@@ -34,7 +34,7 @@ const watching = (vaultDB: VaultDB, scope: WatchScope) => {
 /** Registers the races', notices' and failure's cases over `world`. */
 export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCap, makeCapped, canFail, failNextCall, watches, boxNoticesCarryVault }: BatteryWorld): void => {
   describe("two devices at once", () => {
-    it("two births of one vault settle on one life, the other declined with it", async () => {
+    it("two births of one vault store one, and the other is declined with it", async () => {
       const vaultDB = await fresh()
       const twin = await twinOf(vaultDB)
       const answers = await Promise.all([
@@ -47,7 +47,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.deep.equal(born)
     })
 
-    it("two replacements of one box at one prior write one, the other refused with the winner", async () => {
+    it("two replacements of one box at one prior write one, and the other is refused with the winner", async () => {
       const { vaultDB, box } = await putWith({ box: true })
       const twin = await twinOf(vaultDB)
       const ours = boxAt(1, 'life1', { sidecar: { by: 'ours' } })
@@ -59,7 +59,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect(await vaultDB.getBox(boxQuery)).to.deep.include({ val: written[0]?.val })
     })
 
-    it("two first writes of one box write one, the other refused with the winner", async () => {
+    it("two first writes of one box write one, and the other is refused with the winner", async () => {
       const { vaultDB } = await putWith()
       const twin = await twinOf(vaultDB)
       const ours = boxAt(0, 'life1', { box_tok: 'boxA' })
@@ -86,7 +86,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect([...boxrows.values()].filter((row) => SX.isLiveRow(row))).to.deep.equal([])
     })
 
-    it("two gate verbs at one revision write one, the other refused with the winner", async () => {
+    it("two gate verbs at one revision write one, and the other is refused with the winner", async () => {
       const { vaultDB, vault } = await putWith()
       const twin = await twinOf(vaultDB)
       const ours = gateMoveOf(vault, { passkey_wayin: passkeyWayin })
@@ -110,7 +110,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
     })
   })
 
-  describe("a vault changed between a gate verb's look at it and its move", () => {
+  describe("a vault changed while a gate verb runs", () => {
     it("refuses as gone when the vault was deleted", async () => {
       const { vaultDB, vault } = await putWith()
       const twin = await twinOf(vaultDB)
@@ -118,7 +118,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect(await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'vault_gone' })
     })
 
-    it("answers stale_write with the new life when the vault was deleted and born again", async () => {
+    it("refuses 'stale_write' with the new life when the vault was deleted and born again", async () => {
       const { vaultDB, vault } = await putWith()
       const twin = await twinOf(vaultDB)
       const tombstone = vaultTombstoneOf(vault)
@@ -133,7 +133,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
   describe.skipIf(! watches)("watch", () => {
     const boxWorld = (vault: VaultRow) => (boxNoticesCarryVault ? vault : null)
 
-    it("hears a box written and its vault deleted, each as stored", async () => {
+    it("notifies of a box written and its vault deleted, each as stored", async () => {
       const { vaultDB, vault, box } = await putWith()
       const { notices } = watching(vaultDB, vaultScope)
       await vaultDB.putBox(box, { prior: SX.VoidRevision })
@@ -144,7 +144,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       })
     })
 
-    it("hears what another device writes", async () => {
+    it("notifies of what another device writes", async () => {
       const { vaultDB, vault, box } = await putWith()
       const twin = await twinOf(vaultDB)
       const { notices } = watching(vaultDB, vaultScope)
@@ -152,7 +152,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       await vi.waitFor(() => { expect(notices).to.deep.include({ act: 'got', val: box, world: boxWorld(vault) }) })
     })
 
-    it("hears its own vault under a vault's scope, and every vault of its own bank under a bank's", async () => {
+    it("notifies of its own vault under a vault's scope, and of every vault of its bank under a bank's", async () => {
       const { vaultDB, box } = await putWith()
       const bankwide = watching(vaultDB, bankScope)
       const vaultwide = watching(vaultDB, vaultScope)
@@ -169,7 +169,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect(vaultwide.notices.filter(({ val }) => val.vaultlabel !== 'main')).to.deep.equal([])
     })
 
-    it("hears nothing once told to stop", async () => {
+    it("notifies of nothing once stopped", async () => {
       const { vaultDB, box } = await putWith()
       const { notices, unwatch } = watching(vaultDB, vaultScope)
       await vaultDB.putBox(box, { prior: SX.VoidRevision })
@@ -180,7 +180,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect(notices).to.have.lengthOf(1)
     })
 
-    it("is safe to tell to stop twice", async () => {
+    it("is safe to stop twice", async () => {
       const { vaultDB, box } = await putWith()
       const { notices, unwatch } = watching(vaultDB, vaultScope)
       unwatch()
@@ -190,7 +190,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect(notices).to.deep.equal([])
     })
 
-    it.skipIf(! boxNoticesCarryVault)("hears a cascade's box under the vault row stored, not the request's tombstone", async () => {
+    it.skipIf(! boxNoticesCarryVault)("notifies of a cascade's box with the stored vault row as world, not the request's tombstone", async () => {
       const { vaultDB, vault } = await putWith()
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'oldlife', boxAt(0, 'oldlife'))
       const { notices } = watching(vaultDB, vaultScope)
@@ -203,7 +203,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
   })
 
   describe("a VaultDB's own failure", () => {
-    it.skipIf(! canFail)("refuses the call its storage failed, and answers the next", async () => {
+    it.skipIf(! canFail)("refuses the call its storage failed, and completes the next", async () => {
       const { vaultDB, vault } = await putWith()
       await failNextCall(vaultDB)
       const answer = await vaultDB.tryGetVault(vaultScope)

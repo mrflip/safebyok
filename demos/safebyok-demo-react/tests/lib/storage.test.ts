@@ -6,7 +6,7 @@ import { OutageVaultDB } from '../../src/lib/outage-vault-db'
 import { bankOpts } from '../../src/lib/storage'
 
 describe("the demo's bank options", () => {
-  it("are the browser's batteries and the vaultDB behind the outage switch", () => {
+  it("use the browser's deviceDB and strength checker, and a vaultDB behind the outage switch", () => {
     expect(bankOpts.applabel).to.eq('safebyok_demo')
     expect(bankOpts.deviceDB).to.be.instanceOf(IdbDeviceDB)
     expect(bankOpts.strengthChecker).to.eq(zxcvbnStrengthChecker)

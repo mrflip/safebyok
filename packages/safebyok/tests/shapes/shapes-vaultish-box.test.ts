@@ -41,19 +41,19 @@ describe("SX.boxRecord and SX.boxSparse", () => {
       expect(parsed).to.not.eq(full)
     })
 
-    it("passes a Box instance as a duck, and hands back a pojo of its fields", async () => {
+    it("passes a Box instance, and returns a plain object of its fields", async () => {
       const box = await boxListingOf(mw).build(full)
       const parsed = SX.boxRecord.parse(box)
       expect(parsed).to.deep.equal(full)
       expect(parsed).to.not.be.instanceOf(Box)
     })
 
-    it("refuses a plain object carrying a field the Box ducks without", async () => {
+    it("refuses a plain object with a field a Box does not have", async () => {
       const box = await boxListingOf(mw).build(full)
       TH.expectSyncRefusal(() => SX.boxRecord.parse({ ...SX.boxRecord.parse(box), extra: 1 }))
     })
 
-    it("refuses a Box that is not full, as it ducks as the sparse form", async () => {
+    it("refuses a Box that is not full", async () => {
       const box = await boxListingOf(mw).build(sparse)
       TH.expectSyncRefusal(() => SX.boxRecord.parse(box))
     })
@@ -92,13 +92,13 @@ describe("SX.boxRecord and SX.boxSparse", () => {
       expect(SX.boxSparse.parse({ ...sparse, extra: 1 })).to.deep.equal(sparse)
     })
 
-    it("takes its fields from a Box, which ducks as its record", async () => {
+    it("takes its fields from a Box", async () => {
       const box = await boxListingOf(mw).build(full)
       expect(SX.boxSparse.parse(box)).to.deep.equal(sparse)
     })
   })
 
-  it("name the format of the box the models describe", () => {
+  it("use box format 5001", () => {
     expect(SX.BoxFormat).to.eq(5001)
     expect(full.fmt).to.eq(SX.BoxFormat)
   })
@@ -184,7 +184,7 @@ describe("VX.boxDna", () => {
   })
 })
 
-describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch", () => {
+describe("VX.boxDna and VX.boxPatch", () => {
   const whisper = { apiKey: 'sk-ant-fake' }
   const { sidecar: _sidecar, ...sealedless } = full
 
@@ -236,7 +236,7 @@ describe("VX.boxDna and VX.boxPatch: the duckish of a box's dna and of its patch
   })
 })
 
-describe("SX.vaultRecord and SX.vaultSparse: the gate rides in the vault record, and nowhere in the sparse form", () => {
+describe("SX.vaultRecord and SX.vaultSparse", () => {
   const { boxlabel: _boxlabel, ...vaultscope } = scope
   const sparseVault = { ...vaultscope, fmt: SX.VaultFormat, ...baseProps }
 

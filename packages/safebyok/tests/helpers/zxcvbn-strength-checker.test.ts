@@ -60,7 +60,7 @@ describe("zxcvbnStrengthChecker", () => {
     })
   }
 
-  it("answers StrongVerdict of a strong passphrase", async () => {
+  it("returns StrongVerdict for a strong passphrase", async () => {
     expect(await zxcvbnStrengthChecker('mauve lantern quietly orbits', scope)).to.eq(StrongVerdict)
   })
 
@@ -81,7 +81,7 @@ describe("zxcvbnStrengthChecker", () => {
     expect(await zxcvbnStrengthChecker('mauve lantern quietly orbits', scope)).to.eq(StrongVerdict)
   })
 
-  it("refuses the vault's own names, which a guesser who knows the user tries first", async () => {
+  it("finds a passphrase weak when it is one of the vault's own names", async () => {
     const typed = 'quokkavelodrome'
     expect(await zxcvbnStrengthChecker(typed, scope)).to.eq(StrongVerdict)
     for (const named of [{ applabel: typed }, { user_id: typed }, { vaultlabel: typed }]) {
@@ -101,7 +101,7 @@ describe("zxcvbnStrengthChecker", () => {
     expect(zxcvbnStrengthChecker.load).to.be.a('function')
   })
 
-  it("refuses a passphrase that is no text, and a scope that is no scope", async () => {
+  it("refuses a non-string passphrase or an invalid scope", async () => {
     await TH.expectRefusal(judgedAsync(42 as never, scope), 'bad_option')
     await TH.expectRefusal(judgedAsync('mauve lantern quietly orbits', { applabel: 'acme' } as never), 'bad_option')
   })
@@ -133,7 +133,7 @@ describe("zxcvbnStrengthChecker's load", () => {
     expect(await checker('mauve lantern quietly orbits', scope)).to.deep.equal({ strong: true })
   })
 
-  it("is run by a check made before it, which answers a weak verdict while the dictionary does not load", async () => {
+  it("is started by a check, which finds the passphrase weak until the dictionary loads", async () => {
     const { checker, chunk } = await freshCheckerOverChunk()
     chunk.failing = true
     expect(await checker('mauve lantern quietly orbits', scope)).to.deep.equal({ strong: false, reason: Phrases.PassphraseUnjudged })

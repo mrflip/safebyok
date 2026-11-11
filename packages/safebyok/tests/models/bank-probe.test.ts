@@ -22,7 +22,7 @@ const whisperIn = async (bank: Awaited<ReturnType<typeof readyBankOn>>['bank'], 
 }
 
 describe("bank.tryProbe", () => {
-  it("ensures the vault 'home' on a bank with none, and reports each step, the box 'box1' holding the default whisper and sidecar", async () => {
+  it("builds the vault 'home' and box 'box1' on an empty bank, reporting each step", async () => {
     const { world, bank } = await readyBankOn()
     const report = await TH.expectGood(bank.tryProbe())
     expect(report.timely).to.deep.include({ box: null, boxRefreshedAt: null })
@@ -61,7 +61,7 @@ describe("bank.tryProbe", () => {
     expect(said).to.not.include(sent.world.gate.passphrase_wayin.vault_key_wayin_wrapped.ciphertext_b64)
   })
 
-  it("replaces what the box held, finding it first, and adds no second box", async () => {
+  it("replaces an existing box rather than adding a second", async () => {
     const { bank } = await readyBankOn()
     const first = await TH.expectGood(bank.tryProbe({ whisper: { note: 'first' } }))
     const again = await TH.expectGood(bank.tryProbe({ whisper: { note: 'again' } }))
@@ -100,7 +100,7 @@ describe("bank.tryProbe", () => {
     expect(await whisperIn(bank)).to.deep.equal({ note: 'mine again' })
   })
 
-  it("holds to a maxMillisSinceRefresh of its own, apart from the bank's refresh settings", async () => {
+  it("uses the maxMillisSinceRefresh it is given, not the bank's refresh settings", async () => {
     const world = makeBankWorld()
     const { bank } = await readyBankOn(world)
     await TH.expectGood(bank.tryProbe({ whisper: { note: 'mine' } }))
@@ -111,7 +111,7 @@ describe("bank.tryProbe", () => {
     await TH.expectBad(bank.tryProbe({ whisper: { note: 'late' } }, { maxMillisSinceRefresh: 60_000 }), 'stale_write')
   })
 
-  it("answers as bad the refusal a step meets, naming the verb", async () => {
+  it("returns a step's refusal as a bad Outcome naming the call", async () => {
     const { world, bank } = await readyBankOn()
     await TH.expectGood(bank.tryProbe())
     vi.spyOn(world.vaultDB as unknown as { doPutBox: () => unknown }, 'doPutBox').mockImplementationOnce(() => { throw new VaultError('storage_blocked', 'blocked for the test') })
@@ -119,7 +119,7 @@ describe("bank.tryProbe", () => {
     expect(err.meta?.call).to.eq('putBox')
   })
 
-  it("answers as bad before hello, and for a label it cannot use, or a horizon", async () => {
+  it("returns a bad Outcome before hello, and for an invalid label or horizon", async () => {
     const world = makeBankWorld()
     await TH.expectBad(world.bankOn().tryProbe())
     const { bank } = await readyBankOn(world)

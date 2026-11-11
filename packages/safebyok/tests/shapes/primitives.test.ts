@@ -54,7 +54,7 @@ describe("label", () => {
     expect(said.toLowerCase()).to.not.include('secret')
   })
 
-  it("answers for text of millions of characters, refusing it by its length", () => {
+  it("refuses text of millions of characters by its length", () => {
     const vast = 'n'.repeat(12_000_000)
     expect(JSON.stringify(PX.label.safeParse(vast).error?.issues.map((issue) => issue.message))).to.include('<=40')
     expect(Patterns.label.test(vast)).to.be.true
@@ -152,7 +152,7 @@ describe("Patterns.user_id", () => {
     }
   })
 
-  it("answers for millions of dots at once, refusing them", () => {
+  it("refuses millions of dots", () => {
     expect(Patterns.user_id.test('.'.repeat(12_000_000))).to.be.false
   })
 })

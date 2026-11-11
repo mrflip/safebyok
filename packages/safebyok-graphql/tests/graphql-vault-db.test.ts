@@ -84,7 +84,7 @@ describe("GraphQLVaultDB's constructor", () => {
 })
 
 describe("GraphQLVaultDB's brands", () => {
-  it("is a VaultDB, as a bank takes one, and no AdapterVaultDB, as a server's resolvers take one", () => {
+  it("is a VaultDB and not an AdapterVaultDB", () => {
     const vaultDB = new GraphQLVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] }) })
     expect(DB.isVaultDB(vaultDB)).to.be.true
     expect(DB.isAdapterVaultDB(vaultDB)).to.be.false
@@ -103,7 +103,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     await TH.expectRefusal(vaultDB.getVault(TH.vaultScope), 'unexpected_error')
   })
 
-  it("refuses a failed request with a cause with the error's name, HTTP status and code alone", async () => {
+  it("refuses a failed request with a cause that carries only the error's name, HTTP status and code", async () => {
     const networkError = new Error('{"whisper_ciphered":"the record sent"}', { cause: { code: 'ECONNRESET', detail: 'the record sent' } })
     const combined = new CombinedError({ networkError, response: { status: 502, body: 'the record sent' } })
     const { vaultDB } = fakeClient({ error: combined })
@@ -128,7 +128,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     await TH.expectRefusal(vaultDB.listVaults(TH.bankScope), 'unexpected_error')
   })
 
-  it("refuses a malformed request before sending it, as any VaultDB refuses one", async () => {
+  it("refuses a malformed request before sending it", async () => {
     const { vaultDB } = fakeClient({ data: null })
     await TH.expectRefusal(vaultDB.getVault({ ...TH.vaultScope, vaultlabel: '' }), 'bad_scope')
   })
@@ -138,7 +138,7 @@ describe("GraphQLVaultDB's watch", () => {
   beforeEach(() => { vi.useFakeTimers() })
   afterEach(() => { vi.useRealTimers() })
 
-  it("hears each notice once", () => {
+  it("delivers each notice once", () => {
     const { streams, heard, stop } = watched()
     streams[0]?.({ data: gotNotice, hasNext: true })
     streams[0]?.({ data: gotNotice, hasNext: false })
@@ -146,7 +146,7 @@ describe("GraphQLVaultDB's watch", () => {
     stop()
   })
 
-  it("tells a stream the server ends once, and never subscribes again", async () => {
+  it("reports once a stream the server ends, and does not resubscribe", async () => {
     const { streams, counts, badnews, stop } = watched()
     streams[0]?.({ data: gotNotice, hasNext: false })
     streams[0]?.({ data: null, hasNext: false })
@@ -159,7 +159,7 @@ describe("GraphQLVaultDB's watch", () => {
     expect(counts.unsubscribed).to.be.greaterThanOrEqual(1)
   })
 
-  it("tells a failed request once, its cause naming the error alone", () => {
+  it("reports a failed request once, with a cause that names only the error", () => {
     const { streams, badnews } = watched()
     streams[0]?.({ error: new CombinedError({ networkError: new TypeError('Failed to fetch') }), hasNext: false })
     expect(badnews).to.have.length(1)
@@ -167,7 +167,7 @@ describe("GraphQLVaultDB's watch", () => {
     expect(badnews[0]?.cause).to.include({ thrownName: 'TypeError' })
   })
 
-  it("tells a GraphQL error once, stops its stream, and hears nothing after", () => {
+  it("reports a GraphQL error once and stops the stream", () => {
     const { streams, counts, heard, badnews } = watched()
     streams[0]?.({ error: new CombinedError({ graphQLErrors: [new GraphQLError('Cannot query field')] }), hasNext: true })
     streams[0]?.({ data: gotNotice, hasNext: true })
@@ -178,7 +178,7 @@ describe("GraphQLVaultDB's watch", () => {
     expect(counts.unsubscribed).to.eq(1)
   })
 
-  it("tells nothing of the stream the server ends revoking its identity, and never subscribes again", async () => {
+  it("reports nothing when the server ends the stream for a revoked identity, and does not resubscribe", async () => {
     const { streams, heard, badnews, stop } = watched()
     streams[0]?.({ data: revokedNotice, hasNext: false })
     await vi.advanceTimersByTimeAsync(60_000)
@@ -188,7 +188,7 @@ describe("GraphQLVaultDB's watch", () => {
     expect(badnews).to.deep.eq([])
   })
 
-  it("tells the refusal that ends a stream as itself", () => {
+  it("passes on unchanged the refusal that ends a stream", () => {
     const { streams, badnews } = watched()
     const scopeNotice = { safebyokWatch: { ok: false, act: 'bad_scope', val: null, world: null, err: { refusalkind: 'bad_scope', message: 'No such scope', meta: null } } }
     streams[0]?.({ data: scopeNotice, hasNext: true })
@@ -197,7 +197,7 @@ describe("GraphQLVaultDB's watch", () => {
     expect(badnews[0]).to.include({ refusalkind: 'bad_scope', message: 'No such scope' })
   })
 
-  it("tells nothing of a stream that ends once stopped", () => {
+  it("reports nothing when a stream ends after it was stopped", () => {
     const { streams, counts, badnews, stop } = watched()
     stop()
     streams[0]?.({ data: null, hasNext: false })
@@ -205,7 +205,7 @@ describe("GraphQLVaultDB's watch", () => {
     expect(counts.unsubscribed).to.eq(1)
   })
 
-  it("stops a stream that ends as it begins, telling it once", () => {
+  it("reports once a stream that ends as soon as it starts", () => {
     const { counts, badnews, stop } = watched({ data: null, hasNext: false })
     expect(badnews).to.have.length(1)
     expect(counts.unsubscribed).to.eq(1)

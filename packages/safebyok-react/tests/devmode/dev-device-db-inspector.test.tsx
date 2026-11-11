@@ -63,7 +63,7 @@ describe("DevDeviceDBInspector", () => {
     await waitFor(() => { expect(screen.queryByText('mangled')).to.be.null })
   })
 
-  it("shows a damaged row's proved_at that names no time as its number", async () => {
+  it("shows a damaged row's invalid proved_at as the raw number", async () => {
     const { world } = await renderOverLease()
     world.deviceDB._cheat_leaseRows().set(ckeyOf('acme', 'u1', 'mangled'), { scopepath: ['acme', 'u1', 'mangled'], row: { applabel: 'acme', user_id: 'u1', vaultlabel: 'mangled', proved_at: NaN } })
     includingDamaged()

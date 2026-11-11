@@ -28,7 +28,7 @@ const snapshotOf = async (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord(
 const SnapshotKeys = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'isFull', 'isPresent', 'isExposed', 'isVeiled', 'isLocked']
 
 describe("Box own props", () => {
-  it("are exactly the nine the base tattoos: the four of the scope, registered_at, vault_tok and the three revision props", async () => {
+  it("are exactly nine: the four scope fields, registered_at, vault_tok and the three revision fields", async () => {
     const box = await boxOf()
     expect(Object.keys(box)).to.have.members(['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'registered_at', 'vault_tok', 'revision_tok', 'revision_seq', 'written_at'])
     expect(Object.keys(box)).to.have.lengthOf(9)
@@ -47,7 +47,7 @@ describe("Box own props", () => {
     expect(Object.keys(box)).to.have.members(keys)
   })
 
-  it("leave out the world, the listing, the whisper exposed, the record's sealed parts and fmt, which are adorned, private or on the prototype", async () => {
+  it("leave out the world, the listing, the exposed whisper, the sealed parts and fmt", async () => {
     const box = await boxOf()
     for (const ckey of ['world', 'listing', 'whisper', 'sidecar', 'fmt', 'box_key_wrapped', 'whisper_codec', 'whisper_schema_version', 'whisper_ciphered', 'scope', 'am']) {
       expect(Object.keys(box), ckey).to.not.include(ckey)
@@ -56,21 +56,21 @@ describe("Box own props", () => {
     expect(box.box_key_wrapped).to.deep.equal(fullBoxRecord().box_key_wrapped)
   })
 
-  it("duck as the record's sparse form where the host JSON-stringifies them", async () => {
+  it("serialize to the record's sparse form under JSON.stringify", async () => {
     const box = await boxOf()
     expect(JSON.stringify(box)).to.eq(JSON.stringify(world.mw.sparseBoxRecord()))
   })
 })
 
 describe("Box sidecar, locked or not", () => {
-  it("ENCRYPTED is the bag the whisper answers while unexposed, locked or not", async () => {
+  it("box.whisper is ENCRYPTED while unexposed, locked or not", async () => {
     const box = await boxOf()
     expect(box.whisper).to.eq(ENCRYPTED)
     world.mw.setLocked(true)
     expect(box.whisper).to.eq(ENCRYPTED)
   })
 
-  it("answers itself, whether the vault is unlocked or locked", async () => {
+  it("is readable whether the vault is locked or not", async () => {
     const box = await boxOf()
     expect(box.sidecar).to.deep.equal({ note: 'a test box' })
     world.mw.setLocked(true)
@@ -79,7 +79,7 @@ describe("Box sidecar, locked or not", () => {
     expect(box.sidecar).to.deep.equal({ note: 'a test box' })
   })
 
-  it("is null where the record in hand is not full, locked or not", async () => {
+  it("is null when the cached record is not full, locked or not", async () => {
     const sparse = await boxOf(world.mw.sparseBoxRecord({ boxlabel: 'b_sparse' }))
     const gone = await boxOf(world.mw.tombstoneBoxRecord({ boxlabel: 'b_gone', revision_seq: 2 }))
     for (const isLocked of [false, true]) {
@@ -114,7 +114,7 @@ describe("Box sidecar, locked or not", () => {
     }
   })
 
-  it("follows a receive of a record with another sidecar into the snapshot while locked, telling its listeners", async () => {
+  it("shows a received record's new sidecar in the snapshot while locked, and notifies its listeners", async () => {
     const box = await boxOf()
     world.mw.setLocked(true)
     const before = box.getSnapshot()
@@ -127,7 +127,7 @@ describe("Box sidecar, locked or not", () => {
     expect(box.sidecar).to.deep.equal({ note: 'newer' })
   })
 
-  it("is never on the sparse form or a tombstone, locked or not: those have no sidecar at all", async () => {
+  it("is never on the sparse form or a tombstone, locked or not", async () => {
     const box = await boxOf()
     const gone = await boxOf(world.mw.tombstoneBoxRecord({ boxlabel: 'b_gone', revision_seq: 2 }))
     for (const isLocked of [false, true]) {
@@ -169,13 +169,13 @@ describe("Box snapshot", () => {
     expect(Object.values(snapshot).filter((val) => typeof val === 'function')).to.deep.equal([])
   })
 
-  it("is flat in the scope, so that it ducks as one", async () => {
+  it("has the scope fields at the top level", async () => {
     const snapshot = await snapshotOf()
     expect(snapshot).to.deep.include(world.mw.boxscope('anthropic_api_key'))
   })
 
   describe("for a box in each state", () => {
-    it("full: the sidecar of the record in hand, full and present", async () => {
+    it("full: the cached record's sidecar, full and present", async () => {
       const snapshot = await snapshotOf()
       expect(snapshot).to.include({ isFull: true, isPresent: true, isExposed: false })
       expect(snapshot.sidecar).to.deep.equal({ note: 'a test box' })
@@ -209,14 +209,14 @@ describe("Box snapshot", () => {
       })
     })
 
-    it("put: the record put is the record in hand, so the sidecar and the revision are the put's", async () => {
+    it("put: shows the sidecar and revision of the record just put", async () => {
       const box = await boxOf()
       world.mw.setNow(T0 + 500)
       await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'edited' } })
       expect(box.getSnapshot()).to.deep.include({ sidecar: { note: 'edited' }, revision_seq: 2, written_at: T0 + 500, isFull: true, isPresent: true })
     })
 
-    it("exposed: follows the whisper the box keeps open", async () => {
+    it("exposed: isExposed follows expose and unexpose", async () => {
       const box = await boxOf()
       await box.put({ whisper: { apiKey: 'sk-ant-fake-for-test' } })
       box.getSnapshot()
@@ -271,7 +271,7 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
   }
 })
 
-describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok throws", () => {
+describe("box.receive(rcvd): registered_at, and a record of another vault_tok", () => {
   it("keeps registered_at over a newer living record registered at another time", async () => {
     const box = await builtOf(fullBoxRecord())
     box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', registered_at: T0 + 7 }))
@@ -279,26 +279,26 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
     expect(box.revision_seq).to.eq(2)
   })
 
-  it("takes registered_at and box_tok from a record of another life received over a tombstone world", async () => {
+  it("takes registered_at and box_tok from a record of another life received over a listed tombstone", async () => {
     const box = await builtOf(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
     box.receive(fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-b3', box_tok: 'box-tok-b', registered_at: T0 + 7 }))
     expect(box).to.include({ registered_at: T0 + 7, box_tok: 'box-tok-b', vault_tok: 'vault-tok-u1', revision_seq: 3 })
   })
 
-  it("takes registered_at and box_tok from a newer record of another life received over a box world alive, a birthday elsewhere after a deletion this device never received", async () => {
+  it("takes registered_at and box_tok from a newer record of another life received over a box listed alive", async () => {
     const box = await builtOf(fullBoxRecord())
     box.receive(fullBoxRecord({ revision_seq: 4, revision_tok: 'rev-b4', box_tok: 'box-tok-b', registered_at: T0 + 7 }))
     expect(box).to.include({ registered_at: T0 + 7, box_tok: 'box-tok-b', revision_seq: 4 })
   })
 
   const ListedCases = [
-    ['a box world alive',          () => fullBoxRecord()],
-    ['a box world deleted',        () => tombstoneBoxRecord({ revision_seq: 1 }, 'x')],
+    ['a box listed alive',          () => fullBoxRecord()],
+    ['a box listed deleted',        () => tombstoneBoxRecord({ revision_seq: 1 }, 'x')],
   ] as const
   const OtherVaultCases = [
     [2, 'a newer record'],
-    [1, 'a record at the revision world'],
-    [0, 'an older record, which the revisions of another life of the vault do not order'],
+    [1, 'a record at the same revision'],
+    [0, 'an older record'],
   ] as const
   for (const [listedBlurb, listedOf] of ListedCases) {
     for (const [seq, blurb] of OtherVaultCases) {
@@ -312,7 +312,7 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
     }
   }
 
-  it("throws for a record under another vault_tok whose life tok path, joined, is the box's own", async () => {
+  it("throws for a record under another vault_tok even when its joined tok path equals the box's own", async () => {
     const box = await builtOf(fullBoxRecord())
     const central = box._cheat_central
     TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-u1-box', box_tok: 'tok-a' })))
@@ -335,7 +335,7 @@ describe("box.receive(rcvd): registered_at, set at a birthday; another vault_tok
     expect(box.revision_seq).to.eq(1)
   })
 
-  it("passes over a notice under another vault_tok, keeping its own copy", async () => {
+  it("ignores a notice under another vault_tok, keeping its own copy", async () => {
     const listing = boxListingOf(world.mw)
     await listing.hello()
     const box = await listing.build(fullBoxRecord())
@@ -381,7 +381,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
     TH.expectSyncRefusal(() => box.subscribe('call me' as never))
   })
 
-  it("refuses a bag handed to put, naming whisper and saying it is no whisper", async () => {
+  it("refuses a sentinel bag as the whisper of a put, naming whisper", async () => {
     const box = await builtOf(fullBoxRecord())
     world.mw.setLocked(true)
     world.mw.clearCalls()
@@ -419,7 +419,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
     whisper: { apiKey: 'sk-test-1111' }, sidecar: { note: 'round trip' },
   } as const)
 
-  it("takes { ...record, whisper, sidecar } to put, putting the next revision over the one world", async () => {
+  it("takes { ...record, whisper, sidecar } and puts the next revision over the cached one", async () => {
     const record = fullBoxRecord()
     world.mw.seedPut(record)
     const box = await builtOf(record)
@@ -434,7 +434,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
 // --
 
 describe("registered_at over a rebirth", () => {
-  it("registers a box deleted and reborn at the rebirth's put, as a new life", async () => {
+  it("is set anew when a deleted box is put again", async () => {
     world.mw.seedPut(fullBoxRecord())
     const box = await fakeSealBoxListingOf(world.mw).build(fullBoxRecord())
     await box.del(box.scope)

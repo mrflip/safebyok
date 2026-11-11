@@ -233,11 +233,12 @@ export default defineConfig([
     },
   },
 
-  // Zod comes in as `zod`, classic, the one flavour: every schema in src/ is made in a Checkers
-  // call, which hands its builder Zod's makers. Classic is the larger library (the same five
-  // validators bundle to some 25 kB gzipped, against 7 kB in mini), a cost the Coach accepted for
-  // its ergonomics; named and star imports shake alike. `zod/mini` would bundle a second Zod beside
-  // it. `zod/v4` is the same classic under its version path, and `zod/v3` the classic before it.
+  // Zod is imported as `zod`, the classic build, and by no other path: every schema in src/ is made
+  // in a Checkers call, which passes Zod's makers to the builder function it is given. Classic is
+  // the larger library (the same five validators bundle to some 25 kB gzipped, against 7 kB in
+  // mini), a cost the Coach accepted for its ergonomics; named and star imports tree-shake equally
+  // well. `zod/mini` would bundle a second Zod beside it. `zod/v4` is the same classic build under
+  // its version path, and `zod/v3` is the classic build before it.
   {
     name: 'safebyok/zod-paths',
     files: ['src/**/*.ts', 'tests/test-helpers.ts', 'tests/test-helpers/*.ts'],
@@ -245,7 +246,7 @@ export default defineConfig([
       'no-restricted-imports': ['error', {
         paths: ['zod/mini', 'zod/v4', 'zod/v3'].map((otherPath) => ({
           name:    otherPath,
-          message: "Import zod as `zod` (`import type * as Z from 'zod'` for its types), or build in a Checkers call, which hands its builder Zod's makers: one Zod, classic, bundles.",
+          message: "Import zod as `zod` (`import type * as Z from 'zod'` for its types), or build in a Checkers call, which passes Zod's makers to your builder function: only one Zod, the classic build, is bundled.",
         })),
       }],
     },
@@ -273,8 +274,9 @@ export default defineConfig([
       // `arr`, `props` -- and `err`, where the rule's replacement (`error`) is the one name
       // STYLE.md forbids outright.
       'unicorn/name-replacements': 'off',
-      // Booleans are named for what they say (`locked`, `stale`); an is- prefix on every binding
-      // of one would be a translation layer, and it fights `prefer-destructuring`, which is on.
+      // STYLE.md's `isFoo` is for a boolean on an instance or in a snapshot, and is kept by hand.
+      // This rule wants a prefix on every local and destructured binding too, which fights
+      // `prefer-destructuring`.
       'unicorn/consistent-boolean-name': 'off',
       'unicorn/filename-case': ['error', { cases: { kebabCase: true } }],
       // Taste: `type FooT = Z.output<...>` cannot be an interface, so its neighbours should not
@@ -288,8 +290,8 @@ export default defineConfig([
       // Written for JavaScript, where a return type is only what the code happens to return. Here
       // it is declared, and a declared union (`WhisperJson`) is the contract, not an accident.
       'sonarjs/function-return-type': 'off',
-      // A second no-unused-vars, without the house's `_` for a binding left unused on purpose (a
-      // field dropped by destructuring): typescript-eslint's, configured above, is the one.
+      // A second no-unused-vars, which does not know the `_` prefix for a binding left unused on
+      // purpose (a field dropped by destructuring). typescript-eslint's rule, configured above, does.
       'sonarjs/no-unused-vars': 'off',
       // A shape's name says what it means even where two shapes are one type (`LeaseSparse =
       // LeaseStamp`): the rule calls that alias redundant, where the guidance asks for it.
@@ -304,8 +306,8 @@ export default defineConfig([
       'unicorn/prefer-iterator-to-array':       'off',
       'unicorn/prefer-promise-with-resolvers':  'off',
       'unicorn/prefer-combined-guards':         'off',
-      // A model's `modelkind` is a getter, not a readonly field: on the prototype it is no own key, so a spread,
-      // `Object.keys` and a strict record check never meet it. Off for tests, below.
+      // A model's `modelkind` is a getter, not a readonly field: a getter is on the prototype and is not an own key, so
+      // a spread, `Object.keys` and a strict record check do not see it. Off for tests, below.
       '@typescript-eslint/class-literal-property-style': ['error', 'getters'],
     },
   },
@@ -385,7 +387,8 @@ export default defineConfig([
       // its default, true, refuses exactly the first-line-on-the-/** shape the house writes.
       'jsdoc/multiline-blocks': ['warn', { noZeroLineText: false, noFinalLineText: true }],
       // #no-refusal-catalog: no two quoted snake_case kinds in a member's description; class and module docs are not
-      // listed. The underscore misses the one-word kinds, a price paid to keep the config off src/.
+      // checked. The pattern needs an underscore, so it misses the one-word kinds: the full list is in src/, which this
+      // config does not import.
       'jsdoc/match-description': ['warn', {
         mainDescription: {
           match:   String.raw`^(?![\s\S]*${QuotedKind}[\s\S]*${QuotedKind})`,
@@ -435,7 +438,7 @@ export default defineConfig([
     files: ['tests/**/*.ts'],
     extends: [vitest.configs.recommended],
     rules: {
-      // A test's look-alike or duck holds its literals as own keys, which is what a check sees in the field.
+      // A test's stand-in for a model keeps its literals as own keys, as the real records a checker is given do.
       '@typescript-eslint/class-literal-property-style': 'off',
       'vitest/no-disabled-tests': 'warn',
       'vitest/no-focused-tests': 'warn',

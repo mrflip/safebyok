@@ -23,7 +23,7 @@ describe("good and bad", () => {
 
 describe("Outcome", () => {
   // Outcome @example
-  it("narrows on ok, so a destructured val is the answer once a refusal has returned", () => {
+  it("narrows on ok", () => {
     const answer = (outcome: Outcome<number | null>): number | null | VaultError => {
       const { ok, val, err } = outcome
       if (! ok) {
@@ -59,7 +59,7 @@ describe("outcomeOf", () => {
     expect(rejected.err).to.eq(refusal)
   })
 
-  it("turns anything else thrown into unexpected_error, the thrown value its cause", async () => {
+  it("wraps anything else thrown, keeping it as the cause", async () => {
     const parseImport = (file: string): string => { throw new TypeError(`cannot parse ${file}`) }
     const { ok, err } = await outcomeOf(() => parseImport('backup.json'))
     expect(ok).to.be.false
@@ -69,7 +69,7 @@ describe("outcomeOf", () => {
     expect(err?.cause).to.be.instanceOf(TypeError)
   })
 
-  it("turns a thrown string, or a rejection with nothing, into unexpected_error with a cause that is never null", async () => {
+  it("wraps a thrown string, or a rejection with nothing, with a cause that is never null", async () => {
     const fromString = await outcomeOf(() => { throw 'down' })  // eslint-disable-line @typescript-eslint/only-throw-error -- a body that throws a string is what this guards against
     expect((fromString.err?.cause as Error).message).to.eq('down')
     const fromNothing = await outcomeOf(() => Promise.reject(undefined))  // eslint-disable-line @typescript-eslint/prefer-promise-reject-errors -- likewise, a rejection with nothing
@@ -78,7 +78,7 @@ describe("outcomeOf", () => {
   })
 
   // outcomeOf @example
-  it("never rejects: what an app wraps is one Outcome whatever happens", async () => {
+  it("never rejects", async () => {
     const { ok, val, err } = await outcomeOf(() => fetchBackup('main'), Refusals.storageUnavailable)
     expect(ok).to.be.false
     expect(val).to.be.undefined
@@ -87,8 +87,8 @@ describe("outcomeOf", () => {
   })
 })
 
-describe("outcomeOf, told otherwise", () => {
-  it("turns a throw that is no VaultError into what otherwise makes of it", async () => {
+describe("outcomeOf, given an otherwise", () => {
+  it("passes a throw that is not a VaultError to otherwise", async () => {
     const socketClosed = new Error('socket closed')
     const { err } = await outcomeOf(() => { throw socketClosed }, Refusals.storageUnavailable)
     expect(err?.refusalkind).to.eq('storage_unavailable')
@@ -127,7 +127,7 @@ describe("demandGood", () => {
 
 describe("storageTroubleOf", () => {
   // storageTroubleOf @example
-  it("hands back a VaultError as the same object, and makes storage_unavailable of anything else, the throw its cause", () => {
+  it("returns a VaultError unchanged, and wraps anything else as the cause", () => {
     const refusal = new VaultError('vault_mismatch', 'Another vault is stored there.')
     expect(storageTroubleOf(refusal)).to.eq(refusal)
     const dropped = new Error('connection terminated unexpectedly')
@@ -137,7 +137,7 @@ describe("storageTroubleOf", () => {
     expect(trouble.message).to.not.include('terminated')
   })
 
-  it("makes storage_unavailable of a thrown string, or of nothing, with a cause that is never null and the message Refusals.storageUnavailable gives", () => {
+  it("wraps a thrown string, or nothing, with a cause that is never null", () => {
     for (const thrown of ['socket closed', undefined, null]) {
       const trouble = storageTroubleOf(thrown)
       expect(trouble.refusalkind).to.eq('storage_unavailable')

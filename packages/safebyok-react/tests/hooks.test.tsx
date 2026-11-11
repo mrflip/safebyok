@@ -270,7 +270,7 @@ describe("the box hooks", () => {
     expect(await stored?.extractWhisper()).to.deep.equal({ apiKey: 'sk-ant-fake-stored' })
   })
 
-  it("read why the whisper hides while it will not show", async () => {
+  it("read why the whisper is hidden", async () => {
     const { world } = await boxWorld()
     render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><BoxPage /></BankProvider>)
     await waitFor(() => { expect(shownOfBox('whisper')).to.eq('- unexposed') })
@@ -293,7 +293,7 @@ describe("the box hooks", () => {
     await waitFor(() => { expect(shownOfBox('showing')).to.eq('hidden') })
   })
 
-  it("read none again for a box deleted", async () => {
+  it("read none again once the box is deleted", async () => {
     const { world, vault } = await boxWorld()
     render(<BankProvider {...TH.providerPropsOf(world)}><BoxPage /></BankProvider>)
     await waitFor(() => { expect(shownOfBox('boxes')).to.eq('anthropic') })
@@ -311,7 +311,7 @@ describe("the box hooks", () => {
     expect(shownOfBox('boxes')).to.eq('none')
   })
 
-  it("read whether a box shows and wears its veil", async () => {
+  it("read whether a box is showing and whether it is veiled", async () => {
     const { world } = await boxWorld()
     render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext: typingPassphrase })}><VeilPage /></BankProvider>)
     await waitFor(() => { expect(screen.getByText('Expose')).to.have.property('disabled', false) })
@@ -340,7 +340,7 @@ describe("the box hooks", () => {
     await waitFor(() => { expect(shownOfBox('veil')).to.eq('hidden bare unexposed') })
   })
 
-  it("read the empty answers for no box", () => {
+  it("read the empty values for no box", () => {
     render(<NoBox />)
     expect(screen.getByText('0 unexposed true false')).to.exist
   })

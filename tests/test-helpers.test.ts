@@ -16,13 +16,14 @@ describe("makeScratchDir", () => {
     writeFileSync(path.join(scratch, 'left-behind.txt'), 'gone soon\n')
   })
 
-  it("removes it, and what was left in it, once the test that made it returns", () => {
+  it("removes the directory and its contents once the test that made it returns", () => {
     expect(made).to.have.lengthOf(1)
     expect(existsSync(made[0] ?? '')).to.be.false
   })
 })
 
-describe("makeScratchDir, called in a beforeEach as its @example has it", () => {
+describe("makeScratchDir, called in a beforeEach", () => {
+  // makeScratchDir @example 1
   const made: string[] = []
   beforeEach(() => { made.push(TH.makeScratchDir('test-helpers-each-')) })
 
@@ -31,7 +32,7 @@ describe("makeScratchDir, called in a beforeEach as its @example has it", () => 
     expect(existsSync(made[0] ?? '')).to.be.true
   })
 
-  it("has removed the last test's by the time the next test runs", () => {
+  it("removes the previous test's directory before the next test runs", () => {
     expect(made).to.have.lengthOf(2)
     expect(existsSync(made[0] ?? '')).to.be.false
     expect(existsSync(made[1] ?? '')).to.be.true

@@ -16,7 +16,7 @@ describe("nowMillis()", () => {
 })
 
 describe("_cheat_clock(fn) and _cheat_clockReset()", () => {
-  it("make nowMillis answer what fn answers, until the reset", () => {
+  it("make nowMillis return what fn returns, until the reset", () => {
     let now = T0
     _cheat_clock(() => now)
     expect(nowMillis()).to.eq(T0)

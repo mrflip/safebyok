@@ -38,7 +38,7 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       expect(answer.err?.meta?.fieldnames).to.deep.equal([fieldname])
     })
 
-    it("answers getVault with a vault row of any vault_tok, as its address is its scope alone", async () => {
+    it("getVault returns a vault row of any vault_tok", async () => {
       const { vaultDB } = await putWith()
       const otherLife = vaultAt(3, 'life2')
       await rowsOf(vaultDB).plantVaultRow(vaultScope, otherLife)
@@ -145,14 +145,14 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
   })
 
   describe("listVaults", () => {
-    it("answers gotvoid over a bank with no vaults, its world the scope", async () => {
+    it("returns act 'gotvoid' for a bank with no vaults", async () => {
       const vaultDB = await fresh()
       const answer = await vaultDB.listVaults(bankScope)
       expect(answer).to.deep.include({ ok: true, act: 'gotvoid', world: bankScope })
       expect(answer.val).to.deep.equal({ vaults: [], damaged_rows: [] })
     })
 
-    it("lists vaults full or tombstone, and sets aside a row failing validation as its scope alone", async () => {
+    it("lists the sound vaults, and sets aside a row that fails validation as its scope alone", async () => {
       const { vaultDB, vault } = await putWith()
       await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('broken'), { revision_tok: 'r9', revision_seq: 9, am: 'a', vault_tok: 'life9', garbage: true })
       await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('newer'), { fmt: SX.VaultFormat + 1, revision_seq: 9 })
@@ -175,12 +175,12 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
   })
 
   describe("getVault", () => {
-    it("answers the record alone, and the record as world", async () => {
+    it("returns the record as both val and world", async () => {
       const { vaultDB, vault } = await putWith({ box: true })
       expect(await vaultDB.getVault(vaultScope)).to.deep.include({ ok: true, act: 'got', val: vault, world: vault })
     })
 
-    it("over a void row, refuses with no row, and answers null with ifAbsent nil", async () => {
+    it("over a void row, refuses, or returns null under ifAbsent 'nil'", async () => {
       const vaultDB = await fresh()
       const answer = await vaultDB.tryGetVault(vaultScope)
       expect(answer).to.deep.include({ ok: false, dbhas: null })
@@ -189,7 +189,7 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       expect(nil).to.deep.include({ act: 'gotvoid', val: null, dbhas: null })
     })
 
-    it("over a tombstone, refuses with it, and answers null with ifAbsent nil", async () => {
+    it("over a tombstone, refuses, or returns null under ifAbsent 'nil'", async () => {
       const { vaultDB, vault } = await putWith()
       const tombstone = vaultTombstoneOf(vault)
       await vaultDB.delVault(tombstone, { prior: priorOf(vault) })
@@ -198,7 +198,7 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       expect(await vaultDB.getVault(vaultScope, { ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', val: null, dbhas: tombstone, world: tombstone })
     })
 
-    it("refuses a row failing validation or of a later fmt, naming the field, with no world and the request's safe metadata", async () => {
+    it("refuses an invalid or newer-format row, naming the field", async () => {
       const { vaultDB } = await putWith()
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { garbage: true })
       expect(await vaultDB.tryGetVault(vaultScope)).to.deep.include({ ok: false, act: 'damaged_row', world: null, req_params: vaultScope })
@@ -210,7 +210,7 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
   })
 
   describe("listBoxes", () => {
-    it("answers the sparse boxes, tombstones included, the rows it set aside, and the vault row as world", async () => {
+    it("returns the sparse boxes, tombstones included, the rows it set aside, and the vault row as world", async () => {
       const { vaultDB, vault, box } = await putWith({ box: true })
       const other = boxAt(0, 'life1', { boxlabel: 'other' })
       await vaultDB.putBox(other, { prior: SX.VoidRevision })
@@ -253,12 +253,12 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
   })
 
   describe("getBox", () => {
-    it("answers the record, and the vault row as world", async () => {
+    it("returns the record, with the vault row as world", async () => {
       const { vaultDB, vault, box } = await putWith({ box: true })
       expect(await vaultDB.getBox(boxQuery)).to.deep.include({ ok: true, act: 'got', val: box, world: vault })
     })
 
-    it("over a void box row, refuses as void, and answers null with ifAbsent nil", async () => {
+    it("over a void box row, refuses as void, or returns null under ifAbsent 'nil'", async () => {
       const { vaultDB, vault } = await putWith()
       const answer = await vaultDB.tryGetBox(boxQuery)
       expect(answer).to.deep.include({ ok: false, act: 'void', dbhas: null, world: vault })
@@ -266,7 +266,7 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       expect(await vaultDB.getBox(boxQuery, { ifAbsent: 'nil' })).to.deep.include({ act: 'gotvoid', val: null, dbhas: null, world: vault })
     })
 
-    it("over a tombstoned box row, refuses as gone, and answers null with ifAbsent nil", async () => {
+    it("over a tombstoned box row, refuses as gone, or returns null under ifAbsent 'nil'", async () => {
       const { vaultDB, vault, box } = await putWith({ box: true })
       const tombstone = boxTombstoneOf(box)
       await vaultDB.delBox(tombstone, { prior: priorOf(box) })

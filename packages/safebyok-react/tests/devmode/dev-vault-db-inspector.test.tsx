@@ -33,7 +33,7 @@ describe("DevVaultDBInspector", () => {
     expect(lastCall()).not.to.include('sk-ant-fake-stored')
   })
 
-  it("tombstones a box row by delBox, then answers tidyGone", async () => {
+  it("deletes a box row with delBox, then shows tidyGone's count", async () => {
     await renderOverBox()
     fireEvent.click(within(boxRow('anthropic')).getByRole('button', { name: 'delBox' }))
     await waitFor(() => { expect(boxRow('anthropic').dataset['am']).to.eq('x') })

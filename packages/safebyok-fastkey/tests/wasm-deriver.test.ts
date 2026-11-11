@@ -63,7 +63,7 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
     expect(hexOf(wasmBytes)).to.eq(SavedHex)
   })
 
-  it("derives 32 deterministic bytes, and a different salt lands somewhere else entirely", { timeout: 60_000 }, async () => {
+  it("derives 32 deterministic bytes that change with the salt", { timeout: 60_000 }, async () => {
     const once = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltOf(16))
     const again = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltOf(16))
     const elsewhere = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', new Uint8Array(16).fill(8))
@@ -118,7 +118,7 @@ describe("argon2idWasmDeriver beside argon2idDeriver", () => {
     })
   }
 
-  it("derives differently under each parameter, so none is ignored", async () => {
+  it("derives differently under each parameter", async () => {
     const variants = [CheapSpec, { ...CheapSpec, memory_kib: 128 }, { ...CheapSpec, iterations: 3 }, { ...CheapSpec, parallelism: 2 }]
     const derived = await Promise.all(variants.map((spec) => argon2idWasmDeriver(spec).deriveKeyBytes('pw', saltOf(16))))
     const distinct = new Set(derived.map((bytes) => bytes.join(',')))
@@ -143,7 +143,7 @@ describe("argon2idWasmDeriver", () => {
     expect(specOf(argon2idWasmDeriver(Argon2idWebV1))).to.deep.equal(specOf(argon2idWasmWebV1Deriver))
   })
 
-  it("keeps none of the extra fields it was handed: a spec cannot smuggle in a function", async () => {
+  it("ignores extra fields in the spec", async () => {
     const smuggled = { ...CheapSpec, deriveKeyBytes: () => Promise.resolve(new Uint8Array(32)) } as KeyDeriverSpec
     const derived = await argon2idWasmDeriver(smuggled).deriveKeyBytes('pw', saltOf(16))
     expect(derived).to.not.deep.equal(new Uint8Array(32))
@@ -272,14 +272,14 @@ describe("where WebAssembly cannot run", () => {
     vi.resetModules()
   })
 
-  it("refuses with kind 'bad_option' on a platform with no WebAssembly, as React Native's Hermes is", async () => {
+  it("refuses on a platform with no WebAssembly", async () => {
     vi.stubGlobal('WebAssembly', undefined)
     const attempt = argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltOf(16))
     await expect(attempt).rejects.toThrow(VaultError)
     await expect(attempt).rejects.toThrow(/no WebAssembly/u)
   })
 
-  it("refuses with kind 'bad_option', naming the fix, when a Content-Security-Policy forbids compiling it", async () => {
+  it("refuses, naming the fix, when a Content-Security-Policy forbids compiling it", async () => {
     vi.doMock('hash-wasm', () => ({
       argon2id: () => Promise.reject(new WebAssembly.CompileError("WebAssembly.compile(): Refused to compile or instantiate WebAssembly module because 'wasm-unsafe-eval' is not an allowed source of script")),
     }))
@@ -302,7 +302,7 @@ describe("where WebAssembly cannot run", () => {
     expect(told).to.not.include('correct horse')
   })
 
-  it("passes along, as it came, a failure that is not WebAssembly's to compile", async () => {
+  it("rethrows unchanged a failure that is not a WebAssembly compile error", async () => {
     vi.doMock('hash-wasm', () => ({ argon2id: () => Promise.reject(new RangeError('WebAssembly.Memory.grow(): Maximum memory size exceeded')) }))
     vi.resetModules()
     const Fresh = await import('../src/wasm-deriver')

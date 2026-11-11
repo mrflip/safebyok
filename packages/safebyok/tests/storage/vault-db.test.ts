@@ -42,7 +42,7 @@ describe("AdapterVaultDB", () => {
       protected override doListVaults(): never { throw new Error('socket closed') }
     }
 
-    it("reads as storage_unavailable, the VaultDB's error its cause, by a throw and by an answer alike", async () => {
+    it("is refused with the VaultDB's error as the cause, whether thrown or returned in an answer", async () => {
       const vaultDB = new FailingVaultDB()
       await expect(vaultDB.listVaults(bankScope)).rejects.toSatisfy((err) => isVaultError(err, 'storage_unavailable'))
       const answer = await vaultDB.tryListVaults(bankScope)
@@ -60,7 +60,7 @@ describe("AdapterVaultDB", () => {
   })
 
   describe("the plain verb and its try form", () => {
-    it("read the same, the answer alone carrying the world and dbhas: an error's meta has neither, so no wrapped key", async () => {
+    it("agree, except that only the answer carries world and dbhas", async () => {
       const vaultDB = new MemoryVaultDB()
       const vault = vaultAt()
       await vaultDB.putVault(vault, { prior: SX.VoidRevision })
@@ -77,10 +77,10 @@ describe("AdapterVaultDB", () => {
     })
   })
 
-  describe("the duck a model takes for one", () => {
+  describe("what a model accepts as a VaultDB", () => {
     const brand = { [Symbol.for('@safebyok/vaultdb')]: true }
 
-    it("takes a VaultDB, or a client of one that wears the brand and answers every verb", () => {
+    it("accepts a VaultDB, or a client that has the brand and every verb", () => {
       const vaultDB = new MemoryVaultDB()
       expect(brandedVaultDB.parse(vaultDB)).to.eq(vaultDB)
       const client = { ...brand, ...verbsOf(vaultDB) }

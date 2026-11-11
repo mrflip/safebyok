@@ -142,7 +142,7 @@ describe("IdbVaultDB's databases", () => {
     expect(tidied.totalCount).to.eq(0)
   })
 
-  it("hears a write from another VaultDB over the same database", async () => {
+  it("notifies a watch of a write from another VaultDB over the same database", async () => {
     const vaultDB = makeVaultDB()
     const notices: unknown[] = []
     const unwatch = vaultDB.watch(TH.bankScope, (notice) => { notices.push(notice) })
@@ -162,7 +162,7 @@ describe("IdbVaultDB's database name and wipe", () => {
     expect(DB.VaultsDBVersion).to.match(/^\d{3}-\d{3}-\d{3}$/)
   })
 
-  it("deletes the unversioned vault database and each older version's, unread, on its first call", async () => {
+  it("deletes the unversioned vault database and every older version's, without reading them, on its first call", async () => {
     const dbName = `test-${crypto.randomUUID()}`
     const oldnames = [`${dbName}:vaults`, `${dbName}:vaults-v1`, `${dbName}:vaults-v001-001-000`, `${dbName}:vaults-v000-009-009`]
     for (const oldname of oldnames) { await plantClosedDB(oldname) }
@@ -174,7 +174,7 @@ describe("IdbVaultDB's database name and wipe", () => {
     })
   })
 
-  it("leaves a newer version's database, another dbName's, and the device database's where they stand", async () => {
+  it("leaves untouched a newer version's database, another dbName's, and the device database", async () => {
     const dbName = `test-${crypto.randomUUID()}`
     const kept = [`${dbName}:vaults-v001-002-000`, `${dbName}:device_db`, `${dbName}:device-v001-001-001`, `other-${dbName}:vaults`]
     for (const keptname of kept) { await plantClosedDB(keptname) }

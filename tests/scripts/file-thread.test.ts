@@ -189,7 +189,7 @@ describe('scripts/file-thread', () => {
       expect(git('worktree', 'list', '--porcelain')).not.to.include(root)
     })
 
-    it("knows a tracked file whose name is not ASCII as the tip's", () => {
+    it("recognizes a tracked file with a non-ASCII name as part of the tip", () => {
       cutAndBuild('origin/main')
       commit(root, 'café.md', 'bonjour\n')
       const result = fileWithLeftovers({ 'café.md': 'bonjour\n' })

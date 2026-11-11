@@ -64,7 +64,7 @@ describe('scripts/dump-sessions.sh', () => {
     ])
   })
 
-  it('leaves out credentials, and what can be had again', () => {
+  it('leaves out credentials and anything that can be regenerated', () => {
     plant(home, '.claude/projects/kept.jsonl')
     plant(home, '.claude/.credentials.json')
     plant(home, '.claude/sessions/1.abc123.key')
@@ -76,7 +76,7 @@ describe('scripts/dump-sessions.sh', () => {
     expect(heldBy(dumpFilenames()[0]!)).toEqual(['.claude/projects/kept.jsonl'])
   })
 
-  it('writes the dump readable only by its owner, and stored paths are relative', () => {
+  it('writes the dump readable only by its owner, with relative stored paths', () => {
     plant(home, '.claude/projects/kept.jsonl')
     run()
     const [filename] = dumpFilenames()
@@ -85,7 +85,7 @@ describe('scripts/dump-sessions.sh', () => {
     expect(stored.startsWith('/')).toBe(false)
   })
 
-  it('takes nothing again while nothing has changed, and writes no second dump', () => {
+  it('writes no second dump while nothing has changed', () => {
     plant(home, '.claude/projects/kept.jsonl')
     run()
     expect(run()).toContain('no dump written')
@@ -116,7 +116,7 @@ describe('scripts/dump-sessions.sh', () => {
     expect(run()).toContain('no dump written')
   })
 
-  it('ignores the dumps of another volume: they say nothing of what this one holds', () => {
+  it('ignores the dumps of another volume', () => {
     plant(home, '.claude/projects/kept.jsonl')
     mkdirSync(dumps, { recursive: true })
     writeFileSync(path.join(dumps, 'session-dump-19990101T000000Z-19700101T000000Z-20991231T000000Z.tar.gz'), '')

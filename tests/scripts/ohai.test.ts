@@ -31,7 +31,7 @@ describe('ohaiLine', () => {
   it('stamps the UTC time and the time since the singer began', () => {
     expect(ohaiLine(Began + 6_130_000, Began, 'thread-worker thread=3', 'proving')).to.equal('OHAI 2026-10-28T20:42:10Z +1:42:10 [thread-worker thread=3] proving')
   })
-  it('stamps +-:--:-- where when the singer began is not known', () => {
+  it('stamps +-:--:-- when the start time is not known', () => {
     expect(ohaiLine(Began, null, 'hook session=df710b96', 'compacting (auto)')).to.equal('OHAI 2026-10-28T19:00:00Z +-:--:-- [hook session=df710b96] compacting (auto)')
   })
 })

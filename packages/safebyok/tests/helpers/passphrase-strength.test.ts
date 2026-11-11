@@ -23,7 +23,7 @@ const twentyOrMore: StrengthChecker = (typed) => (typed.length < 20 ? { strong: 
 const alwaysStrong: StrengthChecker = () => StrongVerdict
 
 describe("StrongVerdict", () => {
-  it("is the one verdict that admits, frozen", () => {
+  it("is the frozen verdict { strong: true }", () => {
     expect(StrongVerdict).to.deep.equal({ strong: true })
     expect(Object.isFrozen(StrongVerdict)).to.be.true
   })
@@ -50,17 +50,17 @@ describe("guardStrengthChecker", () => {
   })
 
   // StrengthChecker @example 1
-  it("answers the host's own verdicts: a reason for a passphrase it finds short, StrongVerdict for any other", async () => {
+  it("returns the host checker's verdicts", async () => {
     const guarded = guardStrengthChecker(twentyOrMore)
     expect(await guarded('too short', scope)).to.deep.equal({ strong: false, reason: 'Twenty characters or more, please.' })
     expect(await guarded('long enough for any checker', scope)).to.eq(StrongVerdict)
   })
 
-  it("answers the weak verdict of a checker that finds one weak, its reason as the checker gave it", async () => {
+  it("returns a weak verdict with the checker's reason", async () => {
     expect(await guardStrengthChecker(neverStrong)('acme acme acme', scope)).to.deep.equal({ strong: false, reason: 'Pick a phrase nobody would guess.' })
   })
 
-  it("finds a blank passphrase weak before the checker hears it", async () => {
+  it("finds a blank passphrase weak without calling the checker", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
     for (const blank of ['', ' '.repeat(3), '\t\n']) {
       const verdict = await guardStrengthChecker(checker)(blank, scope)
@@ -70,18 +70,18 @@ describe("guardStrengthChecker", () => {
     expect(checker).not.toHaveBeenCalled()
   })
 
-  it("refuses a passphrase that is no string, before the checker hears it", async () => {
+  it("refuses a passphrase that is not a string, without calling the checker", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
     const err = await TH.expectRefusal(guardStrengthChecker(checker)(42 as never, scope), 'bad_option')
     expect(err.message).to.match(/expected string/u)
     expect(checker).not.toHaveBeenCalled()
   })
 
-  it("awaits a checker that answers a promise", async () => {
+  it("awaits a checker that returns a promise", async () => {
     expect(await guardStrengthChecker(breachedLater)('acme acme acme', scope)).to.deep.equal({ strong: false, reason: 'Found in a breach.' })
   })
 
-  it("answers StrongVerdict for a passphrase the checker admits, handing it the passphrase exactly as given and a frozen copy of the scope", async () => {
+  it("returns StrongVerdict for a passphrase the checker accepts", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => ({ strong: true }))
     expect(await guardStrengthChecker(checker)('  Spaced Out Phrase  ', scope)).to.eq(StrongVerdict)
     expect(checker).toHaveBeenCalledWith('  Spaced Out Phrase  ', { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
@@ -100,7 +100,7 @@ describe("guardStrengthChecker", () => {
     ['Too short.',                      'a reason alone, not in a verdict'],
   ] as const
   for (const [answer, blurb] of Misanswers) {
-    it(`refuses a checker answering ${blurb}`, async () => {
+    it(`refuses a checker returning ${blurb}`, async () => {
       const misfit = (() => answer) as unknown as StrengthChecker
       const err = await TH.expectRefusal(guardStrengthChecker(misfit)('acme acme acme', scope))
       expect(err.message).to.match(/strengthChecker/)
@@ -187,7 +187,7 @@ describe("DefaultStrengthChecker, and the CUSTOMIZATION.md section its reason po
     expect(await guardStrengthChecker(DefaultStrengthChecker)('correct horse battery staple', scope)).to.have.property('strong', false)
   })
 
-  it("answers the same, every time, logging nothing: it is an ordinary checker", async () => {
+  it("returns the same verdict every time", async () => {
     expect(await DefaultStrengthChecker('one', scope)).to.eq(await DefaultStrengthChecker('two', scope))
   })
 

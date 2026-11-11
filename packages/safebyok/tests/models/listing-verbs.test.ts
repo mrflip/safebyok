@@ -23,8 +23,8 @@ const putable = async () => {
 }
 // --
 
-describe("listing.fetch(scope): nothing stored for a thing world alive", () => {
-  it("refuses by the same-revision row same | gone | alive, the box as it was", async () => {
+describe("listing.fetch(scope): nothing stored for a live listed box", () => {
+  it("refuses, and leaves the box unchanged", async () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.build(fullBoxRecord())
     const before = box._cheat_central
@@ -37,9 +37,9 @@ describe("listing.fetch(scope): nothing stored for a thing world alive", () => {
   })
 })
 
-describe("Listing's pipeline: what every answer takes", () => {
+describe("Listing's pipeline: what every answer goes through", () => {
   describe("listing.put(record, { prior })", () => {
-    it("puts a box over the revision it is given, and its answer is the box's", async () => {
+    it("puts a box over the prior revision it is given", async () => {
       const { listing, box, next } = await putable()
       const answered = await listing.put(next, { prior: box })
       const [call] = world.mw.callsOf('put')
@@ -50,13 +50,13 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(box.sidecar).to.deep.equal({ note: 'edited' })
     })
 
-    it("puts a box by the same path, reading its revision from a record as it reads it from a box", async () => {
+    it("reads the prior revision from a record as it does from a box", async () => {
       const { listing, box, next } = await putable()
       expect(await listing.put(next, { prior: fullBoxRecord() })).to.eq(box)
       expect(world.mw.callsOf('put')[0]?.priorRevisionTok).to.equal('rev-a1')
     })
 
-    it("sends no prior tok over no record, and has the box that is written", async () => {
+    it("sends no prior tok when there is no prior record", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.put(fullBoxRecord({ revision_seq: 0 }), { prior: SX.VoidRevision })
       expect(world.mw.callsOf('put')[0]?.priorRevisionTok).to.be.null
@@ -73,7 +73,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       })
     }
 
-    it("forwards ifAbsent and ifPresent, an upcreate where left out", async () => {
+    it("forwards ifAbsent and ifPresent, which default to 'add' and 'repl'", async () => {
       const { listing, box, next } = await putable()
       await listing.put(next, { prior: box })
       expect(world.mw.callsOf('put')[0]).to.include({ ifAbsent: 'add', ifPresent: 'repl' })
@@ -97,7 +97,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(world.mw.callsOf('put')).to.deep.equal([])
     })
 
-    it("has tryPut resolve the outcome of a refusal, rejecting never", async () => {
+    it("tryPut resolves a refusal as a bad Outcome and never rejects", async () => {
       const { listing, box, next } = await putable()
       world.mw.willPut(world.mw.refusalOf(box.scope, new VaultError('storage_unavailable', "Storage is down.")))
       const outcome = await listing.tryPut(next, { prior: box })
@@ -129,7 +129,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(box.isPresent).to.be.false
     })
 
-    it("goes over the sparse record's own revision for a box not world", async () => {
+    it("deletes over the sparse record's own revision for a box not listed", async () => {
       const listing = boxListingOf(world.mw)
       await listing.del(sparseBoxRecord())
       expect(world.mw.callsOf('del')[0]?.priorRevisionTok).to.equal('rev-a1')
@@ -156,7 +156,7 @@ describe("listing.put: the versioned replace", () => {
     expect(listing.things.map(({ isPresent }) => isPresent)).to.deep.equal([false])
   })
 
-  it("makes the fake VaultDB keep the record exactly as given over no row", async () => {
+  it("stores the record exactly as given where there is no row", async () => {
     const box = await boxListingOf(world.mw).put(fullBoxRecord({ revision_tok: 'rev-new', revision_seq: 0 }), { prior: SX.VoidRevision })
     expect(box).to.include({ revision_tok: 'rev-new', revision_seq: 0 })
     expect(world.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-new', revision_seq: 0 })
@@ -185,7 +185,7 @@ describe("listing: an answer is for the scope the call asked about", () => {
     expect(box._cheat_central).to.deep.equal(fullBoxRecord())
   })
 
-  it("takes the record a declined put answers, at a revision it did not send", async () => {
+  it("adopts the record a declined put returns, at a revision it did not send", async () => {
     const { listing, box, next } = await putable()
     const stored = fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 })
     world.mw.willPut({ ...world.mw.answerOf(box.scope, stored), act: 'declined' })
@@ -220,7 +220,7 @@ describe("listing.put(record, { prior, ifPresent }): over a live record", () => 
     expect(world.mw.stored.get(live.boxlabel)).to.include({ revision_tok: 'rev-a2' })
   })
 
-  it("refuses 'camped' under 'fail', the box world taking the live record", async () => {
+  it("refuses 'camped' under 'fail', and lists the box with the live record", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(live)
     const err = await TH.expectRefusal(listing.put(birth, { prior: SX.VoidRevision, ifPresent: 'fail' }), 'camped')
@@ -229,7 +229,7 @@ describe("listing.put(record, { prior, ifPresent }): over a live record", () => 
     expect(world.mw.stored.get(live.boxlabel)).to.deep.equal(live)
   })
 
-  it("saves nothing under 'get', and resolves the box world taking the live record", async () => {
+  it("writes nothing under 'get', and returns the box with the live record", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(live)
     const box = await listing.put(birth, { prior: SX.VoidRevision, ifPresent: 'get' })
@@ -252,14 +252,14 @@ describe("listing.put(record, { prior, ifPresent }): over a live record", () => 
 
 const aliveRow = fullBoxRecord()
 
-describe("listing.put and listing.del: the prior tok they put", () => {
-  it("refuses a record at a revision other than 0 for a box not world, changing nothing", async () => {
+describe("listing.put and listing.del: the prior tok they send", () => {
+  it("refuses a record at a revision other than 0 for a box not listed, changing nothing", async () => {
     const listing = boxListingOf(world.mw)
     await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 1 }), { prior: SX.VoidRevision }))
     expect(listing.things).to.deep.equal([])
   })
 
-  it("meets 'stale_write' for a record at revision 0 put over no record where storage has stored one, the box world keeping its own", async () => {
+  it("refuses 'stale_write' for a first put where storage already has a row, and the listed box keeps its revision", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(aliveRow)
     const box = await listing.build(aliveRow)
@@ -287,7 +287,7 @@ describe("listing.put and listing.del: the prior tok they put", () => {
     expect(world.mw.stored.get('anthropic_api_key')).to.include({ revision_seq: 2, revision_tok: box.revision_tok })
   })
 
-  it("meets 'stale_write' carrying nothing from a put, and a refusal from a del, where the box world is stored no more", async () => {
+  it("refuses a put with 'stale_write', and a del, when the listed box's row is no longer stored", async () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.build(aliveRow)
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } }), 'stale_write')
@@ -296,7 +296,7 @@ describe("listing.put and listing.del: the prior tok they put", () => {
     expect(world.mw.stored.size).to.eq(0)
   })
 
-  it("meets a stored revision lower than the world revision with 'stale_write' carrying it; the box judges it older and keeps its own, stuck there", async () => {
+  it("refuses 'stale_write' when storage has a lower revision than the listed box's, and the box keeps its own", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
     const box = await listing.build(fullBoxRecord({ revision_tok: 'rev-a5', revision_seq: 5 }))
@@ -309,7 +309,7 @@ describe("listing.put and listing.del: the prior tok they put", () => {
 })
 // --
 
-describe("listing.tryPut and listing.tryFetch answer the vaultDB's own answer", () => {
+describe("listing.tryPut and listing.tryFetch return the vaultDB's answer", () => {
   it("carries the put's act, req_params and world, with the instance listed as its val", async () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.build(fullBoxRecord())
@@ -321,14 +321,14 @@ describe("listing.tryPut and listing.tryFetch answer the vaultDB's own answer", 
     expect(answer.req_params).to.include({ boxlabel: box.boxlabel })
   })
 
-  it("answers a refusal before the call as a bad answer, its act the refusalkind", async () => {
+  it("returns a refusal made before the call as a bad answer whose act is the refusal kind", async () => {
     const listing = boxListingOf(world.mw)
     const answer = await listing.tryPut({ garbage: true } as never, { prior: SX.VoidRevision })
     expect(answer).to.deep.include({ ok: false, world: null, req_params: {} })
     expect(answer.act).to.eq(answer.err?.refusalkind)
   })
 
-  it("answers a fetch with the instance as its val, and the vaultDB's act", async () => {
+  it("returns a fetch's instance as val, with the vaultDB's act", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(fullBoxRecord())
     const answer = await listing.tryFetch(scopeOf())

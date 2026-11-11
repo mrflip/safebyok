@@ -138,7 +138,7 @@ describe("ConvexVaultDB over a ConvexReactClient, on a host's functions", () => 
     await TH.expectBad(vaultDB.tryGetVault(TH.vaultScope), 'identity_revoked')
   })
 
-  it("still hears a change in rows the client already watches, so sends no first answer", async () => {
+  it("notifies a second watch of a change in rows the client already watches", async () => {
     const { deployment, vaultDB } = hostedVaultDB('u1')
     const first: Notice[] = []
     const second: Notice[] = []

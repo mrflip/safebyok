@@ -8,8 +8,8 @@ import { Dna, Passphrase, T0, makeBornVault, makeBornVaultAndFriend, makeVaultWo
 
 useVaultWorlds()
 
-describe("VaultListing.buildVault: the gate is built before the vault is born, and stored in the vault record alone", () => {
-  it("builds the vault's gate from what the closure answers, and puts the record with it over no record", async () => {
+describe("VaultListing.buildVault", () => {
+  it("builds the vault's gate from the passphrase typed, and stores it in a new vault record", async () => {
     const { listing, storedNow } = makeVaultWorld()
     const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
     expect(vault.gate.passphrase_wayin.wayinkind).to.eq('passphrase')
@@ -19,7 +19,7 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
     expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
   })
 
-  it("has no vault where the dialog throws: the refusal is sanitized, and a second buildVault is not refused as already listed", async () => {
+  it("builds nothing when the dialog throws", async () => {
     const { listing, storedNow } = makeVaultWorld(null, { requestCleartext: () => { throw new Error("the user closed the dialog") } })
     await TH.expectRefusal(listing.buildVault(Dna))
     expect(listing.things).to.have.lengthOf(0)
@@ -39,7 +39,7 @@ describe("VaultListing.buildVault: the gate is built before the vault is born, a
 })
 
 describe("VaultListing.build of a record, and its constructor", () => {
-  it("has the vault with the gate its record carries", async () => {
+  it("builds the vault with the gate its record carries", async () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
     const vault = await listing.build(record)
@@ -47,14 +47,14 @@ describe("VaultListing.build of a record, and its constructor", () => {
     expect(vault.gate).to.equal(vault.gate)
   })
 
-  it("ducks as its record, the gate_epoch riding on the Gate: listing.recordOf(vault) answers the record it has", async () => {
+  it("listing.recordOf(vault) returns the record the vault was built from", async () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
     const vault = await listing.build(record)
     expect(listing.recordOf(vault)).to.deep.equal(record)
   })
 
-  it("has no gate in hand while it has a sparse record, and refuses until it is hydrated", async () => {
+  it("builds a sparse vault whose gate refuses until it is hydrated", async () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
     const vault = await listing.build(listing.sparseOf(record))
@@ -90,8 +90,8 @@ describe("VaultListing.build of a record, and its constructor", () => {
   })
 })
 
-describe("proving.buildLease(friend): the vault is taken at the grant", () => {
-  it("grants the vault whose stamp the proving is of a lease, caching nothing of itself", async () => {
+describe("proving.buildLease(friend)", () => {
+  it("grants a lease to the vault the proving belongs to, caching nothing", async () => {
     const { vault, deviceDB, friend } = await makeBornVaultAndFriend()
     const proving = await makeProving(vault)
     deviceDB.tryStow.mockClear()
@@ -137,7 +137,7 @@ const bornWithGets = async () => {
 }
 
 describe("vault.ensureTimely(maxMillis)", () => {
-  it("answers itself with no fetch while the record in hand is younger than maxMillis, and fetches once it is not", async () => {
+  it("fetches only once its record is older than maxMillis", async () => {
     const { vault, advance, gets } = await bornWithGets()
     advance(999)
     await expect(vault.ensureTimely(1000)).resolves.to.equal(vault)
@@ -163,7 +163,7 @@ describe("vault.ensureTimely(maxMillis)", () => {
     expect(gets).toHaveBeenCalledOnce()
   })
 
-  it("joins the fetch under way: overlapping calls make one get and share its answer", async () => {
+  it("overlapping calls share one get", async () => {
     const { vault, gets } = await bornWithGets()
     await expect(Promise.all([vault.ensureTimely(0), vault.ensureTimely(0)])).resolves.to.deep.equal([vault, vault])
     expect(gets).toHaveBeenCalledOnce()
@@ -176,7 +176,7 @@ describe("vault.ensureTimely(maxMillis)", () => {
     expect(vault.revision_tok).to.eq(moved.revision_tok)
   })
 
-  it("resolves over a vault its fetch finds gone, enabled still, and leaves the guards that need it present to refuse", async () => {
+  it("resolves for a vault its fetch finds deleted, leaving the refusal to the guards that need it present", async () => {
     const { vault, demandStored, restoreRow } = await bornWithGets()
     const stored = demandStored()
     restoreRow({ ...omit(stored, ['gate']), am: 'x' as const, revision_seq: stored.revision_seq + 1, revision_tok: 'rev-gone' })

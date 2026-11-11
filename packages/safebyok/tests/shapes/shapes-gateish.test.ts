@@ -60,7 +60,7 @@ const misshapenAnswers = (answer: PasskeyAnswer) => [
 ] as const
 
 describe("passkeyAnswer", () => {
-  it("takes a passkey's answer, its bytes the very ones handed in", async () => {
+  it("accepts a passkey's answer without copying its bytes", async () => {
     const answer = await TH.passkeyOf('laptop')
     const checked = GX.passkeyAnswer.parse(answer)
     expect(checked).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })

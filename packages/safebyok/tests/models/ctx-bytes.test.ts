@@ -79,7 +79,7 @@ describe("each ctx, byte for byte", () => {
     expect(await unwrapKeyUnder(record.lease_key, record.vault_key_lease_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
 
-  it("binds a box's two seals to the vault's stamp, the box's own, and each its purpose", async () => {
+  it("binds each of a box's two seals to the vault's stamp, the box's stamp and its own purpose", async () => {
     const stamp = await realBoxStamp()
     const vaultKey = await makeVaultKey()
     const { lease } = await leaseOver(vaultKey)
@@ -147,7 +147,7 @@ describe("each ctx binds every field of its stamps", () => {
     })
   }
 
-  it("makes a box's two purposes two ctxs: its wrapped key will not open as its ciphered whisper", () => {
+  it("gives a box's two purposes different ctxs", () => {
     const stamp = { boxlabel: 'anthropic' }
     expect(hex.encode(cipherCtx([WorldStamp, stamp], 'box_key_wrapped'))).to.not.eq(hex.encode(cipherCtx([WorldStamp, stamp], 'whisper_ciphered')))
   })

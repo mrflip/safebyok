@@ -16,7 +16,7 @@ const ouch      = tombstoneBoxRecord({ revision_seq: 2 }, 'd')
 const revision  = { revision_tok: 'rev-a1', revision_seq: 1 }
 const baseProps = { revision_tok: 'rev-a1', revision_seq: 1, registered_at: T0, written_at: T0, am: 'a', vault_tok: 'vault-tok-u1' }
 
-describe("The checks of what the base knows of a record", () => {
+describe("The checks of a record's base fields", () => {
   describe("SX.am", () => {
     expectCases(SX.am, [
       // each am:
@@ -95,7 +95,7 @@ describe("The checks of what the base knows of a record", () => {
       expect(SX.sparseBase.parse(full)).to.deep.equal(baseProps)
     })
 
-    it("takes the six props from a box, which ducks as its record", async () => {
+    it("takes the six props from a box", async () => {
       const box = await boxListingOf(mw).build(full)
       expect(SX.sparseBase.parse(box)).to.deep.equal(baseProps)
     })
@@ -129,7 +129,7 @@ describe("The checks of what the base knows of a record", () => {
   })
 })
 
-describe("The checks of what reconciling passes", () => {
+describe("The checks of reconcile and align results", () => {
   describe("VX.reconciled", () => {
     expectCases(VX.reconciled, [
       [{ central: sparse, policy: 'same' },  true,  'passes a central and the policy that chose it'],

@@ -60,7 +60,7 @@ describe("createPasskey's options", () => {
     })
   }
 
-  it("takes a relying party id and a timeout left undefined as left out", async () => {
+  it("treats an undefined relying party id or timeout as omitted", async () => {
     const authenticator = TH.installFakeAuthenticator()
     expect(await createPasskey({ rp: { name: 'Acme', id: undefined }, user: Making.user, timeout: undefined })).to.not.be.null
     expect(authenticator.calls.create[0]?.publicKey).to.not.have.property('timeout')
@@ -78,7 +78,7 @@ describe("createPasskey", () => {
     expect(made?.prfBytes.some((byte) => byte !== 0)).to.be.true
   })
 
-  it("zeroes the browser's own copy of the answer once copied, so the answer's bytes are the one copy", async () => {
+  it("zeroes the browser's own copy of the answer once it is copied", async () => {
     const authenticator = TH.installFakeAuthenticator()
     await createPasskey(TH.PasskeyMaking)
     const [handed] = authenticator.answersHanded()
@@ -98,7 +98,7 @@ describe("createPasskey", () => {
     expect(second?.rp).to.not.have.property('id')
   })
 
-  it("asks the new passkey again when its authenticator answers only when asked", async () => {
+  it("asks the new passkey a second time when its authenticator gives no answer at creation", async () => {
     const authenticator = TH.installFakeAuthenticator({ prfAtCreate: false })
     const made = await createPasskey(TH.PasskeyMaking)
     expect(authenticator.calls.get).to.have.lengthOf(1)
@@ -132,7 +132,7 @@ describe("createPasskey", () => {
 })
 
 describe("askPasskey", () => {
-  it("asks the vault's passkey over its own salt, and hands back the answer it gave as made", async () => {
+  it("asks the vault's passkey with its stored salt, and returns the same answer it gave when made", async () => {
     const authenticator = TH.installFakeAuthenticator()
     const made = await createPasskey(TH.PasskeyMaking)
     const madeBytes = Uint8Array.from(made?.prfBytes ?? [])
@@ -156,7 +156,7 @@ describe("askPasskey", () => {
     expect(authenticator.calls.get).to.have.lengthOf(0)
   })
 
-  it("resolves null when the user dismisses the prompt, or has not the passkey at hand", async () => {
+  it("resolves null when the user dismisses the prompt or does not have the passkey", async () => {
     const authenticator = TH.installFakeAuthenticator()
     const made = await createPasskey(TH.PasskeyMaking)
     authenticator.refuseNext('NotAllowedError')
@@ -187,13 +187,13 @@ const SloppyAskingCases = [
   [undefined,                                       {},                        'no header at all'],
   [{ wayinkind: "passkey" },                        {},                        'a passkey header without its credential id or salt'],
   [{ wayinkind: "passkey", credential_id: "AAAA" }, {},                        'a passkey header without its salt'],
-  [{ wayinkind: "sms" },                            {},                        'a header of no wayinkind there is'],
+  [{ wayinkind: "sms" },                            {},                        'a header with an unknown wayinkind'],
   [() => null,                                      {},                        'a function in place of the header'],
   // the options:
   [null,                                            null,                      'null options'],
   [null,                                            { rpid: "example.com" },   'a misspelt rpId'],
   [null,                                            { rpId: "" },              'a blank rpId'],
-  [null,                                            { timeout: 0 },            'a timeout of nothing'],
+  [null,                                            { timeout: 0 },            'a timeout of zero'],
 ] as const
 
 describe("askPasskey's header and options", () => {
@@ -214,7 +214,7 @@ describe("askPasskey's header and options", () => {
     expect(authenticator.calls.get).to.have.lengthOf(0)
   })
 
-  it("refuses a passphrase header as a vault with no passkey", async () => {
+  it("refuses a passphrase header like a vault with no passkey", async () => {
     TH.installFakeAuthenticator()
     const refused = await refusalOf(askPasskey({ wayinkind: 'passphrase', key_deriver_label: 'argon2id' } as never))
     expect(refused).to.include({ refusalkind: 'absent_wayin' })

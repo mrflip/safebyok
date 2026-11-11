@@ -66,7 +66,7 @@ describe("Storable own props", () => {
       expect(JSON.stringify(box)).to.not.contain('"scope"')
     })
 
-    it("is tattooed on the box as its own props, which nothing assigns or deletes", async () => {
+    it("is copied onto the box as own props that cannot be assigned or deleted", async () => {
       const box = await builtBoxOf()
       for (const ckey of ['applabel', 'user_id', 'vaultlabel', 'boxlabel'] as const) {
         const descriptor = Object.getOwnPropertyDescriptor(box, ckey)
@@ -79,7 +79,7 @@ describe("Storable own props", () => {
     })
   })
 
-  describe("the props that follow the record in hand: revision_tok, revision_seq, written_at; and vault_tok, which never moves", () => {
+  describe("the record props: revision_tok, revision_seq, written_at and vault_tok", () => {
     const writable = ['vault_tok', 'revision_tok', 'revision_seq', 'written_at'] as const
 
     it("start as the record the box was received with", async () => {
@@ -87,7 +87,7 @@ describe("Storable own props", () => {
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-a4', revision_seq: 4, written_at: T0 + 40 })
     })
 
-    it("are ordinary enumerable own props, but not configurable, so that nothing removes them", async () => {
+    it("are enumerable own props that are not configurable", async () => {
       const box = await builtBoxOf()
       for (const ckey of writable) {
         expect(Object.getOwnPropertyDescriptor(box, ckey), ckey).to.include({ enumerable: true, configurable: false })
@@ -115,7 +115,7 @@ describe("Storable own props", () => {
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-x2', revision_seq: 2, written_at: T0 + 1000 })
     })
 
-    it("keep the vault_tok of birth, not writable: a record under another vault_tok received over a tombstone throws, and neither it nor the scope moves", async () => {
+    it("keep the vault_tok of birth, which no received record changes", async () => {
       const box = await builtBoxOf(tombstoneBoxRecord())
       const { scope } = box
       TH.expectSyncRefusal(() => box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', vault_tok: 'vault-tok-u2' })))
@@ -125,7 +125,7 @@ describe("Storable own props", () => {
       expect(box.scope).to.deep.equal(world.mw.boxscope('anthropic_api_key'))
     })
 
-    it("stay with the record in hand when an older record is received", async () => {
+    it("do not change when an older record is received", async () => {
       const box = await builtBoxOf(fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-a3', written_at: T0 + 30 }))
       box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', written_at: T0 + 20 }))
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-a3', revision_seq: 3, written_at: T0 + 30 })
@@ -177,7 +177,7 @@ describe("Storable forms", () => {
 
 describe("Storable snapshot and subscription", () => {
   describe("getSnapshot", () => {
-    it("answers one frozen object, the same one again and again", async () => {
+    it("returns the same frozen object on every call", async () => {
       const box = await builtBoxOf()
       const first = box.getSnapshot()
       expect(Object.isFrozen(first)).to.be.true
@@ -185,7 +185,7 @@ describe("Storable snapshot and subscription", () => {
       expect(box.snapshot).to.eq(first)
     })
 
-    it("is one function with one identity, answering the current snapshot", async () => {
+    it("is a stable function that returns the current snapshot", async () => {
       const box = await builtBoxOf()
       expect(box.getSnapshot).to.eq(box.getSnapshot)
       const { getSnapshot } = box
@@ -209,7 +209,7 @@ describe("Storable snapshot and subscription", () => {
       expect(box.getSnapshot()).to.eq(second)
     })
 
-    it("is made on the first call, so that an align before it has none to replace and tells nobody", () => {
+    it("notifies nobody of a change before its first call", () => {
       const { mw } = world
       const box = new TestableBox(mw.world, boxListingOf(mw), mw.fullBoxRecord())
       const listener = vi.fn()
@@ -219,7 +219,7 @@ describe("Storable snapshot and subscription", () => {
       expect(box.getSnapshot()).to.include({ revision_seq: 2 })
     })
 
-    it("is made by becomeNotifiable, which answers the box, so that the next change notifies; the snapshot it made is the one getSnapshot answers", () => {
+    it("returns the snapshot becomeNotifiable made, and the next change notifies", () => {
       const { mw } = world
       const box = new TestableBox(mw.world, boxListingOf(mw), mw.fullBoxRecord())
       const listener = vi.fn()
@@ -244,7 +244,7 @@ describe("Storable snapshot and subscription", () => {
       expect(box.getSnapshot()).to.eq(first)
     })
 
-    it("notifies nobody when a receive only confirms the record in hand", async () => {
+    it("notifies nobody when a receive only confirms the record it already has", async () => {
       const box = await builtBoxOf()
       const first = box.getSnapshot()
       const listener = vi.fn()
@@ -265,7 +265,7 @@ describe("Storable snapshot and subscription", () => {
       expect(other.mock.calls).to.have.lengthOf(1)
     })
 
-    it("hands each listener the new snapshot to find, already in place when it is called", async () => {
+    it("updates the snapshot before it calls each listener", async () => {
       const box = await builtBoxOf()
       box.getSnapshot()
       const seen: number[] = []
@@ -289,7 +289,7 @@ describe("Storable snapshot and subscription", () => {
   })
 
   describe("subscribe", () => {
-    it("is one function with one identity, answering an unsubscribe", async () => {
+    it("is a stable function that returns an unsubscribe", async () => {
       const box = await builtBoxOf()
       expect(box.subscribe).to.eq(box.subscribe)
       expect(box.subscribe(() => undefined)).to.be.a('function')
@@ -308,7 +308,7 @@ describe("Storable snapshot and subscription", () => {
       expect(staying.mock.calls).to.have.lengthOf(2)
     })
 
-    it("takes an unsubscribe called twice as it takes one", async () => {
+    it("treats a second unsubscribe as a no-op", async () => {
       const box = await builtBoxOf()
       box.getSnapshot()
       const [leaving, staying] = [vi.fn(), vi.fn()]
@@ -326,7 +326,7 @@ describe("Storable snapshot and subscription", () => {
 describe("Storable put guards: ensurePuttable, demandPuttable", () => {
   const Patch = { whisper: { apiKey: 'sk-test-0000' } }
 
-  it("demandPuttable answers the patch as parsed while the vault is unlocked, and refuses 'vault_locked' while it is locked", async () => {
+  it("demandPuttable returns the parsed patch while unlocked, and refuses 'vault_locked' while locked", async () => {
     const box = await builtBoxOf()
     expect(box.demandPuttable({ ...box.scope, sidecar: { note: 'sent' } })).to.deep.include({ sidecar: { note: 'sent' } })
     world.mw.setLocked(true)
@@ -340,7 +340,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     TH.expectSyncRefusal(() => box.demandPuttable({ ...Patch, boxlabel: 'openai_api_key' }))
   })
 
-  it("demandPuttable refuses before the lock, and the lock before a record not whole", async () => {
+  it("demandPuttable refuses a vacated box before a locked vault, and a locked vault before a sparse record", async () => {
     const box = await boxListingOf(world.mw).build(sparseBoxRecord())
     TH.expectSyncRefusal(() => box.demandPuttable(Patch))
     world.mw.setLocked(true)
@@ -349,7 +349,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     TH.expectSyncRefusal(() => box.demandPuttable(Patch))
   })
 
-  it("demandPuttable takes a sparse record for a patch of both halves", async () => {
+  it("demandPuttable accepts a patch of both halves over a sparse record", async () => {
     const box = await boxListingOf(world.mw).build(sparseBoxRecord())
     const Both = { ...Patch, sidecar: { note: 'sent' } }
     expect(box.demandPuttable(Both)).to.deep.include(Both)
@@ -365,7 +365,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     expect(box.demandPuttable(Patch, { ifPresent: 'fail' })).to.deep.include(Patch)
   })
 
-  it("demandPuttable takes a void record and a tombstone as whole", async () => {
+  it("demandPuttable accepts a patch over a void record and over a tombstone", async () => {
     const listing = boxListingOf(world.mw)
     const shell = listing.puttable(world.mw.boxscope('anthropic_api_key'))
     expect(shell.demandPuttable(Patch)).to.deep.include(Patch)
@@ -374,14 +374,14 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     expect(world.mw.callsOf('get')).to.deep.equal([])
   })
 
-  it("ensurePuttable refreshes and demands nothing: it resolves while locked, where put refuses", async () => {
+  it("ensurePuttable resolves while the vault is locked", async () => {
     const box = await builtBoxOf()
     world.mw.setLocked(true)
     await expect(box.ensurePuttable({ whisper: { apiKey: 'sk-test-0000' } })).resolves.to.eq(box)
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
   })
 
-  it("put ensures once, before its seal, and a bad patch puts nothing", async () => {
+  it("put calls ensurePuttable once, and a bad patch puts nothing", async () => {
     const box = await builtBoxOf()
     const putGuard = vi.spyOn(Box.prototype, 'ensurePuttable')
     await TH.expectRefusal(box.put({}))

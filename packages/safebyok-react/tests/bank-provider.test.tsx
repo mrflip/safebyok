@@ -103,7 +103,7 @@ describe("BankProvider's bank", () => {
     expect(TH.seenBanks.at(-1)).to.eq(made)
   })
 
-  it("hands down no bank until its deviceDB answers", async () => {
+  it("provides no bank until its deviceDB responds", async () => {
     const { deviceDB, answer } = deviceDBPending('u1')
     const making = vi.spyOn(Bank, 'make')
     provided({ deviceDB })
@@ -129,7 +129,7 @@ describe("BankProvider's bank", () => {
     expect(making.mock.calls.map(([opts]) => [opts.user_id, opts.device_id])).to.deep.equal([['u2', device_id]])
   })
 
-  it("makes no bank when the user signs out while its deviceDB answers", async () => {
+  it("makes no bank when the user signs out before its deviceDB responds", async () => {
     const { deviceDB, answer } = deviceDBPending('u1')
     const making = vi.spyOn(Bank, 'make')
     const { props, rerender } = provided({ deviceDB })
@@ -295,7 +295,7 @@ describe("BankProvider's handlers", () => {
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })
   })
 
-  it("tells onLifecycle of a refused hello, and onBadNews nothing", async () => {
+  it("reports a refused hello to onLifecycle, and nothing to onBadNews", async () => {
     const world = TH.makeBankWorld()
     vi.spyOn(world.vaultDB, 'listVaults').mockRejectedValue(Refusal)
     const [onLifecycle, onBadNews] = [vi.fn<LifecycleHandler>(), vi.fn<BadNewsHandler>()]
@@ -317,7 +317,7 @@ describe("BankProvider's handlers", () => {
     vi.unstubAllGlobals()
   })
 
-  it("tells a refused hello to the onLifecycle last rendered", async () => {
+  it("reports a refused hello to the onLifecycle last rendered", async () => {
     const world = TH.makeBankWorld()
     const pendingListVaults: { refuse?: (err: unknown) => void } = {}
     vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(new Promise((_resolve, reject) => { pendingListVaults.refuse = reject }))
@@ -330,7 +330,7 @@ describe("BankProvider's handlers", () => {
     expect(first).not.toHaveBeenCalled()
   })
 
-  it("tells neither onLifecycle, onBadNews nor the logger of a hello that a sign-out crossed", async () => {
+  it("reports a hello that a sign-out crossed to neither onLifecycle, onBadNews nor the logger", async () => {
     const world = TH.makeBankWorld()
     const pendingListVaults: { refuse?: (err: unknown) => void } = {}
     vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(new Promise((_resolve, reject) => { pendingListVaults.refuse = reject }))
@@ -361,7 +361,7 @@ describe("BankProvider's handlers", () => {
     expect(shown('vault')).to.eq('present locked')
   })
 
-  it("leaves a vault whose lease survived its forget to be vacated when the host has no onLifecycle, as the core does", async () => {
+  it("with no onLifecycle, still vacates a vault whose lease could not be forgotten", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const spy = TH.spyLogger()
@@ -373,7 +373,7 @@ describe("BankProvider's handlers", () => {
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error', 'error'])
   })
 
-  it("tells the next user's onLifecycle nothing of the bank it let go, whose vacate tells the last user's onLifecycle of the lease it cannot forget", async () => {
+  it("reports the last user's vacate to the last user's onLifecycle, and nothing to the next user's", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const next = vi.fn()
@@ -436,7 +436,7 @@ describe("BankProvider's dialog", () => {
     expect(onlyBank().snapshot.openGating).to.not.be.null
   })
 
-  it("shows the dialog with the user's gesture spent, as its own click supplies the next", async () => {
+  it("shows the dialog when the user's gesture is already used up", async () => {
     provided()
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     TH.withoutGesture()
@@ -592,7 +592,7 @@ describe("BankProvider's dialog", () => {
     expect(shown('vault')).to.eq('unborn none')
   })
 
-  it("asks nobody when requestCleartext answers nothing", async () => {
+  it("shows no dialog when requestCleartext returns nothing", async () => {
     provided({ requestCleartext: () => undefined })
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))

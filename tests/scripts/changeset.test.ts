@@ -10,14 +10,14 @@ const ThreadCases = [
   ["20261015-roadmap_fruit",       "20261015-roadmap_fruit", 'a thread branch is its own thread'],
   ["20261015-tamper_test_helper2", "20261015-tamper_test_helper2", 'a label may hold digits'],
   // not a thread:
-  ["main",                         undefined,                'main is no thread'],
-  ["",                             undefined,                'a detached HEAD, with no branch, is no thread'],
-  ["changeset-release/main",       undefined,                'the Version PR\'s branch is no thread'],
-  ["dependabot/npm_and_yarn/foo",  undefined,                'a bot\'s branch is no thread'],
+  ["main",                         undefined,                'main is not a thread'],
+  ["",                             undefined,                'a detached HEAD, with no branch, is not a thread'],
+  ["changeset-release/main",       undefined,                'the Version PR\'s branch is not a thread'],
+  ["dependabot/npm_and_yarn/foo",  undefined,                'a bot\'s branch is not a thread'],
   // edge cases:
-  ["20261015-",                    undefined,                'a bare datestamp is no thread'],
+  ["20261015-",                    undefined,                'a bare datestamp is not a thread'],
   ["20261015-tamper-test-helper",  undefined,                'a label with hyphens is not a label'],
-  ["2026101-roadmap_fruit",        undefined,                'a short datestamp is no datestamp'],
+  ["2026101-roadmap_fruit",        undefined,                'a short datestamp is not a datestamp'],
 ] as const
 
 describe("threadOf", () => {
@@ -97,7 +97,7 @@ describe("changesetRequest", () => {
       .to.deep.equal({ packages: ['safebyok', 'safebyok-convex'], bump: 'patch', message: 'A fix.' })
   })
 
-  it("names a package named twice once", () => {
+  it("lists a package named twice only once", () => {
     expect(Changeset.changesetRequest(['-p', 'safebyok', '-p', 'safebyok', '-b', 'patch', '-m', 'A fix.'], Public)?.packages).to.deep.equal(['safebyok'])
   })
 
@@ -137,7 +137,7 @@ describe("writeChangeset", () => {
     writeFileSync(path.join(scratch, 'README.md'), '# Changesets\n')
   })
 
-  it("names the file for the thread, and a second for its suffix", () => {
+  it("names the file for the thread, and adds a suffix to a second one", () => {
     const request: Changeset.ChangesetRequest = { packages: ['safebyok'], bump: 'patch', message: 'A fix.' }
     expect(Changeset.writeChangeset(scratch, Thread, request)).to.eq(`${Thread}.md`)
     expect(Changeset.writeChangeset(scratch, Thread, request)).to.eq(`${Thread}-2.md`)
@@ -150,13 +150,13 @@ describe("pnpm changeset --package, with no terminal", () => {
   const Script = path.resolve(import.meta.dirname, '../../scripts/changeset.ts')
   const RepoRoot = path.resolve(import.meta.dirname, '../..')
 
-  it("refuses a branch that is no thread's, and writes nothing", () => {
+  it("refuses a branch that is not a thread branch, and writes nothing", () => {
     const result = spawnSync(process.execPath, [Script, '--package', 'safebyok', '--bump', 'patch', '--message', 'A fix.'], { cwd: RepoRoot, encoding: 'utf8', env: { ...process.env, GIT_DIR: path.join(RepoRoot, '.git-nowhere') } })
     expect(result.status).to.eq(2)
     expect(result.stderr).to.include('is not a thread branch')
   })
 
-  it("refuses a request that is not whole, with its reason", () => {
+  it("refuses an incomplete request, with its reason", () => {
     const result = spawnSync(process.execPath, [Script, '--bump', 'patch'], { cwd: RepoRoot, encoding: 'utf8' })
     expect(result.status).to.eq(2)
     expect(result.stderr).to.include('go with --package')

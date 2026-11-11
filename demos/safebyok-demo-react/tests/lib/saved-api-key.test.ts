@@ -31,33 +31,33 @@ const makeVault = async (): Promise<Vault> => {
 const putWhisper = async (vault: Vault, whisper: object) => { await vault.putBox({ boxlabel: Boxlabel, whisper }) }
 
 describe("extractSavedApiKey", () => {
-  it("answers null for no vault", async () => {
+  it("returns null for no vault", async () => {
     expect(await extractSavedApiKey(null, Boxlabel)).to.be.null
   })
 
-  it("answers null for a boxlabel with no box", async () => {
+  it("returns null for a boxlabel with no box", async () => {
     expect(await extractSavedApiKey(await makeVault(), Boxlabel)).to.be.null
   })
 
-  it("answers null for an empty apiKey", async () => {
+  it("returns null for an empty apiKey", async () => {
     const vault = await makeVault()
     await putWhisper(vault, { apiKey: '' })
     expect(await extractSavedApiKey(vault, Boxlabel)).to.be.null
   })
 
-  it("answers null for an apiKey that is no string", async () => {
+  it("returns null for an apiKey that is not a string", async () => {
     const vault = await makeVault()
     await putWhisper(vault, { apiKey: 42 })
     expect(await extractSavedApiKey(vault, Boxlabel)).to.be.null
   })
 
-  it("answers the saved key", async () => {
+  it("returns the saved key", async () => {
     const vault = await makeVault()
     await putWhisper(vault, { apiKey: FakeApiKey })
     expect(await extractSavedApiKey(vault, Boxlabel)).to.eq(FakeApiKey)
   })
 
-  it("unlocks a locked vault to answer the saved key", async () => {
+  it("unlocks a locked vault to return the saved key", async () => {
     const vault = await makeVault()
     await putWhisper(vault, { apiKey: FakeApiKey })
     vault.lock()

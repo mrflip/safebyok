@@ -150,7 +150,7 @@ describe('scripts/git-mergify', () => {
     expect(world.run().status).to.equal(3)
   })
 
-  it('leaves out a draft, a pull request already labeled queue, and one whose head main holds', () => {
+  it('skips a draft, a pull request already labeled queue, and one already merged into main', () => {
     seedStack(world)
     world.branch('landed', 'main')
     world.commit('landed.md', 'api: landed')

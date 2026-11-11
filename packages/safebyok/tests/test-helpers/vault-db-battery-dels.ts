@@ -22,7 +22,7 @@ export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
       expect(await vaultDB.getBox(boxQuery, { ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', dbhas: tombstone })
     })
 
-    it("answers void with a sentinel over a void row, and gone with the stored tombstone over a tombstone, whatever the revision", async () => {
+    it("returns act 'void' over a void row, and 'gone' over a tombstone, whatever the revision", async () => {
       const { vaultDB, vault, box } = await putWith()
       expect(await vaultDB.delBox(boxTombstoneOf(box), { prior: priorOf(box) })).to.deep.include({ act: 'void', val: SX.sentinelBoxOf(boxscope, 'life1'), world: vault })
       await vaultDB.putBox(box, { prior: SX.VoidRevision })
@@ -36,7 +36,7 @@ export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
       expect(await vaultDB.tryDelBox({ ...boxTombstoneOf(box), revision_seq: 8 }, { prior: stale })).to.deep.include({ ok: false, act: 'stale_write', dbhas: box, world: vault })
     })
 
-    it("refuses a row past peeking at any prior, the sentinels a listing shows among them, with the row", async () => {
+    it("refuses over an unreadable row at any prior, and leaves it stored", async () => {
       const { vaultDB, box } = await putWith({ box: true })
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { garbage: true })
       const sentinelled = SX.boxTombstone.parse({ ...SX.sentinelBoxOf(boxscope, 'life1'), ...SX.nextRevisionOf(SX.VoidRevision, Now) })
@@ -70,7 +70,7 @@ export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
       expect(await vaultDB.getBox(boxQuery)).to.deep.include({ val: box })
     })
 
-    it("a repeat over this life's tombstone moves no revision, whatever its own, and answers the tombstone", async () => {
+    it("a repeat over this life's tombstone returns the tombstone and moves no revision", async () => {
       const { vaultDB, vault } = await putWith()
       const tombstone = vaultTombstoneOf(vault)
       await vaultDB.delVault(tombstone, { prior: priorOf(vault) })
@@ -78,7 +78,7 @@ export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
       expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.deep.equal(tombstone)
     })
 
-    it("over no row, or another life's, writes nothing, tombstones what lies under its vault_tok, and answers void with a sentinel", async () => {
+    it("over another life's row, returns act 'void' and tombstones only the boxes under its own vault_tok", async () => {
       const { vaultDB, vault } = await putWith()
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'oldlife', boxAt(0, 'oldlife'))
       const sentinel = SX.sentinelVaultOf(vaultScope, 'oldlife')
@@ -99,7 +99,7 @@ export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
       expect(await storedBoxOf(vaultDB)).to.deep.equal(box)
     })
 
-    it("refuses a row past peeking at the sentinels a listing shows, and a damaged tombstone at its own revision, tombstoning no box", async () => {
+    it("refuses an unreadable row or a damaged tombstone, and tombstones no box", async () => {
       const { vaultDB, vault, box } = await putWith({ box: true })
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { garbage: true })
       const sentinelled = SX.vaultTombstone.parse({ ...SX.sentinelVaultOf(vaultScope), ...SX.nextRevisionOf(SX.VoidRevision, Now) })
@@ -131,7 +131,7 @@ export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
       expect(await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')).to.have.property('size', 0)
     })
 
-    it("keeps the boxes under a vault row past reading, as it may yet be read", async () => {
+    it("keeps the boxes under an unreadable vault row", async () => {
       const { vaultDB, box } = await putWith({ box: true })
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { garbage: true })
       expect(await vaultDB.tidyGone(bankScope)).to.deep.include({ val: { totalCount: 1 } })

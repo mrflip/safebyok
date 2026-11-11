@@ -91,7 +91,7 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
     }
 
     for (const rcvdShape of ShapesAll) {
-      it(`older | ${rcvdShape} | full notes no success: an older record says nothing of the revision world`, () => {
+      it(`older | ${rcvdShape} | full leaves the box untimely`, () => {
         const box = boxOf(Centrals.full())
         box.receive(rcvdOf(rcvdShape, OlderRev))
         expect(box.isTimely).to.be.false
@@ -99,14 +99,14 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
     }
   })
 
-  describe("success noted on a record not older, where the record in hand is whole", () => {
-    it("same | sparse | sparse notes no success: nothing whole is world", () => {
+  describe("timeliness after a record that is not older", () => {
+    it("same | sparse | sparse leaves the box untimely", () => {
       const box = boxOf(Centrals.sparse())
       box.receive(rcvdOf('sparse', SameRev))
       expect(box.isTimely).to.be.false
     })
 
-    it("same | gone | gone notes success: a tombstone is whole", () => {
+    it("same | gone | gone makes the box timely", () => {
       const box = boxOf(Centrals.gone())
       box.receive(rcvdOf('gone', SameRev))
       expect(box.isTimely).to.be.true
@@ -220,7 +220,7 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
       })
     }
 
-    it("other | newer | full | never stored takes 'adopt': a box born elsewhere first is the one storage has stored", () => {
+    it("other | newer | full | never stored takes 'adopt'", () => {
       const box = boxOf(tombstoneBoxRecord({ revision_seq: SX.VoidRevisionSeq, revision_tok: 'rev-never' }))
       const rcvd = fullBoxRecord({ revision_seq: 0, revision_tok: 'rev-b0', ...OtherLife })
       box.receive(rcvd)
@@ -231,19 +231,19 @@ describe("storable.receive(rcvd): the reconcileCentral table, through a Box", ()
 })
 
 describe("storable.receive(null)", () => {
-  it("for a thing never stored reads as 'same': nothing stored is the tombstone it was born with", () => {
+  it("for a thing never stored reads as 'same'", () => {
     const box = boxOf(tombstoneBoxRecord({ revision_seq: SX.VoidRevisionSeq, revision_tok: 'rev-never' }))
     expect(box._cheat_central.revision_seq).to.eq(SX.VoidRevisionSeq)
     expectReceivedUnchanged(box, null, 'same')
   })
 
   for (const centralShape of ShapesAlive) {
-    it(`for a thing world alive (${centralShape}) refuses, by same | gone | alive`, () => {
+    it(`for a live thing (${centralShape}) refuses`, () => {
       expectReceiveConflict(boxOf(Centrals[centralShape]()), null)
     })
   }
 
-  it("for a thing world gone reads as 'same', by same | gone | gone", () => {
+  it("for a deleted thing reads as 'same'", () => {
     expectReceivedUnchanged(boxOf(Centrals.gone()), null, 'same')
   })
 })

@@ -6,10 +6,13 @@ import type { BoundaryProps, BoundarySource } from '../shapes'
 export class Boundary extends Component<BoundaryProps, { caught: boolean }> {
   override state = { caught: false }
 
+  /** Mark the boundary as caught when a child throws. */
   static getDerivedStateFromError() { return { caught: true } }
 
+  /** Call `onCaught` once a child has thrown. */
   override componentDidCatch() { this.props.onCaught?.() }
 
+  /** Render `fallback` once caught, and the children until then. */
   override render() { return this.state.caught ? this.props.fallback : this.props.children }
 }
 

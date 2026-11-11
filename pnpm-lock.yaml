@@ -290,6 +290,9 @@ importers:
       eslint-plugin-import-x:
         specifier: ^4.17.1
         version: 4.17.1(@typescript-eslint/utils@8.71.1(eslint@10.13.0)(typescript@6.0.3))(eslint@10.13.0)
+      eslint-plugin-jsdoc:
+        specifier: ^65.4.2
+        version: 65.4.2(eslint@10.13.0)(typescript@6.0.3)
       eslint-plugin-jsx-a11y:
         specifier: ^6.10.2
         version: 6.10.2(eslint@10.13.0)
@@ -546,6 +549,9 @@ importers:
       eslint-plugin-import-x:
         specifier: ^4.17.1
         version: 4.17.1(@typescript-eslint/utils@8.71.1(eslint@10.13.0)(typescript@6.0.3))(eslint@10.13.0)
+      eslint-plugin-jsdoc:
+        specifier: ^65.4.2
+        version: 65.4.2(eslint@10.13.0)(typescript@6.0.3)
       eslint-plugin-sonarjs:
         specifier: ^4.2.2
         version: 4.2.2(eslint@10.13.0)
@@ -616,6 +622,9 @@ importers:
       eslint-plugin-import-x:
         specifier: ^4.17.1
         version: 4.17.1(@typescript-eslint/utils@8.71.1(eslint@10.13.0)(typescript@6.0.3))(eslint@10.13.0)
+      eslint-plugin-jsdoc:
+        specifier: ^65.4.2
+        version: 65.4.2(eslint@10.13.0)(typescript@6.0.3)
       eslint-plugin-sonarjs:
         specifier: ^4.2.2
         version: 4.2.2(eslint@10.13.0)
@@ -691,6 +700,9 @@ importers:
       eslint-plugin-import-x:
         specifier: ^4.17.1
         version: 4.17.1(@typescript-eslint/utils@8.71.1(eslint@10.13.0)(typescript@6.0.3))(eslint@10.13.0)
+      eslint-plugin-jsdoc:
+        specifier: ^65.4.2
+        version: 65.4.2(eslint@10.13.0)(typescript@6.0.3)
       eslint-plugin-sonarjs:
         specifier: ^4.2.2
         version: 4.2.2(eslint@10.13.0)
@@ -767,6 +779,9 @@ importers:
       eslint-plugin-import-x:
         specifier: ^4.17.1
         version: 4.17.1(@typescript-eslint/utils@8.71.1(eslint@10.13.0)(typescript@6.0.3))(eslint@10.13.0)
+      eslint-plugin-jsdoc:
+        specifier: ^65.4.2
+        version: 65.4.2(eslint@10.13.0)(typescript@6.0.3)
       eslint-plugin-sonarjs:
         specifier: ^4.2.2
         version: 4.2.2(eslint@10.13.0)
@@ -836,6 +851,9 @@ importers:
       eslint-plugin-import-x:
         specifier: ^4.17.1
         version: 4.17.1(@typescript-eslint/utils@8.71.1(eslint@10.13.0)(typescript@6.0.3))(eslint@10.13.0)
+      eslint-plugin-jsdoc:
+        specifier: ^65.4.2
+        version: 65.4.2(eslint@10.13.0)(typescript@6.0.3)
       eslint-plugin-sonarjs:
         specifier: ^4.2.2
         version: 4.2.2(eslint@10.13.0)
@@ -908,6 +926,9 @@ importers:
       eslint-plugin-import-x:
         specifier: ^4.17.1
         version: 4.17.1(@typescript-eslint/utils@8.71.1(eslint@10.13.0)(typescript@6.0.3))(eslint@10.13.0)
+      eslint-plugin-jsdoc:
+        specifier: ^65.4.2
+        version: 65.4.2(eslint@10.13.0)(typescript@6.0.3)
       eslint-plugin-jsx-a11y:
         specifier: ^6.10.2
         version: 6.10.2(eslint@10.13.0)

@@ -64,7 +64,7 @@ describe("listing.stampOfBirth and listing.recordOfBirth", () => {
   })
 })
 
-describe("listing's gate verbs: the record each sends the vaultDB", () => {
+describe("the listing's gate methods", () => {
   const MovedDevice = '00000000-0000-4000-8000-0000000000d2'
 
   it("replacePassphrase sends the next revision with the new wayin and the epoch one up", async () => {
@@ -102,7 +102,7 @@ describe("listing's gate verbs: the record each sends the vaultDB", () => {
     expect(stored).to.deep.equal(record)
   })
 
-  it("revokePasskey over no passkey answers the record stored", async () => {
+  it("revokePasskey with no passkey stored returns the stored record", async () => {
     const { listing, vault } = await makeBornVault()
     const ante = vault.fullRecord
     expect(await listing.revokePasskey(ante)).to.deep.equal(ante)
@@ -119,14 +119,14 @@ describe("listing's gate verbs: the record each sends the vaultDB", () => {
     await TH.expectRefusal(listing.addPasskey(vault.fullRecord, TH.passkeyWayin), 'storage_issue')
   })
 
-  it("refuses an ante of another bank", async () => {
+  it("refuses a record of another user", async () => {
     const { listing, vault } = await makeBornVault()
     await TH.expectRefusal(listing.replacePassphrase({ ...vault.fullRecord, user_id: 'someone_else' }, vault.fullRecord.gate.passphrase_wayin))
   })
 })
 
 describe("a tombstone over a live vault", () => {
-  it("reaches a local delete's end state when a fetch finds it: locked, row forgotten, boxes vacated, the vault in its slot", async () => {
+  it("leaves the vault as a local delete would, once a fetch finds it", async () => {
     const world = await makeBornVault()
     const { vault, listing, demandStored, restoreRow } = world
     const boxes = vault.boxListing
@@ -140,7 +140,7 @@ describe("a tombstone over a live vault", () => {
     expect(vault.boxListing).to.eq(boxes)
   })
 
-  it("announces a refused forget at its tombstone, not as bad news, and the tombstone stands", async () => {
+  it("reports a refused forget to onLifecycle, not as bad news", async () => {
     const onLifecycle = vi.fn()
     const onBadNews = vi.fn()
     const { fakeBank, opts, deviceDB, demandStored, restoreRow, listing: born } = makeVaultWorld(null, { onLifecycle })
@@ -160,7 +160,7 @@ describe("a tombstone over a live vault", () => {
 })
 
 describe("a box notice carrying the vault's tombstone as its world", () => {
-  it("ends the box listing with no bad news, the vault listing's own watch off", async () => {
+  it("ends the box listing with no bad news", async () => {
     const onBadNews = vi.fn()
     const { fakeBank, opts, demandStored, listing: born } = makeVaultWorld()
     const bornVault = await buildTyping(born, Dna, byPassphrase(Passphrase))
@@ -177,7 +177,7 @@ describe("a box notice carrying the vault's tombstone as its world", () => {
   })
 })
 
-describe("a box verb over a vault deleted elsewhere", () => {
+describe("a box method over a vault deleted elsewhere", () => {
   const WorldNow = { maxWorldMillis: 0 }
   const Verbs = [
     ['box.extractWhisper', ({ box }) => box.extractWhisper(WorldNow)],
@@ -187,7 +187,7 @@ describe("a box verb over a vault deleted elsewhere", () => {
     ['vault.delBox',       ({ vault, box }) => vault.delBox(box.boxlabel, WorldNow)],
   ] as const satisfies readonly (readonly [string, (world: { vault: Vault, box: Box }) => Promise<unknown>])[]
 
-  it.each(Verbs)("%s refuses, as the refresh that finds the tombstone vacates the box before the box's guard runs", async (_verb, call) => {
+  it.each(Verbs)("%s refuses", async (_verb, call) => {
     const { vault, demandStored, restoreRow } = await makeBornVault()
     const box = await vault.boxListing.create({ ...vault.scope, ...BoxDna })
     await vault.hello()
@@ -197,7 +197,7 @@ describe("a box verb over a vault deleted elsewhere", () => {
 })
 
 describe("vault.delVaultPrompt()", () => {
-  it("lands on that same end state, the tombstone stored", async () => {
+  it("leaves the vault deleted and locked, its cached lease forgotten", async () => {
     const world = await makeBornVault()
     const boxes = world.vault.boxListing
     await delTyping(world.vault)
@@ -210,8 +210,8 @@ describe("vault.delVaultPrompt()", () => {
 })
 
 const DelCases = [
-  [false,  'deletes an unlocked vault with no prompt, landing on that same end state'],
-  [true,   'deletes a locked vault with no prompt, landing on that same end state'],
+  [false,  'deletes an unlocked vault without showing a dialog'],
+  [true,   'deletes a locked vault without showing a dialog'],
 ] as const
 
 describe("vault.del(vault.scope)", () => {
@@ -230,7 +230,7 @@ describe("vault.del(vault.scope)", () => {
 })
 
 describe("a newer record of another vault_tok over a live vault", () => {
-  it("refuses the old vault's own fetch and hydrate that met it, resolving no vault let go", async () => {
+  it("refuses the old vault's fetch and hydrate", async () => {
     const fetching = await makeBornVault()
     fetching.restoreRow(await otherLifeAt(5))
     await TH.expectRefusal(fetching.vault.fetch())
@@ -239,7 +239,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     await TH.expectBad(hydrating.vault.tryHydrate({ maxMillisSinceRefresh: 0 }))
   })
 
-  it("replaces it: the old vacated and delisted, its row forgotten, a new vault in the slot, locked", async () => {
+  it("replaces the old vault with a new, locked one", async () => {
     const { vault, listing, deviceDB, restoreRow } = await makeBornVault()
     const other = await otherLifeAt(5)
     restoreRow(other)
@@ -254,7 +254,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     expect(deviceDB.cachedNow()).to.be.null
   })
 
-  it("has a tombstone of another vault_tok the same way, the old vacated", async () => {
+  it("also replaces the old vault when it is a tombstone", async () => {
     const { vault, listing, restoreRow } = await makeBornVault()
     const other = await otherLifeAt(5)
     restoreRow(tombstoneOver(other))
@@ -265,8 +265,8 @@ describe("a newer record of another vault_tok over a live vault", () => {
   })
 })
 
-describe("an old instance, replaced by the very call it made", () => {
-  it("vault.del(vault.scope) refuses, and the new life stored stands", async () => {
+describe("an old instance replaced by its own call", () => {
+  it("vault.del(vault.scope) refuses and leaves the new vault stored", async () => {
     const { vault, restoreRow, storedNow } = await makeBornVault()
     const other = await otherLifeAt(5)
     restoreRow(other)
@@ -289,7 +289,7 @@ describe("an older record", () => {
     expect(vault.isLocked).to.be.false
   })
 
-  it("loses to a tombstone, of this vault_tok or another: the vault stays gone", async () => {
+  it("of either vault_tok does not bring back a deleted vault", async () => {
     const { vault, listing, demandStored, restoreRow } = await makeBornVault()
     const born = demandStored()
     await delTyping(vault)
@@ -340,13 +340,13 @@ describe("building over a tombstone", () => {
     expect(storedNow()).to.deep.equal(before)
   })
 
-  it("a vault listing refuses to answer for another user, where another vault of this user is plainly not listed", () => {
+  it("listing.at refuses a scope of another user, and returns null for another vault of this user", () => {
     const { listing } = makeVaultWorld()
     TH.expectSyncRefusal(() => listing.at({ ...Dna, user_id: 'another_user' }))
     expect(listing.at({ ...Dna, vaultlabel: 'another_vault' })).to.be.null
   })
 
-  it("Vault.launchBirth refuses a scope of another user, nobody asked", async () => {
+  it("Vault.launchBirth refuses a scope of another user without showing a dialog", async () => {
     const { listing, fakeBank, opts } = makeVaultWorld()
     const dialog = vi.fn()
     fakeBank.requestCleartext = dialog
@@ -354,7 +354,7 @@ describe("building over a tombstone", () => {
     expect(dialog).not.toHaveBeenCalled()
   })
 
-  it("Vault.launchBirth refuses what is no scope, nobody asked", async () => {
+  it("Vault.launchBirth refuses a malformed scope without showing a dialog", async () => {
     const { listing, fakeBank, opts } = makeVaultWorld()
     const dialog = vi.fn()
     fakeBank.requestCleartext = dialog
@@ -362,7 +362,7 @@ describe("building over a tombstone", () => {
     expect(dialog).not.toHaveBeenCalled()
   })
 
-  it("Vault.launchBirth refuses on a swept listing, nobody asked", async () => {
+  it("Vault.launchBirth refuses on a swept listing without showing a dialog", async () => {
     const { listing, fakeBank, opts } = makeVaultWorld()
     const dialog = vi.fn()
     fakeBank.requestCleartext = dialog
@@ -379,7 +379,7 @@ describe("building over a tombstone", () => {
     expect(storedNow()).to.include({ vault_tok: reborn.vault_tok, revision_seq: 2 })
   })
 
-  it("a birth's listing.put, written: a new vault of the record in the slot, locked", async () => {
+  it("a birth's listing.put over a tombstone lists a new, locked vault of the record", async () => {
     const { vault, listing, tombstone } = await deleted()
     const record = await birthOver(tombstone)
     const reborn = await listing.put(record, { prior: tombstone, ifAbsent: 'add', ifPresent: 'get' })
@@ -389,14 +389,14 @@ describe("building over a tombstone", () => {
     expect(vault.isEnabled).to.be.false
   })
 
-  it("a birth's listing.put, nothing ever stored: written over never stored", async () => {
+  it("a birth's listing.put with nothing ever stored is written", async () => {
     const { listing } = makeVaultWorld()
     const record = await birthOver(SX.VoidRevision)
     const born = await listing.put(record, { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'get' })
     expect(born.vault_tok).to.eq(record.vault_tok)
   })
 
-  it("a birth's listing.put, another won: the vault stored is listed and answered, locked, and the record dropped", async () => {
+  it("a birth's listing.put that loses a race lists the winner's vault, locked", async () => {
     const { listing, tombstone, restoreRow } = await deleted()
     const theirs = await otherLifeAt(2)
     restoreRow(theirs)
@@ -407,7 +407,7 @@ describe("building over a tombstone", () => {
     expect(listing.at(Dna)).to.eq(won)
   })
 
-  it("a birth's listing.put, refused: a newer tombstone stored delivers, and nothing of the record is listed", async () => {
+  it("a birth's listing.put refuses over a newer tombstone, and lists nothing of the record", async () => {
     const { vault, listing, tombstone, demandStored, restoreRow } = await deleted()
     const record = await birthOver(tombstone)
     const stored = demandStored()
@@ -418,21 +418,21 @@ describe("building over a tombstone", () => {
   })
 })
 
-describe("the entrypoints, handed rubble", () => {
-  it("a birth's listing.put refuses a record that is no record, putting nothing", async () => {
+describe("the entrypoints, given malformed input", () => {
+  it("a birth's listing.put refuses a malformed record, putting nothing", async () => {
     const { listing, storedNow } = makeVaultWorld()
     await TH.expectRefusal(listing.put({ garbage: true } as never, { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'get' }))
     expect(storedNow()).to.be.null
   })
 
-  it("listing.del refuses a duck that is no record", async () => {
+  it("listing.del refuses a malformed record", async () => {
     const { listing } = makeVaultWorld()
     await TH.expectRefusal(listing.del(null as never))
   })
 })
 
-describe("lock() with an forget that throws synchronously", () => {
-  it("reports locked, does not throw, and announces the refused forget", async () => {
+describe("lock() with a forget that throws synchronously", () => {
+  it("locks without throwing, and reports the refused forget to onLifecycle", async () => {
     const onLifecycle = vi.fn()
     const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onLifecycle })
     deviceDB.forget.mockImplementationOnce(() => { throw new Error('the duck is broken') })
@@ -444,7 +444,7 @@ describe("lock() with an forget that throws synchronously", () => {
 })
 
 describe("a damaged row", () => {
-  it("refuses a fetch 'damaged_row', and the vault listed stands", async () => {
+  it("refuses a fetch 'damaged_row', leaving the listed vault as it was", async () => {
     const { vault, listing, restoreRow } = await makeBornVault()
     restoreRow({ garbage: true } as never)
     await TH.expectRefusal(listing.fetch(Dna), 'damaged_row')
@@ -455,7 +455,7 @@ describe("a damaged row", () => {
 })
 
 describe("a damaged row met by listing the bank's vaults", () => {
-  it("vacates the vault listed in its slot, keeps the row in damaged_rows, and tells it as bad news", async () => {
+  it("vacates the listed vault and keeps the row in damaged_rows", async () => {
     const { vault, listing, restoreRow, badnews } = await makeBornVault()
     restoreRow({ garbage: true } as never)
     await listing.list()
@@ -475,7 +475,7 @@ describe("a damaged row met by listing the bank's vaults", () => {
     expect(listing.damaged_rows).to.deep.equal([])
   })
 
-  it("tells its listeners when damaged_rows changes, and not when a listing finds the same", async () => {
+  it("notifies its listeners only when damaged_rows changes", async () => {
     const { listing, restoreRow, demandStored } = await makeBornVault()
     const stored = demandStored()
     restoreRow({ garbage: true } as never)
@@ -491,15 +491,15 @@ describe("a damaged row met by listing the bank's vaults", () => {
   })
 })
 
-describe("the listing's verbs answer the vaultDB's own answer", () => {
-  it("tryList answers the act, with the vaults listed as its val", async () => {
+describe("the listing's methods return the vaultDB's answer", () => {
+  it("tryList returns the act, with the listed vaults as its val", async () => {
     const { vault, listing } = await makeBornVault()
     const answer = await TH.expectGood(listing.tryList())
     expect(answer).to.deep.equal([vault])
     expect(await listing.tryList()).to.deep.include({ ok: true, act: 'got' })
   })
 
-  it("tryDel answers the del's act, with the vault deleted as its val", async () => {
+  it("tryDel returns the del's act, with the deleted vault as its val", async () => {
     const { vault, listing } = await makeBornVault()
     vault.lock()
     const answer = await listing.tryDel(vault.sparse)
@@ -508,7 +508,7 @@ describe("the listing's verbs answer the vaultDB's own answer", () => {
     expect(vault.isPresent).to.be.false
   })
 
-  it("tryDel answers a delete naming another life than the vault listed as bad, deleting nothing", async () => {
+  it("tryDel returns a bad answer for a delete naming another vault life, deleting nothing", async () => {
     const { vault, listing, storedNow } = await makeBornVault()
     const before = storedNow()
     const answer = await listing.tryDel({ ...listing.sparseOf(vault), vault_tok: 'another-life' })
@@ -517,7 +517,7 @@ describe("the listing's verbs answer the vaultDB's own answer", () => {
     expect(storedNow()).to.deep.equal(before)
   })
 
-  it("get answers the vault listed, and fetches one that is not", async () => {
+  it("get returns a listed vault, and fetches one that is not listed", async () => {
     const { vault, listing } = await makeBornVault()
     expect(await listing.get(Dna)).to.eq(vault)
     const { listing: fresh } = makeVaultWorld(await storedVaultRecord())
@@ -526,8 +526,8 @@ describe("the listing's verbs answer the vaultDB's own answer", () => {
   })
 })
 
-describe("listing.tryGet: the act says where the instance came from", () => {
-  it("answers 'timely', with no world, where the instance listed is fresh enough, and asks storage nothing", async () => {
+describe("listing.tryGet", () => {
+  it("returns act 'timely' without asking storage when the listed instance is fresh enough", async () => {
     const { vault, listing, opts } = await makeBornVault()
     const tryGetVault = vi.spyOn(opts.vaultDB, 'tryGetVault')
     const answer = await listing.tryGet(Dna, { maxMillisSinceRefresh: Infinity })
@@ -535,15 +535,15 @@ describe("listing.tryGet: the act says where the instance came from", () => {
     expect(tryGetVault).not.toHaveBeenCalled()
   })
 
-  it("answers the vaultDB's own act where it asked storage", async () => {
+  it("returns the vaultDB's own act when it asked storage", async () => {
     const { vault, listing } = await makeBornVault()
     const answer = await listing.tryGet(Dna, { maxMillisSinceRefresh: 0 })
     expect(answer).to.deep.include({ ok: true, act: 'got', val: vault })
   })
 })
 
-describe("the gate verbs answer the vaultDB's own answer", () => {
-  it("tryRevokePasskey answers the act, with the record written as its val", async () => {
+describe("the gate methods return the vaultDB's answer", () => {
+  it("tryRevokePasskey returns the act, with the written record as its val", async () => {
     const { vault, listing, demandStored } = await makeBornVault()
     const ante = demandStored()
     const answer = await listing.tryRevokePasskey(SX.vaultRecord.parse(ante))
@@ -552,7 +552,7 @@ describe("the gate verbs answer the vaultDB's own answer", () => {
     expect(answer.val).to.deep.include({ vault_tok: vault.vault_tok })
   })
 
-  it("answers a disabled listing as bad, asking storage nothing", async () => {
+  it("returns a bad answer on a disabled listing, asking storage nothing", async () => {
     const { listing, demandStored, opts } = await makeBornVault()
     const tryRevokePasskey = vi.spyOn(opts.vaultDB, 'tryRevokePasskey')
     listing.sweep()
@@ -562,7 +562,7 @@ describe("the gate verbs answer the vaultDB's own answer", () => {
   })
 })
 
-describe("a listing asks storage once for what callers ask at once", () => {
+describe("a listing shares one storage call among concurrent requests", () => {
   it("joins fetches of one slot made while one runs, the instance's own among them, into one get", async () => {
     const { vault, listing, opts } = await makeBornVault()
     const tryGetVault = vi.spyOn(opts.vaultDB, 'tryGetVault')

@@ -51,10 +51,10 @@ describe("box.extractWhisper(): refused from its guard", () => {
 
 // == [What the lease opens]: a whisper that opens to no whisper
 
-describe("box.extractWhisper(): what the lease opens that is no whisper", () => {
+describe("box.extractWhisper(): a decrypted value that is not a valid whisper", () => {
   const OpenedCases = [
-    ['text that is no JSON',            'sk-test-SECRET {'],
-    ['JSON that is no whisper',         'null'],
+    ['text that is not JSON',           'sk-test-SECRET {'],
+    ['JSON that is not a whisper',      'null'],
     ['JSON that is a bare string',      '"sk-test-SECRET"'],
     ['JSON that is an array',           '["sk-test-SECRET"]'],
   ] as const
@@ -83,7 +83,7 @@ describe("box.whisper through a lock", () => {
     expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-0000' })
   })
 
-  it("gives back the very object once unlocked, an edit made before the lock or during it kept", async () => {
+  it("returns the same object once unlocked, keeping edits made before and during the lock", async () => {
     const box = await exposedOf({ apiKey: 'sk-test-0000' })
     const exposed = box.whisper as { apiKey: string, org?: string }
     exposed.apiKey = 'sk-test-edited'
@@ -107,7 +107,7 @@ describe("box.whisper through a lock", () => {
 
 // == [The bags]: ENCRYPTED, LOCKED, VEILED, Whispered, Storable.isFUBag
 
-describe("the bags and Storable.isFUBag: a mark, not an identity", () => {
+describe("the sentinel bags and Storable.isFUBag", () => {
   const Bags = [[ENCRYPTED, 'encrypted'], [LOCKED, 'locked'], [VEILED, 'veiled']] as const
 
   for (const [bag, kind] of Bags) {
@@ -128,10 +128,10 @@ describe("the bags and Storable.isFUBag: a mark, not an identity", () => {
     [VEILED,                                          true,  'the veiled bag'],
     [{ ...LOCKED },                                   true,  'a copy made by spreading it'],
     [Object.assign({}, VEILED),                       true,  'a copy made by assigning it'],
-    [{ [Symbol.for('@safebyok/whispered')]: 'mine' }, true,  'a forgery, harmless as it only ever refuses at a put'],
+    [{ [Symbol.for('@safebyok/whispered')]: 'mine' }, true,  'a forgery carrying the mark'],
     [Symbol.for('@safebyok/whispered'),               false, 'the symbol itself'],
     [{},                                              false, 'an empty bag'],
-    [{ deep: { ...LOCKED } },                         false, 'a whisper with one nested, which CX.whisper refuses all the same'],
+    [{ deep: { ...LOCKED } },                         false, 'a whisper with a bag nested in it'],
     [{ apiKey: 'sk-test-0000' },                      false, 'a whisper'],
     [null,                                            false, 'null'],
     [undefined,                                       false, 'undefined'],
@@ -143,14 +143,14 @@ describe("the bags and Storable.isFUBag: a mark, not an identity", () => {
     })
   }
 
-  it("never takes a whisper for one: a whisper of that name is exposed", async () => {
+  it("never mistakes a whisper with a bag's name in it for a bag", async () => {
     const box = await exposedOf({ LOCKED: 'LOCKED' })
     expect(Storable.isFUBag(box.whisper)).to.be.false
     expect(box.whisper).to.deep.equal({ LOCKED: 'LOCKED' })
   })
 
   for (const [bag, kind] of Bags) {
-    it(`refuses ${kind}, a copy, or one nested, at a put, keeping what is stored`, async () => {
+    it(`refuses a put of the ${kind} bag, a copy of it, or a whisper with it nested, keeping what is stored`, async () => {
       const box = await exposedOf()
       for (const whisper of [bag, { ...bag }, { deep: { ...bag } }]) {
         await TH.expectRefusal(box.put({ whisper }))
@@ -159,7 +159,7 @@ describe("the bags and Storable.isFUBag: a mark, not an identity", () => {
     })
   }
 
-  it("puts nothing of a whisper read while locked and put after the unlock", async () => {
+  it("refuses a put of the whisper read while locked, even after the unlock", async () => {
     const box = await exposedOf()
     world.mw.setLocked(true)
     const readWhileLocked = box.whisper
@@ -197,13 +197,13 @@ describe("box.whisper and box.put: what a whisper may be", () => {
     })
   }
 
-  it("refuses before its guards: a whisper JSON would mangle refuses while the vault is locked", async () => {
+  it("refuses a whisper JSON would mangle, even while the vault is locked", async () => {
     const box = await builtOf(fullBoxRecord())
     world.mw.setLocked(true)
     await TH.expectRefusal(box.put({ whisper: new Date(T0), sidecar: {} }))
   })
 
-  it("exposes a plain copy of the whisper put: the host's later change to its own reaches no box, and the box's takes an edit, stable until the next expose", async () => {
+  it("exposes a copy of the whisper put, not the host's object", async () => {
     const box = await builtOf(fullBoxRecord())
     const given = { apiKey: 'sk-test-0000', deep: { orgId: 'org-0000' } }
     await box.put({ whisper: given })
@@ -223,8 +223,8 @@ describe("box.whisper and box.put: what a whisper may be", () => {
     expect(box.whisper).to.deep.equal(AsPut)
   })
 
-  for (const [whisper, blurb] of [[{}, 'an empty object'], [{ val: null }, 'an object with a val, nothing in it now']] as const) {
-    it(`puts and opens ${blurb} as the whisper it is`, async () => {
+  for (const [whisper, blurb] of [[{}, 'an empty object'], [{ val: null }, 'an object whose val is null']] as const) {
+    it(`puts and opens ${blurb} unchanged`, async () => {
       const box = await builtOf(fullBoxRecord())
       await box.put({ whisper })
       expect(await box.extractWhisper()).to.deep.equal(whisper)
@@ -236,13 +236,13 @@ describe("box.whisper and box.put: what a whisper may be", () => {
     })
   }
 
-  it("opens a box sealed as { val } in the old form as the whisper { val }, not a failure", async () => {
+  it("opens a box sealed as { val } in the old form as the whisper { val }", async () => {
     const box = await builtOf(fullBoxRecord())
     await box.put({ whisper: { val: 'sk-test-0000' } })
     expect(await box.extractWhisper()).to.deep.equal({ val: 'sk-test-0000' })
   })
 
-  it("shows the whisper exposed in no snapshot or JSON of the box", async () => {
+  it("keeps the exposed whisper out of every snapshot and JSON form of the box", async () => {
     const box = await exposedOf({ apiKey: 'sk-test-SECRET' })
     for (const form of [box.toJSON(), box, box.getSnapshot(), { central: box._cheat_central }]) {
       expect(JSON.stringify(form)).to.not.include('SECRET')

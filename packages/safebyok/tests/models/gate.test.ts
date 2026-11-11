@@ -19,7 +19,7 @@ describe("Gate.make(stamp, passphraseWayin, passkeyWayin)", () => {
     expect(gate.passkey_wayin).to.be.null
   })
 
-  it("refuses a pickle where it wants a Wayin", async () => {
+  it("refuses a wayin record in place of a Wayin", async () => {
     const { gate } = await builtGate()
     TH.expectSyncRefusal(() => Gate.make(WorldStamp, gate.passphrase_wayin as never, null))
   })
@@ -96,7 +96,7 @@ describe("gate.pickle() and gate.toJSON()", () => {
     expect(() => { (gate as { passkey_wayin: unknown }).passkey_wayin = gate.passphrase_wayin }).to.throw(TypeError)
   })
 
-  it("has the stamp it was handed, as parsed, hidden", async () => {
+  it("keeps the stamp it was given", async () => {
     const { gate } = await builtGate()
     expect(gate.stamp).to.deep.equal(WorldStamp)
   })

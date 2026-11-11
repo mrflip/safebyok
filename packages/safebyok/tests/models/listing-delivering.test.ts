@@ -18,9 +18,9 @@ const scopeOf = (boxlabel = 'anthropic_api_key') => world.mw.boxscope(boxlabel)
 const dnaOf = (boxlabel = 'anthropic_api_key') => boxDnaOf(scopeOf(boxlabel))
 // --
 
-describe("Listing's pipeline: what every answer takes", () => {
+describe("Listing's pipeline: what every answer goes through", () => {
   describe("an answer refused or malformed", () => {
-    it("throws a refusal as it came, delivering nothing", async () => {
+    it("passes a refusal through unchanged and delivers nothing", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())
       world.mw.clearCalls()
@@ -32,7 +32,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(box.revision_seq).to.eq(1)
     })
 
-    it("throws a refusal as it came, where its answer names no scope", async () => {
+    it("passes a refusal through unchanged when its answer names no scope", async () => {
       const listing = boxListingOf(world.mw)
       const err = new VaultError('unexpected_error', "A bug.")
       world.mw.willGet({ ...world.mw.refusalOf(scopeOf(), err), req_params: {} })
@@ -46,7 +46,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       await boxListingOf(world.mw).fetch(scopeOf())
       expect(world.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'the world now' }])
     })
-    it("refuses a fetch of a scope that is no scope, before the world or storage is called", async () => {
+    it("refuses a fetch of a malformed scope, before the world or storage is called", async () => {
       const listing = boxListingOf(world.mw)
       await TH.expectRefusal(listing.fetch({ ...scopeOf(), boxlabel: 'Not A Label!' }))
       expect(world.mw.calls).to.deep.equal([])
@@ -66,7 +66,7 @@ describe("Listing's pipeline: what every answer takes", () => {
   })
 
   describe("an answer arriving past the listing's end", () => {
-    it("refuses, a refusal among them, its world not taken", async () => {
+    it("refuses without receiving its world, even when the answer is a refusal", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.willGet(() => {
         listing.vacate()
@@ -78,7 +78,7 @@ describe("Listing's pipeline: what every answer takes", () => {
   })
 
   describe("a refusal met in delivering a record", () => {
-    it("is thrown to a fetch, which cannot have the record it asked for: the box as it was, nothing told", async () => {
+    it("is thrown to a fetch, leaving the box unchanged", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())
       world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-other' }))
@@ -89,7 +89,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(world.mw.badnews).to.deep.equal([])
     })
 
-    it("is thrown to a build(record), the box world kept as it was", async () => {
+    it("is thrown to a build(record), leaving the listed box unchanged", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())
       world.mw.clearCalls()
@@ -99,7 +99,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(world.mw.badnews).to.deep.equal([])
     })
 
-    it("is thrown to a put, the box as it was", async () => {
+    it("is thrown to a put, leaving the box unchanged", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())
       world.mw.clearCalls()
@@ -109,7 +109,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(world.mw.badnews).to.deep.equal([])
     })
 
-    it("is thrown to a fetch of a scope not world, and nothing is world, saved or told", async () => {
+    it("is thrown to a fetch of a scope not yet listed, and nothing is listed or reported", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.seedPut(fullBoxRecord())
       const refused = vi.spyOn(Box.prototype, 'receive').mockImplementationOnce(() => { throw new VaultError('record_conflict', "Refused.") })
@@ -123,7 +123,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(world.mw.badnews).to.deep.equal([])
     })
 
-    it("lets a 'stale_write' reach its caller as it came, the carried record's conflict going to onBadNews", async () => {
+    it("goes to onBadNews when a 'stale_write' carried the record, and the 'stale_write' is still thrown", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())
       world.mw.willPut(world.mw.staleWriteOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })))
@@ -132,7 +132,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(world.mw.badnews).to.have.length(1)
     })
 
-    it("leaves the answer's own refusals to the caller: a world's, a refusal answer, the absent refusal", async () => {
+    it("leaves the answer's own refusals to the caller", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.willGet(world.mw.refusalOf(scopeOf(), new VaultError('storage_unavailable', "Down."), null))
       await TH.expectRefusal(listing.fetch(scopeOf()), 'storage_unavailable')
@@ -143,7 +143,7 @@ describe("Listing's pipeline: what every answer takes", () => {
   })
 
   describe("a void row, delivered", () => {
-    it("builds an instance that is world, gone, and not in the snapshot", async () => {
+    it("builds a listed instance that is not present and not in the snapshot", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(sentinel())
       expect(listing.things).to.deep.equal([box])
@@ -151,7 +151,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(listing.snapshot).to.deep.equal([])
     })
 
-    it("is the same revision however often it comes, not one revision under two toks", async () => {
+    it("builds the same instance at the void revision however often it arrives", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(sentinel())
       expect(await listing.build(sentinel())).to.eq(box)
@@ -161,7 +161,7 @@ describe("Listing's pipeline: what every answer takes", () => {
   })
 
   describe("one instance for each scope", () => {
-    it("a create(dna) over the scope of a box stored and world alive hears the vaultDB's 'camped': the box world kept", async () => {
+    it("a create(dna) over a live listed box refuses 'camped' and leaves the box unchanged", async () => {
       const listing = boxListingOf(world.mw)
       const record = fullBoxRecord()
       world.mw.seedPut(record)
@@ -171,7 +171,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(box.revision_seq).to.eq(record.revision_seq)
     })
 
-    it("a create(dna) over the scope of a box stored and world deleted brings it back on the instance world, at the next seq", async () => {
+    it("a create(dna) over a deleted listed box brings it back on the same instance, at the next seq", async () => {
       const listing = boxListingOf(world.mw)
       const record = tombstoneBoxRecord({ revision_seq: 2 })
       world.mw.seedPut(record)
@@ -219,7 +219,7 @@ describe("listing: a notice without its vault row", () => {
   })
 })
 
-describe("listing: a record of another vault_tok meets no instance world", () => {
+describe("listing: a record of another vault_tok reaches no listed instance", () => {
   const OtherVault = 'vault-tok-other'
 
   it("refuses for a fetch answered with a record of another vault_tok, making nothing", async () => {
@@ -249,7 +249,7 @@ describe("listing: a record of another vault_tok meets no instance world", () =>
     expect(listing.at(scopeOf('other_box'))).to.be.null
   })
 
-  it("leaves undelivered a stale_write refusal's stored record of another vault_tok, throwing the stale_write", async () => {
+  it("throws a 'stale_write' whose record has another vault_tok without delivering that record", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willPut(world.mw.staleWriteOf(scopeOf(), fullBoxRecord({ vault_tok: OtherVault, revision_seq: 5 })))
     await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { prior: SX.VoidRevision }), 'stale_write')
@@ -257,13 +257,13 @@ describe("listing: a record of another vault_tok meets no instance world", () =>
     expect(listing.things).to.deep.equal([])
   })
 
-  it("leaves a record of the vault's own vault_tok, and a dna, as they were", async () => {
+  it("accepts a record of the vault's own vault_tok, and a dna", async () => {
     const listing = boxListingOf(world.mw)
     await expect(listing.build(fullBoxRecord())).resolves.to.be.instanceOf(Box)
     await expect(listing.create(dnaOf('draft_box'))).resolves.to.be.instanceOf(Box)
   })
 
-  it("compares a record listed under another vault_tok by reconcileCentral, so a listed instance keeps refusing as it did", async () => {
+  it("refuses a record of another vault_tok fetched for a listed instance, saying it is another vault's", async () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.build(fullBoxRecord())
     world.mw.willGet(world.mw.answerOf(box.scope, fullBoxRecord({ vault_tok: OtherVault, revision_seq: 2, revision_tok: 'rev-a2' })))
@@ -280,7 +280,7 @@ describe("listing: an answer names the scope of the record it carries", () => {
     expect(listing.things).to.deep.equal([])
   })
 
-  it("leaves the instance world under the scope asked as it was, and the instance of the record's scope too", async () => {
+  it("leaves the listed instances of both scopes unchanged", async () => {
     const listing = boxListingOf(world.mw)
     const asked = await listing.build(fullBoxRecord({ boxlabel: 'asked_box' }))
     const other = await listing.build(fullBoxRecord({ boxlabel: 'other_box' }))
@@ -291,7 +291,7 @@ describe("listing: an answer names the scope of the record it carries", () => {
     expect(other._cheat_central).to.deep.equal(otherBefore)
   })
 
-  it("refuses a put and a del answered with a record of another scope, and the record a stale_write carries, told to onBadNews with the stale_write thrown", async () => {
+  it("refuses a put or a del answered with a record of another scope", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willPut(world.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
     await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { prior: SX.VoidRevision }))

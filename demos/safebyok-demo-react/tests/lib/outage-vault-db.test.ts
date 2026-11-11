@@ -9,7 +9,7 @@ const Scope = { applabel: 'acme', user_id: 'u1' }
 const makeOutage = () => new OutageVaultDB({ dbName: `outage_${crypto.randomUUID()}` })
 
 describe("OutageVaultDB", () => {
-  it("answers its verbs while online", async () => {
+  it("passes a call through while online", async () => {
     const vaultDB = makeOutage()
     expect(vaultDB.isOnline).to.be.true
     const listed = await vaultDB.tryListVaults(Scope)
@@ -28,7 +28,7 @@ describe("OutageVaultDB", () => {
     expect(relisted.ok).to.be.true
   })
 
-  it("tells its subscribers of each flip, until they unsubscribe", () => {
+  it("notifies its subscribers each time it goes offline or online, until they unsubscribe", () => {
     const vaultDB = makeOutage()
     const heard: boolean[] = []
     const unsubscribe = vaultDB.subscribe(() => { heard.push(vaultDB.getSnapshot()) })

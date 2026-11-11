@@ -49,7 +49,7 @@ const header = { wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', s
 
 describe("cipherCtx", () => {
   // cipherCtx @example 1
-  it("binds a vault's stamp, a purpose and a header: the same parts make the same bytes, and other parts others", () => {
+  it("gives the same bytes for the same parts, and different bytes for different parts", () => {
     const one = cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', header)
     expect(toB64(cipherCtx({ ...vaultStamp }, 'vault_key_passphrase_wrapped', { ...header }))).to.eq(toB64(one))
     expect(toB64(cipherCtx({ ...vaultStamp, user_id: 'u2' }, 'vault_key_passphrase_wrapped', header))).to.not.eq(toB64(one))
@@ -168,7 +168,7 @@ describe("wrap and unwrap", () => {
     await expect(unwrapKeyUnder(vaultKey, wrapped, ctxOf('wrong'), { extractable: false, usage: ['decrypt'] })).rejects.toThrow()
   })
 
-  it("a non-extractable unwrap refuses exportKey: the platform keeps the bytes", async () => {
+  it("a non-extractable unwrapped key refuses exportKey", async () => {
     const vaultKey = await makeVaultKey()
     const boxKey = await makeBoxKey()
     const ctx = ctxOf('box_key_wrapped')
@@ -196,7 +196,7 @@ const infoOf = (device_id: string) => cipherCtx(vaultStamp, 'vault_key_passkey_w
 
 describe("deriveWrappingKey", () => {
   // deriveWrappingKey @example
-  it("takes a cipherCtx as its info: the key made for one header opens nothing sealed under another's", async () => {
+  it("derives different keys for different cipherCtx infos", async () => {
     const prfBytes = randomBytes(32)
     const wrapped = await wrapKeyUnder(await deriveWrappingKey(prfBytes, infoOf('d1')), await makeVaultKey(), ctxOf('slot'))
     const sameHeader = await deriveWrappingKey(prfBytes, infoOf('d1'))

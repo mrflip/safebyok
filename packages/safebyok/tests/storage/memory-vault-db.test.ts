@@ -48,7 +48,7 @@ const putVaultIn = async (vaultDB: MemoryVaultDB): Promise<void> => { await vaul
 const oversizedBox = () => TH.boxAt(0, 'life1', { sidecar: { memo: 'x'.repeat(DefaultMaxRecordBytes) } })
 
 describe("a VaultDB's default caps", () => {
-  it("takes a vault's hundredth box and refuses the next as vault_full", async () => {
+  it("accepts a vault's hundredth box and refuses the next", async () => {
     const vaultDB = new MemoryVaultDB()
     await putVaultIn(vaultDB)
     for (let nn = 0; nn < DefaultMaxBoxes; nn += 1) { await vaultDB.putBox(TH.boxAt(0, 'life1', { boxlabel: `box_${String(nn)}` }), { prior: VoidRevision }) }
@@ -56,7 +56,7 @@ describe("a VaultDB's default caps", () => {
     expect(refusal.meta?.capacity?.boxes).to.deep.equal({ used: DefaultMaxBoxes, max: 100 })
   })
 
-  it("refuses a box record over the default bytes as box_too_large, one that a Postgres notice could still carry", async () => {
+  it("refuses a box record over the default byte cap", async () => {
     expect(DefaultMaxRecordBytes).to.be.lessThan(8000 * 0.95)
     const vaultDB = new MemoryVaultDB()
     await putVaultIn(vaultDB)
