@@ -16,19 +16,21 @@ import * as TH from './test-helpers'
 TH.bootDatabaseFirst()
 
 /** A VaultDB whose database is unreachable. Its driver's error contains text that must never reach a browser. */
-const unreachable = () => new PostgresVaultDB({ client: {
-  query:       () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
-  transaction: () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
-} })
+function unreachable() {
+  return new PostgresVaultDB({ client: {
+    query:       () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
+    transaction: () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
+  } })
+}
 
 /** Round-trip `val` through JSON, as the wire would. */
-const overTheWire = (val: unknown): unknown => {
+function overTheWire(val: unknown): unknown {
   const text = JSON.stringify(val)
   return JSON.parse(text) as unknown
 }
 
 /** Run `source` against `schema` signed in as `user_id`, and return its one root field's answer after a JSON round trip. */
-const sent = async (schema: GraphQLSchema, source: string, variableValues: object, user_id: string | null = 'u1'): Promise<unknown> => {
+async function sent(schema: GraphQLSchema, source: string, variableValues: object, user_id: string | null = 'u1'): Promise<unknown> {
   const result = await graphql({ schema, source, variableValues: { ...variableValues }, contextValue: { user_id } satisfies TH.TestContext })
   expect(result.errors, source).to.be.undefined
   const [answer] = Object.values(overTheWire(result.data) as Record<string, unknown>)
@@ -52,16 +54,16 @@ const vaultBorn   = TH.vaultPutAskOf(TH.vaultAt())
 const boxBorn     = TH.boxPutAskOf(TH.boxAt())
 
 /** A VaultDB's answer in wire form: `dbhas` is null when the answer has none. */
-const asCrossed = (answer: DB.Answer<unknown, string, unknown>) => ({ ...answer, dbhas: answer.dbhas ?? null })
+function asCrossed(answer: DB.Answer<unknown, string, unknown>) { return { ...answer, dbhas: answer.dbhas ?? null } }
 
 /** Build a gate verb's arguments from `vault`: the next record, with `moved` merged into its gate and `gate_epoch` plus one, and `prior` set to the revision it replaces. */
-const gateArgsOf = (vault: DB.VaultRecord, moved: object) => {
+function gateArgsOf(vault: DB.VaultRecord, moved: object) {
   const prior = DB.revisionOf(vault)
   return { record: { ...vault, ...DB.nextRevisionOf(prior, vault.written_at + 1), gate: { ...vault.gate, gate_epoch: vault.gate.gate_epoch + 1, ...moved } }, opts: { prior } }
 }
 
 /** Make a server and its VaultDB. `listening` holds the watch callbacks that are currently listening. */
-const watchedServer = async () => {
+async function watchedServer() {
   const listening = new Set<unknown>()
   const listen: PostgresListen = async (channel, onNotify) => {
     const unlisten = await TH.listen(channel, onNotify)
@@ -76,7 +78,7 @@ const watchedServer = async () => {
 }
 
 /** Subscribe to a watch of `scope` through `schema` as the session `context`. `nextNotice` returns the next notice parsed from the wire, or null when the stream ends. */
-const watching = async (schema: GraphQLSchema, context: TH.TestContext, scope: object = TH.bankScope) => {
+async function watching(schema: GraphQLSchema, context: TH.TestContext, scope: object = TH.bankScope) {
   const stream = await subscribe({ schema, document: parse(VaultOperations.watch), variableValues: { ...scope }, contextValue: context })
   if (! ('next' in stream)) { throw new Error(`Expected a subscription, got ${JSON.stringify(stream)}`) }
   return {

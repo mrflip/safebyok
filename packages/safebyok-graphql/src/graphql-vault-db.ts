@@ -220,7 +220,7 @@ export class GraphQLVaultDB implements VaultDB {
     const watching: { isOn: boolean, subscription?: { unsubscribe: () => void } } = { isOn: true }
     let heardData: unknown
     // Report an ended stream once and never resubscribe. The host decides what to do next.
-    const end = (news: DB.VaultError | null): void => {
+    function end(news: DB.VaultError | null): void {
       watching.isOn = false
       watching.subscription?.unsubscribe()
       if (news !== null) { onBadNews?.(news) }
@@ -266,7 +266,7 @@ export class GraphQLVaultDB implements VaultDB {
 /** Run `ask` and return its answer, converting a thrown refusal into a bad answer.
  * A request that `checked` refuses is never sent.
  */
-const answerOf = async <ValT, ActT extends string, WorldT>(call: string, checked: () => ReqParams, ask: () => Promise<Answer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
+async function answerOf<ValT, ActT extends string, WorldT>(call: string, checked: () => ReqParams, ask: () => Promise<Answer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> {
   const asked = await DB.outcomeOf(checked)
   if (! asked.ok) { return DB.badAnswerOf(asked.err) }
   const req_params = asked.val
@@ -277,31 +277,31 @@ const answerOf = async <ValT, ActT extends string, WorldT>(call: string, checked
 }
 
 /** Return a good answer, or throw a bad answer's refusal. */
-const goodAnswerOf = <ValT, ActT extends string, WorldT>(answer: Answer<ValT, ActT, WorldT>): GoodAnswer<ValT, ActT, WorldT> => {
+function goodAnswerOf<ValT, ActT extends string, WorldT>(answer: Answer<ValT, ActT, WorldT>): GoodAnswer<ValT, ActT, WorldT> {
   if (! answer.ok) { throw answer.err }
   return answer
 }
 
 /** Return the `fieldname` field of an operation's result, or throw the refusal for a failed operation. */
-const fieldOf = ({ error: err, data }: OperationResult<unknown>, fieldname: string): unknown => {
+function fieldOf({ error: err, data }: OperationResult<unknown>, fieldname: string): unknown {
   if (err !== undefined) { throw troubleOf(err) }
   if ((typeof data !== 'object') || (data === null) || ! Object.hasOwn(data, fieldname)) { throw schemaNotServed() }
   return (data as Record<string, unknown>)[fieldname]
 }
 
 /** Convert a failed operation to a refusal: `storage_unavailable` for a network failure, `unexpected_error` for a GraphQL error. */
-const troubleOf = (err: CombinedError): DB.VaultError => (err.networkError === undefined) ? schemaNotServed() : networkTroubleOf(err)
+function troubleOf(err: CombinedError): DB.VaultError { return (err.networkError === undefined) ? schemaNotServed() : networkTroubleOf(err) }
 
 // A GraphQL error means the client and server disagree about the schema. A retry will not fix that, so it is never
 // reported as a storage condition. The refusal carries no cause, so the server's error text never reaches the caller:
 // a variable-coercion error can quote the variable sent, which is the record.
 /** Make the `unexpected_error` for a server response that lacks what was asked for. */
-const schemaNotServed = (): DB.VaultError => new DB.VaultError('unexpected_error', DB.SchemaNotServed)
+function schemaNotServed(): DB.VaultError { return new DB.VaultError('unexpected_error', DB.SchemaNotServed) }
 
 // A network error's message can be the response body, which may quote the record sent. Build a new cause from
 // fields that cannot quote it: the error's name, the HTTP status, and a code such as ECONNREFUSED.
 /** Convert a failed request to `storage_unavailable`. Its cause carries only the error's name, the HTTP status and an error code. */
-const networkTroubleOf = ({ networkError, response }: CombinedError): DB.VaultError => {
+function networkTroubleOf({ networkError, response }: CombinedError): DB.VaultError {
   const thrownName = networkError?.name ?? 'Error'
   const status = statusOf(response)
   const code = codeOf(networkError) ?? codeOf(networkError?.cause)
@@ -310,19 +310,19 @@ const networkTroubleOf = ({ networkError, response }: CombinedError): DB.VaultEr
 }
 
 /** The HTTP status of the failed response, or null. */
-const statusOf = (response: unknown): number | null => {
+function statusOf(response: unknown): number | null {
   const status: unknown = (typeof response === 'object') && (response !== null) && ('status' in response) ? response.status : null
   return Number.isSafeInteger(status) ? status as number : null
 }
 
 /** The error code on `thrown`, such as ECONNREFUSED, or null. Only an all-caps identifier is accepted, so it cannot quote data. */
-const codeOf = (thrown: unknown): string | null => {
+function codeOf(thrown: unknown): string | null {
   const code: unknown = (typeof thrown === 'object') && (thrown !== null) && ('code' in thrown) ? thrown.code : null
   return (typeof code === 'string') && /^[A-Z][A-Z0-9_]{0,39}$/.test(code) ? code : null
 }
 
 /** Pass the notice in `result` to `onNotice`. Returns the refusal if the notice ends the watch, else null. */
-const hearNotice = ({ data }: OperationResult<unknown>, onNotice: (notice: Notice) => void): DB.VaultError | null => {
+function hearNotice({ data }: OperationResult<unknown>, onNotice: (notice: Notice) => void): DB.VaultError | null {
   // A notice is only a hint to fetch again, so a malformed notice is ignored.
   if ((typeof data !== 'object') || (data === null)) { return null }
   const crossed = DB.crossedNotice.safeParse(rowAnswerOf((data as Record<string, unknown>)['safebyokWatch']))
@@ -368,7 +368,7 @@ const listedOf: Drop = (val) => dropTypename(val, { vaults: rowsOf, boxes: rowsO
 const reqParamsOf: Drop = (val) => dropTypename(val, { expected: dropTypename })
 
 /** Make the drop for an answer or a notice, using `valDrop` for its `val`. */
-const answerDrop = (valDrop: Drop): Drop => (val) => dropTypename(val, { val: valDrop, world: rowOf, dbhas: rowOf, req_params: reqParamsOf, err: dropTypename })
+function answerDrop(valDrop: Drop): Drop { return (val) => dropTypename(val, { val: valDrop, world: rowOf, dbhas: rowOf, req_params: reqParamsOf, err: dropTypename }) }
 
 const rowAnswerOf = answerDrop(rowOf)
 const listedAnswerOf = answerDrop(listedOf)

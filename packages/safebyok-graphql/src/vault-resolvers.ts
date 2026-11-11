@@ -93,11 +93,11 @@ const vaultResolversOpts = DB.objCheck(({ custom, fn }) => ({
 }), 'bad_option')
 
 /** Make the resolvers for `VaultSchemaSdl`. A request can reach only the bank of the user it is signed in as. */
-export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): VaultResolvers<ContextT> => {
+export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): VaultResolvers<ContextT> {
   const { vaultDB, getUserId } = vaultResolversOpts.parse(opts)
 
   /** Return null if the request is signed in as `user_id`, else the refusal to send back. */
-  const signInRefusalOf = async (context: ContextT, user_id: string): Promise<DB.VaultError | null> => {
+  async function signInRefusalOf(context: ContextT, user_id: string): Promise<DB.VaultError | null> {
     const signedIn = await DB.outcomeOf(() => getUserId(context))
     if (! signedIn.ok) { return signedIn.err }
     return (signedIn.val === user_id) ? null : DB.identityRevoked()
@@ -106,7 +106,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   /** Run `verb` if the request is signed in as `user_id`, and return its answer in wire form.
    * Otherwise return a bad answer in wire form: the refusal from checking `asked` if it fails, else the sign-in refusal.
    */
-  const serveSignedIn = async (context: ContextT, user_id: string, asked: object, verb: () => Promise<DB.Answer<unknown, string, unknown>>): Promise<CrossingAnswer> => {
+  async function serveSignedIn(context: ContextT, user_id: string, asked: object, verb: () => Promise<DB.Answer<unknown, string, unknown>>): Promise<CrossingAnswer> {
     const refusal = await signInRefusalOf(context, user_id)
     if (refusal === null) { return crossingOf(await verb()) }
     const checked = await DB.outcomeOf(() => DB.reqParamsOf(asked))
@@ -115,7 +115,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   }
 
   /** Watch `scope` and yield its notices in wire form, for as long as the request stays signed in as that user. */
-  const watchNotices = async (context: ContextT, scope: DB.WatchScope): Promise<AsyncIterableIterator<CrossingNotice>> => {
+  async function watchNotices(context: ContextT, scope: DB.WatchScope): Promise<AsyncIterableIterator<CrossingNotice>> {
     const refusal = await signInRefusalOf(context, scope.user_id)
     if (refusal !== null) { return endingWith(refusal) }
     // vaultDB.watch throws `bad_scope` inside the stream's `start`, and the ReadableStream constructor rethrows it.
@@ -203,18 +203,20 @@ const safebyokEpochMillis = new GraphQLScalarType<number, number>({
 // == [Helpers]: crossingOf, crossedErrOf, badNoticeOf, endingWith, openWatch, typenameOf
 
 /** Convert `answer` to wire form. */
-const crossingOf = (answer: DB.Answer<unknown, string, unknown>): CrossingAnswer => ({
-  ok:         answer.ok,
-  act:        answer.act,
-  val:        answer.ok ? answer.val : null,
-  world:      answer.world,
-  dbhas:      answer.dbhas ?? null,
-  req_params: answer.req_params,
-  err:        answer.ok ? null : crossedErrOf(answer.err),
-})
+function crossingOf(answer: DB.Answer<unknown, string, unknown>): CrossingAnswer {
+  return {
+    ok:         answer.ok,
+    act:        answer.act,
+    val:        answer.ok ? answer.val : null,
+    world:      answer.world,
+    dbhas:      answer.dbhas ?? null,
+    req_params: answer.req_params,
+    err:        answer.ok ? null : crossedErrOf(answer.err),
+  }
+}
 
 /** Convert a refusal to wire form. Its `cause` is never sent. */
-const crossedErrOf = ({ refusalkind, message, meta }: DB.VaultError): DB.CrossedErr => {
+function crossedErrOf({ refusalkind, message, meta }: DB.VaultError): DB.CrossedErr {
   // Parse the capacity before sending it: JSON cannot carry Infinity, so the check turns an infinite limit into the largest safe integer.
   const capacity = DB.capacity.safeParse(meta?.capacity)
   return {
@@ -229,10 +231,10 @@ const crossedErrOf = ({ refusalkind, message, meta }: DB.VaultError): DB.Crossed
 }
 
 /** Make the notice that ends a watch, carrying `refusal`. */
-const badNoticeOf = (refusal: DB.VaultError): CrossingNotice => ({ ok: false, act: refusal.refusalkind, val: null, world: null, err: crossedErrOf(refusal) })
+function badNoticeOf(refusal: DB.VaultError): CrossingNotice { return { ok: false, act: refusal.refusalkind, val: null, world: null, err: crossedErrOf(refusal) } }
 
 /** Make the iterator for a watch refused before it started: it yields one notice carrying the refusal, then ends. */
-const endingWith = (refusal: DB.VaultError): AsyncIterableIterator<CrossingNotice> => {
+function endingWith(refusal: DB.VaultError): AsyncIterableIterator<CrossingNotice> {
   const notices = [badNoticeOf(refusal)].values()
   const iterator: AsyncIterableIterator<CrossingNotice> = {
     next:                  () => Promise.resolve(notices.next()),
@@ -243,7 +245,7 @@ const endingWith = (refusal: DB.VaultError): AsyncIterableIterator<CrossingNotic
 }
 
 /** Start watching `scope` on `vaultDB` and return a stream reader. Cancelling the reader stops the watch. */
-const openWatch = (vaultDB: DB.AdapterVaultDB, scope: DB.WatchScope): ReadableStreamDefaultReader<DB.Notice> => {
+function openWatch(vaultDB: DB.AdapterVaultDB, scope: DB.WatchScope): ReadableStreamDefaultReader<DB.Notice> {
   // Use a reader, not the stream's own async iterator. The iterator's `return` waits for a pending
   // `next`, which on a quiet bank never resolves, so a subscriber that left would keep the watch
   // open. A reader's `cancel` ends the pending read immediately.
