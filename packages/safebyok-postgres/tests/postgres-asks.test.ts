@@ -95,6 +95,25 @@ describe("PostgresVaultDB's get, put and del, each given one ask", () => {
     expect(again.ok ? null : again.err.refusalkind).to.eq('absent_box')
   })
 
+  it('stores nothing for a put over no row that its policy forbids, though the row it expects is marked live', async () => {
+    const vaultDB = await vaultDBWithVault()
+    const liveVoid = { ...noBoxYet, am: 'a', box_tok: 'box1' } as const
+    expect(await vaultDB.tryPutBox({ ...Repl, expected: liveVoid, record: TH.boxAt(0) })).to.deep.include({ ok: false, act: 'void', dbhas: null })
+    expect(await TH.rowsOf().boxRowsOf(TH.vaultScope, 'life1')).to.have.property('size', 0)
+  })
+
+  it('refuses clash, and stores nothing, where the row expected has the stored revision_tok under another life tok', async () => {
+    const vaultDB = await vaultDBWithVault()
+    await vaultDB.putBox({ ...Add, expected: noBoxYet, record: TH.boxAt(0) })
+    const otherBox = { box_tok: 'box2' }
+    const boxClash = await vaultDB.tryPutBox({ ...Repl, expected: TH.boxAt(0, 'life1', otherBox), record: TH.boxAt(1, 'life1', otherBox) })
+    expect(boxClash).to.deep.include({ ok: false, act: 'clash', dbhas: TH.boxAt(0) })
+
+    const vaultClash = await vaultDB.tryPutVault({ ...Repl, expected: TH.vaultAt(0, 'life2'), record: TH.vaultAt(1, 'life2') })
+    expect(vaultClash).to.deep.include({ ok: false, act: 'clash', dbhas: TH.vaultAt(0) })
+    expect(await TH.rowsOf().boxRowsOf(TH.vaultScope, 'life1')).to.have.property('size', 1)
+  })
+
   it("tells a watch of a box put and of a vault's deletion, and deletes the box rows of the life that ended", async () => {
     const vaultDB = await vaultDBWithVault()
     const notices: Notice[] = []

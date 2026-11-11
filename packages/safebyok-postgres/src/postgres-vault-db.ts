@@ -178,15 +178,15 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }
 
-  /** Run a vault's write function `text` for the ask's record, with `cited` the expected fields it tests. */
-  async #writeVault(ask: VaultPutAsk | VaultDelAsk, text: string, cited: unknown[]): Promise<VaultClassified> {
-    const [answer] = await this.#query(text, [JSON.stringify(ask.record), ...cited]) as [VaultAnswered]
+  /** Run a vault's write function `text` for the ask's record and the row it expects. */
+  async #writeVault(ask: VaultPutAsk | VaultDelAsk, text: string): Promise<VaultClassified> {
+    const [answer] = await this.#query(text, [JSON.stringify(ask.record), JSON.stringify(ask.expected)]) as [VaultAnswered]
     return this.classifyVault(ask, answer)
   }
 
-  /** Run a box's write function `text` for the ask's record, with `cited` the expected fields it tests. */
-  async #writeBox(ask: BoxPutAsk | BoxDelAsk, text: string, cited: unknown[]): Promise<BoxClassified> {
-    const [answer] = await this.#query(text, [JSON.stringify(ask.record), this.#maxBoxes, ...cited]) as [BoxAnswered]
+  /** Run a box's write function `text` for the ask's record and the row it expects. */
+  async #writeBox(ask: BoxPutAsk | BoxDelAsk, text: string): Promise<BoxClassified> {
+    const [answer] = await this.#query(text, [JSON.stringify(ask.record), JSON.stringify(ask.expected), this.#maxBoxes]) as [BoxAnswered]
     return this.classifyBox(ask, answer)
   }
   // --
@@ -241,36 +241,26 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return this.classifyBox(ask, await this.#fetchBox(ask))
   }
 
-  // A put or del runs the statement that can store its record over the row it expects. An ask whose policy lets it store
-  // nothing over that row is only classified, over the rows as fetched.
+  // A put or del calls the function that can store its record over the row it expects. An ask whose policy lets it store
+  // nothing over that row is only classified, over the rows as fetched: whatever is stored, the classifier names no write for it.
   protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
-    const { expected } = ask
-    if (! mayPutOver(ask)) { return this.classifyVault(ask, await this.#fetchVault(ask.record)) }
-    if (isBirth(ask)) {
-      return await this.#writeVault(ask, BirthVaultSql, [])
-    }
-    return await this.#writeVault(ask, ReviseVaultSql, [expected.revision_tok, expected.am])
+    if (! mayReplace(ask)) { return this.classifyVault(ask, await this.#fetchVault(ask.record)) }
+    return await this.#writeVault(ask, isBirth(ask) ? BirthVaultSql : ReviseVaultSql)
   }
 
   protected async doPutBox(ask: BoxPutAsk): Promise<BoxClassified> {
-    const { expected } = ask
-    if (! mayPutOver(ask)) { return this.classifyBox(ask, await this.#fetchBox(ask.record)) }
-    if (isBirth(ask)) {
-      return await this.#writeBox(ask, BirthBoxSql, [])
-    }
-    return await this.#writeBox(ask, ReviseBoxSql, [expected.revision_tok, expected.am])
+    if (! mayReplace(ask)) { return this.classifyBox(ask, await this.#fetchBox(ask.record)) }
+    return await this.#writeBox(ask, isBirth(ask) ? BirthBoxSql : ReviseBoxSql)
   }
 
   protected async doDelVault(ask: VaultDelAsk): Promise<VaultClassified> {
-    const { expected } = ask
-    if (expected.am !== 'a') { return this.classifyVault(ask, await this.#fetchVault(ask.record)) }
-    return await this.#writeVault(ask, ReviseVaultSql, [expected.revision_tok, expected.am])
+    if (ask.expected.am !== 'a') { return this.classifyVault(ask, await this.#fetchVault(ask.record)) }
+    return await this.#writeVault(ask, ReviseVaultSql)
   }
 
   protected async doDelBox(ask: BoxDelAsk): Promise<BoxClassified> {
-    const { expected } = ask
-    if (expected.am !== 'a') { return this.classifyBox(ask, await this.#fetchBox(ask.record)) }
-    return await this.#writeBox(ask, ReviseBoxSql, [expected.revision_tok, expected.am])
+    if (ask.expected.am !== 'a') { return this.classifyBox(ask, await this.#fetchBox(ask.record)) }
+    return await this.#writeBox(ask, ReviseBoxSql)
   }
 
   protected async doTidyGone({ applabel, user_id }: BankScope): Promise<Tidied> {
@@ -351,7 +341,7 @@ const unlistenOnceListening = async (listening: Promise<(() => unknown) | null>)
 }
 // --
 
-// == [Rows and asks]: rowsFrom, isBirth, mayPutOver
+// == [Rows and asks]: rowsFrom, isBirth, mayReplace
 
 async function rowsFrom(queryable: PostgresQueryable, text: string, params: unknown[]): Promise<unknown[]> {
   const { rows } = await queryable.query(text, params)
@@ -364,9 +354,11 @@ function isBirth({ expected }: BoxPutAsk | VaultPutAsk): boolean {
   return expected.revision_seq === DB.VoidRevisionSeq
 }
 
+// The classifier reads `ifPresent` over a live row stored and `ifAbsent` over a tombstone or none, and names a write only where
+// the row stored is the row expected. So the policy that could let this put store is the one for the row it expects.
 /** True where a put's policies let it store its record over the row it expects: over none or a tombstone under `ifAbsent: 'add'`, over a live row under `ifPresent: 'repl'`. */
-function mayPutOver({ expected, ifAbsent, ifPresent }: BoxPutAsk | VaultPutAsk): boolean {
-  return (expected.am === 'a') ? (ifPresent === 'repl') : (ifAbsent === 'add')
+function mayReplace(ask: BoxPutAsk | VaultPutAsk): boolean {
+  const expectsLive = (! isBirth(ask)) && (ask.expected.am === 'a')
+  return expectsLive ? (ask.ifPresent === 'repl') : (ask.ifAbsent === 'add')
 }
-
 // --

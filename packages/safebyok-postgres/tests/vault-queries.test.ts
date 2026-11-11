@@ -14,21 +14,21 @@ const Add = { op: 'put', ifAbsent: 'add', ifPresent: 'fail' } as const
 /** The one row either statement answers. */
 type BoxWriteAnswer = { ok: boolean, act: string | null, world: unknown, box: unknown, presence: string, boxcount: number }
 
-async function writeBox(text: string, record: BoxRow, rest: unknown[]): Promise<BoxWriteAnswer> {
+async function writeBox(text: string, record: BoxRow, expected: BoxRow, maxBoxes: number): Promise<BoxWriteAnswer> {
   const db = await TH.database()
-  const { rows } = await db.query<BoxWriteAnswer>(text, [JSON.stringify(record), ...rest])
+  const { rows } = await db.query<BoxWriteAnswer>(text, [JSON.stringify(record), JSON.stringify(expected), maxBoxes])
   expect(rows).to.have.length(1)
   return rows[0]!
 }
 
 /** Run BirthBoxSql for `record`. */
 async function birthBox(record: BoxRecord, maxBoxes = 100): Promise<BoxWriteAnswer> {
-  return await writeBox(BirthBoxSql, record, [maxBoxes])
+  return await writeBox(BirthBoxSql, record, DB.sentinelBoxOf(record, record.vault_tok), maxBoxes)
 }
 
 /** Run ReviseBoxSql for `record`, over the row the caller expects to find stored. */
 async function reviseBox(record: BoxRow, expected: BoxRow, maxBoxes = 100): Promise<BoxWriteAnswer> {
-  return await writeBox(ReviseBoxSql, record, [maxBoxes, expected.revision_tok, expected.am])
+  return await writeBox(ReviseBoxSql, record, expected, maxBoxes)
 }
 
 async function storedBox(): Promise<unknown> {
@@ -73,7 +73,7 @@ describe('BirthBoxSql', () => {
     await vaultDBWithVault()
     expect(await birthBox(TH.boxAt(1))).to.deep.include({ ok: false, box: null })
     const tombstone = { ...TH.boxTombstoneOf(TH.boxAt(0)), revision_seq: 0 }
-    expect(await writeBox(BirthBoxSql, tombstone, [100])).to.deep.include({ ok: false, box: null })
+    expect(await writeBox(BirthBoxSql, tombstone, DB.sentinelBoxOf(tombstone, 'life1'), 100)).to.deep.include({ ok: false, box: null })
     expect(await storedBox()).to.be.null
   })
 
@@ -128,6 +128,14 @@ describe('ReviseBoxSql', () => {
     expect(await reviseBox(reborn, { ...tombstone, am: 'a' } as unknown as BoxRow)).to.deep.include({ ok: false, box: tombstone })
     await reviseBox(reborn, tombstone)
     expect(await reviseBox(TH.boxAt(reborn.revision_seq + 1, 'life1', { box_tok: 'box2' }), { ...reborn, am: 'x' } as unknown as BoxRow)).to.deep.include({ ok: false, box: reborn })
+  })
+
+  it('stores nothing where the stored row is of another box_tok than the row expected', async () => {
+    await vaultDBWithVault()
+    await birthBox(TH.boxAt(0))
+    const otherLife = { box_tok: 'box2' }
+    expect(await reviseBox(TH.boxAt(1, 'life1', otherLife), TH.boxAt(0, 'life1', otherLife))).to.deep.include({ ok: false, box: TH.boxAt(0) })
+    expect(await storedBox()).to.deep.equal(TH.boxAt(0))
   })
 
   it('never stores a tombstone over a tombstone', async () => {
