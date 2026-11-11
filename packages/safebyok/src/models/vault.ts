@@ -28,7 +28,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 
 /** SLOPDOC: A vault as this device has it: a storable that ducks as its record, and the world its boxes live in. */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> {
-  // == [Props]: applabel, user_id, vaultlabel, world, listing, #bankFriend, #lease, #friend, #boxListing, #gate
+  // == [Props]: applabel, user_id, vaultlabel, world, listing, #bankFriend, #lease, #vaultFriend, #boxListing, #gate
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly applabel:   string
@@ -43,7 +43,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The lease granted on this device, and null is what locked means. */
   #lease: Lease | null = null
 
-  #friend: LeaseFriend | null = null
+  #vaultFriend: LeaseFriend | null = null
 
   #boxListing: BoxListing | null = null
 
@@ -219,11 +219,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** All a lease or a proving hears of this vault, made once. */
   #leaseFriend(): LeaseFriend {
-    this.#friend ??= this.#makeFriend()
-    return this.#friend
+    this.#vaultFriend ??= this.#makeVaultFriend()
+    return this.#vaultFriend
   }
 
-  #makeFriend(): LeaseFriend {
+  #makeVaultFriend(): LeaseFriend {
     const { world: { logger, deviceDB, leaseMillis } } = this
     const stamp = GX.vaultStamp.parse(this)
     const asked = this.#stampOfLife()

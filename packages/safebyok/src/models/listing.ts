@@ -174,13 +174,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async #listRows(): Promise<Joined<ListingListAnswer<RecordT, SparseT, DamagedT>, readonly ThingT[]>> {
     const answer = await this.doTryList()
     try {
-      return { answer, val: await this.#takeListed(answer) }
+      return { answer, val: await this.#deliverListing(answer) }
     } catch (err) { return { answer, err } }
   }
 
   // A row set aside as damaged takes down the instance listed in its slot, as a tombstone would, and is told as bad news.
   /** The instances `answer` lists, built or brought up to their rows, its damaged rows set aside. */
-  async #takeListed(answer: ListingListAnswer<RecordT, SparseT, DamagedT>): Promise<readonly ThingT[]> {
+  async #deliverListing(answer: ListingListAnswer<RecordT, SparseT, DamagedT>): Promise<readonly ThingT[]> {
     this.demandEnabled()
     if (answer.world !== null) { this.world.receiveWorld(answer.world) }
     if (! answer.ok) {
@@ -291,7 +291,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // --
 
-  // == [Delivering an answer]: deliver, deliverGood, receiveNothing, buildOrReceive, makeThingOf
+  // == [Delivering an answer]: deliver, deliverGood, receiveNothing, buildOrReceive
 
   /** SLOPDOC: The pipeline every storage answer follows, from its world through the instance listed to the caller. */
   protected deliver(answer: ListingPutAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Promise<ThingT>
@@ -331,7 +331,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return listed
   }
 
-  // The one place an instance is made and enlisted: `#makeThingOf` is called from here alone, and only where no instance is listed.
+  // The one place an instance is made and enlisted: `makeThing` is called from here alone, and only where no instance is listed.
+  // A new instance is made void, so that `receive` adopts the record like any newer one.
   /** The instance under the scope of `record`: built, brought up to it or replaced, by the record's fate. */
   protected buildOrReceive(record: Fetched<RecordT, SparseT>): ThingT {
     this.demandEnabled()
@@ -341,7 +342,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const listed = this.at(this.scopeOf(sparse))
     const fate = (listed === null) ? 'replace' : this.fateOver(listed, record)
     if ((listed !== null) && (fate === 'lose')) { return listed }
-    const thing = ((fate === 'replace') ? null : listed) ?? this.#makeThingOf(sparse)
+    const thing = ((fate === 'replace') ? null : listed) ?? this.makeThing({ ...sparse, ...SX.VoidRevision, am: 'x' })
     this.bankFriend.tellBadNews(thing.receive(record).badnews)
     if (thing !== listed) {
       this.#enlist(thing)
@@ -350,9 +351,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.#remakeSnapshot()
     return thing
   }
-
-  /** SLOPDOC: A new instance born of `sparse`, void, for `receive` to adopt its record like any newer one. */
-  #makeThingOf(sparse: SparseT): ThingT { return this.makeThing({ ...sparse, ...SX.VoidRevision, am: 'x' }) }
   // --
 
   // == [The watch]: onNotice

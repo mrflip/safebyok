@@ -185,7 +185,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis } = VX.boxPutOpts.parse(opts)
       await this.ensurePuttable(patch, { maxMillisSinceRefresh, maxWorldMillis })
       const given = this.demandPuttable(patch, { ifPresent })
-      const { record, expected } = await this.#edit(given)
+      const { record, expected } = await this.#editAndSeal(given)
       this.demandPuttable(patch, { ifPresent })
       return await this.listing.tryPut(record, { expected, ifAbsent, ifPresent })
     } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
@@ -203,19 +203,19 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   tryPutExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.putExposed(patch, opts)) }
 
   /** The next record for `patch`, sealed but not yet put, with the row it is put over. */
-  async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, expected: BoxSparse }> {
+  async #editAndSeal({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, expected: BoxSparse }> {
     const expected = this.central
     const written_at = nowMillis()
     const next = { ...expected, ...SX.nextRevisionOf(expected, written_at), am: 'a' as const }
     // A whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
     const record = this.isTombstoneRecord(expected)
       ? await sealedRecordOf(this.world, { ...next, registered_at: written_at, box_tok: makeLifeTok() }, sidecar ?? {}, whisper ?? {})
-      : await sealedRecordOf(this.world, next, sidecar ?? this.demandFullProps().sidecar, whisper ?? await this.#keptWhisper())
+      : await sealedRecordOf(this.world, next, sidecar ?? this.demandFullProps().sidecar, whisper ?? await this.#storedWhisper())
     return { record, expected }
   }
 
-  /** The whisper a patch left out, opened from the record in hand. */
-  #keptWhisper(): Promise<Whisper> { return this.#unseal(this.demandFullProps()) }
+  /** The stored whisper, unsealed from the record in hand, for a patch that leaves the whisper out. */
+  #storedWhisper(): Promise<Whisper> { return this.#unseal(this.demandFullProps()) }
   // --
 
   // == [Guards]: demandUnsealable, demandPuttable, #givenOf, demandExposable, demandPresent, ensureUnsealable, ensurePuttable

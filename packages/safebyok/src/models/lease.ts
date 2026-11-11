@@ -11,7 +11,7 @@ import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSpar
 
 /** A vault's vaultKey in force on this device, good for one `gate_epoch`. It has the key wrapped under a non-extractable leaseKey, unwraps it for a single call, and never hands it out. */
 export class Lease implements LeaseStamp {
-  // == [Props]: fmt, applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, proved_at, wayinkind, #friend, #record, #vaultStamp, #isFromCache, #leaseStamp, toJSON
+  // == [Props]: fmt, applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, proved_at, wayinkind, #vaultFriend, #record, #vaultStamp, #isFromCache, #leaseStamp, toJSON
 
   declare readonly fmt:           typeof LeaseFormat
   declare readonly applabel:      string
@@ -24,7 +24,7 @@ export class Lease implements LeaseStamp {
   declare readonly wayinkind:     Wayinkind
 
   /** All this lease hears of its vault. */
-  readonly #friend: LeaseFriend
+  readonly #vaultFriend: LeaseFriend
 
   /** The record with its keys, null once out of force. */
   #record: LeaseRecord | null
@@ -46,7 +46,7 @@ export class Lease implements LeaseStamp {
   private constructor(friend: LeaseFriend, record: LeaseRecord, isFromCache: boolean) {
     this.#record = leaseRecord.parse(record)
     tattoo(this, leaseStamp.parse(record), { configurable: false })
-    this.#friend = friend
+    this.#vaultFriend = friend
     this.#vaultStamp = vaultStamp.parse(friend)
     this.#isFromCache = isFromCache
     Object.freeze(this)
@@ -100,8 +100,8 @@ export class Lease implements LeaseStamp {
   /** Caches this lease if it can, telling the host of a refusal as bad news. */
   async cacheAsCacheCan(): Promise<void> {
     if (this.#isFromCache) { return }
-    const cached = await this.#friend.tryCacheLease(this.#demandRecord())
-    if (! cached.ok) { this.#friend.tellBadNews([cached.err]) }
+    const cached = await this.#vaultFriend.tryCacheLease(this.#demandRecord())
+    if (! cached.ok) { this.#vaultFriend.tellBadNews([cached.err]) }
   }
   // --
 
@@ -111,7 +111,7 @@ export class Lease implements LeaseStamp {
   async revoke(): Promise<void> {
     if (this.#record === null) { return }
     this.evict()
-    await this.#friend.forgetLease()
+    await this.#vaultFriend.forgetLease()
   }
 
   /** Non-throwing form of {@link revoke}. */
@@ -186,17 +186,17 @@ export class Lease implements LeaseStamp {
       return await unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
     } catch {
       // Locking drops the vault's lease and forgets its row by scope; this one is evicted too, should the vault have another.
-      this.#friend.lock()
+      this.#vaultFriend.lock()
       this.evict()
       throw damagedLease()
     }
   }
   // --
 
-  // == [Guards]: isPresent, demandRecord
+  // == [Guards]: isGranted, demandRecord
 
-  /** The lease still has its record, as `Storable.isPresent` says of a thing not gone. */
-  get isPresent(): boolean { return this.#record !== null }
+  /** The lease still has its record: it was granted and has not been dropped. */
+  get isGranted(): boolean { return this.#record !== null }
 
   /** The record, while the lease is in force. */
   #demandRecord(): LeaseRecord {

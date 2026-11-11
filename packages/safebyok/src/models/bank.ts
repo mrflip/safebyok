@@ -191,7 +191,7 @@ export class Bank {
   /** Sign out on this device: disable the bank, and forget every lease of this bank cached here and its bank row, settling once each forget has been tried. */
   vacate(story: VacateStory = {}): Promise<void> {
     const { cause = bankDisabled() } = VX.vacateStory.parse(story)
-    this.#letGo(cause, () => { this.#vaultListing.vacate() })
+    this.#disable(cause, () => { this.#vaultListing.vacate() })
     // A vacate alone uses the host's handlers past the disable: a lease that outlives sign-out is the one the host most needs to hear of.
     // A vacate after a sweep still forgets its rows, as sign-out may come after the page's cleanup.
     this.#vacating ??= this.#vacateDevice(cause)
@@ -200,12 +200,12 @@ export class Bank {
 
   /** Cleanup while the page lives: disable the bank, leaving each cached lease for the next bank. Never throws. */
   sweep(): this {
-    this.#letGo(bankDisabled(), () => { this.#vaultListing.sweep() })
+    this.#disable(bankDisabled(), () => { this.#vaultListing.sweep() })
     return this
   }
 
   /** The bank disabled, its snapshot saying `cause` and its listing let go by `discard`, for good; a repeat is a no-op. */
-  #letGo(cause: VaultError, discard: () => void): void {
+  #disable(cause: VaultError, discard: () => void): void {
     if (! this.isEnabled) { return }
     this.#endCause = cause
     discard()
