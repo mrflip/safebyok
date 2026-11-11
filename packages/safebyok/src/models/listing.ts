@@ -441,7 +441,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The bad news a row the listing set aside as damaged is told as. */
   protected abstract damagedStoredError(damaged: DamagedT): VaultError
   protected abstract doTryDel(tombstone: DelTombstone<SparseT>, opts: DelOpts): Promise<ListingAnswer<RecordT, SparseT>>
-  /** Start the vaultDB's watch over this listing's scope, `onBadNews` hearing of its end unbidden; returns how to stop. */
+  /** Start the vaultDB's watch over this listing's scope, `onBadNews` hearing of trouble with it; returns how to stop. */
   protected abstract watchRows(onNotice: (notice: VaultDBNotice) => void, onBadNews: (news: VaultError) => void): () => void
   /** True for a row this listing has: the vaultDB's watch tells of a vault's rows and its boxes' alike. */
   protected abstract isOwnRow(row: VaultRow | BoxRow): row is (VaultRow | BoxRow) & Fetched<RecordT, SparseT>

@@ -139,8 +139,8 @@ export interface VaultDB {
   tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
   /** Non-throwing form of {@link VaultDB.tidyGone}. */
   tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>>
-  /** Tells `onNotice` of rows that change under a bank or a vault, `onBadNews` of a watch it ends; returns how to stop.
-   * Nothing may count on a notice arriving.
+  /** Tells `onNotice` of rows that change under a bank or a vault, `onBadNews` of trouble with the watch; returns how to stop.
+   * Nothing may count on a notice arriving. A watch may carry on after its bad news, or may have ended.
    */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: VaultError) => void): () => void
 }
@@ -462,7 +462,7 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   // == [Watch]: watch
 
-  /** Tells `onNotice` of rows that change under a bank or a vault, `onBadNews` of a watch storage ends; returns how to stop. */
+  /** Tells `onNotice` of rows that change under a bank or a vault, `onBadNews` of trouble with the watch; returns how to stop. */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void = noBadNews): () => void {
     return this.doWatch(SX.watchScope.parse(scope), ({ vault, box }) => {
       const world = (vault === undefined) ? null : SX.vaultRow.safeParse(vault)
@@ -497,7 +497,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxWritten>
   /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
-  /** Starts telling `hear` of rows that change, and `onBadNews` of a watch storage ends; returns how to stop. Storage with no watch calls neither. */
+  /** Starts telling `hear` of rows that change, and `onBadNews` of trouble with the watch, ending it or not; returns how to stop. Storage with no watch calls neither. */
   protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void, _onBadNews: (news: VaultError) => void): () => void { return noUnwatching }
   // --
 }

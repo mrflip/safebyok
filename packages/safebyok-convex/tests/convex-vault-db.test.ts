@@ -123,6 +123,18 @@ describe("ConvexVaultDB's refusals", () => {
     const refusal = await TH.expectBad(vaultDB.tryListVaults(TH.bankScope), 'storage_unavailable')
     expect(TH.thrownText(refusal)).not.to.include('sk-live-0000')
   })
+
+  it("tell a watch's onBadNews of a watched query that fails", async () => {
+    const deployment = deploy(TH.hostWith(TH.bySubject))
+    const vaultDB = new ConvexVaultDB({ client: deployment.client('u1'), api: deployment.api.safebyok })
+    const onBadNews = vi.fn()
+    const unwatch = vaultDB.watch(TH.bankScope, () => undefined, onBadNews)
+    await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
+    deployment.signOut()
+    await vi.waitFor(() => { expect(onBadNews).toHaveBeenCalled() })
+    expect(onBadNews.mock.calls[0]?.[0]).to.have.property('refusalkind', 'identity_revoked')
+    unwatch()
+  })
 })
 
 describe("ConvexVaultDB's constructor", () => {
