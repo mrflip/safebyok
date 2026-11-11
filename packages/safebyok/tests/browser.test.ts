@@ -13,7 +13,7 @@ TH.useBankWorlds()
 const mine = () => ({ strong: false, reason: 'Mine says no.' }) as const
 
 /** A fresh dbName, which no other test has touched. */
-const freshDbName = (): string => `test-${crypto.randomUUID()}`
+function freshDbName(): string { return `test-${crypto.randomUUID()}` }
 
 describe("makeArgon2idDeriver and the reserved labels", () => {
   it("refuses a label of the reserved namespace that safebyok does not supply, however well-formed the spec", () => {

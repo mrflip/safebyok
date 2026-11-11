@@ -3,7 +3,7 @@ import { adorn, decorate, nextMicrotask, tattoo, tattooProp } from '../../src/he
 
 type Handle = { label: string, vault?: { vault_tok: string } }
 
-const decorated = () => decorate<Handle>({ label: 'anthropic' }, { vault: { vault_tok: 'v1' } })
+function decorated() { return decorate<Handle>({ label: 'anthropic' }, { vault: { vault_tok: 'v1' } }) }
 
 describe("adorn", () => {
   it("attaches the value under its name, hidden, and hands the value back", () => {

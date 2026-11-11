@@ -4,7 +4,7 @@ import { nowMillis } from '../helpers/clock'
 import { type Modelkind, UNANSWERED } from '../helpers/consts'
 import { makeLifeTok } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
-import { type Outcome, demandGood, outcomeOf, valOf } from '../refusals/outcome'
+import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { type VaultScope, vaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
@@ -77,7 +77,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form, gateVerbAnswered, tryDel
 
   /** Lay a new passphrase wayin on the vault at `ante`, and answer the record stored. Nothing locks: the vaultKey does not change. */
-  async replacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<VaultRecord> { return demandGood(await this.tryReplacePassphrase(ante, passphrase_wayin)).val }
+  async replacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<VaultRecord> { return valOf(await this.tryReplacePassphrase(ante, passphrase_wayin)) }
 
   /** {@link replacePassphrase}, answering the vaultDB's own answer. */
   tryReplacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<ThingAnswer<VaultRecord>> {
@@ -85,7 +85,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   /** Lay a passkey wayin on the vault at `ante`, and answer the record stored. */
-  async addPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<VaultRecord> { return demandGood(await this.tryAddPasskey(ante, passkey_wayin)).val }
+  async addPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<VaultRecord> { return valOf(await this.tryAddPasskey(ante, passkey_wayin)) }
 
   /** {@link addPasskey}, answering the vaultDB's own answer. */
   tryAddPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<ThingAnswer<VaultRecord>> {
@@ -93,7 +93,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   /** Null the passkey wayin of the vault at `ante`, and answer the record stored. */
-  async revokePasskey(ante: VaultRecord): Promise<VaultRecord> { return demandGood(await this.tryRevokePasskey(ante)).val }
+  async revokePasskey(ante: VaultRecord): Promise<VaultRecord> { return valOf(await this.tryRevokePasskey(ante)) }
 
   /** {@link revokePasskey}, answering the vaultDB's own answer. */
   tryRevokePasskey(ante: VaultRecord): Promise<ThingAnswer<VaultRecord>> {

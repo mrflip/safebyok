@@ -6,7 +6,7 @@ import { pgClientOf } from '../src/index'
 import type { PgPool } from '../src/index'
 
 /** A fake pool with one connection. It logs each statement and release, and fails the statements listed in `failing`. */
-const poolOf = (failing: string[] = []) => {
+function poolOf(failing: string[] = []) {
   const said: string[] = []
   const runStatement = (text: string) => {
     said.push(text)

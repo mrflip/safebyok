@@ -16,7 +16,7 @@ const Sidecar    = Object.freeze({ account: 'work' })
 const BoxDna     = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sidecar: Sidecar }
 
 /** A vault as `born` makes it, with a box created in it, stored in the vaultDB every session and device here shares: `boxIn(vault)` fetches that box as `vault`'s world sees it. */
-const makeVaultWithBox = async (born: ReturnType<typeof makeBornVault> = makeBornVault()) => {
+async function makeVaultWithBox(born: ReturnType<typeof makeBornVault> = makeBornVault()) {
   const world = await born
   const box = await new TestableBoxListing(boxWorldOf(world.vault), { ...world.opts, scope: world.vault.scope }).create(BoxDna)
   const boxIn = async (vault: Vault) => {
@@ -171,7 +171,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
 })
 
 /** The vault as another device has it: its own deviceDB, caching no lease yet, over the record this device stored, after its hello. */
-const openOtherDevice = async (stored: VaultRecord) => {
+async function openOtherDevice(stored: VaultRecord) {
   const other = makeVaultWorld(stored, { device_id: '00000000-0000-4000-8000-000000000002' })
   const vault = await other.listing.build(other.demandStored())
   await other.listing.hello()

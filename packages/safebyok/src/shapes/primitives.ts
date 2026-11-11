@@ -1,4 +1,4 @@
-/** The names every scope is made of, and the instant every time is: labels, the user_id and epochMillis.
+/** The names every scope is made of, and the instant every time is: labels, the user_id and epochMillis, imported as `PX`.
  * Each is plain Zod: its `parse` throws a ZodError, not a VaultError. Each failure says what is
  * wrong in a sentence from {@link Phrases}, quoting nothing.
  */

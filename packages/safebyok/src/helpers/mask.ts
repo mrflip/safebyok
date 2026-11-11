@@ -4,7 +4,7 @@ import { Checker } from './validator'
 import * as UX from '../shapes/shapes-utils'
 import type { MaskOpts } from '../shapes/shapes-utils'
 
-const maskInput = Checker(({ str }) => str, 'bad_option')
+const maskArgs = Checker(({ str }) => str, 'bad_option')
 
 /** The stars-and-dots a masked text collapses to once the result would pass `maxLen`. */
 const Collapsed = '***...***'
@@ -14,17 +14,17 @@ const Collapsed = '***...***'
  */
 const Unsafe = /[\p{M}\p{C}\p{Z}\p{Default_Ignorable_Code_Point}\p{Bidi_Control}\u{2800}\u{1D159}\u{FFFC}]/gu
 
-const composeAndStrip = (text: string): string => text.normalize('NFC').replaceAll(Unsafe, '')
+function composeAndStrip(text: string): string { return text.normalize('NFC').replaceAll(Unsafe, '') }
 
 // Twice, since removing an invisible from between two Hangul jamo leaves them to compose.
 /** `text` as one compact line of visible characters: composed to NFC and stripped of all {@link Unsafe} matches, never escaped. */
-const plainLine = (text: string): string => composeAndStrip(composeAndStrip(text))
+function plainLine(text: string): string { return composeAndStrip(composeAndStrip(text)) }
 
 /** `text` as a list of its code points, so that a surrogate pair is never parted. */
-const codePointsOf = (text: string): string[] => text.match(/./gsu) ?? []
+function codePointsOf(text: string): string[] { return text.match(/./gsu) ?? [] }
 
 /** `chars`, already plain, cut to head, stars and tail by the give-up rules `mask` states. */
-const butcher = (chars: readonly string[], { head, tail, minStars, maxLen }: Record<keyof MaskOpts, number>): string => {
+function butcher(chars: readonly string[], { head, tail, minStars, maxLen }: Record<keyof MaskOpts, number>): string {
   // What may be shown at all is what is left once minStars are hidden: tail has first call on it.
   const showable = Math.max(0, chars.length - minStars)
   const tailShown = Math.min(tail, showable)
@@ -52,8 +52,8 @@ const butcher = (chars: readonly string[], { head, tail, minStars, maxLen }: Rec
  * @example mask('sk-1234abcd', { head: 0, tail: 0 })        // '***********': only its length shows
  * @example mask('sk-\nant-\tabcd1234')                      // 'sk*********1234': controls and spaces go before it is cut
  */
-export const mask = (text: string, opts?: MaskOpts): string => {
-  const secret = maskInput.parse(text)
+export function mask(text: string, opts?: MaskOpts): string {
+  const secret = maskArgs.parse(text)
   const { head, tail, minStars, maxLen } = UX.maskOpts.parse(opts ?? {})
   if (secret === '') { return '' }
   const plain = plainLine(secret)

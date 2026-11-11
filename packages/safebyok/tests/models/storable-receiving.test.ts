@@ -40,27 +40,29 @@ const Centrals: Readonly<Record<RecordShape, () => Rec>> = {
 }
 
 /** A record storage delivers, by shape, at the revision given; a full one carries a sidecar of its own. */
-const rcvdOf = (shape: RecordShape, rev: Partial<BoxSparse>): Rec => {
+function rcvdOf(shape: RecordShape, rev: Partial<BoxSparse>): Rec {
   if (shape === 'full')   { return fullBoxRecord({ ...rev, am: 'a', sidecar: { note: 'delivered' } }) }
   if (shape === 'sparse') { return sparseBoxRecord(rev) }
   return tombstoneBoxRecord(rev)
 }
 
 /** A box given `central`, not yet listed and not yet timely. */
-const boxOf = (central: Rec): SpiedBox => (
-  new SpiedBox(world.mw.world, boxListingOf(world.mw), central)
-)
+function boxOf(central: Rec): SpiedBox {
+  return new SpiedBox(world.mw.world, boxListingOf(world.mw), central)
+}
 
 /** The box's world records and the own props that follow the record in hand, for comparing before and after. */
-const stateOf = (box: TestableBox) => ({
-  central:      box._cheat_central,
-  revision_seq: box.revision_seq,
-  revision_tok: box.revision_tok,
-  written_at:   box.written_at,
-})
+function stateOf(box: TestableBox) {
+  return {
+    central:      box._cheat_central,
+    revision_seq: box.revision_seq,
+    revision_tok: box.revision_tok,
+    written_at:   box.written_at,
+  }
+}
 
 /** Asserts `receive(rcvd)` took the row named by `policy`, leaving central as it was. */
-const expectReceivedUnchanged = (box: SpiedBox, rcvd: Rec | null, policy: CentralPolicy): void => {
+function expectReceivedUnchanged(box: SpiedBox, rcvd: Rec | null, policy: CentralPolicy): void {
   const before = stateOf(box)
   box.receive(rcvd)
   expect(policies).to.deep.equal([policy])
@@ -68,7 +70,7 @@ const expectReceivedUnchanged = (box: SpiedBox, rcvd: Rec | null, policy: Centra
 }
 
 /** Asserts `receive(rcvd)` refused, taking no row and leaving the box as it was. */
-const expectReceiveConflict = (box: SpiedBox, rcvd: Rec | null): void => {
+function expectReceiveConflict(box: SpiedBox, rcvd: Rec | null): void {
   const before = stateOf(box)
   TH.expectSyncRefusal(() => box.receive(rcvd))
   expect(policies).to.deep.equal([])

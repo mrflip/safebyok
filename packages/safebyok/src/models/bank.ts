@@ -357,8 +357,8 @@ export const DefaultOnBadNews: BadNewsHandler = ({ news, bank }) => {
 }
 
 /** Tell `onBadNews` each of `badnews` that reached `bank`, awaiting none: the handler's throw or rejection reaches only the platform. */
-export const tellBadNewsTo = (onBadNews: BadNewsHandler, bank: Bank, badnews: readonly VaultError[]): void => {
-  VX.tellBadNewsToInput.parse({ onBadNews, bank, badnews })
+export function tellBadNewsTo(onBadNews: BadNewsHandler, bank: Bank, badnews: readonly VaultError[]): void {
+  VX.tellBadNewsToArgs.parse({ onBadNews, bank, badnews })
   for (const news of badnews) {
     // Any answer is heard out, a thenable among them: none is awaited.
     void (async () => {
@@ -373,14 +373,14 @@ export const tellBadNewsTo = (onBadNews: BadNewsHandler, bank: Bank, badnews: re
 
 // The logger too, as a platform with no reportError (Node, SSR) would hear nothing of it.
 /** `refusal` to `bank`'s logger at error, and to the platform. */
-const reportAtError = (refusal: VaultError, bank: Bank): void => {
+function reportAtError(refusal: VaultError, bank: Bank): void {
   bank.logger.error(refusal.message, { call: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
   reportToPlatform(refusal)
 }
 
 // A lock or a vacate meant the lease gone; a tombstone's forget and an outdated row's are tried again by the next lease cached.
 /** The default's answer to a cached lease that outlived its revoke. */
-const heedRevokeFailed = ({ refusal, vault, where, bank }: Extract<BankEvent, { kind: 'lease_revoke_failed' }>): void => {
+function heedRevokeFailed({ refusal, vault, where, bank }: Extract<BankEvent, { kind: 'lease_revoke_failed' }>): void {
   if (where === 'tombstone' || where === 'undeleted') {
     bank.logger.warn(refusal.message, { call: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
     return
@@ -410,7 +410,7 @@ export const DefaultOnLifecycle: LifecycleHandler = (event) => {
 
 // What the dialog throws is dropped: it may quote what the user typed.
 /** `requestCleartext`, made to honor its contract: the one way a gating asks the user. */
-export const guardRequestCleartext = (requestCleartext: RequestCleartext): AskUser => {
+export function guardRequestCleartext(requestCleartext: RequestCleartext): AskUser {
   const host = HostChecks.requestCleartext.parse(requestCleartext, { where: 'requestCleartext' })
   return brandGuarded(async (gating: AnyGating): Promise<boolean> => {
     try {
@@ -423,7 +423,7 @@ export const guardRequestCleartext = (requestCleartext: RequestCleartext): AskUs
 }
 
 /** `onLifecycle`, made to honor its contract: the one way the core tells the host what happened in the bank's life. */
-export const guardOnLifecycle = (onLifecycle: LifecycleHandler): GuardedLifecycleHandler => {
+export function guardOnLifecycle(onLifecycle: LifecycleHandler): GuardedLifecycleHandler {
   const host = HostChecks.onLifecycle.parse(onLifecycle, { where: 'onLifecycle' })
   return brandGuarded(async (event: BankEvent): Promise<void> => {
     try {
@@ -448,14 +448,14 @@ const DefaultHandlers: Handlers = { onLifecycle: guardOnLifecycle(DefaultOnLifec
 // == [Helpers]: millisOf, checkSecureContext, probeStepOf
 
 /** A storage verb's answer with no wrapped key or ciphertext left in it, and when it came back. */
-const probeStepOf = ({ act, req_params, val, world }: GoodAnswer<Box | null, string, unknown>): VX.ProbeStep => (
-  { ok: true, act, req_params, val: SX.boxSparse.parse(val?.sparse), world: SX.vaultSparse.parse(world), timestamp: nowMillis() }
-)
+function probeStepOf({ act, req_params, val, world }: GoodAnswer<Box | null, string, unknown>): VX.ProbeStep {
+  return { ok: true, act, req_params, val: SX.boxSparse.parse(val?.sparse), world: SX.vaultSparse.parse(world), timestamp: nowMillis() }
+}
 
 // A host's Infinity minutes, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
-const millisOf = (minutes: number | undefined, fallback: number): number => (minutes === undefined ? fallback : Math.min(Math.round(minutes * MinuteMillis), ForeverMillis))
+function millisOf(minutes: number | undefined, fallback: number): number { return (minutes === undefined ? fallback : Math.min(Math.round(minutes * MinuteMillis), ForeverMillis)) }
 
-const checkSecureContext = (): void => {
+function checkSecureContext(): void {
   if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw insecureContext() }
 }
 // --

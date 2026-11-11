@@ -9,9 +9,9 @@ import { bankScope, boxGetAskOf, boxQuery, vaultAt, vaultPutAskOf, vaultScope } 
 import { omitting } from '../test-helpers/refusals'
 
 /** Each verb of `vaultDB`, bound, as a client of it would answer them. */
-const verbsOf = (vaultDB: MemoryVaultDB): Record<string, unknown> => Object.fromEntries(VaultDBVerbnames.map((verbname) => [verbname, vaultDB[verbname].bind(vaultDB)]))
+function verbsOf(vaultDB: MemoryVaultDB): Record<string, unknown> { return Object.fromEntries(VaultDBVerbnames.map((verbname) => [verbname, vaultDB[verbname].bind(vaultDB)])) }
 
-const thrownBy = async (thunk: () => Promise<unknown>): Promise<unknown> => {
+async function thrownBy(thunk: () => Promise<unknown>): Promise<unknown> {
   try { await thunk() } catch (err) { return err }
   return null
 }

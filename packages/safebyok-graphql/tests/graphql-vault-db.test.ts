@@ -44,7 +44,7 @@ type FakeResult = { data?: unknown, error?: CombinedError, hasNext?: boolean }
  * Each subscription's callback is pushed to `streams` for the test to call, after first receiving `atOnce` if given.
  * `counts.unsubscribed` counts the unsubscribes.
  */
-const fakeClient = (asked: FakeResult = {}, atOnce?: FakeResult) => {
+function fakeClient(asked: FakeResult = {}, atOnce?: FakeResult) {
   const streams: ((result: FakeResult) => void)[] = []
   const counts = { unsubscribed: 0 }
   const client = {
@@ -62,7 +62,7 @@ const fakeClient = (asked: FakeResult = {}, atOnce?: FakeResult) => {
 }
 
 /** Start a watch on a fake client, collecting its notices in `heard` and its bad news in `badnews`. */
-const watched = (atOnce?: FakeResult) => {
+function watched(atOnce?: FakeResult) {
   const { vaultDB, streams, counts } = fakeClient({}, atOnce)
   const heard: DB.Notice[] = []
   const badnews: DB.VaultError[] = []

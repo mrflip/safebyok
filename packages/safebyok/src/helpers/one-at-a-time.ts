@@ -9,15 +9,15 @@
  *   const refresh = oneAtATime(refreshOnce)
  *   await Promise.all([refresh(), refresh(), refresh()])  // refreshOnce ran once, and all three shared it
  */
-export const oneAtATime = <ValT>(task: () => Promise<ValT>): (() => Promise<ValT>) => {
+export function oneAtATime<ValT>(task: () => Promise<ValT>): (() => Promise<ValT>) {
   // The run under way, which every call made meanwhile shares.
   let running: Promise<ValT> | null = null
 
   // `task` begun inside a promise of its own, so a task that throws before its first await
   // rejects like any other failure: `running` is then cleared only after it was set.
-  const begin = async () => task()
+  async function begin() { return task() }
 
-  const runAlone = async (): Promise<ValT> => {
+  async function runAlone(): Promise<ValT> {
     try {
       return await begin()
     } finally {

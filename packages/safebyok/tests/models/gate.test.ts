@@ -7,7 +7,7 @@ import { builtGateOf, passkeyAnswerOf, provingWorldOf, TestPassphrase, useFakeCl
 
 useFakeClock()
 
-const builtGate = ({ passkey = false } = {}) => builtGateOf(passkey ? passkeyAnswerOf() : undefined)
+function builtGate({ passkey = false } = {}) { return builtGateOf(passkey ? passkeyAnswerOf() : undefined) }
 
 describe("Gate.make(stamp, passphraseWayin, passkeyWayin)", () => {
   it("is of the first epoch, with the wayins handed", async () => {

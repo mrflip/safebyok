@@ -18,7 +18,7 @@ export const BootMillis = 60_000
 const made: { db?: Promise<PGlite> } = {}
 
 /** Return this test file's PGlite with its tables created. One is shared per file, because each takes seconds to boot. */
-export const database = async (): Promise<PGlite> => {
+export async function database(): Promise<PGlite> {
   made.db ??= (async () => {
     const db = new PGlite()
     await db.exec(VaultTablesSql)
@@ -32,7 +32,7 @@ export const database = async (): Promise<PGlite> => {
 }
 
 /** Boot this file's PGlite before its first test, and close it after its last. */
-export const bootDatabaseFirst = (): void => {
+export function bootDatabaseFirst(): void {
   beforeAll(async () => { await database() }, BootMillis)
   afterAll(async () => {
     const db = await database()
@@ -46,9 +46,9 @@ export const bootDatabaseFirst = (): void => {
 /** A PGlite client whose next statement can be made to fail like a dropped connection. */
 export type FlakyClient = PostgresClient & { failNext: () => void }
 
-export const flakyClientOf = (db: PGlite): FlakyClient => {
+export function flakyClientOf(db: PGlite): FlakyClient {
   let isFailing = false
-  const failure = (): Error => {
+  function failure(): Error {
     isFailing = false
     return Object.assign(new Error('terminating connection due to administrator command'), { code: '57P01', params: ['a row'] })
   }
@@ -62,7 +62,7 @@ export const flakyClientOf = (db: PGlite): FlakyClient => {
 const listenersOf = new Map<string, Set<(text: string) => void>>()
 
 /** Start listening on `channel` the first time it is asked for, and never stop, like the README's recipe. Returns the channel's set of callbacks. */
-const listenOn = async (db: PGlite, channel: string): Promise<Set<(text: string) => void>> => {
+async function listenOn(db: PGlite, channel: string): Promise<Set<(text: string) => void>> {
   const listeners = listenersOf.get(channel)
   if (listeners !== undefined) { return listeners }
   const fresh = new Set<(text: string) => void>()
@@ -84,7 +84,7 @@ const optsOf = new WeakMap<PostgresVaultDB, VaultDBOverOpts>()
 type VaultDBOverOpts = Omit<PostgresVaultDBOpts, 'client'>
 
 /** Make a PostgresVaultDB on this file's PGlite, with `listen` wired up. */
-export const vaultDBOver = async (opts: VaultDBOverOpts = {}): Promise<PostgresVaultDB> => {
+export async function vaultDBOver(opts: VaultDBOverOpts = {}): Promise<PostgresVaultDB> {
   const db = await database()
   const client = flakyClientOf(db)
   const vaultDB = new PostgresVaultDB({ listen, ...opts, client })
@@ -94,12 +94,12 @@ export const vaultDBOver = async (opts: VaultDBOverOpts = {}): Promise<PostgresV
 }
 
 /** Empty the tables and make a new VaultDB. */
-export const makeVaultDB = async (opts?: AdapterVaultDBOpts & { maxBoxes?: number }): Promise<PostgresVaultDB> => {
+export async function makeVaultDB(opts?: AdapterVaultDBOpts & { maxBoxes?: number }): Promise<PostgresVaultDB> {
   await emptyTables()
   return await vaultDBOver(opts)
 }
 
-export const emptyTables = async (): Promise<void> => {
+export async function emptyTables(): Promise<void> {
   const db = await database()
   await db.exec('TRUNCATE safebyok_vaults, safebyok_boxes')
 }
@@ -113,7 +113,7 @@ export const failNextCall = (vaultDB: PostgresVaultDB): void => { clientsOf.get(
 // == [Rows]: sql, recordOf, rowsOf
 
 /** Run SQL directly against the PGlite, for the battery's row checks. */
-const sql = async <RowT>(text: string, params: unknown[]): Promise<RowT[]> => {
+async function sql<RowT>(text: string, params: unknown[]): Promise<RowT[]> {
   const db = await database()
   const { rows } = await db.query<RowT>(text, params)
   return rows

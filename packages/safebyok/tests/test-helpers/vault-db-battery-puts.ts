@@ -54,9 +54,9 @@ const UnstorableBoxAsks = [
 ] as const
 
 /** Registers the puts' and gate verbs' cases over `world`. */
-export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: BatteryWorld): void => {
+export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: BatteryWorld): void {
   /** A box deleted, and the rebirth that would stand on its tombstone. */
-  const withBoxTombstone = async () => {
+  async function withBoxTombstone() {
     const world = await putWith({ box: true })
     const tombstone = boxTombstoneOf(world.box)
     await world.vaultDB.delBox(boxDelAskOf(world.box))
@@ -64,7 +64,7 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
   }
 
   /** The box row `openai` of the vault's life `life1`, as stored. */
-  const storedBoxOf = async (vaultDB: VaultDB): Promise<unknown> => {
+  async function storedBoxOf(vaultDB: VaultDB): Promise<unknown> {
     const boxrows = await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')
     return boxrows.get('openai')
   }

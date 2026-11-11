@@ -127,7 +127,7 @@ export const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, i
       user: obj({ name: named, displayName: str }).strict(),
       timeout,
     }).strict(),
-    askPasskeyInput: obj({
+    askPasskeyArgs: obj({
       passkeyHeader: discrim('wayinkind', [passphraseHeader, passkeyHeader]).nullable(),
       opts:          obj({ rpId: named.optional(), timeout }).strict(),
     }),

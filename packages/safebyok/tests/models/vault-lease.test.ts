@@ -13,7 +13,7 @@ useVaultWorlds()
 const Stamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
 
 /** Node has no `reportError`, so a test hands the platform one. */
-const stubReportError = () => {
+function stubReportError() {
   const reported = vi.fn()
   vi.stubGlobal('reportError', reported)
   return reported
@@ -21,7 +21,7 @@ const stubReportError = () => {
 
 afterEach(() => { vi.unstubAllGlobals() })
 
-const expectChangeUnlocked = async ({ vault, deviceDB, demandStored }: Awaited<ReturnType<typeof makeBornVault>>, epoch0: number): Promise<void> => {
+async function expectChangeUnlocked({ vault, deviceDB, demandStored }: Awaited<ReturnType<typeof makeBornVault>>, epoch0: number): Promise<void> {
   expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
   expect(vault.isUnlocked).to.be.true
   await TH.eventually(() => deviceDB.cachedNow() !== null)
@@ -139,7 +139,7 @@ describe("A refused forget of the lease row", () => {
 
 describe("sweep and vacate", () => {
   const BoxDna = { boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test' }, sidecar: {} }
-  const makeVaultWithBox = async () => {
+  async function makeVaultWithBox() {
     const born = await makeBornVault()
     const box = await born.vault.boxListing.create({ ...born.vault.scope, ...BoxDna })
     return { ...born, box }
@@ -287,7 +287,7 @@ describe("sweep and vacate", () => {
 })
 
 /** Every value `subject` shows by a field or getter, own or inherited, symbols too; its methods stay uncalled. */
-const valuesShownBy = (subject: object): unknown[] => {
+function valuesShownBy(subject: object): unknown[] {
   const shown: unknown[] = []
   for (let proto: object | null = subject; proto !== null && proto !== Object.prototype; proto = Object.getPrototypeOf(proto) as object | null) {
     for (const ckey of Reflect.ownKeys(proto)) {

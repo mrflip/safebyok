@@ -24,8 +24,8 @@ export type Argon2idKeyDeriver = KeyDeriverSpec & KeyDeriver
 // == [Checks]: parseKeyDeriverSpec, isTestDeriver
 
 /** Parse `candidate` into a {@link KeyDeriverSpec}, refusing a spec that misuses a supplied label. */
-export const parseKeyDeriverSpec = (candidate: unknown): KeyDeriverSpec => keyDeriverSpec.parse(candidate)
+export function parseKeyDeriverSpec(candidate: unknown): KeyDeriverSpec { return keyDeriverSpec.parse(candidate) }
 
 /** True when `keyDeriver`'s label starts with {@link TestLabelPrefix}. */
-export const isTestDeriver = (keyDeriver: Pick<KeyDeriver, 'key_deriver_label'>): boolean => keyDeriver.key_deriver_label.startsWith(TestLabelPrefix)
+export function isTestDeriver(keyDeriver: Pick<KeyDeriver, 'key_deriver_label'>): boolean { return keyDeriver.key_deriver_label.startsWith(TestLabelPrefix) }
 // --

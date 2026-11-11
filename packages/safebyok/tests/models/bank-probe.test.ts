@@ -9,14 +9,14 @@ useBankWorlds()
 
 const HomeBox = { vaultlabel: 'home', boxlabel: 'box1' }
 
-const readyBankOn = async (world: BankWorld = makeBankWorld()) => {
+async function readyBankOn(world: BankWorld = makeBankWorld()) {
   const bank = world.bankOn()
   await bank.hello()
   return { world, bank }
 }
 
 /** What opening the probe's box answers now. */
-const whisperIn = async (bank: Awaited<ReturnType<typeof readyBankOn>>['bank'], vaultlabel = 'home', boxlabel = 'box1'): Promise<unknown> => {
+async function whisperIn(bank: Awaited<ReturnType<typeof readyBankOn>>['bank'], vaultlabel = 'home', boxlabel = 'box1'): Promise<unknown> {
   const box = await bank.vaultAt({ vaultlabel })?.fetchBox(boxlabel)
   return box?.extractWhisper()
 }

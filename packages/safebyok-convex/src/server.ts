@@ -59,7 +59,7 @@ export class SafebyokComponent {
     const publicMutation: MutationBuilder<DataModel, 'public'> = mutationGeneric
 
     /** Throw `identity_revoked` unless the caller is signed in as `user_id`. */
-    const demandCaller = async (ctx: GenericQueryCtx<DataModel>, user_id: string): Promise<void> => {
+    async function demandCaller(ctx: GenericQueryCtx<DataModel>, user_id: string): Promise<void> {
       const callerId = await opts.getUserId(ctx)
       if ((! callerId) || (callerId !== user_id)) { throw new ConvexError<SafebyokErrorData>({ kind: 'identity_revoked' }) }
     }

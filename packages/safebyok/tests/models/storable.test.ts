@@ -10,16 +10,16 @@ import { type BoxAnswer, TestableBox, boxListingOf, fullBoxRecord, sparseBoxReco
 const world = useModelsWorld()
 
 /** A box with `record`, by default the full box record `anthropic_api_key` at revision 1, with the same in storage. */
-const builtBoxOf = (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Promise<TestableBox> => {
+function builtBoxOf(record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Promise<TestableBox> {
   world.mw.seedPut(record)
   return boxListingOf(world.mw).build(record)
 }
 
 /** The own props that follow the record in hand, as the box has them now. */
-const followingPropsOf = (box: TestableBox) => ({ vault_tok: box.vault_tok, revision_tok: box.revision_tok, revision_seq: box.revision_seq, written_at: box.written_at })
+function followingPropsOf(box: TestableBox) { return { vault_tok: box.vault_tok, revision_tok: box.revision_tok, revision_seq: box.revision_seq, written_at: box.written_at } }
 
 /** Script the VaultDB's next `del` pending until `release`, answering `tombstone`; `entered` resolves once the VaultDB has the call. The fake timers stay where they are: `vi.waitFor` would move them. */
-const pendingNextDel = (box: TestableBox): { entered: Promise<void>, release: () => void, sentTok: () => string | undefined } => {
+function pendingNextDel(box: TestableBox): { entered: Promise<void>, release: () => void, sentTok: () => string | undefined } {
   let release: (() => void) | undefined
   let sentTok: string | undefined
   const gate = new Promise<void>((resolve) => { release = resolve })

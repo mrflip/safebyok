@@ -30,7 +30,7 @@ type Store<SnapshotT> = { subscribe: (listener: () => void) => () => void, getSn
 /** A component over `useSyncExternalStore(subscribe, getSnapshot)`, both detached as React takes them, painting `view`.
  * A listener told with nothing new, or a snapshot that changed with no listener told, fails the next `expectRenders`.
  */
-const mountComponent = <SnapshotT>({ subscribe, getSnapshot }: Store<SnapshotT>, view: (snapshot: SnapshotT) => string) => {
+function mountComponent<SnapshotT>({ subscribe, getSnapshot }: Store<SnapshotT>, view: (snapshot: SnapshotT) => string) {
   let rendered = getSnapshot()
   let idleTells = 0
   const painted = [view(rendered)]
@@ -50,7 +50,7 @@ const mountComponent = <SnapshotT>({ subscribe, getSnapshot }: Store<SnapshotT>,
   }
 }
 
-const lockWordOf = (isLocked: boolean): string => (isLocked ? 'locked' : 'unlocked')
+function lockWordOf(isLocked: boolean): string { return (isLocked ? 'locked' : 'unlocked') }
 
 const bankStatus = ({ stage, vaults, openGating }: BankSnapshot): string => {
   const rows = vaults.map(({ vaultlabel, isLocked }) => `${vaultlabel} ${lockWordOf(isLocked)}`)
@@ -65,13 +65,13 @@ const boxList = (boxes: readonly BoxSnapshot[]): string => boxes.map(({ boxlabel
 const boxRow = ({ boxlabel, isPresent, sidecar }: BoxSnapshot): string => `${boxlabel} ${isPresent ? JSON.stringify(sidecar) : 'deleted'}`
 
 /** The store of the component that shows the whisper itself: `box.whisper` is its snapshot, as the box's snapshot never has it. */
-const whisperStoreOf = (box: Box): Store<Whisper> => ({ subscribe: box.subscribe, getSnapshot: () => box.whisper })
+function whisperStoreOf(box: Box): Store<Whisper> { return { subscribe: box.subscribe, getSnapshot: () => box.whisper } }
 
 /** The view of `box`'s whisper: the whisper while it shows, else where it stands. */
-const whisperRevealOf = (box: Box) => (whisper: Whisper): string => (box.isShowing ? JSON.stringify(whisper) : box.exposure)
+function whisperRevealOf(box: Box) { return (whisper: Whisper): string => (box.isShowing ? JSON.stringify(whisper) : box.exposure) }
 
 /** The host's dialog: it records what it was shown for, and attempts what the user types; typing nothing closes it. */
-const makeDialog = () => {
+function makeDialog() {
   const dialog = {
     typing: byPassphrase(Passphrase) as object,
     refusals: [] as VaultError[],
@@ -89,7 +89,7 @@ const makeDialog = () => {
 // --
 
 /** A bank past its `hello` with the vault of `VaultScopeGiven` built and unlocked, and the dialog that did it, cleared. */
-const buildHost = async (logger?: VaultLogger) => {
+async function buildHost(logger?: VaultLogger) {
   const world = makeBankWorld()
   const dialog = makeDialog()
   const bank = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews, ...(logger && { logger }) })

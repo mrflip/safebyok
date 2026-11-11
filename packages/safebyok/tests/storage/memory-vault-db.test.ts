@@ -41,13 +41,13 @@ describe("describeVaultDBBattery", () => {
   })
 })
 
-const putVaultIn = async (vaultDB: MemoryVaultDB): Promise<void> => { await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt())) }
+async function putVaultIn(vaultDB: MemoryVaultDB): Promise<void> { await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt())) }
 
 /** The first put of the box `boxlabel`. */
-const firstPutOf = (boxlabel: string) => TH.boxPutAskOf(TH.boxAt(0, 'life1', { boxlabel }))
+function firstPutOf(boxlabel: string) { return TH.boxPutAskOf(TH.boxAt(0, 'life1', { boxlabel })) }
 
 /** The first put of a box record over the default bytes, by its sidecar alone. */
-const oversizedPut = () => TH.boxPutAskOf(TH.boxAt(0, 'life1', { sidecar: { memo: 'x'.repeat(DefaultMaxRecordSizeEst) } }))
+function oversizedPut() { return TH.boxPutAskOf(TH.boxAt(0, 'life1', { sidecar: { memo: 'x'.repeat(DefaultMaxRecordSizeEst) } })) }
 
 describe("a VaultDB's default caps", () => {
   it("accepts a vault's hundredth box and refuses the next", async () => {

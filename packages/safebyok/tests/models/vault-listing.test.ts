@@ -18,16 +18,16 @@ useVaultWorlds()
 const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' }, sidecar: {} }
 
 /** The tombstone a delete elsewhere leaves over `record`, in a life of its own. */
-const tombstoneOver = (record: VaultRecord) => ({ ...omit(record, ['gate']), am: 'x' as const, vault_tok: 'life-gone', revision_seq: record.revision_seq + 1, revision_tok: 'rev-gone' })
+function tombstoneOver(record: VaultRecord) { return { ...omit(record, ['gate']), am: 'x' as const, vault_tok: 'life-gone', revision_seq: record.revision_seq + 1, revision_tok: 'rev-gone' } }
 
 /** A vault of another life, stored at `revision_seq`. */
-const otherLifeAt = async (revision_seq: number): Promise<VaultRecord> => ({ ...await storedVaultRecord(), revision_seq, revision_tok: `rev-other-${String(revision_seq)}` })
+async function otherLifeAt(revision_seq: number): Promise<VaultRecord> { return { ...await storedVaultRecord(), revision_seq, revision_tok: `rev-other-${String(revision_seq)}` } }
 
 /** Past the forget each end state sets going. */
-const forgotten = () => new Promise((yes) => { setTimeout(yes, 0) })
+function forgotten() { return new Promise((yes) => { setTimeout(yes, 0) }) }
 
 /** A born vault deleted, past its forget, and its tombstone as stored. */
-const deleted = async () => {
+async function deleted() {
   const world = await makeBornVault()
   await delTyping(world.vault)
   await forgotten()
@@ -35,10 +35,10 @@ const deleted = async () => {
 }
 
 /** The record of a vault's birth over the row `expected`, as a birth's `listing.put` is handed it. */
-const birthOver = async (expected: SX.Revision): Promise<VaultRecord> => ({ ...await storedVaultRecord(), ...SX.nextRevisionOf(expected, Date.now()) })
+async function birthOver(expected: SX.Revision): Promise<VaultRecord> { return { ...await storedVaultRecord(), ...SX.nextRevisionOf(expected, Date.now()) } }
 
 // A tombstone is of a life of its own, so the vault of the life deleted is vacated, and the tombstone's instance takes its slot.
-const expectLandedGone = async (vault: Vault, { listing, deviceDB }: Pick<Awaited<ReturnType<typeof makeBornVault>>, 'listing' | 'deviceDB'>) => {
+async function expectLandedGone(vault: Vault, { listing, deviceDB }: Pick<Awaited<ReturnType<typeof makeBornVault>>, 'listing' | 'deviceDB'>) {
   await forgotten()
   const gone = listing.at(Dna)
   expect(gone).to.not.eq(vault)

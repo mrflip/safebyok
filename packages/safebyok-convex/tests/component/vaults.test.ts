@@ -17,68 +17,78 @@ const vault = TH.vaultAt()
 const life1: Life = { ...TH.vaultScope, vault_tok: 'life1' }
 
 /** Put `record` in `backend` over the row `ante`, or over none, under the soft cap `maxBoxes` where given. */
-const putBoxIn = (backend: Backend, record: DB.BoxRecord, ante: DB.BoxRow | null = null, maxBoxes?: number) => backend.mutation(api.putBox, TH.putBoxArgs(record, ante, maxBoxes))
+function putBoxIn(backend: Backend, record: DB.BoxRecord, ante: DB.BoxRow | null = null, maxBoxes?: number) { return backend.mutation(api.putBox, TH.putBoxArgs(record, ante, maxBoxes)) }
 
 /** Delete the box row `ante` in `backend`. */
-const delBoxIn = (backend: Backend, ante: DB.BoxRow) => backend.mutation(api.delBox, TH.delBoxArgs(ante))
+function delBoxIn(backend: Backend, ante: DB.BoxRow) { return backend.mutation(api.delBox, TH.delBoxArgs(ante)) }
 
 /** True for a box put's answer that refuses `vault_full`. */
-const isFull = ({ act }: { act: string }): boolean => act === 'vault_full'
+function isFull({ act }: { act: string }): boolean { return act === 'vault_full' }
 
 /** Make the box `boxlabel` at `revision_seq`, in life1 unless `extra` says otherwise, with ciphertext `cipherBytes` long. */
-const boxOf = (boxlabel: string, { revision_seq = 0, cipherBytes = 3, ...extra }: { revision_seq?: number, cipherBytes?: number, vault_tok?: string, user_id?: string, box_tok?: string } = {}) => (
-  TH.boxAt(revision_seq, 'life1', { boxlabel, box_tok: `tok-${boxlabel}`, whisper_ciphered: { cipher_iv_b64: 'aXY', ciphertext_b64: 'c'.repeat(cipherBytes) }, ...extra })
-)
+function boxOf(boxlabel: string, { revision_seq = 0, cipherBytes = 3, ...extra }: { revision_seq?: number, cipherBytes?: number, vault_tok?: string, user_id?: string, box_tok?: string } = {}) {
+  return TH.boxAt(revision_seq, 'life1', { boxlabel, box_tok: `tok-${boxlabel}`, whisper_ciphered: { cipher_iv_b64: 'aXY', ciphertext_b64: 'c'.repeat(cipherBytes) }, ...extra })
+}
 
 /** Make a backend where `record` is u1's live vault, which every box put needs. */
-const withVault = async (transactionLimits = false, record = vault): Promise<Backend> => {
+async function withVault(transactionLimits = false, record = vault): Promise<Backend> {
   const backend = TH.componentTest(transactionLimits)
   await backend.mutation(api.putVault, TH.putVaultArgs(record))
   return backend
 }
 
 /** Read the tally row stored for `life`, or null. */
-const keptTally = (backend: Backend, { applabel, user_id, vaultlabel, vault_tok }: Life = life1) => backend.run(async ({ db }): Promise<Tally | null> => {
-  const kept = await db.query('safebyok_tallies')
-    .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
-    .unique()
-  return kept && { all_count: kept.all_count, live_count: kept.live_count, all_size: kept.all_size, live_size: kept.live_size }
-})
+function keptTally(backend: Backend, { applabel, user_id, vaultlabel, vault_tok }: Life = life1) {
+  return backend.run(async ({ db }): Promise<Tally | null> => {
+    const kept = await db.query('safebyok_tallies')
+      .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+      .unique()
+    return kept && { all_count: kept.all_count, live_count: kept.live_count, all_size: kept.all_size, live_size: kept.live_size }
+  })
+}
 
 /** Count and weigh the box rows of `life` directly, as Convex sizes them: every row, tombstones included, and the live rows alone. */
-const weighedTally = (backend: Backend, { applabel, user_id, vaultlabel, vault_tok }: Life = life1) => backend.run(async ({ db }): Promise<Tally> => {
-  const boxDocs = await db.query('safebyok_boxes')
-    .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
-    .collect()
-  const liveDocs = boxDocs.filter(({ box }) => DB.isLiveRow(box))
-  const sizeOf = (docs: typeof boxDocs) => docs.reduce((total, boxDoc) => total + getDocumentSize(boxDoc), 0)
-  return { all_count: boxDocs.length, live_count: liveDocs.length, all_size: sizeOf(boxDocs), live_size: sizeOf(liveDocs) }
-})
+function weighedTally(backend: Backend, { applabel, user_id, vaultlabel, vault_tok }: Life = life1) {
+  return backend.run(async ({ db }): Promise<Tally> => {
+    const boxDocs = await db.query('safebyok_boxes')
+      .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+      .collect()
+    const liveDocs = boxDocs.filter(({ box }) => DB.isLiveRow(box))
+    function sizeOf(docs: typeof boxDocs) { return docs.reduce((total, boxDoc) => total + getDocumentSize(boxDoc), 0) }
+    return { all_count: boxDocs.length, live_count: liveDocs.length, all_size: sizeOf(boxDocs), live_size: sizeOf(liveDocs) }
+  })
+}
 
 /** List the lives that have a tally row, each as `user_id/vault_tok`. */
-const talliedLives = (backend: Backend) => backend.run(async ({ db }) => {
-  const tallyDocs = await db.query('safebyok_tallies').collect()
-  return tallyDocs.map(({ user_id, vault_tok }) => `${user_id}/${vault_tok}`)
-})
+function talliedLives(backend: Backend) {
+  return backend.run(async ({ db }) => {
+    const tallyDocs = await db.query('safebyok_tallies').collect()
+    return tallyDocs.map(({ user_id, vault_tok }) => `${user_id}/${vault_tok}`)
+  })
+}
 
 /** Insert box rows directly, without tallying them, as a component version that kept no tallies would have left them. */
-const plantBoxes = (backend: Backend, boxes: (DB.BoxRecord | DB.BoxTombstone)[]) => backend.run(async ({ db }) => {
-  await Promise.all(boxes.map((box) => {
-    const { applabel, user_id, vaultlabel, vault_tok, boxlabel } = box
-    return db.insert('safebyok_boxes', { applabel, user_id, vaultlabel, vault_tok, boxlabel, box })
-  }))
-})
+function plantBoxes(backend: Backend, boxes: (DB.BoxRecord | DB.BoxTombstone)[]) {
+  return backend.run(async ({ db }) => {
+    await Promise.all(boxes.map((box) => {
+      const { applabel, user_id, vaultlabel, vault_tok, boxlabel } = box
+      return db.insert('safebyok_boxes', { applabel, user_id, vaultlabel, vault_tok, boxlabel, box })
+    }))
+  })
+}
 
 /** Overwrite the stored vault row directly, so the previous life ends with its box rows left behind. */
-const plantVault = (backend: Backend, vault: DB.VaultRecord) => backend.run(async ({ db }) => {
-  const { applabel, user_id, vaultlabel } = vault
-  const doc = await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel)).unique()
-  if (doc === null) { throw new Error(`No vault row to plant over for ${user_id}/${vaultlabel}`) }
-  await db.patch(doc._id, { vault })
-})
+function plantVault(backend: Backend, vault: DB.VaultRecord) {
+  return backend.run(async ({ db }) => {
+    const { applabel, user_id, vaultlabel } = vault
+    const doc = await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel)).unique()
+    if (doc === null) { throw new Error(`No vault row to plant over for ${user_id}/${vaultlabel}`) }
+    await db.patch(doc._id, { vault })
+  })
+}
 
 /** List the boxlabels of the box rows in `asked`. */
-const listedBoxlabels = async (backend: Backend, asked: Life = life1) => {
+async function listedBoxlabels(backend: Backend, asked: Life = life1) {
   const { boxes } = await backend.query(api.listBoxes, { asked })
   return boxes.map(({ boxlabel }) => boxlabel)
 }
@@ -161,7 +171,7 @@ describe("a life's tally", () => {
     const replaced = boxOf('anthropic', { revision_seq: 1, cipherBytes: 5000 })
     const tombstone = TH.boxTombstoneOf(replaced)
     const reborn = boxOf('anthropic', { revision_seq: tombstone.revision_seq + 1, box_tok: 'tok-anthropic2' })
-    const figures = async () => {
+    async function figures() {
       const kept = await keptTally(backend)
       expect(kept).to.deep.equal(await weighedTally(backend))
       return kept
@@ -297,7 +307,7 @@ describe("putBox's count cap", () => {
 })
 
 /** Make a backend whose life1 has eight boxes of 900,000 bytes each, just under the byte limit. Also returns the room left. */
-const nearlyFull = async () => {
+async function nearlyFull() {
   const backend = await withVault()
   for (let ii = 0; ii < 8; ii++) {
     await putBoxIn(backend, boxOf(`heavy_${String(ii)}`, { cipherBytes: 900_000 }))
@@ -344,7 +354,7 @@ describe("putBox's weight limit", () => {
 // fits in one transaction, even beside a vault row as large as a document may be.
 
 /** List, watch and delete life1's vault, each in one transaction, and return what each found. */
-const listWatchDel = async (backend: Backend) => {
+async function listWatchDel(backend: Backend) {
   const listed = await listedBoxlabels(backend)
   const { boxes } = await backend.query(api.watchRows, { scope: TH.vaultScope })
   const vaultRow = await backend.query(api.getVault, { scope: TH.vaultScope })
@@ -355,7 +365,7 @@ const listWatchDel = async (backend: Backend) => {
 }
 
 /** Make a vault record padded to just under Convex's document size limit. */
-const wholeDocumentVault = () => {
+function wholeDocumentVault() {
   const padding = 1_048_576 - getDocumentSize({ ...TH.vaultScope, vault }) - 64
   const passphrase_wayin = { ...TH.passphraseWayin, key_deriver_label: TH.passphraseWayin.key_deriver_label + 'c'.repeat(padding) }
   return TH.vaultAt(0, 'life1', { gate: { ...vault.gate, passphrase_wayin } })

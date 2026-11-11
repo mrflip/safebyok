@@ -10,9 +10,9 @@ import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBox
 
 const world = useModelsWorld()
 
-const dna = (boxlabel = 'anthropic_api_key') => boxDnaOf(world.mw.boxscope(boxlabel))
+function dna(boxlabel = 'anthropic_api_key') { return boxDnaOf(world.mw.boxscope(boxlabel)) }
 
-const scope   = () => world.mw.boxscope('anthropic_api_key')
+function scope() { return world.mw.boxscope('anthropic_api_key') }
 
 /** The revision a stale_write says storage has stored. */
 const stored = { revision_tok: 'rev-s5', revision_seq: 5 }

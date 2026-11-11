@@ -19,7 +19,7 @@ TH.bootDatabaseFirst()
 // == [The recipe]: vaultRoute, browserVaultDB
 
 /** Build the README's route for `vaultDB`. `signedInUserId` returns each request's signed-in user. */
-const vaultRoute = (vaultDB: PostgresVaultDB, signedInUserId: (request: Request) => Promise<string | null>, isDev = false) => {
+function vaultRoute(vaultDB: PostgresVaultDB, signedInUserId: (request: Request) => Promise<string | null>, isDev = false) {
   /** The per-request context the resolvers see: the user your own auth signed in, or null. */
   type VaultContext = { user_id: string | null }
   const schema = createSchema<VaultContext>({
@@ -37,12 +37,14 @@ const vaultRoute = (vaultDB: PostgresVaultDB, signedInUserId: (request: Request)
 }
 
 /** Build the README's browser side: a GraphQLVaultDB on an urql Client that sends queries, mutations and subscriptions to the route by fetch. */
-const browserVaultDB = (fetcher: typeof fetch) => new GraphQLVaultDB({ client: new Client({
-  url:                'https://app.example.test/api/graphql',
-  exchanges:          [fetchExchange],
-  fetchSubscriptions: true,
-  fetch:              fetcher,
-}) })
+function browserVaultDB(fetcher: typeof fetch) {
+  return new GraphQLVaultDB({ client: new Client({
+    url:                'https://app.example.test/api/graphql',
+    exchanges:          [fetchExchange],
+    fetchSubscriptions: true,
+    fetch:              fetcher,
+  }) })
+}
 // --
 
 // == [Wiring]: Route, byHeader, overTheNetwork, browserFor, signedInAsAsked, makeVaultDB, makeTwin
@@ -53,7 +55,7 @@ type Route = (request: Request) => Promise<Response>
 const byHeader = (request: Request) => Promise.resolve(request.headers.get('x-test-user'))
 
 /** Wrap `response` so that aborting the request cancels the body the server is sending, as a real network connection would. */
-const overTheNetwork = (request: Request, response: Response): Response => {
+function overTheNetwork(request: Request, response: Response): Response {
   if (response.body === null) { return response }
   const sending = response.body.getReader()
   request.signal.addEventListener('abort', () => { void sending.cancel() })
@@ -67,17 +69,17 @@ const overTheNetwork = (request: Request, response: Response): Response => {
 }
 
 /** Make a browser-side VaultDB whose fetch calls `route` in-process. `signedInAs` picks each operation's user from its variables. */
-const browserFor = (route: Route, signedInAs: (variables: Record<string, unknown>) => string | null) => (
-  browserVaultDB(async (url, init) => {
+function browserFor(route: Route, signedInAs: (variables: Record<string, unknown>) => string | null) {
+  return browserVaultDB(async (url, init) => {
     const request = new Request(url, init)
     const user_id = signedInAs(await variablesOf(request.clone()))
     if (user_id !== null) { request.headers.set('x-test-user', user_id) }
     return overTheNetwork(request, await route(request))
   })
-)
+}
 
 /** Read an operation's variables from the request: from the URL when urql sent a query by GET, otherwise from the body. */
-const variablesOf = async (request: Request): Promise<Record<string, unknown>> => {
+async function variablesOf(request: Request): Promise<Record<string, unknown>> {
   const inUrl = new URL(request.url).searchParams.get('variables')
   const sent = (inUrl === null) ? (await request.json() as { variables?: unknown }).variables : JSON.parse(inUrl) as unknown
   return (sent ?? {}) as Record<string, unknown>
@@ -91,7 +93,7 @@ const signedInAsAsked = (variables: Record<string, unknown>): string | null => (
 const serversOf = new WeakMap<GraphQLVaultDB, { route: Route, adapter: PostgresVaultDB }>()
 
 /** Empty the tables and make a new browser-side VaultDB with its own route. Its server's VaultDB is made with `opts` and, if given, a cap of `maxBoxes` boxes per vault. */
-const makeVaultDB = async (opts: DB.AdapterVaultDBOpts = {}, maxBoxes?: number): Promise<GraphQLVaultDB> => {
+async function makeVaultDB(opts: DB.AdapterVaultDBOpts = {}, maxBoxes?: number): Promise<GraphQLVaultDB> {
   await TH.emptyTables()
   const adapter = await TH.serverOver({ ...opts, ...((maxBoxes !== undefined) && { maxBoxes }) })
   const route = vaultRoute(adapter, byHeader)
@@ -101,7 +103,7 @@ const makeVaultDB = async (opts: DB.AdapterVaultDBOpts = {}, maxBoxes?: number):
 }
 
 /** Return the route and the server's VaultDB behind a browser that makeVaultDB or makeTwin made. */
-const serverOf = (vaultDB: GraphQLVaultDB): { route: Route, adapter: PostgresVaultDB } => {
+function serverOf(vaultDB: GraphQLVaultDB): { route: Route, adapter: PostgresVaultDB } {
   const server = serversOf.get(vaultDB)
   if (server === undefined) { throw new Error('This takes a browser makeVaultDB or makeTwin made') }
   return server

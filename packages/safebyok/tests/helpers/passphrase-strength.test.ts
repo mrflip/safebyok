@@ -30,10 +30,12 @@ describe("StrongVerdict", () => {
 })
 
 /** A checker whose verdict's `field` is a getter that throws, quoting the passphrase. */
-const lazyCheckerThrowingOn = (field: 'strong' | 'reason'): StrengthChecker => (passphrase) => {
-  const verdict = { strong: false, reason: 'Pick another.' }
-  Object.defineProperty(verdict, field, { enumerable: true, get: () => { throw new Error(`could not judge ${passphrase}`) } })
-  return verdict
+function lazyCheckerThrowingOn(field: 'strong' | 'reason'): StrengthChecker {
+  return (passphrase) => {
+    const verdict = { strong: false, reason: 'Pick another.' }
+    Object.defineProperty(verdict, field, { enumerable: true, get: () => { throw new Error(`could not judge ${passphrase}`) } })
+    return verdict
+  }
 }
 
 describe("guardStrengthChecker", () => {

@@ -11,7 +11,7 @@ import { Checkers } from 'safebyok/storage'
 // user from the start. There is no reconnecting, ping or action. Clients discard `log` lines, and
 // send `warn` and `error` to the console unless given a logger.
 /** Make an in-memory Convex deployment that runs `host` under convex-test, for real Convex clients to reach over a fake WebSocket. */
-export const fakeDeployment = <Host extends FakeHost>(host: Host, opts: FakeDeploymentOpts = {}): FakeDeployment<Host> => new FakeDeployment(host, opts)
+export function fakeDeployment<Host extends FakeHost>(host: Host, opts: FakeDeploymentOpts = {}): FakeDeployment<Host> { return new FakeDeployment(host, opts) }
 
 /** A logger for the clients of a {@link FakeDeployment}: `log`, `warn` and `error`, and optionally `logVerbose`. */
 export type FakeClientLogger = Pick<ConvexLogger, 'log' | 'warn' | 'error'> & Partial<Pick<ConvexLogger, 'logVerbose'>>
@@ -73,14 +73,14 @@ const { fakeHost, fakeDeploymentOpts } = Checkers('bad_option', ({ obj, custom }
 
 // A Convex client needs all four logger methods. Each method given is bound to its logger, so a logger built as a class keeps its `this`.
 // A logger without `logVerbose` discards verbose lines. With no logger at all, `log` and `logVerbose` are discarded and `warn` and `error` go to the console.
-const loggerFor = (logger: FakeClientLogger | undefined): ConvexLogger => (
-  logger === undefined ? QuietLogger : {
+function loggerFor(logger: FakeClientLogger | undefined): ConvexLogger {
+  return logger === undefined ? QuietLogger : {
     log:        logger.log.bind(logger),
     warn:       logger.warn.bind(logger),
     error:      logger.error.bind(logger),
     logVerbose: logger.logVerbose?.bind(logger) ?? (() => undefined),
   }
-)
+}
 
 /** The default logger for a deployment's clients. */
 const QuietLogger: ConvexLogger = {
@@ -277,13 +277,13 @@ export class FakeDeployment<Host extends FakeHost> {
 }
 
 /** Format a failed call as the protocol reports it: the error message, plus the `data` of a ConvexError. */
-const failureOf = (err: unknown): { result: string, errorData?: JSONValue } => {
+function failureOf(err: unknown): { result: string, errorData?: JSONValue } {
   const result = err instanceof Error ? err.message : String(err)
   return err instanceof ConvexError ? { result, errorData: convexToJson(err.data as Value) } : { result }
 }
 
 /** Encode a timestamp as the protocol does: eight bytes, little-endian, in base64. */
-const encodeTs = (ts: number): string => {
+function encodeTs(ts: number): string {
   const bytes = new Uint8Array(8)
   new DataView(bytes.buffer).setBigUint64(0, BigInt(ts), true)
   return Base64.fromByteArray(bytes)

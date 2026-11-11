@@ -4,7 +4,7 @@ import { type GoodOutcome, type Outcome, storageRefusalOf, bad, demandGood, good
 import * as Refusals from '../../src/refusals/throwers'
 
 /** An app's own call, which rejects: what outcomeOf's first example wraps. */
-const fetchBackup = (vaultlabel: string): Promise<string> => Promise.reject(new TypeError(`no backup of ${vaultlabel}`))
+function fetchBackup(vaultlabel: string): Promise<string> { return Promise.reject(new TypeError(`no backup of ${vaultlabel}`)) }
 
 describe("good and bad", () => {
   it("makes a good outcome of a val", () => {
@@ -24,7 +24,7 @@ describe("good and bad", () => {
 describe("Outcome", () => {
   // Outcome @example
   it("narrows on ok", () => {
-    const answer = (outcome: Outcome<number | null>): number | null | VaultError => {
+    function answer(outcome: Outcome<number | null>): number | null | VaultError {
       const { ok, val, err } = outcome
       if (! ok) {
         expectTypeOf(err).toEqualTypeOf<VaultError>()
@@ -60,7 +60,7 @@ describe("outcomeOf", () => {
   })
 
   it("wraps anything else thrown, keeping it as the cause", async () => {
-    const parseImport = (file: string): string => { throw new TypeError(`cannot parse ${file}`) }
+    function parseImport(file: string): string { throw new TypeError(`cannot parse ${file}`) }
     const { ok, err } = await outcomeOf(() => parseImport('backup.json'))
     expect(ok).to.be.false
     expect(err).to.be.instanceOf(VaultError)

@@ -9,7 +9,7 @@ import * as PX from '../shapes/primitives'
 // == [Kit]: isBytes, Kit, KitWith, Merged
 
 /** True for a Uint8Array from any realm: judged by its tag, as `instanceof` refuses one made in an iframe or a test's jsdom. */
-const isBytes = (candidate: unknown): candidate is Uint8Array => ArrayBuffer.isView(candidate) && Object.prototype.toString.call(candidate) === '[object Uint8Array]'
+function isBytes(candidate: unknown): candidate is Uint8Array { return ArrayBuffer.isView(candidate) && Object.prototype.toString.call(candidate) === '[object Uint8Array]' }
 
 /** The makers a `Checkers` builder is handed: Zod's under short names, its scalars ready made, the scope names, and `epochMillis`.
  * An object is strict or loose by its methods, `obj({ ... }).strict()`, and null is `lit(null)`.
@@ -101,9 +101,9 @@ export type Merged<SourcesT extends readonly object[]> =
  *     return { vaultRecord }
  *   }, [GateChecks])
  */
-export const Checkers = <ValsT extends Record<string, Z.ZodType>, const SourcesT extends readonly object[] = readonly []>(
+export function Checkers<ValsT extends Record<string, Z.ZodType>, const SourcesT extends readonly object[] = readonly []>(
   kind: Refusalkind, build: (kit: KitWith<SourcesT>) => ValsT, sources?: SourcesT,
-): { [ValnameT in keyof ValsT]: Refusing<ValsT[ValnameT]> } => {
+): { [ValnameT in keyof ValsT]: Refusing<ValsT[ValnameT]> } {
   const vals = build(kitWith(sources))
   return Object.fromEntries(Object.entries(vals).map(([valname, schema]) => [valname, refusing(kind, schema)])) as { [ValnameT in keyof ValsT]: Refusing<ValsT[ValnameT]> }
 }
@@ -115,9 +115,9 @@ export const Checkers = <ValsT extends Record<string, Z.ZodType>, const SourcesT
  *   export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltSize, Phrases.prfSaltShape(PasskeySaltSize)), 'bad_record')
  * @example export const callback = Checker(({ fn }) => fn(), 'bad_option')
  */
-export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readonly object[] = readonly []>(
+export function Checker<SchemaT extends Z.ZodType, const SourcesT extends readonly object[] = readonly []>(
   build: (kit: KitWith<SourcesT>) => SchemaT, kind: Refusalkind = 'bad_record', sources?: SourcesT,
-): Refusing<SchemaT> => refusing(kind, build(kitWith(sources)))
+): Refusing<SchemaT> { return refusing(kind, build(kitWith(sources))) }
 
 /** Make one validator of an object: `build` gets the kit and returns the object's fields, and the object, strict unless `opts` says otherwise, comes back as a {@link Checker} hands one back.
  * `opts` is the kind it refuses, or an {@link ObjCheckOpts}: `refusalkind`, the kind, 'bad_record'
@@ -141,9 +141,9 @@ export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readon
  *   }), { refusalkind: 'bad_record', extras: 'strip' }, [CX])
  *   boxCiphered.parse(boxRecord)  // its two ciphered fields, the rest dropped
  */
-export const objCheck = <ShapeT extends Z.ZodRawShape, const SourcesT extends readonly object[] = readonly []>(
+export function objCheck<ShapeT extends Z.ZodRawShape, const SourcesT extends readonly object[] = readonly []>(
   build: (kit: KitWith<SourcesT>) => ShapeT, opts: Refusalkind | ObjCheckOpts = 'bad_record', sources?: SourcesT,
-): Refusing<Z.ZodObject<ShapeT>> => {
+): Refusing<Z.ZodObject<ShapeT>> {
   const { refusalkind: kind, extras } = Checks.objCheckOpts.parse(typeof opts === 'string' ? { refusalkind: opts } : opts)
   const fields = build(kitWith(sources))
   return refusing(kind, extras === 'strip' ? Kit.obj(fields) : Kit.obj(fields).strict())
@@ -174,10 +174,10 @@ export const objStrip = <ShapeT extends Z.ZodRawShape, const SourcesT extends re
 ): Refusing<Z.ZodObject<ShapeT>> => objCheck(build, { refusalkind: refusalkindOf(opts), extras: 'strip' }, sources)
 
 /** The kind an {@link objStrict} or {@link objStrip} call's `opts` names. */
-const refusalkindOf = (opts: Refusalkind | RefusalOpts): Refusalkind => Checks.refusalOpts.parse(typeof opts === 'string' ? { refusalkind: opts } : opts).refusalkind
+function refusalkindOf(opts: Refusalkind | RefusalOpts): Refusalkind { return Checks.refusalOpts.parse(typeof opts === 'string' ? { refusalkind: opts } : opts).refusalkind }
 
 /** The kit a builder is handed: `sources` spread in beneath {@link Kit}. */
-const kitWith = <SourcesT extends readonly object[]>(sources?: SourcesT): KitWith<SourcesT> => Object.assign({}, ...(sources ?? []), Kit) as KitWith<SourcesT>
+function kitWith<SourcesT extends readonly object[]>(sources?: SourcesT): KitWith<SourcesT> { return Object.assign({}, ...(sources ?? []), Kit) as KitWith<SourcesT> }
 
 /** True exactly when `A` and `B` are the same type: match a hand-written shape to its checker with `true satisfies AssertEqual<Shape, CheckerInput<typeof check>>`. */
 export type AssertEqual<A, B> = Z.core.util.AssertEqual<A, B>
@@ -200,7 +200,7 @@ export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
 // == [Refusals]: refusing, InEnglish, English, fieldnamesOf, MaxFailuresSaid, fieldnameOf, sentenceOf, refusalOf, framed
 
 /** A clone of `schema` whose `parse` throws a VaultError of `kind` where Zod's would throw its own, and whose `parseConsistent` parses, then compares the result to another bag. Every schema gets `parseConsistent`; {@link Refusing} types it only on an object's. */
-const refusing = <SchemaT extends Z.ZodType>(kind: Refusalkind, schema: SchemaT): Refusing<SchemaT> => {
+function refusing<SchemaT extends Z.ZodType>(kind: Refusalkind, schema: SchemaT): Refusing<SchemaT> {
   const parse = (val: unknown, story?: Story): Z.output<SchemaT> => {
     const framing = story === undefined ? {} : Checks.story.parse(story)
     const result = schema.safeParse(val, InEnglish)
@@ -227,22 +227,22 @@ const InEnglish = {
 const English = Zod.locales.en().localeError
 
 /** The fields an object schema accepts, by its shape: none for any other schema. */
-const fieldnamesOf = (schema: unknown): string[] => (schema instanceof Zod.ZodObject ? Object.keys(schema.shape) : [])
+function fieldnamesOf(schema: unknown): string[] { return (schema instanceof Zod.ZodObject ? Object.keys(schema.shape) : []) }
 
 /** The most failures a refusal's message names; it counts the rest. */
 const MaxFailuresSaid = 8
 
 /** Where one failure is, as a refusal says it: its path's steps joined on `.`, and '' for the input as a whole. */
-const fieldnameOf = (issue: Z.core.$ZodIssue): string => issue.path.map(String).join('.')
+function fieldnameOf(issue: Z.core.$ZodIssue): string { return issue.path.map(String).join('.') }
 
 /** One failure as a refusal says it: where, then Zod's sentence, which names a type, a limit or the values we allow, never the value refused. */
-const sentenceOf = (issue: Z.core.$ZodIssue): string => {
+function sentenceOf(issue: Z.core.$ZodIssue): string {
   const fieldname = fieldnameOf(issue)
   return fieldname ? `${fieldname}: ${issue.message}` : issue.message
 }
 
 /** The VaultError of `kind` for a failed parse, its message and `meta.fieldnames` as {@link Checkers} says, framed as `story` asks. */
-const refusalOf = (kind: Refusalkind, err: Z.ZodError, story: Story): VaultError => {
+function refusalOf(kind: Refusalkind, err: Z.ZodError, story: Story): VaultError {
   const issues     = err.issues.slice(0, MaxFailuresSaid)
   const unsaid     = err.issues.length - issues.length
   const sentences  = [...issues.map((issue) => sentenceOf(issue)), ...(unsaid > 0 ? [Phrases.moreFailures(unsaid)] : [])]
@@ -251,7 +251,7 @@ const refusalOf = (kind: Refusalkind, err: Z.ZodError, story: Story): VaultError
 }
 
 /** The failures `said`, with `story`'s `where` before them and its `advice` after: with either, the failures end in a period; with neither, they stand alone. */
-const framed = (said: string, { where, advice }: Story): string => {
+function framed(said: string, { where, advice }: Story): string {
   if (where === undefined && advice === undefined) { return said }
   const led    = where  === undefined ? said : `${where}: ${said}`
   return advice === undefined ? `${led}.` : `${led}. ${advice}`
@@ -269,7 +269,7 @@ const framed = (said: string, { where, advice }: Story): string => {
  *
  * @example isConsistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' })   // true: no field is defined in both
  */
-export const isConsistent = (bag: object, other: object): boolean => disagreeing(bag, other).length === 0
+export function isConsistent(bag: object, other: object): boolean { return disagreeing(bag, other).length === 0 }
 
 /** True once `bag` is {@link isConsistent} with `other`: a VaultError of `refusal.kind` otherwise, naming the fields that disagree in `meta.fieldnames`, and in its message unless `refusal.message` says its own.
  * The kind is the caller's to choose, as the caller knows what a disagreement means: a scope of
@@ -277,7 +277,7 @@ export const isConsistent = (bag: object, other: object): boolean => disagreeing
  *
  * @example demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }, { kind: 'bad_scope', message: (fieldnames) => `This names another ${fieldnames.join(' and ')}` })   // throws 'bad_scope', naming user_id
  */
-export const demandConsistent = (bag: object, other: object, refusal: ConsistencyRefusal): true => {
+export function demandConsistent(bag: object, other: object, refusal: ConsistencyRefusal): true {
   const { kind, message } = Checks.consistencyRefusal.parse(refusal)
   const fieldnames = disagreeing(bag, other)
   if (fieldnames.length === 0) { return true }
@@ -286,13 +286,13 @@ export const demandConsistent = (bag: object, other: object, refusal: Consistenc
 }
 
 /** `bag`, once it is {@link isConsistent} with `other`: refuses as {@link demandConsistent} does. For a bag already parsed; a {@link Refusing}'s `parseConsistent` is this over its `parse`. */
-export const checkedConsistent = <BagT extends object>(bag: BagT, other: object, refusal: ConsistencyRefusal): BagT => {
+export function checkedConsistent<BagT extends object>(bag: BagT, other: object, refusal: ConsistencyRefusal): BagT {
   demandConsistent(bag, other, refusal)
   return bag
 }
 
 /** The names of the fields `bag` and `other` both define and have at different values, frozen: each bag checked to be an object first. */
-const disagreeing = (bag: object, other: object): readonly string[] => {
+function disagreeing(bag: object, other: object): readonly string[] {
   const ours = Checks.bag.parse(bag)
   const theirs: Partial<Record<string, unknown>> = Checks.bag.parse(other)
   return Object.freeze(Object.entries(ours)

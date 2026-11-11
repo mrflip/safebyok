@@ -10,13 +10,15 @@ import * as TH from './test-helpers'
 TH.bootDatabaseFirst()
 
 /** A client whose every statement fails with `err`. */
-const throwingClient = (err: Error) => ({
-  query:       () => Promise.reject(err),
-  transaction: () => Promise.reject(err),
-})
+function throwingClient(err: Error) {
+  return {
+    query:       () => Promise.reject(err),
+    transaction: () => Promise.reject(err),
+  }
+}
 
 /** Watch `scope` on `vaultDB` until the test ends. Returns the array that collects its notices. */
-const watching = (vaultDB: PostgresVaultDB, scope: DB.WatchScope = TH.vaultScope) => {
+function watching(vaultDB: PostgresVaultDB, scope: DB.WatchScope = TH.vaultScope) {
   const notices: Notice[] = []
   const unwatch = vaultDB.watch(scope, (notice) => { notices.push(notice) })
   onTestFinished(unwatch)
@@ -107,7 +109,7 @@ describe("PostgresVaultDB's watch", () => {
 })
 
 /** Collect the notifications sent on the test user's channel until the test ends, each parsed from JSON. */
-const sentOn = async (): Promise<unknown[]> => {
+async function sentOn(): Promise<unknown[]> {
   const sent: unknown[] = []
   const unlisten = await TH.listen(vaultChannelOf(TH.bankScope.user_id), (text) => { sent.push(JSON.parse(text)) })
   onTestFinished(() => { unlisten() })

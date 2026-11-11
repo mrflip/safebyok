@@ -16,7 +16,7 @@ useBankWorlds()
 const AutolockMillis = AutolockMinutes * 60_000
 
 /** A lease row of this bank, as `world`'s one cached row but under `vaultlabel` and another life, proved long before the clock's first reading. */
-const oldLeaseRow = (world: ReturnType<typeof makeBankWorld>, vaultlabel: string): LeaseRow => ({ ...(world.leaseRows()[0] as LeaseRow), vaultlabel, vault_tok: makeLifeTok(), proved_at: T0 - (2 * AutolockMillis) })
+function oldLeaseRow(world: ReturnType<typeof makeBankWorld>, vaultlabel: string): LeaseRow { return { ...(world.leaseRows()[0] as LeaseRow), vaultlabel, vault_tok: makeLifeTok(), proved_at: T0 - (2 * AutolockMillis) } }
 
 describe("bank.autolock", () => {
   it("locks a listed vault past its autolock, which forgets its lease, leaving a younger one", async () => {

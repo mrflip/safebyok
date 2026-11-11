@@ -31,7 +31,7 @@ const RtlScripts = [
   'Chorasmian', 'Yezidi', 'Garay', 'Lydian', 'Cypriot', 'Meroitic_Cursive', 'Meroitic_Hieroglyphs', 'Old_Uyghur',
 ]
 
-const rtlLettersOf = (script: string): string => {
+function rtlLettersOf(script: string): string {
   const inScript = new RegExp(String.raw`^\p{Script=${script}}$`, 'u')
   return Array.from({ length: 0x2_00_00 }, (_slot, cp) => String.fromCodePoint(cp))
     .filter((chr) => /^[\p{L}\p{N}]$/u.test(chr) && inScript.test(chr))
@@ -39,9 +39,9 @@ const rtlLettersOf = (script: string): string => {
 }
 
 // A small seeded generator, so a failure repeats.
-const randomCodePoints = (count: number, seed: number): string => {
+function randomCodePoints(count: number, seed: number): string {
   let state = seed
-  const next = (): number => {
+  function next(): number {
     state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0
     return state
   }

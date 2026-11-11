@@ -21,4 +21,4 @@ import { VaultError, type Refusalkind } from './errors'
  *     throw HostErrorSanitizer.refusalFor(err, 'storage_unavailable', "The vault's storage failed: try again shortly.")
  *   }
  */
-export const refusalFor = (_foreign: unknown, kind: Refusalkind, message: string): VaultError => new VaultError(kind, message)
+export function refusalFor(_foreign: unknown, kind: Refusalkind, message: string): VaultError { return new VaultError(kind, message) }

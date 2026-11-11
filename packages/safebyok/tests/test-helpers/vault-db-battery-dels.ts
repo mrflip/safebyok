@@ -15,9 +15,9 @@ const Rival = { revision_tok: 'rival' }
 const noBoxYet = SX.shellBoxOf(boxscope, 'life1')
 
 /** Registers the dels' and tidyGone's cases over `world`. */
-export const describeDels = ({ putWith, rowsOf }: BatteryWorld): void => {
+export function describeDels({ putWith, rowsOf }: BatteryWorld): void {
   /** The box row `openai` of the vault's life `life1`, as stored. */
-  const storedBoxOf = async (vaultDB: VaultDB): Promise<unknown> => {
+  async function storedBoxOf(vaultDB: VaultDB): Promise<unknown> {
     const boxrows = await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')
     return boxrows.get('openai')
   }

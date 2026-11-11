@@ -13,7 +13,7 @@ import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingDelOpts, ListingListAnswer, ListingPutAnswer, ListingPutOpts, ListingOpts, ListingWorld, ListingGetAnswer, SlotFate, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
 import { instanceDisabled, rowOfOtherVaultTok, storageIssue } from '../refusals/throwers'
 import * as Phrases from '../helpers/phrases'
-import { demandGood, outcomeOf } from '../refusals/outcome'
+import { outcomeOf, valOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
 import type { Storable } from './storable'
 
@@ -159,7 +159,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // == [Storage verbs]: list, tryList, listRows, takeListed, listedAt, get, tryGet, fetch, tryFetch, fetchJoined, fetchSlot, handleIfAbsent, put, tryPut, del, tryDel
 
   /** Enlists every row the vaultDB lists here, sets aside the rows it found damaged, and answers the instances listed. */
-  async list(): Promise<readonly ThingT[]> { return demandGood(await this.tryList()).val }
+  async list(): Promise<readonly ThingT[]> { return valOf(await this.tryList()) }
 
   /** {@link list}, answering the vaultDB's own answer with the instances listed as its `val`. */
   async tryList(): Promise<ThingAnswer<readonly ThingT[]>> {
@@ -201,7 +201,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   #listedAt(damaged: DamagedT): ThingT | null { return this.#things.get(this.scopepathOf(damaged)) ?? null }
 
   /** The instance under `scoped`: the one listed, no older than `opts` allows, or fetched where none is; null under `ifAbsent: 'nil'`. */
-  async get(scoped: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> { return demandGood(await this.tryGet(scoped, opts)).val }
+  async get(scoped: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> { return valOf(await this.tryGet(scoped, opts)) }
 
   /** {@link get}, answering the vaultDB's own answer where storage was asked, or the act `timely` where the instance listed served it. */
   async tryGet(scoped: ScopeT, opts: FetchOpts = {}): Promise<ListingGetAnswer<ThingT | null>> {
@@ -216,7 +216,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   /** SLOPDOC: The instance under `scope` as it is now stored, built where none was listed. */
-  async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> { return demandGood(await this.tryFetch(scope, opts)).val }
+  async fetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> { return valOf(await this.tryFetch(scope, opts)) }
 
   /** {@link fetch}, answering the vaultDB's own answer with the instance as its `val`. */
   async tryFetch(scope: ScopeT, opts: FetchOpts = {}): Promise<ThingAnswer<ThingT | null>> {
@@ -260,7 +260,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   /** Put `record` over the row `opts.expected`, and return the listed instance. */
-  async put(record: RecordT, opts: PutOpts): Promise<ThingT> { return demandGood(await this.tryPut(record, opts)).val }
+  async put(record: RecordT, opts: PutOpts): Promise<ThingT> { return valOf(await this.tryPut(record, opts)) }
 
   /** {@link put}, answering the vaultDB's own answer with the instance listed as its `val`. */
   async tryPut(record: RecordT, opts: PutOpts): Promise<ThingAnswer<ThingT>> {
@@ -275,7 +275,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   /** SLOPDOC: Deletes the thing `record` names, over its revision, and delivers storage's answer: its tombstone, if anything was stored. */
-  async del(record: SparseT): Promise<ThingT | null> { return demandGood(await this.tryDel(record)).val }
+  async del(record: SparseT): Promise<ThingT | null> { return valOf(await this.tryDel(record)) }
 
   /** {@link del}, answering the vaultDB's own answer with the instance as its `val`. */
   async tryDel(record: SparseT): Promise<ThingAnswer<ThingT | null>> {

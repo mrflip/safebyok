@@ -15,7 +15,7 @@ useVaultWorlds()
 
 // The literals below are the UTF-8 text of each ctx's JSON: a rename of a stored field moves them on purpose, and nothing else should.
 
-const textBytes = (text: string): Uint8Array => new TextEncoder().encode(text)
+function textBytes(text: string): Uint8Array { return new TextEncoder().encode(text) }
 
 const WhisperText = '{"val":"sk-test-0000"}'
 
@@ -27,7 +27,7 @@ const LeaseStampFields = ['fmt', ...VaultStampFields, 'gate_epoch', 'proved_at',
 const BoxStampFields = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'fmt', 'vault_tok', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'box_tok', 'whisper_codec', 'whisper_schema_version', 'sidecar'] as const
 
 /** A lease of `stamp`'s vault over a vaultKey the test holds, its record cached on the friend. */
-const leaseOver = async (vaultKey: CryptoKey, overrides: Partial<typeof WorldStamp> = {}) => {
+async function leaseOver(vaultKey: CryptoKey, overrides: Partial<typeof WorldStamp> = {}) {
   const friend = fakeLeaseFriendOf(overrides)
   const lease = await Lease.buildGranted(friend, vaultKey, GrantedAs)
   await lease.cacheAsCacheCan()
@@ -35,7 +35,7 @@ const leaseOver = async (vaultKey: CryptoKey, overrides: Partial<typeof WorldSta
 }
 
 /** The stamp a real vault binds a real box to, as its put hands the lease. */
-const realBoxStamp = async (): Promise<CipherCtxRecord> => {
+async function realBoxStamp(): Promise<CipherCtxRecord> {
   const seal = vi.spyOn(Lease.prototype, 'sealWith')
   const { vault } = await makeBornVault()
   await vault.putBox({ boxlabel: 'anthropic', whisper: { apiKey: 'sk-test-0000' }, sidecar: { label: 'work account' } })
@@ -45,7 +45,7 @@ const realBoxStamp = async (): Promise<CipherCtxRecord> => {
 }
 
 /** `val` changed, keeping its type: a number one more, a string with a letter added. */
-const changed = (val: unknown): unknown => ((typeof val === 'number') ? val + 1 : `${String(val)}x`)
+function changed(val: unknown): unknown { return ((typeof val === 'number') ? val + 1 : `${String(val)}x`) }
 
 describe("each ctx, byte for byte", () => {
   it("encodes a list of stamps, a purpose and a header, each record's keys sorted", () => {
@@ -84,7 +84,7 @@ describe("each ctx, byte for byte", () => {
     const vaultKey = await makeVaultKey()
     const { lease } = await leaseOver(vaultKey)
     const sealed = await lease.sealWith(WhisperText, stamp)
-    const field = (fieldname: string): string => JSON.stringify(stamp[fieldname])
+    function field(fieldname: string): string { return JSON.stringify(stamp[fieldname]) }
     expect(stamp['sidecar']).to.eq('{"label":"work account"}')
     const boxText = `{"am":${field('am')},"applabel":${field('applabel')},"box_tok":${field('box_tok')},"boxlabel":"anthropic","fmt":${field('fmt')},"registered_at":${field('registered_at')},"revision_seq":${field('revision_seq')},"revision_tok":${field('revision_tok')},"sidecar":${field('sidecar')},"user_id":${field('user_id')},"vault_tok":${field('vault_tok')},"vaultlabel":${field('vaultlabel')},"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${field('written_at')}}`
     const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, textBytes(`[${VaultStampText},${boxText},"box_key_wrapped"]`), { extractable: false, usage: ['decrypt'] })
@@ -160,7 +160,7 @@ describe("each ctx binds every field of its stamps", () => {
 })
 
 /** Fails unless what is sealed under `ctx` will not open under `other`. */
-const expectSealedApart = async (ctx: Uint8Array, other: Uint8Array): Promise<void> => {
+async function expectSealedApart(ctx: Uint8Array, other: Uint8Array): Promise<void> {
   const cipherKey = await makeBoxKey()
   const sealed = await cipherBytes(cipherKey, textBytes('sk-test-0000'), ctx)
   expect(new TextDecoder().decode(await decipherBytes(cipherKey, sealed, ctx))).to.eq('sk-test-0000')

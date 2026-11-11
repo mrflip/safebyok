@@ -7,7 +7,7 @@ import { boxDnaOf, boxListingOf, fullBoxRecord, shellBoxRecord, sparseBoxRecord,
 
 const world = useModelsWorld()
 
-const scope   = () => world.mw.boxscope('anthropic_api_key')
+function scope() { return world.mw.boxscope('anthropic_api_key') }
 
 const gone    = () => tombstoneBoxRecord({ revision_seq: 2 })
 
@@ -15,7 +15,7 @@ const gone    = () => tombstoneBoxRecord({ revision_seq: 2 })
 const stored = { revision_tok: 'rev-s5', revision_seq: 5 }
 
 /** A full box world, and the calls forgotten. */
-const listedBox = async () => {
+async function listedBox() {
   const listing = boxListingOf(world.mw)
   const box = await listing.build(fullBoxRecord())
   world.mw.clearCalls()
@@ -63,7 +63,7 @@ describe("BoxListing: an absent box", () => {
 
   describe("listing.fetch(scope) of a stored tombstone", () => {
     for (const [form, tombstone, am] of [['deleted', gone, 'x']] as const) {
-      const seedTombstone = () => { world.mw.seedPut(tombstone()) }
+      function seedTombstone() { world.mw.seedPut(tombstone()) }
 
       it(`refuses 'absent_box' for a ${form} box, and lists its tombstone`, async () => {
         seedTombstone()

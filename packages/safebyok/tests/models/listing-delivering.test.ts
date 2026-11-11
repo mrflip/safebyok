@@ -10,12 +10,12 @@ import { TestableBox, TestableBoxListing, boxDnaOf, boxListingOf, fullBoxRecord,
 
 const world = useModelsWorld()
 
-const shell = () => SX.shellBoxOf(world.mw.boxscope('anthropic_api_key'), world.mw.world.vault_tok)
+function shell() { return SX.shellBoxOf(world.mw.boxscope('anthropic_api_key'), world.mw.world.vault_tok) }
 
 // == [Helpers of the pipeline tests]: scopeOf, dnaOf
 
-const scopeOf = (boxlabel = 'anthropic_api_key') => world.mw.boxscope(boxlabel)
-const dnaOf = (boxlabel = 'anthropic_api_key') => boxDnaOf(scopeOf(boxlabel))
+function scopeOf(boxlabel = 'anthropic_api_key') { return world.mw.boxscope(boxlabel) }
+function dnaOf(boxlabel = 'anthropic_api_key') { return boxDnaOf(scopeOf(boxlabel)) }
 // --
 
 describe("Listing's pipeline: what every answer goes through", () => {

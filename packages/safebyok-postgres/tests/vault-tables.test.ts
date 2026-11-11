@@ -10,7 +10,7 @@ import * as TH from './test-helpers'
 TH.bootDatabaseFirst()
 
 /** List the columns of `table` from information_schema: each column's name, type and nullability. */
-const columnsOf = async (table: string): Promise<string[][]> => {
+async function columnsOf(table: string): Promise<string[][]> {
   const db = await TH.database()
   const { rows } = await db.query<{ column_name: string, data_type: string, is_nullable: string }>(
     'SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position', [table],
@@ -20,7 +20,7 @@ const columnsOf = async (table: string): Promise<string[][]> => {
 
 // The checks are tested by the rows they refuse, in `vault-rows.test.ts`: Postgres rewrites a check's text as it stores it.
 /** List the primary-key, unique and foreign-key constraints of `table`, as Postgres defines them. */
-const keysOf = async (table: string): Promise<string[]> => {
+async function keysOf(table: string): Promise<string[]> {
   const db = await TH.database()
   const { rows } = await db.query<{ definition: string }>(
     "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = $1::regclass AND contype IN ('p', 'u', 'f')", [table],

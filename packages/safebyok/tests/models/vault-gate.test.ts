@@ -86,7 +86,7 @@ describe("a passkey over a passphrase change", () => {
 })
 
 /** A born vault's record with its passkey wayin's salt too short to be one. */
-const damagedOf = async (): Promise<VaultRecord> => {
+async function damagedOf(): Promise<VaultRecord> {
   const { demandStored } = await makeBornVaultWithPasskey()
   const record = demandStored()
   return { ...record, gate: { ...record.gate, passkey_wayin: { ...record.gate.passkey_wayin!, prf_salt_b64: 'short' as PrfSalt } } }
@@ -114,7 +114,7 @@ describe("a passkey wayin stored damaged", () => {
 type Born = Awaited<ReturnType<typeof makeBornVault>>
 
 /** Leaves the world's dialog up until the gating concludes, and shows the gating to the test. */
-const dialogOf = (world: Born) => {
+function dialogOf(world: Born) {
   const shown: unknown[] = []
   world.fakeBank.requestCleartext = (gating) => {
     shown.push(gating)
@@ -130,10 +130,10 @@ const dialogOf = (world: Born) => {
 }
 
 /** The proving of the gate the vault has that `passphrase` opens, refusing 'wrong_passphrase' otherwise. */
-const proveBy = ({ vault }: Born, passphrase: string) => PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(passphrase), vault.world)
+function proveBy({ vault }: Born, passphrase: string) { return PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(passphrase), vault.world) }
 
 /** Moves the row past what the attempt read, as another device does just before `verb`'s commit reaches the vaultDB. */
-const movedBeforeCommit = ({ opts: { vaultDB }, demandStored, putBehindOurBack }: Born, verb: 'tryReplacePassphrase' | 'tryAddPasskey' | 'tryRevokePasskey') => {
+function movedBeforeCommit({ opts: { vaultDB }, demandStored, putBehindOurBack }: Born, verb: 'tryReplacePassphrase' | 'tryAddPasskey' | 'tryRevokePasskey') {
   const commit = vaultDB[verb].bind(vaultDB) as (record: never, opts: never) => Promise<never>
   const crossing = (record: never, opts: never) => {
     putBehindOurBack(demandStored())

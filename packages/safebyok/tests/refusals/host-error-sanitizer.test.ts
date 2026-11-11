@@ -4,7 +4,7 @@ import * as HostErrorSanitizer from '../../src/refusals/host-error-sanitizer'
 import * as TH from '../test-helpers'
 
 /** An error from outside safebyok that quotes what it was handed, as a storage client's may. */
-const quotingError = () => {
+function quotingError() {
   const err = new Error('Validator error: got `sk-ant-fake-pasted-key` for note', { cause: new Error('beneath: sk-ant-fake-cause') })
   return Object.assign(err, { args: { note: 'sk-ant-fake-in-a-property' } })
 }
@@ -43,7 +43,7 @@ describe("HostErrorSanitizer.refusalFor", () => {
 
   // Each getter notes its read before it throws, so a read swallowed by a catch is still caught.
   const getterReads: string[] = []
-  const notedTrap = (field: string): never => { getterReads.push(field); return quotingTrap() }
+  function notedTrap(field: string): never { getterReads.push(field); return quotingTrap() }
 
   const HostileCases = [
     [undefined,                     'replaces a thrown undefined'],
@@ -63,7 +63,7 @@ describe("HostErrorSanitizer.refusalFor", () => {
 
   it("replaces a key deriver's error that quotes the passphrase", async () => {
     const keyDeriver = { deriveKeyBytes: (passphrase: string) => Promise.reject(new TypeError(`cannot derive ${passphrase}`)) }
-    const deriveOrRefuse = async (passphrase: string) => {
+    async function deriveOrRefuse(passphrase: string) {
       let handed: unknown
       try { handed = await keyDeriver.deriveKeyBytes(passphrase) } catch (err) {
         throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', 'The keyDeriver handed to Bank.make threw rather than deriving a key. What it threw is left out of this report, as the deriver hears the passphrase.')
@@ -78,7 +78,7 @@ describe("HostErrorSanitizer.refusalFor", () => {
   // HostErrorSanitizer.refusalFor @example
   it("replaces a storage client's error", async () => {
     const client = { mutation: () => Promise.reject(quotingError()) }
-    const putBox = async () => {
+    async function putBox() {
       try {
         return await client.mutation()
       } catch (err) {

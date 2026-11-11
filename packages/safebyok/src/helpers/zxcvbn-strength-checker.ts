@@ -16,23 +16,23 @@ export const MinPassphraseChars = 12
 export const MinZxcvbnScore = 3
 // --
 
-// == [The checker]: checkerInput, graphemeCount, makeZxcvbnStrengthChecker, zxcvbnStrengthChecker
+// == [The checker]: checkerArgs, graphemeCount, makeZxcvbnStrengthChecker, zxcvbnStrengthChecker
 
 /** What the checker is handed: the passphrase as typed, and the scope of its vault. */
-const checkerInput = objCheck(({ passphraseCleartext, vaultScope }) => ({ typed: passphraseCleartext, scope: vaultScope }), 'bad_option', [GX, CX])
+const checkerArgs = objCheck(({ passphraseCleartext, vaultScope }) => ({ typed: passphraseCleartext, scope: vaultScope }), 'bad_option', [GX, CX])
 
 // Intl.Segmenter is missing from browsers before 2024 and from React Native's Hermes; there each code point counts as one.
 /** How many characters `typed` contains, as its reader counts them. */
-const graphemeCount = (typed: string): number => (
-  typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter().segment(typed)].length : (typed.match(/./gsu) ?? []).length
-)
+function graphemeCount(typed: string): number {
+  return typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter().segment(typed)].length : (typed.match(/./gsu) ?? []).length
+}
 
 // The dictionary is most of zxcvbn's weight, so it comes in as a chunk of its own, at the bank's hello, never at import.
 // A failed import leaves the judge unbuilt, so the next load tries again.
 /** A strength checker with a zxcvbn judge of its own, built over the common dictionary at its first load. */
-const makeZxcvbnStrengthChecker = () => {
+function makeZxcvbnStrengthChecker() {
   let judgeLoaded: ZxcvbnFactory | undefined
-  const loadJudge = async (): Promise<ZxcvbnFactory> => {
+  async function loadJudge(): Promise<ZxcvbnFactory> {
     if (judgeLoaded === undefined) {
       const { dictionary, adjacencyGraphs } = await import('@zxcvbn-ts/language-common')
       judgeLoaded ??= new ZxcvbnFactory({ dictionary, graphs: adjacencyGraphs, useLevenshteinDistance: true })
@@ -40,7 +40,7 @@ const makeZxcvbnStrengthChecker = () => {
     return judgeLoaded
   }
   const judgeStrength = async (passphrase: string, vaultScope: VaultScope): Promise<PassphraseVerdict> => {
-    const { typed, scope: { applabel, user_id, vaultlabel } } = checkerInput.parse({ typed: passphrase, scope: vaultScope })
+    const { typed, scope: { applabel, user_id, vaultlabel } } = checkerArgs.parse({ typed: passphrase, scope: vaultScope })
     if (graphemeCount(typed) < MinPassphraseChars) { return { strong: false, reason: Phrases.passphraseTooShort(MinPassphraseChars) } }
     let judge: ZxcvbnFactory
     try {

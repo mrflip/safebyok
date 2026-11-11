@@ -1,4 +1,4 @@
-/** What the checks say when input fails them, every such sentence in one place, and the sentences of bank.ts's and vault.ts's own refusals and a vault's bad news (a refusal they pass on from another module, refusals.ts or gating.ts, keeps its words there): so wording and tone are reviewed together, and so is the rule that none quotes the input.
+/** What the checks say when input fails them, every such sentence in one place, and the sentences of bank.ts's and vault.ts's own refusals and a vault's bad news (a refusal they pass on from another module, refusals/throwers.ts or gating.ts, keeps its words there): so wording and tone are reviewed together, and so is the rule that none quotes the input.
  * The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts.
  */
 
@@ -52,7 +52,7 @@ export const VaultDBExpected = "Expected a VaultDB: an adapter or client branded
 export const DeviceDBExpected = "Expected a DeviceDB: an instance of a class extending safebyok's DeviceDB"
 
 /** Anything but bytes, a Uint8Array, `count` of them when that many are asked. */
-export const bytesExpected = (count?: number): string => (count === undefined ? "Expected bytes, a Uint8Array" : `Expected ${String(count)} bytes, a Uint8Array`)
+export function bytesExpected(count?: number): string { return (count === undefined ? "Expected bytes, a Uint8Array" : `Expected ${String(count)} bytes, a Uint8Array`) }
 
 /** Anything but a leaseKey as `makeLeaseKey` makes one, where a lease record keeps its key. */
 export const LeaseKeyExpected = "Expected a non-extractable AES-GCM CryptoKey for wrapKey and unwrapKey"
@@ -74,10 +74,10 @@ export const VaultErrorExpected = "Expected a VaultError"
 // == [Passphrases]: passphraseSaltShape, passphraseTooShort, PassphraseGuessable, PassphraseUnjudged
 
 /** A passphrase wayin's salt that is not `saltChars` characters of base64url text, for `saltBytes` bytes. */
-export const passphraseSaltShape = (saltBytes: number, saltChars: number): string => `A passphrase salt is base64url text of ${String(saltBytes)} bytes: ${String(saltChars)} characters`
+export function passphraseSaltShape(saltBytes: number, saltChars: number): string { return `A passphrase salt is base64url text of ${String(saltBytes)} bytes: ${String(saltChars)} characters` }
 
 /** zxcvbnStrengthChecker's reason for a new passphrase of fewer than `minChars` characters. */
-export const passphraseTooShort = (minChars: number): string => `A passphrase needs ${String(minChars)} characters or more: a few words together make a strong one, and easy to remember.`
+export function passphraseTooShort(minChars: number): string { return `A passphrase needs ${String(minChars)} characters or more: a few words together make a strong one, and easy to remember.` }
 
 /** zxcvbnStrengthChecker's reason for a new passphrase a guesser would reach early. */
 export const PassphraseGuessable = "That passphrase would be easy to guess: add a word or two that don't usually go together, and leave out names, dates and this app's own words."
@@ -92,7 +92,7 @@ export const PassphraseUnjudged = "This passphrase can't be checked just now: th
 export const PasskeyAnswerUsed = "This passkey's answer was used already, and its bytes zeroed: ask the passkey again, as safebyok-react's askPasskey does, and hand in its fresh answer"
 
 /** A passkey's salt that is not `count` bytes of base64url text. */
-export const prfSaltShape = (count: number): string => `A passkey's salt is base64url text of ${String(count)} bytes`
+export function prfSaltShape(count: number): string { return `A passkey's salt is base64url text of ${String(count)} bytes` }
 // --
 
 // == [Options]: MinutesShape, KeyDeriverShape, LoggerShape, KeyDeriverSpecShape, memoryPerLane, StrengthCheckerShape
@@ -110,7 +110,7 @@ export const LoggerShape = "Expected a VaultLogger, with log, warn and error fun
 export const KeyDeriverSpecShape = `Expected a keyDeriverSpec: algorithm 'argon2id', key_deriver_label, memory_kib, iterations, parallelism, salt_size (${String(PassphraseSaltSize)}) and output_size`
 
 /** An Argon2id spec with less than `minKib` of memory for each of its lanes. */
-export const memoryPerLane = (minKib: number): string => `Expected at least ${String(minKib)} KiB of memory for each lane (parallelism)`
+export function memoryPerLane(minKib: number): string { return `Expected at least ${String(minKib)} KiB of memory for each lane (parallelism)` }
 
 /** A `strengthChecker` that is no checker. */
 export const StrengthCheckerShape = "Expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. Pass zxcvbnStrengthChecker from safebyok/browser, or your own (notes/configuration.md, Pluggable Passphrase Strength Checker)"
@@ -119,19 +119,19 @@ export const StrengthCheckerShape = "Expected a function from the passphrase, an
 // == [Refusals]: unknownFields, moreFailures, WhisperShape, fieldsDisagree, BagNotObject, WhisperBagShape
 
 /** An object with `count` fields it does not accept, never named, as a name may be the caller's data, and the `fieldnames` it accepts. */
-export const unknownFields = (count: number, fieldnames: readonly string[]): string => {
+export function unknownFields(count: number, fieldnames: readonly string[]): string {
   const refused = count === 1 ? 'There is a field it does not accept (its name is not repeated)' : `There are ${String(count)} fields it does not accept (their names are not repeated)`
   const accepted = fieldnames.length === 0 ? 'it accepts no fields' : `it accepts only ${fieldnames.join(', ')}`
   return `${refused}: ${accepted}. Check the spelling, or leave ${count === 1 ? 'it' : 'them'} out`
 }
 
 /** How many more failures a refusal found than it names. */
-export const moreFailures = (count: number): string => `and ${String(count)} more ${count === 1 ? 'failure' : 'failures'}`
+export function moreFailures(count: number): string { return `and ${String(count)} more ${count === 1 ? 'failure' : 'failures'}` }
 
 /** A whisper that is no plain object of JSON. */
 export const WhisperShape = "A whisper is a plain object of JSON, with no symbol key anywhere: a bare string, number, boolean, array, null or undefined cannot be put, so wrap one as { apiKey: 'sk-...' }. To empty a box, delete it (null inside an array or object is fine)"
 /** A bag whose `fieldnames` have other values than in the bag it is checked against. */
-export const fieldsDisagree = (fieldnames: readonly string[]): string => `This has another ${fieldnames.join(' and ')} than what it is checked against: a field both have must agree`
+export function fieldsDisagree(fieldnames: readonly string[]): string { return `This has another ${fieldnames.join(' and ')} than what it is checked against: a field both have must agree` }
 
 /** A bag to check another against that is not an object. */
 export const BagNotObject = "What a bag is checked against is an object, with the fields to compare"
@@ -234,7 +234,7 @@ export const OtherPrfSalt = "The passkey answered for a different salt than this
 export const UnknownKeyDeriver = "This vault was made with a key deriver this package does not carry: update safebyok, or open the vault where it was made."
 
 /** Why what a keyDeriver hands back is refused when it is not `count` fresh key bytes. */
-export const notKeyBytes = (count: number): string => `The keyDeriver handed back something other than ${String(count)} fresh key bytes.`
+export function notKeyBytes(count: number): string { return `The keyDeriver handed back something other than ${String(count)} fresh key bytes.` }
 
 /** Why a proving asked for the vaultKey before it has a wayin refuses: a bug. */
 export const WayinNotMadeYet = "A proving was asked for the vaultKey before it made or opened a wayin: a bug in the caller."
@@ -277,12 +277,12 @@ export const UnlockFirst = "The vault is locked, so nothing was read or written:
 export const LetGoInstance = "This object was let go, by a sweep, a vacate or a delete, so it answers nothing more: ask the bank for the vault again."
 
 /** Why a vault absent from storage is refused, by its vaultlabel. */
-export const vaultAbsent = (vaultlabel: string): string => `No vault is stored under the label ${vaultlabel}.`
+export function vaultAbsent(vaultlabel: string): string { return `No vault is stored under the label ${vaultlabel}.` }
 
-export const boxAbsent = (boxlabel: string): string => `No box is stored under the label ${boxlabel}.`
+export function boxAbsent(boxlabel: string): string { return `No box is stored under the label ${boxlabel}.` }
 
 /** Why a put that must find a box refuses where none is listed, with nothing fetched. */
-export const boxNotListed = (boxlabel: string): string => `No box is listed under the label ${boxlabel}, though one may be stored: call vault.hello() to list what is stored.`
+export function boxNotListed(boxlabel: string): string { return `No box is listed under the label ${boxlabel}, though one may be stored: call vault.hello() to list what is stored.` }
 
 
 export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."
@@ -325,9 +325,9 @@ export const StrengthCheckerThrew = "The strengthChecker handed to Bank.make thr
 
 export const SamePassphrase = "The new passphrase is the one the vault has already, so nothing was changed: choose another."
 
-export const reservedDeriverLabel = (prefix: string): string => `Labels beginning ${prefix} are reserved for the specs safebyok supplies, present and future: choose a label of your own, naming your app, say.`
+export function reservedDeriverLabel(prefix: string): string { return `Labels beginning ${prefix} are reserved for the specs safebyok supplies, present and future: choose a label of your own, naming your app, say.` }
 
-export const suppliedSpecChanged = (label: string): string => `A key deriver labelled ${label} must carry that spec's parameters exactly, or vaults made under it will not open elsewhere: spread the exported spec into yours, or choose a label of your own.`
+export function suppliedSpecChanged(label: string): string { return `A key deriver labelled ${label} must carry that spec's parameters exactly, or vaults made under it will not open elsewhere: spread the exported spec into yours, or choose a label of your own.` }
 
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault has real secrets, open it with argon2idWebV1Deriver (from safebyok/browser), or another vetted Argon2id deriver."
 // --
@@ -339,10 +339,10 @@ export const BankHelloFirst = "This bank isn't ready: call bank.hello() and wait
 export const BankLetGo = "This bank was let go, by a sweep or a vacate, so it answers nothing more: make another with Bank.make."
 
 /** Bad news of a vault row `listVaults` set aside. */
-export const vaultStoredDamaged = (vaultlabel: string): string => `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.`
+export function vaultStoredDamaged(vaultlabel: string): string { return `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.` }
 
 /** Bad news of a box row `listBoxes` set aside. */
-export const boxStoredDamaged = (boxlabel: string): string => `The box ${boxlabel} is stored damaged, so it can't be read. It was left as it is.`
+export function boxStoredDamaged(boxlabel: string): string { return `The box ${boxlabel} is stored damaged, so it can't be read. It was left as it is.` }
 // --
 
 // == [Refusals: outcomes and helpers]: NoErrorGiven, nonErrorThrown, StorageUnavailable, UnexpectedError, UnboundCipherCtx, NoJsonText, StrengthCheckerMisanswered, StrengthCheckerLoadFailed, KeyDeriverLoadFailed
@@ -351,7 +351,7 @@ export const boxStoredDamaged = (boxlabel: string): string => `The box ${boxlabe
 export const NoErrorGiven = "What failed threw nothing: null or undefined, not an Error."
 
 /** The cause's message where what failed threw a value that is neither an Error nor a string, `typeName` its typeof. */
-export const nonErrorThrown = (typeName: string): string => `What failed threw a value of type ${typeName}, not an Error; that value is this error's cause.`
+export function nonErrorThrown(typeName: string): string { return `What failed threw a value of type ${typeName}, not an Error; that value is this error's cause.` }
 
 /** The message of `storage_unavailable` where an adapter says no more exactly what failed. */
 export const StorageUnavailable = "The vault's storage could not be reached, or failed partway: try again shortly. The storage adapter's own error is this error's cause."
@@ -399,7 +399,7 @@ export const Camped = "A live record is already stored here, and this call was t
 export const AbsentBox = "No box is stored under that label."
 
 /** A change of the gate refused, `why` saying which check it failed. */
-export const gateIssue = (why: string): string => `This change of the gate was refused: ${why}`
+export function gateIssue(why: string): string { return `This change of the gate was refused: ${why}` }
 
 /** Why a gate verb naming a registered_at the stored vault does not have is refused, as {@link gateIssue}'s `why`. */
 export const RegisteredAtNotStored = "its registered_at is not the stored one."
@@ -411,7 +411,7 @@ export const GateEpochNotNext = "its gate_epoch is not one past the stored one."
 export const OtherWayinMoved = "it moves a wayin this verb does not."
 
 /** A box record over the bytes its storage allows in one record. */
-export const boxTooLarge = (recordSizeEst: number, maxRecordSizeEst: number): string => `That box weighs ${String(recordSizeEst)} bytes, over the ${String(maxRecordSizeEst)} its storage allows in one record.`
+export function boxTooLarge(recordSizeEst: number, maxRecordSizeEst: number): string { return `That box weighs ${String(recordSizeEst)} bytes, over the ${String(maxRecordSizeEst)} its storage allows in one record.` }
 
 /** A vault with as many boxes as its storage allows. */
 export const VaultFull = "This vault has as many boxes as its storage allows."
@@ -441,16 +441,16 @@ export const GateVerbRecordMismatch = "addPasskey's record has a passkey wayin, 
 export const RecordOfOtherAddress = "A put's or del's record is at the address its ask names."
 
 /** A device database's failure in `call`, `named` the sentence naming what it threw, or blank. */
-export const deviceDBFailed = (call: string, named: string): string => `This device's own storage failed in ${call}: try again.${named}`
+export function deviceDBFailed(call: string, named: string): string { return `This device's own storage failed in ${call}: try again.${named}` }
 
 /** The sentence naming what a datastore threw, by its `name` alone. */
-export const thrownNamed = (thrownName: string): string => ` It threw ${thrownName}.`
+export function thrownNamed(thrownName: string): string { return ` It threw ${thrownName}.` }
 // --
 
 // == [Refusals: storage backends]: storageFailed, StorageIssue, IdentityRevoked, NoBrowserDatastore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserDatadeviceDBFailed, SchemaNotServed, fetchFailed, WatchEnded
 
 /** A vault's storage backend failing in `call`, `named` the sentence naming what it threw, or blank. */
-export const storageFailed = (call: string, named: string): string => `The vault's storage could not be reached, or failed, in ${call}: try again shortly.${named}`
+export function storageFailed(call: string, named: string): string { return `The vault's storage could not be reached, or failed, in ${call}: try again shortly.${named}` }
 
 /** A row out of storage that is not an object at all. */
 export const StorageIssue = "The vault's storage answered with a row that is not an object, which nothing safebyok writes could be. Trying again is unlikely to help: the database or its storage adapter needs someone to look at it."
@@ -477,7 +477,7 @@ export const BrowserDatastoreFailed = "IndexedDB failed while the vault was read
 export const SchemaNotServed = "The GraphQL server answered without what was asked of it: is it serving safebyok-graphql's VaultSchemaSdl?"
 
 /** A request to a GraphQL server that failed, named by what it threw, its HTTP status and its code, where each is known. */
-export const fetchFailed = (thrownName: string, status: number | null, code: string | null): string => {
+export function fetchFailed(thrownName: string, status: number | null, code: string | null): string {
   const said = [thrownName, ...((status === null) ? [] : [`HTTP ${String(status)}`]), ...((code === null) ? [] : [code])]
   return `A request to the GraphQL server failed: ${said.join(', ')}.`
 }

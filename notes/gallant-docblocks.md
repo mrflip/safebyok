@@ -41,7 +41,7 @@ it carried the same sentence, and `notes/answer-contract.md` already says it onc
 /** The act a vault's get, put or del amounts to over `vaultRaw`, the row stored at its scope or null for none.
  * Nothing is stored here: where {@link isWriteAct} holds of the act, the caller stores the request's record, in the atomic unit it fetched the row in.
  */
-export const vaultActOf = (request: VaultRequest, vaultRaw: unknown): VaultAct => {
+export function vaultActOf(request: VaultRequest, vaultRaw: unknown): VaultAct {
 ```
 
 **Gallant:**
@@ -434,7 +434,7 @@ The first pairs (`create`, `demandUnsealable`) are in `notes/gallant.md`.
  * 'bad_option' for a key deriver a vault does not keep, or a clock that throws or reads out of
  * bounds. The limits are held to the default `vaultDB`'s here, and to a vault's own at its birth.
  */
-export const parseMakeBankOpts = (opts: MakeBankOpts): ParsedBankOpts => {
+export function parseMakeBankOpts(opts: MakeBankOpts): ParsedBankOpts {
 ```
 
 Every refusal kind in throw order, chained with "then" and semicolons.
@@ -551,7 +551,7 @@ Redefines sidecar, which `Sidecar` in shapes/shapes-core.ts already defines.
 /** True when a stored row is a tombstone, the mark a deleted vault leaves in its place: judged by its `format` alone.
  * A tombstone too damaged to parse still reads as one, so it is never taken for a vault record.
  */
-export const isTombstone = (stored: unknown): boolean => fieldOf(stored, 'format') === TombstoneFormat
+export function isTombstone(stored: unknown): boolean { return fieldOf(stored, 'format') === TombstoneFormat }
 ```
 
 A predicate redefines tombstone in an appositive.
@@ -646,7 +646,7 @@ Invented figures of speech: "bare of its level", "what a refusal is over". Nothi
 ```ts
 // storage/classifier.ts
 /** How a box request citing `vault_tok` finds `vault`, its vault's row. */
-const gateOf = (vault: Found<VaultRow>, vault_tok: string): Exclude<Gate, 'full'> => {
+function gateOf(vault: Found<VaultRow>, vault_tok: string): Exclude<Gate, 'full'> {
 ```
 
 A "How a foo verbs" opening, its verb a metaphor: "finds" stands for "the state it is in".
@@ -667,7 +667,7 @@ A "How a foo verbs" opening, its verb a metaphor: "finds" stands for "the state 
  * Each stamp may come whole, a Vault object or a lease record: only its stamp fields are taken.
  * It refuses 'bad_record' for one missing any of them.
  */
-export const leaseCtxOf = (vaultStamp: VaultStampButFormat, leaseStamp: LeaseStamp): Uint8Array => (
+export function leaseCtxOf(vaultStamp: VaultStampButFormat, leaseStamp: LeaseStamp): Uint8Array {
 ```
 
 The block spends its words on how the ctx is made and on a refusal, and never says what the binding is for.
@@ -747,7 +747,7 @@ An invariant for maintainers inside the doc block.
  * No JavaScript engine promises constant time, but nothing here branches on a byte: only the
  * verdict steers what follows, and the refusal of an all-zero output tells that anyway.
  */
-const isAllZero = (bytes: Uint8Array): boolean => bytes.reduce((seen, byte) => seen | byte, 0) === 0
+function isAllZero(bytes: Uint8Array): boolean { return bytes.reduce((seen, byte) => seen | byte, 0) === 0 }
 ```
 
 The reason fills the block. And the `reduce`, though branch-free, does not read as the idiom a reviewer knows.
@@ -759,7 +759,7 @@ The reason fills the block. And the `reduce`, though branch-free, does not read 
 // early and `for of` would allocate an iterator. No JavaScript engine promises constant time; only the verdict steers what
 // follows, and the refusal of an all-zero key tells that anyway.
 /** True when every byte of `bytes` is zero. */
-const isSafelyAllZero = (bytes: Uint8Array): boolean => {
+function isSafelyAllZero(bytes: Uint8Array): boolean {
   let   seen = 0
   const len  = bytes.length
   for (let ii = 0; ii < len; ii++) { seen |= bytes[ii] ?? 0 }
@@ -772,7 +772,7 @@ const isSafelyAllZero = (bytes: Uint8Array): boolean => {
 ```ts
 // storage/vault-db-shapes.ts
 /** The tombstone of a vault row nothing holds. A damaged listing's label comes from storage, and is not checked here: it is part of what is reported. */
-export const sentinelVaultOf = ({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone => ({
+export function sentinelVaultOf({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone {
 ```
 
 A maintainer's note on what is not checked here, and why.

@@ -21,7 +21,7 @@ const pgPool = DB.Checker(({ custom }) => custom<PgPool>(isPgPool, 'Expected a p
 // --
 
 /** Roll back the transaction on `conn`. Returns false if the ROLLBACK itself failed. */
-const rollBack = async (conn: PgPoolClient): Promise<boolean> => {
+async function rollBack(conn: PgPoolClient): Promise<boolean> {
   try {
     await conn.query('ROLLBACK')
     return true
@@ -31,7 +31,7 @@ const rollBack = async (conn: PgPoolClient): Promise<boolean> => {
 }
 
 /** Wrap a pg Pool as a {@link PostgresClient}: `new PostgresVaultDB({ client: pgClientOf(pool) })`. */
-export const pgClientOf = (given: PgPool): PostgresClient => {
+export function pgClientOf(given: PgPool): PostgresClient {
   const pool = pgPool.parse(given)
   return {
     query:       async (text, params) => await pool.query(text, params),

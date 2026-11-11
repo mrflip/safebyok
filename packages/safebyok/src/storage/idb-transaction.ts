@@ -9,7 +9,7 @@ import { storageBlocked, storageFull, storageUnavailable } from '../refusals/thr
 // == [The transaction]: inOneStep, workOrAbandon, abortOf, abandon, rowAt
 
 /** What `work` returns, once its transaction on `shelf` has committed. */
-export const inOneStep = async <ValT>(shelf: UseStore, txMode: IDBTransactionMode, work: (store: IDBObjectStore) => ValT | Promise<ValT>): Promise<ValT> => {
+export async function inOneStep<ValT>(shelf: UseStore, txMode: IDBTransactionMode, work: (store: IDBObjectStore) => ValT | Promise<ValT>): Promise<ValT> {
   try {
     return await shelf(txMode, async (store) => {
       const ended = abortOf(store.transaction)
@@ -27,7 +27,7 @@ export const inOneStep = async <ValT>(shelf: UseStore, txMode: IDBTransactionMod
 // else (a timer, a fetch, WebCrypto) lets IndexedDB commit the transaction midway.
 
 /** What `work` returns on `store`; if it throws, the transaction aborts. */
-const workOrAbandon = async <ValT>(store: IDBObjectStore, work: (store: IDBObjectStore) => ValT | Promise<ValT>): Promise<ValT> => {
+async function workOrAbandon<ValT>(store: IDBObjectStore, work: (store: IDBObjectStore) => ValT | Promise<ValT>): Promise<ValT> {
   try {
     return await work(store)
   } catch (err) {
@@ -37,13 +37,15 @@ const workOrAbandon = async <ValT>(store: IDBObjectStore, work: (store: IDBObjec
 }
 
 /** Null once `transaction` commits, or the error it aborted with. */
-const abortOf = (transaction: IDBTransaction): Promise<Error | null> => new Promise((resolve) => {
-  transaction.addEventListener('complete', () => { resolve(null) })
-  transaction.addEventListener('abort', () => { resolve(transaction.error ?? new DOMException(Phrases.TransactionAborted, 'AbortError')) })
-})
+function abortOf(transaction: IDBTransaction): Promise<Error | null> {
+  return new Promise((resolve) => {
+    transaction.addEventListener('complete', () => { resolve(null) })
+    transaction.addEventListener('abort', () => { resolve(transaction.error ?? new DOMException(Phrases.TransactionAborted, 'AbortError')) })
+  })
+}
 
 /** Abort `transaction`, where it has not already committed. */
-const abandon = (transaction: IDBTransaction): void => {
+function abandon(transaction: IDBTransaction): void {
   try {
     transaction.abort()
   } catch {
@@ -52,15 +54,15 @@ const abandon = (transaction: IDBTransaction): void => {
 }
 
 /** The row filed at `scopepath`, or null for none. */
-export const rowAt = async (store: IDBObjectStore, scopepath: IDBValidKey): Promise<unknown> => (
-  (await promisifyRequest<unknown>(store.get(scopepath))) ?? null
-)
+export async function rowAt(store: IDBObjectStore, scopepath: IDBValidKey): Promise<unknown> {
+  return (await promisifyRequest<unknown>(store.get(scopepath))) ?? null
+}
 // --
 
 // == [Trouble]: troubleOf
 
 /** The refusal that says what went wrong in IndexedDB. */
-const troubleOf = (err: unknown): VaultError => {
+function troubleOf(err: unknown): VaultError {
   if (isVaultError(err)) { return err }
   // A browser with IndexedDB switched off may have the global as null rather than leave it out.
   if ((typeof indexedDB === 'undefined') || ((indexedDB as IDBFactory | null) === null)) { return storageBlocked(err, Phrases.NoBrowserDatastore) }

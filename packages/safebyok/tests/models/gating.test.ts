@@ -19,7 +19,7 @@ const Wrong = 'not the passphrase at all'
 const strengthChecker = (passphrase: string) => (passphrase === 'weak' ? { strong: false as const, reason: "too short" } : { strong: true as const })
 
 /** A dialog that shows each gating to the test, and stays up until it concludes. */
-const makeDialog = () => {
+function makeDialog() {
   const shown: AnyGating[] = []
   return {
     requestCleartext: (gating: AnyGating) => {
@@ -40,20 +40,20 @@ const makeDialog = () => {
 const unnarrowedDialog: RequestCleartext = async (gating) => { await gating.attempt({ passphraseClear }) }
 
 /** A promise, and the function that resolves it. */
-const heldOpen = () => {
+function heldOpen() {
   let release!: () => void
   const held = new Promise<void>((resolve) => { release = resolve })
   return { held, release }
 }
 
 /** A fresh world with a dialog, nothing stored. */
-const birthWorld = (worldOverrides: VaultWorldGiven = {}) => {
+function birthWorld(worldOverrides: VaultWorldGiven = {}) {
   const dialog = makeDialog()
   return { ...dialog, ...makeVaultWorld(null, { requestCleartext: dialog.requestCleartext, ...worldOverrides }) }
 }
 
 /** A vault born under {@link Passphrase}, locked, its cached lease forgotten, in a world with a dialog. */
-const lockedVault = async (born = makeBornVault()) => {
+async function lockedVault(born = makeBornVault()) {
   const world = await born
   const dialog = makeDialog()
   world.fakeBank.requestCleartext = dialog.requestCleartext

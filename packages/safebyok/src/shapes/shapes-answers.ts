@@ -52,7 +52,7 @@ export type CrossedReqParams = Z.output<typeof crossedReqParams>
 // == [Answers]: listVaultsAnswer, getVaultAnswer, putVaultAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delVaultAnswer, listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer, crossedNotice
 
 /** The answer a verb returns, made from the one that crossed: its request's metadata as the core has it, and its refusal a VaultError again. */
-const answerOfCrossed = <ValT, ActT extends string, WorldT>(crossed: Crossed<ValT, ActT, WorldT>): Answer<ValT, ActT, WorldT> => {
+function answerOfCrossed<ValT, ActT extends string, WorldT>(crossed: Crossed<ValT, ActT, WorldT>): Answer<ValT, ActT, WorldT> {
   const req_params = reqParamsOfCrossed(crossed.req_params)
   if (crossed.ok) { return { ok: true, act: crossed.act, val: crossed.val, world: crossed.world, dbhas: crossed.dbhas, req_params } }
   const { act, world, dbhas } = crossed
@@ -66,12 +66,12 @@ type Crossed<ValT, ActT extends string, WorldT> = { req_params: CrossedReqParams
 )
 
 /** `crossed` as the core has a request's metadata, each null field left out. */
-const reqParamsOfCrossed = (crossed: CrossedReqParams): ReqParams => (
-  Object.fromEntries(Object.entries(crossed).filter(([, field]) => field !== null))
-)
+function reqParamsOfCrossed(crossed: CrossedReqParams): ReqParams {
+  return Object.fromEntries(Object.entries(crossed).filter(([, field]) => field !== null))
+}
 
 /** The VaultError `crossed` stands for, its meta with what crossed and what the answer has. */
-const vaultErrorOfCrossed = ({ refusalkind, message, meta }: CrossedErr, answered: RefusalMeta, rows: RefusalRows): VaultError => {
+function vaultErrorOfCrossed({ refusalkind, message, meta }: CrossedErr, answered: RefusalMeta, rows: RefusalRows): VaultError {
   const crossedMeta = Object.fromEntries(Object.entries(meta ?? {}).filter(([, field]) => field !== null)) as RefusalMeta
   return new VaultError(refusalkind, message, { meta: { ...crossedMeta, ...answered }, rows })
 }
@@ -85,12 +85,14 @@ export const {
   type AnswerParts<ValT extends Z.ZodType, ActsT extends readonly [string, ...string[]], WorldT extends Z.ZodType> = {
     val: ValT, acts: ActsT, world: WorldT, badWorld: Z.ZodType, dbhas: Z.ZodType,
   }
-  const answerCheck = <ValT extends Z.ZodType, const ActsT extends readonly [string, ...string[]], WorldT extends Z.ZodType>(
+  function answerCheck<ValT extends Z.ZodType, const ActsT extends readonly [string, ...string[]], WorldT extends Z.ZodType>(
     { val, acts, world, badWorld, dbhas }: AnswerParts<ValT, ActsT, WorldT>,
-  ) => discrim('ok', [
-    obj({ ok: lit(true), act: oneof(acts), val, world, dbhas: dbhas.nullable().default(null), req_params: crossedReqParams, err: lit(null).default(null) }).strict(),
-    obj({ ok: lit(false), act: str, val: lit(null).default(null), world: badWorld.nullable().default(null), dbhas: dbhas.nullable().default(null), req_params: crossedReqParams, err: crossedErr }).strict(),
-  ]).transform((crossed) => answerOfCrossed(crossed as Crossed<Z.output<ValT>, ActsT[number], Z.output<WorldT>>))
+  ) {
+    return discrim('ok', [
+      obj({ ok: lit(true), act: oneof(acts), val, world, dbhas: dbhas.nullable().default(null), req_params: crossedReqParams, err: lit(null).default(null) }).strict(),
+      obj({ ok: lit(false), act: str, val: lit(null).default(null), world: badWorld.nullable().default(null), dbhas: dbhas.nullable().default(null), req_params: crossedReqParams, err: crossedErr }).strict(),
+    ]).transform((crossed) => answerOfCrossed(crossed as Crossed<Z.output<ValT>, ActsT[number], Z.output<WorldT>>))
+  }
 
   const vaultish  = { world: SX.vaultRow, badWorld: SX.vaultRow, dbhas: SX.vaultRow }
   const boxish    = { world: SX.vaultRecord, badWorld: SX.vaultRow, dbhas: union([SX.vaultRow, SX.boxRow]) }

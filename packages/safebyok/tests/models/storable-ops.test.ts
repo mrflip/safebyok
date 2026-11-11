@@ -13,7 +13,7 @@ const world = useModelsWorld()
 // == [Hydrate]: when it fetches, the world first, the thing's horizon
 
 /** A box listing of horizon `horizonMillis`, and its box `anthropic_api_key` built from the full record seeded in the VaultDB at revision 1: received at the clock's reading, so timely from then. Calls are cleared after. */
-const timelyBoxOf = async (horizonMillis = 1000) => {
+async function timelyBoxOf(horizonMillis = 1000) {
   const { mw } = world
   const record = mw.fullBoxRecord()
   mw.seedPut(record)
@@ -24,7 +24,7 @@ const timelyBoxOf = async (horizonMillis = 1000) => {
 }
 
 /** A promise the test resolves when it chooses, to keep a call pending. */
-const makePending = () => {
+function makePending() {
   const opener = { open: (): void => undefined }
   const promise = new Promise<void>((resolve) => { opener.open = () => { resolve() } })
   return { promise, open: () => { opener.open() } }
@@ -332,7 +332,7 @@ describe("storable verbs while the vault is locked", () => {
 // == [Try forms]: outcomes, never a rejection
 
 /** The refusal a VaultDB that cannot be reached answers. */
-const storageDown = (): VaultError => new VaultError('storage_unavailable', "The storage could not be reached.")
+function storageDown(): VaultError { return new VaultError('storage_unavailable', "The storage could not be reached.") }
 
 describe("storable try forms: an outcome, never a rejection", () => {
   const GoodCases = [

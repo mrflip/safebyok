@@ -11,14 +11,14 @@ import { WorldVault, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tom
 
 const world = useModelsWorld()
 
-const good = (): BoxListingOpts => ({ scope: WorldVault.scope, vaultDB: world.mw.vaultDB, maxMillisSinceRefresh: 1000, bankFriend: world.mw.bankFriend })
+function good(): BoxListingOpts { return { scope: WorldVault.scope, vaultDB: world.mw.vaultDB, maxMillisSinceRefresh: 1000, bankFriend: world.mw.bankFriend } }
 
-const dna = () => boxDnaOf(world.mw.boxscope('anthropic_api_key'))
+function dna() { return boxDnaOf(world.mw.boxscope('anthropic_api_key')) }
 
 const Label = 'anthropic_api_key'
 
 /** Every verb a listing calls on its vaultDB, with no brand: a duck. */
-const vaultDBDuck = () => Object.fromEntries(['tryGetVault', 'tryPutVault', 'tryDelVault', 'tryListBoxes', 'tryGetBox', 'tryPutBox', 'tryDelBox', 'watch'].map((verb) => [verb, () => null]))
+function vaultDBDuck() { return Object.fromEntries(['tryGetVault', 'tryPutVault', 'tryDelVault', 'tryListBoxes', 'tryGetBox', 'tryPutBox', 'tryDelBox', 'watch'].map((verb) => [verb, () => null])) }
 
 describe("BoxListing", () => {
   describe("new BoxListing(world, opts)", () => {

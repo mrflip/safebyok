@@ -25,9 +25,9 @@ const idbVaultDBOpts = DB.objCheck(({ str, uint }) => ({ ...DB.adapterVaultDBOpt
 type Rung = { scope: VaultScope, heard: Heard }
 
 /** True when a write under `scope` falls within the `watched` scope. */
-const isHeardBy = (watched: WatchScope, scope: VaultScope): boolean => (
-  (watched.applabel === scope.applabel) && (watched.user_id === scope.user_id) && ((watched.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
-)
+function isHeardBy(watched: WatchScope, scope: VaultScope): boolean {
+  return (watched.applabel === scope.applabel) && (watched.user_id === scope.user_id) && ((watched.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
+}
 
 /** The vault scope of an ask or a row, without its other fields. */
 function scopeOf({ applabel, user_id, vaultlabel }: VaultScope): VaultScope { return { applabel, user_id, vaultlabel } }
@@ -173,4 +173,4 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
 }
 
 /** Make an {@link IdbVaultDB}: a vaultDB in this browser's IndexedDB, for an app with no backend. */
-export const idbVaultDB = (opts?: IdbVaultDBOpts): IdbVaultDB => new IdbVaultDB(opts)
+export function idbVaultDB(opts?: IdbVaultDBOpts): IdbVaultDB { return new IdbVaultDB(opts) }

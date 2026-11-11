@@ -17,7 +17,7 @@ const Stamped = { ...WorldStamp, fmt: LeaseFormat, proved_at: T0, ...GrantedAs }
 const WhisperText = '{"val":"sk-test-0000"}'
 
 /** A lease granted and cached, beside the friend that hears it. */
-const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ friend: FakeLeaseFriend, lease: Lease }> => {
+async function grantedWorld(opts?: LeaseGrantOpts): Promise<{ friend: FakeLeaseFriend, lease: Lease }> {
   const friend = fakeLeaseFriendOf()
   const lease = await makeGrantedLease(friend, opts)
   await lease.cacheAsCacheCan()
@@ -25,7 +25,7 @@ const grantedWorld = async (opts?: LeaseGrantOpts): Promise<{ friend: FakeLeaseF
 }
 
 /** A friend of {@link WorldStamp} whose slot has a record cached under `stamp`. */
-const friendWithRowOf = async (stamp: Partial<VaultStamp>): Promise<FakeLeaseFriend> => {
+async function friendWithRowOf(stamp: Partial<VaultStamp>): Promise<FakeLeaseFriend> {
   const elsewhere = fakeLeaseFriendOf(stamp)
   const lease = await makeGrantedLease(elsewhere)
   await lease.cacheAsCacheCan()

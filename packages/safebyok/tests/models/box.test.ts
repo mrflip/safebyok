@@ -12,15 +12,15 @@ const world = useModelsWorld()
 
 /** A box with `record` (the full box record `anthropic_api_key` at revision 1, by default) as received, through a listing over the test world. */
 /** A box built of `record`, with the same record in storage. */
-const builtOf = (record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> => {
+function builtOf(record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> {
   world.mw.seedPut(record)
   return boxListingOf(world.mw).build(record)
 }
 
-const boxOf = (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Promise<TestableBox> => builtOf(record)
+function boxOf(record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Promise<TestableBox> { return builtOf(record) }
 
 /** The snapshot of a box with `record`, as `getSnapshot` answers it. */
-const snapshotOf = async (record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Promise<BoxSnapshot> => {
+async function snapshotOf(record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Promise<BoxSnapshot> {
   const box = await boxOf(record)
   return box.getSnapshot()
 }
@@ -414,10 +414,12 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
   })
 
   /** A record handed back as a patch, every field the box controls given and none of it heeded. */
-  const roundTripOf = (record: BoxRecord) => ({
-    ...record, revision_tok: 'rev-ignored', revision_seq: 99, am: 'x' as never, written_at: T0 + 99, registered_at: T0 + 99,
-    whisper: { apiKey: 'sk-test-1111' }, sidecar: { note: 'round trip' },
-  } as const)
+  function roundTripOf(record: BoxRecord) {
+    return {
+      ...record, revision_tok: 'rev-ignored', revision_seq: 99, am: 'x' as never, written_at: T0 + 99, registered_at: T0 + 99,
+      whisper: { apiKey: 'sk-test-1111' }, sidecar: { note: 'round trip' },
+    } as const
+  }
 
   it("takes { ...record, whisper, sidecar } and puts the next revision over the cached one", async () => {
     const record = fullBoxRecord()

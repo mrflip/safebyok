@@ -18,10 +18,10 @@ export type GoodOutcome<ValT> = { ok: true, val: ValT, err?: never }
 export type BadOutcome = { ok: false, val?: never, err: VaultError }
 
 /** `val` as the outcome of a call that succeeded. */
-export const good = <ValT>(val: ValT): GoodOutcome<ValT> => ({ ok: true, val })
+export function good<ValT>(val: ValT): GoodOutcome<ValT> { return { ok: true, val } }
 
 /** `err` as the outcome of a call that was refused. */
-export const bad = (err: VaultError): BadOutcome => ({ ok: false, err })
+export function bad(err: VaultError): BadOutcome { return { ok: false, err } }
 
 /** The outcome of `thunk`, a body that refuses by throwing: what it returns as a good outcome, what it throws as a bad one. Never rejects.
  * A thrown VaultError is kept as it came, as {@link isVaultError} tells one. Anything else thrown
@@ -35,7 +35,7 @@ export const bad = (err: VaultError): BadOutcome => ({ ok: false, err })
  *   const { ok, val, err } = await outcomeOf(() => fetchBackup(vaultlabel), storageUnavailable)
  *   if (! ok) { showGripe(err.message) }
  */
-export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwise: (thrown: unknown) => VaultError = unexpectedError): Promise<Outcome<ValT>> => {
+export async function outcomeOf<ValT>(thunk: () => ValT | Promise<ValT>, otherwise: (thrown: unknown) => VaultError = unexpectedError): Promise<Outcome<ValT>> {
   try {
     return good(await thunk())
   } catch (err) {
@@ -48,19 +48,19 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
  * @example
  *   try { return await client.query(sql, params) } catch (err) { throw storageRefusalOf(err) }   // a driver's Error as storage_unavailable, its words kept in the cause
  */
-export const storageRefusalOf = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : storageUnavailable(thrown))
+export function storageRefusalOf(thrown: unknown): VaultError { return (isVaultError(thrown) ? thrown : storageUnavailable(thrown)) }
 
-/** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome}.
+/** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome} (use {@link demandGood} if you just want the throw).
  *
  * @example const listed = valOf(await vaultDB.tryGetVault(scope))  // throws the refusal, if any: what vaultDB.getVault(scope) does itself
  */
-export const valOf = <ValT>(outcome: Outcome<ValT>): ValT => {
+export function valOf<ValT>(outcome: Outcome<ValT>): ValT {
   if (! outcome.ok) { throw outcome.err }
   return outcome.val
 }
 
-/** `outcome` itself when it is good, or its `err` thrown. */
-export const demandGood = <OutcomeT extends Outcome<unknown>>(outcome: OutcomeT): Extract<OutcomeT, { ok: true }> => {
+/** `outcome` itself when it is good, or its `err` thrown (use {@link valOf} to extract the value). */
+export function demandGood<OutcomeT extends Outcome<unknown>>(outcome: OutcomeT): Extract<OutcomeT, { ok: true }> {
   if (! outcome.ok) { throw outcome.err }
   return outcome as Extract<OutcomeT, { ok: true }>  // narrowed by the ok just tested
 }

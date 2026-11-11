@@ -212,5 +212,5 @@ export class Lease implements LeaseStamp {
 // == [Judging the cached record]: isPastAutolock
 
 /** True once a row was proved longer ago than the autolock duration: due for locking, as `bank.autolock` judges it. */
-const isPastAutolock = ({ proved_at }: LeaseStamp, { leaseMillis }: LeaseFriend): boolean => nowMillis() - proved_at > leaseMillis
+function isPastAutolock({ proved_at }: LeaseStamp, { leaseMillis }: LeaseFriend): boolean { return nowMillis() - proved_at > leaseMillis }
 // --

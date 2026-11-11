@@ -167,7 +167,7 @@ export const tidyGone = mutation({
   handler: async (ctx, { scope }) => {
     const vaultDocs = await listVaultDocs(ctx.db, scope)
     const vaultsBylabel = new Map(vaultDocs.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
-    const isOver = ({ vaultlabel, vault_tok }: Life) => DB.isLifeOver(vaultsBylabel.get(vaultlabel) ?? null, vault_tok)
+    function isOver({ vaultlabel, vault_tok }: Life) { return DB.isLifeOver(vaultsBylabel.get(vaultlabel) ?? null, vault_tok) }
     const boxDocs = await listBoxDocs(ctx.db, scope)
     const tallyDocs = await listTallyDocs(ctx.db, scope)
     const overBoxDocs = boxDocs.filter((boxDoc) => isOver(boxDoc))

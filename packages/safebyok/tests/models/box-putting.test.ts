@@ -10,7 +10,7 @@ import { FakeBoxKeyWrapped, FakeWhisperCiphered, type TestableBox, boxListingOf,
 const world = useModelsWorld()
 
 /** A box built of `record`, with the same record in storage. */
-const builtOf = (record: Fetched<BoxRecord, BoxSparse>, listing: TestableBoxListing = boxListingOf(world.mw)): Promise<TestableBox> => {
+function builtOf(record: Fetched<BoxRecord, BoxSparse>, listing: TestableBoxListing = boxListingOf(world.mw)): Promise<TestableBox> {
   world.mw.seedPut(record)
   return listing.build(record)
 }

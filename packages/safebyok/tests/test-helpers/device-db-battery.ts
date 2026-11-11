@@ -50,26 +50,26 @@ const Hour = 3_600_000
 const asked = { ...vaultScope, vault_tok: 'tok_one' }
 
 /** A lease row of the vault `asked` names, its leaseKey a real handle, its other fields opaque. */
-const leaseRowOf = async (over: Partial<LeaseRow> = {}): Promise<LeaseRow> => ({ ...asked, proved_at: T0, lease_key: await makeLeaseKey(), wrapped: 'opaque', ...over })
+async function leaseRowOf(over: Partial<LeaseRow> = {}): Promise<LeaseRow> { return { ...asked, proved_at: T0, lease_key: await makeLeaseKey(), wrapped: 'opaque', ...over } }
 
 /** The scopepath a DeviceDB files the lease row of `scope` under. */
-const scopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath => [applabel, user_id, vaultlabel]
+function scopepathOf({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath { return [applabel, user_id, vaultlabel] }
 
 /** A raw row, as the bag a case reads a field of. */
-const bagOf = (row: unknown): Record<string, unknown> => row as Record<string, unknown>
+function bagOf(row: unknown): Record<string, unknown> { return row as Record<string, unknown> }
 // --
 
 // == [The battery]: describeDeviceDBBattery
 
 /** Stands in for a hook the DeviceDB did not give, in a case that is skipped without it. */
-const notGiven = (hookname: string) => (): never => { throw new TypeError(`The DeviceDB gave the battery no ${hookname}.`) }
+function notGiven(hookname: string) { return (): never => { throw new TypeError(`The DeviceDB gave the battery no ${hookname}.`) } }
 
 // The opts are checked before anything registers, so a DeviceDB missing a hook fails here, not inside each case.
 /** Registers the cases every DeviceDB must pass, under `label`. */
-export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opts: DeviceDBBatteryOpts<DBT>): void => {
+export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opts: DeviceDBBatteryOpts<DBT>): void {
   batteryOpts.parse(opts, { where: `describeDeviceDBBattery("${label}")` })
   const { makeDeviceDB, _cheat_rowsOf, _cheat_failNextCall } = opts
-  const fresh = async (): Promise<DBT> => makeDeviceDB()
+  async function fresh(): Promise<DBT> { return makeDeviceDB() }
   const rowsOf = _cheat_rowsOf ?? notGiven('_cheat_rowsOf')
   const failNextCall = _cheat_failNextCall ?? notGiven('_cheat_failNextCall')
   const noRows = _cheat_rowsOf === undefined

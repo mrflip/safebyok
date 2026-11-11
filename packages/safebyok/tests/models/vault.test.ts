@@ -131,7 +131,7 @@ describe("vault.receiveWorld(world)", () => {
 
 const Horizon = 10 * 60_000
 
-const bornWithGets = async () => {
+async function bornWithGets() {
   const born = await makeBornVault()
   return { ...born, gets: vi.spyOn(born.opts.vaultDB, 'tryGetVault') }
 }

@@ -12,7 +12,7 @@ const Whisper = { apiKey: 'sk-test-0000', orgId: null }
 const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sidecar: { account: 'work' } }
 
 /** Box listings whose world is a real vault, born unlocked under `Passphrase`, over its vaultDB. */
-const sealWorld = async () => {
+async function sealWorld() {
   const vaultWorld = makeVaultWorld()
   const vault = await buildTyping(vaultWorld.listing, Dna, { passphraseClear: Passphrase })
   const boxesOf = () => new TestableBoxListing(boxWorldOf(vault), { ...vaultWorld.opts, scope: vault.scope })

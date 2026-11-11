@@ -36,7 +36,7 @@ const versionedShelfSpec = objCheck(({ str, arr }) => ({
 const shelves = new Map<string, UseStore>()
 
 /** The page's shelf for the database `dbName:dbstem-v<version>`, made on the first call. */
-export const versionedShelfOf = (spec: VersionedShelfSpec): UseStore => {
+export function versionedShelfOf(spec: VersionedShelfSpec): UseStore {
   const checked = versionedShelfSpec.parse(spec, { where: 'versionedShelfOf' })
   const dbname = `${checked.dbName}:${checked.dbstem}-v${checked.version}`
   const kept = shelves.get(dbname)
@@ -57,10 +57,10 @@ export const versionedShelfOf = (spec: VersionedShelfSpec): UseStore => {
 
 // A test's backdoor, reached from `safebyok/testing` and never from `safebyok/storage`.
 /** For tests only: the next {@link versionedShelfOf} of the database `dbname` opens a connection of its own. */
-export const _cheat_forgetShelf = (dbname: string): void => { shelves.delete(dbname) }
+export function _cheat_forgetShelf(dbname: string): void { shelves.delete(dbname) }
 
 /** True for the name of a database of `spec`'s stem at an older version. */
-const isOlderDBName = (spec: VersionedShelfSpec, dbname: string): boolean => {
+function isOlderDBName(spec: VersionedShelfSpec, dbname: string): boolean {
   const stemmed = `${spec.dbName}:${spec.dbstem}-v`
   if (! dbname.startsWith(stemmed)) { return false }
   const version = dbname.slice(stemmed.length)
@@ -71,7 +71,7 @@ const isOlderDBName = (spec: VersionedShelfSpec, dbname: string): boolean => {
 // Old databases are deleted by name, because not every browser lists its databases. The wipe is housekeeping: a browser that
 // cannot list them keeps its older versioned ones rather than failing the vault.
 /** Start the deletion of each of `spec`'s old databases. */
-const wipeOlderDBs = async (spec: VersionedShelfSpec): Promise<void> => {
+async function wipeOlderDBs(spec: VersionedShelfSpec): Promise<void> {
   try {
     for (const oldname of spec.oldnames) { indexedDB.deleteDatabase(oldname) }
     const listed = await indexedDB.databases()

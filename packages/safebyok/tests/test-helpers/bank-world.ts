@@ -27,7 +27,7 @@ export const VaultScopeGiven = Object.freeze({ vaultlabel: Dna.vaultlabel })
 export const OtherScopeGiven = Object.freeze({ vaultlabel: 'other' })
 
 /** The vaultlabels of a snapshot's vaults, in its order. */
-export const labelsOf = ({ vaults }: BankSnapshot): string[] => vaults.map(({ vaultlabel }) => vaultlabel)
+export function labelsOf({ vaults }: BankSnapshot): string[] { return vaults.map(({ vaultlabel }) => vaultlabel) }
 
 /** A {@link MemoryVaultDB} that refuses every vault get, once told to, as a VaultDB out of reach or a user signed out does. */
 export class RefusingVaultDB extends MemoryVaultDB {
@@ -61,7 +61,7 @@ export const useBankWorlds = (): void => {
 }
 
 /** A vaultDB, a deviceDB, a scripted dialog and a movable clock for tests of a bank. */
-export const makeBankWorld = () => {
+export function makeBankWorld() {
   let now = T0
   _cheat_clock(() => now)
   const vaultDB = new RefusingVaultDB()
@@ -87,7 +87,7 @@ export const makeBankWorld = () => {
 export type BankWorld = ReturnType<typeof makeBankWorld>
 
 /** A bank past its `hello`, with the vault of `Dna` built in it and unlocked. */
-export const makeBankWithVault = async (world: BankWorld = makeBankWorld(), overrides: Partial<BankOpts> = {}) => {
+export async function makeBankWithVault(world: BankWorld = makeBankWorld(), overrides: Partial<BankOpts> = {}) {
   const bank = world.bankOn(overrides)
   await bank.hello()
   const vault = await bank.ensureVault(VaultScopeGiven)

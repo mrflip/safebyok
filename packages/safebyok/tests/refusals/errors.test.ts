@@ -5,18 +5,18 @@ import { VaultError, RefusalFamilyForKind, refusalFamilyVals, refusalkindVals, t
 const errorsSource = readFileSync(new URL('../../src/refusals/errors.ts', import.meta.url), 'utf8')
 
 /** The text of errors.ts from `from` up to the next `until`. */
-const sourceBetween = (from: string, until: string): string => {
+function sourceBetween(from: string, until: string): string {
   const start = errorsSource.indexOf(from)
   return errorsSource.slice(start, errorsSource.indexOf(until, start))
 }
 
 /** The kinds a doc block names, in backticks. */
-const namedKinds = (text: string): string[] => (
-  refusalkindVals.filter((kind) => text.includes(`\`${kind}\``))
-)
+function namedKinds(text: string): string[] {
+  return refusalkindVals.filter((kind) => text.includes(`\`${kind}\``))
+}
 
 /** The kinds RefusalFamilyForKind puts in `family`. */
-const familyKinds = (family: string): string[] => refusalkindVals.filter((kind) => RefusalFamilyForKind[kind] === family)
+function familyKinds(family: string): string[] { return refusalkindVals.filter((kind) => RefusalFamilyForKind[kind] === family) }
 
 describe("refusalkindVals", () => {
   it("lists each kind once", () => {
@@ -172,7 +172,7 @@ describe("isCondition", () => {
   // isCondition @example
   it("lets a caller show a condition and rethrow anything else", () => {
     const shown: string[] = []
-    const handle = (err: unknown) => {
+    function handle(err: unknown) {
       if (! isCondition(err)) { throw err }
       shown.push(err.message)
     }
@@ -186,7 +186,7 @@ describe("isVaultError", () => {
   // isVaultError @example
   it("tells a refusal of the kind asked", () => {
     const prompted: string[] = []
-    const handle = (err: unknown) => { if (isVaultError(err, 'vault_locked')) { prompted.push('passphrase') } }
+    function handle(err: unknown) { if (isVaultError(err, 'vault_locked')) { prompted.push('passphrase') } }
     handle(new VaultError('vault_locked', 'Unlock the vault first.'))
     handle(new VaultError('absent_box', 'No box under that label.'))
     expect(prompted).to.deep.equal(['passphrase'])

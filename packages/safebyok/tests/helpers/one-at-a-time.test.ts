@@ -6,7 +6,7 @@ import * as TH from '../test-helpers'
  * A task each of whose runs waits until the test lets it end, failing when the test says: it keeps
  * how many runs began, and how many were under way at once at most.
  */
-const pendingTask = () => {
+function pendingTask() {
   const releases: ((outcome: 'resolve' | 'reject') => void)[] = []
   const tally = { began: 0, underWay: 0, most: 0 }
   const task = async () => {
@@ -32,13 +32,13 @@ const pendingTask = () => {
 type Seen = { settled: 'pending' | 'resolved' | 'rejected', err: unknown }
 
 /** Whether `promise` has settled, and how, so far. */
-const watched = (promise: Promise<void>): Seen => {
+function watched(promise: Promise<void>): Seen {
   const seen: Seen = { settled: 'pending', err: undefined }
   void settleInto(seen, promise)
   return seen
 }
 
-const settleInto = async (seen: Seen, promise: Promise<void>) => {
+async function settleInto(seen: Seen, promise: Promise<void>) {
   try {
     await promise
     seen.settled = 'resolved'

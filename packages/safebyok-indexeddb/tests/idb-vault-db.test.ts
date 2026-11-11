@@ -28,7 +28,7 @@ const makeVaultDB = (opts: IdbVaultDBOpts = {}): IdbVaultDB => {
 }
 
 /** The IndexedDB connection a VaultDB runs its transactions on, captured during a `listVaults` call. */
-const connectionOf = async (vaultDB: IdbVaultDB): Promise<unknown> => {
+async function connectionOf(vaultDB: IdbVaultDB): Promise<unknown> {
   const transaction = vi.spyOn(IDBDatabase.prototype, 'transaction')
   try {
     await vaultDB.listVaults(TH.bankScope)
@@ -71,14 +71,14 @@ const failNextCall = (): void => {
 }
 
 /** The names of all databases IndexedDB currently has. */
-const dbNamesNow = async (): Promise<string[]> => {
+async function dbNamesNow(): Promise<string[]> {
   const dbs = await indexedDB.databases()
   return dbs.map((db) => db.name).filter((dbname) => dbname !== undefined)
 }
 
 // idb-keyval keeps its connection open for the life of the page, like a tab left open. This helper closes its connection, like a closed tab.
 /** Create the database `dbname` with one row in an object store, then close it. */
-const plantClosedDB = async (dbname: string): Promise<void> => {
+async function plantClosedDB(dbname: string): Promise<void> {
   const storename = 'rows'
   const opening = indexedDB.open(dbname)
   opening.addEventListener('upgradeneeded', () => { opening.result.createObjectStore(storename) })

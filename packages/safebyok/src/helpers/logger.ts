@@ -46,7 +46,7 @@ const guardedFor = new WeakMap<object, VaultLogger>()
  *
  * @example parseLogger(undefined).log('opened')  // to the default: the console says 'safebyok: opened'
  */
-export const parseLogger = (candidate: VaultLogger | null | undefined): VaultLogger => {
+export function parseLogger(candidate: VaultLogger | null | undefined): VaultLogger {
   if (candidate === undefined || candidate === null) { return DefaultLogger }
   if (guardedOnes.has(candidate)) { return candidate }
   CX.loggerShape.parse(candidate, { where: 'logger' })
@@ -64,7 +64,7 @@ export const isGuardedLogger = (val: unknown): val is VaultLogger => (typeof val
 type AnyReturningLogger = Record<VaultLoggerLevel, (message?: string, story?: Record<string, unknown>, err?: Error | null) => unknown>
 
 /** `hostLogger`, each call made so that nothing it throws or rejects with reaches the vault; kept as guarded. */
-const guarded = (hostLogger: AnyReturningLogger): VaultLogger => {
+function guarded(hostLogger: AnyReturningLogger): VaultLogger {
   const safe: VaultLogger = {
     log:   (message, story, err) => { tell(hostLogger, 'log', message, story, err) },
     warn:  (message, story, err) => { tell(hostLogger, 'warn', message, story, err) },
@@ -81,7 +81,7 @@ const GuardedConsole = guarded(consoleLogger)
 const defaults: { target: VaultLogger } = { target: GuardedConsole }
 
 /** A logger that hands each call on to `defaults.target` as it is when called; kept as guarded, its target being so. */
-const forwarding = (): VaultLogger => {
+function forwarding(): VaultLogger {
   const forwarder: VaultLogger = {
     log:   (message, story, err) => { defaults.target.log(message, story, err) },
     warn:  (message, story, err) => { defaults.target.warn(message, story, err) },
@@ -107,13 +107,13 @@ export const DefaultLogger: VaultLogger = forwarding()
  *
  * @param logger - The app's own logger. Null or undefined puts the console back.
  */
-export const setDefaultLogger = (logger: VaultLogger | null | undefined): void => {
+export function setDefaultLogger(logger: VaultLogger | null | undefined): void {
   const parsed = parseLogger(logger)
   // The default handed back as its own target would hand each call to itself, forever.
   defaults.target = parsed === DefaultLogger ? GuardedConsole : parsed
 }
 
-const tell = (hostLogger: AnyReturningLogger, level: VaultLoggerLevel, message?: string, story?: Record<string, unknown>, err?: Error | null) => {
+function tell(hostLogger: AnyReturningLogger, level: VaultLoggerLevel, message?: string, story?: Record<string, unknown>, err?: Error | null) {
   try {
     // Called as a method, so a logger built as a class keeps its `this`.
     void dropRejection(hostLogger[level](message, story, err))
@@ -123,7 +123,7 @@ const tell = (hostLogger: AnyReturningLogger, level: VaultLoggerLevel, message?:
 }
 
 /** Settle what a logger returned, dropping a rejection rather than leaving it unhandled, whatever kind of thenable it is. */
-const dropRejection = async (pending: unknown) => {
+async function dropRejection(pending: unknown) {
   try {
     await pending
   } catch {
@@ -132,4 +132,4 @@ const dropRejection = async (pending: unknown) => {
 }
 
 /** A thrown value, for a logger's `err`: an Error as it is, anything else as null. */
-export const asError = (thrown: unknown): Error | null => (thrown instanceof Error ? thrown : null)
+export function asError(thrown: unknown): Error | null { return (thrown instanceof Error ? thrown : null) }

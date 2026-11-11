@@ -44,14 +44,14 @@ const postgresVaultDBOpts = DB.objCheck(({ custom, fn, int }) => ({
 
 // == [Notices]: vaultChannelOf, channelOf, Told, toldOf
 
-const vaultChannelOfInput = DB.Checker(({ user_id }) => user_id, 'bad_option')
+const vaultChannelOfArgs = DB.Checker(({ user_id }) => user_id, 'bad_option')
 
 /** Return the notification channel for `user_id`'s writes: the channel a `PostgresListen` subscribes to. */
-export const vaultChannelOf = (user_id: string): string => channelOf(vaultChannelOfInput.parse(user_id, { where: 'vaultChannelOf' }))
+export function vaultChannelOf(user_id: string): string { return channelOf(vaultChannelOfArgs.parse(user_id, { where: 'vaultChannelOf' })) }
 
 // Postgres identifiers are at most 63 bytes. A user_id whose channel name is longer cannot be notified, so a write that would send a notice for it fails.
 /** The notification channel for `user_id`. */
-const channelOf = (user_id: string): string => `safebyok_${user_id}`
+function channelOf(user_id: string): string { return `safebyok_${user_id}` }
 
 // Each notice comes from `safebyok_tell` in `vault-functions.ts`: a JSON object with the stored row's address under `at`,
 // and under `vault` and `box` whichever rows fit.
@@ -73,35 +73,35 @@ function toldOf(text: string): Told | null {
   return { ...where.data, heard: { vault, box } }
 }
 
-const jsonOrNull = (text: string): unknown => {
+function jsonOrNull(text: string): unknown {
   try {
     return JSON.parse(text)
   } catch { return null }
 }
 
-const isHeardIn = (scope: WatchScope, told: Told): boolean => (
-  (scope.applabel === told.applabel) && (scope.user_id === told.user_id) && ((scope.vaultlabel ?? told.vaultlabel) === told.vaultlabel)
-)
+function isHeardIn(scope: WatchScope, told: Told): boolean {
+  return (scope.applabel === told.applabel) && (scope.user_id === told.user_id) && ((scope.vaultlabel ?? told.vaultlabel) === told.vaultlabel)
+}
 // --
 
 // == [Refusals]: refusalOf, causeOf, codeOf
 
 /** Convert a thrown value to a VaultError: a setup fault (SQLSTATE class 42) is an unexpected error, anything else is storage unavailable. */
-const refusalOf = (thrown: unknown): VaultError => {
+function refusalOf(thrown: unknown): VaultError {
   if (DB.isVaultError(thrown)) { return thrown }
   if (codeOf(thrown)?.startsWith('42')) { return DB.unexpectedError(causeOf(thrown)) }
   return DB.storageUnavailable(causeOf(thrown))
 }
 
 // A driver's error can include the statement's parameters, which may include a row. Keep only its message and code.
-const causeOf = (thrown: unknown): Error => {
+function causeOf(thrown: unknown): Error {
   const code = codeOf(thrown)
   return Object.assign(new Error(DB.sanitizeForeignError(thrown).message), (code === undefined) ? {} : { code })
 }
 
-const codeOf = (thrown: unknown): string | undefined => (
-  ((typeof thrown === 'object') && (thrown !== null) && ('code' in thrown) && (typeof thrown.code === 'string')) ? thrown.code : undefined
-)
+function codeOf(thrown: unknown): string | undefined {
+  return ((typeof thrown === 'object') && (thrown !== null) && ('code' in thrown) && (typeof thrown.code === 'string')) ? thrown.code : undefined
+}
 // --
 
 // == [What the database returns]: VaultAnswered, BoxAnswered, storedVerdict, worldRow, RowOfOtherAddress
@@ -126,7 +126,7 @@ const StoredNothing = 'The database stored nothing for a write its rows allow.'
 // --
 
 /** The vault row in a one-row result, or null for none. */
-const vaultOf = (rows: unknown[]): unknown => ((rows[0] as { vault?: unknown } | undefined)?.vault ?? null)
+function vaultOf(rows: unknown[]): unknown { return ((rows[0] as { vault?: unknown } | undefined)?.vault ?? null) }
 
 /** A vaultDB that stores its rows in your Postgres: `new PostgresVaultDB({ client: pgClientOf(pool) })`. */
 export class PostgresVaultDB extends DB.AdapterVaultDB {
@@ -334,7 +334,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
 // == [Listening]: listenOrNull, unlistenOnceListening
 
 /** Start listening and return the function that stops it. If listening fails, tell `onFailed` and return null. */
-const listenOrNull = async (listen: PostgresListen, channel: string, onNotify: (text: string) => void, onFailed: (news: VaultError) => void): Promise<(() => unknown) | null> => {
+async function listenOrNull(listen: PostgresListen, channel: string, onNotify: (text: string) => void, onFailed: (news: VaultError) => void): Promise<(() => unknown) | null> {
   try {
     return await listen(channel, onNotify)
   } catch (err) {
@@ -343,7 +343,7 @@ const listenOrNull = async (listen: PostgresListen, channel: string, onNotify: (
   }
 }
 
-const unlistenOnceListening = async (listening: Promise<(() => unknown) | null>): Promise<void> => {
+async function unlistenOnceListening(listening: Promise<(() => unknown) | null>): Promise<void> {
   const unlisten = await listening
   try {
     await unlisten?.()
