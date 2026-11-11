@@ -15,8 +15,8 @@ import type {
 } from '../shapes/shapes-storage'
 import type { BankListed, BoxesListed } from './vault-db'
 
-// == [Rows and presence]: Meta, presenceVals, Presence, RowAt, RecordAsk
-// Each function below takes the ask first, and what is stored second.
+// == [Rows and presence]: Meta, presenceVals, Presence, presenceOf, RecordAsk
+// Each function below takes the ask first, and the row stored second, null for none.
 
 /** The fields of a row, stored or expected, that the tables compare. */
 type Meta = Readonly<Pick<BoxSparse, 'revision_tok' | 'revision_seq' | 'am' | 'vault_tok'> & Partial<Pick<BoxSparse, 'box_tok'>>>
@@ -25,8 +25,11 @@ type Meta = Readonly<Pick<BoxSparse, 'revision_tok' | 'revision_seq' | 'am' | 'v
 export const presenceVals = ['void', 'gone', 'live'] as const
 export type Presence = typeof presenceVals[number]
 
-/** The row stored at a scope, or null for none, with its {@link Presence}. */
-type RowAt<RowT extends Meta = Meta> = Readonly<{ presence: 'void', row: null } | { presence: Exclude<Presence, 'void'>, row: RowT }>
+/** The presence of `row`, `'void'` for null. */
+function presenceOf(row: Meta | null): Presence {
+  if (row === null) { return 'void' }
+  return (row.am === 'a') ? 'live' : 'gone'
+}
 
 /** A put or del ask, box or vault: one that carries the row it expects and the record it would store. */
 type RecordAsk = VaultPutAsk | VaultDelAsk | BoxPutAsk | BoxDelAsk
@@ -34,18 +37,18 @@ type RecordAsk = VaultPutAsk | VaultDelAsk | BoxPutAsk | BoxDelAsk
 
 // == [Columns]: RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, lifeTokOf, isLifeOff
 // These are the columns of the tables in `notes/answer-contract.md`: what is stored, the two revision comparisons, and the
-// `ifPresent` or `ifAbsent` policy that applies. A `revision_tok` names one version of a row, so when the request's matches the
+// `ifPresent` or `ifAbsent` policy that applies. A `revision_tok` names one version of a row, so when the ask's matches the
 // stored one, the tables also check that the life token and liveness match.
 
-/** The stored `revision_tok` compared with the request's.
+/** The stored `revision_tok` compared with the ask's.
  * - `'birth'` -- expected an empty row, and none is stored
- * - `'=next'` -- the stored row already has the token this request would write
+ * - `'=next'` -- the stored row already has the token this ask would write
  * - `'eq'`    -- expected exactly the token the stored row has
  * - `'neq'`   -- anything else
  */
 type RevtokCmp = 'birth' | '=next' | 'eq' | 'neq'
 
-/** The request's expected `revision_seq` compared with the stored one.
+/** The ask's expected `revision_seq` compared with the stored one.
  * - `'birth'` -- expected an empty row
  * - `'eq'`    -- expected exactly the seq the stored row has
  * - `'stale'` -- expected an older revision: a write has intervened
@@ -53,25 +56,25 @@ type RevtokCmp = 'birth' | '=next' | 'eq' | 'neq'
  */
 type RevseqCmp = 'birth' | 'eq' | 'stale' | 'ahead'
 
-function revtokCmpOf({ expected, record }: RecordAsk, stored: RowAt): RevtokCmp {
-  if (stored.presence === 'void')                      { return (expected.revision_tok === SX.VoidRevisionTok) ? 'birth' : 'neq' }
-  if (stored.row.revision_tok === record.revision_tok) { return '=next' }
-  return (stored.row.revision_tok === expected.revision_tok) ? 'eq' : 'neq'
+function revtokCmpOf({ expected, record }: RecordAsk, row: Meta | null): RevtokCmp {
+  if (row === null)                             { return (expected.revision_tok === SX.VoidRevisionTok) ? 'birth' : 'neq' }
+  if (row.revision_tok === record.revision_tok) { return '=next' }
+  return (row.revision_tok === expected.revision_tok) ? 'eq' : 'neq'
 }
 
-function revseqCmpOf({ expected }: RecordAsk, stored: RowAt): RevseqCmp {
-  if (expected.revision_seq === SX.VoidRevisionSeq)      { return 'birth' }
-  if (stored.presence === 'void')                        { return 'ahead' }
-  if (expected.revision_seq === stored.row.revision_seq) { return 'eq' }
-  return (expected.revision_seq < stored.row.revision_seq) ? 'stale' : 'ahead'
+function revseqCmpOf({ expected }: RecordAsk, row: Meta | null): RevseqCmp {
+  if (expected.revision_seq === SX.VoidRevisionSeq) { return 'birth' }
+  if (row === null)                                 { return 'ahead' }
+  if (expected.revision_seq === row.revision_seq)   { return 'eq' }
+  return (expected.revision_seq < row.revision_seq) ? 'stale' : 'ahead'
 }
 
 // A box's life is named by its `box_tok`. A vault row has none, and its life is its `vault_tok`.
 function lifeTokOf({ box_tok, vault_tok }: Meta): string { return box_tok ?? vault_tok }
 
 /** True when a row is stored, and the row expected differs from it in its life token or its liveness. */
-function isLifeOff({ expected }: RecordAsk, stored: RowAt): boolean {
-  return (stored.presence !== 'void') && ((lifeTokOf(stored.row) !== lifeTokOf(expected)) || (stored.row.am !== expected.am))
+function isLifeOff({ expected }: RecordAsk, row: Meta | null): boolean {
+  return (row !== null) && ((lifeTokOf(row) !== lifeTokOf(expected)) || (row.am !== expected.am))
 }
 // --
 
@@ -79,22 +82,23 @@ function isLifeOff({ expected }: RecordAsk, stored: RowAt): boolean {
 // Each returns the act for the asked-for row, box or vault alike.
 
 /** Classify a get: see the get table in `notes/answer-contract.md`. */
-function getActOf({ ifAbsent }: VaultGetAsk | BoxGetAsk, { presence }: RowAt): VaultAct {
+function getActOf({ ifAbsent }: VaultGetAsk | BoxGetAsk, row: Meta | null): VaultAct {
+  const presence = presenceOf(row)
   if (presence === 'live') { return 'gotlive' }
   if (presence === 'void') { return (ifAbsent === 'nil') ? 'gotvoid' : 'void' }
   return (ifAbsent === 'nil') ? 'gotgone' : 'gone'
 }
 
 /** Classify a put: see the put table in `notes/answer-contract.md`. The first matching row wins. */
-function putActOf(ask: VaultPutAsk | BoxPutAsk, stored: RowAt): VaultAct {
-  const { presence } = stored
+function putActOf(ask: VaultPutAsk | BoxPutAsk, row: Meta | null): VaultAct {
+  const presence     = presenceOf(row)
   // The policy that applies: `ifPresent` over a live row, `ifAbsent` over a tombstone or void row.
   const opflag       = (presence === 'live') ? ask.ifPresent : ask.ifAbsent
-  const revseqCmp    = revseqCmpOf(ask, stored)
-  const revtokCmp    = revtokCmpOf(ask, stored)
+  const revseqCmp    = revseqCmpOf(ask, row)
+  const revtokCmp    = revtokCmpOf(ask, row)
   if (revtokCmp  === '=next')                                                     { return 'retcon' }
   if (revseqCmp  === 'ahead')                                                     { return 'ahead' }
-  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeOff(ask, stored)))   { return 'clash' }
+  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeOff(ask, row)))     { return 'clash' }
   if ((revtokCmp === 'neq') && (revseqCmp === 'eq'))                              { return 'forked' }
   if (revtokCmp  === 'neq')                                                       { return ((presence === 'live') && (opflag === 'get')) ? 'passed' : 'stale' }
   if (presence   === 'void')                                                      { return (opflag === 'add') ? 'born'   : 'void' }
@@ -104,13 +108,13 @@ function putActOf(ask: VaultPutAsk | BoxPutAsk, stored: RowAt): VaultAct {
 }
 
 /** Classify a del: see the del table in `notes/answer-contract.md`. The first matching row wins. */
-function delActOf(ask: VaultDelAsk | BoxDelAsk, stored: RowAt): VaultAct {
-  const { presence } = stored
-  const revseqCmp    = revseqCmpOf(ask, stored)
-  const revtokCmp    = revtokCmpOf(ask, stored)
+function delActOf(ask: VaultDelAsk | BoxDelAsk, row: Meta | null): VaultAct {
+  const presence     = presenceOf(row)
+  const revseqCmp    = revseqCmpOf(ask, row)
+  const revtokCmp    = revtokCmpOf(ask, row)
   if (revtokCmp  === '=next')                                                     { return 'retcon' }
   if (revseqCmp  === 'ahead')                                                     { return 'ahead' }
-  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeOff(ask, stored)))   { return 'clash' }
+  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeOff(ask, row)))     { return 'clash' }
   if ((revtokCmp === 'neq') && (revseqCmp === 'eq'))                              { return 'forked' }
   if (revtokCmp  === 'neq')                                                       { return (presence === 'gone') ? 'gone' : 'stale' }
   if (presence   === 'void')                                                      { return 'void' }
@@ -118,14 +122,14 @@ function delActOf(ask: VaultDelAsk | BoxDelAsk, stored: RowAt): VaultAct {
 }
 
 /** Classify an ask against the row stored at its scope. */
-function rowActOf(ask: VaultAsk | BoxAsk, stored: RowAt): VaultAct {
-  if (ask.op === 'get') { return getActOf(ask, stored) }
-  if (ask.op === 'put') { return putActOf(ask, stored) }
-  return delActOf(ask, stored)
+function rowActOf(ask: VaultAsk | BoxAsk, row: Meta | null): VaultAct {
+  if (ask.op === 'get') { return getActOf(ask, row) }
+  if (ask.op === 'put') { return putActOf(ask, row) }
+  return delActOf(ask, row)
 }
 // --
 
-// == [Rows stored]: boxVaultRow, RowOfOtherAddress, vaultRowAt, boxRowAt, boxWorldOf, boxVaultActOf, listedRowOf
+// == [Rows stored]: boxVaultRow, RowOfOtherAddress, vaultRowOf, boxRowOf, boxWorldOf, boxVaultActOf, listedRowOf
 
 // A faulty row throws, with the message of the check that failed. A row is damaged when it fails its own checks: the
 // asked-for row throws `damaged_row`, and the vault row of an asked-for box throws `damaged_vault`. A row that is not an
@@ -137,26 +141,24 @@ const RowOfOtherAddress = { kind: 'storage_issue', message: Phrases.rowOfOtherAd
 
 // Checked against its scope, not its vault_tok: a vault row from another life refuses `vault_gone` or `vault_reborn`, and is no fault of storage.
 /** The vault row stored at `vaultScope`, checked by `checker`, which throws for a row that fails its checks. */
-function vaultRowAt(vaultScope: VaultScope, vaultRaw: unknown, checker: typeof SX.storedVaultRow): RowAt<VaultRow> {
-  if (vaultRaw === null)         { return { presence: 'void', row: null } }
+function vaultRowOf(vaultScope: VaultScope, vaultRaw: unknown, checker: typeof SX.storedVaultRow): VaultRow | null {
+  if (vaultRaw === null)         { return null }
   if (! CX.isPlainBag(vaultRaw)) { throw Refuse.storageIssue() }
-  const row = checker.parseConsistent(vaultRaw, CX.vaultScope.parse(vaultScope), RowOfOtherAddress)
-  return { presence: (row.am === 'a') ? 'live' : 'gone', row }
+  return checker.parseConsistent(vaultRaw, CX.vaultScope.parse(vaultScope), RowOfOtherAddress)
 }
 
 /** The box row stored at `boxQuery`, checked. Throws `damaged_row` for a row that fails its checks. */
-function boxRowAt(boxQuery: BoxQuery, boxRaw: unknown): RowAt<BoxRow> {
-  if (boxRaw === null)         { return { presence: 'void', row: null } }
+function boxRowOf(boxQuery: BoxQuery, boxRaw: unknown): BoxRow | null {
+  if (boxRaw === null)         { return null }
   if (! CX.isPlainBag(boxRaw)) { throw Refuse.storageIssue() }
-  const row = SX.storedBoxRow.parseConsistent(boxRaw, SX.boxQuery.parse(boxQuery), RowOfOtherAddress)
-  return { presence: (row.am === 'a') ? 'live' : 'gone', row }
+  return SX.storedBoxRow.parseConsistent(boxRaw, SX.boxQuery.parse(boxQuery), RowOfOtherAddress)
 }
 
 /** The stored vault row of a box ask, or the shell row for none.
  * Throws `damaged_vault` for a row that fails its checks.
  */
 function boxWorldOf(vaultScope: VaultScope, vaultRaw: unknown): VaultRow {
-  return vaultRowAt(vaultScope, vaultRaw, boxVaultRow).row ?? SX.shellVaultOf(vaultScope)
+  return vaultRowOf(vaultScope, vaultRaw, boxVaultRow) ?? SX.shellVaultOf(vaultScope)
 }
 
 /** Classify a box ask's vault row: the act it refuses with, or null when the vault is live in the asked-for life. */
@@ -176,7 +178,7 @@ function listedRowOf<RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknow
 
 // == [Acts]: isWriteAct, isBirthAct, isOkAct, cappedActOf
 
-/** True when the act tells the caller to store the request's record. */
+/** True when the act tells the caller to store the ask's record. */
 export function isWriteAct(act: BoxAct | VaultAct): act is WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
 
 /** True when the act creates a row, or re-creates a deleted one. */
@@ -230,7 +232,7 @@ const GateActOfForVerb: Readonly<Record<EX.GateVerb, (record: VaultRecord, store
 }
 // --
 
-// == [Classifying]: RowOfVault, RowOfBox, VaultFetched, BoxFetched, BoxesFetched, VaultStored, BoxStored, VaultsStored, BoxesStored, classifyStoredVault, classifyStoredBox, classifyStoredVaults, classifyStoredBoxes, presenceOf, vaultActOf, boxActOf
+// == [Classifying]: RowOfVault, RowOfBox, VaultFetched, BoxFetched, BoxesFetched, VaultStored, BoxStored, VaultsStored, BoxesStored, classifyStoredVault, classifyStoredBox, classifyStoredVaults, classifyStoredBoxes, vaultActOf, boxActOf
 // The classifier checks each stored row once, and returns everything it worked out on the way to the answer.
 // A row that fails its checks throws, and `AdapterVaultDB` turns the throw into a refused answer.
 
@@ -296,10 +298,10 @@ export type BoxesStored = Readonly<({ ok: true, act: ListAct, listed: BoxesListe
  * Throws for a row that fails its checks or is stored at another scope, and `gate_issue` when a gate verb's record fails that verb's checks.
  */
 export function classifyStoredVault(ask: VaultAsk, { vault }: VaultFetched): VaultStored {
-  const stored   = vaultRowAt(ask, vault, SX.storedVaultRow)
-  const { presence, row } = stored
+  const row      = vaultRowOf(ask, vault, SX.storedVaultRow)
+  const presence = presenceOf(row)
   const world    = row ?? SX.shellVaultOf(ask)
-  const tabled   = rowActOf(ask, stored)
+  const tabled   = rowActOf(ask, row)
 
   // A gate verb's put also checks its record against the gate of the live row it would replace.
   const isGatePut = (ask.op === 'put') && (ask.gateVerb !== undefined) && (tabled === 'replaced') && (row?.am === 'a')
@@ -322,10 +324,9 @@ export function classifyStoredBox(ask: BoxAsk, fetched: BoxFetched): BoxStored {
   const vaultAct = boxVaultActOf(ask, world)
   if (vaultAct !== null) { return { ok: false, act: vaultAct, world, box: null, presence: null, capacity: null } }
 
-  const box      = boxRowAt(ask, fetched.box).row
+  const box      = boxRowOf(ask, fetched.box)
   const presence = presenceOf(box)
-  const stored: RowAt<BoxRow> = (box === null) ? { presence: 'void', row: null } : { presence: presence as 'live' | 'gone', row: box }
-  const uncapped = rowActOf(ask, stored)
+  const uncapped = rowActOf(ask, box)
   const act      = (capacity === null) ? uncapped : cappedActOf(uncapped, capacity)
   if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, world, box: ask.record, presence, capacity } }
   return isOkAct(act) ? { ok: true, act, world, box, presence, capacity } : { ok: false, act, world, box, presence, capacity }
@@ -361,12 +362,6 @@ export function classifyStoredBoxes(ask: BoxListAsk, fetched: BoxesFetched): Box
     if (row === null) { listed.damaged_rows.push(SX.damagedBoxOf(address, vault_tok)) } else { listed.boxes.push(SX.boxSparse.parse(row)) }
   }
   return { ok: true, act: (fetched.boxes.length > 0) ? 'got' : 'gotvoid', world, listed }
-}
-
-/** The presence of `row`, `'void'` for null. */
-function presenceOf(row: Meta | null): Presence {
-  if (row === null) { return 'void' }
-  return (row.am === 'a') ? 'live' : 'gone'
 }
 
 /** Classify a vault ask's outcome, based on the stored row. */
