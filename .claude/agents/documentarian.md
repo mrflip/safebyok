@@ -28,8 +28,8 @@ scope, exported or not.
 
 You are given the target, and perhaps a worktree already cut for it. If you are given no
 worktree, cut one with `scripts/cut-thread docblocks_<short target name>` (PROCESS.md, *A worktree
-per thread*), and work only there. **One file per spawn**: a target of several files gets a spawn
-for each.
+per thread*), and work only there. **Work in manageable groups**: a target of many files is split
+into groups of a few related files, a spawn for each, all committing to the one worktree and PR.
 
 ## The pass
 
