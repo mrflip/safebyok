@@ -28,10 +28,10 @@ afterEach(async () => {
 })
 
 describe("fakeDeployment", () => {
-  // The fake socket implements the sync protocol of convex 1.48. Upgrading convex fails this test on
+  // The fake socket implements the sync protocol of convex 1.49. Upgrading convex fails this test on
   // purpose: check the fake against the new client's messages, then update the version here.
-  it("follows the sync protocol of the convex it was written against, 1.48", () => {
-    expect(convexVersion).to.match(/^1\.48\./)
+  it("follows the sync protocol of the convex it was written against, 1.49", () => {
+    expect(convexVersion).to.match(/^1\.49\./)
   })
 
   it("serves a ConvexClient's query and mutation, signed in as the subject it was given", async () => {
