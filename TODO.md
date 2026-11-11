@@ -60,6 +60,25 @@ Small irritants, each a few lines, picked up by whoever is nearby.
   `packages/safebyok/src/refusals/throwers.ts` says `meta` carries the `world` and `dbhas` the
   answer carries. The throwers put those rows in the error's `rows` option (`RefusalRows` in
   `refusals/errors.ts`), which `rowsOfRefusal` reads, and `actRefused` carries none. Reword it.
+* **A `fooOf` that does more than derive.** Found 2026-11-11 (the names-that-jar report, ruled
+  for TODO): STYLE.md has a `fooOf` pure, yet these mint, construct, mutate or call out.
+  `refusalOf` (`storage/adapter-vault-db.ts`) sets the thrown error's `meta`; `versionedShelfOf`
+  (`storage/idb-shelf.ts`) opens and caches, an ensure; `nextRevisionOf` and `boxTombstoneOf`
+  mint toks; `sealedRecordOf` encrypts; `boxListingOf` calls `new`; `stampOfBirth` mints a
+  token; `tombstoneOver` mints; `passphraseKeyOf` derives a key; GraphQL's `answerOf` sends a
+  request; `_cheat_vaultRowsOf` builds maps. The report proposed `ensureVersionedShelf`,
+  `makeNextRevision`, `sealRecord`, `makeBoxListing`, `mintBirthStamp`, `makeDelTombstone` and
+  `derivePassphraseKey`. Rename each when its file is next opened.
+* **`sanitizeForeignError` sanitizes nothing.** Found 2026-11-11 (names report): it is public in
+  `safebyok/storage` and returns an Error untouched, or wraps anything else in one, yet a
+  security reviewer reads "sanitize". Proposed: `causeOf`.
+* **`isCondition` passes `bad_news` too.** Found 2026-11-11 (names report): its body is
+  `family !== 'misuse'` (`refusals/errors.ts`), and only tests call it. Rename it (`isShowable`),
+  or narrow the body to the condition family.
+* **`VacateStory` is no story.** Found 2026-11-11 (names report): it is public, and a story is
+  `{ where, advice }`, while this is `{ cause }`. Proposed: `VacateOpts`.
+* **`RevokeSite`'s `'undeleted'` names an unlock.** Found 2026-11-11 (names report): the public
+  type's doc block says it is a row of another epoch or life met at an unlock. Proposed: `'unlock'`.
 
 ## Roadmapped
 
