@@ -16,7 +16,7 @@ describe("adorn", () => {
   })
 
   // adorn @example
-  it("lets a getter attach what it works out on the first read, which every later read finds in its place", () => {
+  it("lets a getter cache its value on the first read", () => {
     let workedOut = 0
     class Labelled {
       readonly label = 'anthropic'
@@ -63,7 +63,7 @@ describe("decorate", () => {
     expect(handle.vault).to.be.undefined
   })
 
-  it("is fixed with the rest of an object frozen after it", () => {
+  it("leaves what it attached frozen once the object is frozen", () => {
     const handle = Object.freeze(decorated())
     expect(Reflect.set(handle, 'vault', { vault_tok: 'v2' })).to.be.false
     expect(Reflect.deleteProperty(handle, 'vault')).to.be.false
@@ -93,7 +93,7 @@ describe("tattoo", () => {
     expect(Object.getOwnPropertyDescriptor(handle, 'vault_tok')).to.include({ enumerable: true, writable: false, configurable: true })
   })
 
-  it("throws on assigning to a readonly prop, which a configurable one still lets adorn redefine", () => {
+  it("throws on assigning to a readonly prop", () => {
     const handle: { vault_tok?: string } = {}
     tattoo(handle, { vault_tok: 'v1' })
     expect(() => { handle.vault_tok = 'v2' }).to.throw(TypeError)

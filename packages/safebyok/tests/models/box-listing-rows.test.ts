@@ -25,19 +25,19 @@ const listedBox = async () => {
 
 describe("BoxListing: an absent box", () => {
   describe("listing.fetch(scope) of nothing stored", () => {
-    it("refuses 'absent_box' for a box not world, having none", async () => {
+    it("refuses 'absent_box' for a box not listed", async () => {
       const listing = boxListingOf(world.mw)
       await TH.expectRefusal(listing.fetch(scope()), 'absent_box')
       expect(listing.at(scope())).to.be.null
     })
 
-    it("resolves null for a box not world under 'nil'", async () => {
+    it("resolves null under 'nil' for a box not listed", async () => {
       const listing = boxListingOf(world.mw)
       expect(await listing.fetch(scope(), { ifAbsent: 'nil' })).to.be.null
       expect(listing.at(scope())).to.be.null
     })
 
-    it("refuses 'absent_box' for a box world gone, which stays world", async () => {
+    it("refuses 'absent_box' for a listed tombstone, which stays listed", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(gone())
       world.mw.clearCalls()
@@ -46,7 +46,7 @@ describe("BoxListing: an absent box", () => {
       expect(box.isPresent).to.be.false
     })
 
-    it("resolves null for a box world gone under 'nil', the box still at `at(scope)` as its tombstone", async () => {
+    it("resolves null under 'nil' for a listed tombstone, which stays listed", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(gone())
       expect(await listing.fetch(scope(), { ifAbsent: 'nil' })).to.be.null
@@ -66,7 +66,7 @@ describe("BoxListing: an absent box", () => {
     for (const [form, tombstone, am] of [['deleted', gone, 'x']] as const) {
       const seedTombstone = () => { world.mw.seedPut(tombstone()) }
 
-      it(`refuses 'absent_box' for a ${form} box, built and world as its tombstone`, async () => {
+      it(`refuses 'absent_box' for a ${form} box, and lists its tombstone`, async () => {
         seedTombstone()
         const listing = boxListingOf(world.mw)
         await TH.expectRefusal(listing.fetch(scope()), 'absent_box')
@@ -77,14 +77,14 @@ describe("BoxListing: an absent box", () => {
         expect(listing.snapshot).to.deep.equal([])
       })
 
-      it(`resolves null for a ${form} box under 'nil', world all the same`, async () => {
+      it(`resolves null under 'nil' for a ${form} box, and still lists its tombstone`, async () => {
         seedTombstone()
         const listing = boxListingOf(world.mw)
         expect(await listing.fetch(scope(), { ifAbsent: 'nil' })).to.be.null
         expect(listing.at(scope())?.am).to.eq(am)
       })
 
-      it(`takes a ${form} box world alive away, then refuses 'absent_box'`, async () => {
+      it(`takes a ${form} box that was listed alive out of the snapshot, then refuses 'absent_box'`, async () => {
         const listing = boxListingOf(world.mw)
         const box = await listing.build(fullBoxRecord())
         seedTombstone()
@@ -109,7 +109,7 @@ describe("BoxListing: an absent box", () => {
       expect(fetched?.isFull).to.be.false
     })
 
-    it("does not judge a put's or a del's answer: a deleted box comes back world", async () => {
+    it("does not apply ifAbsent to a del, which returns the deleted box", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())
       world.mw.seedPut(fullBoxRecord())
@@ -124,7 +124,7 @@ describe("BoxListing: an absent box", () => {
       expect(await box.fetch({ ifAbsent: 'nil' })).to.eq(box)
     })
 
-    it("hydrates an absent box without refusing: the refresh passes 'nil'", async () => {
+    it("hydrates an absent box without refusing", async () => {
       const box = await boxListingOf(world.mw).build(gone())
       world.mw.clearCalls()
       expect(await box.hydrate({ maxMillisSinceRefresh: 0 })).to.eq(box)
@@ -144,7 +144,7 @@ describe("BoxListing: an absent box", () => {
   })
 
   describe("listing.build(tombstone)", () => {
-    it("has a gone instance: not present, no sidecar, absent from the snapshot", async () => {
+    it("lists a tombstone as not present, with no sidecar, and absent from the snapshot", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(gone())
       expect(listing.at(scope())).to.eq(box)
@@ -168,7 +168,7 @@ describe("BoxListing: an absent box", () => {
       expect(box.sidecar).to.deep.equal({ note: 'theirs' })
     })
 
-    it("delivers a sparse box_stored to the box, which has no sidecar to speak of, then throws 'stale_write'", async () => {
+    it("delivers a sparse box_stored to the box, leaving it no sidecar, then throws 'stale_write'", async () => {
       const { listing, box } = await listedBox()
       const stale = world.mw.staleWriteOf(box.scope, sparseBoxRecord(stored))
       world.mw.willPut(stale)
@@ -217,7 +217,7 @@ describe("BoxListing: an absent box", () => {
       expect(box._cheat_central.revision_seq).to.eq(1)
     })
 
-    it("delivers box_stored to a box not yet world, building it", async () => {
+    it("builds a box not yet listed from box_stored", async () => {
       const listing = boxListingOf(world.mw)
       const stale = world.mw.staleWriteOf(scope(), fullBoxRecord(stored))
       world.mw.willPut(stale)
@@ -225,7 +225,7 @@ describe("BoxListing: an absent box", () => {
       expect(listing.at(scope())?.revision_seq).to.eq(5)
     })
 
-    it("delivers the record of a stale_write to a fetch's refusal-bearing answer too", async () => {
+    it("delivers the record of a fetch's stale_write refusal too", async () => {
       const listing = boxListingOf(world.mw)
       const stale = world.mw.staleWriteOf(scope(), fullBoxRecord(stored))
       world.mw.willGet(stale)
@@ -236,7 +236,7 @@ describe("BoxListing: an absent box", () => {
 })
 
 describe("BoxListing: its snapshot is what its boxes show", () => {
-  it("shows a box's sidecar as `box.sidecar` gives it: Bob's your uncle by any path", async () => {
+  it("shows the same sidecar as `box.sidecar`", async () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.build(fullBoxRecord({ boxlabel: 'robert', sidecar: { uncle: 'Bob' } }))
     const robert = listing.at(world.mw.boxscope('robert'))
@@ -255,13 +255,13 @@ describe("BoxListing: its snapshot is what its boxes show", () => {
     expect(shown).to.include({ boxlabel: 'anthropic_api_key', revision_seq: 0, isPresent: true, isFull: true })
   })
 
-  it("shows a box sparse as its snapshot does: present, not full, no sidecar", async () => {
+  it("shows a sparse box as present, not full, with no sidecar", async () => {
     const listing = boxListingOf(world.mw)
     await listing.build(sparseBoxRecord())
     expect(listing.snapshot[0]).to.include({ isPresent: true, isFull: false, sidecar: null })
   })
 
-  it("follows the box through a put: the listing shows the sidecar `box.sidecar` now gives", async () => {
+  it("shows the box's new sidecar after a put", async () => {
     const listing = boxListingOf(world.mw)
     const record = fullBoxRecord({ sidecar: { uncle: 'Bob' } })
     world.mw.seedPut(record)

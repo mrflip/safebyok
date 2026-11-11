@@ -28,7 +28,7 @@ const makeRecipeBox = async (): Promise<{ vault: Vault, box: Box }> => {
 }
 
 describe("the README's script", () => {
-  it("fetches its passphrase in requestCleartext, spreads and edits the whisper, and a lock takes its fields and an unlock brings them back", async () => {
+  it("runs as written", async () => {
     const doppler = { get: vi.fn(() => Promise.resolve('a passphrase from the container')) }
     const bank = makeBankWorld().bankOn({
       requestCleartext: async (gating) => {
@@ -61,7 +61,7 @@ describe("the README's script", () => {
 })
 
 describe("safebyok-react's README's raw field", () => {
-  it("shows at an expose, hides at a lock with an edit kept, saves on the button, and unexposes as it unmounts", async () => {
+  it("runs as written", async () => {
     const { vault, box } = await makeRecipeBox()
     const hook = hookOf(box.subscribe, box.getSnapshot)
     const input = { value: '' }
@@ -92,7 +92,7 @@ describe("safebyok-react's README's raw field", () => {
 })
 
 describe("the README's React form", () => {
-  it("paints a new object at each patch, a read-only blank at a lock and a veil, and puts what was patched", async () => {
+  it("runs as written", async () => {
     const { vault, box } = await makeRecipeBox()
     await box.expose()
     const hook = hookOf(box.subscribe, () => box.whisper)

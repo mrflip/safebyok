@@ -31,7 +31,7 @@ const vaultDBWithBox = async (): Promise<MemoryVaultDB> => {
 // --
 
 describe("AX's answer checks", () => {
-  it("parse each good answer that crossed back to the answer its verb returned", async () => {
+  it("parse each serialized good answer back to what its verb returned", async () => {
     const vaultDB = await vaultDBWithBox()
     const answers = [
       [AX.listVaultsAnswer, await vaultDB.tryListVaults(bankScope)],
@@ -50,7 +50,7 @@ describe("AX's answer checks", () => {
     }
   })
 
-  it("parses a refusal that crossed to a VaultError of its kind", async () => {
+  it("parses a serialized refusal to a VaultError of its kind", async () => {
     const vaultDB = await vaultDBWithBox()
     const answer = await vaultDB.tryPutVault(vaultAt(1), { prior: stale })
     expect(answer.ok).to.be.false

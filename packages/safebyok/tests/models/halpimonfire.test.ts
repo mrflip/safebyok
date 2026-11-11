@@ -13,7 +13,7 @@ const world = useModelsWorld()
 useVaultWorlds()
 
 describe("a lock() called during a put", () => {
-  it("during the seal refuses 'vault_locked', putting nothing: put checks the lock at both ends of the seal", async () => {
+  it("during the seal refuses 'vault_locked', putting nothing", async () => {
     const lock = { during: false }
     const listing = fakeSealBoxListingOf(world.mw, {}, () => { if (lock.during) { world.mw.setLocked(true) } })
     const record = fullBoxRecord()
@@ -24,7 +24,7 @@ describe("a lock() called during a put", () => {
     expect(world.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("during the put writes the record anyway: the put is past the window, and the box reports locked after", async () => {
+  it("during the put still writes the record", async () => {
     const record = fullBoxRecord()
     world.mw.seedPut(record)
     const box = await boxListingOf(world.mw).build(record)
@@ -39,7 +39,7 @@ describe("a lock() called during a put", () => {
 })
 
 describe("A lock called while an unlock proves", () => {
-  it("ends unlocked: the proof still takes up and caches its lease, and the next lock() ends that session", async () => {
+  it("leaves the vault unlocked", async () => {
     const { vault, deviceDB, fakeBank } = await makeBornVault()
     vault.lock()
     fakeBank.requestCleartext = async (gating) => {
@@ -56,7 +56,7 @@ describe("A lock called while an unlock proves", () => {
 })
 
 describe("A lock called during a box verb", () => {
-  it("during hello leaves the list made and the next putBox refusing 'vault_locked', putting nothing", async () => {
+  it("during hello lets it resolve, and the next putBox refuses 'vault_locked'", async () => {
     const { vault, vaultDB } = await makeBornVault()
     const tryListBoxes = vaultDB.tryListBoxes.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryListBoxes').mockImplementationOnce((...args) => { vault.lock(); return tryListBoxes(...args) })
@@ -64,7 +64,7 @@ describe("A lock called during a box verb", () => {
     await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } }), 'vault_locked')
   })
 
-  it("during getBox's get answers the box, with its whisper refusing 'vault_locked'", async () => {
+  it("during fetchBox's get still returns the box, whose whisper refuses 'vault_locked'", async () => {
     const { vault, vaultDB } = await makeBornVault()
     await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
     const tryGetBox = vaultDB.tryGetBox.bind(vaultDB)
@@ -90,7 +90,7 @@ describe("A lock called during a box verb", () => {
     vi.restoreAllMocks()
   })
 
-  it("during delBox's del lands: the tombstone is stored, and the vault reports locked after", async () => {
+  it("during delBox's del still deletes the box", async () => {
     const { vault, vaultDB } = await makeBornVault()
     await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
     const tryDelBox = vaultDB.tryDelBox.bind(vaultDB)
@@ -140,7 +140,7 @@ const crossingGrant = (crossing: () => unknown) => {
 }
 
 describe("A gate change after its record is stored", () => {
-  it.each(['sweep', 'vacate'] as const)("a %s as the answer comes back refuses, the row stored all the same", async (ending) => {
+  it.each(['sweep', 'vacate'] as const)("a %s as the answer arrives refuses, though the row is stored", async (ending) => {
     const { vault, listing, demandStored, opts: { vaultDB } } = await makeBornVault()
     const commit = vaultDB.tryReplacePassphrase.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (record, opts) => {
@@ -153,7 +153,7 @@ describe("A gate change after its record is stored", () => {
     expect(vault.isUnlocked).to.be.false
   })
 
-  it("leaves the vault unlocked on the new lease where a lock crossed its making, with no second forget", async () => {
+  it("stays unlocked on the new lease when lock() is called while that lease is made", async () => {
     const { vault, deviceDB } = await makeBornVault()
     deviceDB.forget.mockClear()
     crossingGrant(() => { vault.lock() })

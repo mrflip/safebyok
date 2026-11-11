@@ -134,7 +134,7 @@ describe("IdbDeviceDB's database", () => {
   ] as const
 
   for (const [errname, refusalkind, wording] of Faults) {
-    it(`says a browser's ${errname} as '${refusalkind}'`, async () => {
+    it(`maps a browser's ${errname} to '${refusalkind}'`, async () => {
       const deviceDB = makeDeviceDB()
       await failNextCall(deviceDB, errname)
       const refusal = await TH.expectRefusal(deviceDB.listLeases(), refusalkind)
@@ -144,7 +144,7 @@ describe("IdbDeviceDB's database", () => {
 })
 
 describe("IdbDeviceDB's wipe of the old databases", () => {
-  it("deletes the old core's device database and each earlier version's, unread, on its first call", async () => {
+  it("deletes the old core's device database and each earlier version's, without reading them, on its first call", async () => {
     const dbName = freshDbName()
     const oldnames = [`${dbName}:device_db`, `${dbName}:device-v0`, `${dbName}:device-v1`, `${dbName}:device-v001-001-000`, `${dbName}:device-v000-009-009`]
     await plantClosedDB(oldnames[0]!, 'records')
@@ -171,7 +171,7 @@ describe("IdbDeviceDB's wipe of the old databases", () => {
     })
   })
 
-  it("leaves a newer version's database, as an updated tab of the page made it", async () => {
+  it("leaves a newer version's database alone", async () => {
     const dbName = freshDbName()
     const newername = `${dbName}:device-v001-002-000`
     await plantClosedDB(newername, 'leases')
@@ -180,7 +180,7 @@ describe("IdbDeviceDB's wipe of the old databases", () => {
     expect(await dbNamesNow()).to.include(newername)
   })
 
-  it("answers its calls while another tab has an old database open", async () => {
+  it("still works while another tab has an old database open", async () => {
     const dbName = freshDbName()
     await set('lease', { wrapped: 'old' }, createStore(`${dbName}:device_db`, 'records'))
     const deviceDB = makeDeviceDB(dbName)
@@ -189,7 +189,7 @@ describe("IdbDeviceDB's wipe of the old databases", () => {
     expect(await dbNamesNow()).to.include(`${dbName}:device_db`)
   })
 
-  it("leaves another dbName's databases, and the vault's, where they stand", async () => {
+  it("leaves another dbName's databases and the vault database untouched", async () => {
     const dbName = freshDbName()
     const otherName = freshDbName()
     await plantClosedDB(`${otherName}:device_db`, 'records')

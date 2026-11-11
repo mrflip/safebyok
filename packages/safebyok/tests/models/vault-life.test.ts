@@ -38,8 +38,8 @@ const makeVaultWithBox = async (born: ReturnType<typeof makeBornVault> = makeBor
   return { ...world, box, boxIn, unsealIn, openNextSession }
 }
 
-describe("Birth: a vault born with its gate seals its first box under the birth lease", () => {
-  it("is born unlocked under a gate of its passphrase, which the vault record carries, and a box built in it opens the whisper it sealed; neither record stored has the whisper or the passphrase", async () => {
+describe("A new vault", () => {
+  it("is born unlocked, and stores neither the whisper nor the passphrase", async () => {
     const { vault, box, demandStored } = await makeVaultWithBox()
     expect(vault.isUnlocked).to.be.true
     expect(demandStored().gate).to.deep.include(vault.gate.pickle())
@@ -52,7 +52,7 @@ describe("Birth: a vault born with its gate seals its first box under the birth 
 })
 
 describe("Locking, and the sessions after it on this device", () => {
-  it("forgets the kept lease at lock(), so the next session asks for the passphrase: its box refuses 'vault_locked', a wrong passphrase refuses 'wrong_passphrase', and the right one opens the whisper the first session sealed", async () => {
+  it("after lock(), the next session must unlock with the passphrase", async () => {
     const { vault, boxIn, openNextSession, deviceDB } = await makeVaultWithBox()
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
@@ -66,7 +66,7 @@ describe("Locking, and the sessions after it on this device", () => {
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("leaves the cached lease at a sweep, so the next session's ensureUnlocked takes it up and opens the box without asking; a lock() there forgets it, and the session after asks for the passphrase again", async () => {
+  it("after a sweep, the next session unlocks without asking, until a lock() forgets the lease", async () => {
     const { listing, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox()
     listing.sweep()
     const second = await openNextSession()
@@ -82,7 +82,7 @@ describe("Locking, and the sessions after it on this device", () => {
     expect(await unsealIn(third.vault)).to.deep.equal(Whisper)
   })
 
-  it("opens, in a first session locked, a whisper the next one sealed: the first takes up the lease the next cached at its next ensureUnlocked, asking nothing", async () => {
+  it("a locked session unlocks with the lease a later session cached, and opens the whisper that session sealed", async () => {
     const { vault, box, boxIn, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox()
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
@@ -97,8 +97,8 @@ describe("Locking, and the sessions after it on this device", () => {
   })
 })
 
-describe("The lock, with a box in hand", () => {
-  it("locks the vault: the exposed whisper shows LOCKED, the unseal refuses 'vault_locked', and the cached lease is forgotten, so the next session asks for the passphrase", async () => {
+describe("The lock, with a box exposed", () => {
+  it("shows LOCKED for the exposed whisper and forgets the cached lease", async () => {
     const { vault, box, deviceDB, openNextSession } = await makeVaultWithBox()
     await box.expose()
     expect(box.whisper).to.deep.equal(Whisper)
@@ -112,7 +112,7 @@ describe("The lock, with a box in hand", () => {
     await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
   })
 
-  it("keeps the exposed whisper through the lock: unlocked again by the passphrase, the box answers it again", async () => {
+  it("shows the exposed whisper again once unlocked", async () => {
     const { vault, box } = await makeVaultWithBox()
     await box.expose()
     vault.lock()
@@ -124,7 +124,7 @@ describe("The lock, with a box in hand", () => {
 })
 
 describe("Changing the gate, with a box sealed before the change", () => {
-  it("replaces the passphrase: the vault stays unlocked through the change and still seals; the next session's old passphrase refuses 'wrong_passphrase', and the new one opens the box, as does the passkey, whose wayin the change kept", async () => {
+  it("after the passphrase is replaced, only the new passphrase and the passkey unlock the next session", async () => {
     const { vault, box, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox(makeBornVaultWithPasskey())
     await replaceTyping(vault, Passphrase, NewPassphrase)
     expect(vault.isUnlocked).to.be.true
@@ -143,7 +143,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
   })
 
   // PasskeyAnswer @example
-  it("adds a passkey: the next session unlocks by the passkey alone, and opens the box sealed under the passphrase's lease before the passkey was added", async () => {
+  it("an added passkey alone unlocks the next session and opens the box sealed before it", async () => {
     const { vault, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox()
     await addPasskeyTyping(vault, Passphrase, 'laptop')
     vault.lock()
@@ -154,7 +154,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
     expect(await unsealIn(again)).to.deep.equal(Whisper)
   })
 
-  it("revokes the passkey: a vault unlocked by the passkey stays unlocked through the revoke and still seals; the next session's passkey is refused, and the passphrase opens what that vault sealed", async () => {
+  it("after the passkey is revoked, only the passphrase unlocks the next session", async () => {
     const { vault, box, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox(makeBornVaultWithPasskey())
     vault.lock()
     await unlockTyping(vault, byPasskey('laptop'))
@@ -179,7 +179,7 @@ const openOtherDevice = async (stored: VaultRecord) => {
 }
 
 describe("Another device, over the same vaultDB and boxes", () => {
-  it("asks the other device for the passphrase, though this one caches a lease; unlocked, it caches a lease of its own and opens the box this device sealed, and this device's lock() leaves it unlocked", async () => {
+  it("must unlock with the passphrase, even though this device has a cached lease", async () => {
     const { vault, unsealIn, demandStored, deviceDB } = await makeVaultWithBox()
     const other = await openOtherDevice(demandStored())
     expect(other.vault.isLocked).to.be.true
@@ -193,7 +193,7 @@ describe("Another device, over the same vaultDB and boxes", () => {
     expect(other.deviceDB.cachedNow()).not.to.be.null
   })
 
-  it("seals, on the other device, a whisper this one opens: every lease of the vault has its one vaultKey", async () => {
+  it("seals a whisper that this device opens", async () => {
     const { vault, boxIn, unsealIn, demandStored } = await makeVaultWithBox()
     const other = await openOtherDevice(demandStored())
     await unlockTyping(other.vault, byPassphrase(Passphrase))

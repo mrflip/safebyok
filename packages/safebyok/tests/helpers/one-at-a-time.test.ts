@@ -60,7 +60,7 @@ describe("oneAtATime", () => {
     expect(first.settled).to.eq('resolved')
   })
 
-  it("serves every call made during a run with that same run, starting none of its own", async () => {
+  it("shares the running task with every call made during it", async () => {
     const pending = pendingTask()
     const run = oneAtATime(pending.task)
     const first = watched(run())
@@ -97,7 +97,7 @@ describe("oneAtATime", () => {
     expect(pending.tally.most).to.eq(1)
   })
 
-  it("tells a run's failure to every call that shared it", async () => {
+  it("rejects every call that shared a failed run", async () => {
     const pending = pendingTask()
     const run = oneAtATime(pending.task)
     const shared = [run(), run()].map((promise) => watched(promise))

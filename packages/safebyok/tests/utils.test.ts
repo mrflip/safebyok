@@ -35,18 +35,18 @@ describe("mash", () => {
     it(blurb, async () => { expect(await mash(text)).to.eq(digest) })
   }
 
-  it("answers 43 characters of unpadded base64url", async () => {
+  it("returns 43 characters of unpadded base64url", async () => {
     const mashed = await mash('ada@example.com')
     expect(mashed).to.match(/^[\w-]{43}$/)
     expect(utils.fromB64(mashed)).to.have.lengthOf(32)
   })
 
-  it("answers alike for equal text and apart for different text", async () => {
+  it("returns the same hash for equal text and different hashes for different text", async () => {
     expect(await mash('ada@example.com')).to.eq(await mash('ada@example.com'))
     expect(await mash('ada@example.com')).to.not.eq(await mash('Ada@example.com'))
   })
 
-  it("answers an id that passes the user_id rule and fails the label rule", async () => {
+  it("returns an id that passes the user_id rule and fails the label rule", async () => {
     const mashed = await mash('ada@example.com')
     expect(PX.user_id.safeParse(mashed).success).to.be.true
     expect(PX.label.safeParse(mashed).success).to.be.false

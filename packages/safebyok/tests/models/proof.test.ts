@@ -276,7 +276,7 @@ describe("the proof", () => {
     bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
   })
 
-  it("a host calling autolock locks a vault past its autolock, and a late page asks for a proof whether its host calls it or not", async () => {
+  it("bank.autolock locks a vault past its autolock duration, and a page opened later asks for a proof", async () => {
     const { world, bank, vault, dialog } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
@@ -322,7 +322,7 @@ describe("the proof", () => {
     await TH.eventually(() => world.leaseRows().length === 0)
   })
 
-  it("a row past autolock outlives a late page whose dialog closes unanswered, and the first page's bank.autolock finds it and locks", async () => {
+  it("a lease row past autolock survives a late page's unanswered dialog, and the first page's bank.autolock then locks", async () => {
     const { world, bank, vault } = await buildHost()
     const bankUi = mountComponent(bank, bankStatus)
     bankUi.expectRenders(['ready: main unlocked'])
@@ -384,7 +384,7 @@ describe("the proof", () => {
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
   })
 
-  it("a second device: what it does reaches this one's components through the watch, with nobody asked and no lock", async () => {
+  it("a second device's changes reach this device's components through the watch", async () => {
     const { world, bank, vault, dialog } = await buildHost()
     const box = await vault.putBox(ApiKey)
     await vault.hello()
@@ -441,7 +441,7 @@ describe("the proof", () => {
     await TH.expectRefusal(vault.ensureUnlocked())
   })
 
-  it("React StrictMode over a vault already cached: the second effect's fresh bank picks up the lease with nobody asked", async () => {
+  it("under React StrictMode, the second effect's bank unlocks with the cached lease without asking", async () => {
     const { world, dialog } = await buildHost()
     const opts = { requestCleartext: dialog.requestCleartext, onBadNews }
 

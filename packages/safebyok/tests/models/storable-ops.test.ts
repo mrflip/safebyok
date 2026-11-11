@@ -69,14 +69,14 @@ describe("storable.hydrate(opts): when it fetches", () => {
     })
   }
 
-  it("never fetches a created box for want of the whisperCiphered: the birth that was written is full", async () => {
+  it("never fetches a box it created", async () => {
     const box = await boxListingOf(world.mw).create(boxDnaOf(world.mw.boxscope('anthropic_api_key')))
     expect(box.isFull).to.be.true
     await box.hydrate({ maxMillisSinceRefresh: Infinity })
     expect(world.mw.callsOf('get')).to.deep.equal([])
   })
 
-  it("never fetches a deleted central for want of the whisperCiphered, while timely", async () => {
+  it("never fetches a deleted box while timely", async () => {
     const listing = boxListingOf(world.mw, { maxMillisSinceRefresh: 1000 })
     const box = await listing.build(world.mw.tombstoneBoxRecord())
     world.mw.clearCalls()
@@ -178,7 +178,7 @@ describe("storable.hydrate(opts): after a failed fetch", () => {
 })
 
 describe("storable: no timer", () => {
-  it("arms none, however long the record in hand sits: an untimely record waits for the next call that asks", async () => {
+  it("sets no timer, and fetches nothing as its record goes untimely", async () => {
     const { box } = await timelyBoxOf(1000)
     expect(vi.getTimerCount()).to.eq(0)
     await world.mw.advance(5000)
@@ -200,7 +200,7 @@ describe("storable.hydrate(opts): a thing made with a horizon of Infinity", () =
 // == [Put]: seal, then put
 
 describe("storable.put(patch): seal, then put", () => {
-  it("puts the record sealed over central's revision, resolving this once storage's answer is adopted", async () => {
+  it("puts the sealed record over central's revision, and resolves once storage's answer is adopted", async () => {
     const { box } = await timelyBoxOf()
     const pending = makePending()
     world.mw.willPut(async ({ record }) => {
@@ -228,7 +228,7 @@ describe("storable.put(patch): seal, then put", () => {
 
 // == [Del]: deleted over central's revision, again where gone
 
-describe("storable.del(): deleted over central's revision, again where gone", () => {
+describe("storable.del()", () => {
   it("deletes at central's revision, gone once the answer is adopted", async () => {
     const { box } = await timelyBoxOf()
     const pending = makePending()
@@ -255,13 +255,13 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
     expect(world.mw.callsOf('del')[0]?.priorRevisionTok).to.equal(asked.revision_tok)
   })
 
-  it("refuses a scope that is no scope, deleting nothing", async () => {
+  it("refuses a malformed scope, deleting nothing", async () => {
     const { box } = await timelyBoxOf()
     await TH.expectRefusal(box.del({ ...box.scope, boxlabel: '' }))
     expect(world.mw.callsOf('del')).to.deep.equal([])
   })
 
-  it("deletes again a thing deleted, at its tombstone's revision, which stays", async () => {
+  it("deletes a deleted thing again at its tombstone's revision", async () => {
     const { box } = await timelyBoxOf()
     await box.del(box.scope)
     const tombstone = box._cheat_central
@@ -272,7 +272,7 @@ describe("storable.del(): deleted over central's revision, again where gone", ()
     expect(box._cheat_central).to.deep.include({ am: 'x', revision_seq: tombstone.revision_seq })
   })
 
-  it("deletes again a thing deleted; the same tombstone answered reads 'same'", async () => {
+  it("keeps its tombstone when a repeat delete returns the same one", async () => {
     const { box } = await timelyBoxOf()
     await box.del(box.scope)
     const tombstone = box._cheat_central
@@ -302,7 +302,7 @@ describe("storable verbs while the vault is locked", () => {
     })
   }
 
-  it("follows the listing's word on isLocked, reading it fresh each time", async () => {
+  it("reads the listing's isLocked afresh on each call", async () => {
     const { box } = await timelyBoxOf()
     expect(box.isLocked).to.be.false
     world.mw.setLocked(true)
@@ -351,8 +351,8 @@ describe("storable try forms: an outcome, never a rejection", () => {
 
 // == [Success by receive's verdict]: success noted on the fetch path
 
-describe("storable.hydrate(opts): success is receive's verdict on the record fetched", () => {
-  it("notes no success for a fetch answered with an older record: the next hydrate fetches again", async () => {
+describe("storable.hydrate(opts): timeliness after a fetch", () => {
+  it("fetches again after a fetch returned an older record", async () => {
     const { listing, box } = await timelyBoxOf(1000)
     await listing.build(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
     world.mw.setNow(T0 + 1000)
@@ -364,7 +364,7 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
     expect(world.mw.callsOf('get')).to.have.lengthOf(2)
   })
 
-  it("notes no success for a fetch answered with a sparse record where nothing whole is world", async () => {
+  it("fetches again after a fetch returned only a sparse record", async () => {
     const { box } = await timelyBoxOf(1000)
     world.mw.setNow(T0 + 1000)
     world.mw.willGet(world.mw.answerOf(box.scope, sparseBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 })))
@@ -375,7 +375,7 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
     expect(world.mw.callsOf('get')).to.have.lengthOf(2)
   })
 
-  it("notes success for a fetch answered with a newer full record, timely for the whole horizon after it", async () => {
+  it("is timely for the whole horizon after a fetch returned a newer full record", async () => {
     const { box } = await timelyBoxOf(1000)
     world.mw.setNow(T0 + 1000)
     world.mw.willGet(world.mw.answerOf(box.scope, fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 })))
@@ -387,7 +387,7 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
     expect(box.isTimely).to.be.false
   })
 
-  it("throws a refusal of the record fetched to the hydrate's caller, and notes no success", async () => {
+  it("throws a refusal of the fetched record to its caller, and stays untimely", async () => {
     const { box } = await timelyBoxOf(1000)
     world.mw.setNow(T0 + 1000)
     world.mw.willGet(world.mw.answerOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })))
@@ -401,8 +401,8 @@ describe("storable.hydrate(opts): success is receive's verdict on the record fet
 
 // == [Rebirth, sentences]: a deletion arriving again after a put, phrases.ts
 
-describe("storable.receive(rcvd): after a put over a box world gone", () => {
-  it("keeps a rebirth written over a box world gone when the deletion world arrives again: an older record says nothing new", async () => {
+describe("storable.receive(rcvd): after a put over a deleted box", () => {
+  it("keeps a rebirth when the old deletion arrives again", async () => {
     const gone = tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' })
     world.mw.seedPut(gone)
     const box = await fakeSealBoxListingOf(world.mw).build(gone)
@@ -446,7 +446,7 @@ describe("storable refusal sentences, from phrases.ts", () => {
 
 // == [Timeliness of the record in hand]: hydrate, receive
 
-describe("storable.hydrate(opts): timeliness asks of the record in hand alone", () => {
+describe("storable.hydrate(opts): timeliness depends only on the box's own record", () => {
   it("fetches a whole box once its record is older than the horizon, and not before", async () => {
     const { box } = await timelyBoxOf(Infinity)
     world.mw.setNow(T0 + 30_000)
@@ -457,7 +457,7 @@ describe("storable.hydrate(opts): timeliness asks of the record in hand alone", 
     expect(world.mw.callsOf('get')).to.have.lengthOf(1)
   })
 
-  it("fetches a sparse box whatever its age, until a whole record is in hand", async () => {
+  it("fetches a sparse box whatever its age, until it has a full record", async () => {
     world.mw.seedPut(fullBoxRecord())
     const box = await boxListingOf(world.mw).build(sparseBoxRecord())
     await box.hydrate({ maxMillisSinceRefresh: Infinity })

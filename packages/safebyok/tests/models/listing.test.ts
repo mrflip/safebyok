@@ -35,29 +35,29 @@ describe("listing.ensureTimelyWorld(maxMillis)", () => {
   })
 })
 
-describe("Listing's pipeline: what every answer takes", () => {
+describe("Listing's pipeline: what every answer goes through", () => {
   describe("listing.hello()", () => {
-    it("has nothing of an empty listing, and still starts the watch", async () => {
+    it("starts the watch even for an empty listing", async () => {
       const listing = boxListingOf(world.mw)
       await listing.hello()
       expect(listing.things).to.deep.equal([])
       expect(world.mw.callsOf('watch')).to.have.lengthOf(1)
     })
 
-    it("fetches nothing: the instances world stay as they are", async () => {
+    it("fetches nothing for instances already listed", async () => {
       const listing = await seededListing()
       world.mw.clearCalls()
       await listing.hello()
       expect(world.mw.callsOf('get')).to.deep.equal([])
     })
 
-    it("rejects, throwing nothing at its caller, where the VaultDB's watch refuses", async () => {
+    it("rejects, rather than throws, when the VaultDB's watch throws", async () => {
       const listing = boxListingOf(world.mw)
       vi.spyOn(world.mw.vaultDB, 'watch').mockImplementation(() => { throw new VaultError('storage_unavailable', "The storage could not be reached.") })
       await expect(listing.hello()).rejects.toThrow(/could not be reached/)
     })
 
-    it("tells as bad news the end the VaultDB's watch reports", async () => {
+    it("reports the end of the VaultDB's watch as bad news", async () => {
       const listing = boxListingOf(world.mw)
       const ended = new VaultError('storage_unavailable', "The stream ended.")
       await listing.hello()
@@ -65,7 +65,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(world.mw.badnews).to.deep.equal([ended])
     })
 
-    it("panics with a vaultDB's 'identity_revoked' before its caller hears it, telling no bad news", async () => {
+    it("panics on a vaultDB's 'identity_revoked', reporting no bad news", async () => {
       const listing = boxListingOf(world.mw)
       const revoked = new VaultError('identity_revoked', "Signed out.")
       vi.spyOn(world.mw.vaultDB, 'tryListBoxes').mockResolvedValueOnce({ ok: false, err: revoked, world: null } as never)
@@ -101,7 +101,7 @@ describe("Listing's pipeline: what every answer takes", () => {
   })
 
   describe("the watch's notices", () => {
-    it("delivers a notice as a good answer: a box not world is built and world", async () => {
+    it("builds and lists a box from a notice of one not yet listed", async () => {
       const listing = boxListingOf(world.mw)
       await listing.hello()
       world.mw.clearCalls()
@@ -113,7 +113,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(world.mw.callsOf('get')).to.deep.equal([])
     })
 
-    it("hands a notice to the box world, which receives it", async () => {
+    it("hands a notice to the listed box", async () => {
       const listing = boxListingOf(world.mw)
       await listing.hello()
       const box = await listing.build(fullBoxRecord())
@@ -123,7 +123,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(box.sidecar).to.deep.equal({ note: 'pushed' })
     })
 
-    it("delivers a notice of a deletion, which no fetch's ifAbsent judges: the box is world gone", async () => {
+    it("delivers a notice of a deletion, and the listed box is no longer present", async () => {
       const listing = boxListingOf(world.mw)
       await listing.hello()
       const box = await listing.build(fullBoxRecord())
@@ -133,7 +133,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(world.mw.badnews).to.deep.equal([])
     })
 
-    it("tells a refusal met on the way to its world, rather than throwing it", async () => {
+    it("reports a refusal from a notice as bad news instead of throwing it", async () => {
       const listing = boxListingOf(world.mw)
       await listing.hello()
       await listing.build(fullBoxRecord())
@@ -143,7 +143,7 @@ describe("Listing's pipeline: what every answer takes", () => {
   })
 
   describe("listing.snapshot, getSnapshot and subscribe", () => {
-    it("is empty, frozen and the same array before anything is world", () => {
+    it("is the same empty frozen array before anything is listed", () => {
       const listing = boxListingOf(world.mw)
       expect(listing.snapshot).to.deep.equal([])
       expect(Object.isFrozen(listing.snapshot)).to.be.true
@@ -162,7 +162,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(Object.isFrozen(listing.snapshot)).to.be.true
     })
 
-    it("is the same array until one thing's snapshot changes, and tells its listeners once per change", async () => {
+    it("is the same array until one thing's snapshot changes, and notifies its listeners once per change", async () => {
       const listing = boxListingOf(world.mw)
       let told = 0
       listing.subscribe(() => { told += 1 })
@@ -182,7 +182,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(told).to.eq(2)
     })
 
-    it("follows a thing's change that no delivery brought: a put, once", async () => {
+    it("follows a change made by a box's own put, notifying once", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.seedPut(fullBoxRecord())
       const box = await listing.build(fullBoxRecord())
@@ -194,7 +194,7 @@ describe("Listing's pipeline: what every answer takes", () => {
       expect(listing.snapshot[0]?.sidecar).to.deep.equal({ note: 'edited' })
     })
 
-    it("takes a box in when it comes back to life, and lets it go when it is deleted", async () => {
+    it("includes a box once it is reborn, and drops it once it is deleted", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(tombstoneBoxRecord({ revision_seq: 2 }))
       expect(listing.snapshot).to.deep.equal([])

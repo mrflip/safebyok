@@ -35,7 +35,7 @@ const friendWithRowOf = async (stamp: Partial<VaultStamp>): Promise<FakeLeaseFri
 }
 
 describe("a revoke whose forget is refused", () => {
-  it("throws with the lease already gone from memory, and a second revoke asks nothing more, the row left for Lease.forget", async () => {
+  it("throws, and leaves the lease out of force", async () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
     await lease.cacheAsCacheCan()
@@ -57,7 +57,7 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
     expect(Object.keys(record.vault_key_lease_wrapped)).to.have.members(['cipher_iv_b64', 'ciphertext_b64'])
   })
 
-  it("caches nothing of itself: a lease is cached by cacheAsCacheCan", async () => {
+  it("caches nothing on its own", async () => {
     const friend = fakeLeaseFriendOf()
     await makeGrantedLease(friend)
     expect(friend.tryCacheLease).not.toHaveBeenCalled()
@@ -79,10 +79,10 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
 
   const GrantRefusalCases = [
     [() => ({ vaultKey: makeLeaseKey() }),                                        'refuses a vaultKey that is not extractable'],
-    [() => ({ vaultKey: 'a vault key' }),                                         'refuses a vaultKey that is no CryptoKey'],
+    [() => ({ vaultKey: 'a vault key' }),                                         'refuses a vaultKey that is not a CryptoKey'],
     [() => ({ opts: { ...GrantedAs, gate_epoch: 0 } }),                           'refuses gate_epoch 0'],
     [() => ({ opts: { ...GrantedAs, gate_epoch: 1.5 } }),                         'refuses a gate_epoch that is not whole'],
-    [() => ({ opts: { ...GrantedAs, wayinkind: 'carrier pigeon' } }),             'refuses a kind of proving there is none of'],
+    [() => ({ opts: { ...GrantedAs, wayinkind: 'carrier pigeon' } }),             'refuses an unknown wayinkind'],
     [() => ({ opts: {} }),                                                        'refuses opts with neither'],
     [() => ({ friend: { ...fakeLeaseFriendOf(), lock: undefined } }),             'refuses a friend with no lock'],
     [() => ({ friend: { ...fakeLeaseFriendOf(), vault_tok: undefined } }),        'refuses a friend with no vault_tok'],
@@ -117,7 +117,7 @@ describe("lease.cacheAsCacheCan()", () => {
     expect(friend.tryCacheLease).not.toHaveBeenCalled()
   })
 
-  it("tells what tryCacheLease refuses as bad news, leaving the lease in force", async () => {
+  it("reports a tryCacheLease refusal as bad news, leaving the lease in force", async () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
     const refusal = new VaultError('unexpected_error', 'the disk is full')
@@ -128,7 +128,7 @@ describe("lease.cacheAsCacheCan()", () => {
     await lease.sealWith(WhisperText, sealStampOf('b1'))
   })
 
-  it("refuses once out of force, telling no bad news and caching nothing", async () => {
+  it("refuses once out of force, reporting no bad news and caching nothing", async () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
     lease.evict()
@@ -139,11 +139,11 @@ describe("lease.cacheAsCacheCan()", () => {
 })
 
 describe("Lease.buildFromCache(friend, gate_epoch)", () => {
-  it("answers null when the device caches no lease", async () => {
+  it("returns null when the device has no cached lease", async () => {
     expect(await Lease.buildFromCache(fakeLeaseFriendOf(), GrantedAs.gate_epoch)).to.be.null
   })
 
-  it("answers the cached lease of this vault and epoch, which opens what the granted lease sealed", async () => {
+  it("returns the cached lease of this vault and epoch, which opens what the granted lease sealed", async () => {
     const { friend, lease: granted } = await grantedWorld()
     const stamp = sealStampOf('b1')
     const sealed = await granted.sealWith('{"val":"cached"}', stamp)
@@ -152,7 +152,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(await got!.unsealWith(sealed, stamp)).to.eq('{"val":"cached"}')
   })
 
-  it("answers a lease proved exactly the autolock duration ago, which still opens what the granted lease sealed", async () => {
+  it("returns a lease proved exactly the autolock duration ago, which still opens what the granted lease sealed", async () => {
     const { friend, lease: granted } = await grantedWorld()
     const stamp = sealStampOf('b1')
     const sealed = await granted.sealWith('{"val":"cached"}', stamp)
@@ -162,7 +162,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(friend.tryForgetLease).not.toHaveBeenCalled()
   })
 
-  it("answers null past autolock, so the vault asks for a proof, and leaves the row untouched, warning of nothing", async () => {
+  it("returns null past autolock and leaves the row untouched", async () => {
     const { friend } = await grantedWorld()
     const row = friend.cached
     vi.setSystemTime(T0 + FriendLeaseMillis + 1)
@@ -172,7 +172,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(friend.logged).to.deep.equal([])
   })
 
-  it("opens a row past autolock again once the clock is set back, as the row was left", async () => {
+  it("opens a row past autolock again once the clock is set back", async () => {
     const { friend } = await grantedWorld()
     vi.setSystemTime(T0 + FriendLeaseMillis + 1)
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
@@ -181,7 +181,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(got?.isPresent).to.be.true
   })
 
-  it("forgets a row of another epoch even past autolock: the epoch is judged first", async () => {
+  it("forgets a row of another epoch even past autolock", async () => {
     const { friend } = await grantedWorld()
     vi.setSystemTime(T0 + FriendLeaseMillis + 1)
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch + 1)).to.be.null
@@ -189,7 +189,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(friend.cached).to.be.null
   })
 
-  it("finds nothing past an autolock of ForeverMillis, a host's Infinity: a lease cached long ago is in force", async () => {
+  it("never expires a lease under an autolock of ForeverMillis", async () => {
     const friend = fakeLeaseFriendOf({ leaseMillis: ForeverMillis })
     const lease = await makeGrantedLease(friend)
     await lease.cacheAsCacheCan()
@@ -198,7 +198,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(got?.isPresent).to.be.true
   })
 
-  it("tells a datastore's refusal as bad news, once, and answers null", async () => {
+  it("reports a datastore's refusal as bad news, once, and returns null", async () => {
     const friend = fakeLeaseFriendOf()
     const refusal = new VaultError('unexpected_error', 'the datastore is down')
     friend.peekLease.mockRejectedValue(refusal)
@@ -207,13 +207,13 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(friend.tryForgetLease).not.toHaveBeenCalled()
   })
 
-  it("refuses a friend its check refuses, where it tells no bad news", async () => {
+  it("refuses a malformed friend, reporting no bad news", async () => {
     const friend = { ...fakeLeaseFriendOf(), peekLease: undefined } as unknown as FakeLeaseFriend
     await TH.expectRefusal(Lease.buildFromCache(friend, GrantedAs.gate_epoch))
     expect(friend.tellBadNews).not.toHaveBeenCalled()
   })
 
-  it("forgets a cached lease of another gate of this vault, telling no bad news, so the vault asks for a proof", async () => {
+  it("forgets a cached lease of another gate of this vault, reporting no bad news", async () => {
     const { friend } = await grantedWorld()
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch + 1)).to.be.null
     expect(friend.tryForgetLease).toHaveBeenCalledTimes(1)
@@ -229,7 +229,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
   ] as const
 
   for (const [stamp, blurb] of OtherStampCases) {
-    it(`forgets a cached lease of ${blurb}, telling it as bad news, and answers null`, async () => {
+    it(`forgets a cached lease of ${blurb}, reports it as bad news and returns null`, async () => {
       const friend = await friendWithRowOf(stamp)
       expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
       expect(friend.tryForgetLease).toHaveBeenCalledTimes(1)
@@ -239,21 +239,21 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     })
   }
 
-  it("tells the bad news for a row of another stamp even where its forget is refused", async () => {
+  it("reports the bad news for a row of another stamp even when its forget is refused", async () => {
     const friend = await friendWithRowOf({ user_id: 'u2' })
     friend.tryForgetLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the datastore is down')))
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
     expect(friend.tellBadNews).toHaveBeenCalledOnce()
   })
 
-  it("lets a throw that is no refusal through, telling no bad news", async () => {
+  it("rethrows an error that is not a refusal, reporting no bad news", async () => {
     const friend = fakeLeaseFriendOf()
     friend.peekLease.mockRejectedValue(new TypeError('a bug'))
     await expect(Lease.buildFromCache(friend, GrantedAs.gate_epoch)).rejects.to.be.instanceOf(TypeError)
     expect(friend.tellBadNews).not.toHaveBeenCalled()
   })
 
-  it("still answers null where a row of another gate has its forget refused, telling no bad news and logging nothing", async () => {
+  it("returns null quietly when forgetting another gate's row is refused", async () => {
     const { friend } = await grantedWorld()
     friend.tryForgetLease.mockResolvedValueOnce(bad(new VaultError('unexpected_error', 'the datastore is down')))
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch + 1)).to.be.null
@@ -267,11 +267,11 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     [(record: LeaseRecord) => ({ ...record, vault_key_lease_wrapped: undefined }), 'with no wrapped vaultKey'],
     [(record: LeaseRecord) => ({ ...record, proved_at: undefined }),               'with no proved_at'],
     [(record: LeaseRecord) => ({ ...record, extra: 'field' }),                     'with a field no lease has'],
-    [() => 'a lease',                                                              'that is no record at all'],
+    [() => 'a lease',                                                              'that is not a record at all'],
   ] as const
 
   for (const [tamper, blurb] of MalformedCases) {
-    it(`tells a cached record ${blurb} as 'damaged_lease' bad news, quoting none of it, answers null and leaves it in place`, async () => {
+    it(`reports a cached record ${blurb} as bad news without quoting it`, async () => {
       const { friend } = await grantedWorld()
       const { vault_key_lease_wrapped } = friend.cached as LeaseRecord
       const tampered = tamper(friend.cached as LeaseRecord, await makeVaultKey())
@@ -288,7 +288,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
 })
 
 describe("lease.revoke(), lease.evict() and isPresent", () => {
-  it("vacate forgets the cached record and leaves the lease forgotten and out of force", async () => {
+  it("revoke forgets the cached record and leaves the lease out of force", async () => {
     const { friend, lease } = await grantedWorld()
     await lease.revoke()
     expect(friend.forgetLease).toHaveBeenCalledTimes(1)
@@ -296,14 +296,14 @@ describe("lease.revoke(), lease.evict() and isPresent", () => {
     expect(lease.isPresent).to.be.false
   })
 
-  it("is idempotent: a second vacate forgets nothing more", async () => {
+  it("is idempotent: a second revoke forgets nothing more", async () => {
     const { friend, lease } = await grantedWorld()
     await lease.revoke()
     await lease.revoke()
     expect(friend.forgetLease).toHaveBeenCalledTimes(1)
   })
 
-  it("throws what forgetLease refuses, the lease out of force all the same; tryRevoke answers it as a bad Outcome", async () => {
+  it("throws what forgetLease refuses, leaving the lease out of force", async () => {
     const { friend, lease } = await grantedWorld()
     friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
     await TH.expectRefusal(lease.revoke())
@@ -314,7 +314,7 @@ describe("lease.revoke(), lease.evict() and isPresent", () => {
     expect(other.lease.isPresent).to.be.false
   })
 
-  it("Lease.forget forgets a record with no lease granted, on each call, and starts before it answers, so forgets are written in call order", async () => {
+  it("Lease.forget forgets a record with no lease granted, starting before it returns", async () => {
     const friend = fakeLeaseFriendOf()
     friend.cached = 'a row of an earlier session'
     const forgetting = Lease.tryForget(friend)
@@ -325,7 +325,7 @@ describe("lease.revoke(), lease.evict() and isPresent", () => {
     expect(friend.forgetLease).toHaveBeenCalledTimes(2)
   })
 
-  it("Lease.forget throws what forgetLease refuses; tryForget answers it as a bad Outcome", async () => {
+  it("Lease.forget throws what forgetLease refuses", async () => {
     const friend = fakeLeaseFriendOf()
     friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
     await TH.expectRefusal(Lease.forget(friend))
@@ -333,7 +333,7 @@ describe("lease.revoke(), lease.evict() and isPresent", () => {
     await TH.expectBad(Lease.tryForget(friend))
   })
 
-  it("Lease.forget refuses a friend its check refuses, forgetting nothing", async () => {
+  it("Lease.forget refuses a malformed friend, forgetting nothing", async () => {
     const friend = { ...fakeLeaseFriendOf(), lock: undefined } as unknown as FakeLeaseFriend
     await TH.expectRefusal(Lease.forget(friend))
     expect(friend.forgetLease).not.toHaveBeenCalled()
@@ -347,7 +347,7 @@ describe("lease.revoke(), lease.evict() and isPresent", () => {
     expect(friend.cached).to.not.be.null
   })
 
-  it("refuses sealWith and unsealWith once vacated, as 'vault_locked'", async () => {
+  it("sealWith and unsealWith refuse 'vault_locked' once revoked", async () => {
     const { lease } = await grantedWorld()
     const stamp = sealStampOf('b1')
     const sealed = await lease.sealWith(WhisperText, stamp)
@@ -408,7 +408,7 @@ describe("lease.sealWith(whisperText, stamp) and unsealWith(sealed, stamp)", () 
     })
   }
 
-  it("refuses a whisper that is no string", async () => {
+  it("refuses a whisper that is not a string", async () => {
     const { lease } = await grantedWorld()
     await TH.expectRefusal(lease.sealWith(new TextEncoder().encode(WhisperText) as never, sealStampOf('b1')))
   })
@@ -427,7 +427,7 @@ describe("lease.sealWith(whisperText, stamp) and unsealWith(sealed, stamp)", () 
     })
   }
 
-  it("refuses to open the box key and whisper of one box laid under another's: 'damaged_whisper'", async () => {
+  it("refuses 'damaged_whisper' for one box's wrapped key beside another box's whisper", async () => {
     const { lease } = await grantedWorld()
     const sealedOne = await lease.sealWith(WhisperText, sealStampOf('b1'))
     const sealedTwo = await lease.sealWith(WhisperText, sealStampOf('b2'))
@@ -451,7 +451,7 @@ describe("lease.sealWith(whisperText, stamp) and unsealWith(sealed, stamp)", () 
     expect(TH.thrownText(err)).to.not.include(tampered.whisper_ciphered.ciphertext_b64)
   })
 
-  it("refuses sealed parts that are no ciphered bags", async () => {
+  it("refuses sealed parts that are not ciphertext objects", async () => {
     const { lease } = await grantedWorld()
     const stamp = sealStampOf('b1')
     await TH.expectRefusal(lease.unsealWith({ box_key_wrapped: 'wrapped' } as never, stamp))
@@ -461,13 +461,13 @@ describe("lease.sealWith(whisperText, stamp) and unsealWith(sealed, stamp)", () 
 describe("a tampered lease record", () => {
   const TamperCases = [
     [(record: LeaseRecord) => ({ ...record, proved_at: record.proved_at + 1 }),                'its proved_at moved'],
-    [(record: LeaseRecord) => ({ ...record, wayinkind: 'passkey' }),                           'its kind of proving changed'],
+    [(record: LeaseRecord) => ({ ...record, wayinkind: 'passkey' }),                           'its wayinkind changed'],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, lease_key: other.lease_key }), "another lease's leaseKey"],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, vault_key_lease_wrapped: other.vault_key_lease_wrapped }), "another lease's wrapped vaultKey"],
   ] as const
 
   for (const [tamper, blurb] of TamperCases) {
-    it(`reads as a lease, but with ${blurb} its first seal or unseal locks the vault, refuses 'damaged_lease' and lets the lease go, forgetting nothing itself, so the next refuses 'vault_locked'`, async () => {
+    it(`with ${blurb} locks the vault at its first seal or unseal`, async () => {
       const { friend, lease } = await grantedWorld()
       const stamp = sealStampOf('b1')
       const sealed = await lease.sealWith(WhisperText, stamp)
@@ -484,7 +484,7 @@ describe("a tampered lease record", () => {
     })
   }
 
-  it("will not open once its gate_epoch is moved to the one asked: the epoch is bound by the wrap", async () => {
+  it("refuses to seal once its gate_epoch is changed to the epoch asked for", async () => {
     const { friend } = await grantedWorld()
     friend.cached = { ...(friend.cached as LeaseRecord), gate_epoch: 2 }
     const got = await Lease.buildFromCache(friend, 2)

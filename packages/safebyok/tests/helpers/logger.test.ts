@@ -14,7 +14,7 @@ const NotLoggers = [
 ] as const
 
 describe("parseLogger", () => {
-  it("hands back the host's logger, each call passed through as it was made", () => {
+  it("wraps the host's logger, passing each call through unchanged", () => {
     const spy = TH.spyLogger()
     const logger = parseLogger(spy.logger)
     const err = new Error('the storage adapter failed')
@@ -42,20 +42,20 @@ describe("parseLogger", () => {
     warn.mockRestore()
   })
 
-  it("answers the one default logger, DefaultLogger, whenever it is given none or null", () => {
+  it("returns DefaultLogger when given none or null", () => {
     expect(parseLogger(undefined)).to.eq(DefaultLogger)
     expect(parseLogger(null)).to.eq(DefaultLogger)
     expect(parseLogger(DefaultLogger)).to.eq(DefaultLogger)
   })
 
-  it("guards the same host logger as the same object, however often it is handed in", () => {
+  it("returns the same guarded logger each time it is given the same host logger", () => {
     const telemetry = TH.spyLogger().logger
     expect(parseLogger(telemetry)).to.eq(parseLogger(parseLogger(telemetry)))
     expect(parseLogger(telemetry)).to.eq(parseLogger(telemetry))
     expect(parseLogger(TH.spyLogger().logger)).to.not.eq(parseLogger(telemetry))
   })
 
-  it("guards a logger once: one it has guarded comes back as itself, however many layers hand it down", () => {
+  it("returns an already-guarded logger unchanged", () => {
     const spy = TH.spyLogger()
     const guarded = parseLogger(spy.logger)
     expect(guarded).to.not.eq(spy.logger)
@@ -64,12 +64,12 @@ describe("parseLogger", () => {
     expect(parseLogger(parseLogger(fallback))).to.eq(fallback)
   })
 
-  it("carries nothing beside its three calls", () => {
+  it("returns a logger with no properties beyond its three methods", () => {
     const guarded = parseLogger(TH.spyLogger().logger)
     expect(Reflect.ownKeys(guarded)).to.deep.equal(['log', 'warn', 'error'])
   })
 
-  it("guards a logger made from a guarded one, which inherits nothing that would let it skip the guard", () => {
+  it("guards a logger whose prototype is a guarded logger", () => {
     const child = Object.create(parseLogger(TH.spyLogger().logger)) as VaultLogger
     child.error = () => { throw new Error('a child logger that throws') }
     const taken = parseLogger(child)
@@ -130,7 +130,7 @@ describe("parseLogger", () => {
     }
   })
 
-  it("drops what a promise from another realm rejects with, which is no instance of this realm's Promise", async () => {
+  it("drops a rejection from another realm's promise", async () => {
     const unhandled = vi.fn()
     process.on('unhandledRejection', unhandled)
     try {
@@ -146,7 +146,7 @@ describe("parseLogger", () => {
 })
 
 describe("isGuardedLogger", () => {
-  it("knows a logger parseLogger made safe, and the DefaultLogger, from the host's bare one", () => {
+  it("is true of a guarded logger and of DefaultLogger, and false of an unguarded host logger", () => {
     const spy = TH.spyLogger()
     expect(isGuardedLogger(parseLogger(spy.logger))).to.be.true
     expect(isGuardedLogger(DefaultLogger)).to.be.true
@@ -159,7 +159,7 @@ describe("isGuardedLogger", () => {
 describe("setDefaultLogger", () => {
   afterEach(() => { setDefaultLogger(undefined) })
 
-  it("sends what the default logger hears to the app's own, a fallback taken before the call included", () => {
+  it("routes the default logger's calls to the app's logger, including a fallback taken before the call", () => {
     const fallback = parseLogger(undefined)
     const telemetry = TH.spyLogger()
     setDefaultLogger(telemetry.logger)
@@ -184,7 +184,7 @@ describe("setDefaultLogger", () => {
     expect(() => { DefaultLogger.error('a listener threw') }).to.not.throw()
   })
 
-  it("takes the default logger itself as the console, rather than handing each call to itself", () => {
+  it("logs to the console when given DefaultLogger itself", () => {
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
     setDefaultLogger(DefaultLogger)
     DefaultLogger.warn('heard once')
@@ -204,7 +204,7 @@ describe("setDefaultLogger", () => {
 })
 
 describe("VaultLogger", () => {
-  it("fits a logger whose story is typed as a record of any", () => {
+  it("accepts a logger whose story parameter is typed Record<string, any>", () => {
     type CoachsLogger = {
       log:   (message?: string, story?: Record<string, any>, err?: Error | null) => void
       warn:  (message?: string, story?: Record<string, any>, err?: Error | null) => void

@@ -33,7 +33,7 @@ describe("HostErrorSanitizer.refusalFor", () => {
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
 
-  it("reads nothing of the foreign throw: one whose every access, instanceof included, throws costs nothing", () => {
+  it("never reads the foreign error, even one whose every property access throws", () => {
     const booby = new Proxy(() => undefined, { get: quotingTrap, set: quotingTrap, has: quotingTrap, deleteProperty: quotingTrap, ownKeys: quotingTrap, getOwnPropertyDescriptor: quotingTrap, defineProperty: quotingTrap, getPrototypeOf: quotingTrap, setPrototypeOf: quotingTrap, isExtensible: quotingTrap, preventExtensions: quotingTrap, apply: quotingTrap, construct: quotingTrap })
     expect(() => booby instanceof Error).to.throw('sk-ant-fake-trap')
     const refusal = HostErrorSanitizer.refusalFor(booby, 'unexpected_error', 'The checker threw.')
@@ -46,9 +46,9 @@ describe("HostErrorSanitizer.refusalFor", () => {
   const notedTrap = (field: string): never => { getterReads.push(field); return quotingTrap() }
 
   const HostileCases = [
-    [undefined,                     'stands in for undefined thrown'],
-    ["sk-ant-fake-thrown-string",   'stands in for a bare string thrown, quoting none of it'],
-    [{ get message(): string { return notedTrap('message') }, get name(): string { return notedTrap('name') }, get stack(): string { return notedTrap('stack') }, get cause(): string { return notedTrap('cause') } }, 'stands in for an object whose getters throw, reading none of them'],
+    [undefined,                     'replaces a thrown undefined'],
+    ["sk-ant-fake-thrown-string",   'replaces a thrown string, quoting none of it'],
+    [{ get message(): string { return notedTrap('message') }, get name(): string { return notedTrap('name') }, get stack(): string { return notedTrap('stack') }, get cause(): string { return notedTrap('cause') } }, 'replaces an object whose getters throw, reading none of them'],
   ] as const
 
   for (const [foreign, blurb] of HostileCases) {
@@ -61,7 +61,7 @@ describe("HostErrorSanitizer.refusalFor", () => {
     })
   }
 
-  it("stands in for a key deriver's throw quoting the passphrase", async () => {
+  it("replaces a key deriver's error that quotes the passphrase", async () => {
     const keyDeriver = { deriveKeyBytes: (passphrase: string) => Promise.reject(new TypeError(`cannot derive ${passphrase}`)) }
     const deriveOrRefuse = async (passphrase: string) => {
       let handed: unknown
@@ -76,7 +76,7 @@ describe("HostErrorSanitizer.refusalFor", () => {
   })
 
   // HostErrorSanitizer.refusalFor @example
-  it("stands in for a storage client's failure", async () => {
+  it("replaces a storage client's error", async () => {
     const client = { mutation: () => Promise.reject(quotingError()) }
     const putBox = async () => {
       try {

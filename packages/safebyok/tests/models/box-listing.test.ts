@@ -22,7 +22,7 @@ const vaultDBDuck = () => Object.fromEntries(['tryGetVault', 'tryPutVault', 'try
 
 describe("BoxListing", () => {
   describe("new BoxListing(world, opts)", () => {
-    it("makes a listing of a world, a vaultDB and a horizon, calling none of them", () => {
+    it("makes a listing from a world, a vaultDB and a horizon without calling them", () => {
       const listing = new BoxListing(world.mw.world, good())
       expect(listing).to.be.instanceOf(BoxListing)
       expect(listing.things).to.deep.equal([])
@@ -33,7 +33,7 @@ describe("BoxListing", () => {
     const bads: readonly (readonly [blurb: string, args: () => readonly [world: unknown, opts: unknown]])[] = [
       ['no world',                    () => [undefined, good()]],
       ['no vaultDB',                  () => [world.mw.world, { ...good(), vaultDB: undefined }]],
-      ['a vaultDB that is a duck of one', () => [world.mw.world, { ...good(), vaultDB: vaultDBDuck() }]],
+      ['an unbranded look-alike of a vaultDB', () => [world.mw.world, { ...good(), vaultDB: vaultDBDuck() }]],
       ['no horizon',                  () => [world.mw.world, { ...good(), maxMillisSinceRefresh: undefined }]],
       ['a negative horizon',          () => [world.mw.world, { ...good(), maxMillisSinceRefresh: -1 }]],
       ['a world among its options',   () => [world.mw.world, { ...good(), world: world.mw.world }]],
@@ -69,7 +69,7 @@ describe("BoxListing", () => {
       })
     }
 
-    it("has the box, in the snapshot", async () => {
+    it("lists the box, and shows it in the snapshot", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())
       expect(listing.at(box.scope)).to.eq(box)
@@ -77,14 +77,14 @@ describe("BoxListing", () => {
       expect(listing.snapshot).to.have.lengthOf(1)
     })
 
-    it("refuses a dna, which is no record, having and putting nothing", async () => {
+    it("refuses a dna in place of a record", async () => {
       const listing = boxListingOf(world.mw)
       await TH.expectRefusal(listing.build(dna() as never))
       expect(listing.things).to.deep.equal([])
       expect(world.mw.calls).to.deep.equal([])
     })
 
-    it("hands a record to the box already world, which receives it", async () => {
+    it("delivers a newer record to the box already listed", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())
       const again = await listing.build(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
@@ -95,7 +95,7 @@ describe("BoxListing", () => {
 })
 
 describe("boxListing.get(scoped, opts)", () => {
-  it("hydrates a box world, answering that instance", async () => {
+  it("hydrates a listed box and returns it", async () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.build(sparseBoxRecord())
     world.mw.seedPut(fullBoxRecord())
@@ -105,7 +105,7 @@ describe("boxListing.get(scoped, opts)", () => {
     expect(world.mw.callsOf('get')).to.have.length(1)
   })
 
-  it("asks nothing of a full box world within its horizon, and asks again given a horizon of 0", async () => {
+  it("asks storage nothing for a full listed box within its horizon, and fetches under a horizon of 0", async () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.build(fullBoxRecord())
     world.mw.seedPut(fullBoxRecord())
@@ -116,7 +116,7 @@ describe("boxListing.get(scoped, opts)", () => {
     expect(world.mw.callsOf('get')).to.have.length(1)
   })
 
-  it("fetches a box not world, and has what it finds", async () => {
+  it("fetches and lists a box not yet listed", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(fullBoxRecord())
     const box = await listing.get(world.mw.boxscope(Label))
@@ -124,13 +124,13 @@ describe("boxListing.get(scoped, opts)", () => {
     expect(listing.at(world.mw.boxscope(Label))).to.eq(box)
   })
 
-  it("refuses a box absent as 'absent_box', or answers null where asked for nil", async () => {
+  it("refuses an absent box with 'absent_box', or returns null under 'nil'", async () => {
     const listing = boxListingOf(world.mw)
     await TH.expectRefusal(listing.get(world.mw.boxscope(Label)), 'absent_box')
     expect(await listing.get(world.mw.boxscope(Label), { ifAbsent: 'nil' })).to.be.null
   })
 
-  it("refuses a box whose tombstone it finds as absent, or answers null where asked for nil", async () => {
+  it("refuses a box whose stored row is a tombstone as absent, or returns null under 'nil'", async () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.build(tombstoneBoxRecord())
     world.mw.seedPut(tombstoneBoxRecord())
@@ -138,7 +138,7 @@ describe("boxListing.get(scoped, opts)", () => {
     expect(await listing.get(box.scope, { ifAbsent: 'nil' })).to.be.null
   })
 
-  it("answers the box stored while the vault is locked", async () => {
+  it("returns the stored box while the vault is locked", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(fullBoxRecord())
     world.mw.setLocked(true)
@@ -147,14 +147,14 @@ describe("boxListing.get(scoped, opts)", () => {
     expect(box?.isPresent).to.be.true
   })
 
-  it("refuses fed a put's ifAbsent, and once vacated", async () => {
+  it("refuses a put's ifAbsent, and refuses once vacated", async () => {
     const listing = boxListingOf(world.mw)
     await TH.expectRefusal(listing.get(world.mw.boxscope(Label), { ifAbsent: 'add' } as never))
     listing.vacate()
     await TH.expectRefusal(listing.get(world.mw.boxscope(Label)))
   })
 
-  it("tryGet answers the outcome", async () => {
+  it("tryGet returns a refusal as an Outcome", async () => {
     const outcome = await boxListingOf(world.mw).tryGet(world.mw.boxscope(Label))
     expect(outcome.ok).to.be.false
   })
@@ -173,7 +173,7 @@ describe("boxListing.puttable(scoped, opts)", () => {
     expect(world.mw.calls).to.deep.equal([])
   })
 
-  it("answers the box world, alive or deleted, as it stands", async () => {
+  it("returns the listed box, alive or deleted", async () => {
     const listing = boxListingOf(world.mw)
     const alive = await listing.build(fullBoxRecord({ boxlabel: 'alive_one' }))
     const gone  = await listing.build(tombstoneBoxRecord({ boxlabel: 'gone_one' }))
@@ -181,7 +181,7 @@ describe("boxListing.puttable(scoped, opts)", () => {
     expect(listing.puttable(gone.scope)).to.eq(gone)
   })
 
-  it("under ifAbsent 'fail', answers the box world, alive or deleted, and refuses an empty slot as 'absent_box', naming vault.hello", async () => {
+  it("under ifAbsent 'fail', refuses an empty slot with 'absent_box'", async () => {
     const listing = boxListingOf(world.mw)
     const alive = await listing.build(fullBoxRecord({ boxlabel: 'alive_one' }))
     const gone  = await listing.build(tombstoneBoxRecord({ boxlabel: 'gone_one' }))
@@ -201,7 +201,7 @@ describe("boxListing.puttable(scoped, opts)", () => {
     expect(listing.things).to.deep.equal([])
   })
 
-  it("demands nothing of the vault, as only the put it prepares has side effects: that put refuses 'vault_locked'", async () => {
+  it("works while the vault is locked", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.setLocked(true)
     const shell = listing.puttable(world.mw.boxscope(Label))
@@ -228,7 +228,7 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
   ] as const
 
   for (const [inputOf, blurb] of BadDnaCases) {
-    it(`refuses creating ${blurb} while the vault is locked, having nothing and calling nothing`, async () => {
+    it(`refuses creating ${blurb} while the vault is locked, calling nothing`, async () => {
       const listing = boxListingOf(world.mw)
       world.mw.setLocked(true)
       await TH.expectRefusal(listing.create(inputOf() as never))
@@ -237,14 +237,14 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
     })
   }
 
-  it("refuses a sound dna created while the vault is locked as 'vault_locked', the dna checked first", async () => {
+  it("refuses 'vault_locked' for a sound dna created while the vault is locked", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.setLocked(true)
     await TH.expectRefusal(listing.create(dna()), 'vault_locked')
     expect(listing.snapshot).to.deep.equal([])
   })
 
-  it("says a bag is no whisper, naming whisper, for a dna that hands it as the whisper", async () => {
+  it("refuses LOCKED as a dna's whisper, naming whisper", async () => {
     const err = await TH.expectRefusal(boxListingOf(world.mw).create({ ...dna(), whisper: LOCKED }))
     expect(err.message).to.include(Phrases.WhisperedIsNoWhisper)
     expect(err.meta?.fieldnames).to.deep.equal(['whisper'])
@@ -260,7 +260,7 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
     expect(err.meta?.fieldnames).to.include('scope.applabel')
   })
 
-  it("shows the scope of the vault it lists, as a vault shows its own", () => {
+  it("shows the scope of the vault it lists", () => {
     const listing = boxListingOf(world.mw)
     expect(listing.scope).to.deep.equal(WorldVault.scope)
     expect(listing).to.include(WorldVault.scope)

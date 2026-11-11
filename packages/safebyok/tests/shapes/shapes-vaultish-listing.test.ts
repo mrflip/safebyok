@@ -26,7 +26,7 @@ describe("The checks of options", () => {
       [null,      false, 'refuses null'],
     ])
 
-    it("keeps Infinity as ForeverMillis, so no horizon past the check is infinite", () => {
+    it("turns Infinity into ForeverMillis", () => {
       expect(VX.horizonMillis.parse(Infinity)).to.eq(ForeverMillis)
       expect(VX.timelyOpts.parse({ maxWorldMillis: Infinity })).to.deep.equal({ maxWorldMillis: ForeverMillis })
     })
@@ -96,7 +96,7 @@ describe("VX.ifAbsent and VX.fetchOpts", () => {
 })
 
 describe("VX.boxCreateOpts", () => {
-  it("fills what a create means: add where nothing stands, fail over a live record", () => {
+  it("defaults to ifAbsent 'add' and ifPresent 'fail'", () => {
     expect(VX.boxCreateOpts.parse({})).to.deep.equal({ ifAbsent: 'add', ifPresent: 'fail' })
   })
 
@@ -104,7 +104,7 @@ describe("VX.boxCreateOpts", () => {
     expect(VX.boxCreateOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'add', ifPresent: 'repl', maxWorldMillis: 5 })
   })
 
-  it("has ifAbsent to 'add': a create that must find a box is not a create", () => {
+  it("refuses an ifAbsent other than 'add'", () => {
     TH.expectSyncRefusal(() => VX.boxCreateOpts.parse({ ifAbsent: 'fail' }))
   })
 })
@@ -135,7 +135,7 @@ describe("VX.ifPresent and VX.boxPutOpts", () => {
     expect(VX.boxPutOpts.parse({})).to.deep.equal({ ifAbsent: 'add', ifPresent: 'repl' })
   })
 
-  it("refuses a fetch's ifAbsent: 'nil' is no answer to a put", () => {
+  it("refuses ifAbsent 'nil'", () => {
     TH.expectSyncRefusal(() => VX.boxPutOpts.parse({ ifAbsent: 'nil' }))
   })
 

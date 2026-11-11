@@ -10,14 +10,14 @@ describe("WhisperFieldAttributes", () => {
     ])
   })
 
-  it("turns off filling, saving and generating, capitalizing, correcting and spell-checking: a secret text is no credential", () => {
+  it("turns off autocomplete, capitalization, correction and spell-checking", () => {
     expect(WhisperFieldAttributes.autoComplete).to.eq('off')
     expect(WhisperFieldAttributes.autoCapitalize).to.eq('none')
     expect(WhisperFieldAttributes.autoCorrect).to.eq('off')
     expect(WhisperFieldAttributes.spellCheck).to.eq('false')
   })
 
-  it("is every value text, so setAttribute takes each as it is", () => {
+  it("has only string values", () => {
     // WhisperFieldAttributes @example 2
     const set: Record<string, string> = {}
     const field = { setAttribute: (attrname: string, attrval: string) => { set[attrname.toLowerCase()] = attrval } }

@@ -69,7 +69,7 @@ describe("whisper and sidecar refusing by kind", () => {
     }
   })
 
-  it("says a bag or a copy is no whisper, and of one nested that a whisper has no symbol key", () => {
+  it("refuses a sentinel bag, a copy of one, and one nested inside a whisper", () => {
     expect(TH.expectSyncRefusal(() => CX.whisper.parse(LOCKED)).message).to.include(Phrases.WhisperedIsNoWhisper)
     expect(TH.expectSyncRefusal(() => CX.whisper.parse({ ...LOCKED })).message).to.include(Phrases.WhisperedIsNoWhisper)
     expect(TH.expectSyncRefusal(() => CX.whisper.parse({ deep: { ...LOCKED } })).message).to.include(Phrases.WhisperBagShape)

@@ -20,7 +20,7 @@ const sealWorld = async () => {
 }
 
 describe("a box sealed and unsealed through the vault's lease", () => {
-  it("opens the whisper create sealed, and the one a later put sealed: the sealed parts carry none of it", async () => {
+  it("opens the whispers sealed by create and by a later put", async () => {
     const { boxes } = await sealWorld()
     const box = await boxes.create(BoxDna)
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
@@ -29,7 +29,7 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-1111' })
   })
 
-  it("opens the sealed record in another listing, and refuses 'damaged_whisper' for it with its sidecar altered", async () => {
+  it("opens the sealed record in another listing, and refuses 'damaged_whisper' when its sidecar is altered", async () => {
     const { boxes, boxesOf } = await sealWorld()
     const built = await boxes.create(BoxDna)
     const sealed = built._cheat_central
@@ -39,7 +39,7 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     await TH.expectRefusal(altered.extractWhisper(), 'damaged_whisper')
   })
 
-  it("refuses 'vault_locked' from the lease, at the seal and the unseal, once the vault locks", async () => {
+  it("refuses 'vault_locked' at the seal and the unseal once the vault locks", async () => {
     const { boxes, vault } = await sealWorld()
     const box = await boxes.create(BoxDna)
     vault.lock()

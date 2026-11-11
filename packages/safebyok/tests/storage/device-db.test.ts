@@ -45,14 +45,14 @@ describe("a deviceDB whose generic call throws", () => {
     }
   })
 
-  it("passes a VaultError a generic call throws as it came", async () => {
+  it("rethrows a VaultError from a generic call unchanged", async () => {
     const refusal = new VaultError('storage_unavailable', 'This browser does not let the app keep anything on this device.')
     const err = await TH.expectBad(new BrokenDeviceDB(refusal).tryPeek(asked), 'storage_unavailable')
     expect(err).to.eq(refusal)
   })
 })
 
-describe("a deviceDB whose generic call answers a bank row that fails its check", () => {
+describe("a deviceDB whose generic call returns an invalid bank row", () => {
   it("refuses ensureCachedBank", async () => {
     class GarbledDeviceDB extends BrokenDeviceDB {
       protected override doEnsureCachedBank(): unknown { return { applabel: 'acme', user_id: 'u1', device_id: 'not-a-uuid' } }

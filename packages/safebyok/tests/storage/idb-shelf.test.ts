@@ -14,7 +14,7 @@ const specOf = (over: Partial<VersionedShelfSpec> = {}): VersionedShelfSpec => (
 })
 
 describe("versionedShelfOf(spec)", () => {
-  it("answers a shelf that files rows in the database named by its stem and version", async () => {
+  it("returns a shelf that stores rows in the database named by its stem and version", async () => {
     const spec = specOf()
     const shelf = versionedShelfOf(spec)
     await inOneStep(shelf, 'readwrite', (store) => { store.put({ wrapped: 'one' }, 'key') })
@@ -23,12 +23,12 @@ describe("versionedShelfOf(spec)", () => {
     expect(dbs.map((db) => db.name)).to.include(`${spec.dbName}:device-v001-001-001`)
   })
 
-  it("answers the one shelf for a database, however often it is asked", () => {
+  it("returns the same shelf for a database on every call", () => {
     const spec = specOf()
     expect(versionedShelfOf(spec)).to.eq(versionedShelfOf({ ...spec }))
   })
 
-  it("answers a shelf on a connection of its own once the page has forgotten the database's", async () => {
+  it("returns a shelf on a new connection once the page has dropped the old one", async () => {
     const spec = specOf()
     const shelf = versionedShelfOf(spec)
     _cheat_forgetShelf(`${spec.dbName}:device-v001-001-001`)
@@ -39,7 +39,7 @@ describe("versionedShelfOf(spec)", () => {
     expect(await inOneStep(fresh, 'readonly', (store) => rowAt(store, 'key'))).to.deep.equal({ wrapped: 'one' })
   })
 
-  it("answers a shelf of its own for each dbName, stem and version", () => {
+  it("returns a separate shelf for each dbName, stem and version", () => {
     const spec = specOf()
     const shelf = versionedShelfOf(spec)
     for (const other of [specOf(), { ...spec, dbstem: 'vaults' }, { ...spec, version: '001-001-002' }]) {
@@ -47,7 +47,7 @@ describe("versionedShelfOf(spec)", () => {
     }
   })
 
-  it("lists the browser's databases for its wipe once for each database, however many shelves use it", async () => {
+  it("lists the browser's databases once per database, however many shelves share it", async () => {
     const spec = specOf()
     const databases = vi.spyOn(indexedDB, 'databases')
     try {
@@ -73,7 +73,7 @@ describe("versionedShelfOf(spec)", () => {
     expect(() => versionedShelfOf(specOf(over as unknown as Partial<VersionedShelfSpec>))).to.throw(VaultError).with.property('refusalkind', 'bad_option')
   })
 
-  it("refuses a spec that is no bag, and a field it does not accept", () => {
+  it("refuses a spec that is not an object, or has an unknown field", () => {
     expect(() => versionedShelfOf(null as never)).to.throw(VaultError)
     expect(() => versionedShelfOf({ ...specOf(), extra: 1 } as never)).to.throw(VaultError)
   })

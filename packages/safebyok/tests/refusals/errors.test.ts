@@ -40,7 +40,7 @@ describe("VaultError", () => {
     expect(isVaultError(new Error('vault_full'))).to.be.false
   })
 
-  it("carries refusalkind, family, message and cause, and its family read from the one table", () => {
+  it("carries refusalkind, family, message and cause", () => {
     const cause = new Error('socket closed')
     const err = new VaultError('storage_unavailable', 'Try again shortly.', { cause })
     expect(err).to.include({ refusalkind: 'storage_unavailable', family: 'condition', message: 'Try again shortly.', cause })
@@ -104,31 +104,31 @@ const FamilyCases = [
   ["weak_passphrase",     "condition", 'a passphrase too easy to guess asks the user for another'],
   ["wrong_passkey",       "condition", 'a passkey that does not open the vault asks again, or for a passphrase'],
   ["passkey_unavailable", "condition", 'a browser or authenticator that cannot answer for a passkey asks for the passphrase, or another authenticator'],
-  ["absent_box",          "condition", 'a box deleted elsewhere is a fact of syncing'],
-  ["absent_vault",        "condition", 'a novel vault, asked for what only a gated one has, is set up by its first unlock'],
-  ["absent_wayin",        "condition", 'a passkey removed on another device is a fact of syncing'],
+  ["absent_box",          "condition", 'a box deleted on another device is a normal part of syncing'],
+  ["absent_vault",        "condition", 'a vault with no gate yet is set up by its first unlock'],
+  ["absent_wayin",        "condition", 'a passkey removed on another device is a normal part of syncing'],
   ["box_too_large",       "condition", "a box too heavy for one record is the user's whisper and note, not the code"],
   ["vault_full",          "condition", 'a full vault tells the user to remove a box'],
-  ["damaged_whisper",     "bad_news",  'a box stored damaged is told to the user, who may remove it'],
-  ["newer_format",        "bad_news",  'a vault a newer version wrote is told to the user, who updates the app'],
-  ["stale_write",         "condition", 'another device writing first is a fact of syncing'],
+  ["damaged_whisper",     "bad_news",  'a box stored damaged is reported to the user, who may remove it'],
+  ["newer_format",        "bad_news",  'a vault a newer version wrote is reported to the user, who updates the app'],
+  ["stale_write",         "condition", 'another device writing first is a normal part of syncing'],
   ["record_conflict",     "condition", 'storage and this device disagreeing about one revision is for the app to tell the user of; fetching again does not mend it'],
   ["identity_revoked",    "bad_news",  'a signed-out user signs in again'],
   ["storage_unavailable", "condition", 'unreachable storage is tried again shortly'],
-  ["storage_blocked", "condition", 'a browser that withholds its storage is told so, as a retry will not mend it'],
-  ["gate_made_elsewhere", "condition", 'a vault made first elsewhere is told to the user who typed another passphrase'],
-  ["vault_gone",          "condition", 'a vault deleted while a call worked on it is a fact of syncing'],
-  ["vault_mismatch",      "condition", 'a vault deleted or made anew on another device is a fact of syncing'],
+  ["storage_blocked", "condition", 'a browser that withholds its storage is reported to the user'],
+  ["gate_made_elsewhere", "condition", 'a vault made first on another device is reported to the user who typed another passphrase'],
+  ["vault_gone",          "condition", 'a vault deleted while a call worked on it is a normal part of syncing'],
+  ["vault_mismatch",      "condition", 'a vault deleted or made anew on another device is a normal part of syncing'],
   ["gating_concluded",    "condition", 'a gating ended while its attempt ran is the user moving on, not a fault'],
-  ["damaged_lease",       "bad_news",  'a lease damaged on this device is told to the user, who unlocks again'],
+  ["damaged_lease",       "bad_news",  'a lease damaged on this device is reported to the user, who unlocks again'],
   ["attempt_in_flight",   "condition", 'a second submit while the first attempt runs is the user being quick, not a fault'],
   ["already_asking",      "condition", 'a second launch while a dialog is up is the host deduping late, not a fault'],
   ["dismissed",           "condition", 'a dismissed dialog is not a fault'],
   ["same_passphrase",     "condition", 'a new passphrase equal to the current one asks the user for another'],
   ["camped",              "condition", 'a put told not to replace a live record takes up the one stored'],
-  ["vault_empty",         "condition", 'a vault_tok of a life no row has is a fact of syncing: read the vault by its scope'],
-  ["damaged_row",         "bad_news",  'a row read from storage failing its checks is set aside and told of'],
-  ["storage_issue",       "bad_news",  'a row no working store could answer, no object at all or of another address, is past retrying'],
+  ["vault_empty",         "condition", 'a vault_tok that matches no stored vault life is a normal part of syncing'],
+  ["damaged_row",         "bad_news",  'a row from storage that fails its checks is set aside and reported'],
+  ["storage_issue",       "bad_news",  'a row that is not an object, or is stored at the wrong address, will not be fixed by a retry'],
   ["gate_issue",          "misuse",    'gate params at odds with the stored row are a bug in the caller'],
   ["disabled",            "misuse",    'calling an object let go by a sweep, a vacate or a delete is a bug: ask the bank for it again'],
 ] as const
@@ -229,7 +229,7 @@ describe("isVaultError", () => {
   ] as const
 
   for (const [impostor, blurb] of ImpostorCases) {
-    it(`is false for ${blurb}, so it can pose as no refusal`, () => {
+    it(`is false for ${blurb}`, () => {
       expect(isVaultError(impostor)).to.be.false
       expect(isVaultError(impostor, 'identity_revoked')).to.be.false
       expect(isCondition(impostor)).to.be.false
@@ -244,7 +244,7 @@ describe("listedKindOf", () => {
     expect(listedKindOf(new Error('no luck with hunter2'))).to.be.null
   })
 
-  it("is null for a VaultError whose kind is off the list: the thrower's own text", () => {
+  it("is null for a VaultError whose kind is not on the list", () => {
     expect(listedKindOf(new VaultError('no luck with hunter2' as Refusalkind, 'A refusal made up.'))).to.be.null
     expect(listedKindOf('hunter2')).to.be.null
   })

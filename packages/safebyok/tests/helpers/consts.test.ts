@@ -13,7 +13,7 @@ describe("DeviceDBVersion and VaultsDBVersion", () => {
 })
 
 describe("FarFuture", () => {
-  it("is the microsecond epochalypse: the last millisecond whose epoch microseconds are a safe integer", () => {
+  it("is the last millisecond whose epoch microseconds are a safe integer", () => {
     expect(FarFuture).to.eq(Math.floor(Number.MAX_SAFE_INTEGER / 1000))
     expect(Number.isSafeInteger(FarFuture * 1000)).to.be.true
     expect(Number.isSafeInteger((FarFuture + 1) * 1000)).to.be.false
@@ -53,20 +53,20 @@ describe("hasModelkind", () => {
     expect(hasModelkind('box', 'box')).to.be.false
   })
 
-  it("is no own key of a model, so a spread and Object.keys leave it out", () => {
+  it("reads a modelkind that is not an own key of the model", () => {
     expect(Object.keys(boxListingOf(mw))).not.to.include('modelkind')
   })
 })
 
 describe("isVaultDB and isDeviceDB", () => {
-  it("tell a VaultDB or a DeviceDB by the brand its base class carries, as another copy of safebyok would make it", () => {
+  it("recognize a VaultDB or a DeviceDB by its base class's brand, even from another copy of safebyok", () => {
     expect(isVaultDB(new MemoryVaultDB())).to.be.true
     expect(isDeviceDB(new MemoryDeviceDB())).to.be.true
     expect(isVaultDB({ [Symbol.for('@safebyok/vaultdb')]: true })).to.be.true
     expect(isDeviceDB({ [Symbol.for('@safebyok/devicedb')]: true })).to.be.true
   })
 
-  it("refuse a duck, the other one, and a copy of a VaultDB's own fields, which leaves the brand behind", () => {
+  it("are false for a look-alike object, the other kind of DB, and a copy of a VaultDB's own fields", () => {
     const vaultDB = new MemoryVaultDB()
     expect(isDeviceDB({ tryPeek: () => null, tryStow: () => null, tryForget: () => null })).to.be.false
     expect(isVaultDB(Object.assign({}, vaultDB))).to.be.false
@@ -78,7 +78,7 @@ describe("isVaultDB and isDeviceDB", () => {
 })
 
 describe("isAdapterVaultDB", () => {
-  it("tells an AdapterVaultDB from a client of one, which wears only the VaultDB's brand", () => {
+  it("is true of an AdapterVaultDB and false of a client that has only the VaultDB's brand", () => {
     const vaultDB = new MemoryVaultDB()
     const client = { [Symbol.for('@safebyok/vaultdb')]: true }
     expect([isVaultDB(vaultDB), isAdapterVaultDB(vaultDB)]).to.deep.equal([true, true])
@@ -86,7 +86,7 @@ describe("isAdapterVaultDB", () => {
     expect(isAdapterVaultDB({ [Symbol.for('@safebyok/adaptervaultdb')]: true })).to.be.true
   })
 
-  it("refuses a plain object answering every verb, and a copy of a VaultDB's own fields", () => {
+  it("is false for a plain object with every method, and for a copy of a VaultDB's own fields", () => {
     const vaultDB = new MemoryVaultDB()
     const verbs = Object.fromEntries(VaultDBVerbnames.map((verbname) => [verbname, vaultDB[verbname].bind(vaultDB)]))
     expect([isVaultDB(verbs), isAdapterVaultDB(verbs)]).to.deep.equal([false, false])
@@ -123,7 +123,7 @@ describe("brand and brandOf", () => {
     expect(brandOf(marked, Mine)).to.eq('first')
   })
 
-  it("read a brand a class's getter wears", () => {
+  it("read a brand from a class's getter", () => {
     class Worn { get [Mine](): string { return 'worn' } }
     expect(brandOf(new Worn(), Mine)).to.eq('worn')
   })
@@ -145,7 +145,7 @@ describe("brand and brandOf", () => {
 })
 
 describe("isGuarded", () => {
-  it("knows a guarded function or object from any copy of safebyok", () => {
+  it("recognizes a guarded function or object made by any copy of safebyok", () => {
     expect(IsGuarded).to.eq(Symbol.for('@safebyok/guarded'))
     expect(isGuarded(brandGuarded(() => 3))).to.be.true
     expect(isGuarded(brandGuarded({ deriveKeyBytes: () => 3 }))).to.be.true
@@ -153,7 +153,7 @@ describe("isGuarded", () => {
     expect(isGuarded(brand(() => 3, GuardedBrand))).to.be.true
   })
 
-  it("refuses what wears no true guard's brand", () => {
+  it("is false for anything without a true guard brand", () => {
     expect(isGuarded(() => 3)).to.be.false
     const guarded = brandGuarded({ deriveKeyBytes: () => 3 })
     expect(isGuarded({ ...guarded })).to.be.false

@@ -84,7 +84,7 @@ const expectShows = (box: TestableBox, shown: keyof typeof Shows): void => {
   expect(box.isShowing).to.eq(shown === 'value')
 }
 
-describe("box.whisper, state by operation (the Coach, 2026-11-05)", () => {
+describe("box.whisper, state by operation", () => {
   for (const [state, shows, ...cells] of StateTable) {
     it(`${state} shows ${shows}`, async () => {
       expectShows(await StateMakers[state](), shows)
@@ -172,20 +172,20 @@ describe("the veil from behind a lock", () => {
     expect(box.unveil().whisper).to.eq(exposed)
   })
 
-  it("an expose after a veil shows the whisper again, and the snapshot says so (the Coach, 2026-11-05)", async () => {
+  it("an expose after a veil shows the whisper again", async () => {
     const box = await veiledOf()
     await box.expose()
     expect(box.whisper).to.deep.equal(Exposed)
     expect(box.getSnapshot()).to.deep.include({ isExposed: true, isVeiled: false })
   })
 
-  it("an unveil with nothing exposed says so, in plain words", async () => {
+  it("an unveil with nothing exposed refuses, pointing to box.expose()", async () => {
     const box = await unexposedOf()
     const err = TH.expectSyncRefusal(() => box.unveil())
     expect(err.message).to.include('box.expose()')
   })
 
-  it("tells a listener at each of veil, unveil and unexpose", async () => {
+  it("notifies a listener at each of veil, unveil and unexpose", async () => {
     const box = await showingOf()
     const listener = vi.fn()
     box.subscribe(listener)
@@ -204,7 +204,7 @@ describe("the endings of a box exposed", () => {
     ['vacate', (box: TestableBox) => box.vacate()],
   ] as const
   for (const [ending, end] of EndingCases) {
-    it(`a ${ending} clears the value, a veil still passes, and an unveil says nothing is exposed`, async () => {
+    it(`a ${ending} clears the value`, async () => {
       const box = await showingOf()
       end(box)
       expect(box.whisper).to.eq(ENCRYPTED)
@@ -250,7 +250,7 @@ describe("the endings of a box exposed", () => {
 // == [putExposed]
 
 describe("box.putExposed", () => {
-  it("seals the value exposed, an edit in place included, and answers the box", async () => {
+  it("seals the exposed value, including edits made in place", async () => {
     const box = await showingOf()
     const exposed = box.whisper as { apiKey: string, org?: string }
     exposed.org = 'acme'
@@ -259,7 +259,7 @@ describe("box.putExposed", () => {
     expect(box.whisper).to.eq(exposed)
   })
 
-  it("takes a sidecar, and keeps the one in hand if given none", async () => {
+  it("takes a sidecar, and keeps the current one if given none", async () => {
     const box = await showingOf()
     await box.putExposed({ sidecar: { note: 'new' } })
     expect(box.sidecar).to.deep.equal({ note: 'new' })
@@ -268,7 +268,7 @@ describe("box.putExposed", () => {
     expect(await box.extractWhisper()).to.deep.equal(Exposed)
   })
 
-  it("puts while veiled and unlocked: the veil hides, it does not discard (the Coach, 2026-11-05)", async () => {
+  it("puts while veiled and unlocked", async () => {
     const box = await veiledOf()
     const { revision_seq } = box
     await box.putExposed({ sidecar: { note: 'veiled' } })
@@ -296,7 +296,7 @@ describe("box.putExposed", () => {
     expect(world.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("answers an Outcome from tryPutExposed", async () => {
+  it("tryPutExposed returns an Outcome", async () => {
     const box = await showingOf()
     expect(await box.tryPutExposed()).to.deep.include({ ok: true })
     box.unexpose()
@@ -309,7 +309,7 @@ describe("box.putExposed", () => {
 // == [Hearing of a lock]: subscribe, getSnapshot, isLocked
 
 describe("box.subscribe and box.getSnapshot, through a lock", () => {
-  it("reads isLocked live, and has none of it on the box", async () => {
+  it("reads isLocked live without storing it on the box", async () => {
     const box = await unexposedOf()
     expect(box.isLocked).to.be.false
     world.mw.setLocked(true)
@@ -317,7 +317,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     expect(Object.keys(box)).to.not.include('isLocked')
   })
 
-  it("works detached, as useSyncExternalStore takes them, telling a lock once with a new snapshot", async () => {
+  it("works when detached from the box, notifying of a lock once with a new snapshot", async () => {
     const box = await showingOf()
     const { subscribe, getSnapshot } = box
     const listener = vi.fn()
@@ -333,7 +333,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it("shows the vault's lock on the snapshot through a lock and an unlock, telling a listener once each", async () => {
+  it("shows the vault's lock on the snapshot through a lock and an unlock, notifying a listener once each", async () => {
     const box = await unexposedOf()
     const listener = vi.fn()
     box.subscribe(listener)
@@ -349,7 +349,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     expect(listener).toHaveBeenCalledTimes(2)
   })
 
-  it("tells an unsubscribed listener of nothing, a lock included", async () => {
+  it("notifies an unsubscribed listener of nothing, not even a lock", async () => {
     const box = await unexposedOf()
     const listener = vi.fn()
     const unsubscribe = box.subscribe(listener)
@@ -359,7 +359,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
-  it("keeps one listener on two boxes through one's leaving", async () => {
+  it("keeps a listener on one box when it unsubscribes from the other", async () => {
     const one = await unexposedOf()
     const other = await builtOf(fullBoxRecord({ boxlabel: 'openai_api_key' }))
     const listener = vi.fn()
@@ -377,7 +377,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     expect(JSON.stringify(box.getSnapshot())).to.not.include('sk-test-0000')
   })
 
-  it("answers box.whisper with one identity between changes, so a store over it does not loop", async () => {
+  it("returns the same box.whisper object until it changes", async () => {
     const box = await showingOf()
     expect(box.whisper).to.eq(box.whisper)
     box.veil()

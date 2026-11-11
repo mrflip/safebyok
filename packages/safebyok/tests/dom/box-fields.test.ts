@@ -21,7 +21,7 @@ const unexposedOf = async (): Promise<TestableBox> => {
 const elOf = (text = ''): { value: string } => ({ value: text })
 
 describe("BoxFields.of", () => {
-  it("answers one instance per box", async () => {
+  it("returns one instance per box", async () => {
     const box = await unexposedOf()
 
     expect(BoxFields.of(box)).to.eq(BoxFields.of(box))
@@ -66,14 +66,14 @@ describe("fields.bind: what an element shows", () => {
     expect(el.value).to.eq(Stored.apiKey)
   })
 
-  it("answers the same ref callback for the same path, so a re-render does not unbind", async () => {
+  it("returns the same ref callback for the same path", async () => {
     const box = await unexposedOf()
 
     expect(BoxFields.of(box).bind('apiKey')).to.eq(BoxFields.of(box).bind('apiKey'))
     expect(BoxFields.of(box).bind('apiKey')).not.to.eq(BoxFields.of(box).bind('org.name'))
   })
 
-  it("does nothing given null, as a React before 19 hands a ref at an unmount", async () => {
+  it("does nothing when given null", async () => {
     const box = await unexposedOf()
 
     expect(BoxFields.of(box).bind('apiKey')(null)).to.eq(undefined)
@@ -146,7 +146,7 @@ describe("fields.bind: into hiding and back", () => {
     expect(await box.extractWhisper()).to.deep.equal(Stored)
   })
 
-  it("leaves an edit be at a tell that moved nothing of its leaf", async () => {
+  it("keeps an edit when another field changes", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -157,7 +157,7 @@ describe("fields.bind: into hiding and back", () => {
     expect(el.value).to.eq('sk-editing')
   })
 
-  it("follows a leaf that moved", async () => {
+  it("shows the new value of a field that changed", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -227,7 +227,7 @@ describe("fields.put", () => {
     expect([keyEl.value, nameEl.value]).to.deep.equal(['sk-saved', 'zenith'])
   })
 
-  it("makes a new whisper with an edit and tells, and keeps the one in hand with none", async () => {
+  it("makes a new whisper only when a field was edited", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -273,7 +273,7 @@ describe("fields.put", () => {
     await TH.expectRefusal(BoxFields.of(box).put(), 'vault_locked')
   })
 
-  it("has a try form answering an outcome", async () => {
+  it("has a try form that returns an Outcome", async () => {
     const box = await unexposedOf()
 
     const outcome = await BoxFields.of(box).tryPut()
@@ -282,7 +282,7 @@ describe("fields.put", () => {
 })
 
 describe("fields.bind: the last unbind", () => {
-  it("unexposes at the last unbind of every caller of BoxFields.of, and not before, blanking each as it goes", async () => {
+  it("unexposes only when the last bound element unbinds", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -299,7 +299,7 @@ describe("fields.bind: the last unbind", () => {
     expect(box.getSnapshot().isExposed).to.be.false
   })
 
-  it("stops hearing, so that a lock writes to no element let go", async () => {
+  it("writes nothing to an unbound element at a lock", async () => {
     const box = await unexposedOf()
 
     await box.expose()
@@ -311,7 +311,7 @@ describe("fields.bind: the last unbind", () => {
     expect(el.value).to.eq('let go')
   })
 
-  it("binds again from nothing, and hears again", async () => {
+  it("follows the box again when bound after the last unbind", async () => {
     const box = await unexposedOf()
 
     const el = elOf()

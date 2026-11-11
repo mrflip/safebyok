@@ -55,7 +55,7 @@ describe("Refusals.sanitizeForeignError", () => {
 
 describe("Refusals.storageUnavailable", () => {
   // storageUnavailable @example
-  it("refuses as storage_unavailable, saying to try again, the backend's error as its cause", () => {
+  it("says to try again, with the backend's error as the cause", () => {
     const outage = new Error('connection reset')
     const refusal = Refusals.storageUnavailable(outage)
     expect(refusal).to.be.instanceOf(VaultError)
@@ -128,13 +128,13 @@ describe("Refusals.storageFailed", () => {
     expect(err.message).not.to.include('c2VjcmV0')
   })
 
-  it("names no thrown at all for a throw that has no name", () => {
+  it("leaves the thrown name out when the throw has none", () => {
     expect(Refusals.storageFailed('getVault', undefined).message).to.equal(Phrases.storageFailed('getVault', ''))
   })
 })
 
 describe("Refusals.storageIssue", () => {
-  it("is the kind whose phrase it carries", () => {
+  it("carries the message for its kind", () => {
     expect(Refusals.storageIssue()).to.include({ refusalkind: 'storage_issue', message: Phrases.StorageIssue })
   })
 })

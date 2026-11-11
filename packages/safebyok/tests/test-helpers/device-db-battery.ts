@@ -121,7 +121,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(again?.proved_at).to.eq(T0)
       })
 
-      it.skipIf(noRows)("peeks null for a stored row that fails its check, as for none", async () => {
+      it.skipIf(noRows)("peeks null for a stored row that fails its check", async () => {
         const deviceDB = await fresh()
         await rowsOf(deviceDB).plantLeaseRow(vaultScope, { ...asked, proved_at: 'yesterday' })
         expect(await deviceDB.peek(asked)).to.be.null
@@ -134,7 +134,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         await expectRefusal(deviceDB.peek({ ...vaultScope } as never))
       })
 
-      it("answers an Outcome through each try form", async () => {
+      it("each try form returns an Outcome", async () => {
         const deviceDB = await fresh()
         const stowed = await deviceDB.tryStow(await leaseRowOf())
         expect(stowed.ok).to.be.true
@@ -159,7 +159,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await rowsOf(deviceDB).leaseRowsOf()).to.have.lengthOf(0)
       })
 
-      it("leaves a row of another vault_tok where it stands", async () => {
+      it("leaves a row of another vault_tok untouched", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf({ vault_tok: 'tok_two' }))
         await deviceDB.forget(asked)
@@ -182,7 +182,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.peek(asked)).to.be.null
       })
 
-      it("peeks what stood before a forget called after it, however late it is awaited", async () => {
+      it("does not affect a peek called before it", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         const peeking = deviceDB.peek(asked)
@@ -193,7 +193,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
     })
 
     describe("listLeases()", () => {
-      it("answers every lease stowed, oldest first, without its key", async () => {
+      it("returns every stowed lease, oldest first, without its key", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf({ vaultlabel: 'late', proved_at: T0 - Hour }))
         await deviceDB.stow(await leaseRowOf({ vaultlabel: 'early', proved_at: T0 - (3 * Hour) }))
@@ -225,14 +225,14 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.listLeases()).to.deep.equal([])
       })
 
-      it("answers an empty list for an empty DeviceDB", async () => {
+      it("returns an empty list for an empty DeviceDB", async () => {
         const deviceDB = await fresh()
         expect(await expectGood(deviceDB.tryListLeases())).to.deep.equal([])
       })
     })
 
     describe("listRawLeases()", () => {
-      it("answers every row stowed beside its scopepath, its lease_key handle among its fields", async () => {
+      it("returns every stowed row with its scopepath, including its lease_key handle", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         const [raw, ...more] = await expectGood(deviceDB.tryListRawLeases())
@@ -242,7 +242,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(bagOf(raw?.row)['lease_key']).to.be.instanceOf(CryptoKey)
       })
 
-      it.skipIf(noRows)("answers a stored row that fails its check, which listLeases leaves out", async () => {
+      it.skipIf(noRows)("includes a stored row that fails its check", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         await rowsOf(deviceDB).plantLeaseRow(vaultScopeOf('damaged'), { proved_at: 5 })
@@ -263,14 +263,14 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(again?.scopepath).to.deep.equal(scopepathOf(vaultScope))
       })
 
-      it("answers an empty list for an empty DeviceDB", async () => {
+      it("returns an empty list for an empty DeviceDB", async () => {
         const deviceDB = await fresh()
         expect(await deviceDB.listRawLeases()).to.deep.equal([])
       })
     })
 
     describe("forgetRawLease(scopepath)", () => {
-      it.skipIf(noRows)("deletes a stored row that fails its check, by the scopepath listRawLeases showed it under", async () => {
+      it.skipIf(noRows)("deletes a stored row that fails its check, by its scopepath", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         await rowsOf(deviceDB).plantLeaseRow(vaultScopeOf('damaged'), { proved_at: 5 })
@@ -281,7 +281,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.peek(asked)).to.not.be.null
       })
 
-      it.skipIf(noRows)("deletes a row filed under labels today's checks refuse, by the scopepath listRawLeases answers", async () => {
+      it.skipIf(noRows)("deletes a row stored under invalid labels, by its scopepath", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         const badLabel = vaultScopeOf('Bad Label')
@@ -295,7 +295,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.listLeases()).to.have.lengthOf(1)
       })
 
-      it.skipIf(noRows)("deletes a row that lost its scope, by the scopepath listRawLeases answers", async () => {
+      it.skipIf(noRows)("deletes a row that lost its scope, by its scopepath", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         const stripped = vaultScopeOf('stripped')
@@ -317,7 +317,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.listRawLeases()).to.deep.equal([])
       })
 
-      it("is a no-op where nothing stands", async () => {
+      it("is a no-op where there is no row", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         const absent = scopepathOf(vaultScopeOf('absent'))
@@ -344,7 +344,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.listRawBanks()).to.deep.equal([made])
       })
 
-      it("answers the same row on a later call", async () => {
+      it("returns the same row on a later call", async () => {
         const deviceDB = await fresh()
         const made = await deviceDB.ensureCachedBank(bankScope)
         expect(await deviceDB.ensureCachedBank(bankScope)).to.deep.equal(made)
@@ -362,7 +362,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.listRawBanks()).to.have.lengthOf(3)
       })
 
-      it("answers one device_id to two calls made at once for a scope", async () => {
+      it("returns one device_id to two calls made at once for a scope", async () => {
         const deviceDB = await fresh()
         const [one, other] = await Promise.all([deviceDB.ensureCachedBank(bankScope), deviceDB.ensureCachedBank(bankScope)])
         expect(other).to.deep.equal(one)
@@ -413,7 +413,7 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.listRawBanks()).to.deep.equal([])
       })
 
-      it("answers an Outcome through its try form", async () => {
+      it("its try form returns an Outcome", async () => {
         const deviceDB = await fresh()
         const made = await expectGood(deviceDB.tryEnsureCachedBank(bankScope))
         expect(await deviceDB.ensureCachedBank(bankScope)).to.deep.equal(made)
@@ -464,14 +464,14 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
     })
 
     describe("listRawBanks()", () => {
-      it.skipIf(noRows)("answers a stored row that fails its check beside the sound ones", async () => {
+      it.skipIf(noRows)("returns a stored row that fails its check beside the sound ones", async () => {
         const deviceDB = await fresh()
         const made = await deviceDB.ensureCachedBank(bankScope)
         await rowsOf(deviceDB).plantBankRow({ ...bankScope, user_id: 'u2' }, { device_id: 5 })
         expect(await expectGood(deviceDB.tryListRawBanks())).to.have.deep.members([made, { device_id: 5 }])
       })
 
-      it("answers an empty list for an empty DeviceDB", async () => {
+      it("returns an empty list for an empty DeviceDB", async () => {
         const deviceDB = await fresh()
         expect(await deviceDB.listRawBanks()).to.deep.equal([])
       })
