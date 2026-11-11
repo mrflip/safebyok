@@ -30,7 +30,7 @@ describe("bank.tryProbe", () => {
     expect(report.timely.vaultRefreshedAt).to.be.a('number')
     expect(report.put).to.deep.include({ ok: true, act: 'born' })
     expect(report.put.val).to.include(HomeBox)
-    expect(report.fetch).to.deep.include({ ok: true, act: 'got' })
+    expect(report.fetch).to.deep.include({ ok: true, act: 'gotlive' })
     expect(report.fetch.val).to.include(HomeBox)
     expect(report.unseal.ok).to.be.true
     expect(world.leaseRows()).to.have.lengthOf(1)

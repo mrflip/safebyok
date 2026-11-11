@@ -167,10 +167,12 @@ export const { passkeyAddRecord, passkeyRevokeRecord } = Checkers('bad_option', 
 export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq } = Checkers('bad_option', ({ obj, oneof, orDefault, box_tok }) => {
   const ifAbsentOpts = obj({ ifAbsent: orDefault(oneof(EX.ifAbsentVals), 'fail') })
   const putOptsGiven = obj({ prior: revision, ifAbsent: oneof(EX.putIfAbsentVals), ifPresent: oneof(EX.ifPresentVals) })
-  const putOpts = obj({ ...putOptsGiven.shape, ifAbsent: orDefault(putOptsGiven.shape.ifAbsent, 'add'), ifPresent: orDefault(putOptsGiven.shape.ifPresent, 'repl') })
+  // The row a put or del expects to find is read here as a row's meta, and kept whole: its kind's own fields are for whoever knows its kind.
+  const expected = obj({ ...revision.shape, am, ...vaulted.shape }).loose()
+  const putOpts = obj({ expected, ifAbsent: orDefault(putOptsGiven.shape.ifAbsent, 'add'), ifPresent: orDefault(putOptsGiven.shape.ifPresent, 'repl') })
   // A gate verb and a deletion say for themselves what a put over a missing or present row does: neither takes ifAbsent or ifPresent.
   const gateVerbOpts = obj({ prior: revision }).strict()
-  const delOpts = obj({ prior: revision }).strict()
+  const delOpts = obj({ expected }).strict()
 
   const reqParams = boxQuery.extend({ box_tok, ...revision.shape, expected: revision }).partial()
   const nextSeq = obj({ record: revision, prior: revision }).refine(({ record, prior }) => record.revision_seq === (prior.revision_seq + 1), Phrases.SeqNotNext)

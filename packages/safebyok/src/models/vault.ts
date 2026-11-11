@@ -88,8 +88,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     listing.demandEnabled()
     const listed = listing.at(checked)
     if (listed?.isPresent === true) { throw alreadyListedError() }
-    const prior = SX.revisionOf(listed ?? SX.VoidRevision)
-    return Gating.launch('build_vault', { listing, scope: checked, vault: null, prior, friend: Vault.#gatingFriend, askUser })
+    const expected = listed?.sparse ?? SX.sentinelVaultOf(checked)
+    return Gating.launch('build_vault', { listing, scope: checked, vault: null, expected, friend: Vault.#gatingFriend, askUser })
   }
   // --
 
@@ -218,7 +218,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   get #launchArgs(): LaunchArgs<Exclude<Gatingkind, 'build_vault'>> {
-    return { listing: this.listing, scope: this.scope, vault: this, prior: null, friend: Vault.#gatingFriend, askUser: this.#bankFriend.askUser }
+    return { listing: this.listing, scope: this.scope, vault: this, expected: null, friend: Vault.#gatingFriend, askUser: this.#bankFriend.askUser }
   }
   // --
 
@@ -317,7 +317,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link putBox}. */
   tryPutBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
 
-  /** Tombstones the box listed at `boxlabel` and answers it, or null where none is stored; {@link BoxListing.del} has the refusals. */
+  /** Tombstones the box listed at `boxlabel` and answers it. A box already deleted, or never stored, refuses `absent_box`; {@link BoxListing.del} has the other refusals. */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
     const scope = { ...this.scope, boxlabel }
     const box = await this.boxListing.deletable(scope).del(scope, opts)

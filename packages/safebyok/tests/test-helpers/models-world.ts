@@ -30,14 +30,14 @@ import type { Boxscope } from '../../src/shapes/shapes-core'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { type BankAnnouncement, type BankFriend, type BoxDna, type BoxWorld, type Fetched, type BoxListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
-import { type BoxQuery, type BoxRow, type BoxTombstone, type DelOpts, type IfAbsentOpts, type PutOpts, type ReqParams, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
+import { type BoxDelAsk, type BoxGetAsk, type BoxPutAsk, type BoxRow, type BoxTombstone, type ReqParams, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Notice } from '../../src/storage/vault-db'
 import * as Refuse from '../../src/refusals/throwers'
 import { fakeCiphered } from './builders'
 
-// == [Time and builders]: T0, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord
+// == [Time and builders]: T0, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, sentinelBoxRecord
 
 /** The clock's first reading, in epoch milliseconds: 14 November 2023. The epoch check refuses small numbers. */
 export const T0 = 1_700_000_000_000
@@ -90,17 +90,20 @@ export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse =
  * @example tombstoneBoxRecord({ revision_seq: 2 }, 'd')   // an entry of a `damaged_rows`
  */
 export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' | 'x' = 'x'): Tombstone<BoxSparse> => ({ ...sparseBoxRecord(overrides), am })
+
+/** The row a put or del expects to find where no box is stored under `boxlabel`: the sentinel, in {@link WorldVault}. */
+export const sentinelBoxRecord = (boxlabel = 'anthropic_api_key'): BoxTombstone => SX.sentinelBoxOf({ ...WorldVault.scope, boxlabel }, WorldVault.vault_tok)
 // --
 
 // == [Calls and answers]: ModelsCall, Scripted, BoxAnswer, ModelsWatch
 
-/** One call made to the world or the vaultDB, in {@link ModelsWorld.calls}. `priorRevisionTok` is null for a birth. */
+/** One call made to the world or the vaultDB, in {@link ModelsWorld.calls}. `expectedRevisionTok` is that of the row the call expects to find, null for the sentinel's. */
 export type ModelsCall =
   | { verb: 'ensureTimely', maxMillis: number | undefined }
   | { verb: 'receiveWorld',    world: unknown }
-  | { verb: 'get',          scope: Boxscope }
-  | { verb: 'put',          record: BoxRecord, priorRevisionTok: string | null, ifAbsent: PutOpts['ifAbsent'], ifPresent: PutOpts['ifPresent'] }
-  | { verb: 'del',          scope: Boxscope, priorRevisionTok: string | null }
+  | { verb: 'get',          scope: Boxscope, expectedRevisionTok: string | null }
+  | { verb: 'put',          record: BoxRecord, expectedRevisionTok: string | null, ifAbsent: BoxPutAsk['ifAbsent'], ifPresent: BoxPutAsk['ifPresent'] }
+  | { verb: 'del',          scope: Boxscope, expectedRevisionTok: string | null }
   | { verb: 'watch',        onNotice: (notice: Notice) => void }
   | { verb: 'unwatch' }
 
@@ -183,11 +186,11 @@ export type ModelsWorld = {
   /** Script the next `tryPutBox` calls to answer with `answers`, one each. */
   willPut(...answers: readonly Scripted<PutCall>[]): void
   /** Script the next `tryDelBox` calls to answer with `answers`, one each. */
-  willDel(...answers: readonly Scripted<{ scope: Boxscope, priorRevisionTok: string | null, tombstone: BoxTombstone }>[]): void
+  willDel(...answers: readonly Scripted<{ scope: Boxscope, expectedRevisionTok: string | null, tombstone: BoxTombstone }>[]): void
   /** The next `ensureTimely` runs `thunk` (async, so it may stay pending, or reject). */
   willEnsureTimely(...thunks: readonly ((maxMillis: number | undefined) => Promise<void> | void)[]): void
 
-  /** The good answer about `scope`: `val` is the record stored, null for none. */
+  /** The good answer about `scope`, under a get's act: `val` is the record stored, null for none. */
   answerOf(scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world?: unknown): BoxAnswer
   /** The refused answer about `scope`; `dbhas` is the row it carries. */
   refusalOf(scope: Boxscope, err: VaultError, world?: unknown, dbhas?: unknown): BoxAnswer
@@ -221,11 +224,11 @@ class Script<CallT> {
 }
 
 type GetCall = { scope: Boxscope }
-type PutCall = { record: BoxRecord, priorRevisionTok: string | null, ifAbsent: PutOpts['ifAbsent'], ifPresent: PutOpts['ifPresent'] }
-type DelCall = { scope: Boxscope, priorRevisionTok: string | null, tombstone: BoxTombstone }
+type PutCall = { record: BoxRecord, expectedRevisionTok: string | null, ifAbsent: BoxPutAsk['ifAbsent'], ifPresent: BoxPutAsk['ifPresent'] }
+type DelCall = { scope: Boxscope, expectedRevisionTok: string | null, tombstone: BoxTombstone }
 
-/** The `revision_tok` a call goes over: null for a birth. */
-const priorTokOf = ({ revision_tok }: Revision): string | null => ((revision_tok === SX.VoidRevisionTok) ? null : revision_tok)
+/** The `revision_tok` of the row a call expects to find: null for the sentinel's. */
+const expectedTokOf = ({ revision_tok }: Revision): string | null => ((revision_tok === SX.VoidRevisionTok) ? null : revision_tok)
 
 /** A {@link MemoryVaultDB} whose box verbs and watch log each call, and answer what a test scripts in place of their own. */
 export class TestableVaultDB extends MemoryVaultDB {
@@ -240,27 +243,28 @@ export class TestableVaultDB extends MemoryVaultDB {
   }
 
   /** Log this get, then answer it from the script or, with the script empty, from storage. */
-  override async tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts) {
-    const scope = CX.boxscope.parse(asked)
-    this.#calls.push({ verb: 'get', scope })
+  override async tryGetBox(ask: BoxGetAsk) {
+    const scope = CX.boxscope.parse(ask)
+    this.#calls.push({ verb: 'get', scope, expectedRevisionTok: expectedTokOf(ask.expected) })
     const { scripted, answer } = this.scripts.get.take({ scope })
-    return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryGetBox']>>) : super.tryGetBox(asked, opts)
+    return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryGetBox']>>) : super.tryGetBox(ask)
   }
 
   /** Log this put, then answer it from the script or, with the script empty, from storage. */
-  override async tryPutBox(record: BoxRecord, opts: PutOpts) {
-    const call: PutCall = { record, priorRevisionTok: priorTokOf(opts.prior), ifAbsent: opts.ifAbsent, ifPresent: opts.ifPresent }
+  override async tryPutBox(ask: BoxPutAsk) {
+    const { record, expected, ifAbsent, ifPresent } = ask
+    const call: PutCall = { record, expectedRevisionTok: expectedTokOf(expected), ifAbsent, ifPresent }
     this.#calls.push({ verb: 'put', ...call })
     const { scripted, answer } = this.scripts.put.take(call)
-    return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryPutBox']>>) : super.tryPutBox(record, opts)
+    return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryPutBox']>>) : super.tryPutBox(ask)
   }
 
   /** Log this delete, then answer it from the script or, with the script empty, from storage. */
-  override async tryDelBox(tombstone: BoxTombstone, opts: DelOpts) {
-    const call: DelCall = { scope: CX.boxscope.parse(tombstone), priorRevisionTok: priorTokOf(opts.prior), tombstone }
+  override async tryDelBox(ask: BoxDelAsk) {
+    const call: DelCall = { scope: CX.boxscope.parse(ask), expectedRevisionTok: expectedTokOf(ask.expected), tombstone: ask.record }
     this.#calls.push({ verb: 'del', ...call })
     const { scripted, answer } = this.scripts.del.take(call)
-    return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryDelBox']>>) : super.tryDelBox(tombstone, opts)
+    return scripted ? ((await answer) as Awaited<ReturnType<MemoryVaultDB['tryDelBox']>>) : super.tryDelBox(ask)
   }
 
   /** Log this watch and keep it for `notify` to reach. */
@@ -278,7 +282,11 @@ export class TestableVaultDB extends MemoryVaultDB {
 }
 
 const factsOf = (scope: Boxscope) => ({ req_params: scope as ReqParams })
-const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world: unknown = null): BoxAnswer => ({ ok: true, val, world, act: 'got', ...factsOf(scope) })
+const gotActOf = (val: Fetched<BoxRecord, BoxSparse> | null): string => {
+  if (val === null) { return 'gotvoid' }
+  return VX.isTombstone(val) ? 'gotgone' : 'gotlive'
+}
+const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, world: unknown = null): BoxAnswer => ({ ok: true, val, world, act: gotActOf(val), ...factsOf(scope) })
 
 /** Make a fake vault and a vaultDB for a {@link BoxListing}, with the calls they log and the means to script them.
  * Pass the result to {@link boxListingOf}.

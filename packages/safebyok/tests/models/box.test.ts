@@ -426,7 +426,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
     world.mw.clearCalls()
     await expect(box.put(roundTripOf(record), { maxMillisSinceRefresh: Infinity, maxWorldMillis: Infinity })).resolves.to.eq(box)
     const [put] = world.mw.callsOf('put')
-    expect(put?.priorRevisionTok).to.eq('rev-a1')
+    expect(put?.expectedRevisionTok).to.eq('rev-a1')
     expect(put?.record).to.deep.include({ am: 'a', revision_seq: 2, registered_at: T0, sidecar: { note: 'round trip' } })
     expect(box._cheat_central).to.deep.include({ revision_seq: 2, sidecar: { note: 'round trip' } })
   })

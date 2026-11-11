@@ -159,13 +159,13 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
 /** Past the proving, the change the gating was launched for. Each hears provings, never a clear, and comes to its vault's private verbs by the friend. */
 const RunForGatingkind: { [KindT in Gatingkind]: Run<KindT> } = {
-  build_vault: async ({ passphraseProving, passkeyProving }, { listing, prior, friend }) => {
+  build_vault: async ({ passphraseProving, passkeyProving }, { listing, expected, friend }) => {
     const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
     const passkeyWayin    = await passkeyProving?.buildWayin(passphraseProving) ?? null
 
     const gate   = Gate.make(passphraseProving.stamp, passphraseWayin, passkeyWayin)
-    const record = listing.recordOfBirth(gate, prior)
-    const vault  = await listing.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' })
+    const record = listing.recordOfBirth(gate, expected)
+    const vault  = await listing.put(record, { expected, ifAbsent: 'add', ifPresent: 'get' })
 
     // The row stored may be another's, born first: this proof opens only its own, and the user must hear that theirs was not set.
     if (vault.vault_tok !== record.vault_tok) { throw gateMadeElsewhere() }

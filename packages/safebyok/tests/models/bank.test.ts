@@ -126,7 +126,7 @@ describe("bank.hello", () => {
     expect(listed?.isEnabled).to.be.false
   })
 
-  it("marks a listed vault deleted when its row is deleted", async () => {
+  it("lists a deleted vault's tombstone in its slot, the vault of the life deleted vacated", async () => {
     const world = makeBankWorld()
     const { vault } = await makeBankWithVault(world)
     const bank = world.bankOnAnotherDevice()
@@ -134,11 +134,13 @@ describe("bank.hello", () => {
     const listed = bank.vaultAt(VaultScopeGiven)
     await vault.delVaultPrompt()
     await bank.hello()
-    expect(bank.vaultAt(VaultScopeGiven)).to.equal(listed)
-    expect(listed?.isPresent).to.be.false
+    const gone = bank.vaultAt(VaultScopeGiven)
+    expect(gone).to.not.equal(listed)
+    expect(gone?.isPresent).to.be.false
+    expect(listed?.isEnabled).to.be.false
     expect(bank.snapshot.vaults).to.deep.equal([])
     const reborn = await bank.ensureVault(VaultScopeGiven)
-    expect(reborn).not.to.equal(listed)
+    expect(reborn).not.to.equal(gone)
     expect(reborn.isUnlocked).to.be.true
     expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
   })

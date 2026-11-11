@@ -75,15 +75,26 @@ describe("the row checks a VaultDB's conditional writes run", () => {
 })
 
 describe("the options a VaultDB's writes take", () => {
+  const box = boxAt()
+  const vault = vaultAt()
+
   it("putOpts fills ifAbsent add and ifPresent repl, whether left out or sent as null", () => {
-    const filled = { prior: SX.VoidRevision, ifAbsent: 'add', ifPresent: 'repl' }
-    expect(SX.putOpts.parse({ prior: SX.VoidRevision })).to.deep.equal(filled)
-    expect(SX.putOpts.parse({ prior: SX.VoidRevision, ifAbsent: null, ifPresent: null })).to.deep.equal(filled)
+    const filled = { expected: box, ifAbsent: 'add', ifPresent: 'repl' }
+    expect(SX.putOpts.parse({ expected: box })).to.deep.equal(filled)
+    expect(SX.putOpts.parse({ expected: box, ifAbsent: null, ifPresent: null })).to.deep.equal(filled)
   })
 
-  it("gateVerbOpts and delOpts take prior alone, refusing an ifAbsent or ifPresent offered", () => {
+  it("putOpts and delOpts keep the row expected whole, and refuse one that does not read as a row", () => {
+    const sentinel = SX.sentinelBoxOf(box, box.vault_tok)
+    expect(SX.putOpts.parse({ expected: sentinel }).expected).to.deep.equal(sentinel)
+    expect(SX.delOpts.parse({ expected: vault })).to.deep.equal({ expected: vault })
+    expect(() => SX.putOpts.parse({ expected: SX.VoidRevision })).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+    expect(() => SX.delOpts.parse({})).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+  })
+
+  it("gateVerbOpts takes prior alone and delOpts the row expected alone, refusing an ifAbsent or ifPresent offered", () => {
     expect(() => SX.gateVerbOpts.parse({ prior: SX.VoidRevision, ifPresent: 'repl' })).to.throw(VaultError).with.property('refusalkind', 'bad_option')
-    expect(() => SX.delOpts.parse({ prior: SX.VoidRevision, ifAbsent: 'add' })).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+    expect(() => SX.delOpts.parse({ expected: box, ifAbsent: 'add' })).to.throw(VaultError).with.property('refusalkind', 'bad_option')
   })
 })
 

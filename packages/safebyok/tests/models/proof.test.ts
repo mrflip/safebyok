@@ -178,14 +178,17 @@ describe("the proof", () => {
     revealUi.expectRenders([JSON.stringify(ApiKey.whisper)])
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
 
-    // Delete: the user proves it, the list empties, and the vault says it is gone.
+    // Delete: the user proves it, the list empties, and the vault object goes quiet, locked: its tombstone is of another life, and another instance.
     dialog.typing = byPassphrase(Passphrase)
     await vault.delVaultPrompt()
     expect(dialog.shown.splice(0)).to.deep.equal(['del_vault'])
     bankUi.expectRenders(['ready: main unlocked (asking del_vault)', 'ready: main locked (asking del_vault)', 'ready: no vaults (asking del_vault)', 'ready: no vaults'])
-    vaultUi.expectRenders(['main locked', 'main deleted'])
-    await TH.expectRefusal(vault.fetch())
-    expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
+    vaultUi.expectRenders(['main locked'])
+    await TH.expectRefusal(vault.fetch(), 'disabled')
+    const gone = bank.vaultAt(VaultScopeGiven)
+    expect(gone).not.to.eq(vault)
+    expect(gone?.vault_tok).not.to.eq(vault.vault_tok)
+    expect(vaultStatus(gone!.getSnapshot())).to.eq('main deleted')
     boxesUi.expectRenders(['anthropic_api_key', 'no boxes'])
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}', 'anthropic_api_key {"nickname":"work"}'])
     revealUi.expectRenders(['locked', 'unexposed'])

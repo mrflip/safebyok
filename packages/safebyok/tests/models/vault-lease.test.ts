@@ -247,8 +247,8 @@ describe("sweep and vacate", () => {
     const { listing, demandStored } = await makeBornVault()
     const stored = demandStored()
     listing.sweep()
-    await TH.expectRefusal(listing.put(stored, { prior: stored }))
-    await TH.expectRefusal(listing.del(stored))
+    await TH.expectRefusal(listing.put(stored, { expected: stored }), 'disabled')
+    await TH.expectRefusal(listing.del(stored), 'disabled')
     expect(demandStored()).to.eq(stored)
   })
 

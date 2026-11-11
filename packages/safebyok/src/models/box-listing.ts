@@ -2,14 +2,16 @@
 
 import { VaultError } from '../refusals/errors'
 import type { Modelkind } from '../helpers/consts'
+import { nowMillis } from '../helpers/clock'
+import { makeLifeTok } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
 import { absentBoxError, boxStoredDamaged, notListedBoxError } from '../refusals/throwers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxCreateOpts, type BoxDna, type BoxListingOpts, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type DelTombstone, type Fetched, boxDna } from '../shapes/shapes-vaultish'
-import type { BoxRow, DamagedBox, DelOpts, PutOpts, VaultRow, BoxRecord, BoxSparse } from '../shapes/shapes-storage'
+import { type BoxCreateOpts, type BoxDna, type BoxListingOpts, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type DelTombstone, type Fetched, type ListingDelOpts, type ListingPutOpts, boxDna } from '../shapes/shapes-vaultish'
+import type { BoxRow, DamagedBox, VaultRow, BoxRecord, BoxSparse } from '../shapes/shapes-storage'
 import type { Notice } from '../storage/vault-db'
 import { Box } from './box'
 import { Listing } from './listing'
@@ -77,7 +79,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.sentinelBoxOf(scope, this.world.vault_tok)) }
   // --
 
-  // == [Defined by the box listing]: vaultTokOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, doTryDel, watchRows, isOwnRow
+  // == [Defined by the box listing]: vaultTokOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   protected vaultTokOfWorld(): string { return this.world.vault_tok }
 
@@ -98,11 +100,23 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   protected damagedStoredError(damaged: DamagedBox): VaultError { return boxStoredDamaged(damaged) }
 
-  protected doTryGet(scope: Boxscope) { return this.vaultDB.tryGetBox({ ...scope, vault_tok: this.world.vault_tok }, { ifAbsent: 'nil' }) }
+  protected doTryGet(scope: Boxscope) {
+    const { vault_tok } = this.world
+    const expected = this.at(scope)?.sparse ?? SX.sentinelBoxOf(scope, vault_tok)
+    return this.vaultDB.tryGetBox({ op: 'get', ...scope, vault_tok, ifAbsent: 'nil', expected })
+  }
 
-  protected doTryPut(record: BoxRecord, opts: PutOpts) { return this.vaultDB.tryPutBox(record, opts) }
+  protected doTryPut(record: BoxRecord, { expected, ifAbsent, ifPresent }: ListingPutOpts<BoxSparse>) {
+    return this.vaultDB.tryPutBox({ op: 'put', ...SX.boxQuery.parse(record), ifAbsent, ifPresent, expected, record })
+  }
 
-  protected doTryDel(tombstone: DelTombstone<BoxSparse>, opts: DelOpts) { return this.vaultDB.tryDelBox(tombstone, opts) }
+  protected tombstoneOver(expected: BoxSparse): DelTombstone<BoxSparse> {
+    return { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), am: 'x', box_tok: makeLifeTok() }
+  }
+
+  protected doTryDel(tombstone: DelTombstone<BoxSparse>, { expected }: ListingDelOpts<BoxSparse>) {
+    return this.vaultDB.tryDelBox({ op: 'del', ...SX.boxQuery.parse(tombstone), expected, record: tombstone })
+  }
 
   protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.vaultDB.watch(this.scope, onNotice, onBadNews) }
 

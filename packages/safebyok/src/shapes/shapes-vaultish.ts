@@ -14,7 +14,7 @@ import type { Storable } from '../models/storable'
 import type { Vault } from '../models/vault'
 import type { DeviceDB } from '../storage/device-db'
 import type { Outcome } from '../refusals/outcome'
-import { type Answer, type GoodAnswer, type ListAct, type PutAct, type VaultDB, VaultDBVerbnames } from '../storage/vault-db'
+import { type Answer, type GoodAnswer, type ListAct, type VaultDB, VaultDBVerbnames } from '../storage/vault-db'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
@@ -230,7 +230,7 @@ export const storableArgs = objCheck(({ custom }) => ({
 
 // --
 
-// == [Given to a listing]: Thing, ListingAnswer, DelTombstone, SlotFate, ListingOf
+// == [Given to a listing]: Thing, ListingAnswer, ListingPutAnswer, ListingPutOpts, ListingDelOpts, DelTombstone, SlotFate, ListingOf
 
 /** A vault or box in a listing. */
 export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
@@ -239,7 +239,13 @@ export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extend
 export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, string, unknown>
 
 /** A put's {@link ListingAnswer}, whose good form always carries a record. */
-export type ListingPutAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT>, PutAct, unknown>
+export type ListingPutAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT>, string, unknown>
+
+/** What a listing's put asks of the vaultDB beside its record: the row it expects to find, in its sparse form, and what to do over none or over a live one. */
+export type ListingPutOpts<SparseT> = Readonly<{ expected: SparseT, ifAbsent: EX.PutIfAbsent, ifPresent: EX.IfPresent }>
+
+/** What a listing's del asks of the vaultDB beside its tombstone: the row it expects to find, in its sparse form. */
+export type ListingDelOpts<SparseT> = Readonly<{ expected: SparseT }>
 
 /** A listing's answer from `listVaults` or `listBoxes`: the rows listed, and those set aside as damaged. */
 export type ListingListAnswer<RecordT, SparseT, DamagedT> = Answer<{ listed: readonly Fetched<RecordT, SparseT>[], damaged_rows: readonly DamagedT[] }, ListAct, unknown>
@@ -250,7 +256,7 @@ export type ListingGetAnswer<ValT> = ThingAnswer<ValT> | GoodAnswer<ValT, 'timel
 /** What a listing's `tryPut` and `tryFetch` answer: the vaultDB's own answer, with the instance listed as its `val`. */
 export type ThingAnswer<ValT> = Answer<ValT, string, unknown>
 
-/** The tombstone `listing.del` hands the vaultDB: gone, at the revision after the one it goes over. */
+/** The tombstone `listing.del` hands the vaultDB: gone, at the revision after the one it goes over, in a life of its own. */
 export type DelTombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
 
 /** The fate of a record meeting the thing in its slot: `receive` judges it, `lose` drops it unheard, and `replace` gives the slot a new instance of it. */

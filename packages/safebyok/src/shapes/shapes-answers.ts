@@ -34,7 +34,7 @@ export const { crossedErr, crossedReqParams, damagedVault, damagedBox } = Checke
     box_tok:      box_tok.nullable().default(null),
     revision_tok: revision_tok.nullable().default(null),
     revision_seq: int.nullable().default(null),
-    prior:        SX.revision.strict().nullable().default(null),
+    expected:     SX.revision.strict().nullable().default(null),
   }).strict()
   // A damaged row's label is the one it is stored under, which may fail a label's check: a reason it is listed.
   const damagedVault = obj({ applabel, user_id, vaultlabel: str, am: lit('d') }).strict()
@@ -108,14 +108,14 @@ export const {
 
   return {
     listVaultsAnswer:        answerCheck({ val: bankListed, acts: EX.listActVals, world: CX.bankScope, badWorld: lit(null), dbhas: lit(null) }),
-    getVaultAnswer:          answerCheck({ val: SX.vaultRecord.nullable(), acts: EX.gotActVals, ...vaultish }),
+    getVaultAnswer:          answerCheck({ val: SX.vaultRow.nullable(), acts: EX.gotActVals, ...vaultish }),
     putVaultAnswer:          answerCheck({ val: SX.vaultRow, acts: EX.putActVals, ...vaultish }),
     replacePassphraseAnswer: answerCheck({ val: SX.vaultRecord, acts: ['replaced'], ...vaultish }),
     addPasskeyAnswer:        answerCheck({ val: SX.vaultRecord, acts: ['added'], ...vaultish }),
     revokePasskeyAnswer:     answerCheck({ val: SX.vaultRecord, acts: ['revoked'], ...vaultish }),
     delVaultAnswer:          answerCheck({ val: SX.vaultTombstone, acts: EX.delActVals, ...vaultish }),
     listBoxesAnswer:         answerCheck({ val: boxesListed, acts: EX.listActVals, world: SX.vaultRecord, badWorld: SX.vaultRow, dbhas: SX.vaultRow }),
-    getBoxAnswer:            answerCheck({ val: SX.boxRecord.nullable(), acts: EX.gotActVals, ...boxish }),
+    getBoxAnswer:            answerCheck({ val: SX.boxRow.nullable(), acts: EX.gotActVals, ...boxish }),
     putBoxAnswer:            answerCheck({ val: SX.boxRow, acts: EX.putActVals, ...boxish }),
     delBoxAnswer:            answerCheck({ val: SX.boxTombstone, acts: EX.delActVals, ...boxish }),
     tidyGoneAnswer:          answerCheck({ val: tidied, acts: ['tidied'], world: CX.bankScope, badWorld: lit(null), dbhas: lit(null) }),

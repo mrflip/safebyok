@@ -18,7 +18,7 @@ import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type VaultScope, vaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
-import type { Revision, VaultRecord } from './shapes-storage'
+import type { VaultRecord, VaultSparse } from './shapes-storage'
 import type { VaultWorld } from './shapes-vaultish'
 
 // == [Wayin kinds]: wayinkind, isPrfSalt
@@ -376,8 +376,8 @@ export type Run<KindT extends EX.Gatingkind> = (provings: ProvingsForGatingkind[
 /** The vault each kind of gating acts on, null for a `build_vault` whose vault does not exist yet. */
 export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
 
-/** All a gating is launched with; `prior`, the revision a birth is put over, is read at launch, and `askUser` is the bank's, null with no host dialog. */
-export type LaunchArgs<KindT extends EX.Gatingkind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], prior: KindT extends 'build_vault' ? Revision : null, friend: GatingFriend, askUser: AskUser | null }
+/** All a gating is launched with; `expected`, the row a birth is put over, is read at launch, and `askUser` is the bank's, null with no host dialog. */
+export type LaunchArgs<KindT extends EX.Gatingkind> = { listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], expected: KindT extends 'build_vault' ? VaultSparse : null, friend: GatingFriend, askUser: AskUser | null }
 
 /** The vault, scope, listing and world a gating hands its {@link Prove}. */
 export type Asked<KindT extends EX.Gatingkind> = { scope: VaultScope, vault: VaultForGatingkind[KindT], listing: VaultListing, world: VaultWorld }

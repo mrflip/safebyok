@@ -241,9 +241,9 @@ describe("a birth through a gating", () => {
     const theirs = await storedVaultRecord()
     const { listing, opts, gatingAt, restoreRow, deviceDB } = birthWorld()
     const tryPutVault = opts.vaultDB.tryPutVault.bind(opts.vaultDB)
-    vi.spyOn(opts.vaultDB, 'tryPutVault').mockImplementationOnce(async (record, putOpts) => {
-      const answer = await tryPutVault(record, putOpts)
-      restoreRow({ ...theirs, revision_tok: 'rev-of-the-new-life', revision_seq: record.revision_seq + 2 })
+    vi.spyOn(opts.vaultDB, 'tryPutVault').mockImplementationOnce(async (ask) => {
+      const answer = await tryPutVault(ask)
+      restoreRow({ ...theirs, revision_tok: 'rev-of-the-new-life', revision_seq: ask.record.revision_seq + 2 })
       await listing.fetch(Dna)
       return answer
     })
