@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import * as DB from 'safebyok/storage'
-import { VaultTablesSql } from '../src/index'
+import { VaultFunctionsSql, VaultTablesSql } from '../src/index'
 import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
@@ -30,6 +30,12 @@ const keysOf = async (table: string): Promise<string[]> => {
 describe("VaultTablesSql", () => {
   it("is the vault-tables.sql the package ships", () => {
     expect(readFileSync(path.join(import.meta.dirname, '..', 'vault-tables.sql'), 'utf8')).to.equal(VaultTablesSql)
+  })
+
+  it("comes with VaultFunctionsSql, which is the vault-functions.sql the package ships and is safe to run again", async () => {
+    expect(readFileSync(path.join(import.meta.dirname, '..', 'vault-functions.sql'), 'utf8')).to.equal(VaultFunctionsSql)
+    const db = await TH.database()
+    await db.exec(VaultFunctionsSql)
   })
 
   it("is safe to run again, keeping the rows already stored", async () => {

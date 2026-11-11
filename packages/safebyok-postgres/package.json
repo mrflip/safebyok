@@ -25,6 +25,7 @@
   "sideEffects": false,
   "files": [
     "dist",
+    "vault-functions.sql",
     "vault-tables.sql"
   ],
   "engines": {

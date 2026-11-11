@@ -4,7 +4,7 @@ import { afterAll, beforeAll } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import type { AdapterVaultDBOpts, Boxscope, VaultScope } from 'safebyok/storage'
 import * as TH from 'safebyok/testing'
-import { PostgresVaultDB, VaultTablesSql, vaultChannelOf } from '../src/index'
+import { PostgresVaultDB, VaultFunctionsSql, VaultTablesSql, vaultChannelOf } from '../src/index'
 import type { PostgresClient, PostgresListen, PostgresVaultDBOpts } from '../src/index'
 
 // Re-export the core's test helpers, so a test here imports this one module as TH.
@@ -22,6 +22,7 @@ export const database = async (): Promise<PGlite> => {
   made.db ??= (async () => {
     const db = new PGlite()
     await db.exec(VaultTablesSql)
+    await db.exec(VaultFunctionsSql)
     // Listen on the battery user's channel at boot. PGlite queues a LISTEN behind the statements already waiting,
     // so a write made right after a watch's first LISTEN would be missed.
     await listenOn(db, vaultChannelOf(TH.bankScope.user_id))

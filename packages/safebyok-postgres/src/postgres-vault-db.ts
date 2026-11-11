@@ -201,31 +201,27 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }
 
-  // One statement tests the ask and stores its record. Where it stored, its answer is checked and is the answer.
-  // Where it did not, the classifier names the refusal over one fresh read. The statement's own rows are of two moments,
-  // the vault row as of its start and the box row as of the end of any wait, and a row written or deleted in between
-  // would be classified as a state that never was.
+  // One call tests the ask and stores its record. Where it stored, its answer is checked and is the answer.
+  // Where it did not, it answers the rows as they now stand, and the classifier names the refusal from them.
   /** Run a vault's write `text`, with `cited` the expected fields it tests after the write's own parameters. */
   async #writeVault(ask: VaultPutAsk | VaultDelAsk, text: string, cited: unknown[]): Promise<VaultClassified> {
-    const { applabel, user_id, vaultlabel } = ask.record
-    const params = [applabel, user_id, vaultlabel, JSON.stringify(ask.record), channelOf(user_id), noticeTextOf(ask.record)]
+    const params = [JSON.stringify(ask.record), channelOf(ask.record.user_id), noticeTextOf(ask.record)]
     /** The one row a vault's write statement answers. */
     type VaultWriteAnswer = { ok: boolean, act: unknown, vault: unknown, presence: unknown }
     const [answer] = await this.#query(text, [...params, ...cited]) as [VaultWriteAnswer]
     if (answer.ok) { return DB.vaultWrittenOf(ask, answer) }
-    return unwritten(this.classifyVault(ask, await this.#fetchVault(ask.record)))
+    return unwritten(this.classifyVault(ask, { vault: answer.vault }))
   }
 
   /** Run a box's write `text`, with `cited` the expected fields it tests after the write's own parameters. */
   async #writeBox(ask: BoxPutAsk | BoxDelAsk, text: string, cited: unknown[]): Promise<BoxClassified> {
-    const { applabel, user_id, vaultlabel, vault_tok, boxlabel } = ask.record
-    const params = [applabel, user_id, vaultlabel, vault_tok, boxlabel, JSON.stringify(ask.record), this.#maxBoxes, channelOf(user_id), noticeTextOf(ask.record)]
+    const params = [JSON.stringify(ask.record), channelOf(ask.record.user_id), noticeTextOf(ask.record), this.#maxBoxes]
     /** The one row a box's write statement answers. */
     type BoxWriteAnswer = { ok: boolean, act: unknown, world: unknown, box: unknown, presence: unknown, boxcount: number }
     const [answer] = await this.#query(text, [...params, ...cited]) as [BoxWriteAnswer]
     const capacity = this.#roomAt(answer.boxcount)
     if (answer.ok) { return DB.boxWrittenOf(ask, { ...answer, capacity }) }
-    return unwritten(this.classifyBox(ask, { ...await this.#fetchBox(ask.record), capacity }))
+    return unwritten(this.classifyBox(ask, { vault: answer.world, box: answer.box, capacity }))
   }
   // --
 
@@ -367,7 +363,7 @@ function mayPutOver({ expected, ifAbsent, ifPresent }: BoxPutAsk | VaultPutAsk):
   return (expected.am === 'a') ? (ifPresent === 'repl') : (ifAbsent === 'add')
 }
 
-/** A refusal, classified over the rows read after a statement stored nothing. Throws where the classifier would store the record: the statement and the classifier disagree. */
+/** A refusal, classified over the rows a write answered where it stored nothing. Throws where the classifier would store the record: the database and the classifier disagree. */
 function unwritten<ClassifiedT extends BoxClassified | VaultClassified>(classified: ClassifiedT): ClassifiedT {
   if (classified.write !== null) { throw DB.unexpectedError(new Error('The database stored nothing for a write its rows allow.')) }
   return classified
