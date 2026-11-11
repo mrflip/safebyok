@@ -72,7 +72,7 @@ added or folded into through the subagent, and no other entry changes.
   so any subscriber to a frozen snapshot is handed it and can call `gating.attempt` and `gating.decline`.** In `packages/safebyok/src/models/bank.ts`, the field is the
   bank's `VaultListing.#openGating`; a host's `requestCleartext` was already handed this same object. A `Gating` (`models/gating.ts`) holds no clear between attempts:
   clears are arguments, spent or zeroed by `spendClears`, and its `toJSON` serializes only its scope and kind. `requestCleartext` is now optional: with none,
-  `Gating.launch` calls no host function, and the gating waits in the snapshot until someone calls `attempt` or `decline`.
+  a launch (`Gating.launchOn`, `Gating.launchBirth`) calls no host function, and the gating waits in the snapshot until someone calls `attempt` or `decline`.
 * 2026-11-08 (bank_disable, branch `20261108-bank_disable`): **`bank.vacate()` disables the bank, then forgets every lease row of the bank's applabel
   and user_id; it drops no IndexedDB database.** In `packages/safebyok/src/models/bank.ts`, `vacate()` first disables the bank, synchronously:
   `bank.isEnabled` is false for good, every `hello`, `ensureVault` or `vaultAt` refuses `disabled` from that instant, and the snapshot reads `refused`
@@ -122,7 +122,7 @@ added or folded into through the subagent, and no other entry changes.
   refusal to the platform (`reportToPlatform`) and bad news goes to `DefaultOnBadNews` (the bank's logger); `DefaultOnPanic` is no longer reached from a disabled
   bank, so no panic can start a second vacate, or a scrub on a swept bank. `Bank.askUser` was a second branded wrap that called the host's dialog while the bank
   was enabled and answered true without calling the host once disabled; it is now `guardRequestCleartext(requestCleartext)` alone. A disabled bank still asks no
-  one, by construction: every `Gating.launch` follows, in the same tick, a check that its vault or vault listing is enabled, and a sweep or a vacate disables both
+  one, by construction: every launch (`Gating.launchOn`, `Gating.launchBirth`) follows, in the same tick, a check that its vault or vault listing is enabled, and a sweep or a vacate disables both
   synchronously before it returns. The vacate's scrub is the only thing past the disable that reaches the host's handlers: it tells the host's `onPanic` of a
   lease it cannot forget and `onBadNews` of a refused listing. `autolock` picks its handlers after its await, so an autolock whose lease listing is refused after a
   sweep or vacate tells the bank's logger, not the host's `onBadNews`. A box listing's `identity_revoked` panic names no vault (`{ refusal, bank }`), as a
@@ -139,8 +139,7 @@ added or folded into through the subagent, and no other entry changes.
   is not logged); the logger is the host's, so the message goes wherever the host sends it.
   (3) `bank.tellBadNews`, `vault.tellBadNews` and `bank.askUser` are no longer public members, as `bank.panic` was not. The bank hands its vault listing a `BankFriend`
   `{ panic, tellBadNews, askUser }`, each function branded by `brandGuarded` and checked by `isGuarded` (`VX.bankFriend`), replacing `ListingOpts.panic` and its `VX.bankPanic`; the listing holds
-  it in a TypeScript-`protected` field (reachable at runtime, as `vaultDB` and the panic were), hands it to each `Vault` (a `#private` field) and each box listing, and a gating gets `askUser` in
-  its launch args (`gatingLaunchArgs`). The brand is a tripwire, as above, not a lock: a host holding a vault listing can still reach the friend at runtime and so make the bank run its `onBadNews`
+  it in a TypeScript-`protected` field (reachable at runtime, as `vaultDB` and the panic were), hands it to each `Vault` (a `#private` field) and each box listing, and a gating gets `askUser` from its launcher (`Gating.launchOn`, `Gating.launchBirth`; checked as guarded by `VX.listingOpts` when the vault listing is built and by `VX.bankFriend` in the `Vault` constructor). The brand is a tripwire, as above, not a lock: a host holding a vault listing can still reach the friend at runtime and so make the bank run its `onBadNews`
   or ask the user for the passphrase through the host's own `requestCleartext`. The guard that runs a host's `onBadNews` and sends its throw or rejection to the platform is now the exported
   `tellBadNewsTo(onBadNews, bank, badnews)`, which validates its input. safebyok-react's provider hands descendants a `tellBadNews` bound to the bank and the host's latest `onBadNews`, and
   it does nothing once `bank.isEnabled` is false, so a descendant of a vacated bank reaches neither the host's `onBadNews` nor the bank's logger through it.
@@ -238,14 +237,14 @@ added or folded into through the subagent, and no other entry changes.
   never on a snapshot, in `toJSON` or in a refusal; `box.getSnapshot()` carries only the booleans `exposed` and `veiled` and the
   `lockState`. (amended 2026-11-05 (whisper_object): the full argument for keeping the exposed whisper is in
   `notes/expose_improves_security.md`.)
-* 2026-11-05 (lease_fold, [#494](https://github.com/mrflip/safebyok/pull/494), branch `20261105-lease_fold`): **A gating's run reaches the
-  vault's private `#unlockByProof` and its gate-change methods by a gating friend, a second friend beside the lease's.** In
-  `packages/safebyok/src/models/`, a gating's runs are `RunForGatingkind` in `gating.ts`, beside `ProveForGatingkind`; a run hears
-  provings, never a clear. `Vault.#gatingFriend` (private, static) is two closures taking a vault and a proving, handed to
-  `Gating.launch` as `friend` and held in the gating's private `#launchArgs`. No public `Vault` method takes a proving, and no field of a
-  gating shows the friend (`tests/models/vault-lease.test.ts` checks it). It holds no key; it can make a gate change or attach a lease by
-  a proving already made. `Gating.launch` no longer accepts a `run`: a caller who supplies a friend of their own hears provings, the
-  same reach a supplied `run` had. The vault entrypoints are `replacePassphrasePrompt`, `addPasskeyPrompt`, `revokePasskeyPrompt` and
+* 2026-11-05 (lease_fold, [#494](https://github.com/mrflip/safebyok/pull/494), branch `20261105-lease_fold`): **A gating's act reaches the
+  vault's private `#unlockByProof` by a private function the vault hands each launcher.** In
+  `packages/safebyok/src/models/`, a gating's acts are one function per gating kind in `gating.ts`; past its `Proving` builders an act uses only
+  the provings, never a clear. `Vault.#unlockVaultByProof` (private, static, an `UnlockByProof`) is handed to each launcher,
+  `Gating.launchOn` and `Gating.launchBirth`, and reached through `Gating.#callGatingByKind`. No public `Vault` method takes a proving, and no field of a
+  gating shows the function (`tests/models/vault-lease.test.ts` checks it). It holds no key; it can make a gate change or attach a lease by
+  a proving already made. A caller who supplies an `unlockByProof` of their own to a launcher hears provings, the
+  same reach a supplied run once had. The vault entrypoints are `replacePassphrasePrompt`, `addPasskeyPrompt`, `revokePasskeyPrompt` and
   `delVaultPrompt`. (Models are not yet exported from the package.)
   amended 2026-11-11 (gating_reform): **No published route hands a host a Proving.** `src/index.ts` exports `Gating` as a type only (`export type { Gating }`, checked by `tests/index.test.ts`);
   the public static `Gating.launch` and its `friend` are gone, and `GatingFriend`, `Vault.#gatingFriend` and `gatingLaunchArgs` with them. The launchers are `Gating.launchOn(vault, gatingkind, unlockByProof, askUser)`
@@ -253,7 +252,7 @@ added or folded into through the subagent, and no other entry changes.
   and the `Vault` constructor, the scope by `listing.scopeOf` and `vault.scope`. Each gating kind is now one function in `models/gating.ts` that checks the clears with `checkedClears`, builds its provings, then
   makes its change, in place of `ProveForGatingkind` and `RunForGatingkind`; `#attemptOnce` holds the clears through it and spends them after. A passphrase still goes only to `checkedClears` and the
   `Proving` builders. Left open: a static stays reachable at runtime through any gating instance's `.constructor` (`bank.openGating.constructor.launchOn`), so a host that reaches around the published types
-  can call the launcher with an `unlockByProof` of its own and hear the Proving; the host is inside the trust boundary (SECURITY.md). Entries here that name `Gating.launch` or `gatingLaunchArgs` read as written.
+  can call the launcher with an `unlockByProof` of its own and hear the Proving; the host is inside the trust boundary (SECURITY.md).
 * 2026-11-03 (cleanup, branch `20261103-cleanup`): **The key that gets a thing out of storage is entered into the data with an enter-key
   step, and no verb of the models layer returns a vaultKey, wayinKey or leaseKey.** In `packages/safebyok/src/models/`, a vaultKey is
   unwrapped under the wayinKey (`Proving.#unwrapVaultKey`, extractable only to be wrapped again, dropped when the method ends) or under
@@ -295,13 +294,13 @@ added or folded into through the subagent, and no other entry changes.
   The prior `Gate.with*` and closure-taking `attemptProof` (host code handed proof closures) are gone: what the user types arrives as
   clears through the one gating, and is spent by `spendClears`, which also zeroes a bare `ArrayBuffer` `prfBytes`.
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **`del_vault`'s proof is a client-side confirmation; the vaultDB checks no
-  proof.** Its delete is conditional on the revision (`VaultListing.del`, `models/vault-listing.ts`). the `del_vault` run (`RunForGatingkind` in `models/gating.ts`; amended 2026-11-05 (lease_fold): it was `Vault.#runDelVault`) locks first,
+  proof.** Its delete is conditional on the revision (`VaultListing.del`, `models/vault-listing.ts`). the `del_vault` act (`delVault` in `models/gating.ts`; amended 2026-11-05 (lease_fold): it was `Vault.#runDelVault`) locks first,
   so no box opens under a lease while the tombstone goes out; a refused delete leaves the vault locked. A `lock()` does not conclude a
   `del_vault` asking, as a lock does not stop a delete (`declineAtLock` skips that kind), but a goodbye or vacate does
   (`declineAtDiscard`). `Vault.del()` is `delVaultPrompt()` (amended 2026-11-05 (lease_fold): the entrypoints were renamed), and `revokePasskeyPrompt` runs through its own gating, so each is guarded by a Gating (the user proves the
   passphrase) (amended 2026-11-03 (cleanup): this said there was no unguarded delete through the Vault; the listing's is not guarded). `listing.del(vault)`
   (`VaultListing.del`, `models/vault-listing.ts`) has no gating of its own: it is the call a gated `vault.del()` ends in
-  (the `del_vault` run), and a host holding the listing can call it directly, with no proof asked. `vaultListing.del(ante)`
+  (the `del_vault` act), and a host holding the listing can call it directly, with no proof asked. `vaultListing.del(ante)`
   refuses `stale_write`, asking nothing of the vaultDB, for an instance of another life than the slot's vault, as a delivered answer
   would tombstone the live vault locally.
 * 2026-11-03 (gating, branch `20261103-gating`): **A birth whose put answers another's vault attaches no lease to it.** In
@@ -339,8 +338,8 @@ added or folded into through the subagent, and no other entry changes.
   or a Lease. Now `Lease` holds the friend in `#friend`, and `Vault` makes it in a private `#leaseFriend()`, the only way to the friend (amended
   2026-11-03 (small_rulings): `lease.isMadeFor` and the refusal built on it are gone; a lease reaches only the vault whose friend it was built
   on, as `lease.attach` calls its own friend's `attachLease`). A birth used to hand `vault.leaseFriend()` to `passphraseProving.buildLease`
-  from `VaultListing`; its run now lives in the Vault class as the public static `Vault.launchBirth(listing, scope)` with a private
-  static `#runBirth`, which reaches the private `vault.#unlockByProof` (amended 2026-11-05 (lease_fold): `#runBirth` is gone; the run is `RunForGatingkind.build_vault` in `models/gating.ts`, which reaches `#unlockByProof` by the gating friend, see the entry of that date). `launchBirth` runs `listing.scopeOf` and `listing.demandBirthSlot`
+  from `VaultListing`; its act now lives in the Vault class as the public static `Vault.launchBirth(listing, scope)` with a private
+  static `#runBirth`, which reaches the private `vault.#unlockByProof` (amended 2026-11-05 (lease_fold): `#runBirth` is gone; the act is `buildVault` in `models/gating.ts`, which reaches `#unlockByProof` by `Vault.#unlockVaultByProof`, see the entry of that date; amended 2026-11-11 (gating_reform): the birth launcher is `Gating.launchBirth`, called by `Vault`). `launchBirth` runs `listing.scopeOf` and `listing.demandBirthSlot`
   itself and refuses 'bad_option' over a vault present, with no gating opened and no KDF run. It takes no proving: the proving comes from the
   gating it launches. A public `vault.unlockByProof(proving)` was set aside, as whatever is passed as a proving is handed the friend
   (`buildLease(friend)`), so a duck or a subclass would have been a new door. Left open: (1) (amended 2026-11-03 (small_rulings): `vault._cheat_leaseFriend()`, a public
@@ -753,7 +752,7 @@ added or folded into through the subagent, and no other entry changes.
   object goes. A forgotten passphrase can therefore no longer delete a sound vault from the client; `delDamagedVault`
   remains for props that fail their checks, and `safebyok-react`'s start over is off pending a ruling.
   Amended 2026-11-03 (gate_changes): in `models/vault.ts` the passphrase's proof is a client-side confirmation only; the vaultDB is
-  conditional on the revision and checks no proof. the `del_vault` run locks first and the delete follows, where this entry has the lock
+  conditional on the revision and checks no proof. the `del_vault` act locks first and the delete follows, where this entry has the lock
   after it; a refused delete leaves the vault locked. See the 2026-11-03 (gate_changes) entry on `del_vault`.
 * 2026-10-23 (primitives sprint, thread 9, gating): **a grant the device database refuses after a change to the ways in landed is warned of, not
   thrown (today's contract).** For change passphrase and put or delete passkey, a `storage_unavailable` or `storage_blocked`
@@ -3648,7 +3647,7 @@ added or folded into through the subagent, and no other entry changes.
   Review amendment 2026-10-23 (proving_gate): an all-zero `PasskeyAnswer` is refused `bad_option` by `checkedPasskeyAnswer` (amended 2026-10-27 (validator_ducks): now `passkeyAnswer.parse` (amended 2026-10-28 (validator_names): `passkeyAnswerShape.parse` when this was written), `src/shapes/vault.ts`; its `prfBytes` check is by tag, a shared `bytes` kit maker, so bytes from another realm such as an iframe or jsdom are accepted, as the lease's bytes already were; the all-zero refusal is unchanged) before any seal, so an answer reused after `PasskeyProving.seal` zeroed it can never seal a wayin under HKDF over 32 zero bytes (a key anyone could rebuild from the public ctx); it is the same zero check `passphraseKeyOf` already makes on derived bytes.
   Amended 2026-10-28 (activity_mount, PR [#350](https://github.com/mrflip/safebyok/pull/350); the Coach asked for both fixes): (1) `src/gating.ts`: a gating's attempt now spends the `PasskeyAnswer` it is handed (`spendAnswer`; the `answerOf` argument to `attemptOf` in `#gatingOf`), zeroing `prfBytes` on every outcome except a refusal the user can correct (`correctableKindVals`). Before, only `PasskeyProving.seal` zeroed them, so an attempt refused before the seal left them as they were: the gating already over (`gating_concluded`), another attempt in flight (`attempt_in_flight`), a malformed passphrase beside the answer (`bad_option`), a lock landing before the seal, a storage failure before it. A correctable refusal raised before the seal (a mistyped passphrase in `put_passkey`, `absent_wayin`) still leaves the answer unspent, because the README promises a host it may hand the same answer in again; zeroing it is then the host's. A host that retried with the same answer after misuse now meets `bad_option`. (2) `safebyok-react`: `useWhenShown` first parked a passkey answer that came back while the dialog was hidden (React's `<Activity>`, a Suspense boundary) and tried it when the dialog showed again, with no time limit and no zeroing if the dialog unmounted while hidden, so the bytes lived in a closure in a ref until garbage collection. Amended 2026-11-09 (react_forms): the zeroing of a hidden dialog's answer is gone, and `useWhenShown` with it; `PasskeyUnlockButton` and `GatingModal`'s put_passkey form hand an answer to `gating.attempt` at once, shown or hidden (see the 2026-11-09 react_forms entry at the top). Each dialog still zeroes the answer once its one attempt is done, refused or not (`attemptOnce`, `packages/safebyok-react/src/helpers/passkey.ts`). Unchanged: a JavaScript string passphrase cannot be zeroed (G1's caveat).
   Amended 2026-11-03 (gating, branch `20261103-gating`): in `packages/safebyok/src/models/gating.ts` the gating holds the clears only for
-  the length of an attempt, and its `run` hears provings, never a clear. `spendClears` zeroes a passkey answer's PRF bytes on every path but
+  the length of an attempt, and past its `Proving` builders an act uses only the provings, never a clear. `spendClears` zeroes a passkey answer's PRF bytes on every path but
   a correctable refusal, including an attempt refused before it is tried (`gating_concluded`, `attempt_in_flight`).
 * 2026-10-16: **the deriver's label is checked three ways before a vault trusts it.** `Vault.make`
   refuses a label beginning `argon2id_web_` (any case) that is not a spec safebyok supplies,
