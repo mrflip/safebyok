@@ -99,26 +99,26 @@ const listener = new Client({ connectionString: process.env.DATABASE_URL })
 // Without this handler, a dropped connection crashes the process. With it, every watch goes quiet until you listen again.
 listener.on('error', (err) => { console.warn('safebyok listener lost:', err.message) })
 await listener.connect()
-const heedersOf = new Map<string, Set<(text: string) => void>>()
+const listenersOf = new Map<string, Set<(text: string) => void>>()
 listener.on('notification', ({ channel, payload = '' }) => {
-  const heeders = heedersOf.get(channel) ?? []
-  for (const onNotify of heeders) { onNotify(payload) }
+  const listeners = listenersOf.get(channel) ?? []
+  for (const onNotify of listeners) { onNotify(payload) }
 })
 
 const listen: PostgresListen = async (channel, onNotify) => {
-  const heeders = heedersOf.get(channel) ?? new Set()
-  if (! heedersOf.has(channel)) {
-    heedersOf.set(channel, heeders)
+  const listeners = listenersOf.get(channel) ?? new Set()
+  if (! listenersOf.has(channel)) {
+    listenersOf.set(channel, listeners)
     // A user_id may contain capitals and punctuation, which LISTEN accepts only in a quoted identifier.
     try {
       await listener.query(`LISTEN ${escapeIdentifier(channel)}`)
     } catch (err) {
-      heedersOf.delete(channel)  // so the next watch on this channel LISTENs again
+      listenersOf.delete(channel)  // so the next watch on this channel LISTENs again
       throw err
     }
   }
-  heeders.add(onNotify)
-  return () => heeders.delete(onNotify)
+  listeners.add(onNotify)
+  return () => listeners.delete(onNotify)
 }
 const vaultDB = new PostgresVaultDB({ client: pgClientOf(pool), listen })
 ```

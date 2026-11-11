@@ -13,15 +13,15 @@ export type { MemoryVaultDBOpts } from '../shapes/shapes-storage'
 
 
 type BoxLife = { scope: VaultScope, vault_tok: string, boxrows: Map<string, unknown> }
-type Heeder = { scope: WatchScope, hear: (heard: Heard) => void }
+type Listener = { scope: WatchScope, hear: (heard: Heard) => void }
 
 /** A vaultDB kept in this tab's memory, gone when the tab closes. */
 export class MemoryVaultDB extends AdapterVaultDB {
-  // == [Props]: #vaultrowsOfBank, #boxLives, #heeders, #maxBoxes
+  // == [Props]: #vaultrowsOfBank, #boxLives, #listeners, #maxBoxes
 
   readonly #vaultrowsOfBank = new Map<string, Map<string, unknown>>()
   readonly #boxLives = new Map<string, BoxLife>()
-  readonly #heeders = new Set<Heeder>()
+  readonly #listeners = new Set<Listener>()
   readonly #maxBoxes: number
   // --
 
@@ -78,7 +78,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   // Each listener is called on a later microtask, so nothing it does runs inside the write that notified it.
   /** Notify each listener watching `scope` of `heard`. */
   #tell(scope: VaultScope, heard: Heard): void {
-    for (const { scope: heardScope, hear } of this.#heeders) {
+    for (const { scope: heardScope, hear } of this.#listeners) {
       const isHeard = (heardScope.applabel === scope.applabel) && (heardScope.user_id === scope.user_id) && ((heardScope.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
       if (isHeard) { queueMicrotask(() => { hear(structuredClone(heard)) }) }
     }
@@ -149,9 +149,9 @@ export class MemoryVaultDB extends AdapterVaultDB {
   }
 
   protected override doWatch(scope: WatchScope, hear: (heard: Heard) => void): () => void {
-    const heeder = { scope, hear }
-    this.#heeders.add(heeder)
-    return () => { this.#heeders.delete(heeder) }
+    const listener = { scope, hear }
+    this.#listeners.add(listener)
+    return () => { this.#listeners.delete(listener) }
   }
   // --
 }

@@ -140,25 +140,25 @@ export const useFileDatabase = (): (() => FileDatabase) => {
 
 /** A `listen` as the package's README has it, over a connection of its own, already listening for the battery's user. */
 export const listenOver = async (db: FileDatabase): Promise<PostgresListen> => {
-  const heedersOf = new Map<string, Set<(text: string) => void>>()
+  const listenersOf = new Map<string, Set<(text: string) => void>>()
   const listener = await db.client()
   listener.on('notification', ({ channel, payload = '' }) => {
-    const heeders = heedersOf.get(channel) ?? []
-    for (const onNotify of heeders) { onNotify(payload) }
+    const listeners = listenersOf.get(channel) ?? []
+    for (const onNotify of listeners) { onNotify(payload) }
   })
   const listen: PostgresListen = async (channel, onNotify) => {
-    const heeders = heedersOf.get(channel) ?? new Set()
-    if (! heedersOf.has(channel)) {
-      heedersOf.set(channel, heeders)
+    const listeners = listenersOf.get(channel) ?? new Set()
+    if (! listenersOf.has(channel)) {
+      listenersOf.set(channel, listeners)
       try {
         await listener.query(`LISTEN ${escapeIdentifier(channel)}`)
       } catch (err) {
-        heedersOf.delete(channel)
+        listenersOf.delete(channel)
         throw err
       }
     }
-    heeders.add(onNotify)
-    return () => heeders.delete(onNotify)
+    listeners.add(onNotify)
+    return () => listeners.delete(onNotify)
   }
   // A watch's first LISTEN races the writes made just after it, so the battery's user is listened for before any watch.
   const unlisten = await listen(vaultChannelOf(TH.bankScope.user_id), () => undefined)

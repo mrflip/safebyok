@@ -134,7 +134,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   protected override doWatch(scope: WatchScope, hear: (heard: Heard) => void, onBadNews: (news: VaultError) => void): () => void {
     let seen: RowsWatched | null = null
     let isWatching = true
-    const heed = (rows: RowsWatched): void => {
+    const hearRows = (rows: RowsWatched): void => {
       if (! isWatching) { return }
       if (seen !== null) { for (const heard of changesOf(seen, rows)) { hear(heard) } }
       seen = rows
@@ -142,7 +142,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     const fail = (thrown: unknown): void => {
       if (isWatching) { onBadNews(refusalOf('watchRows', thrown)) }
     }
-    const unsubscribe = this.#subscribe(scope, heed, fail)
+    const unsubscribe = this.#subscribe(scope, hearRows, fail)
     // Convex counts a query's watchers, and each unsubscribe call lowers that count. A second call
     // would end another watch of the same rows on the same client.
     return () => {
@@ -157,20 +157,20 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 
   // A failing watch reports to `fail` and keeps running. When it recovers, its next result is compared
   // with the last one it received.
-  #subscribe({ vaultlabel, ...bankScope }: WatchScope, heed: (rows: RowsWatched) => void, fail: (thrown: unknown) => void): () => void {
+  #subscribe({ vaultlabel, ...bankScope }: WatchScope, hearRows: (rows: RowsWatched) => void, fail: (thrown: unknown) => void): () => void {
     const args = { scope: (vaultlabel === undefined) ? bankScope : { ...bankScope, vaultlabel } }
     if ('watchQuery' in this.#client) {
       const watch = this.#client.watchQuery(this.#api.watchRows, args)
-      const heedLatest = () => {
+      const hearLatest = () => {
         const rows = latestOf(watch, fail)
-        if (rows !== undefined) { heed(rows) }
+        if (rows !== undefined) { hearRows(rows) }
       }
-      const unsubscribe = watch.onUpdate(heedLatest)
+      const unsubscribe = watch.onUpdate(hearLatest)
       // A ConvexReactClient that is already watching these rows sends no first result, only changes.
-      heedLatest()
+      hearLatest()
       return unsubscribe
     }
-    return this.#client.onUpdate(this.#api.watchRows, args, heed, fail)
+    return this.#client.onUpdate(this.#api.watchRows, args, hearRows, fail)
   }
   // --
 }

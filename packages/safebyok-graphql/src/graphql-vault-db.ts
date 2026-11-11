@@ -232,7 +232,7 @@ export class GraphQLVaultDB implements VaultDB {
         return
       }
       // When a stream over fetch closes, its final result repeats the previous notice's data. Do not deliver it twice.
-      const refusal = (result.data === heardData) ? null : heedNotice(result, onNotice)
+      const refusal = (result.data === heardData) ? null : hearNotice(result, onNotice)
       heardData = result.data
       if (refusal !== null) {
         end(DB.isVaultError(refusal, 'identity_revoked') ? null : refusal)
@@ -261,7 +261,7 @@ export class GraphQLVaultDB implements VaultDB {
 }
 // --
 
-// == [Answers]: answerOf, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, heedNotice
+// == [Answers]: answerOf, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, hearNotice
 
 /** Run `ask` and return its answer, converting a thrown refusal into a bad answer.
  * A request that `checked` refuses is never sent.
@@ -322,7 +322,7 @@ const codeOf = (thrown: unknown): string | null => {
 }
 
 /** Pass the notice in `result` to `onNotice`. Returns the refusal if the notice ends the watch, else null. */
-const heedNotice = ({ data }: OperationResult<unknown>, onNotice: (notice: Notice) => void): DB.VaultError | null => {
+const hearNotice = ({ data }: OperationResult<unknown>, onNotice: (notice: Notice) => void): DB.VaultError | null => {
   // A notice is only a hint to fetch again, so a malformed notice is ignored.
   if ((typeof data !== 'object') || (data === null)) { return null }
   const crossed = DB.crossedNotice.safeParse(rowAnswerOf((data as Record<string, unknown>)['safebyokWatch']))
