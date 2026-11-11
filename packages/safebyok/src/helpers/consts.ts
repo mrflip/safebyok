@@ -90,16 +90,16 @@ export const isWhisperedBag = (val: unknown): val is WhisperedBag => (typeof val
 
 // A check reads the getter in place of instanceof, which needs the class imported (a cycle, often) and fails across the
 // ESM and CommonJS builds. A getter sits on the prototype, so it is no own key that a spread or Object.keys would meet.
-/** The model class each `modelkind` names: `ModelkindClasses['box']` is `Box`. */
-export type ModelkindClasses = {
+/** The model class each `modelkind` names: `ClassForModelkind['box']` is `Box`. */
+export type ClassForModelkind = {
   bank: Bank, vault: Vault, box: Box, vault_listing: VaultListing, box_listing: BoxListing, gating: Gating, gate: Gate, wayin: Wayin, lease: Lease, proving: Proving,
 }
 
 /** What each model's `modelkind` getter answers: `box.modelkind` is `'box'`. */
-export type Modelkind = keyof ModelkindClasses
+export type Modelkind = keyof ClassForModelkind
 
 /** True when `val` is a model of one of `modelkinds`, and typed as its class. */
-export const hasModelkind = <MKT extends Modelkind>(val: unknown, ...modelkinds: MKT[]): val is ModelkindClasses[MKT] => (
+export const hasModelkind = <MKT extends Modelkind>(val: unknown, ...modelkinds: MKT[]): val is ClassForModelkind[MKT] => (
   (typeof val === 'object') && (val !== null) && (modelkinds as Modelkind[]).includes((val as { modelkind?: unknown }).modelkind as Modelkind)
 )
 

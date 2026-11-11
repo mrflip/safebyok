@@ -183,7 +183,7 @@ export function cappedActOf(act: BoxAct, capacity: Capacity): BoxAct {
 }
 // --
 
-// == [Gate verbs]: replacePassphraseActOf, addPasskeyActOf, revokePasskeyActOf, GateActOf
+// == [Gate verbs]: replacePassphraseActOf, addPasskeyActOf, revokePasskeyActOf, GateActOfForVerb
 // A gate verb is a put of the vault record over its live row, with checks of its own that compare the record's gate with
 // the stored one. They run on the row the adapter fetched in the same step that stores the record, never on a row a
 // caller fetched earlier. Each returns `replaced` when the record may be stored, or the act that stops it, and throws
@@ -214,7 +214,7 @@ function revokePasskeyActOf(record: VaultRecord, stored: VaultRecord): VaultAct 
   return 'replaced'
 }
 
-const GateActOf: Readonly<Record<EX.GateVerb, (record: VaultRecord, stored: VaultRecord) => VaultAct>> = {
+const GateActOfForVerb: Readonly<Record<EX.GateVerb, (record: VaultRecord, stored: VaultRecord) => VaultAct>> = {
   replacePassphrase: replacePassphraseActOf, addPasskey: addPasskeyActOf, revokePasskey: revokePasskeyActOf,
 }
 // --
@@ -274,7 +274,7 @@ export function classifyVault(ask: VaultAsk, { vault }: VaultFetched): VaultClas
 
   // A gate verb's put also checks its record against the gate of the live row it would replace.
   const isGatePut = (ask.op === 'put') && (ask.gateVerb !== undefined) && (tabled === 'replaced') && (row?.am === 'a')
-  const act      = isGatePut ? GateActOf[ask.gateVerb](ask.record, row) : tabled
+  const act      = isGatePut ? GateActOfForVerb[ask.gateVerb](ask.record, row) : tabled
 
   if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, world: ask.record, vault: ask.record, presence } }
   return isOkAct(act) ? { ok: true, act, world, vault: row, presence } : { ok: false, act, world, vault: row, presence }

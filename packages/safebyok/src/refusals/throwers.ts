@@ -257,7 +257,7 @@ export const noJsonText = (): VaultError => new VaultError('unexpected_error', P
 
 // Each refusal kind calls for one response from the caller, whichever act produced it: treat the row as missing, fetch
 // again and rewrite, leave the live row alone, or report it. An expected refusal and an impossible one never share a kind.
-const KindOfBoxAct = {
+const RefusalkindForBoxAct = {
   void: 'absent_box', gone: 'absent_box', dubdel: 'absent_box',
   stale: 'stale_write', retcon: 'stale_write',
   camped: 'camped',
@@ -265,7 +265,7 @@ const KindOfBoxAct = {
   vault_void: 'absent_vault', vault_gone: 'absent_vault', vault_reborn: 'vault_reborn', vault_full: 'vault_full',
 } as const satisfies Record<EX.RefusedAct | EX.BoxVaultAct, Refusalkind>
 
-const KindOfVaultAct = { ...KindOfBoxAct, void: 'absent_vault', gone: 'absent_vault', dubdel: 'absent_vault' } as const satisfies Record<EX.RefusedAct, Refusalkind>
+const RefusalkindForVaultAct = { ...RefusalkindForBoxAct, void: 'absent_vault', gone: 'absent_vault', dubdel: 'absent_vault' } as const satisfies Record<EX.RefusedAct, Refusalkind>
 
 // No rows go on this error: the rows the refusal found are in its answer, as `world` and `dbhas`.
 /** The refusal for a get, put or del whose `act` is a refusal. Its message is its kind, and `meta.act` is the act.
@@ -273,7 +273,7 @@ const KindOfVaultAct = { ...KindOfBoxAct, void: 'absent_vault', gone: 'absent_va
  * @param meta    - Extra context: the `call`, its `req_params`, and for `vault_full` the `capacity`.
  */
 export function actRefused(rowkind: 'box' | 'vault', act: EX.RefusedAct | EX.BoxVaultAct, meta: RefusalMeta = {}): VaultError {
-  const refusalkind = ((rowkind === 'vault') ? KindOfVaultAct : KindOfBoxAct)[act]
+  const refusalkind = ((rowkind === 'vault') ? RefusalkindForVaultAct : RefusalkindForBoxAct)[act]
   return new VaultError(refusalkind, refusalkind, { meta: { ...meta, act } })
 }
 
