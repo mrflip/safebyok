@@ -67,8 +67,9 @@ copy it:
   verbs. The base class checks scope and options on the way in, validates every row on the way
   out, and turns a put or del that did not take effect into its refusal.
 * **Do each `do*` in one transaction of your datastore.** Fetch the vault row with the rows the call
-  may write, classify the ask with `this.classifyVault` or `this.classifyBox`, and store the ask's
-  record only if `isWriteAct(classified.act)`, from `safebyok/storage`, is true. Make no check of
+  may write, classify the ask with `this.classifyStoredVault` or `this.classifyStoredBox` (a listing's,
+  with `this.classifyStoredVaults` or `this.classifyStoredBoxes`), and store the ask's record only if
+  `isWriteAct(stored.act)`, from `safebyok/storage`, is true. Make no check of
   your own: the classifier throws on a row that fails its checks, so it is never written over.
 * **Triage your datastore's failures into refusals** where you catch them (`inOneStep` from
   `safebyok/storage` does it for IndexedDB). Anything else you throw becomes `storage_unavailable`.

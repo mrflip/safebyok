@@ -30,7 +30,7 @@ import type { Boxscope } from '../../src/shapes/shapes-core'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { type BankAnnouncement, type BankFriend, type BoxDna, type BoxWorld, type Fetched, type BoxListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
-import { type BoxDelAsk, type BoxGetAsk, type BoxPutAsk, type BoxRow, type BoxTombstone, type ReqParams, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
+import { type BoxDelAsk, type BoxGetAsk, type BoxPutAsk, type BoxRow, type BoxTombstone, type LoggableAsk, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Notice } from '../../src/storage/vault-db'
@@ -282,7 +282,7 @@ export class TestableVaultDB extends MemoryVaultDB {
   }
 }
 
-function factsOf(scope: Boxscope) { return { req_params: scope as ReqParams } }
+function factsOf(scope: Boxscope) { return { ask: { op: 'get', ...scope } as LoggableAsk } }
 function gotActOf(val: Fetched<BoxRecord, BoxSparse> | null): string {
   if (val === null) { return 'gotvoid' }
   return VX.isTombstone(val) ? 'gotgone' : 'gotlive'

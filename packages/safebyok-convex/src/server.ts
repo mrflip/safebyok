@@ -69,7 +69,7 @@ export class SafebyokComponent {
         args:    CVX.listVaultsArgs,
         returns: v.array(CVX.rowOfVault),
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.scope.user_id)
+          await demandCaller(ctx, args.ask.user_id)
           return await ctx.runQuery(vaults.listVaults, args)
         },
       }),
@@ -77,7 +77,7 @@ export class SafebyokComponent {
         args:    CVX.getVaultArgs,
         returns: v.any(),
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.scope.user_id)
+          await demandCaller(ctx, args.ask.user_id)
           return await ctx.runQuery(vaults.getVault, args)
         },
       }),
@@ -85,7 +85,7 @@ export class SafebyokComponent {
         args:    CVX.listBoxesArgs,
         returns: CVX.boxesFetched,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.asked.user_id)
+          await demandCaller(ctx, args.ask.user_id)
           return await ctx.runQuery(vaults.listBoxes, args)
         },
       }),
@@ -93,13 +93,13 @@ export class SafebyokComponent {
         args:    CVX.getBoxArgs,
         returns: CVX.boxFetched,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.asked.user_id)
+          await demandCaller(ctx, args.ask.user_id)
           return await ctx.runQuery(vaults.getBox, args)
         },
       }),
       putVault: publicMutation({
         args:    CVX.putVaultArgs,
-        returns: CVX.vaultClassified,
+        returns: CVX.vaultStored,
         handler: async (ctx, args) => {
           await demandCaller(ctx, args.ask.user_id)
           return await ctx.runMutation(vaults.putVault, args)
@@ -107,7 +107,7 @@ export class SafebyokComponent {
       }),
       putBox: publicMutation({
         args:    CVX.putBoxArgs,
-        returns: CVX.boxClassified,
+        returns: CVX.boxStored,
         handler: async (ctx, args) => {
           await demandCaller(ctx, args.ask.user_id)
           return await ctx.runMutation(vaults.putBox, args)
@@ -115,7 +115,7 @@ export class SafebyokComponent {
       }),
       delVault: publicMutation({
         args:    CVX.delVaultArgs,
-        returns: CVX.vaultClassified,
+        returns: CVX.vaultStored,
         handler: async (ctx, args) => {
           await demandCaller(ctx, args.ask.user_id)
           return await ctx.runMutation(vaults.delVault, args)
@@ -123,7 +123,7 @@ export class SafebyokComponent {
       }),
       delBox: publicMutation({
         args:    CVX.delBoxArgs,
-        returns: CVX.boxClassified,
+        returns: CVX.boxStored,
         handler: async (ctx, args) => {
           await demandCaller(ctx, args.ask.user_id)
           return await ctx.runMutation(vaults.delBox, args)

@@ -81,7 +81,7 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
     const intruder = TH.browserAt(server, () => 'u2')
     const born = TH.vaultPutAskOf(TH.vaultAt())
     await TH.expectRefusal(intruder.putVault(born), 'identity_revoked')
-    await TH.expectRefusal(TH.browserAt(server, () => null).listVaults(TH.bankScope), 'identity_revoked')
+    await TH.expectRefusal(TH.browserAt(server, () => null).listVaults(TH.vaultListAsk), 'identity_revoked')
     expect(await TH.rowsOf(getDb()).vaultRowOf(TH.vaultScope)).to.be.null
   })
 })

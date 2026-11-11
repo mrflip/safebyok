@@ -6,7 +6,7 @@ import * as SX from '../../src/shapes/shapes-storage'
 import { VaultError } from '../../src/refusals/errors'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Answer } from '../../src/storage/vault-db'
-import { bankScope, boxAt, boxDelAskOf, boxGetAskOf, boxPutAskOf, vaultAt, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultQuery, vaultScope } from '../test-helpers/storage-world'
+import { bankScope, boxAt, boxDelAskOf, boxGetAskOf, boxPutAskOf, vaultAt, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultScope, vaultListAsk, boxListAsk } from '../test-helpers/storage-world'
 
 // == [A wire]: crossed
 
@@ -34,9 +34,9 @@ describe("AX's answer checks", () => {
   it("parse each serialized good answer back to what its verb returned", async () => {
     const vaultDB = await vaultDBWithBox()
     const answers = [
-      [AX.listVaultsAnswer, await vaultDB.tryListVaults(bankScope)],
+      [AX.listVaultsAnswer, await vaultDB.tryListVaults(vaultListAsk)],
       [AX.getVaultAnswer,   await vaultDB.tryGetVault(vaultGetAskOf())],
-      [AX.listBoxesAnswer,  await vaultDB.tryListBoxes(vaultQuery)],
+      [AX.listBoxesAnswer,  await vaultDB.tryListBoxes(boxListAsk)],
       [AX.getBoxAnswer,     await vaultDB.tryGetBox(boxGetAskOf())],
       [AX.putBoxAnswer,     await vaultDB.tryPutBox(boxPutAskOf(boxAt(1), boxAt()))],
       [AX.delBoxAnswer,     await vaultDB.tryDelBox(boxDelAskOf(boxAt(1)))],
@@ -63,7 +63,7 @@ describe("AX's answer checks", () => {
     expect(parsed.err).to.be.instanceOf(VaultError)
     expect(parsed.err.refusalkind).to.equal(answer.err.refusalkind)
     expect(parsed.err.message).to.equal(answer.err.message)
-    expect(parsed.err.meta).to.deep.include({ act: answer.act, req_params: answer.req_params })
+    expect(parsed.err.meta).to.deep.include({ act: answer.act, ask: answer.ask })
     expect(parsed.err.meta).to.not.have.any.keys('world', 'dbhas')
     expect(parsed).to.deep.include({ world: answer.world })
     expect(parsed.err.cause).to.be.undefined
@@ -71,7 +71,7 @@ describe("AX's answer checks", () => {
 
   it("take a damaged row only under damaged_rows", async () => {
     const vaultDB = await vaultDBWithBox()
-    const listed = crossed(await vaultDB.tryListVaults(bankScope)) as { val: { vaults: unknown[], damaged_rows: unknown[] } }
+    const listed = crossed(await vaultDB.tryListVaults(vaultListAsk)) as { val: { vaults: unknown[], damaged_rows: unknown[] } }
     const damaged = SX.damagedVaultOf({ ...vaultScope, vaultlabel: 'other' })
     expect(() => AX.listVaultsAnswer.parse({ ...listed, val: { ...listed.val, damaged_rows: [damaged] } })).not.to.throw()
     expect(() => AX.listVaultsAnswer.parse({ ...listed, val: { ...listed.val, vaults: [...listed.val.vaults, damaged] } })).to.throw(VaultError)
@@ -79,7 +79,7 @@ describe("AX's answer checks", () => {
 
   it("takes a damaged row under the label it is stored under", async () => {
     const vaultDB = await vaultDBWithBox()
-    const listed = crossed(await vaultDB.tryListVaults(bankScope)) as { val: { vaults: unknown[], damaged_rows: unknown[] } }
+    const listed = crossed(await vaultDB.tryListVaults(vaultListAsk)) as { val: { vaults: unknown[], damaged_rows: unknown[] } }
     const misnamed = SX.damagedVaultOf({ ...vaultScope, vaultlabel: 'Not A Label' })
     const parsed = AX.listVaultsAnswer.parse({ ...listed, val: { ...listed.val, damaged_rows: [misnamed] } })
     expect(parsed.ok && parsed.val.damaged_rows).to.deep.eq([misnamed])

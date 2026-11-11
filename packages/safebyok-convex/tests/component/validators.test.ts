@@ -43,7 +43,7 @@ describe("the component's validators, against what the core writes", () => {
     const sidecar = { label: 'work', tags: ['a', 'b'], nested: { count: 2, on: true, none: null } }
     const record = TH.boxAt(0, 'life1', { sidecar })
     await backend.mutation(api.putBox, TH.putBoxArgs(record))
-    expect(await backend.query(api.getBox, { asked: { ...TH.boxscope, vault_tok: record.vault_tok } })).to.deep.equal({ vault, box: record })
+    expect(await backend.query(api.getBox, TH.getBoxArgs({ ...TH.boxscope, vault_tok: record.vault_tok }))).to.deep.equal({ world: vault, box: record })
   })
 })
 

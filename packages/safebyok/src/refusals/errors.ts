@@ -143,8 +143,8 @@ export type RefusalMeta = {
   call?:         string
   /** A vaultDB's refusal: what happened, when it is not said by the refusalkind alone. */
   act?:          string
-  /** A vaultDB's refusal: the request's scope, vault_tok and other safe metadata. */
-  req_params?:   Readonly<Record<string, unknown>>
+  /** A vaultDB's refusal: what it carries of its ask, a `LoggableAsk`: its address, policies and revisions, never a record's payload. */
+  ask?:          Readonly<Record<string, unknown>>
 }
 
 /** The rows `err` hands a vaultDB's answer, empty where it has none. */

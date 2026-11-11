@@ -104,13 +104,13 @@ describe("a record stored in its table", () => {
     expect(await rowsFrom(ListVaultsSql, VaultAddress.slice(0, 2))).to.deep.equal([{ vaultlabel: 'main', vault }])
     expect(await rowsFrom(GetVaultSql, VaultAddress)).to.deep.equal([{ vault }])
     expect(await rowsFrom(GetBoxWithVaultSql, BoxAddress)).to.deep.equal([{ world: vault, box }])
-    expect(await rowsFrom(ListBoxesWithVaultSql, LifeAddress)).to.deep.equal([{ vault, boxes: [{ boxlabel, box }] }])
+    expect(await rowsFrom(ListBoxesWithVaultSql, LifeAddress)).to.deep.equal([{ world: vault, boxes: [{ boxlabel, box }] }])
   })
 
   it("is answered as null or an empty list where no row is stored", async () => {
     expect(await rowsFrom(GetVaultSql, VaultAddress)).to.deep.equal([])
     expect(await rowsFrom(GetBoxWithVaultSql, BoxAddress)).to.deep.equal([{ world: null, box: null }])
-    expect(await rowsFrom(ListBoxesWithVaultSql, LifeAddress)).to.deep.equal([{ vault: null, boxes: [] }])
+    expect(await rowsFrom(ListBoxesWithVaultSql, LifeAddress)).to.deep.equal([{ world: null, boxes: [] }])
   })
 })
 

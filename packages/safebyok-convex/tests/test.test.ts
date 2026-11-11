@@ -11,7 +11,7 @@ describe("register", () => {
     const backend = defineTestApp({ schema: defineSchema({}) }).defineModules({}).createTest()
     const vaultdb = register(backend, 'vaultdb')
     await backend.mutation(vaultdb.vaults.putVault, TH.putVaultArgs(vault))
-    expect(await backend.query(vaultdb.vaults.getVault, { scope: TH.vaultScope })).to.deep.equal(vault)
+    expect(await backend.query(vaultdb.vaults.getVault, TH.getVaultArgs())).to.deep.equal(vault)
   })
 
   it("serves a host app's re-exported functions, as defineTestApp's component helper", async () => {
@@ -19,6 +19,6 @@ describe("register", () => {
     const { api, createTest } = app.defineModules({ safebyok: component.api({ getUserId: () => 'u1' }) })
     const backend = createTest()
     await backend.mutation(api.safebyok.putVault, TH.putVaultArgs(vault))
-    expect(await backend.query(api.safebyok.getVault, { scope: TH.vaultScope })).to.deep.equal(vault)
+    expect(await backend.query(api.safebyok.getVault, TH.getVaultArgs())).to.deep.equal(vault)
   })
 })

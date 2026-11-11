@@ -115,7 +115,7 @@ export function describeDels({ putWith, rowsOf }: BatteryWorld): void {
       await vaultDB.delVault(vaultDelAskOf(vault))
       const reborn = vaultAt(2, 'life2')
       await vaultDB.putVault(vaultPutAskOf(reborn, tombstone))
-      const listed = await vaultDB.listBoxes({ ...vaultScope, vault_tok: 'life2' })
+      const listed = await vaultDB.listBoxes({ op: 'list', ...vaultScope, vault_tok: 'life2' })
       expect(listed).to.deep.include({ act: 'gotvoid', world: reborn })
       expect(await vaultDB.tryGetBox(boxGetAskOf(boxQuery, 'nil'))).to.deep.include({ ok: false, act: 'vault_reborn', world: reborn })
     })

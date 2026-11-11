@@ -1,14 +1,14 @@
 /** The vaultDB in memory. */
 
 import { type Tidied } from './vault-db'
-import { type BoxesFetched, type Heard, type RowOfVault, AdapterVaultDB } from './adapter-vault-db'
+import { type Heard, AdapterVaultDB } from './adapter-vault-db'
 import { isWriteAct } from './classifier'
-import type { BoxClassified, VaultClassified } from './classifier'
+import type { BoxesStored, BoxStored, VaultsStored, VaultStored } from './classifier'
 import { DefaultMaxBoxes } from '../helpers/consts'
 import { ckeyOf } from '../helpers/helpers'
 import * as SX from '../shapes/shapes-storage'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
-import type { BoxDelAsk, BoxGetAsk, BoxPutAsk, BoxRecord, BoxTombstone, Capacity, MemoryVaultDBOpts, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultQuery, VaultRecord, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import type { BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRecord, BoxTombstone, Capacity, MemoryVaultDBOpts, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultRecord, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
 export type { MemoryVaultDBOpts } from '../shapes/shapes-storage'
 
 
@@ -87,56 +87,63 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
-  protected doListVaults(scope: BankScope): RowOfVault[] {
-    return Array.from(this._cheat_vaultRowsOf(scope), ([vaultlabel, vault]) => ({ vaultlabel, vault: structuredClone(vault) }))
+  protected doListVaults(ask: VaultListAsk): VaultsStored {
+    const vaults = Array.from(this._cheat_vaultRowsOf(ask), ([vaultlabel, vault]) => ({ vaultlabel, vault: structuredClone(vault) }))
+    return this.classifyStoredVaults(ask, vaults)
   }
 
-  protected doGetVault(ask: VaultGetAsk): VaultClassified {
-    return this.classifyVault(ask, { vault: this.#vaultRowOf(ask) })
-  }
-
-  protected doListBoxes(asked: VaultQuery): BoxesFetched {
-    const boxes = Array.from(this._cheat_boxRowsOf(asked, asked.vault_tok), ([boxlabel, box]) => ({ boxlabel, box: structuredClone(box) }))
-    return { vault: structuredClone(this.#vaultRowOf(asked)), boxes }
-  }
-
-  protected doGetBox(ask: BoxGetAsk): BoxClassified {
-    const box = this._cheat_boxRowsOf(ask, ask.vault_tok).get(ask.boxlabel) ?? null
-    return this.classifyBox(ask, { world: this.#vaultRowOf(ask), box })
-  }
-
-  protected doPutVault(ask: VaultPutAsk): VaultClassified {
-    const classified = this.classifyVault(ask, { vault: this.#vaultRowOf(ask) })
-    if (isWriteAct(classified.act)) { this.#writeVaultRow(ask.record) }
-    return classified
-  }
-
-  protected doPutBox(ask: BoxPutAsk): BoxClassified {
-    const boxrows = this._cheat_boxRowsOf(ask, ask.vault_tok)
+  protected doGetVault(ask: VaultGetAsk): VaultStored {
     const vault = this.#vaultRowOf(ask)
-    const box = boxrows.get(ask.boxlabel) ?? null
-    const classified = this.classifyBox(ask, { world: vault, box, capacity: this.#roomIn(boxrows) })
-    if (isWriteAct(classified.act)) { this.#writeBoxRow(boxrows, vault, ask.record) }
-    return classified
+    return this.classifyStoredVault(ask, { vault })
   }
 
-  protected doDelVault(ask: VaultDelAsk): VaultClassified {
-    const classified = this.classifyVault(ask, { vault: this.#vaultRowOf(ask) })
-    if (isWriteAct(classified.act)) {
+  protected doListBoxes(ask: BoxListAsk): BoxesStored {
+    const world = structuredClone(this.#vaultRowOf(ask))
+    const boxes = Array.from(this._cheat_boxRowsOf(ask, ask.vault_tok), ([boxlabel, box]) => ({ boxlabel, box: structuredClone(box) }))
+    return this.classifyStoredBoxes(ask, { world, boxes })
+  }
+
+  protected doGetBox(ask: BoxGetAsk): BoxStored {
+    const world = this.#vaultRowOf(ask)
+    const box   = this._cheat_boxRowsOf(ask, ask.vault_tok).get(ask.boxlabel) ?? null
+    return this.classifyStoredBox(ask, { world, box })
+  }
+
+  protected doPutVault(ask: VaultPutAsk): VaultStored {
+    const vault  = this.#vaultRowOf(ask)
+    const stored = this.classifyStoredVault(ask, { vault })
+    if (isWriteAct(stored.act)) { this.#writeVaultRow(ask.record) }
+    return stored
+  }
+
+  protected doPutBox(ask: BoxPutAsk): BoxStored {
+    const boxrows  = this._cheat_boxRowsOf(ask, ask.vault_tok)
+    const world    = this.#vaultRowOf(ask)
+    const box      = boxrows.get(ask.boxlabel) ?? null
+    const capacity = this.#roomIn(boxrows)
+    const stored   = this.classifyStoredBox(ask, { world, box, capacity })
+    if (isWriteAct(stored.act)) { this.#writeBoxRow(boxrows, world, ask.record) }
+    return stored
+  }
+
+  protected doDelVault(ask: VaultDelAsk): VaultStored {
+    const vault  = this.#vaultRowOf(ask)
+    const stored = this.classifyStoredVault(ask, { vault })
+    if (isWriteAct(stored.act)) {
       this.#writeVaultRow(ask.record)
       // A vault's boxes end with its life: no call fetches a box row from a life that is over.
       this._cheat_boxRowsOf(ask, ask.expected.vault_tok).clear()
     }
-    return classified
+    return stored
   }
 
-  protected doDelBox(ask: BoxDelAsk): BoxClassified {
+  protected doDelBox(ask: BoxDelAsk): BoxStored {
     const boxrows = this._cheat_boxRowsOf(ask, ask.vault_tok)
-    const vault = this.#vaultRowOf(ask)
-    const box = boxrows.get(ask.boxlabel) ?? null
-    const classified = this.classifyBox(ask, { world: vault, box })
-    if (isWriteAct(classified.act)) { this.#writeBoxRow(boxrows, vault, ask.record) }
-    return classified
+    const world   = this.#vaultRowOf(ask)
+    const box     = boxrows.get(ask.boxlabel) ?? null
+    const stored  = this.classifyStoredBox(ask, { world, box })
+    if (isWriteAct(stored.act)) { this.#writeBoxRow(boxrows, world, ask.record) }
+    return stored
   }
 
   protected doTidyGone(scope: BankScope): Tidied {

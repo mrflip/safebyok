@@ -27,7 +27,7 @@ TH.describeOnPostgres('races', "PostgresVaultDB's box cap, over a real Postgres"
       const written = answers.filter(({ ok }) => ok)
       expect(written.length).to.be.at.least(1)
       expect(answers.filter(({ ok, err }) => (! ok) && (! DB.isVaultError(err, 'vault_full')))).to.deep.equal([])
-      const { val: { boxes } } = await first.listBoxes(TH.vaultQuery)
+      const { val: { boxes } } = await first.listBoxes(TH.boxListAsk)
       expect(boxes).to.have.lengthOf((Cap - 1) + written.length)
     }
   })
@@ -48,7 +48,7 @@ TH.describeOnPostgres('races', "PostgresVaultDB's box cap, over a real Postgres"
       ...writers.map(async (writer, idx) => await writer.tryPutBox(TH.boxPutAskOf(writerBox(idx)))),
     ])
 
-    const listed = await first.tryListBoxes(TH.vaultQuery)
+    const listed = await first.tryListBoxes(TH.boxListAsk)
     expect(listed.ok).to.equal(false)
     await first.tidyGone(TH.bankScope)
     const boxrows = await TH.rowsOf(db).boxRowsOf(TH.vaultScope, 'life1')

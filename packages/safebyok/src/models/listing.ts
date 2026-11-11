@@ -214,7 +214,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       await this.ensureTimelyWorld(maxWorldMillis)
       const listed = this.at(scope)
       if (listed?.isHydratedWithin(maxMillisSinceRefresh) !== true) { return await this.tryFetch(scope, opts) }
-      return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), world: null, req_params: SX.reqParams.parse(scope) }
+      return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), world: null, ask: SX.loggableAsk.parse({ op: 'get', ...scope }) }
     } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
   }
 
@@ -330,7 +330,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   #deliverGood(answer: GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null {
     const record = answer.val
     // An `act: 'passed'` put returns the stored row. Its revision does not match the one sent, so only its scope is checked.
-    const pins = (answer.act === 'passed') ? this.scopeOf(sent) : SX.reqParamsOf(sent)
+    const pins = (answer.act === 'passed') ? this.scopeOf(sent) : { ...this.scopeOf(sent), ...SX.revisionPins.parse(sent) }
     if (record !== null) { checkedConsistent(record, pins, { kind: 'storage_issue', message: Phrases.AnswerNotAsSent }) }
     return (record === null) ? this.#receiveNothing(this.scopeOf(sent)) : this.buildOrReceive(record)
   }

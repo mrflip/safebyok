@@ -397,7 +397,7 @@ validator splits it into its parts before checking them.
 * **A reference to another thing's part keeps a flat field, named as in the owner**: a lease's
   `gate_epoch` names the gate it was granted under, as a foreign key would.
 * **What one atomic step reads travels together**, its halves apart until checked, so damaged
-  data cannot collide with its own fields: `{ vault, boxes }` (`BoxesFetched`). Checked, it
+  data cannot collide with its own fields: `{ world, boxes }` (`BoxesFetched`). Checked, it
   is the thing it describes, written out where it is used: a vault's record and its box listing
   are a vault, `VaultRecord & { boxes: readonly BoxSparse[] }`.
 

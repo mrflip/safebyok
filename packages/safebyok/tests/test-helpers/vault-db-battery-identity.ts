@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
 import type { VaultDB } from '../../src/storage/vault-db'
 import {
-  bankScope, boxAt, passkeyWayin, passphraseWayin, vaultAt, vaultQuery, gateMoveOf,
+  vaultListAsk, boxListAsk, boxAt, passkeyWayin, passphraseWayin, vaultAt, gateMoveOf,
   vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf, boxDelAskOf,
 } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
@@ -15,9 +15,9 @@ const box = boxAt()
 /** Each verb of `vaultDB`, by name, called on u1's vault as its owner could call it: all that a stranger must be refused. */
 function everyVerbOn(vaultDB: VaultDB) {
   return {
-    listVaults:        () => vaultDB.listVaults(bankScope),
+    listVaults:        () => vaultDB.listVaults(vaultListAsk),
     getVault:          () => vaultDB.getVault(vaultGetAskOf()),
-    listBoxes:         () => vaultDB.listBoxes(vaultQuery),
+    listBoxes:         () => vaultDB.listBoxes(boxListAsk),
     getBox:            () => vaultDB.getBox(boxGetAskOf()),
     putVault:          () => vaultDB.putVault(vaultPutAskOf(vaultAt(1), vault)),
     putBox:            () => vaultDB.putBox(boxPutAskOf(boxAt(1), box)),

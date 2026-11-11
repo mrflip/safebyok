@@ -114,13 +114,13 @@ describe("ConvexVaultDB's refusals", () => {
     const deployment = deploy(TH.hostWith(TH.bySubject))
     const vaultDB = new ConvexVaultDB({ client: deployment.client('u2'), api: deployment.api.safebyok })
     await TH.expectBad(vaultDB.tryGetVault(TH.vaultGetAskOf()), 'identity_revoked')
-    await TH.expectBad(vaultDB.tryListVaults(TH.bankScope), 'identity_revoked')
+    await TH.expectBad(vaultDB.tryListVaults(TH.vaultListAsk), 'identity_revoked')
   })
 
   it("quote nothing of any other failure's text", async () => {
     const vaultDB = vaultDBOn(deploy(TH.componentHost()))
     failNextCall(vaultDB, 'host detail sk-live-0000')
-    const refusal = await TH.expectBad(vaultDB.tryListVaults(TH.bankScope), 'storage_unavailable')
+    const refusal = await TH.expectBad(vaultDB.tryListVaults(TH.vaultListAsk), 'storage_unavailable')
     expect(TH.thrownText(refusal)).not.to.include('sk-live-0000')
   })
 

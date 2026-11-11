@@ -18,6 +18,10 @@ export const boxscope   = { ...vaultScope, boxlabel: 'openai' }
 export const vaultQuery = { ...vaultScope, vault_tok: 'life1' }
 /** The query for the box the records stand in, in the life `life1`. */
 export const boxQuery   = { ...boxscope, vault_tok: 'life1' }
+/** The `listVaults` ask of the bank the records stand in. */
+export const vaultListAsk = { op: 'list' as const, ...bankScope }
+/** The `listBoxes` ask of the vault the records stand in, in the life `life1`. */
+export const boxListAsk   = { op: 'list' as const, ...vaultQuery }
 /** The moment every record was registered and written at. */
 export const Now = Date.UTC(2026, 9, 15)
 

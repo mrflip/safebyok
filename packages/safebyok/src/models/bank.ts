@@ -448,8 +448,8 @@ const DefaultHandlers: Handlers = { onLifecycle: guardOnLifecycle(DefaultOnLifec
 // == [Helpers]: millisOf, checkSecureContext, probeStepOf
 
 /** A storage verb's answer with no wrapped key or ciphertext left in it, and when it came back. */
-function probeStepOf({ act, req_params, val, world }: GoodAnswer<Box | null, string, unknown>): VX.ProbeStep {
-  return { ok: true, act, req_params, val: SX.boxSparse.parse(val?.sparse), world: SX.vaultSparse.parse(world), timestamp: nowMillis() }
+function probeStepOf({ act, ask, val, world }: GoodAnswer<Box | null, string, unknown>): VX.ProbeStep {
+  return { ok: true, act, ask, val: SX.boxSparse.parse(val?.sparse), world: SX.vaultSparse.parse(world), timestamp: nowMillis() }
 }
 
 // A host's Infinity minutes, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.

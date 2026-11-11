@@ -14,7 +14,7 @@ function deploy(opts?: FakeDeploymentOpts) {
 
 const vault = TH.vaultAt()
 const putVaultArgs = TH.putVaultArgs(vault)
-const vaultAsked = { scope: TH.vaultScope }
+const vaultAsked = TH.getVaultArgs()
 const watchRowsArgs = { scope: TH.bankScope }
 
 /** Send a mutation from a client signed in as no one, which the host refuses as `identity_revoked`. */

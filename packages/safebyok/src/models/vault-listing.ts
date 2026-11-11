@@ -192,7 +192,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // A bank's listing has its scope for a world, no row, so it has nothing for the bank to receive.
   protected async doTryList() {
-    const answer = await this.vaultDB.tryListVaults(this.world.scope)
+    const answer = await this.vaultDB.tryListVaults({ op: 'list', ...this.world.scope })
     return answer.ok ? { ...answer, world: null, val: { listed: answer.val.vaults, damaged_rows: answer.val.damaged_rows } } : answer
   }
 
@@ -204,7 +204,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   protected doTryPut(record: VaultRecord, { expected, ifAbsent, ifPresent }: ListingPutOpts<VaultSparse>) {
-    return this.vaultDB.tryPutVault({ op: 'put', ...vaultScope.parse(record), ifAbsent, ifPresent, expected, record })
+    const { applabel, user_id, vaultlabel } = record
+    return this.vaultDB.tryPutVault({ op: 'put', applabel, user_id, vaultlabel, ifAbsent, ifPresent, expected, record })
   }
 
   protected tombstoneOver(expected: VaultSparse): DelTombstone<VaultSparse> {
@@ -212,7 +213,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   protected doTryDel(tombstone: DelTombstone<VaultSparse>, { expected }: ListingDelOpts<VaultSparse>) {
-    return this.vaultDB.tryDelVault({ op: 'del', ...vaultScope.parse(tombstone), expected, record: tombstone })
+    const { applabel, user_id, vaultlabel } = tombstone
+    return this.vaultDB.tryDelVault({ op: 'del', applabel, user_id, vaultlabel, expected, record: tombstone })
   }
 
   protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.vaultDB.watch(this.world.scope, onNotice, onBadNews) }

@@ -24,8 +24,10 @@ const boxRow = `fragment SafebyokBoxRowFields on SafebyokBoxRow {
 
 const row = 'fragment SafebyokRowFields on SafebyokRow { ...SafebyokVaultRowFields ...SafebyokBoxRowFields }'
 
-const reqParams = `fragment SafebyokReqParamsFields on SafebyokReqParams {
-  applabel user_id vaultlabel boxlabel vault_tok box_tok revision_tok revision_seq expected { revision_tok revision_seq }
+const ask = `fragment SafebyokAskFields on SafebyokAsk {
+  op applabel user_id vaultlabel boxlabel vault_tok ifAbsent ifPresent gateVerb
+  expected { revision_tok revision_seq am vault_tok box_tok }
+  record { revision_tok revision_seq am vault_tok box_tok }
 }`
 
 const err = 'fragment SafebyokErrFields on SafebyokErr { refusalkind message meta }'
@@ -35,7 +37,7 @@ const vaultAnswer = `fragment SafebyokVaultAnswerFields on SafebyokVaultAnswer {
   val { ...SafebyokVaultRowFields }
   world { ...SafebyokVaultRowFields }
   dbhas { ...SafebyokVaultRowFields }
-  req_params { ...SafebyokReqParamsFields }
+  ask { ...SafebyokAskFields }
   err { ...SafebyokErrFields }
 }`
 
@@ -44,13 +46,13 @@ const boxAnswer = `fragment SafebyokBoxAnswerFields on SafebyokBoxAnswer {
   val { ...SafebyokBoxRowFields }
   world { ...SafebyokVaultRowFields }
   dbhas { ...SafebyokRowFields }
-  req_params { ...SafebyokReqParamsFields }
+  ask { ...SafebyokAskFields }
   err { ...SafebyokErrFields }
 }`
 
 // The fragments each group of operations uses, nested ones included.
-const vaultAnswerFragments = [vaultAnswer, vaultRow, gate, ciphered, reqParams, err].join('\n')
-const boxAnswerFragments = [boxAnswer, row, boxRow, vaultRow, gate, ciphered, reqParams, err].join('\n')
+const vaultAnswerFragments = [vaultAnswer, vaultRow, gate, ciphered, ask, err].join('\n')
+const boxAnswerFragments = [boxAnswer, row, boxRow, vaultRow, gate, ciphered, ask, err].join('\n')
 
 /** The GraphQL documents a client sends to `safebyok-graphql/server`: one per vaultDB verb, and one for the watch subscription. */
 export const VaultOperations = {
@@ -59,11 +61,11 @@ export const VaultOperations = {
     ok act
     val { vaults { ...SafebyokVaultRowFields } damaged_rows }
     world { applabel user_id }
-    req_params { ...SafebyokReqParamsFields }
+    ask { ...SafebyokAskFields }
     err { ...SafebyokErrFields }
   }
 }
-${[vaultRow, gate, ciphered, reqParams, err].join('\n')}`,
+${[vaultRow, gate, ciphered, ask, err].join('\n')}`,
 
   getVault: `query SafebyokGetVault($ask: SafebyokVaultGetAskInput!) {
   safebyokGetVault(ask: $ask) { ...SafebyokVaultAnswerFields }
@@ -76,11 +78,11 @@ ${vaultAnswerFragments}`,
     val { boxes { ${boxSparseFields} } damaged_rows }
     world { ...SafebyokVaultRowFields }
     dbhas { ...SafebyokVaultRowFields }
-    req_params { ...SafebyokReqParamsFields }
+    ask { ...SafebyokAskFields }
     err { ...SafebyokErrFields }
   }
 }
-${[vaultRow, gate, ciphered, reqParams, err].join('\n')}`,
+${[vaultRow, gate, ciphered, ask, err].join('\n')}`,
 
   getBox: `query SafebyokGetBox($ask: SafebyokBoxGetAskInput!) {
   safebyokGetBox(ask: $ask) { ...SafebyokBoxAnswerFields }
@@ -127,11 +129,11 @@ ${vaultAnswerFragments}`,
     ok act
     val { totalCount }
     world { applabel user_id }
-    req_params { ...SafebyokReqParamsFields }
+    ask { ...SafebyokAskFields }
     err { ...SafebyokErrFields }
   }
 }
-${[reqParams, err].join('\n')}`,
+${[ask, err].join('\n')}`,
 
   watch: `subscription SafebyokWatch($applabel: String!, $user_id: String!, $vaultlabel: String) {
   safebyokWatch(applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel) {

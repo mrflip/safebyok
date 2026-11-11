@@ -1,8 +1,8 @@
 import { IdbVaultDB } from 'safebyok-indexeddb'
 import { storageUnavailable } from 'safebyok/storage'
 import type {
-  BankScope, BoxClassified, BoxDelAsk, BoxesFetched, BoxGetAsk, BoxPutAsk, RowOfVault, Tidied,
-  VaultClassified, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultQuery,
+  BankScope, BoxDelAsk, BoxesStored, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxStored, Tidied,
+  VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultsStored, VaultStored,
 } from 'safebyok/storage'
 
 /** The message of every refusal while the outage switch is off. */
@@ -40,42 +40,42 @@ export class OutageVaultDB extends IdbVaultDB {
 
   // == [The generic calls, refused while offline]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone
 
-  protected override async doListVaults(scope: BankScope): Promise<RowOfVault[]> {
+  protected override async doListVaults(ask: VaultListAsk): Promise<VaultsStored> {
     this.#demandOnline()
-    return await super.doListVaults(scope)
+    return await super.doListVaults(ask)
   }
 
-  protected override async doGetVault(ask: VaultGetAsk): Promise<VaultClassified> {
+  protected override async doGetVault(ask: VaultGetAsk): Promise<VaultStored> {
     this.#demandOnline()
     return await super.doGetVault(ask)
   }
 
-  protected override async doListBoxes(asked: VaultQuery): Promise<BoxesFetched> {
+  protected override async doListBoxes(ask: BoxListAsk): Promise<BoxesStored> {
     this.#demandOnline()
-    return await super.doListBoxes(asked)
+    return await super.doListBoxes(ask)
   }
 
-  protected override async doGetBox(ask: BoxGetAsk): Promise<BoxClassified> {
+  protected override async doGetBox(ask: BoxGetAsk): Promise<BoxStored> {
     this.#demandOnline()
     return await super.doGetBox(ask)
   }
 
-  protected override async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
+  protected override async doPutVault(ask: VaultPutAsk): Promise<VaultStored> {
     this.#demandOnline()
     return await super.doPutVault(ask)
   }
 
-  protected override async doPutBox(ask: BoxPutAsk): Promise<BoxClassified> {
+  protected override async doPutBox(ask: BoxPutAsk): Promise<BoxStored> {
     this.#demandOnline()
     return await super.doPutBox(ask)
   }
 
-  protected override async doDelVault(ask: VaultDelAsk): Promise<VaultClassified> {
+  protected override async doDelVault(ask: VaultDelAsk): Promise<VaultStored> {
     this.#demandOnline()
     return await super.doDelVault(ask)
   }
 
-  protected override async doDelBox(ask: BoxDelAsk): Promise<BoxClassified> {
+  protected override async doDelBox(ask: BoxDelAsk): Promise<BoxStored> {
     this.#demandOnline()
     return await super.doDelBox(ask)
   }
