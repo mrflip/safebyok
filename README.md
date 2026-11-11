@@ -1,17 +1,18 @@
 # safebyok
 
-Keep user data encrypted at rest, only accessible on the user's device. Bring Your Own Key (BYOK)
-Browser Vault uses E2EE (End-to-end Encryption) and pluggable remote storage to ensure secrets are
-decrypted where the app runs, using keys that never leave the device. The backend only ever has
-ciphertext: unrecoverable even with a copy of the database, the application, and its environments.
+A Bring Your Own Key (BYOK) browser vault: end-to-end encrypted storage for API keys and other
+small secrets a user brings to a browser app. Secrets are decrypted only where the app runs, under
+keys that never leave the device, and synchronized through remote storage the app plugs in. The
+backend only ever has ciphertext, which cannot be decrypted even with a copy of the database, the
+application, and its environments.
 
 This repository is a pnpm workspace. Its packages:
 
 * [`safebyok`](packages/safebyok) -- the vault itself.
 * [`safebyok-react`](packages/safebyok-react) -- the React binding: a provider, snapshot hooks,
-  and a guard that asks for the passphrase on demand.
+  and the dialogs that ask the user for a passphrase or passkey when one is needed.
 * [`safebyok-convex`](packages/safebyok-convex) -- Convex storage: a Convex component, and the
-  `VaultDB` adapter that speaks to it.
+  `VaultDB` adapter that calls it.
 * [`safebyok-postgres`](packages/safebyok-postgres) -- Postgres storage: the tables, and the
   server-side `VaultDB` over them, through the driver your app already has.
 * [`safebyok-graphql`](packages/safebyok-graphql) -- GraphQL storage: the schema and resolvers
@@ -19,8 +20,8 @@ This repository is a pnpm workspace. Its packages:
   Client that calls them from the browser.
 * [`safebyok-fastkey`](packages/safebyok-fastkey) -- Argon2id through WebAssembly: a
   key deriver several times faster than the core's, deriving the same bytes under the same specs.
-* [`safebyok-indexeddb`](packages/safebyok-indexeddb) -- IndexedDB storage: a vault kept in this
-  browser, every verb one transaction, and the template for a key-value backend of your own.
+* [`safebyok-indexeddb`](packages/safebyok-indexeddb) -- IndexedDB storage: a vault stored in this
+  browser, each call in one transaction, and a template for a key-value backend of your own.
 * [`safebyok-demo-react`](demos/safebyok-demo-react) -- a playground app; never published.
 * [`safebyok-e2e`](e2e) -- the tests that pair an adapter with a framework's client; never published.
 

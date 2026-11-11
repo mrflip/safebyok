@@ -10,13 +10,12 @@ pnpm justify                 # from demos/safebyok-demo-react: lint, typecheck, 
 
 ## Encrypted for real
 
-Whispers are encrypted on this device before anything reaches storage. The page takes the
-browser's batteries, `browserOpts` from `safebyok/browser`: Argon2id to derive, zxcvbn to judge
-a new passphrase, and the device's leases in this browser's IndexedDB. The vault's rows live in
-IndexedDB too, in a database of their own (through `safebyok-indexeddb`), standing in for the
-ciphertext a backend would have. Only the fake auth's scaffolding rows sit in localStorage; the
-`device_id` each user's bank is made with is kept beside the leases, as the provider asks the
-deviceDB for it.
+Whispers are encrypted on this device before anything reaches storage. The page uses the
+browser defaults, `browserOpts` from `safebyok/browser`: Argon2id to derive keys, zxcvbn to check a
+new passphrase's strength, and the device's leases in this browser's IndexedDB. The vault's rows
+are in IndexedDB too, in their own database (through `safebyok-indexeddb`), which stands in for a
+backend. Only the fake sign-in's rows are in localStorage. The `device_id` each user's bank is made
+with is kept with the leases, because the provider gets it from the deviceDB.
 
 ## The pages
 
@@ -33,24 +32,25 @@ confirmation), then the account. Under it,
 with *Change passphrase*, and a fingerprint button to add or remove a passkey. A dialog the user
 cancels changes nothing, and the page says nothing of it.
 
-On the labs page the flows sit side by side, each keeping a key of its own in its own box, so the
-ways compare side by side, and each knocking with its own key through [src/lib/anthropic.ts](src/lib/anthropic.ts):
+On the labs page the three flows sit side by side, for comparison. Each keeps its own key in its
+own box, and knocks with that key through [src/lib/anthropic.ts](src/lib/anthropic.ts):
 
 * **Widget form** ([src/components/KnockKnockWidget.tsx](src/components/KnockKnockWidget.tsx)):
-  the key is never exposed. An uncontrolled `WhisperField` takes it, *Save* is `vault.putBox`
-  (building and unlocking the vault as needed) and clears the field, and only a knock reads it
-  back, with `box.extractWhisper`.
+  the key is never exposed. The user types it into an uncontrolled `WhisperField`. *Save* calls
+  `vault.putBox`, building and unlocking the vault as needed, and clears the field. Only a knock
+  gets the key back, with `box.extractWhisper`.
 * **Toolkit form** ([src/components/KnockKnockToolkit.tsx](src/components/KnockKnockToolkit.tsx)):
-  an ordinary controlled field over `useWhisper(box)`; typing is `box.patchWhisper`, *Save* is
-  `box.putExposed`, and leaving the page is `box.unexpose`.
+  an ordinary controlled field over `useWhisper(box)`. Typing calls `box.patchWhisper`, *Save*
+  calls `box.putExposed`, and leaving the page calls `box.unexpose`.
 * **DOM form** ([src/components/KnockKnockDom.tsx](src/components/KnockKnockDom.tsx)):
-  the key sits in a field that `safebyok/dom` fills and saves, so it never passes through React.
-  *Add key* builds and unlocks the vault as needed and shows the field; *Save* puts it; *Done*
-  hides it again.
+  the key is in a field that `safebyok/dom` fills and puts, so it never passes through React.
+  *Add key* builds and unlocks the vault as needed and shows the field, *Save* puts the key, and
+  *Done* hides the field again.
 
 The labs page's aside, *Behind the scenes*, is for developers: its *Backend online* switch
 ([src/lib/outage-vault-db.ts](src/lib/outage-vault-db.ts)) takes the vaultDB offline, so every
-verb refuses as an unreachable backend does. The landing page is what is left without it.
+vaultDB call refuses as it would with an unreachable backend. The landing page is the app without
+this aside.
 
 ## Where the layers live
 
@@ -62,7 +62,7 @@ verb refuses as an unreachable backend does. The landing page is what is left wi
 | developer tools | [src/lib/outage-vault-db.ts](src/lib/outage-vault-db.ts), [src/components/OutageSwitch.tsx](src/components/OutageSwitch.tsx) |
 | the app itself | [src/components/](src/components/), [src/lib/anthropic.ts](src/lib/anthropic.ts) |
 
-Tests live in `tests/`, mirroring `src/`. The machinery's (auth scaffold, the Anthropic request
-shape via an injected fetch) run under node; each
-component's renders it under jsdom, inside a BankProvider over databases in memory, and works it as
-a user would (`tests/test-helpers.tsx`). The vault and provider are tested in their own packages.
+Tests live in `tests/`, mirroring `src/`. Tests of the scaffolding (the fake sign-in, and the
+shape of the Anthropic request through an injected fetch) run under Node. Each component's test
+renders it under jsdom, inside a `BankProvider` over in-memory databases, and drives it as a user
+would (`tests/test-helpers.tsx`). The vault and provider are tested in their own packages.
