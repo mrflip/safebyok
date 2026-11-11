@@ -90,7 +90,7 @@ Copied from `unrace-progress.md` at the sprint's end. The names are as they were
 * A tombstone or sparse record that lands during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).
 * When a `del_vault`'s `lock()` has its forget refused and there is no `onPanic`, the vault is vacated during the delete, and `listing.del` still lands (thread 11).
 * A tombstone or discard that lands between the gate verb and the lease concludes the gating as failed, although the row moved (thread 11's review).
-* A gate verb refused with `vault_gone` or `vault_mismatch` delivers nothing, so the Vault still reports present until its next fetch, box answer or notice (thread 11's review).
+* A gate verb refused with `vault_gone` or `vault_reborn` delivers nothing, so the Vault still reports present until its next fetch, box answer or notice (thread 11's review).
 * When two `hello`s cross, the last one answered sets the stage (thread 12).
 * A record changed between `getBank` and the watch's start isn't seen until the next fetch (thread 12).
 * A listed live vault whose row is void in `getBank` stays listed until its next fetch (thread 12).

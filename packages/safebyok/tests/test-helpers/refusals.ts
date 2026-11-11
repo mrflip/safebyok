@@ -90,7 +90,7 @@ const isOutcome = (settled: unknown): settled is Outcome<unknown> => (
  * @param refusalkind - The refusal's expected `refusalkind`; left out, any VaultError passes.
  * @returns The refusal, for a closer look at its message, cause or meta.
  *
- * @example await TH.expectBad(vaultDB.tryPutBox(scope, TH.noBoxYet, box), 'vault_mismatch')
+ * @example await TH.expectBad(vaultDB.tryPutBox(scope, TH.noBoxYet, box), 'vault_reborn')
  */
 export const expectBad = async (operation: Outcome<unknown> | Promise<Outcome<unknown>>, refusalkind?: Refusalkind): Promise<VaultError> => {
   const outcome = await operation

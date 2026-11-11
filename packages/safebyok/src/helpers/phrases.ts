@@ -371,7 +371,7 @@ export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed: c
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed: check your package and build settings."
 // --
 
-// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultMismatch, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, GateEpochNotNext, OtherWayinMoved, boxTooLarge, VaultFull, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVault, deviceDBFailed, thrownNamed
+// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultReborn, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, GateEpochNotNext, OtherWayinMoved, boxTooLarge, VaultFull, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVault, deviceDBFailed, thrownNamed
 
 /** A well-formed row out of storage, whose own `fieldnames` are not the address it was asked for at. */
 export const rowOfOtherAddress = (fieldnames: readonly string[]): string => `The vault's storage answered with a row naming another ${fieldnames.join(' and ')} than the one asked for: the database or its storage adapter has filed it under the wrong address.`
@@ -380,7 +380,7 @@ export const rowOfOtherAddress = (fieldnames: readonly string[]): string => `The
 export const VaultEmpty = "Nothing is stored for this life of the vault: read the vault again by its scope."
 
 /** A live vault stored under another vault_tok than the call names. */
-export const VaultMismatch = "A live vault stands here under another vault_tok, so nothing was read or written: read the vault again by its scope."
+export const VaultReborn = "A live vault stands here under another vault_tok, so nothing was read or written: read the vault again by its scope."
 
 /** A vault deleted, its tombstone stored. */
 export const VaultGone = "This vault was deleted."

@@ -650,7 +650,7 @@ override.
 
 ```ts
 protected isRefusalOfRow({ refusalkind }) { return (refusalkind === 'stale_write') || (refusalkind === 'camped') }
-// VaultListing adds 'vault_gone' and 'vault_mismatch'; BoxListing adds 'absent_box'
+// VaultListing adds 'vault_gone' and 'vault_reborn'; BoxListing adds 'absent_box'
 ```
 
 **Gallant:** `isOwnRow` already answers exactly that question, about the row itself.

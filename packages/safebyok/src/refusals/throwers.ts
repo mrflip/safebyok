@@ -88,8 +88,8 @@ export const unlockFirst = (): VaultError => new VaultError('vault_locked', Phra
 
 // == [Vault Listing Throwers]: delOfOtherLife, vaultStoredDamaged
 
-/** A `vault_mismatch` refusal: a delete named a different life of the vault than the life in its slot. */
-export const delOfOtherLife = (): VaultError => new VaultError('vault_mismatch', Phrases.DelOfOtherLife)
+/** A `vault_reborn` refusal: a delete named a different life of the vault than the life in its slot. */
+export const delOfOtherLife = (): VaultError => new VaultError('vault_reborn', Phrases.DelOfOtherLife)
 
 /** A `damaged_row` refusal: this vault is stored damaged and cannot be read. */
 export const vaultStoredDamaged = ({ vaultlabel }: SX.DamagedVault): VaultError => new VaultError('damaged_row', Phrases.vaultStoredDamaged(vaultlabel))
@@ -247,7 +247,7 @@ export const unknownKeyDeriver = (): VaultError => new VaultError('newer_format'
 export const strengthCheckerLoadFailed = (cause: unknown): VaultError => new VaultError('unexpected_error', Phrases.StrengthCheckerLoadFailed, { cause })
 // --
 
-// == [VaultDB Throwers]: vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, storageFull, seqNotNext
+// == [VaultDB Throwers]: vaultEmpty, vaultReborn, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, storageFull, seqNotNext
 
 /* The refusals of a vaultDB, each read the same in an answer and an error: `meta` has the `world` and `dbhas` the answer carries. */
 
@@ -256,9 +256,9 @@ export const vaultEmpty = (world: SX.VaultRow): VaultError => (
   new VaultError('vault_empty', Phrases.VaultEmpty, { rows: { world, dbhas: null } })
 )
 
-/** A `vault_mismatch` refusal: a live vault stands here under another vault_tok. */
-export const vaultMismatch = (stored: SX.VaultRow): VaultError => (
-  new VaultError('vault_mismatch', Phrases.VaultMismatch, { rows: { world: null, dbhas: stored } })
+/** A `vault_reborn` refusal: a live vault stands here under another vault_tok. */
+export const vaultReborn = (stored: SX.VaultRow): VaultError => (
+  new VaultError('vault_reborn', Phrases.VaultReborn, { rows: { world: null, dbhas: stored } })
 )
 
 /** A `vault_gone` refusal: this vault was deleted. */

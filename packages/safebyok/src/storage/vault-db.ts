@@ -545,7 +545,7 @@ const listedRowOf = <RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknow
 const liveVaultOf = (raw: unknown, asked: VaultQuery): VaultRecord => {
   const found = foundVaultRowOf(raw, asked)
   if (found === null) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(asked, asked.vault_tok)) }
-  if ((found.am === 'a') && (found.vault_tok !== asked.vault_tok)) { throw Refuse.vaultMismatch(found) }
+  if ((found.am === 'a') && (found.vault_tok !== asked.vault_tok)) { throw Refuse.vaultReborn(found) }
   if (found.vault_tok !== asked.vault_tok) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(asked, asked.vault_tok)) }
   if (found.am === 'x') { throw Refuse.vaultGone(found) }
   return found
