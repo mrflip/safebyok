@@ -117,7 +117,7 @@ box.put(patch, opts)                                 vault.putBox comes here, th
 
 Nothing is kept between `#edit` and the put: storage refuses a record built on a revision that has since
 changed. So a refused put leaves nothing behind, like a refused birth's put, and a snapshot shows a change
-only once it has landed. A sparse box given a patch with both halves needs no fetch, because the put's
+only once it has been written. A sparse box given a patch with both halves needs no fetch, because the put's
 revision check catches a stale record.
 
 Only a box has `put`. A vault has none, because the only part of its record that changes is its gate, which has its
@@ -144,7 +144,7 @@ own verbs (*Changing the gate*). The patch hooks belong to `Box`.
   forgets the row. It reports failures loudly: a refused scan is bad news, and a lock whose forget is refused panics
 * The device caches only leases and the device record, not vault or box records, and no refresh timer runs
 * The goal: when lock is called, nothing crosses it. We get there with simple code that can be analyzed in context, so a
-  crossing is raised in one sentence (`whiteboard/20261102-newdesign/reference-timings.md`), not fine-tuned
+  crossing is stated in one sentence (`whiteboard/20261102-newdesign/reference-timings.md`), not fine-tuned
 * A box birth: when no box is listed, `vault.putBox` lists a void box (`boxListing.puttable`). That box's `box.put` makes
   the record with the sentinel as its prior, seals it and puts it (`born` or `reborn`), and the answer is delivered. A
   `box.put` of only a sidecar unseals and reseals, because the box stamp binds the sidecar
@@ -191,12 +191,12 @@ already locked, so that `lock()` changed no state.
 
 **A `lock()` after the attach** is an ordinary lock of an unlocked vault: it vacates the lease, which removes
 it from the cache. This requires the new deviceDB to apply calls in the order they were made, so
-that the vacate lands after the put. The put is awaited before `align`, because a listener may call
+that the vacate is written after the put. The put is awaited before `align`, because a listener may call
 `lock()`. So the attach needs no compare, and no second vacate.
 
 **A `lock()` that crosses a gate change** does not stay in effect, as with an unlock: the proof shows that this
 user may have the vault unlocked. Each of the three gate changes ends in `#unlockByProof`, which gives the vault a
-lease for a full term under the epoch that landed.
+lease for a full term under the epoch that was written.
 
 **`sweep`, `vacate` and `delete`** leave a one-way state: every guard refuses from then on, so
 anything worth guarding stops working. A swept or vacated object is also delisted. A deleted vault stays listed,
@@ -229,7 +229,7 @@ this needs no counter; a vacate marks itself done before its forget.
 
 **A `lock()` and the dialog.** A lock leaves an open gating open: the lock says the vault is locked, and
 the user can still answer the dialog. If the gating was asking for an unlock, it still unlocks, and if it was
-asking for a change of the gate, the change lands and unlocks. A valid request goes through if it was authorized at
+asking for a change of the gate, the change is written and unlocks. A valid request goes through if it was authorized at
 the start of its critical section.
 
 **A `dismiss()` and the dialog.** The package cannot close a host's dialog, so a gating says when to close it:
@@ -360,7 +360,7 @@ each gate change's act, past its provings
 └─ vault.#unlockByProof(proved, stored.gate.gate_epoch)    a fresh lease of full term; a lock() crossing the change does not stay in effect
 ```
 
-* **The lease comes after the put**, so its `gate_epoch` is the one that landed, and a refused put
+* **The lease comes after the put**, so its `gate_epoch` is the one that was written, and a refused put
   has nothing to clean up. The old lease stays in force in between, so the vault does
   not report locked. That is safe, because the vaultKey did not change. A crash between the two leaves a cached
   lease under the old epoch, which `Lease.buildFromCache` forgets, so the next session asks for a passphrase: a normal state.
@@ -368,14 +368,14 @@ each gate change's act, past its provings
   proves against `ante`'s gate. The next record is minted from `ante`, not the live vault, so `ante`'s revision is the put's prior.
   Anything the watch delivers during the attempt therefore makes the put refuse: a passkey revoked elsewhere is not brought
   back, and a passphrase replaced elsewhere is not overwritten.
-* **A write landing after the timeliness request.** The put refuses with 'stale_write'. The gating concludes with
+* **A write made after the timeliness request.** The put refuses with 'stale_write'. The gating concludes with
   that refusal, and the vault has by then taken in the stored record. Nothing retries; a host may call
   the verb again.
 * **A gate change locks no device.** Another device's session keeps its lease until its own lock or next `bank.autolock`; its
   cached lease, of the older `gate_epoch`, is forgotten at its next session (Decided).
 * **The vaultDB checks what it can see, and no more.** It refuses a record whose `registered_at` moved, whose `gate_epoch`
   is not one up, or that moves the other wayin (`gate_issue`), and an `addPasskey` over a passkey already stored (`camped`).
-  It cannot tell whether a wrap opens, so a bad `vault_key_wayin_wrapped` still lands.
+  It cannot tell whether a wrap opens, so a bad `vault_key_wayin_wrapped` is still written.
 
 ### `replace_passphrase`
 
@@ -470,7 +470,7 @@ gating.attempt({ passphraseClear })                  no lock check: a lock does 
                └─ boxListing.vacate()                boxes disabled and delisted, nothing deleted; the vault stays in its slot, tombstoned
 ```
 
-The lock comes first because it is synchronous and safe: from then on no box can be opened under a lease while
+The lock comes first because it is synchronous and safe: from then on no box can be unsealed under a lease while
 the tombstone is sent. Locked is also a normal state, so a refused delete leaves a Vault that reports locked and
 nothing half done. The cost is one passphrase entry, because the lock's vacate forgets the cached lease. The box listing's vacate
 comes last, because it cannot be undone. The proof unlocks nothing here, because no lease follows it. The delete is made over the
@@ -479,7 +479,7 @@ Vault.
 
 The vaultDB owns the cascade: removing a vault tombstones its box rows by scope and `vault_tok`, so no
 client has to walk them. The `vault_tok` keeps a late or repeated cascade away from a rebirth's boxes, which have the
-same scope but a different token. The tombstone and the cascade share a transaction in every adapter we implement. What a repeated delete does:
+same scope but a different token. The tombstone and the cascade share a transaction in every adapter we implement. A repeated delete, step by step:
 
 ```text
 vaultDB.delVault(tombstone, { prior })
@@ -500,12 +500,12 @@ A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or
 ## Required of the parts not yet drawn
 
 * Storage's conditional put is atomic on `revision_tok`.
-* The deviceDB's calls land in the order they were made (*The lease*).
+* The deviceDB's calls take effect in the order they were made (*The lease*).
 * `lock()` removes the cached lease even on a vault already reporting locked.
 * The deviceDB has `cache`, `peek` and `vacate`, by scope and `vault_tok`: `vacate` and `del_vault` both need a removal.
 * Every put validates `prior.revision_tok` and `prior.revision_seq` against the row, and that the record's `revision_seq`
   is `prior.revision_seq` plus one. A birth where no row is stored sends `VS.NeverStored`, which has a known `revision_tok` and a
-  `revision_seq` of -1. The sentinel is a value and not a null, so the invariant holds for it too.
+  `revision_seq` of -1. The sentinel is a value and not a null, so the invariant applies to it too.
 * The deviceDB also has `leasesProvedBefore(cutoff)`, an index range scan over its cached leases, for `bank.autolock`.
 * `adopt` ignores a record older by `revision_seq`.
 * `Promptly`, a constant: the timeliness an attempt asks of `ensureTimely`. `maxMillis: 0` is the customer's to ask, as an

@@ -7,9 +7,9 @@ React bindings for the safebyok vault: a provider, hooks, and dialogs. A full gu
 If you hand a whisper to an `<input>` through React's `value` prop, React also writes it into the input's `value`
 attribute, so that part of the whisper shows in `outerHTML` and in anything that serializes the page.
 
-`BoxWhisperField` keeps the whisper out of React's hands. It fills the field in directly rather than through `value`,
-and gives the field no `name`, so a form submitted the ordinary way sends nothing. It stays blank and read-only while
-the whisper won't show. When the last field referencing part of the whisper unmounts(\*), the box unexposes.
+`BoxWhisperField` keeps the whisper out of React's props and state. It fills the field in directly rather than
+through `value`, and gives the field no `name`, so a form submitted the ordinary way sends nothing. It stays blank and
+read-only while the whisper is hidden. When the last field referencing part of the whisper unmounts(\*), the box unexposes.
 
 For a plain `<input>`, `BoxFields.of(box).bind('apiKey')` from `safebyok/dom` does the same: pass what it returns as
 the input's `ref`.
@@ -32,10 +32,11 @@ function ApiKeyField({ box }) {
 ```
 
 The whisper reaches no prop or state of yours, so it is only in the page (and on the screen), where React's dev tools
-do not list it. The field goes blank at a lock or a veil, and an edit comes back with the value. Nothing is stored
-until `fields.put()`. Both buttons refuse while the vault is locked, so `showOutcome` and `showRefusal`, yours to
-write, say so. `BoxFields.of` answers the same instance for a box wherever it is called. Outside React,
-`const letGo = BoxFields.of(box).bind('apiKey')(el)` fills any element with a `value`, and `letGo()` lets it go.
+do not list it. The field goes blank when the vault locks or the box is veiled, and comes back, with any unsaved edit,
+when the whisper shows again. Nothing is stored until `fields.put()`. Both calls fail while the vault is locked, so
+`showOutcome` and `showRefusal`, yours to write, should say so. `BoxFields.of` returns the same instance for a box
+wherever it is called. Outside React, `const letGo = BoxFields.of(box).bind('apiKey')(el)` fills any element that has
+a `value`, and `letGo()` unbinds it.
 
 (\*) When React takes the field off the page or hides it, which can be sooner than you'd expect. In development, React
 also does this once right after the field first appears, so expose the box after its field mounts. The details, with
@@ -43,40 +44,41 @@ React's own documentation, are in [notes/expose_improves_security.md](https://gi
 
 ## Dialogs
 
-`BankProvider` shows its own dialog for each gating the bank has open: the dialog follows `openGating` in the bank's
-snapshot, and closes when the gating concludes, whether by the user's answer, a sweep or a vacate; a lock leaves it up. Its passkey
-button asks the passkey from the user's click on it, so a gating opened from a timer or a fetch shows the dialog all the
-same, and the user's click supplies the gesture the browser needs.
+`BankProvider` shows its own dialog for each gating the bank has open. The dialog follows `openGating` in the bank's
+snapshot, and closes when the gating concludes, whether by the user's answer, a sweep or a vacate. A lock leaves it
+open. Its passkey button asks for the passkey from the user's click on it, so a gating opened from a timer or a fetch
+still shows the dialog, and the user's click supplies the gesture the browser needs.
 
 The dialogs are native `<dialog>` elements with the class `modal`, opened with `showModal()`, so the browser keeps the
-focus inside and leaves the page behind inert; style the dimmed page with `.modal::backdrop`. jsdom has no `showModal` or
+focus inside and makes the page behind inert. Style the dimmed page with `.modal::backdrop`. jsdom has no `showModal` or
 `close`, so a host's tests that show a dialog need a stand-in on `HTMLDialogElement.prototype`.
 
-Pass `requestCleartext` to use a dialog of your own: the provider then renders none. It is called with each gating, and
-as last rendered, so an inline arrow is fine. Pass it from the first render, as whether the host's dialog asks is fixed
-when the bank is made. To show one of this package's modals there, keep the gating until it concludes:
+Pass `requestCleartext` to use a dialog of your own: the provider then renders none. The provider calls the function
+from its latest render with each gating, so an inline arrow is fine. Pass it from the first render, because whether
+your dialog or the provider's asks the user is fixed when the bank is made. To show one of this package's modals from
+your function, keep the gating in state until it concludes:
 `setGating(gating); await gating.whenConcluded; setGating(null)`.
 
 ## Signing out
 
 Call `bank.vacate()` when the user signs out, before you clear their `user_id`: it forgets the bank's cached leases and
 its bank row on this device, so the next person to use it starts fresh. `BankProvider` doesn't vacate when `user_id` turns `null`,
-since auth may blink to `null` while it refreshes a token or reconnects, after a laptop wakes for instance. When a
+because auth may briefly report `null` while it refreshes a token or reconnects, for instance after a laptop wakes. When a
 different user signs in, it vacates the last user's bank itself.
 
-Once a bank is vacated, by your sign-out or by a revoked identity, `useVault` answers `{ stage: 'spent', vault: null,
-cause }` for each of its vaults, `cause` saying why the bank ended, and `useVaultSnapshot` answers null. Show a signed-out
+Once a bank is vacated, by your sign-out or by a revoked identity, `useVault` returns `{ stage: 'spent', vault: null,
+cause }` for each of its vaults, where `cause` says why the bank ended, and `useVaultSnapshot` returns null. Show a signed-out
 state there rather than a spinner: the bank never becomes ready again.
 
 ## Hearing the bank
 
 `BankProvider` takes `Bank.make`'s `onLifecycle` and `onBadNews`, and calls each as last rendered, so an inline arrow
-is fine. `onLifecycle` hears each hello the provider and the hooks make, as a `helloed` event with its outcome, and the
-other events of the bank's life. `onBadNews` hears the refusals no caller waits on, a failed unlock from
-`VaultLockControl` among them. Leave either out for its default, described in the safebyok README.
+is fine. `onLifecycle` receives a `helloed` event, with its outcome, for each hello the provider and the hooks make,
+and the bank's other lifecycle events. `onBadNews` receives the refusals no caller is waiting on, including a failed
+unlock from `VaultLockControl`. Leave either out for its default, described in the safebyok README.
 
 ## React version
 
-safebyok-react needs React 19.2 or later, for `useEffectEvent`. `BoxFields` gives React a `ref` function that returns a cleanup. React 19 runs that
+safebyok-react needs React 19.2 or later, for `useEffectEvent`. `BoxFields`, from `safebyok/dom`, gives React a `ref` function that returns a cleanup. React 19 runs that
 cleanup when the field leaves the page; React 18 ignores it. On React 18 the field is never let go, and the box never
 unexposes.

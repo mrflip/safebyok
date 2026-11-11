@@ -254,7 +254,7 @@ an attempt refused before it starts (while another runs, or after the gating is 
 its gating, whether or not a proving was derived from them. So an answer is single-use, and an answer handed in again is
 refused as `bad_option` because its bytes are all zero (`passkeyAnswer`, `shapes-gateish.ts`). The bytes are left
 un-zeroed in one case only: the attempt ends in a refusal the user can correct (`wrong_passkey` is one) and is not the
-gating's last attempt. That holds even when a key was already derived from them. The host may then hand the answer in
+gating's last attempt. That is so even when a key was already derived from them. The host may then hand the answer in
 again, or zero it, and the gating keeps no reference with which to zero them later. *Caveat:* in that case the zeroing
 is the host's to do; `safebyok-react`'s dialogs do it (`attemptOnce`). The passkeyKey is HKDF-SHA256 of those bytes, with
 the wayin's whole ctx as its `info`, derived non-extractable (`deriveWrappingKey`). The result, the
@@ -418,7 +418,7 @@ the crypto imports.
   ciphers is small (a vaultKey wraps once per box write, wayin and lease grant), far under the
   2^32 guidance for random IVs.
 * *Key separation by usage and purpose.* Wrapping keys carry `wrapKey`/`unwrapKey` only; a boxKey
-  `encrypt`/`decrypt` only; an unwrapped key gets the one usage its call needs, and WebCrypto
+  `encrypt`/`decrypt` only; an unwrapped key gets a single usage, the one its call needs, and WebCrypto
   enforces it. Each kind of field has its own purpose string (`PurposeForWayinkind`,
   `vault_key_lease_wrapped`, `box_key_wrapped`, `whisper_ciphered`), and the passkeyKey's HKDF
   `info` is its wayin's ctx, so the same bytes under another purpose make another key.

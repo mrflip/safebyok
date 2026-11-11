@@ -20,10 +20,10 @@ they conflict with this file.
 ## The tab
 
 It lives in the doc the session already keeps (usually a sprint's), ordered first, so it is the
-tab that opens. With no doc in the session, birth one named for the work. Editing or interacting
-with a doc: load the docs skill and the Docs guides `topic.index`, `topic.tabs`, and (if needed)
-`topic.editing`, before the first write of a session: the surface moves. Reading only: spawn
-`doc-tab-reader`.
+tab that opens. With no doc in the session, birth one named for the work. To edit or interact
+with a doc, load the docs skill and the Docs guides `topic.index`, `topic.tabs`, and (if needed)
+`topic.editing` before the session's first write, because the docs tools change between sessions.
+To read only, spawn `doc-tab-reader`.
 
 * **A lead**, a few lines long, saying what each state does.
 * **The matters table**: `Coach answer | State | Matter`. *Coach Answer* is the Coach's and starts
@@ -46,7 +46,7 @@ every chip over to it.
 
 One decision per row, and one row per decision: never roll a report's leftovers into one row, even
 when they share a Rec. Lead with a bold handle of a few words, then **one to three sentences**: what
-the matter is, why it matters, and what we recommend (**Rec:**). End with where it was raised
+the matter is, why it matters, and what we recommend (**Rec:**). End with where it was asked
 (`(#129)`, `(thread 7)`, `(human/…)`), so its ruling can be carried back. Write in language a little
 less technical than the whiteboard's, so the Coach can answer without hunting through the files
 behind it. A row that waits on the Coach's own action rather than their word (try it on a real
@@ -81,7 +81,7 @@ questions, and say so in the lead.
 * **elevate**: sweep the row into a tab of its own, nested under Open Matters, and add a row to
   *Elevated matters* pointing to it. The tab is for the Coach to hand to an agent in another
   session, to discuss (below).
-* **noted**: treat this as you would **drafting**
+* **noted**: treat this as you would **drafting**.
 
 The chip is the only signal. An answer whose chip still says `drafting` is still drafting.
 
@@ -108,7 +108,7 @@ settled -- to the session that keeps it, rather than writing it themselves.
 2. **Act on every flipped row** in that pass. Investigation goes to subagents, so the code they
    read stays out of the session's context and only their paragraph comes back; independent
    proceed work goes to workers or threads at once, carrying the row's text, not the doc.
-3. **Edit by id, cell by cell.** Make every write from that one read, against the ids it gave:
+3. **Edit by id, cell by cell.** Make every write from that single read, against the ids it gave:
    replace one *Matter* cell's paragraph, one chip's paragraph, or delete one ruled row. Each
    replace or delete of a whole block carries the guards that read printed for it, `ifHash` (its
    `h`) and `ifRev` (the read's rev). If the Coach has changed the block since, the write is
@@ -137,9 +137,9 @@ When a matter is ruled (`proceed`, or an answer in chat), beside acting on it:
 
 * **Resolved**: delete the row, and append a bullet to *Resolved*: the handle, the matter as the
   row put it, the Coach's answer word for word ("(empty: took the Rec)" on an empty `proceed`),
-  the date, where it was raised, and where the work went.
-* **The PR** it was raised on: `gh pr edit` puts `→ *Coach (YYYY-MM-DD):* <the ruling, briefly>`
-  beside the question in its description, the question left in place. A question raised only in
+  the date, where it was asked, and where the work went.
+* **The PR** it was asked on: `gh pr edit` puts `→ *Coach (YYYY-MM-DD):* <the ruling, briefly>`
+  beside the question in its description, and leaves the question in place. A question asked only in
   a file needs no line there: *Resolved* is the record.
 * **At the end** of the sprint or session, a `sonnet` subagent reads *Resolved* once, writes it
   into the resolutions file, newest batch first -- in a sprint, `<sprint_name>-resolutions.md` in

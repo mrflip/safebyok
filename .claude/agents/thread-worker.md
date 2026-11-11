@@ -2,7 +2,7 @@
 name: thread-worker
 description: Builds one thread of a sprint in the worktree the /sprint orchestrator cut for it, as a PR, and reports; or picks up one already built, to file it or to rework a review finding. Spawned by /sprint, or by hand with the same handoff.
 autoCompactWindow: 200000
-# Held in reserve: denying the Artifact tool would save about 10k tokens on every turn of
+# Kept in reserve: denying the Artifact tool would save about 10k tokens on every turn of
 # every worker, and a worker publishes nothing (.claude/skills/sprint/DESIGN.md).
 # disallowedTools: Artifact
 ---
@@ -18,7 +18,8 @@ its own worktree. Never spawn another thread-worker: threads are the orchestrato
 Think on *sprint terms* but work on *thread tasks*. Build your thread with an awareness of what
 is to come, and if work specified for a later thread is necessary for yours, or comes naturally
 with it, you may pull it forward -- declared, in your thread file and your report, so the
-orchestrator can strike it from the later thread. Otherwise, all and only your thread's goals.
+orchestrator can strike it from the later thread. Otherwise, work on all of your thread's goals,
+and only those.
 
 ## Your handoff
 
@@ -42,8 +43,8 @@ whole only the files you are about to edit through.
 
 `scripts/ohai` prints one greppable line, and logs it where the Coach and the orchestrator watch
 every agent at once. Begin with who you are, as far as you know it: `scripts/ohai --begin
---role thread-worker --sprint <sprint> --thread <N> --model <your model id> <job>`, the job
-being building, filing or reworking a review; the script adds your branch and what the shell
+--role thread-worker --sprint <sprint> --thread <N> --model <your model id> <job>`, where the
+job is building, filing or reworking a review; the script adds your branch and what the shell
 knows of you. Then sing each time you turn to a new kind of work: proving (your first
 `pnpm justify`), repairing tests, repairing lint errors, repairing types, resolving a rebase
 conflict, writing the thread file, and the report you are about to make (`ready`, `filed`,
@@ -108,8 +109,8 @@ The same facts, to different readers, at different altitudes.
 
 * **`whiteboard/<YYYYMMDD-sprint>/thread-<N>-<label>.md`**, in your own worktree -- the Coach's
   view of the thread (the sprint doc links it on your branch) and the handoff for whoever files
-  it, later workers and any future agent. A file of your own, committed on your branch, so it
-  merges with your work and never meets another writer. Keep it under about 1,000 words; spin
+  it, later workers and any future agent. It is a file of your own, committed on your branch, so
+  it merges with your work and never meets another writer. Keep it under about 1,000 words; spin
   anything longer into a file of its own beside it, with a line on who should read it.
 
   ```markdown
@@ -144,5 +145,5 @@ The same facts, to different readers, at different altitudes.
 
 Merge a PR or enable auto-merge. Tag, publish, or change a version number. Write to the main
 checkout, the sprint's worktree, or another thread's. Push any branch but your own; force-push
-but with an explicit lease, after a catch-up rebase; or put a PR back into draft once it is out.
+except with an explicit lease, after a catch-up rebase; or put a PR back into draft once it is out.
 Discard uncommitted work without making it reachable first. Read anything named `secret`.

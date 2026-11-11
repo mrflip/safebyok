@@ -1,9 +1,9 @@
 # Process
 
 How work moves from an idea to a merged PR: threads, commits, pull requests, changesets, and what
-may be added to the package. What CI checks is `notes/ci.md`; how a release is made,
-`notes/releasing.md`. CLAUDE.md has the values these serve; STYLE.md has how the
-code itself reads.
+may be added to the package. What CI checks is in `notes/ci.md`, and how a release is made is in
+`notes/releasing.md`. CLAUDE.md has the values these serve, and STYLE.md says how the code itself
+reads.
 
 ## Threads
 
@@ -12,8 +12,8 @@ Work goes in **threads**: one line of work, one branch, one PR. A branch is name
 and progress for a thread that takes more than a sitting go in `whiteboard/YYYYMMDD-<label>/`.
 
 Within a thread you have standing permission to commit, push its branch, and open its PR without
-asking. Commit at natural milestones: a set of related changes, with `pnpm justify` green. Not
-mid-refactor, not on a timer.
+asking. Commit at natural milestones: a set of related changes, with `pnpm justify` green. Do not
+commit mid-refactor or on a timer.
 
 ### A worktree per thread
 
@@ -25,16 +25,17 @@ container's git pushes a branch to its upstream, and a branch tracking `origin/m
 main. A thread built on another's unmerged work is cut from that branch's tip, and its PR says
 "Stacked on #N". Push with
 `git -c credential.helper= -c credential.helper='!gh auth git-credential' push`. Once the PR is
-filed, `git worktree remove ../byok-<label>`; the branch stays for the PR. Once it has merged,
-`/branch-sweep`, run when the Coach asks, has `scripts/git-survey.sh` tag the branch
-`closed/<branch>` and point it at its merged head, and remove the thread's worktree if it was
-left behind clean and idle (`notes/housekeeping.md`): the one place an agent moves a branch or
+filed, run `git worktree remove ../byok-<label>`. The branch stays for the PR. Once the PR has
+merged, `/branch-sweep`, run when the Coach asks, has `scripts/git-survey.sh` tag the branch
+`closed/<branch>` and point it at its merged head, and remove the thread's worktree if it was left
+behind clean and idle (`notes/housekeeping.md`). That is the only place an agent moves a branch or
 removes a worktree that is not its own.
 
 An ordered series of threads issued at once is a **sprint**, run by `/sprint`
 (`.claude/skills/sprint/SKILL.md`) through `thread-worker` and `thread-reviewer` agents.
-Open questions too many for chat go to a doc's **Open Matters** tab, run by `/turbochat`
-(`.claude/skills/turbochat/SKILL.md`): the Coach flips a row's state, and agents act on that.
+When there are too many open questions for chat, they go to a doc's **Open Matters** tab, run by
+`/turbochat` (`.claude/skills/turbochat/SKILL.md`): the Coach flips a row's state, and agents act
+on that.
 A set of open PRs is made one merge line by `/restacker` (`.claude/skills/restacker/SKILL.md`),
 which rebases in a clone of its own, tests once at the tip, and force-pushes only under named leases.
 Doc blocks are brought to STYLE.md's rules by the `documentarian` agent
@@ -44,7 +45,7 @@ Comments, doc blocks and READMEs across a whole target are brought to plain Engl
 
 ## The history we keep
 
-* **History on main is semi-linear.** Every PR lands as one merge commit, and its commits keep
+* **History on main is semi-linear.** Every PR is merged as one merge commit, and its commits keep
   the SHAs they had on the branch, so `git log --first-parent main` reads one line per PR and
   `git revert -m 1 <merge>` backs a PR out whole. Commits stay in straight lines because PRs
   are built as a stack: each branch is cut from the tip of the one below it (*A worktree per
@@ -52,7 +53,7 @@ Comments, doc blocks and READMEs across a whole target are brought to plain Engl
 * **Never merge `main` into a branch**, and never use GitHub's "Update branch" in merge mode:
   rebase. A branch is rebased by hand, before it is queued, when it has fallen behind `main` and
   is not part of a stack; a rebase moves its SHAs, so it is `/restacker`'s work or the thread's own.
-* **Mergify's queue lands each PR** (`.mergify.yml`): it tests the queued PRs together once, on a
+* **Mergify's queue merges each PR** (`.mergify.yml`): it tests the queued PRs together once, on a
   draft PR, then merges each PR at its own head, in the order they were queued. It never rebases
   or updates a branch. The Coach queues a stack by labeling its PRs `queue`, bottom first; an
   agent never adds that label. Once a PR is queued, push to it only to fix what the queue refused.
@@ -60,12 +61,12 @@ Comments, doc blocks and READMEs across a whole target are brought to plain Engl
 * **A PR's page shows the commits between it and its base.** In a stack every PR has base `main`
   (the "Stacked on #N" line carries the order), so it lists the PRs below it until they merge,
   then only its own commits.
-* **Every commit lands in main individually**, so each should pass `pnpm justify`. An
+* **Every commit reaches main individually**, so each should pass `pnpm justify`. An
   intermediate red commit is allowed only when it isolates something, say a large mechanical
   change from the thoughtful repairs after it, and the PR says so.
 * **Force-push only with an explicit lease**: `--force-with-lease=<branch>:<sha you rebased from>`,
-  the branch's tip when you took it, never one fetched since: a lease read off a fresh fetch
-  always matches, so it guards nothing. Never plain `--force`, and never a branch that isn't your
+  the branch's tip when you started from it, never one fetched since. A lease read off a fresh
+  fetch always matches, so it guards nothing. Never plain `--force`, and never a branch that isn't your
   thread's.
 * **Never merge a PR, enable auto-merge, or queue one. The Coach merges.**
 * Before a command that throws work away (`reset --hard`, `restore`, `clean`, `branch -D`), make
@@ -104,7 +105,7 @@ prefix names the part of the package the commit is about, never the kind of chan
 | `rel`     | the Version PR's one commit, made by the release workflow: version bumps, CHANGELOG entries, spent changesets. Never typed by hand       |
 | `tests`   | tests and fixtures, when the tests themselves are the work                                                                             |
 
-Tests and notes that ride along with a change take its prefix
+Tests and notes that come with a change take its prefix.
 
 ## Pull requests
 
@@ -135,11 +136,11 @@ The published packages live in `packages/`: `safebyok`, the core, and its compan
 for what it plugs in. A storage adapter is `safebyok-<store>` (`safebyok-convex`,
 `safebyok-indexeddb`, `safebyok-postgres`, `safebyok-graphql`), a framework binding
 `safebyok-<framework>` (`safebyok-react`), and anything else is named for what it supplies
-(`safebyok-fastkey`, a key deriver). A new one copies an existing package's packaging -- its
-own `eslint.config.mjs` cut from the core's, a README, a changeset -- takes `safebyok` as a peer
-dependency, so a `VaultError` is one class across them, and joins the `fixed` group in
-`.changeset/config.json` (a test refuses a public package left out). `safebyok-indexeddb`'s
-README is written as the template for a storage adapter.
+(`safebyok-fastkey`, a key deriver). A new one copies an existing package's packaging: its own
+`eslint.config.mjs` cut from the core's, a README, and a changeset. It takes `safebyok` as a peer
+dependency, so that `VaultError` is one class across the packages, and it joins the `fixed` group
+in `.changeset/config.json` (a test refuses a public package left out of it).
+`safebyok-indexeddb`'s README is written as the template for a storage adapter.
 
 ## Releases
 
@@ -149,8 +150,8 @@ contributes is a changeset.
 * **A changeset** is a short file in `.changeset/`, written with `pnpm changeset`: which packages
   it bumps, by how much, and a sentence or two for the CHANGELOG. It is named for the thread,
   `.changeset/YYYYMMDD-<label>.md` (a second one on the thread gets `-2`, and so on):
-  `scripts/changeset.ts` runs the changesets CLI and renames what it writes. The CLI asks at a
-  terminal; an agent with none writes it in one line, `pnpm changeset --package safebyok
+  `scripts/changeset.ts` runs the changesets CLI and renames what it writes. The CLI asks its
+  questions at a terminal. An agent without one writes it in one line, `pnpm changeset --package safebyok
   --package safebyok-react --bump minor --message "What a host sees."`. A PR that changes a
   public package carries one, or CI fails it; one that needs no release (tooling, tests, docs)
   carries an empty one, `pnpm changeset --empty`. Agents write changesets: they state intent, not a version.
@@ -185,11 +186,11 @@ offering a **disciplined interface**.
 * **Nothing is installed until it is seven days old.** `pnpm-workspace.yaml` sets
   `minimumReleaseAge: 10080` (minutes) with `minimumReleaseAgeStrict: true`: no version of
   anything, transitive dependencies included, is resolved or installed younger than that, and an
-  install that could only be satisfied by one fails rather than falling back. A lockfile holding
+  install that could only be satisfied by one fails rather than falling back. A lockfile that pins
   such a version fails its frozen install too. A range's floor is therefore the newest release
-  that has aged: raise it as releases mature, not the day they appear. Dependabot's `cooldown`
+  that has aged: move it up as releases age, not the day they appear. Dependabot's `cooldown`
   matches (`.github/dependabot.yml`); security updates ignore it, and then the rule below applies.
-* **A hot release is the one exception, and is pinned more tightly, not less.** When a fix cannot
+* **A hot release is the only exception, and is pinned more tightly, not less.** When a fix cannot
   wait for its seventh day, pin that exact version (no range, no caret), and exempt it in
   `minimumReleaseAgeExclude` by name and exact version (`pkg@1.2.3`; never a bare name, a glob or
   a version list that outlives the need). Never an exclusion for convenience or to get a newer

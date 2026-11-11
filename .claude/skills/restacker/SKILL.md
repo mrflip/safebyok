@@ -1,6 +1,6 @@
 ---
 name: restacker
-description: Restack a set of GitHub PRs into one linear chain so merging the top lands the rest — clean rebases first, tests once at the tip, force-push only with named leases. Use for any restack, never a hand-briefed worker; it rewrites and force-pushes branches.
+description: Restack a set of GitHub PRs into one linear chain so merging the top merges the rest — clean rebases first, tests once at the tip, force-push only with named leases. Use for any restack, never a hand-briefed worker; it rewrites and force-pushes branches.
 argument-hint: "[PR numbers / ignore list / ordering, e.g. '40 45 46, ignore 52, restack 61 first']"
 ---
 
@@ -107,7 +107,7 @@ The run works in a throwaway clone, not a `git worktree`, because
 rerere's cache (`.git/rr-cache`) is shared by every worktree of a repo,
 and so would carry in resolutions the Coach or another session recorded
 (perhaps the ones that sent the Coach here). A clone has a cache of its
-own, empty at the start, which holds only what this run resolves and
+own, empty at the start, which contains only what this run resolves and
 replays it only within this run: the same conflict meeting a rebased
 branch again in §4 is resolved once.
 
@@ -196,7 +196,8 @@ is usually right, but check that what it carried is already in the base
 (`git diff <orig> HEAD -- <its files>`) before trusting it. Rerere's
 replays are this run's own (§2); never run `git rerere` commands against
 `<repo>`'s cache.
-Then `git rebase --abort`, leave the origin branch untouched, and carry
+
+For a hairy conflict, `git rebase --abort`, leave the origin branch untouched, and carry
 on with the rest. Send `restack-conflict-scout` the branch, base, and
 conflicted files; use its findings for the report rather than reading
 both diffs here. A clean merge-tree preview followed by a conflicting
@@ -281,7 +282,7 @@ rm -rf <clone>
 
 The tags name only commits already in `<repo>` (the old tips), so this
 moves refs, not history; if the fetch fails, list the old tip SHAs in
-the report instead. Don't `rm -rf` a clone holding a branch that is not
+the report instead. Don't `rm -rf` a clone that has a branch not yet
 pushed. Keep the tags as the rollback path.
 
 Give `restack-verifier` the intended chain and have it confirm the pushed
