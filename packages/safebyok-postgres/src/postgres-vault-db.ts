@@ -44,10 +44,10 @@ const postgresVaultDBOpts = DB.objCheck(({ custom, fn, int }) => ({
 
 // == [Notices]: vaultChannelOf, channelOf, Told, toldOf
 
-const vaultChannelOfInput = DB.Checker(({ user_id }) => user_id, 'bad_option')
+const vaultChannelOfArgs = DB.Checker(({ user_id }) => user_id, 'bad_option')
 
 /** Return the notification channel for `user_id`'s writes: the channel a `PostgresListen` subscribes to. */
-export const vaultChannelOf = (user_id: string): string => channelOf(vaultChannelOfInput.parse(user_id, { where: 'vaultChannelOf' }))
+export const vaultChannelOf = (user_id: string): string => channelOf(vaultChannelOfArgs.parse(user_id, { where: 'vaultChannelOf' }))
 
 // Postgres identifiers are at most 63 bytes. A user_id whose channel name is longer cannot be notified, so a write that would send a notice for it fails.
 /** The notification channel for `user_id`. */

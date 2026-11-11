@@ -358,7 +358,7 @@ export const DefaultOnBadNews: BadNewsHandler = ({ news, bank }) => {
 
 /** Tell `onBadNews` each of `badnews` that reached `bank`, awaiting none: the handler's throw or rejection reaches only the platform. */
 export const tellBadNewsTo = (onBadNews: BadNewsHandler, bank: Bank, badnews: readonly VaultError[]): void => {
-  VX.tellBadNewsToInput.parse({ onBadNews, bank, badnews })
+  VX.tellBadNewsToArgs.parse({ onBadNews, bank, badnews })
   for (const news of badnews) {
     // Any answer is heard out, a thenable among them: none is awaited.
     void (async () => {

@@ -4,7 +4,7 @@ import { Checker } from './validator'
 import * as UX from '../shapes/shapes-utils'
 import type { MaskOpts } from '../shapes/shapes-utils'
 
-const maskInput = Checker(({ str }) => str, 'bad_option')
+const maskArgs = Checker(({ str }) => str, 'bad_option')
 
 /** The stars-and-dots a masked text collapses to once the result would pass `maxLen`. */
 const Collapsed = '***...***'
@@ -53,7 +53,7 @@ const butcher = (chars: readonly string[], { head, tail, minStars, maxLen }: Rec
  * @example mask('sk-\nant-\tabcd1234')                      // 'sk*********1234': controls and spaces go before it is cut
  */
 export const mask = (text: string, opts?: MaskOpts): string => {
-  const secret = maskInput.parse(text)
+  const secret = maskArgs.parse(text)
   const { head, tail, minStars, maxLen } = UX.maskOpts.parse(opts ?? {})
   if (secret === '') { return '' }
   const plain = plainLine(secret)

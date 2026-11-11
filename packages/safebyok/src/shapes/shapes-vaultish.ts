@@ -482,7 +482,7 @@ export interface BadNews {
 export type BadNewsHandler = (badnews: BadNews) => unknown
 
 /** The check of what `tellBadNewsTo` is handed: a handler, the bank the news reached, and the news. */
-export const tellBadNewsToInput = objCheck(({ fn, custom, arr }) => ({
+export const tellBadNewsToArgs = objCheck(({ fn, custom, arr }) => ({
   onBadNews: fn<BadNewsHandler>(),
   bank:      custom<Bank>((val) => hasModelkind(val, 'bank'), Phrases.BankExpected),
   badnews:   arr(custom<VaultError>(isVaultError, Phrases.VaultErrorExpected)),

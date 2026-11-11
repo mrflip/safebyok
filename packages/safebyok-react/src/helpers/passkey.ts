@@ -63,7 +63,7 @@ export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAn
  *   if (passkeyClear !== null) { await gating.attempt({ passkeyClear }) }
  */
 export const askPasskey = async (passkeyHeader: WayinHeader | null, given: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> => {
-  const { passkeyHeader: header, opts } = PasskeyChecks.askPasskeyInput.parse({ passkeyHeader, opts: given }, { where: "In askPasskey's arguments" })
+  const { passkeyHeader: header, opts } = PasskeyChecks.askPasskeyArgs.parse({ passkeyHeader, opts: given }, { where: "In askPasskey's arguments" })
   demandWebAuthn()
   if (header?.wayinkind !== 'passkey') { throw new VaultError('absent_wayin', Messages.noPasskeyToAsk) }
   const { credential_id } = header

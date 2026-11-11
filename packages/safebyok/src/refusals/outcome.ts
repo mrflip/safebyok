@@ -50,7 +50,7 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
  */
 export const storageRefusalOf = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : storageUnavailable(thrown))
 
-/** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome}.
+/** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome} (use {@link demandGood} if you just want the throw).
  *
  * @example const listed = valOf(await vaultDB.tryGetVault(scope))  // throws the refusal, if any: what vaultDB.getVault(scope) does itself
  */
@@ -59,7 +59,7 @@ export const valOf = <ValT>(outcome: Outcome<ValT>): ValT => {
   return outcome.val
 }
 
-/** `outcome` itself when it is good, or its `err` thrown. */
+/** `outcome` itself when it is good, or its `err` thrown (use {@link valOf} to extract the value). */
 export const demandGood = <OutcomeT extends Outcome<unknown>>(outcome: OutcomeT): Extract<OutcomeT, { ok: true }> => {
   if (! outcome.ok) { throw outcome.err }
   return outcome as Extract<OutcomeT, { ok: true }>  // narrowed by the ok just tested
