@@ -26,6 +26,8 @@ const buttonFor = (gating: Gating<'unlock_vault'>, extra: { takesFocus?: boolean
   return { ...TH.renderReporting(ui), ui, gripes }
 }
 
+// The passkey's word shows before its transition settles. A fireEvent in that gap renders inside a synchronous act,
+// which drops a render that suspends, and the dialog never leaves Unlocking…: a test waits for asking() to be 'false'.
 /** Return the button's aria-disabled value. It is 'true' while the browser is asking for the passkey. */
 const asking = () => screen.getByText(Messages.passkeyButton).getAttribute('aria-disabled')
 
@@ -91,6 +93,7 @@ describe("PasskeyUnlockButton", () => {
     authenticator.refuseNext('UnknownError')
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await waitFor(() => { expect(gripes).to.deep.equal([null, Messages.passkeyAskFailed]) })
+    await waitFor(() => { expect(asking()).to.eq('false') })
     gating.dismiss()
     refusingAttempts(new VaultError('dismissed', 'dismissed'))
     fireEvent.click(screen.getByText(Messages.passkeyButton))
@@ -169,6 +172,7 @@ describe("PassphraseModal, for a vault with a passkey", () => {
     authenticator.refuseNext('UnknownError')
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await screen.findByText(Messages.passkeyAskFailed)
+    await waitFor(() => { expect(asking()).to.eq('false') })
     fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'wrong' } })
     expect(screen.getByText(Messages.passkeyAskFailed)).to.exist
     const running = TH.makePending()
