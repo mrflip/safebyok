@@ -76,7 +76,7 @@ export function capacityOf(tally: Tally | null, maxBoxes: number) {
 
 /** Read the life's tally: the stored one, or else a count of its box rows that stops once a limit is passed. */
 export async function reckon(db: DatabaseReader, life: Life): Promise<Reckoning> {
-  const kept = await findTallyRow(db, life)
+  const kept = await getTallyRow(db, life)
   if (kept) { return { kept, tally: { all_count: kept.all_count, live_count: kept.live_count, all_size: kept.all_size, live_size: kept.live_size } } }
   // A loop, not a reduce, so it can stop reading rows once a limit is passed.
   let tally = tallyOf(null)
@@ -103,13 +103,13 @@ export const record = async (db: DatabaseWriter, life: Life, { kept, tally }: Re
 // A del never recounts a life: a life too large to read in one transaction must still be able to shrink, one box at a time.
 /** Add a del's `growth` to the life's tally, if it has one. */
 export const forget = async (db: DatabaseWriter, life: Life, growth: Tally): Promise<void> => {
-  const kept = await findTallyRow(db, life)
+  const kept = await getTallyRow(db, life)
   if (kept) { await db.patch('safebyok_tallies', kept._id, plus(kept, growth)) }
 }
 
 /** Delete the life's tally row, if it has one. */
 export const drop = async (db: DatabaseWriter, life: Life): Promise<void> => {
-  const kept = await findTallyRow(db, life)
+  const kept = await getTallyRow(db, life)
   if (kept) { await db.delete('safebyok_tallies', kept._id) }
 }
 
@@ -128,7 +128,7 @@ function negated({ all_count, live_count, all_size, live_size }: Tally): Tally {
 
 // `.unique()` throws if it finds two rows. A tally is inserted only when none was found in the same
 // transaction, so two would mean damage, and that should fail loudly.
-const findTallyRow = (db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life) => (
+const getTallyRow = (db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life) => (
   db.query('safebyok_tallies')
     .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
     .unique()

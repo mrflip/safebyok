@@ -140,14 +140,14 @@ export type BoxRow       = BoxRecord | BoxTombstone
 export type DamagedBox   = Readonly<{ applabel: string, user_id: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>
 // --
 
-// == [Rows found]: foundVaultRow, foundBoxRow, storedVaultRow, storedBoxRow
+// == [Rows stored]: storedVaultRowOrNull, storedBoxRowOrNull, storedVaultRow, storedBoxRow
 
-/** A vault row or box row as storage answers it, null for none where the check says `found`: one failing its checks refuses 'damaged_row'. */
-export const { foundVaultRow, foundBoxRow, storedVaultRow, storedBoxRow } = Checkers('damaged_row', () => ({
-  foundVaultRow:  vaultRow.nullable(),
-  foundBoxRow:    boxRow.nullable(),
-  storedVaultRow: vaultRow,
-  storedBoxRow:   boxRow,
+/** A vault row or box row as storage answers it, null for none where the check ends `OrNull`: one failing its checks refuses 'damaged_row'. */
+export const { storedVaultRowOrNull, storedBoxRowOrNull, storedVaultRow, storedBoxRow } = Checkers('damaged_row', () => ({
+  storedVaultRowOrNull: vaultRow.nullable(),
+  storedBoxRowOrNull:   boxRow.nullable(),
+  storedVaultRow:       vaultRow,
+  storedBoxRow:         boxRow,
 }))
 // --
 
@@ -275,20 +275,20 @@ export const isLiveBoxRecord = (raw: unknown, vault_tok: string): boolean => {
 
 // A row that fails its check is never put over, whatever `prior` names: only `isRowAt` reads its meta, and it runs after the check.
 // A put replaces a live row only within its own life: a new life is born over a tombstone or nothing.
-const isPutAllowedOver = (found: { am: EX.Am } | null, isSameLife: boolean, ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
-  isRowAt(ante, prior) && ((found?.am === 'a') ? ((ifPresent === 'repl') && isSameLife) : (ifAbsent === 'add'))
+const isPutAllowedOver = (stored: { am: EX.Am } | null, isSameLife: boolean, ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
+  isRowAt(ante, prior) && ((stored?.am === 'a') ? ((ifPresent === 'repl') && isSameLife) : (ifAbsent === 'add'))
 )
 
 /** True when `record` may be written over `ante`, the vault row stored there or null, under `opts`. */
 export const isVaultPutAllowed = (ante: unknown, record: VaultRecord, opts: PutOptsGiven): boolean => {
-  const found = foundVaultRow.safeParse(ante)
-  return found.success && isPutAllowedOver(found.data, found.data?.vault_tok === record.vault_tok, ante, opts)
+  const stored = storedVaultRowOrNull.safeParse(ante)
+  return stored.success && isPutAllowedOver(stored.data, stored.data?.vault_tok === record.vault_tok, ante, opts)
 }
 
 /** True when `record` may be written over `ante`, the box row stored there or null, under `opts`. */
 export const isBoxPutAllowed = (ante: unknown, record: BoxRecord, opts: PutOptsGiven): boolean => {
-  const found = foundBoxRow.safeParse(ante)
-  return found.success && isPutAllowedOver(found.data, found.data?.box_tok === record.box_tok, ante, opts)
+  const stored = storedBoxRowOrNull.safeParse(ante)
+  return stored.success && isPutAllowedOver(stored.data, stored.data?.box_tok === record.box_tok, ante, opts)
 }
 
 /** True when `raw` is no row, a tombstone, or a row of another life, so the boxes under `vault_tok` belong to nothing. A row failing its checks might be theirs, and is false. */

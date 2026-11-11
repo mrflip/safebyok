@@ -37,7 +37,7 @@ export const getVault = query({
   args:    CVX.getVaultArgs,
   returns: v.any(),
   handler: async (ctx, { scope }) => {
-    const vaultDoc = await findVaultDoc(ctx.db, scope)
+    const vaultDoc = await getVaultDoc(ctx.db, scope)
     return vaultDoc?.vault ?? null
   },
 })
@@ -47,7 +47,7 @@ export const listBoxes = query({
   args:    CVX.listBoxesArgs,
   returns: CVX.boxesFetched,
   handler: async (ctx, { asked }) => {
-    const vaultDoc = await findVaultDoc(ctx.db, asked)
+    const vaultDoc = await getVaultDoc(ctx.db, asked)
     const vault = vaultDoc?.vault ?? null
     const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(ctx.db, asked).collect()
     return { vault, boxes: boxDocs.map(({ boxlabel, box }) => ({ boxlabel, box })) }
@@ -59,9 +59,9 @@ export const getBox = query({
   args:    CVX.getBoxArgs,
   returns: CVX.boxFetched,
   handler: async (ctx, { asked }) => {
-    const vaultDoc = await findVaultDoc(ctx.db, asked)
+    const vaultDoc = await getVaultDoc(ctx.db, asked)
     const vault = vaultDoc?.vault ?? null
-    const boxDoc = await findBoxDoc(ctx.db, asked, asked.boxlabel)
+    const boxDoc = await getBoxDoc(ctx.db, asked, asked.boxlabel)
     const box = boxDoc?.box ?? null
     return { vault, box }
   },
@@ -76,7 +76,7 @@ export const putVault = mutation({
   returns: CVX.vaultClassified,
   handler: async (ctx, { ask: sent }) => {
     const ask = crossing(() => DB.vaultPut.parse(sent))
-    const anteDoc = await findVaultDoc(ctx.db, ask)
+    const anteDoc = await getVaultDoc(ctx.db, ask)
     const vault = anteDoc?.vault ?? null
     const classified = crossing(() => DB.classifyVault(ask, { vault }), vault)
     if (DB.isWriteAct(classified.act)) { await writeVaultDoc(ctx.db, anteDoc, ask, ask.record) }
@@ -96,8 +96,8 @@ export const putBox = mutation({
   handler: async (ctx, { ask: sent, maxBoxes = Tallies.MaxVaultBoxes }) => {
     const ask = crossing(() => DB.boxPut.parse(sent))
     const life = lifeOf(ask)
-    const vaultDoc = await findVaultDoc(ctx.db, ask)
-    const anteDoc = await findBoxDoc(ctx.db, life, ask.boxlabel)
+    const vaultDoc = await getVaultDoc(ctx.db, ask)
+    const anteDoc = await getBoxDoc(ctx.db, life, ask.boxlabel)
     const reckoning = await Tallies.reckon(ctx.db, life)
     // Convex accepts NaN as a number. Math.min would return it, and no count is greater than NaN, so the limit would never apply.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
@@ -125,7 +125,7 @@ export const delVault = mutation({
   returns: CVX.vaultClassified,
   handler: async (ctx, { ask: sent }) => {
     const ask = crossing(() => DB.vaultDel.parse(sent))
-    const anteDoc = await findVaultDoc(ctx.db, ask)
+    const anteDoc = await getVaultDoc(ctx.db, ask)
     const vault = anteDoc?.vault ?? null
     const classified = crossing(() => DB.classifyVault(ask, { vault }), vault)
     if (DB.isWriteAct(classified.act)) {
@@ -144,8 +144,8 @@ export const delBox = mutation({
   handler: async (ctx, { ask: sent }) => {
     const ask = crossing(() => DB.boxDel.parse(sent))
     const life = lifeOf(ask)
-    const vaultDoc = await findVaultDoc(ctx.db, ask)
-    const anteDoc = await findBoxDoc(ctx.db, life, ask.boxlabel)
+    const vaultDoc = await getVaultDoc(ctx.db, ask)
+    const anteDoc = await getBoxDoc(ctx.db, life, ask.boxlabel)
     const classified = crossing(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null }))
     if (DB.isWriteAct(classified.act)) {
       const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
@@ -225,25 +225,25 @@ function crossingOf(thrown: unknown, world: unknown): unknown {
 
 /** The `vault_full` refusal, with the stored box row, for a box put classified as a write that the life has no room for. */
 function roomlessOf(classified: DB.BoxClassified, anteDoc: BoxDoc | null, capacity: DB.Capacity): DB.BoxClassified {
-  const box = DB.foundBoxRow.parse(anteDoc?.box ?? null)
+  const box = DB.storedBoxRowOrNull.parse(anteDoc?.box ?? null)
   return { ok: false, act: 'vault_full', world: classified.world, box, presence: classified.presence, capacity }
 }
 // --
 
-// == [Helpers]: lifeOf, findVaultDoc, findBoxDoc, writeVaultDoc, writeBoxDoc, deleteBoxes, listVaultDocs, listBoxDocs, listTallyDocs, VaultDoc, BoxDoc
+// == [Helpers]: lifeOf, getVaultDoc, getBoxDoc, writeVaultDoc, writeBoxDoc, deleteBoxes, listVaultDocs, listBoxDocs, listTallyDocs, VaultDoc, BoxDoc
 
 /** Return the life an ask or a record belongs to: its vault's scope and `vault_tok`. */
 function lifeOf({ applabel, user_id, vaultlabel, vault_tok }: Life): Life { return { applabel, user_id, vaultlabel, vault_tok } }
 
 // `.unique()` throws if it finds two documents. A document is inserted only when none was found in
 // the same transaction, so two would mean damage, and that should fail loudly.
-async function findVaultDoc(db: DatabaseReader, { applabel, user_id, vaultlabel }: VaultScope): Promise<VaultDoc | null> {
+async function getVaultDoc(db: DatabaseReader, { applabel, user_id, vaultlabel }: VaultScope): Promise<VaultDoc | null> {
   return await db.query('safebyok_vaults')
     .withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel))
     .unique()
 }
 
-async function findBoxDoc(db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life, boxlabel: string): Promise<BoxDoc | null> {
+async function getBoxDoc(db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life, boxlabel: string): Promise<BoxDoc | null> {
   return await db.query('safebyok_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok).eq('boxlabel', boxlabel))
     .unique()
