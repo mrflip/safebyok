@@ -161,12 +161,12 @@ export const delBox = mutation({
 export const tidyGone = mutation({
   args:    CVX.tidyGoneArgs,
   returns: CVX.tidied,
-  handler: async (ctx, { scope }) => {
-    const vaultDocs = await listVaultDocs(ctx.db, scope)
+  handler: async (ctx, { ask }) => {
+    const vaultDocs = await listVaultDocs(ctx.db, ask)
     const vaultsBylabel = new Map(vaultDocs.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
     function isOver({ vaultlabel, vault_tok }: Life) { return DB.isLifeOver(vaultsBylabel.get(vaultlabel) ?? null, vault_tok) }
-    const boxDocs = await listBoxDocs(ctx.db, scope)
-    const tallyDocs = await listTallyDocs(ctx.db, scope)
+    const boxDocs = await listBoxDocs(ctx.db, ask)
+    const tallyDocs = await listTallyDocs(ctx.db, ask)
     const overBoxDocs = boxDocs.filter((boxDoc) => isOver(boxDoc))
     const overTallyDocs = tallyDocs.filter((tallyDoc) => isOver(tallyDoc))
     await Promise.all(overBoxDocs.map(({ _id }) => ctx.db.delete('safebyok_boxes', _id)))

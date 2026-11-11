@@ -135,7 +135,7 @@ see whose bank each operation reaches. Every name the schema adds begins `safeby
 operations it knows.
 
 **A refusal is the answer's `err` field, never a GraphQL error.** It carries its `refusalkind`, its
-message, and in `meta` the `capacity` of a `vault_full`, the `fieldnames` it names and the `call` it
+message, and in `meta` the `capacity` of a `vault_full`, the `fieldnames` it names and the `oplabel` it
 refused. The browser rethrows it as a VaultError of that kind. The box cap is the `maxBoxes` of the
 vaultDB behind your resolvers, a best-effort limit: exact at moderate write rates, never a strict
 one. **Nothing else of a refusal is sent**, not even its cause, so a driver's message stays on your server.

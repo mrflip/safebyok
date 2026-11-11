@@ -168,7 +168,10 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
       safebyokRevokePasskey:     async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, { op: 'put', gateVerb: 'revokePasskey', ...record, record }, async () => await vaultDB.tryRevokePasskey(record, opts)),
       safebyokDelBox:            async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryDelBox(ask)),
       safebyokDelVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryDelVault(ask)),
-      safebyokTidyGone:          async (_parent, scope, context) => await serveSignedIn(context, scope.user_id, scope, async () => await vaultDB.tryTidyGone(scope)),
+      safebyokTidyGone:          async (_parent, { applabel, user_id }, context) => {
+        const ask = { op: 'tidy_gone', applabel, user_id } as const
+        return await serveSignedIn(context, user_id, ask, async () => await vaultDB.tryTidyGone(ask))
+      },
     },
     Subscription: {
       safebyokWatch: {
@@ -231,7 +234,7 @@ function crossedErrOf({ refusalkind, message, meta }: DB.VaultError): DB.Crossed
     meta: {
       capacity:   capacity.success ? capacity.data : null,
       fieldnames: (meta?.fieldnames === undefined) ? null : [...meta.fieldnames],
-      call:       meta?.call ?? null,
+      oplabel:    meta?.oplabel ?? null,
     },
   }
 }

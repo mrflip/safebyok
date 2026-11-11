@@ -334,10 +334,10 @@ export function seqNotNext(): VaultError { return new VaultError('bad_option', P
 // == [DeviceDB Throwers]: deviceDBFailed
 
 /** A device database's failure as `storage_unavailable`, naming the verb and the thrown `name` and nothing else: the device database is handed every lease row, and what it throws may quote one. */
-export function deviceDBFailed(call: string, thrown: unknown): VaultError {
+export function deviceDBFailed(oplabel: string, thrown: unknown): VaultError {
   const thrownName = thrownNameOf(thrown)
   const named = (thrownName === null) ? '' : Phrases.thrownNamed(thrownName)
-  return new VaultError('storage_unavailable', Phrases.deviceDBFailed(call, named))
+  return new VaultError('storage_unavailable', Phrases.deviceDBFailed(oplabel, named))
 }
 // --
 
@@ -345,10 +345,10 @@ export function deviceDBFailed(call: string, thrown: unknown): VaultError {
 
 // A backend's error may quote the call's arguments, so only its `name` is kept.
 /** A storage backend's failure as `storage_unavailable`, naming the call and the thrown `name` and nothing else. */
-export function storageFailed(call: string, thrown: unknown): VaultError {
+export function storageFailed(oplabel: string, thrown: unknown): VaultError {
   const thrownName = thrownNameOf(thrown)
   const named = (thrownName === null) ? '' : Phrases.thrownNamed(thrownName)
-  return new VaultError('storage_unavailable', Phrases.storageFailed(call, named))
+  return new VaultError('storage_unavailable', Phrases.storageFailed(oplabel, named))
 }
 
 /** A `storage_issue` refusal: a row out of storage is not an object at all. */

@@ -35,7 +35,7 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['putBox',     (caller) => caller.mutation(api.safebyok.putBox, TH.putBoxArgs(otherBox))],
   ['delBox',     (caller) => caller.mutation(api.safebyok.delBox, TH.delBoxArgs(box))],
   ['delVault',   (caller) => caller.mutation(api.safebyok.delVault, TH.delVaultArgs(vault))],
-  ['tidyGone',   (caller) => caller.mutation(api.safebyok.tidyGone, { scope: TH.bankScope })],
+  ['tidyGone',   (caller) => caller.mutation(api.safebyok.tidyGone, { ask: TH.boxTidyAsk })],
   ['watchRows',  (caller) => caller.query(api.safebyok.watchRows, { scope: TH.bankScope })],
 ]
 

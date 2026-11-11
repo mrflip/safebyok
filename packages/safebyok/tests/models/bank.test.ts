@@ -342,7 +342,7 @@ describe("DefaultOnLifecycle", () => {
     const spy = TH.spyLogger()
     const bank = { vacate: vi.fn(), logger: spy.logger } as unknown as Bank
     DefaultOnLifecycle({ kind: 'lease_revoke_failed', refusal: Refusal, vault: null, where: 'vacate', bank })
-    expect(spy.calls).to.deep.equal([{ level: 'error', message: Refusal.message, story: { call: 'Bank.onLifecycle', refusalkind: 'storage_unavailable' }, err: undefined }])
+    expect(spy.calls).to.deep.equal([{ level: 'error', message: Refusal.message, story: { oplabel: 'Bank.onLifecycle', refusalkind: 'storage_unavailable' }, err: undefined }])
     expect(JSON.stringify(spy.calls)).not.to.include(Passphrase)
     vi.unstubAllGlobals()
   })
@@ -606,7 +606,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     await page.hello()
     const unlocked = await page.vaultAt(VaultScopeGiven)?.ensureUnlocked()
     expect(unlocked?.isUnlocked).to.be.true
-    expect(warn).toHaveBeenCalledWith('the datastore is down', expect.objectContaining({ call: 'Bank.onLifecycle' }), undefined)
+    expect(warn).toHaveBeenCalledWith('the datastore is down', expect.objectContaining({ oplabel: 'Bank.onLifecycle' }), undefined)
   })
 
   it("reports a vault's bad news to onBadNews the same as its own", async () => {

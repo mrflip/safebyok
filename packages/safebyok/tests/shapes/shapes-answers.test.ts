@@ -6,7 +6,7 @@ import * as SX from '../../src/shapes/shapes-storage'
 import { VaultError } from '../../src/refusals/errors'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Answer } from '../../src/storage/vault-db'
-import { bankScope, boxAt, boxDelAskOf, boxGetAskOf, boxPutAskOf, vaultAt, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultScope, vaultListAsk, boxListAsk } from '../test-helpers/storage-world'
+import { boxAt, boxDelAskOf, boxGetAskOf, boxPutAskOf, vaultAt, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultScope, vaultListAsk, boxListAsk, boxTidyAsk } from '../test-helpers/storage-world'
 
 // == [A wire]: crossed
 
@@ -15,7 +15,7 @@ function crossed(answer: Answer<unknown, string, unknown>): unknown {
   const err = answer.ok ? null : {
     refusalkind: answer.err.refusalkind,
     message:     answer.err.message,
-    meta:        { capacity: answer.err.meta?.capacity, fieldnames: answer.err.meta?.fieldnames, call: answer.err.meta?.call },
+    meta:        { capacity: answer.err.meta?.capacity, fieldnames: answer.err.meta?.fieldnames, oplabel: answer.err.meta?.oplabel },
   }
   const sent = { ...answer, val: answer.ok ? answer.val : null, err }
   return JSON.parse(JSON.stringify(sent, (_ckey, field: unknown) => field ?? null)) as unknown
@@ -44,7 +44,7 @@ describe("AX's answer checks", () => {
       [AX.putVaultAnswer,   await vaultDB.tryPutVault(vaultPutAskOf(vaultAt(0, 'life2', { vaultlabel: 'second' })))],
       [AX.delVaultAnswer,   await vaultDB.tryDelVault(vaultDelAskOf(vaultAt()))],
       [AX.getVaultAnswer,   await vaultDB.tryGetVault(vaultGetAskOf(undefined, 'nil'))],
-      [AX.tidyGoneAnswer,   await vaultDB.tryTidyGone(bankScope)],
+      [AX.tidyGoneAnswer,   await vaultDB.tryTidyGone(boxTidyAsk)],
     ] as const
     for (const [check, answer] of answers) {
       expect(answer.ok, answer.ok ? "" : `${answer.act}: ${answer.err.message}`).to.be.true

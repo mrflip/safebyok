@@ -50,7 +50,7 @@ export const boxTombstone = zodToConvex(DB.boxTombstone)
 export const capacity = zodOutputToConvex(DB.capacity)
 // --
 
-// == [Asks]: vaultListAsk, boxListAsk, vaultGetAsk, boxGetAsk, vaultPutAsk, boxPutAsk, vaultDelAsk, boxDelAsk
+// == [Asks]: vaultListAsk, boxListAsk, boxTidyAsk, vaultGetAsk, boxGetAsk, vaultPutAsk, boxPutAsk, vaultDelAsk, boxDelAsk
 // These check an ask's structure only. The component checks each ask in full with the core's own checker before it reads a row.
 
 // The metadata of the stored row that a put or del expects to find.
@@ -65,6 +65,9 @@ export const vaultListAsk = v.object({ ...bankScope.fields, op: v.literal('list'
 
 /** What `listBoxes` is asked. */
 export const boxListAsk = v.object({ ...vaultQuery.fields, op: v.literal('list') }) as unknown as Validator<DB.BoxListAsk, 'required', string>
+
+/** What `tidyGone` is asked. */
+export const boxTidyAsk = v.object({ ...bankScope.fields, op: v.literal('tidy_gone') }) as unknown as Validator<DB.BoxTidyAsk, 'required', string>
 
 /** What `getVault` is asked. */
 export const vaultGetAsk = v.object({
@@ -146,8 +149,8 @@ export const putBoxArgs     = { ask: boxPutAsk, maxBoxes: v.optional(v.number())
 export const delVaultArgs   = { ask: vaultDelAsk }
 /** `delBox` takes a box's del ask. */
 export const delBoxArgs     = { ask: boxDelAsk }
-/** `tidyGone` takes a bank's scope. */
-export const tidyGoneArgs   = { scope: bankScope }
+/** `tidyGone` takes a tidy ask. */
+export const tidyGoneArgs   = { ask: boxTidyAsk }
 /** `watchRows` takes a watch's scope. */
 export const watchRowsArgs  = { scope: watchScope }
 // --

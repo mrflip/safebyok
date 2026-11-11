@@ -1,7 +1,7 @@
 import { IdbVaultDB } from 'safebyok-indexeddb'
 import { storageUnavailable } from 'safebyok/storage'
 import type {
-  BankScope, BoxDelAsk, BoxesStored, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxStored, Tidied,
+  BoxDelAsk, BoxesStored, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, BoxStored, Tidied,
   VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultsStored, VaultStored,
 } from 'safebyok/storage'
 
@@ -80,9 +80,9 @@ export class OutageVaultDB extends IdbVaultDB {
     return await super.doDelBox(ask)
   }
 
-  protected override async doTidyGone(scope: BankScope): Promise<Tidied> {
+  protected override async doTidyGone(ask: BoxTidyAsk): Promise<Tidied> {
     this.#demandOnline()
-    return await super.doTidyGone(scope)
+    return await super.doTidyGone(ask)
   }
   // --
 }

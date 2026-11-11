@@ -50,7 +50,7 @@ TH.describeOnPostgres('races', "PostgresVaultDB's box cap, over a real Postgres"
 
     const listed = await first.tryListBoxes(TH.boxListAsk)
     expect(listed.ok).to.equal(false)
-    await first.tidyGone(TH.bankScope)
+    await first.tidyGone(TH.boxTidyAsk)
     const boxrows = await TH.rowsOf(db).boxRowsOf(TH.vaultScope, 'life1')
     expect([...boxrows.values()].filter((row) => DB.isLiveRow(row))).to.deep.equal([])
   })

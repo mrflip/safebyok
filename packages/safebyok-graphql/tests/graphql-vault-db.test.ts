@@ -99,7 +99,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     expect(answer.ask).to.deep.include(TH.vaultScope)
     expect(DB.isVaultError(answer.err, 'unexpected_error')).to.be.true
     expect(answer.err?.cause).to.be.undefined
-    expect(answer.err?.meta).to.deep.include({ call: 'getVault' })
+    expect(answer.err?.meta).to.deep.include({ oplabel: 'getVault' })
     await TH.expectRefusal(vaultDB.getVault(TH.vaultGetAskOf()), 'unexpected_error')
   })
 
@@ -155,7 +155,7 @@ describe("GraphQLVaultDB's watch", () => {
     expect(streams).to.have.length(1)
     expect(badnews).to.have.length(1)
     expect(badnews[0]).to.include({ refusalkind: 'storage_unavailable', message: DB.WatchEnded })
-    expect(badnews[0]?.meta).to.deep.eq({ call: 'watch' })
+    expect(badnews[0]?.meta).to.deep.eq({ oplabel: 'watch' })
     expect(counts.unsubscribed).to.be.greaterThanOrEqual(1)
   })
 

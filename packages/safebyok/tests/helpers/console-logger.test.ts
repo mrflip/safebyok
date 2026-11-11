@@ -19,13 +19,13 @@ describe("consoleLogger", () => {
   it("follows the message with its story and its error, when there are any", () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(quiet)
     const err = new Error('the storage adapter failed')
-    consoleLogger.warn('a refresh failed', { call: 'refresh' }, err)
+    consoleLogger.warn('a refresh failed', { oplabel: 'refresh' }, err)
     consoleLogger.warn('a refresh failed', undefined, err)
-    consoleLogger.warn('a refresh failed', { call: 'refresh' }, null)
+    consoleLogger.warn('a refresh failed', { oplabel: 'refresh' }, null)
     expect(warn.mock.calls).to.deep.equal([
-      ['safebyok: a refresh failed', { call: 'refresh' }, err],
+      ['safebyok: a refresh failed', { oplabel: 'refresh' }, err],
       ['safebyok: a refresh failed', err],
-      ['safebyok: a refresh failed', { call: 'refresh' }],
+      ['safebyok: a refresh failed', { oplabel: 'refresh' }],
     ])
   })
 

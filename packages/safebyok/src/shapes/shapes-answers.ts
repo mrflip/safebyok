@@ -22,7 +22,7 @@ export const { crossedErr, crossedAsk, damagedVault, damagedBox } = Checkers('un
     meta:        obj({
       capacity:   SX.capacity.nullable().default(null),
       fieldnames: arr(str).nullable().default(null),
-      call:       str.nullable().default(null),
+      oplabel:    str.nullable().default(null),
     }).strict().nullable().default(null),
   }).strict()
   const crossedMeta = obj({

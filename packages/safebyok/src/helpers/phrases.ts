@@ -440,8 +440,8 @@ export const GateVerbRecordMismatch = "addPasskey's record has a passkey wayin, 
 /** Why a put or del is refused for its record: the record must be at the request's address. */
 export const RecordOfOtherAddress = "A put's or del's record is at the address its ask names."
 
-/** A device database's failure in `call`, `named` the sentence naming what it threw, or blank. */
-export function deviceDBFailed(call: string, named: string): string { return `This device's own storage failed in ${call}: try again.${named}` }
+/** A device database's failure in `oplabel`, `named` the sentence naming what it threw, or blank. */
+export function deviceDBFailed(oplabel: string, named: string): string { return `This device's own storage failed in ${oplabel}: try again.${named}` }
 
 /** The sentence naming what a datastore threw, by its `name` alone. */
 export function thrownNamed(thrownName: string): string { return ` It threw ${thrownName}.` }
@@ -449,8 +449,8 @@ export function thrownNamed(thrownName: string): string { return ` It threw ${th
 
 // == [Refusals: storage backends]: storageFailed, StorageIssue, IdentityRevoked, NoBrowserDatastore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserDatadeviceDBFailed, SchemaNotServed, fetchFailed, WatchEnded
 
-/** A vault's storage backend failing in `call`, `named` the sentence naming what it threw, or blank. */
-export function storageFailed(call: string, named: string): string { return `The vault's storage could not be reached, or failed, in ${call}: try again shortly.${named}` }
+/** A vault's storage backend failing in `oplabel`, `named` the sentence naming what it threw, or blank. */
+export function storageFailed(oplabel: string, named: string): string { return `The vault's storage could not be reached, or failed, in ${oplabel}: try again shortly.${named}` }
 
 /** A row out of storage that is not an object at all. */
 export const StorageIssue = "The vault's storage answered with a row that is not an object, which nothing safebyok writes could be. Trying again is unlikely to help: the database or its storage adapter needs someone to look at it."
