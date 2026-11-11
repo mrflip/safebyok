@@ -31,6 +31,25 @@ describe("PostgresVaultDB's get, put and del, each given one ask", () => {
     expect(await vaultDB.getBox({ ...Get, ...TH.boxQuery, ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', val: tombstone })
   })
 
+  it("answers born, replaced, deleted and reborn as a vault is put, replaced, deleted and put again, and refuses stale_write over a revision it has moved on from", async () => {
+    const vaultDB = await TH.makeVaultDB()
+    expect(await vaultDB.putVault({ ...Add, expected: noVaultYet, record: TH.vaultAt(0) })).to.deep.include({ ok: true, act: 'born', val: TH.vaultAt(0), world: TH.vaultAt(0) })
+    expect(await vaultDB.putVault({ ...Repl, expected: TH.vaultAt(0), record: TH.vaultAt(1) })).to.deep.include({ act: 'replaced', val: TH.vaultAt(1) })
+    const rival = TH.vaultAt(1, 'life1', { revision_tok: 'rival' })
+    const stale = await vaultDB.tryPutVault({ ...Repl, expected: TH.vaultAt(0), record: rival })
+    expect(stale).to.deep.include({ ok: false, act: 'stale', dbhas: TH.vaultAt(1) })
+    expect(stale.ok ? null : stale.err.refusalkind).to.eq('stale_write')
+
+    const tombstone = TH.vaultTombstoneOf(TH.vaultAt(1))
+    expect(tombstone.vault_tok).not.to.eq('life1')
+    expect(await vaultDB.delVault({ ...Del, expected: TH.vaultAt(1), record: tombstone })).to.deep.include({ act: 'deleted', val: tombstone })
+    const again = await vaultDB.tryDelVault({ ...Del, expected: tombstone, record: { ...tombstone, revision_tok: 'again', revision_seq: tombstone.revision_seq + 1, vault_tok: 'again' } })
+    expect(again).to.deep.include({ ok: false, act: 'dubdel', dbhas: tombstone })
+    const reborn = TH.vaultAt(tombstone.revision_seq + 1, 'life2')
+    expect(await vaultDB.putVault({ ...Add, expected: tombstone, record: reborn })).to.deep.include({ act: 'reborn', val: reborn })
+    expect(await vaultDB.getVault({ ...Get, ...TH.vaultScope, ifAbsent: 'fail' })).to.deep.include({ act: 'gotlive', val: reborn })
+  })
+
   it("refuses stale_write for a put that expects a revision the box has moved on from, with the row stored as dbhas, and writes nothing", async () => {
     const vaultDB = await vaultDBWithVault()
     await vaultDB.putBox({ ...Add, expected: noBoxYet, record: TH.boxAt(0) })
@@ -71,18 +90,19 @@ describe("PostgresVaultDB's get, put and del, each given one ask", () => {
 
     const tombstone = TH.boxTombstoneOf(TH.boxAt(0))
     await vaultDB.delBox({ ...Del, expected: TH.boxAt(0), record: tombstone })
-    const again = await vaultDB.tryDelBox({ ...Del, expected: tombstone, record: { ...tombstone, revision_tok: 'again', revision_seq: tombstone.revision_seq + 1 } })
+    const again = await vaultDB.tryDelBox({ ...Del, expected: tombstone, record: { ...tombstone, revision_tok: 'again', revision_seq: tombstone.revision_seq + 1, box_tok: 'again' } })
     expect(again).to.deep.include({ ok: false, act: 'dubdel', dbhas: tombstone })
     expect(again.ok ? null : again.err.refusalkind).to.eq('absent_box')
   })
 
-  it("tells a watch of a box put and of a vault's deletion with its boxes", async () => {
+  it("tells a watch of a box put and of a vault's deletion, and deletes the box rows of the life that ended", async () => {
     const vaultDB = await vaultDBWithVault()
     const notices: Notice[] = []
     const unwatch = vaultDB.watch(TH.vaultScope, (notice) => { notices.push(notice) })
     await vaultDB.putBox({ ...Add, expected: noBoxYet, record: TH.boxAt(0) })
     await vaultDB.delVault({ ...Del, expected: TH.vaultAt(0), record: TH.vaultTombstoneOf(TH.vaultAt(0)) })
-    await expect.poll(() => notices.map(({ act }) => act)).to.deep.equal(['got', 'gone', 'gone'])
+    await expect.poll(() => notices.map(({ act }) => act)).to.deep.equal(['got', 'gone'])
+    expect(await TH.rowsOf().boxRowsOf(TH.vaultScope, 'life1')).to.have.property('size', 0)
     unwatch()
   })
 })

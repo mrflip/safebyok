@@ -394,7 +394,7 @@ describe("boxActOf, one box through a run of requests", () => {
     expect(request.record.revision_seq, 'a write is one seq past the row it replaces').to.eq((run.stored?.revision_seq ?? SX.VoidRevisionSeq) + 1)
     expect(run.versions.map((version) => version.revision_tok), 'no revision_tok is stored twice').not.to.include(request.record.revision_tok)
     const isNewLife = (request.record.box_tok !== run.stored?.box_tok)
-    expect(isNewLife, 'a life begins at a birth and at nothing else').to.eq((act === 'born') || (act === 'reborn'))
+    expect(isNewLife, 'a life tok is new at a birth and at a delete, and kept by a replace').to.eq(act !== 'replaced')
     return { stored: request.record, versions: [...run.versions, request.record], sent, wrote: new Set([...run.wrote, request]) }
   }
 

@@ -1,13 +1,14 @@
 /** Classify a get, put or del against the stored rows, per the tables in `notes/answer-contract.md`. */
 
 import * as Phrases from '../helpers/phrases'
+import { Checkers } from '../helpers/validator'
 import * as Refuse from '../refusals/throwers'
 import * as CX from '../shapes/shapes-core'
 import * as EX from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { VaultScope } from '../shapes/shapes-core'
 import type { BoxAct, BoxVaultAct, OkAct, RefusedAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
-import type { BoxAsk, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, Capacity, Revision, VaultAsk, VaultRecord, VaultRow, VaultTombstone } from '../shapes/shapes-storage'
+import type { BoxAsk, BoxDelAsk, BoxPutAsk, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, Capacity, Revision, VaultAsk, VaultDelAsk, VaultPutAsk, VaultRecord, VaultRow, VaultTombstone } from '../shapes/shapes-storage'
 
 // == [Asked and stored]: Meta, Asked, GetAsked, PutAsked, DelAsked, Presence, Stored
 // Every function below takes what was asked first, and what is stored second.
@@ -248,5 +249,35 @@ export function vaultActOf(request: VaultAsk, vaultRaw: unknown): VaultAct {
 /** Classify a box request's outcome, based on its stored vault and box rows. */
 export function boxActOf(request: BoxAsk, vaultRaw: unknown, boxRaw: unknown): BoxAct {
   return classifyBox(SX.boxAsk.parse(request), { vault: vaultRaw, box: boxRaw }).act
+}
+// --
+
+// == [A write the datastore made]: BoxWritten, VaultWritten, boxWrittenOf, vaultWrittenOf
+// An adapter whose datastore tests an ask and stores its record in one step hands back what it stored.
+// Its parts are checked here, and nothing is classified again.
+
+/** What a datastore answers for a box record it stored: the act, the vault row, the row now stored, what was stored before, and the vault's room. Unchecked. */
+export type BoxWritten = Readonly<{ act: unknown, world: unknown, box: unknown, presence: unknown, capacity?: Capacity }>
+/** What a datastore answers for a vault record it stored: the act, the row now stored, and what was stored before. Unchecked. */
+export type VaultWritten = Readonly<{ act: unknown, vault: unknown, presence: unknown }>
+
+const { writtenAct, writtenPresence } = Checkers('storage_issue', ({ oneof }) => ({
+  writtenAct: oneof(EX.writeActVals), writtenPresence: oneof(['void', 'gone', 'live'] as const),
+}))
+
+/** The classified answer of a box write the datastore made. Throws for a part that fails its checks. */
+export function boxWrittenOf(ask: BoxPutAsk | BoxDelAsk, { act, world, box, presence, capacity }: BoxWritten): BoxClassified {
+  const boxQuery = SX.boxQueryOf(ask)
+  const vaultRow = vaultRowAt(boxQuery, world, boxVaultRow)
+  const stored   = boxRowAt(boxQuery, box)
+  if ((vaultRow.row === null) || (stored.row === null)) { throw Refuse.storageIssue() }
+  return { ok: true, act: writtenAct.parse(act), world: vaultRow.row, row: stored.row, write: null, presence: writtenPresence.parse(presence), capacity: capacity ?? null }
+}
+
+/** The classified answer of a vault write the datastore made. Throws for a part that fails its checks. */
+export function vaultWrittenOf(ask: VaultPutAsk | VaultDelAsk, { act, vault, presence }: VaultWritten): VaultClassified {
+  const stored = vaultRowAt(SX.vaultScopeOf(ask), vault, SX.storedVaultRow)
+  if (stored.row === null) { throw Refuse.storageIssue() }
+  return { ok: true, act: writtenAct.parse(act), world: stored.row, row: stored.row, write: null, presence: writtenPresence.parse(presence) }
 }
 // --

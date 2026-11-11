@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  BirthVaultSql, BoxAndRoomSql, BoxesOfLifeSql, BoxLivesSql, GetBoxSql, GetBoxWithVaultSql, GetVaultSql, ListBoxesWithVaultSql, ListVaultsSql, LockVaultSql,
+  ClaimVaultSql, BoxAndRoomSql, BoxesOfLifeSql, BoxLivesSql, GetBoxSql, GetBoxWithVaultSql, GetVaultSql, ListBoxesWithVaultSql, ListVaultsSql, LockVaultSql,
   WriteBoxSql, WriteVaultSql,
 } from '../src/vault-queries'
 import * as TH from './test-helpers'
@@ -100,10 +100,10 @@ describe("a record stored in its table", () => {
   })
 })
 
-describe("BirthVaultSql", () => {
+describe("ClaimVaultSql", () => {
   it("stores a record over no row, and answers no row and stores nothing over a row stored", async () => {
-    expect(await rowsFrom(BirthVaultSql, [JSON.stringify(vault)])).to.deep.equal([{ vaultlabel: 'main' }])
-    expect(await rowsFrom(BirthVaultSql, [JSON.stringify(passkeyVault)])).to.deep.equal([])
+    expect(await rowsFrom(ClaimVaultSql, [JSON.stringify(vault)])).to.deep.equal([{ vaultlabel: 'main' }])
+    expect(await rowsFrom(ClaimVaultSql, [JSON.stringify(passkeyVault)])).to.deep.equal([])
     expect(await storedVault()).to.deep.equal(vault)
   })
 })
