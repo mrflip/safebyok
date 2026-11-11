@@ -1,9 +1,9 @@
 # Why `box.expose` improves security
 
-A reviewer's first instinct is that `box.expose()`, which holds an open whisper on the instance, is
-a hole in an end-to-end encrypted vault. This note argues the opposite. A host that shows or uses a
+A reviewer's first instinct is that `box.expose()`, which keeps a deciphered whisper on the instance,
+is a hole in an end-to-end encrypted vault. This note argues the opposite. A host that shows or uses a
 secret has it in the clear whatever we offer, so the choice isn't whether a clear copy exists. The
-choice is who holds it, for how long, and what puts it away.
+choice is who has it, for how long, and what ends it.
 
 | Audience                       | What they use                             | Where else it is in the clear                 | What ends it                             |
 | ------------------------------ | ----------------------------------------- | --------------------------------------------- | ---------------------------------------- |
@@ -11,20 +11,17 @@ choice is who holds it, for how long, and what puts it away.
 | A team wanting a raw DOM field | `BoxFields.of(box).bind` (`safebyok/dom`) | the element's `value`                         | the last field unbinding                 |
 | A React form                   | `box.whisper`, `box.patchWhisper`         | the `value` prop and attribute, React's props | the form calling `unexpose`              |
 
-`BoxFields` and `box.patchWhisper` are in #505, which is still open and whose names may change.
-
 ## The risk is time, not exposure
 
-| Who                                                 | What holding the whisper on the box changes                                                                           |
+| Who                                                 | What keeping the whisper on the box changes                                                                           |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | A hostile script, vault unlocked                    | Nothing. It reads `input.value`, or calls `box.extractWhisper()`                                                      |
-| A hostile script, vault locked                      | Little. `box.whisper` answers a bag and `#exposed` is private. It can wait for an unlock, or wrap `Box.prototype.put` |
+| A hostile script, vault locked                      | Little. `box.whisper` returns a bag and `#exposed` is private. It can wait for an unlock, or wrap `Box.prototype.put` |
 | An accident: a log line, `JSON.stringify`, a spread | An improvement on a variable: none of them show it                                                                    |
 | Someone with dev tools or a heap dump, after a lock | A loss. The value is still in memory, and a lock doesn't remove it                                                    |
 
 So exposure adds no reach to a script in the page. What it adds is time: the value stays in memory
-for as long as nothing ends it. That is why each row of the first table has an answer for what ends
-it.
+for as long as nothing ends it. That is why each row of the first table says what ends it.
 
 ### What "minimize the surface" would cost
 
@@ -75,21 +72,21 @@ floor: **while the text is in the field, any script in the page can read it.** T
 still passes the value through a local on its way in and out, and JavaScript strings can't be wiped.
 
 So the shift is small and the sacrifice is notable. `BoxFields` keeps the first two rows without most
-of the list above: it holds the value through a lock so edits survive, and ends the exposure when the
+of the list above: it keeps the value through a lock so edits survive, and ends the exposure when the
 last field unbinds. Anything derived from the value and controlled components stay out, because the
 value never reaches React.
 
-**When a field lets go.** React tells a field it is leaving through the cleanup its `ref` function
-returns, and the box unexposes when its last field lets go. A field lets go in the same update that
-removes it, just before its elements are deleted, never later. A field covered by a loading
-placeholder (Suspense) or hidden with `<Activity>` lets go too, though React keeps its elements,
-hidden: the box unexposes, and is not exposed again when the content comes back. Swapping the last
-field for a new one (a change of its `key`) unexposes the box in between the old field and the new.
-In development, StrictMode rehearses each new `ref`, attaching it, cleaning it up and attaching it
-again, so a box exposed before its field first appears is unexposed by the rehearsal
+**When a field detaches.** React tells a field it is leaving by calling the cleanup its `ref`
+function returns, and the box unexposes when its last field detaches. A field detaches in the same
+update that removes it, just before its elements are deleted, never later. A field covered by a
+loading placeholder (Suspense) or hidden with `<Activity>` detaches too, though React keeps its
+elements, hidden: the box unexposes, and is not exposed again when the content comes back. Swapping
+the last field for a new one (a change of its `key`) unexposes the box between the old field and the
+new. In development, StrictMode runs each new `ref` twice: it attaches it, cleans it up and attaches
+it again. So a box exposed before its field first appears is unexposed by that extra cleanup
 (`packages/safebyok-react/tests/box-whisper-field.test.tsx`, *under StrictMode*). While React
-prepares a new screen in the background (a transition), nothing lets go until it puts that screen in
-place. React's own pages:
+prepares a new screen in the background (a transition), no field detaches until React puts that
+screen in place. React's own pages:
 [the `ref` callback](https://react.dev/reference/react-dom/components/common#ref-callback),
 [StrictMode](https://react.dev/reference/react/StrictMode),
 [Suspense](https://react.dev/reference/react/Suspense) and
@@ -139,9 +136,9 @@ function useAwsForm(box: Box) {
 }
 ```
 
-That is thirty-odd lines of secret handling in the host's code, crossing masking, reshaping and
-nulling, and no review of ours ever sees them. The secret sits in React state and in the closure of
-every render. `put({ whisper: view })` would store the mask over the real secret and succeed. With
+That is thirty-odd lines of secret handling in the host's code, spanning masking, reshaping and
+null checks, and no review of ours ever sees them. The secret sits in React state and in the closure
+of every render. `put({ whisper: view })` would put the mask over the real secret, and succeed. With
 `expose`, the same form is:
 
 ```tsx
@@ -159,7 +156,7 @@ function useAwsForm(box: Box) {
 }
 ```
 
-The fields read blank when the whisper won't show, because a bag has no fields. The host never holds
+The fields read blank when the whisper won't show, because a bag has no fields. The host never keeps
 the value in state, writes no lock branch, and has nothing to get wrong at save: `putExposed` takes
 no whisper, and a bag refuses at `put`. What's left to get right is one line, the `unexpose`, and
 without it the exposure lasts until a sweep. Call `box.expose()` from a button after mount, because
@@ -202,7 +199,7 @@ accidents, and a lock that takes effect.
 ## What this does not do
 
 * **A lock hides the whisper; it doesn't remove it from memory.** That is the contract, so that edits
-  survive a lock. Only `unexpose`, a sweep, a delete or a vacate drop it. After a lock, someone with
+  survive a lock. Only `unexpose`, a sweep, a delete or a vacate drops it. After a lock, someone with
   dev tools or a heap dump can still find it, and only a host that calls `unexpose` closes that.
 * **A reference outlives everything.** `const w = box.whisper` keeps the secret past a lock and past
   `unexpose`. We can't empty it without walking the object, so the rule is to read `box.whisper` each
@@ -210,4 +207,4 @@ accidents, and a lock that takes effect.
 * **Dropping a value isn't wiping it.** JavaScript strings can't be zeroed. `unexpose` makes the value
   unreachable, and the collector decides when it leaves memory.
 * **A copy can't be recalled.** Whatever the host copies out of `box.whisper`, or out of an input, is
-  the host's to answer for.
+  the host's responsibility.
