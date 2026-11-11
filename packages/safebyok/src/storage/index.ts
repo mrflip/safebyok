@@ -40,7 +40,7 @@ export type { Sidecar, WhisperJson } from '../shapes/shapes-core'
 export { passkeyAddRecord, passkeyRevokeRecord } from '../shapes/shapes-storage'
 export { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqParams, adapterVaultDBOpts, memoryVaultDBOpts, capacity } from '../shapes/shapes-storage'
 export type { AdapterVaultDBOpts, Capacity, DelOpts, GateVerbOpts, IfAbsentOpts, MemoryVaultDBOpts, PutOpts, PutOptsGiven, ReqParams } from '../shapes/shapes-storage'
-export { rowPeek, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
+export { rowMeta, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
 export { isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow } from '../shapes/shapes-storage'
 export { sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf } from '../shapes/shapes-storage'
 export { leaseQuery, leaseDated, leaseRow, leaseScopepath, bankRow } from '../shapes/shapes-storage'
@@ -55,8 +55,8 @@ export type { CrossedErr, CrossedReqParams } from '../shapes/shapes-answers'
 // --
 
 // == [Validators]: the makers an adapter checks its own options and rows with
-export { Checker, Checkers, objCheck, type AssertEqual, type CheckerInput } from '../helpers/validator'
-export type { ConsistencyRefusal, ObjCheckOpts, Refusing, Story } from '../helpers/validator'
+export { Checker, Checkers, objCheck, objStrict, objStrip, type AssertEqual, type CheckerInput } from '../helpers/validator'
+export type { ConsistencyRefusal, ObjCheckOpts, RefusalOpts, Refusing, Story } from '../helpers/validator'
 // --
 
 // == [The refusals]: an adapter's throwers

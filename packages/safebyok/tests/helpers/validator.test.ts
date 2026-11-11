@@ -13,7 +13,7 @@ import * as VX from '../../src/shapes/shapes-vaultish'
 import { PasskeySaltBytes } from '../../src/helpers/consts'
 import { fromB64OrNull, toB64 } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
-import { Checker, Checkers, type ConsistencyRefusal, Kit, type Story, consistent, demandConsistent, objCheck, verifyConsistent } from '../../src/helpers/validator'
+import { Checker, Checkers, type ConsistencyRefusal, Kit, type Story, consistent, demandConsistent, objCheck, objStrict, objStrip, verifyConsistent } from '../../src/helpers/validator'
 import { type Refusalkind, VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'
 
@@ -363,6 +363,47 @@ describe("objCheck", () => {
     const outer = objCheck(({ gateRecord, uint }) => ({ gate: gateRecord, gate_epoch: uint }), 'bad_option', [GateChecks])
     expect(outer.parse({ gate, gate_epoch: 1 })).to.deep.equal({ gate, gate_epoch: 1 })
     TH.expectSyncRefusal(() => outer.parse({ gate, gate_epoch: -1 }), 'bad_option')
+  })
+})
+
+describe("objStrict", () => {
+  // objStrict @example
+  it("makes a validator of an object that refuses a field it does not accept, with a default refusal kind", () => {
+    const checkedScope = objStrict(bankScopeOf)
+    expect(checkedScope.parse({ applabel: 'acme', user_id: 'u1' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
+    const extra = TH.expectSyncRefusal(() => checkedScope.parse({ ...scope, vault_tok: 'tok' }), 'bad_record')
+    expect(extra.message).to.eq("There are 2 fields it does not accept (their names are not repeated): it accepts only applabel, user_id. Check the spelling, or leave them out")
+  })
+
+  it("refuses the kind it is told, given alone or as refusalkind", () => {
+    TH.expectSyncRefusal(() => objStrict(bankScopeOf, 'bad_scope').parse({ ...scope }), 'bad_scope')
+    TH.expectSyncRefusal(() => objStrict(bankScopeOf, { refusalkind: 'bad_option' }).parse({ ...scope }), 'bad_option')
+  })
+
+  it("takes a kind and a module of validators", () => {
+    const outer = objStrict(({ gateRecord, uint }) => ({ gate: gateRecord, gate_epoch: uint }), 'bad_option', [GateChecks])
+    expect(outer.parse({ gate, gate_epoch: 1 })).to.deep.equal({ gate, gate_epoch: 1 })
+    TH.expectSyncRefusal(() => outer.parse({ gate, gate_epoch: -1 }), 'bad_option')
+  })
+})
+
+describe("objStrip", () => {
+  // objStrip @example
+  it("makes a validator of an object that drops a field it does not accept, unread, still refusing a bad one it does", () => {
+    const checkedScope = objStrip(bankScopeOf, 'bad_scope')
+    expect(checkedScope.parse({ ...scope, vault_tok: 'tok' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
+    TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_scope')
+    TH.expectSyncRefusal(() => objStrip(bankScopeOf).parse({}), 'bad_record')
+  })
+})
+
+describe("objStrict and objStrip", () => {
+  it("refuse opts that are none, extras among them, whatever they would check", () => {
+    for (const make of [objStrict, objStrip]) {
+      for (const opts of ['bad_kind', { extras: 'strip' }, { extras: 'strict' }, { refusalkind: 'bad_kind' }, { kind: 'bad_scope' }, null]) {
+        TH.expectSyncRefusal(() => make(bankScopeOf, opts as never))
+      }
+    }
   })
 })
 
