@@ -17,7 +17,7 @@ const mashArgs = Checker(({ str }) => str, 'bad_option')
  *
  * @example await mash('abc')  // 'ungWv48Bz-pBQUDeXa4iI7ADYaOWF3qctBD_YfIAFa0'
  */
-export const mash = async (text: string): Promise<string> => {
+export async function mash(text: string): Promise<string> {
   const bytes = new TextEncoder().encode(mashArgs.parse(text))
   return toB64(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
 }

@@ -23,16 +23,16 @@ const checkerArgs = objCheck(({ passphraseCleartext, vaultScope }) => ({ typed: 
 
 // Intl.Segmenter is missing from browsers before 2024 and from React Native's Hermes; there each code point counts as one.
 /** How many characters `typed` contains, as its reader counts them. */
-const graphemeCount = (typed: string): number => (
-  typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter().segment(typed)].length : (typed.match(/./gsu) ?? []).length
-)
+function graphemeCount(typed: string): number {
+  return typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter().segment(typed)].length : (typed.match(/./gsu) ?? []).length
+}
 
 // The dictionary is most of zxcvbn's weight, so it comes in as a chunk of its own, at the bank's hello, never at import.
 // A failed import leaves the judge unbuilt, so the next load tries again.
 /** A strength checker with a zxcvbn judge of its own, built over the common dictionary at its first load. */
-const makeZxcvbnStrengthChecker = () => {
+function makeZxcvbnStrengthChecker() {
   let judgeLoaded: ZxcvbnFactory | undefined
-  const loadJudge = async (): Promise<ZxcvbnFactory> => {
+  async function loadJudge(): Promise<ZxcvbnFactory> {
     if (judgeLoaded === undefined) {
       const { dictionary, adjacencyGraphs } = await import('@zxcvbn-ts/language-common')
       judgeLoaded ??= new ZxcvbnFactory({ dictionary, graphs: adjacencyGraphs, useLevenshteinDistance: true })

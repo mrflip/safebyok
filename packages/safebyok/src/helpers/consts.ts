@@ -56,14 +56,14 @@ export const DefaultMaxRecordSizeEst = 5600
 // bundles) wears and reads the same one, and a host may wear one on purpose. Non-enumerable, it stays out of a spread,
 // `Object.keys`, `JSON.stringify` and a log line.
 /** `obj`, wearing `Brand` as `val`, a fixed and hidden mark that {@link brandOf} reads back. */
-export const brand = <ObjT extends object>(obj: ObjT, Brand: symbol, val: unknown = true): ObjT => (
-  Object.defineProperty(obj, Brand, { value: val, enumerable: false, writable: false, configurable: false })
-)
+export function brand<ObjT extends object>(obj: ObjT, Brand: symbol, val: unknown = true): ObjT {
+  return Object.defineProperty(obj, Brand, { value: val, enumerable: false, writable: false, configurable: false })
+}
 
 /** The value `val` wears as `Brand`, or undefined, for anything at all. */
-export const brandOf = (val: unknown, Brand: symbol): unknown => (
-  (typeof val === 'function' || (typeof val === 'object' && val !== null)) ? (val as Partial<Record<symbol, unknown>>)[Brand] : undefined
-)
+export function brandOf(val: unknown, Brand: symbol): unknown {
+  return (typeof val === 'function' || (typeof val === 'object' && val !== null)) ? (val as Partial<Record<symbol, unknown>>)[Brand] : undefined
+}
 
 /** The mark on what a box answers for a whisper it will not show.
  * Never read it, nor compare `box.whisper` with a bag: ask `box.exposure`, `box.isShowing`, `box.isVeiled` or {@link isWhisperedBag}.
@@ -86,7 +86,7 @@ export const LOCKED: WhisperedBag = Object.freeze({ [Whispered]: 'locked' })
 export const VEILED: WhisperedBag = Object.freeze({ [Whispered]: 'veiled' })
 
 /** True for anything carrying {@link Whispered}, a copy included. Forging one is harmless: it only ever refuses at a put. */
-export const isWhisperedBag = (val: unknown): val is WhisperedBag => (typeof val === 'object') && (brandOf(val, Whispered) !== undefined)
+export function isWhisperedBag(val: unknown): val is WhisperedBag { return (typeof val === 'object') && (brandOf(val, Whispered) !== undefined) }
 
 // A check reads the getter in place of instanceof, which needs the class imported (a cycle, often) and fails across the
 // ESM and CommonJS builds. A getter sits on the prototype, so it is no own key that a spread or Object.keys would meet.
@@ -99,15 +99,15 @@ export type ClassForModelkind = {
 export type Modelkind = keyof ClassForModelkind
 
 /** True when `val` is a model of one of `modelkinds`, and typed as its class. */
-export const hasModelkind = <MKT extends Modelkind>(val: unknown, ...modelkinds: MKT[]): val is ClassForModelkind[MKT] => (
-  (typeof val === 'object') && (val !== null) && (modelkinds as Modelkind[]).includes((val as { modelkind?: unknown }).modelkind as Modelkind)
-)
+export function hasModelkind<MKT extends Modelkind>(val: unknown, ...modelkinds: MKT[]): val is ClassForModelkind[MKT] {
+  return (typeof val === 'object') && (val !== null) && (modelkinds as Modelkind[]).includes((val as { modelkind?: unknown }).modelkind as Modelkind)
+}
 
 /** The tag a VaultDB answers true to, so a model can tell one from a duck. */
 export const IsVaultDB: unique symbol = Symbol.for('@safebyok/vaultdb')
 
 /** True for a VaultDB, made by whichever copy of safebyok: an object that answers true to {@link IsVaultDB}. */
-export const isVaultDB = (val: unknown): val is { [IsVaultDB]: true } => brandOf(val, IsVaultDB) === true
+export function isVaultDB(val: unknown): val is { [IsVaultDB]: true } { return brandOf(val, IsVaultDB) === true }
 
 /** The tag an AdapterVaultDB answers true to, and no client of one, as a GraphQLVaultDB is. */
 export const IsAdapterVaultDB: unique symbol = Symbol.for('@safebyok/adaptervaultdb')
@@ -128,7 +128,7 @@ export const IsGuarded: unique symbol = Symbol.for('@safebyok/guarded')
 export const isGuarded = (val: unknown): boolean => brandOf(val, IsGuarded) === true
 
 /** `made`, frozen, answering true to {@link IsGuarded}. */
-export const brandGuarded = <MadeT extends object>(made: MadeT): MadeT => Object.freeze(brand(made, IsGuarded))
+export function brandGuarded<MadeT extends object>(made: MadeT): MadeT { return Object.freeze(brand(made, IsGuarded)) }
 
 /** The tag a VaultError answers true to, so `isVaultError` knows one from any copy of safebyok. */
 export const IsVaultError: unique symbol = Symbol.for('@safebyok/vaulterror')

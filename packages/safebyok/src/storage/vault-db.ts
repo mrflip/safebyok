@@ -41,22 +41,22 @@ export type Tidied      = { totalCount: number }
 export type Notice = { act: 'got' | 'gone', val: VaultRow | BoxRow, world: VaultRow | null }
 
 /** A good answer with `val`, keeping `answer`'s act, world and request metadata. */
-export const answerWithVal = <ValT>(answer: Answer<unknown, string, unknown>, val: ValT): GoodAnswer<ValT, string, unknown> => ({ ...carriedOf(answer), ok: true, val })
+export function answerWithVal<ValT>(answer: Answer<unknown, string, unknown>, val: ValT): GoodAnswer<ValT, string, unknown> { return { ...carriedOf(answer), ok: true, val } }
 
 // A refusal thrown while delivering a good answer keeps that answer's act: storage did what the act says.
 /** Make a bad answer of `thrown`, keeping the act and world of `answer`.
  * Pass {@link UNANSWERED} when the throw came before storage returned an answer: the bad answer is then made from the refusal alone.
  */
-export const refusedAnswerOf = (thrown: unknown, answer: Answer<unknown, string, unknown> | typeof UNANSWERED): BadAnswer => {
+export function refusedAnswerOf(thrown: unknown, answer: Answer<unknown, string, unknown> | typeof UNANSWERED): BadAnswer {
   const err = isVaultError(thrown) ? thrown : Refuse.unexpectedError(thrown)
   return (answer === UNANSWERED) ? badAnswerOf(err) : { ...carriedOf(answer), ok: false, err }
 }
 
 /** The fields of an answer besides its val or err. */
-const carriedOf = ({ req_params, act, world, dbhas }: Answer<unknown, string, unknown>) => ({ req_params, act, world, ...((dbhas !== undefined) && { dbhas }) })
+function carriedOf({ req_params, act, world, dbhas }: Answer<unknown, string, unknown>) { return { req_params, act, world, ...((dbhas !== undefined) && { dbhas }) } }
 
 /** Make a bad answer of `err`, with the act, request metadata and rows it carries, if it has them. */
-export const badAnswerOf = (err: VaultError): BadAnswer => {
+export function badAnswerOf(err: VaultError): BadAnswer {
   const { act = err.refusalkind, req_params = {} } = err.meta ?? {}
   const { world = null, dbhas } = rowsOfRefusal(err)
   return { ok: false, err, act, world, req_params, ...((dbhas !== undefined) && { dbhas }) }

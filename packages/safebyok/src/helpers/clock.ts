@@ -9,7 +9,7 @@ const deviceMillis = (): number => Date.now()
 const clock: { millis: () => number } = { millis: deviceMillis }
 
 /** The time now, in epoch milliseconds, by the device's clock. */
-export const nowMillis = (): number => clock.millis()
+export function nowMillis(): number { return clock.millis() }
 
 /** For tests only: {@link nowMillis} answers what `fn` answers until {@link _cheat_clockReset}. */
 export const _cheat_clock = (fn: () => number): void => { clock.millis = fn }

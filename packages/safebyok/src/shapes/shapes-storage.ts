@@ -244,83 +244,87 @@ export function reqParamsOf(request: unknown): ReqParams { return requestParams.
 export const revisionOf = ({ revision_tok, revision_seq }: Revision): Revision => ({ revision_tok, revision_seq })
 
 /** Fresh revision fields for the next write, written at `written_at`. */
-export const nextRevisionOf = ({ revision_seq }: Revision, written_at: number) => ({ revision_tok: randomId(), revision_seq: revision_seq + 1, written_at })
+export function nextRevisionOf({ revision_seq }: Revision, written_at: number) { return { revision_tok: randomId(), revision_seq: revision_seq + 1, written_at } }
 
-const metaOf = (raw: unknown) => {
+function metaOf(raw: unknown) {
   const parsed = rowMeta.safeParse(raw)
   return parsed.success ? parsed.data : null
 }
 
 /** True when `raw`, a stored row or null for a void one, stands at `prior`. Storage's conditional put is atomic on this. */
-export const isRowAt = (raw: unknown, prior: Revision): boolean => {
+export function isRowAt(raw: unknown, prior: Revision): boolean {
   if (raw === null) { return (prior.revision_tok === VoidRevisionTok) && (prior.revision_seq === VoidRevisionSeq) }
   const meta = metaOf(raw)
   return (meta?.revision_tok === prior.revision_tok) && (meta.revision_seq === prior.revision_seq)
 }
 
 /** True when `raw` is a live row. */
-export const isLiveRow = (raw: unknown): boolean => (metaOf(raw)?.am === 'a')
+export function isLiveRow(raw: unknown): boolean { return (metaOf(raw)?.am === 'a') }
 
 /** True when `raw` passes a vault row's checks, live in the life `vault_tok`. */
-export const isLiveVaultRecord = (raw: unknown, vault_tok: string): boolean => {
+export function isLiveVaultRecord(raw: unknown, vault_tok: string): boolean {
   const parsed = vaultRow.safeParse(raw)
   return parsed.success && (parsed.data.am === 'a') && (parsed.data.vault_tok === vault_tok)
 }
 
 /** True when `raw` passes a box row's checks, live in the life `vault_tok`. */
-export const isLiveBoxRecord = (raw: unknown, vault_tok: string): boolean => {
+export function isLiveBoxRecord(raw: unknown, vault_tok: string): boolean {
   const parsed = boxRow.safeParse(raw)
   return parsed.success && (parsed.data.am === 'a') && (parsed.data.vault_tok === vault_tok)
 }
 
 // A row that fails its check is never put over, whatever `prior` names: only `isRowAt` reads its meta, and it runs after the check.
 // A put replaces a live row only within its own life: a new life is born over a tombstone or nothing.
-const isPutAllowedOver = (stored: { am: EX.Am } | null, isSameLife: boolean, ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsParsed): boolean => (
-  isRowAt(ante, prior) && ((stored?.am === 'a') ? ((ifPresent === 'repl') && isSameLife) : (ifAbsent === 'add'))
-)
+function isPutAllowedOver(stored: { am: EX.Am } | null, isSameLife: boolean, ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsParsed): boolean {
+  return isRowAt(ante, prior) && ((stored?.am === 'a') ? ((ifPresent === 'repl') && isSameLife) : (ifAbsent === 'add'))
+}
 
 /** True when `record` may be written over `ante`, the vault row stored there or null, under `opts`. */
-export const isVaultPutAllowed = (ante: unknown, record: VaultRecord, opts: PutOptsParsed): boolean => {
+export function isVaultPutAllowed(ante: unknown, record: VaultRecord, opts: PutOptsParsed): boolean {
   const stored = storedVaultRowOrNull.safeParse(ante)
   return stored.success && isPutAllowedOver(stored.data, stored.data?.vault_tok === record.vault_tok, ante, opts)
 }
 
 /** True when `record` may be written over `ante`, the box row stored there or null, under `opts`. */
-export const isBoxPutAllowed = (ante: unknown, record: BoxRecord, opts: PutOptsParsed): boolean => {
+export function isBoxPutAllowed(ante: unknown, record: BoxRecord, opts: PutOptsParsed): boolean {
   const stored = storedBoxRowOrNull.safeParse(ante)
   return stored.success && isPutAllowedOver(stored.data, stored.data?.box_tok === record.box_tok, ante, opts)
 }
 
 /** True when `raw` is no row, a tombstone, or a row of another life, so the boxes under `vault_tok` belong to nothing. A row failing its checks might be theirs, and is false. */
-export const isLifeOver = (raw: unknown, vault_tok: string): boolean => {
+export function isLifeOver(raw: unknown, vault_tok: string): boolean {
   if (raw === null) { return true }
   const parsed = vaultRow.safeParse(raw)
   return parsed.success && ((parsed.data.am === 'x') || (parsed.data.vault_tok !== vault_tok))
 }
 
 /** True when `raw` is the tombstone of a deleted row. */
-export const isTombstoneRow = (raw: unknown): boolean => (metaOf(raw)?.am === 'x')
+export function isTombstoneRow(raw: unknown): boolean { return (metaOf(raw)?.am === 'x') }
 
 const shellTimes = { registered_at: VoidTime, written_at: VoidTime }
 
 /** The tombstone of a vault row that is not stored. */
-export const shellVaultOf = ({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone => ({
-  applabel, user_id, vaultlabel, fmt: VaultFormat, ...VoidRevision, ...shellTimes, am: 'x', vault_tok,
-})
+export function shellVaultOf({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone {
+  return {
+    applabel, user_id, vaultlabel, fmt: VaultFormat, ...VoidRevision, ...shellTimes, am: 'x', vault_tok,
+  }
+}
 
 /** The tombstone of a box row that is not stored. */
-export const shellBoxOf = ({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string): BoxTombstone => ({
-  applabel, user_id, vaultlabel, boxlabel, fmt: BoxFormat, ...VoidRevision, ...shellTimes, am: 'x', vault_tok, box_tok: VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
-})
+export function shellBoxOf({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string): BoxTombstone {
+  return {
+    applabel, user_id, vaultlabel, boxlabel, fmt: BoxFormat, ...VoidRevision, ...shellTimes, am: 'x', vault_tok, box_tok: VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
+  }
+}
 
 /** A listing's entry for a vault row that failed validation. Its label comes from storage, unchecked: it is part of what is reported. */
-export const damagedVaultOf = ({ applabel, user_id, vaultlabel }: VaultScope): DamagedVault => ({ applabel, user_id, vaultlabel, am: 'd' })
+export function damagedVaultOf({ applabel, user_id, vaultlabel }: VaultScope): DamagedVault { return { applabel, user_id, vaultlabel, am: 'd' } }
 
 /** A listing's entry for a box row that failed validation. Its label comes from storage, unchecked: it is part of what is reported. */
-export const damagedBoxOf = ({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string): DamagedBox => ({ applabel, user_id, vaultlabel, boxlabel, vault_tok, am: 'd' })
+export function damagedBoxOf({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string): DamagedBox { return { applabel, user_id, vaultlabel, boxlabel, vault_tok, am: 'd' } }
 
 /** The tombstone a vault's deletion leaves for a box row, or null for a row already one or past reading. */
-export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone | null => {
+export function boxTombstoneOf(raw: unknown, written_at: number): BoxTombstone | null {
   const parsed = boxRow.safeParse(raw)
   if ((! parsed.success) || (parsed.data.am === 'x')) { return null }
   return { ...boxSparse.parse(parsed.data), ...nextRevisionOf(parsed.data, written_at), am: 'x' }

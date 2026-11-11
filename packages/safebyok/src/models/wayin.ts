@@ -17,7 +17,7 @@ export const PurposeForWayinkind = Object.freeze({
  * The value cannot be unwrapped unless the same bytes, unchanged, are independently provided along with the wrapping
  * key. Any change to that associated data, another user_id or a forged registered_at, will not unwrap.
  */
-export const wayinCtxOf = (stamp: VaultStamp, header: WayinHeader): Uint8Array => {
+export function wayinCtxOf(stamp: VaultStamp, header: WayinHeader): Uint8Array {
   const checked = wayinHeader.parse(header)
   return cipherCtx(vaultStamp.parse(stamp), PurposeForWayinkind[checked.wayinkind], checked)
 }

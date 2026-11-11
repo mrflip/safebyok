@@ -15,7 +15,7 @@ import type { Revision } from '../shapes/shapes-storage'
 // == [Revisions]: cmpRevisions
 
 /** How `post` compares to `ante`: the later `revision_seq` is newer. The same seq under another `revision_tok` is two puts written as one revision. */
-export const cmpRevisions = (ante: Revision, post: Revision): Age => {
+export function cmpRevisions(ante: Revision, post: Revision): Age {
   if (post.revision_seq < ante.revision_seq) { return 'older' }
   if (post.revision_seq > ante.revision_seq) { return 'newer' }
   if (post.revision_tok !== ante.revision_tok) {

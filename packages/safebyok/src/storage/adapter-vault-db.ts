@@ -20,7 +20,7 @@ import * as Refuse from '../refusals/throwers'
 
 // == [Answers]: answerOf
 
-const answerOf = async <ValT, ActT extends string, WorldT>(thunk: () => Promise<GoodAnswer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> => {
+async function answerOf<ValT, ActT extends string, WorldT>(thunk: () => Promise<GoodAnswer<ValT, ActT, WorldT>>): Promise<Answer<ValT, ActT, WorldT>> {
   const outcome = await outcomeOf(thunk)
   return outcome.ok ? outcome.val : badAnswerOf(outcome.err)
 }
@@ -356,7 +356,7 @@ function goodOrThrow<ValT, ActT extends string, WorldT>(answer: Answer<ValT, Act
 /** Select the appropriate refusal for a thrown error. A VaultError is returned directly. Other errors become `storage_unavailable`.
  * Either way, its meta names the `callerlabel` as `call`, with the ask's safe metadata as `req_params`.
  */
-const refusalOf = (thrown: unknown, callerlabel: string, ask: unknown): VaultError => {
+function refusalOf(thrown: unknown, callerlabel: string, ask: unknown): VaultError {
   const refusal = storageRefusalOf(thrown)
   // A request that failed its check has no metadata to trust: its refusal carries none.
   const params = SX.requestParams.safeParse(ask)
@@ -389,7 +389,7 @@ function liveVaultOf(stored: VaultRow | null, asked: VaultQuery): VaultRecord {
   return stored
 }
 
-const listedBoxesOf = ({ vault_tok, ...scope }: VaultQuery, rows: RowOfBox[]): BoxesListed => {
+function listedBoxesOf({ vault_tok, ...scope }: VaultQuery, rows: RowOfBox[]): BoxesListed {
   const listed: BoxesListed = { boxes: [], damaged_rows: [] }
   for (const { boxlabel, box } of rows) {
     const address = { ...scope, boxlabel, vault_tok }
@@ -399,5 +399,5 @@ const listedBoxesOf = ({ vault_tok, ...scope }: VaultQuery, rows: RowOfBox[]): B
   return listed
 }
 
-const jsonSize = (val: unknown): number => new TextEncoder().encode(JSON.stringify(val)).length
+function jsonSize(val: unknown): number { return new TextEncoder().encode(JSON.stringify(val)).length }
 // --

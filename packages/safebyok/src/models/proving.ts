@@ -185,21 +185,25 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
 
 // == [Headers]: mintPassphraseHeader, mintPasskeyHeader
 
-const mintPassphraseHeader = ({ keyDeriver, device_id }: ProvingWorld): PassphraseWayinHeader => passphraseWayinHeader.parse({
-  wayinkind:         'passphrase',
-  key_deriver_label: keyDeriver.key_deriver_label,
-  salt_b64:          toB64(randomBytes(keyDeriver.salt_size)),
-  device_id,
-  registered_at:     nowMillis(),
-})
+function mintPassphraseHeader({ keyDeriver, device_id }: ProvingWorld): PassphraseWayinHeader {
+  return passphraseWayinHeader.parse({
+    wayinkind:         'passphrase',
+    key_deriver_label: keyDeriver.key_deriver_label,
+    salt_b64:          toB64(randomBytes(keyDeriver.salt_size)),
+    device_id,
+    registered_at:     nowMillis(),
+  })
+}
 
-const mintPasskeyHeader = ({ device_id }: ProvingWorld, { credential_id, prf_salt_b64 }: GX.PasskeyAnswer): PasskeyWayinHeader => passkeyWayinHeader.parse({
-  wayinkind:     'passkey',
-  credential_id,
-  prf_salt_b64,
-  device_id,
-  registered_at: nowMillis(),
-})
+function mintPasskeyHeader({ device_id }: ProvingWorld, { credential_id, prf_salt_b64 }: GX.PasskeyAnswer): PasskeyWayinHeader {
+  return passkeyWayinHeader.parse({
+    wayinkind:     'passkey',
+    credential_id,
+    prf_salt_b64,
+    device_id,
+    registered_at: nowMillis(),
+  })
+}
 // --
 
 // == [The key deriver]: GuardedKeyDeriver, guardKeyDeriver, deriveKeyBytes
@@ -216,7 +220,7 @@ export type GuardedKeyDeriver = Readonly<{
 // checked where they arrive, in passphraseKeyOf. A failed `load` keeps its throw as the cause, as it heard nothing;
 // a VaultError `load` throws passes as it came.
 /** `hostDeriver`, made to honor its interface: the one way a proving asks it for key bytes. */
-export const guardKeyDeriver = (hostDeriver: KeyDeriver): GuardedKeyDeriver => {
+export function guardKeyDeriver(hostDeriver: KeyDeriver): GuardedKeyDeriver {
   const { key_deriver_label, salt_size } = CX.keyDeriverShape.parse(hostDeriver, { where: 'keyDeriver' })
   const load = async (): Promise<void> => {
     try {
@@ -230,7 +234,7 @@ export const guardKeyDeriver = (hostDeriver: KeyDeriver): GuardedKeyDeriver => {
 }
 
 // The key deriver hears the passphrase here (guarantees.md, G1 and G8): what it throws may quote it, so it is replaced, not kept as a cause.
-const deriveKeyBytes = async (hostDeriver: KeyDeriver, passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<unknown> => {
+async function deriveKeyBytes(hostDeriver: KeyDeriver, passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<unknown> {
   try {
     return await hostDeriver.deriveKeyBytes(passphrase, saltBytes)
   } catch {
@@ -241,13 +245,13 @@ const deriveKeyBytes = async (hostDeriver: KeyDeriver, passphrase: GX.Passphrase
 
 // == [Key bytes]: isSharedMemory, isSafelyAllZero, passphraseKeyOf
 
-const isSharedMemory = (view: ArrayBufferView): boolean => Object.prototype.toString.call(view.buffer) === '[object SharedArrayBuffer]'
+function isSharedMemory(view: ArrayBufferView): boolean { return Object.prototype.toString.call(view.buffer) === '[object SharedArrayBuffer]' }
 
 // Reads every byte with no early exit and no branch on a byte, as libsodium's sodium_is_zero does: `every` would exit
 // early and `for of` would allocate an iterator. No JavaScript engine promises constant time; only the verdict steers what
 // follows, and the refusal of an all-zero key tells that anyway.
 /** True when every byte of `bytes` is zero. */
-const isSafelyAllZero = (bytes: Uint8Array): boolean => {
+function isSafelyAllZero(bytes: Uint8Array): boolean {
   let   seen = 0
   const len  = bytes.length
   for (let ii = 0; ii < len; ii++) {
@@ -257,7 +261,7 @@ const isSafelyAllZero = (bytes: Uint8Array): boolean => {
   return seen === 0
 }
 
-const passphraseKeyOf = async (keyDeriver: GuardedKeyDeriver, passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<CryptoKey> => {
+async function passphraseKeyOf(keyDeriver: GuardedKeyDeriver, passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<CryptoKey> {
   const handed = await keyDeriver.deriveKeyBytes(passphrase, saltBytes)
   if (! ArrayBuffer.isView(handed) || isSharedMemory(handed)) { throw notKeyBytes() }
   const keyBytes = new Uint8Array(handed.buffer, handed.byteOffset, handed.byteLength)

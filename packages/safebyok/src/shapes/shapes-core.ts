@@ -87,7 +87,7 @@ export type WhisperJson = string | number | boolean | null | WhisperJson[] | { [
 export type Whisper = Record<string, any>
 
 /** True for a plain object, built by a literal or `Object.create(null)`: never a Date or Map, which JSON would flatten, nor one with a symbol key, such as a bag marked `Whispered`, which it would drop. */
-export const isPlainBag = (val: unknown): val is Record<string, unknown> => {
+export function isPlainBag(val: unknown): val is Record<string, unknown> {
   if (typeof val !== 'object' || val === null) { return false }
   if (Object.getOwnPropertySymbols(val).length > 0) { return false }
   const proto: unknown = Object.getPrototypeOf(val)

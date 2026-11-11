@@ -13,7 +13,7 @@ export function adorn<VT>(obj: object, ckey: string, val: VT): VT {
 }
 
 /** Add properties of `hidden` to `obj` as a hidden property; return `obj`. */
-export const decorate = <OT extends object>(obj: OT, hidden: Partial<OT>): OT => {
+export function decorate<OT extends object>(obj: OT, hidden: Partial<OT>): OT {
   for (const [ckey, val] of Object.entries(hidden)) {
     adorn(obj, ckey, val)
   }
@@ -63,5 +63,5 @@ export function nextMicrotask(): Promise<void> { return new Promise(queueMicrota
 export type Awaitable<ValT> = ValT | Promise<ValT>
 
 /** The ckey of `parts`, whichever characters they contain: JSON, so no two lists of parts meet. */
-export const ckeyOf = (...parts: string[]): string => JSON.stringify(parts)
+export function ckeyOf(...parts: string[]): string { return JSON.stringify(parts) }
 // --

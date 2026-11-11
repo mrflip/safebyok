@@ -29,21 +29,25 @@ export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optio
 type BankScopepath = [applabel: string, user_id: string]
 
 /** The scopepath of the lease row at `scope`. */
-const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath => [applabel, user_id, vaultlabel]
+function leaseScopepathOf({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath { return [applabel, user_id, vaultlabel] }
 /** The scopepath of the bank row at `scope`. */
-const bankScopepathOf = ({ applabel, user_id }: BankScope): BankScopepath => [applabel, user_id]
+function bankScopepathOf({ applabel, user_id }: BankScope): BankScopepath { return [applabel, user_id] }
 
 /** The lease shelf: the device database of `dbName`, which has the leases. */
-const leaseShelfOf = (dbName: string): UseStore => versionedShelfOf({
-  dbName, dbstem: 'device', version: DeviceDBVersion, storename: 'leases', oldnames: [`${dbName}:device_db`, `${dbName}:device-v1`],
-})
+function leaseShelfOf(dbName: string): UseStore {
+  return versionedShelfOf({
+    dbName, dbstem: 'device', version: DeviceDBVersion, storename: 'leases', oldnames: [`${dbName}:device_db`, `${dbName}:device-v1`],
+  })
+}
 
 // A separate database, because a versioned shelf has a single object store: adding a second object store to the device
 // database would change its version, and every device would forget its leases.
 /** The bank shelf: the bank database of `dbName`, which has the bank rows. */
-const bankShelfOf = (dbName: string): UseStore => versionedShelfOf({
-  dbName, dbstem: 'bank', version: BankDBVersion, storename: 'bank', oldnames: [],
-})
+function bankShelfOf(dbName: string): UseStore {
+  return versionedShelfOf({
+    dbName, dbstem: 'bank', version: BankDBVersion, storename: 'bank', oldnames: [],
+  })
+}
 // --
 
 /** A device database that keeps this device's leases and bank rows in its browser's IndexedDB. */
@@ -113,6 +117,6 @@ export class IdbDeviceDB extends DeviceDB {
 }
 
 /** A device database in this browser's IndexedDB, for a browser app to pass to `Bank.make`. */
-export const idbDeviceDB = (opts?: IdbDeviceDBOpts): IdbDeviceDB => new IdbDeviceDB(opts)
+export function idbDeviceDB(opts?: IdbDeviceDBOpts): IdbDeviceDB { return new IdbDeviceDB(opts) }
 
 true satisfies Z.core.util.AssertEqual<IdbDeviceDBOpts, Z.input<typeof idbDeviceDBOpts>>

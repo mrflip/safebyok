@@ -303,21 +303,21 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 // == [Patches]: isOfBothHalves
 
 /** Whether `given` carries both the whisper and the sidecar, so that a put of it needs nothing from the record stored. */
-const isOfBothHalves = ({ whisper, sidecar }: BoxPatchParsed): boolean => (whisper !== undefined) && (sidecar !== undefined)
+function isOfBothHalves({ whisper, sidecar }: BoxPatchParsed): boolean { return (whisper !== undefined) && (sidecar !== undefined) }
 // --
 
 // == [Merging]: mergedOver
 
 /** `patch` merged over a copy of `whisper`, arrays replaced, as a plain object merge. */
-const mergedOver = (whisper: Whisper, patch: Whisper): Whisper => (
-  mergeWith(cloneDeep(whisper), patch, (_was, val) => (Array.isArray(val) ? val : undefined))
-)
+function mergedOver(whisper: Whisper, patch: Whisper): Whisper {
+  return mergeWith(cloneDeep(whisper), patch, (_was, val) => (Array.isArray(val) ? val : undefined))
+}
 // --
 
 // == [The seal]: sealedRecordOf, boxStampOf, deserializeWhisper
 
 /** The full record of `base` with `sidecar`, `whisper` sealed through `world`: as json_v1, bound with its key to the box's stamp. Of `base`, only its sparse fields are taken. */
-const sealedRecordOf = async (world: Pick<BoxWorld, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: Whisper): Promise<BoxRecord> => {
+async function sealedRecordOf(world: Pick<BoxWorld, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: Whisper): Promise<BoxRecord> {
   const sparse = SX.boxSparse.parse(base)
   const stamp = boxStampOf(sparse, sidecar)
   const { box_key_wrapped, whisper_ciphered } = await world.sealStampedString(stableJsonify(whisper), stamp)
@@ -325,7 +325,7 @@ const sealedRecordOf = async (world: Pick<BoxWorld, 'sealStampedString'>, base: 
 }
 
 /** The box's stamp, which the lease binds both sealed parts to: every sparse field of the record, and its sidecar as stable JSON. */
-const boxStampOf = (sparse: BoxSparse, sidecar: Sidecar): CipherCtxRecord => ({ ...sparse, sidecar: stableJsonify(sidecar) })
+function boxStampOf(sparse: BoxSparse, sidecar: Sidecar): CipherCtxRecord { return { ...sparse, sidecar: stableJsonify(sidecar) } }
 
 // What JSON.parse throws is replaced, never kept as a cause: a SyntaxError can quote the text it failed on.
 /** The whisper `text` holds as JSON; `damaged_whisper` where it holds none, or holds what is not a whisper. */

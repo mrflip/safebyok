@@ -148,7 +148,7 @@ export type RefusalMeta = {
 }
 
 /** The rows `err` hands a vaultDB's answer, empty where it has none. */
-export const rowsOfRefusal = (err: VaultError): RefusalRows => (err as unknown as Record<symbol, RefusalRows | undefined>)[RowsOfRefusal] ?? {}
+export function rowsOfRefusal(err: VaultError): RefusalRows { return (err as unknown as Record<symbol, RefusalRows | undefined>)[RowsOfRefusal] ?? {} }
 
 /** The options of a VaultError beside its refusalkind and message: the `cause` behind it, and its `meta`. */
 export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta, rows?: RefusalRows }
@@ -204,9 +204,9 @@ export type Thrown = unknown
  *
  * @example listedKindOf(new Error('no luck with hunter2'))  // null
  */
-export const listedKindOf = (thrown: unknown): Refusalkind | null => (
-  isVaultError(thrown) && (refusalkindVals as readonly string[]).includes(thrown.refusalkind) ? thrown.refusalkind : null
-)
+export function listedKindOf(thrown: unknown): Refusalkind | null {
+  return isVaultError(thrown) && (refusalkindVals as readonly string[]).includes(thrown.refusalkind) ? thrown.refusalkind : null
+}
 
 /** The string `name` of `thrown` when it is an object carrying one, else null: all a refusal keeps of an error it replaces.
  * An Error's or a DOMException's is its class name; a host's own error carries whatever name the
@@ -214,9 +214,9 @@ export const listedKindOf = (thrown: unknown): Refusalkind | null => (
  *
  * @example thrownNameOf(new DOMException('No room.', 'QuotaExceededError'))  // 'QuotaExceededError'
  */
-export const thrownNameOf = (thrown: unknown): string | null => (
-  typeof thrown === 'object' && thrown !== null && 'name' in thrown && typeof thrown.name === 'string' ? thrown.name : null
-)
+export function thrownNameOf(thrown: unknown): string | null {
+  return typeof thrown === 'object' && thrown !== null && 'name' in thrown && typeof thrown.name === 'string' ? thrown.name : null
+}
 // --
 
 // == [Guards]: isVaultError, isCondition
@@ -244,7 +244,7 @@ export const isVaultError = (err: unknown, refusalkind?: Refusalkind): err is Va
  *     showGripe(err.message)
  *   }
  */
-export const isCondition = (err: unknown): err is VaultError => (
-  isVaultError(err) && err.family !== 'misuse'
-)
+export function isCondition(err: unknown): err is VaultError {
+  return isVaultError(err) && err.family !== 'misuse'
+}
 // --

@@ -175,7 +175,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 // change hears provings, and comes to the vault's private unlock by unlockByProving (G9).
 
 /** Build a vault under `scope` using the passphrase and (if given) passkey; unlock once built. */
-const buildVault = async (listing: VaultListing, scope: VaultScope, expected: VaultSparse, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> => {
+async function buildVault(listing: VaultListing, scope: VaultScope, expected: VaultSparse, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> {
   const { passphraseClear, passkeyClear } = checkedCleartexts(GX.vaultBuildCleartexts, cleartexts)
   // A birth's stamp is minted here, one per attempt.
   const stamp             = listing.stampOfBirth(scope)
@@ -264,13 +264,13 @@ const ActOnVault: Record<VaultGatingkind, (vault: Vault, cleartexts: unknown, un
 // == [An act's helpers]: timelyAnte, checkedCleartexts, isCorrectable, spendCleartexts
 
 /** The hydrated vault's record (as a pojo, not instance) and its gate (as an instance) */
-const timelyAnte = async (vault: Vault): Promise<{ ante: VaultRecord, gate: Gate }> => {
+async function timelyAnte(vault: Vault): Promise<{ ante: VaultRecord, gate: Gate }> {
   await vault.ensureTimely(VX.Promptly); vault.demandPromptable()
   return { ante: vault.fullRecord, gate: vault.gate }
 }
 
 /** The cleartexts through their checker. A throw that is not one of this library's is replaced whole, keeping nothing of it (G8). */
-const checkedCleartexts = <CleartextsT>(checker: { parse: (cleartexts: unknown) => CleartextsT }, cleartexts: unknown): CleartextsT => {
+function checkedCleartexts<CleartextsT>(checker: { parse: (cleartexts: unknown) => CleartextsT }, cleartexts: unknown): CleartextsT {
   try {
     return checker.parse(cleartexts)
   } catch (err) {
@@ -278,10 +278,10 @@ const checkedCleartexts = <CleartextsT>(checker: { parse: (cleartexts: unknown) 
   }
 }
 
-const isCorrectable = (err: VaultError): boolean => (EX.correctablekindVals as readonly string[]).includes(err.refusalkind)
+function isCorrectable(err: VaultError): boolean { return (EX.correctablekindVals as readonly string[]).includes(err.refusalkind) }
 
 /** Zero a passkey answer's PRF bytes wherever `cleartexts` carries them (G2). */
-const spendCleartexts = (cleartexts: unknown): void => {
+function spendCleartexts(cleartexts: unknown): void {
   // The reach-in may meet a getter or a proxy of the host's, which may throw: spending is best effort, and never replaces the outcome it follows.
   // The cleartexts may be unchecked, as at the door, so nothing about them is assumed. An answer is single-use: once zeroed, a
   // second hand-in is refused by its all-zero bytes.

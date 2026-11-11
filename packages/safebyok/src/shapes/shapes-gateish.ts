@@ -25,7 +25,7 @@ import * as SX from './shapes-storage'
 export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinkindVals), 'bad_option')
 
 /** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltSize} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
-export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_salt_b64)?.length === PasskeySaltSize
+export function isPrfSalt(prf_salt_b64: string): boolean { return fromB64OrNull(prf_salt_b64)?.length === PasskeySaltSize }
 // --
 
 // == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord

@@ -2,7 +2,7 @@
  * A browser's or Deno's shows it as an uncaught error, without ending anything. Where there is
  * none (Node, Bun), it does nothing. A `reportError` that throws is ignored.
  */
-export const reportToPlatform = (err: unknown): void => {
+export function reportToPlatform(err: unknown): void {
   const { reportError } = globalThis as { reportError?: unknown }
   if (typeof reportError !== 'function') { return }
   try {

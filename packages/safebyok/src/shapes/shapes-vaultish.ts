@@ -59,7 +59,7 @@ export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[Prop] | undefined }
 
 /** True for a deleted record: its `am` is 'x'. */
-export const isTombstone = <SparseT extends Liveness>(fetched: SparseT): fetched is Tombstone<SparseT> => (fetched.am === 'x')
+export function isTombstone<SparseT extends Liveness>(fetched: SparseT): fetched is Tombstone<SparseT> { return (fetched.am === 'x') }
 
 // --
 
@@ -192,9 +192,9 @@ export type ListingOpts = {
 }
 
 /** True for an object answering each of {@link VaultDBVerbnames} with a function. */
-const answersEachVerb = (val: object): boolean => (
-  VaultDBVerbnames.every((verbname) => typeof (val as Partial<Record<string, unknown>>)[verbname] === 'function')
-)
+function answersEachVerb(val: object): boolean {
+  return VaultDBVerbnames.every((verbname) => typeof (val as Partial<Record<string, unknown>>)[verbname] === 'function')
+}
 
 /** The check of a vaultDB as a model is handed one: branded, from whichever copy of safebyok, and answering each verb with a function. */
 export const brandedVaultDB = Checker(({ custom }) => custom<VaultDB>((val) => isVaultDB(val) && answersEachVerb(val), Phrases.VaultDBExpected), 'bad_option')
