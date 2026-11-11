@@ -25,11 +25,11 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  * `load` yourself only to warm up. A `load` that fails refuses the hello, a `VaultError` it throws as
  * it came and anything else with what it threw as the cause, so a vault that cannot check a new passphrase never opens.
  *
- * `safebyok/browser` ships `zxcvbnStrengthChecker`, or pass your own (CUSTOMIZATION.md). To ask it as the user types, call
+ * `safebyok/browser` ships `zxcvbnStrengthChecker`, or pass your own (notes/configuration.md). To ask it as the user types, call
  * `gating.checkStrength(typed)`, which answers its verdict.
  *
  * - A blank passphrase is sent back as a weak passphrase, unconditionally, without consulting the checker.
- * - The default strength checker refuses everything: see CUSTOMIZATION.md for why we do this, and instructions to supply one.
+ * - The default strength checker refuses everything: see notes/configuration.md for why we do this, and instructions to supply one.
  *
  * @example
  *   const strengthChecker = (typed: string) => (typed.length < 20 ? { strong: false, reason: 'Twenty characters or more, please.' } : { strong: true })
@@ -54,7 +54,7 @@ export const StrongVerdict: PassphraseVerdict = Object.freeze({ strong: true })
 /** The verdict {@link DefaultStrengthChecker} answers of every passphrase: a word to the user, and one to the app's makers. */
 const DefaultVerdict: PassphraseVerdict = Object.freeze({
   strong: false,
-  reason: "This app can't accept a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Bank.make needs a strengthChecker, such as zxcvbnStrengthChecker from safebyok/browser, as safebyok's CUSTOMIZATION.md says under Pluggable Passphrase Strength Checker.",
+  reason: "This app can't accept a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Bank.make needs a strengthChecker, such as zxcvbnStrengthChecker from safebyok/browser, as notes/configuration.md in safebyok's repository says under Pluggable Passphrase Strength Checker.",
 })
 
 /** The strength checker of a vault whose host chose none: every passphrase is too weak, so no vault can be made, nor a passphrase changed.

@@ -112,7 +112,7 @@ export const KeyDeriverSpecShape = `Expected a keyDeriverSpec: algorithm 'argon2
 export const memoryPerLane = (minKib: number): string => `Expected at least ${String(minKib)} KiB of memory for each lane (parallelism)`
 
 /** A `strengthChecker` that is no checker. */
-export const StrengthCheckerShape = "Expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. Pass zxcvbnStrengthChecker from safebyok/browser, or your own (CUSTOMIZATION.md, Pluggable Passphrase Strength Checker)"
+export const StrengthCheckerShape = "Expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. Pass zxcvbnStrengthChecker from safebyok/browser, or your own (notes/configuration.md, Pluggable Passphrase Strength Checker)"
 // --
 
 // == [Refusals]: unknownFields, moreFailures, WhisperShape, fieldsDisagree, BagNotObject, WhisperBagShape

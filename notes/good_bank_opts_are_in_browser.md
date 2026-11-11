@@ -36,7 +36,7 @@ Breaking any of the three, for example importing a `safebyok/browser` module fro
 
 ## Why the default checker refuses everything
 
-It is the contract, not a bug (`packages/safebyok/CUSTOMIZATION.md`, *Pluggable Passphrase Strength
+It is the contract, not a bug (`notes/configuration.md`, *Pluggable Passphrase Strength
 Checker*). The core won't guess how strong a passphrase a host's users need, and a length-only
 checker is no checker. The refusal's message tells the user, and the developer, that a checker must
 be chosen. A host gets a good one by spreading `browserOpts()`, or brings its own.
