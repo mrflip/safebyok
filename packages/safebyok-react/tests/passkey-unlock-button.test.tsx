@@ -181,6 +181,8 @@ describe("PassphraseModal, for a vault with a passkey", () => {
       diag('passkey button clicked')
       await screen.findByText(Messages.passkeyAskFailed)
       diag('passkey gripe shown')
+      await waitFor(() => { expect(asking()).to.eq('false') })
+      diag('passkey button done asking')
       fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'wrong' } })
       diag('typed')
       expect(screen.getByText(Messages.passkeyAskFailed)).to.exist
