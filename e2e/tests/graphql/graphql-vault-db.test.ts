@@ -44,8 +44,8 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
     makeCappedVaultDB:    async (maxBoxes) => await freshBrowser({ maxBoxes }),
     makeTwin:             twinOf,
     _cheat_rowsOf:        () => TH.rowsOf(getDb()),
-    _cheat_adapterOf:       (browser) => serverOf.get(browser)!.vaultDB,
-    boxNoticesCarryVault: false,
+    _cheat_adapterOf:     (browser) => serverOf.get(browser)!.vaultDB,
+    plantsAnyRow:         false,
   })
 
   it("hears what a browser of another server puts, a box too large for a notice included", async () => {
@@ -59,8 +59,8 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
     const vault = TH.vaultAt()
     const box = TH.boxAt(0, 'life1', { sidecar: { padding: 'x'.repeat(9000) } })
 
-    await writer.putVault(vault, { prior: DB.VoidRevision })
-    await writer.putBox(box, { prior: DB.VoidRevision })
+    await writer.putVault(TH.vaultPutAskOf(vault))
+    await writer.putBox(TH.boxPutAskOf(box))
 
     await vi.waitFor(() => { expect(notices).to.have.lengthOf(2) })
     expect(notices.map(({ act, val }) => [act, val])).to.deep.equal([['got', vault], ['got', box]])
@@ -80,7 +80,8 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
   it("refuses a browser signed in as one user the bank of another", async () => {
     const server = await TH.freshServer(getDb())
     const intruder = TH.browserAt(server, () => 'u2')
-    await TH.expectRefusal(intruder.putVault(TH.vaultAt(), { prior: DB.VoidRevision }), 'identity_revoked')
+    const born = TH.vaultPutAskOf(TH.vaultAt())
+    await TH.expectRefusal(intruder.putVault(born), 'identity_revoked')
     await TH.expectRefusal(TH.browserAt(server, () => null).listVaults(TH.bankScope), 'identity_revoked')
     expect(await TH.rowsOf(getDb()).vaultRowOf(TH.vaultScope)).to.be.null
   })

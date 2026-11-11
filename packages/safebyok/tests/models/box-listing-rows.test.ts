@@ -2,9 +2,8 @@
 
 import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
-import * as SX from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
-import { boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
+import { boxDnaOf, boxListingOf, fullBoxRecord, sentinelBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
 const world = useModelsWorld()
 
@@ -162,7 +161,7 @@ describe("BoxListing: an absent box", () => {
       const record = fullBoxRecord({ ...stored, sidecar: { note: 'theirs' } })
       const stale = world.mw.staleWriteOf(box.scope, record)
       world.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { expected: box.sparse }), 'stale_write')
       expect(box.revision_seq).to.eq(5)
       expect(box.isFull).to.be.true
       expect(box.sidecar).to.deep.equal({ note: 'theirs' })
@@ -172,7 +171,7 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await listedBox()
       const stale = world.mw.staleWriteOf(box.scope, sparseBoxRecord(stored))
       world.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { expected: box.sparse }), 'stale_write')
       expect(box.revision_seq).to.eq(5)
       expect(box.isFull).to.be.false
       expect(box.sidecar).to.be.null
@@ -182,7 +181,7 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await listedBox()
       const stale = world.mw.staleWriteOf(box.scope, tombstoneBoxRecord(stored))
       world.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { expected: box.sparse }), 'stale_write')
       expect(box.isPresent).to.be.false
     })
 
@@ -198,7 +197,7 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await listedBox()
       const stale = world.mw.staleWriteOf(box.scope, undefined)
       world.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { expected: box.sparse }), 'stale_write')
       expect(box._cheat_central.revision_seq).to.eq(1)
     })
 
@@ -206,14 +205,14 @@ describe("BoxListing: an absent box", () => {
       const { listing, box } = await listedBox()
       const stale = world.mw.staleWriteOf(box.scope, null)
       world.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { expected: box.sparse }), 'stale_write')
     })
 
     it("throws 'stale_write' with nothing delivered for a box_stored that fails its check", async () => {
       const { listing, box } = await listedBox()
       const stale = world.mw.staleWriteOf(box.scope, { junk: 1 } as never)
       world.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { expected: box.sparse }), 'stale_write')
       expect(box._cheat_central.revision_seq).to.eq(1)
     })
 
@@ -221,7 +220,7 @@ describe("BoxListing: an absent box", () => {
       const listing = boxListingOf(world.mw)
       const stale = world.mw.staleWriteOf(scope(), fullBoxRecord(stored))
       world.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { prior: SX.VoidRevision }), 'stale_write')
+      await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { expected: sentinelBoxRecord() }), 'stale_write')
       expect(listing.at(scope())?.revision_seq).to.eq(5)
     })
 

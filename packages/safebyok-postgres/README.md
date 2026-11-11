@@ -17,18 +17,30 @@ pnpm add safebyok safebyok-postgres
 `safebyok` is a peer dependency, so the adapter and your app share one copy, and a `VaultError`
 from one is a `VaultError` to the other.
 
-## Make the tables
+## Make the tables and the functions
 
-`VaultTablesSql` is the SQL, for Postgres 14 or later; the package also ships it as
+`VaultTablesSql` is the SQL of the tables, for Postgres 14 or later; the package also ships it as
 `vault-tables.sql`, to copy into your migrations. It creates only what is missing, so it is safe to
 run again. Until 1.0 there is no migration: a release that changes the tables says so in its
 changelog, and you drop them and run it again.
 
+The tables hold a column for each field of a row, and check each row's shape: its `am`, the columns
+a live row has and a tombstone lacks, and the outline of each `jsonb` field. A row they refuse
+(SQLSTATE `23514`) is one safebyok could not have read back. They do not judge `fmt`: a row of a
+later format may sit beside these, and the functions store nothing over it.
+
+`VaultFunctionsSql` is the SQL of the functions `PostgresVaultDB` calls to write a row, shipped as
+`vault-functions.sql`. Run it after the tables, and **again with each upgrade of this package**:
+each run replaces the functions. They run as the role that calls them, and no other role may call
+them, so run both files as the role your pool connects as, or grant it `EXECUTE`.
+
 ```ts
-import { VaultTablesSql } from 'safebyok-postgres'
+import { VaultFunctionsSql, VaultTablesSql } from 'safebyok-postgres'
 
 await pool.query(VaultTablesSql)    // pg runs several statements in one query without parameters
+await pool.query(VaultFunctionsSql)
 await pglite.exec(VaultTablesSql)
+await pglite.exec(VaultFunctionsSql)
 ```
 
 ## Use
@@ -62,11 +74,15 @@ missing table or privilege (a code in class `42`) refuses as `unexpected_error`,
 ## Hearing other writes
 
 Each write sends a notification on its user's channel, `vaultChannelOf(user_id)`, which is
-`safebyok_` and the user_id, as it commits. A vault's notification is its row as stored; a box's
-is one JSON array, its vault's fields but the wayins and then its own; a row too long for a
-notification is told by where it is, and the listener reads it afresh. `listen(channel, onNotify)`
-hands each notification's text on that channel to `onNotify`, as it came, and answers how to stop.
-A watch hears a box with a null `world`: the vault's own notifications bring it.
+`safebyok_` and the user_id, as it commits. The database makes it, in the function `safebyok_tell`:
+one JSON object, with the address of the row written under `at`, a vault's row under `vault`, and
+a box's row under `box` with its vault's row beside it. Postgres takes no notification of 8,000
+bytes or more: one too heavy leaves out a box's vault row first, and then every row, and the
+listener fetches what is stored at the address. `listen(channel, onNotify)` hands each
+notification's text on that channel to `onNotify`, as it came, and answers how to stop.
+A watch hears a box with its vault's row as `world`, or a null `world` where the notification had
+no room for it. Any role that can connect to the database can `LISTEN` on a channel, and so reads
+the rows a notification carries: they hold what the tables hold, ciphertext and wrapped keys.
 
 LISTEN needs a connection of its own for as long as it listens, so share one among every watch.
 This recipe LISTENs on a channel the first time a watch asks for it and **never UNLISTENs**: the
@@ -120,9 +136,21 @@ with this package for now.
 
 `safebyok_vaults` has a row per vault, keyed by `applabel`, `user_id` and `vaultlabel`;
 `safebyok_boxes` a row per box, keyed by those, the life of its vault (`vault_tok`) and its
-`boxlabel`. Each row's record is one `jsonb` column, `vault` or `box`, as safebyok wrote it. A
-deleted vault or box leaves its tombstone in place, and `tidyGone` removes the boxes of a vault's
-ended lives. Row-level security is on with no policy, so of the roles you grant the tables to,
+`boxlabel`. Each field of a row is a column of its own. The labels, the tokens and `am` are `text`;
+`fmt`, `revision_seq` and `whisper_schema_version` are `integer`; the times, `registered_at` and
+`written_at`, are `bigint`, in UTC epoch milliseconds. A field that is an object is a `jsonb`
+column: a vault's `gate`, and a box's `sidecar`, `box_key_wrapped` and `whisper_ciphered`. Your own
+SQL can read any of them, a sidecar's fields included (`sidecar->>'note'`); leave the writing to
+`PostgresVaultDB`.
+
+A deleted vault or box leaves its tombstone in place: the same row, its `am` `'x'` where a live
+row's is `'a'`, and its `jsonb` columns null. `tidyGone` removes the boxes of a vault's ended
+lives. A box row has a foreign key to the vault row at its scope, whatever that vault's
+`vault_tok`: no box row is stored where no vault row is, and **a `DELETE` of a vault row is
+refused while it has box rows**. `PostgresVaultDB` never deletes a vault row, so that is your
+own SQL's doing, and a `TRUNCATE` of the vaults table must name both tables.
+
+Row-level security is on with no policy, so of the roles you grant the tables to,
 only their owner, the role your server connects as, reaches the rows; a superuser, or a role that
 bypasses row-level security, reaches them too. A notification is not a table: any role that may
 connect can LISTEN on any user's channel and hear the rows each write changes.

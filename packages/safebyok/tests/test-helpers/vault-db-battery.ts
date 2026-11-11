@@ -3,12 +3,11 @@
 import { afterEach, beforeEach, describe } from 'vitest'
 import { objCheck } from '../../src/helpers/validator'
 import { _cheat_clock, _cheat_clockReset } from '../../src/helpers/clock'
-import * as SX from '../../src/shapes/shapes-storage'
 import type { Awaitable } from '../../src/helpers/helpers'
 import type { Boxscope, VaultScope } from '../../src/shapes/shapes-core'
 import type { AdapterVaultDBOpts } from '../../src/shapes/shapes-storage'
 import type { AdapterVaultDB, VaultDB } from '../../src/storage/vault-db'
-import { Now, vaultAt, boxAt } from './storage-world'
+import { Now, vaultAt, boxAt, vaultPutAskOf, boxPutAskOf } from './storage-world'
 import { describeGets } from './vault-db-battery-gets'
 import { describePuts } from './vault-db-battery-puts'
 import { describeDels } from './vault-db-battery-dels'
@@ -49,6 +48,11 @@ export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
   watches?: boolean
   /** False for a VaultDB whose box notices come without their vault row, which a watch then hears with a null world. */
   boxNoticesCarryVault?: boolean
+  /** False for a VaultDB whose storage refuses a row failing its checks, a row of a later fmt excepted: of the battery's flaws it holds only `LaterFmtFlaw`.
+   * It holds no row that is no object, lacks a field every row has, names another address than it is filed at, or is a box row under no vault row;
+   * the cases of such rows, and of the other flaws, are then skipped, and a case that wants only some failing row plants a later fmt.
+   */
+  plantsAnyRow?: boolean
 }
 // --
 
@@ -63,6 +67,7 @@ const batteryOpts = objCheck(({ fn, bool }) => ({
   _cheat_adapterOf:       fn<NonNullable<VaultDBBatteryOpts['_cheat_adapterOf']>>().optional(),
   watches:              bool.optional(),
   boxNoticesCarryVault: bool.optional(),
+  plantsAnyRow:         bool.optional(),
 }), 'bad_option')
 
 // == [The world the cases share]: BatteryWorld, worldOf
@@ -86,6 +91,7 @@ export type BatteryWorld = {
   failNextCall:         (vaultDB: VaultDB) => Promise<void>
   watches:              boolean
   boxNoticesCarryVault: boolean
+  plantsAnyRow:         boolean
 }
 
 /** Stands in for a hook the VaultDB did not give, in a case that is skipped without it. */
@@ -94,14 +100,14 @@ const notGiven = (hookname: string) => (): never => { throw new TypeError(`The V
 // Every VaultDB a world's hooks are handed is one its own factories made, so the narrowing to DBT has;
 // a world given no `_cheat_adapterOf` was handed AdapterVaultDBs.
 const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWorld => {
-  const { makeVaultDB, _cheat_rowsOf, makeTwin, makeCappedVaultDB, makeVaultDBFor, _cheat_failNextCall, _cheat_adapterOf, watches = true, boxNoticesCarryVault = true } = opts
+  const { makeVaultDB, _cheat_rowsOf, makeTwin, makeCappedVaultDB, makeVaultDBFor, _cheat_failNextCall, _cheat_adapterOf, watches = true, boxNoticesCarryVault = true, plantsAnyRow = true } = opts
   const fresh = async (dbOpts?: AdapterVaultDBOpts): Promise<VaultDB> => await makeVaultDB(dbOpts)
   const putWith = async ({ box: withBox = false } = {}) => {
     const vaultDB = await fresh()
     const vault = vaultAt()
-    await vaultDB.putVault(vault, { prior: SX.VoidRevision })
+    await vaultDB.putVault(vaultPutAskOf(vault))
     const box = boxAt()
-    if (withBox) { await vaultDB.putBox(box, { prior: SX.VoidRevision }) }
+    if (withBox) { await vaultDB.putBox(boxPutAskOf(box)) }
     return { vaultDB, vault, box }
   }
   return {
@@ -118,6 +124,7 @@ const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWor
     failNextCall: _cheat_failNextCall ? async (vaultDB) => { await _cheat_failNextCall(vaultDB as DBT) } : notGiven('_cheat_failNextCall'),
     watches,
     boxNoticesCarryVault,
+    plantsAnyRow,
   }
 }
 // --

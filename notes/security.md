@@ -41,6 +41,38 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-11 (vaultdb_classifier, package `safebyok`): **A gate verb's tests are made over the vault row the adapter fetched in the step that stores the record.**
+  `replacePassphrase`, `addPasskey` and `revokePasskey` are each a vault put that names its verb (`gateVerb` on the ask); the vaultDB no longer reads the vault row beforehand and tests the record against that earlier read.
+  The verb's tests (the record keeps the stored `registered_at`, moves `gate_epoch` up by exactly one, and leaves the other wayin as stored; a passkey is added only where none is stored) are made by the classifier
+  (`classifyVault`) over the row the adapter fetched in the same atomic step that stores the record. A record that fails them is refused `gate_issue` and nothing is stored.
+  In `safebyok-postgres` that step is two calls with no transaction: the vault row is fetched and classified, then `safebyok_revise_vault` stores the record only where the stored row still has the expected
+  `revision_tok`, `am`, `vault_tok` and the `revision_seq` one below the record's, so the row the tests ran over is the row replaced, or nothing is stored.
+  Every ask is checked in `AdapterVaultDB` before an adapter is called, and an adapter is handed the checked ask.
+
+* 2026-11-11 (vaultdb_classifier, package `safebyok-postgres`): **`safebyok-postgres` writes vault and box rows through stored functions its setup SQL creates, run as the calling role.**
+  `VaultFunctionsSql` (`packages/safebyok-postgres/src/vault-functions.ts`, shipped as `vault-functions.sql`) creates six functions: `safebyok_record`, `safebyok_tell`, `safebyok_birth_vault`,
+  `safebyok_revise_vault`, `safebyok_birth_box` and `safebyok_revise_box`. None is `SECURITY DEFINER`: each is `SECURITY INVOKER`, Postgres's default, so it runs with the privileges of the role
+  that calls it, and the tables' row-level security (on, with no policy) still decides which rows that role reaches. None sets a `search_path`; each names its tables unqualified. The setup SQL ends with
+  `REVOKE ALL ON FUNCTION ... FROM PUBLIC` for each of the six, since Postgres grants EXECUTE to PUBLIC by default and a hosted Postgres that serves functions over an HTTP data API
+  (Supabase's) would otherwise offer them to its anonymous and authenticated roles; the role that owns them, the one the host's server connects as, keeps EXECUTE.
+  The four write functions take the record to store and the row the caller expects, each as jsonb (`new_record`, `expected_row`), and the two box functions also take the cap on live boxes as an integer; they build no SQL from them: none of the six contains dynamic SQL (`EXECUTE`).
+  The two birth functions take `expected_row` and read nothing of it. amended 2026-11-11 (vaultdb_classifier): `safebyok_revise_vault` and `safebyok_revise_box` test the life token of the stored row against the row expected
+  (`vault_tok` for a vault, `box_tok` for a box), beside `revision_tok`, `am` and `revision_seq`. Before this, a vault record that cited the stored `revision_tok` under another `vault_tok` would have been stored,
+  and the box rows of the vault's old life swept with it; now nothing is stored.
+  amended 2026-11-11 (vaultdb_classifier): the caller no longer supplies a channel or a notice. Each write function calls `safebyok_tell(vault, box)` once it has stored a record, in the same transaction,
+  and `safebyok_tell` builds the notice from the row just stored and sends it with `pg_notify` on the channel `safebyok_<user_id>`. A vault's notice carries the vault row; a box's carries the box row
+  and, new in this amendment, its vault row, which includes the `gate` (wrapped keys and key-derivation parameters, no plaintext secret). A notice of 8000 bytes or more sheds the vault row first and then every row,
+  leaving only the address, `at`. A notification is not protected by row-level security, and in Postgres `LISTEN` needs no privilege: any role able to connect to the database may listen on a user's channel
+  and read what a notification carries (see the 2026-10-15 entry and the package README). That is only what the tables hold, ciphertext and wrapped keys. Before this amendment a vault's notification
+  already carried the vault row and a box's already carried the box row; what is new is that the vault row also goes out with each box write.
+  amended 2026-11-11 (vaultdb_classifier): `safebyok_revise_vault` and `safebyok_revise_box` store nothing over a stored row whose `fmt` differs from the record's, and the two box functions store nothing
+  under a vault row whose `fmt` is not 6001. Otherwise the functions do not judge the content of the stored row: a put or del that cites the exact revision of a row garbled deeper than the table checks
+  (next) reach would be stored over it. The core's classifier refuses such a row on every read.
+  amended 2026-11-11 (vaultdb_classifier): the two tables in `vault-tables.sql` now have CHECK constraints. They hold `am` to 'a' or 'x'; a live row to having the columns a tombstone lacks (a vault's `gate`;
+  a box's `sidecar`, `box_key_wrapped`, `whisper_ciphered`) and a tombstone to lacking them; and each `jsonb` field to its outline (the gate's `gate_epoch` a number, `passphrase_wayin` an object,
+  `passkey_wayin` an object or null; each ciphered field an object with two strings). They do not judge `fmt`, and they do not look inside a wayin, so a row garbled deeper than the outline can still be stored.
+  Every secret field the functions handle is ciphertext as stored; they log nothing and raise nothing that quotes a value.
+
 * 2026-11-10 (old_gaps, branch `20261109-old_gaps`): **Five possibilities whose pinning tests were deleted, on the Coach's ruling, as paranoia.**
   (1) A VaultDB that answers a rebirth with the buried record's `registered_at`, as a database default might keep it, is adopted quietly, and the box's `registered_at` follows it.
   (2) A crypto failure in `buildLease` during a gate change rejects, with the row stored and the vault on its new gate under the lease it held.

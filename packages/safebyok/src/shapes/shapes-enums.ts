@@ -65,26 +65,30 @@ export type Gatingkind = typeof gatingkindVals[number]
 export const correctablekindVals = ['wrong_passphrase', 'wrong_passkey', 'passkey_unavailable', 'weak_passphrase', 'same_passphrase'] as const
 // --
 
-// == [Acts]: listActVals, ListAct, gotActVals, GotAct, putActVals, PutAct, delActVals, DelAct
+// == [Acts]: listActVals, ListAct, gotActVals, GotAct, putActVals, PutAct, delActVals, DelAct, gateVerbVals, GateVerb
 
 /** What a listing verb's answer says happened: `got` rows, or `gotvoid` for none. */
 export const listActVals = ['got', 'gotvoid'] as const
 export type ListAct = typeof listActVals[number]
 
-/** What a get's answer says happened: `got` the row, `gotvoid` for none stored, `gotgone` for a tombstone. */
-export const gotActVals = ['got', 'gotvoid', 'gotgone'] as const
+/** What a get's answer says happened: `gotlive` the row, `gotvoid` for none stored, `gotgone` for a tombstone. */
+export const gotActVals = ['gotlive', 'gotvoid', 'gotgone'] as const
 export type GotAct = typeof gotActVals[number]
 
-/** What a put's answer says happened: `born` over nothing, `reborn` over a tombstone, `replaced` a live row, or `declined` for the live row taken up. */
-export const putActVals = ['born', 'reborn', 'replaced', 'declined'] as const
+/** What a put's answer says happened: `born` over nothing, `reborn` over a tombstone, `replaced` a live row, or `passed` for the live row taken up. */
+export const putActVals = ['born', 'reborn', 'replaced', 'passed'] as const
 export type PutAct = typeof putActVals[number]
 
-/** What a del's answer says happened: `deleted` the row, `gone` for a tombstone found, or `void` for nothing stored. */
-export const delActVals = ['deleted', 'gone', 'void'] as const
+/** What a del's answer says happened: `deleted` the row. */
+export const delActVals = ['deleted'] as const
 export type DelAct = typeof delActVals[number]
+
+/** The verbs that change a vault's gate. Each is a put of the vault's record with tests of its own, and a vault's put names the one it is for. */
+export const gateVerbVals = ['replacePassphrase', 'addPasskey', 'revokePasskey'] as const
+export type GateVerb = typeof gateVerbVals[number]
 // --
 
-// == [Classified acts]: writeActVals, WriteAct, foundActVals, FoundAct, refusedActVals, RefusedAct, boxVaultActVals, BoxVaultAct, VaultAct, BoxAct
+// == [Classified acts]: writeActVals, WriteAct, foundActVals, FoundAct, OkAct, refusedActVals, RefusedAct, boxVaultActVals, BoxVaultAct, VaultAct, BoxAct
 
 /** The acts of a put or del that stored its record: `born` over nothing, `reborn` over a tombstone, `replaced` over a live row, or `deleted`. */
 export const writeActVals = ['born', 'reborn', 'replaced', 'deleted'] as const
@@ -93,6 +97,9 @@ export type WriteAct = typeof writeActVals[number]
 /** The acts that answer what is stored and write nothing: a get's `gotlive`, `gotvoid` or `gotgone`, and `passed` for a put told to get the live row it met. */
 export const foundActVals = ['gotlive', 'gotvoid', 'gotgone', 'passed'] as const
 export type FoundAct = typeof foundActVals[number]
+
+/** The acts of a good answer: the record was stored, or the row found is answered. */
+export type OkAct = WriteAct | FoundAct
 
 /** The acts a get, put or del refuses with over the row it asked for, a box's or a vault's alike. */
 export const refusedActVals = ['void', 'gone', 'camped', 'dubdel', 'stale', 'retcon', 'clash', 'forked', 'ahead'] as const

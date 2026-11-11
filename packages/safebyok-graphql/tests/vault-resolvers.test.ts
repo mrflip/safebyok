@@ -35,6 +35,22 @@ const sent = async (schema: GraphQLSchema, source: string, variableValues: objec
   return answer
 }
 
+/** A get's, put's or del's variables: its ask as its checker hands it on, the form GraphQLVaultDB sends. */
+function askVarsOf(ask: DB.VaultAsk | DB.BoxAsk) {
+  return { ask: ('boxlabel' in ask) ? DB.boxAsk.parse(ask) : DB.vaultAsk.parse(ask) }
+}
+
+/** Send `ask` as the get, put or del `source` is, through `schema`, and return its answer as {@link sent} does. */
+async function sentAsk(schema: GraphQLSchema, source: string, ask: DB.VaultAsk | DB.BoxAsk): Promise<unknown> {
+  return await sent(schema, source, askVarsOf(ask))
+}
+
+// The asks of u1's vault and box that the cases send: a get by a caller that holds no row, and a put over none.
+const vaultGetAsk = TH.vaultGetAskOf()
+const boxGetAsk   = TH.boxGetAskOf()
+const vaultBorn   = TH.vaultPutAskOf(TH.vaultAt())
+const boxBorn     = TH.boxPutAskOf(TH.boxAt())
+
 /** A VaultDB's answer in wire form: `dbhas` is null when the answer has none. */
 const asCrossed = (answer: DB.Answer<unknown, string, unknown>) => ({ ...answer, dbhas: answer.dbhas ?? null })
 
@@ -80,19 +96,18 @@ describe("vaultResolvers", () => {
     const schema = TH.schemaOver(await TH.serverOver())
     const record = TH.vaultAt()
     const box = TH.boxAt()
-    const opts = { prior: DB.VoidRevision }
     const asked: [string, object, { parse: (crossed: unknown) => DB.Answer<unknown, string, unknown> }][] = [
       [VaultOperations.listVaults, TH.bankScope, DB.listVaultsAnswer],
-      [VaultOperations.getVault, TH.vaultScope, DB.getVaultAnswer],
+      [VaultOperations.getVault, askVarsOf(vaultGetAsk), DB.getVaultAnswer],
       [VaultOperations.listBoxes, TH.vaultQuery, DB.listBoxesAnswer],
-      [VaultOperations.getBox, TH.boxQuery, DB.getBoxAnswer],
-      [VaultOperations.putVault, { record, opts }, DB.putVaultAnswer],
-      [VaultOperations.putBox, { record: box, opts }, DB.putBoxAnswer],
+      [VaultOperations.getBox, askVarsOf(boxGetAsk), DB.getBoxAnswer],
+      [VaultOperations.putVault, askVarsOf(TH.vaultPutAskOf(record)), DB.putVaultAnswer],
+      [VaultOperations.putBox, askVarsOf(TH.boxPutAskOf(box)), DB.putBoxAnswer],
       [VaultOperations.replacePassphrase, gateArgsOf(record, { passphrase_wayin: TH.passphraseWayin }), DB.replacePassphraseAnswer],
       [VaultOperations.addPasskey, gateArgsOf(record, { passkey_wayin: TH.passkeyWayin }), DB.addPasskeyAnswer],
       [VaultOperations.revokePasskey, gateArgsOf(record, { passkey_wayin: null }), DB.revokePasskeyAnswer],
-      [VaultOperations.delBox, { tombstone: TH.boxTombstoneOf(box), opts }, DB.delBoxAnswer],
-      [VaultOperations.delVault, { tombstone: TH.vaultTombstoneOf(record), opts }, DB.delVaultAnswer],
+      [VaultOperations.delBox, askVarsOf(TH.boxDelAskOf(box)), DB.delBoxAnswer],
+      [VaultOperations.delVault, askVarsOf(TH.vaultDelAskOf(record)), DB.delVaultAnswer],
       [VaultOperations.tidyGone, TH.bankScope, DB.tidyGoneAnswer],
     ]
     for (const user_id of ['u2', null]) {
@@ -108,7 +123,7 @@ describe("vaultResolvers", () => {
 
   it("refuses a malformed request signed in as another user for what is malformed", async () => {
     const schema = TH.schemaOver(await TH.serverOver())
-    const answer = DB.getBoxAnswer.parse(await sent(schema, VaultOperations.getBox, { ...TH.boxQuery, vault_tok: '' }, 'u2')) as DB.BadAnswer
+    const answer = DB.getBoxAnswer.parse(await sent(schema, VaultOperations.getBox, { ask: { ...askVarsOf(boxGetAsk).ask, vault_tok: '' } }, 'u2')) as DB.BadAnswer
     expect(answer).to.deep.include({ ok: false, act: 'bad_option', world: null })
   })
 
@@ -117,15 +132,15 @@ describe("vaultResolvers", () => {
     const vaultDB = await TH.serverOver()
     const schema = TH.schemaOver(vaultDB)
     const record = TH.vaultAt()
-    const born = DB.putVaultAnswer.parse(await sent(schema, VaultOperations.putVault, { record, opts: { prior: DB.VoidRevision } }))
+    const born = DB.putVaultAnswer.parse(await sentAsk(schema, VaultOperations.putVault, TH.vaultPutAskOf(record)))
     expect(born).to.deep.include({ ok: true, act: 'born', val: record })
-    expect(DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, TH.vaultScope))).to.deep.eq(asCrossed(await vaultDB.tryGetVault(TH.vaultScope)))
+    expect(DB.getVaultAnswer.parse(await sentAsk(schema, VaultOperations.getVault, vaultGetAsk))).to.deep.eq(asCrossed(await vaultDB.tryGetVault(vaultGetAsk)))
     expect(DB.listVaultsAnswer.parse(await sent(schema, VaultOperations.listVaults, TH.bankScope))).to.deep.eq(asCrossed(await vaultDB.tryListVaults(TH.bankScope)))
 
     const box = TH.boxAt(0, 'life1', { sidecar: { note: 'work', 'nested key': [1, { deep: null }] } })
-    const boxed = DB.putBoxAnswer.parse(await sent(schema, VaultOperations.putBox, { record: box, opts: { prior: DB.VoidRevision } }))
+    const boxed = DB.putBoxAnswer.parse(await sentAsk(schema, VaultOperations.putBox, TH.boxPutAskOf(box)))
     expect(boxed).to.deep.include({ ok: true, act: 'born', val: box, world: record })
-    expect(DB.getBoxAnswer.parse(await sent(schema, VaultOperations.getBox, TH.boxQuery))).to.deep.eq(asCrossed(await vaultDB.tryGetBox(TH.boxQuery)))
+    expect(DB.getBoxAnswer.parse(await sentAsk(schema, VaultOperations.getBox, boxGetAsk))).to.deep.eq(asCrossed(await vaultDB.tryGetBox(boxGetAsk)))
     expect(DB.listBoxesAnswer.parse(await sent(schema, VaultOperations.listBoxes, TH.vaultQuery))).to.deep.eq(asCrossed(await vaultDB.tryListBoxes(TH.vaultQuery)))
 
     const replaced = DB.replacePassphraseAnswer.parse(await sent(schema, VaultOperations.replacePassphrase, gateArgsOf(record, { passphrase_wayin: { ...TH.passphraseWayin, key_deriver_label: 'moved' } })))
@@ -135,32 +150,27 @@ describe("vaultResolvers", () => {
     const revoked = DB.revokePasskeyAnswer.parse(await sent(schema, VaultOperations.revokePasskey, gateArgsOf(added.val as DB.VaultRecord, { passkey_wayin: null })))
     expect(revoked.val).to.have.nested.property('gate.passkey_wayin', null)
 
-    const goneBox = DB.delBoxAnswer.parse(await sent(schema, VaultOperations.delBox, { tombstone: TH.boxTombstoneOf(box), opts: { prior: DB.revisionOf(box) } }))
+    const goneBox = DB.delBoxAnswer.parse(await sentAsk(schema, VaultOperations.delBox, TH.boxDelAskOf(box)))
     expect(goneBox).to.deep.include({ ok: true, val: TH.boxTombstoneOf(box) })
     const vault = revoked.val as DB.VaultRecord
-    const goneVault = DB.delVaultAnswer.parse(await sent(schema, VaultOperations.delVault, { tombstone: TH.vaultTombstoneOf(vault), opts: { prior: DB.revisionOf(vault) } }))
+    const goneVault = DB.delVaultAnswer.parse(await sentAsk(schema, VaultOperations.delVault, TH.vaultDelAskOf(vault)))
     expect(goneVault).to.deep.include({ ok: true, val: TH.vaultTombstoneOf(vault) })
     const tidied = DB.tidyGoneAnswer.parse(await sent(schema, VaultOperations.tidyGone, TH.bankScope))
     expect(tidied).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 0 }, world: TH.bankScope })
   })
 
-  it("takes the VaultDB's default for an option left out", async () => {
+  it("holds a request to the user its ask names, refusing a record filed under another user", async () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver())
-    const absent = DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, TH.vaultScope)) as DB.BadAnswer
-    expect(absent.ok).to.be.false
-    expect(DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, { ...TH.vaultScope, opts: { ifAbsent: 'nil' } }))).to.deep.include({ ok: true, val: null })
-  })
-
-  it("reads an option sent as null as its default", async () => {
-    await TH.emptyTables()
-    const schema = TH.schemaOver(await TH.serverOver())
-    const nulled = DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, { ...TH.vaultScope, opts: { ifAbsent: null } })) as DB.BadAnswer
-    expect(nulled.err.refusalkind).to.eq('vault_empty')
+    const ask = DB.vaultPut.parse(vaultBorn)
+    const elsewhere = DB.putVaultAnswer.parse(await sent(schema, VaultOperations.putVault, { ask: { ...ask, record: { ...ask.record, user_id: 'u2' } } })) as DB.BadAnswer
+    expect(elsewhere).to.deep.include({ ok: false, act: 'bad_record' })
+    expect(await TH.rowsOf().vaultRowOf({ ...TH.vaultScope, user_id: 'u2' })).to.be.null
+    expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })
 
   it("sends a refusal as the answer's err, without the driver's own error", async () => {
-    const crossed = await sent(TH.schemaOver(unreachable()), VaultOperations.getVault, TH.vaultScope)
+    const crossed = await sentAsk(TH.schemaOver(unreachable()), VaultOperations.getVault, vaultGetAsk)
     const answer = DB.getVaultAnswer.parse(crossed) as DB.BadAnswer
     expect(answer.err.refusalkind).to.eq('storage_unavailable')
     expect(answer.err.cause).to.be.undefined
@@ -172,7 +182,7 @@ describe("vaultResolvers", () => {
       typeDefs:  VaultSchemaSdl,
       resolvers: vaultResolvers({ vaultDB: await TH.serverOver(), userIdOf: () => { throw new Error('session cookie s3cr3t-cookie is malformed') } }),
     })
-    const crossed = await sent(schema, VaultOperations.getVault, TH.vaultScope)
+    const crossed = await sentAsk(schema, VaultOperations.getVault, vaultGetAsk)
     expect((DB.getVaultAnswer.parse(crossed) as DB.BadAnswer).err.refusalkind).to.eq('unexpected_error')
     expect(JSON.stringify(crossed)).not.to.include('s3cr3t')
   })
@@ -180,23 +190,26 @@ describe("vaultResolvers", () => {
   it("refuses at the server what the browser's own checks would, for a browser that skipped them", async () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver({ maxRecordBytes: 200 }))
-    const born = DB.putVaultAnswer.parse(await sent(schema, VaultOperations.putVault, { record: TH.vaultAt(), opts: { prior: DB.VoidRevision } }))
+    const born = DB.putVaultAnswer.parse(await sentAsk(schema, VaultOperations.putVault, vaultBorn))
     expect(born).to.have.property('ok', true)
-    const heavy = DB.putBoxAnswer.parse(await sent(schema, VaultOperations.putBox, { record: TH.boxAt(), opts: { prior: DB.VoidRevision } })) as DB.BadAnswer
+    const heavy = DB.putBoxAnswer.parse(await sentAsk(schema, VaultOperations.putBox, boxBorn)) as DB.BadAnswer
     expect(heavy.err.refusalkind).to.eq('box_too_large')
-    const malformed = DB.putVaultAnswer.parse(await sent(schema, VaultOperations.putVault, { record: { ...TH.vaultAt(), am: 'q' }, opts: { prior: DB.VoidRevision } })) as DB.BadAnswer
-    expect(malformed.err.refusalkind).to.eq('bad_option')
-    expect(malformed.err.meta?.fieldnames).to.be.an('array').that.is.not.empty
+    const ask = DB.vaultPut.parse(TH.vaultPutAskOf(TH.vaultAt(1), TH.vaultAt()))
+    const malformed = DB.putVaultAnswer.parse(await sent(schema, VaultOperations.putVault, { ask: { ...ask, record: { ...ask.record, am: 'q' } } })) as DB.BadAnswer
+    expect(malformed.err.refusalkind).to.eq('bad_record')
+    expect(malformed.err.meta?.fieldnames).to.deep.equal(['record.am'])
+    const misnamed = DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, { ask: { ...DB.vaultGet.parse(vaultGetAsk), op: 'put' } })) as DB.BadAnswer
+    expect(misnamed.err.refusalkind).to.eq('bad_record')
+    expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.deep.equal(TH.vaultAt())
   })
 
   it("sends a full vault's capacity in its err's meta", async () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver({ maxBoxes: 1 }))
-    const opts = { prior: DB.VoidRevision }
-    await sent(schema, VaultOperations.putVault, { record: TH.vaultAt(), opts })
-    await sent(schema, VaultOperations.putBox, { record: TH.boxAt(), opts })
+    await sentAsk(schema, VaultOperations.putVault, vaultBorn)
+    await sentAsk(schema, VaultOperations.putBox, boxBorn)
     const second = TH.boxAt(0, 'life1', { boxlabel: 'anthropic', box_tok: 'box2' })
-    const full = DB.putBoxAnswer.parse(await sent(schema, VaultOperations.putBox, { record: second, opts })) as DB.BadAnswer
+    const full = DB.putBoxAnswer.parse(await sentAsk(schema, VaultOperations.putBox, TH.boxPutAskOf(second))) as DB.BadAnswer
     expect(full.err.refusalkind).to.eq('vault_full')
     expect(full.err.meta?.capacity).to.deep.eq({ boxes: { used: 1, max: 1 }, bytes: { used: 0, max: Number.MAX_SAFE_INTEGER } })
   })
@@ -214,9 +227,9 @@ describe("vaultResolvers' watch", () => {
     await TH.emptyTables()
     const { listening, vaultDB, schema } = await watchedServer()
     const { stream, nextNotice } = await watching(schema, { user_id: 'u1' })
-    await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+    await vaultDB.putVault(vaultBorn)
     expect(await nextNotice()).to.deep.eq({ ok: true, val: { act: 'got', val: TH.vaultAt(), world: TH.vaultAt() } })
-    await vaultDB.putBox(TH.boxAt(), { prior: DB.VoidRevision })
+    await vaultDB.putBox(boxBorn)
     expect(await nextNotice()).to.have.nested.property('val.val.boxlabel', TH.boxAt().boxlabel)
     expect(listening.size).to.eq(1)
     await stream.return(undefined)
@@ -237,10 +250,10 @@ describe("vaultResolvers' watch", () => {
       const { listening, vaultDB, schema } = await watchedServer()
       const session: TH.TestContext = { user_id: 'u1' }
       const { nextNotice } = await watching(schema, session)
-      await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+      await vaultDB.putVault(vaultBorn)
       expect(await nextNotice()).to.have.property('ok', true)
       session.user_id = revoked
-      await vaultDB.putBox(TH.boxAt(), { prior: DB.VoidRevision })
+      await vaultDB.putBox(boxBorn)
       expect(await nextNotice()).to.have.nested.property('err.refusalkind', 'identity_revoked')
       expect(await nextNotice()).to.be.null
       await vi.waitFor(() => { expect(listening.size).to.eq(0) })
@@ -253,7 +266,7 @@ describe("vaultResolvers' watch", () => {
     const session: TH.TestContext = { user_id: 'u1' }
     const { stream } = await watching(schema, session)
     Object.defineProperty(session, 'user_id', { get: () => { throw new Error('session datastore s3cr3t-host is down') } })
-    await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+    await vaultDB.putVault(vaultBorn)
     const last = await stream.next()
     expect(JSON.stringify(last)).not.to.include('s3cr3t')
     expect(DB.crossedNotice.parse(overTheWire(last.value?.data?.['safebyokWatch']))).to.have.nested.property('err.refusalkind', 'unexpected_error')
@@ -290,7 +303,7 @@ describe("VaultSchemaSdl", () => {
     await TH.emptyTables()
     const executable = TH.schemaOver(await TH.serverOver())
     const later = TH.vaultAt(0, 'life1', { registered_at: 2 ** 41, written_at: 2 ** 41 })
-    const born = DB.putVaultAnswer.parse(await sent(executable, VaultOperations.putVault, { record: later, opts: { prior: DB.VoidRevision } }))
+    const born = DB.putVaultAnswer.parse(await sentAsk(executable, VaultOperations.putVault, TH.vaultPutAskOf(later)))
     expect(born.val).to.have.property('written_at', 2 ** 41)
   })
 
@@ -298,7 +311,8 @@ describe("VaultSchemaSdl", () => {
     await TH.emptyTables()
     const executable = TH.schemaOver(await TH.serverOver())
     const later = TH.vaultAt(0, 'life1', { registered_at: 2 ** 41, written_at: 2 ** 41 })
-    const fractional = await graphql({ schema: executable, source: VaultOperations.putVault, variableValues: { record: { ...later, written_at: 1.5 }, opts: { prior: DB.VoidRevision } }, contextValue: { user_id: 'u1' } })
+    const ask = DB.vaultPut.parse(TH.vaultPutAskOf(later))
+    const fractional = await graphql({ schema: executable, source: VaultOperations.putVault, variableValues: { ask: { ...ask, record: { ...ask.record, written_at: 1.5 } } }, contextValue: { user_id: 'u1' } })
     expect(fractional.errors).to.have.lengthOf(1)
   })
 })

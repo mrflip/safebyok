@@ -10,8 +10,8 @@ import { type VaultScope, vaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import { type DelTombstone, type Fetched, type ListingOpts, type SlotFate, type ThingAnswer, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
-import type { BoxRow, DelOpts, GateVerbOpts, PutOpts, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
+import { type DelTombstone, type Fetched, type ListingDelOpts, type ListingOpts, type ListingPutOpts, type SlotFate, type ThingAnswer, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
+import type { BoxRow, GateVerbOpts, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { type Answer, type Notice, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
 import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
@@ -68,9 +68,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return vaultStamp.parse({ ...scope, vault_tok: makeLifeTok(), registered_at: nowMillis() })
   }
 
-  /** The record of a birth, at the revision after `prior`, carrying `gate` and the stamp it was made under. */
-  recordOfBirth(gate: Gate, prior: SX.Revision): VaultRecord {
-    return { ...gate.stamp, fmt: SX.VaultFormat, am: 'a', ...SX.nextRevisionOf(prior, nowMillis()), gate: gate.pickle() }
+  /** The record of a birth, at the revision after `expected`'s, carrying `gate` and the stamp it was made under. */
+  recordOfBirth(gate: Gate, expected: SX.Revision): VaultRecord {
+    return { ...gate.stamp, fmt: SX.VaultFormat, am: 'a', ...SX.nextRevisionOf(expected, nowMillis()), gate: gate.pickle() }
   }
   // --
 
@@ -167,7 +167,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   #dismissGatingOfGoneListing(): void { this.#openGating?.dismiss() }
   // --
 
-  // == [Defined by the vault listing]: vaultTokOfWorld, fateOver, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, doTryDel, watchRows, isOwnRow
+  // == [Defined by the vault listing]: vaultTokOfWorld, fateOver, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   protected vaultTokOfWorld(): null { return null }
 
@@ -198,11 +198,22 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   protected damagedStoredError(damaged: SX.DamagedVault): VaultError { return vaultStoredDamaged(damaged) }
 
-  protected doTryGet(scope: VaultScope) { return this.vaultDB.tryGetVault(scope, { ifAbsent: 'nil' }) }
+  protected doTryGet(scope: VaultScope) {
+    const expected = this.at(scope)?.sparse ?? SX.sentinelVaultOf(scope)
+    return this.vaultDB.tryGetVault({ op: 'get', ...scope, ifAbsent: 'nil', expected })
+  }
 
-  protected doTryPut(record: VaultRecord, opts: PutOpts) { return this.vaultDB.tryPutVault(record, opts) }
+  protected doTryPut(record: VaultRecord, { expected, ifAbsent, ifPresent }: ListingPutOpts<VaultSparse>) {
+    return this.vaultDB.tryPutVault({ op: 'put', ...vaultScope.parse(record), ifAbsent, ifPresent, expected, record })
+  }
 
-  protected doTryDel(tombstone: DelTombstone<VaultSparse>, opts: DelOpts) { return this.vaultDB.tryDelVault(tombstone, opts) }
+  protected tombstoneOver(expected: VaultSparse): DelTombstone<VaultSparse> {
+    return { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), am: 'x', vault_tok: makeLifeTok() }
+  }
+
+  protected doTryDel(tombstone: DelTombstone<VaultSparse>, { expected }: ListingDelOpts<VaultSparse>) {
+    return this.vaultDB.tryDelVault({ op: 'del', ...vaultScope.parse(tombstone), expected, record: tombstone })
+  }
 
   protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.vaultDB.watch(this.world.scope, onNotice, onBadNews) }
 

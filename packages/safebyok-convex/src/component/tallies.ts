@@ -5,11 +5,11 @@ import type { Doc } from './_generated/dataModel'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 
 // The component enforces its own limits on a vault, whatever cap the client sends, so that one
-// transaction can always tombstone the whole vault. `delVault` reads every box row of the life and
-// writes each live one, and a Convex transaction may read 16 MiB and write 16,000 documents. The
-// limits are half of each, which leaves room for the vault row and the tally. They are enforced
-// here because a modified client cannot be trusted to keep its vault small. `delVault` has to read
-// a box's tombstone too, so tombstones count toward both limits: putting and deleting under new
+// transaction can always delete the whole vault. `delVault` reads every box row of the life and
+// deletes each, and a Convex transaction may read 16 MiB and write 16,000 documents. The limits are
+// half of each, which leaves room for the vault row and the tally. They are enforced here because a
+// modified client cannot be trusted to keep its vault small. `delVault` has to read and delete a
+// box's tombstone too, so tombstones count toward both limits: putting and deleting under new
 // boxlabels fills a life just as putting alone does.
 
 // == [Limits]: MaxVaultBoxes, MaxVaultBoxBytes

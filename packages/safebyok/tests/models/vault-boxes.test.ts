@@ -233,10 +233,18 @@ describe("vault.delBox", () => {
     await expect(dead?.extractWhisper()).rejects.toThrow()
   })
 
-  it("resolves null for nothing stored, deleting nothing", async () => {
+  it("refuses 'absent_box' for nothing stored, deleting nothing", async () => {
     const { vault, boxrows } = await makeWorld()
-    expect(await vault.delBox(boxlabel)).to.be.null
+    await TH.expectRefusal(vault.delBox(boxlabel), 'absent_box')
     expect(boxrows.has(boxlabel)).to.be.false
+  })
+
+  it("refuses 'absent_box' for a box already deleted, its tombstone left as it was", async () => {
+    const { vault, boxrows } = await makeWorldWithBox()
+    await vault.delBox(boxlabel)
+    const tombstone = boxrows.get(boxlabel)
+    await TH.expectRefusal(vault.delBox(boxlabel), 'absent_box')
+    expect(boxrows.get(boxlabel)).to.deep.equal(tombstone)
   })
 
   it("refuses a boxlabel that fails its check", async () => {

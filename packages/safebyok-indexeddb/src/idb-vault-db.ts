@@ -3,8 +3,8 @@
 import type { UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type {
-  AdapterVaultDBOpts, BankScope, BoxesFetched, BoxFetched, BoxWritten, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Written, PutOptsGiven,
-  RowOfVault, Tidied, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope,
+  AdapterVaultDBOpts, BankScope, BoxClassified, BoxDelAsk, BoxesFetched, BoxGetAsk, BoxPutAsk, Capacity, Heard,
+  RowOfVault, Tidied, VaultClassified, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultQuery, VaultScope, WatchScope,
 } from 'safebyok/storage'
 import { bankBoxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, shelfOf, vaultlabelOf, vaultScopepathOf, vaultsRangeOf } from './shelf'
 
@@ -19,7 +19,7 @@ export type IdbVaultDBOpts = AdapterVaultDBOpts & { dbName?: string | undefined,
 const idbVaultDBOpts = DB.objCheck(({ str, uint }) => ({ ...DB.adapterVaultDBOpts.shape, dbName: str.min(1).optional(), maxBoxes: uint.optional() }), 'bad_option')
 // --
 
-// == [Helpers]: Rung, isHeardBy
+// == [Helpers]: Rung, isHeardBy, scopeOf
 
 /** A notice of one write, broadcast to every watch on the database: the scope written under, and the rows written. */
 type Rung = { scope: VaultScope, heard: Heard }
@@ -28,6 +28,9 @@ type Rung = { scope: VaultScope, heard: Heard }
 const isHeardBy = (watched: WatchScope, scope: VaultScope): boolean => (
   (watched.applabel === scope.applabel) && (watched.user_id === scope.user_id) && ((watched.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
 )
+
+/** The vault scope alone of an ask or a row. */
+function scopeOf({ applabel, user_id, vaultlabel }: VaultScope): VaultScope { return { applabel, user_id, vaultlabel } }
 // --
 
 /** A vaultDB stored in this browser's IndexedDB. Its watch reports writes from every tab. */
@@ -50,15 +53,14 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   }
   // --
 
-  // == [Room]: #demandRoom
+  // == [Room]: #roomIn
 
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** Demand that the vault has room for a new live box, under the soft cap `maxBoxes`. */
-  async #demandRoom(store: IDBObjectStore, record: BoxRecord, ante: unknown): Promise<void> {
-    if (DB.isLiveRow(ante)) { return }
-    const boxes = await filedIn(store, lifeRangeOf(record))
+  /** The room of the vault life `asked` names, under the soft cap `maxBoxes`: its count of live boxes, taken inside the caller's transaction. */
+  async #roomIn(store: IDBObjectStore, asked: VaultQuery): Promise<Capacity> {
+    const boxes = await filedIn(store, lifeRangeOf(asked))
     const used = boxes.filter(({ row }) => DB.isLiveRow(row)).length
-    if (used >= this.#maxBoxes) { throw DB.vaultFull({ boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }) }
+    return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }
   // --
 
@@ -69,8 +71,12 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
     return filed.map(({ scopepath, row }) => ({ vaultlabel: vaultlabelOf(scopepath), vault: row }))
   }
 
-  protected async doGetVault(scope: VaultScope): Promise<unknown> {
-    return await DB.inOneStep(this.#shelf, 'readonly', (store) => DB.rowAt(store, vaultScopepathOf(scope)))
+  // A get, put or del is one IndexedDB transaction: it fetches the rows, the classifier names what the ask comes to over them,
+  // and where that is a write the ask's record is stored, all before the transaction ends.
+  protected async doGetVault(ask: VaultGetAsk): Promise<VaultClassified> {
+    return await DB.inOneStep(this.#shelf, 'readonly', async (store) => (
+      this.classifyVault(ask, { vault: await DB.rowAt(store, vaultScopepathOf(ask)) })
+    ))
   }
 
   protected async doListBoxes(asked: VaultQuery): Promise<BoxesFetched> {
@@ -80,73 +86,57 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
     })
   }
 
-  protected async doGetBox(asked: BoxQuery): Promise<BoxFetched> {
+  protected async doGetBox(ask: BoxGetAsk): Promise<BoxClassified> {
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
-      const [vault, box] = await Promise.all([DB.rowAt(store, vaultScopepathOf(asked)), DB.rowAt(store, boxScopepathOf(asked))])
-      return { vault, box }
+      const [world, box] = await Promise.all([DB.rowAt(store, vaultScopepathOf(ask)), DB.rowAt(store, boxScopepathOf(ask))])
+      return this.classifyBox(ask, { world, box })
     })
   }
 
-  protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Written> {
-    const written = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const ante = await DB.rowAt(store, vaultScopepathOf(record))
-      const isWritten = DB.isVaultPutAllowed(ante, record, opts)
-      if (isWritten) { store.put(record, vaultScopepathOf(record)) }
-      return { isWritten, ante }
+  protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
+    const classified = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+      const classified = this.classifyVault(ask, { vault: await DB.rowAt(store, vaultScopepathOf(ask)) })
+      if (DB.isWriteAct(classified.act)) { store.put(ask.record, vaultScopepathOf(ask)) }
+      return classified
     })
-    if (written.isWritten) { this.#ring([{ scope: record, heard: { vault: record } }]) }
-    return written
+    if (DB.isWriteAct(classified.act)) { this.#ring([{ scope: scopeOf(ask), heard: { vault: ask.record } }]) }
+    return classified
   }
 
-  protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxWritten> {
-    const written = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const [vault, ante] = await Promise.all([DB.rowAt(store, vaultScopepathOf(record)), DB.rowAt(store, boxScopepathOf(record))])
-      const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, record, opts)
-      if (isWritten) {
-        await this.#demandRoom(store, record, ante)
-        store.put(record, boxScopepathOf(record))
-      }
-      return { isWritten, ante, vault }
+  protected async doPutBox(ask: BoxPutAsk): Promise<BoxClassified> {
+    const classified = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+      const [world, box, capacity] = await Promise.all([DB.rowAt(store, vaultScopepathOf(ask)), DB.rowAt(store, boxScopepathOf(ask)), this.#roomIn(store, ask)])
+      const classified = this.classifyBox(ask, { world, box, capacity })
+      if (DB.isWriteAct(classified.act)) { store.put(ask.record, boxScopepathOf(ask)) }
+      return classified
     })
-    if (written.isWritten) { this.#ring([{ scope: record, heard: { vault: written.vault, box: record } }]) }
-    return written
+    if (DB.isWriteAct(classified.act)) { this.#ring([{ scope: scopeOf(ask), heard: { vault: classified.world, box: ask.record } }]) }
+    return classified
   }
 
-  protected async doDelVault(tombstone: VaultTombstone, { prior }: DelOpts): Promise<Written> {
-    const { written, rungs } = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const ante = await DB.rowAt(store, vaultScopepathOf(tombstone))
-      const isOurs = DB.isLiveVaultRecord(ante, tombstone.vault_tok)
-      const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
-      const isWritten = isOurs && DB.isRowAt(ante, prior)
-      // Stop here, leaving the boxes alone, when the vault row is damaged or is this life's live row at another revision.
-      // For any other row, go on to tombstone the boxes, so that a repeated del finishes the job.
-      if ((! isWritten) && (isOurs || isDamaged)) { return { written: { isWritten, ante }, rungs: [] } }
-      if (isWritten) { store.put(tombstone, vaultScopepathOf(tombstone)) }
-      const vault = isWritten ? tombstone : ante
-      const rungs: Rung[] = isWritten ? [{ scope: tombstone, heard: { vault } }] : []
-      const boxes = await filedIn(store, lifeRangeOf(tombstone))
-      for (const { scopepath, row } of boxes) {
-        const boxTombstone = DB.boxTombstoneOf(row, tombstone.written_at)
-        if (boxTombstone === null) { continue }
-        store.put(boxTombstone, scopepath)
-        rungs.push({ scope: tombstone, heard: { vault, box: boxTombstone } })
-      }
-      return { written: { isWritten, ante }, rungs }
+  protected async doDelVault(ask: VaultDelAsk): Promise<VaultClassified> {
+    const classified = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+      const classified = this.classifyVault(ask, { vault: await DB.rowAt(store, vaultScopepathOf(ask)) })
+      if (! DB.isWriteAct(classified.act)) { return classified }
+      store.put(ask.record, vaultScopepathOf(ask))
+      // A vault's boxes end with its life: nothing reads a box row of a life that is over.
+      const boxes = await filedIn(store, lifeRangeOf({ ...scopeOf(ask), vault_tok: ask.expected.vault_tok }))
+      for (const { scopepath } of boxes) { store.delete(scopepath) }
+      return classified
     })
-    this.#ring(rungs)
-    return written
+    if (DB.isWriteAct(classified.act)) { this.#ring([{ scope: scopeOf(ask), heard: { vault: ask.record } }]) }
+    return classified
   }
 
-  protected async doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): Promise<BoxWritten> {
-    const written = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const [vault, ante] = await Promise.all([DB.rowAt(store, vaultScopepathOf(tombstone)), DB.rowAt(store, boxScopepathOf(tombstone))])
-      const isDeletable = DB.isLiveBoxRecord(ante, tombstone.vault_tok) && DB.isRowAt(ante, prior)
-      const isWritten = DB.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
-      if (isWritten) { store.put(tombstone, boxScopepathOf(tombstone)) }
-      return { isWritten, ante, vault }
+  protected async doDelBox(ask: BoxDelAsk): Promise<BoxClassified> {
+    const classified = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+      const [world, box] = await Promise.all([DB.rowAt(store, vaultScopepathOf(ask)), DB.rowAt(store, boxScopepathOf(ask))])
+      const classified = this.classifyBox(ask, { world, box })
+      if (DB.isWriteAct(classified.act)) { store.put(ask.record, boxScopepathOf(ask)) }
+      return classified
     })
-    if (written.isWritten) { this.#ring([{ scope: tombstone, heard: { vault: written.vault, box: tombstone } }]) }
-    return written
+    if (DB.isWriteAct(classified.act)) { this.#ring([{ scope: scopeOf(ask), heard: { vault: classified.world, box: ask.record } }]) }
+    return classified
   }
 
   protected async doTidyGone(scope: BankScope): Promise<Tidied> {

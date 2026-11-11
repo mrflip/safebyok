@@ -16,11 +16,12 @@ TH.describeOnPostgres('races', "PostgresVaultDB's box cap, over a real Postgres"
     const db = getDb()
     for (let round = 0; round < Rounds; round += 1) {
       const first = await TH.freshVaultDB(db, { maxBoxes: Cap })
-      await first.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
-      for (const boxlabel of ['one', 'two', 'three', 'four']) { await first.putBox(TH.boxAt(0, 'life1', { boxlabel }), { prior: DB.VoidRevision }) }
+      await first.putVault(TH.vaultPutAskOf(TH.vaultAt()))
+      for (const boxlabel of ['one', 'two', 'three', 'four']) { await first.putBox(TH.boxPutAskOf(TH.boxAt(0, 'life1', { boxlabel }))) }
       const racers = await Promise.all(Array.from({ length: Racers }, async () => await TH.vaultDBOver(db, { maxBoxes: Cap })))
 
-      const answers = await Promise.all(racers.map(async (racer, idx) => await racer.tryPutBox(TH.boxAt(0, 'life1', { boxlabel: `racer_${String(idx)}` }), { prior: DB.VoidRevision })))
+      const racerBox = (idx: number) => TH.boxAt(0, 'life1', { boxlabel: `racer_${String(idx)}` })
+      const answers = await Promise.all(racers.map(async (racer, idx) => await racer.tryPutBox(TH.boxPutAskOf(racerBox(idx)))))
 
       expect(answers.filter(({ ok }) => ok)).to.have.lengthOf(1)
       expect(answers.filter(({ ok, err }) => (! ok) && (! DB.isVaultError(err, 'vault_full')))).to.deep.equal([])
@@ -33,12 +34,14 @@ TH.describeOnPostgres('races', "PostgresVaultDB's box cap, over a real Postgres"
     const db = getDb()
     const first = await TH.freshVaultDB(db)
     const vault = TH.vaultAt()
-    await first.putVault(vault, { prior: DB.VoidRevision })
+    await first.putVault(TH.vaultPutAskOf(vault))
     const writers = await Promise.all(Array.from({ length: Racers }, async () => await TH.vaultDBOver(db)))
 
+    const writerBox = (idx: number) => TH.boxAt(0, 'life1', { boxlabel: `writer_${String(idx)}` })
+
     await Promise.all([
-      first.delVault(TH.vaultTombstoneOf(vault), { prior: DB.revisionOf(vault) }),
-      ...writers.map(async (writer, idx) => await writer.tryPutBox(TH.boxAt(0, 'life1', { boxlabel: `writer_${String(idx)}` }), { prior: DB.VoidRevision })),
+      first.delVault(TH.vaultDelAskOf(vault)),
+      ...writers.map(async (writer, idx) => await writer.tryPutBox(TH.boxPutAskOf(writerBox(idx)))),
     ])
 
     const boxrows = await TH.rowsOf(db).boxRowsOf(TH.vaultScope, 'life1')

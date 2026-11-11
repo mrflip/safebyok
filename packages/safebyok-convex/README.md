@@ -46,10 +46,18 @@ export const { listVaults, getVault, listBoxes, getBox, putVault, putBox, delVau
 Run your Convex codegen, and your clients reach them as `api.safebyok`.
 
 **`getUserId` decides who may reach which bank.** Every call names the `user_id` whose rows it
-reads or writes, and each function refuses a caller who is signed out (`getUserId` answers null,
-undefined or empty) or signed in as anyone else, with a `ConvexError` whose `data` is
-`{ kind: 'identity_revoked' }`. The client meets it as a `VaultError` of that kind. Use the same id
-your app gives the core as `user_id`.
+reads or writes, in its scope or in its ask's address, and each function refuses a caller who is
+signed out (`getUserId` answers null, undefined or empty) or signed in as anyone else, with a
+`ConvexError` whose `data` is `{ kind: 'identity_revoked' }`. The client meets it as a `VaultError`
+of that kind. Use the same id your app gives the core as `user_id`.
+
+**Each put and del is checked again on your deployment.** Anyone signed in can call these
+functions directly, so the component checks each ask with the core's own checks before it reads a
+row, refusing one that fails them as `bad_record`; it then names what the ask comes to with the
+core's classifier, and stores the record where that is a write, all in one mutation. A refusal
+the core makes there (`bad_record`, `damaged_row`, `damaged_vault`, `storage_issue`, `gate_issue`)
+crosses as a `ConvexError` whose `data` has its kind and the core's sentence, and a `gate_issue`
+the vault row it tested; the client meets it as a `VaultError` of that kind.
 
 ## Use
 
@@ -69,9 +77,10 @@ Hand `vaultDB` to the core, as its README's *A host* shows.
   `ConvexReactClient` you give `ConvexProvider`, so the vault shares its socket and its signed-in
   user. `safebyok-convex` imports nothing of React's.
 * **`api`** is `api.safebyok`, the functions above.
-* **`maxBoxes`**, optional, 100 if left out, is a best-effort cap on the box rows in one vault, deleted boxes' tombstones
-  among them, under the component's own limit: a put past it refuses as `vault_full`. It is exact at
-  moderate write rates; a strict cap would take concurrency machinery this package does not add.
+* **`maxBoxes`**, optional, 100 if left out, is a cap on the box rows in one vault, deleted boxes' tombstones
+  among them, under the component's own limit: a put that would add a live box past it, a new boxlabel or a box
+  reborn over its tombstone, refuses as `vault_full`. Each put counts in the mutation that stores it, so the cap is
+  exact; a replacement never refuses for it.
 * **`maxRecordBytes`**, optional, as every vaultDB takes it: 5,600 bytes if left out, at most Convex's 1 MiB document.
 
 **Sign in first.** Open the vault once the Convex client is authenticated (in React, once
@@ -80,7 +89,7 @@ Hand `vaultDB` to the core, as its README's *A host* shows.
 **Other writes arrive live.** `watch` keeps a `watchRows` query open on the bank or vault it is
 given, and tells its listener of each row that changes, from any device.
 
-**A call that fails** refuses as `storage_unavailable`, naming the call and nothing of Convex's
+**A call that fails** for any other reason refuses as `storage_unavailable`, naming the call and nothing of Convex's
 error, which on a dev deployment may quote the call's arguments; your deployment's logs have it.
 Offline, a call waits for the connection, as every Convex call does, and Convex resends a mutation
 when it reconnects, so a put may land after any timeout you set.
@@ -109,9 +118,10 @@ tables first (on the dashboard's Data page, pick the `safebyok` component).
 leaves its tombstone in its row, which counts toward both limits as a live box does; a box put
 again under the same boxlabel takes that row back. A put that would take a vault past either limit
 and leave it larger refuses as `vault_full`; a replacement no heavier, and every delete, always
-lands. **Once deleted boxes fill a vault's cap, it refuses new box labels until the vault is
-deleted.** Deleting it is the only way to empty it: its next life starts with none, and `tidyGone`
-removes the old life's rows.
+lands. **Once deleted boxes fill a vault's cap, it refuses new boxes, and boxes reborn over their
+tombstones, until the vault is deleted.** Deleting it is the only way to empty it: `delVault`
+deletes the box rows of the life it ends, in the same mutation, and the next life starts with none.
+`tidyGone` removes the rows of any life that ended some other way.
 
 **How big a bank can be.** The limit above is per vault; a bank is every vault of one user in one
 app, and `tidyGone` and the bank-wide `watch` each read all of the bank's rows in one Convex

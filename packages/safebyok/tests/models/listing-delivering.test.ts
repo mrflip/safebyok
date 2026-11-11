@@ -6,7 +6,7 @@ import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
-import { TestableBox, TestableBoxListing, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
+import { TestableBox, TestableBoxListing, boxDnaOf, boxListingOf, fullBoxRecord, sentinelBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
 const world = useModelsWorld()
 
@@ -104,7 +104,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       const box = await listing.build(fullBoxRecord())
       world.mw.clearCalls()
       world.mw.willPut(world.mw.answerOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })))
-      await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }))
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { expected: box.sparse }))
       expect(box.revision_tok).to.eq('rev-a1')
       expect(world.mw.badnews).to.deep.equal([])
     })
@@ -127,7 +127,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())
       world.mw.willPut(world.mw.staleWriteOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })))
-      const err = await TH.expectRefusal(listing.put(listing.recordOf(box), { prior: box }), 'stale_write')
+      const err = await TH.expectRefusal(listing.put(listing.recordOf(box), { expected: box.sparse }), 'stale_write')
       expect(err.meta ?? {}).to.not.have.property('dbhas')
       expect(world.mw.badnews).to.have.length(1)
     })
@@ -193,7 +193,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
         await listing.fetch(scopeOf('fetched'))
         await listing.fetch(scopeOf('fetched'))
         world.mw.seedPut(fullBoxRecord({ boxlabel: 'built' }))
-        await listing.put(fullBoxRecord({ boxlabel: 'built', revision_tok: 'rev-a2', revision_seq: 2 }), { prior: fullBoxRecord({ boxlabel: 'built' }) })
+        await listing.put(fullBoxRecord({ boxlabel: 'built', revision_tok: 'rev-a2', revision_seq: 2 }), { expected: fullBoxRecord({ boxlabel: 'built' }) })
         await listing.del(box.sparse)
         await world.mw.notify(fullBoxRecord({ boxlabel: 'noticed' }))
         await world.mw.notify(fullBoxRecord({ boxlabel: 'noticed' }))
@@ -252,7 +252,7 @@ describe("listing: a record of another vault_tok reaches no listed instance", ()
   it("throws a 'stale_write' whose record has another vault_tok without delivering that record", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willPut(world.mw.staleWriteOf(scopeOf(), fullBoxRecord({ vault_tok: OtherVault, revision_seq: 5 })))
-    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { prior: SX.VoidRevision }), 'stale_write')
+    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { expected: sentinelBoxRecord() }), 'stale_write')
     expect(world.mw.badnews).to.deep.equal([])
     expect(listing.things).to.deep.equal([])
   })
@@ -296,11 +296,11 @@ describe("listing: an answer names the scope of the record it carries", () => {
   it("refuses a put or a del answered with a record of another scope", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willPut(world.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
-    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { prior: SX.VoidRevision }))
+    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { expected: sentinelBoxRecord('asked_box') }))
     world.mw.willDel(world.mw.answerOf(scopeOf('asked_box'), tombstoneBoxRecord({ boxlabel: 'other_box', revision_seq: 2 })))
     await TH.expectRefusal(listing.del(sparseBoxRecord({ boxlabel: 'asked_box' })))
     world.mw.willPut(world.mw.staleWriteOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box', revision_seq: 5 })))
-    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { prior: SX.VoidRevision }), 'stale_write')
+    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { expected: sentinelBoxRecord('asked_box') }), 'stale_write')
     expect(world.mw.badnews).to.have.length(1)
     expect(listing.things).to.deep.equal([])
   })

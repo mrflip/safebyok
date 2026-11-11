@@ -310,11 +310,11 @@ export const gatingLaunchOnArgs = objStrict(({ oneof, custom, fn }) => ({
   askUser:       custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
 
-/** What launches a gating that builds a vault: its listing, its scope and the revision it is put over, the unlock, and the bank's dialog or null. */
+/** What launches a gating that builds a vault: its listing, its scope and the row it is put over, the unlock, and the bank's dialog or null. */
 export const gatingLaunchBirthArgs = objStrict(({ custom, fn }) => ({
   listing:       custom<VaultListing>((val) => hasModelkind(val, 'vault_listing'), Phrases.ListingExpected),
   scope:         vaultScope,
-  prior:         SX.revision,
+  expected:      SX.vaultSparse,
   unlockByProof: fn<UnlockByProof>(),
   askUser:       custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')

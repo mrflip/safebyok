@@ -7,6 +7,7 @@ import type { Gating } from '../../src/models/gating'
 import type { Gatingkind } from '../../src/shapes/shapes-enums'
 import type { AnyGating, CleartextsForGatingkind, RequestCleartext } from '../../src/shapes/shapes-gateish'
 import { PassphraseProving } from '../../src/models/proving'
+import * as SX from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
 import { type VaultWorldGiven, Dna, Passphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
 
@@ -241,9 +242,9 @@ describe("a birth through a gating", () => {
     const theirs = await storedVaultRecord()
     const { listing, opts, gatingAt, restoreRow, deviceDB } = birthWorld()
     const tryPutVault = opts.vaultDB.tryPutVault.bind(opts.vaultDB)
-    vi.spyOn(opts.vaultDB, 'tryPutVault').mockImplementationOnce(async (record, putOpts) => {
-      const answer = await tryPutVault(record, putOpts)
-      restoreRow({ ...theirs, revision_tok: 'rev-of-the-new-life', revision_seq: record.revision_seq + 2 })
+    vi.spyOn(opts.vaultDB, 'tryPutVault').mockImplementationOnce(async (ask) => {
+      const answer = await tryPutVault(ask)
+      restoreRow({ ...theirs, revision_tok: 'rev-of-the-new-life', revision_seq: ask.record.revision_seq + 2 })
       await listing.fetch(Dna)
       return answer
     })
@@ -275,7 +276,7 @@ describe("a launcher reached through a live gating", () => {
     const gating = await gatingAt<'build_vault'>()
     const launchers = gating.constructor as typeof Gating
     await TH.expectRefusal(launchers.launchOn({} as never, 'unlock_vault', neverUnlocks, null), 'bad_option')
-    await TH.expectRefusal(launchers.launchBirth({} as never, Dna, { revision_tok: 'r', revision_seq: 0 }, neverUnlocks, null), 'bad_option')
+    await TH.expectRefusal(launchers.launchBirth({} as never, Dna, SX.sentinelVaultOf(Dna), neverUnlocks, null), 'bad_option')
     expect(listing.openGating).to.eq(gating)
     gating.dismiss()
     await first

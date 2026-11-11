@@ -6,7 +6,7 @@ import { Box } from '../../src/models/box'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { BoxDna } from '../../src/shapes/shapes-vaultish'
 import * as TH from '../test-helpers'
-import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBoxRecord, sentinelBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
 const world = useModelsWorld()
 
@@ -63,10 +63,10 @@ describe("BoxListing", () => {
       expect(again.revision_seq).to.eq(0)
     })
 
-    it("refuses 'camped' over a live row it does not have, and lists that row", async () => {
+    it("refuses 'stale_write' over a live row it does not have, and lists that row", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.seedPut(fullBoxRecord(stored))
-      await TH.expectRefusal(listing.create(dna()), 'camped')
+      await TH.expectRefusal(listing.create(dna()), 'stale_write')
       expect(listing.at(scope())?.revision_seq).to.eq(5)
     })
 
@@ -88,7 +88,7 @@ describe("BoxListing", () => {
 
     it("refuses a put of another vault's record, putting nothing", async () => {
       const listing = boxListingOf(world.mw)
-      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, { prior: SX.VoidRevision }))
+      await TH.expectRefusal(listing.put({ ...fullBoxRecord(), vaultlabel: 'mary' }, { expected: sentinelBoxRecord() }))
       expect(world.mw.callsOf('put')).to.deep.equal([])
     })
 
@@ -230,7 +230,7 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
     expect(box.box_key_wrapped).to.deep.equal(FakeBoxKeyWrapped)
     expect(box.whisper_ciphered).to.deep.equal(FakeWhisperCiphered)
     const [put] = world.mw.callsOf('put')
-    expect(put?.priorRevisionTok).to.be.null
+    expect(put?.expectedRevisionTok).to.be.null
     expect(put?.record).to.include({ revision_seq: 0, am: 'a' })
     expect(SX.boxRecord.parse(put?.record)).to.deep.equal(put?.record)
   })

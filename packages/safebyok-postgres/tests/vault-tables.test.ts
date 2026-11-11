@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import * as DB from 'safebyok/storage'
-import { VaultTablesSql } from '../src/index'
+import { VaultFunctionsSql, VaultTablesSql } from '../src/index'
 import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
@@ -18,11 +18,12 @@ const columnsOf = async (table: string): Promise<string[][]> => {
   return rows.map(({ column_name, data_type, is_nullable }) => [column_name, data_type, is_nullable])
 }
 
-/** List the primary-key, unique, foreign-key and check constraints of `table`, as Postgres defines them. */
+// The checks are tested by the rows they refuse, in `vault-rows.test.ts`: Postgres rewrites a check's text as it stores it.
+/** List the primary-key, unique and foreign-key constraints of `table`, as Postgres defines them. */
 const keysOf = async (table: string): Promise<string[]> => {
   const db = await TH.database()
   const { rows } = await db.query<{ definition: string }>(
-    "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = $1::regclass AND contype IN ('p', 'u', 'f', 'c')", [table],
+    "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid = $1::regclass AND contype IN ('p', 'u', 'f')", [table],
   )
   return rows.map(({ definition }) => definition)
 }
@@ -32,23 +33,48 @@ describe("VaultTablesSql", () => {
     expect(readFileSync(path.join(import.meta.dirname, '..', 'vault-tables.sql'), 'utf8')).to.equal(VaultTablesSql)
   })
 
-  it("is safe to run again, keeping the rows already stored", async () => {
-    const vaultDB = await TH.makeVaultDB()
-    await vaultDB.putVault(TH.vaultAt(), { prior: DB.VoidRevision })
+  it("comes with VaultFunctionsSql, which is the vault-functions.sql the package ships and is safe to run again", async () => {
+    expect(readFileSync(path.join(import.meta.dirname, '..', 'vault-functions.sql'), 'utf8')).to.equal(VaultFunctionsSql)
     const db = await TH.database()
-    await db.exec(VaultTablesSql)
-    expect(await vaultDB.getVault(TH.vaultScope)).to.deep.include({ act: 'got', val: TH.vaultAt() })
+    await db.exec(VaultFunctionsSql)
   })
 
-  it("makes a vaults table keyed by bank and vaultlabel, and a boxes table keyed by life and boxlabel, each row a jsonb", async () => {
+  it("is safe to run again, keeping the rows already stored", async () => {
+    const vaultDB = await TH.makeVaultDB()
+    await vaultDB.putVault({ op: 'put', ...TH.vaultScope, ifAbsent: 'add', ifPresent: 'fail', expected: DB.sentinelVaultOf(TH.vaultScope), record: TH.vaultAt() })
+    const db = await TH.database()
+    await db.exec(VaultTablesSql)
+    expect(await vaultDB.getVault({ op: 'get', ...TH.vaultScope, ifAbsent: 'fail', expected: TH.vaultAt() })).to.deep.include({ act: 'gotlive', val: TH.vaultAt() })
+  })
+
+  it("makes a vaults table keyed by bank and vaultlabel, a column to each field of a vault row, with only the gate nullable", async () => {
     expect(await columnsOf('safebyok_vaults')).to.deep.equal([
-      ['applabel', 'text', 'NO'], ['user_id', 'text', 'NO'], ['vaultlabel', 'text', 'NO'], ['vault', 'jsonb', 'NO'],
+      ['applabel', 'text', 'NO'], ['user_id', 'text', 'NO'], ['vaultlabel', 'text', 'NO'],
+      ['fmt', 'integer', 'NO'], ['am', 'text', 'NO'], ['revision_tok', 'text', 'NO'], ['revision_seq', 'integer', 'NO'],
+      ['registered_at', 'bigint', 'NO'], ['written_at', 'bigint', 'NO'], ['vault_tok', 'text', 'NO'], ['gate', 'jsonb', 'YES'],
     ])
     expect(await keysOf('safebyok_vaults')).to.deep.equal(['PRIMARY KEY (applabel, user_id, vaultlabel)'])
+  })
+
+  it("makes a boxes table keyed by life and boxlabel, a column to each field of a box row, with only what a tombstone lacks nullable", async () => {
     expect(await columnsOf('safebyok_boxes')).to.deep.equal([
-      ['applabel', 'text', 'NO'], ['user_id', 'text', 'NO'], ['vaultlabel', 'text', 'NO'], ['vault_tok', 'text', 'NO'], ['boxlabel', 'text', 'NO'], ['box', 'jsonb', 'NO'],
+      ['applabel', 'text', 'NO'], ['user_id', 'text', 'NO'], ['vaultlabel', 'text', 'NO'], ['vault_tok', 'text', 'NO'], ['boxlabel', 'text', 'NO'],
+      ['fmt', 'integer', 'NO'], ['am', 'text', 'NO'], ['revision_tok', 'text', 'NO'], ['revision_seq', 'integer', 'NO'],
+      ['registered_at', 'bigint', 'NO'], ['written_at', 'bigint', 'NO'], ['box_tok', 'text', 'NO'],
+      ['whisper_codec', 'text', 'NO'], ['whisper_schema_version', 'integer', 'NO'],
+      ['sidecar', 'jsonb', 'YES'], ['box_key_wrapped', 'jsonb', 'YES'], ['whisper_ciphered', 'jsonb', 'YES'],
     ])
-    expect(await keysOf('safebyok_boxes')).to.deep.equal(['PRIMARY KEY (applabel, user_id, vaultlabel, vault_tok, boxlabel)'])
+    expect(await keysOf('safebyok_boxes')).to.have.members([
+      'PRIMARY KEY (applabel, user_id, vaultlabel, vault_tok, boxlabel)',
+      'FOREIGN KEY (applabel, user_id, vaultlabel) REFERENCES safebyok_vaults(applabel, user_id, vaultlabel)',
+    ])
+  })
+
+  it("has a column for every field of each row the core stores, and no other", async () => {
+    const vaultColumns = await columnsOf('safebyok_vaults')
+    expect(vaultColumns.map(([columnname]) => columnname)).to.have.members(Object.keys(TH.vaultAt()))
+    const boxColumns = await columnsOf('safebyok_boxes')
+    expect(boxColumns.map(([columnname]) => columnname)).to.have.members(Object.keys(TH.boxAt()))
   })
 
   it("turns on row-level security for both tables", async () => {

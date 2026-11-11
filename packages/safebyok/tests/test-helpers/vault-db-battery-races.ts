@@ -5,9 +5,11 @@ import { isVaultError } from '../../src/refusals/errors'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { VaultRow, WatchScope } from '../../src/shapes/shapes-storage'
 import type { AdapterVaultDB, Notice, VaultDB } from '../../src/storage/vault-db'
-import { bankScope, vaultScope, boxscope, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, priorOf, vaultQuery, boxQuery } from './storage-world'
+import {
+  bankScope, vaultScope, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, vaultQuery, gateMoveOf,
+  vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf,
+} from './storage-world'
 import { aWhile, beforeNextCall } from './timing'
-import { gateMoveOf } from './vault-db-battery-puts'
 import type { BatteryWorld } from './vault-db-battery'
 
 /** The answers that were written, and those refused. */
@@ -16,7 +18,7 @@ const splitOf = <AnswerT extends { ok: boolean }>(answers: AnswerT[]) => ({
   refused: answers.filter(({ ok }) => ! ok),
 })
 
-/** Runs `meanwhile`, another device's doings, just before the gate verb's doPutVault, after its doGetVault found the live row. */
+/** Runs `meanwhile`, another device's doings, just before the gate verb's doPutVault. */
 const slipInFront = (vaultDB: AdapterVaultDB, meanwhile: () => Promise<unknown>): void => {
   /** A VaultDB seen as the protected call a gate verb moves the vault row by. */
   type MovesVaultRow = { doPutVault: (...args: never[]) => Promise<unknown> }
@@ -33,57 +35,59 @@ const watching = (vaultDB: VaultDB, scope: WatchScope) => {
 
 /** Registers the races', notices' and failure's cases over `world`. */
 export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCap, makeCapped, canFail, failNextCall, watches, boxNoticesCarryVault }: BatteryWorld): void => {
+  /** The world a watch hears beside a box of `vault`: the vault row, or null from a VaultDB whose box notices carry none. */
+  const boxWorld = (vault: VaultRow) => (boxNoticesCarryVault ? vault : null)
+
   describe("two devices at once", () => {
-    it("two births of one vault store one, and the other is declined with it", async () => {
+    it("two births of one vault store one, and the other is passed it", async () => {
       const vaultDB = await fresh()
       const twin = await twinOf(vaultDB)
-      const answers = await Promise.all([
-        vaultDB.putVault(vaultAt(0, 'lifeA'), { prior: SX.VoidRevision, ifPresent: 'get' }),
-        twin.putVault(vaultAt(0, 'lifeB'), { prior: SX.VoidRevision, ifPresent: 'get' }),
-      ])
-      expect(answers.map(({ act }) => act)).to.have.members(['born', 'declined'])
+      const ours = vaultPutAskOf(vaultAt(0, 'lifeA', { revision_tok: 'vrevA' }), null, { ifPresent: 'get' })
+      const theirs = vaultPutAskOf(vaultAt(0, 'lifeB', { revision_tok: 'vrevB' }), null, { ifPresent: 'get' })
+      const answers = await Promise.all([vaultDB.putVault(ours), twin.putVault(theirs)])
+      expect(answers.map(({ act }) => act)).to.have.members(['born', 'passed'])
       const born = answers.find(({ act }) => act === 'born')?.val
       expect(answers.map(({ val }) => val)).to.deep.equal([born, born])
       expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.deep.equal(born)
     })
 
-    it("two replacements of one box at one prior write one, and the other is refused with the winner", async () => {
+    it("two replacements of one box at one revision write one, and the other is refused with the winner", async () => {
       const { vaultDB, box } = await putWith({ box: true })
       const twin = await twinOf(vaultDB)
-      const ours = boxAt(1, 'life1', { sidecar: { by: 'ours' } })
-      const theirs = boxAt(1, 'life1', { sidecar: { by: 'theirs' }, revision_tok: 'brev1b' })
-      const prior = priorOf(box)
-      const { written, refused } = splitOf(await Promise.all([vaultDB.tryPutBox(ours, { prior }), twin.tryPutBox(theirs, { prior })]))
+      const ours = boxPutAskOf(boxAt(1, 'life1', { sidecar: { by: 'ours' } }), box)
+      const theirs = boxPutAskOf(boxAt(1, 'life1', { sidecar: { by: 'theirs' }, revision_tok: 'brev1b' }), box)
+      const { written, refused } = splitOf(await Promise.all([vaultDB.tryPutBox(ours), twin.tryPutBox(theirs)]))
       expect([written.length, refused.length]).to.deep.equal([1, 1])
-      expect(refused[0]).to.deep.include({ act: 'stale_write', dbhas: written[0]?.val })
-      expect(await vaultDB.getBox(boxQuery)).to.deep.include({ val: written[0]?.val })
+      expect(refused[0]).to.deep.include({ act: 'stale', dbhas: written[0]?.val })
+      expect(refused[0]?.err?.refusalkind).to.eq('stale_write')
+      expect(await vaultDB.getBox(boxGetAskOf())).to.deep.include({ val: written[0]?.val })
     })
 
     it("two first writes of one box write one, and the other is refused with the winner", async () => {
       const { vaultDB } = await putWith()
       const twin = await twinOf(vaultDB)
-      const ours = boxAt(0, 'life1', { box_tok: 'boxA' })
-      const theirs = boxAt(0, 'life1', { box_tok: 'boxB', revision_tok: 'brev0b' })
-      const { written, refused } = splitOf(await Promise.all([vaultDB.tryPutBox(ours, { prior: SX.VoidRevision }), twin.tryPutBox(theirs, { prior: SX.VoidRevision })]))
+      const ours = boxPutAskOf(boxAt(0, 'life1', { box_tok: 'boxA' }))
+      const theirs = boxPutAskOf(boxAt(0, 'life1', { box_tok: 'boxB', revision_tok: 'brev0b' }))
+      const { written, refused } = splitOf(await Promise.all([vaultDB.tryPutBox(ours), twin.tryPutBox(theirs)]))
       expect([written.length, refused.length]).to.deep.equal([1, 1])
-      expect(refused[0]).to.deep.include({ dbhas: written[0]?.val })
+      expect(refused[0]).to.deep.include({ act: 'stale', dbhas: written[0]?.val })
     })
 
     it("writes to two boxes of one vault are both written", async () => {
-      const { vaultDB } = await putWith()
+      const { vaultDB, box } = await putWith()
       const twin = await twinOf(vaultDB)
       const other = boxAt(0, 'life1', { boxlabel: 'other' })
-      await Promise.all([vaultDB.putBox(boxAt(), { prior: SX.VoidRevision }), twin.putBox(other, { prior: SX.VoidRevision })])
+      await Promise.all([vaultDB.putBox(boxPutAskOf(box)), twin.putBox(boxPutAskOf(other))])
       const { val } = await vaultDB.listBoxes(vaultQuery)
       expect(val.boxes.map(({ boxlabel }) => boxlabel)).to.have.members(['openai', 'other'])
     })
 
-    it("a vault deleted while a box is written leaves no live box under the life it ended", async () => {
+    it("a vault deleted while a box is written answers no box of the life it ended", async () => {
       const { vaultDB, vault, box } = await putWith()
       const twin = await twinOf(vaultDB)
-      await Promise.all([vaultDB.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) }), twin.tryPutBox(box, { prior: SX.VoidRevision })])
-      const boxrows = await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')
-      expect([...boxrows.values()].filter((row) => SX.isLiveRow(row))).to.deep.equal([])
+      await Promise.all([vaultDB.delVault(vaultDelAskOf(vault)), twin.tryPutBox(boxPutAskOf(box))])
+      expect(await vaultDB.tryGetBox(boxGetAskOf())).to.deep.include({ ok: false, act: 'vault_gone', world: vaultTombstoneOf(vault) })
+      expect(await vaultDB.tryListBoxes(vaultQuery)).to.deep.include({ ok: false, act: 'vault_gone' })
     })
 
     it("two gate verbs at one revision write one, and the other is refused with the winner", async () => {
@@ -93,52 +97,59 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       const theirs = gateMoveOf(vault, { passphrase_wayin: { ...passphraseWayin, device_id: '00000000-0000-4000-8000-0000000000d2' } })
       const { written, refused } = splitOf(await Promise.all([vaultDB.tryAddPasskey(...ours), twin.tryReplacePassphrase(...theirs)]))
       expect([written.length, refused.length]).to.deep.equal([1, 1])
-      expect(refused[0]).to.deep.include({ act: 'stale_write', dbhas: written[0]?.val })
-      expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.deep.include({ revision_seq: 1 })
+      expect(refused[0]).to.deep.include({ act: 'stale', dbhas: written[0]?.val })
+      expect(refused[0]?.err?.refusalkind).to.eq('stale_write')
+      expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.deep.equal(written[0]?.val)
     })
 
     it.skipIf(! hasCap)("writers racing for a vault's last place under a cap write one", async () => {
       const vaultDB = await makeCapped(2)
       const twin = await twinOf(vaultDB)
-      await vaultDB.putVault(vaultAt(), { prior: SX.VoidRevision })
-      await vaultDB.putBox(boxAt(), { prior: SX.VoidRevision })
-      const racers = ['racer_a', 'racer_b', 'racer_c', 'racer_d'].map((boxlabel, ii) => ((ii % 2) ? twin : vaultDB).tryPutBox(boxAt(0, 'life1', { boxlabel }), { prior: SX.VoidRevision }))
+      await vaultDB.putVault(vaultPutAskOf(vaultAt()))
+      await vaultDB.putBox(boxPutAskOf(boxAt()))
+      const racers = ['racer_a', 'racer_b', 'racer_c', 'racer_d'].map((boxlabel, ii) => ((ii % 2) ? twin : vaultDB).tryPutBox(boxPutAskOf(boxAt(0, 'life1', { boxlabel }))))
       const { written, refused } = splitOf(await Promise.all(racers))
       expect([written.length, refused.length]).to.deep.equal([1, 3])
+      expect(refused.map(({ act }) => act)).to.deep.equal(['vault_full', 'vault_full', 'vault_full'])
       const boxrows = await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')
       expect([...boxrows.values()].filter((row) => SX.isLiveRow(row))).to.have.lengthOf(2)
     })
   })
 
   describe("a vault changed while a gate verb runs", () => {
-    it("refuses as gone when the vault was deleted", async () => {
+    it("refuses 'stale_write' with the tombstone when the vault was deleted", async () => {
       const { vaultDB, vault } = await putWith()
       const twin = await twinOf(vaultDB)
-      slipInFront(adapterOf(vaultDB), async () => await twin.delVault(vaultTombstoneOf(vault), { prior: priorOf(vault) }))
-      expect(await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'vault_gone' })
+      const tombstone = vaultTombstoneOf(vault)
+      slipInFront(adapterOf(vaultDB), async () => await twin.delVault(vaultDelAskOf(vault)))
+      const answer = await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))
+      expect(answer).to.deep.include({ ok: false, act: 'stale', dbhas: tombstone, world: tombstone })
+      expect(answer.err?.refusalkind).to.eq('stale_write')
+      expect(await rowsOf(vaultDB).vaultRowOf(vaultScope)).to.deep.equal(tombstone)
     })
 
     it("refuses 'stale_write' with the new life when the vault was deleted and born again", async () => {
       const { vaultDB, vault } = await putWith()
       const twin = await twinOf(vaultDB)
       const tombstone = vaultTombstoneOf(vault)
+      const reborn = vaultAt(2, 'life2')
       slipInFront(adapterOf(vaultDB), async () => {
-        await twin.delVault(tombstone, { prior: priorOf(vault) })
-        await twin.putVault(vaultAt(2, 'life2'), { prior: priorOf(tombstone) })
+        await twin.delVault(vaultDelAskOf(vault))
+        await twin.putVault(vaultPutAskOf(reborn, tombstone))
       })
-      expect(await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'stale_write', dbhas: vaultAt(2, 'life2') })
+      const answer = await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))
+      expect(answer).to.deep.include({ ok: false, act: 'stale', dbhas: reborn, world: reborn })
+      expect(answer.err?.refusalkind).to.eq('stale_write')
     })
   })
 
   describe.skipIf(! watches)("watch", () => {
-    const boxWorld = (vault: VaultRow) => (boxNoticesCarryVault ? vault : null)
-
     it("notifies of a box written and its vault deleted, each as stored", async () => {
       const { vaultDB, vault, box } = await putWith()
       const { notices } = watching(vaultDB, vaultScope)
-      await vaultDB.putBox(box, { prior: SX.VoidRevision })
+      await vaultDB.putBox(boxPutAskOf(box))
       const tombstone = vaultTombstoneOf(vault)
-      await vaultDB.delVault(tombstone, { prior: priorOf(vault) })
+      await vaultDB.delVault(vaultDelAskOf(vault))
       await vi.waitFor(() => {
         expect(notices).to.deep.include.members([{ act: 'got', val: box, world: boxWorld(vault) }, { act: 'gone', val: tombstone, world: tombstone }])
       })
@@ -148,7 +159,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       const { vaultDB, vault, box } = await putWith()
       const twin = await twinOf(vaultDB)
       const { notices } = watching(vaultDB, vaultScope)
-      await twin.putBox(box, { prior: SX.VoidRevision })
+      await twin.putBox(boxPutAskOf(box))
       await vi.waitFor(() => { expect(notices).to.deep.include({ act: 'got', val: box, world: boxWorld(vault) }) })
     })
 
@@ -157,9 +168,9 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       const bankwide = watching(vaultDB, bankScope)
       const vaultwide = watching(vaultDB, vaultScope)
       const other = vaultAt(0, 'life2', { vaultlabel: 'other' })
-      await vaultDB.putVault(other, { prior: SX.VoidRevision })
-      await vaultDB.putVault(vaultAt(0, 'life3', { user_id: 'u2' }), { prior: SX.VoidRevision })
-      await vaultDB.putBox(box, { prior: SX.VoidRevision })
+      await vaultDB.putVault(vaultPutAskOf(other))
+      await vaultDB.putVault(vaultPutAskOf(vaultAt(0, 'life3', { user_id: 'u2' })))
+      await vaultDB.putBox(boxPutAskOf(box))
       await vi.waitFor(() => {
         expect(bankwide.notices.map(({ val }) => val)).to.deep.include.members([other, box])
         expect(vaultwide.notices.map(({ val }) => val)).to.deep.include(box)
@@ -172,10 +183,10 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
     it("notifies of nothing once stopped", async () => {
       const { vaultDB, box } = await putWith()
       const { notices, unwatch } = watching(vaultDB, vaultScope)
-      await vaultDB.putBox(box, { prior: SX.VoidRevision })
+      await vaultDB.putBox(boxPutAskOf(box))
       await vi.waitFor(() => { expect(notices).to.have.lengthOf(1) })
       unwatch()
-      await vaultDB.putBox(boxAt(1), { prior: priorOf(box) })
+      await vaultDB.putBox(boxPutAskOf(boxAt(1), box))
       await aWhile()
       expect(notices).to.have.lengthOf(1)
     })
@@ -185,20 +196,9 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       const { notices, unwatch } = watching(vaultDB, vaultScope)
       unwatch()
       expect(() => { unwatch() }).not.to.throw()
-      await vaultDB.putBox(box, { prior: SX.VoidRevision })
+      await vaultDB.putBox(boxPutAskOf(box))
       await aWhile()
       expect(notices).to.deep.equal([])
-    })
-
-    it.skipIf(! boxNoticesCarryVault)("notifies of a cascade's box with the stored vault row as world, not the request's tombstone", async () => {
-      const { vaultDB, vault } = await putWith()
-      await rowsOf(vaultDB).plantBoxRow(boxscope, 'oldlife', boxAt(0, 'oldlife'))
-      const { notices } = watching(vaultDB, vaultScope)
-      const oldLife = vaultAt(0, 'oldlife')
-      await vaultDB.delVault(vaultTombstoneOf(oldLife), { prior: priorOf(oldLife) })
-      await vi.waitFor(() => { expect(notices.map(({ world }) => world)).to.deep.equal([vault]) })
-      await aWhile()
-      expect(notices.map(({ world }) => world)).to.deep.equal([vault])
     })
   })
 
@@ -206,10 +206,11 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
     it.skipIf(! canFail)("refuses the call its storage failed, and completes the next", async () => {
       const { vaultDB, vault } = await putWith()
       await failNextCall(vaultDB)
-      const answer = await vaultDB.tryGetVault(vaultScope)
-      expect(answer).to.deep.include({ ok: false, req_params: vaultScope })
+      const answer = await vaultDB.tryGetVault(vaultGetAskOf())
+      expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null })
+      expect(answer.req_params).to.deep.include(vaultScope)
       expect(isVaultError(answer.err, 'storage_unavailable')).to.be.true
-      expect(await vaultDB.getVault(vaultScope)).to.deep.include({ val: vault })
+      expect(await vaultDB.getVault(vaultGetAskOf())).to.deep.include({ val: vault })
     })
   })
 }

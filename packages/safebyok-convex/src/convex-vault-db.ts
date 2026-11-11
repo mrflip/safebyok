@@ -4,9 +4,12 @@ import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import * as DB from 'safebyok/storage'
-import type { AdapterVaultDBOpts, BankScope, BoxesFetched, BoxFetched, BoxWritten, BoxQuery, BoxRecord, BoxTombstone, DelOpts, Heard, Written, PutOptsGiven, RowOfVault, Tidied, VaultError, VaultQuery, VaultRecord, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
+import type {
+  AdapterVaultDBOpts, BankScope, BoxClassified, BoxDelAsk, BoxesFetched, BoxGetAsk, BoxPutAsk, Heard, RowOfVault, Tidied,
+  VaultClassified, VaultDelAsk, VaultError, VaultGetAsk, VaultPutAsk, VaultQuery, WatchScope,
+} from 'safebyok/storage'
 import * as Phrases from './phrases'
-import { isSafebyokErrorData } from './refusals'
+import { isSafebyokErrorData, safebyokErrorData } from './refusals'
 import type { SafebyokApi } from './server'
 
 // == [Clients]: ConvexCalls, ConvexWatchingClient, ConvexReactWatchingClient, ConvexVaultClient, ConvexVaultDBOpts
@@ -46,7 +49,7 @@ export type ConvexVaultDBOpts = AdapterVaultDBOpts & {
   client: ConvexVaultClient
   /** The app's safebyok functions: `api.safebyok`, not the whole `api`. */
   api: SafebyokApi
-  /** A soft cap on a vault's box rows, tombstones included. Defaults to `DefaultMaxBoxes`, and never exceeds the component's own limit. */
+  /** A soft cap on a vault's box rows, tombstones included: a put that would add a live box past it refuses `vault_full`. Defaults to `DefaultMaxBoxes`, and never exceeds the component's own limit. */
   maxBoxes?: number | undefined
 }
 
@@ -86,35 +89,37 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     return await reaching('doListVaults', () => this.#client.query(this.#api.listVaults, { scope }))
   }
 
-  protected async doGetVault(scope: VaultScope): Promise<unknown> {
-    return await reaching('doGetVault', () => this.#client.query(this.#api.getVault, { scope }))
+  // A get reads its rows in one query, from one snapshot, and the client classifies them: a get stores nothing, so it needs no mutation.
+  protected async doGetVault(ask: VaultGetAsk): Promise<VaultClassified> {
+    const vault: unknown = await reaching('doGetVault', () => this.#client.query(this.#api.getVault, { scope: DB.vaultScope.parse(ask) }))
+    return this.classifyVault(ask, { vault })
   }
 
   protected async doListBoxes(asked: VaultQuery): Promise<BoxesFetched> {
     return await reaching('doListBoxes', () => this.#client.query(this.#api.listBoxes, { asked }))
   }
 
-  protected async doGetBox(asked: BoxQuery): Promise<BoxFetched> {
-    return await reaching('doGetBox', () => this.#client.query(this.#api.getBox, { asked }))
+  protected async doGetBox(ask: BoxGetAsk): Promise<BoxClassified> {
+    const { vault, box } = await reaching('doGetBox', () => this.#client.query(this.#api.getBox, { asked: DB.boxQuery.parse(ask) }))
+    return this.classifyBox(ask, { world: vault, box })
   }
 
-  protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Written> {
-    return await reaching('doPutVault', () => this.#client.mutation(this.#api.putVault, { record, opts }))
+  // A put or del is one mutation: the component checks the ask, fetches the rows, classifies, and stores the record where
+  // the act is a write, all in one transaction. What it answers is the classifier's, checked here once.
+  protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
+    return vaultClassified.parse(await reaching('doPutVault', () => this.#client.mutation(this.#api.putVault, { ask })))
   }
 
-  // For a full vault the component returns its capacity instead of throwing, so `vault_full` is thrown here, with the core's thrower.
-  protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxWritten> {
-    const answer = await reaching('doPutBox', () => this.#client.mutation(this.#api.putBox, { record, opts, maxBoxes: this.#maxBoxes }))
-    if ('capacity' in answer) { throw DB.vaultFull(answer.capacity) }
-    return answer
+  protected async doPutBox(ask: BoxPutAsk): Promise<BoxClassified> {
+    return boxClassified.parse(await reaching('doPutBox', () => this.#client.mutation(this.#api.putBox, { ask, maxBoxes: this.#maxBoxes })))
   }
 
-  protected async doDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Written> {
-    return await reaching('doDelVault', () => this.#client.mutation(this.#api.delVault, { tombstone, opts }))
+  protected async doDelVault(ask: VaultDelAsk): Promise<VaultClassified> {
+    return vaultClassified.parse(await reaching('doDelVault', () => this.#client.mutation(this.#api.delVault, { ask })))
   }
 
-  protected async doDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<BoxWritten> {
-    return await reaching('doDelBox', () => this.#client.mutation(this.#api.delBox, { tombstone, opts }))
+  protected async doDelBox(ask: BoxDelAsk): Promise<BoxClassified> {
+    return boxClassified.parse(await reaching('doDelBox', () => this.#client.mutation(this.#api.delBox, { ask })))
   }
 
   protected async doTidyGone(scope: BankScope): Promise<Tidied> {
@@ -169,14 +174,14 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Helpers]: reaching, refusalOf, changesOf, latestOf, isConvexClient, isSafebyokApi, convexVaultDBOpts
+// == [Helpers]: reaching, refusalOf, refusalOfCrossed, changesOf, latestOf, isConvexClient, isSafebyokApi, convexVaultDBOpts, vaultClassified, boxClassified
 
 /** Convex's size limit for one document, in bytes. */
 const ConvexDocumentBytes = 1_048_576
 
 // Takes a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
 /** Run `call`, converting anything it throws into a safebyok refusal. */
-const reaching = async <ValT>(callname: string, call: () => Promise<ValT>): Promise<ValT> => {
+async function reaching<ValT>(callname: string, call: () => Promise<ValT>): Promise<ValT> {
   try {
     return await call()
   } catch (err) {
@@ -185,15 +190,24 @@ const reaching = async <ValT>(callname: string, call: () => Promise<ValT>): Prom
 }
 
 // On a dev deployment Convex's error text may quote the call's arguments, so its message is never
-// passed on. The wrapper's own refusal is recognized by its `data`.
-const refusalOf = (callname: string, thrown: unknown): VaultError => {
-  if ((thrown instanceof ConvexError) && isSafebyokErrorData(thrown.data)) { return DB.identityRevoked() }
+// passed on. A refusal that crosses is recognized by its `data`, which this package's functions alone make.
+/** The refusal `thrown` stands for: one that crossed as itself, anything else as `storage_unavailable` naming `callname`. */
+function refusalOf(callname: string, thrown: unknown): VaultError {
+  if ((thrown instanceof ConvexError) && isSafebyokErrorData(thrown.data)) { return refusalOfCrossed(thrown.data) }
   return DB.storageFailed(callname, thrown)
+}
+
+/** The VaultError a crossed refusal's `data` carries: its kind and the core's sentence, and on `gate_issue` the vault row it tested. */
+function refusalOfCrossed(data: unknown): VaultError {
+  const crossed = safebyokErrorData.parse(data)
+  if (crossed.kind === 'identity_revoked') { return DB.identityRevoked() }
+  if (crossed.kind === 'gate_issue') { return new DB.VaultError('gate_issue', crossed.message, { rows: { world: crossed.world, dbhas: crossed.world } }) }
+  return new DB.VaultError(crossed.kind, crossed.message)
 }
 
 // Both results come from Convex's own serializer, so an unchanged row serializes the same way twice.
 /** Return the vault rows and box rows in `rows` that are new or changed since `seen`. */
-const changesOf = (seen: RowsWatched, rows: RowsWatched): Heard[] => {
+function changesOf(seen: RowsWatched, rows: RowsWatched): Heard[] {
   const seenVaults = new Map(seen.vaults.map(({ vaultlabel, vault }) => [vaultlabel, JSON.stringify(vault)]))
   const seenBoxes = new Map(seen.boxes.map(({ vaultlabel, vault_tok, boxlabel, box }) => [DB.ckeyOf(vaultlabel, vault_tok, boxlabel), JSON.stringify(box)]))
   const vaultOf = new Map(rows.vaults.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
@@ -217,7 +231,7 @@ const latestOf = (watch: { localQueryResult(): RowsWatched | undefined }, fail: 
 }
 
 /** True when `candidate` has `query`, `mutation`, and either `onUpdate` or `watchQuery`. */
-const isConvexClient = (candidate: unknown): candidate is ConvexVaultClient => {
+function isConvexClient(candidate: unknown): candidate is ConvexVaultClient {
   if ((typeof candidate !== 'object') || (candidate === null)) { return false }
   const calls = candidate as Partial<Record<'query' | 'mutation' | 'onUpdate' | 'watchQuery', unknown>>
   return (typeof calls.query === 'function') && (typeof calls.mutation === 'function') && ((typeof calls.onUpdate === 'function') || (typeof calls.watchQuery === 'function'))
@@ -230,7 +244,7 @@ const SafebyokFnnames = ['listVaults', 'getVault', 'listBoxes', 'getBox', 'putVa
 // reference for any property, so `api.getVault` exists, but it names no module and
 // `getFunctionName` throws on it.
 /** True when `candidate` is the module of safebyok functions (`api.safebyok`), not the whole `api`. */
-const isSafebyokApi = (candidate: unknown): candidate is SafebyokApi => {
+function isSafebyokApi(candidate: unknown): candidate is SafebyokApi {
   if ((typeof candidate !== 'object') || (candidate === null)) { return false }
   const fnRefs = candidate as Partial<Record<string, FunctionReference<'query' | 'mutation'>>>
   return SafebyokFnnames.every((fnname) => {
@@ -245,10 +259,30 @@ const isSafebyokApi = (candidate: unknown): candidate is SafebyokApi => {
 }
 
 /** Validator for {@link ConvexVaultDBOpts}. */
-const convexVaultDBOpts = DB.objCheck(({ custom, uint }) => ({
+const convexVaultDBOpts = DB.objCheck(({ custom, int }) => ({
   ...DB.adapterVaultDBOpts.shape,
   client:   custom<ConvexVaultClient>(isConvexClient, Phrases.ClientExpected),
   api:      custom<SafebyokApi>(isSafebyokApi, Phrases.ApiExpected),
-  maxBoxes: uint.optional(),
+  maxBoxes: int.positive().optional(),
 }), 'bad_option')
+
+const OkActVals = [...DB.writeActVals, ...DB.foundActVals] as const
+
+// A failed check here is a component out of step with this copy of safebyok, never a damaged row: the classifier checked the rows.
+/** Validators for what a put's or del's mutation answers: what the classifier made of a vault's ask, and of a box's. */
+const { vaultClassified, boxClassified } = DB.Checkers('unexpected_error', ({ obj, union, lit, oneof }) => {
+  const presence = oneof(DB.presenceVals)
+  const vaultParts = { world: DB.vaultRow, vault: DB.vaultRow.nullable(), presence }
+  const boxParts   = { world: DB.vaultRow, box: DB.boxRow.nullable(), presence: presence.nullable(), capacity: DB.capacity.nullable() }
+  return {
+    vaultClassified: union([
+      obj({ ok: lit(true), act: oneof(OkActVals), ...vaultParts }),
+      obj({ ok: lit(false), act: oneof(DB.refusedActVals), ...vaultParts }),
+    ]),
+    boxClassified: union([
+      obj({ ok: lit(true), act: oneof(OkActVals), ...boxParts }),
+      obj({ ok: lit(false), act: oneof([...DB.refusedActVals, ...DB.boxVaultActVals]), ...boxParts }),
+    ]),
+  }
+})
 // --

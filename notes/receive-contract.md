@@ -106,8 +106,9 @@ After preflight, the record is delivered to the receiver. First match wins. The 
 | R2  | `same`  | `same`  | `full` | `sparse`        | `fill`   | has `rcvd`                                                                                       |
 | R3  | `same`  | `same`  | @      | @               | `same`   | as it was                                                                                        |
 | R4  | —       | —       | `none` | `void` · `gone` | `same`   | as it was                                                                                        |
-| R5  | `newer` | `other` | @      | @               | `reborn` | A box has `rcvd`, with its new `box_tok` and `registered_at`. A Vault never meets this row (S2). |
-| R6  | `newer` | `same`  | `gone` | @               | `gone`   | has the tombstone, and has dropped its secrets (L6)                                              |
+| R5  | `newer` | `other` | `gone` | @               | `gone`   | A box has the tombstone, under the tombstone's own `box_tok`, and has dropped its secrets (L6). A Vault never meets this row (S2). |
+| R5  | `newer` | `other` | *live* | @               | `reborn` | A box has `rcvd`, with its new `box_tok` and `registered_at`. A Vault never meets this row (S2). |
+| R6  | `newer` | `same`  | `gone` | `void`          | `gone`   | A stand-in has the tombstone. No other instance meets this row: a tombstone carries a life token of its own. |
 | R7  | `newer` | `same`  | *live* | @               | `adopt`  | has `rcvd`                                                                                       |
 
 Coverage: `rev` has four values. `forked` is F4. `older` is R1, whatever else holds. `same` leaves only pairs of one life that are both gone or both live (F5): R2 is the one that changes anything, and R3 is the rest. `newer` splits on `life`, then on whether `rcvd` is gone, with F7 taken out. `none` has no revision: F6 or R4. A stand-in is `void` in `rcvd`'s life, so it meets R6 or R7.
@@ -125,9 +126,8 @@ A box answer or notice typically carries its vault's row as `world`. The bank's 
 | W3  | a row of this `vault_tok`, older                | @      | R1     | as it was                                                                                                     | the answer's own act |
 | W3  | a row of this `vault_tok`, at the same revision | @      | R2, R3 | as it was, or filled where it was `sparse`                                                                    | the answer's own act |
 | W3  | a live row of this `vault_tok`, newer           | live   | R7     | has the world: a gate changed on another device arrives here                                                  | the answer's own act |
-| W3  | a tombstone of this `vault_tok`, newer          | live   | R6     | The vault locks, forgets its lease and vacates its boxes, the box listing that brought the answer among them. | `vault_gone`         |
 
-W2 is how this device learns from a box answer alone that its vault's life is over. The Vault object of that life is vacated at once, so it never stays unlocked until the vault listing next asks for its own row. A world of another life that is older is R1, and one at the same revision is F5.
+W2 is how this device learns from a box answer alone that its vault's life is over. A vault's tombstone carries a `vault_tok` of its own, so a deletion always arrives as W2, never as a row of this `vault_tok`. The Vault object of that life is vacated at once, so it never stays unlocked until the vault listing next asks for its own row. A world of another life that is older is R1, and one at the same revision is F5.
 
 ## Where this differs from the code today
 

@@ -6,7 +6,7 @@ import * as SX from '../../src/shapes/shapes-storage'
 import { VaultError } from '../../src/refusals/errors'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Answer } from '../../src/storage/vault-db'
-import { bankScope, boxAt, boxscope, boxTombstoneOf, stale, vaultAt, vaultQuery, vaultScope, vaultTombstoneOf } from '../test-helpers/storage-world'
+import { bankScope, boxAt, boxDelAskOf, boxGetAskOf, boxPutAskOf, vaultAt, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultQuery, vaultScope } from '../test-helpers/storage-world'
 
 // == [A wire]: crossed
 
@@ -24,8 +24,8 @@ const crossed = (answer: Answer<unknown, string, unknown>): unknown => {
 /** A VaultDB with the vault and one box, at revision 0. */
 const vaultDBWithBox = async (): Promise<MemoryVaultDB> => {
   const vaultDB = new MemoryVaultDB()
-  await vaultDB.putVault(vaultAt(), { prior: SX.VoidRevision })
-  await vaultDB.putBox(boxAt(), { prior: SX.VoidRevision })
+  await vaultDB.putVault(vaultPutAskOf(vaultAt()))
+  await vaultDB.putBox(boxPutAskOf(boxAt()))
   return vaultDB
 }
 // --
@@ -35,13 +35,15 @@ describe("AX's answer checks", () => {
     const vaultDB = await vaultDBWithBox()
     const answers = [
       [AX.listVaultsAnswer, await vaultDB.tryListVaults(bankScope)],
-      [AX.getVaultAnswer,   await vaultDB.tryGetVault(vaultScope)],
+      [AX.getVaultAnswer,   await vaultDB.tryGetVault(vaultGetAskOf())],
       [AX.listBoxesAnswer,  await vaultDB.tryListBoxes(vaultQuery)],
-      [AX.getBoxAnswer,     await vaultDB.tryGetBox({ ...boxscope, vault_tok: 'life1' })],
-      [AX.putBoxAnswer,     await vaultDB.tryPutBox(boxAt(1), { prior: SX.revisionOf(boxAt()) })],
-      [AX.delBoxAnswer,     await vaultDB.tryDelBox(boxTombstoneOf(boxAt(1)), { prior: SX.revisionOf(boxAt(1)) })],
-      [AX.putVaultAnswer,   await vaultDB.tryPutVault(vaultAt(0, 'life2', { vaultlabel: 'second' }), { prior: SX.VoidRevision })],
-      [AX.delVaultAnswer,   await vaultDB.tryDelVault(vaultTombstoneOf(vaultAt()), { prior: SX.revisionOf(vaultAt()) })],
+      [AX.getBoxAnswer,     await vaultDB.tryGetBox(boxGetAskOf())],
+      [AX.putBoxAnswer,     await vaultDB.tryPutBox(boxPutAskOf(boxAt(1), boxAt()))],
+      [AX.delBoxAnswer,     await vaultDB.tryDelBox(boxDelAskOf(boxAt(1)))],
+      [AX.getBoxAnswer,     await vaultDB.tryGetBox(boxGetAskOf(undefined, 'nil'))],
+      [AX.putVaultAnswer,   await vaultDB.tryPutVault(vaultPutAskOf(vaultAt(0, 'life2', { vaultlabel: 'second' })))],
+      [AX.delVaultAnswer,   await vaultDB.tryDelVault(vaultDelAskOf(vaultAt()))],
+      [AX.getVaultAnswer,   await vaultDB.tryGetVault(vaultGetAskOf(undefined, 'nil'))],
       [AX.tidyGoneAnswer,   await vaultDB.tryTidyGone(bankScope)],
     ] as const
     for (const [check, answer] of answers) {
@@ -52,7 +54,8 @@ describe("AX's answer checks", () => {
 
   it("parses a serialized refusal to a VaultError of its kind", async () => {
     const vaultDB = await vaultDBWithBox()
-    const answer = await vaultDB.tryPutVault(vaultAt(1), { prior: stale })
+    await vaultDB.putVault(vaultPutAskOf(vaultAt(1), vaultAt()))
+    const answer = await vaultDB.tryPutVault(vaultPutAskOf(vaultAt(1, 'life1', { revision_tok: 'rival' }), vaultAt()))
     expect(answer.ok).to.be.false
     const parsed = AX.putVaultAnswer.parse(crossed(answer))
     expect(parsed.ok).to.be.false
@@ -84,7 +87,7 @@ describe("AX's answer checks", () => {
 
   it("refuses an answer out of step with its verb's checker", async () => {
     const vaultDB = await vaultDBWithBox()
-    const got = crossed(await vaultDB.tryGetVault(vaultScope)) as Record<string, unknown>
+    const got = crossed(await vaultDB.tryGetVault(vaultGetAskOf())) as Record<string, unknown>
     for (const bad of [{ ...got, surplus: 1 }, { ...got, act: 'born' }, { ...got, world: null }]) {
       expect(() => AX.getVaultAnswer.parse(bad)).to.throw(VaultError).with.property('refusalkind', 'unexpected_error')
     }

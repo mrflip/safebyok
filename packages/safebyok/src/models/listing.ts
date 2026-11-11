@@ -4,15 +4,14 @@ import { isEqual } from 'es-toolkit'
 import { UNANSWERED } from '../helpers/consts'
 import { verifyConsistent } from '../helpers/validator'
 import { oneAtATime } from '../helpers/one-at-a-time'
-import { nowMillis } from '../helpers/clock'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { type GoodAnswer, type Notice as VaultDBNotice, type VaultDB, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
 import type { IfAbsent } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
-import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
+import type { BoxRow, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingListAnswer, ListingPutAnswer, ListingOpts, ListingWorld, ListingGetAnswer, SlotFate, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
-import { disabledError, rowOfOtherVaultTok } from '../refusals/throwers'
+import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingDelOpts, ListingListAnswer, ListingPutAnswer, ListingPutOpts, ListingOpts, ListingWorld, ListingGetAnswer, SlotFate, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
+import { disabledError, rowOfOtherVaultTok, storageIssue } from '../refusals/throwers'
 import * as Phrases from '../helpers/phrases'
 import { demandGood, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
@@ -257,17 +256,17 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return (found?.isPresent === true) ? found : null
   }
 
-  /** Puts `record` over the revision `prior`, answering the instance listed. */
+  /** Puts `record` over the row `opts.expected`, answering the instance listed. */
   async put(record: RecordT, opts: PutOpts): Promise<ThingT> { return demandGood(await this.tryPut(record, opts)).val }
 
   /** {@link put}, answering the vaultDB's own answer with the instance listed as its `val`. */
   async tryPut(record: RecordT, opts: PutOpts): Promise<ThingAnswer<ThingT>> {
     let answer: ListingPutAnswer<RecordT, SparseT> | typeof UNANSWERED = UNANSWERED
     try {
-      const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
+      const { expected, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
       const checked = this.recordOf(record)
       this.demandEnabled()
-      answer = await this.doTryPut(checked, { prior, ifAbsent, ifPresent })
+      answer = putAnswerOf(await this.doTryPut(checked, { expected: this.sparseOf(expected), ifAbsent, ifPresent }))
       return answerWithVal(answer, await this.deliver(answer, checked))
     } catch (err) { return refusedAnswerOf(err, answer) }
   }
@@ -279,11 +278,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async tryDel(record: SparseT): Promise<ThingAnswer<ThingT | null>> {
     let answer: ListingAnswer<RecordT, SparseT> | typeof UNANSWERED = UNANSWERED
     try {
-      const sparse = this.sparseOf(record)
+      const expected = this.sparseOf(record)
       this.demandEnabled()
-      const prior = SX.revisionOf(sparse)
-      const tombstone = { ...sparse, ...SX.nextRevisionOf(prior, nowMillis()), am: 'x' as const }
-      answer = await this.doTryDel(tombstone, { prior })
+      const tombstone = this.tombstoneOver(expected)
+      answer = await this.doTryDel(tombstone, { expected })
       return answerWithVal(answer, await this.deliver(answer, tombstone))
     } catch (err) { return refusedAnswerOf(err, answer) }
   }
@@ -313,9 +311,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** The instance a good answer to `sent` leaves listed, or null where none is. */
   #deliverGood(answer: GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null {
-    const record = recordOfAnswer<RecordT, SparseT>(answer)
-    // A declined put and a del over a tombstone answer what storage has, whose revision no one sent: only the scope is pinned.
-    const pins = ((answer.act === 'declined') || (answer.act === 'gone')) ? this.scopeOf(sent) : SX.reqParams.parse(sent)
+    const record = answer.val
+    // A passed put answers what storage has, whose revision no one sent: only the scope is pinned.
+    const pins = (answer.act === 'passed') ? this.scopeOf(sent) : SX.reqParamsOf(sent)
     if (record !== null) { verifyConsistent(record, pins, { kind: 'storage_issue', message: Phrases.AnswerNotAsSent }) }
     return (record === null) ? this.#receiveNothing(this.scopeOf(sent)) : this.buildOrReceive(record)
   }
@@ -415,7 +413,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Defined by the concrete listing]: fateOver, vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, doTryDel, watchRows, isOwnRow
+  // == [Defined by the concrete listing]: fateOver, vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** The fate of `record` meeting `listed`, the thing in its slot: by default its `receive` judges it. */
   protected fateOver(_held: ThingT, _record: Fetched<RecordT, SparseT>): SlotFate { return 'receive' }
@@ -432,15 +430,18 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected abstract makeThing(central: Fetched<RecordT, SparseT>): ThingT
   /** The refusal for a scope where no row is stored and no instance is listed. */
   protected abstract nothingStoredError(scope: ScopeT): VaultError
-  /** The vaultDB's get of this kind of thing, answering null for nothing stored. */
+  /** The vaultDB's get of this kind of thing, expecting the row of the instance listed, and answering null for nothing stored. */
   protected abstract doTryGet(scope: ScopeT): Promise<ListingAnswer<RecordT, SparseT>>
-  /** The vaultDB's put of this kind of thing, whose good answer always carries a record. */
-  protected abstract doTryPut(record: RecordT, opts: PutOpts): Promise<ListingPutAnswer<RecordT, SparseT>>
+  /** The vaultDB's put of this kind of thing. */
+  protected abstract doTryPut(record: RecordT, opts: ListingPutOpts<SparseT>): Promise<ListingAnswer<RecordT, SparseT>>
   /** The vaultDB's listing of every row of this kind, live, gone and damaged. */
   protected abstract doTryList(): Promise<ListingListAnswer<RecordT, SparseT, DamagedT>>
   /** The bad news a row the listing set aside as damaged is told as. */
   protected abstract damagedStoredError(damaged: DamagedT): VaultError
-  protected abstract doTryDel(tombstone: DelTombstone<SparseT>, opts: DelOpts): Promise<ListingAnswer<RecordT, SparseT>>
+  /** The tombstone a del stores over `expected`: at the next revision, with a new life token of its own. */
+  protected abstract tombstoneOver(expected: SparseT): DelTombstone<SparseT>
+  /** The vaultDB's del of this kind of thing. */
+  protected abstract doTryDel(tombstone: DelTombstone<SparseT>, opts: ListingDelOpts<SparseT>): Promise<ListingAnswer<RecordT, SparseT>>
   /** Start the vaultDB's watch over this listing's scope, `onBadNews` hearing of trouble with it; returns how to stop. */
   protected abstract watchRows(onNotice: (notice: VaultDBNotice) => void, onBadNews: (news: VaultError) => void): () => void
   /** True for a row this listing has: the vaultDB's watch tells of a vault's rows and its boxes' alike. */
@@ -448,14 +449,16 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // --
 }
 
-// == [Helpers]: Joined, recordOfAnswer
+// == [Helpers]: Joined, putAnswerOf
 
 /** A joined storage call's answer, with what delivering it made, or the refusal delivering met. */
 type Joined<AnswerT, ValT> = { answer: AnswerT, val: ValT } | { answer: AnswerT, err: unknown }
 
-/** The record a good answer delivers: its `val`, or the tombstone in `dbhas` where it answers null; null for nothing stored, as a del's `void` is, whose `val` is a sentinel. */
-const recordOfAnswer = <RecordT, SparseT>(answer: GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>): Fetched<RecordT, SparseT> | null => {
-  if (answer.act === 'void') { return null }
-  return answer.val ?? (answer.dbhas as Fetched<RecordT, SparseT> | null | undefined) ?? null
+/** `answer` as a put's: a good one carries the record stored, or the live one found. Throws `storage_issue` for a good one that carries none. */
+function putAnswerOf<RecordT, SparseT>(answer: ListingAnswer<RecordT, SparseT>): ListingPutAnswer<RecordT, SparseT> {
+  if (! answer.ok) { return answer }
+  const { val } = answer
+  if (val === null) { throw storageIssue() }
+  return { ...answer, val }
 }
 // --
