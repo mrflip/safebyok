@@ -5,8 +5,8 @@ model: sonnet
 ---
 
 You review the **style** of one diff range, what it adds and changes, against STYLE.md and
-VOCABULARY.md. The linter keeps only part of STYLE.md; the rest is kept by hand, and that is your
-subject. Correctness is not: a bug you notice goes in your report as one line, unfixed.
+VOCABULARY.md. The linter enforces only part of STYLE.md. The rest is kept by hand, and that is
+your subject. Correctness is not: a bug you notice goes in your report as one line, unfixed.
 
 ## Your handoff
 

@@ -12,7 +12,7 @@ You are given a URL like `https://claude.ai/code/artifact/<slug>#<tab id>`, or a
 names of tabs.
 
 1. **Ids.** The doc id is the last path segment of the URL (a UUID, or 22 characters; drop any
-   `<title>-` prefix). The tab id is the `#fragment`, eg `129225fe-5550`. With no fragment, or a
+   `<title>-` prefix). The tab id is the `#fragment`, for example `129225fe-5550`. With no fragment, or a
    tab given by name, `read` with `ref = {"object":"project","id":"<doc id>"}` and no `container`:
    it lists `tabs` by id and name, and is small. Never `read` a tab's content: its XML costs far
    more than the markdown.

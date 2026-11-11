@@ -3,7 +3,7 @@
 For whoever changes `/sprint` or its agents. Nothing here is read when a sprint runs: SKILL.md,
 `wrapup.md` and the two agent definitions are what runs.
 
-**What costs context.** The orchestrator holds the longest context of any agent in a sprint, so
+**What costs context.** The orchestrator has the longest context of any agent in a sprint, so
 it is the one compaction catches mid-sprint, losing its place. Everything it reads stays and is
 paid again on every turn. Each subagent pays its own definition, CLAUDE.md and its handoff on
 every turn. The `description` of a skill or agent is paid by every session in the repository,
@@ -13,7 +13,7 @@ sprinting or not, which is why those are one sentence of when to use it.
   no delegation depth, keeping live chat with the Coach, and workers delegate freely below it.
   `context: fork` would burn a layer, sever the chat, and background the orchestrator into a
   restricted toolset.
-* **The sprint doc links files; it never holds copies.** Until 2026-10-17 the orchestrator
+* **The sprint doc links files; it never contains copies.** Until 2026-10-17 the orchestrator
   mirrored every file in the sprint directory into a tab, whole. Each mirror put the file into
   its context twice (read, then written), and the progress document was mirrored at every
   milestone: well over 100k tokens a sprint, many times the skill itself. A link to the file on
@@ -45,7 +45,7 @@ sprinting or not, which is why those are one sentence of when to use it.
   <instructions>` steers a summary; an automatic compaction takes no instructions. But a skill body
   comes back after either kind, so SKILL.md carries the pointer. The routine sits beside it, like
   `wrapup.md`: it is needed rarely, and a body comes back only up to 5,000 tokens, where SKILL.md
-  already sits close at about 18.7k characters. It
+  already sits close at about 18.3k characters. It
   says *Read beside its question* of a ruling because the Coach's chat answers are replies to a
   row: v6bank's "Not sure I want a counter" answered one question on the rollback guard, and
   thread 13 built an unrelated forget counter soon after. A bare quote in a summary could have
@@ -81,7 +81,7 @@ sprinting or not, which is why those are one sentence of when to use it.
   166--176k under 200k. A worker's first `pnpm justify` came at a median 176k, so the cap puts
   the compaction where building turns to proving, whose fixes need the test output and `git
   diff` more than the build's history. On the 1m window no worker had ever compacted; the
-  median worker turn held 200k tokens, and 45% of what workers read came after their first
+  median worker turn carried 200k tokens, and 45% of what workers read came after their first
   justify. A compaction costs about one turn's read plus a summary of a few thousand tokens, and
   leaves 30--55k.
 * **A thread reaches its first justify in one context** (§1: about four items). Thread 9 of
@@ -90,14 +90,14 @@ sprinting or not, which is why those are one sentence of when to use it.
   second compaction fell just after its first justify, mid-repair. Its items ran roughly 25k
   tokens each to survey and build, against some 130k of room above a worker's start. Cost is not
   the reason: a worker pays about a tenth of its context in cache reads each turn, and moving the
-  compaction anywhere from 100k to 170k changes its bill by under a tenth. The summary is: a
+  compaction anywhere from 100k to 170k changes its bill by under a tenth. The reason is rework: a
   worker compacted mid-survey reads again what it lost (21k tokens in thread 9), and one
   compacted mid-repair runs justify again.
 * **Handoffs quote; *Read:* points only at the rest.** Thread 9's *Read:* (the plan's *Read
   first*: the brief and the progress document, then five STYLE.md sections) put 33k tokens in its
   context before its first edit, mostly rules its *From the sprint* lines already quoted, carried
   on every turn after. Thread 8, handed one item and two of the plan's sections, finished at 56k.
-* **A saving held in reserve: workers could do without the Artifact tool** (`disallowedTools:`,
+* **A saving kept in reserve: workers could do without the Artifact tool** (`disallowedTools:`,
   commented out in `thread-worker.md`). Its schema alone is 36k characters, about 10k tokens on
   every turn of every worker, and a worker publishes nothing; the Coach chose on 2026-10-30 to keep
   it for now. If adopted, a denylist, not an allowlist: an allowlist also strips what an agent loads
@@ -112,7 +112,7 @@ sprinting or not, which is why those are one sentence of when to use it.
 
 **The reviewer runs isolated** (`isolation: "worktree"`). `/code-review` takes no working
 directory, and the agents it starts read files from wherever their shell starts. A subagent's
-shell starts in the main checkout, which holds the Coach's branch and other agents' unfinished
+shell starts in the main checkout, which has the Coach's branch and other agents' unfinished
 edits, not the thread; in another project's sprint the skill once checked out a commit there to
 try code, and switched back 90 seconds later. Reviewers were fenced in with a rule passed to the
 skill, a snapshot of the main checkout compared after, and a bail; that was about 40% of the
