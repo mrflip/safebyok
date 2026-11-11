@@ -91,9 +91,11 @@ its first result, or on a graphql-ws error, sends no closing result, so its end 
 ## Who reaches which bank
 
 One vaultDB serves every request. **`userIdOf(context)`** answers the user your own auth signed
-in for this request, or null. Each operation names the bank it reaches (its `user_id`, or its
-record's, tombstone's or params' `user_id`), and the resolvers serve it only when that is the
-signed-in user's; anything else answers refused as `identity_revoked`, without calling the vaultDB.
+in for this request, or null. Each operation names the bank it reaches (its `user_id`, its ask's,
+or a gate verb's record's), and the resolvers serve it only when that is the signed-in user's;
+anything else answers refused as `identity_revoked`, without calling the vaultDB. A put's or del's
+record must stand at its ask's address, which the vaultDB's own check of the ask holds it to before
+anything is read.
 A `watch` subscription asks `userIdOf` again at each change it would send. Once the answer is no
 longer the user it subscribed as, its last notice is the `identity_revoked` refusal, the stream
 ends, and the browser does not subscribe again. A `userIdOf` that looks the session up live,
@@ -112,6 +114,8 @@ the rest, behind the same gate: a host calls `tidyGone({ applabel, user_id })` o
 
 The vaultDB the resolvers call checks what it is sent, as the browser's vaultDB checks it before
 sending, so a caller that skips those checks, or is not a browser at all, is refused the same.
+A get, put or del hands the vaultDB's verb the ask as it came, and that verb's own check of the ask
+runs before anything is read.
 
 ## What crosses the wire
 
@@ -119,8 +123,11 @@ Every operation answers a typed object, the same fields as its verb's `try*` ans
 `val`, `world`, `dbhas`, `req_params` and `err`. Rows are typed, a live row and a tombstone each a
 type of a union. A box's sidecar, a damaged row and a refusal's meta are `SafebyokJson`, carried
 whole; times are `SafebyokEpochMillis`, integer UTC epoch milliseconds beyond GraphQL's 32-bit
-`Int`. Scopes are typed arguments, so your logs and allowlists see whose bank each operation
-reaches. Every name the schema adds begins `safebyok` or `Safebyok`, to sit beside your own.
+`Int`. A get, put or del takes one argument, `ask`: an input whose fields are those of the core's
+ask (`op`, the address, `ifAbsent` and `ifPresent`, the row it `expected`, read as that row's
+revision, `am` and tokens, the `record` to store, and a vault put's `gateVerb`). A listing takes
+its scope as typed arguments, and a gate verb its `record` and `opts`. So your logs and allowlists
+see whose bank each operation reaches. Every name the schema adds begins `safebyok` or `Safebyok`, to sit beside your own.
 `VaultOperations` has the documents `GraphQLVaultDB` sends, for a server that allows only the
 operations it knows.
 

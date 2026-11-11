@@ -78,10 +78,10 @@ export const freshServer = async (db: TH.FileDatabase, opts: TH.VaultDBOverOpts 
 /** Who a browser signs each operation in as, from the variables it sends, or null for signed out. */
 export type Signing = (variables: Record<string, unknown>) => string | null
 
-/** Signs each operation in as the user it asks for, so the server's gate stays on and lets the battery's users through. */
+/** Signs each operation in as the user it names, its scope's, its ask's or its record's, so the server's sign-in check stays on and lets the battery's users through. */
 export const signedInAsAsked: Signing = (variables) => {
-  const { user_id, record, tombstone, params } = variables as { user_id?: string } & Partial<Record<'record' | 'tombstone' | 'params', { user_id?: string }>>
-  return user_id ?? record?.user_id ?? tombstone?.user_id ?? params?.user_id ?? null
+  const { user_id, ask, record } = variables as { user_id?: string } & Partial<Record<'ask' | 'record', { user_id?: string }>>
+  return user_id ?? ask?.user_id ?? record?.user_id ?? null
 }
 
 /** The README's browser half: a GraphQLVaultDB over an urql Client posting to `server` over the network, and subscribing there too. */

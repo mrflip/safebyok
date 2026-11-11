@@ -127,24 +127,20 @@ const AnswerChecks = [
   ['safebyokWatch',             DB.crossedNotice],
 ] as const
 
-// The check GraphQLVaultDB parses each input object with before sending it.
+// The check GraphQLVaultDB parses each input object with before sending it, and the server's vaultDB parses it with again.
 const InputChecks = [
-  ['safebyokGetVault',          'opts',      DB.ifAbsentOpts],
-  ['safebyokGetBox',            'opts',      DB.ifAbsentOpts],
-  ['safebyokPutVault',          'record',    DB.vaultRecord],
-  ['safebyokPutVault',          'opts',      DB.putOpts],
-  ['safebyokPutBox',            'record',    DB.boxRecord],
-  ['safebyokPutBox',            'opts',      DB.putOpts],
-  ['safebyokReplacePassphrase', 'record',    DB.vaultRecord],
-  ['safebyokReplacePassphrase', 'opts',      DB.gateVerbOpts],
-  ['safebyokAddPasskey',        'record',    DB.vaultRecord],
-  ['safebyokAddPasskey',        'opts',      DB.gateVerbOpts],
-  ['safebyokRevokePasskey',     'record',    DB.vaultRecord],
-  ['safebyokRevokePasskey',     'opts',      DB.gateVerbOpts],
-  ['safebyokDelBox',            'tombstone', DB.boxTombstone],
-  ['safebyokDelBox',            'opts',      DB.delOpts],
-  ['safebyokDelVault',          'tombstone', DB.vaultTombstone],
-  ['safebyokDelVault',          'opts',      DB.delOpts],
+  ['safebyokGetVault',          'ask',    DB.vaultGet],
+  ['safebyokGetBox',            'ask',    DB.boxGet],
+  ['safebyokPutVault',          'ask',    DB.vaultPut],
+  ['safebyokPutBox',            'ask',    DB.boxPut],
+  ['safebyokReplacePassphrase', 'record', DB.vaultRecord],
+  ['safebyokReplacePassphrase', 'opts',   DB.gateVerbOpts],
+  ['safebyokAddPasskey',        'record', DB.vaultRecord],
+  ['safebyokAddPasskey',        'opts',   DB.gateVerbOpts],
+  ['safebyokRevokePasskey',     'record', DB.vaultRecord],
+  ['safebyokRevokePasskey',     'opts',   DB.gateVerbOpts],
+  ['safebyokDelBox',            'ask',    DB.boxDel],
+  ['safebyokDelVault',          'ask',    DB.vaultDel],
 ] as const
 // --
 
@@ -168,6 +164,11 @@ describe("VaultSchemaSdl", () => {
   it("fails the drift check when it sends an object where a check reads a scalar", () => {
     const deepened = buildSchema(VaultSchemaSdl.replace('  refusalkind: SafebyokRefusalkind!\n', '  refusalkind: SafebyokRevision!\n'))
     expect(schemaDriftOf(deepened).join('\n')).to.include('refusalkind')
+  })
+
+  it("fails the drift check when an ask lacks a field of the row it expects", () => {
+    const shorted = buildSchema(VaultSchemaSdl.replace(/(input SafebyokBoxExpectedInput \{[^}]*?)\n {2}box_tok: {6}String!/u, '$1'))
+    expect(schemaDriftOf(shorted).join('\n')).to.include('safebyokPutBox(ask).expected')
   })
 })
 

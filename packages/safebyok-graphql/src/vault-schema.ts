@@ -2,10 +2,11 @@ import { refusalkindVals } from 'safebyok/storage'
 
 // Each operation is one vaultDB verb. It returns what the verb's `try*` form returns, as a typed
 // object with any refusal in its `err` field. A GraphQL error is left for what GraphQL itself
-// rejects, such as a client and server whose schemas differ. A get takes its scope as separate
-// arguments, so a host's logs and allowlists show whose bank each request reaches. Three things
-// are untyped JSON: a sidecar (the app's own object), a damaged row (it failed validation), and a
-// refusal's meta (the few fields a server sends).
+// rejects, such as a client and server whose schemas differ. A get, put or del takes its ask as one
+// input whose fields are the ask's, and a listing takes its scope as separate arguments, so a host's
+// logs and allowlists show whose bank each request reaches. Three things are untyped JSON: a sidecar
+// (the app's own object), a damaged row (it failed validation), and a refusal's meta (the few fields
+// a server sends).
 
 // The fields every form of a vault row has, and the fields every form of a box row has.
 const vaultSparseFields = `
@@ -55,6 +56,9 @@ enum SafebyokRefusalkind {
   ${refusalkindVals.join('\n  ')}
 }
 
+"""The verb an ask is for: a get, a put or a del."""
+enum SafebyokOp { get put del }
+
 """What a get does when the row was never stored or is deleted: fail with a refusal, or return null."""
 enum SafebyokIfAbsent { fail nil }
 
@@ -63,6 +67,9 @@ enum SafebyokPutIfAbsent { add fail }
 
 """What a put does when a live row exists: replace it, fail, or return the existing row."""
 enum SafebyokIfPresent { repl fail get }
+
+"""The gate verb a vault's put is for, whose tests the server's vaultDB adds over the live row it replaces."""
+enum SafebyokGateVerb { replacePassphrase addPasskey revokePasskey }
 
 # Rows
 
@@ -151,7 +158,7 @@ type SafebyokReqParams {
   box_tok:      String
   revision_tok: String
   revision_seq: Int
-  prior:        SafebyokRevision
+  expected:     SafebyokRevision
 }
 
 """A refusal: its kind and its message. Its meta may carry capacity, fieldnames and call."""
@@ -272,45 +279,116 @@ input SafebyokRevisionInput {
   revision_seq: Int!
 }
 
-"""Options for a get. An omitted option takes safebyok's default."""
-input SafebyokIfAbsentOptsInput {
-  ifAbsent: SafebyokIfAbsent
-}
-
-"""Options for a put: the revision the record was made from, and its policies. An omitted policy takes safebyok's default."""
-input SafebyokPutOptsInput {
-  prior:     SafebyokRevisionInput!
-  ifAbsent:  SafebyokPutIfAbsent
-  ifPresent: SafebyokIfPresent
-}
-
 """Options for a gate verb: the revision its record was made from."""
 input SafebyokGateVerbOptsInput {
   prior: SafebyokRevisionInput!
 }
 
-"""Options for a del: the revision its tombstone was made from."""
-input SafebyokDelOptsInput {
-  prior: SafebyokRevisionInput!
+"""The vault row an ask's caller holds, read as its meta, or the sentinel row where it holds none."""
+input SafebyokVaultExpectedInput {
+  revision_tok: String!
+  revision_seq: Int!
+  am:           String!
+  vault_tok:    String!
+}
+
+"""The box row an ask's caller holds, read as its meta, or the sentinel row where it holds none."""
+input SafebyokBoxExpectedInput {
+  revision_tok: String!
+  revision_seq: Int!
+  am:           String!
+  vault_tok:    String!
+  box_tok:      String!
+}
+
+"""What getVault asks: the vault's scope, what to answer over no row, and the row its caller holds."""
+input SafebyokVaultGetAskInput {
+  op:         SafebyokOp!
+  applabel:   String!
+  user_id:    String!
+  vaultlabel: String!
+  ifAbsent:   SafebyokIfAbsent!
+  expected:   SafebyokVaultExpectedInput!
+}
+
+"""What putVault asks: the vault's scope, its policies, the row it expects to find, the record to store, and the gate verb it is for, if any."""
+input SafebyokVaultPutAskInput {
+  op:         SafebyokOp!
+  applabel:   String!
+  user_id:    String!
+  vaultlabel: String!
+  ifAbsent:   SafebyokPutIfAbsent!
+  ifPresent:  SafebyokIfPresent!
+  expected:   SafebyokVaultExpectedInput!
+  record:     SafebyokVaultRecordInput!
+  gateVerb:   SafebyokGateVerb
+}
+
+"""What delVault asks: the vault's scope, the row it expects to find, and the tombstone to store."""
+input SafebyokVaultDelAskInput {
+  op:         SafebyokOp!
+  applabel:   String!
+  user_id:    String!
+  vaultlabel: String!
+  expected:   SafebyokVaultExpectedInput!
+  record:     SafebyokVaultTombstoneInput!
+}
+
+"""What getBox asks: the box's address, what to answer over no row, and the row its caller holds."""
+input SafebyokBoxGetAskInput {
+  op:         SafebyokOp!
+  applabel:   String!
+  user_id:    String!
+  vaultlabel: String!
+  boxlabel:   String!
+  vault_tok:  String!
+  ifAbsent:   SafebyokIfAbsent!
+  expected:   SafebyokBoxExpectedInput!
+}
+
+"""What putBox asks: the box's address, its policies, the row it expects to find, and the record to store."""
+input SafebyokBoxPutAskInput {
+  op:         SafebyokOp!
+  applabel:   String!
+  user_id:    String!
+  vaultlabel: String!
+  boxlabel:   String!
+  vault_tok:  String!
+  ifAbsent:   SafebyokPutIfAbsent!
+  ifPresent:  SafebyokIfPresent!
+  expected:   SafebyokBoxExpectedInput!
+  record:     SafebyokBoxRecordInput!
+}
+
+"""What delBox asks: the box's address, the row it expects to find, and the tombstone to store."""
+input SafebyokBoxDelAskInput {
+  op:         SafebyokOp!
+  applabel:   String!
+  user_id:    String!
+  vaultlabel: String!
+  boxlabel:   String!
+  vault_tok:  String!
+  expected:   SafebyokBoxExpectedInput!
+  record:     SafebyokBoxTombstoneInput!
 }
 
 # Operations
 
 type Query {
   safebyokListVaults(applabel: String!, user_id: String!): SafebyokBankListedAnswer!
-  safebyokGetVault(applabel: String!, user_id: String!, vaultlabel: String!, opts: SafebyokIfAbsentOptsInput): SafebyokVaultAnswer!
+  safebyokGetVault(ask: SafebyokVaultGetAskInput!): SafebyokVaultAnswer!
   safebyokListBoxes(applabel: String!, user_id: String!, vaultlabel: String!, vault_tok: String!): SafebyokBoxesListedAnswer!
-  safebyokGetBox(applabel: String!, user_id: String!, vaultlabel: String!, boxlabel: String!, vault_tok: String!, opts: SafebyokIfAbsentOptsInput): SafebyokBoxAnswer!
+  safebyokGetBox(ask: SafebyokBoxGetAskInput!): SafebyokBoxAnswer!
 }
 
 type Mutation {
-  safebyokPutVault(record: SafebyokVaultRecordInput!, opts: SafebyokPutOptsInput!): SafebyokVaultAnswer!
-  safebyokPutBox(record: SafebyokBoxRecordInput!, opts: SafebyokPutOptsInput!): SafebyokBoxAnswer!
+  safebyokPutVault(ask: SafebyokVaultPutAskInput!): SafebyokVaultAnswer!
+  safebyokPutBox(ask: SafebyokBoxPutAskInput!): SafebyokBoxAnswer!
   safebyokReplacePassphrase(record: SafebyokVaultRecordInput!, opts: SafebyokGateVerbOptsInput!): SafebyokVaultAnswer!
   safebyokAddPasskey(record: SafebyokVaultRecordInput!, opts: SafebyokGateVerbOptsInput!): SafebyokVaultAnswer!
   safebyokRevokePasskey(record: SafebyokVaultRecordInput!, opts: SafebyokGateVerbOptsInput!): SafebyokVaultAnswer!
-  safebyokDelBox(tombstone: SafebyokBoxTombstoneInput!, opts: SafebyokDelOptsInput!): SafebyokBoxAnswer!
-  safebyokDelVault(tombstone: SafebyokVaultTombstoneInput!, opts: SafebyokDelOptsInput!): SafebyokVaultAnswer!
+  safebyokDelBox(ask: SafebyokBoxDelAskInput!): SafebyokBoxAnswer!
+  safebyokDelVault(ask: SafebyokVaultDelAskInput!): SafebyokVaultAnswer!
   safebyokTidyGone(applabel: String!, user_id: String!): SafebyokTidiedAnswer!
 }
 

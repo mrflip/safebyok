@@ -25,7 +25,7 @@ const boxRow = `fragment SafebyokBoxRowFields on SafebyokBoxRow {
 const row = 'fragment SafebyokRowFields on SafebyokRow { ...SafebyokVaultRowFields ...SafebyokBoxRowFields }'
 
 const reqParams = `fragment SafebyokReqParamsFields on SafebyokReqParams {
-  applabel user_id vaultlabel boxlabel vault_tok box_tok revision_tok revision_seq prior { revision_tok revision_seq }
+  applabel user_id vaultlabel boxlabel vault_tok box_tok revision_tok revision_seq expected { revision_tok revision_seq }
 }`
 
 const err = 'fragment SafebyokErrFields on SafebyokErr { refusalkind message meta }'
@@ -65,8 +65,8 @@ export const VaultOperations = {
 }
 ${[vaultRow, gate, ciphered, reqParams, err].join('\n')}`,
 
-  getVault: `query SafebyokGetVault($applabel: String!, $user_id: String!, $vaultlabel: String!, $opts: SafebyokIfAbsentOptsInput) {
-  safebyokGetVault(applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel, opts: $opts) { ...SafebyokVaultAnswerFields }
+  getVault: `query SafebyokGetVault($ask: SafebyokVaultGetAskInput!) {
+  safebyokGetVault(ask: $ask) { ...SafebyokVaultAnswerFields }
 }
 ${vaultAnswerFragments}`,
 
@@ -82,18 +82,18 @@ ${vaultAnswerFragments}`,
 }
 ${[vaultRow, gate, ciphered, reqParams, err].join('\n')}`,
 
-  getBox: `query SafebyokGetBox($applabel: String!, $user_id: String!, $vaultlabel: String!, $boxlabel: String!, $vault_tok: String!, $opts: SafebyokIfAbsentOptsInput) {
-  safebyokGetBox(applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel, boxlabel: $boxlabel, vault_tok: $vault_tok, opts: $opts) { ...SafebyokBoxAnswerFields }
+  getBox: `query SafebyokGetBox($ask: SafebyokBoxGetAskInput!) {
+  safebyokGetBox(ask: $ask) { ...SafebyokBoxAnswerFields }
 }
 ${boxAnswerFragments}`,
 
-  putVault: `mutation SafebyokPutVault($record: SafebyokVaultRecordInput!, $opts: SafebyokPutOptsInput!) {
-  safebyokPutVault(record: $record, opts: $opts) { ...SafebyokVaultAnswerFields }
+  putVault: `mutation SafebyokPutVault($ask: SafebyokVaultPutAskInput!) {
+  safebyokPutVault(ask: $ask) { ...SafebyokVaultAnswerFields }
 }
 ${vaultAnswerFragments}`,
 
-  putBox: `mutation SafebyokPutBox($record: SafebyokBoxRecordInput!, $opts: SafebyokPutOptsInput!) {
-  safebyokPutBox(record: $record, opts: $opts) { ...SafebyokBoxAnswerFields }
+  putBox: `mutation SafebyokPutBox($ask: SafebyokBoxPutAskInput!) {
+  safebyokPutBox(ask: $ask) { ...SafebyokBoxAnswerFields }
 }
 ${boxAnswerFragments}`,
 
@@ -112,13 +112,13 @@ ${vaultAnswerFragments}`,
 }
 ${vaultAnswerFragments}`,
 
-  delBox: `mutation SafebyokDelBox($tombstone: SafebyokBoxTombstoneInput!, $opts: SafebyokDelOptsInput!) {
-  safebyokDelBox(tombstone: $tombstone, opts: $opts) { ...SafebyokBoxAnswerFields }
+  delBox: `mutation SafebyokDelBox($ask: SafebyokBoxDelAskInput!) {
+  safebyokDelBox(ask: $ask) { ...SafebyokBoxAnswerFields }
 }
 ${boxAnswerFragments}`,
 
-  delVault: `mutation SafebyokDelVault($tombstone: SafebyokVaultTombstoneInput!, $opts: SafebyokDelOptsInput!) {
-  safebyokDelVault(tombstone: $tombstone, opts: $opts) { ...SafebyokVaultAnswerFields }
+  delVault: `mutation SafebyokDelVault($ask: SafebyokVaultDelAskInput!) {
+  safebyokDelVault(ask: $ask) { ...SafebyokVaultAnswerFields }
 }
 ${vaultAnswerFragments}`,
 
