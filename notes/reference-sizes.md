@@ -29,8 +29,8 @@ memory, a vendor's forum, or a source file rather than docs.
 | A wrapped 256-bit key               | 64                             | Measured | AES-GCM `wrapKey`, raw: 32 bytes and a 16-byte tag. Box keys and vault keys alike           |
 | A wrapped 512-bit key               | 107                            | Measured | The same, wrapping a 64-byte key                                                            |
 | A whisper of W bytes of JSON        | ceil((W + 16) × 4 / 3)         | Measured | AES-GCM with a 16-byte tag, then base64url: about 1.33 × W                                  |
-| passphraseSalt, `salt_bytes` 16     | 22                             | Measured | `Argon2idWebV1.salt_bytes`; the spec allows 8 to 65,536                                     |
-| prfSalt                             | 43                             | Measured | `PasskeySaltBytes` 32, fixed by the check                                                   |
+| passphraseSalt, `salt_size` 16     | 22                             | Measured | `Argon2idWebV1.salt_size`; the spec allows 8 to 65,536                                     |
+| prfSalt                             | 43                             | Measured | `PasskeySaltSize` 32, fixed by the check                                                   |
 | `credential_id`                     | 22 to 86 (43 used)             | Estimate | A platform passkey is 16 to 32 bytes, a security key 64 or more. WebAuthn allows 1,023     |
 | A token or revisionTok              | 36                             | Measured | `crypto.randomUUID()`; the checks ask only for one character                               |
 | A label / a user_id                 | 2 to 40 / 1 to 100             | Measured | `MaxLabelChars`, `MaxUserIdChars`                                                           |
@@ -77,10 +77,10 @@ up a `limits` string) padded through a `notes` string to exactly that length, al
   `{"cipher_iv_b64":"…","ciphertext_b64":"…"}`, the 16-character IV and the ciphertext of the whisper's JSON plus its
   16-byte tag, each base64url without padding: 56 + ceil((W + 16) × 4 / 3) bytes for a whisper of W. Computed from the
   measured rule above. The box's other ciphered field, `box_key_wrapped`, adds 136 bytes whatever the whisper.
-* **The core's measure** is the size `box_too_large` compares against `maxRecordBytes`, from `jsonBytes` in
+* **The core's measure** is the size `box_too_large` compares against `maxRecordSizeEst`, from `jsonSize` in
   `adapter-vault-db.ts`: `new TextEncoder().encode(JSON.stringify(boxRecord)).length`. It equals the JSON length whenever the
   sidecar is ASCII. **Convex weighs** is safebyok-convex's `weigh`: Convex's `getDocumentSize` of the stored document
-  with its label columns. That is what counts toward `MaxVaultBoxBytes`.
+  with its label columns. That is what counts toward `MaxVaultBoxSize`.
 * **Reading "minimum validatable size".** The labels and user_id are at their minimum: 2 characters, and 1 for the
   user_id. The tokens, times and ciphered fields are as the core mints them (UUIDs, 13-digit times, real ciphertext):
   their checks accept a single character, but no real box has one that short. Medium, large and xl have their labels at
@@ -150,11 +150,11 @@ Every box is in one vault, under distinct boxlabels of one length. *Full* is `{ 
 ## Bank sizes
 
 Nothing limits the vaults per bank. The core's defaults are `DefaultMaxBoxes`, 100 live boxes to a vault, and
-`DefaultMaxRecordBytes`, 5,600 bytes to a box record: about 95% of Postgres's 8,000-byte `NOTIFY` payload, less the
+`DefaultMaxRecordSizeEst`, 5,600 bytes to a box record: about 95% of Postgres's 8,000-byte `NOTIFY` payload, less the
 Larger vault row above, rounded down. Two other sets of limits exist, and each gets a family of rows below.
 
 * *Convex*: what safebyok-convex enforces. Each box is at most 1,048,576 bytes, a vault has at most 8,000 boxes, and
-  its box rows weigh at most 7,339,008 bytes (`MaxVaultBoxBytes`: half the 16 MiB read, less a document and the
+  its box rows weigh at most 7,339,008 bytes (`MaxVaultBoxSize`: half the 16 MiB read, less a document and the
   tally).
 * *Old*: the old design's `Bank.make` defaults, in packages/safebyok-old (removed 2026-11-10). A vault had at most 100
   boxes (`MaxBoxes`), and a whisper and its sidecar together at most 40,444 bytes of JSON (`MaxWhisperBytes`).
@@ -162,7 +162,7 @@ Larger vault row above, rounded down. Two other sets of limits exist, and each g
 Both families take 8,192 as the 100% figure for vaults per bank. That is Convex's limit on the elements of any array,
 which applies to the array `listVaults` returns. Each vault row is the maximum-label row, 1,441 bytes as Convex weighs
 it. Each dimension is set to the given percentage independently. *Boxes after the clip* caps each vault at
-`MaxVaultBoxBytes`, as safebyok-convex does.
+`MaxVaultBoxSize`, as safebyok-convex does.
 
 | Family, % of each limit | Vaults | Boxes per vault | Box (Convex) | Naive bank | Boxes after the clip | Per vault | Bank      | Source   |
 | ----------------------- | ------ | --------------- | ------------ | ---------- | -------------------- | --------- | --------- | -------- |
@@ -178,7 +178,7 @@ it. Each dimension is set to the given percentage independently. *Boxes after th
 | Ratchet B               | 16     | 64 of 16 KiB    | 16,652       | 17.1 MB    | 64                   | 1.1 MB    | 17.1 MB   | Computed |
 
 * **One call against these banks.** A `listBoxes` reads at most 7.3 MB and returns at most 8,000 boxes, so it fits
-  one Convex transaction (16 MiB, 8,192 elements). That is what `MaxVaultBoxBytes` and `MaxVaultBoxes` are for.
+  one Convex transaction (16 MiB, 8,192 elements). That is what `MaxVaultBoxSize` and `MaxVaultBoxes` are for.
   A `listVaults` of 8,192 maximum-label vaults reads 11.8 MB, which fits. But **nothing stops a bank from growing
   past it**. At 8,193 vaults the returned array is over Convex's limit. At about 7,200 *larger* vault rows the read
   is over 16 MiB.
@@ -247,7 +247,7 @@ it. Each dimension is set to the given percentage independently. *Boxes after th
 
 A binary blob in a whisper is base64-encoded inside the JSON, and then base64-encoded again as ciphertext, so its box
 is about 1.78 times the blob. The photo-like PNG (1.7 MB) would be a box of about 3 MB. That is over a Convex document, and so over
-safebyok-convex's `maxRecordBytes`.
+safebyok-convex's `maxRecordSizeEst`.
 
 ## Convex cost to poll, per 1,000 devices a month
 

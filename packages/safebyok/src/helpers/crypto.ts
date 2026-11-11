@@ -9,10 +9,10 @@ import * as Phrases from './phrases'
 import { stableJsonify } from './stable-jsonify'
 import { Checker } from './validator'
 
-// == [Constants]: AesGcm, IvBytes
+// == [Constants]: AesGcm, IvSize
 
 const AesGcm = { name: 'AES-GCM', length: 256 } as const
-const IvBytes = 12
+const IvSize = 12
 // --
 
 // == [Randomness and base64]: randomBytes, randomId, makeLifeTok, toB64, fromB64, fromB64OrNull
@@ -139,7 +139,7 @@ export const deriveWrappingKey = async (keyBytes: Uint8Array, info: Uint8Array):
 
 /** `plainBytes` encrypted under `cipherKey`, bound to `ctx`, under a fresh cipherIv every call. */
 export const cipherBytes = async (cipherKey: CryptoKey, plainBytes: Uint8Array, ctx: Uint8Array): Promise<Ciphered> => {
-  const cipherIv = randomBytes(IvBytes)
+  const cipherIv = randomBytes(IvSize)
   const ciphertext = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: cipherIv as BufferSource, additionalData: ctx as BufferSource },
     cipherKey,
@@ -166,7 +166,7 @@ export const decipherBytes = async (cipherKey: CryptoKey, ciphered: Ciphered, ct
 
 /** `wrappedKey`, which must be extractable, encrypted under `wrappingKey` and bound to `ctx`, under a fresh cipherIv every call. */
 export const wrapKeyUnder = async (wrappingKey: CryptoKey, wrappedKey: CryptoKey, ctx: Uint8Array): Promise<Ciphered> => {
-  const cipherIv = randomBytes(IvBytes)
+  const cipherIv = randomBytes(IvSize)
   const ciphertext = await crypto.subtle.wrapKey(
     'raw',
     wrappedKey,

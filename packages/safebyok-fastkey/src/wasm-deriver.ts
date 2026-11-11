@@ -36,7 +36,7 @@ const deriveWithWasm = async (spec: KeyDeriverSpec, passphrase: string, saltByte
       iterations:  spec.iterations,
       parallelism: spec.parallelism,
       memorySize:  spec.memory_kib,
-      hashLength:  spec.output_bytes,
+      hashLength:  spec.output_size,
       outputType:  'binary',
     })
   } catch (err) {

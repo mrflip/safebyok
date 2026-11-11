@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto'
 import { argon2idAsync } from '@noble/hashes/argon2.js'
 import { describe, expect, it } from 'vitest'
-import { Argon2idWebV1, IdbDeviceDB, PassphraseSaltBytes, argon2idDeriver, argon2idWebV1Deriver, browserOpts, parseKeyDeriverSpec, zxcvbnStrengthChecker } from '../src/browser'
+import { Argon2idWebV1, IdbDeviceDB, PassphraseSaltSize, argon2idDeriver, argon2idWebV1Deriver, browserOpts, parseKeyDeriverSpec, zxcvbnStrengthChecker } from '../src/browser'
 import * as Front from '../src/index'
 import * as Phrases from '../src/helpers/phrases'
 import * as TH from './test-helpers'
@@ -28,8 +28,8 @@ const CheapSpec = {
   memory_kib:        8,
   iterations:        1,
   parallelism:       1,
-  salt_bytes:        16,
-  output_bytes:      32,
+  salt_size:        16,
+  output_size:      32,
 } as const
 
 const salt = new Uint8Array(16).fill(7)
@@ -46,7 +46,7 @@ describe("Argon2id's reference test vector", () => {
   })
 
   it("has a salt too short for a keyDeriverSpec", () => {
-    expect(() => parseKeyDeriverSpec({ ...CheapSpec, salt_bytes: 8 })).to.throw(/salt_bytes/u)
+    expect(() => parseKeyDeriverSpec({ ...CheapSpec, salt_size: 8 })).to.throw(/salt_size/u)
   })
 })
 
@@ -84,7 +84,7 @@ describe("safebyok/browser", () => {
     expect(argon2idWebV1Deriver).to.include({ ...Argon2idWebV1 })
     expect(parseKeyDeriverSpec(CheapSpec)).to.deep.equal(CheapSpec)
     expect(() => parseKeyDeriverSpec({ ...Argon2idWebV1, iterations: 4 })).to.throw(/argon2id_web_v1/u)
-    expect(PassphraseSaltBytes).to.eq(Argon2idWebV1.salt_bytes)
+    expect(PassphraseSaltSize).to.eq(Argon2idWebV1.salt_size)
   })
 
   it("refuses a spec under a reserved label that safebyok does not supply, whatever its case", () => {

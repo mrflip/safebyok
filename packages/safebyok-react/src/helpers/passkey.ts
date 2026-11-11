@@ -1,4 +1,4 @@
-import { PasskeySaltBytes, VaultError, type PasskeyAnswer, type WayinHeader } from 'safebyok'
+import { PasskeySaltSize, VaultError, type PasskeyAnswer, type WayinHeader } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { PasskeyChecks, type AskPasskeyOpts, type CreatePasskeyOpts } from '../shapes'
 import { Messages } from './messages'
@@ -21,7 +21,7 @@ export const passkeysAvailable = (): boolean => (
 export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAnswer | null> => {
   const opts = PasskeyChecks.createPasskeyOpts.parse(given, { where: "In createPasskey's options" })
   demandWebAuthn()
-  const prfSaltBytes = crypto.getRandomValues(new Uint8Array(PasskeySaltBytes))
+  const prfSaltBytes = crypto.getRandomValues(new Uint8Array(PasskeySaltSize))
   const created = await askAuthenticator(() => navigator.credentials.create({
     publicKey: {
       rp:                     { name: opts.rp.name, ...optional('id', opts.rp.id) },

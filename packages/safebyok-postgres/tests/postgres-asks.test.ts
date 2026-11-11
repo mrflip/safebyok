@@ -127,7 +127,7 @@ describe("PostgresVaultDB's get, put and del, each given one ask", () => {
   })
 
   it('tells a watch of a box too heavy for a notice, whose rows the watch fetches', async () => {
-    const vaultDB = await vaultDBWithVault({ maxRecordBytes: 20_000 })
+    const vaultDB = await vaultDBWithVault({ maxRecordSizeEst: 20_000 })
     const notices: Notice[] = []
     const unwatch = vaultDB.watch(TH.vaultScope, (notice) => { notices.push(notice) })
     const heavy = TH.boxAt(0, 'life1', { sidecar: { remark: 'x'.repeat(9000) } })

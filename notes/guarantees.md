@@ -433,7 +433,7 @@ the crypto imports.
   (`deriver/shapes.ts`), which only `argon2idDeriver` reaches, through `parseKeyDeriverSpec`. A host's own deriver is
   checked once, by `keyDeriverShape`
   (`shapes/shapes-core.ts`) in `guardKeyDeriver` as `Bank`'s constructor wraps it: by its interface, and by its
-  `salt_bytes`, which every deriver's spec and every stored salt keep at 16 (`PassphraseSaltBytes`, `helpers/consts.ts`),
+  `salt_size`, which every deriver's spec and every stored salt keep at 16 (`PassphraseSaltSize`, `helpers/consts.ts`),
   but not by its other parameters, as a host bent on weak ones would find a way (`#the-host-is-not-our-threat-model`, the Coach, 2026-11-06). `safebyok/browser`
   exports `argon2idDeriver` and `argon2idWebV1Deriver` (the main entry point, `safebyok`, exports neither), and
   `tests/browser.test.ts` runs both, the refines through `parseKeyDeriverSpec`;

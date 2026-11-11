@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PasskeySaltBytes } from '../../src/helpers/consts'
+import { PasskeySaltSize } from '../../src/helpers/consts'
 import { randomBytes, toB64 } from '../../src/helpers/crypto'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
@@ -18,7 +18,7 @@ const passphraseRecord = (overrides: Record<string, unknown> = {}): Record<strin
 const passkeyRecord = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   wayinkind:               'passkey',
   credential_id:           'cred-test-1',
-  prf_salt_b64:            toB64(randomBytes(PasskeySaltBytes)),
+  prf_salt_b64:            toB64(randomBytes(PasskeySaltSize)),
   device_id:               DeviceId,
   registered_at:           T0,
   vault_key_wayin_wrapped: TH.fakeCiphered('wayin-pk'),
@@ -33,8 +33,8 @@ describe("new Wayin(record): the record check", () => {
 
   const RecordRefusalCases = [
     // the passkey's salt:
-    [() => passkeyRecord({ prf_salt_b64: toB64(randomBytes(PasskeySaltBytes - 1)) }), 'refuses a passkey salt one byte short'],
-    [() => passkeyRecord({ prf_salt_b64: toB64(randomBytes(PasskeySaltBytes + 1)) }), 'refuses a passkey salt one byte long'],
+    [() => passkeyRecord({ prf_salt_b64: toB64(randomBytes(PasskeySaltSize - 1)) }), 'refuses a passkey salt one byte short'],
+    [() => passkeyRecord({ prf_salt_b64: toB64(randomBytes(PasskeySaltSize + 1)) }), 'refuses a passkey salt one byte long'],
     [() => passkeyRecord({ prf_salt_b64: 'not base64url!' }),                   'refuses a passkey salt that is not base64url'],
     // fields of the wrong kind, missing or extra:
     [() => passphraseRecord({ credential_id: 'cred-test-1' }),                  "refuses a passphrase record carrying a passkey's field"],

@@ -64,7 +64,7 @@ const vaultDB = new PostgresVaultDB({ client: pgClientOf(pool) })
   past it is refused with `vault_full`. A deleted box's tombstone still counts, so deleting a box frees no room. A vault
   made anew starts at zero. The cap is exact at moderate write rates. A strict cap would take concurrency machinery this
   package does not add.
-* **`maxRecordBytes`**, optional, as every vaultDB takes it: 5,600 bytes if left out, so a box's row fits a `NOTIFY`.
+* **`maxRecordSizeEst`**, optional, as every vaultDB takes it: 5,600 bytes if left out, so a box's row fits a `NOTIFY`.
 
 `PostgresVaultDB` writes what it is handed under the scope it is handed. **Your route decides who
 may reach which bank**: check the signed-in user before a request reaches the vaultDB, and build

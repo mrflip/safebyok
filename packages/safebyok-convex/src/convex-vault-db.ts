@@ -77,8 +77,8 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   // == [Construction]: constructor
 
   constructor(opts: ConvexVaultDBOpts) {
-    const { client, api, maxBoxes = DB.DefaultMaxBoxes, maxRecordBytes = DB.DefaultMaxRecordBytes } = convexVaultDBOpts.parse(opts, { where: 'ConvexVaultDB', advice: Phrases.ConvexVaultDBAdvice })
-    super({ maxRecordBytes: Math.min(maxRecordBytes, ConvexDocumentBytes) })
+    const { client, api, maxBoxes = DB.DefaultMaxBoxes, maxRecordSizeEst = DB.DefaultMaxRecordSizeEst } = convexVaultDBOpts.parse(opts, { where: 'ConvexVaultDB', advice: Phrases.ConvexVaultDBAdvice })
+    super({ maxRecordSizeEst: Math.min(maxRecordSizeEst, ConvexDocumentSize) })
     this.#client = client
     this.#api = api
     this.#maxBoxes = maxBoxes
@@ -179,7 +179,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 // == [Helpers]: reaching, refusalOf, refusalOfCrossed, changesOf, latestOf, isConvexClient, isSafebyokApi, convexVaultDBOpts, vaultClassified, boxClassified
 
 /** Convex's size limit for one document, in bytes. */
-const ConvexDocumentBytes = 1_048_576
+const ConvexDocumentSize = 1_048_576
 
 // Takes a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
 /** Run `call`, converting anything it throws into a safebyok refusal. */

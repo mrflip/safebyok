@@ -37,7 +37,7 @@ bank.hello()                                         a forced reset; a host may 
 |                     | `revision_seq`                  | 0, or the tombstone's plus one                       |
 | Passphrase wayin    | `wayinkind`                     | Fixed                                                |
 |                     | `key_deriver_label`             | Key deriver                                          |
-|                     | `salt_b64`                      | Random, of the deriver's `salt_bytes`                |
+|                     | `salt_b64`                      | Random, of the deriver's `salt_size`                |
 |                     | `device_id`, `registered_at`    | Bank, clock                                          |
 |                     | `vault_key_wayin_wrapped`       | New random vaultKey, wrapped under the passphraseKey |
 | Passkey wayin (opt) | `credential_id`, `prf_salt_b64` | `passkeyClear`                                       |

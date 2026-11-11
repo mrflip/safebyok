@@ -181,8 +181,8 @@ export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqPa
 
 /** The check of an AdapterVaultDB's options, refusing 'bad_option'. */
 export const adapterVaultDBOpts = objCheck(({ num }) => ({
-  /** The most bytes one stored box record may weigh; `DefaultMaxRecordBytes` by default. */
-  maxRecordBytes: num.positive().optional(),
+  /** The most bytes one stored box record may weigh; `DefaultMaxRecordSizeEst` by default. */
+  maxRecordSizeEst: num.positive().optional(),
 }), 'bad_option')
 /** The check of a memory vaultDB's options, refusing 'bad_option'. */
 export const memoryVaultDBOpts = objCheck(({ int }) => ({

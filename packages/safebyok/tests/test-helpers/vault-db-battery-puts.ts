@@ -253,8 +253,8 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')).to.have.property('size', 0)
     })
 
-    it("refuses a box over maxRecordBytes", async () => {
-      const vaultDB = await fresh({ maxRecordBytes: 2000 })
+    it("refuses a box over maxRecordSizeEst", async () => {
+      const vaultDB = await fresh({ maxRecordSizeEst: 2000 })
       await vaultDB.putVault(vaultPutAskOf(vaultAt()))
       const heavy = boxAt(0, 'life1', { sidecar: { memo: 'x'.repeat(2000) } })
       expect(await vaultDB.tryPutBox(boxPutAskOf(heavy))).to.deep.include({ ok: false, act: 'box_too_large' })

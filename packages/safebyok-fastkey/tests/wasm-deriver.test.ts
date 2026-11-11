@@ -49,7 +49,7 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
 
   // Slow: two full derivations at 64 MiB and three passes. The core's deriver alone takes about half a second.
   it("derives byte for byte what the core's deriver derives, for one fixed passphrase and salt", { timeout: 60_000 }, async () => {
-    const saltBytes = saltOf(Argon2idWebV1.salt_bytes)
+    const saltBytes = saltOf(Argon2idWebV1.salt_size)
     const wasmBytes = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltBytes)
     const nobleBytes = await argon2idWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltBytes)
     expect(wasmBytes).to.have.lengthOf(32)
@@ -110,7 +110,7 @@ describe("argon2idWasmDeriver beside argon2idDeriver", () => {
   for (const [change, passphrase, blurb] of SameBytesCases) {
     it(`derives the same bytes under ${blurb}`, async () => {
       const spec = { ...CheapSpec, ...change }
-      const saltBytes = saltOf(spec.salt_bytes)
+      const saltBytes = saltOf(spec.salt_size)
       const wasmBytes = await argon2idWasmDeriver(spec).deriveKeyBytes(passphrase, saltBytes)
       const nobleBytes = await argon2idDeriver(spec).deriveKeyBytes(passphrase, saltBytes)
       expect(wasmBytes).to.have.lengthOf(32)
@@ -150,8 +150,8 @@ describe("argon2idWasmDeriver", () => {
   })
 
   it("refuses a spec Argon2id cannot run, before deriving anything", () => {
-    expect(() => argon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', salt_bytes: 4 } as unknown as KeyDeriverSpec))
-      .to.throw(/salt_bytes/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_option'))
+    expect(() => argon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', salt_size: 4 } as unknown as KeyDeriverSpec))
+      .to.throw(/salt_size/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_option'))
   })
 
   it("refuses the supplied spec's label on other parameters", () => {
@@ -174,13 +174,13 @@ describe("argon2idWasmDeriver", () => {
 // This package's factory and the core's `argon2idDeriver` both validate with the core's parseKeyDeriverSpec.
 // These tests compare their refusal messages word for word, instead of restating the bounds.
 const UnworkableSpecs = [
-  [{ salt_bytes: 15 },                    'a salt of 15 bytes'],
-  [{ salt_bytes: 32 },                    'a salt of 32 bytes'],
+  [{ salt_size: 15 },                    'a salt of 15 bytes'],
+  [{ salt_size: 32 },                    'a salt of 32 bytes'],
   [{ memory_kib: 64, parallelism: 9 },    'under 8 KiB for each of nine lanes'],
   [{ memory_kib: 1_048_577 },             'more than 1 GiB'],
   [{ iterations: 0 },                     'no passes over memory'],
   [{ parallelism: 0 },                    'no lanes'],
-  [{ output_bytes: 16 },                  'a 128-bit key'],
+  [{ output_size: 16 },                  'a 128-bit key'],
   [{ algorithm: 'scrypt' },               'another key derivation function'],
   [{ key_deriver_label: '' },             'no label for a vault to record'],
 ] as const

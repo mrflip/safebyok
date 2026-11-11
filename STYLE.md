@@ -140,7 +140,7 @@ about: a thing's stage in its life is its `stage`. A stored field keeps its stor
 (`selfDestructPreventionDisabled`).
 
 **A validator is named after the parameter it checks**, in that parameter's case (`user_id`,
-`vaultScopepath`, `salt_bytes`), **or, for a function's whole input, after the function with
+`vaultScopepath`, `salt_size`), **or, for a function's whole input, after the function with
 `Input` appended** (`dragForceInput`). A shape's validator checks no one parameter, and accepts its
 type's name with the first letter lowered: lowerCamelCase beside its ModuleCase type (the Coach,
 2026-10-27: "it makes it less confusing"), `export const { boxSparse } = ...`, `export type
@@ -264,7 +264,7 @@ was sent)". Not the argument it was handed, not `this`, not a boolean. Where the
 key material, a model's verb resolves its summary: `vault.putWayin()` resolves the vault, whose
 `vault.snapshot.gate` then shows the way in as stored; `VaultDB.putBox()` resolves the record.
 
-**Stored fields are underbar_case** (`salt_bytes`, `memory_kib`): they are written to someone
+**Stored fields are underbar_case** (`salt_b64`, `written_at`): they are written to someone
 else's database, and stay one spelling from the wire to the code. **One name for one thing,
 everywhere**: a field with a stored value keeps its stored spelling wherever it goes, in the
 facades a record passes through, a host's options and a snapshot alike. A key deriver's

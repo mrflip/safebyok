@@ -1,7 +1,7 @@
 /** `AdapterVaultDB`, the base class a storage adapter extends by writing its `do*` calls, and the rows those calls return. */
 
 import type * as Z from 'zod'
-import { DefaultMaxRecordBytes, IsAdapterVaultDB, IsVaultDB } from '../helpers/consts'
+import { DefaultMaxRecordSizeEst, IsAdapterVaultDB, IsVaultDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
 import * as Phrases from '../helpers/phrases'
 import { verifyConsistent } from '../helpers/validator'
@@ -47,9 +47,9 @@ const noBadNews = (_news: VaultError): void => undefined
  * See notes/answer-contract.md for details.
  */
 export abstract class AdapterVaultDB implements VaultDB {
-  // == [Props]: #maxRecordBytes, IsVaultDB, IsAdapterVaultDB
+  // == [Props]: #maxRecordSizeEst, IsVaultDB, IsAdapterVaultDB
 
-  readonly #maxRecordBytes: number
+  readonly #maxRecordSizeEst: number
 
   // Brands are implemented this way to avoid the flaws of branding by string props, private symbols, weak maps or instanceof.
   /** Always true: marks a vaultDB for safe branding. */
@@ -62,8 +62,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Construction]: constructor
 
   constructor(opts: AdapterVaultDBOpts = {}) {
-    const { maxRecordBytes = DefaultMaxRecordBytes } = SX.adapterVaultDBOpts.parse(opts)
-    this.#maxRecordBytes = maxRecordBytes
+    const { maxRecordSizeEst = DefaultMaxRecordSizeEst } = SX.adapterVaultDBOpts.parse(opts)
+    this.#maxRecordSizeEst = maxRecordSizeEst
   }
   // --
 
@@ -187,10 +187,10 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return this.answerForRefusal(err, 'putVault', ask) }
   }
 
-  /** Throw `box_too_large` for a record larger than this vaultDB's `maxRecordBytes`. */
+  /** Throw `box_too_large` for a record larger than this vaultDB's `maxRecordSizeEst`. */
   #demandEnoughVolume({ record }: BoxPutAsk): void {
-    const recordBytes = jsonBytes(record)
-    if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
+    const recordSizeEst = jsonSize(record)
+    if (recordSizeEst > this.#maxRecordSizeEst) { throw Refuse.boxTooLarge(recordSizeEst, this.#maxRecordSizeEst) }
   }
 
   /** Store `ask.record` over the box row `ask.expected`, in a vault live under its `vault_tok`, as `ifPresent` and `ifAbsent` allow.
@@ -345,7 +345,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // --
 }
 
-// == [Helpers]: goodOrThrow, refusalOf, gateAskOf, RowOfOtherAddress, listedRowOf, liveVaultOf, listedBoxesOf, jsonBytes
+// == [Helpers]: goodOrThrow, refusalOf, gateAskOf, RowOfOtherAddress, listedRowOf, liveVaultOf, listedBoxesOf, jsonSize
 
 /** `answer` if it is good, else throw its refusal. */
 function goodOrThrow<ValT, ActT extends string, WorldT>(answer: Answer<ValT, ActT, WorldT>): GoodAnswer<ValT, ActT, WorldT> {
@@ -399,5 +399,5 @@ const listedBoxesOf = ({ vault_tok, ...scope }: VaultQuery, rows: RowOfBox[]): B
   return listed
 }
 
-const jsonBytes = (val: unknown): number => new TextEncoder().encode(JSON.stringify(val)).length
+const jsonSize = (val: unknown): number => new TextEncoder().encode(JSON.stringify(val)).length
 // --

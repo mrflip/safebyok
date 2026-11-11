@@ -26,7 +26,7 @@ export { ckeyOf } from '../helpers/helpers'
 export { inOneStep, rowAt } from './idb-transaction'
 export { versionedShelfOf } from './idb-shelf'
 export type { VersionedShelfSpec } from './idb-shelf'
-export { DefaultMaxBoxes, DefaultMaxRecordBytes, VaultsDBVersion } from '../helpers/consts'
+export { DefaultMaxBoxes, DefaultMaxRecordSizeEst, VaultsDBVersion } from '../helpers/consts'
 // --
 
 // == [The rows]: shells, scopes, records, options and the helpers that read a row

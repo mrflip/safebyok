@@ -15,7 +15,7 @@
  * depth two only; no arrays, which are kept as their JSON text; an object past depth two replaced by the string '{...}'.
  */
 
-import { PassphraseKeyBytes } from '../helpers/consts'
+import { PassphraseKeySize } from '../helpers/consts'
 import { VaultError, thrownNameOf } from './errors'
 import type { Refusalkind, RefusalMeta, Thrown } from './errors'
 import type * as EX from '../shapes/shapes-enums'
@@ -205,7 +205,7 @@ export const passkeyAlreadyAdded = (): VaultError => new VaultError('bad_option'
 // == [Proving Throwers]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, keyDeriverLoadFailed, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
 
 /** A `bad_option` refusal: the key deriver handed back something other than fresh key bytes of the right length. */
-export const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeyBytes))
+export const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeySize))
 
 /** An `unexpected_error` refusal: a proving was asked for the vaultKey before it made or opened a wayin. */
 export const wayinNotMadeYet = (): VaultError => new VaultError('unexpected_error', Phrases.WayinNotMadeYet)
@@ -312,9 +312,9 @@ export const gateIssue = (world: SX.VaultRow, why: string): VaultError => (
   new VaultError('gate_issue', Phrases.gateIssue(why), { rows: { world, dbhas: world } })
 )
 
-/** A `box_too_large` refusal: the record's `recordBytes` exceed `maxRecordBytes`. */
-export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): VaultError => (
-  new VaultError('box_too_large', Phrases.boxTooLarge(recordBytes, maxRecordBytes))
+/** A `box_too_large` refusal: the record's `recordSizeEst` exceed `maxRecordSizeEst`. */
+export const boxTooLarge = (recordSizeEst: number, maxRecordSizeEst: number): VaultError => (
+  new VaultError('box_too_large', Phrases.boxTooLarge(recordSizeEst, maxRecordSizeEst))
 )
 
 /** A `vault_full` refusal: the vault has as many boxes as its storage allows. */

@@ -6,7 +6,7 @@ import { Checker, Checkers, objCheck, objStrict, objStrip } from '../helpers/val
 import type { VaultError } from '../refusals/errors'
 import type { Outcome } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
-import { ForeverMillis, PasskeySaltBytes, hasModelkind, isGuarded } from '../helpers/consts'
+import { ForeverMillis, PasskeySaltSize, hasModelkind, isGuarded } from '../helpers/consts'
 import { type VaultLogger, isGuardedLogger } from '../helpers/logger'
 import { type CipherCtxRecord, fromB64OrNull } from '../helpers/crypto'
 import type { GuardedStrengthChecker, StrengthChecker } from '../helpers/passphrase-strength'
@@ -24,8 +24,8 @@ import * as SX from './shapes-storage'
 /** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link EX.wayinkindVals}. */
 export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinkindVals), 'bad_option')
 
-/** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltBytes} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
-export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_salt_b64)?.length === PasskeySaltBytes
+/** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltSize} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
+export const isPrfSalt = (prf_salt_b64: string): boolean => fromB64OrNull(prf_salt_b64)?.length === PasskeySaltSize
 // --
 
 // == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord
@@ -68,7 +68,7 @@ export const gateProps = objCheck(() => ({
 export type GateProps = Z.infer<typeof gateProps>
 // --
 
-// == [Cleartexts]: passphraseCleartext, PassphraseCleartext, PrfAnswerBytes, passkeyAnswer, PasskeyAnswer, freshPasskeyAnswer
+// == [Cleartexts]: passphraseCleartext, PassphraseCleartext, PrfAnswerSize, passkeyAnswer, PasskeyAnswer, freshPasskeyAnswer
 
 /** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` quotes none of it.
  * What a blank one means is the gating's to say.
@@ -79,7 +79,7 @@ export const passphraseCleartext = Checker(({ str }) => str.brand<'PassphraseCle
 export type PassphraseCleartext = Z.infer<typeof passphraseCleartext>
 
 /** How many bytes a passkey's PRF answers with: always 32, by the WebAuthn PRF extension. */
-export const PrfAnswerBytes = 32
+export const PrfAnswerSize = 32
 
 /** What a passkey's answer must carry: its credential's id, the salt it answered for, and its PRF bytes, judged by their tag, so bytes from an iframe pass. Its `parse` quotes none of it, as its bytes are secret.
  * An answer already used, its bytes zeroed by the proving sealed of it, is refused too: sealed
@@ -92,7 +92,7 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
   credential_id,
   prf_salt_b64:  str.min(1),
   /** 32 bytes, as good as the passphrase for this vault: hand them to the gating, then drop them. */
-  prfBytes:      bytes(PrfAnswerBytes).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
+  prfBytes:      bytes(PrfAnswerSize).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
 }), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
 
 /** A passkey's answer when asked for a vault's PRF: the cleartext a gating accepts for a passkey. `safebyok-react`'s `askPasskey` makes one.
@@ -103,13 +103,13 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
  */
 export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
 
-/** A new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a passkey's answer, over a fresh salt of {@link PasskeySaltBytes} bytes as base64url text. Its `parse` quotes none of it.
+/** A new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a passkey's answer, over a fresh salt of {@link PasskeySaltSize} bytes as base64url text. Its `parse` quotes none of it.
  * A passkey wayin sealed over another salt would read as damaged at every later unlock.
  *
  * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })  // throws
  */
 export const freshPasskeyAnswer = Checker(() => (
-  passkeyAnswer.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltShape(PasskeySaltBytes), path: ['prf_salt_b64'] })
+  passkeyAnswer.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltShape(PasskeySaltSize), path: ['prf_salt_b64'] })
 ), 'bad_option')
 // --
 

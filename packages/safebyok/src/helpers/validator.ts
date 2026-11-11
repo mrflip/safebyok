@@ -112,7 +112,7 @@ export const Checkers = <ValsT extends Record<string, Z.ZodType>, const SourcesT
  * It refuses as a {@link Checkers} call's validators do, and accepts `sources` as one does.
  *
  * @example
- *   export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltShape(PasskeySaltBytes)), 'bad_record')
+ *   export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltSize, Phrases.prfSaltShape(PasskeySaltSize)), 'bad_record')
  * @example export const callback = Checker(({ fn }) => fn(), 'bad_option')
  */
 export const Checker = <SchemaT extends Z.ZodType, const SourcesT extends readonly object[] = readonly []>(

@@ -1,6 +1,6 @@
 import { Checkers, verifyConsistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
-import { PassphraseKeyBytes, type Modelkind, type PassphraseSaltBytes, brandGuarded, hasModelkind } from '../helpers/consts'
+import { PassphraseKeySize, type Modelkind, type PassphraseSaltSize, brandGuarded, hasModelkind } from '../helpers/consts'
 import { deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn } from '../helpers/helpers'
@@ -188,7 +188,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
 const mintPassphraseHeader = ({ keyDeriver, device_id }: ProvingWorld): PassphraseWayinHeader => passphraseWayinHeader.parse({
   wayinkind:         'passphrase',
   key_deriver_label: keyDeriver.key_deriver_label,
-  salt_b64:          toB64(randomBytes(keyDeriver.salt_bytes)),
+  salt_b64:          toB64(randomBytes(keyDeriver.salt_size)),
   device_id,
   registered_at:     nowMillis(),
 })
@@ -207,7 +207,7 @@ const mintPasskeyHeader = ({ device_id }: ProvingWorld, { credential_id, prf_sal
 /** A key deriver as a bank keeps it: the host's, made to honor its interface by {@link guardKeyDeriver}. */
 export type GuardedKeyDeriver = Readonly<{
   key_deriver_label: string
-  salt_bytes:        typeof PassphraseSaltBytes
+  salt_size:        typeof PassphraseSaltSize
   deriveKeyBytes:    (passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array) => Promise<unknown>
   load:              () => Promise<void>
 }>
@@ -217,7 +217,7 @@ export type GuardedKeyDeriver = Readonly<{
 // a VaultError `load` throws passes as it came.
 /** `hostDeriver`, made to honor its interface: the one way a proving asks it for key bytes. */
 export const guardKeyDeriver = (hostDeriver: KeyDeriver): GuardedKeyDeriver => {
-  const { key_deriver_label, salt_bytes } = CX.keyDeriverShape.parse(hostDeriver, { where: 'keyDeriver' })
+  const { key_deriver_label, salt_size } = CX.keyDeriverShape.parse(hostDeriver, { where: 'keyDeriver' })
   const load = async (): Promise<void> => {
     try {
       await hostDeriver.load?.()
@@ -226,7 +226,7 @@ export const guardKeyDeriver = (hostDeriver: KeyDeriver): GuardedKeyDeriver => {
       throw keyDeriverLoadFailed(err)
     }
   }
-  return brandGuarded<GuardedKeyDeriver>({ key_deriver_label, salt_bytes, deriveKeyBytes: (passphrase, saltBytes) => deriveKeyBytes(hostDeriver, passphrase, saltBytes), load })
+  return brandGuarded<GuardedKeyDeriver>({ key_deriver_label, salt_size, deriveKeyBytes: (passphrase, saltBytes) => deriveKeyBytes(hostDeriver, passphrase, saltBytes), load })
 }
 
 // The key deriver hears the passphrase here (guarantees.md, G1 and G8): what it throws may quote it, so it is replaced, not kept as a cause.
@@ -262,7 +262,7 @@ const passphraseKeyOf = async (keyDeriver: GuardedKeyDeriver, passphrase: GX.Pas
   if (! ArrayBuffer.isView(handed) || isSharedMemory(handed)) { throw notKeyBytes() }
   const keyBytes = new Uint8Array(handed.buffer, handed.byteOffset, handed.byteLength)
   try {
-    if (keyBytes.length !== PassphraseKeyBytes || isSafelyAllZero(keyBytes)) { throw notKeyBytes() }
+    if (keyBytes.length !== PassphraseKeySize || isSafelyAllZero(keyBytes)) { throw notKeyBytes() }
     return await importWrappingKeyBytes(keyBytes)
   } finally {
     keyBytes.fill(0)

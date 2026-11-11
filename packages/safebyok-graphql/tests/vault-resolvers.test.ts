@@ -189,7 +189,7 @@ describe("vaultResolvers", () => {
 
   it("refuses at the server what the browser's own checks would, for a browser that skipped them", async () => {
     await TH.emptyTables()
-    const schema = TH.schemaOver(await TH.serverOver({ maxRecordBytes: 200 }))
+    const schema = TH.schemaOver(await TH.serverOver({ maxRecordSizeEst: 200 }))
     const born = DB.putVaultAnswer.parse(await sentAsk(schema, VaultOperations.putVault, vaultBorn))
     expect(born).to.have.property('ok', true)
     const heavy = DB.putBoxAnswer.parse(await sentAsk(schema, VaultOperations.putBox, boxBorn)) as DB.BadAnswer

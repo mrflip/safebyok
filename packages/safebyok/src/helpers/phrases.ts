@@ -2,7 +2,7 @@
  * The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts.
  */
 
-import { PassphraseSaltBytes } from './consts'
+import { PassphraseSaltSize } from './consts'
 
 // == [Names]: LabelShape, DeviceIdShape, UserIdMissing, UserIdChars
 
@@ -101,13 +101,13 @@ export const prfSaltShape = (count: number): string => `A passkey's salt is base
 export const MinutesShape = "Expected a number of minutes, zero or more, fractions too (0.5 is thirty seconds), or Infinity"
 
 /** A `keyDeriver` left out, or no object. */
-export const KeyDeriverShape = `Expected a KeyDeriver: in a browser, argon2idWebV1Deriver from 'safebyok/browser'; elsewhere, your own, with a key_deriver_label, a salt_bytes of ${String(PassphraseSaltBytes)} and a deriveKeyBytes function`
+export const KeyDeriverShape = `Expected a KeyDeriver: in a browser, argon2idWebV1Deriver from 'safebyok/browser'; elsewhere, your own, with a key_deriver_label, a salt_size of ${String(PassphraseSaltSize)} and a deriveKeyBytes function`
 
 /** A `logger` that is no object. */
 export const LoggerShape = "Expected a VaultLogger, with log, warn and error functions: leave it out for the default logger, or pass functions that do nothing to log nowhere"
 
 /** A keyDeriverSpec that is no object. */
-export const KeyDeriverSpecShape = `Expected a keyDeriverSpec: algorithm 'argon2id', key_deriver_label, memory_kib, iterations, parallelism, salt_bytes (${String(PassphraseSaltBytes)}) and output_bytes`
+export const KeyDeriverSpecShape = `Expected a keyDeriverSpec: algorithm 'argon2id', key_deriver_label, memory_kib, iterations, parallelism, salt_size (${String(PassphraseSaltSize)}) and output_size`
 
 /** An Argon2id spec with less than `minKib` of memory for each of its lanes. */
 export const memoryPerLane = (minKib: number): string => `Expected at least ${String(minKib)} KiB of memory for each lane (parallelism)`
@@ -411,7 +411,7 @@ export const GateEpochNotNext = "its gate_epoch is not one past the stored one."
 export const OtherWayinMoved = "it moves a wayin this verb does not."
 
 /** A box record over the bytes its storage allows in one record. */
-export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): string => `That box weighs ${String(recordBytes)} bytes, over the ${String(maxRecordBytes)} its storage allows in one record.`
+export const boxTooLarge = (recordSizeEst: number, maxRecordSizeEst: number): string => `That box weighs ${String(recordSizeEst)} bytes, over the ${String(maxRecordSizeEst)} its storage allows in one record.`
 
 /** A vault with as many boxes as its storage allows. */
 export const VaultFull = "This vault has as many boxes as its storage allows."

@@ -1,5 +1,5 @@
 import { describe, expect, it, type Mock, vi } from 'vitest'
-import { PasskeySaltBytes, isGuarded } from '../../src/helpers/consts'
+import { PasskeySaltSize, isGuarded } from '../../src/helpers/consts'
 import * as Phrases from '../../src/helpers/phrases'
 import { cipherCtx, deriveWrappingKey, fromB64, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
@@ -19,7 +19,7 @@ const WorldScope = vaultScope.parse(WorldStamp)
 /** A key deriver scripted to hand back anything at all, to try what a proving makes of it. */
 const deriverHanding = (handBack: () => unknown): KeyDeriver => ({
   key_deriver_label: 'test_scripted_v0',
-  salt_bytes:        16,
+  salt_size:        16,
   deriveKeyBytes:    () => Promise.resolve(handBack() as Uint8Array),
 })
 
@@ -147,14 +147,14 @@ describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
     expect(proving.stamp).to.deep.equal(WorldStamp)
   })
 
-  it("hands the keyDeriver the passphrase and a fresh salt of its salt_bytes, the salt the header carries", async () => {
+  it("hands the keyDeriver the passphrase and a fresh salt of its salt_size, the salt the header carries", async () => {
     const deriveKeyBytes: Mock<KeyDeriver['deriveKeyBytes']> = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
     const proving = await novelPassphrase(provingWorldOf({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }))
     expect(deriveKeyBytes).toHaveBeenCalledTimes(1)
     const [passphrase, saltBytes] = deriveKeyBytes.mock.calls[0]!
     expect(passphrase).to.eq(TestPassphrase)
     expect(saltBytes).to.deep.equal(fromB64(proving.header.salt_b64))
-    expect(saltBytes.length).to.eq(TH.testDeriver.salt_bytes)
+    expect(saltBytes.length).to.eq(TH.testDeriver.salt_size)
   })
 
   it("zeroes the key bytes the keyDeriver handed back, once imported", async () => {
@@ -214,7 +214,7 @@ describe("PasskeyProving.buildNovel(stamp, passkeyClear, world)", () => {
   const AnswerCases = [
     [() => passkeyAnswerOf({ prfBytes: new Uint8Array(32) }),                                  'an answer whose PRF bytes are all zero'],
     [() => passkeyAnswerOf({ prfBytes: randomBytes(31) }),                                     'PRF bytes one short'],
-    [() => passkeyAnswerOf({ prf_salt_b64: toB64(randomBytes(PasskeySaltBytes - 1)) }),        'a salt one byte short'],
+    [() => passkeyAnswerOf({ prf_salt_b64: toB64(randomBytes(PasskeySaltSize - 1)) }),        'a salt one byte short'],
     [() => TH.omitting(passkeyAnswerOf(), 'credential_id'),                                    'an answer with no credential_id'],
   ] as const
 
@@ -258,7 +258,7 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
   it("refuses a wayin made under another key deriver as 'newer_format', before the world's is asked", async () => {
     const { gate } = await gateWithBoth()
     const deriveKeyBytes = vi.fn(() => Promise.resolve(randomBytes(32)))
-    const keyDeriver: KeyDeriver = { key_deriver_label: 'test_other_v0', salt_bytes: 16, deriveKeyBytes }
+    const keyDeriver: KeyDeriver = { key_deriver_label: 'test_other_v0', salt_size: 16, deriveKeyBytes }
     await TH.expectRefusal(PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf({ keyDeriver })), 'newer_format')
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
@@ -269,7 +269,7 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
     const { gate } = await gateWithBoth()
     const { passphrase_wayin } = gate.pickle()
     const deriveKeyBytes = vi.fn(() => Promise.resolve(randomBytes(32)))
-    const keyDeriver: KeyDeriver = { key_deriver_label: passphrase_wayin.key_deriver_label, salt_bytes: 16, deriveKeyBytes }
+    const keyDeriver: KeyDeriver = { key_deriver_label: passphrase_wayin.key_deriver_label, salt_size: 16, deriveKeyBytes }
     const damaged = { stamp: WorldStamp, ...gate.pickle(), passphrase_wayin: { ...passphrase_wayin, salt_b64: salt as never } }
     const err = await TH.expectRefusal(PassphraseProving.buildStored(damaged, TestPassphrase, provingWorldOf({ keyDeriver })), 'bad_option')
     expect(TH.thrownText(err)).to.not.include(salt)
@@ -317,7 +317,7 @@ describe("PasskeyProving.buildStored(gate, passkeyClear)", () => {
 
   const WrongAnswerCases = [
     [{ credential_id: 'cred-test-other' },                       'of another credential'],
-    [{ prf_salt_b64: toB64(randomBytes(PasskeySaltBytes)) },     'of another salt'],
+    [{ prf_salt_b64: toB64(randomBytes(PasskeySaltSize)) },     'of another salt'],
     [{ prfBytes: randomBytes(32) },                              'whose PRF bytes do not open the wayin'],
   ] as const
 
@@ -339,7 +339,7 @@ describe("PasskeyProving.buildStored(gate, passkeyClear)", () => {
 describe("guardKeyDeriver(hostDeriver)", () => {
   it("keeps the deriver's label and salt length, and marks the result as guarded", () => {
     const guarded = guardKeyDeriver(TH.testDeriver)
-    expect(guarded).to.include({ key_deriver_label: TH.testDeriver.key_deriver_label, salt_bytes: TH.testDeriver.salt_bytes })
+    expect(guarded).to.include({ key_deriver_label: TH.testDeriver.key_deriver_label, salt_size: TH.testDeriver.salt_size })
     expect(Object.isFrozen(guarded)).to.be.true
     expect(isGuarded(guarded)).to.be.true
     expect(isGuarded({ ...guarded })).to.be.false
@@ -353,11 +353,11 @@ describe("guardKeyDeriver(hostDeriver)", () => {
   })
 
   const Misfits = [
-    [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 16 },                                         'a deriver with no deriveKeyBytes'],
-    [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 0, deriveKeyBytes: () => Promise.resolve() },  'a deriver asking for no salt'],
-    [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 15, deriveKeyBytes: () => Promise.resolve() }, 'a deriver asking for a salt of 15 bytes'],
-    [{ key_deriver_label: 'test_kdf_v0', salt_bytes: 32, deriveKeyBytes: () => Promise.resolve() }, 'a deriver asking for a salt of 32 bytes'],
-    [{ salt_bytes: 16, deriveKeyBytes: () => Promise.resolve() },                                  'a deriver with no label'],
+    [{ key_deriver_label: 'test_kdf_v0', salt_size: 16 },                                         'a deriver with no deriveKeyBytes'],
+    [{ key_deriver_label: 'test_kdf_v0', salt_size: 0, deriveKeyBytes: () => Promise.resolve() },  'a deriver asking for no salt'],
+    [{ key_deriver_label: 'test_kdf_v0', salt_size: 15, deriveKeyBytes: () => Promise.resolve() }, 'a deriver asking for a salt of 15 bytes'],
+    [{ key_deriver_label: 'test_kdf_v0', salt_size: 32, deriveKeyBytes: () => Promise.resolve() }, 'a deriver asking for a salt of 32 bytes'],
+    [{ salt_size: 16, deriveKeyBytes: () => Promise.resolve() },                                  'a deriver with no label'],
     [() => undefined,                                                                              'a bare function'],
   ] as const
   for (const [misfit, blurb] of Misfits) {
@@ -405,7 +405,7 @@ describe("a proving's header", () => {
     const { header } = await novelPassphrase(provingWorldOf())
     expect(header).to.deep.include({ wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', device_id: DeviceId, registered_at: T0 + 5 })
     expect(Object.keys(header)).to.have.members(['wayinkind', 'key_deriver_label', 'salt_b64', 'device_id', 'registered_at'])
-    expect(fromB64(header.salt_b64).length).to.eq(TH.testDeriver.salt_bytes)
+    expect(fromB64(header.salt_b64).length).to.eq(TH.testDeriver.salt_size)
     expect(Object.isFrozen(header)).to.be.true
   })
 

@@ -34,7 +34,7 @@ TH.describeVaultDBBattery("PostgresVaultDB", {
 describe("PostgresVaultDB's constructor", () => {
   it("refuses a client, listen or maxBoxes it cannot use", async () => {
     const client = TH.flakyClientOf(await TH.database())
-    const unusable = [{}, { client: { query: client.query } }, { client, listen: 'yes' }, { client, maxBoxes: -1 }, { client, maxRecordBytes: 0 }]
+    const unusable = [{}, { client: { query: client.query } }, { client, listen: 'yes' }, { client, maxBoxes: -1 }, { client, maxRecordSizeEst: 0 }]
     for (const opts of unusable) { TH.expectSyncRefusal(() => new PostgresVaultDB(opts as never), 'bad_option') }
   })
 })
@@ -77,7 +77,7 @@ describe("PostgresVaultDB's refusals", () => {
 
 describe("PostgresVaultDB's watch", () => {
   it("delivers the stored rows for a write too large for a notification", async () => {
-    const vaultDB = await TH.makeVaultDB({ maxRecordBytes: 20_000 })
+    const vaultDB = await TH.makeVaultDB({ maxRecordSizeEst: 20_000 })
     const vault = TH.vaultAt()
     await vaultDB.putVault(TH.vaultPutAskOf(vault))
     const notices = watching(vaultDB)
@@ -134,7 +134,7 @@ describe("PostgresVaultDB's notices", () => {
   })
 
   it("sends a box too long for a notification as its address alone", async () => {
-    const vaultDB = await TH.makeVaultDB({ maxRecordBytes: 20_000 })
+    const vaultDB = await TH.makeVaultDB({ maxRecordSizeEst: 20_000 })
     await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
     const sent = await sentOn()
     const box = TH.boxAt(0, 'life1', { sidecar: { note: 'x'.repeat(9000) } })

@@ -105,12 +105,12 @@ TH.describeVaultDBBattery("IdbVaultDB", {
 
 describe("IdbVaultDB's options", () => {
   it("takes a dbName and the AdapterVaultDB's own options", () => {
-    expect(new IdbVaultDB({ dbName: 'mine', maxRecordBytes: 1000 })).to.be.instanceOf(IdbVaultDB)
+    expect(new IdbVaultDB({ dbName: 'mine', maxRecordSizeEst: 1000 })).to.be.instanceOf(IdbVaultDB)
     expect(idbVaultDB()).to.be.instanceOf(IdbVaultDB)
   })
 
-  it("refuses a dbName, a maxRecordBytes or a field it cannot use", () => {
-    for (const opts of [{ dbName: '' }, { dbName: 7 }, { maxRecordBytes: -1 }, { dbname: 'mine' }]) {
+  it("refuses a dbName, a maxRecordSizeEst or a field it cannot use", () => {
+    for (const opts of [{ dbName: '' }, { dbName: 7 }, { maxRecordSizeEst: -1 }, { dbname: 'mine' }]) {
       expect(() => new IdbVaultDB(opts as never)).to.throw(DB.VaultError).with.property('refusalkind', 'bad_option')
     }
   })

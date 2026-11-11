@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PasskeySaltBytes, PrfAnswerBytes, VaultError, type WayinHeader } from 'safebyok'
+import { PasskeySaltSize, PrfAnswerSize, VaultError, type WayinHeader } from 'safebyok'
 import { fromB64 } from 'safebyok/utils'
 import { Messages } from '../src/helpers/messages'
 import { askPasskey, attemptOnce, createPasskey, passkeysAvailable } from '../src/helpers/passkey'
@@ -73,8 +73,8 @@ describe("createPasskey", () => {
     const made = await createPasskey(TH.PasskeyMaking)
     expect(made).to.not.be.null
     expect(authenticator.credentialIds()).to.deep.equal([made?.credential_id])
-    expect(fromB64(made?.prf_salt_b64 ?? '')).to.have.lengthOf(PasskeySaltBytes)
-    expect(made?.prfBytes).to.have.lengthOf(PrfAnswerBytes)
+    expect(fromB64(made?.prf_salt_b64 ?? '')).to.have.lengthOf(PasskeySaltSize)
+    expect(made?.prfBytes).to.have.lengthOf(PrfAnswerSize)
     expect(made?.prfBytes.some((byte) => byte !== 0)).to.be.true
   })
 
@@ -168,7 +168,7 @@ describe("askPasskey", () => {
   it("refuses an answer from a passkey it did not offer, zeroing that answer", async () => {
     TH.installFakeAuthenticator()
     const made = await createPasskey(TH.PasskeyMaking)
-    const answer = crypto.getRandomValues(new Uint8Array(PrfAnswerBytes))
+    const answer = crypto.getRandomValues(new Uint8Array(PrfAnswerSize))
     const otherCredential = { type: 'public-key', rawId: new Uint8Array(16).buffer, getClientExtensionResults: () => ({ prf: { results: { first: answer } } }) }
     vi.spyOn(navigator.credentials, 'get').mockResolvedValue(otherCredential as unknown as Credential)
     const asking = askPasskey(headerOf(made?.credential_id ?? '', made?.prf_salt_b64 ?? ''))
@@ -231,7 +231,7 @@ describe("attemptOnce's answer", () => {
   })
 
   it("zeroes the answer's bytes when it refuses an attempt that is no function", async () => {
-    const passkey = { credential_id: 'AAAA', prf_salt_b64: 'AAAA', prfBytes: crypto.getRandomValues(new Uint8Array(PrfAnswerBytes)) }
+    const passkey = { credential_id: 'AAAA', prf_salt_b64: 'AAAA', prfBytes: crypto.getRandomValues(new Uint8Array(PrfAnswerSize)) }
     expect(await refusalOf(attemptOnce(passkey, 'attempt' as never))).to.include({ refusalkind: 'bad_option' })
     expect(passkey.prfBytes.every((byte) => byte === 0)).to.be.true
   })

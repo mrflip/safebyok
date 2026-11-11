@@ -2,7 +2,7 @@ import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { makeLeaseKey, makeVaultKey } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
-import { PasskeySaltBytes } from '../../src/helpers/consts'
+import { PasskeySaltSize } from '../../src/helpers/consts'
 import { parseLogger } from '../../src/helpers/logger'
 import { guardRequestCleartext } from '../../src/models/bank'
 import * as GX from '../../src/shapes/shapes-gateish'
@@ -134,7 +134,7 @@ describe("freshPasskeyAnswer", () => {
   it("refuses an answer over a salt too short, naming the salt", async () => {
     const answer = await TH.passkeyOf('laptop')
     const err = TH.expectSyncRefusal(() => GX.freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' }))
-    expect(err.message).to.eq(`prf_salt_b64: ${Phrases.prfSaltShape(PasskeySaltBytes)}`)
+    expect(err.message).to.eq(`prf_salt_b64: ${Phrases.prfSaltShape(PasskeySaltSize)}`)
   })
 })
 // --

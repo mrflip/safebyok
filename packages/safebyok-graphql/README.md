@@ -8,7 +8,7 @@ safebyok's vaultDB over [GraphQL](https://graphql.org), in two halves:
   own), and returns that verb's answer, for the signed-in user's bank only.
 * **In the browser**, `safebyok-graphql`: **`new GraphQLVaultDB({ client })`**, the vaultDB over
   your app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `Bank.make`.
-  It takes the Client alone. Limits such as `maxBoxes` and `maxRecordBytes` are set on the vaultDB
+  It takes the Client alone. Limits such as `maxBoxes` and `maxRecordSizeEst` are set on the vaultDB
   your server hosts and hands to `vaultResolvers`. The browser half sets none.
 
 **Deploy the two halves together.** The browser half sends the documents the server half's schema

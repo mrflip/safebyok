@@ -11,7 +11,7 @@ import { type IdbDeviceDB, idbDeviceDB, idbDeviceDBOpts, type IdbDeviceDBOpts } 
 export { argon2idDeriver, argon2idWebV1Deriver } from './deriver/argon2id-webv1'
 export { parseKeyDeriverSpec } from './deriver/basederiver'
 export type { Argon2idKeyDeriver, KeyDeriver } from './deriver/basederiver'
-export { PassphraseSaltBytes } from './helpers/consts'
+export { PassphraseSaltSize } from './helpers/consts'
 export { Argon2idWebV1 } from './deriver/shapes'
 export type { KeyDeriverSpec } from './deriver/shapes'
 export type { StrengthChecker } from './helpers/passphrase-strength'

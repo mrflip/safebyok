@@ -10,7 +10,7 @@ import * as GX from '../../src/shapes/shapes-gateish'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as UX from '../../src/shapes/shapes-utils'
 import * as VX from '../../src/shapes/shapes-vaultish'
-import { PasskeySaltBytes } from '../../src/helpers/consts'
+import { PasskeySaltSize } from '../../src/helpers/consts'
 import { fromB64OrNull, toB64 } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
 import { Checker, Checkers, type ConsistencyRefusal, Kit, type Story, consistent, demandConsistent, objCheck, objStrict, objStrip, verifyConsistent } from '../../src/helpers/validator'
@@ -279,11 +279,11 @@ describe("Checkers", () => {
 describe("Checker", () => {
   // Checker @example 1
   it("checks a value whole, refusing with a sentence of its own as a bad record unless given a kind", () => {
-    const prfSalt = Checker(({ str }) => str.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltShape(PasskeySaltBytes)))
-    const salt = toB64(new Uint8Array(PasskeySaltBytes).fill(7))
+    const prfSalt = Checker(({ str }) => str.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltSize, Phrases.prfSaltShape(PasskeySaltSize)))
+    const salt = toB64(new Uint8Array(PasskeySaltSize).fill(7))
     expect(prfSalt.parse(salt)).to.eq(salt)
-    const err = TH.expectSyncRefusal(() => prfSalt.parse(toB64(new Uint8Array(PasskeySaltBytes - 1))), 'bad_record')
-    expect(err.message).to.eq(Phrases.prfSaltShape(PasskeySaltBytes))
+    const err = TH.expectSyncRefusal(() => prfSalt.parse(toB64(new Uint8Array(PasskeySaltSize - 1))), 'bad_record')
+    expect(err.message).to.eq(Phrases.prfSaltShape(PasskeySaltSize))
   })
 
   // Checker @example 2

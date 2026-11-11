@@ -12,7 +12,7 @@ import      { type StrengthChecker, StrongVerdict } from '../../src/helpers/pass
  */
 export const testDeriver: KeyDeriver = {
   key_deriver_label: 'test_digest_v0',
-  salt_bytes:        16,
+  salt_size:        16,
   deriveKeyBytes: async (passphrase, saltBytes) => {
     const passphraseBytes = new TextEncoder().encode(passphrase)
     const joined = new Uint8Array(passphraseBytes.length + saltBytes.length)

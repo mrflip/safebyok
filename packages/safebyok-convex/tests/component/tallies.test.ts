@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getDocumentSize } from 'convex/values'
 import * as TH from '../test-helpers'
-import { MaxVaultBoxBytes, MaxVaultBoxes, capacityOf, growthOf, refuses, tallyOf, weigh } from '../../src/component/tallies'
+import { MaxVaultBoxSize, MaxVaultBoxes, capacityOf, growthOf, refuses, tallyOf, weigh } from '../../src/component/tallies'
 
 const MiB = 1024 * 1024
 
@@ -11,7 +11,7 @@ describe("the limits every vault is bound by", () => {
   })
 
   it("has at most 7 MiB less 1 KiB of boxes", () => {
-    expect(MaxVaultBoxBytes).to.eq((7 * MiB) - 1024)
+    expect(MaxVaultBoxSize).to.eq((7 * MiB) - 1024)
   })
 })
 
@@ -69,7 +69,7 @@ describe("tallyOf and growthOf", () => {
 
 describe("refuses", () => {
   const full = allOf(MaxVaultBoxes, 4096)
-  const heavy = allOf(10, MaxVaultBoxBytes - 100)
+  const heavy = allOf(10, MaxVaultBoxSize - 100)
 
   const RefusalCases = [
     // by count:
@@ -83,8 +83,8 @@ describe("refuses", () => {
     [heavy, allOf(1, 101),    MaxVaultBoxes,  true,   'refuses a new box one byte past the vault weight'],
     [heavy, allOf(0, 101),    MaxVaultBoxes,  true,   'refuses a replacement that grows the vault past its weight'],
     [heavy, allOf(0, 99),     MaxVaultBoxes,  false,  'lets a replacement grow the vault within its weight'],
-    [allOf(10, MaxVaultBoxBytes + 5000), allOf(0, -10), MaxVaultBoxes, false, 'lets a replacement shrink a vault already past its weight'],
-    [allOf(10, MaxVaultBoxBytes + 5000), allOf(0, 0),   MaxVaultBoxes, false, 'lets a replacement of the same weight into a vault past its weight'],
+    [allOf(10, MaxVaultBoxSize + 5000), allOf(0, -10), MaxVaultBoxes, false, 'lets a replacement shrink a vault already past its weight'],
+    [allOf(10, MaxVaultBoxSize + 5000), allOf(0, 0),   MaxVaultBoxes, false, 'lets a replacement of the same weight into a vault past its weight'],
     // a vault past a limit, so never fully counted:
     [null,  allOf(1, 512),    MaxVaultBoxes,  true,   'refuses a new box in a vault past a limit, uncounted'],
     [null,  allOf(0, 1),      MaxVaultBoxes,  true,   'refuses a heavier replacement in a vault past a limit, uncounted'],
@@ -98,11 +98,11 @@ describe("refuses", () => {
 
 describe("capacityOf", () => {
   it("reports a tally against the given box cap and the component's weight limit", () => {
-    expect(capacityOf(allOf(12, 48_000), 100)).to.deep.equal({ boxes: { used: 12, max: 100 }, bytes: { used: 48_000, max: MaxVaultBoxBytes } })
+    expect(capacityOf(allOf(12, 48_000), 100)).to.deep.equal({ boxes: { used: 12, max: 100 }, bytes: { used: 48_000, max: MaxVaultBoxSize } })
   })
 
   it("reports an uncounted vault past a limit as full in both boxes and bytes", () => {
-    expect(capacityOf(null, MaxVaultBoxes)).to.deep.equal({ boxes: { used: MaxVaultBoxes, max: MaxVaultBoxes }, bytes: { used: MaxVaultBoxBytes, max: MaxVaultBoxBytes } })
+    expect(capacityOf(null, MaxVaultBoxes)).to.deep.equal({ boxes: { used: MaxVaultBoxes, max: MaxVaultBoxes }, bytes: { used: MaxVaultBoxSize, max: MaxVaultBoxSize } })
     expect(refuses(null, allOf(1, 0), MaxVaultBoxes)).to.be.true
   })
 })
