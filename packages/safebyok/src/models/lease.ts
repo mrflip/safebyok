@@ -1,17 +1,17 @@
 import type { Modelkind } from '../helpers/consts'
-import { consistent } from '../helpers/validator'
+import { isConsistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
 import { isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import { damagedLease, leaseNotInForce, unopenedWhisper } from '../refusals/throwers'
+import { damagedLease, leaseNotInForce, undecipheredWhisper } from '../refusals/throwers'
 import type { Wayinkind } from '../shapes/shapes-enums'
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, LeaseFormat, leaseFriend, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from '../shapes/shapes-gateish'
 
-/** A vault's vaultKey in force on this device, good for one `gate_epoch`. It has the key wrapped under a non-extractable leaseKey, opens it for a single call, and never hands it out. */
+/** A vault's vaultKey in force on this device, good for one `gate_epoch`. It has the key wrapped under a non-extractable leaseKey, unwraps it for a single call, and never hands it out. */
 export class Lease implements LeaseStamp {
-  // == [Props]: fmt, applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, proved_at, wayinkind, #friend, #record, #vaultStamp, #isFromCache, #leaseStamp, toJSON
+  // == [Props]: fmt, applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, proved_at, wayinkind, #vaultFriend, #record, #vaultStamp, #isFromCache, #leaseStamp, toJSON
 
   declare readonly fmt:           typeof LeaseFormat
   declare readonly applabel:      string
@@ -24,7 +24,7 @@ export class Lease implements LeaseStamp {
   declare readonly wayinkind:     Wayinkind
 
   /** All this lease hears of its vault. */
-  readonly #friend: LeaseFriend
+  readonly #vaultFriend: LeaseFriend
 
   /** The record with its keys, null once out of force. */
   #record: LeaseRecord | null
@@ -46,14 +46,14 @@ export class Lease implements LeaseStamp {
   private constructor(friend: LeaseFriend, record: LeaseRecord, isFromCache: boolean) {
     this.#record = leaseRecord.parse(record)
     tattoo(this, leaseStamp.parse(record), { configurable: false })
-    this.#friend = friend
+    this.#vaultFriend = friend
     this.#vaultStamp = vaultStamp.parse(friend)
     this.#isFromCache = isFromCache
     Object.freeze(this)
   }
 
-  /** The lease cached for `gate_epoch`, or null so the vault asks for a proof. A row of another epoch or stamp is forgotten;
-   * one past autolock stays, not loaded, for a later proof to write over or `bank.autolock` to forget.
+  /** The lease cached for `gate_epoch`, or null so the vault asks the user to unlock. A row of another epoch or stamp is forgotten;
+   * one past autolock stays, not loaded, for a later unlock's lease to write over or `bank.autolock` to forget.
    * A device database that refuses, or a row that will not read, is bad news and null, the row left standing.
    */
   static async buildFromCache(friend: LeaseFriend, gate_epoch: number): Promise<Lease | null> {
@@ -70,7 +70,7 @@ export class Lease implements LeaseStamp {
         await friend.tryForgetLease()
         return null
       }
-      if (! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
+      if (! isConsistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
         await friend.tryForgetLease()
         throw damagedLease()
       }
@@ -96,12 +96,12 @@ export class Lease implements LeaseStamp {
 
   // == [Caching]: cacheAsCacheCan
 
-  // A refusal costs the next session a proof, not this one its lease.
+  // A refusal costs the next session an unlock, not this one its lease.
   /** Caches this lease if it can, telling the host of a refusal as bad news. */
   async cacheAsCacheCan(): Promise<void> {
     if (this.#isFromCache) { return }
-    const cached = await this.#friend.tryCacheLease(this.#demandRecord())
-    if (! cached.ok) { this.#friend.tellBadNews([cached.err]) }
+    const cached = await this.#vaultFriend.tryCacheLease(this.#demandRecord())
+    if (! cached.ok) { this.#vaultFriend.tellBadNews([cached.err]) }
   }
   // --
 
@@ -111,7 +111,7 @@ export class Lease implements LeaseStamp {
   async revoke(): Promise<void> {
     if (this.#record === null) { return }
     this.evict()
-    await this.#friend.forgetLease()
+    await this.#vaultFriend.forgetLease()
   }
 
   /** Non-throwing form of {@link revoke}. */
@@ -151,7 +151,7 @@ export class Lease implements LeaseStamp {
   async unsealWith(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
     const checked = leaseUnsealArgs.parse({ sealed, stamp })
     const vaultKey = await this.#vaultKey('unwrapKey')
-    const bytes = await this.#opened(vaultKey, checked.sealed, checked.stamp)
+    const bytes = await this.#decipherSealed(vaultKey, checked.sealed, checked.stamp)
     try {
       this.#demandRecord()
       return new TextDecoder().decode(bytes)
@@ -160,7 +160,7 @@ export class Lease implements LeaseStamp {
     }
   }
 
-  async #opened(vaultKey: CryptoKey, sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<Uint8Array> {
+  async #decipherSealed(vaultKey: CryptoKey, sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<Uint8Array> {
     const boxKeyCtx  = this.#ctxOf(stamp, 'box_key_wrapped')
     const whisperCtx = this.#ctxOf(stamp, 'whisper_ciphered')
     // Only these two WebCrypto calls are trapped: their rejection is how a damaged whisper is learned. The calls above refuse as they are, or are bugs.
@@ -168,7 +168,7 @@ export class Lease implements LeaseStamp {
       const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, boxKeyCtx, { extractable: false, usage: ['decrypt'] })
       return await decipherBytes(boxKey, sealed.whisper_ciphered, whisperCtx)
     } catch {
-      throw unopenedWhisper()
+      throw undecipheredWhisper()
     }
   }
 
@@ -186,17 +186,17 @@ export class Lease implements LeaseStamp {
       return await unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
     } catch {
       // Locking drops the vault's lease and forgets its row by scope; this one is evicted too, should the vault have another.
-      this.#friend.lock()
+      this.#vaultFriend.lock()
       this.evict()
       throw damagedLease()
     }
   }
   // --
 
-  // == [Guards]: isPresent, demandRecord
+  // == [Guards]: isGranted, demandRecord
 
-  /** The lease still has its record, as `Storable.isPresent` says of a thing not gone. */
-  get isPresent(): boolean { return this.#record !== null }
+  /** The lease still has its record: it was granted and has not been dropped. */
+  get isGranted(): boolean { return this.#record !== null }
 
   /** The record, while the lease is in force. */
   #demandRecord(): LeaseRecord {

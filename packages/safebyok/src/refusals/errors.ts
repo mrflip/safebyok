@@ -26,7 +26,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  * A record that fails its checks is named for its direction. One read from storage that fails them
  * is `damaged_row`, on the way out. A damaged row never indicates format drift: it is thrown by the
  * vaultDB tied to the datastore. One handed in is `bad_option`, on the way in; `bad_record` where one
- * check serves both ways. A whisper that will not open under the lease in hand, or opens to no
+ * check serves both ways. A whisper that will not decipher under the lease in hand, or deciphers to no
  * whisper, is `damaged_whisper`, Zod's own error its `cause` where a check failed. A storage
  * adapter's answer that cannot be, one revision under two toks or a world row failing its checks
  * say, is `record_conflict`.
@@ -46,9 +46,9 @@ export const refusalkindVals = [
   'bad_scope',           // a name in a scope -- a label, or the user_id -- that fails its check
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage allows in one record
   'vault_full',          // a new box in a vault already at its maxBoxes (a best-effort cap), or a write storage has no room for
-  'bad_option',          // an option, argument or record handed in that fails its check: Bank.make's, argon2idDeriver's, a vaultDB verb's, a putBox()'s sidecar
+  'bad_option',          // an option, argument or record handed in that fails its check: Bank.make's, makeArgon2idDeriver's, a vaultDB verb's, a putBox()'s sidecar
   'bad_record',          // a record that fails a check serving both ways, a record handed in and one read back
-  'damaged_whisper',     // a box's whisper would not open under the vault's lease, or opened to no whisper this package knows
+  'damaged_whisper',     // a box's whisper would not decipher under the vault's lease, or deciphered to no whisper this package knows
   'newer_format',        // a stored wayin naming a key deriver this handle was not built with: update safebyok
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
@@ -60,8 +60,8 @@ export const refusalkindVals = [
   'storage_issue',       // the storage backend answered with a row no working store could: no object at all, or naming another address than the one asked: the database is so broken we just can't, and a retry is unlikely to help
   'vault_gone',          // the vault a call was working on is no longer stored: deleted, here or elsewhere
   'vault_reborn',        // a live vault stands where the call's vault stood, under another vault_tok than the call has: expected, and the vault is read again by its scope
-  'gating_concluded',    // a proof under way was for a prompt that ended meanwhile -- it was answered or dismissed -- so it unlocked nothing
-  'damaged_lease',       // this device's lease would not open under its leaseKey: it was forgotten, and the vault locked
+  'gating_concluded',    // an attempt under way was for a prompt that ended meanwhile -- it was answered or dismissed -- so it unlocked nothing
+  'damaged_lease',       // this device's lease would not unwrap under its leaseKey: it was forgotten, and the vault locked
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
   'already_asking',      // a gating is open on this bank, so a second one was not launched: one dialog at a time, and no join
   'dismissed',           // the dialog was dismissed with no attempt under way, so nothing was done

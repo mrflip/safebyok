@@ -13,7 +13,7 @@ import * as VX from '../shapes/shapes-vaultish'
 import { type DelTombstone, type Fetched, type ListingDelOpts, type ListingOpts, type ListingPutOpts, type SlotFate, type ThingAnswer, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
 import type { BoxRow, GateVerbOpts, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { type Answer, type Notice, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
-import { absentVaultError, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
+import { vaultAbsent, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
 import type { Gate } from './gate'
 import { Listing } from './listing'
@@ -51,14 +51,14 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return new BoxListing(vault, { scope: vault.scope, vaultDB: this.vaultDB, maxMillisSinceRefresh: this.world.boxRefreshMillis, bankFriend: this.bankFriend })
   }
 
-  /** The scope of `duck`, which must be this bank's: no listing answers for another's. */
-  scopeOf(duck: unknown):  VaultScope  { return vaultScope.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
+  /** The scope of `vaultish`, which must be this bank's: no listing answers for another's. */
+  scopeOf(vaultish: unknown):  VaultScope  { return vaultScope.parseConsistent(vaultish, this.world.scope, { message: Phrases.otherScope }) }
 
-  /** Parse `duck` as a {@link VaultSparse}. */
-  sparseOf(duck: unknown): VaultSparse { return SX.vaultSparse.parse(duck) }
+  /** Parse `vaultish` as a {@link VaultSparse}. */
+  sparseOf(vaultish: unknown): VaultSparse { return SX.vaultSparse.parse(vaultish) }
 
-  /** Parse `duck` as a {@link VaultRecord} of this bank. */
-  recordOf(duck: unknown): VaultRecord { return SX.vaultRecord.parseConsistent(duck, this.world.scope, { message: Phrases.otherScope }) }
+  /** Parse `vaultish` as a {@link VaultRecord} of this bank. */
+  recordOf(vaultish: unknown): VaultRecord { return SX.vaultRecord.parseConsistent(vaultish, this.world.scope, { message: Phrases.otherScope }) }
   // --
 
   // == [A birth's forms]: stampOfBirth, recordOfBirth
@@ -188,7 +188,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return new Vault(this.world, this, central, this.bankFriend)
   }
 
-  protected nothingStoredError(scope: VaultScope): VaultError { return absentVaultError(scope) }
+  protected nothingStoredError(scope: VaultScope): VaultError { return vaultAbsent(scope) }
 
   // A bank's listing has its scope for a world, no row, so it has nothing for the bank to receive.
   protected async doTryList() {
@@ -199,7 +199,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   protected damagedStoredError(damaged: SX.DamagedVault): VaultError { return vaultStoredDamaged(damaged) }
 
   protected doTryGet(scope: VaultScope) {
-    const expected = this.at(scope)?.sparse ?? SX.sentinelVaultOf(scope)
+    const expected = this.at(scope)?.sparse ?? SX.shellVaultOf(scope)
     return this.vaultDB.tryGetVault({ op: 'get', ...scope, ifAbsent: 'nil', expected })
   }
 

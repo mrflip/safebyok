@@ -47,14 +47,14 @@ const convexRowsOf = (vaultDB: ConvexVaultDB): TH.VaultDBRowCheats => {
   const { deployment } = madeOf(vaultDB)
   // Plant through `arrange`, so the clients are notified of each planted change, as they would be of a write from elsewhere.
   const run: ComponentBackend['run'] = async (fn) => await deployment.arrange(async (backend) => await backend.run(fn))
-  const findVaultDoc = async (db: Parameters<Parameters<ComponentBackend['run']>[0]>[0]['db'], { applabel, user_id, vaultlabel }: VaultScope) => (
+  const getVaultDoc = async (db: Parameters<Parameters<ComponentBackend['run']>[0]>[0]['db'], { applabel, user_id, vaultlabel }: VaultScope) => (
     await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel)).unique()
   )
   return {
     plantVaultRow: async (scope, row) => {
       await run(async ({ db }) => {
         const { applabel, user_id, vaultlabel } = scope
-        const vaultDoc = await findVaultDoc(db, scope)
+        const vaultDoc = await getVaultDoc(db, scope)
         if (vaultDoc) { await db.replace('safebyok_vaults', vaultDoc._id, { applabel, user_id, vaultlabel, vault: row }) } else { await db.insert('safebyok_vaults', { applabel, user_id, vaultlabel, vault: row }) }
       })
     },
@@ -74,7 +74,7 @@ const convexRowsOf = (vaultDB: ConvexVaultDB): TH.VaultDBRowCheats => {
       })
     },
     vaultRowOf: async (scope) => await run(async ({ db }) => {
-      const vaultDoc = await findVaultDoc(db, scope)
+      const vaultDoc = await getVaultDoc(db, scope)
       return (vaultDoc?.vault ?? null) as unknown
     }),
     boxRowsOf: async ({ applabel, user_id, vaultlabel }, vault_tok) => {

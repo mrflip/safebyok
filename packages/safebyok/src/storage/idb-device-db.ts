@@ -23,7 +23,7 @@ export interface IdbDeviceDBOpts {
 export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_option')
 // --
 
-// == [The databases]: BankScopepath, leaseScopepathOf, bankScopepathOf, deviceShelfOf, bankShelfOf
+// == [The databases]: BankScopepath, leaseScopepathOf, bankScopepathOf, leaseShelfOf, bankShelfOf
 
 /** Where the bank shelf files a bank's row. */
 type BankScopepath = [applabel: string, user_id: string]
@@ -33,14 +33,14 @@ const leaseScopepathOf = ({ applabel, user_id, vaultlabel }: VaultScope): LeaseS
 /** The scopepath of the bank row at `scope`. */
 const bankScopepathOf = ({ applabel, user_id }: BankScope): BankScopepath => [applabel, user_id]
 
-/** The shelf of the device database of `dbName`, which has the leases. */
-const deviceShelfOf = (dbName: string): UseStore => versionedShelfOf({
+/** The lease shelf: the device database of `dbName`, which has the leases. */
+const leaseShelfOf = (dbName: string): UseStore => versionedShelfOf({
   dbName, dbstem: 'device', version: DeviceDBVersion, storename: 'leases', oldnames: [`${dbName}:device_db`, `${dbName}:device-v1`],
 })
 
 // A separate database, because a versioned shelf has a single object store: adding a second object store to the device
 // database would change its version, and every device would forget its leases.
-/** The shelf of the bank database of `dbName`, which has the bank rows. */
+/** The bank shelf: the bank database of `dbName`, which has the bank rows. */
 const bankShelfOf = (dbName: string): UseStore => versionedShelfOf({
   dbName, dbstem: 'bank', version: BankDBVersion, storename: 'bank', oldnames: [],
 })
@@ -59,7 +59,7 @@ export class IdbDeviceDB extends DeviceDB {
   constructor(opts: IdbDeviceDBOpts = {}) {
     const { dbName = 'safebyok' } = idbDeviceDBOpts.parse(opts, { where: "In IdbDeviceDB's options" })
     super()
-    this.#leaseShelf = deviceShelfOf(dbName)
+    this.#leaseShelf = leaseShelfOf(dbName)
     this.#bankShelf = bankShelfOf(dbName)
   }
   // --

@@ -4,7 +4,7 @@ import { ForeverMillis, MinuteMillis, type AnyGating } from 'safebyok'
 import { gripeOfRefusal } from '../helpers/attempt-refusals'
 import { Doing, Locale, Messages } from '../helpers/messages'
 import { useRevealToggle } from '../hooks/reveal-toggle'
-import { Boundary, forBoundary } from '../provider/boundary'
+import { Boundary, boundaryRefusalOf } from '../provider/boundary'
 import type { BoundarySource, Gripe, ModalFormProps, PassphraseFieldname } from '../shapes'
 
 // == [Dialog]: showWhileMounted, GatingDialog, DialogBoundary, DialogTrouble
@@ -56,7 +56,7 @@ const DialogTrouble = ({ gating }: { gating: AnyGating }) => {
 }
 // --
 
-// == [Form]: textOf, useAttemptAction, SubmitButton, ModalForm, holdsFocus, unlockedFor
+// == [Form]: textOf, useAttemptAction, SubmitButton, ModalForm, containsFocus, unlockedFor
 
 /** Return the text typed in the field named `fieldname`, or '' when there is none. */
 export const textOf = (form: FormData, fieldname: PassphraseFieldname): string => {
@@ -112,7 +112,7 @@ export const ModalForm = ({ gating, title, blurb, submitWord, pendingWord, isSub
 }
 
 /** True when the focused element is inside `container`, a shadow root included. */
-export const holdsFocus = (container: HTMLElement | null): boolean => {
+export const containsFocus = (container: HTMLElement | null): boolean => {
   if (container === null) { return false }
   const root = container.getRootNode()
   // Ask the container's own root for the focused element. Inside a shadow root, the document's
@@ -221,7 +221,7 @@ export const useChosenPassphrase = (gating: AnyGating, source: BoundarySource) =
   // The error is wrapped in an object, so that a thrown null or undefined still counts as a failure.
   const [failure, setFailure] = useState<{ err: unknown } | null>(null)
   const asked = useRef(0)
-  if (failure !== null) { throw forBoundary(failure.err, source) }
+  if (failure !== null) { throw boundaryRefusalOf(failure.err, source) }
 
   const compare = () => {
     const confirming = confirmRef.current?.value ?? ''
@@ -237,7 +237,7 @@ export const useChosenPassphrase = (gating: AnyGating, source: BoundarySource) =
     setIsStrong(false)
     if (typed === '') { setAdvice(null); return }
     try {
-      const verdict = await gating.checkStrength(typed)
+      const verdict = await gating.judgeStrength(typed)
       if (askedNow !== asked.current) { return }
       setAdvice(verdict.strong ? null : verdict.reason)
       setIsStrong(verdict.strong)
@@ -247,14 +247,14 @@ export const useChosenPassphrase = (gating: AnyGating, source: BoundarySource) =
   }
 
   // React clears the fields after each attempt without calling onChange, so this state is reset by hand.
-  const forget = () => {
+  const reset = () => {
     asked.current += 1
     setAdvice(null)
     setIsStrong(false)
     setConfirmation('untyped')
   }
 
-  return { chosenRef, confirmRef, advice, confirmation, isSubmittable: isStrong && confirmation === 'matches', hearChosen, compare, forget }
+  return { chosenRef, confirmRef, advice, confirmation, isSubmittable: isStrong && confirmation === 'matches', hearChosen, compare, reset }
 }
 
 /** The new-passphrase field and its confirmation, with a line saying whether the two match. */

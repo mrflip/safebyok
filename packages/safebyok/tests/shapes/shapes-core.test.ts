@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LOCKED, PassphraseSaltBytes } from '../../src/helpers/consts'
+import { LOCKED, PassphraseSaltSize } from '../../src/helpers/consts'
 import * as Phrases from '../../src/helpers/phrases'
 import * as CX from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
@@ -264,6 +264,6 @@ describe("CX.salt_b64", () => {
 
   it("refuses with the sentence that says what a passphrase salt is", () => {
     const refusal = TH.expectSyncRefusal(() => CX.salt_b64.parse('short'), 'bad_record')
-    expect(refusal.message).to.include(Phrases.passphraseSaltShape(PassphraseSaltBytes, 22))
+    expect(refusal.message).to.include(Phrases.passphraseSaltShape(PassphraseSaltSize, 22))
   })
 })

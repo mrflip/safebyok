@@ -21,7 +21,7 @@ const LeftOut = "It is left out of this report, as it may quote what the user ty
 /** Convert an error a boundary caught into a VaultError that is safe to report.
  * The error's cause is left out, because it may quote what the user typed.
  */
-export const forBoundary = (err: unknown, source: BoundarySource): VaultError => {
+export const boundaryRefusalOf = (err: unknown, source: BoundarySource): VaultError => {
   if (! isVaultError(err)) {
     return HostErrorSanitizer.refusalFor(err, 'unexpected_error', `Something inside safebyok-react's ${source} failed with an error that was not the vault's own. ${LeftOut}.`)
   }

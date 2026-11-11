@@ -1,4 +1,4 @@
-import { PasskeySaltBytes, VaultError, type PasskeyAnswer, type WayinHeader } from 'safebyok'
+import { PasskeySaltSize, VaultError, type PasskeyAnswer, type WayinHeader } from 'safebyok'
 import { fromB64, toB64 } from 'safebyok/utils'
 import { PasskeyChecks, type AskPasskeyOpts, type CreatePasskeyOpts } from '../shapes'
 import { Messages } from './messages'
@@ -21,7 +21,7 @@ export const passkeysAvailable = (): boolean => (
 export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAnswer | null> => {
   const opts = PasskeyChecks.createPasskeyOpts.parse(given, { where: "In createPasskey's options" })
   demandWebAuthn()
-  const prfSaltBytes = crypto.getRandomValues(new Uint8Array(PasskeySaltBytes))
+  const prfSaltBytes = crypto.getRandomValues(new Uint8Array(PasskeySaltSize))
   const created = await askAuthenticator(() => navigator.credentials.create({
     publicKey: {
       rp:                     { name: opts.rp.name, ...optional('id', opts.rp.id) },
@@ -38,7 +38,7 @@ export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAn
   if (created === null) { return null }
   const credential_id = toB64(new Uint8Array(created.rawId))
   const { prf } = created.getClientExtensionResults()
-  if (prf?.results !== undefined) { return answerOf(credential_id, prfSaltBytes, prf.results.first) }
+  if (prf?.results !== undefined) { return makePasskeyAnswer(credential_id, prfSaltBytes, prf.results.first) }
   if (prf?.enabled !== true) { throw noPrf() }
   // Many authenticators enable PRF when they create the passkey, but return its output only on a later request.
   const asked = await askAuthenticator(() => navigator.credentials.get({
@@ -54,7 +54,7 @@ export const createPasskey = async (given: CreatePasskeyOpts): Promise<PasskeyAn
   if (asked === null) { return null }
   const answer = asked.getClientExtensionResults().prf?.results?.first
   if (answer === undefined) { throw noPrf() }
-  return answerOf(credential_id, prfSaltBytes, answer)
+  return makePasskeyAnswer(credential_id, prfSaltBytes, answer)
 }
 
 /** Ask the passkey named in `passkeyHeader` for its answer. Returns null when the user dismisses the prompt.
@@ -82,18 +82,18 @@ export const askPasskey = async (passkeyHeader: WayinHeader | null, given: AskPa
   if (asked === null) { return null }
   const answer = asked.getClientExtensionResults().prf?.results?.first
   if (answer === undefined) { throw noPrf() }
-  const passkeyClear = answerOf(credential_id, saltBytes, answer)
+  const passkeyClear = makePasskeyAnswer(credential_id, saltBytes, answer)
   // The browser should respond only with the credential it was asked for. A response from any other credential cannot unlock this vault.
   if (toB64(new Uint8Array(asked.rawId)) !== credential_id) { passkeyClear.prfBytes.fill(0); throw new VaultError('passkey_unavailable', Messages.passkeyAskFailed) }
   return passkeyClear
 }
 
 /** Pass `passkey` to `attempt`, then zero the passkey's bytes, whether the attempt succeeded or threw. */
-export const attemptOnce = async <ValT>(passkey: PasskeyAnswer, attempt: (passkey: PasskeyAnswer) => Promise<ValT>): Promise<ValT> => {
-  PasskeyChecks.attemptOnceAnswer.parse(passkey, { where: "In attemptOnce's passkey" })
+export const attemptThenZero = async <ValT>(passkey: PasskeyAnswer, attempt: (passkey: PasskeyAnswer) => Promise<ValT>): Promise<ValT> => {
+  PasskeyChecks.attemptThenZeroAnswer.parse(passkey, { where: "In attemptThenZero's passkey" })
   // `attempt` is validated inside the try, so the passkey's bytes are zeroed even when `attempt` is not a function.
   try {
-    PasskeyChecks.attemptOnceAttempt.parse(attempt, { where: "In attemptOnce's attempt" })
+    PasskeyChecks.attemptThenZeroAttempt.parse(attempt, { where: "In attemptThenZero's attempt" })
     return await attempt(passkey)
   } finally {
     passkey.prfBytes.fill(0)
@@ -108,14 +108,14 @@ const credentialBytesOf = (credential_id: string): Uint8Array<ArrayBuffer> => {
   }
 }
 
-const answerOf = (credential_id: string, saltBytes: Uint8Array, answer: BufferSource): PasskeyAnswer => ({
+const makePasskeyAnswer = (credential_id: string, saltBytes: Uint8Array, answer: BufferSource): PasskeyAnswer => ({
   credential_id,
   prf_salt_b64: toB64(saltBytes),
-  prfBytes:     bytesOf(answer),
+  prfBytes:     copyThenZero(answer),
 })
 
 /** Copy `source`'s bytes and zero the original, so the returned bytes are the only copy. */
-const bytesOf = (source: BufferSource): Uint8Array<ArrayBuffer> => {
+const copyThenZero = (source: BufferSource): Uint8Array<ArrayBuffer> => {
   // ArrayBuffer.isView works across realms (an iframe's buffers, for example). instanceof does not.
   const handed = ArrayBuffer.isView(source) ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength) : new Uint8Array(source)
   const copied = Uint8Array.from(handed)

@@ -46,9 +46,9 @@ export const outcomeOf = async <ValT>(thunk: () => ValT | Promise<ValT>, otherwi
 /** `thrown`, what a call out to storage threw, as the refusal a storage verb throws: a VaultError as it came, anything else `storage_unavailable` with `thrown` its cause.
  *
  * @example
- *   try { return await client.query(sql, params) } catch (err) { throw storageTroubleOf(err) }   // a driver's Error as storage_unavailable, its words kept in the cause
+ *   try { return await client.query(sql, params) } catch (err) { throw storageRefusalOf(err) }   // a driver's Error as storage_unavailable, its words kept in the cause
  */
-export const storageTroubleOf = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : storageUnavailable(thrown))
+export const storageRefusalOf = (thrown: unknown): VaultError => (isVaultError(thrown) ? thrown : storageUnavailable(thrown))
 
 /** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome}.
  *

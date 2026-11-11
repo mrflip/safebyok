@@ -12,9 +12,9 @@ describe("safebyok", () => {
     expectTypeOf<Front.BankOpts['strengthChecker']>().toEqualTypeOf<Front.StrengthChecker | undefined>()
     expectTypeOf<Front.BankOpts['logger']>().toEqualTypeOf<Front.VaultLogger | undefined>()
     expectTypeOf<Parameters<Front.RequestCleartext>[0]>().toEqualTypeOf<Front.AnyGating>()
-    expectTypeOf<Front.KeyDeriver['salt_bytes']>().toEqualTypeOf<typeof Front.PassphraseSaltBytes>()
+    expectTypeOf<Front.KeyDeriver['salt_size']>().toEqualTypeOf<typeof Front.PassphraseSaltSize>()
     expectTypeOf<Parameters<Front.GuardedKeyDeriver['deriveKeyBytes']>[0]>().toEqualTypeOf<Front.PassphraseCleartext>()
-    expectTypeOf<ReturnType<Front.Gating<'build_vault'>['checkStrength']>>().toEqualTypeOf<Promise<Front.PassphraseVerdict>>()
+    expectTypeOf<ReturnType<Front.Gating<'build_vault'>['judgeStrength']>>().toEqualTypeOf<Promise<Front.PassphraseVerdict>>()
     expectTypeOf<Front.VaultError['refusalkind']>().toEqualTypeOf<Front.Refusalkind>()
     expectTypeOf<Front.VaultError['family']>().toEqualTypeOf<Front.RefusalFamily>()
     expectTypeOf<Parameters<Front.Vault['getBox']>[1]>().toEqualTypeOf<Front.FetchOpts | undefined>()
@@ -47,8 +47,8 @@ describe("safebyok", () => {
     expect(Front.MaxUserIdChars).to.eq(100)
   })
 
-  it("exports the salt length a key deriver's salt_bytes must be", () => {
-    expect(Front.PassphraseSaltBytes).to.eq(16)
+  it("exports the salt length a key deriver's salt_size must be", () => {
+    expect(Front.PassphraseSaltSize).to.eq(16)
   })
 
   it("exports the DeviceDB a host hands Bank.make: the DeviceDB base to extend, and MemoryDeviceDB", () => {
@@ -75,8 +75,8 @@ describe("safebyok", () => {
   })
 
   it("exports the byte counts and the minute a passkey call and an autolock setting need", () => {
-    expect(Front.PasskeySaltBytes).to.eq(32)
-    expect(Front.PrfAnswerBytes).to.eq(32)
+    expect(Front.PasskeySaltSize).to.eq(32)
+    expect(Front.PrfAnswerSize).to.eq(32)
     expect(Front.MinuteMillis).to.eq(60_000)
     expectTypeOf<Front.PasskeyAnswer['prfBytes']>().toExtend<Uint8Array>()
   })

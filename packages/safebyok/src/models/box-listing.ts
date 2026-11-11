@@ -5,7 +5,7 @@ import type { Modelkind } from '../helpers/consts'
 import { nowMillis } from '../helpers/clock'
 import { makeLifeTok } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
-import { absentBoxError, boxStoredDamaged, notListedBoxError } from '../refusals/throwers'
+import { boxAbsent, boxStoredDamaged, boxNotListed } from '../refusals/throwers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
@@ -41,14 +41,14 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     Object.freeze(this)
   }
 
-  /** The scope of `duck`, which must be this vault's: no listing answers for another's. */
-  scopeOf(duck: unknown):  Boxscope  { return boxscope.parseConsistent(duck, this.scope) }
+  /** The scope of `boxish`, which must be this vault's: no listing answers for another's. */
+  scopeOf(boxish: unknown):  Boxscope  { return boxscope.parseConsistent(boxish, this.scope) }
 
-  /** Parse `duck` as a {@link BoxSparse}. */
-  sparseOf(duck: unknown): BoxSparse { return SX.boxSparse.parse(duck) }
+  /** Parse `boxish` as a {@link BoxSparse}. */
+  sparseOf(boxish: unknown): BoxSparse { return SX.boxSparse.parse(boxish) }
 
-  /** Parse `duck` as a {@link BoxRecord} of this vault. */
-  recordOf(duck: unknown): BoxRecord { return SX.boxRecord.parseConsistent(duck, this.scope) }
+  /** Parse `boxish` as a {@link BoxRecord} of this vault. */
+  recordOf(boxish: unknown): BoxRecord { return SX.boxRecord.parseConsistent(boxish, this.scope) }
   // --
 
   // == [Methods]: puttable, create, tryCreate, shellFor
@@ -58,7 +58,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     const { ifAbsent } = VX.boxPutOpts.parse(opts)
     const scope = this.scopeOf(scoped)
     const listed = this.at(scope)
-    if ((listed === null) && (ifAbsent === 'fail')) { throw notListedBoxError(scope) }
+    if ((listed === null) && (ifAbsent === 'fail')) { throw boxNotListed(scope) }
     return listed ?? this.#shellFor(scope)
   }
 
@@ -76,7 +76,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
   /** A void box listed under `scope`. */
-  #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.sentinelBoxOf(scope, this.world.vault_tok)) }
+  #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.shellBoxOf(scope, this.world.vault_tok)) }
   // --
 
   // == [Defined by the box listing]: vaultTokOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
@@ -91,7 +91,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return new Box(this.world, this, central)
   }
 
-  protected nothingStoredError(scope: Boxscope): VaultError { return absentBoxError(scope) }
+  protected nothingStoredError(scope: Boxscope): VaultError { return boxAbsent(scope) }
 
   protected async doTryList() {
     const answer = await this.vaultDB.tryListBoxes({ ...this.scope, vault_tok: this.world.vault_tok })
@@ -102,7 +102,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   protected doTryGet(scope: Boxscope) {
     const { vault_tok } = this.world
-    const expected = this.at(scope)?.sparse ?? SX.sentinelBoxOf(scope, vault_tok)
+    const expected = this.at(scope)?.sparse ?? SX.shellBoxOf(scope, vault_tok)
     return this.vaultDB.tryGetBox({ op: 'get', ...scope, vault_tok, ifAbsent: 'nil', expected })
   }
 

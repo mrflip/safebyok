@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'
-import { boxListingOf, fullBoxRecord, sentinelBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
+import { boxListingOf, fullBoxRecord, shellBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
 const world = useModelsWorld()
 
@@ -37,7 +37,7 @@ describe("listing.fetch(scope): nothing stored for a live listed box", () => {
 })
 
 describe("listing.fetch(scope): the row it says it expects", () => {
-  it("expects the sentinel row for a box not listed, and the listed box's own row from then on", async () => {
+  it("expects the shell row for a box not listed, and the listed box's own row from then on", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(fullBoxRecord())
     await listing.fetch(scopeOf())
@@ -65,9 +65,9 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(world.mw.callsOf('put')[0]?.expectedRevisionTok).to.equal('rev-a1')
     })
 
-    it("expects the sentinel row where no row is held", async () => {
+    it("expects the shell row where no row is held", async () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.put(fullBoxRecord({ revision_seq: 0 }), { expected: sentinelBoxRecord() })
+      const box = await listing.put(fullBoxRecord({ revision_seq: 0 }), { expected: shellBoxRecord() })
       expect(world.mw.callsOf('put')[0]?.expectedRevisionTok).to.be.null
       expect(listing.at(scopeOf())).to.eq(box)
       expect(box.isFull).to.be.true
@@ -115,7 +115,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     })
   })
 
-  describe("listing.del(duck)", () => {
+  describe("listing.del(record)", () => {
     it("deletes a box at central's revision, and delivers the tombstone to it", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())
@@ -162,7 +162,7 @@ describe("listing.put: the versioned replace", () => {
   it("refuses 'stale_write' over a box stored when none was expected, delivering the box stored", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
-    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { expected: sentinelBoxRecord() }), 'stale_write')
+    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { expected: shellBoxRecord() }), 'stale_write')
     expect(listing.things.map(({ revision_tok }) => revision_tok)).to.deep.equal(['rev-stored'])
     expect(world.mw.callsOf('put').map(({ expectedRevisionTok }) => expectedRevisionTok)).to.deep.equal([null])
     expect(world.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-stored', revision_seq: 4 })
@@ -171,14 +171,14 @@ describe("listing.put: the versioned replace", () => {
   it("refuses 'stale_write' over a tombstone stored when none was expected, delivering the tombstone", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(tombstoneBoxRecord({ revision_seq: 4 }))
-    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_tok: 'rev-a0', revision_seq: 0 }), { expected: sentinelBoxRecord() }), 'stale_write')
+    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_tok: 'rev-a0', revision_seq: 0 }), { expected: shellBoxRecord() }), 'stale_write')
     expect(world.mw.callsOf('put').map(({ expectedRevisionTok }) => expectedRevisionTok)).to.deep.equal([null])
     expect(world.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_seq: 4 })
     expect(listing.things.map(({ isPresent }) => isPresent)).to.deep.equal([false])
   })
 
   it("stores the record exactly as given where there is no row", async () => {
-    const box = await boxListingOf(world.mw).put(fullBoxRecord({ revision_tok: 'rev-new', revision_seq: 0 }), { expected: sentinelBoxRecord() })
+    const box = await boxListingOf(world.mw).put(fullBoxRecord({ revision_tok: 'rev-new', revision_seq: 0 }), { expected: shellBoxRecord() })
     expect(box).to.include({ revision_tok: 'rev-new', revision_seq: 0 })
     expect(world.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-new', revision_seq: 0 })
   })
@@ -236,7 +236,7 @@ describe("listing.put(record, { expected, ifPresent }): over a live record", () 
 
   it("refuses an ifPresent it does not accept, calling nothing", async () => {
     const listing = boxListingOf(world.mw)
-    await TH.expectRefusal(listing.put(birth, { expected: sentinelBoxRecord(), ifPresent: 'replace' } as never))
+    await TH.expectRefusal(listing.put(birth, { expected: shellBoxRecord(), ifPresent: 'replace' } as never))
     expect(world.mw.callsOf('put')).to.deep.equal([])
   })
 
@@ -260,7 +260,7 @@ describe("listing.put(record, { expected, ifPresent }): over a live record", () 
   it("refuses 'stale_write' under 'fail' over a live record where it expects none, and lists the box with it", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(live)
-    await TH.expectRefusal(listing.put(birth, { expected: sentinelBoxRecord(), ifPresent: 'fail' }), 'stale_write')
+    await TH.expectRefusal(listing.put(birth, { expected: shellBoxRecord(), ifPresent: 'fail' }), 'stale_write')
     expect(listing.at(scopeOf())?.revision_tok).to.eq('rev-a1')
     expect(world.mw.stored.get(live.boxlabel)).to.deep.equal(live)
   })
@@ -268,7 +268,7 @@ describe("listing.put(record, { expected, ifPresent }): over a live record", () 
   it("writes nothing under 'get', and returns the box with the live record", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(live)
-    const box = await listing.put(birth, { expected: sentinelBoxRecord(), ifPresent: 'get' })
+    const box = await listing.put(birth, { expected: shellBoxRecord(), ifPresent: 'get' })
     expect(box.revision_tok).to.eq('rev-a1')
     expect(world.mw.stored.get(live.boxlabel)).to.deep.equal(live)
   })
@@ -277,7 +277,7 @@ describe("listing.put(record, { expected, ifPresent }): over a live record", () 
     for (const ifPresent of ['fail', 'get'] as const) {
       const listing = boxListingOf(world.mw)
       world.mw.stored.clear()
-      const box = await listing.put(birth, { expected: sentinelBoxRecord(), ifPresent })
+      const box = await listing.put(birth, { expected: shellBoxRecord(), ifPresent })
       expect(box.revision_tok).to.eq('rev-mine')
     }
   })
@@ -291,7 +291,7 @@ const aliveRow = fullBoxRecord()
 describe("listing.put and listing.del: the row they say they expect", () => {
   it("refuses a record at a revision other than 0 for a box not listed, changing nothing", async () => {
     const listing = boxListingOf(world.mw)
-    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 1 }), { expected: sentinelBoxRecord() }))
+    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 1 }), { expected: shellBoxRecord() }))
     expect(listing.things).to.deep.equal([])
   })
 
@@ -299,7 +299,7 @@ describe("listing.put and listing.del: the row they say they expect", () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(aliveRow)
     const box = await listing.build(aliveRow)
-    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_tok: 'rev-a0', revision_seq: 0 }), { expected: sentinelBoxRecord() }), 'stale_write')
+    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_tok: 'rev-a0', revision_seq: 0 }), { expected: shellBoxRecord() }), 'stale_write')
     expect(world.mw.callsOf('put').map(({ expectedRevisionTok }) => expectedRevisionTok)).to.deep.equal([null])
     expect(box.revision_tok).to.eq('rev-a1')
   })
@@ -359,7 +359,7 @@ describe("listing.tryPut and listing.tryFetch return the vaultDB's answer", () =
 
   it("returns a refusal made before the call as a bad answer whose act is the refusal kind", async () => {
     const listing = boxListingOf(world.mw)
-    const answer = await listing.tryPut({ garbage: true } as never, { expected: sentinelBoxRecord() })
+    const answer = await listing.tryPut({ garbage: true } as never, { expected: shellBoxRecord() })
     expect(answer).to.deep.include({ ok: false, world: null, req_params: {} })
     expect(answer.act).to.eq(answer.err?.refusalkind)
   })

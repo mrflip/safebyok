@@ -13,25 +13,25 @@ import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 // box's tombstone too, so tombstones count toward both limits: putting and deleting under new
 // boxlabels fills a life just as putting alone does. A tally keeps the live rows' figures beside them.
 
-// == [Limits]: MaxVaultBoxes, MaxVaultBoxBytes
+// == [Limits]: MaxVaultBoxes, MaxVaultBoxSize
 
 /** Convex's size limit for one document, in bytes. */
-const ConvexDocumentBytes = 1_048_576
+const ConvexDocumentSize = 1_048_576
 
 /** Convex's limit on what one transaction may read, in bytes. */
-const ConvexTransactionReadBytes = 16_777_216
+const ConvexTransactionReadSize = 16_777_216
 
 /** Convex's limit on the documents one transaction may write. */
 const ConvexTransactionWrittenDocuments = 16_000
 
 /** Bytes reserved for reading the tally row. */
-const TallyReserveBytes = 1024
+const TallyReserveSize = 1024
 
 /** The most box rows one life of a vault may have, tombstones included. */
 export const MaxVaultBoxes = ConvexTransactionWrittenDocuments / 2
 
 /** The most bytes one life's box rows may total, tombstones included, measured as Convex sizes a document. */
-export const MaxVaultBoxBytes = (ConvexTransactionReadBytes / 2) - ConvexDocumentBytes - TallyReserveBytes
+export const MaxVaultBoxSize = (ConvexTransactionReadSize / 2) - ConvexDocumentSize - TallyReserveSize
 // --
 
 // == [Tallies]: Life, Tally, Reckoning, BoxDocGiven, weigh, tallyOf, growthOf, capacityOf, reckon, refuses, record, forget, drop
@@ -70,19 +70,19 @@ export function growthOf(anteDoc: BoxDocGiven | null, boxDoc: BoxDocGiven): Tall
 export function capacityOf(tally: Tally | null, maxBoxes: number) {
   return {
     boxes: { used: tally?.all_count ?? maxBoxes, max: maxBoxes },
-    bytes: { used: tally?.all_size ?? MaxVaultBoxBytes, max: MaxVaultBoxBytes },
+    bytes: { used: tally?.all_size ?? MaxVaultBoxSize, max: MaxVaultBoxSize },
   }
 }
 
 /** Read the life's tally: the stored one, or else a count of its box rows that stops once a limit is passed. */
 export async function reckon(db: DatabaseReader, life: Life): Promise<Reckoning> {
-  const kept = await findTallyRow(db, life)
+  const kept = await getTallyRow(db, life)
   if (kept) { return { kept, tally: { all_count: kept.all_count, live_count: kept.live_count, all_size: kept.all_size, live_size: kept.live_size } } }
   // A loop, not a reduce, so it can stop reading rows once a limit is passed.
   let tally = tallyOf(null)
   for await (const boxDoc of lifeBoxQuery(db, life)) {
     tally = plus(tally, tallyOf(boxDoc))
-    if ((tally.all_count > MaxVaultBoxes) || (tally.all_size > MaxVaultBoxBytes)) { return { kept: null, tally: null } }
+    if ((tally.all_count > MaxVaultBoxes) || (tally.all_size > MaxVaultBoxSize)) { return { kept: null, tally: null } }
   }
   return { kept: null, tally }
 }
@@ -91,7 +91,7 @@ export async function reckon(db: DatabaseReader, life: Life): Promise<Reckoning>
 export function refuses(tally: Tally | null, growth: Tally, maxBoxes: number): boolean {
   if (tally === null) { return (growth.all_count > 0) || (growth.all_size > 0) }
   const after = plus(tally, growth)
-  return ((growth.all_count > 0) && (after.all_count > maxBoxes)) || ((growth.all_size > 0) && (after.all_size > MaxVaultBoxBytes))
+  return ((growth.all_count > 0) && (after.all_count > maxBoxes)) || ((growth.all_size > 0) && (after.all_size > MaxVaultBoxSize))
 }
 
 /** Add a put's `growth` to the life's tally, inserting the tally row the first time. A life past a limit gets no tally row. */
@@ -103,13 +103,13 @@ export const record = async (db: DatabaseWriter, life: Life, { kept, tally }: Re
 // A del never recounts a life: a life too large to read in one transaction must still be able to shrink, one box at a time.
 /** Add a del's `growth` to the life's tally, if it has one. */
 export const forget = async (db: DatabaseWriter, life: Life, growth: Tally): Promise<void> => {
-  const kept = await findTallyRow(db, life)
+  const kept = await getTallyRow(db, life)
   if (kept) { await db.patch('safebyok_tallies', kept._id, plus(kept, growth)) }
 }
 
 /** Delete the life's tally row, if it has one. */
 export const drop = async (db: DatabaseWriter, life: Life): Promise<void> => {
-  const kept = await findTallyRow(db, life)
+  const kept = await getTallyRow(db, life)
   if (kept) { await db.delete('safebyok_tallies', kept._id) }
 }
 
@@ -128,7 +128,7 @@ function negated({ all_count, live_count, all_size, live_size }: Tally): Tally {
 
 // `.unique()` throws if it finds two rows. A tally is inserted only when none was found in the same
 // transaction, so two would mean damage, and that should fail loudly.
-const findTallyRow = (db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life) => (
+const getTallyRow = (db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life) => (
   db.query('safebyok_tallies')
     .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
     .unique()

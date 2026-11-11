@@ -28,7 +28,7 @@ Hand it to the core wherever a `VaultDB` is asked for.
 * **`dbName`** names the database, default `'safebyok'`. The rows go in `<dbName>:vaults-v001-001-001`, and a vault
   database under an older name is deleted unread. Two `IdbVaultDB`s made with the same `dbName`, in one tab or two, share
   the rows.
-* **`maxRecordBytes`**, an option of every `AdapterVaultDB`, is the largest box record a `putBox` accepts, 5,600 bytes if
+* **`maxRecordSizeEst`**, an option of every `AdapterVaultDB`, is the largest box record a `putBox` accepts, 5,600 bytes if
   left out.
 * **`maxBoxes`** is a best-effort cap on the box rows of one vault life, 100 if left out. A put of a new box past it is
   refused with `vault_full`. A deleted box's tombstone still counts, so deleting a box frees no room. A vault made anew
@@ -48,7 +48,7 @@ Hand it to the core wherever a `VaultDB` is asked for.
   - a write past the origin's storage quota: `vault_full`
   - an aborted transaction, or a database closed under the page: `storage_unavailable`
   - no IndexedDB at all, or storage the browser withholds: `storage_blocked`
-* **No size limit beyond `maxRecordBytes` and `maxBoxes`.** The origin's quota bounds the whole database.
+* **No size limit beyond `maxRecordSizeEst` and `maxBoxes`.** The origin's quota bounds the whole database.
 
 ## What is stored
 

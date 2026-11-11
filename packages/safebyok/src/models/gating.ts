@@ -7,7 +7,7 @@ import * as EX from '../shapes/shapes-enums'
 import type { Gatingkind } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
-import type { AnyGating, AskUser, CleartextsForGatingkind, GatingSnapshot, UnlockByProof, VaultForGatingkind, VaultGatingkind, WayinHeader } from '../shapes/shapes-gateish'
+import type { AnyGating, AskUser, CleartextsForGatingkind, GatingSnapshot, UnlockByProving, VaultForGatingkind, VaultGatingkind, WayinHeader } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import * as SX from '../shapes/shapes-storage'
 import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
@@ -75,25 +75,25 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     Object.freeze(this)
   }
 
-  // The package exports Gating as a type only: these take the vault's unlockByProof, which a gating hands a proving.
+  // The package exports Gating as a type only: these take the vault's unlockByProving, which a gating hands a proving.
   /** Ask the user to prove they may make the change `gatingkind` names to `vault`, and answer the vault once it is made. */
-  static async launchOn(vault: Vault, gatingkind: VaultGatingkind, unlockByProof: UnlockByProof, askUser: AskUser | null): Promise<Vault> {
-    const checked = GX.gatingLaunchOnArgs.parse({ gatingkind, vault, unlockByProof, askUser })
-    const act: Act = (cleartexts) => Gating.#callGatingByKind(checked.gatingkind, checked.vault, cleartexts, checked.unlockByProof)
+  static async launchOn(vault: Vault, gatingkind: VaultGatingkind, unlockByProving: UnlockByProving, askUser: AskUser | null): Promise<Vault> {
+    const checked = GX.gatingLaunchOnArgs.parse({ gatingkind, vault, unlockByProving, askUser })
+    const act: Act = (cleartexts) => Gating.#callGatingByKind(checked.gatingkind, checked.vault, cleartexts, checked.unlockByProving)
     const gating = new Gating(checked.gatingkind, checked.vault.listing, checked.vault.scope, checked.vault, act)
     return gating.#launch(checked.askUser)
   }
 
   /** Ask the user for a new vault's passphrase, build the vault under `scope` over the row `expected`, and return it unlocked. */
-  static async launchBirth(listing: VaultListing, scope: VaultScope, expected: VaultSparse, unlockByProof: UnlockByProof, askUser: AskUser | null): Promise<Vault> {
-    const checked = GX.gatingLaunchBirthArgs.parse({ listing, scope, expected, unlockByProof, askUser })
-    const act: Act = (cleartexts) => buildVault(checked.listing, checked.scope, checked.expected, cleartexts, checked.unlockByProof)
+  static async launchBirth(listing: VaultListing, scope: VaultScope, expected: VaultSparse, unlockByProving: UnlockByProving, askUser: AskUser | null): Promise<Vault> {
+    const checked = GX.gatingLaunchBirthArgs.parse({ listing, scope, expected, unlockByProving, askUser })
+    const act: Act = (cleartexts) => buildVault(checked.listing, checked.scope, checked.expected, cleartexts, checked.unlockByProving)
     const gating = new Gating('build_vault', checked.listing, checked.scope, null, act)
     return gating.#launch(checked.askUser)
   }
 
-  static #callGatingByKind(gatingkind: VaultGatingkind, vault: Vault, cleartexts: unknown, unlockByProof: UnlockByProof): Promise<Vault> {
-    return ActOnVault[gatingkind](vault, cleartexts, unlockByProof)
+  static #callGatingByKind(gatingkind: VaultGatingkind, vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> {
+    return ActOnVault[gatingkind](vault, cleartexts, unlockByProving)
   }
 
   async #launch(askUser: AskUser | null): Promise<Vault> {
@@ -107,11 +107,11 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   }
   // --
 
-  // == [The attempt]: checkStrength, attempt, refusalOfAttempt, attemptOnce
+  // == [The attempt]: judgeStrength, attempt, refusalOfAttempt, attemptOnce
 
   /** The verdict on a passphrase, as the user types it. Nothing changes. */
-  async checkStrength(passphraseClear: string): Promise<GX.PassphraseVerdict> {
-    return Proving.checkStrength(GX.passphraseCleartext.parse(passphraseClear), this.#scope, this.#listing.world)
+  async judgeStrength(passphraseClear: string): Promise<GX.PassphraseVerdict> {
+    return Proving.judgeStrength(GX.passphraseCleartext.parse(passphraseClear), this.#scope, this.#listing.world)
   }
 
   /** SLOPDOC: The one door for a cleartext: tries what the user typed once, and answers how it went as an Outcome. */
@@ -172,10 +172,10 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 // == [The acts]: buildVault, unlockVault, replacePassphrase, addPasskey, revokePasskey, delVault, ActOnVault
 
 // Each act proves the cleartexts, then makes its change. A cleartext goes only to checkedCleartexts and a Proving builder (G1); the
-// change hears provings, and comes to the vault's private unlock by unlockByProof (G9).
+// change hears provings, and comes to the vault's private unlock by unlockByProving (G9).
 
 /** Build a vault under `scope` using the passphrase and (if given) passkey; unlock once built. */
-const buildVault = async (listing: VaultListing, scope: VaultScope, expected: VaultSparse, cleartexts: unknown, unlockByProof: UnlockByProof): Promise<Vault> => {
+const buildVault = async (listing: VaultListing, scope: VaultScope, expected: VaultSparse, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> => {
   const { passphraseClear, passkeyClear } = checkedCleartexts(GX.vaultBuildCleartexts, cleartexts)
   // A birth's stamp is minted here, one per attempt.
   const stamp             = listing.stampOfBirth(scope)
@@ -188,25 +188,25 @@ const buildVault = async (listing: VaultListing, scope: VaultScope, expected: Va
   const record = listing.recordOfBirth(gate, expected)
   const vault  = await listing.put(record, { expected, ifAbsent: 'add', ifPresent: 'get' })
 
-  // The row stored may be another's, born first: this proof opens only its own, and the user must hear that theirs was not set.
+  // The row stored may be another's, born first: this proving unwraps only its own, and the user must hear that theirs was not set.
   if (vault.vault_tok !== record.vault_tok) { throw gateMadeElsewhere() }
-  return unlockByProof(vault, passphraseProving)
+  return unlockByProving(vault, passphraseProving)
 }
 
 /** Unlock `vault` by the passphrase or the passkey. */
-const unlockVault = async (vault: Vault, cleartexts: unknown, unlockByProof: UnlockByProof): Promise<Vault> => {
+const unlockVault = async (vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> => {
   const { passphraseClear, passkeyClear } = checkedCleartexts(GX.vaultUnlockCleartexts, cleartexts)
   await vault.ensureTimely(VX.Promptly); vault.demandPromptable()
   const proved = (passphraseClear === undefined)
     ? await PasskeyProving.buildStored(vault.gate, passkeyClear)
     : await PassphraseProving.buildStored(vault.gate, passphraseClear, vault.world)
-  return unlockByProof(vault, proved)
+  return unlockByProving(vault, proved)
 }
 
 // Each gate change grants a lease to the vault under the epoch it wrote. The old lease stays in force for the moments between: the vaultKey did not change.
 
 /** Replace the passphrase of `vault`, proved by the one it has. */
-const replacePassphrase = async (vault: Vault, cleartexts: unknown, unlockByProof: UnlockByProof): Promise<Vault> => {
+const replacePassphrase = async (vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> => {
   const { antePassphraseClear, nextPassphraseClear } = checkedCleartexts(GX.passphraseReplaceCleartexts, cleartexts)
   if (antePassphraseClear === nextPassphraseClear) { throw samePassphrase() }
   const { ante, gate } = await timelyAnte(vault)
@@ -215,11 +215,11 @@ const replacePassphrase = async (vault: Vault, cleartexts: unknown, unlockByProo
 
   const nextWayin = await nextProving.buildWayin(anteProving)
   const stored    = await vault.listing.replacePassphrase(ante, SX.passphraseWayinRecord.parse(nextWayin.pickle()))
-  return unlockByProof(vault, anteProving, stored.gate.gate_epoch)
+  return unlockByProving(vault, anteProving, stored.gate.gate_epoch)
 }
 
 /** Add a passkey to `vault`, proved by its passphrase. */
-const addPasskey = async (vault: Vault, cleartexts: unknown, unlockByProof: UnlockByProof): Promise<Vault> => {
+const addPasskey = async (vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> => {
   const { passphraseClear, passkeyClear } = checkedCleartexts(GX.passkeyAddCleartexts, cleartexts)
   const { ante, gate } = await timelyAnte(vault)
   const proved         = await PassphraseProving.buildStored(gate, passphraseClear, vault.world)
@@ -227,17 +227,17 @@ const addPasskey = async (vault: Vault, cleartexts: unknown, unlockByProof: Unlo
 
   const passkeyWayin = await passkeyProving.buildWayin(proved)
   const stored       = await vault.listing.addPasskey(ante, SX.passkeyWayinRecord.parse(passkeyWayin.pickle()))
-  return unlockByProof(vault, proved, stored.gate.gate_epoch)
+  return unlockByProving(vault, proved, stored.gate.gate_epoch)
 }
 
 /** Revoke the passkey of `vault`, proved by its passphrase. */
-const revokePasskey = async (vault: Vault, cleartexts: unknown, unlockByProof: UnlockByProof): Promise<Vault> => {
+const revokePasskey = async (vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> => {
   const { passphraseClear } = checkedCleartexts(GX.passkeyRevokeCleartexts, cleartexts)
   const { ante, gate } = await timelyAnte(vault)
   const proved = await PassphraseProving.buildStored(gate, passphraseClear, vault.world)
 
   const stored = await vault.listing.revokePasskey(ante)
-  return unlockByProof(vault, proved, stored.gate.gate_epoch)
+  return unlockByProving(vault, proved, stored.gate.gate_epoch)
 }
 
 /** Delete `vault`, proved by its passphrase. */
@@ -246,13 +246,13 @@ const delVault = async (vault: Vault, cleartexts: unknown): Promise<Vault> => {
   const { ante, gate      } = await timelyAnte(vault)
   await PassphraseProving.buildStored(gate, passphraseClear, vault.world)
 
-  // The lock first: no box opens under a lease while the tombstone goes out. The delete goes over the revision proved, as
+  // The lock first: no box unseals under a lease while the tombstone goes out. The delete goes over the revision proved, as
   // a gate verb's record does, and the answer delivered vacates its boxes.
   vault.lock()
   return vault.del(ante)
 }
 
-const ActOnVault: Record<VaultGatingkind, (vault: Vault, cleartexts: unknown, unlockByProof: UnlockByProof) => Promise<Vault>> = {
+const ActOnVault: Record<VaultGatingkind, (vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving) => Promise<Vault>> = {
   unlock_vault:       unlockVault,
   replace_passphrase: replacePassphrase,
   add_passkey:        addPasskey,

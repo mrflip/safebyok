@@ -7,7 +7,7 @@
  */
 
 import { afterEach, beforeEach, type Mock, vi } from 'vitest'
-import { PasskeySaltBytes } from '../../src/helpers/consts'
+import { PasskeySaltSize } from '../../src/helpers/consts'
 import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
@@ -124,7 +124,7 @@ export const provingWorldOf = ({ keyDeriver = testDeriver, strengthChecker = any
 /** A fresh passkey answer: a fake credential id, a fresh salt of the right length, and 32 random PRF bytes. */
 export const passkeyAnswerOf = (overrides: Partial<GX.PasskeyAnswer> = {}): GX.PasskeyAnswer => ({
   credential_id: 'cred-test-1',
-  prf_salt_b64:  toB64(randomBytes(PasskeySaltBytes)),
+  prf_salt_b64:  toB64(randomBytes(PasskeySaltSize)),
   prfBytes:      randomBytes(32),
   ...overrides,
 })

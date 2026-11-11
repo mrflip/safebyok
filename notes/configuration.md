@@ -116,7 +116,7 @@ that leaves it out, a Content Security Policy that blocks it, an offline build),
 loudly, and no vault is born until a later hello loads it.
 
 Call the vault's checker from your passphrase field as the user types, so they see the reason
-before they submit. `gating.checkStrength(typed)` returns the verdict of your checker, under the
+before they submit. `gating.judgeStrength(typed)` returns the verdict of your checker, under the
 contract above (`{ strong: true }` or `{ strong: false, reason }`), so the field and the vault
 decide alike. `safebyok-react`'s dialog does this by default.
 

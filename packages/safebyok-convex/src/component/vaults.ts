@@ -37,7 +37,7 @@ export const getVault = query({
   args:    CVX.getVaultArgs,
   returns: v.any(),
   handler: async (ctx, { scope }) => {
-    const vaultDoc = await findVaultDoc(ctx.db, scope)
+    const vaultDoc = await getVaultDoc(ctx.db, scope)
     return vaultDoc?.vault ?? null
   },
 })
@@ -47,7 +47,7 @@ export const listBoxes = query({
   args:    CVX.listBoxesArgs,
   returns: CVX.boxesFetched,
   handler: async (ctx, { asked }) => {
-    const vaultDoc = await findVaultDoc(ctx.db, asked)
+    const vaultDoc = await getVaultDoc(ctx.db, asked)
     const vault = vaultDoc?.vault ?? null
     const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(ctx.db, asked).collect()
     return { vault, boxes: boxDocs.map(({ boxlabel, box }) => ({ boxlabel, box })) }
@@ -59,9 +59,9 @@ export const getBox = query({
   args:    CVX.getBoxArgs,
   returns: CVX.boxFetched,
   handler: async (ctx, { asked }) => {
-    const vaultDoc = await findVaultDoc(ctx.db, asked)
+    const vaultDoc = await getVaultDoc(ctx.db, asked)
     const vault = vaultDoc?.vault ?? null
-    const boxDoc = await findBoxDoc(ctx.db, asked, asked.boxlabel)
+    const boxDoc = await getBoxDoc(ctx.db, asked, asked.boxlabel)
     const box = boxDoc?.box ?? null
     return { vault, box }
   },
@@ -75,10 +75,10 @@ export const putVault = mutation({
   args:    CVX.putVaultArgs,
   returns: CVX.vaultClassified,
   handler: async (ctx, { ask: sent }) => {
-    const ask = crossing(() => DB.vaultPut.parse(sent))
-    const anteDoc = await findVaultDoc(ctx.db, ask)
+    const ask = runForClient(() => DB.vaultPut.parse(sent))
+    const anteDoc = await getVaultDoc(ctx.db, ask)
     const vault = anteDoc?.vault ?? null
-    const classified = crossing(() => DB.classifyVault(ask, { vault }), vault)
+    const classified = runForClient(() => DB.classifyVault(ask, { vault }), vault)
     if (DB.isWriteAct(classified.act)) { await writeVaultDoc(ctx.db, anteDoc, ask, ask.record) }
     return classified
   },
@@ -94,15 +94,15 @@ export const putBox = mutation({
   args:    CVX.putBoxArgs,
   returns: CVX.boxClassified,
   handler: async (ctx, { ask: sent, maxBoxes = Tallies.MaxVaultBoxes }) => {
-    const ask = crossing(() => DB.boxPut.parse(sent))
+    const ask = runForClient(() => DB.boxPut.parse(sent))
     const life = lifeOf(ask)
-    const vaultDoc = await findVaultDoc(ctx.db, ask)
-    const anteDoc = await findBoxDoc(ctx.db, life, ask.boxlabel)
+    const vaultDoc = await getVaultDoc(ctx.db, ask)
+    const anteDoc = await getBoxDoc(ctx.db, life, ask.boxlabel)
     const reckoning = await Tallies.reckon(ctx.db, life)
     // Convex accepts NaN as a number. Math.min would return it, and no count is greater than NaN, so the limit would never apply.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
     const capacity = Tallies.capacityOf(reckoning.tally, cap)
-    const classified = crossing(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity }))
+    const classified = runForClient(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity }))
     if (! DB.isWriteAct(classified.act)) { return classified }
     const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
     // A put over a tombstone replaces that row, so only a new boxlabel adds to `all_count`.
@@ -124,10 +124,10 @@ export const delVault = mutation({
   args:    CVX.delVaultArgs,
   returns: CVX.vaultClassified,
   handler: async (ctx, { ask: sent }) => {
-    const ask = crossing(() => DB.vaultDel.parse(sent))
-    const anteDoc = await findVaultDoc(ctx.db, ask)
+    const ask = runForClient(() => DB.vaultDel.parse(sent))
+    const anteDoc = await getVaultDoc(ctx.db, ask)
     const vault = anteDoc?.vault ?? null
-    const classified = crossing(() => DB.classifyVault(ask, { vault }), vault)
+    const classified = runForClient(() => DB.classifyVault(ask, { vault }), vault)
     if (DB.isWriteAct(classified.act)) {
       await writeVaultDoc(ctx.db, anteDoc, ask, ask.record)
       // A vault's boxes end with its life: nothing reads a box row of a life that is over.
@@ -142,11 +142,11 @@ export const delBox = mutation({
   args:    CVX.delBoxArgs,
   returns: CVX.boxClassified,
   handler: async (ctx, { ask: sent }) => {
-    const ask = crossing(() => DB.boxDel.parse(sent))
+    const ask = runForClient(() => DB.boxDel.parse(sent))
     const life = lifeOf(ask)
-    const vaultDoc = await findVaultDoc(ctx.db, ask)
-    const anteDoc = await findBoxDoc(ctx.db, life, ask.boxlabel)
-    const classified = crossing(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null }))
+    const vaultDoc = await getVaultDoc(ctx.db, ask)
+    const anteDoc = await getBoxDoc(ctx.db, life, ask.boxlabel)
+    const classified = runForClient(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null }))
     if (DB.isWriteAct(classified.act)) {
       const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
       await writeBoxDoc(ctx.db, anteDoc, boxDoc)
@@ -194,7 +194,7 @@ export const watchRows = query({
 })
 // --
 
-// == [Asks and refusals]: crossing, crossingOf, roomlessOf
+// == [Asks and refusals]: runForClient, crossingOf, roomlessOf
 
 // Anyone signed in may call these functions with an ask of their own making, so each mutation parses its ask again here,
 // with the core's own checker, before a row is read, and continues with what the parse returns.
@@ -202,7 +202,7 @@ export const watchRows = query({
 /** Return what `step` returns, rethrowing a refusal the client must see as a ConvexError.
  * `world` is the stored vault row, sent along with a `gate_issue`.
  */
-function crossing<ValT>(step: () => ValT, world: unknown = null): ValT {
+function runForClient<ValT>(step: () => ValT, world: unknown = null): ValT {
   try {
     return step()
   } catch (err) {
@@ -225,25 +225,25 @@ function crossingOf(thrown: unknown, world: unknown): unknown {
 
 /** The `vault_full` refusal, with the stored box row, for a box put classified as a write that the life has no room for. */
 function roomlessOf(classified: DB.BoxClassified, anteDoc: BoxDoc | null, capacity: DB.Capacity): DB.BoxClassified {
-  const box = DB.foundBoxRow.parse(anteDoc?.box ?? null)
+  const box = DB.storedBoxRowOrNull.parse(anteDoc?.box ?? null)
   return { ok: false, act: 'vault_full', world: classified.world, box, presence: classified.presence, capacity }
 }
 // --
 
-// == [Helpers]: lifeOf, findVaultDoc, findBoxDoc, writeVaultDoc, writeBoxDoc, deleteBoxes, listVaultDocs, listBoxDocs, listTallyDocs, VaultDoc, BoxDoc
+// == [Helpers]: lifeOf, getVaultDoc, getBoxDoc, writeVaultDoc, writeBoxDoc, deleteBoxes, listVaultDocs, listBoxDocs, listTallyDocs, VaultDoc, BoxDoc
 
 /** Return the life an ask or a record belongs to: its vault's scope and `vault_tok`. */
 function lifeOf({ applabel, user_id, vaultlabel, vault_tok }: Life): Life { return { applabel, user_id, vaultlabel, vault_tok } }
 
 // `.unique()` throws if it finds two documents. A document is inserted only when none was found in
 // the same transaction, so two would mean damage, and that should fail loudly.
-async function findVaultDoc(db: DatabaseReader, { applabel, user_id, vaultlabel }: VaultScope): Promise<VaultDoc | null> {
+async function getVaultDoc(db: DatabaseReader, { applabel, user_id, vaultlabel }: VaultScope): Promise<VaultDoc | null> {
   return await db.query('safebyok_vaults')
     .withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel))
     .unique()
 }
 
-async function findBoxDoc(db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life, boxlabel: string): Promise<BoxDoc | null> {
+async function getBoxDoc(db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life, boxlabel: string): Promise<BoxDoc | null> {
   return await db.query('safebyok_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok).eq('boxlabel', boxlabel))
     .unique()

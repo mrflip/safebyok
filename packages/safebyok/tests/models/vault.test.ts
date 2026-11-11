@@ -96,7 +96,7 @@ describe("proving.buildLease(friend)", () => {
     const proving = await makeProving(vault)
     deviceDB.tryStow.mockClear()
     const lease = await proving.buildLease(friend)
-    expect(lease.isPresent).to.be.true
+    expect(lease.isGranted).to.be.true
     expect(deviceDB.tryStow).not.toHaveBeenCalled()
     lease.evict()
   })

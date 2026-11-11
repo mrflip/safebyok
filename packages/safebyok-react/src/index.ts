@@ -22,7 +22,7 @@ export { RevokePasskeyModal } from './modals/revoke-passkey-modal'
 export type { RevokePasskeyModalProps } from './shapes'
 export { PasskeyUnlockButton, offersPasskey } from './components/passkey-unlock-button'
 export type { PasskeyUnlockButtonProps } from './shapes'
-export { askPasskey, attemptOnce, createPasskey, passkeysAvailable } from './helpers/passkey'
+export { askPasskey, attemptThenZero, createPasskey, passkeysAvailable } from './helpers/passkey'
 export type { AskPasskeyOpts, CreatePasskeyOpts } from './shapes'
 
 export { WhisperField } from './components/whisper-field'

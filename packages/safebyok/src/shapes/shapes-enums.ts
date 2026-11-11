@@ -1,14 +1,10 @@
 /** The closed lists of values, each with the type it makes: this file imports nothing, so anything may import it. Imported as `EX`. */
 
-// == [Records]: amVals, Am, tombstoneAmVals
+// == [Records]: amVals, Am
 
 /** Whether a record is alive (`a`), damaged (`d`: it failed its check, and is set aside in `damaged_rows`) or gone (`x`: deleted). */
 export const amVals = ['a', 'd', 'x'] as const
 export type Am = typeof amVals[number]
-
-/** The `am` a tombstone carries: damaged or gone, never alive. */
-export const tombstoneAmVals = ['d', 'x'] as const
-
 // --
 
 // == [Reconciling]: recordShapeVals, RecordShape, ageVals, Age, centralPolicyVals, CentralPolicy

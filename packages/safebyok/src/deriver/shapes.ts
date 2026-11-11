@@ -1,6 +1,6 @@
 import type * as Z from 'zod'
 import { Checkers } from '../helpers/validator'
-import { PassphraseKeyBytes, PassphraseSaltBytes } from '../helpers/consts'
+import { PassphraseKeySize, PassphraseSaltSize } from '../helpers/consts'
 import * as Phrases from '../helpers/phrases'
 
 // == [Bounds]: MaxMemoryKib, MinMemoryKibPerLane, Uint32Bound, ReservedLabelPrefix, TestLabelPrefix
@@ -25,8 +25,8 @@ export const Argon2idWebV1 = Object.freeze({
   memory_kib:        65_536,
   iterations:        3,
   parallelism:       1,
-  salt_bytes:        PassphraseSaltBytes,
-  output_bytes:      PassphraseKeyBytes,
+  salt_size:        PassphraseSaltSize,
+  output_size:      PassphraseKeySize,
 } as const) satisfies KeyDeriverSpec
 
 /** Every key deriver spec safebyok supplies, whose settings no caller may change. */
@@ -40,8 +40,8 @@ export const { keyDeriverSpec } = Checkers('bad_option', ({ obj, str, int, lit }
     memory_kib:        int.gte(MinMemoryKibPerLane).lte(MaxMemoryKib),
     iterations:        int.gte(1).lt(Uint32Bound),
     parallelism:       int.gte(1),
-    salt_bytes:        lit(PassphraseSaltBytes),
-    output_bytes:      lit(PassphraseKeyBytes),
+    salt_size:        lit(PassphraseSaltSize),
+    output_size:      lit(PassphraseKeySize),
   }, Phrases.KeyDeriverSpecShape)
     .refine((spec) => spec.memory_kib >= MinMemoryKibPerLane * spec.parallelism, { error: Phrases.memoryPerLane(MinMemoryKibPerLane), path: ['memory_kib'] })
     .superRefine((spec, ctx) => {

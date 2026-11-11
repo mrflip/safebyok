@@ -15,7 +15,7 @@
  * depth two only; no arrays, which are kept as their JSON text; an object past depth two replaced by the string '{...}'.
  */
 
-import { PassphraseKeyBytes } from '../helpers/consts'
+import { PassphraseKeySize } from '../helpers/consts'
 import { VaultError, thrownNameOf } from './errors'
 import type { Refusalkind, RefusalMeta, Thrown } from './errors'
 import type * as EX from '../shapes/shapes-enums'
@@ -77,10 +77,10 @@ export const helloFirst = (): VaultError => new VaultError('bad_option', Phrases
 export const bankDisabled = (): VaultError => new VaultError('disabled', Phrases.BankLetGo)
 // --
 
-// == [Vault Throwers]: lockedError, unlockFirst
+// == [Vault Throwers]: needUnlocked, unlockFirst
 
 /** A `vault_locked` refusal: the vault is locked, and `ensureUnlocked()` will ask the user. */
-export const lockedError      = () => new VaultError('vault_locked', Phrases.VaultLocked)
+export const needUnlocked = (): VaultError => new VaultError('vault_locked', Phrases.VaultLocked)
 
 /** A `vault_locked` refusal: the vault has no lease for a seal or unseal to use. */
 export const unlockFirst = (): VaultError => new VaultError('vault_locked', Phrases.UnlockFirst)
@@ -102,28 +102,28 @@ export const vaultStoredDamaged = ({ vaultlabel }: SX.DamagedVault): VaultError 
 export const rowOfOtherVaultTok = (): VaultError => new VaultError('storage_issue', Phrases.rowOfOtherAddress(['vault_tok']))
 // --
 
-// == [Storable Throwers]: partialLoadError, alreadyListedError, disabledError, absentBoxError, notListedBoxError, absentVaultError, deletedVaultError, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
+// == [Storable Throwers]: partialLoad, alreadyListed, instanceDisabled, boxAbsent, boxNotListed, vaultAbsent, deletedVault, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
 
 /** A `bad_option` refusal: the record in hand is not full, and needs hydrating first. */
-export const partialLoadError = () => new VaultError('bad_option', Phrases.PartialLoad)
+export const partialLoad = (): VaultError => new VaultError('bad_option', Phrases.PartialLoad)
 
 /** A `bad_option` refusal: the listing already has an instance under the dna's scope. */
-export const alreadyListedError    = () => new VaultError('bad_option', Phrases.AlreadyListed)
+export const alreadyListed = (): VaultError => new VaultError('bad_option', Phrases.AlreadyListed)
 
 /** A `disabled` refusal: this object was let go by a sweep, a vacate or a delete. */
-export const disabledError    = () => new VaultError('disabled', Phrases.LetGoInstance)
+export const instanceDisabled = (): VaultError => new VaultError('disabled', Phrases.LetGoInstance)
 
 /** An `absent_box` refusal: no box is stored under the label given. */
-export const absentBoxError   = ({ boxlabel }: { boxlabel: string }) => new VaultError('absent_box', Phrases.boxAbsent(boxlabel))
+export const boxAbsent = ({ boxlabel }: { boxlabel: string }): VaultError => new VaultError('absent_box', Phrases.boxAbsent(boxlabel))
 
 /** An `absent_box` refusal: no box is listed under the label given, though one may be stored. */
-export const notListedBoxError = ({ boxlabel }: { boxlabel: string }) => new VaultError('absent_box', Phrases.boxNotListed(boxlabel))
+export const boxNotListed = ({ boxlabel }: { boxlabel: string }): VaultError => new VaultError('absent_box', Phrases.boxNotListed(boxlabel))
 
 /** An `absent_vault` refusal: no vault is stored under the label given. */
-export const absentVaultError = ({ vaultlabel }: { vaultlabel: string }) => new VaultError('absent_vault', Phrases.vaultAbsent(vaultlabel))
+export const vaultAbsent = ({ vaultlabel }: { vaultlabel: string }): VaultError => new VaultError('absent_vault', Phrases.vaultAbsent(vaultlabel))
 
 /** A `vault_gone` refusal: this vault was deleted. */
-export const deletedVaultError = () => new VaultError('vault_gone', Phrases.VaultDeleted)
+export const deletedVault = (): VaultError => new VaultError('vault_gone', Phrases.VaultDeleted)
 
 /** A `record_conflict` refusal: this revision_seq is stored under another revision_tok. */
 export const oneRevisionTwoToks = (): VaultError => new VaultError('record_conflict', Phrases.OneRevisionTwoToks)
@@ -141,7 +141,7 @@ export const otherVaultTok = (): VaultError => new VaultError('record_conflict',
 export const shapeUnreconciled = (): VaultError => new VaultError('unexpected_error', Phrases.ShapeUnreconciled)
 // --
 
-// == [Box Throwers]: boxStoredDamaged, recordForNewBox, undecodedWhisper, notExposedError
+// == [Box Throwers]: boxStoredDamaged, recordForNewBox, undecodedWhisper, notExposed
 
 /** A `damaged_row` refusal: this box is stored damaged and cannot be read. */
 export const boxStoredDamaged = ({ boxlabel }: SX.DamagedBox): VaultError => new VaultError('damaged_row', Phrases.boxStoredDamaged(boxlabel))
@@ -153,16 +153,16 @@ export const recordForNewBox = (): VaultError => new VaultError('bad_option', Ph
 export const undecodedWhisper = (): VaultError => new VaultError('damaged_whisper', Phrases.UndecodedWhisper)
 
 /** The refusal of a call that works on the exposed whisper, on a box with none. */
-export const notExposedError = (): VaultError => new VaultError('bad_option', Phrases.NotExposed)
+export const notExposed = (): VaultError => new VaultError('bad_option', Phrases.NotExposed)
 // --
 
-// == [Lease Throwers]: damagedLease, unopenedWhisper, leaseNotInForce
+// == [Lease Throwers]: damagedLease, undecipheredWhisper, leaseNotInForce
 
-/** A `damaged_lease` refusal: this device's lease will not open. */
+/** A `damaged_lease` refusal: this device's lease will not unwrap the vaultKey. */
 export const damagedLease = (): VaultError => new VaultError('damaged_lease', Phrases.DamagedLease)
 
-/** A `damaged_whisper` refusal: the whisper would not open under this vault's key. */
-export const unopenedWhisper = (): VaultError => new VaultError('damaged_whisper', Phrases.UnopenedWhisper)
+/** A `damaged_whisper` refusal: the whisper would not decipher under this vault's key. */
+export const undecipheredWhisper = (): VaultError => new VaultError('damaged_whisper', Phrases.UndecipheredWhisper)
 
 /** A `vault_locked` refusal: this lease is out of force. */
 export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
@@ -205,7 +205,7 @@ export const passkeyAlreadyAdded = (): VaultError => new VaultError('bad_option'
 // == [Proving Throwers]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, keyDeriverLoadFailed, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
 
 /** A `bad_option` refusal: the key deriver handed back something other than fresh key bytes of the right length. */
-export const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeyBytes))
+export const notKeyBytes = (): VaultError => new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeySize))
 
 /** An `unexpected_error` refusal: a proving was asked for the vaultKey before it made or opened a wayin. */
 export const wayinNotMadeYet = (): VaultError => new VaultError('unexpected_error', Phrases.WayinNotMadeYet)
@@ -257,7 +257,7 @@ export const noJsonText = (): VaultError => new VaultError('unexpected_error', P
 
 // Each refusal kind calls for one response from the caller, whichever act produced it: treat the row as missing, fetch
 // again and rewrite, leave the live row alone, or report it. An expected refusal and an impossible one never share a kind.
-const KindOfBoxAct = {
+const RefusalkindForBoxAct = {
   void: 'absent_box', gone: 'absent_box', dubdel: 'absent_box',
   stale: 'stale_write', retcon: 'stale_write',
   camped: 'camped',
@@ -265,7 +265,7 @@ const KindOfBoxAct = {
   vault_void: 'absent_vault', vault_gone: 'absent_vault', vault_reborn: 'vault_reborn', vault_full: 'vault_full',
 } as const satisfies Record<EX.RefusedAct | EX.BoxVaultAct, Refusalkind>
 
-const KindOfVaultAct = { ...KindOfBoxAct, void: 'absent_vault', gone: 'absent_vault', dubdel: 'absent_vault' } as const satisfies Record<EX.RefusedAct, Refusalkind>
+const RefusalkindForVaultAct = { ...RefusalkindForBoxAct, void: 'absent_vault', gone: 'absent_vault', dubdel: 'absent_vault' } as const satisfies Record<EX.RefusedAct, Refusalkind>
 
 // No rows go on this error: the rows the refusal found are in its answer, as `world` and `dbhas`.
 /** The refusal for a get, put or del whose `act` is a refusal. Its message is its kind, and `meta.act` is the act.
@@ -273,7 +273,7 @@ const KindOfVaultAct = { ...KindOfBoxAct, void: 'absent_vault', gone: 'absent_va
  * @param meta    - Extra context: the `call`, its `req_params`, and for `vault_full` the `capacity`.
  */
 export function actRefused(rowkind: 'box' | 'vault', act: EX.RefusedAct | EX.BoxVaultAct, meta: RefusalMeta = {}): VaultError {
-  const refusalkind = ((rowkind === 'vault') ? KindOfVaultAct : KindOfBoxAct)[act]
+  const refusalkind = ((rowkind === 'vault') ? RefusalkindForVaultAct : RefusalkindForBoxAct)[act]
   return new VaultError(refusalkind, refusalkind, { meta: { ...meta, act } })
 }
 
@@ -312,9 +312,9 @@ export const gateIssue = (world: SX.VaultRow, why: string): VaultError => (
   new VaultError('gate_issue', Phrases.gateIssue(why), { rows: { world, dbhas: world } })
 )
 
-/** A `box_too_large` refusal: the record's `recordBytes` exceed `maxRecordBytes`. */
-export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): VaultError => (
-  new VaultError('box_too_large', Phrases.boxTooLarge(recordBytes, maxRecordBytes))
+/** A `box_too_large` refusal: the record's `recordSizeEst` exceed `maxRecordSizeEst`. */
+export const boxTooLarge = (recordSizeEst: number, maxRecordSizeEst: number): VaultError => (
+  new VaultError('box_too_large', Phrases.boxTooLarge(recordSizeEst, maxRecordSizeEst))
 )
 
 /** A `vault_full` refusal: the vault has as many boxes as its storage allows. */

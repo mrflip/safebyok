@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getDocumentSize } from 'convex/values'
 import * as DB from 'safebyok/storage'
 import * as TH from '../test-helpers'
-import { MaxVaultBoxBytes, MaxVaultBoxes, capacityOf } from '../../src/component/tallies'
+import { MaxVaultBoxSize, MaxVaultBoxes, capacityOf } from '../../src/component/tallies'
 import type { Life, Tally } from '../../src/component/tallies'
 
 // The shared VaultDB battery tests the VaultDB contract, and runs against this component through a
@@ -248,7 +248,7 @@ describe("putBox's count cap", () => {
     await putBoxIn(backend, boxOf('anthropic'), null, 2)
     await putBoxIn(backend, boxOf('openai'), null, 2)
     const { all_size: used } = await weighedTally(backend)
-    const capacity = { boxes: { used: 2, max: 2 }, bytes: { used, max: MaxVaultBoxBytes } }
+    const capacity = { boxes: { used: 2, max: 2 }, bytes: { used, max: MaxVaultBoxSize } }
     expect(await putBoxIn(backend, boxOf('github'), null, 2)).to.deep.include({ ok: false, act: 'vault_full', box: null, capacity })
     const replacement = TH.putBoxArgs(boxOf('anthropic', { revision_seq: 1 }), boxOf('anthropic'), 2)
     expect(await backend.mutation(api.putBox, replacement)).to.deep.include({ ok: true, act: 'replaced' })
@@ -257,7 +257,7 @@ describe("putBox's count cap", () => {
   it("refuses a new box past the component's own count limit, whatever cap the client asks for", async () => {
     const backend = await withVault()
     await backend.run(async ({ db }) => { await db.insert('safebyok_tallies', { ...life1, all_count: MaxVaultBoxes, live_count: MaxVaultBoxes, all_size: 1000, live_size: 1000 }) })
-    const full = { act: 'vault_full', capacity: { boxes: { used: MaxVaultBoxes, max: MaxVaultBoxes }, bytes: { used: 1000, max: MaxVaultBoxBytes } } }
+    const full = { act: 'vault_full', capacity: { boxes: { used: MaxVaultBoxes, max: MaxVaultBoxes }, bytes: { used: 1000, max: MaxVaultBoxSize } } }
     expect(await putBoxIn(backend, boxOf('anthropic'), null, 1_000_000)).to.deep.include(full)
     expect(await putBoxIn(backend, boxOf('anthropic'))).to.deep.include(full)
     expect(await putBoxIn(backend, boxOf('anthropic'), null, NaN)).to.deep.include(full)
@@ -271,7 +271,7 @@ describe("putBox's count cap", () => {
       expect(await delBoxIn(backend, box)).to.deep.include({ act: 'deleted' })
     }
     const { all_size: used } = await weighedTally(backend)
-    expect(await putBoxIn(backend, boxOf('gitlab'), null, 3)).to.deep.include({ act: 'vault_full', capacity: { boxes: { used: 3, max: 3 }, bytes: { used, max: MaxVaultBoxBytes } } })
+    expect(await putBoxIn(backend, boxOf('gitlab'), null, 3)).to.deep.include({ act: 'vault_full', capacity: { boxes: { used: 3, max: 3 }, bytes: { used, max: MaxVaultBoxSize } } })
   })
 
   it("lets a box reborn over its tombstone take the tombstone's row, even in a life at its cap", async () => {
@@ -303,13 +303,13 @@ const nearlyFull = async () => {
     await putBoxIn(backend, boxOf(`heavy_${String(ii)}`, { cipherBytes: 900_000 }))
   }
   const { all_size: boxBytes } = await weighedTally(backend)
-  return { backend, room: MaxVaultBoxBytes - boxBytes }
+  return { backend, room: MaxVaultBoxSize - boxBytes }
 }
 
 describe("putBox's weight limit", () => {
   it("refuses a new box that would exceed it, and accepts one that fits", async () => {
     const { backend, room } = await nearlyFull()
-    const capacity = { boxes: { used: 8, max: MaxVaultBoxes }, bytes: { used: MaxVaultBoxBytes - room, max: MaxVaultBoxBytes } }
+    const capacity = { boxes: { used: 8, max: MaxVaultBoxes }, bytes: { used: MaxVaultBoxSize - room, max: MaxVaultBoxSize } }
     expect(await putBoxIn(backend, boxOf('big', { cipherBytes: room }))).to.deep.include({ ok: false, act: 'vault_full', box: null, capacity })
     expect(await putBoxIn(backend, boxOf('small'))).to.deep.include({ act: 'born' })
   })
@@ -318,7 +318,7 @@ describe("putBox's weight limit", () => {
     const { backend, room } = await nearlyFull()
     const grown = boxOf('heavy_0', { revision_seq: 1, cipherBytes: 900_000 + room })
     expect(await putBoxIn(backend, grown, boxOf('heavy_0'))).to.deep.include({ act: 'replaced' })
-    expect(await keptTally(backend)).to.deep.equal({ all_count: 8, live_count: 8, all_size: MaxVaultBoxBytes, live_size: MaxVaultBoxBytes })
+    expect(await keptTally(backend)).to.deep.equal({ all_count: 8, live_count: 8, all_size: MaxVaultBoxSize, live_size: MaxVaultBoxSize })
     const overgrown = await putBoxIn(backend, boxOf('heavy_0', { revision_seq: 2, cipherBytes: 900_001 + room }), grown)
     expect(overgrown).to.deep.include({ ok: false, act: 'vault_full', box: grown, presence: 'live' })
     expect(await putBoxIn(backend, boxOf('heavy_0', { revision_seq: 2 }), grown)).to.deep.include({ act: 'replaced' })
@@ -340,7 +340,7 @@ describe("putBox's weight limit", () => {
 
 // A Convex transaction may read 16 MiB and write 16,000 documents. Listing and watching read a life
 // once. Deleting the vault reads every box row of the life and deletes each. The component
-// limits every life to MaxVaultBoxes box rows and MaxVaultBoxBytes of them, so that each of these
+// limits every life to MaxVaultBoxes box rows and MaxVaultBoxSize of them, so that each of these
 // fits in one transaction, even beside a vault row as large as a document may be.
 
 /** List, watch and delete life1's vault, each in one transaction, and return what each found. */
@@ -390,7 +390,7 @@ describe("a large vault, within Convex's per-transaction limits", () => {
     expect(filledCount).to.be.within(100, 199)
     const kept = await keptTally(backend)
     expect(kept).to.deep.equal(await weighedTally(backend))
-    expect(kept?.all_size).to.be.within(MaxVaultBoxBytes - 60_000, MaxVaultBoxBytes)
+    expect(kept?.all_size).to.be.within(MaxVaultBoxSize - 60_000, MaxVaultBoxSize)
     expect(await listWatchDel(backend)).to.deep.equal({ listedCount: filledCount, watchedCount: filledCount, act: 'deleted', liveCount: 0 })
   }, 60_000)
 })

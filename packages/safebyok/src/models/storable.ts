@@ -1,12 +1,11 @@
 import { isEqual } from 'es-toolkit'
 import { nowMillis } from '../helpers/clock'
 import * as Phrases from '../helpers/phrases'
-import { verifyConsistent } from '../helpers/validator'
+import { checkedConsistent } from '../helpers/validator'
 import { adorn, tattoo } from '../helpers/helpers'
-import { type WhisperedBag, isWhisperedBag } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
-import { disabledError, lockedError, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoadError, shapeUnreconciled } from '../refusals/throwers'
+import { instanceDisabled, needUnlocked, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoad, shapeUnreconciled } from '../refusals/throwers'
 import type { Age, Am, RecordShape } from '../shapes/shapes-enums'
 import * as VX from '../shapes/shapes-vaultish'
 import type { Fetched, FetchOpts, ListingOf, ListingWorld, Reconciled, Aligned, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
@@ -28,7 +27,7 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
 
 /** A vault or box in this tab, kept in step with its row in the vaultDB. */
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
-  // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #listeners, #getSnapshot, #subscribe, isFUBag
+  // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #listeners, #getSnapshot, #subscribe
 
   /** Adorned in the constructor: readable, left out of enumeration and JSON. */
   declare readonly world:   ListingWorld
@@ -66,9 +65,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.#listeners.add(VX.listener.parse(listener))
     return () => { this.#listeners.delete(listener) }
   }
-
-  /** True for what a box answers for a whisper it will not show, or a copy of it: anything carrying the `Whispered` mark. */
-  static isFUBag(val: unknown): val is WhisperedBag { return isWhisperedBag(val) }
   // --
 
   // == [Getters]: scope, central, full, sparse, am, toJSON, snapshot, getSnapshot, subscribe, subscribeOwn
@@ -178,7 +174,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const pins = { ...SX.reqParams.parse(asked), ...scope }
     const { maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)
     await this.ensureDeletable({ maxMillisSinceRefresh, maxWorldMillis }); this.demandDeletable()
-    verifyConsistent(this.sparse, pins, { kind: 'stale_write', message: Phrases.DelOfOtherRevision })
+    checkedConsistent(this.sparse, pins, { kind: 'stale_write', message: Phrases.DelOfOtherRevision })
     await this.listing.del(this.sparse)
     return this
   }
@@ -346,21 +342,21 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   demandDeletable(): this { return this.demandEnabled().demandUnlocked() }
 
   /** Demand that this thing's vault is unlocked. */
-  demandUnlocked(): this { if (this.isLocked)    { throw lockedError() }                               return this }
+  demandUnlocked(): this { if (this.isLocked)    { throw needUnlocked() }                               return this }
 
   /** Demand that this thing is still enabled. */
-  demandEnabled():  this { if (! this.#isEnabled) { throw disabledError() }                            return this }
+  demandEnabled():  this { if (! this.#isEnabled) { throw instanceDisabled() }                            return this }
 
   /** Demand that the record in hand is full. */
-  demandFull():     this { if (! this.isFull)    { throw partialLoadError() }                          return this }
+  demandFull():     this { if (! this.isFull)    { throw partialLoad() }                          return this }
 
   /** Demand that the record in hand is whole: full, or a tombstone. */
-  demandWhole():    this { if (! this.#isWhole)  { throw partialLoadError() }                          return this }
+  demandWhole():    this { if (! this.#isWhole)  { throw partialLoad() }                          return this }
 
   /** The full record in hand. */
   protected demandFullProps(): RecordT {
     if (this.full !== null) { return this.full }
-    throw partialLoadError()
+    throw partialLoad()
   }
 
   /** Hydrate this thing so that a delete can act on it. */

@@ -1,14 +1,14 @@
 /** What the vaultDB and the deviceDB write and accept, and their helpers. Imported as `SX`. */
 
 import type * as Z from 'zod'
-import { Checker, Checkers, consistent, objCheck, objStrip } from '../helpers/validator'
+import { Checker, Checkers, isConsistent, objCheck, objStrip } from '../helpers/validator'
 import * as Phrases from '../helpers/phrases'
 import { randomId } from '../helpers/crypto'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type Boxscope, type VaultScope, sidecar } from './shapes-core'
 
-// == [Sentinels and formats]: VoidRevisionTok, VoidRevisionSeq, VoidLifeTok, VoidTime, BoxFormat, VaultFormat, VoidRevision
+// == [Shells and formats]: VoidRevisionTok, VoidRevisionSeq, VoidLifeTok, VoidTime, BoxFormat, VaultFormat, VoidRevision
 
 /** The `revision_tok` of a void row, and of a birth's prior: no populated row ever has it. */
 export const VoidRevisionTok = '00000000-0000-0000-0000-000000000000'
@@ -140,14 +140,14 @@ export type BoxRow       = BoxRecord | BoxTombstone
 export type DamagedBox   = Readonly<{ applabel: string, user_id: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>
 // --
 
-// == [Rows found]: foundVaultRow, foundBoxRow, storedVaultRow, storedBoxRow
+// == [Rows stored]: storedVaultRowOrNull, storedBoxRowOrNull, storedVaultRow, storedBoxRow
 
-/** A vault row or box row as storage answers it, null for none where the check says `found`: one failing its checks refuses 'damaged_row'. */
-export const { foundVaultRow, foundBoxRow, storedVaultRow, storedBoxRow } = Checkers('damaged_row', () => ({
-  foundVaultRow:  vaultRow.nullable(),
-  foundBoxRow:    boxRow.nullable(),
-  storedVaultRow: vaultRow,
-  storedBoxRow:   boxRow,
+/** A vault row or box row as storage answers it, null for none where the check ends `OrNull`: one failing its checks refuses 'damaged_row'. */
+export const { storedVaultRowOrNull, storedBoxRowOrNull, storedVaultRow, storedBoxRow } = Checkers('damaged_row', () => ({
+  storedVaultRowOrNull: vaultRow.nullable(),
+  storedBoxRowOrNull:   boxRow.nullable(),
+  storedVaultRow:       vaultRow,
+  storedBoxRow:         boxRow,
 }))
 // --
 
@@ -161,7 +161,7 @@ export const { passkeyAddRecord, passkeyRevokeRecord } = Checkers('bad_option', 
 })
 // --
 
-// == [Options]: ifAbsentOpts, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsGiven, GateVerbOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
+// == [Options]: ifAbsentOpts, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsParsed, GateVerbOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
 
 /** The checks of the options a vaultDB verb accepts, of a write's record against its prior revision, and of the safe metadata an answer carries. */
 export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq } = Checkers('bad_option', ({ obj, oneof, orDefault, box_tok }) => {
@@ -181,8 +181,8 @@ export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqPa
 
 /** The check of an AdapterVaultDB's options, refusing 'bad_option'. */
 export const adapterVaultDBOpts = objCheck(({ num }) => ({
-  /** The most bytes one stored box record may weigh; `DefaultMaxRecordBytes` by default. */
-  maxRecordBytes: num.positive().optional(),
+  /** The most bytes one stored box record may weigh; `DefaultMaxRecordSizeEst` by default. */
+  maxRecordSizeEst: num.positive().optional(),
 }), 'bad_option')
 /** The check of a memory vaultDB's options, refusing 'bad_option'. */
 export const memoryVaultDBOpts = objCheck(({ int }) => ({
@@ -195,7 +195,7 @@ export const memoryVaultDBOpts = objCheck(({ int }) => ({
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
 /** A put's options as parsed, defaults filled in: what a subclass's `doPutVault` and `doPutBox` receive. */
-export type PutOptsGiven = Readonly<Z.infer<typeof putOptsGiven>>
+export type PutOptsParsed = Readonly<Z.infer<typeof putOptsGiven>>
 /** What a gate verb is told beside its record: the revision the record replaces. */
 export type GateVerbOpts = Readonly<Z.input<typeof gateVerbOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>
@@ -225,7 +225,7 @@ export const capacity = objCheck(({ obj, union, int, uint, lit }) => {
 export type Capacity = Z.infer<typeof capacity>
 // --
 
-// == [Row helpers]: rowMeta, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow, sentinelVaultOf, sentinelBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf
+// == [Row helpers]: rowMeta, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow, shellVaultOf, shellBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf
 
 /** The check that reads a row's revision and liveness without judging the rest. */
 export const rowMeta = objStrip(({ vault_tok }) => ({ ...revision.shape, am, vault_tok }), 'bad_option', [CX])
@@ -275,20 +275,20 @@ export const isLiveBoxRecord = (raw: unknown, vault_tok: string): boolean => {
 
 // A row that fails its check is never put over, whatever `prior` names: only `isRowAt` reads its meta, and it runs after the check.
 // A put replaces a live row only within its own life: a new life is born over a tombstone or nothing.
-const isPutAllowedOver = (found: { am: EX.Am } | null, isSameLife: boolean, ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsGiven): boolean => (
-  isRowAt(ante, prior) && ((found?.am === 'a') ? ((ifPresent === 'repl') && isSameLife) : (ifAbsent === 'add'))
+const isPutAllowedOver = (stored: { am: EX.Am } | null, isSameLife: boolean, ante: unknown, { prior, ifAbsent, ifPresent }: PutOptsParsed): boolean => (
+  isRowAt(ante, prior) && ((stored?.am === 'a') ? ((ifPresent === 'repl') && isSameLife) : (ifAbsent === 'add'))
 )
 
 /** True when `record` may be written over `ante`, the vault row stored there or null, under `opts`. */
-export const isVaultPutAllowed = (ante: unknown, record: VaultRecord, opts: PutOptsGiven): boolean => {
-  const found = foundVaultRow.safeParse(ante)
-  return found.success && isPutAllowedOver(found.data, found.data?.vault_tok === record.vault_tok, ante, opts)
+export const isVaultPutAllowed = (ante: unknown, record: VaultRecord, opts: PutOptsParsed): boolean => {
+  const stored = storedVaultRowOrNull.safeParse(ante)
+  return stored.success && isPutAllowedOver(stored.data, stored.data?.vault_tok === record.vault_tok, ante, opts)
 }
 
 /** True when `record` may be written over `ante`, the box row stored there or null, under `opts`. */
-export const isBoxPutAllowed = (ante: unknown, record: BoxRecord, opts: PutOptsGiven): boolean => {
-  const found = foundBoxRow.safeParse(ante)
-  return found.success && isPutAllowedOver(found.data, found.data?.box_tok === record.box_tok, ante, opts)
+export const isBoxPutAllowed = (ante: unknown, record: BoxRecord, opts: PutOptsParsed): boolean => {
+  const stored = storedBoxRowOrNull.safeParse(ante)
+  return stored.success && isPutAllowedOver(stored.data, stored.data?.box_tok === record.box_tok, ante, opts)
 }
 
 /** True when `raw` is no row, a tombstone, or a row of another life, so the boxes under `vault_tok` belong to nothing. A row failing its checks might be theirs, and is false. */
@@ -301,16 +301,16 @@ export const isLifeOver = (raw: unknown, vault_tok: string): boolean => {
 /** True when `raw` is the tombstone of a deleted row. */
 export const isTombstoneRow = (raw: unknown): boolean => (metaOf(raw)?.am === 'x')
 
-const sentinelTimes = { registered_at: VoidTime, written_at: VoidTime }
+const shellTimes = { registered_at: VoidTime, written_at: VoidTime }
 
 /** The tombstone of a vault row that is not stored. */
-export const sentinelVaultOf = ({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone => ({
-  applabel, user_id, vaultlabel, fmt: VaultFormat, ...VoidRevision, ...sentinelTimes, am: 'x', vault_tok,
+export const shellVaultOf = ({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone => ({
+  applabel, user_id, vaultlabel, fmt: VaultFormat, ...VoidRevision, ...shellTimes, am: 'x', vault_tok,
 })
 
 /** The tombstone of a box row that is not stored. */
-export const sentinelBoxOf = ({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string): BoxTombstone => ({
-  applabel, user_id, vaultlabel, boxlabel, fmt: BoxFormat, ...VoidRevision, ...sentinelTimes, am: 'x', vault_tok, box_tok: VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
+export const shellBoxOf = ({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string): BoxTombstone => ({
+  applabel, user_id, vaultlabel, boxlabel, fmt: BoxFormat, ...VoidRevision, ...shellTimes, am: 'x', vault_tok, box_tok: VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
 })
 
 /** A listing's entry for a vault row that failed validation. Its label comes from storage, unchecked: it is part of what is reported. */
@@ -345,7 +345,7 @@ function isGateVerbRecord({ gateVerb, record }: { gateVerb?: EX.GateVerb | undef
 }
 
 // A request and its record share only the address fields, so they agree when the record is at the request's address.
-const isRecordAtAsk    = ({ record, ...asked }: { record: object }): boolean => consistent(record, asked)
+const isRecordAtAsk    = ({ record, ...asked }: { record: object }): boolean => isConsistent(record, asked)
 
 /** True when a record's `lifeTok` is that of the live row it replaces, or a new one when it creates or deletes the row. */
 function isLifeTokPlaced(lifeTok: string, expectedLifeTok: string, expectedAm: EX.Am, recordAm: EX.Am): boolean {
@@ -357,7 +357,7 @@ function isLifeTokPlaced(lifeTok: string, expectedLifeTok: string, expectedAm: E
 // to find, and for a put or del the record to store. So code handed a request reads the address from the request itself,
 // whatever its op.
 /** Validators of a box or vault request: a get, put or del.
- * `expected` is parsed as a row's meta and its other fields dropped, so a caller may pass the row it has, or the sentinel row for none.
+ * `expected` is parsed as a row's meta and its other fields dropped, so a caller may pass the row it has, or the shell row for none.
  */
 export const { boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk } = Checkers('bad_record', ({ lit, oneof, discrim, box_tok }) => {
   const ifAbsent    = oneof(EX.ifAbsentVals)
@@ -419,15 +419,15 @@ export const { boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vau
 export type BoxAsk      = Readonly<Z.output<typeof boxAsk>>
 /** A vault get, put or del request, as the vaultDB receives it and passes it to its adapter and the classifier. */
 export type VaultAsk    = Readonly<Z.output<typeof vaultAsk>>
-/** A `getBox` request: the box's address, the expected row (or sentinel), and the `ifAbsent` option (see `VaultDB.getBox`). */
+/** A `getBox` request: the box's address, the expected row (or shell), and the `ifAbsent` option (see `VaultDB.getBox`). */
 export type BoxGetAsk   = Extract<BoxAsk,   { op: 'get' }>
-/** A `putBox` request: the box's address, the record to store, the expected row (or sentinel), and the `ifPresent` and `ifAbsent` options (see `VaultDB.putBox`). */
+/** A `putBox` request: the box's address, the record to store, the expected row (or shell), and the `ifPresent` and `ifAbsent` options (see `VaultDB.putBox`). */
 export type BoxPutAsk   = Extract<BoxAsk,   { op: 'put' }>
 /** A `delBox` request: the box's address, the tombstone to store, and the expected row. */
 export type BoxDelAsk   = Extract<BoxAsk,   { op: 'del' }>
-/** A `getVault` request: the vault's scope, the expected row (or sentinel), and the `ifAbsent` option (see `VaultDB.getVault`). */
+/** A `getVault` request: the vault's scope, the expected row (or shell), and the `ifAbsent` option (see `VaultDB.getVault`). */
 export type VaultGetAsk = Extract<VaultAsk, { op: 'get' }>
-/** A `putVault` request: the vault's scope, the record to store, the expected row (or sentinel), the `ifPresent` and `ifAbsent` options (see `VaultDB.putVault`), and its gate verb, if any. */
+/** A `putVault` request: the vault's scope, the record to store, the expected row (or shell), the `ifPresent` and `ifAbsent` options (see `VaultDB.putVault`), and its gate verb, if any. */
 export type VaultPutAsk = Extract<VaultAsk, { op: 'put' }>
 /** A `delVault` request: the vault's scope, the tombstone to store, and the expected row. */
 export type VaultDelAsk = Extract<VaultAsk, { op: 'del' }>

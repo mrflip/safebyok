@@ -3,12 +3,12 @@
 safebyok's vaultDB over [GraphQL](https://graphql.org), in two halves:
 
 * **On your server**, `safebyok-graphql/server`: **`VaultSchemaSdl`**, the schema as SDL, and
-  **`vaultResolvers({ vaultDB, userIdOf })`**. Each operation is one of the vaultDB's own verbs,
+  **`vaultResolvers({ vaultDB, getUserId })`**. Each operation is one of the vaultDB's own verbs,
   called on the vaultDB your server hosts ([`safebyok-postgres`](../safebyok-postgres)'s, or your
   own), and returns that verb's answer, for the signed-in user's bank only.
 * **In the browser**, `safebyok-graphql`: **`new GraphQLVaultDB({ client })`**, the vaultDB over
   your app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `Bank.make`.
-  It takes the Client alone. Limits such as `maxBoxes` and `maxRecordBytes` are set on the vaultDB
+  It takes the Client alone. Limits such as `maxBoxes` and `maxRecordSizeEst` are set on the vaultDB
   your server hosts and hands to `vaultResolvers`. The browser half sets none.
 
 **Deploy the two halves together.** The browser half sends the documents the server half's schema
@@ -55,7 +55,7 @@ const vaultDB = new PostgresVaultDB({ client: pgClientOf(pool), listen })
 
 const schema = createSchema<VaultContext>({
   typeDefs:  [VaultSchemaSdl],
-  resolvers: [vaultResolvers({ vaultDB, userIdOf: ({ user_id }: VaultContext) => user_id })],
+  resolvers: [vaultResolvers({ vaultDB, getUserId: ({ user_id }: VaultContext) => user_id })],
 })
 
 const { handleRequest } = createYoga<object, VaultContext>({
@@ -92,15 +92,15 @@ goes unreported.
 
 ## Who reaches which bank
 
-One vaultDB serves every request. **`userIdOf(context)`** returns the user your own auth signed
+One vaultDB serves every request. **`getUserId(context)`** returns the user your own auth signed
 in for this request, or null. Each operation names the bank it reaches (its `user_id`, its ask's,
 or a gate verb's record's), and the resolvers serve it only when that is the signed-in user's bank.
 Any other request gets an answer refused as `identity_revoked`, and the vaultDB is not called. A
 put's or del's record must be at its ask's address, and the vaultDB's own check of the ask enforces
 that before anything is read.
-A `watch` subscription calls `userIdOf` again at each change it would send. Once it returns anyone
+A `watch` subscription calls `getUserId` again at each change it would send. Once it returns anyone
 other than the user it subscribed as, its last notice is the `identity_revoked` refusal, the stream
-ends, and the browser does not subscribe again. A `userIdOf` that looks the session up live,
+ends, and the browser does not subscribe again. A `getUserId` that looks the session up live,
 rather than reading what the request carried, is what lets a revoked session's stream end. An
 idle stream stays open until its next change.
 

@@ -4,11 +4,11 @@ import { VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'
 import { boxAt, boxFlaws, boxQuery, boxscope, boxTombstoneOf, priorOf, stale, vaultAt, vaultFlaws, vaultScope, vaultTombstoneOf } from '../test-helpers/storage-world'
 
-describe("SX.sentinelBoxOf and the void row", () => {
-  it("passes the void row a sentinel makes, its zero toks and its 2008 date, as a tombstone of its kind", () => {
+describe("SX.shellBoxOf and the void row", () => {
+  it("passes the void row a shell makes, its zero toks and its 2008 date, as a tombstone of its kind", () => {
     const scope = { applabel: 'testapp', user_id: 'u1', vaultlabel: 'default', boxlabel: 'anthropic_api_key' }
-    const sentinel = SX.sentinelBoxOf(scope, 'vault-tok-1')
-    expect(SX.boxTombstone.parse(sentinel)).to.deep.include({ ...SX.VoidRevision, box_tok: SX.VoidLifeTok, registered_at: SX.VoidTime, written_at: SX.VoidTime, am: 'x' })
+    const shell = SX.shellBoxOf(scope, 'vault-tok-1')
+    expect(SX.boxTombstone.parse(shell)).to.deep.include({ ...SX.VoidRevision, box_tok: SX.VoidLifeTok, registered_at: SX.VoidTime, written_at: SX.VoidTime, am: 'x' })
     expect(new Date(SX.VoidTime).toISOString()).to.eq('2008-08-08T08:08:08.777Z')
     expect(SX.VoidRevisionTok).to.eq('00000000-0000-0000-0000-000000000000')
     expect(SX.VoidLifeTok).to.eq('00000000-0000-0000-0000-000000000000')
@@ -85,8 +85,8 @@ describe("the options a VaultDB's writes take", () => {
   })
 
   it("putOpts and delOpts keep the row expected whole, and refuse one that does not read as a row", () => {
-    const sentinel = SX.sentinelBoxOf(box, box.vault_tok)
-    expect(SX.putOpts.parse({ expected: sentinel }).expected).to.deep.equal(sentinel)
+    const shell = SX.shellBoxOf(box, box.vault_tok)
+    expect(SX.putOpts.parse({ expected: shell }).expected).to.deep.equal(shell)
     expect(SX.delOpts.parse({ expected: vault })).to.deep.equal({ expected: vault })
     expect(() => SX.putOpts.parse({ expected: SX.VoidRevision })).to.throw(VaultError).with.property('refusalkind', 'bad_option')
     expect(() => SX.delOpts.parse({})).to.throw(VaultError).with.property('refusalkind', 'bad_option')
@@ -127,7 +127,7 @@ describe("capacity", () => {
 describe("SX.boxAsk and SX.vaultAsk", () => {
   const liveBox      = boxAt(5)
   const goneBox      = boxTombstoneOf(boxAt(4))
-  const boxSentinel  = SX.sentinelBoxOf(boxscope, 'life1')
+  const boxShell  = SX.shellBoxOf(boxscope, 'life1')
   const boxPut       = { op: 'put', ...boxQuery, ifAbsent: 'add', ifPresent: 'repl', expected: liveBox, record: boxAt(6) } as const
   const boxDel       = { op: 'del', ...boxQuery, expected: liveBox, record: boxTombstoneOf(liveBox) } as const
   const liveVault    = vaultAt(5)
@@ -136,20 +136,20 @@ describe("SX.boxAsk and SX.vaultAsk", () => {
 
   it("pass a get, a put over the live row it expects, and a del of it", () => {
     expect(SX.boxAsk.parse({ op: 'get', ...boxQuery, ifAbsent: 'nil', expected: liveBox })).to.include({ op: 'get', ifAbsent: 'nil', boxlabel: 'openai' })
-    expect(SX.vaultAsk.parse({ op: 'get', ...vaultScope, ifAbsent: 'fail', expected: SX.sentinelVaultOf(vaultScope) })).to.include({ op: 'get', vaultlabel: 'main' })
+    expect(SX.vaultAsk.parse({ op: 'get', ...vaultScope, ifAbsent: 'fail', expected: SX.shellVaultOf(vaultScope) })).to.include({ op: 'get', vaultlabel: 'main' })
     for (const request of [boxPut, boxDel]) { expect(SX.boxAsk.parse(request).op).to.eq(request.op) }
     for (const request of [vaultPut, vaultDel]) { expect(SX.vaultAsk.parse(request).op).to.eq(request.op) }
   })
 
   it("pass a put that brings a new life over nothing and over a tombstone", () => {
-    expect(SX.boxAsk.parse({ ...boxPut, expected: boxSentinel, record: boxAt(0) }).op).to.eq('put')
+    expect(SX.boxAsk.parse({ ...boxPut, expected: boxShell, record: boxAt(0) }).op).to.eq('put')
     expect(SX.boxAsk.parse({ ...boxPut, expected: goneBox, record: boxAt(6, 'life1', { box_tok: 'box2' }) }).op).to.eq('put')
-    expect(SX.vaultAsk.parse({ ...vaultPut, expected: SX.sentinelVaultOf(vaultScope), record: vaultAt(0) }).op).to.eq('put')
+    expect(SX.vaultAsk.parse({ ...vaultPut, expected: SX.shellVaultOf(vaultScope), record: vaultAt(0) }).op).to.eq('put')
   })
 
   it("pass a del that expects nothing, which brings a life tok of its own", () => {
-    const tombstone = { ...SX.sentinelBoxOf(boxscope, 'life1'), revision_tok: 'brev0', revision_seq: 0, box_tok: 'box9' }
-    expect(SX.boxAsk.parse({ op: 'del', ...boxQuery, expected: boxSentinel, record: tombstone }).op).to.eq('del')
+    const tombstone = { ...SX.shellBoxOf(boxscope, 'life1'), revision_tok: 'brev0', revision_seq: 0, box_tok: 'box9' }
+    expect(SX.boxAsk.parse({ op: 'del', ...boxQuery, expected: boxShell, record: tombstone }).op).to.eq('del')
   })
 
   const BoxFlaws = [
@@ -159,7 +159,7 @@ describe("SX.boxAsk and SX.vaultAsk", () => {
     [{ ...boxPut, record: boxAt(6, 'life1', { revision_tok: SX.VoidRevisionTok }) },     "the void row's revision_tok on its record"],
     // the revision expected
     [{ ...boxPut, expected: { ...liveBox, revision_tok: SX.VoidRevisionTok } },          "the void row's tok expected at a stored seq"],
-    [{ ...boxPut, expected: { ...boxSentinel, revision_tok: 'brev' }, record: boxAt(0) }, "the void row's seq expected under another tok"],
+    [{ ...boxPut, expected: { ...boxShell, revision_tok: 'brev' }, record: boxAt(0) }, "the void row's seq expected under another tok"],
     [{ ...boxPut, expected: { ...liveBox, vault_tok: 'life2' } },                        'an expected row of another vault life'],
     // the life
     [{ ...boxPut, record: boxAt(6, 'life1', { box_tok: 'box2' }) },                      'a new life over the live row it expects'],

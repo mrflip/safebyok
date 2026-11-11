@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import * as EX from '../../src/shapes/shapes-enums'
 
-describe("EX.amVals and EX.tombstoneAmVals", () => {
-  it("list alive, damaged and gone, and for a tombstone only damaged and gone", () => {
+describe("EX.amVals", () => {
+  it("lists alive, damaged and gone", () => {
     expect(EX.amVals).to.deep.equal(['a', 'd', 'x'])
-    expect(EX.tombstoneAmVals).to.deep.equal(['d', 'x'])
   })
 })
 

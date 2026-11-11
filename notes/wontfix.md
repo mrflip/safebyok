@@ -113,7 +113,7 @@ not as a settled ruling, and check it against the current design before relying 
   `storage_unavailable`. Convex's docs list more it will not take: an empty name, a name starting with `_`, nesting past 16 levels, and more than
   1024 entries in one object. The core does not check for any of these before the call.
 * 2026-11-07 (the Coach, vaultdb_cleanup, thread 7, the GraphQL stream row): **the GraphQL stream stops on a best-effort basis.** The server's
-  resolvers call `userIdOf` again on each notice, so an idle stream stays open until its next change. A `userIdOf` that does not look the
+  resolvers call `getUserId` again on each notice, so an idle stream stays open until its next change. A `getUserId` that does not look the
   session up live (a cached or decoded token) never stops the stream.
 * 2026-11-07 (the Coach, vaultdb_cleanup, thread 7, "A Convex vault full of tombstones needs a delVault": "publicize and accept"): **a Convex
   vault whose deleted boxes fill its cap refuses new box labels until the vault is deleted.** A deleted box leaves its tombstone, which counts

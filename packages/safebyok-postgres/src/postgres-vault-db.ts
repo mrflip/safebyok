@@ -290,26 +290,26 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   protected override doWatch(scope: WatchScope, hear: (heard: Heard) => void, onBadNews: (news: VaultError) => void): () => void {
     const listen = this.#listen
     if (listen === undefined) { return super.doWatch(scope, hear, onBadNews) }
-    let isHeeding = true
+    let isListening = true
     const onNotify = (text: string): void => {
       const told = toldOf(text)
-      if ((told === null) || (! isHeeding) || (! isHeardIn(scope, told))) { return }
+      if ((told === null) || (! isListening) || (! isHeardIn(scope, told))) { return }
       void hearTold(told)
     }
     const hearTold = async (told: Told): Promise<void> => {
       const heard = await this.#heardOrNull(told)
-      if ((heard !== null) && isHeeding) { hear(heard) }
+      if ((heard !== null) && isListening) { hear(heard) }
     }
     // A listen that fails ends the watch before it heard anything.
     const onListenFailed = (news: VaultError): void => {
-      if (! isHeeding) { return }
-      isHeeding = false
+      if (! isListening) { return }
+      isListening = false
       onBadNews(news)
     }
     const listening = listenOrNull(listen, channelOf(scope.user_id), onNotify, onListenFailed)
     return () => {
-      if (! isHeeding) { return }
-      isHeeding = false
+      if (! isListening) { return }
+      isListening = false
       void unlistenOnceListening(listening)
     }
   }

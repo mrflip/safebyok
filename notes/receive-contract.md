@@ -27,7 +27,7 @@ Each test compares the record received (`rcvd`) with the record of the instance 
 | tag    | values                                | the test                                                                                                                                                                                                                   |
 | ------ | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `held` | `void` · `gone` · `sparse` · `full`   | The listed instance's record.     `void`: a stand-in instance at the void revision. `gone`: a tombstone. `sparse`: a live record without a box's sealed whisper or a vault's gate. `full`: a live record with every field. |
-| `rcvd` | `none` · `gone` · `sparse` · `full`   | The stored record in the response (via `world`, `val` or `dbhas`). `none`: the sentinel tombstone, which is never stored: storage answered that nothing is at the scope.                                                   |
+| `rcvd` | `none` · `gone` · `sparse` · `full`   | The stored record in the response (via `world`, `val` or `dbhas`). `none`: the shell tombstone, which is never stored: storage answered that nothing is at the scope.                                                   |
 | `rev`  | `older` · `same` · `newer` · `forked` | `rcvd`'s `revision_seq` is below, at or above `held`'s. `forked`: the same seq under another `revision_tok`. A `void` stand-in is below every stored revision.                                                             |
 | `life` | `same` · `other`                      | `rcvd`'s life token against `held`'s: `vault_tok` for a vault, `box_tok` for a box.                                                                                                                                        |
 
@@ -73,7 +73,7 @@ The acts are the classifier's (`notes/answer-contract.md`). Each act says by its
 | `gotgone`                                  | the tombstone             |   🪦    | `val`                                                                   |
 | `born` · `reborn` · `replaced`             | the record stored         |   👍    | `val`; if unequal to the request's record, refuse `storage_issue`       |
 | `deleted`                                  | the tombstone stored      |   ❎    | `val`; if unequal to the request's record, refuse `storage_issue`       |
-| `gotvoid`                                  | null                      |   🔲    | the sentinel tombstone (not stored): `none`                             |
+| `gotvoid`                                  | null                      |   🔲    | the shell tombstone (not stored): `none`                             |
 | a refusal with the stored row in `dbhas` § | the row stored            | 🧨 🔁 🌀  | `dbhas`, then the refusal is thrown. ‡                                  |
 | `void`                                     | nothing                   |  🧨 🔁   | nothing is received                                                     |
 | a `vault_*` refusal of a box op            | its world                 |  🔁 🌀   | nothing at the box listing, but the world was delivered                 |
@@ -119,8 +119,8 @@ A box answer or notice typically carries its vault's row as `world`. The world i
 
 | #   | the world                                       | `held` | by     | the vault afterwards                                                                                          | the caller gets      |
 | --- | ----------------------------------------------- | ------ | ------ | ------------------------------------------------------------------------------------------------------------- | -------------------- |
-| W1  | the sentinel: no vault row is stored            | live   | F6     | as it was, and the finding is reported to the host as bad news                                                | `vault_void`         |
-| W1  | the sentinel: no vault row is stored            | `gone` | R4     | as it was                                                                                                     | `vault_void`         |
+| W1  | the shell: no vault row is stored            | live   | F6     | as it was, and the finding is reported to the host as bad news                                                | `vault_void`         |
+| W1  | the shell: no vault row is stored            | `gone` | R4     | as it was                                                                                                     | `vault_void`         |
 | W2  | a tombstone under another `vault_tok`, newer    | @      | S2, R6 | This Vault object is vacated, and a new one is enlisted with the tombstone.                                   | `vault_gone`         |
 | W2  | a live row under another `vault_tok`, newer     | @      | S2, R7 | This Vault object is vacated, and a new one is enlisted with the world: a new vault, locked.                  | `vault_reborn`       |
 | W3  | a row of this `vault_tok`, older                | @      | R1     | as it was                                                                                                     | the answer's own act |
@@ -134,11 +134,11 @@ W2 is how this device learns from a box answer alone that its vault's life is ov
 1. **`fateOver` becomes S2, and `SlotFate` is removed.** Its `lose` is R1, and its `replace` is S2. `Listing.buildOrReceive` keeps only selection.
 2. **One table, read once.** Today a vault row is judged by `VaultListing.fateOver`, then by `Storable.reconcileCentral`, and the two do not agree: `reconcileCentral` checks `vault_tok` before age, so an older row of another life is dropped at the listing, and would throw at an instance handed it directly.
 3. **A box row of another `vault_tok`** is refused `storage_issue` by its listing, as F3 says (`rowOfOtherVaultTok` in `Listing.buildOrReceive`). An instance handed one directly still throws `record_conflict` (`otherVaultTok` in `reconcileCentral`).
-4. **W1 reports no bad news.** `Vault.receiveWorld` passes the world to the vault listing, so W2 and W3 already apply. The sentinel is `older` there and is dropped as R1, where F6 would report it to the host.
+4. **W1 reports no bad news.** `Vault.receiveWorld` passes the world to the vault listing, so W2 and W3 already apply. The shell is `older` there and is dropped as R1, where F6 would report it to the host.
 5. **F4, F5 and F6** are three throwers and three sentences today (`oneRevisionTwoToks`, `oneRevisionTwoLives`, `oneRevisionTwoFates`).
 6. **F7 is new as a refusal.** Today a vault is replaced there (`isRebirth` in `fateOver`), and a box adopts.
 7. **`shapeUnreconciled` cannot be reached**, and is removed.
-8. **`none` is a tag**, and what is received for it is the sentinel tombstone. Today `Storable.receive(null)` makes a tombstone at the instance's revision so that `reconcileCentral` has something to compare.
+8. **`none` is a tag**, and what is received for it is the shell tombstone. Today `Storable.receive(null)` makes a tombstone at the instance's revision so that `reconcileCentral` has something to compare.
 9. **What an answer carries** is read from `val`, not from the act. Today `Listing#deliverGood` receives a null `val` as `none`, and checks any other `val` against the request's params (only its scope for `passed`) before receiving it.
 
 ## Not in this note

@@ -10,10 +10,10 @@ import * as GX from '../../src/shapes/shapes-gateish'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as UX from '../../src/shapes/shapes-utils'
 import * as VX from '../../src/shapes/shapes-vaultish'
-import { PasskeySaltBytes } from '../../src/helpers/consts'
+import { PasskeySaltSize } from '../../src/helpers/consts'
 import { fromB64OrNull, toB64 } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
-import { Checker, Checkers, type ConsistencyRefusal, Kit, type Story, consistent, demandConsistent, objCheck, objStrict, objStrip, verifyConsistent } from '../../src/helpers/validator'
+import { Checker, Checkers, type ConsistencyRefusal, Kit, type Story, demandConsistent, isConsistent, objCheck, objStrict, objStrip, checkedConsistent } from '../../src/helpers/validator'
 import { type Refusalkind, VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'
 
@@ -279,11 +279,11 @@ describe("Checkers", () => {
 describe("Checker", () => {
   // Checker @example 1
   it("checks a value whole, refusing with a sentence of its own as a bad record unless given a kind", () => {
-    const prfSalt = Checker(({ str }) => str.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltShape(PasskeySaltBytes)))
-    const salt = toB64(new Uint8Array(PasskeySaltBytes).fill(7))
+    const prfSalt = Checker(({ str }) => str.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltSize, Phrases.prfSaltShape(PasskeySaltSize)))
+    const salt = toB64(new Uint8Array(PasskeySaltSize).fill(7))
     expect(prfSalt.parse(salt)).to.eq(salt)
-    const err = TH.expectSyncRefusal(() => prfSalt.parse(toB64(new Uint8Array(PasskeySaltBytes - 1))), 'bad_record')
-    expect(err.message).to.eq(Phrases.prfSaltShape(PasskeySaltBytes))
+    const err = TH.expectSyncRefusal(() => prfSalt.parse(toB64(new Uint8Array(PasskeySaltSize - 1))), 'bad_record')
+    expect(err.message).to.eq(Phrases.prfSaltShape(PasskeySaltSize))
   })
 
   // Checker @example 2
@@ -407,24 +407,24 @@ describe("objStrict and objStrip", () => {
   })
 })
 
-describe("consistent", () => {
+describe("isConsistent", () => {
   it("is true for a record naming the same app, user and vault as a scope, whatever else it has", () => {
-    expect(consistent({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1' }, TH.scopeOf('u1'))).to.be.true
+    expect(isConsistent({ ...TH.scopeOf('u1'), vault_tok: 'vault-tok-u1' }, TH.scopeOf('u1'))).to.be.true
   })
 
   it("is false when any one field both define differs", () => {
-    expect(consistent(TH.scopeOf('u2'), TH.scopeOf('u1'))).to.be.false
-    expect(consistent(TH.scopeOf('u1', 'spare'), TH.scopeOf('u1'))).to.be.false
-    expect(consistent({ ...TH.scopeOf('u1'), applabel: 'other' }, TH.scopeOf('u1'))).to.be.false
+    expect(isConsistent(TH.scopeOf('u2'), TH.scopeOf('u1'))).to.be.false
+    expect(isConsistent(TH.scopeOf('u1', 'spare'), TH.scopeOf('u1'))).to.be.false
+    expect(isConsistent({ ...TH.scopeOf('u1'), applabel: 'other' }, TH.scopeOf('u1'))).to.be.false
   })
 
-  // consistent @example
+  // isConsistent @example
   it("is true when no field is defined in both", () => {
-    expect(consistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' })).to.be.true
+    expect(isConsistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' })).to.be.true
   })
 
   it("refuses a bag that is not an object", () => {
-    TH.expectSyncRefusal(() => consistent(null as unknown as object, scope))
+    TH.expectSyncRefusal(() => isConsistent(null as unknown as object, scope))
   })
 })
 
@@ -437,14 +437,14 @@ describe("demandConsistent", () => {
   })
 })
 
-describe("verifyConsistent", () => {
+describe("checkedConsistent", () => {
   it("returns the bag when each field both define is ===", () => {
     const bag = { ...sparse }
-    expect(verifyConsistent(bag, scope, { kind: 'vault_reborn' })).to.eq(bag)
+    expect(checkedConsistent(bag, scope, { kind: 'vault_reborn' })).to.eq(bag)
   })
 
   it("refuses the kind it is handed, naming each field that disagrees, in its message and meta.fieldnames", () => {
-    const err = TH.expectSyncRefusal(() => verifyConsistent({ ...scope, user_id: 'u2', vaultlabel: 'other' }, scope, { kind: 'bad_scope' }), 'bad_scope')
+    const err = TH.expectSyncRefusal(() => checkedConsistent({ ...scope, user_id: 'u2', vaultlabel: 'other' }, scope, { kind: 'bad_scope' }), 'bad_scope')
     expect(err.message).to.contain('user_id and vaultlabel')
     expect(err.meta).to.deep.equal({ fieldnames: ['user_id', 'vaultlabel'] })
     expect(Object.isFrozen(err.meta?.fieldnames)).to.be.true
@@ -453,34 +453,34 @@ describe("verifyConsistent", () => {
 
   it("uses the refusal's message, whether a sentence or a function of the fields that disagree", () => {
     const disagreeing = { ...scope, user_id: 'u2', vaultlabel: 'other' }
-    expect(TH.expectSyncRefusal(() => verifyConsistent(disagreeing, scope, { kind: 'bad_scope', message: 'Another vault' }), 'bad_scope').message).to.eq('Another vault')
-    const err = TH.expectSyncRefusal(() => verifyConsistent(disagreeing, scope, { kind: 'bad_scope', message: (fieldnames) => `Another ${fieldnames.join(' and ')}` }), 'bad_scope')
+    expect(TH.expectSyncRefusal(() => checkedConsistent(disagreeing, scope, { kind: 'bad_scope', message: 'Another vault' }), 'bad_scope').message).to.eq('Another vault')
+    const err = TH.expectSyncRefusal(() => checkedConsistent(disagreeing, scope, { kind: 'bad_scope', message: (fieldnames) => `Another ${fieldnames.join(' and ')}` }), 'bad_scope')
     expect(err.message).to.eq('Another user_id and vaultlabel')
   })
 
   it("ignores a field that either object lacks or defines as undefined", () => {
-    expect(() => verifyConsistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' }, { kind: 'bad_scope' })).to.not.throw()
-    expect(() => verifyConsistent({ boxlabel: 'openai' }, { user_id: 'u1', boxlabel: undefined }, { kind: 'bad_scope' })).to.not.throw()
-    expect(() => verifyConsistent({}, scope, { kind: 'bad_scope' })).to.not.throw()
+    expect(() => checkedConsistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' }, { kind: 'bad_scope' })).to.not.throw()
+    expect(() => checkedConsistent({ boxlabel: 'openai' }, { user_id: 'u1', boxlabel: undefined }, { kind: 'bad_scope' })).to.not.throw()
+    expect(() => checkedConsistent({}, scope, { kind: 'bad_scope' })).to.not.throw()
   })
 
   it("disagrees on null against a value, and on two equal objects that are not the same object", () => {
-    TH.expectSyncRefusal(() => verifyConsistent({ gate: null }, { gate: {} }, { kind: 'bad_record' }), 'bad_record')
-    TH.expectSyncRefusal(() => verifyConsistent({ gate: {} }, { gate: {} }, { kind: 'bad_record' }), 'bad_record')
-    expect(() => verifyConsistent({ gate: null }, { gate: null }, { kind: 'bad_record' })).to.not.throw()
+    TH.expectSyncRefusal(() => checkedConsistent({ gate: null }, { gate: {} }, { kind: 'bad_record' }), 'bad_record')
+    TH.expectSyncRefusal(() => checkedConsistent({ gate: {} }, { gate: {} }, { kind: 'bad_record' }), 'bad_record')
+    expect(() => checkedConsistent({ gate: null }, { gate: null }, { kind: 'bad_record' })).to.not.throw()
   })
 
   it("reads the other bag's fields by name, a getter that is not enumerable included", () => {
     const scoped = Object.defineProperty({}, 'user_id', { get: () => 'u1', enumerable: false })
-    expect(() => verifyConsistent({ user_id: 'u1' }, scoped, { kind: 'bad_scope' })).to.not.throw()
-    TH.expectSyncRefusal(() => verifyConsistent({ user_id: 'u2' }, scoped, { kind: 'bad_scope' }), 'bad_scope')
+    expect(() => checkedConsistent({ user_id: 'u1' }, scoped, { kind: 'bad_scope' })).to.not.throw()
+    TH.expectSyncRefusal(() => checkedConsistent({ user_id: 'u2' }, scoped, { kind: 'bad_scope' }), 'bad_scope')
   })
 
   it("refuses a non-object, or an invalid refusal", () => {
-    TH.expectSyncRefusal(() => verifyConsistent(scope, null as unknown as object, { kind: 'bad_scope' }))
-    TH.expectSyncRefusal(() => verifyConsistent('acme' as unknown as object, scope, { kind: 'bad_scope' }))
-    TH.expectSyncRefusal(() => verifyConsistent(scope, scope, { kind: 'no_such_kind' } as never))
-    TH.expectSyncRefusal(() => verifyConsistent(scope, scope, { kind: 'bad_scope', message: 7 } as never))
+    TH.expectSyncRefusal(() => checkedConsistent(scope, null as unknown as object, { kind: 'bad_scope' }))
+    TH.expectSyncRefusal(() => checkedConsistent('acme' as unknown as object, scope, { kind: 'bad_scope' }))
+    TH.expectSyncRefusal(() => checkedConsistent(scope, scope, { kind: 'no_such_kind' } as never))
+    TH.expectSyncRefusal(() => checkedConsistent(scope, scope, { kind: 'bad_scope', message: 7 } as never))
   })
 })
 

@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
 import * as TH from '../test-helpers'
-import { boxDnaOf, boxListingOf, fullBoxRecord, sentinelBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
+import { boxDnaOf, boxListingOf, fullBoxRecord, shellBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
 const world = useModelsWorld()
 
@@ -220,7 +220,7 @@ describe("BoxListing: an absent box", () => {
       const listing = boxListingOf(world.mw)
       const stale = world.mw.staleWriteOf(scope(), fullBoxRecord(stored))
       world.mw.willPut(stale)
-      await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { expected: sentinelBoxRecord() }), 'stale_write')
+      await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { expected: shellBoxRecord() }), 'stale_write')
       expect(listing.at(scope())?.revision_seq).to.eq(5)
     })
 

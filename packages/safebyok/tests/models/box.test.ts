@@ -293,7 +293,7 @@ describe("box.receive(rcvd): registered_at, and a record of another vault_tok", 
 
   const ListedCases = [
     ['a box listed alive',          () => fullBoxRecord()],
-    ['a box listed deleted',        () => tombstoneBoxRecord({ revision_seq: 1 }, 'x')],
+    ['a box listed deleted',        () => tombstoneBoxRecord({ revision_seq: 1 })],
   ] as const
   const OtherVaultCases = [
     [2, 'a newer record'],
@@ -323,7 +323,7 @@ describe("box.receive(rcvd): registered_at, and a record of another vault_tok", 
     const box = await boxListingOf(world.mw).create(boxDnaOf(world.mw.boxscope('drafted')))
     const other = { boxlabel: 'drafted', vault_tok: 'vault-tok-other' }
     TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ ...other, revision_seq: 1 })))
-    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ ...other, revision_seq: 1 }, 'x')))
+    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ ...other, revision_seq: 1 })))
     expect(box).to.include({ vault_tok: 'vault-tok-u1', revision_seq: 0 })
   })
 

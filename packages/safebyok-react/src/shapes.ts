@@ -6,7 +6,7 @@ import { fromB64, type WhisperFieldAttributes } from 'safebyok/utils'
 // The types and checkers of safebyok-react, grouped by area. This file imports nothing from a component or
 // hook, so it cannot be part of an import cycle at run time.
 
-// == [Provider]: BankProviderProps, providerProps, ProviderBankOpts, Handlers, ContextValue, TellBadNews, GatingModalProps, BoundaryProps, BoundarySource
+// == [Provider]: BankProviderProps, bankProviderProps, ProviderBankOpts, Handlers, ContextValue, TellBadNews, GatingModalProps, BoundaryProps, BoundarySource
 
 /** BankProvider's props: the `Bank.make` options except `device_id`, plus the signed-in `user_id` and props for the dialogs. */
 export interface BankProviderProps extends Omit<BankOpts, 'user_id' | 'device_id' | 'requestCleartext'> {
@@ -22,7 +22,7 @@ export interface BankProviderProps extends Omit<BankOpts, 'user_id' | 'device_id
 }
 
 /** Checker for {@link BankProviderProps}. */
-export const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ device_id: true }).extend({
+export const bankProviderProps = Checker(({ fn, custom, str }) => bankOpts.omit({ device_id: true }).extend({
   user_id:            bankOpts.shape.user_id.nullable(),
   requestCleartext:   fn<RequestCleartext>().optional(),
   passphraseUsername: str.optional(),
@@ -31,7 +31,7 @@ export const providerProps = Checker(({ fn, custom, str }) => bankOpts.omit({ de
 }), 'bad_option')
 
 // The interface is written by hand so that each prop has a doc comment. This line fails to compile if it and the checker drift apart.
-true satisfies AssertEqual<BankProviderProps, CheckerInput<typeof providerProps>>
+true satisfies AssertEqual<BankProviderProps, CheckerInput<typeof bankProviderProps>>
 
 /** The `Bank.make` options the provider passes through: all but `device_id` and the handlers, with a `user_id` that may be null. */
 export type ProviderBankOpts = Omit<BankOpts, 'user_id' | 'device_id' | 'onLifecycle' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
@@ -66,7 +66,7 @@ export type BoundaryProps = {
   children:  ReactNode
 }
 
-/** The component that a `forBoundary` error message names as its source. */
+/** The component that a `boundaryRefusalOf` error message names as its source. */
 export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'DelVaultModal' | 'AddPasskeyModal' | 'RevokePasskeyModal' | 'PasskeyUnlockButton'
 // --
 
@@ -132,9 +132,9 @@ export const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, i
       opts:          obj({ rpId: named.optional(), timeout }).strict(),
     }),
     // The gating's attempt validates the rest of the answer.
-    /** The only field of a passkey answer that attemptOnce reads. */
-    attemptOnceAnswer:  obj({ prfBytes: bytes() }),
-    attemptOnceAttempt: fn(),
+    /** The only field of a passkey answer that attemptThenZero reads. */
+    attemptThenZeroAnswer:  obj({ prfBytes: bytes() }),
+    attemptThenZeroAttempt: fn(),
   }
 })
 // --

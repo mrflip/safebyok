@@ -6,11 +6,11 @@ import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as TH from '../test-helpers'
-import { TestableBox, TestableBoxListing, boxDnaOf, boxListingOf, fullBoxRecord, sentinelBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
+import { TestableBox, TestableBoxListing, boxDnaOf, boxListingOf, fullBoxRecord, shellBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
 const world = useModelsWorld()
 
-const sentinel = () => SX.sentinelBoxOf(world.mw.boxscope('anthropic_api_key'), world.mw.world.vault_tok)
+const shell = () => SX.shellBoxOf(world.mw.boxscope('anthropic_api_key'), world.mw.world.vault_tok)
 
 // == [Helpers of the pipeline tests]: scopeOf, dnaOf
 
@@ -145,7 +145,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
   describe("a void row, delivered", () => {
     it("builds a listed instance that is not present and not in the snapshot", async () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.build(sentinel())
+      const box = await listing.build(shell())
       expect(listing.things).to.deep.equal([box])
       expect(box.isPresent).to.be.false
       expect(listing.snapshot).to.deep.equal([])
@@ -153,8 +153,8 @@ describe("Listing's pipeline: what every answer goes through", () => {
 
     it("builds the same instance at the void revision however often it arrives", async () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.build(sentinel())
-      expect(await listing.build(sentinel())).to.eq(box)
+      const box = await listing.build(shell())
+      expect(await listing.build(shell())).to.eq(box)
       expect(box.revision_tok).to.eq(SX.VoidRevisionTok)
       expect(box.revision_seq).to.eq(SX.VoidRevisionSeq)
     })
@@ -252,7 +252,7 @@ describe("listing: a record of another vault_tok reaches no listed instance", ()
   it("throws a 'stale_write' whose record has another vault_tok without delivering that record", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willPut(world.mw.staleWriteOf(scopeOf(), fullBoxRecord({ vault_tok: OtherVault, revision_seq: 5 })))
-    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { expected: sentinelBoxRecord() }), 'stale_write')
+    await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { expected: shellBoxRecord() }), 'stale_write')
     expect(world.mw.badnews).to.deep.equal([])
     expect(listing.things).to.deep.equal([])
   })
@@ -296,11 +296,11 @@ describe("listing: an answer names the scope of the record it carries", () => {
   it("refuses a put or a del answered with a record of another scope", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willPut(world.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
-    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { expected: sentinelBoxRecord('asked_box') }))
+    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { expected: shellBoxRecord('asked_box') }))
     world.mw.willDel(world.mw.answerOf(scopeOf('asked_box'), tombstoneBoxRecord({ boxlabel: 'other_box', revision_seq: 2 })))
     await TH.expectRefusal(listing.del(sparseBoxRecord({ boxlabel: 'asked_box' })))
     world.mw.willPut(world.mw.staleWriteOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box', revision_seq: 5 })))
-    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { expected: sentinelBoxRecord('asked_box') }), 'stale_write')
+    await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { expected: shellBoxRecord('asked_box') }), 'stale_write')
     expect(world.mw.badnews).to.have.length(1)
     expect(listing.things).to.deep.equal([])
   })

@@ -59,23 +59,23 @@ export const flakyClientOf = (db: PGlite): FlakyClient => {
   }
 }
 
-const heedersOf = new Map<string, Set<(text: string) => void>>()
+const listenersOf = new Map<string, Set<(text: string) => void>>()
 
 /** Start listening on `channel` the first time it is asked for, and never stop, like the README's recipe. Returns the channel's set of callbacks. */
 const listenOn = async (db: PGlite, channel: string): Promise<Set<(text: string) => void>> => {
-  const heeders = heedersOf.get(channel)
-  if (heeders !== undefined) { return heeders }
+  const listeners = listenersOf.get(channel)
+  if (listeners !== undefined) { return listeners }
   const fresh = new Set<(text: string) => void>()
-  heedersOf.set(channel, fresh)
+  listenersOf.set(channel, fresh)
   // PGlite uses the channel identifier as written, so it must be quoted to keep its case and punctuation. A user_id never contains `"`.
   await db.listen(`"${channel}"`, (text) => { for (const onNotify of fresh) { onNotify(text) } })
   return fresh
 }
 
 export const listen: PostgresListen = async (channel, onNotify) => {
-  const heeders = heedersOf.get(channel) ?? await listenOn(await database(), channel)
-  heeders.add(onNotify)
-  return () => heeders.delete(onNotify)
+  const listeners = listenersOf.get(channel) ?? await listenOn(await database(), channel)
+  listeners.add(onNotify)
+  return () => listeners.delete(onNotify)
 }
 
 const clientsOf = new WeakMap<PostgresVaultDB, FlakyClient>()

@@ -2,11 +2,11 @@ import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { makeLeaseKey, makeVaultKey } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
-import { PasskeySaltBytes } from '../../src/helpers/consts'
+import { PasskeySaltSize } from '../../src/helpers/consts'
 import { parseLogger } from '../../src/helpers/logger'
 import { guardRequestCleartext } from '../../src/models/bank'
 import * as GX from '../../src/shapes/shapes-gateish'
-import { VoidRevision, sentinelVaultOf } from '../../src/shapes/shapes-storage'
+import { VoidRevision, shellVaultOf } from '../../src/shapes/shapes-storage'
 import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
 
@@ -33,9 +33,9 @@ describe("guardedLogger", () => {
 
 describe("gatingLaunchOnArgs", () => {
   const vault = { modelkind: 'vault' }
-  const unlockByProof = () => Promise.resolve(vault)
+  const unlockByProving = () => Promise.resolve(vault)
   const askUser = guardRequestCleartext(() => undefined)
-  const args = { gatingkind: 'add_passkey', vault, unlockByProof, askUser }
+  const args = { gatingkind: 'add_passkey', vault, unlockByProving, askUser }
 
   it("passes a born vault's gating kind, the vault, its unlock and the bank's dialog, handing on the vault it was given", () => {
     expect(GX.gatingLaunchOnArgs.parse(args).vault).to.eq(vault)
@@ -45,7 +45,7 @@ describe("gatingLaunchOnArgs", () => {
   it("refuses a build_vault, a kind it does not know, what is no vault, an unlock that is no function, a dialog the bank did not wrap, and a field it does not know", () => {
     for (const bad of [
       { ...args, gatingkind: 'build_vault' }, { ...args, gatingkind: 'open_sesame' }, { ...args, vault: { modelkind: 'box' } },
-      { ...args, unlockByProof: null }, { ...args, askUser: () => Promise.resolve(true) }, { ...args, prior: VoidRevision },
+      { ...args, unlockByProving: null }, { ...args, askUser: () => Promise.resolve(true) }, { ...args, prior: VoidRevision },
     ]) {
       TH.expectSyncRefusal(() => GX.gatingLaunchOnArgs.parse(bad), 'bad_option')
     }
@@ -55,9 +55,9 @@ describe("gatingLaunchOnArgs", () => {
 describe("gatingLaunchBirthArgs", () => {
   const listing = { modelkind: 'vault_listing' }
   const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
-  const unlockByProof = () => Promise.resolve(listing)
+  const unlockByProving = () => Promise.resolve(listing)
   const askUser = guardRequestCleartext(() => undefined)
-  const args = { listing, scope, expected: sentinelVaultOf(scope), unlockByProof, askUser }
+  const args = { listing, scope, expected: shellVaultOf(scope), unlockByProving, askUser }
 
   it("passes a vault listing, a scope, the row put over, the unlock and the bank's dialog, handing on the listing it was given", () => {
     expect(GX.gatingLaunchBirthArgs.parse(args).listing).to.eq(listing)
@@ -67,14 +67,14 @@ describe("gatingLaunchBirthArgs", () => {
   it("refuses what is no vault listing, a scope that is none, an expected that is no vault row, an unlock that is no function, and a dialog the bank did not wrap", () => {
     for (const bad of [
       { ...args, listing: { modelkind: 'box_listing' } }, { ...args, scope: { applabel: 'acme' } }, { ...args, expected: { revision_seq: 'one' } },
-      { ...args, unlockByProof: 'unlock' }, { ...args, askUser: () => Promise.resolve(true) },
+      { ...args, unlockByProving: 'unlock' }, { ...args, askUser: () => Promise.resolve(true) },
     ]) {
       TH.expectSyncRefusal(() => GX.gatingLaunchBirthArgs.parse(bad), 'bad_option')
     }
   })
 })
 
-// == [Proofs]: passkeyAnswer
+// == [Cleartexts]: passkeyAnswer
 
 /** What is no passkey's answer, each refused, and the field the refusal names. */
 const misshapenAnswers = (answer: PasskeyAnswer) => [
@@ -134,7 +134,7 @@ describe("freshPasskeyAnswer", () => {
   it("refuses an answer over a salt too short, naming the salt", async () => {
     const answer = await TH.passkeyOf('laptop')
     const err = TH.expectSyncRefusal(() => GX.freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' }))
-    expect(err.message).to.eq(`prf_salt_b64: ${Phrases.prfSaltShape(PasskeySaltBytes)}`)
+    expect(err.message).to.eq(`prf_salt_b64: ${Phrases.prfSaltShape(PasskeySaltSize)}`)
   })
 })
 // --

@@ -9,10 +9,10 @@ import type { Sidecar, Boxscope, Whisper } from '../shapes/shapes-core'
 import type { BoxExposure } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import { type BoxExposedPatch, type BoxPatch, type BoxPatchGiven, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type Fetched, type ThingAnswer, type TimelyOpts } from '../shapes/shapes-vaultish'
+import { type BoxExposedPatch, type BoxPatch, type BoxPatchParsed, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type Fetched, type ThingAnswer, type TimelyOpts } from '../shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../shapes/shapes-storage'
 import { stableJsonify } from '../helpers/stable-jsonify'
-import { absentBoxError, notExposedError, undecodedWhisper } from '../refusals/throwers'
+import { boxAbsent, notExposed, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 import { refusedAnswerOf } from '../storage/vault-db'
@@ -99,7 +99,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Non-throwing form of {@link extractWhisper}. */
   tryExtractWhisper(opts: TimelyOpts = {}): Promise<Outcome<Whisper>> { return outcomeOf(() => this.extractWhisper(opts)) }
 
-  /** Open the stored whisper and keep it on the instance, showing, where `box.whisper` offers it until {@link unexpose}.
+  /** Unseal the stored whisper and keep it on the instance, showing, where `box.whisper` offers it until {@link unexpose}.
    * See notes/expose_improves_security.md
    */
   async expose(opts: TimelyOpts = {}): Promise<this> {
@@ -135,7 +135,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
    * See notes/expose_improves_security.md
    */
   unveil(): this {
-    if (this.#exposed === null) { throw notExposedError() }
+    if (this.#exposed === null) { throw notExposed() }
     this.#isVeiled = false
     this.align()
     return this
@@ -145,7 +145,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   patchWhisper(patch: Whisper): this {
     const given = VX.whisperPatch.parse(patch)
     this.demandEnabled()
-    if (this.#exposed === null) { throw notExposedError() }
+    if (this.#exposed === null) { throw notExposed() }
     this.#replaceExposed(mergedOver(this.#exposed, given))
     return this
   }
@@ -185,7 +185,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis } = VX.boxPutOpts.parse(opts)
       await this.ensurePuttable(patch, { maxMillisSinceRefresh, maxWorldMillis })
       const given = this.demandPuttable(patch, { ifPresent })
-      const { record, expected } = await this.#edit(given)
+      const { record, expected } = await this.#editAndSeal(given)
       this.demandPuttable(patch, { ifPresent })
       return await this.listing.tryPut(record, { expected, ifAbsent, ifPresent })
     } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
@@ -195,7 +195,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Seal the whisper exposed, veiled or not, and put it; `patch` may name a sidecar, never a whisper. */
   async putExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<this> {
     const { sidecar } = VX.boxExposedPatch.parse(patch)
-    if (this.#exposed === null) { throw notExposedError() }
+    if (this.#exposed === null) { throw notExposed() }
     return this.put({ whisper: this.#exposed, sidecar }, opts)
   }
 
@@ -203,19 +203,19 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   tryPutExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.putExposed(patch, opts)) }
 
   /** The next record for `patch`, sealed but not yet put, with the row it is put over. */
-  async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, expected: BoxSparse }> {
+  async #editAndSeal({ whisper, sidecar }: BoxPatchParsed): Promise<{ record: BoxRecord, expected: BoxSparse }> {
     const expected = this.central
     const written_at = nowMillis()
     const next = { ...expected, ...SX.nextRevisionOf(expected, written_at), am: 'a' as const }
     // A whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
     const record = this.isTombstoneRecord(expected)
       ? await sealedRecordOf(this.world, { ...next, registered_at: written_at, box_tok: makeLifeTok() }, sidecar ?? {}, whisper ?? {})
-      : await sealedRecordOf(this.world, next, sidecar ?? this.demandFullProps().sidecar, whisper ?? await this.#keptWhisper())
+      : await sealedRecordOf(this.world, next, sidecar ?? this.demandFullProps().sidecar, whisper ?? await this.#storedWhisper())
     return { record, expected }
   }
 
-  /** The whisper a patch left out, opened from the record in hand. */
-  #keptWhisper(): Promise<Whisper> { return this.#unseal(this.demandFullProps()) }
+  /** The stored whisper, unsealed from the record in hand, for a patch that leaves the whisper out. */
+  #storedWhisper(): Promise<Whisper> { return this.#unseal(this.demandFullProps()) }
   // --
 
   // == [Guards]: demandUnsealable, demandPuttable, #givenOf, demandExposable, demandPresent, ensureUnsealable, ensurePuttable
@@ -224,7 +224,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   demandUnsealable(): this { return this.demandEnabled().demandUnlocked().demandPresent().demandFull() }
 
   /** The parsed `patch`, refused unless a put of it under `opts` may go ahead now. */
-  demandPuttable(patch: BoxPatch, { ifPresent }: BoxPutOpts = {}): BoxPatchGiven {
+  demandPuttable(patch: BoxPatch, { ifPresent }: BoxPutOpts = {}): BoxPatchParsed {
     const given = this.#givenOf(patch, ifPresent)
     this.demandEnabled().demandUnlocked()
     if (! isOfBothHalves(given)) { this.demandWhole() }
@@ -232,7 +232,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
 
   /** `patch` parsed as one of this box's, for a put under `ifPresent`. */
-  #givenOf(patch: BoxPatch, ifPresent?: BoxPutOpts['ifPresent']): BoxPatchGiven {
+  #givenOf(patch: BoxPatch, ifPresent?: BoxPutOpts['ifPresent']): BoxPatchParsed {
     const patchCheck = (ifPresent === 'fail') ? VX.boxPatchNew : VX.boxPatch
     return patchCheck.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
@@ -242,7 +242,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** Demand that this box is present. */
   demandPresent(): this {
-    if (! this.isPresent) { throw absentBoxError(this) }
+    if (! this.isPresent) { throw boxAbsent(this) }
     return this
   }
 
@@ -303,7 +303,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 // == [Patches]: isOfBothHalves
 
 /** Whether `given` carries both the whisper and the sidecar, so that a put of it needs nothing from the record stored. */
-const isOfBothHalves = ({ whisper, sidecar }: BoxPatchGiven): boolean => (whisper !== undefined) && (sidecar !== undefined)
+const isOfBothHalves = ({ whisper, sidecar }: BoxPatchParsed): boolean => (whisper !== undefined) && (sidecar !== undefined)
 // --
 
 // == [Merging]: mergedOver

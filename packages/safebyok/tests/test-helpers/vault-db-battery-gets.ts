@@ -71,11 +71,11 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
 
     it("over a void row, refuses, or returns null under ifAbsent 'nil'", async () => {
       const vaultDB = await fresh()
-      const sentinel = SX.sentinelVaultOf(vaultScope)
+      const shell = SX.shellVaultOf(vaultScope)
       const answer = await vaultDB.tryGetVault(vaultGetAskOf())
-      expect(answer).to.deep.include({ ok: false, act: 'void', dbhas: null, world: sentinel })
+      expect(answer).to.deep.include({ ok: false, act: 'void', dbhas: null, world: shell })
       expect(answer.err?.refusalkind).to.eq('absent_vault')
-      expect(await vaultDB.getVault(vaultGetAskOf(vaultScope, 'nil'))).to.deep.include({ act: 'gotvoid', val: null, world: sentinel })
+      expect(await vaultDB.getVault(vaultGetAskOf(vaultScope, 'nil'))).to.deep.include({ act: 'gotvoid', val: null, world: shell })
     })
 
     it("over a tombstone, refuses, or returns the tombstone under ifAbsent 'nil'", async () => {
@@ -138,7 +138,7 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       expect(gone.err?.refusalkind).to.eq('absent_vault')
       const nowhere = vaultScopeOf('nowhere')
       const overVoid = await vaultDB.tryListBoxes({ ...nowhere, vault_tok: 'life1' })
-      expect(overVoid).to.deep.include({ ok: false, act: 'vault_void', world: SX.sentinelVaultOf(nowhere) })
+      expect(overVoid).to.deep.include({ ok: false, act: 'vault_void', world: SX.shellVaultOf(nowhere) })
       expect(overVoid.err?.refusalkind).to.eq('absent_vault')
     })
 
@@ -192,7 +192,7 @@ export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
     it("refuses over no vault row, and under a vault's tombstone, with the row it met as world", async () => {
       const vaultDB = await fresh()
       const overVoid = await vaultDB.tryGetBox(boxGetAskOf(boxQuery, 'nil'))
-      expect(overVoid).to.deep.include({ ok: false, act: 'vault_void', world: SX.sentinelVaultOf(vaultScope), dbhas: null })
+      expect(overVoid).to.deep.include({ ok: false, act: 'vault_void', world: SX.shellVaultOf(vaultScope), dbhas: null })
       expect(overVoid.err?.refusalkind).to.eq('absent_vault')
       const vault = vaultAt()
       await vaultDB.putVault(vaultPutAskOf(vault))

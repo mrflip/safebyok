@@ -140,7 +140,7 @@ about: a thing's stage in its life is its `stage`. A stored field keeps its stor
 (`selfDestructPreventionDisabled`).
 
 **A validator is named after the parameter it checks**, in that parameter's case (`user_id`,
-`vaultScopepath`, `salt_bytes`), **or, for a function's whole input, after the function with
+`vaultScopepath`, `salt_size`), **or, for a function's whole input, after the function with
 `Input` appended** (`dragForceInput`). A shape's validator checks no one parameter, and accepts its
 type's name with the first letter lowered: lowerCamelCase beside its ModuleCase type (the Coach,
 2026-10-27: "it makes it less confusing"), `export const { boxSparse } = ...`, `export type
@@ -212,11 +212,6 @@ is named for the act.
 | `fooOf(thing)` | Pure: the foo derived from `thing`. |
 | `tryFoo` | `foo`, resolving an `Outcome` instead of throwing. |
 
-**No function or method is named `read` or `write`** (the Coach, 2026-10-28). Those are the umbrella words for any view or
-any mutation (VOCABULARY.md), so a category may use them (`stale_write`, `written_at`); a function says which: `find`, `get`,
-`ensure`, or the mutation's own verb (`put`, `del`, `increment`). A `read` or `write` name met in the code is a rename to
-propose, not a precedent.
-
 **`make` and `build` say whether to await; the suffix says what comes back** (the Coach,
 2026-11-02). With no suffix, the name is the thing itself; a suffix says you get something else:
 
@@ -230,7 +225,7 @@ propose, not a precedent.
 **`ensure` acquires or constructs, idempotently.** `bank.ensureVault({ vaultlabel })`,
 `vault.ensureUnlocked()`: have one, or make it so, and return it, so a second call costs
 nothing. A function that only checks and refuses is not an `ensure`: it is a `check`
-(`checkBoxlabel(label)`, `checkStrength(passphrase)`), a `demand` (below), or a `parse` when it
+(`checkBoxlabel(label)`, `checkUnwraps(wrongCleartext)`), a `demand` (below), or a `parse` when it
 also returns the cleaned value (*Validation*). Reviewers: an `ensure` that returns nothing is
 misnamed.
 
@@ -264,7 +259,7 @@ was sent)". Not the argument it was handed, not `this`, not a boolean. Where the
 key material, a model's verb resolves its summary: `vault.putWayin()` resolves the vault, whose
 `vault.snapshot.gate` then shows the way in as stored; `VaultDB.putBox()` resolves the record.
 
-**Stored fields are underbar_case** (`salt_bytes`, `memory_kib`): they are written to someone
+**Stored fields are underbar_case** (`salt_b64`, `written_at`): they are written to someone
 else's database, and stay one spelling from the wire to the code. **One name for one thing,
 everywhere**: a field with a stored value keeps its stored spelling wherever it goes, in the
 facades a record passes through, a host's options and a snapshot alike. A key deriver's
@@ -314,8 +309,6 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
   Never `var`.
 * Functional style is strongly preferred: `map`, `filter`, `reduce` over index loops.
 * Arrow functions for inline lambdas; their params always parenthesized: `(val) => val.label`.
-* Don't write to objects you don't own (`no-param-reassign`). When it is right, disable the rule
-  on that line and say why.
 * `return await` inside a `try` or `catch`, nowhere else -- unless you want the current function
   kept in the stack trace.
 
@@ -870,7 +863,7 @@ is tested beside that verb. Test and build artifacts are never written to `src/`
 * **A helper named `expect...` must assert.** The linter (`vitest/expect-expect`) counts a call to
   any function named `expect...` as an assertion, so a test whose only check is such a helper
   passes. Name it for what it does: if the helper should not assert, give it a different name
-  (`check...`, `read...`); if it should, make it assert and keep the name. Never add an assertion
+  (`check...`, say); if it should, make it assert and keep the name. Never add an assertion
   to a helper merely to make the rule happy.
 * **Every use case of an exported function has a test. A title is one plain clause naming the behaviour.** It chains no
   second outcome, and quotes a refusal kind only if the customer checks for it and reacts: `stale_write` is part of our
@@ -945,6 +938,6 @@ of one is unwieldy, not wrong.
 **`@typescript-eslint/no-unused-vars` passes only a named ignore**: its ignore patterns are
 `^_[a-zA-Z0-9]`, so `_scopepathkind` passes and a bare `_` does not (*Build for maintenance*).
 
-**Safety hatches** -- `@ts-expect-error`, `any`, the non-null `!` -- are allowed, because
-forbidding them sends a fix into a tailspin when the problem is elsewhere. Use them with care,
-and **always report each one** in chat or in the PR's open questions.
+**Safety hatches** -- `@ts-expect-error`, `eslint-disable-line`, `any`, the non-null `!` -- are
+allowed, because forbidding them sends a fix into a tailspin when the problem is elsewhere. Use
+them with care, and **report each one you add**, in chat.

@@ -32,7 +32,7 @@ const ReplacePassphraseForm = ({ gating, passphraseUsername }: ReplacePassphrase
       gripeText={gripe?.text ?? null}
       gripeId={gripeId}
       action={action}
-      onReset={chosen.forget}
+      onReset={chosen.reset}
     >
       <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)} />
       <PassphraseField ref={anteRef} fieldname="current-password" fieldlabel={Messages.currentField} invalidBy={isAnteWrong ? gripeId : undefined} />

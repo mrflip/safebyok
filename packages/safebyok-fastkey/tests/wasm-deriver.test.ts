@@ -1,9 +1,9 @@
 import { argon2id } from 'hash-wasm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { type Bank, type BankOpts, VaultError, isVaultError } from 'safebyok'
-import { Argon2idWebV1, argon2idDeriver, argon2idWebV1Deriver, type KeyDeriver, type KeyDeriverSpec } from 'safebyok/browser'
+import { Argon2idWebV1, makeArgon2idDeriver, argon2idWebV1Deriver, type KeyDeriver, type KeyDeriverSpec } from 'safebyok/browser'
 import * as TH from 'safebyok/testing'
-import { argon2idWasmDeriver, argon2idWasmWebV1Deriver } from '../src/wasm-deriver'
+import { makeArgon2idWasmDeriver, argon2idWasmWebV1Deriver } from '../src/wasm-deriver'
 
 /** A host's own spec that is cheap to derive under. Its three counts all differ, so a test catches two of them being swapped. */
 const CheapSpec: KeyDeriverSpec = { ...Argon2idWebV1, key_deriver_label: 'acme_cheap_v1', memory_kib: 64, iterations: 2, parallelism: 4 }
@@ -49,7 +49,7 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
 
   // Slow: two full derivations at 64 MiB and three passes. The core's deriver alone takes about half a second.
   it("derives byte for byte what the core's deriver derives, for one fixed passphrase and salt", { timeout: 60_000 }, async () => {
-    const saltBytes = saltOf(Argon2idWebV1.salt_bytes)
+    const saltBytes = saltOf(Argon2idWebV1.salt_size)
     const wasmBytes = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltBytes)
     const nobleBytes = await argon2idWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltBytes)
     expect(wasmBytes).to.have.lengthOf(32)
@@ -106,13 +106,13 @@ const SameBytesCases = [
   [{},                                                   "half a \u{D83D} key",           'a lone surrogate, which each encodes as U+FFFD'],
 ] as const
 
-describe("argon2idWasmDeriver beside argon2idDeriver", () => {
+describe("makeArgon2idWasmDeriver beside makeArgon2idDeriver", () => {
   for (const [change, passphrase, blurb] of SameBytesCases) {
     it(`derives the same bytes under ${blurb}`, async () => {
       const spec = { ...CheapSpec, ...change }
-      const saltBytes = saltOf(spec.salt_bytes)
-      const wasmBytes = await argon2idWasmDeriver(spec).deriveKeyBytes(passphrase, saltBytes)
-      const nobleBytes = await argon2idDeriver(spec).deriveKeyBytes(passphrase, saltBytes)
+      const saltBytes = saltOf(spec.salt_size)
+      const wasmBytes = await makeArgon2idWasmDeriver(spec).deriveKeyBytes(passphrase, saltBytes)
+      const nobleBytes = await makeArgon2idDeriver(spec).deriveKeyBytes(passphrase, saltBytes)
       expect(wasmBytes).to.have.lengthOf(32)
       expect([...wasmBytes]).to.deep.equal([...nobleBytes])
     })
@@ -120,88 +120,88 @@ describe("argon2idWasmDeriver beside argon2idDeriver", () => {
 
   it("derives differently under each parameter", async () => {
     const variants = [CheapSpec, { ...CheapSpec, memory_kib: 128 }, { ...CheapSpec, iterations: 3 }, { ...CheapSpec, parallelism: 2 }]
-    const derived = await Promise.all(variants.map((spec) => argon2idWasmDeriver(spec).deriveKeyBytes('pw', saltOf(16))))
+    const derived = await Promise.all(variants.map((spec) => makeArgon2idWasmDeriver(spec).deriveKeyBytes('pw', saltOf(16))))
     const distinct = new Set(derived.map((bytes) => bytes.join(',')))
     expect(distinct.size).to.eq(variants.length)
   })
 })
 
-describe("argon2idWasmDeriver", () => {
+describe("makeArgon2idWasmDeriver", () => {
   it("carries the whole spec beside its function, frozen", () => {
-    const deriver = argon2idWasmDeriver(CheapSpec)
+    const deriver = makeArgon2idWasmDeriver(CheapSpec)
     expect(specOf(deriver)).to.deep.equal(CheapSpec)
     expect(deriver).to.be.frozen
   })
 
   it("takes a spec of the host's own, under its own label", () => {
-    const deriver = argon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 })
+    const deriver = makeArgon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 })
     expect(deriver.key_deriver_label).to.eq('acme_argon2id_v1')
     expect(deriver.memory_kib).to.eq(131_072)
   })
 
   it("makes a deriver of the supplied spec too, the same one argon2idWasmWebV1Deriver is", () => {
-    expect(specOf(argon2idWasmDeriver(Argon2idWebV1))).to.deep.equal(specOf(argon2idWasmWebV1Deriver))
+    expect(specOf(makeArgon2idWasmDeriver(Argon2idWebV1))).to.deep.equal(specOf(argon2idWasmWebV1Deriver))
   })
 
   it("ignores extra fields in the spec", async () => {
     const smuggled = { ...CheapSpec, deriveKeyBytes: () => Promise.resolve(new Uint8Array(32)) } as KeyDeriverSpec
-    const derived = await argon2idWasmDeriver(smuggled).deriveKeyBytes('pw', saltOf(16))
+    const derived = await makeArgon2idWasmDeriver(smuggled).deriveKeyBytes('pw', saltOf(16))
     expect(derived).to.not.deep.equal(new Uint8Array(32))
   })
 
   it("refuses a spec Argon2id cannot run, before deriving anything", () => {
-    expect(() => argon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', salt_bytes: 4 } as unknown as KeyDeriverSpec))
-      .to.throw(/salt_bytes/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_option'))
+    expect(() => makeArgon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', salt_size: 4 } as unknown as KeyDeriverSpec))
+      .to.throw(/salt_size/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_option'))
   })
 
   it("refuses the supplied spec's label on other parameters", () => {
-    expect(() => argon2idWasmDeriver({ ...Argon2idWebV1, iterations: 4 }))
+    expect(() => makeArgon2idWasmDeriver({ ...Argon2idWebV1, iterations: 4 }))
       .to.throw(/argon2id_web_v1/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_option'))
   })
 
   it("refuses an empty passphrase as unlock() does, rather than with hash-wasm's plain Error", async () => {
-    await expect(argon2idWasmDeriver(CheapSpec).deriveKeyBytes('', saltOf(16))).rejects.toThrow(VaultError)
-    await expect(argon2idWasmDeriver(CheapSpec).deriveKeyBytes('', saltOf(16))).rejects.toThrow(/empty/u)
+    await expect(makeArgon2idWasmDeriver(CheapSpec).deriveKeyBytes('', saltOf(16))).rejects.toThrow(VaultError)
+    await expect(makeArgon2idWasmDeriver(CheapSpec).deriveKeyBytes('', saltOf(16))).rejects.toThrow(/empty/u)
   })
 
   it("refuses a label safebyok reserves, as the core's deriver does, in the same words", () => {
     const spec = { ...CheapSpec, key_deriver_label: 'argon2id_web_v2' }
-    expect(refusalOf(() => argon2idWasmDeriver(spec))).to.eq(refusalOf(() => argon2idDeriver(spec)))
-    expect(refusalOf(() => argon2idWasmDeriver(spec))).to.include('reserved')
+    expect(refusalOf(() => makeArgon2idWasmDeriver(spec))).to.eq(refusalOf(() => makeArgon2idDeriver(spec)))
+    expect(refusalOf(() => makeArgon2idWasmDeriver(spec))).to.include('reserved')
   })
 })
 
-// This package's factory and the core's `argon2idDeriver` both validate with the core's parseKeyDeriverSpec.
+// This package's factory and the core's `makeArgon2idDeriver` both validate with the core's parseKeyDeriverSpec.
 // These tests compare their refusal messages word for word, instead of restating the bounds.
 const UnworkableSpecs = [
-  [{ salt_bytes: 15 },                    'a salt of 15 bytes'],
-  [{ salt_bytes: 32 },                    'a salt of 32 bytes'],
+  [{ salt_size: 15 },                    'a salt of 15 bytes'],
+  [{ salt_size: 32 },                    'a salt of 32 bytes'],
   [{ memory_kib: 64, parallelism: 9 },    'under 8 KiB for each of nine lanes'],
   [{ memory_kib: 1_048_577 },             'more than 1 GiB'],
   [{ iterations: 0 },                     'no passes over memory'],
   [{ parallelism: 0 },                    'no lanes'],
-  [{ output_bytes: 16 },                  'a 128-bit key'],
+  [{ output_size: 16 },                  'a 128-bit key'],
   [{ algorithm: 'scrypt' },               'another key derivation function'],
   [{ key_deriver_label: '' },             'no label for a vault to record'],
 ] as const
 
-describe("argon2idWasmDeriver's bounds", () => {
+describe("makeArgon2idWasmDeriver's bounds", () => {
   for (const [change, blurb] of UnworkableSpecs) {
     it(`refuses ${blurb} in the core's own words`, () => {
       const spec = { ...CheapSpec, ...change } as unknown as KeyDeriverSpec
-      expect(refusalOf(() => argon2idWasmDeriver(spec))).to.eq(refusalOf(() => argon2idDeriver(spec)))
+      expect(refusalOf(() => makeArgon2idWasmDeriver(spec))).to.eq(refusalOf(() => makeArgon2idDeriver(spec)))
     })
   }
 
   it("refuses what is not a spec at all", () => {
     for (const notSpec of [undefined, null, 'argon2id_web_v1', 65_536]) {
-      expect(refusalOf(() => argon2idWasmDeriver(notSpec as unknown as KeyDeriverSpec))).to.include('memory_kib')
+      expect(refusalOf(() => makeArgon2idWasmDeriver(notSpec as unknown as KeyDeriverSpec))).to.include('memory_kib')
     }
   })
 
   it("allows the largest of each bound", () => {
     const lavish = { ...CheapSpec, memory_kib: 1_048_576, iterations: (2 ** 32) - 1, parallelism: 131_072 }
-    expect(specOf(argon2idWasmDeriver(lavish))).to.deep.equal(lavish)
+    expect(specOf(makeArgon2idWasmDeriver(lavish))).to.deep.equal(lavish)
   })
 })
 

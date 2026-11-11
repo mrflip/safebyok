@@ -144,22 +144,22 @@ const boxQueryIn = ({ applabel, user_id, vaultlabel, boxlabel, vault_tok }: BoxQ
 
 /** The get of the vault at `scope`, by a caller that holds no row of it. */
 export const vaultGetAskOf = (scope: VaultScope = vaultScope, ifAbsent: IfAbsent = 'fail'): VaultGetAsk => ({
-  op: 'get', ...vaultScopeIn(scope), ifAbsent, expected: SX.sentinelVaultOf(scope),
+  op: 'get', ...vaultScopeIn(scope), ifAbsent, expected: SX.shellVaultOf(scope),
 })
 
 /** The get of the box `asked` for, by a caller that holds no row of it. */
 export const boxGetAskOf = (asked: BoxQuery = boxQuery, ifAbsent: IfAbsent = 'fail'): BoxGetAsk => ({
-  op: 'get', ...boxQueryIn(asked), ifAbsent, expected: SX.sentinelBoxOf(asked, asked.vault_tok),
+  op: 'get', ...boxQueryIn(asked), ifAbsent, expected: SX.shellBoxOf(asked, asked.vault_tok),
 })
 
 /** The put of the vault `record` over the row `expected`, or over none for null. It adds and replaces, but for what `policies` says. */
 export const vaultPutAskOf = (record: VaultRecord, expected: VaultRow | null = null, policies: PutPolicies = {}): VaultPutAsk => ({
-  op: 'put', ...vaultScopeIn(record), ...AddOrReplace, ...policies, expected: expected ?? SX.sentinelVaultOf(record), record,
+  op: 'put', ...vaultScopeIn(record), ...AddOrReplace, ...policies, expected: expected ?? SX.shellVaultOf(record), record,
 })
 
 /** The put of the box `record` over the row `expected`, or over none for null. It adds and replaces, but for what `policies` says. */
 export const boxPutAskOf = (record: BoxRecord, expected: BoxRow | null = null, policies: PutPolicies = {}): BoxPutAsk => ({
-  op: 'put', ...boxQueryIn(record), ...AddOrReplace, ...policies, expected: expected ?? SX.sentinelBoxOf(record, record.vault_tok), record,
+  op: 'put', ...boxQueryIn(record), ...AddOrReplace, ...policies, expected: expected ?? SX.shellBoxOf(record, record.vault_tok), record,
 })
 
 /** The del of the vault row `expected`, storing `record`: its tombstone, unless given. */

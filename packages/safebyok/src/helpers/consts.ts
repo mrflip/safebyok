@@ -36,21 +36,21 @@ export const BankDBVersion = '001-001-001'
 export const VaultsDBVersion = '001-001-001'
 
 // RFC 9106's recommendation for Argon2id. One length for every deriver, until a host asks for another.
-/** How many random bytes a passphraseSalt has: the `salt_bytes` of every key deriver. */
-export const PassphraseSaltBytes = 16
+/** How many random bytes a passphraseSalt has: the `salt_size` of every key deriver. */
+export const PassphraseSaltSize = 16
 
 /** How many bytes a passphraseKey is: a 256-bit AES-GCM key. */
-export const PassphraseKeyBytes = 32
+export const PassphraseKeySize = 32
 
 /** How many random bytes a passkey wayin's `prf_salt_b64` has: a new passkey's answer carries a fresh salt this long, and a stored salt of any other length fails its record's check. */
-export const PasskeySaltBytes = 32
+export const PasskeySaltSize = 32
 
 /** The default cap on a vault life's box rows, live and deleted together, for a vaultDB made without `maxBoxes`. */
 export const DefaultMaxBoxes = 100
 
 // About 95% of Postgres's 8,000-byte NOTIFY payload, less the 1,944 bytes of the Larger vault row in notes/reference-sizes.md, rounded down.
-/** How many bytes one stored box record may weigh, unless its vaultDB was made with another `maxRecordBytes`. */
-export const DefaultMaxRecordBytes = 5600
+/** How many bytes one stored box record may weigh, unless its vaultDB was made with another `maxRecordSizeEst`. */
+export const DefaultMaxRecordSizeEst = 5600
 
 // A brand is a `Symbol.for` key, so a second copy of safebyok (our ESM and CJS builds side by side, or one an adapter
 // bundles) wears and reads the same one, and a host may wear one on purpose. Non-enumerable, it stays out of a spread,
@@ -90,16 +90,16 @@ export const isWhisperedBag = (val: unknown): val is WhisperedBag => (typeof val
 
 // A check reads the getter in place of instanceof, which needs the class imported (a cycle, often) and fails across the
 // ESM and CommonJS builds. A getter sits on the prototype, so it is no own key that a spread or Object.keys would meet.
-/** The model class each `modelkind` names: `ModelkindClasses['box']` is `Box`. */
-export type ModelkindClasses = {
+/** The model class each `modelkind` names: `ClassForModelkind['box']` is `Box`. */
+export type ClassForModelkind = {
   bank: Bank, vault: Vault, box: Box, vault_listing: VaultListing, box_listing: BoxListing, gating: Gating, gate: Gate, wayin: Wayin, lease: Lease, proving: Proving,
 }
 
 /** What each model's `modelkind` getter answers: `box.modelkind` is `'box'`. */
-export type Modelkind = keyof ModelkindClasses
+export type Modelkind = keyof ClassForModelkind
 
 /** True when `val` is a model of one of `modelkinds`, and typed as its class. */
-export const hasModelkind = <MKT extends Modelkind>(val: unknown, ...modelkinds: MKT[]): val is ModelkindClasses[MKT] => (
+export const hasModelkind = <MKT extends Modelkind>(val: unknown, ...modelkinds: MKT[]): val is ClassForModelkind[MKT] => (
   (typeof val === 'object') && (val !== null) && (modelkinds as Modelkind[]).includes((val as { modelkind?: unknown }).modelkind as Modelkind)
 )
 

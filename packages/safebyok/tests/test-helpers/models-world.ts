@@ -37,7 +37,7 @@ import type { Notice } from '../../src/storage/vault-db'
 import * as Refuse from '../../src/refusals/throwers'
 import { fakeCiphered } from './builders'
 
-// == [Time and builders]: T0, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, sentinelBoxRecord
+// == [Time and builders]: T0, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, shellBoxRecord
 
 /** The clock's first reading, in epoch milliseconds: 14 November 2023. The epoch check refuses small numbers. */
 export const T0 = 1_700_000_000_000
@@ -85,19 +85,16 @@ export const fullBoxRecord = (overrides: Partial<BoxRecord> = {}): BoxRecord => 
 /** The sparse form of a box record: {@link fullBoxRecord} less its sidecar and sealed parts. `overrides` says otherwise; a sidecar or sealed part it names is stripped. */
 export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse => SX.boxSparse.parse({ ...fullBoxRecord(), ...overrides })
 
-/** The tombstone of a box record: exactly its sparse form, as {@link sparseBoxRecord} makes it, with `am` 'x' for a deletion or 'd' for damage, and nothing more (no sidecar, no sealed parts). `overrides` says otherwise, but for `am`.
- *
- * @example tombstoneBoxRecord({ revision_seq: 2 }, 'd')   // an entry of a `damaged_rows`
- */
-export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}, am: 'd' | 'x' = 'x'): Tombstone<BoxSparse> => ({ ...sparseBoxRecord(overrides), am })
+/** The tombstone of a box record: exactly its sparse form, as {@link sparseBoxRecord} makes it, with `am` 'x', and nothing more (no sidecar, no sealed parts). `overrides` says otherwise, but for `am`. */
+export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}): Tombstone<BoxSparse> => ({ ...sparseBoxRecord(overrides), am: 'x' })
 
-/** The row a put or del expects to find where no box is stored under `boxlabel`: the sentinel, in {@link WorldVault}. */
-export const sentinelBoxRecord = (boxlabel = 'anthropic_api_key'): BoxTombstone => SX.sentinelBoxOf({ ...WorldVault.scope, boxlabel }, WorldVault.vault_tok)
+/** The row a put or del expects to find where no box is stored under `boxlabel`: the shell, in {@link WorldVault}. */
+export const shellBoxRecord = (boxlabel = 'anthropic_api_key'): BoxTombstone => SX.shellBoxOf({ ...WorldVault.scope, boxlabel }, WorldVault.vault_tok)
 // --
 
 // == [Calls and answers]: ModelsCall, Scripted, BoxAnswer, ModelsWatch
 
-/** One call made to the world or the vaultDB, in {@link ModelsWorld.calls}. `expectedRevisionTok` is that of the row the call expects to find, null for the sentinel's. */
+/** One call made to the world or the vaultDB, in {@link ModelsWorld.calls}. `expectedRevisionTok` is that of the row the call expects to find, null for the shell's. */
 export type ModelsCall =
   | { verb: 'ensureTimely', maxMillis: number | undefined }
   | { verb: 'receiveWorld',    world: unknown }
@@ -205,7 +202,7 @@ export type ModelsWorld = {
   /** {@link sparseBoxRecord}, in this world's vault. */
   sparseBoxRecord(overrides?: Partial<BoxSparse>): BoxSparse
   /** {@link tombstoneBoxRecord}, in this world's vault. */
-  tombstoneBoxRecord(overrides?: Partial<BoxSparse>, am?: 'd' | 'x'): Tombstone<BoxSparse>
+  tombstoneBoxRecord(overrides?: Partial<BoxSparse>): Tombstone<BoxSparse>
   /** The scope of the box `boxlabel` in this world's vault. */
   boxscope(boxlabel: string): Boxscope
 }
@@ -227,7 +224,7 @@ type GetCall = { scope: Boxscope }
 type PutCall = { record: BoxRecord, expectedRevisionTok: string | null, ifAbsent: BoxPutAsk['ifAbsent'], ifPresent: BoxPutAsk['ifPresent'] }
 type DelCall = { scope: Boxscope, expectedRevisionTok: string | null, tombstone: BoxTombstone }
 
-/** The `revision_tok` of the row a call expects to find: null for the sentinel's. */
+/** The `revision_tok` of the row a call expects to find: null for the shell's. */
 const expectedTokOf = ({ revision_tok }: Revision): string | null => ((revision_tok === SX.VoidRevisionTok) ? null : revision_tok)
 
 /** A {@link MemoryVaultDB} whose box verbs and watch log each call, and answer what a test scripts in place of their own. */
@@ -345,7 +342,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       await Promise.resolve()
       demandFakeUnlocked()
       const whisperText = sealedTexts.get(stableJsonify(stamp))
-      if (whisperText === undefined) { throw Refuse.unopenedWhisper() }
+      if (whisperText === undefined) { throw Refuse.undecipheredWhisper() }
       return whisperText
     },
     receiveWorld:    (taken) => { calls.push({ verb: 'receiveWorld', world: taken }) },
@@ -426,7 +423,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
 
     fullBoxRecord:      (overrides) => fullBoxRecord(overrides),
     sparseBoxRecord:    (overrides) => sparseBoxRecord(overrides),
-    tombstoneBoxRecord: (overrides, am) => tombstoneBoxRecord(overrides, am),
+    tombstoneBoxRecord: (overrides) => tombstoneBoxRecord(overrides),
     boxscope:           scopeFor,
   }
 }

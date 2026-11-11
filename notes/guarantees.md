@@ -120,10 +120,10 @@ imported them into a non-extractable handle and zeroed them. The authenticator's
 static methods have derived a non-extractable handle from them and the gating's `spendCleartexts` has zeroed them, once the
 attempt is over (G2 says when a correctable refusal leaves them to the host). The handle exists in
 `Proving.#wayinKey` until the proving is dropped. Nothing of either is ever stored. Outside the core,
-`safebyok-react`'s `bytesOf` (the package runs on the old core until it moves) copies the browser's PRF
+`safebyok-react`'s `copyThenZero` (the package runs on the old core until it moves) copies the browser's PRF
 result into the answer and zeroes the buffer it copied from, so the answer's bytes are the only copy.
 Its dialogs attempt an answer as soon as it comes back, whether or not they are hidden, and zero it once its single
-attempt is done (`attemptOnce`).
+attempt is done (`attemptThenZero`).
 
 ## The secret values
 
@@ -159,15 +159,15 @@ bytes. Everything not listed never sees the value. Private methods are named wit
 `gating.attempt` → `#attemptOnce`, inside the gating's `outcomeOf` → its kind's act (`buildVault`, `unlockVault`,
 `replacePassphrase`, `addPasskey`, `revokePasskey`, `delVault`, `models/gating.ts`) → `checkedCleartexts` (`GX.vaultBuildCleartexts`, `vaultUnlockCleartexts`, `passphraseReplaceCleartexts`,
 `passkeyAddCleartexts`, `passkeyRevokeCleartexts`, `vaultDelCleartexts`: shape only, `passphraseCleartext`) → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
-`buildNovel` → `Proving.checkStrength` → the world's `strengthChecker`, as `guardStrengthChecker`
+`buildNovel` → `Proving.judgeStrength` → the world's `strengthChecker`, as `guardStrengthChecker`
 (`helpers/passphrase-strength.ts`) wraps it → the host's `strengthChecker`; both → `passphraseKeyOf` → the world's
 `keyDeriver.deriveKeyBytes`, as `guardKeyDeriver` wraps it → `deriveKeyBytes` → the host's `keyDeriver.deriveKeyBytes`
-(`argon2idDeriver`'s, from `deriver/argon2id-webv1.ts`, or the host's own). As the user types, before any attempt:
-`gating.checkStrength` → `Proving.checkStrength`, as above.
+(`makeArgon2idDeriver`'s, from `deriver/argon2id-webv1.ts`, or the host's own). As the user types, before any attempt:
+`gating.judgeStrength` → `Proving.judgeStrength`, as above.
 Operates on it without having it: nothing; a passphrase has no handle form.
 
-**Passkey PRF answer.** Naked: `safebyok-react`'s `createPasskey`, `askPasskey` → `answerOf`,
-`bytesOf` (a copy of the authenticator's result) → the host → `gating.attempt` → `#attemptOnce` → its kind's
+**Passkey PRF answer.** Naked: `safebyok-react`'s `createPasskey`, `askPasskey` → `makePasskeyAnswer`,
+`copyThenZero` (a copy of the authenticator's result) → the host → `gating.attempt` → `#attemptOnce` → its kind's
 prove → `checkedCleartexts` (`passkeyAnswer`, `freshPasskeyAnswer`; `passkeyAnswer`'s `prfBytes` check refuses all-zero
 bytes by an inline `reduce`) → `PasskeyProving.buildNovel`, `buildStored` → `deriveWrappingKey`
 (`subtle.importKey` as HKDF input, then `subtle.deriveKey`), none of which zeroes them. `spendCleartexts`
@@ -175,7 +175,7 @@ bytes by an inline `reduce`) → `PasskeyProving.buildNovel`, `buildStored` → 
 checked and whether it is a view or a bare `ArrayBuffer`, and zeroes it with `fill(0)`. It does so in `gating.attempt`
 for an attempt refused before it starts, and in `#attemptOnce` for an attempt that concludes its gating. In
 `safebyok-react`, `PasskeyUnlockButton` and `GatingModal`'s `put_passkey` form pass it on at once, whether or not an
-Activity has hidden them, and `attemptOnce` zeroes it after its attempt.
+Activity has hidden them, and `attemptThenZero` zeroes it after its attempt.
 
 **passphraseKey bytes.** Naked: `keyDeriver.deriveKeyBytes` → `passphraseKeyOf`
 (`isSharedMemory`, `isSafelyAllZero`, the length check) → `importWrappingKeyBytes`
@@ -184,23 +184,23 @@ Activity has hidden them, and `attemptOnce` zeroes it after its attempt.
 **wayinKey.** Never naked: non-extractable from `importWrappingKeyBytes` or
 `deriveWrappingKey`. Has: `Proving.#wayinKey`, set in the constructor. Operates: `#wrapVaultKey`
 (`wrapKeyUnder`), `#unwrapVaultKey` (`unwrapKeyUnder`) through `buildWayin` and
-`buildLease`, and `checkOpens` (`unwrapKeyUnder`).
+`buildLease`, and `checkUnwraps` (`unwrapKeyUnder`).
 
 **vaultKey.** Naked, as an extractable handle in a local: `makeVaultKey` in `buildWayin`;
 `#unwrapVaultKey` with `RewrapUsage` in `buildWayin` and `buildLease`, handed to `#wrapVaultKey`
 (`wrapKeyUnder`) and `Lease.buildGranted` (`wrapKeyUnder` under the leaseKey). Operates, as a
-non-extractable one-usage handle in a local: `checkOpens` (`unwrapKeyUnder`, `CheckUsage`);
+non-extractable one-usage handle in a local: `checkUnwraps` (`unwrapKeyUnder`, `CheckUsage`);
 `Lease.#vaultKey` in `sealWith` (`wrapKey`) and `unsealWith` (`unwrapKey`), handed to
-`#opened`.
+`#decipherSealed`.
 Stored only as `vault_key_wayin_wrapped` (VaultDB) and `vault_key_lease_wrapped` (DeviceDB).
 
 **boxKey.** Naked, extractable in a local: `makeBoxKey` in `Lease.sealWith`, wrapped by
 `wrapKeyUnder` and used by `cipherBytes`. Operates, non-extractable `decrypt` only:
-`unwrapKeyUnder` in `Lease.#opened`, for `unsealWith`, used by `decipherBytes`. Stored
+`unwrapKeyUnder` in `Lease.#decipherSealed`, for `unsealWith`, used by `decipherBytes`. Stored
 only as `box_key_wrapped`.
 
 **leaseKey.** Never naked, never bytes. Made: `makeLeaseKey` in `Lease.buildGranted`, called by
-`Proving.buildLease`, from the vault's `#unlockByProof` and `#renewLease`. Carried, as the `lease_key` of a
+`Proving.buildLease`, from the vault's `#unlockByProving` and `#renewLease`. Carried, as the `lease_key` of a
 `LeaseRecord`: `Lease.#record`, the Lease the vault has in `#lease` (`#attachLease`) → `lease.cacheAsCacheCan` →
 the `LeaseFriend`'s `tryCacheLease` (made in `Vault.#makeFriend`) → `DeviceDB.stow`
 (`storage/device-db.ts`; `IdbDeviceDB`'s structured clone into IndexedDB, or `MemoryDeviceDB`'s
@@ -221,7 +221,7 @@ their `try*` forms → `box.put` → `demandPuttable` (`VX.boxPatch` or `VX.boxP
 `structuredClone`) → `Box.#edit` → `sealedRecordOf` → `stableJsonify`, the text → `vault.sealStampedString`
 (`GX.leaseSealArgs`) → `Lease.sealWith` → `TextEncoder`, `cipherBytes`, the bytes zeroed in a `finally`.
 Out: `box.extractWhisper`, `tryExtractWhisper`, `box.expose`, and `#keptWhisper` for a put that leaves the
-whisper out → `Box.#unseal` → `vault.unsealStampedString` → `Lease.unsealWith` → `#opened` (`decipherBytes`) →
+whisper out → `Box.#unseal` → `vault.unsealStampedString` → `Lease.unsealWith` → `#decipherSealed` (`decipherBytes`) →
 `TextDecoder`, the bytes zeroed in a `finally` → `deserializeWhisper` (`CX.whisper`) → the host, or `Box.#exposed`
 (*Open items*, 1). The core has no `mask` to show an outline of one.
 
@@ -230,10 +230,10 @@ whisper out → `Box.#unseal` → `vault.unsealStampedString` → `Lease.unsealW
 **G1. A passphrase is never a field.** Inside the core a passphrase is only ever a function
 argument or a local. The gating's `attempt` passes the cleartexts to `#attemptOnce`, which passes them to its
 kind's act (`models/gating.ts`), whose `checkedCleartexts` reads them. The act passes the
-passphrase to `PassphraseProving.buildNovel` or `buildStored`; `buildNovel` passes it to `Proving.checkStrength`; and
+passphrase to `PassphraseProving.buildNovel` or `buildStored`; `buildNovel` passes it to `Proving.judgeStrength`; and
 each of the two passes it to `passphraseKeyOf`, which passes it, through the `guardKeyDeriver` wrapper and
 `deriveKeyBytes`, to the host's `keyDeriver.deriveKeyBytes` (`models/proving.ts`).
-`gating.checkStrength` passes a passphrase to `Proving.checkStrength` as the user types. No class, record, snapshot or
+`gating.judgeStrength` passes a passphrase to `Proving.judgeStrength` as the user types. No class, record, snapshot or
 closure that outlives the call keeps it: no gate or vault is ever given a passphrase, and
 past its `Proving` builders an act uses only the provings. The only comparison of two
 passphrases is `antePassphraseClear === nextPassphraseClear` in the `replacePassphrase` act, both
@@ -256,7 +256,7 @@ refused as `bad_option` because its bytes are all zero (`passkeyAnswer`, `shapes
 un-zeroed in one case only: the attempt ends in a refusal the user can correct (`wrong_passkey` is one) and is not the
 gating's last attempt. That is so even when a key was already derived from them. The host may then hand the answer in
 again, or zero it, and the gating keeps no reference with which to zero them later. *Caveat:* in that case the zeroing
-is the host's to do; `safebyok-react`'s dialogs do it (`attemptOnce`). The passkeyKey is HKDF-SHA256 of those bytes, with
+is the host's to do; `safebyok-react`'s dialogs do it (`attemptThenZero`). The passkeyKey is HKDF-SHA256 of those bytes, with
 the wayin's whole ctx as its `info`, derived non-extractable (`deriveWrappingKey`). The result, the
 wayinKey, is not a local: it is `Proving.#wayinKey`, private, for the proving's life, and no
 method returns it or a vaultKey (`models/proving.ts`). Bytes refused before import: anything but
@@ -272,7 +272,7 @@ Uint8Array*).
 (`makeVaultKey`), and unwrapped with `RewrapUsage` in `buildWayin` and `buildLease` (`#unwrapVaultKey`). An extractable
 handle yields its bytes to anyone who has it, so each is dropped at the end of its method and
 crosses no boundary: those methods return a `Wayin`, a `Lease` or a wrap. (b) As a
-*non-extractable* local with one usage: `checkOpens` (`CheckUsage`), and `Lease.#vaultKey`
+*non-extractable* local with one usage: `checkUnwraps` (`CheckUsage`), and `Lease.#vaultKey`
 for each cipher or decipher, which keeps nothing between calls. The pantry has the vaultKey
 only as `vault_key_lease_wrapped`, ciphertext bytes under the leaseKey; there is no handle to a
 naked vaultKey anywhere at rest, and no cache of one in memory. Kept by: `models/proving.ts`,
@@ -309,7 +309,7 @@ safebyok's protection*). Kept by: `models/lease.ts`, `storage/device-db.ts`, `sh
 none of it, answers null and leaves it in place*, one of a list of cases under one title).
 
 **G5. A boxKey is a local.** It is made fresh in `Lease.sealWith`, extractable only so that it can be wrapped. It is
-unwrapped in `#opened`, for `unsealWith`, as a non-extractable key with the `decrypt` usage only. Each is dropped at the
+unwrapped in `#decipherSealed`, for `unsealWith`, as a non-extractable key with the `decrypt` usage only. Each is dropped at the
 end of its method.
 
 **G6. The whisper's bytes are zeroed; its value is the host's.** A put (`putBox`, `box.put`, `putExposed`,
@@ -356,9 +356,9 @@ A `keyDeriver`'s `load` and a strength checker's `load` are given no passphrase.
 passes through unchanged, and any other throw is kept as the cause of `keyDeriverLoadFailed` or
 `strengthCheckerLoadFailed`. A WebCrypto
 failure that a wrong key or an altered record explains is caught and replaced, and its error is never
-kept: the unwrap that proves a wayin (`Proving.checkOpens`, `wrongProof`), the unwrap of a lease's
+kept: the unwrap that proves a wayin (`Proving.checkUnwraps`, `wrongCleartext`), the unwrap of a lease's
 vaultKey (`Lease.#vaultKey`, `damaged_lease`), and the unwrap and decipher of a whisper
-(`Lease.#opened`, `damaged_whisper`). Each such catch covers only WebCrypto calls, with their ctx built before
+(`Lease.#decipherSealed`, `damaged_whisper`). Each such catch covers only WebCrypto calls, with their ctx built before
 it, so a bug in building the ctx is never reported as a wrong proof or a damaged box. Where no wrong key or
 altered record can explain a failure, a WebCrypto error is not caught where it is thrown: in sealing
 a whisper (`Lease.sealWith`: `makeBoxKey`, `wrapKeyUnder`, `cipherBytes`), granting a lease
@@ -390,7 +390,7 @@ the row, and returns null). *Host obligation, documented:* a `strengthChecker`'s
 
 **G9. Only `Gating`, `Proving` and `Lease` have or use a key or its cleartext pre-image.** A passkey's PRF bytes count as a pre-image.
 Besides them a passphrase passes through the host functions of G1, through their wrappers, and through
-`Proving.checkStrength` on its way to one. `src/models/proving.ts` and `src/models/lease.ts` are the only modules
+`Proving.judgeStrength` on its way to one. `src/models/proving.ts` and `src/models/lease.ts` are the only modules
 that import `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes`, `decipherBytes` or a key maker. The wayinKey lives only
 in `Proving.#wayinKey`; the leaseKey only in `Lease.#record` and the row cached on the device. The Vault keeps its
 `Lease` private, in `#lease`, and neither the Vault nor the Bank has a lease record: `Proving.buildLease` makes the
@@ -398,8 +398,8 @@ Lease the vault has, and `Lease.buildFromCache` checks what `DeviceDB.peek` hand
 it. A `Box` reaches the Lease only through the public `vault.sealStampedString` and `unsealStampedString`, which hand
 the lease a whisper's text and a stamp and hand back a sealed whisper or text, never a key. The `LeaseFriend` whose
 `peekLease` returns the cached row with its leaseKey handle is kept in `Lease.#friend` and made
-in `Vault.#leaseFriend`. No public `Vault` method takes a proving: a gating's act reaches `#unlockByProof`
-through `Vault.#unlockVaultByProof`, which is private, and which the vault passes to `Gating.launchOn` or `launchBirth`.
+in `Vault.#leaseFriend`. No public `Vault` method takes a proving: a gating's act reaches `#unlockByProving`
+through `Vault.#unlockVaultByProving`, which is private, and which the vault passes to `Gating.launchOn` or `launchBirth`.
 The entry points export `Gating` as a type only, so the published surface has no launcher a host could hand an unlock
 of its own. A live gating's `constructor` still reaches the statics: that goes around the published types, and the host
 is inside the trust boundary (SECURITY.md). Nothing public on a
@@ -424,18 +424,18 @@ the crypto imports.
   `info` is its wayin's ctx, so the same bytes under another purpose make another key.
 * *A memory-hard, labelled, salted derivation.* Argon2id under a stored `key_deriver_label` whose spec is fixed
   (`Argon2idWebV1`, `deriver/shapes.ts`: 64 MiB, 3 passes, 1 lane, 16-byte salt, 32-byte key), made by
-  `argon2idDeriver` (`deriver/argon2id-webv1.ts`, over `@noble/hashes`); a fresh random salt per wayin
+  `makeArgon2idDeriver` (`deriver/argon2id-webv1.ts`, over `@noble/hashes`); a fresh random salt per wayin
   (`mintPassphraseHeader`, `models/proving.ts`); a wayin under another label is refused as `newer_format`
   (`PassphraseProving.buildStored`), so there is no silent downgrade (`tests/models/proving.test.ts`, *refuses a
-  wayin made under another key deriver as 'newer_format', before the world's is asked*). A deriver that `argon2idDeriver`
-  makes under a supplied label must carry exactly that label's supplied parameters, and `argon2idDeriver` makes none
+  wayin made under another key deriver as 'newer_format', before the world's is asked*). A deriver that `makeArgon2idDeriver`
+  makes under a supplied label must carry exactly that label's supplied parameters, and `makeArgon2idDeriver` makes none
   under another label with the reserved prefix `argon2id_web_`. These are the refines of `keyDeriverSpec`
-  (`deriver/shapes.ts`), which only `argon2idDeriver` reaches, through `parseKeyDeriverSpec`. A host's own deriver is
+  (`deriver/shapes.ts`), which only `makeArgon2idDeriver` reaches, through `parseKeyDeriverSpec`. A host's own deriver is
   checked once, by `keyDeriverShape`
   (`shapes/shapes-core.ts`) in `guardKeyDeriver` as `Bank`'s constructor wraps it: by its interface, and by its
-  `salt_bytes`, which every deriver's spec and every stored salt keep at 16 (`PassphraseSaltBytes`, `helpers/consts.ts`),
+  `salt_size`, which every deriver's spec and every stored salt keep at 16 (`PassphraseSaltSize`, `helpers/consts.ts`),
   but not by its other parameters, as a host bent on weak ones would find a way (`#the-host-is-not-our-threat-model`, the Coach, 2026-11-06). `safebyok/browser`
-  exports `argon2idDeriver` and `argon2idWebV1Deriver` (the main entry point, `safebyok`, exports neither), and
+  exports `makeArgon2idDeriver` and `argon2idWebV1Deriver` (the main entry point, `safebyok`, exports neither), and
   `tests/browser.test.ts` runs both, the refines through `parseKeyDeriverSpec`;
   safebyok-fastkey's hash-wasm deriver runs on the old core.
 * *Randomness* from `crypto.getRandomValues`, `crypto.randomUUID` and `subtle.generateKey` alone (`randomBytes`,

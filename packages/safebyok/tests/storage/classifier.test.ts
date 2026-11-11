@@ -21,8 +21,8 @@ type Meta = Readonly<{ revision_tok: string, revision_seq: number, am: EX.Am, va
 const ExpectedSeqs = { birth: SX.VoidRevisionSeq, stale: Seq - 1, eq: Seq, ahead: Seq + 2 } as const
 const Repl: Policies = { ifAbsent: 'add', ifPresent: 'repl' }
 
-const noVaultYet = SX.sentinelVaultOf(vaultScope)
-const noBoxYet   = SX.sentinelBoxOf(boxscope, 'life1')
+const noVaultYet = SX.shellVaultOf(vaultScope)
+const noBoxYet   = SX.shellBoxOf(boxscope, 'life1')
 
 const liveVault = vaultAt(Seq)
 function goneVaultOf(lifeTok: string) { return SX.vaultTombstone.parse({ ...SX.vaultSparse.parse(vaultAt(Seq, lifeTok)), am: 'x' }) }
@@ -39,7 +39,7 @@ type Level = Readonly<{
   delAct:  (expected: Meta, proposedTok: string, stored: Stored) => string
 }>
 
-const sentinelMeta: Meta = { ...SX.VoidRevision, am: 'x', vault_tok: 'life1', lifeTok: SX.VoidLifeTok }
+const shellMeta: Meta = { ...SX.VoidRevision, am: 'x', vault_tok: 'life1', lifeTok: SX.VoidLifeTok }
 
 // A put brings a new life tok over a tombstone or nothing, and keeps the one of a live row.
 const lifeTokOver = (expected: Meta): string => ((expected.am === 'a') ? expected.lifeTok : `${expected.lifeTok}-reborn`)
@@ -49,7 +49,7 @@ const boxProposed   = (expected: Meta, revision_tok: string) => ({ revision_tok,
 
 const BoxLevel: Level = {
   rows:   { void: null, gone: goneBox, live: liveBox },
-  metaOf: (row) => ((row === null) ? sentinelMeta : { ...SX.rowMeta.parse(row), lifeTok: (row as BoxRow).box_tok }),
+  metaOf: (row) => ((row === null) ? shellMeta : { ...SX.rowMeta.parse(row), lifeTok: (row as BoxRow).box_tok }),
   getAct: (ifAbsent, stored) => boxActOf({ op: 'get', ...boxQuery, ifAbsent, expected: noBoxYet }, liveVault, BoxLevel.rows[stored]),
   putAct: (expected, proposedTok, policies, stored) => boxActOf({
     op: 'put', ...boxQuery, ...policies, expected: boxExpectedOf(expected), record: { ...liveBox, ...boxProposed(expected, proposedTok), box_tok: lifeTokOver(expected) },
@@ -63,7 +63,7 @@ const vaultExpectedOf = ({ lifeTok, ...meta }: Meta) => ({ ...meta, vault_tok: l
 
 const VaultLevel: Level = {
   rows:   { void: null, gone: goneVault, live: liveVault },
-  metaOf: (row) => ((row === null) ? { ...sentinelMeta, vault_tok: SX.VoidLifeTok } : { ...SX.rowMeta.parse(row), lifeTok: row.vault_tok }),
+  metaOf: (row) => ((row === null) ? { ...shellMeta, vault_tok: SX.VoidLifeTok } : { ...SX.rowMeta.parse(row), lifeTok: row.vault_tok }),
   getAct: (ifAbsent, stored) => vaultActOf({ op: 'get', ...vaultScope, ifAbsent, expected: noVaultYet }, VaultLevel.rows[stored]),
   putAct: (expected, proposedTok, policies, stored) => vaultActOf({
     op: 'put', ...vaultScope, ...policies, expected: vaultExpectedOf(expected), record: { ...liveVault, ...boxProposed(expected, proposedTok), vault_tok: lifeTokOver(expected) },
@@ -367,7 +367,7 @@ describe("boxActOf, one box through a run of requests", () => {
   // A row as a request carries it: the record it would store, which is the row stored once it has.
   type Row = Write['record']
   type Run = Readonly<{ stored: Row | null, versions: readonly Row[], sent: readonly Write[], wrote: ReadonlySet<Write> }>
-  const sentinel: Row = SX.sentinelBoxOf(boxscope, 'life1')
+  const shell: Row = SX.shellBoxOf(boxscope, 'life1')
   let minted = 0
   const mint = (stem: string): string => { minted += 1; return `${stem}${String(minted)}` }
 
@@ -381,7 +381,7 @@ describe("boxActOf, one box through a run of requests", () => {
 
   /** Every request worth sending next: a put or del citing nothing, the row stored or the one before it, and each request sent before, again. */
   const nextRequests = ({ stored, versions, sent }: Run): Write[] => {
-    const citable = [sentinel, ...versions.slice(-2)]
+    const citable = [shell, ...versions.slice(-2)]
     const fresh = citable.flatMap((expected) => [
       putCiting(expected, Repl), putCiting(expected, { ifAbsent: 'add', ifPresent: 'get' }), putCiting(expected, { ifAbsent: 'fail', ifPresent: 'fail' }), delCiting(expected),
     ])
@@ -418,7 +418,7 @@ describe("boxActOf, one box through a run of requests", () => {
   })
 
   it("goes on from a tombstone's seq at a rebirth", () => {
-    const born    = putCiting(sentinel, Repl)
+    const born    = putCiting(shell, Repl)
     const deleted = delCiting(born.record)
     const reborn  = putCiting(deleted.record, Repl)
     expect(boxActOf(born, liveVault, null)).to.eq('born')

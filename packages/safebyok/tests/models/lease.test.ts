@@ -41,7 +41,7 @@ describe("a revoke whose forget is refused", () => {
     await lease.cacheAsCacheCan()
     friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
     await TH.expectRefusal(lease.revoke())
-    expect(lease.isPresent).to.be.false
+    expect(lease.isGranted).to.be.false
     await lease.revoke()
     expect(friend.forgetLease).toHaveBeenCalledTimes(1)
     expect(friend.cached).to.not.be.null
@@ -74,7 +74,7 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
   it("shows the record's stamp as the lease's own props, and is in force", async () => {
     const { lease } = await grantedWorld()
     expect(lease).to.deep.include(Stamped)
-    expect(lease.isPresent).to.be.true
+    expect(lease.isGranted).to.be.true
   })
 
   const GrantRefusalCases = [
@@ -124,7 +124,7 @@ describe("lease.cacheAsCacheCan()", () => {
     friend.tryCacheLease.mockResolvedValue(bad(refusal))
     await lease.cacheAsCacheCan()
     expect(friend.tellBadNews).toHaveBeenCalledWith([refusal])
-    expect(lease.isPresent).to.be.true
+    expect(lease.isGranted).to.be.true
     await lease.sealWith(WhisperText, sealStampOf('b1'))
   })
 
@@ -178,7 +178,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
     vi.setSystemTime(T0)
     const got = await Lease.buildFromCache(friend, GrantedAs.gate_epoch)
-    expect(got?.isPresent).to.be.true
+    expect(got?.isGranted).to.be.true
   })
 
   it("forgets a row of another epoch even past autolock", async () => {
@@ -195,7 +195,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
     await lease.cacheAsCacheCan()
     vi.setSystemTime(T0 + (400 * 24 * 60 * 60_000))
     const got = await Lease.buildFromCache(friend, GrantedAs.gate_epoch)
-    expect(got?.isPresent).to.be.true
+    expect(got?.isGranted).to.be.true
   })
 
   it("reports a datastore's refusal as bad news, once, and returns null", async () => {
@@ -287,13 +287,13 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
   }
 })
 
-describe("lease.revoke(), lease.evict() and isPresent", () => {
+describe("lease.revoke(), lease.evict() and isGranted", () => {
   it("revoke forgets the cached record and leaves the lease out of force", async () => {
     const { friend, lease } = await grantedWorld()
     await lease.revoke()
     expect(friend.forgetLease).toHaveBeenCalledTimes(1)
     expect(friend.cached).to.be.null
-    expect(lease.isPresent).to.be.false
+    expect(lease.isGranted).to.be.false
   })
 
   it("is idempotent: a second revoke forgets nothing more", async () => {
@@ -307,11 +307,11 @@ describe("lease.revoke(), lease.evict() and isPresent", () => {
     const { friend, lease } = await grantedWorld()
     friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
     await TH.expectRefusal(lease.revoke())
-    expect(lease.isPresent).to.be.false
+    expect(lease.isGranted).to.be.false
     const other = await grantedWorld()
     other.friend.forgetLease.mockRejectedValueOnce(new VaultError('unexpected_error', 'the datastore is down'))
     await TH.expectBad(other.lease.tryRevoke())
-    expect(other.lease.isPresent).to.be.false
+    expect(other.lease.isGranted).to.be.false
   })
 
   it("Lease.forget forgets a record with no lease granted, starting before it returns", async () => {
@@ -342,7 +342,7 @@ describe("lease.revoke(), lease.evict() and isPresent", () => {
   it("evict drops the keys and leaves the record cached", async () => {
     const { friend, lease } = await grantedWorld()
     lease.evict()
-    expect(lease.isPresent).to.be.false
+    expect(lease.isGranted).to.be.false
     expect(friend.forgetLease).not.toHaveBeenCalled()
     expect(friend.cached).to.not.be.null
   })
@@ -477,7 +477,7 @@ describe("a tampered lease record", () => {
       expect(got).to.be.instanceOf(Lease)
       await TH.expectRefusal(got!.unsealWith(sealed, stamp), 'damaged_lease')
       expect(friend.lock).toHaveBeenCalledTimes(1)
-      expect(got!.isPresent).to.be.false
+      expect(got!.isGranted).to.be.false
       expect(friend.forgetLease).not.toHaveBeenCalled()
       await TH.expectRefusal(got!.sealWith(WhisperText, stamp), 'vault_locked')
       expect(friend.lock).toHaveBeenCalledTimes(1)

@@ -5,8 +5,8 @@ import * as SX from '../../src/shapes/shapes-storage'
 import type { BoxRecord, BoxTombstone, VaultRecord, VaultTombstone } from '../../src/shapes/shapes-storage'
 import { boxAt, boxQuery, boxscope, gateMoveOf, passkeyWayin, passphraseWayin, vaultAt, vaultScope } from '../test-helpers/storage-world'
 
-const noVaultYet = SX.sentinelVaultOf(vaultScope)
-const noBoxYet   = SX.sentinelBoxOf(boxscope, 'life1')
+const noVaultYet = SX.shellVaultOf(vaultScope)
+const noBoxYet   = SX.shellBoxOf(boxscope, 'life1')
 const Add  = { op: 'put', ifAbsent: 'add',  ifPresent: 'fail' } as const
 const Repl = { op: 'put', ifAbsent: 'fail', ifPresent: 'repl' } as const
 const Get  = { op: 'get' } as const
@@ -112,7 +112,7 @@ describe("a vaultDB's get, put and del, each given one ask", () => {
     const vaultDB = await vaultDBWithVault({ maxBoxes: 1 })
     await vaultDB.putBox({ ...Add, ...boxQuery, expected: noBoxYet, record: boxAt(0) })
     const second = { ...boxscope, boxlabel: 'anthropic' }
-    const full = await vaultDB.tryPutBox({ ...Add, ...boxQuery, ...second, expected: SX.sentinelBoxOf(second, 'life1'), record: boxAt(0, 'life1', second) })
+    const full = await vaultDB.tryPutBox({ ...Add, ...boxQuery, ...second, expected: SX.shellBoxOf(second, 'life1'), record: boxAt(0, 'life1', second) })
     expect(full).to.deep.include({ ok: false, act: 'vault_full', world: vaultAt(0), dbhas: null })
     expect(full.ok ? null : full.err.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
   })

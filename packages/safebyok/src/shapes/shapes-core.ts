@@ -2,7 +2,7 @@
 
 import type * as Z from 'zod'
 import { never, record, uuid } from 'zod'
-import { PassphraseSaltBytes, PasskeySaltBytes, isWhisperedBag } from '../helpers/consts'
+import { PassphraseSaltSize, PasskeySaltSize, isWhisperedBag } from '../helpers/consts'
 import { fromB64OrNull } from '../helpers/crypto'
 import type { VaultLogger } from '../helpers/logger'
 import * as Phrases from '../helpers/phrases'
@@ -12,10 +12,10 @@ import { Patterns } from './primitives'
 
 // Unpadded base64url spends four characters on three bytes, so the salt's length is judged before decoding it.
 /** How many characters of base64url text a passphraseSalt is. */
-const PassphraseSaltChars = Math.ceil((PassphraseSaltBytes * 4) / 3)
+const PassphraseSaltChars = Math.ceil((PassphraseSaltSize * 4) / 3)
 
 /** The sentence a passphrase salt's refusal says. */
-const SaltShape = Phrases.passphraseSaltShape(PassphraseSaltBytes, PassphraseSaltChars)
+const SaltShape = Phrases.passphraseSaltShape(PassphraseSaltSize, PassphraseSaltChars)
 
 // == [Ciphered]: ciphered, Ciphered
 
@@ -35,7 +35,7 @@ export { epochMillis, type EpochMillis } from './primitives'
  * A token is plain text, as a host's adapter may write one by hand. A device's id is a UUID. A key deriver's label
  * and a passkey's credential id are plain text, not empty. A salt or a ciphered field is
  * branded for its role, since nothing but safebyok makes one. A passphrase's salt is base64url text of
- * {@link PassphraseSaltBytes} bytes, judged by its characters, its length and decoding it; a passkey's is text, not empty, and {@link prfSalt} judges its length.
+ * {@link PassphraseSaltSize} bytes, judged by its characters, its length and decoding it; a passkey's is text, not empty, and {@link prfSalt} judges its length.
  */
 export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
   vault_tok:               str.min(1),
@@ -52,8 +52,8 @@ export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, c
   vault_key_lease_wrapped: ciphered.brand<'VaultKeyLeaseWrapped'>(),
 }))
 
-/** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltBytes} bytes, as a wayin record has it: a stored row with any other refuses 'damaged_row'. */
-export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltBytes, Phrases.prfSaltShape(PasskeySaltBytes)), 'bad_record')
+/** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltSize} bytes, as a wayin record has it: a stored row with any other refuses 'damaged_row'. */
+export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltSize, Phrases.prfSaltShape(PasskeySaltSize)), 'bad_record')
 
 /** A passphrase wayin's passphraseSalt, its `salt_b64`: base64url text of the random bytes the key deriver takes beside the passphrase. */
 export type PassphraseSalt = Z.infer<typeof salt_b64>
@@ -179,7 +179,7 @@ export type BankedVaultScope = Z.input<typeof bankedVaultScope>
 export const keyDeriverShape = Checker(({ obj, fn, str, lit }) => obj({
   algorithm:         str.optional(),
   key_deriver_label,
-  salt_bytes:        lit(PassphraseSaltBytes),
+  salt_size:        lit(PassphraseSaltSize),
   deriveKeyBytes:    fn<KeyDeriver['deriveKeyBytes']>(),
   load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
 }, Phrases.KeyDeriverShape), 'bad_option')

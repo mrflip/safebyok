@@ -1,16 +1,16 @@
 import type { Modelkind } from '../helpers/consts'
-import { verifyConsistent } from '../helpers/validator'
+import { checkedConsistent } from '../helpers/validator'
 import * as Phrases from '../helpers/phrases'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { type Outcome, demandGood, outcomeOf } from '../refusals/outcome'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
-import type { AskUser, GateProps, LeaseFriend, SealedWhisper, UnlockByProof } from '../shapes/shapes-gateish'
+import type { AskUser, GateProps, LeaseFriend, SealedWhisper, UnlockByProving } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, BoxPut, BoxPutOpts, RevokeSite, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
-import { alreadyListedError, deletedVaultError, unlockFirst } from '../refusals/throwers'
+import { alreadyListed, deletedVault, unlockFirst } from '../refusals/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
@@ -28,7 +28,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 
 /** SLOPDOC: A vault as this device has it: a storable that ducks as its record, and the world its boxes live in. */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> {
-  // == [Props]: applabel, user_id, vaultlabel, world, listing, #bankFriend, #lease, #friend, #boxListing, #gate
+  // == [Props]: applabel, user_id, vaultlabel, world, listing, #bankFriend, #lease, #vaultFriend, #boxListing, #gate
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly applabel:   string
@@ -43,7 +43,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The lease granted on this device, and null is what locked means. */
   #lease: Lease | null = null
 
-  #friend: LeaseFriend | null = null
+  #vaultFriend: LeaseFriend | null = null
 
   #boxListing: BoxListing | null = null
 
@@ -86,9 +86,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const checked = listing.scopeOf(scope)
     listing.demandEnabled()
     const listed = listing.at(checked)
-    if (listed?.isPresent === true) { throw alreadyListedError() }
-    const expected = listed?.sparse ?? SX.sentinelVaultOf(checked)
-    return Gating.launchBirth(listing, checked, expected, Vault.#unlockVaultByProof, askUser)
+    if (listed?.isPresent === true) { throw alreadyListed() }
+    const expected = listed?.sparse ?? SX.shellVaultOf(checked)
+    return Gating.launchBirth(listing, checked, expected, Vault.#unlockVaultByProving, askUser)
   }
   // --
 
@@ -97,7 +97,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** SLOPDOC: Replaces the passphrase through a gating; the passkey stays and no other device is locked. */
   async replacePassphrasePrompt(): Promise<this> {
     await this.ensureTimely(); this.demandPromptable()
-    await Gating.launchOn(this, 'replace_passphrase', Vault.#unlockVaultByProof, this.#bankFriend.askUser)
+    await Gating.launchOn(this, 'replace_passphrase', Vault.#unlockVaultByProving, this.#bankFriend.askUser)
     return this
   }
 
@@ -108,7 +108,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async addPasskeyPrompt(): Promise<this> {
     await this.ensureTimely(VX.Promptly); this.demandPromptable()
     this.gate.demandPasskeyAddable()
-    await Gating.launchOn(this, 'add_passkey', Vault.#unlockVaultByProof, this.#bankFriend.askUser)
+    await Gating.launchOn(this, 'add_passkey', Vault.#unlockVaultByProving, this.#bankFriend.askUser)
     return this
   }
 
@@ -119,7 +119,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async revokePasskeyPrompt(): Promise<this> {
     await this.ensureTimely(VX.Promptly); this.demandPromptable()
     if (this.gate.pkWayin === null) { return this }
-    await Gating.launchOn(this, 'revoke_passkey', Vault.#unlockVaultByProof, this.#bankFriend.askUser)
+    await Gating.launchOn(this, 'revoke_passkey', Vault.#unlockVaultByProving, this.#bankFriend.askUser)
     return this
   }
 
@@ -129,7 +129,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Delete this vault through a del_vault gating, which asks for the passphrase, leaving a tombstone in its slot and nothing of it on this device. */
   async delVaultPrompt(): Promise<this> {
     await this.ensureTimely(); this.demandPromptable()
-    await Gating.launchOn(this, 'del_vault', Vault.#unlockVaultByProof, this.#bankFriend.askUser)
+    await Gating.launchOn(this, 'del_vault', Vault.#unlockVaultByProving, this.#bankFriend.askUser)
     return this
   }
 
@@ -152,10 +152,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link ensureUnlocked}. */
   tryEnsureUnlocked(): Promise<Outcome<this>> { return outcomeOf(() => this.ensureUnlocked()) }
 
-  /** Ask the user for proof, and unlock by it. */
+  /** Ask the user for a passphrase or passkey, and unlock by its proving. */
   async unlock(): Promise<this> {
     await this.ensureTimely(); this.demandPromptable()
-    await Gating.launchOn(this, 'unlock_vault', Vault.#unlockVaultByProof, this.#bankFriend.askUser)
+    await Gating.launchOn(this, 'unlock_vault', Vault.#unlockVaultByProving, this.#bankFriend.askUser)
     return this
   }
 
@@ -163,7 +163,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
   // --
 
-  // == [The lease]: lock, revokeLease, unlockByProof, attachLease, alignBoxes
+  // == [The lease]: lock, revokeLease, unlockByProving, attachLease, alignBoxes
 
   /** Lock the vault and its boxes before returning, and forget the row cached on this device.
    * A failed revoke is announced as `lease_revoke_failed` and does not throw. A no-op on a vault discarded.
@@ -186,8 +186,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     if (! revoked.ok) { this.#bankFriend.announce({ kind: 'lease_revoke_failed', refusal: revoked.err, vault: this, where }) }
   }
 
-  /** The lease `proved` earns, attached. A lock called during the unlock does not stand: the proof says this user may have the vault unlocked. */
-  async #unlockByProof(proved: Proving, gate_epoch?: number): Promise<this> {
+  /** The lease `proved` earns, attached. A lock called during the unlock does not stand: the proving says this user may have the vault unlocked. */
+  async #unlockByProving(proved: Proving, gate_epoch?: number): Promise<this> {
     const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
     await this.#attachLease(lease)
     return this
@@ -209,21 +209,21 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The gating's unlock]: unlockVaultByProof
+  // == [The gating's unlock]: unlockVaultByProving
 
-  // A gating comes to #unlockByProof by this, as no public method of a vault accepts a proving (G9).
-  static readonly #unlockVaultByProof: UnlockByProof = (vault, proved, gate_epoch) => vault.#unlockByProof(proved, gate_epoch)
+  // A gating comes to #unlockByProving by this, as no public method of a vault accepts a proving (G9).
+  static readonly #unlockVaultByProving: UnlockByProving = (vault, proved, gate_epoch) => vault.#unlockByProving(proved, gate_epoch)
   // --
 
   // == [The lease's friend]: leaseFriend, makeFriend, stampOfLife
 
   /** All a lease or a proving hears of this vault, made once. */
   #leaseFriend(): LeaseFriend {
-    this.#friend ??= this.#makeFriend()
-    return this.#friend
+    this.#vaultFriend ??= this.#makeVaultFriend()
+    return this.#vaultFriend
   }
 
-  #makeFriend(): LeaseFriend {
+  #makeVaultFriend(): LeaseFriend {
     const { world: { logger, deviceDB, leaseMillis } } = this
     const stamp = GX.vaultStamp.parse(this)
     const asked = this.#stampOfLife()
@@ -335,12 +335,12 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   #demandLease(stamp: CipherCtxRecord): Lease {
     this.demandEnabled().demandPresent()
-    verifyConsistent(stamp, this.#stampOfLife(), { kind: 'unexpected_error', message: Phrases.StampOfOtherVault })
+    checkedConsistent(stamp, this.#stampOfLife(), { kind: 'unexpected_error', message: Phrases.StampOfOtherVault })
     if (this.#lease === null) { throw unlockFirst() }
     return this.#lease
   }
 
-  // The passphrase's proof is the del_vault gating's, and its run locks the vault before it deletes: a lock does not stop a delete.
+  // The passphrase's proving is the del_vault gating's, and its run locks the vault before it deletes: a lock does not stop a delete.
   /** A delete needs the vault enabled. */
   override demandDeletable(): this { return this.demandEnabled() }
 
@@ -355,7 +355,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Demand that this vault is present. */
   demandPresent(): this {
-    if (! this.isPresent) { throw deletedVaultError() }
+    if (! this.isPresent) { throw deletedVault() }
     return this
   }
 

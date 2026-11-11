@@ -2,7 +2,7 @@
 
 import { isEqual } from 'es-toolkit'
 import { UNANSWERED } from '../helpers/consts'
-import { verifyConsistent } from '../helpers/validator'
+import { checkedConsistent } from '../helpers/validator'
 import { oneAtATime } from '../helpers/one-at-a-time'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { type GoodAnswer, type Notice as VaultDBNotice, type VaultDB, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
@@ -11,7 +11,7 @@ import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingDelOpts, ListingListAnswer, ListingPutAnswer, ListingPutOpts, ListingOpts, ListingWorld, ListingGetAnswer, SlotFate, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
-import { disabledError, rowOfOtherVaultTok, storageIssue } from '../refusals/throwers'
+import { instanceDisabled, rowOfOtherVaultTok, storageIssue } from '../refusals/throwers'
 import * as Phrases from '../helpers/phrases'
 import { demandGood, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
@@ -99,9 +99,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [The listed things]: at, delist, enlist
 
-  /** The instance listed under the scope of `duck`, or null. */
-  at(duck: unknown): ThingT | null {
-    return this.#things.get(this.scopepathOf(this.scopeOf(duck))) ?? null
+  /** The instance listed under the scope of `recordish`, or null. */
+  at(recordish: unknown): ThingT | null {
+    return this.#things.get(this.scopepathOf(this.scopeOf(recordish))) ?? null
   }
 
   /** Delist `thing`, as its own discard asks: the slot empties only for this very instance. */
@@ -174,13 +174,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async #listRows(): Promise<Joined<ListingListAnswer<RecordT, SparseT, DamagedT>, readonly ThingT[]>> {
     const answer = await this.doTryList()
     try {
-      return { answer, val: await this.#takeListed(answer) }
+      return { answer, val: await this.#deliverListing(answer) }
     } catch (err) { return { answer, err } }
   }
 
   // A row set aside as damaged takes down the instance listed in its slot, as a tombstone would, and is told as bad news.
   /** The instances `answer` lists, built or brought up to their rows, its damaged rows set aside. */
-  async #takeListed(answer: ListingListAnswer<RecordT, SparseT, DamagedT>): Promise<readonly ThingT[]> {
+  async #deliverListing(answer: ListingListAnswer<RecordT, SparseT, DamagedT>): Promise<readonly ThingT[]> {
     this.demandEnabled()
     if (answer.world !== null) { this.world.receiveWorld(answer.world) }
     if (! answer.ok) {
@@ -291,7 +291,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // --
 
-  // == [Delivering an answer]: deliver, deliverGood, receiveNothing, buildOrReceive, makeThingOf
+  // == [Delivering an answer]: deliver, deliverGood, receiveNothing, buildOrReceive
 
   /** SLOPDOC: The pipeline every storage answer follows, from its world through the instance listed to the caller. */
   protected deliver(answer: ListingPutAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Promise<ThingT>
@@ -317,7 +317,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const record = answer.val
     // An `act: 'passed'` put returns the stored row. Its revision does not match the one sent, so only its scope is checked.
     const pins = (answer.act === 'passed') ? this.scopeOf(sent) : SX.reqParamsOf(sent)
-    if (record !== null) { verifyConsistent(record, pins, { kind: 'storage_issue', message: Phrases.AnswerNotAsSent }) }
+    if (record !== null) { checkedConsistent(record, pins, { kind: 'storage_issue', message: Phrases.AnswerNotAsSent }) }
     return (record === null) ? this.#receiveNothing(this.scopeOf(sent)) : this.buildOrReceive(record)
   }
 
@@ -331,7 +331,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return listed
   }
 
-  // The one place an instance is made and enlisted: `#makeThingOf` is called from here alone, and only where no instance is listed.
+  // The one place an instance is made and enlisted: `makeThing` is called from here alone, and only where no instance is listed.
+  // A new instance is made void, so that `receive` adopts the record like any newer one.
   /** The instance under the scope of `record`: built, brought up to it or replaced, by the record's fate. */
   protected buildOrReceive(record: Fetched<RecordT, SparseT>): ThingT {
     this.demandEnabled()
@@ -341,7 +342,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const listed = this.at(this.scopeOf(sparse))
     const fate = (listed === null) ? 'replace' : this.fateOver(listed, record)
     if ((listed !== null) && (fate === 'lose')) { return listed }
-    const thing = ((fate === 'replace') ? null : listed) ?? this.#makeThingOf(sparse)
+    const thing = ((fate === 'replace') ? null : listed) ?? this.makeThing({ ...sparse, ...SX.VoidRevision, am: 'x' })
     this.bankFriend.tellBadNews(thing.receive(record).badnews)
     if (thing !== listed) {
       this.#enlist(thing)
@@ -350,9 +351,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.#remakeSnapshot()
     return thing
   }
-
-  /** SLOPDOC: A new instance born of `sparse`, void, for `receive` to adopt its record like any newer one. */
-  #makeThingOf(sparse: SparseT): ThingT { return this.makeThing({ ...sparse, ...SX.VoidRevision, am: 'x' }) }
   // --
 
   // == [The watch]: onNotice
@@ -406,13 +404,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Demands that this listing be enabled: not past a sweep or a vacate. */
   demandEnabled(): this {
-    if (! this.#isEnabled) { throw disabledError() }
+    if (! this.#isEnabled) { throw instanceDisabled() }
     return this
   }
 
   /** Demands a `record` whose scope is `scope`, the one the answer that carries it names. */
   #demandRecordOfScope(record: Fetched<RecordT, SparseT>, scope: ScopeT): void {
-    verifyConsistent(this.scopeOf(record), scope, { kind: 'storage_issue', message: Phrases.RecordOfOtherScope })
+    checkedConsistent(this.scopeOf(record), scope, { kind: 'storage_issue', message: Phrases.RecordOfOtherScope })
   }
   // --
 
@@ -424,12 +422,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The `vault_tok` every record of this listing lies under, being the vault's own; null for a listing whose records make their own, as a vault's do. */
   protected abstract vaultTokOfWorld(): string | null
   protected abstract scopepathOf(scope: ScopeT): string
-  /** The scope of `duck`, a record in any form or a thing ducking as one. */
-  abstract scopeOf(duck: unknown): ScopeT
-  /** The sparse form of `duck`, a record in any form or a thing ducking as one, as a plain copy with the payload left out. */
-  abstract sparseOf(duck: unknown): SparseT
-  /** The full record `duck` is, as a plain copy. */
-  abstract recordOf(duck: unknown): RecordT
+  /** The scope of `recordish`, a record in any form or a thing ducking as one. */
+  abstract scopeOf(recordish: unknown): ScopeT
+  /** The sparse form of `recordish`, a record in any form or a thing ducking as one, as a plain copy with the payload left out. */
+  abstract sparseOf(recordish: unknown): SparseT
+  /** The full record `recordish` is, as a plain copy. */
+  abstract recordOf(recordish: unknown): RecordT
   protected abstract makeThing(central: Fetched<RecordT, SparseT>): ThingT
   /** The refusal for a scope where no row is stored and no instance is listed. */
   protected abstract nothingStoredError(scope: ScopeT): VaultError

@@ -12,7 +12,7 @@ afterEach(() => { mw.dispose() })
 const full      = fullBoxRecord()
 const sparse    = sparseBoxRecord()
 const gone      = tombstoneBoxRecord({ revision_seq: 2 })
-const ouch      = tombstoneBoxRecord({ revision_seq: 2 }, 'd')
+const ouch      = { ...sparseBoxRecord({ revision_seq: 2 }), am: 'd' as const }
 const revision  = { revision_tok: 'rev-a1', revision_seq: 1 }
 const baseProps = { revision_tok: 'rev-a1', revision_seq: 1, registered_at: T0, written_at: T0, am: 'a', vault_tok: 'vault-tok-u1' }
 
@@ -109,16 +109,16 @@ describe("The checks of a record's base fields", () => {
   describe("VX.tombstone", () => {
     expectCases(VX.tombstone, [
       [gone,   true,  'passes a deletion tombstone'],
-      [ouch,   true,  'passes a damaged one\'s tombstone'],
+      [ouch,   false, 'refuses a damaged record'],
       [sparse, false, 'refuses an alive sparse record'],
       [full,   false, 'refuses an alive full record'],
     ])
   })
 
   describe("VX.isTombstone and SX.VoidRevisionSeq", () => {
-    it("tells a damaged or gone record from an alive one, whatever its form", () => {
+    it("tells a gone record from an alive or damaged one, whatever its form", () => {
       expect(VX.isTombstone(gone)).to.be.true
-      expect(VX.isTombstone(ouch)).to.be.true
+      expect(VX.isTombstone(ouch)).to.be.false
       expect(VX.isTombstone(sparse)).to.be.false
       expect(VX.isTombstone(full)).to.be.false
     })

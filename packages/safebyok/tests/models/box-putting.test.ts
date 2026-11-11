@@ -19,11 +19,11 @@ const builtOf = (record: Fetched<BoxRecord, BoxSparse>, listing: TestableBoxList
 
 describe("box.put(patch): rebirth over a tombstone", () => {
   const TombstoneCases = [
-    ["x", "rev-x2", 'a deleted box'],
+    ["rev-x2", 'a deleted box'],
   ] as const
-  for (const [am, tok, blurb] of TombstoneCases) {
+  for (const [tok, blurb] of TombstoneCases) {
     it(`brings ${blurb} back to life under a new box_tok`, async () => {
-      const box = await builtOf(tombstoneBoxRecord({ revision_seq: 2, revision_tok: tok }, am), fakeSealBoxListingOf(world.mw))
+      const box = await builtOf(tombstoneBoxRecord({ revision_seq: 2, revision_tok: tok }), fakeSealBoxListingOf(world.mw))
       world.mw.setNow(T0 + 5000)
       await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'reborn' } })).resolves.to.eq(box)
       expect(box.isPresent).to.be.true
@@ -36,7 +36,7 @@ describe("box.put(patch): rebirth over a tombstone", () => {
     })
 
     it(`brings ${blurb} back to life from a patch with only a sidecar`, async () => {
-      const box = await builtOf(tombstoneBoxRecord({ revision_seq: 2, revision_tok: tok }, am), fakeSealBoxListingOf(world.mw))
+      const box = await builtOf(tombstoneBoxRecord({ revision_seq: 2, revision_tok: tok }), fakeSealBoxListingOf(world.mw))
       world.mw.clearCalls()
       await box.put({ sidecar: { note: 'no whisper' } })
       expect(world.mw.callsOf('put')).to.have.lengthOf(1)

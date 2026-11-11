@@ -284,7 +284,7 @@ input SafebyokGateVerbOptsInput {
   prior: SafebyokRevisionInput!
 }
 
-"""The metadata of the vault row the caller expects to find, or of the sentinel row if it expects none."""
+"""The metadata of the vault row the caller expects to find, or of the shell row if it expects none."""
 input SafebyokVaultExpectedInput {
   revision_tok: String!
   revision_seq: Int!
@@ -292,7 +292,7 @@ input SafebyokVaultExpectedInput {
   vault_tok:    String!
 }
 
-"""The metadata of the box row the caller expects to find, or of the sentinel row if it expects none."""
+"""The metadata of the box row the caller expects to find, or of the shell row if it expects none."""
 input SafebyokBoxExpectedInput {
   revision_tok: String!
   revision_seq: Int!

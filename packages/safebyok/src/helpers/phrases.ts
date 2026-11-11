@@ -2,7 +2,7 @@
  * The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts.
  */
 
-import { PassphraseSaltBytes } from './consts'
+import { PassphraseSaltSize } from './consts'
 
 // == [Names]: LabelShape, DeviceIdShape, UserIdMissing, UserIdChars
 
@@ -101,13 +101,13 @@ export const prfSaltShape = (count: number): string => `A passkey's salt is base
 export const MinutesShape = "Expected a number of minutes, zero or more, fractions too (0.5 is thirty seconds), or Infinity"
 
 /** A `keyDeriver` left out, or no object. */
-export const KeyDeriverShape = `Expected a KeyDeriver: in a browser, argon2idWebV1Deriver from 'safebyok/browser'; elsewhere, your own, with a key_deriver_label, a salt_bytes of ${String(PassphraseSaltBytes)} and a deriveKeyBytes function`
+export const KeyDeriverShape = `Expected a KeyDeriver: in a browser, argon2idWebV1Deriver from 'safebyok/browser'; elsewhere, your own, with a key_deriver_label, a salt_size of ${String(PassphraseSaltSize)} and a deriveKeyBytes function`
 
 /** A `logger` that is no object. */
 export const LoggerShape = "Expected a VaultLogger, with log, warn and error functions: leave it out for the default logger, or pass functions that do nothing to log nowhere"
 
 /** A keyDeriverSpec that is no object. */
-export const KeyDeriverSpecShape = `Expected a keyDeriverSpec: algorithm 'argon2id', key_deriver_label, memory_kib, iterations, parallelism, salt_bytes (${String(PassphraseSaltBytes)}) and output_bytes`
+export const KeyDeriverSpecShape = `Expected a keyDeriverSpec: algorithm 'argon2id', key_deriver_label, memory_kib, iterations, parallelism, salt_size (${String(PassphraseSaltSize)}) and output_size`
 
 /** An Argon2id spec with less than `minKib` of memory for each of its lanes. */
 export const memoryPerLane = (minKib: number): string => `Expected at least ${String(minKib)} KiB of memory for each lane (parallelism)`
@@ -210,10 +210,10 @@ export const AnswerNotAsSent = "Storage answered with a record other than the on
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
 
-// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, ProofClosureThrew, KeyDeriverThrew
+// == [Models: provings]: CleartextMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, KeyDeriverThrew
 
-/** Why a proof that hands in neither a passphrase nor a passkey's answer is refused. */
-export const ProofMissing = "A proof hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
+/** Why cleartexts that hand in neither a passphrase nor a passkey's answer are refused. */
+export const CleartextMissing = "An attempt hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
 
 /** Why a passphrase whose key does not open the vault's passphrase wayin is refused. */
 export const WrongPassphrase = "That passphrase didn't unlock the vault. Check for typos and try again. If you're sure it's right, the stored vault may be damaged."
@@ -255,13 +255,13 @@ export const StampOfOtherVault = "This stamp names another vault than this one, 
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, VaultDeleted
+// == [Models: leases, vaults and boxes]: DamagedLease, UndecipheredWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, VaultDeleted
 
 /** Why a lease on this device is no use: whether found so in the cache, or in force and failing to open. */
 export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
 
 /** Why a whisper that will not open under the vault's key is refused. */
-export const UnopenedWhisper = "That whisper would not open under this vault's key: it was altered in storage, or sealed under another vault. Nothing was changed."
+export const UndecipheredWhisper = "That whisper would not open under this vault's key: it was altered in storage, or sealed under another vault. Nothing was changed."
 
 /** Why a whisper that opened but is no whisper this package knows is refused. */
 export const UndecodedWhisper = "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or seal a whisper over it."
@@ -411,7 +411,7 @@ export const GateEpochNotNext = "its gate_epoch is not one past the stored one."
 export const OtherWayinMoved = "it moves a wayin this verb does not."
 
 /** A box record over the bytes its storage allows in one record. */
-export const boxTooLarge = (recordBytes: number, maxRecordBytes: number): string => `That box weighs ${String(recordBytes)} bytes, over the ${String(maxRecordBytes)} its storage allows in one record.`
+export const boxTooLarge = (recordSizeEst: number, maxRecordSizeEst: number): string => `That box weighs ${String(recordSizeEst)} bytes, over the ${String(maxRecordSizeEst)} its storage allows in one record.`
 
 /** A vault with as many boxes as its storage allows. */
 export const VaultFull = "This vault has as many boxes as its storage allows."

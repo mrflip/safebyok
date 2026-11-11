@@ -9,11 +9,11 @@ const deriverOf = (spec: KeyDeriverSpec): Argon2idKeyDeriver => Object.freeze({
 })
 
 /** Make a frozen key deriver that runs Argon2id at `spec` through WebAssembly.
- * It derives the same bytes as safebyok's `argon2idDeriver` does for the same spec.
+ * It derives the same bytes as safebyok's `makeArgon2idDeriver` does for the same spec.
  *
- * @example argon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 })
+ * @example makeArgon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 })
  */
-export const argon2idWasmDeriver = (spec: KeyDeriverSpec): Argon2idKeyDeriver => deriverOf(parseKeyDeriverSpec(spec))
+export const makeArgon2idWasmDeriver = (spec: KeyDeriverSpec): Argon2idKeyDeriver => deriverOf(parseKeyDeriverSpec(spec))
 
 /** The key deriver for the supplied `Argon2idWebV1` spec, run through WebAssembly: a drop-in replacement for safebyok's `argon2idWebV1Deriver`.
  *
@@ -26,7 +26,7 @@ export const argon2idWasmWebV1Deriver = /* @__PURE__ */ deriverOf(Argon2idWebV1)
 /** Derive the key bytes with hash-wasm's Argon2id at `spec`. */
 const deriveWithWasm = async (spec: KeyDeriverSpec, passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array> => {
   if (typeof WebAssembly === 'undefined') {
-    throw new VaultError('bad_option', "This platform has no WebAssembly (React Native's Hermes has none), so the WebAssembly key deriver cannot run here: use argon2idWebV1Deriver, or argon2idDeriver, from safebyok/browser.")
+    throw new VaultError('bad_option', "This platform has no WebAssembly (React Native's Hermes has none), so the WebAssembly key deriver cannot run here: use argon2idWebV1Deriver, or makeArgon2idDeriver, from safebyok/browser.")
   }
   if (passphrase === '') { throw new VaultError('wrong_passphrase', "A passphrase can't be empty.") }
   try {
@@ -36,7 +36,7 @@ const deriveWithWasm = async (spec: KeyDeriverSpec, passphrase: string, saltByte
       iterations:  spec.iterations,
       parallelism: spec.parallelism,
       memorySize:  spec.memory_kib,
-      hashLength:  spec.output_bytes,
+      hashLength:  spec.output_size,
       outputType:  'binary',
     })
   } catch (err) {

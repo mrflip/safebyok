@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
-import { type GoodOutcome, type Outcome, storageTroubleOf, bad, demandGood, good, outcomeOf, valOf } from '../../src/refusals/outcome'
+import { type GoodOutcome, type Outcome, storageRefusalOf, bad, demandGood, good, outcomeOf, valOf } from '../../src/refusals/outcome'
 import * as Refusals from '../../src/refusals/throwers'
 
 /** An app's own call, which rejects: what outcomeOf's first example wraps. */
@@ -14,7 +14,7 @@ describe("good and bad", () => {
   })
 
   it("makes a bad outcome of a refusal", () => {
-    const err = Refusals.lockedError()
+    const err = Refusals.needUnlocked()
     const outcome = bad(err)
     expect(outcome).to.deep.equal({ ok: false, err })
     expect(outcome).to.not.have.property('val')
@@ -125,13 +125,13 @@ describe("demandGood", () => {
   })
 })
 
-describe("storageTroubleOf", () => {
-  // storageTroubleOf @example
+describe("storageRefusalOf", () => {
+  // storageRefusalOf @example
   it("returns a VaultError unchanged, and wraps anything else as the cause", () => {
     const refusal = new VaultError('vault_reborn', 'Another vault is stored there.')
-    expect(storageTroubleOf(refusal)).to.eq(refusal)
+    expect(storageRefusalOf(refusal)).to.eq(refusal)
     const dropped = new Error('connection terminated unexpectedly')
-    const trouble = storageTroubleOf(dropped)
+    const trouble = storageRefusalOf(dropped)
     expect(trouble.refusalkind).to.eq('storage_unavailable')
     expect(trouble.cause).to.eq(dropped)
     expect(trouble.message).to.not.include('terminated')
@@ -139,7 +139,7 @@ describe("storageTroubleOf", () => {
 
   it("wraps a thrown string, or nothing, with a cause that is never null", () => {
     for (const thrown of ['socket closed', undefined, null]) {
-      const trouble = storageTroubleOf(thrown)
+      const trouble = storageRefusalOf(thrown)
       expect(trouble.refusalkind).to.eq('storage_unavailable')
       expect(trouble.message).to.eq(Refusals.storageUnavailable(thrown).message)
       expect(trouble.cause).to.not.be.null

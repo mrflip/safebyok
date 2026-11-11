@@ -8,7 +8,7 @@ export type VaultResolversOpts<ContextT> = {
   /** The vaultDB that serves every request, such as a `PostgresVaultDB`. */
   vaultDB:  DB.AdapterVaultDB
   /** Return the `user_id` your own auth signed this request in as, or null when signed out. */
-  userIdOf: (context: ContextT) => DB.Awaitable<string | null>
+  getUserId: (context: ContextT) => DB.Awaitable<string | null>
 }
 
 /** Each root field's arguments, as GraphQL coerced them, keyed by the field's name. */
@@ -89,16 +89,16 @@ export type VaultResolvers<ContextT> = {
 
 const vaultResolversOpts = DB.objCheck(({ custom, fn }) => ({
   vaultDB:  custom<DB.AdapterVaultDB>(DB.isAdapterVaultDB, 'Expected an AdapterVaultDB from safebyok/storage'),
-  userIdOf: fn<VaultResolversOpts<unknown>['userIdOf']>(),
+  getUserId: fn<VaultResolversOpts<unknown>['getUserId']>(),
 }), 'bad_option')
 
 /** Make the resolvers for `VaultSchemaSdl`. A request can reach only the bank of the user it is signed in as. */
 export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): VaultResolvers<ContextT> => {
-  const { vaultDB, userIdOf } = vaultResolversOpts.parse(opts)
+  const { vaultDB, getUserId } = vaultResolversOpts.parse(opts)
 
   /** Return null if the request is signed in as `user_id`, else the refusal to send back. */
   const signInRefusalOf = async (context: ContextT, user_id: string): Promise<DB.VaultError | null> => {
-    const signedIn = await DB.outcomeOf(() => userIdOf(context))
+    const signedIn = await DB.outcomeOf(() => getUserId(context))
     if (! signedIn.ok) { return signedIn.err }
     return (signedIn.val === user_id) ? null : DB.identityRevoked()
   }
@@ -106,7 +106,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   /** Run `verb` if the request is signed in as `user_id`, and return its answer in wire form.
    * Otherwise return a bad answer in wire form: the refusal from checking `asked` if it fails, else the sign-in refusal.
    */
-  const served = async (context: ContextT, user_id: string, asked: object, verb: () => Promise<DB.Answer<unknown, string, unknown>>): Promise<CrossingAnswer> => {
+  const serveSignedIn = async (context: ContextT, user_id: string, asked: object, verb: () => Promise<DB.Answer<unknown, string, unknown>>): Promise<CrossingAnswer> => {
     const refusal = await signInRefusalOf(context, user_id)
     if (refusal === null) { return crossingOf(await verb()) }
     const checked = await DB.outcomeOf(() => DB.reqParamsOf(asked))
@@ -149,20 +149,20 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     SafebyokBoxRow:      { __resolveType: typenameOf },
     SafebyokRow:         { __resolveType: typenameOf },
     Query: {
-      safebyokListVaults: async (_parent, scope, context) => await served(context, scope.user_id, scope, async () => await vaultDB.tryListVaults(scope)),
-      safebyokGetVault:   async (_parent, { ask }, context) => await served(context, ask.user_id, ask, async () => await vaultDB.tryGetVault(ask)),
-      safebyokListBoxes:  async (_parent, asked, context) => await served(context, asked.user_id, asked, async () => await vaultDB.tryListBoxes(asked)),
-      safebyokGetBox:     async (_parent, { ask }, context) => await served(context, ask.user_id, ask, async () => await vaultDB.tryGetBox(ask)),
+      safebyokListVaults: async (_parent, scope, context) => await serveSignedIn(context, scope.user_id, scope, async () => await vaultDB.tryListVaults(scope)),
+      safebyokGetVault:   async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryGetVault(ask)),
+      safebyokListBoxes:  async (_parent, asked, context) => await serveSignedIn(context, asked.user_id, asked, async () => await vaultDB.tryListBoxes(asked)),
+      safebyokGetBox:     async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryGetBox(ask)),
     },
     Mutation: {
-      safebyokPutVault:          async (_parent, { ask }, context) => await served(context, ask.user_id, ask, async () => await vaultDB.tryPutVault(ask)),
-      safebyokPutBox:            async (_parent, { ask }, context) => await served(context, ask.user_id, ask, async () => await vaultDB.tryPutBox(ask)),
-      safebyokReplacePassphrase: async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryReplacePassphrase(record, opts)),
-      safebyokAddPasskey:        async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryAddPasskey(record, opts)),
-      safebyokRevokePasskey:     async (_parent, { record, opts }, context) => await served(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryRevokePasskey(record, opts)),
-      safebyokDelBox:            async (_parent, { ask }, context) => await served(context, ask.user_id, ask, async () => await vaultDB.tryDelBox(ask)),
-      safebyokDelVault:          async (_parent, { ask }, context) => await served(context, ask.user_id, ask, async () => await vaultDB.tryDelVault(ask)),
-      safebyokTidyGone:          async (_parent, scope, context) => await served(context, scope.user_id, scope, async () => await vaultDB.tryTidyGone(scope)),
+      safebyokPutVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryPutVault(ask)),
+      safebyokPutBox:            async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryPutBox(ask)),
+      safebyokReplacePassphrase: async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryReplacePassphrase(record, opts)),
+      safebyokAddPasskey:        async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryAddPasskey(record, opts)),
+      safebyokRevokePasskey:     async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryRevokePasskey(record, opts)),
+      safebyokDelBox:            async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryDelBox(ask)),
+      safebyokDelVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryDelVault(ask)),
+      safebyokTidyGone:          async (_parent, scope, context) => await serveSignedIn(context, scope.user_id, scope, async () => await vaultDB.tryTidyGone(scope)),
     },
     Subscription: {
       safebyokWatch: {

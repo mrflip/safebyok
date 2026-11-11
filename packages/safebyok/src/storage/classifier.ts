@@ -148,11 +148,11 @@ function boxRowAt(boxQuery: BoxQuery, boxRaw: unknown): Stored<BoxRow> {
   return { presence: (row.am === 'a') ? 'live' : 'gone', row }
 }
 
-/** The stored vault row of a box request, or the sentinel row for none.
+/** The stored vault row of a box request, or the shell row for none.
  * Throws `damaged_vault` for a row that fails its checks.
  */
 export function boxWorldOf(vaultScope: VaultScope, vaultRaw: unknown): VaultRow {
-  return vaultRowAt(vaultScope, vaultRaw, boxVaultRow).row ?? SX.sentinelVaultOf(vaultScope)
+  return vaultRowAt(vaultScope, vaultRaw, boxVaultRow).row ?? SX.shellVaultOf(vaultScope)
 }
 
 /** Classify a box request's vault row: the act it refuses with, or null when the vault is live in the requested life. */
@@ -183,7 +183,7 @@ export function cappedActOf(act: BoxAct, capacity: Capacity): BoxAct {
 }
 // --
 
-// == [Gate verbs]: replacePassphraseActOf, addPasskeyActOf, revokePasskeyActOf, GateActOf
+// == [Gate verbs]: replacePassphraseActOf, addPasskeyActOf, revokePasskeyActOf, GateActOfForVerb
 // A gate verb is a put of the vault record over its live row, with checks of its own that compare the record's gate with
 // the stored one. They run on the row the adapter fetched in the same step that stores the record, never on a row a
 // caller fetched earlier. Each returns `replaced` when the record may be stored, or the act that stops it, and throws
@@ -214,7 +214,7 @@ function revokePasskeyActOf(record: VaultRecord, stored: VaultRecord): VaultAct 
   return 'replaced'
 }
 
-const GateActOf: Readonly<Record<EX.GateVerb, (record: VaultRecord, stored: VaultRecord) => VaultAct>> = {
+const GateActOfForVerb: Readonly<Record<EX.GateVerb, (record: VaultRecord, stored: VaultRecord) => VaultAct>> = {
   replacePassphrase: replacePassphraseActOf, addPasskey: addPasskeyActOf, revokePasskey: revokePasskeyActOf,
 }
 // --
@@ -238,7 +238,7 @@ export type BoxFetched = Readonly<{ world: unknown, box: unknown, capacity?: Cap
  * - `act` -- directs how to route and handle the answer
  */
 export type VaultClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct }) & {
-  /** The vault row after this request: the record it stores, else the stored row, else the sentinel for none. */
+  /** The vault row after this request: the record it stores, else the stored row, else the shell for none. */
   world:    VaultRow
   /** A good answer's `val`, or a refusal's `dbhas`: the record this request stores, else the stored vault row, or null for none. */
   vault:    VaultRow | null
@@ -251,7 +251,7 @@ export type VaultClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, 
  * - `act` -- directs how to route and handle the answer
  */
 export type BoxClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct | BoxVaultAct }) & {
-  /** The vault row stored, or the sentinel for none. */
+  /** The vault row stored, or the shell for none. */
   world:    VaultRow
   /** A good answer's `val`, or a refusal's `dbhas`: the record this request stores, else the stored box row, or null for none or when the vault row refused. */
   box:      BoxRow | null
@@ -269,12 +269,12 @@ export type BoxClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, ac
 export function classifyVault(ask: VaultAsk, { vault }: VaultFetched): VaultClassified {
   const stored   = vaultRowAt(ask, vault, SX.storedVaultRow)
   const { presence, row } = stored
-  const world    = row ?? SX.sentinelVaultOf(ask)
+  const world    = row ?? SX.shellVaultOf(ask)
   const tabled   = rowActOf(ask, stored)
 
   // A gate verb's put also checks its record against the gate of the live row it would replace.
   const isGatePut = (ask.op === 'put') && (ask.gateVerb !== undefined) && (tabled === 'replaced') && (row?.am === 'a')
-  const act      = isGatePut ? GateActOf[ask.gateVerb](ask.record, row) : tabled
+  const act      = isGatePut ? GateActOfForVerb[ask.gateVerb](ask.record, row) : tabled
 
   if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, world: ask.record, vault: ask.record, presence } }
   return isOkAct(act) ? { ok: true, act, world, vault: row, presence } : { ok: false, act, world, vault: row, presence }
