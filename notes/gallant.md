@@ -1,19 +1,19 @@
 # Goofus and Gallant
 
-Representative bad code from the models, what we did about it, and the principle it teaches. Each principle has a
-hashtag to refer to in a review. The examples come from the `newput` work of November 2026, trimmed for reading: real code,
-except where one says it was only proposed.
+This file shows representative bad code from the models, what we did about it, and the principle it teaches. Each
+principle has a hashtag to refer to in a review. The examples come from the `newput` work of November 2026, trimmed for
+reading. They are real code, except where a pair says it was only proposed.
 
-This file is for code review. Agents writing code learn these from the code around them, so the way to teach them is to fix
-the code. Reviewing against it:
+This file is for code review. Agents writing code learn these principles from the code around them, so the way to teach
+them is to fix the code. When you review against this file:
 
 * Skip anything marked *Planned*, unless you're reviewing that thread.
 * Check a proposed fix against the plan before you offer it. This file teaches the faults, not the rulings, so a fix that follows
   the wording here can still undo something ruled.
 
-**Status** covers the sites named, not the whole codebase, so a fault marked *Fixed* can still live elsewhere. *Fixed* is
-merged or on #470. *Planned* is ruled or proposed for a later thread in `whiteboard/20261104-newput/newput-plan.md`, not
-built. *Open* is a live case that has no thread and needs a ruling.
+**Status** covers the sites named, not the whole codebase, so a fault marked *Fixed* can still live elsewhere. *Fixed*
+means merged, or on #470. *Planned* means ruled or proposed for a later thread in
+`whiteboard/20261104-newput/newput-plan.md`, and not built. *Open* means a live case that has no thread and needs a ruling.
 
 Contents:
 
@@ -32,7 +32,7 @@ Contents:
 ## One way in `#straight-chute`
 
 Each operation has one route from its entry point to storage. A method that branches on how the caller got there is
-doing someone else's job. The state the object already holds should make the branch unnecessary.
+doing someone else's job. The state the object already has should make the branch unnecessary.
 
 **Goofus:** birth and update are two paths, each minting a `box_tok`, setting `registered_at` and sealing.
 
@@ -98,7 +98,7 @@ async get(scoped, opts = {}) {
 }
 ```
 
-**Goofus still:** `delBox` has the shape `getBox` had: a held branch, its own ensure and demand, and a sentinel, because
+**Goofus still:** `delBox` has the shape `getBox` had: a `held` branch, its own ensure and demand, and a sentinel, because
 `BoxListing` has no `del` to forward to.
 
 ```ts
@@ -148,7 +148,7 @@ hello() { return this.boxes.hello() }                      // BoxListing: the wa
 Don't have a middleman assemble another class's record, and don't let it overrule what the caller said. It's only there
 to route.
 
-**Goofus:** the listing assembles a tombstone inline, and swaps the revision the caller named for the one it holds, so a
+**Goofus:** the listing assembles a tombstone inline, and swaps the revision the caller named for the one it has, so a
 stale caller deletes over whatever is current.
 
 ```ts
@@ -179,8 +179,8 @@ vaultDB.delBox(duck)   // an instance, a record, or { ...scope, vault_tok, ...re
 
 If you throw away the return value, you wanted something else. Name it, or put it where it belongs.
 
-**Goofus:** `puttable` finds or makes an instance. `box.put` calls it and discards the answer, only for two throws. It runs
-before the refresh, so those throws judge a stale record, and it can plant a shell by accident.
+**Goofus:** `puttable` finds or makes an instance. `box.put` calls it only for its two throws, and discards the instance.
+It runs before the refresh, so those throws judge a stale record, and it can plant a shell by accident.
 
 ```ts
 async put(patch, opts = {}) {
@@ -217,7 +217,7 @@ async put(patch, opts = {}) {
   const given = this.demandPuttable(patch, { ifPresent })
 ```
 
-**Gallant again:** the one parse sits where its result is used, so every route gets it and `build` has nothing left to do.
+**Gallant again:** a single parse sits where its result is used, so every route gets it and `build` has nothing left to do.
 
 ```ts
 protected buildOrReceive(record) {
@@ -230,10 +230,10 @@ protected buildOrReceive(record) {
 
 ## A try pair has one body `#one-body-per-pair`
 
-Work out which half is easier to write, the throwing form or the try form. That half holds the body; the other is one line
-that wraps it. A method whose `Outcome` carries `meta` holds its body on the try side.
+Work out which half is easier to write, the throwing form or the try form. That half has the body, and the other is one
+line that wraps it. A method whose `Outcome` carries `meta` has its body on the try side.
 
-**Goofus:** the throwing form unwraps an Outcome, the try form wraps it again, and the one caller takes it apart a third time.
+**Goofus:** the throwing form unwraps an Outcome, the try form wraps it again, and the only caller takes it apart a third time.
 
 ```ts
 async cache() {
@@ -247,7 +247,7 @@ async cacheAsCacheCan() {
 }
 ```
 
-**Gallant:** one method, working directly. Where there are two forms, one holds the body and the other wraps it.
+**Gallant:** one method, working directly. Where there are two forms, one has the body and the other wraps it.
 
 ```ts
 async cacheAsCacheCan() {
@@ -262,9 +262,9 @@ tryGetBox(boxlabel, opts = {}) { return outcomeOf(() => this.getBox(boxlabel, op
 
 ## Make an outcome only for someone who wants one `#outcome-for-its-consumer`
 
-`outcomeOf` is for a function that returns an `Outcome`, or whose immediate consumer needs one. Made and unmade on the spot,
-possibly across methods, it is a try/catch in a costume: write the try/catch. `valOf` is for its value; to throw a bad outcome
-and discard the answer, `demandGood`.
+`outcomeOf` is for a function that returns an `Outcome`, or whose immediate consumer needs one. An outcome made and unmade
+on the spot, possibly across methods, is a try/catch in disguise: write the try/catch. `valOf` is for an outcome's value. To
+throw a bad outcome and discard the answer, use `demandGood`.
 
 **Goofus:** an outcome built only to be unbuilt, and a `valOf` whose value nobody takes.
 
@@ -328,7 +328,7 @@ if (checked.data.gate_epoch !== epoch || ! consistent(vaultStamp.parse(checked.d
 }
 ```
 
-**Gallant:** an outdated row is ordinary and says nothing; a row of another stamp is news.
+**Gallant:** an outdated row is ordinary and says nothing. A row of another stamp is news.
 
 ```ts
 try {
@@ -416,9 +416,9 @@ puttable(scoped, opts = {}) {
 demandPuttable(patch, choices) { /* parses the patch, then demands enabled, vault usable, whole */ }
 ```
 
-**Enabled is a special guard:** one monkeywrench is enough. The code that ends a listing is synchronous: it disables the listing,
-disables every thing in it, and removes them, so nothing crosses it halfway. The one check after a store's answer is at the top of
-`deliver`, before it takes the answer's world.
+**Enabled is a special guard:** one check is enough. The code that ends a listing is synchronous: it disables the
+listing, disables every thing in it, and removes them, so nothing crosses it halfway. The only check after storage answers is at
+the top of `deliver`, before it takes the answer's world.
 
 ```ts
 protected async deliver(answer) {
@@ -451,7 +451,7 @@ this.demandPuttable(patch, choices)
 ```
 
 **Not this fault:** `fetch` and `hydrate` check the world again at each step, on the way to storage. A check that is timely costs
-nothing, and the one cost is that a caller's looser `maxWorldMillis` can still earn a refresh. We leave them.
+nothing, and the only cost is that a caller's looser `maxWorldMillis` can still earn a refresh. We leave them.
 
 *Status: Fixed.*
 
@@ -475,8 +475,8 @@ protected demandNotListed(scope) {
 **Gallant:** delete it. A `create` over a live box refuses `camped`, and over a stored, unlisted box `stale_write`, each with
 the row that was in the way.
 
-**Goofus again:** `demandPuttable` refused a held tombstone under `ifAbsent: 'fail'`, though the vaultDB is told `ifAbsent` too. Over a box
-reborn elsewhere, the local check said absent, where the vaultDB's `stale_write` delivers the frontier.
+**Goofus again:** `demandPuttable` refused over a local tombstone under `ifAbsent: 'fail'`, though the vaultDB is told `ifAbsent` too. Over a
+box reborn elsewhere, the local check said absent, where the vaultDB's `stale_write` delivers the frontier.
 
 ```ts
 if (ifAbsent === 'fail') { this.demandPresent() }
@@ -484,14 +484,14 @@ if (ifAbsent === 'fail') { this.demandPresent() }
 
 **Gallant again:** delete it, and the vaultDB's `absent_box` or `stale_write` answers.
 
-**Not this fault:** a birth's refusal of a vault held. No backend is asked yet: it spares the user a passphrase dialog and a KDF that
-could only fail.
+**Not this fault:** a birth's refusal of a vault the bank already has. No backend has been asked yet, and the refusal spares the user a
+passphrase dialog and a KDF that could only fail.
 
 *Status: Fixed.*
 
 ## The impossible is one line `#impossible-is-a-crash`
 
-A branch the types force and only a broken system reaches is one line: `throw`. If it wants a second line, stop and raise it.
+A branch the types force and only a broken system reaches is one line: `throw`. If it wants a second line, stop and flag it.
 Never `!` or a cast, which is what a host's own vaultDB adapter gets to crash through. No row, no FIXME, and no reviewer asking
 for more. What makes this safe is failing closed before anything changes, not proving the branch never runs. The test: if you
 can name a *correct* system that reaches the state, it isn't this case.
@@ -544,7 +544,7 @@ await this.#ensureGreeted(); this.demandBoxesUsable()
 **Goofus again, proposed and dropped:** a `delBox` that fetches first, so a host that skipped `hello` never meets a `stale_write`.
 
 **Gallant:** no `#isGreeted`. A host that skips `vault.hello` has no list and no pushes, and `vault.delBox` on a box it doesn't
-hold fails stale, with the frontier delivered. The host chose that.
+have fails stale, with the frontier delivered. The host chose that.
 
 *Status: Fixed.*
 
@@ -553,7 +553,7 @@ hold fails stale, with the frontier delivered. The host chose that.
 Before fixing an edge case, trace who actually reaches it, and what the fix costs everyone else. A special case that names a
 sentinel is a smell. So is a fix that changes behaviour for cases the bug never touched.
 
-**Goofus:** a shell left by a refused put made `get` answer absent, so a reviewer taught `get` about void revisions.
+**Goofus:** a shell left by a refused put made `get` return absent, so a reviewer taught `get` about void revisions.
 
 ```ts
 const isHeard = (held !== null) && (held.revision_seq !== VS.VoidRevisionSeq)
@@ -619,8 +619,8 @@ tryDelDamagedBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box |
 }
 ```
 
-The two aren't DRYed: each is short, and they should be free to differ. A damaged row with no readable revision is the one
-exception today: storage can't tell `delBox`'s sentinel from it, which Thread 3 owns.
+The two aren't DRYed: each is short, and they should be free to differ. A damaged row with no readable revision is the only
+exception today: storage can't tell it from `delBox`'s sentinel. Thread 3 owns that case.
 
 *Status: Fixed.*
 
@@ -630,7 +630,7 @@ exception today: storage can't tell `delBox`'s sentinel from it, which Thread 3 
 
 ## Look before you write `#use-the-helper`
 
-Search `src/checks/validator.ts` and the module's helpers before writing anything small. The pull to write it again is
+Search `src/helpers/validator.ts` and the module's helpers before writing anything small. The pull to write it again is
 strongest where the helper is one grep away.
 
 **Goofus:**
@@ -653,7 +653,7 @@ protected isRefusalOfRow({ refusalkind }) { return (refusalkind === 'stale_write
 // VaultListing adds 'vault_gone' and 'vault_reborn'; BoxListing adds 'absent_box'
 ```
 
-**Gallant:** `isOwnRow` already answers exactly that question, about the row itself.
+**Gallant:** `isOwnRow` already decides exactly that question, about the row itself.
 
 ```ts
 if ((stored !== null) && this.isOwnRow(stored)) { /* deliver it */ }
@@ -697,7 +697,7 @@ return (ifAbsent === 'nil' && thing?.isPresent !== true) ? null : thing
 return this.handleIfAbsent(await held.hydrate(timely), scoped, ifAbsent)
 ```
 
-**Goofus again:** `receive` asks whether the answer is older, right after `reconcileCentral` compared the same two revisions and said.
+**Goofus again:** `receive` asks whether the answer is older, right after `reconcileCentral` compared the same two revisions.
 
 ```ts
 const { central } = this.reconcileCentral(answer, this.classifyRecordShape(answer))
@@ -738,7 +738,7 @@ const record = this.isTombstoneRecord(prior)
   : await sealedRecordOf(this.world, next, sidecar ?? this.demandFullProps().sidecar, whisper ?? await this.#keptWhisper())
 ```
 
-**Not this fault:** `Storable.fetch` keeps its own `ifAbsent` test, as it answers the thing rather than found-or-null.
+**Not this fault:** `Storable.fetch` keeps its own `ifAbsent` test, because it returns the thing itself rather than found-or-null.
 
 *Status: `deliver`, `BoxListing.get`, `receive`, `#edit`, Fixed.*
 
@@ -777,7 +777,7 @@ return this.boxListing.puttable({ ...patch, ...this.scope }, opts).put(patch, op
 
 A placeholder that looks real gets read as real. If you don't have the value yet, get it first, or ask for it.
 
-**Goofus:** `bank.device_id` and the snapshot show a random id that was never stored, then change once `hello` lands. A second
+**Goofus:** `bank.device_id` and the snapshot show a random id that was never stored, then change once `hello` resolves. A second
 page's id is thrown away, and a host's own id silently loses to a stored one.
 
 ```ts
@@ -816,9 +816,9 @@ export const VoidTime = 1_218_182_888_777   // 2008-08-08T08:08:08.777Z
 ## If it's the host's, ask the host `#ask-the-host`
 
 Before building machinery to work out a value, ask whether the caller can simply be asked for it. Count what that machinery
-actually costs: here, a store, a row kind, an async factory and a bad-news path, for a value nothing reads back.
+actually costs: here, a datastore, a row kind, an async factory and a bad-news path, for a value nothing reads back.
 
-**Goofus:** a candidate minted in the constructor and a first-wins row in the deviceDB, in the code. Then, proposed and dropped, a
+**Goofus:** in the code, a candidate minted in the constructor and a first-wins row in the deviceDB. Then, proposed and dropped, a
 pull when a wayin is minted, and this async `Bank.build`.
 
 ```ts
@@ -832,8 +832,8 @@ static async build(opts) {
 ```
 
 **Gallant:** `device_id` is a required option of a synchronous `Bank.make`, and the deviceDB serves leases alone. The option's doc
-block carries what the mint used to guarantee: a random id, never drawn from anything about the device or the user, as it sits in
-the clear on every wayin.
+block carries what the mint used to guarantee: a random id, never drawn from anything about the device or the user, because it is
+stored unencrypted on every wayin.
 
 *Status: Planned, Thread 2.*
 
@@ -842,7 +842,7 @@ the clear on every wayin.
 When a rule changes, go looking for what existed only to serve the old rule. A wrapper every caller must construct and unwrap
 needs a reason.
 
-**Goofus:** whispers were any JSON value, so each sits in a `{ val }` holder, which every caller writes and the ciphertext stores.
+**Goofus:** whispers were any JSON value, so each sits in a `{ val }` wrapper, which every caller writes and the ciphertext stores.
 
 ```ts
 box.put({ whisper: { val: { a: 7 } } })   // seals '{"val":{"a":7}}'
@@ -857,7 +857,7 @@ box.put({ whisper: { a: 7 } })            // seals '{"a":7}'
 box.put({ whisper: 7 })                   // refused 'bad_option'
 ```
 
-**Goofus again:** `Aligned` promises refusals for the host, and nothing ever puts one in it. Every `receive` and `align` answers an
+**Goofus again:** `Aligned` promises refusals for the host, and nothing ever puts one in it. Every `receive` and `align` returns an
 empty `badnews`, and every caller still reads it.
 
 ```ts
@@ -867,7 +867,7 @@ align() {
 }
 ```
 
-**Gallant again:** `align` and `receive` answer nothing, and `Aligned.badnews` goes.
+**Gallant again:** `align` and `receive` return nothing, and `Aligned.badnews` goes.
 
 **Goofus a third time:** a one-line precondition spread across three methods and a listing verb with a birth-only name.
 
@@ -921,7 +921,7 @@ demandEnabled():    this { if (! this.#isEnabled) { throw disabledError() } retu
 
 ## Guards chain to the caller or the receiver `#chain-guards`
 
-A guard name should either match a direct attribute of the receiver or match (with +able) the step its callers share. The first tests one thing; the second chains those.
+A guard name should either match a direct attribute of the receiver or match (with +able) the step its callers share. The first tests one thing, and the second chains such tests.
 
 **Goofus:**
 
@@ -953,8 +953,8 @@ keeping goes in a `//` comment above the doc block: `// The lock first: no box o
 | The lock first, as it is synchronous and safe: no box opens under a lease while the tombstone goes out. The tombstone's answer, delivered, vacates the boxes. | Lock this vault and store its tombstone. Its boxes are vacated once storage answers. |
 | Fetch this vault with what its get lists: a timely vault, its boxes held sparse, its damaged rows set aside, and the box listing's watch started. No box verb needs it; the host runs it for the list and the pushes. | List this vault's boxes and start its watch. |
 
-From the old tree (`packages/safebyok-old/src`, removed 2026-11-10), the Gallant column proposed, not the Coach's: a decision given as its reason, the
-project rule the code answers echoed as its doc, and a look ahead.
+These come from the old tree (`packages/safebyok-old/src`, removed 2026-11-10), and the Gallant column is proposed, not the Coach's. The
+Goofuses show a decision given as its reason, the project rule the code follows echoed as its doc, and a look ahead.
 
 | Goofus | Gallant, proposed |
 |---|---|
@@ -1020,7 +1020,7 @@ demandUnsealable(): this
 ## Say what to do, not what gets refused `#say-what-to-do`
 
 "Refuses before ready" hands the caller a state they can't act on. "Precede with `await bank.hello()`" hands them the call.
-A block written for its caller names the call to make before and the one to make after, and bolds the one word that would
+A block written for its caller names the call to make before and the call to make after, and bolds the word that would
 surprise them.
 
 **Goofus:**
@@ -1044,7 +1044,7 @@ vaultAt(scope: BankedVaultScope): Vault | null
 ## The line worth writing is the guarantee `#say-the-guarantee`
 
 The signature can't tell a caller what the call proves, and a security reviewer opens the block for exactly that. A line spent
-on the holder's shape, with the refusals pointed at another method, leaves it unsaid.
+on the `WhisperHolder`'s shape, with the refusals pointed at another method, leaves it unsaid.
 
 **Goofus:**
 
@@ -1064,8 +1064,8 @@ async extractWhisper(opts: TimelyOpts = {}): Promise<Whisper>
 
 ## A private helper gets a phrase `#a-helper-gets-a-phrase`
 
-A private helper trusts its exported caller, and its block does too: what it answers, in a phrase. The reach it makes and the
-refusals it can meet belong to the exported method that owns them, and are said there, once.
+A private helper trusts its exported caller, and its block does too: it says what the helper returns, in a phrase. The verbs it
+calls and the refusals it can meet belong to the exported method that owns them, and are said there, once.
 
 **Goofus:**
 
@@ -1088,7 +1088,7 @@ async #unseal(record: BoxRecord): Promise<Whisper>
 ## The best name is its own doc `#its-name-is-its-doc`
 
 A name that says what the thing is needs no doc line beside it. When the doc line is longer than the name, and the
-name could have said it, rename. The pair the Coach wrote on an option of `objCheck` (landed as PR #510).
+name could have said it, rename. The Coach wrote this pair, on an option of `objCheck` (merged as PR #510).
 
 **Goofus:**
 

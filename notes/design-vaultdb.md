@@ -69,14 +69,14 @@ For every return value,
 | VPA7 | all   | vault_gone       | 💣   | database row and `dbhas` equal tombstone                                              |
 | VPA7 | all   | vault_empty      | 💣   | database row empty, `dbhas` null, world a sentinel'ed tombstone                       |
 | VPA7 | all   | vault_reborn     | 💣   | database row live under another vault_tok; `world` and `dbhas` equal that row         |
-| VPA7 | all   | vault_full       | 💣   | `req_params` holds scope, vault_tok, other safe metadata                                      |
-| VPA7 | all   | box_too_large    | 💣   | `req_params` holds scope, vault_tok, other safe metadata                                      |
-| VPA7 | all   | identity_revoked | 💣   | `req_params` holds scope, vault_tok, other safe metadata                                      |
-| VPA7 | all   | storage_error    | 🌀   | `req_params` holds scope, vault_tok, other safe metadata                                      |
-| VPA7 | all   | not_permitted    | 🌀   | `req_params` holds scope, vault_tok, other safe metadata                                      |
-| VPA7 | all   | damaged_record   | 🌀   | `req_params` holds scope, vault_tok, other safe metadata                                      |
-| VPA7 | all   | invalid_input    | 🌀   | `req_params` holds scope, vault_tok, other safe metadata                                      |
-| VPA7 | all   | newer_format     | 🌀   | `req_params` holds scope, vault_tok, other safe metadata                                      |
+| VPA7 | all   | vault_full       | 💣   | `req_params` contains scope, vault_tok, other safe metadata                                   |
+| VPA7 | all   | box_too_large    | 💣   | `req_params` contains scope, vault_tok, other safe metadata                                   |
+| VPA7 | all   | identity_revoked | 💣   | `req_params` contains scope, vault_tok, other safe metadata                                   |
+| VPA7 | all   | storage_error    | 🌀   | `req_params` contains scope, vault_tok, other safe metadata                                   |
+| VPA7 | all   | not_permitted    | 🌀   | `req_params` contains scope, vault_tok, other safe metadata                                   |
+| VPA7 | all   | damaged_record   | 🌀   | `req_params` contains scope, vault_tok, other safe metadata                                   |
+| VPA7 | all   | invalid_input    | 🌀   | `req_params` contains scope, vault_tok, other safe metadata                                   |
+| VPA7 | all   | newer_format     | 🌀   | `req_params` contains scope, vault_tok, other safe metadata                                   |
 
 * ifAbsent, on a get: with 'fail', a void or gone row refuses; with 'nil', a void or gone row succeeds (val = null, and dbhas is null or the tombstone). On a put (`PutOpts`, for `putVault` and `putBox` alike): 'add', the default, creates the record over a void row, or over a tombstone at `prior`; 'fail' refuses in those cases, with `vault_empty` or `vault_gone` (`absent_box` for a box)
 * Gate verbs take `(record, { prior })`: the whole next vault record, which the vault listing builds, and the revision it replaces. `{ prior }` is strict, as it is for `delVault` and `delBox`: passing an `ifAbsent` or `ifPresent` refuses `bad_option`. Each gate verb gets the stored vault (`doGetVault`) and checks it. The stored row must be at `prior`, or the verb refuses `stale_write`. `registered_at` must be unchanged, `gate_epoch` must be one more than the stored one, and only the verb's own wayin may differ, or the verb refuses `gate_issue`. An `addPasskey` when a passkey is already stored refuses `camped`; a `revokePasskey` when none is stored returns the stored row. Then each verb puts through `putVault(record, { prior, ifAbsent: 'fail', ifPresent: 'repl' })`
@@ -93,7 +93,7 @@ For every return value,
   | --- | ----------------- | ----- | ------------- | --- | --- | ---- | ------------------------------------------------------------------------------------------------------ | ---------- |
   | V3  | `getBank`         | nil   | got           | 👍   | 📌   | 🟰 📌  | world equals request scope                                                                             | 2.5        |
   | V3  | `getBank`         | nil   | got           | 👍   | 📌   | 🟰 📌  | db vaults and `val.vaults` are equal, simultaneous, either full or tombstone                           | 2.5        |
-  | V3  | `getBank`         | nil   | got           | 👍   | 🌀   | 🟰 🌀  | `damaged_records` holds tombstones for any vaults failing validation (`am: 'd'`: going, next sprint)  | 2.5        |
+  | V3  | `getBank`         | nil   | got           | 👍   | 🌀   | 🟰 🌀  | `damaged_records` contains tombstones for any vaults failing validation (`am: 'd'`: going, next sprint)  | 2.5        |
   | V3  | `getBank`         | nil   | gotvoid       | 👍   | 🔲   | 🟰 🔲  | no vaults for that applabel/user_id                                                                    | 2.5        |
   | ..  |                   |       |               | ◽️   | ◽️   | ◽️ ◽️  |                                                                                                        |
   | V3  | `getBox`          | _any_ | got           | 👍   | 📌   | 🟰 📌  | db row and `val` are equal, request scope+vault_tok match                                              | 2.5        |
@@ -102,7 +102,7 @@ For every return value,
   | V3  | `getBox`          | nil   | gotvoid       | 👍   | 🔲   | 🟰 🔲  | db row void, `dbhas` is null, `val` is null                                                            | 2.5        |
   | V3  | `getBox`          | nil   | gotgone       | 👍   | 🪦   | 🟰 🪦  | db row  and  `dbhas` tombstone equal, `val` is null                                                    | 2.5        |
   | ..  |                   |       |               | ◽️   | ◽️   | ◽️ ◽️  |                                                                                                        |
-  | V3  | `getVault`        | _any_ | got           | 👍   | 🌀   | 🟰 🌀  | `damaged_records` (`am: 'd'`: going, next sprint) holds tombstones for any boxes failing validation (→ `vaultBoxes(vault)`, not built yet) | 2.5        |
+  | V3  | `getVault`        | _any_ | got           | 👍   | 🌀   | 🟰 🌀  | `damaged_records` (`am: 'd'`: going, next sprint) contains tombstones for any boxes failing validation (→ `vaultBoxes(vault)`, not built yet) | 2.5        |
   | V1  | `getVault`        | _any_ | got           | 👍   | 📌   | 🟰 📌  | db row, request, `val`, world are equal, request scope matches                                         | 2.4        |
   | V1  | `getVault`        | _any_ | got           | 👍   | 📌   | 🟰 📌  | val.boxes has sparse db boxes, simultaneous (→ `vaultBoxes(vault)`, not built yet)                     | 2.4        |
   | V3  | `getVault`        | fail  | vault_empty   | 💣   | 🔲   | 🟰 🔲  | db row void; `dbhas` is null,                                                                          | 2.5        |
@@ -152,7 +152,7 @@ For every return value,
   | ..  |                   |       |               | ◽️   | ◽️   | ◽️ ◽️  |                                                                                                        |
   | V9  | ~~`getCapacity`~~ |       | ok            | 👍   | ➖   | 🟰 *️⃣  | capacity count estimates +/- 20% boxes sharing request scope+vault_tok                                 | 4          |
   | V10 | `tidyGone`        |       | tidied        | 👍   | *️⃣   | 💾 🔲  | Removes rows for boxes whose vault scope and vault_tok match no vault or a tombstoned vault            |
-  | V10 | `tidyGone`        |       | tidied        | 👍   | *️⃣   | 💾 🔲  | `val` holds `{ totalCount: <number of non-void boxes remaining after request> }`.                      |
+  | V10 | `tidyGone`        |       | tidied        | 👍   | *️⃣   | 💾 🔲  | `val` contains `{ totalCount: <number of non-void boxes remaining after request> }`.                   |
   | V10 | `tidyGone`        |       | storage_error | 💣   | *️⃣   | 🤷 🤷  | no `val`: a refusal carries none                                                                       |
 
 
@@ -162,7 +162,7 @@ Eyebrow raisers from the Coach's replies in the sprint's Closer Look (`whiteboar
 
 * **Damage:** `am: 'd'`, its sentinels and the `damaged*` helpers. "damage is an agent obsession I thought I'd ruled out. We need to remove this."
 * **The answer frame:** `#call`, `answerOf`, `adapted`, every verb's body in a wrapper. "redesign as we decommission the old code".
-* **The `do*` seam:** invariants a remote store may be unable to run in one transaction. "Nothing has been contemplated that involved running zod inside a transaction"; `doCacheDeviceRecord`'s closure is to be removed.
+* **The `do*` seam:** invariants a remote datastore may be unable to run in one transaction. "Nothing has been contemplated that involved running zod inside a transaction"; `doCacheDeviceRecord`'s closure is to be removed.
 * **A refusal's row:** `world` and `dbhas` are on an enumerable `meta`, so a host's error logger gets the wrapped `vaultKey` and the salt. Refusal factories should choose what goes on it.
 * **The box list:** `fetchListed` and `vaultRowOf`, a second vault get kept to take the list apart from the row. "a design artifact".
 * **`maxBoxes`:** `notes/wontfix.md` says a damaged row still counts, but `MemoryVaultDB`'s `#demandRoom` counts rows whose peeked `am` is `'a'`, so a damaged row counts only if its `am` still reads `'a'`. Which should it be?

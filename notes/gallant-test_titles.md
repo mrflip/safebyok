@@ -1,13 +1,13 @@
 # Goofus and Gallant: test titles
 
-Specimens of the test-title register in `packages/safebyok/tests/`, harvested 2026-11-05 at `b7bacb68`, one fault each,
-with the rewrite. The rule is STYLE.md *Tests*: a title is one plain clause naming the behaviour; the assertions carry the
-kinds no customer reacts to; a pointer to an `@example` is a `// member @example 2` comment on the test's first line.
+Test titles from `packages/safebyok/tests/`, collected 2026-11-05 at `b7bacb68`, each showing one fault, with its
+rewrite. The rule is STYLE.md *Tests*. A title is one plain clause naming the behaviour. The assertions carry the kinds no
+customer reacts to. A pointer to an `@example` is a `// member @example 2` comment on the test's first line.
 
-This file is for the agent fixing titles and the reviewer checking it. Each principle has a hashtag to cite.
+This file is for the agent fixing titles and the reviewer checking that work. Each principle has a hashtag to cite.
 
 **Read a title in its scope.** A `describe` names the subject, the member under test (`vault.ensureTimely(maxMillis)`),
-and below it, where one is needed, the situation (`with no passkey held`). The `it` is the predicate. Read down the chain
+and below it, where one is needed, the situation (`with no passkey held`). The `it` is the predicate. Read down the chain,
 they make a sentence: "vault.revokePasskey(), with no passkey held, is a no-op". A title is right or wrong only in that
 chain, so read the chain, never the title alone, and a condition every sibling shares moves up into a `describe`. The lint
 allows five levels before it warns; three is usually plenty. Titles in brackets below are the enclosing `describe`.
@@ -20,10 +20,10 @@ Contents: `#kind-is-the-assertion`, `#no-as-trailer`, `#outcome-not-action`, `#i
 ## The kind is the assertion's `#kind-is-the-assertion`
 
 A kind in the title repeats the `expectRefusal` one line below. Keep it only where the customer checks for that kind and
-reacts to it, a `stale_write` race, a `wrong_passphrase`: those kinds are part of our API, and `CustomerKinds` in the lint
-lists them. A *misuse* kind (`bad_option`, `bad_scope`, `bad_record`) never is one. Three or more contiguous siblings
-refusing a listed kind group under a `describe` that names it once. Any other kind just drops, and what its siblings share
-moves up into a `describe`.
+reacts to it, as with a `stale_write` race or a `wrong_passphrase`. Those kinds are part of our API, and `CustomerKinds` in
+the lint lists them. A *misuse* kind (`bad_option`, `bad_scope`, `bad_record`) is never one of them. Three or more
+contiguous siblings refusing a listed kind are grouped under a `describe` that names it once. Any other kind is dropped from
+the title, and what its siblings share moves up into a `describe`.
 
 | Goofus | Gallant |
 |---|---|
@@ -33,9 +33,9 @@ moves up into a `describe`.
 
 ## No "as" trailer `#no-as-trailer`
 
-"As its second example shows" becomes a `// parseLogger @example 2` comment on the line above the `it(`, the member
-being the one whose doc block holds the example and the number its position there. An "as X does" that
-is the assertion itself is the predicate: say it as one. The reason for a fixture goes in a `//` by the fixture, or nowhere.
+"As its second example shows" becomes a `// parseLogger @example 2` comment on the line above the `it(`. The member is
+the one whose doc block has the example, and the number is the example's position there. An "as X does" that
+is the assertion itself is the predicate: state it as the predicate. The reason for a fixture goes in a `//` by the fixture, or nowhere.
 
 | Goofus | Gallant |
 |---|---|
@@ -57,7 +57,7 @@ list those rather than split them.
 
 ## The invariant, not the trace `#invariant-not-trace`
 
-A test of a call sequence is legitimate: the chute is a contract. Its title still names the guarantee, often as a "never",
+A test of a call sequence is legitimate: the route a call takes is a contract (`#straight-chute` in `notes/gallant.md`). Its title still names the guarantee, often as a "never",
 not the steps in order. Where the sequence itself is the assertion, say so plainly and list it once.
 
 | Goofus | Gallant |
@@ -68,7 +68,7 @@ not the steps in order. Where the sequence itself is the assertion, say so plain
 
 ## Conditions move up `#conditions-move-up`
 
-Three qualifiers on one verb are a `describe` waiting to be written: the situation goes up, the predicate stays short.
+Three qualifiers on one verb are a `describe` waiting to be written: move the situation up into it, and keep the predicate short.
 A property the assertions check is not a condition and leaves the title.
 
 | Goofus | Gallant |
@@ -79,7 +79,7 @@ A property the assertions check is not a condition and leaves the title.
 
 ## Name the referent `#name-the-referent`
 
-"It", "one" and "its own" for a noun a sibling test named. Each title stands alone in the runner's output.
+The fault is a title that says "it", "one" or "its own" for a noun that only a sibling test named. Each title stands alone in the runner's output.
 
 | Goofus | Gallant |
 |---|---|
@@ -88,7 +88,7 @@ A property the assertions check is not a condition and leaves the title.
 ## No citations `#no-citations`
 
 A date, a Coach, a gate code or a section tag in a title is history (`#purpose-not-path`). A `describe` names the
-behaviour; the ruling lives in the whiteboard.
+behaviour, and the ruling stays in the whiteboard.
 
 | Goofus | Gallant |
 |---|---|
@@ -108,8 +108,8 @@ assertions check.
 
 ## Template titles are tables `#templates-are-tables`
 
-A `${...}` title over a case list is right: it reads as a table row in the runner. The blurb slot carries the sentence and
-the inputs are the columns. Leave them.
+A `${...}` title over a case list is right: it reads as a table row in the runner. The blurb slot carries the sentence, and
+the inputs are the columns. Leave these titles alone.
 
 ## Already good
 

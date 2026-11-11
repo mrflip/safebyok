@@ -1,8 +1,9 @@
 # Goofus and Gallant: doc blocks
 
-Doc blocks in pairs: Goofus, the slop, and Gallant, the block that replaces it, under the principle the pair shows. Each
-principle has a hashtag to cite in a review; `rg '#tag' notes/` finds the pair. The principle names the species, to hunt in
-the blocks this file doesn't cover. Some lessons have their first pair in `notes/gallant.md`, under *Words*.
+This file collects doc blocks in pairs, each under the principle it shows: Goofus is the slop, and Gallant is the block
+that replaces it. Each principle has a hashtag to cite in a review, and `rg '#tag' notes/` finds its pair. A principle names
+a kind of fault: hunt for it in the blocks this file does not show. Some principles have their first pair in
+`notes/gallant.md`, under *Words*.
 
 ---
 
@@ -10,8 +11,9 @@ the blocks this file doesn't cover. Some lessons have their first pair in `notes
 
 ## Lead with the job `#lead-with-the-job`
 
-The first line says what the call does, in the words of the caller's own checklist. When a host calls it, and what a refusal
-leaves behind, are the class's story, said once there or not at all. "A host may repeat" is a caller list in disguise.
+The first line says what the call does, in the words the caller would use for the task. When a host calls it, and what a
+refusal leaves behind, belong in the class's doc block, said once there or not at all. "A host may repeat" is a list of
+callers in disguise.
 
 **Goofus:**
 
@@ -29,8 +31,8 @@ async hello(): Promise<void>
 async hello(): Promise<void>
 ```
 
-A second specimen, on a pure function. The second line is the adapter's story, not this call's: `boxActOf` beside it carried
-the same sentence, and `notes/answer-contract.md` already says it once.
+A second specimen, on a pure function. Its second line describes the adapter's job, not this function's: `boxActOf` beside
+it carried the same sentence, and `notes/answer-contract.md` already says it once.
 
 **Goofus:**
 
@@ -51,7 +53,7 @@ export const vaultActOf = (request: VaultRequest, vaultRaw: unknown): VaultAct =
 ## The outcome, not the branch tour `#outcome-not-branches`
 
 A block that walks each path the method can take, with the state each leaves, is its control flow in prose. Say what the
-caller holds when it resolves, and any case that bends it.
+caller has when it resolves, and any case that is an exception.
 
 **Goofus:**
 
@@ -87,9 +89,9 @@ async ensureVault(scope: BankedVaultScope): Promise<Vault>
 
 ## The whole contract in one breath `#one-breath-contract`
 
-When every clause is true and the block is still wrong, the fault is the shape: mechanism, the halves a patch keeps, a refusal
-catalog, the rebirth case and the option semantics in one paragraph. The caller wants a first line, a pointer for the terms and
-a list for the option values, as `#no-refusal-catalog` shows on `create`.
+When every clause is true and the block is still wrong, the fault is its shape. This Goofus packs the mechanism, the halves a
+patch keeps, a refusal catalog, the rebirth case and the option semantics into one paragraph. The caller wants a first line, a
+pointer to where the terms are defined, and a list of the option values, as `#no-refusal-catalog` shows on `create`.
 
 **Goofus:**
 
@@ -119,12 +121,12 @@ async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this>
 
 ## The first line is short; a surprise may lengthen it `#one-sentence-headline`
 
-The first line rests on the `/**`: a few words to a full line, so the essentials read with the code folded. A second fact
-goes on a line below, under a short headline. The test: read the line aloud; a breath taken at "so", "as" or a semicolon
-marks where the second line begins.
+The first line starts on the `/**` and runs from a few words to a full line, so the essentials can be read with the code
+folded. A second fact goes on a line below the short headline. The test: read the line aloud. Where you take a breath at
+"so", "as" or a semicolon, the second line begins.
 
-**A refusal the caller meets in normal use sits right under the headline.** `create` refusing a live box is what a
-caller checks before calling it: one line below the headline, not glued onto it.
+**A refusal the caller meets in normal use goes right under the headline.** A caller checks for a live box before calling
+`create`, so that refusal goes on the line below the headline, not glued onto it.
 
 **Goofus:**
 
@@ -143,9 +145,9 @@ async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box>
 async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box>
 ```
 
-**Stays short: criteria are a description, not a headline.** `putVault` is the thrower of a put's refusals, so its block
-carries them (`#no-refusal-catalog` exempts the thrower). Crammed into the first line they are a sentence nobody can hold;
-under a one-line headline they are a list a caller can scan.
+**The headline stays short: criteria are a description, not a headline.** `putVault` throws a put's refusals, so its block
+lists them (`#no-refusal-catalog` exempts the thrower). Crammed into the first line, they make a sentence nobody can follow.
+Under a one-line headline, they make a list a caller can scan.
 
 **Goofus:**
 
@@ -166,8 +168,8 @@ async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow,
 async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>>
 ```
 
-**The tell: two facts glued.** A long first line is not wrong for being long; it is wrong when a "so" or an "as" joins the
-act to a guarantee or a condition that is a fact of its own. The guarantee is the line worth writing (`#say-the-guarantee`),
+**The tell: two facts glued together.** A long first line is not wrong for being long. It is wrong when a "so" or an "as"
+joins the act to a guarantee or a condition that is a fact of its own. The guarantee is the line worth writing (`#say-the-guarantee`),
 and it gets its own line.
 
 **Goofus:**
@@ -272,7 +274,7 @@ A private one-liner gets three lines: two null cases, then a reason about storag
 
 ## Not the body aloud, second specimens `#purpose-not-machinery`
 
-The first pairs are in `notes/gallant.md`. Here, the state left behind told as participial absolutes, and a wait narrated.
+The first pairs are in `notes/gallant.md`. These two tell the state left behind as participial absolutes, and narrate a wait.
 
 **Goofus:**
 
@@ -312,7 +314,7 @@ Narrates when it demands relative to its one wait, with a "so" clause giving the
 
 ## Name the act `#name-the-act`
 
-A function that stores, wraps or attaches opens with that verb. A past-tense event or a participle phrase is a lookup's opening, not an act's.
+A function that stores, wraps or attaches opens with that verb. A past-tense event or a participle phrase may open a lookup's block, never an act's.
 
 **Goofus:**
 
@@ -366,7 +368,7 @@ Attaches a property, but leads with what it returns.
 
 ## Replace multiple fragments with sentences `#use-sentences`
 
-The usual signs: a semicolon joining two facts, a list with its verb gapped out, a stand-in "one", a trailing absolute. Each is a cue to rewrite as a sentence, not a ban.
+The usual signs are a semicolon joining two facts, a list with its verb gapped out, a stand-in "one", and a trailing absolute. Each is a cue to rewrite as a sentence, not a ban.
 
 **Goofus:**
 
@@ -408,7 +410,7 @@ A stand-in "one" inside a participle.
   parse: (val: unknown, story?: Story) => Z.output<SchemaT>
 ```
 
-A participle lead, gapped refusals joined by a semicolon, and a trailing absolute; no finite verb.
+It opens with a participle, joins gapped refusals with a semicolon, and ends on a trailing absolute. It has no finite verb.
 
 **Gallant:**
 
@@ -473,7 +475,7 @@ States the 'vault_full' a caller meets in normal use, and gives no recipe for it
 
 ## Option values get a list `#option-values-get-a-list`
 
-One value a line, the default marked. Values gapped into a sentence, or told as policy prose, hide the value the caller is looking for.
+List one value a line, and mark the default. Values gapped into a sentence, or told as policy prose, hide the value the caller is looking for.
 
 **Goofus:**
 
@@ -483,7 +485,7 @@ One value a line, the default marked. Values gapped into a sentence, or told as 
 export interface ObjCheckOpts extends Z.input<typeof Checks.objCheckOpts> {}
 ```
 
-Two options and their values gapped into one sentence, the default in parentheses.
+Two options and their values gapped into one sentence, with the default in parentheses.
 
 **Gallant:**
 
@@ -534,7 +536,7 @@ A term with a home gets one `{@link}` or a pointer, never a second definition.
   readonly sidecar:                Sidecar
 ```
 
-Redefines sidecar, which `Sidecar` in shapes/box.ts already defines.
+Redefines sidecar, which `Sidecar` in shapes/shapes-core.ts already defines.
 
 **Gallant:**
 
@@ -578,9 +580,10 @@ Redefines the gate record, which `GateRecord` in shapes/vault.ts already defines
 
 ## Words all three audiences can read `#customer-first`
 
-Use words a front-end developer (the customer) or a regular person (the user) knows, that a security reviewer understands without ambiguity.
-A security reviewer reads "additional associated data"; a developer reads "a bag of props turned into bytes, mixed in but
-not stored". Word it so both read it: none of our abbreviations, and no "it is one ... header" slop.
+Use words that a front-end developer (the customer) or a regular person (the user) knows, and that a security reviewer
+understands without ambiguity. A security reviewer reads "additional associated data". A developer reads "a bag of props
+turned into bytes, mixed in but not stored". Word it so both can read it: use none of our abbreviations, and no "it is one
+... header" slop.
 
 **Goofus:**
 
@@ -604,7 +607,7 @@ not stored". Word it so both read it: none of our abbreviations, and no "it is o
 ## Plain English `#plain-english`
 
 Every word can be ordinary and the sentence still be one nobody would say. Say the line to someone who has not opened the
-file: if they would ask "meaning what?", write the answer to that question. `#customer-first` is about our jargon; this is
+file: if they would ask "meaning what?", write the answer to that question. `#customer-first` is about our jargon. This one is
 about plain words in a private phrasing. The gallant line is usually shorter than the signature under it.
 
 **Goofus:**
@@ -667,7 +670,7 @@ A "How a foo verbs" opening, its verb a metaphor: "finds" stands for "the state 
 export const leaseCtxOf = (vaultStamp: VaultStampButFormat, leaseStamp: LeaseStamp): Uint8Array => (
 ```
 
-Words were spent on how the ctx is made and a refusal, while the purpose of the binding went unsaid:
+The block spends its words on how the ctx is made and on a refusal, and never says what the binding is for.
 
 **Gallant:**
 
@@ -681,7 +684,7 @@ Words were spent on how the ctx is made and a refusal, while the purpose of the 
 
 ## A guard names its predicates `#guard-names-its-predicates`
 
-A guard says what it asks, linked where the predicate has a name; not the kinds it refuses, and not its callers.
+A guard says what it asks, with a link where the predicate has a name. It does not list the kinds it refuses, or its callers.
 
 **Goofus:**
 
@@ -691,7 +694,7 @@ A guard says what it asks, linked where the predicate has a name; not the kinds 
   #demandLease(call: VaultCall): Lease {
 ```
 
-A guard written as a noun phrase, its predicates given as participles rather than named.
+A guard written as a noun phrase, with its predicates given as participles rather than named.
 
 **Gallant:**
 
@@ -717,7 +720,7 @@ Names the kinds it refuses, not the predicate it asks, then says who calls it.
 
 ## The reason goes above `#reason-goes-above`
 
-A maintainer's note, an invariant kept or a reason, is a `//` comment above the doc block; the doc block says what the member does.
+A maintainer's note, such as an invariant kept or a reason, is a `//` comment above the doc block. The doc block says what the member does.
 
 **Goofus:**
 
@@ -747,7 +750,7 @@ An invariant for maintainers inside the doc block.
 const isAllZero = (bytes: Uint8Array): boolean => bytes.reduce((seen, byte) => seen | byte, 0) === 0
 ```
 
-The reason fills the block; and the `reduce`, though branch-free, does not read as the idiom a reviewer knows.
+The reason fills the block. And the `reduce`, though branch-free, does not read as the idiom a reviewer knows.
 
 **Gallant:**
 
@@ -783,7 +786,7 @@ A maintainer's note on what is not checked here, and why.
 
 ## Facts come from the code `#facts-from-the-code`
 
-A doc states what the body does, never what the old prose or a test title claimed. Where they disagree, write the code and raise it.
+A doc states what the body does, never what the old prose or a test title claimed. Where they disagree, write what the code does, and flag the disagreement.
 
 **Goofus:**
 
@@ -793,7 +796,7 @@ A doc states what the body does, never what the old prose or a test title claime
   isCarriedBy(vaultRecord: Pick<VaultRecord, 'gate'>): boolean {
 ```
 
-Says the proving "opens the gate it holds"; the body only compares visible header fields.
+It says the proving "opens the gate it holds", but the body only compares visible header fields.
 
 **Gallant:**
 

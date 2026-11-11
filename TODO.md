@@ -45,7 +45,7 @@ Small irritants, each a few lines, picked up by whoever is nearby.
   job runs the VaultDB battery, its races and the `23503` case against a real server, and is not
   required by the main ruleset until it has a track record. The ruleset is the Coach's to change.
 * **`node-compat (22)` a required check.** Ruled 2026-10-16
-  ([#130](https://github.com/mrflip/safebyok/pull/130)): the job gates on Node 22, the platform
+  ([#130](https://github.com/mrflip/safebyok/pull/130)): the job blocks a merge on Node 22, the platform
   floor (`engines`), and only reports on the newest Node. A workflow cannot make a check
   required; the ruleset is the Coach's to change.
 * **The vaultDB throwers' banner names the wrong field.** Found 2026-11-11
@@ -155,7 +155,7 @@ are both big but acceptable gaps". Two gaps, both accepted for now:
   adapter's tests show which user_ids fail (by byte length, multibyte characters counted in bytes).
   The repair is to be decided: a hash, a host-given channel id, or a tighter user_id.
 * **The listener never unlistens.** The README's `listen` recipe runs `LISTEN` on a user's channel
-  when that user's first watch opens and never `UNLISTEN`s, so one connection holds a channel for
+  when that user's first watch opens and never `UNLISTEN`s, so one connection keeps listening on a channel for
   every user its server has watched since it connected. The repair is a count per channel, or
   unlistening on a schedule.
 
@@ -240,7 +240,7 @@ so a lock that lands during an unlock's proof leaves the vault unlocked. Still o
 
 The Gripefest doc's NOT YET row G530: whether asking for the passphrase again whenever a lease
 expires is still the right demand once a vault has a passkey. (The question beside it, whether a
-vault should hold several passphrases, was settled by the Coach on 2026-10-19: one passphrase and
+vault should have several passphrases, was settled by the Coach on 2026-10-19: one passphrase and
 at most one passkey, built in `slots`, B4a of the contract sprint.) Decide before the wayin
 surface is 1.0.
 
@@ -334,7 +334,7 @@ first; maintainability beats speed unless something is shown slow.
 From thread 4 ([#132](https://github.com/mrflip/safebyok/pull/132), `thread-4-refusals_and_catchup.md`,
 *A pre-existing race*): during a change to the wayins, this handle's own bell refresh can read the
 new vault props before `reviseWayins` sets it, judge the key `outlived`, drop it and discard the
-lease. `grantLease` restores the key in memory, but that discard can land after the
+lease. `grantLease` restores the key in memory, but that discard can be written after the
 new record, so the next open asks for the passphrase. The direction is safe, and serializing the
 refreshes does not cure it. The Coach (2026-10-16): into the TODO, beside the multiple-passphrases
 question. The fix, small: do not judge `outlived` against vault props this handle wrote itself.
@@ -385,7 +385,7 @@ not recurse into the call that found the damage.
 ### The sidecar out of the seal (next)
 
 The Coach (2026-11-10): "the sidecar is not supposed to be sealed, we should handle that next." Today the box's stamp, which both seals are
-bound to, holds the sidecar as stable JSON, so a sidecar-only `putBox` must open the whisper and seal it again (`Box.#edit`), and needs
+bound to, contains the sidecar as stable JSON, so a sidecar-only `putBox` must decipher the whisper and seal it again (`Box.#edit`), and needs
 the vault unlocked. Take the sidecar out of the stamp. The core README says a sidecar is "authenticated but never encrypted", and only
 the stamp authenticates it: say whether that promise is dropped, or what authenticates the sidecar instead. This replaces the 2026-10-22
 question of how a `putBox` that leaves the whisper out is expressed.
@@ -416,7 +416,7 @@ instance to the device cache in its `align(thing)`, which runs on each delivery 
 `Storable.edit` aligns only the instance and does not notify the listing, so a staged edit that has
 not been sent exists only in memory, and a reload restores the instance from the copy cached before
 the edit: the edit is lost. The design question: whether `edit` should pass the thing to the
-listing's `align` (the staged record holds the whisper sealed, never in the clear, so the copy is
+listing's `align` (the staged record has the whisper sealed, never in the clear, so the copy is
 safe to keep), and what a restored staged edit means when another device may have written a later
 revision in the meantime.
 
@@ -551,5 +551,5 @@ The Coach (2026-10-18): "make a todo section for accessability, enter this there
 
 ## RAGEBAIT
 
-Moved to `NOTYET.md`, which holds the shelf.
+Moved to `NOTYET.md`, which has the shelf.
 

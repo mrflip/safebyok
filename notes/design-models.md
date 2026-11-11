@@ -48,7 +48,7 @@ Removed from the interface, and so absent from every table: every `cleartexts` p
 
 Given the seam and the row, everything to its right is guaranteed.
 
-* The columns left of the seam give what must hold when the call starts, and are filled in on the method's first row only: 🎬 unlocked; 🏦 or 🗳️, the object acted on, with ⏳ where it must be timely; 1️⃣ one at a time. A blank means not required. A ? marks a sigil that was inferred, where neither the old cell nor the gating file says so.
+* The columns left of the seam give what must be true when the call starts, and are filled in on the method's first row only: 🎬 unlocked; 🏦 or 🗳️, the object acted on, with ⏳ where it must be timely; 1️⃣ one at a time. A blank means not required. A ? marks a sigil that was inferred, where neither the old cell nor the gating file says so.
 * The columns right of the seam: act, the outcome's name where it has one; ok; post, for the listing and then the object, whether each changed and to what; ret, the return value, or its properties where they matter; note.
 * Rows and columns with nothing to say are left out. Proving and Gate write nothing, so they have no post column.
 
