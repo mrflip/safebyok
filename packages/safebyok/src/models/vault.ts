@@ -262,8 +262,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.#demandLease(checked.stamp).unsealWith(checked.sealed, checked.stamp)
   }
 
-  // The vault listing takes it as it takes any vault row: a gate moved elsewhere arrives with it, and a newer row of another life replaces this Vault there.
-  /** Delivers the vault row a box's answer carries. */
+  // The vault listing receives the `world` as it would a row from any vault request:
+  // a gate changed on another device comes with it, and a newer row from another life
+  // replaces this Vault in the listing.
+  /** Deliver the vault row a box answer carries. */
   receiveWorld(world: unknown): void { this.listing.receiveRow(SX.vaultRow.refusingAs('record_conflict').parse(world)) }
   // --
 
@@ -310,7 +312,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link putBox}. */
   tryPutBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
 
-  /** Tombstones the box listed at `boxlabel` and answers it. A box already deleted, or never stored, refuses `absent_box`; {@link BoxListing.del} has the other refusals. */
+  /** Delete the box listed at `boxlabel`, and return it.
+   * Refuses `absent_box` for a box already deleted or never stored.
+   */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
     const scope = { ...this.scope, boxlabel }
     const box = await this.boxListing.deletable(scope).del(scope, opts)

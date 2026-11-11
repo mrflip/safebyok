@@ -53,10 +53,10 @@ export const vaultChannelOf = (user_id: string): string => channelOf(vaultChanne
 /** The notification channel for `user_id`. */
 const channelOf = (user_id: string): string => `safebyok_${user_id}`
 
-// The database sends each notice, from `safebyok_tell` in `vault-functions.ts`: one JSON object, with the address of the row
-// stored under `at`, and under `vault` and `box` the rows it had room for.
+// Each notice comes from `safebyok_tell` in `vault-functions.ts`: a JSON object with the stored row's address under `at`,
+// and under `vault` and `box` whichever rows fit.
 
-/** A parsed notice: the address of the row stored, plus the rows the notice had room for. */
+/** A parsed notice: the stored row's address, and the rows that fit the byte-size limit. */
 type Told = VaultScope & { vault_tok?: string | undefined, boxlabel?: string | undefined, heard?: Heard | undefined }
 
 const toldWhere = DB.objCheck(({ applabel, user_id, vaultlabel, str }) => ({
@@ -104,14 +104,14 @@ const codeOf = (thrown: unknown): string | undefined => (
 )
 // --
 
-// == [What the database answers]: VaultAnswered, BoxAnswered, storedVerdict, worldRow, RowOfOtherAddress
-// A plain fetch answers rows alone. A write function also answers whether it stored the record (`ok`), and where it did,
-// the `act` that came to and the `presence` of what was stored before.
+// == [What the database returns]: VaultAnswered, BoxAnswered, storedVerdict, worldRow, RowOfOtherAddress
+// A fetch returns rows alone. A write function also returns whether it stored the record (`ok`), and if it did,
+// the `act` and the `presence` of what was stored before.
 
-/** What the database answers for a vault's ask, as it comes: the vault row, and a write function's verdict. */
+/** The database's result for a vault request, unchecked: the vault row, and a write function's verdict. */
 type VaultAnswered = VaultFetched & { ok?: boolean, act?: unknown, presence?: unknown }
 
-/** What the database answers for a box's ask, as it comes: the vault row and the box row, a write function's verdict, and a birth's count of the vault life's box rows. */
+/** The database's result for a box request, unchecked: the vault row, the box row, a write function's verdict, and for a birth the vault life's count of box rows. */
 type BoxAnswered = BoxFetched & { ok?: boolean, act?: unknown, presence?: unknown, boxcount?: number }
 
 const { storedVerdict } = DB.Checkers('storage_issue', ({ obj, oneof }) => ({
@@ -125,7 +125,7 @@ const RowOfOtherAddress = { kind: 'storage_issue', message: DB.rowOfOtherAddress
 const StoredNothing = 'The database stored nothing for a write its rows allow.'
 // --
 
-/** The vault row a one-row answer has, null for none. */
+/** The vault row in a one-row result, or null for none. */
 const vaultOf = (rows: unknown[]): unknown => ((rows[0] as { vault?: unknown } | undefined)?.vault ?? null)
 
 /** A vaultDB that stores its rows in your Postgres: `new PostgresVaultDB({ client: pgClientOf(pool) })`. */
@@ -167,13 +167,13 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return { vault: vaultOf(await this.#query(GetVaultSql, [applabel, user_id, vaultlabel])) }
   }
 
-  /** A box row and its vault row as `world`, null for none, read in one statement. */
+  /** A box row and its vault row as `world`, each null for none, fetched in one statement. */
   async #fetchBox({ applabel, user_id, vaultlabel, vault_tok, boxlabel }: BoxQuery): Promise<BoxFetched> {
     const [fetched] = await this.#query(GetBoxWithVaultSql, [applabel, user_id, vaultlabel, vault_tok, boxlabel]) as BoxFetched[]
     return fetched ?? { world: null, box: null }
   }
 
-  /** A vault life's room, at a count of its box rows, live and deleted. */
+  /** The capacity of a vault life with `used` box rows, live and deleted. */
   #roomAt(used: number): Capacity {
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }
@@ -196,9 +196,9 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   // --
 
   // == [Classifying]: classifyVault, classifyBox
-  // A write function tests an ask and stores its record in one call. A record it stored is the answer as it stands, once its parts are checked:
-  // nothing is classified. Where it stored nothing, or the ask was only fetched for, the core's classifier names what the ask comes to over the rows answered.
-  // A write the classifier names over rows the function refused to store over is a fault, thrown where the function was called.
+  // A write function checks an ask and stores its record in one call. When it stored the record, its result is checked and returned
+  // without classifying. When it stored nothing, or the ask is a get, the core's classifier classifies the ask against the rows returned.
+  // If the classifier finds a write when the function stored nothing, that is a fault, thrown by `#writeVault` or `#writeBox`.
 
   protected override classifyVault(ask: VaultAsk, answered: VaultAnswered): VaultClassified {
     if ((answered.ok !== true) || (ask.op === 'get')) { return super.classifyVault(ask, answered) }
@@ -236,17 +236,17 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return this.classifyBox(ask, await this.#fetchBox(ask))
   }
 
-  // A put or del calls the function that can store its record over the row it expects. An ask whose policy lets it store
-  // nothing over that row is only classified, over the rows as fetched: whatever is stored, the classifier names no write for it.
+  // A put or del calls the write function for the row it expects. A put whose options allow no write over that row is only
+  // classified against the rows fetched: whatever is stored, the classifier finds no write for it.
   protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
     if (! mayReplace(ask)) { return this.classifyVault(ask, await this.#fetchVault(ask)) }
     if (ask.gateVerb !== undefined) { return await this.#putGateVerb(ask) }
     return await this.#writeVault(ask, isBirth(ask) ? BirthVaultSql : ReviseVaultSql)
   }
 
-  // A gate verb's tests read the gate of the row stored, and the classifier makes them. So its put is classified first, over
-  // the row fetched. Where that names a write, the function stores the record only over that same revision of the row:
-  // the row tested is the row replaced, or nothing is stored and the ask is classified again over the row as it now stands.
+  // The classifier runs a gate verb's checks, which read the stored row's gate, so its put is classified first, against the
+  // fetched row. If that finds a write, the function stores the record only over that same revision of the row. Either the
+  // row checked is the row replaced, or nothing is stored and the ask is classified again against the row as it now stands.
   async #putGateVerb(ask: VaultPutAsk): Promise<VaultClassified> {
     const classified = this.classifyVault(ask, await this.#fetchVault(ask))
     if (! DB.isWriteAct(classified.act)) { return classified }
@@ -333,7 +333,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
 
 // == [Listening]: listenOrNull, unlistenOnceListening
 
-/** Start listening and return the function that stops it; null, telling `onFailed`, where listening failed. */
+/** Start listening and return the function that stops it. If listening fails, tell `onFailed` and return null. */
 const listenOrNull = async (listen: PostgresListen, channel: string, onNotify: (text: string) => void, onFailed: (news: VaultError) => void): Promise<(() => unknown) | null> => {
   try {
     return await listen(channel, onNotify)
@@ -361,14 +361,17 @@ async function rowsFrom(queryable: PostgresQueryable, text: string, params: unkn
 }
 
 
-/** True where a put expects no row stored, so its record is a first one. */
+/** True if a put expects no stored row, so its record is the first. */
 function isBirth({ expected }: BoxPutAsk | VaultPutAsk): boolean {
   return expected.revision_seq === DB.VoidRevisionSeq
 }
 
-// The classifier reads `ifPresent` over a live row stored and `ifAbsent` over a tombstone or none, and names a write only where
-// the row stored is the row expected. So the policy that could let this put store is the one for the row it expects.
-/** True where a put's policies let it store its record over the row it expects: over none or a tombstone under `ifAbsent: 'add'`, over a live row under `ifPresent: 'repl'`. */
+// The classifier reads `ifPresent` over a stored live row and `ifAbsent` over a tombstone or no row, and finds a write only
+// when the stored row is the expected row. So only the option for the expected row can let this put store.
+/** True if the put's options let it store its record over the row it expects:
+ * - no row or a tombstone, under `ifAbsent: 'add'`
+ * - a live row, under `ifPresent: 'repl'`
+ */
 function mayReplace(ask: BoxPutAsk | VaultPutAsk): boolean {
   const expectsLive = (! isBirth(ask)) && (ask.expected.am === 'a')
   return expectsLive ? (ask.ifPresent === 'repl') : (ask.ifAbsent === 'add')

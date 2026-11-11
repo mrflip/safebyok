@@ -342,7 +342,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return VX.isTombstone(record)
   }
 
-  /** A delete needs the thing enabled and the vault unlocked, and no more. */
+  /** Throw unless this thing is enabled and its vault is unlocked. */
   demandDeletable(): this { return this.demandEnabled().demandUnlocked() }
 
   /** Demand that this thing's vault is unlocked. */

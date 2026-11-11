@@ -68,14 +68,14 @@ export class MemoryVaultDB extends AdapterVaultDB {
   }
 
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** The room a vault life has under its soft cap `maxBoxes`, counting its box rows live and deleted. */
+  /** The capacity of a vault life: its box rows, live and deleted, against `maxBoxes`. */
   #roomIn(boxrows: Map<string, unknown>): Capacity {
     return { boxes: { used: boxrows.size, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }
 
 
-  // Each heeder hears on a later tick, so that nothing it does touches the transaction that told it.
-  /** Tell each heeder of `scope` what was `heard`. */
+  // Each listener is called on a later microtask, so nothing it does runs inside the write that notified it.
+  /** Notify each listener watching `scope` of `heard`. */
   #tell(scope: VaultScope, heard: Heard): void {
     for (const { scope: heardScope, hear } of this.#heeders) {
       const isHeard = (heardScope.applabel === scope.applabel) && (heardScope.user_id === scope.user_id) && ((heardScope.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
@@ -123,7 +123,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const classified = this.classifyVault(ask, { vault: this.#vaultRowOf(ask) })
     if (isWriteAct(classified.act)) {
       this.#writeVaultRow(ask.record)
-      // A vault's boxes end with its life: nothing reads a box row of a life that is over.
+      // A vault's boxes end with its life: no call fetches a box row from a life that is over.
       this._cheat_boxRowsOf(ask, ask.expected.vault_tok).clear()
     }
     return classified

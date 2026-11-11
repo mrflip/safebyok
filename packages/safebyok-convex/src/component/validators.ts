@@ -51,9 +51,9 @@ export const capacity = zodOutputToConvex(DB.capacity)
 // --
 
 // == [Asks]: vaultPutAsk, boxPutAsk, vaultDelAsk, boxDelAsk
-// An ask's structure alone: the component checks each ask again with the core's own checker before it reads a row.
+// These check an ask's structure only. The component checks each ask in full with the core's own checker before it reads a row.
 
-// The row a put or del expects to find, as a checked ask carries it: a row's meta.
+// The metadata of the stored row that a put or del expects to find.
 const vaultExpected = zodToConvex(DB.rowMeta)
 const boxExpected   = v.object({ ...vaultExpected.fields, box_tok: v.string() })
 const putPolicies   = { ifAbsent: zodToConvex(DB.putOptsGiven.shape.ifAbsent), ifPresent: zodToConvex(DB.putOptsGiven.shape.ifPresent) }
@@ -95,10 +95,10 @@ export const boxesFetched = v.object({ vault: v.any(), boxes: v.array(rowOfBox) 
 /** One box row, and the vault row read in the same snapshot. */
 export const boxFetched = v.object({ vault: v.any(), box: v.any() })
 
-/** What a vault's put or del came to, as the core's classifier answered it. The client checks it in full. */
+/** The core classifier's outcome for a vault's put or del. The client checks it in full. */
 export const vaultClassified = v.object({ ok: v.boolean(), act: v.string(), world: v.any(), vault: v.any(), presence: v.string() })
 
-/** What a box's put or del came to, as the core's classifier answered it. The client checks it in full. */
+/** The core classifier's outcome for a box's put or del. The client checks it in full. */
 export const boxClassified = v.object({ ok: v.boolean(), act: v.string(), world: v.any(), box: v.any(), presence: v.union(v.string(), v.null()), capacity: v.union(capacity, v.null()) })
 
 /** How many box rows a bank has left after a tidy. */
@@ -123,7 +123,7 @@ export const listBoxesArgs  = { asked: vaultQuery }
 export const getBoxArgs     = { asked: boxQuery }
 /** `putVault` takes a vault's put ask. */
 export const putVaultArgs   = { ask: vaultPutAsk }
-/** `putBox` takes a box's put ask, and an optional soft cap on the vault's live boxes. */
+/** `putBox` takes a box's put ask, and an optional soft cap on the box rows of the vault life, tombstones included. */
 export const putBoxArgs     = { ask: boxPutAsk, maxBoxes: v.optional(v.number()) }
 /** `delVault` takes a vault's del ask. */
 export const delVaultArgs   = { ask: vaultDelAsk }

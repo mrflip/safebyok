@@ -48,6 +48,12 @@ Small irritants, each a few lines, picked up by whoever is nearby.
   ([#130](https://github.com/mrflip/safebyok/pull/130)): the job gates on Node 22, the platform
   floor (`engines`), and only reports on the newest Node. A workflow cannot make a check
   required; the ruleset is the Coach's to change.
+* **The vaultDB throwers' banner names the wrong field.** Found 2026-11-11
+  ([#645](https://github.com/mrflip/safebyok/pull/645), the storage prose pass): the
+  `/* The refusals of a vaultDB ... */` comment under `[VaultDB Throwers]` in
+  `packages/safebyok/src/refusals/throwers.ts` says `meta` carries the `world` and `dbhas` the
+  answer carries. The throwers put those rows in the error's `rows` option (`RefusalRows` in
+  `refusals/errors.ts`), which `rowsOfRefusal` reads, and `actRefused` carries none. Reword it.
 
 ## Roadmapped
 

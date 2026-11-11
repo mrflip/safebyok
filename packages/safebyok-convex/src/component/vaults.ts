@@ -13,10 +13,12 @@ import * as CVX from './validators'
 
 // One function for each of AdapterVaultDB's generic calls. They are called through the host's
 // wrapper, which has already checked that the caller is the user the call names. Convex runs a
-// mutation as one serializable transaction, so each put and del is the vaultDB's one atomic step:
-// it checks its ask with the core's own checker, reads the rows, has the core's classifier name
-// what the ask comes to, and stores the ask's record where that is a write. A get only reads, from
-// one snapshot, and the client classifies what it read.
+// mutation as one serializable transaction, so each put and del is atomic. In one mutation, it will:
+// * check its ask with the core's checker,
+// * read the stored rows,
+// * classify the ask with the core's classifier, then
+// * store the ask's record if the classifier instructs it to write.
+// A get only reads, from one snapshot, and the client classifies what it read.
 
 // == [Gets]: listVaults, getVault, listBoxes, getBox
 
@@ -68,7 +70,7 @@ export const getBox = query({
 
 // == [Puts]: putVault, putBox
 
-/** Store a vault put's record where the classifier names a write over the row stored. Returns what the classifier answered. */
+/** Classify a vault put against the stored row, and store its record if the outcome is a write. Returns the classifier's outcome. */
 export const putVault = mutation({
   args:    CVX.putVaultArgs,
   returns: CVX.vaultClassified,
@@ -82,9 +84,12 @@ export const putVault = mutation({
   },
 })
 
-// The cap the client asks for is soft, and counts box rows, tombstones among them, as the tally's `all_count` does. The component's own
-// limits are hard: a write the classifier names that would take the life past them is not stored, and answers `vault_full`.
-/** Store a box put's record where the classifier names a write over the rows stored and the vault's room. Returns what the classifier answered. */
+// The cap the client sends is a soft cap, as every vaultDB's is. Like the tally's `all_count`, it counts every box row, tombstones
+// included. This component currently enforces it and its own limits exactly, inside the mutation: a write that would take the life
+// past one is not stored, and the put returns `vault_full` instead. Nothing promises that exactness.
+/** Classify a box put against the stored rows and the vault's capacity, and store its record if the outcome is a write.
+ * Returns the classifier's outcome, or `vault_full` if the write would pass a limit.
+ */
 export const putBox = mutation({
   args:    CVX.putBoxArgs,
   returns: CVX.boxClassified,
@@ -112,7 +117,9 @@ export const putBox = mutation({
 
 // == [Dels]: delVault, delBox
 
-/** Store a vault del's tombstone where the classifier names a write over the row stored, and delete the box rows of the life it ends. Returns what the classifier answered. */
+/** Classify a vault del against the stored row. If the outcome is a write, store its tombstone and delete the box rows of the life it ends.
+ * Returns the classifier's outcome.
+ */
 export const delVault = mutation({
   args:    CVX.delVaultArgs,
   returns: CVX.vaultClassified,
@@ -130,7 +137,7 @@ export const delVault = mutation({
   },
 })
 
-/** Store a box del's tombstone where the classifier names a write over the rows stored. Returns what the classifier answered. */
+/** Classify a box del against the stored rows, and store its tombstone if the outcome is a write. Returns the classifier's outcome. */
 export const delBox = mutation({
   args:    CVX.delBoxArgs,
   returns: CVX.boxClassified,
@@ -190,9 +197,11 @@ export const watchRows = query({
 // == [Asks and refusals]: crossing, crossingOf, roomlessOf
 
 // Anyone signed in may call these functions with an ask of their own making, so each mutation parses its ask again here,
-// with the core's own checker, before a row is read, and goes on with what the parse answers.
+// with the core's own checker, before a row is read, and continues with what the parse returns.
 
-/** `step`'s answer; a refusal it throws of a kind that crosses is thrown as the ConvexError that carries it. `world` is the vault row stored, for a `gate_issue`. */
+/** Return what `step` returns, rethrowing a refusal the client must see as a ConvexError.
+ * `world` is the stored vault row, sent along with a `gate_issue`.
+ */
 function crossing<ValT>(step: () => ValT, world: unknown = null): ValT {
   try {
     return step()
@@ -203,8 +212,8 @@ function crossing<ValT>(step: () => ValT, world: unknown = null): ValT {
 
 // A ConvexError's `data` reaches the client whole, on any deployment, where another error's text is withheld or may quote
 // the call's arguments. The message is the core's own sentence, which quotes no value (notes/guarantees.md, G8). A
-// `gate_issue` carries the vault row it tested, as the core's refusal does; the caller may read that row with `getVault`.
-/** The ConvexError that carries `thrown`, a refusal of a kind that crosses; anything else as it came. */
+// `gate_issue` carries the stored vault row it checked, as the core's refusal does. The caller may read that row with `getVault`.
+/** `thrown` wrapped in a ConvexError if it is a refusal the client must see, else `thrown` unchanged. */
 function crossingOf(thrown: unknown, world: unknown): unknown {
   if (! DB.isVaultError(thrown)) { return thrown }
   const { refusalkind: kind, message } = thrown
@@ -214,7 +223,7 @@ function crossingOf(thrown: unknown, world: unknown): unknown {
   return (sentenceKind === undefined) ? thrown : new ConvexError<SafebyokErrorData>({ kind: sentenceKind, message })
 }
 
-/** What a box put the classifier named a write comes to where the life has no room for it: `vault_full`, over the row stored. */
+/** The `vault_full` refusal, with the stored box row, for a box put classified as a write that the life has no room for. */
 function roomlessOf(classified: DB.BoxClassified, anteDoc: BoxDoc | null, capacity: DB.Capacity): DB.BoxClassified {
   const box = DB.foundBoxRow.parse(anteDoc?.box ?? null)
   return { ok: false, act: 'vault_full', world: classified.world, box, presence: classified.presence, capacity }

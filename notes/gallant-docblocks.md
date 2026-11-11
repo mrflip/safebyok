@@ -801,3 +801,172 @@ Says the proving "opens the gate it holds"; the body only compares visible heade
 /** True when `vaultRecord`'s wayin at this proving's slotlabel carries this proving's header. */
 ```
 
+## Slop tropes
+
+These phrases are not the house style: they are glossolallia from agents, and unclear.
+
+```
+Goofus: Among other issues, the specific slop tell is "as stored"
+    /** Puts `record`, the vault row at `opts.prior` with no passkey wayin and its `gate_epoch` one up; a row with none answers as stored. */
+Gallant: 'answers with' might be acceptable (it returns an `Answer`); but the jsdoc convention here wins:
+    /** Puts the properly revisioned `record`, demanding a new `gate_epoch` and that the passkey is absent.
+     * @returns an answer with the stored row: @see {@link putVault}
+     */
+
+Goofus: "where it is", "as a"; use specific terms ('names'), lead with a verb, look to the name
+    /** `stored` where it is a vault row live in the life `asked` names; else throws as a box's call refuses for its vault. */
+Gallant:
+    /** Return the given `stored` vault, if live at the asked-for `vault_tok`. Otherwise throw
+     * the appropriate refusal: `absent_vault` for a void or tombstoned vault, `vault_reborn` for another life.
+     */
+
+Goofus: "the policy that speaks": a policy doesn't speak; say which one applies
+    // The policy that speaks: `ifPresent` over a live row, `ifAbsent` over a tombstone or none.
+Gallant:
+    // The policy that applies: `ifPresent` over a live row, `ifAbsent` over a tombstone or void row.
+
+Goofus: "the vault's room", "gauged": a private figure for a type that has a name (`Capacity`)
+/** The rows an adapter fetched for a box's ask, as stored and unchecked: its vault row as `world` and the box row, each null for none, and the vault's room where the adapter gauged it. */
+Gallant:
+    /** The rows an adapter fetched for a box request, unchecked:
+     * - `box`      -- the stored box row, as fetched before any write (null for none)
+     * - `world`    -- the vault row, fetched in the same step (null for none)
+     * - `capacity` -- the vault's {@link Capacity} stats, for adapters that return it
+     */
+
+Goofus: "what the ask comes to", "names a write": the verb is classify, and a classifier finds
+    // it checks its ask with the core's own checker, reads the rows, has the core's classifier name what the ask comes to, and stores the ask's record where that is a write.
+Gallant:
+    // * check its ask with the core's checker,
+    // * read the stored rows,
+    // * classify the ask with the core's classifier, then
+    // * store the ask's record if the classifier instructs it to write
+
+Goofus: "What a vault's ask comes to over the row stored": the same figure, as a type's headline
+    /** What a vault's ask comes to over the row stored. `ok` is true for a good answer and false for a refusal, and `act` says which. */
+Gallant:
+    /** A vault request, classified against the stored row.
+     * - `ok`  -- true for a good answer, false for a refusal
+     * - `act` -- directs how to route and handle the answer
+     */
+
+Goofus: "as storage hands it up": hands up to whom? say where it came from and that it is unchecked. "under": not a precise term
+    /** A vault row as storage hands it up, unchecked, under its vaultlabel. */
+Gallant:
+    /** A vault row from storage, unchecked, with its vaultlabel. */
+
+Goofus: "the refusals that cross": cross what? name the sender, the carrier and the receiver
+    /** The kinds of refusal that cross: the wrapper's `identity_revoked`, and those the core throws inside the component for an ask or a row stored. */
+Gallant: essentials on the first line, continues to the details
+    /** The refusal kinds a `ConvexError` from the host's safebyok functions may carry:
+     * `identity_revoked` from the wrapper, and the kinds the core throws inside the component.
+     */
+
+Goofus: "with one laid on and its `gate_epoch` one up": the same figure, plus a count told as a direction
+    /** Puts `record`, the vault row at `opts.prior`, which has no passkey wayin, with one laid on and its `gate_epoch` one up. */
+Gallant: A long line is appropriate here
+    /** Put the properly revisioned `record`, demanding a new `gate_epoch` and that its only change is to add a passkey wayin.
+     * Refuses `camped` when a passkey wayin is already stored.
+     */
+
+Goofus: "the front door", "name one door": an entry point is an entry point
+    // Kept off the front door (`safebyok`) so a host's autocomplete never meets the adapter's contract, and an adapter's imports name one door.
+Gallant:
+    // Kept out of the main entry (`safebyok`), so a host's autocomplete never shows the adapter contract, and an adapter imports from one place.
+
+Goofus: "the row in hand it goes over": in whose hand? say which row and what is done with it
+    /** The next record `patch` makes, sealed and not put, and the row in hand it goes over. */
+Gallant:
+    /** The next record for `patch`, sealed but not yet put, with the row it is put over. */
+
+Goofus: "the vault above a box": rows have no height; say whose row it is
+    /** The vault row above a box's ask, as stored at its scope: the sentinel row for none. Throws `damaged_vault` for a row that fails its checks. */
+Gallant: only the essentials go on the first line.
+    /** The stored vault row of a box request, or the sentinel row for none.
+     * Throws `damaged_vault` for a row that fails its checks.
+     */
+
+Goofus: "for the vaultDB's handler to tell of": which handler, telling whom? name the class and what it does
+    // A row that fails its checks is thrown, for the vaultDB's handler to tell of.
+Gallant:
+    // A row that fails its checks throws, and `AdapterVaultDB` turns the throw into a refused answer.
+
+Goofus: "Damaged is a judgment of the row taken alone", "the words of the check that found it": define the term plainly
+    // Both faults of a row are thrown, each with the words of the check that found it. Damaged is a judgment of the row taken alone: it fails its own checks.
+Gallant:
+    // A faulty row throws, with the message of the check that failed. A row is damaged when it fails its own checks.
+
+Goofus: "the brand a model knows a vaultDB by": say what the value is for
+    /** True: the brand a model knows a vaultDB by, from whichever copy of safebyok. */
+Gallant:
+    // Brands are implemented this way to avoid various flaws that branding by string props, private symbols, weak maps, or instanceof present
+    /** Always true: marks a vaultDB for safe branding. */
+
+Goofus: "rides along in a spread": a spread copies. (Also: don't document what the declaration already says)
+    // A getter on the class, never an own field, so the brand neither serializes nor rides along in a spread.
+Gallant:
+    // A getter ensures the brand is neither serialized nor copied by a spread.
+
+Goofus: "only the scope is pinned": pinned means checked
+    // A passed put answers what storage has, whose revision no one sent: only the scope is pinned.
+Gallant:
+    // An `act: 'passed'` put returns the stored row. Its revision does not match the one sent, so only its scope is checked.
+
+Goofus: "a gate moved elsewhere arrives with it", "takes it": a gate is changed, on another device; a listing receives
+    // The vault listing takes it as it takes any vault row: a gate moved elsewhere arrives with it, and a newer row of another life replaces this Vault there.
+Gallant:
+    // The vault listing receives the `world` as it would a row from any vault request:
+    // a gate changed on another device comes with it, and a newer row from another life
+    // replaces this Vault in the listing.
+
+Goofus: "hears on a later tick", "the transaction that told it": a listener is called, on a microtask
+    // Each heeder hears on a later tick, so that nothing it does touches the transaction that told it.
+Gallant:
+    // Each listener is called on a later microtask, so nothing it does runs inside the write that notified it.
+
+Goofus: "keeps its delete waiting": the delete is blocked
+    // The old databases are deleted unread and never awaited: a tab still keeping one open keeps its delete waiting (notes/wontfix.md).
+Gallant:
+    // The old databases are deleted unread and never awaited: a tab that still has one open blocks its delete (notes/wontfix.md).
+
+Goofus: "The wipe is hygiene": housekeeping is the word the reader knows
+    // The wipe is hygiene, so a browser that cannot list them keeps its older versioned ones rather than failing the vault.
+Gallant:
+    // The wipe is housekeeping: a browser that cannot list them keeps its older versioned ones rather than failing the vault.
+
+Goofus: "what to answer over none": name the option, and the case it covers
+    /** What `getBox` is asked: the box's address, the row its caller holds or the sentinel for none, and what to answer over none. */
+Gallant:
+    /** A `getBox` request: the box's address, the expected row (or sentinel), and the `ifAbsent` option (see `VaultDB.getBox`). */
+
+Goofus: "`passed` for the live row taken up": taken up by whom? say what is stored and what is returned
+    /** What a put's answer says happened: `born` over nothing, `reborn` over a tombstone, `replaced` a live row, or `passed` for the live row taken up. */
+Gallant:
+    /** A put's act:
+     * - `born`     -- stored where no row was
+     * - `reborn`   -- stored over a tombstone
+     * - `replaced` -- stored over a live row
+     * - `passed`   -- (for `ifPresent: 'get'`) nothing stored, the answer's `val` is the live row found
+     */
+
+Goofus: "null tallies nothing": null is a value, not an actor
+    /** The tally of `boxDoc` alone; null tallies nothing. */
+Gallant:
+    /** The tally of `boxDoc` alone, or an empty tally for null. */
+
+Goofus: "the rows the notice had room for": say what decides it: whether they fit
+    /** A parsed notice: the address of the row stored, plus the rows the notice had room for. */
+Gallant:
+    /** A parsed notice: the stored row's address, and the rows that fit the byte-size limit. */
+
+Goofus: "Unheard, ...; heard, ...": a handler is attached or not
+    // Unheard, a dropped connection crashes the process; heard, every watch goes quiet until you listen again.
+Gallant:
+    // Without this handler, a dropped connection crashes the process. With it, every watch goes quiet until you listen again.
+
+Goofus: "behind the same gate": the sign-in check is not the Gate; gate means `Gate` and `vault.gate` only
+    the rest, behind the same gate: a host calls `tidyGone({ applabel, user_id })` on its
+Gallant:
+    the rest, behind the same sign-in check: a host calls `tidyGone({ applabel, user_id })` on its
+
+```

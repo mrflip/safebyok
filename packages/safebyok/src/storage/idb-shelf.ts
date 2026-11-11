@@ -1,4 +1,4 @@
-/** The versioned shelf: an IndexedDB datastore's one object store, in a database named for its layout version. */
+/** The versioned shelf: an IndexedDB datastore's single object store, in a database named for its layout version. */
 
 import { createStore, type UseStore } from 'idb-keyval'
 import type * as Z from 'zod'
@@ -6,7 +6,7 @@ import { objCheck } from '../helpers/validator'
 
 // == [The versioned shelf]: VersionedShelfSpec, VersionPattern, versionedShelfSpec, shelves, versionedShelfOf, isOlderDBName, wipeOlderDBs
 
-/** What names a versioned shelf: its host's `dbName`, which kind of database it is, and the layout version. */
+/** The parts of a versioned shelf's name: its host's `dbName`, the kind of database, and the layout version. */
 export interface VersionedShelfSpec {
   /** The host's `dbName`, which every database of the bank begins with. */
   dbName:    string
@@ -14,9 +14,9 @@ export interface VersionedShelfSpec {
   dbstem:    string
   /** The layout version, three zero-padded parts (`001-001-001`), so that a name sorts as its version does. */
   version:   string
-  /** The one object store of the database. */
+  /** The database's only object store. */
   storename: string
-  /** The names, whole, of the databases of this kind from before its three-part version. */
+  /** The full names of this kind's databases from before the three-part version. */
   oldnames:  string[]
 }
 
@@ -31,11 +31,11 @@ const versionedShelfSpec = objCheck(({ str, arr }) => ({
   oldnames:  arr(str.min(1)),
 }), 'bad_option')
 
-// A page's one shelf for each database: each connection a shelf keeps open is never closed, and its wipe is run once.
+// One shelf per database per page: a shelf's connection stays open for the page's life, and its wipe runs once.
 /** The shelf of each database this page has made one for, by the database's name. */
 const shelves = new Map<string, UseStore>()
 
-/** The page's one shelf of the database `dbName:dbstem-v<version>`. */
+/** The page's shelf for the database `dbName:dbstem-v<version>`, made on the first call. */
 export const versionedShelfOf = (spec: VersionedShelfSpec): UseStore => {
   const checked = versionedShelfSpec.parse(spec, { where: 'versionedShelfOf' })
   const dbname = `${checked.dbName}:${checked.dbstem}-v${checked.version}`
@@ -46,7 +46,7 @@ export const versionedShelfOf = (spec: VersionedShelfSpec): UseStore => {
   const made: UseStore = async (txMode, callback) => {
     if (! isWiped) {
       isWiped = true
-      // The old databases are deleted unread and never awaited: a tab still keeping one open keeps its delete waiting (notes/wontfix.md).
+      // The old databases are deleted unread and never awaited: a tab that still has one open blocks its delete (notes/wontfix.md).
       void wipeOlderDBs(checked)
     }
     return await shelf(txMode, callback)
@@ -64,12 +64,12 @@ const isOlderDBName = (spec: VersionedShelfSpec, dbname: string): boolean => {
   const stemmed = `${spec.dbName}:${spec.dbstem}-v`
   if (! dbname.startsWith(stemmed)) { return false }
   const version = dbname.slice(stemmed.length)
-  // A name whose version this code cannot read is deleted, as is an older one: a later change of the version format takes a new stem.
+  // A name whose version this code cannot parse is deleted, like an older one. A future change to the version format must use a new stem.
   return (! VersionPattern.test(version)) || (version < spec.version)
 }
 
-// The old names are deleted by name, as not every browser lists its databases. The wipe is hygiene, so a browser that cannot list
-// them keeps its older versioned ones rather than failing the vault.
+// Old databases are deleted by name, because not every browser lists its databases. The wipe is housekeeping: a browser that
+// cannot list them keeps its older versioned ones rather than failing the vault.
 /** Start the deletion of each of `spec`'s old databases. */
 const wipeOlderDBs = async (spec: VersionedShelfSpec): Promise<void> => {
   try {

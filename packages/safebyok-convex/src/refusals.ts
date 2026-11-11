@@ -1,24 +1,28 @@
-/** The refusals that cross from the host's functions to the client as a `ConvexError`. The client turns each back into a VaultError of its kind. */
+/** Refusals that the host's safebyok functions send to the client as a `ConvexError`. The client rethrows each as a VaultError of the same kind. */
 
 import * as DB from 'safebyok/storage'
 import type { Value } from 'convex/values'
 
-/** The kinds of refusal that cross: the wrapper's `identity_revoked`, and those the core throws inside the component for an ask or a row stored. */
+/** The refusal kinds a `ConvexError` from the host's safebyok functions may carry:
+ * `identity_revoked` from the wrapper, and the kinds the core throws inside the component.
+ */
 export const safebyokErrorKindVals = ['identity_revoked', 'bad_record', 'damaged_row', 'damaged_vault', 'storage_issue', 'gate_issue'] as const
 
-/** The kinds the core throws inside the component that cross with its sentence alone: an ask that fails its checks, and a row stored that fails its own. */
+/** The refusal kinds that reach the client with the core's message and nothing else. The core throws them for an `ask` or a stored row that fails its checks. */
 export const sentenceKindVals = ['bad_record', 'damaged_row', 'damaged_vault', 'storage_issue'] as const
 
 /** One of {@link safebyokErrorKindVals}. */
 export type SafebyokErrorKind = typeof safebyokErrorKindVals[number]
 
-/** The `data` of a `ConvexError` that carries a refusal: its kind; the core's sentence, but on `identity_revoked`; and on `gate_issue`, the vault row tested. */
+/** The `data` of a `ConvexError` that carries a refusal.
+ * Every kind but `identity_revoked` has the core's message, and a `gate_issue` also has the stored vault row it checked.
+ */
 export type SafebyokErrorData =
   | { kind: 'identity_revoked' }
   | { kind: typeof sentenceKindVals[number], message: string }
   | { kind: 'gate_issue', message: string, world: Value }
 
-/** The check of a crossed refusal's `data`, as the client receives it. */
+/** Validator for {@link SafebyokErrorData}, as the client receives it. */
 export const safebyokErrorData = DB.Checker(({ discrim, obj, lit, oneof, str }) => discrim('kind', [
   obj({ kind: lit('identity_revoked') }),
   obj({ kind: oneof(sentenceKindVals), message: str }),
@@ -27,7 +31,7 @@ export const safebyokErrorData = DB.Checker(({ discrim, obj, lit, oneof, str }) 
 
 true satisfies DB.AssertEqual<SafebyokErrorKind, 'identity_revoked' | 'gate_issue' | typeof sentenceKindVals[number]>
 
-/** True when `data`, taken from a `ConvexError`, is one of the refusals that cross. */
+/** True when `data`, from a `ConvexError`, is a {@link SafebyokErrorData}. */
 export function isSafebyokErrorData(data: unknown): data is SafebyokErrorData {
   return safebyokErrorData.safeParse(data).success
 }
