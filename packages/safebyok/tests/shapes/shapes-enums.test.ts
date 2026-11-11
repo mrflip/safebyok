@@ -21,3 +21,20 @@ describe("EX.ifPresentVals", () => {
     expect(EX.ifPresentVals).to.deep.equal(['repl', 'fail', 'get'])
   })
 })
+
+describe("EX.writeActVals, EX.foundActVals, EX.refusedActVals and EX.boxVaultActVals", () => {
+  it("name the four acts that store and the four that answer what is stored", () => {
+    expect(EX.writeActVals).to.deep.equal(['born', 'reborn', 'replaced', 'deleted'])
+    expect(EX.foundActVals).to.deep.equal(['gotlive', 'gotvoid', 'gotgone', 'passed'])
+  })
+
+  it("name a refusal over the row asked for in one bare word, and one for a box's vault after the vault", () => {
+    for (const act of EX.refusedActVals) { expect(act).to.match(/^[a-z]+$/) }
+    for (const act of EX.boxVaultActVals) { expect(act).to.match(/^vault_[a-z]+$/) }
+  })
+
+  it("name no act twice", () => {
+    const acts = [...EX.writeActVals, ...EX.foundActVals, ...EX.refusedActVals, ...EX.boxVaultActVals]
+    expect(new Set(acts).size).to.eq(acts.length)
+  })
+})

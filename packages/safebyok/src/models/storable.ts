@@ -207,7 +207,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Reconcile]: reconcileCentral, sameLife, classifyRecordShape
 
   /** SLOPDOC: Judges `rcvd` against the central adopted, answering the central that results and the policy applied. */
-  protected reconcileCentral(rcvd: Fetched<RecordT, SparseT>, rcvdShape: RecordShape): Reconciled<RecordT, SparseT> { // eslint-disable-line sonarjs/cognitive-complexity
+  protected reconcileCentral(rcvd: Fetched<RecordT, SparseT>, rcvdShape: RecordShape): Reconciled<RecordT, SparseT> {
     // The vault_tok first, whatever the life: a joined life tok path cannot tell 'a-b' + 'c' from 'a' + 'b-c'.
     if ((rcvd.vault_tok !== this.vault_tok))                     { throw otherVaultTok() }
     const central = this.#central

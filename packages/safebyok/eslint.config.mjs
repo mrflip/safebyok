@@ -287,6 +287,10 @@ export default defineConfig([
       // STYLE.md endorses the guard clause, and asks that visual weight match didactic weight: a
       // guard is not a choice between two values, and should not have to read like one.
       'unicorn/prefer-ternary': 'off',
+      // A decision table reads best flat: a row a line, each with its tests and its answer. The
+      // rule counts every `&&` and early return against such a function, and the way to satisfy
+      // it is helpers that hide the rows (`storage/classifier.ts`).
+      'sonarjs/cognitive-complexity': 'off',
       // Written for JavaScript, where a return type is only what the code happens to return. Here
       // it is declared, and a declared union (`WhisperJson`) is the contract, not an accident.
       'sonarjs/function-return-type': 'off',
