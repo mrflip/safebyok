@@ -34,13 +34,18 @@ const PasskeyPress = ({ gating, onGripe, rpId, takesFocus }: PasskeyUnlockButton
   }
 
   const askAndAttempt = async () => {
+    ;(globalThis as { __diag?: (what: string) => void }).__diag?.('passkey askAndAttempt starts')
     try {
       const answer = await askPasskey(gating.passkeyHeader, { rpId })
+      ;(globalThis as { __diag?: (what: string) => void }).__diag?.(`passkey askPasskey answered ${answer === null ? 'null' : 'an answer'}`)
       if (answer === null) { return }
       const { ok, err } = await attemptOnce(answer, (passkeyClear) => gating.attempt({ passkeyClear }))
       if (! ok) { hear(err) }
     } catch (err) {
+      ;(globalThis as { __diag?: (what: string) => void }).__diag?.('passkey askAndAttempt caught')
       hear(err)
+    } finally {
+      ;(globalThis as { __diag?: (what: string) => void }).__diag?.('passkey askAndAttempt settles')
     }
   }
 

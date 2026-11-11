@@ -54,6 +54,7 @@ const UnlockForm = ({ gating, leaseMillis, passphraseUsername, passkeyRpId }: Pa
     () => fieldRef,
   )
   const offering = offersPasskey(gating)
+  ;(globalThis as { __diag?: (what: string) => void }).__diag?.(`UnlockForm renders isPending=${String(isPending)} passkeyGripe=${passkeyGripe === null ? 'null' : 'set'}`)
 
   const hearPasskey = (text: string | null) => {
     setPasskeyGripe(text)

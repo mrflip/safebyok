@@ -9,6 +9,13 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
+// DIAGNOSTIC, never to merge: timestamps of each step, the form action and the passkey ask, and each console.error.
+const diagStart = performance.now()
+const diag = (what: string) => { process.stderr.write(`DIAG ${(performance.now() - diagStart).toFixed(0).padStart(6)} [${expect.getState().currentTestName?.slice(-12) ?? ''}] ${what}\n`) }
+;(globalThis as { __diag?: (what: string) => void }).__diag = diag
+const consoleErrorBefore = console.error.bind(console)
+console.error = (...args: unknown[]) => { diag(`console.error: ${String(args[0]).slice(0, 90)}`); consoleErrorBefore(...args) }
+
 /** An unlock_vault gating, kept open on another device, for a vault with a passkey the fake authenticator has; and the authenticator. */
 const passkeyedUnlock = async () => {
   const authenticator = TH.installFakeAuthenticator()
@@ -164,25 +171,39 @@ describe("PassphraseModal, for a vault with a passkey", () => {
     await waitFor(() => { expect(asking()).to.eq('false') })
   })
 
-  it("keeps the passkey's word while the user types the passphrase, until they submit", async () => {
-    const { authenticator } = await dialogFor()
-    authenticator.refuseNext('UnknownError')
-    fireEvent.click(screen.getByText(Messages.passkeyButton))
-    await screen.findByText(Messages.passkeyAskFailed)
-    fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'wrong' } })
-    expect(screen.getByText(Messages.passkeyAskFailed)).to.exist
-    const running = TH.makePending()
-    vi.spyOn(Gating.prototype, 'attempt').mockImplementation(async () => {
-      await running.promise
-      return { ok: false, err: new VaultError('wrong_passphrase', 'Not that one.') } as never
+  for (const round of Array.from({ length: 30 }, (_, ii) => ii)) {
+    it(`keeps the passkey's word while the user types the passphrase, until they submit, round ${String(round).padStart(2, '0')}`, { timeout: 20_000 }, async () => {
+      diag('--- test starts')
+      const { authenticator } = await dialogFor()
+      diag('dialog rendered')
+      authenticator.refuseNext('UnknownError')
+      fireEvent.click(screen.getByText(Messages.passkeyButton))
+      diag('passkey button clicked')
+      await screen.findByText(Messages.passkeyAskFailed)
+      diag('passkey gripe shown')
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'wrong' } })
+      diag('typed')
+      expect(screen.getByText(Messages.passkeyAskFailed)).to.exist
+      const running = TH.makePending()
+      vi.spyOn(Gating.prototype, 'attempt').mockImplementation(async () => {
+        diag('stubbed attempt entered')
+        await running.promise
+        return { ok: false, err: new VaultError('wrong_passphrase', 'Not that one.') } as never
+      })
+      fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'wrong passphrase' } })
+      diag('typed again')
+      fireEvent.click(screen.getByText('Unlock'))
+      diag('Unlock clicked')
+      await screen.findByText(Messages.unlockingButton)
+      diag('Unlocking shown')
+      expect(screen.queryByText(Messages.passkeyAskFailed)).to.be.null
+      await act(async () => { running.resolve(undefined); await TH.wakeupAtNextTick() })
+      diag('attempt released')
+      await waitFor(() => { expect(screen.getByText(Messages.unlockButton)).to.exist }, { timeout: 10_000 })
+      diag('Unlock shown again')
+      expect(screen.queryByText(Messages.passkeyAskFailed)).to.be.null
     })
-    TH.submitPassphrase('wrong passphrase')
-    await screen.findByText(Messages.unlockingButton)
-    expect(screen.queryByText(Messages.passkeyAskFailed)).to.be.null
-    await act(async () => { running.resolve(undefined); await TH.wakeupAtNextTick() })
-    await waitFor(() => { expect(screen.getByText(Messages.unlockButton)).to.exist })
-    expect(screen.queryByText(Messages.passkeyAskFailed)).to.be.null
-  })
+  }
 
   it("keeps the passphrase when the passkey meets misuse: the button goes, and the dialog says why", async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* React reports what its Boundary caught */ })

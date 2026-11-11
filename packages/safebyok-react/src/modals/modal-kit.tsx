@@ -73,11 +73,14 @@ export const useAttemptAction = (
 ) => {
   const gripeId = useId()
   const [gripe, action, isPending] = useActionState(async (_last: Gripe | null, form: FormData): Promise<Gripe | null> => {
+    ;(globalThis as { __diag?: (what: string) => void }).__diag?.(`form action starts (${source})`)
     const outcome = await tried(form)
+    ;(globalThis as { __diag?: (what: string) => void }).__diag?.(`form action tried answered ok=${String(outcome?.ok)}`)
     if (outcome === null || outcome.ok) { return null }
     const gripeNow = gripeOfRefusal(gating, outcome.err, source)
     // The submit button, disabled while the attempt ran, has dropped the focus.
     if (gripeNow !== null) { fieldFor(gripeNow.refusalkind).current?.focus() }
+    ;(globalThis as { __diag?: (what: string) => void }).__diag?.('form action returns a gripe')
     return gripeNow
   }, null)
   return { gripe: isPending ? null : gripe, gripeId, action, isPending }
