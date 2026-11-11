@@ -128,9 +128,9 @@ through the whole tree with `rg -l` first, then open the hits that matter.
   typing* when you write a doc block, a test, a validator, or a type or class that keeps state.**
   Every export has a doc block written for its caller and tests in proportion.
 * `packages/safebyok/eslint.config.mjs` -- the final authority on formatting; the other configs
-  are cut from it. Where it and a prose document disagree, flag the bug. `@ts-expect-error` and
-  `eslint-disable-line` are allowed as the correct compromise; **always report each one** in chat
-  and in the PR's open questions.
+  are cut from it. Where it and a prose document disagree, flag the bug. `@ts-expect-error`,
+  `eslint-disable-line` and the other safety hatches are allowed as the correct compromise;
+  **report each one you add**, in chat (STYLE.md, *Safety hatches*).
 * `tsconfig.base.json` -- every strictness flag, extended by every tsconfig; its comments say why.
 * **Claude Docs** (a `claude.ai/.../artifact/<id>` link). For a tab's text alone, spawn the
   `doc-tab-reader` agent with the URL and follow its description. To edit or comment, or for what

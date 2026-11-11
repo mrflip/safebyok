@@ -945,6 +945,6 @@ of one is unwieldy, not wrong.
 **`@typescript-eslint/no-unused-vars` passes only a named ignore**: its ignore patterns are
 `^_[a-zA-Z0-9]`, so `_scopepathkind` passes and a bare `_` does not (*Build for maintenance*).
 
-**Safety hatches** -- `@ts-expect-error`, `any`, the non-null `!` -- are allowed, because
-forbidding them sends a fix into a tailspin when the problem is elsewhere. Use them with care,
-and **always report each one** in chat or in the PR's open questions.
+**Safety hatches** -- `@ts-expect-error`, `eslint-disable-line`, `any`, the non-null `!` -- are
+allowed, because forbidding them sends a fix into a tailspin when the problem is elsewhere. Use
+them with care, and **report each one you add**, in chat.
