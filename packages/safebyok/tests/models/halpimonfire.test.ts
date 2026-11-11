@@ -102,7 +102,7 @@ describe("A lock called during a box verb", () => {
 })
 
 /** A stored box whose next unseal runs `crossing` with the whisper opened, before it comes back to `box.expose`. */
-const boxCrossingUnseal = async (crossing: (box: TestableBox) => unknown) => {
+async function boxCrossingUnseal(crossing: (box: TestableBox) => unknown) {
   const unsealStampedString: BoxWorld['unsealStampedString'] = async (sealed, stamp) => {
     const whisperText = await world.mw.world.unsealStampedString(sealed, stamp)
     crossing(box)
@@ -130,7 +130,7 @@ describe("An ending called while box.expose unseals", () => {
 })
 
 /** The next `Lease.buildGranted` runs `crossing` once its lease is made, as a slow wrap would let it. */
-const crossingGrant = (crossing: () => unknown) => {
+function crossingGrant(crossing: () => unknown) {
   const grant = Lease.buildGranted.bind(Lease)
   vi.spyOn(Lease, 'buildGranted').mockImplementationOnce(async (...args) => {
     const lease = await grant(...args)

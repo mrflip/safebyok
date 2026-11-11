@@ -8,7 +8,7 @@ export { good, bad } from '../../src/refusals/outcome'
 const NotRefused = Symbol('not refused')
 
 /** The words a failed expectation adds for an expected `refusalkind`, none when no kind was expected. */
-const kindClause = (refusalkind: Refusalkind | undefined): string => (refusalkind === undefined ? '' : ` of refusalkind '${refusalkind}'`)
+function kindClause(refusalkind: Refusalkind | undefined): string { return (refusalkind === undefined ? '' : ` of refusalkind '${refusalkind}'`) }
 
 /** The VaultError `operation` rejected with, once the test has checked it is one, and of `refusalkind` if given; the
  * test fails if `operation` resolves, or rejects with anything else: a plain Error, one that only
@@ -20,7 +20,7 @@ const kindClause = (refusalkind: Refusalkind | undefined): string => (refusalkin
  *
  * @example await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'vault_locked')
  */
-export const expectRefusal = async (operation: Promise<unknown>, refusalkind?: Refusalkind): Promise<VaultError> => {
+export async function expectRefusal(operation: Promise<unknown>, refusalkind?: Refusalkind): Promise<VaultError> {
   let refusal: unknown = NotRefused
   try {
     await operation
@@ -40,7 +40,7 @@ export const expectRefusal = async (operation: Promise<unknown>, refusalkind?: R
  * @param operation - The call that should succeed, or its outcome.
  * @returns Its `val`.
  */
-export const expectGood = async <ValT>(operation: Outcome<ValT> | Promise<Outcome<ValT>>): Promise<ValT> => {
+export async function expectGood<ValT>(operation: Outcome<ValT> | Promise<Outcome<ValT>>): Promise<ValT> {
   const outcome = await operation
   expect(outcome.ok, `expected a good outcome, but it was refused: ${outcome.err?.refusalkind ?? ''} ${outcome.err?.message ?? ''}`).to.be.true
   return outcome.val as ValT
@@ -60,27 +60,29 @@ export type ExpectingGood<DbT> = {
  *
  * @example expect(await TH.expectingGood(vaultDB).tryGetBox(scope, 'anthropic', TH.inThisVault)).to.be.null
  */
-export const expectingGood = <DbT extends object>(db: DbT): ExpectingGood<DbT> => new Proxy(db, {
-  get: (target, prop) => {
-    const member: unknown = Reflect.get(target, prop, target)
-    if (typeof member !== 'function') { return member }
-    return (...args: unknown[]) => {
-      const answer: unknown = member.apply(target, args)
-      return answer instanceof Promise ? goodValOf(answer) : answer
-    }
-  },
-}) as ExpectingGood<DbT>
+export function expectingGood<DbT extends object>(db: DbT): ExpectingGood<DbT> {
+  return new Proxy(db, {
+    get: (target, prop) => {
+      const member: unknown = Reflect.get(target, prop, target)
+      if (typeof member !== 'function') { return member }
+      return (...args: unknown[]) => {
+        const answer: unknown = member.apply(target, args)
+        return answer instanceof Promise ? goodValOf(answer) : answer
+      }
+    },
+  }) as ExpectingGood<DbT>
+}
 
 /** What `answer` settles to: a good Outcome's `val`, once checked, or anything else as it came. */
-const goodValOf = async (answer: Promise<unknown>): Promise<unknown> => {
+async function goodValOf(answer: Promise<unknown>): Promise<unknown> {
   const settled = await answer
   return isOutcome(settled) ? expectGood(settled) : settled
 }
 
 /** True for an Outcome, good or bad. */
-const isOutcome = (settled: unknown): settled is Outcome<unknown> => (
-  typeof settled === 'object' && settled !== null && 'ok' in settled && typeof settled.ok === 'boolean'
-)
+function isOutcome(settled: unknown): settled is Outcome<unknown> {
+  return typeof settled === 'object' && settled !== null && 'ok' in settled && typeof settled.ok === 'boolean'
+}
 
 /** The VaultError of the bad Outcome `operation` resolved to, once the test has checked it is one,
  * and of `refusalkind` if given; the test fails if it resolved a good one, if it rejected (which no
@@ -92,7 +94,7 @@ const isOutcome = (settled: unknown): settled is Outcome<unknown> => (
  *
  * @example await TH.expectBad(vaultDB.tryPutBox(scope, TH.noBoxYet, box), 'vault_reborn')
  */
-export const expectBad = async (operation: Outcome<unknown> | Promise<Outcome<unknown>>, refusalkind?: Refusalkind): Promise<VaultError> => {
+export async function expectBad(operation: Outcome<unknown> | Promise<Outcome<unknown>>, refusalkind?: Refusalkind): Promise<VaultError> {
   const outcome = await operation
   expect(outcome.ok, `expected a refusal${kindClause(refusalkind)}, but the outcome was good`).to.be.false
   expect(outcome.err).to.be.instanceOf(VaultError)
@@ -109,7 +111,7 @@ export const expectBad = async (operation: Outcome<unknown> | Promise<Outcome<un
  *
  * @example TH.expectSyncRefusal(() => Scopepath.box({ ...scope, user_id: 'a^b', boxlabel: 'x' }), 'bad_scope')
  */
-export const expectSyncRefusal = (attempt: () => unknown, refusalkind?: Refusalkind): VaultError => {
+export function expectSyncRefusal(attempt: () => unknown, refusalkind?: Refusalkind): VaultError {
   let refusal: unknown = NotRefused
   try {
     attempt()
@@ -130,7 +132,7 @@ export const expectSyncRefusal = (attempt: () => unknown, refusalkind?: Refusalk
  * @param ckey - The field to leave out.
  * @returns A copy of `bag` without that field.
  */
-export const omitting = <Bag extends object>(bag: Bag, ckey: keyof Bag): Bag => {
+export function omitting<Bag extends object>(bag: Bag, ckey: keyof Bag): Bag {
   const { [ckey]: _omitted, ...rest } = bag
   return rest as Bag
 }

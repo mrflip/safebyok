@@ -5,7 +5,7 @@ import { VaultError } from '../../src/refusals/errors'
 export type Case = readonly [input: unknown, passes: boolean, blurb: string]
 
 /** 'refuses' where `attempt` throws a VaultError, 'passes' where it throws nothing. Anything else thrown is rethrown. */
-const verdictOf = (attempt: () => unknown): string => {
+function verdictOf(attempt: () => unknown): string {
   try {
     attempt()
     return 'passes'
@@ -16,7 +16,7 @@ const verdictOf = (attempt: () => unknown): string => {
 }
 
 /** A check run against its table of cases: each passes, or refuses. */
-export const expectCases = (check: { parse: (val: unknown) => unknown }, cases: readonly Case[]): void => {
+export function expectCases(check: { parse: (val: unknown) => unknown }, cases: readonly Case[]): void {
   for (const [input, passes, blurb] of cases) {
     it(blurb, () => { expect(verdictOf(() => check.parse(input))).to.eq(passes ? 'passes' : 'refuses') })
   }

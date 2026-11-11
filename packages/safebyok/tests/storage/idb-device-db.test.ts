@@ -16,10 +16,10 @@ import * as TH from '../test-helpers'
 const dbNameOf = new WeakMap<IdbDeviceDB, string>()
 
 /** A fresh dbName, which no other test has touched. */
-const freshDbName = (): string => `test-${crypto.randomUUID()}`
+function freshDbName(): string { return `test-${crypto.randomUUID()}` }
 
 /** A DeviceDB over a database of its own. */
-const makeDeviceDB = (dbName = freshDbName()): IdbDeviceDB => {
+function makeDeviceDB(dbName = freshDbName()): IdbDeviceDB {
   const deviceDB = new IdbDeviceDB({ dbName })
   dbNameOf.set(deviceDB, dbName)
   return deviceDB
@@ -48,14 +48,14 @@ const failNextCall = async (deviceDB: IdbDeviceDB, errname = 'InvalidStateError'
 }
 
 /** The name of every database IndexedDB has stored now. */
-const dbNamesNow = async (): Promise<string[]> => {
+async function dbNamesNow(): Promise<string[]> {
   const dbs = await indexedDB.databases()
   return dbs.map((db) => db.name).filter((dbname) => dbname !== undefined)
 }
 
 // idb-keyval has its connection open for the page's life, as an old tab would; this one closes, as a closed tab has.
 /** Makes the database `dbname` with one row in `storename`, and closes it. */
-const plantClosedDB = async (dbname: string, storename: string): Promise<void> => {
+async function plantClosedDB(dbname: string, storename: string): Promise<void> {
   const opening = indexedDB.open(dbname)
   opening.addEventListener('upgradeneeded', () => { opening.result.createObjectStore(storename) })
   const db = await promisifyRequest(opening)

@@ -544,12 +544,12 @@ const shapesOf = (schema: unknown): Zod.ZodRawShape[] => {
 // Each field is parsed on its own: handed every field at once, a checker names eight failures and
 // counts the rest, and a union refuses at its discriminator before any other field is heard.
 /** `schema` and every field schema under it, at any depth. */
-const partsOf = (schema: unknown): Zod.ZodType[] => (
-  schema instanceof Zod.ZodType ? [schema, ...shapesOf(schema).flatMap((shape) => Object.values(shape).flatMap((field) => partsOf(field)))] : []
-)
+function partsOf(schema: unknown): Zod.ZodType[] {
+  return schema instanceof Zod.ZodType ? [schema, ...shapesOf(schema).flatMap((shape) => Object.values(shape).flatMap((field) => partsOf(field)))] : []
+}
 
 /** What a refusal of `attempt` says, its message, stack, meta and every cause; null when it passes. */
-const refusalTextOf = (attempt: () => unknown): string | null => {
+function refusalTextOf(attempt: () => unknown): string | null {
   try {
     attempt()
     return null

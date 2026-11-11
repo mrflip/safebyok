@@ -22,11 +22,13 @@ export type LoggedCall = {
  *   const vault = await TH.settledVault({ ...opts, logger: spy.logger })
  *   spy.calls.map((call) => call.level)  // => ['warn'], say
  */
-export const spyLogger = () => {
+export function spyLogger() {
   const calls: LoggedCall[] = []
-  const hear = (level: keyof VaultLogger): VaultLogger[typeof level] => (message, story, err) => {
-    if (message === TestDeriverNotice) { return }
-    calls.push({ level, message, story, err })
+  function hear(level: keyof VaultLogger): VaultLogger[typeof level] {
+    return (message, story, err) => {
+      if (message === TestDeriverNotice) { return }
+      calls.push({ level, message, story, err })
+    }
   }
   const logger: VaultLogger = { log: hear('log'), warn: hear('warn'), error: hear('error') }
   return { logger, calls }
@@ -59,9 +61,9 @@ export const quietLogger: VaultLogger = {
  *
  * @example expect(TH.loggedText(spy.calls)).to.not.include(passphrase)
  */
-export const loggedText = (calls: readonly LoggedCall[]): string => (
-  calls.map((call) => [call.level, call.message ?? '', jsonOrPlaceholder(call.story ?? {}), thrownText(call.err)].join(' ')).join('\n')
-)
+export function loggedText(calls: readonly LoggedCall[]): string {
+  return calls.map((call) => [call.level, call.message ?? '', jsonOrPlaceholder(call.story ?? {}), thrownText(call.err)].join(' ')).join('\n')
+}
 
 /** Everything a thrown value carries, as one text to search for what must never be there: an
  * error's message, stack and own properties, and the same of each cause beneath it; anything else
@@ -73,7 +75,7 @@ export const loggedText = (calls: readonly LoggedCall[]): string => (
  *
  * @example expect(TH.thrownText(err)).to.not.include(passphrase)
  */
-export const thrownText = (thrown: unknown): string => errorText(thrown, new Set())
+export function thrownText(thrown: unknown): string { return errorText(thrown, new Set()) }
 
 /** Every string and number in `val`, at any depth, as text: the values of a record, to search an
  * error or a log for. Field names are not among them. Give the record values distinctive
@@ -84,7 +86,7 @@ export const thrownText = (thrown: unknown): string => errorText(thrown, new Set
  *
  * @example TH.leafTexts({ vault_tok: 'vault-tok-u1', wrapped: { ciphertext_b64: 'ct-a1' }, epoch: 7 })  // => ['vault-tok-u1', 'ct-a1', '7']
  */
-export const leafTexts = (val: unknown): string[] => {
+export function leafTexts(val: unknown): string[] {
   const leaves: string[] = []
   JSON.stringify(val, (_ckey, nested: unknown) => {
     if (typeof nested === 'string' || typeof nested === 'number') { leaves.push(String(nested)) }
@@ -102,13 +104,13 @@ export const leafTexts = (val: unknown): string[] => {
  *
  * @example expect(TH.shownOf(model)).to.deep.equal({ label: 'shown', count: 2 })   // no private field, no getter
  */
-export const shownOf = (obj: object): Record<string, unknown> => Object.fromEntries(Object.entries(obj))
+export function shownOf(obj: object): Record<string, unknown> { return Object.fromEntries(Object.entries(obj)) }
 
 /** What `JSON.stringify` writes of `val`, read back: for a test of what a model serializes as.
  *
  * @example expect(TH.jsonOf(model)).to.deep.equal({ label: 'shown' })   // through its toJSON, where it has one
  */
-export const jsonOf = (val: unknown): Record<string, unknown> => {
+export function jsonOf(val: unknown): Record<string, unknown> {
   const written = JSON.stringify(val)
   return JSON.parse(written) as Record<string, unknown>
 }
@@ -116,7 +118,7 @@ export const jsonOf = (val: unknown): Record<string, unknown> => {
 /** An error and every cause under it as text: message, stack and own properties each. Anything
  * else thrown, as JSON. `seen` has the errors already written, so a cause cycle ends.
  */
-const errorText = (thrown: unknown, seen: Set<unknown>): string => {
+function errorText(thrown: unknown, seen: Set<unknown>): string {
   if (thrown === undefined || thrown === null) { return '' }
   if (seen.has(thrown)) { return '[cause seen above]' }
   seen.add(thrown)
@@ -125,7 +127,7 @@ const errorText = (thrown: unknown, seen: Set<unknown>): string => {
 }
 
 /** `val` as JSON, or `[not JSON]` where JSON.stringify throws on it. */
-const jsonOrPlaceholder = (val: unknown): string => {
+function jsonOrPlaceholder(val: unknown): string {
   try {
     return JSON.stringify(val)
   } catch {

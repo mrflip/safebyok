@@ -94,11 +94,11 @@ export type BatteryWorld = {
 }
 
 /** Stands in for a hook the VaultDB did not give, in a case not registered without it. */
-const notGiven = (hookname: string) => (): never => { throw new TypeError(`The VaultDB gave the battery no ${hookname}.`) }
+function notGiven(hookname: string) { return (): never => { throw new TypeError(`The VaultDB gave the battery no ${hookname}.`) } }
 
 // Every VaultDB a world's hooks are handed is one its own factories made, so the narrowing to DBT has;
 // a world given no `_cheat_adapterOf` was handed AdapterVaultDBs.
-const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWorld => {
+function worldOf<DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWorld {
   const { makeVaultDB, _cheat_rowsOf, makeTwin, makeCappedVaultDB, makeVaultDBFor, _cheat_failNextCall, _cheat_adapterOf, watches = true, boxNoticesCarryVault = true } = opts
   const fresh = async (dbOpts?: AdapterVaultDBOpts): Promise<VaultDB> => await makeVaultDB(dbOpts)
   const putWith = async ({ box: withBox = false } = {}) => {
@@ -131,7 +131,7 @@ const worldOf = <DBT extends VaultDB>(opts: VaultDBBatteryOpts<DBT>): BatteryWor
 
 // The opts are checked before anything registers, so a VaultDB missing a hook fails here, not inside each case.
 /** Registers the cases every VaultDB must pass, under `label`. */
-export const describeVaultDBBattery = <DBT extends VaultDB>(label: string, opts: VaultDBBatteryOpts<DBT>): void => {
+export function describeVaultDBBattery<DBT extends VaultDB>(label: string, opts: VaultDBBatteryOpts<DBT>): void {
   batteryOpts.parse(opts, { where: `describeVaultDBBattery("${label}")` })
   const world = worldOf(opts)
   describe(label, () => {

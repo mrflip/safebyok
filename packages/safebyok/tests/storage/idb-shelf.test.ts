@@ -9,9 +9,11 @@ import { _cheat_forgetShelf, versionedShelfOf, type VersionedShelfSpec } from '.
 import { inOneStep, rowAt } from '../../src/storage/idb-transaction'
 
 /** A spec over a dbName no other test has touched. */
-const specOf = (over: Partial<VersionedShelfSpec> = {}): VersionedShelfSpec => ({
-  dbName: `test-${crypto.randomUUID()}`, dbstem: 'device', version: '001-001-001', storename: 'leases', oldnames: [], ...over,
-})
+function specOf(over: Partial<VersionedShelfSpec> = {}): VersionedShelfSpec {
+  return {
+    dbName: `test-${crypto.randomUUID()}`, dbstem: 'device', version: '001-001-001', storename: 'leases', oldnames: [], ...over,
+  }
+}
 
 describe("versionedShelfOf(spec)", () => {
   it("returns a shelf that stores rows in the database named by its stem and version", async () => {
@@ -33,7 +35,7 @@ describe("versionedShelfOf(spec)", () => {
     const shelf = versionedShelfOf(spec)
     _cheat_forgetShelf(`${spec.dbName}:device-v001-001-001`)
     const fresh = versionedShelfOf(spec)
-    const connectionOf = async (made: UseStore): Promise<IDBDatabase> => await inOneStep(made, 'readonly', (store) => store.transaction.db)
+    async function connectionOf(made: UseStore): Promise<IDBDatabase> { return await inOneStep(made, 'readonly', (store) => store.transaction.db) }
     expect(await connectionOf(fresh)).to.not.eq(await connectionOf(shelf))
     await inOneStep(shelf, 'readwrite', (store) => { store.put({ wrapped: 'one' }, 'key') })
     expect(await inOneStep(fresh, 'readonly', (store) => rowAt(store, 'key'))).to.deep.equal({ wrapped: 'one' })

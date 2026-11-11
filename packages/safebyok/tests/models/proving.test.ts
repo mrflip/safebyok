@@ -17,30 +17,32 @@ useFakeClock()
 const WorldScope = vaultScope.parse(WorldStamp)
 
 /** A key deriver scripted to hand back anything at all, to try what a proving makes of it. */
-const deriverHanding = (handBack: () => unknown): KeyDeriver => ({
-  key_deriver_label: 'test_scripted_v0',
-  salt_size:        16,
-  deriveKeyBytes:    () => Promise.resolve(handBack() as Uint8Array),
-})
+function deriverHanding(handBack: () => unknown): KeyDeriver {
+  return {
+    key_deriver_label: 'test_scripted_v0',
+    salt_size:        16,
+    deriveKeyBytes:    () => Promise.resolve(handBack() as Uint8Array),
+  }
+}
 
-const novelPassphrase = (world: ProvingWorld = provingWorldOf()): Promise<PassphraseProving> => (
-  PassphraseProving.buildNovel(WorldStamp, TestPassphrase, world)
-)
+function novelPassphrase(world: ProvingWorld = provingWorldOf()): Promise<PassphraseProving> {
+  return PassphraseProving.buildNovel(WorldStamp, TestPassphrase, world)
+}
 
-const novelOverHanded = (handBack: () => unknown): Promise<PassphraseProving> => novelPassphrase(provingWorldOf({ keyDeriver: deriverHanding(handBack) }))
+function novelOverHanded(handBack: () => unknown): Promise<PassphraseProving> { return novelPassphrase(provingWorldOf({ keyDeriver: deriverHanding(handBack) })) }
 
 /** A passphrase proving that has a wayin under a new vaultKey, beside that wayin. */
-const novelWithWayin = async (): Promise<{ proving: PassphraseProving, wayin: Wayin }> => {
+async function novelWithWayin(): Promise<{ proving: PassphraseProving, wayin: Wayin }> {
   const proving = await novelPassphrase()
   return { proving, wayin: await proving.buildWayin(NOVEL) }
 }
 
-const novelPasskey = (answer = passkeyAnswerOf(), world: ProvingWorld = provingWorldOf()): Promise<PasskeyProving> => (
-  PasskeyProving.buildNovel(WorldStamp, answer, world)
-)
+function novelPasskey(answer = passkeyAnswerOf(), world: ProvingWorld = provingWorldOf()): Promise<PasskeyProving> {
+  return PasskeyProving.buildNovel(WorldStamp, answer, world)
+}
 
 /** A gate with both wayins, beside a fresh copy of the answer that opens its passkey's: the gate's build spent the one it was handed. */
-const gateWithBoth = async (epochs = 0): Promise<{ gate: Gate, answerOf: () => PasskeyAnswer }> => {
+async function gateWithBoth(epochs = 0): Promise<{ gate: Gate, answerOf: () => PasskeyAnswer }> {
   const answer = passkeyAnswerOf()
   const { credential_id, prf_salt_b64 } = answer
   const prfBytes = new Uint8Array(answer.prfBytes)
@@ -57,7 +59,7 @@ const findsWeak = () => ({ strong: false as const, reason: 'too short' })
 const findsStrongAsync = () => Promise.resolve({ strong: true as const })
 
 /** Whether `one`'s lease opens what `other`'s seals: whether both have one vaultKey. */
-const expectOneVaultKey = async (one: Proving, other: Proving): Promise<void> => {
+async function expectOneVaultKey(one: Proving, other: Proving): Promise<void> {
   const friend = fakeLeaseFriendOf()
   const stamp = sealStampOf('b1')
   const sealer = await one.buildLease(friend)

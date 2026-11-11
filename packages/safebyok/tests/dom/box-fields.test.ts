@@ -11,14 +11,14 @@ const world = useModelsWorld()
 const Stored = { apiKey: 'sk-test-0000', org: { name: 'acme', seats: 3 }, tags: ['a', 'b'] }
 
 /** A box whose whisper is {@link Stored}, not exposed. */
-const unexposedOf = async (): Promise<TestableBox> => {
+async function unexposedOf(): Promise<TestableBox> {
   const record = fullBoxRecord()
   world.mw.seedPut(record)
   const box = await boxListingOf(world.mw).build(record)
   return box.put({ whisper: Stored })
 }
 
-const elOf = (text = ''): { value: string } => ({ value: text })
+function elOf(text = ''): { value: string } { return { value: text } }
 
 describe("BoxFields.of", () => {
   it("returns one instance per box", async () => {

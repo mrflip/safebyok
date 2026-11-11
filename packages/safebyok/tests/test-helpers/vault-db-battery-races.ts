@@ -13,20 +13,22 @@ import { aWhile, beforeNextCall } from './timing'
 import type { BatteryWorld } from './vault-db-battery'
 
 /** The answers that were written, and those refused. */
-const splitOf = <AnswerT extends { ok: boolean }>(answers: AnswerT[]) => ({
-  written: answers.filter(({ ok }) => ok),
-  refused: answers.filter(({ ok }) => ! ok),
-})
+function splitOf<AnswerT extends { ok: boolean }>(answers: AnswerT[]) {
+  return {
+    written: answers.filter(({ ok }) => ok),
+    refused: answers.filter(({ ok }) => ! ok),
+  }
+}
 
 /** Runs `meanwhile`, another device's doings, just before the gate verb's doPutVault. */
-const slipInFront = (vaultDB: AdapterVaultDB, meanwhile: () => Promise<unknown>): void => {
+function slipInFront(vaultDB: AdapterVaultDB, meanwhile: () => Promise<unknown>): void {
   /** A VaultDB seen as the protected call a gate verb moves the vault row by. */
   type MovesVaultRow = { doPutVault: (...args: never[]) => Promise<unknown> }
   beforeNextCall(vaultDB as unknown as MovesVaultRow, 'doPutVault', meanwhile)
 }
 
 /** A watch on `vaultDB` at `scope`, closed when the test ends, and the notices it has heard so far. */
-const watching = (vaultDB: VaultDB, scope: WatchScope) => {
+function watching(vaultDB: VaultDB, scope: WatchScope) {
   const notices: Notice[] = []
   const unwatch = vaultDB.watch(scope, (notice) => { notices.push(notice) })
   onTestFinished(unwatch)
@@ -34,9 +36,9 @@ const watching = (vaultDB: VaultDB, scope: WatchScope) => {
 }
 
 /** Registers the races', notices' and failure's cases over `world`. */
-export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCap, makeCapped, canFail, failNextCall, watches, boxNoticesCarryVault }: BatteryWorld): void => {
+export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCap, makeCapped, canFail, failNextCall, watches, boxNoticesCarryVault }: BatteryWorld): void {
   /** The world a watch hears beside a box of `vault`: the vault row, or null from a VaultDB whose box notices carry none. */
-  const boxWorld = (vault: VaultRow) => (boxNoticesCarryVault ? vault : null)
+  function boxWorld(vault: VaultRow) { return (boxNoticesCarryVault ? vault : null) }
 
   describe("two devices at once", () => {
     it("two births of one vault store one, and the other is passed it", async () => {

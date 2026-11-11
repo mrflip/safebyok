@@ -19,7 +19,7 @@ const LiteralSidecar = {
 }
 
 /** Registers the gets' cases over `world`. */
-export const describeGets = ({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): void => {
+export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): void {
   describe("listVaults", () => {
     it("returns act 'gotvoid' for a bank with no vaults", async () => {
       const vaultDB = await fresh()

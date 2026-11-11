@@ -9,10 +9,10 @@ const world = useModelsWorld()
 
 // == [Helpers of the pipeline tests]: scopeOf, putable
 
-const scopeOf = (boxlabel = 'anthropic_api_key') => world.mw.boxscope(boxlabel)
+function scopeOf(boxlabel = 'anthropic_api_key') { return world.mw.boxscope(boxlabel) }
 
 /** A listing with a box of the record storage has stored, and the next revision of it to put. */
-const putable = async () => {
+async function putable() {
   const listing = boxListingOf(world.mw)
   world.mw.seedPut(fullBoxRecord())
   const box = await listing.build(fullBoxRecord())

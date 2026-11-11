@@ -13,7 +13,7 @@ const world = useModelsWorld()
 const Exposed = { apiKey: 'sk-test-0000' }
 
 /** A box built of `record`, with the same record in storage. */
-const builtOf = (record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> => {
+function builtOf(record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> {
   world.mw.seedPut(record)
   return boxListingOf(world.mw).build(record)
 }
@@ -35,7 +35,7 @@ const veiledOf = async (): Promise<TestableBox> => {
   return box.veil()
 }
 
-const locking = (box: TestableBox): TestableBox => {
+function locking(box: TestableBox): TestableBox {
   world.mw.setLocked(true)
   return box
 }
@@ -78,7 +78,7 @@ const StateTable = [
 
 const OperationOrder = ['veil', 'unveil', 'unexpose', 'expose', 'lock', 'unlock'] as const
 
-const expectShows = (box: TestableBox, shown: keyof typeof Shows): void => {
+function expectShows(box: TestableBox, shown: keyof typeof Shows): void {
   if (shown === 'value') { expect(box.whisper).to.deep.equal(Exposed) } else { expect(box.whisper).to.eq(Shows[shown]) }
   expect(box.exposure).to.eq(BoxExposures[shown])
   expect(box.isShowing).to.eq(shown === 'value')

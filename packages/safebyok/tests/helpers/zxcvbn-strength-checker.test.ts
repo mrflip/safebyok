@@ -10,7 +10,7 @@ const scope: VaultScope = Object.freeze({ applabel: 'acme', user_id: 'u1', vault
 
 // A fresh module, so its StrongVerdict is its own: the tests below compare verdicts deeply.
 /** A checker made fresh, over a dictionary chunk that fails to load until `chunk.failing` is cleared. */
-const freshCheckerOverChunk = async () => {
+async function freshCheckerOverChunk() {
   const chunk = { failing: false, imports: 0 }
   vi.doMock('@zxcvbn-ts/language-common', async (importOriginal) => {
     chunk.imports += 1
@@ -23,7 +23,7 @@ const freshCheckerOverChunk = async () => {
 }
 
 /** The checker's verdict, as a promise whether it answers at once or later. */
-const judgedAsync = async (typed: string, vaultScope: VaultScope) => zxcvbnStrengthChecker(typed, vaultScope)
+async function judgedAsync(typed: string, vaultScope: VaultScope) { return zxcvbnStrengthChecker(typed, vaultScope) }
 
 afterEach(() => {
   vi.unstubAllGlobals()

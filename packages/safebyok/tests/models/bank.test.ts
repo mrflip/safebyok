@@ -19,7 +19,7 @@ useBankWorlds()
 const nothing = (): void => undefined
 
 /** `news`, told as bad news by `bank`: its autolock, whose listing of the cached leases `world`'s deviceDB refuses with it. */
-const tellByAutolock = async (world: ReturnType<typeof makeBankWorld>, bank: Bank, news: VaultError): Promise<void> => {
+async function tellByAutolock(world: ReturnType<typeof makeBankWorld>, bank: Bank, news: VaultError): Promise<void> {
   vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValueOnce({ ok: false, err: news })
   await bank.autolock()
 }
@@ -696,7 +696,7 @@ describe("the snapshot and its subscription", () => {
 })
 
 /** A bank with no `requestCleartext`, past its hello, with the vault of `Dna` locked to it and `ensureUnlocked` waiting on its gating. */
-const bankWaitingOnUnlock = async () => {
+async function bankWaitingOnUnlock() {
   const { world } = await makeBankWithVault()
   const bank = world.bankOnAnotherDevice({ requestCleartext: undefined })
   await bank.hello()
@@ -706,7 +706,7 @@ const bankWaitingOnUnlock = async () => {
   return { world, bank, vault, unlocking, gating }
 }
 
-const fail = (message: string): never => { throw new Error(message) }
+function fail(message: string): never { throw new Error(message) }
 
 describe("the snapshot's open gating", () => {
   it("is null with no gating open", async () => {
@@ -840,7 +840,7 @@ describe("the snapshot's open gating", () => {
   })
 })
 
-const isRefusing = (call: () => unknown): boolean => {
+function isRefusing(call: () => unknown): boolean {
   try {
     call()
     return false
@@ -850,7 +850,7 @@ const isRefusing = (call: () => unknown): boolean => {
 }
 
 /** A key deriver that has each derivation until the test calls `answer`. */
-const pendingDeriver = () => {
+function pendingDeriver() {
   let isAsked = false
   let release = nothing
   const released = new Promise<void>((resolve) => { release = resolve })

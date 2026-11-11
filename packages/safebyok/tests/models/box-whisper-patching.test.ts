@@ -9,10 +9,10 @@ import { type TestableBox, boxListingOf, fullBoxRecord, useModelsWorld } from '.
 const world = useModelsWorld()
 
 const Stored = { apiKey: 'sk-test-0000', org: { name: 'acme', seats: 3 }, tags: ['a', 'b'] }
-const lock = () => { world.mw.setLocked(true) }
+function lock() { world.mw.setLocked(true) }
 
 /** A box whose whisper is {@link Stored}, not exposed. */
-const unexposedOf = async (): Promise<TestableBox> => {
+async function unexposedOf(): Promise<TestableBox> {
   const record = fullBoxRecord()
   world.mw.seedPut(record)
   const box = await boxListingOf(world.mw).build(record)

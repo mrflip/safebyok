@@ -9,11 +9,11 @@ const world = useModelsWorld()
 
 // == [Helpers of the pipeline tests]: scopeOf, dnaOf, seededListing
 
-const scopeOf = (boxlabel = 'anthropic_api_key') => world.mw.boxscope(boxlabel)
-const dnaOf = (boxlabel = 'anthropic_api_key') => boxDnaOf(scopeOf(boxlabel))
+function scopeOf(boxlabel = 'anthropic_api_key') { return world.mw.boxscope(boxlabel) }
+function dnaOf(boxlabel = 'anthropic_api_key') { return boxDnaOf(scopeOf(boxlabel)) }
 
 /** A listing with a full box and a deleted one, each of a record storage has stored too, with no call made yet. */
-const seededListing = async () => {
+async function seededListing() {
   const listing = boxListingOf(world.mw)
   const full = fullBoxRecord({ boxlabel: 'full_box' })
   const gone = tombstoneBoxRecord({ boxlabel: 'gone_box', revision_seq: 2 })

@@ -28,7 +28,7 @@ export { T0 } from './models-world'
 // == [Time]: useFakeClock
 
 /** Vitest's fake timers from {@link T0} before each test, real ones back after it. Call it at the top of a test file that makes a lease. */
-export const useFakeClock = (): void => {
+export function useFakeClock(): void {
   beforeEach(() => { vi.useFakeTimers({ now: T0 }) })
   afterEach(() => { vi.useRealTimers() })
 }
@@ -60,7 +60,7 @@ export type FakeLeaseFriend = LeaseFriend & {
 }
 
 /** A {@link FakeLeaseFriend} of {@link WorldStamp}, as `overrides` changes it, caching nothing yet, its verbs answering good. Script a refusal with the spy's `mockRejectedValueOnce(err)`, or `mockResolvedValueOnce(bad(err))` for a `try` verb. */
-export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp & Pick<LeaseFriend, 'leaseMillis'>> = {}): FakeLeaseFriend => {
+export function fakeLeaseFriendOf(overrides: Partial<VaultStamp & Pick<LeaseFriend, 'leaseMillis'>> = {}): FakeLeaseFriend {
   const { logger, calls } = spyLogger()
   const friend: FakeLeaseFriend = {
     ...WorldStamp,
@@ -95,12 +95,12 @@ export const fakeLeaseFriendOf = (overrides: Partial<VaultStamp & Pick<LeaseFrie
 export const GrantedAs: LeaseGrantOpts = Object.freeze({ gate_epoch: FirstGateEpoch, wayinkind: 'passphrase' })
 
 /** A lease under a fresh vaultKey: no two share a key. Not cached. */
-export const makeGrantedLease = async (friend: FakeLeaseFriend, opts: LeaseGrantOpts = GrantedAs): Promise<Lease> => (
-  Lease.buildGranted(friend, await makeVaultKey(), opts)
-)
+export async function makeGrantedLease(friend: FakeLeaseFriend, opts: LeaseGrantOpts = GrantedAs): Promise<Lease> {
+  return Lease.buildGranted(friend, await makeVaultKey(), opts)
+}
 
 /** The two stamps a box hands the lease to seal its whisper under, its own fields, flat: `boxlabel` and `box_tok` for the boxKey's wrap, the same and `revision_seq` for the whisper's cipher. `overrides` lays fields over both. */
-export const sealStampOf = (boxlabel: string, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord => ({ boxlabel, box_tok: `box-tok-${boxlabel}`, revision_seq: 1, ...overrides })
+export function sealStampOf(boxlabel: string, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord { return { boxlabel, box_tok: `box-tok-${boxlabel}`, revision_seq: 1, ...overrides } }
 // --
 
 // == [Provings]: TestPassphrase, DeviceId, provingWorldOf, passkeyAnswerOf, builtGateOf
@@ -115,22 +115,26 @@ export const DeviceId = '00000000-0000-4000-8000-00000000000a'
 export type ProvingWorldGiven = { keyDeriver?: KeyDeriver | undefined, strengthChecker?: StrengthChecker | undefined, device_id?: string | undefined }
 
 /** A proving's world: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceId}, each wrapped as a bank wraps it. */
-export const provingWorldOf = ({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_id = DeviceId }: ProvingWorldGiven = {}): ProvingWorld => ({
-  keyDeriver:      guardKeyDeriver(keyDeriver),
-  strengthChecker: guardStrengthChecker(strengthChecker),
-  device_id,
-})
+export function provingWorldOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_id = DeviceId }: ProvingWorldGiven = {}): ProvingWorld {
+  return {
+    keyDeriver:      guardKeyDeriver(keyDeriver),
+    strengthChecker: guardStrengthChecker(strengthChecker),
+    device_id,
+  }
+}
 
 /** A fresh passkey answer: a fake credential id, a fresh salt of the right length, and 32 random PRF bytes. */
-export const passkeyAnswerOf = (overrides: Partial<GX.PasskeyAnswer> = {}): GX.PasskeyAnswer => ({
-  credential_id: 'cred-test-1',
-  prf_salt_b64:  toB64(randomBytes(PasskeySaltSize)),
-  prfBytes:      randomBytes(32),
-  ...overrides,
-})
+export function passkeyAnswerOf(overrides: Partial<GX.PasskeyAnswer> = {}): GX.PasskeyAnswer {
+  return {
+    credential_id: 'cred-test-1',
+    prf_salt_b64:  toB64(randomBytes(PasskeySaltSize)),
+    prfBytes:      randomBytes(32),
+    ...overrides,
+  }
+}
 
 /** A first gate of {@link WorldStamp}, made as a birth makes it, of {@link TestPassphrase} and any passkey `answer`, which it leaves unspent, beside the passphrase's proving. */
-export const builtGateOf = async (answer?: GX.PasskeyAnswer): Promise<{ gate: Gate, proving: PassphraseProving }> => {
+export async function builtGateOf(answer?: GX.PasskeyAnswer): Promise<{ gate: Gate, proving: PassphraseProving }> {
   const world = provingWorldOf()
   const proving = await PassphraseProving.buildNovel(WorldStamp, GX.passphraseCleartext.parse(TestPassphrase), world)
   const passkeyProving = answer && await PasskeyProving.buildNovel(WorldStamp, answer, world)
@@ -143,7 +147,7 @@ export const builtGateOf = async (answer?: GX.PasskeyAnswer): Promise<{ gate: Ga
 // == [Bytes]: isZeroed
 
 /** Whether every byte of `bytes` is zero: what a spent passkey answer, a sealed whisper's bytes or refused key bytes are left as. */
-export const isZeroed = (bytes: Uint8Array): boolean => bytes.every((byte) => byte === 0)
+export function isZeroed(bytes: Uint8Array): boolean { return bytes.every((byte) => byte === 0) }
 // --
 
 // == [Backdoor]: WayinSecret, _cheat_vaultKeyBytesOf
@@ -152,10 +156,10 @@ export const isZeroed = (bytes: Uint8Array): boolean => bytes.every((byte) => by
 export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
 
 /** A test backdoor: the raw bytes of the vaultKey `wayin` wraps, opened from outside the models as a later unlock would open it, from the secret, the wayin's header and the vault's stamp. It exists only so a test can show two wayins have one vaultKey, or that a wayin opens at all; no model hands out a vaultKey. Rejects with WebCrypto's error when the wayin will not open. */
-export const _cheat_vaultKeyBytesOf = async (vault: VaultStamp, wayin: Wayin, secret: WayinSecret, keyDeriver: KeyDeriver = testDeriver): Promise<Uint8Array> => {
+export async function _cheat_vaultKeyBytesOf(vault: VaultStamp, wayin: Wayin, secret: WayinSecret, keyDeriver: KeyDeriver = testDeriver): Promise<Uint8Array> {
   const header = wayin.toJSON()
   const ctx = wayinCtxOf(vaultStamp.parse(vault), header)
-  const wayinKeyOf = async (): Promise<CryptoKey> => {
+  async function wayinKeyOf(): Promise<CryptoKey> {
     if ('prfBytes' in secret) {
       if (header.wayinkind !== 'passkey') { throw new Error('PRF bytes open a passkey wayin alone.') }
       return deriveWrappingKey(secret.prfBytes, ctx)

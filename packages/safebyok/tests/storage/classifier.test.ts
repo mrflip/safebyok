@@ -42,10 +42,10 @@ type Level = Readonly<{
 const shellMeta: Meta = { ...SX.VoidRevision, am: 'x', vault_tok: 'life1', lifeTok: SX.VoidLifeTok }
 
 // A put brings a new life tok over a tombstone or nothing, and keeps the one of a live row.
-const lifeTokOver = (expected: Meta): string => ((expected.am === 'a') ? expected.lifeTok : `${expected.lifeTok}-reborn`)
+function lifeTokOver(expected: Meta): string { return ((expected.am === 'a') ? expected.lifeTok : `${expected.lifeTok}-reborn`) }
 
-const boxExpectedOf = ({ lifeTok, ...meta }: Meta) => ({ ...meta, box_tok: lifeTok })
-const boxProposed   = (expected: Meta, revision_tok: string) => ({ revision_tok, revision_seq: expected.revision_seq + 1 })
+function boxExpectedOf({ lifeTok, ...meta }: Meta) { return { ...meta, box_tok: lifeTok } }
+function boxProposed(expected: Meta, revision_tok: string) { return { revision_tok, revision_seq: expected.revision_seq + 1 } }
 
 const BoxLevel: Level = {
   rows:   { void: null, gone: goneBox, live: liveBox },
@@ -59,7 +59,7 @@ const BoxLevel: Level = {
   }, liveVault, BoxLevel.rows[stored]),
 }
 
-const vaultExpectedOf = ({ lifeTok, ...meta }: Meta) => ({ ...meta, vault_tok: lifeTok })
+function vaultExpectedOf({ lifeTok, ...meta }: Meta) { return { ...meta, vault_tok: lifeTok } }
 
 const VaultLevel: Level = {
   rows:   { void: null, gone: goneVault, live: liveVault },
@@ -76,7 +76,7 @@ const VaultLevel: Level = {
 const Levels = [['boxActOf', BoxLevel], ['vaultActOf', VaultLevel]] as const
 
 /** What a request in the cell `tok` by `seq` expects and proposes against the row `stored`. */
-const citedOver = (level: Level, stored: Stored, tok: TokCell, seq: SeqCell): { expected: Meta, proposedTok: string } => {
+function citedOver(level: Level, stored: Stored, tok: TokCell, seq: SeqCell): { expected: Meta, proposedTok: string } {
   const row       = level.rows[stored]
   const storedTok = (row === null) ? 'no-row' : row.revision_tok
   // What it expects has the life and liveness of the row stored, or of a live row where none is: only its revision is off.
@@ -198,7 +198,7 @@ describe("the whole table of a put, a del and a get, cell by cell", () => {
   const cells = Storeds.flatMap((stored) => TokCells.flatMap((tok) => SeqCells.map((seq) => ({ stored, tok, seq }))))
     .filter(({ stored, tok, seq }) => (! ((tok === 'eq') && (seq === 'birth'))) && ((stored !== 'void') || (tok === 'neq')))
   const policiesList = EX.putIfAbsentVals.flatMap((ifAbsent) => EX.ifPresentVals.map((ifPresent) => ({ ifAbsent, ifPresent })))
-  const isCited = ({ stored, tok, seq }: typeof cells[number]) => (stored === 'void') ? (seq === 'birth') : ((tok === 'eq') && (seq === 'eq'))
+  function isCited({ stored, tok, seq }: typeof cells[number]) { return (stored === 'void') ? (seq === 'birth') : ((tok === 'eq') && (seq === 'eq')) }
 
   describe.each(Levels)("%s", (_fnname, level) => {
     const knownActs: readonly string[] = [...EX.writeActVals, ...EX.foundActVals, ...EX.refusedActVals]
@@ -268,7 +268,7 @@ describe("boxActOf, its vault", () => {
 
 })
 
-const damagedRowOf = (classify: () => unknown): VaultError => {
+function damagedRowOf(classify: () => unknown): VaultError {
   try { classify() } catch (err) { return err as VaultError }
   return expect.fail('the classifier answered an act for a damaged row')
 }
@@ -325,7 +325,7 @@ describe("boxActOf and vaultActOf, a row no working store could answer", () => {
   })
 })
 
-const roomOf = (used: number) => ({ boxes: { used, max: 3 }, bytes: { used: 0, max: 1000 } })
+function roomOf(used: number) { return { boxes: { used, max: 3 }, bytes: { used: 0, max: 1000 } } }
 
 describe("cappedActOf, the soft cap on a vault's boxes", () => {
   it("answers vault_full for a born in a vault at its cap", () => {
@@ -369,18 +369,22 @@ describe("boxActOf, one box through a run of requests", () => {
   type Run = Readonly<{ stored: Row | null, versions: readonly Row[], sent: readonly Write[], wrote: ReadonlySet<Write> }>
   const shell: Row = SX.shellBoxOf(boxscope, 'life1')
   let minted = 0
-  const mint = (stem: string): string => { minted += 1; return `${stem}${String(minted)}` }
+  function mint(stem: string): string { minted += 1; return `${stem}${String(minted)}` }
 
-  const putCiting = (expected: Row, policies: Policies): Write => ({
-    op: 'put', ...boxQuery, ...policies, expected,
-    record: { ...liveBox, revision_tok: mint('rev'), revision_seq: expected.revision_seq + 1, box_tok: (expected.am === 'a') ? expected.box_tok : mint('life') },
-  })
-  const delCiting = (expected: Row): Write => ({
-    op: 'del', ...boxQuery, expected, record: { ...goneBox, revision_tok: mint('rev'), revision_seq: expected.revision_seq + 1, box_tok: mint('life') },
-  })
+  function putCiting(expected: Row, policies: Policies): Write {
+    return {
+      op: 'put', ...boxQuery, ...policies, expected,
+      record: { ...liveBox, revision_tok: mint('rev'), revision_seq: expected.revision_seq + 1, box_tok: (expected.am === 'a') ? expected.box_tok : mint('life') },
+    }
+  }
+  function delCiting(expected: Row): Write {
+    return {
+      op: 'del', ...boxQuery, expected, record: { ...goneBox, revision_tok: mint('rev'), revision_seq: expected.revision_seq + 1, box_tok: mint('life') },
+    }
+  }
 
   /** Every request worth sending next: a put or del citing nothing, the row stored or the one before it, and each request sent before, again. */
-  const nextRequests = ({ stored, versions, sent }: Run): Write[] => {
+  function nextRequests({ stored, versions, sent }: Run): Write[] {
     const citable = [shell, ...versions.slice(-2)]
     const fresh = citable.flatMap((expected) => [
       putCiting(expected, Repl), putCiting(expected, { ifAbsent: 'add', ifPresent: 'get' }), putCiting(expected, { ifAbsent: 'fail', ifPresent: 'fail' }), delCiting(expected),
@@ -389,7 +393,7 @@ describe("boxActOf, one box through a run of requests", () => {
   }
 
   /** The run after `request` was answered `act`, with what the contract promises of a write checked on the way. */
-  const runAfter = (run: Run, request: Write, act: BoxAct): Run => {
+  function runAfter(run: Run, request: Write, act: BoxAct): Run {
     const sent = run.sent.includes(request) ? run.sent : [...run.sent, request]
     if (! isWriteAct(act)) { return { ...run, sent } }
     expect(run.wrote.has(request), 'a request stores its record at most once').to.be.false
@@ -400,7 +404,7 @@ describe("boxActOf, one box through a run of requests", () => {
     return { stored: request.record, versions: [...run.versions, request.record], sent, wrote: new Set([...run.wrote, request]) }
   }
 
-  const walk = (run: Run, depth: number, seen: { acts: Set<BoxAct>, runs: number }): void => {
+  function walk(run: Run, depth: number, seen: { acts: Set<BoxAct>, runs: number }): void {
     seen.runs += 1
     if (depth === 0) { return }
     for (const request of nextRequests(run)) {

@@ -12,14 +12,14 @@ useBankWorlds()
 const Stored = { apiKey: 'sk-test-0000' }
 
 /** The sequence `useSyncExternalStore(subscribe, read)` runs: what a component would paint, told of each change. */
-const hookOf = <ValT>(subscribe: (listener: () => void) => () => void, read: () => ValT) => {
+function hookOf<ValT>(subscribe: (listener: () => void) => () => void, read: () => ValT) {
   const painted = [read()]
   const unsubscribe = subscribe(() => { if (read() !== painted.at(-1)) { painted.push(read()) } })
   return { painted, unsubscribe, current: () => painted.at(-1) as ValT }
 }
 
 /** A box whose whisper is {@link Stored}, on a bank that asks as a dialog would, in a vault unlocked. */
-const makeRecipeBox = async (): Promise<{ vault: Vault, box: Box }> => {
+async function makeRecipeBox(): Promise<{ vault: Vault, box: Box }> {
   const bank = makeBankWorld().bankOn()
   await bank.hello()
   const vault = await bank.ensureVault({ vaultlabel: 'main' })

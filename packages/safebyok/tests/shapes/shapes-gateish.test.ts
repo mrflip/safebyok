@@ -77,12 +77,14 @@ describe("gatingLaunchBirthArgs", () => {
 // == [Cleartexts]: passkeyAnswer
 
 /** What is no passkey's answer, each refused, and the field the refusal names. */
-const misshapenAnswers = (answer: PasskeyAnswer) => [
-  [{ ...answer, prfBytes: [...answer.prfBytes] },          'prfBytes',      'its bytes an array, not a Uint8Array'],
-  [{ ...answer, prfBytes: answer.prfBytes.subarray(1) },   'prfBytes',      'its bytes one short of 32'],
-  [{ ...answer, credential_id: '' },                       'credential_id', 'an empty credential'],
-  [{ ...answer, prf_salt_b64: undefined },                 'prf_salt_b64',  'no salt'],
-] as const
+function misshapenAnswers(answer: PasskeyAnswer) {
+  return [
+    [{ ...answer, prfBytes: [...answer.prfBytes] },          'prfBytes',      'its bytes an array, not a Uint8Array'],
+    [{ ...answer, prfBytes: answer.prfBytes.subarray(1) },   'prfBytes',      'its bytes one short of 32'],
+    [{ ...answer, credential_id: '' },                       'credential_id', 'an empty credential'],
+    [{ ...answer, prf_salt_b64: undefined },                 'prf_salt_b64',  'no salt'],
+  ] as const
+}
 
 describe("passkeyAnswer", () => {
   it("accepts a passkey's answer without copying its bytes", async () => {

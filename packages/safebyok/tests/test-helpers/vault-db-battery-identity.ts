@@ -13,22 +13,24 @@ const vault = vaultAt()
 const box = boxAt()
 
 /** Each verb of `vaultDB`, by name, called on u1's vault as its owner could call it: all that a stranger must be refused. */
-const everyVerbOn = (vaultDB: VaultDB) => ({
-  listVaults:        () => vaultDB.listVaults(bankScope),
-  getVault:          () => vaultDB.getVault(vaultGetAskOf()),
-  listBoxes:         () => vaultDB.listBoxes(vaultQuery),
-  getBox:            () => vaultDB.getBox(boxGetAskOf()),
-  putVault:          () => vaultDB.putVault(vaultPutAskOf(vaultAt(1), vault)),
-  putBox:            () => vaultDB.putBox(boxPutAskOf(boxAt(1), box)),
-  replacePassphrase: () => vaultDB.replacePassphrase(...gateMoveOf(vault, { passphrase_wayin: passphraseWayin })),
-  addPasskey:        () => vaultDB.addPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin })),
-  revokePasskey:     () => vaultDB.revokePasskey(...gateMoveOf(vault, { passkey_wayin: null })),
-  delBox:            () => vaultDB.delBox(boxDelAskOf(box)),
-  delVault:          () => vaultDB.delVault(vaultDelAskOf(vault)),
-})
+function everyVerbOn(vaultDB: VaultDB) {
+  return {
+    listVaults:        () => vaultDB.listVaults(bankScope),
+    getVault:          () => vaultDB.getVault(vaultGetAskOf()),
+    listBoxes:         () => vaultDB.listBoxes(vaultQuery),
+    getBox:            () => vaultDB.getBox(boxGetAskOf()),
+    putVault:          () => vaultDB.putVault(vaultPutAskOf(vaultAt(1), vault)),
+    putBox:            () => vaultDB.putBox(boxPutAskOf(boxAt(1), box)),
+    replacePassphrase: () => vaultDB.replacePassphrase(...gateMoveOf(vault, { passphrase_wayin: passphraseWayin })),
+    addPasskey:        () => vaultDB.addPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin })),
+    revokePasskey:     () => vaultDB.revokePasskey(...gateMoveOf(vault, { passkey_wayin: null })),
+    delBox:            () => vaultDB.delBox(boxDelAskOf(box)),
+    delVault:          () => vaultDB.delVault(vaultDelAskOf(vault)),
+  }
+}
 
 /** Registers the cases of who may reach a vault over `world`. */
-export const describeIdentity = ({ hasIdentity, makeVaultDBFor }: BatteryWorld): void => {
+export function describeIdentity({ hasIdentity, makeVaultDBFor }: BatteryWorld): void {
   if (hasIdentity) {
     describe("who may reach a vault", () => {
       for (const [blurb, user_id] of [['another user', 'u2'], ['no one signed in', null]] as const) {

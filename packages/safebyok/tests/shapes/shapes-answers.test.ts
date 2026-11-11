@@ -11,7 +11,7 @@ import { bankScope, boxAt, boxDelAskOf, boxGetAskOf, boxPutAskOf, vaultAt, vault
 // == [A wire]: crossed
 
 // As a server sends an answer: its refusal as kind, message and the meta that may cross, and every absent field as null.
-const crossed = (answer: Answer<unknown, string, unknown>): unknown => {
+function crossed(answer: Answer<unknown, string, unknown>): unknown {
   const err = answer.ok ? null : {
     refusalkind: answer.err.refusalkind,
     message:     answer.err.message,
@@ -22,7 +22,7 @@ const crossed = (answer: Answer<unknown, string, unknown>): unknown => {
 }
 
 /** A VaultDB with the vault and one box, at revision 0. */
-const vaultDBWithBox = async (): Promise<MemoryVaultDB> => {
+async function vaultDBWithBox(): Promise<MemoryVaultDB> {
   const vaultDB = new MemoryVaultDB()
   await vaultDB.putVault(vaultPutAskOf(vaultAt()))
   await vaultDB.putBox(boxPutAskOf(boxAt()))

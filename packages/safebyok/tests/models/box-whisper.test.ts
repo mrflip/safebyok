@@ -12,7 +12,7 @@ import { type TestableBox, boxListingOf, fullBoxRecord, tombstoneBoxRecord, useM
 const world = useModelsWorld()
 
 /** A box built of `record`, with the same record in storage. */
-const builtOf = (record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> => {
+function builtOf(record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> {
   world.mw.seedPut(record)
   return boxListingOf(world.mw).build(record)
 }
@@ -20,7 +20,7 @@ const builtOf = (record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> =>
 const TestWhisper = { apiKey: 'sk-test-0000' }
 
 /** A box whose whisper is `whisper`, that whisper exposed. */
-const exposedOf = async (whisper: Whisper = TestWhisper): Promise<TestableBox> => {
+async function exposedOf(whisper: Whisper = TestWhisper): Promise<TestableBox> {
   const box = await builtOf(fullBoxRecord())
   await box.put({ whisper })
   return box.expose()

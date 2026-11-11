@@ -3,7 +3,7 @@ import { cipherCtx, cipherBytes, decipherBytes, deriveWrappingKey, fromB64, from
 import * as TH from '../test-helpers'
 import { vault_tok } from '../../src/shapes/shapes-core'
 
-const utf8 = (text: string) => new TextEncoder().encode(text)
+function utf8(text: string) { return new TextEncoder().encode(text) }
 
 describe("base64url text", () => {
   it("round-trips bytes exactly", () => {
@@ -40,7 +40,7 @@ describe("random material", () => {
 })
 
 /** A ctx for a test of the primitives alone, under one stamp, its purpose `purpose`. */
-const ctxOf = (purpose: string) => cipherCtx({ test: 'crypto' }, purpose)
+function ctxOf(purpose: string) { return cipherCtx({ test: 'crypto' }, purpose) }
 
 /** A vault's stamp, a box's and a wayin's header, as plain records: what the cipherCtx cases are built of. */
 const vaultStamp = { format: 'safebyok-vault-v6', applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'vid', registered_at: 1 }
@@ -189,10 +189,10 @@ describe("wrap and unwrap", () => {
 })
 
 /** Hex text to bytes, for a published test vector. */
-const hexBytes = (hex: string) => Uint8Array.from(hex.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16))
+function hexBytes(hex: string) { return Uint8Array.from(hex.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16)) }
 
 /** The info of a passkey wayin's key, for the header of the device `device_id`. */
-const infoOf = (device_id: string) => cipherCtx(vaultStamp, 'vault_key_passkey_wrapped', { ...header, device_id })
+function infoOf(device_id: string) { return cipherCtx(vaultStamp, 'vault_key_passkey_wrapped', { ...header, device_id }) }
 
 describe("deriveWrappingKey", () => {
   // deriveWrappingKey @example
@@ -212,7 +212,7 @@ describe("deriveWrappingKey", () => {
     const vaultKey = await makeVaultKey()
     const wrapped = await wrapKeyUnder(derived, vaultKey, ctxOf('kat'))
     const recovered = await unwrapKeyUnder(expected, wrapped, ctxOf('kat'), { extractable: true, usage: ['wrapKey'] })
-    const rawOf = async (handle: CryptoKey) => toB64(new Uint8Array(await crypto.subtle.exportKey('raw', handle)))
+    async function rawOf(handle: CryptoKey) { return toB64(new Uint8Array(await crypto.subtle.exportKey('raw', handle))) }
     expect(await rawOf(recovered)).to.eq(await rawOf(vaultKey))
   })
 

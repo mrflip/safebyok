@@ -36,7 +36,7 @@ export type FakeCiphered = WhisperCiphered & BoxKeyWrapped & VaultKeyWayinWrappe
  *
  * @example fakeCiphered('a1')  // => { cipher_iv_b64: 'iv-a1', ciphertext_b64: 'ct-a1' }
  */
-export const fakeCiphered = (tag: string): FakeCiphered => {
+export function fakeCiphered(tag: string): FakeCiphered {
   const fake: Ciphered = { cipher_iv_b64: `iv-${tag}`, ciphertext_b64: `ct-${tag}` }
   return fake as FakeCiphered
 }
@@ -45,26 +45,28 @@ export const fakeCiphered = (tag: string): FakeCiphered => {
  *
  * @example scopeOf('u1')           // => { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
  */
-export const scopeOf = (user_id: string, vaultlabel = 'main'): VaultScope => ({ applabel: 'acme', user_id, vaultlabel })
+export function scopeOf(user_id: string, vaultlabel = 'main'): VaultScope { return { applabel: 'acme', user_id, vaultlabel } }
 
 /** A shape-valid passphrase wayin, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
  * never decrypt. It wraps the vault's first vaultKey, and was sealed by the bank world's first device.
  */
-export const wayinOf = (tag: string, overrides: Partial<PassphraseWayinRecord> = {}): PassphraseWayinRecord => ({
-  wayinkind:               'passphrase',
-  key_deriver_label:       'test_digest_v0',
-  // base64 of the literal text 'saltsaltsaltsalt': a fake salt, public material anyway
-  salt_b64:                CX.salt_b64.parse('c2FsdHNhbHRzYWx0c2FsdA'),
-  device_id:               '00000000-0000-4000-8000-0000000000b1',
-  registered_at:           Date.UTC(2026, 9, 14),
-  vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
-  ...overrides,
-})
+export function wayinOf(tag: string, overrides: Partial<PassphraseWayinRecord> = {}): PassphraseWayinRecord {
+  return {
+    wayinkind:               'passphrase',
+    key_deriver_label:       'test_digest_v0',
+    // base64 of the literal text 'saltsaltsaltsalt': a fake salt, public material anyway
+    salt_b64:                CX.salt_b64.parse('c2FsdHNhbHRzYWx0c2FsdA'),
+    device_id:               '00000000-0000-4000-8000-0000000000b1',
+    registered_at:           Date.UTC(2026, 9, 14),
+    vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
+    ...overrides,
+  }
+}
 
 /** SHA-256 of `text`'s UTF-8 bytes. */
-const digestOf = async (text: string): Promise<Uint8Array> => (
-  new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))
-)
+async function digestOf(text: string): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))
+}
 
 /** A passkey's answer, as a fake authenticator would give it: for tests, in place of a WebAuthn
  * call. The credential is `tag`'s own (its id base64url of `cred-<tag>`), the salt a 32-byte one
@@ -75,7 +77,7 @@ const digestOf = async (text: string): Promise<Uint8Array> => (
  * @example await TH.unlock(vault, await passkeyOf('laptop'))
  * @example await passkeyOf('laptop', otherSaltB64)  // the same credential, answering another salt
  */
-export const passkeyOf = async (tag: string, prfSaltGiven?: string): Promise<PasskeyAnswer> => {
+export async function passkeyOf(tag: string, prfSaltGiven?: string): Promise<PasskeyAnswer> {
   const credential_id = toB64(new TextEncoder().encode(`cred-${tag}`))
   const saltB64 = prfSaltGiven ?? toB64(await digestOf(`salt-${tag}`))
   return { credential_id, prf_salt_b64: saltB64, prfBytes: await digestOf(`${credential_id}:${saltB64}`) }
@@ -92,7 +94,7 @@ export const passkeyOf = async (tag: string, prfSaltGiven?: string): Promise<Pas
  * @example tweakB64('Zm9v') // 'am9v'
  * @example tweakB64('')     // throws a TypeError
  */
-export const tweakB64 = (b64: string): string => {
+export function tweakB64(b64: string): string {
   if (b64 === '') { throw new TypeError('tweakB64 needs base64url text to bend, and was handed blank text.') }
   const replacer = b64.startsWith('a') ? 'b' : 'a'
   return replacer + b64.slice(1)

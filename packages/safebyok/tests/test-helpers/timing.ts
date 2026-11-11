@@ -6,7 +6,7 @@ import { vi } from 'vitest'
  *
  * @returns A promise for the next tick.
  */
-export const wakeupAtNextTick = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 0) })
+export function wakeupAtNextTick(): Promise<void> { return new Promise((resolve) => { setTimeout(resolve, 0) }) }
 
 /** A while for something that should not happen to have had its chance: fifty milliseconds.
  *
@@ -16,14 +16,14 @@ export const wakeupAtNextTick = (): Promise<void> => new Promise((resolve) => { 
  *   await TH.aWhile()
  *   expect(heard.count).to.eq(0)   // nothing came, though it had its chance
  */
-export const aWhile = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 50) })
+export function aWhile(): Promise<void> { return new Promise((resolve) => { setTimeout(resolve, 50) }) }
 
 /** Resolves once `check` is true, looking every few milliseconds; rejects after two seconds, so a
  * thing that never comes to pass fails its test rather than hanging it.
  *
  * @param check - Whether the thing has come to pass yet.
  */
-export const eventually = async (check: () => boolean): Promise<void> => {
+export async function eventually(check: () => boolean): Promise<void> {
   for (let ii = 0; ii < 400; ii += 1) {
     if (check()) { return }
     await new Promise((resolve) => { setTimeout(resolve, 5) })
@@ -36,7 +36,7 @@ export const eventually = async (check: () => boolean): Promise<void> => {
  *
  * @returns `onChange`, to subscribe with; `heard`, whose `count` it raises.
  */
-export const changeCounter = () => {
+export function changeCounter() {
   const heard = { count: 0 }
   return { heard, onChange: () => { heard.count += 1 } }
 }
@@ -52,7 +52,7 @@ export const changeCounter = () => {
  *   const slowDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase, saltBytes) => { await latch.pass(); return await TH.testDeriver.deriveKeyBytes(passphrase, saltBytes) } }
  *   // then as pendingNextCall's: await latch.reached, act, latch.release()
  */
-export const makeLatch = () => {
+export function makeLatch() {
   const opened = deferred()
   const arrived = deferred()
   const pass = async () => {
@@ -80,7 +80,7 @@ export type AsyncVerbOf<Target> = {
  * @example
  *   TH.beforeNextCall(vaultDB, 'tryPutBox', () => there.putBox('anthropic', 'sk-ant-fake-theirs'))
  */
-export const beforeNextCall = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string, meanwhile: () => Promise<unknown>): void => {
+export function beforeNextCall<Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string, meanwhile: () => Promise<unknown>): void {
   const method = (target as unknown as Record<string, AsyncFn | undefined>)[verb]
   if (method === undefined) { throw new TypeError(`beforeNextCall found no method ${verb} to intercept.`) }
   // Armed already, once per call: this errand waits its turn behind the others.
@@ -142,7 +142,7 @@ const originalOf = new WeakMap<object, AsyncFn>()
  *   await vault.lock()                     // called mid-unlock: the unlock refuses, nothing unlocked
  *   latch.release()
  */
-export const pendingNextCall = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {
+export function pendingNextCall<Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) {
   const latch = makeLatch()
   beforeNextCall(target, verb, latch.pass)
   return latch
@@ -167,7 +167,7 @@ export const pendingNextCall = <Target extends object>(target: Target, verb: Asy
  *   await vault.lock()                     // its forget is called after the write
  *   written.release()
  */
-export const pendingNextAnswer = <Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) => {
+export function pendingNextAnswer<Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) {
   const latch = makeLatch()
   const original = (target as unknown as Record<string, AsyncFn | undefined>)[verb]
   if (original === undefined) { throw new TypeError(`pendingNextAnswer found no method ${verb} to keep pending.`) }
@@ -189,18 +189,18 @@ export const pendingNextAnswer = <Target extends object>(target: Target, verb: A
  *   world.putBehindOurBack(spoiled)   // a change elsewhere, its ring perhaps answered by a read begun before it
  *   await TH.readAfresh(vault)              // the snapshot shows it
  */
-export const readAfresh = async (vault: { refresh: () => Promise<unknown> }): Promise<void> => {
+export async function readAfresh(vault: { refresh: () => Promise<unknown> }): Promise<void> {
   await vault.refresh()
   await vault.refresh()
 }
 
 /** Resolves after `count` turns of the microtask queue. */
-export const microtasks = async (count: number) => {
+export async function microtasks(count: number) {
   for (let ii = 0; ii < count; ii += 1) { await Promise.resolve() }
 }
 
 /** Resolves after `count` turns of the macrotask queue. */
-export const ticks = async (count: number) => {
+export async function ticks(count: number) {
   for (let ii = 0; ii < count; ii += 1) { await wakeupAtNextTick() }
 }
 
@@ -208,7 +208,7 @@ export const ticks = async (count: number) => {
 const unresolved = () => { /* replaced before use */ }
 
 /** A promise, and apart from it the function that resolves it. */
-const deferred = () => {
+function deferred() {
   let resolve: () => void = unresolved
   const promise = new Promise<void>((resolver) => { resolve = resolver })
   return { promise, resolve }

@@ -46,50 +46,54 @@ export const T0 = 1_700_000_000_000
 export const WorldVault = Object.freeze({ scope: Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }), vault_tok: 'vault-tok-u1' })
 
 /** The one live vault row of every world, which a box verb demands. */
-export const worldVaultRow = (): VaultRecord => ({
-  ...WorldVault.scope,
-  fmt:           SX.VaultFormat,
-  vault_tok:     WorldVault.vault_tok,
-  am:            'a',
-  revision_tok:  'rev-world',
-  revision_seq:  0,
-  registered_at: T0,
-  written_at:    T0,
-  gate:          {
-    gate_epoch:       1,
-    passphrase_wayin: { wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdHNhbHRzYWx0c2FsdA' as CX.PassphraseSalt, device_id: '00000000-0000-4000-8000-0000000000d1', registered_at: T0, vault_key_wayin_wrapped: fakeCiphered('wayin') },
-    passkey_wayin:    null,
-  },
-})
+export function worldVaultRow(): VaultRecord {
+  return {
+    ...WorldVault.scope,
+    fmt:           SX.VaultFormat,
+    vault_tok:     WorldVault.vault_tok,
+    am:            'a',
+    revision_tok:  'rev-world',
+    revision_seq:  0,
+    registered_at: T0,
+    written_at:    T0,
+    gate:          {
+      gate_epoch:       1,
+      passphrase_wayin: { wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdHNhbHRzYWx0c2FsdA' as CX.PassphraseSalt, device_id: '00000000-0000-4000-8000-0000000000d1', registered_at: T0, vault_key_wayin_wrapped: fakeCiphered('wayin') },
+      passkey_wayin:    null,
+    },
+  }
+}
 
 /** A full box record that passes `boxRecord`, in {@link WorldVault}: revision 1 of the box `anthropic_api_key`, of the life `box-tok-a`, alive, registered and written at {@link T0}, its sealed parts the fake ciphered bags that open under no key. `overrides` says otherwise. */
-export const fullBoxRecord = (overrides: Partial<BoxRecord> = {}): BoxRecord => ({
-  ...WorldVault.scope,
-  boxlabel:               'anthropic_api_key',
-  fmt:                    BoxFormat,
-  vault_tok:              WorldVault.vault_tok,
-  box_tok:                'box-tok-a',
-  am:                     'a',
-  revision_tok:           'rev-a1',
-  revision_seq:           1,
-  registered_at:          T0,
-  written_at:             T0,
-  sidecar:                { note: 'a test box' },
-  box_key_wrapped:        fakeCiphered('boxkey-a1'),
-  whisper_codec:          'json_v1',
-  whisper_schema_version: 1,
-  whisper_ciphered:       fakeCiphered('whisper-a1'),
-  ...overrides,
-})
+export function fullBoxRecord(overrides: Partial<BoxRecord> = {}): BoxRecord {
+  return {
+    ...WorldVault.scope,
+    boxlabel:               'anthropic_api_key',
+    fmt:                    BoxFormat,
+    vault_tok:              WorldVault.vault_tok,
+    box_tok:                'box-tok-a',
+    am:                     'a',
+    revision_tok:           'rev-a1',
+    revision_seq:           1,
+    registered_at:          T0,
+    written_at:             T0,
+    sidecar:                { note: 'a test box' },
+    box_key_wrapped:        fakeCiphered('boxkey-a1'),
+    whisper_codec:          'json_v1',
+    whisper_schema_version: 1,
+    whisper_ciphered:       fakeCiphered('whisper-a1'),
+    ...overrides,
+  }
+}
 
 /** The sparse form of a box record: {@link fullBoxRecord} less its sidecar and sealed parts. `overrides` says otherwise; a sidecar or sealed part it names is stripped. */
-export const sparseBoxRecord = (overrides: Partial<BoxSparse> = {}): BoxSparse => SX.boxSparse.parse({ ...fullBoxRecord(), ...overrides })
+export function sparseBoxRecord(overrides: Partial<BoxSparse> = {}): BoxSparse { return SX.boxSparse.parse({ ...fullBoxRecord(), ...overrides }) }
 
 /** The tombstone of a box record: exactly its sparse form, as {@link sparseBoxRecord} makes it, with `am` 'x', and nothing more (no sidecar, no sealed parts). `overrides` says otherwise, but for `am`. */
-export const tombstoneBoxRecord = (overrides: Partial<BoxSparse> = {}): Tombstone<BoxSparse> => ({ ...sparseBoxRecord(overrides), am: 'x' })
+export function tombstoneBoxRecord(overrides: Partial<BoxSparse> = {}): Tombstone<BoxSparse> { return { ...sparseBoxRecord(overrides), am: 'x' } }
 
 /** The row a put or del expects to find where no box is stored under `boxlabel`: the shell, in {@link WorldVault}. */
-export const shellBoxRecord = (boxlabel = 'anthropic_api_key'): BoxTombstone => SX.shellBoxOf({ ...WorldVault.scope, boxlabel }, WorldVault.vault_tok)
+export function shellBoxRecord(boxlabel = 'anthropic_api_key'): BoxTombstone { return SX.shellBoxOf({ ...WorldVault.scope, boxlabel }, WorldVault.vault_tok) }
 // --
 
 // == [Calls and answers]: ModelsCall, Scripted, BoxAnswer, ModelsWatch
@@ -225,7 +229,7 @@ type PutCall = { record: BoxRecord, expectedRevisionTok: string | null, ifAbsent
 type DelCall = { scope: Boxscope, expectedRevisionTok: string | null, tombstone: BoxTombstone }
 
 /** The `revision_tok` of the row a call expects to find: null for the shell's. */
-const expectedTokOf = ({ revision_tok }: Revision): string | null => ((revision_tok === SX.VoidRevisionTok) ? null : revision_tok)
+function expectedTokOf({ revision_tok }: Revision): string | null { return ((revision_tok === SX.VoidRevisionTok) ? null : revision_tok) }
 
 /** A {@link MemoryVaultDB} whose box verbs and watch log each call, and answer what a test scripts in place of their own. */
 export class TestableVaultDB extends MemoryVaultDB {
@@ -278,8 +282,8 @@ export class TestableVaultDB extends MemoryVaultDB {
   }
 }
 
-const factsOf = (scope: Boxscope) => ({ req_params: scope as ReqParams })
-const gotActOf = (val: Fetched<BoxRecord, BoxSparse> | null): string => {
+function factsOf(scope: Boxscope) { return { req_params: scope as ReqParams } }
+function gotActOf(val: Fetched<BoxRecord, BoxSparse> | null): string {
   if (val === null) { return 'gotvoid' }
   return VX.isTombstone(val) ? 'gotgone' : 'gotlive'
 }
@@ -297,7 +301,7 @@ const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, wo
  *   expect(mw.callsOf('get')).to.have.lengthOf(1)
  * @example mw.willPut((call) => mw.staleWriteOf(mw.boxscope(call.record.boxlabel), mw.fullBoxRecord({ revision_seq: 5 })))   // the next put loses a race
  */
-export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
+export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
   const { fakeTimers = true } = opts
   // The clock under real timers. Under fake ones the clock is the faked `Date`, which moves to each timer's due time as it fires.
   let now = opts.now ?? T0
@@ -322,11 +326,11 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
 
   // The fake seal: the text sealed, by the stamp it was sealed under.
   const sealedTexts = new Map<string, string>()
-  const demandFakeUnlocked = (): void => {
+  function demandFakeUnlocked(): void {
     if (isLocked) { throw Refuse.unlockFirst() }
   }
   // The fake stands in for the vault, which `ensureTimely` answers; no box reads the answer.
-  const standIn = (): Vault => world as unknown as Vault
+  function standIn(): Vault { return world as unknown as Vault }
 
   const world: BoxWorld = {
     vault_tok:    WorldVault.vault_tok,
@@ -354,14 +358,14 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
     },
   }
 
-  const liveWatch = (): ModelsWatch => {
+  function liveWatch(): ModelsWatch {
     const live = watches.findLast((watch) => watch.active)
     if (live === undefined) { throw new Error('No watch is live: the listing has not started one, or has ended it.') }
     return live
   }
 
   /** Every microtask a notice set going has run, under fake timers or real. */
-  const settled = async (): Promise<void> => {
+  async function settled(): Promise<void> {
     if (fakeTimers) { await vi.advanceTimersByTimeAsync(0) } else { await new Promise((resolve) => { setTimeout(resolve, 0) }) }
   }
 
@@ -434,7 +438,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
  *   const world = useModelsWorld()
  *   it('fetches', async () => { world.mw.seedPut(fullBoxRecord()); await boxListingOf(world.mw).fetch(world.mw.boxscope('anthropic_api_key')) })
  */
-export const useModelsWorld = (opts: ModelsWorldOpts = {}): { readonly mw: ModelsWorld } => {
+export function useModelsWorld(opts: ModelsWorldOpts = {}): { readonly mw: ModelsWorld } {
   let current: ModelsWorld | null = null
   beforeEach(() => { current = makeModelsWorld(opts) })
   afterEach(() => {
@@ -489,15 +493,15 @@ export class TestableBoxListing extends BoxListing {
   override at(...args: Parameters<BoxListing['at']>): TestableBox | null { return nullOrTestableOf(super.at(...args)) }
 }
 
-const testableOf = (box: Box): TestableBox => {
+function testableOf(box: Box): TestableBox {
   if (! (box instanceof TestableBox)) { throw new TypeError('a TestableBoxListing makes only TestableBoxes') }
   return box
 }
 
-const nullOrTestableOf = (box: Box | null): TestableBox | null => (box === null ? null : testableOf(box))
+function nullOrTestableOf(box: Box | null): TestableBox | null { return (box === null ? null : testableOf(box)) }
 
 /** A {@link BoxListing} over the world's vault and vaultDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es, aligned at each `setLocked`. `overrides` replaces its world or any of its options; the horizon is ten minutes. */
-export const boxListingOf = (mw: ModelsWorld, overrides: BoxListingOverrides = {}): TestableBoxListing => {
+export function boxListingOf(mw: ModelsWorld, overrides: BoxListingOverrides = {}): TestableBoxListing {
   const { world = mw.world, scope = WorldVault.scope, vaultDB = mw.vaultDB, maxMillisSinceRefresh = 10 * 60_000, bankFriend = mw.bankFriend } = overrides
   const listing = new TestableBoxListing(world, { scope, vaultDB, maxMillisSinceRefresh, bankFriend })
   mw.listings.add(listing)
@@ -514,7 +518,7 @@ export type BoxListingOverrides = Partial<BoxListingOpts & { world: BoxWorld }>
  *
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLocked(true) })   // the vault locks during each seal
  */
-export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: BoxListingOverrides = {}, duringSeal: () => void = () => undefined): TestableBoxListing => {
+export function fakeSealBoxListingOf(mw: ModelsWorld, overrides: BoxListingOverrides = {}, duringSeal: () => void = () => undefined): TestableBoxListing {
   const sealStampedString: BoxWorld['sealStampedString'] = async (whisperText, stamp) => {
     await mw.world.sealStampedString(whisperText, stamp)
     duringSeal()
@@ -527,5 +531,5 @@ export const fakeSealBoxListingOf = (mw: ModelsWorld, overrides: BoxListingOverr
 // == [Dna]: boxDnaOf
 
 /** A box's dna for `create`: `scope`, with a fake whisper and an empty sidecar, as every update of a box names both, and `overrides` laid over them. */
-export const boxDnaOf = (scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna => ({ ...scope, whisper: { apiKey: 'sk-test-0000' }, sidecar: {}, ...overrides })
+export function boxDnaOf(scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna { return { ...scope, whisper: { apiKey: 'sk-test-0000' }, sidecar: {}, ...overrides } }
 // --
