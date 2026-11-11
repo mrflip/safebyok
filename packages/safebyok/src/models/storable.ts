@@ -3,7 +3,6 @@ import { nowMillis } from '../helpers/clock'
 import * as Phrases from '../helpers/phrases'
 import { checkedConsistent } from '../helpers/validator'
 import { adorn, tattoo } from '../helpers/helpers'
-import { type WhisperedBag, isWhisperedBag } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
 import { instanceDisabled, needUnlocked, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoad, shapeUnreconciled } from '../refusals/throwers'
@@ -28,7 +27,7 @@ export const cmpRevisions = (ante: Revision, post: Revision): Age => {
 
 /** A vault or box in this tab, kept in step with its row in the vaultDB. */
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
-  // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #listeners, #getSnapshot, #subscribe, isFUBag
+  // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #listeners, #getSnapshot, #subscribe
 
   /** Adorned in the constructor: readable, left out of enumeration and JSON. */
   declare readonly world:   ListingWorld
@@ -66,9 +65,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.#listeners.add(VX.listener.parse(listener))
     return () => { this.#listeners.delete(listener) }
   }
-
-  /** True for what a box answers for a whisper it will not show, or a copy of it: anything carrying the `Whispered` mark. */
-  static isFUBag(val: unknown): val is WhisperedBag { return isWhisperedBag(val) }
   // --
 
   // == [Getters]: scope, central, full, sparse, am, toJSON, snapshot, getSnapshot, subscribe, subscribeOwn

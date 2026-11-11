@@ -1,11 +1,10 @@
 /** A Box's whisper: extractWhisper, the kept value through a lock, the bags, and what may be a whisper. The states are in box-whisper-states.test.ts. */
 
 import { describe, expect, it } from 'vitest'
-import { ENCRYPTED, LOCKED, VEILED, Whispered, brandOf } from '../../src/helpers/consts'
+import { ENCRYPTED, LOCKED, VEILED, Whispered, brandOf, isWhisperedBag } from '../../src/helpers/consts'
 import type { Whisper } from '../../src/shapes/shapes-core'
 import type { BoxWorld, Fetched } from '../../src/shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
-import { Storable } from '../../src/models/storable'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxListingOf, fullBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
@@ -105,9 +104,9 @@ describe("box.whisper through a lock", () => {
 })
 // --
 
-// == [The bags]: ENCRYPTED, LOCKED, VEILED, Whispered, Storable.isFUBag
+// == [The bags]: ENCRYPTED, LOCKED, VEILED, Whispered, isWhisperedBag
 
-describe("the sentinel bags and Storable.isFUBag", () => {
+describe("the sentinel bags and isWhisperedBag", () => {
   const Bags = [[ENCRYPTED, 'encrypted'], [LOCKED, 'locked'], [VEILED, 'veiled']] as const
 
   for (const [bag, kind] of Bags) {
@@ -139,13 +138,13 @@ describe("the sentinel bags and Storable.isFUBag", () => {
   ] as const
   for (const [val, expected, blurb] of CarriesCases) {
     it(`is ${String(expected)} for ${blurb}`, () => {
-      expect(Storable.isFUBag(val)).to.eq(expected)
+      expect(isWhisperedBag(val)).to.eq(expected)
     })
   }
 
   it("never mistakes a whisper with a bag's name in it for a bag", async () => {
     const box = await exposedOf({ LOCKED: 'LOCKED' })
-    expect(Storable.isFUBag(box.whisper)).to.be.false
+    expect(isWhisperedBag(box.whisper)).to.be.false
     expect(box.whisper).to.deep.equal({ LOCKED: 'LOCKED' })
   })
 
