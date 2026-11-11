@@ -321,6 +321,71 @@ export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone |
 }
 // --
 
+// == [Requests]: boxRequest, vaultRequest, BoxRequest, VaultRequest
+
+type Cited = { record: Revision, expected: Revision }
+
+const isSeqNext        = ({ record, expected }: Cited): boolean => record.revision_seq === (expected.revision_seq + 1)
+const isRevisionTokNew = ({ record, expected }: Cited): boolean => (record.revision_tok !== expected.revision_tok) && (record.revision_tok !== VoidRevisionTok)
+const isExpectedWhole  = ({ expected }: Cited): boolean => (expected.revision_tok === VoidRevisionTok) === (expected.revision_seq === VoidRevisionSeq)
+
+/** True when a put's `lifeTok` is the one of the live row it expects, or a new one over a tombstone or nothing. */
+const isLifeTokPlaced = (lifeTok: string, expectedLifeTok: string, expectedAm: EX.Am): boolean => (
+  (expectedAm === 'a') ? (lifeTok === expectedLifeTok) : ((lifeTok !== expectedLifeTok) && (lifeTok !== VoidLifeTok))
+)
+
+/** The checks of what a box's or a vault's get, put or del asks: its `op`, its policies, and for a put or del the row it expects to find and the record it would store. */
+export const { boxRequest, vaultRequest } = Checkers('bad_record', ({ obj, lit, oneof, discrim, box_tok }) => {
+  const ifAbsent    = oneof(EX.ifAbsentVals)
+  const putPolicies = { ifAbsent: oneof(EX.putIfAbsentVals), ifPresent: oneof(EX.ifPresentVals) }
+  const boxExpected = rowMeta.extend({ box_tok })
+
+  const boxGet = boxQuery.extend({
+    op: lit('get'), ifAbsent,
+  })
+  const boxPut = obj({
+    op: lit('put'), ...putPolicies, expected: boxExpected, record: boxRecord,
+  }).refine(isSeqNext,        Phrases.SeqNotNext)
+    .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
+    .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
+    .refine(({ record, expected }) => record.vault_tok === expected.vault_tok,                              Phrases.ExpectedOfOtherVault)
+    .refine(({ record, expected }) => isLifeTokPlaced(record.box_tok, expected.box_tok, expected.am),       Phrases.LifeTokMisplaced)
+  const boxDel = obj({
+    op: lit('del'), expected: boxExpected, record: boxTombstone,
+  }).refine(isSeqNext,        Phrases.SeqNotNext)
+    .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
+    .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
+    .refine(({ record, expected }) => record.vault_tok === expected.vault_tok,                              Phrases.ExpectedOfOtherVault)
+    .refine(({ record, expected }) => record.box_tok === expected.box_tok,                                  Phrases.LifeTokMisplaced)
+
+  const vaultGet = CX.vaultScope.unwrap().extend({
+    op: lit('get'), ifAbsent,
+  })
+  const vaultPut = obj({
+    op: lit('put'), ...putPolicies, expected: rowMeta, record: vaultRecord,
+  }).refine(isSeqNext,        Phrases.SeqNotNext)
+    .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
+    .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
+    .refine(({ record, expected }) => isLifeTokPlaced(record.vault_tok, expected.vault_tok, expected.am),   Phrases.LifeTokMisplaced)
+  const vaultDel = obj({
+    op: lit('del'), expected: rowMeta, record: vaultTombstone,
+  }).refine(isSeqNext,        Phrases.SeqNotNext)
+    .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
+    .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
+    .refine(({ record, expected }) => record.vault_tok === expected.vault_tok,                              Phrases.LifeTokMisplaced)
+
+  return {
+    boxRequest:   discrim('op', [boxGet,   boxPut,   boxDel]),
+    vaultRequest: discrim('op', [vaultGet, vaultPut, vaultDel]),
+  }
+}, [CX])
+
+/** What a box's get, put or del asks of the vaultDB. */
+export type BoxRequest   = Readonly<Z.input<typeof boxRequest>>
+/** What a vault's get, put or del asks of the vaultDB. */
+export type VaultRequest = Readonly<Z.input<typeof vaultRequest>>
+// --
+
 // == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow, leaseScopepath, LeaseScopepath, RawLease, bankRow, BankRow
 
 /** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */

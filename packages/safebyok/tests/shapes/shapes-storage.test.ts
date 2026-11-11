@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as SX from '../../src/shapes/shapes-storage'
 import { VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'
-import { boxAt, boxFlaws, boxTombstoneOf, priorOf, stale, vaultAt, vaultFlaws, vaultTombstoneOf } from '../test-helpers/storage-world'
+import { boxAt, boxFlaws, boxQuery, boxscope, boxTombstoneOf, priorOf, stale, vaultAt, vaultFlaws, vaultScope, vaultTombstoneOf } from '../test-helpers/storage-world'
 
 describe("SX.sentinelBoxOf and the void row", () => {
   it("passes the void row a sentinel makes, its zero toks and its 2008 date, as a tombstone of its kind", () => {
@@ -109,6 +109,77 @@ describe("capacity", () => {
   for (const [given, blurb] of BadCapacities) {
     it(`refuses ${blurb}`, () => {
       TH.expectSyncRefusal(() => SX.capacity.parse(given))
+    })
+  }
+})
+
+describe("SX.boxRequest and SX.vaultRequest", () => {
+  const liveBox      = boxAt(5)
+  const goneBox      = boxTombstoneOf(boxAt(4))
+  const boxSentinel  = SX.sentinelBoxOf(boxscope, 'life1')
+  const boxPut       = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: liveBox, record: boxAt(6) } as const
+  const boxDel       = { op: 'del', expected: liveBox, record: boxTombstoneOf(liveBox) } as const
+  const liveVault    = vaultAt(5)
+  const vaultPut     = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: liveVault, record: vaultAt(6) } as const
+  const vaultDel     = { op: 'del', expected: liveVault, record: vaultTombstoneOf(liveVault) } as const
+
+  it("pass a get, a put over the live row it expects, and a del of it", () => {
+    expect(SX.boxRequest.parse({ op: 'get', ifAbsent: 'nil', ...boxQuery })).to.include({ op: 'get', ifAbsent: 'nil', boxlabel: 'openai' })
+    expect(SX.vaultRequest.parse({ op: 'get', ifAbsent: 'fail', ...vaultScope })).to.include({ op: 'get', vaultlabel: 'main' })
+    for (const request of [boxPut, boxDel]) { expect(SX.boxRequest.parse(request).op).to.eq(request.op) }
+    for (const request of [vaultPut, vaultDel]) { expect(SX.vaultRequest.parse(request).op).to.eq(request.op) }
+  })
+
+  it("pass a put that brings a new life over nothing and over a tombstone", () => {
+    expect(SX.boxRequest.parse({ ...boxPut, expected: boxSentinel, record: boxAt(0) }).op).to.eq('put')
+    expect(SX.boxRequest.parse({ ...boxPut, expected: goneBox, record: boxAt(6, 'life1', { box_tok: 'box2' }) }).op).to.eq('put')
+    expect(SX.vaultRequest.parse({ ...vaultPut, expected: SX.sentinelVaultOf(vaultScope), record: vaultAt(0) }).op).to.eq('put')
+  })
+
+  it("pass a del that expects nothing, which keeps the void row's life tok", () => {
+    const tombstone = { ...SX.sentinelBoxOf(boxscope, 'life1'), revision_tok: 'brev0', revision_seq: 0 }
+    expect(SX.boxRequest.parse({ op: 'del', expected: boxSentinel, record: tombstone }).op).to.eq('del')
+  })
+
+  const BoxFlaws = [
+    // the revision proposed
+    [{ ...boxPut, record: boxAt(8) },                                                     'a seq two past the row it expects'],
+    [{ ...boxPut, record: boxAt(6, 'life1', { revision_tok: liveBox.revision_tok }) },   'the revision_tok of the row it expects'],
+    [{ ...boxPut, record: boxAt(6, 'life1', { revision_tok: SX.VoidRevisionTok }) },     "the void row's revision_tok on its record"],
+    // the revision expected
+    [{ ...boxPut, expected: { ...liveBox, revision_tok: SX.VoidRevisionTok } },          "the void row's tok expected at a stored seq"],
+    [{ ...boxPut, expected: { ...boxSentinel, revision_tok: 'brev' }, record: boxAt(0) }, "the void row's seq expected under another tok"],
+    [{ ...boxPut, expected: { ...liveBox, vault_tok: 'life2' } },                        'an expected row of another vault life'],
+    // the life
+    [{ ...boxPut, record: boxAt(6, 'life1', { box_tok: 'box2' }) },                      'a new life over the live row it expects'],
+    [{ ...boxPut, expected: goneBox },                                                    'the life of the tombstone it expects'],
+    [{ ...boxPut, expected: goneBox, record: boxAt(6, 'life1', { box_tok: SX.VoidLifeTok }) }, "the void row's life tok over a tombstone"],
+    [{ ...boxDel, record: { ...boxTombstoneOf(liveBox), box_tok: 'box2' } },             'a tombstone of another life than the row it deletes'],
+    // the op
+    [{ ...boxPut, record: boxTombstoneOf(liveBox) },                                      'a tombstone for a put'],
+    [{ ...boxDel, record: boxAt(6) },                                                     'a live record for a del'],
+    [{ ...boxPut, ifPresent: 'clobber' },                                                 'a policy it does not know'],
+    [{ ...boxPut, op: 'patch' },                                                          'an op it does not know'],
+  ] as const
+
+  for (const [request, blurb] of BoxFlaws) {
+    it(`refuse a box's request with ${blurb}`, () => {
+      expect(() => SX.boxRequest.parse(request)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
+    })
+  }
+
+  const VaultFlaws = [
+    [{ ...vaultPut, record: vaultAt(8) },                                                 'a seq two past the row it expects'],
+    [{ ...vaultPut, expected: { ...liveVault, revision_tok: SX.VoidRevisionTok } },      "the void row's tok expected at a stored seq"],
+    [{ ...vaultPut, record: vaultAt(6, 'life2') },                                        'a new life over the live row it expects'],
+    [{ ...vaultPut, expected: vaultTombstoneOf(vaultAt(4)) },                             'the life of the tombstone it expects'],
+    [{ ...vaultDel, record: { ...vaultTombstoneOf(liveVault), vault_tok: 'life2' } },    'a tombstone of another life than the row it deletes'],
+    [{ ...vaultDel, record: vaultAt(6) },                                                 'a live record for a del'],
+  ] as const
+
+  for (const [request, blurb] of VaultFlaws) {
+    it(`refuse a vault's request with ${blurb}`, () => {
+      expect(() => SX.vaultRequest.parse(request)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
     })
   }
 })

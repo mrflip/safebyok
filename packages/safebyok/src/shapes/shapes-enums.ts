@@ -83,3 +83,28 @@ export type PutAct = typeof putActVals[number]
 export const delActVals = ['deleted', 'gone', 'void'] as const
 export type DelAct = typeof delActVals[number]
 // --
+
+// == [Classified acts]: writeActVals, WriteAct, foundActVals, FoundAct, refusedActVals, RefusedAct, boxVaultActVals, BoxVaultAct, VaultAct, BoxAct
+
+/** The acts of a put or del that stored its record: `born` over nothing, `reborn` over a tombstone, `replaced` over a live row, or `deleted`. */
+export const writeActVals = ['born', 'reborn', 'replaced', 'deleted'] as const
+export type WriteAct = typeof writeActVals[number]
+
+/** The acts that answer what is stored and write nothing: a get's `gotlive`, `gotvoid` or `gotgone`, and `passed` for a put told to get the live row it met. */
+export const foundActVals = ['gotlive', 'gotvoid', 'gotgone', 'passed'] as const
+export type FoundAct = typeof foundActVals[number]
+
+/** The acts a get, put or del refuses with over the row it asked for, a box's or a vault's alike. */
+export const refusedActVals = ['void', 'gone', 'camped', 'dubdel', 'stale', 'retcon', 'clash', 'forked', 'ahead'] as const
+export type RefusedAct = typeof refusedActVals[number]
+
+// 'vault_full' is the soft cap on a vault's boxes: where it falls among the others is no promise (notes/answer-contract.md, *Soft caps*).
+/** The acts a box's get, put or del refuses with for the state of its vault: none stored, a tombstone, a live vault of another life, or one at its cap. */
+export const boxVaultActVals = ['vault_void', 'vault_gone', 'vault_reborn', 'vault_full'] as const
+export type BoxVaultAct = typeof boxVaultActVals[number]
+
+/** Every act a vault's get, put or del is classified as. */
+export type VaultAct = WriteAct | FoundAct | RefusedAct
+/** Every act a box's get, put or del is classified as: those of its own row, and those of its vault. */
+export type BoxAct   = VaultAct | BoxVaultAct
+// --
