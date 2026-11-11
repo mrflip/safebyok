@@ -45,7 +45,7 @@ export const PassphraseKeyBytes = 32
 /** How many random bytes a passkey wayin's `prf_salt_b64` has: a new passkey's answer carries a fresh salt this long, and a stored salt of any other length fails its record's check. */
 export const PasskeySaltBytes = 32
 
-/** How many box rows a vault life holds, live and deleted together, unless its vaultDB was made with another `maxBoxes`. */
+/** The default cap on a vault life's box rows, live and deleted together, for a vaultDB made without `maxBoxes`. */
 export const DefaultMaxBoxes = 100
 
 // About 95% of Postgres's 8,000-byte NOTIFY payload, less the 1,944 bytes of the Larger vault row in notes/reference-sizes.md, rounded down.

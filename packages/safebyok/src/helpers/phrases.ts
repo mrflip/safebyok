@@ -431,13 +431,13 @@ export const ExpectedHalfVoid = "The revision a write expects is the void row's,
 /** Why a write's record is refused for its life tok: a life begins over a tombstone or nothing, and lasts until it is deleted. */
 export const LifeTokMisplaced = "A record keeps the life tok of the live row it replaces. A tombstone, and a record over a tombstone or nothing, brings a new one."
 
-/** Why a box's ask is refused for the row it expects: both are filed under one life of the vault. */
+/** Why a box request is refused for the row it expects: both must be in the same vault life. */
 export const ExpectedOfOtherVault = "A box's ask and the row it expects name the same vault_tok."
 
-/** Why a gate verb's put is refused for its record: `addPasskey` lays a passkey wayin on, and `revokePasskey` takes it off. */
+/** Why a gate verb's put is refused for its record: `addPasskey` adds a passkey wayin, and `revokePasskey` removes it. */
 export const GateVerbRecordMismatch = "addPasskey's record has a passkey wayin, and revokePasskey's has none."
 
-/** Why a put or del is refused for its record: an ask names one address, and its record is the row for it. */
+/** Why a put or del is refused for its record: the record must be at the request's address. */
 export const RecordOfOtherAddress = "A put's or del's record is at the address its ask names."
 
 /** A device database's failure in `call`, `named` the sentence naming what it threw, or blank. */

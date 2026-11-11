@@ -202,7 +202,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Non-throwing form of {@link putExposed}. */
   tryPutExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.putExposed(patch, opts)) }
 
-  /** The next record `patch` makes, sealed and not put, and the row in hand it goes over. */
+  /** The next record for `patch`, sealed but not yet put, with the row it is put over. */
   async #edit({ whisper, sidecar }: BoxPatchGiven): Promise<{ record: BoxRecord, expected: BoxSparse }> {
     const expected = this.central
     const written_at = nowMillis()

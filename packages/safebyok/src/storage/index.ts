@@ -1,4 +1,4 @@
-// Kept off the front door (`safebyok`) so a host's autocomplete never meets the adapter's contract, and an adapter's imports name one door.
+// Kept out of the main entry (`safebyok`), so a host's autocomplete never shows the adapter contract, and an adapter imports from one place.
 /** `safebyok/storage`: what a storage adapter is written against, the AdapterVaultDB and the DeviceDB. */
 
 // == [The databases]: AdapterVaultDB, VaultDB, DeviceDB, their brands, and the two in memory
@@ -21,7 +21,7 @@ export type { Awaitable } from '../helpers/helpers'
 export { ckeyOf } from '../helpers/helpers'
 // --
 
-// == [IndexedDB]: the one transaction an IndexedDB datastore uses per call, the row at a scopepath within it, and the versioned shelf
+// == [IndexedDB]: the single transaction of each IndexedDB call, the row at a scopepath within it, and the versioned shelf
 export { inOneStep, rowAt } from './idb-transaction'
 export { versionedShelfOf } from './idb-shelf'
 export type { VersionedShelfSpec } from './idb-shelf'
@@ -54,7 +54,7 @@ export { leaseQuery, leaseDated, leaseRow, leaseScopepath, bankRow } from '../sh
 export type { BankRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 // --
 
-// == [Answers off a wire]: the checks a client of a vaultDB parses each answer with, an absent field arriving as null
+// == [Answers over a wire]: the validators a vaultDB client parses each answer with, which read an absent field as null
 export { crossedErr, crossedReqParams, damagedVault, damagedBox, crossedNotice } from '../shapes/shapes-answers'
 export { listVaultsAnswer, getVaultAnswer, putVaultAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delVaultAnswer } from '../shapes/shapes-answers'
 export { listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer } from '../shapes/shapes-answers'

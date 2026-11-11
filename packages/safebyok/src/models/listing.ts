@@ -84,7 +84,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return this.buildOrReceive(record)
   }
 
-  /** {@link build} for a row that came beside another listing's answer: it answers at once, and throws where `build` rejects. */
+  /** {@link build}, synchronously, for a row that came with another listing's answer. Throws if `build` would reject. */
   receiveRow(record: Fetched<RecordT, SparseT>): ThingT { return this.buildOrReceive(record) }
   // --
 
@@ -259,7 +259,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return (found?.isPresent === true) ? found : null
   }
 
-  /** Puts `record` over the row `opts.expected`, answering the instance listed. */
+  /** Put `record` over the row `opts.expected`, and return the listed instance. */
   async put(record: RecordT, opts: PutOpts): Promise<ThingT> { return demandGood(await this.tryPut(record, opts)).val }
 
   /** {@link put}, answering the vaultDB's own answer with the instance listed as its `val`. */
@@ -315,7 +315,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The instance a good answer to `sent` leaves listed, or null where none is. */
   #deliverGood(answer: GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null {
     const record = answer.val
-    // A passed put answers what storage has, whose revision no one sent: only the scope is pinned.
+    // A passed put returns the stored row, whose revision no caller sent, so only its scope is checked.
     const pins = (answer.act === 'passed') ? this.scopeOf(sent) : SX.reqParamsOf(sent)
     if (record !== null) { verifyConsistent(record, pins, { kind: 'storage_issue', message: Phrases.AnswerNotAsSent }) }
     return (record === null) ? this.#receiveNothing(this.scopeOf(sent)) : this.buildOrReceive(record)
@@ -433,7 +433,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected abstract makeThing(central: Fetched<RecordT, SparseT>): ThingT
   /** The refusal for a scope where no row is stored and no instance is listed. */
   protected abstract nothingStoredError(scope: ScopeT): VaultError
-  /** The vaultDB's get of this kind of thing, expecting the row of the instance listed, and answering null for nothing stored. */
+  /** The vaultDB's get of this kind of thing, expecting the listed instance's row. Its answer's `val` is null when nothing is stored. */
   protected abstract doTryGet(scope: ScopeT): Promise<ListingAnswer<RecordT, SparseT>>
   /** The vaultDB's put of this kind of thing. */
   protected abstract doTryPut(record: RecordT, opts: ListingPutOpts<SparseT>): Promise<ListingAnswer<RecordT, SparseT>>
@@ -457,7 +457,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 /** A joined storage call's answer, with what delivering it made, or the refusal delivering met. */
 type Joined<AnswerT, ValT> = { answer: AnswerT, val: ValT } | { answer: AnswerT, err: unknown }
 
-/** `answer` as a put's: a good one carries the record stored, or the live one found. Throws `storage_issue` for a good one that carries none. */
+/** `answer` as a put's answer, whose good form carries the stored record or the live row found. Throws `storage_issue` for a good answer with no row. */
 function putAnswerOf<RecordT, SparseT>(answer: ListingAnswer<RecordT, SparseT>): ListingPutAnswer<RecordT, SparseT> {
   if (! answer.ok) { return answer }
   const { val } = answer
