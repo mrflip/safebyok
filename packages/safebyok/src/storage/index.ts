@@ -74,7 +74,7 @@ export { storageFailed, identityRevoked } from '../refusals/throwers'
 export { VaultError, isVaultError, refusalkindVals } from '../refusals/errors'
 export { IsVaultError, brand, brandOf } from '../helpers/consts'
 export type { RefusalFamily, RefusalFamilyForKind, RefusalMeta, Refusalkind, Thrown, VaultErrorOpts } from '../refusals/errors'
-export { outcomeOf, storageTroubleOf } from '../refusals/outcome'
+export { outcomeOf, storageRefusalOf } from '../refusals/outcome'
 export type { BadOutcome, GoodOutcome, Outcome } from '../refusals/outcome'
 // --
 

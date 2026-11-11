@@ -6,7 +6,7 @@ import type { Awaitable } from '../helpers/helpers'
 import * as Phrases from '../helpers/phrases'
 import { checkedConsistent } from '../helpers/validator'
 import type { VaultError } from '../refusals/errors'
-import { outcomeOf, storageTroubleOf } from '../refusals/outcome'
+import { outcomeOf, storageRefusalOf } from '../refusals/outcome'
 import * as SX from '../shapes/shapes-storage'
 import * as CX from '../shapes/shapes-core'
 import type { BankScope } from '../shapes/shapes-core'
@@ -357,7 +357,7 @@ function goodOrThrow<ValT, ActT extends string, WorldT>(answer: Answer<ValT, Act
  * Either way, its meta names the `callerlabel` as `call`, with the ask's safe metadata as `req_params`.
  */
 const refusalOf = (thrown: unknown, callerlabel: string, ask: unknown): VaultError => {
-  const refusal = storageTroubleOf(thrown)
+  const refusal = storageRefusalOf(thrown)
   // A request that failed its check has no metadata to trust: its refusal carries none.
   const params = SX.requestParams.safeParse(ask)
   return Object.assign(refusal, { meta: { ...refusal.meta, call: callerlabel, req_params: params.success ? params.data : {} } })

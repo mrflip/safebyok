@@ -3,7 +3,7 @@ import type { Gating } from 'safebyok'
 import { PasskeyUnlockButton, offersPasskey } from '../components/passkey-unlock-button'
 import { Messages } from '../helpers/messages'
 import type { PassphraseModalProps } from '../shapes'
-import { ChosenPassphraseFields, DialogBoundary, ModalForm, PassphraseField, UsernameField, holdsFocus, textOf, unlockedFor, useAttemptAction, useChosenPassphrase } from './modal-kit'
+import { ChosenPassphraseFields, DialogBoundary, ModalForm, PassphraseField, UsernameField, containsFocus, textOf, unlockedFor, useAttemptAction, useChosenPassphrase } from './modal-kit'
 
 /** Render the passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
 export const PassphraseModal = (props: PassphraseModalProps) => (
@@ -32,7 +32,7 @@ const BuildForm = ({ gating, leaseMillis, passphraseUsername }: PassphraseModalP
       gripeId={gripeId}
       footnote={leaseMillis === undefined ? undefined : unlockedFor(leaseMillis, true)}
       action={action}
-      onReset={chosen.forget}
+      onReset={chosen.reset}
     >
       <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)} />
       <ChosenPassphraseFields chosen={chosen} chosenRef={chosenRef} confirmRef={confirmRef} chosenLabel={Messages.passphraseField} confirmLabel={Messages.confirmField} chosenInvalidBy={gripe === null ? undefined : gripeId} />
@@ -58,7 +58,7 @@ const UnlockForm = ({ gating, leaseMillis, passphraseUsername, passkeyRpId }: Pa
   const hearPasskey = (text: string | null) => {
     setPasskeyGripe(text)
     // If the passkey button removed itself, focus was lost with it, so return focus to the passphrase field.
-    if (text !== null && ! holdsFocus(formRef.current)) { fieldRef.current?.focus() }
+    if (text !== null && ! containsFocus(formRef.current)) { fieldRef.current?.focus() }
   }
 
   return (
