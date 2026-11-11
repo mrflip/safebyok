@@ -212,11 +212,6 @@ is named for the act.
 | `fooOf(thing)` | Pure: the foo derived from `thing`. |
 | `tryFoo` | `foo`, resolving an `Outcome` instead of throwing. |
 
-**No function or method is named `read` or `write`** (the Coach, 2026-10-28). Those are the umbrella words for any view or
-any mutation (VOCABULARY.md), so a category may use them (`stale_write`, `written_at`); a function says which: `find`, `get`,
-`ensure`, or the mutation's own verb (`put`, `del`, `increment`). A `read` or `write` name met in the code is a rename to
-propose, not a precedent.
-
 **`make` and `build` say whether to await; the suffix says what comes back** (the Coach,
 2026-11-02). With no suffix, the name is the thing itself; a suffix says you get something else:
 
@@ -870,7 +865,7 @@ is tested beside that verb. Test and build artifacts are never written to `src/`
 * **A helper named `expect...` must assert.** The linter (`vitest/expect-expect`) counts a call to
   any function named `expect...` as an assertion, so a test whose only check is such a helper
   passes. Name it for what it does: if the helper should not assert, give it a different name
-  (`check...`, `read...`); if it should, make it assert and keep the name. Never add an assertion
+  (`check...`, say); if it should, make it assert and keep the name. Never add an assertion
   to a helper merely to make the rule happy.
 * **Every use case of an exported function has a test. A title is one plain clause naming the behaviour.** It chains no
   second outcome, and quotes a refusal kind only if the customer checks for it and reacts: `stale_write` is part of our
