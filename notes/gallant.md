@@ -800,7 +800,7 @@ translate it back before any verb can use it.
 
 ```ts
 #neverStoredOf(sparse) { return { ...sparse, revision_tok: randomId(), revision_seq: NeverStoredSeq, am: 'x' } }
-const priorOf = (ante) => ((ante === null || ante.revision_seq === NeverStoredSeq) ? VS.NeverStored : VS.revisionOf(ante))
+function priorOf(ante) { return (ante === null || ante.revision_seq === NeverStoredSeq) ? VS.NeverStored : VS.revisionOf(ante) }
 ```
 
 **Gallant:**
