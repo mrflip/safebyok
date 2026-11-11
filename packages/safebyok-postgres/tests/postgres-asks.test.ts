@@ -1,0 +1,88 @@
+/** PostgresVaultDB on PGlite: a get, put and del each given one ask, classified inside its transaction. */
+
+import { describe, expect, it } from 'vitest'
+import * as DB from 'safebyok/storage'
+import type { Notice } from 'safebyok/storage'
+import * as TH from './test-helpers'
+
+TH.bootDatabaseFirst()
+
+const noVaultYet = DB.sentinelVaultOf(TH.vaultScope)
+const noBoxYet   = DB.sentinelBoxOf(TH.boxscope, 'life1')
+const Add  = { op: 'put', ifAbsent: 'add',  ifPresent: 'fail' } as const
+const Repl = { op: 'put', ifAbsent: 'fail', ifPresent: 'repl' } as const
+const Get  = { op: 'get' } as const
+const Del  = { op: 'del' } as const
+
+async function vaultDBWithVault(opts = {}) {
+  const vaultDB = await TH.makeVaultDB(opts)
+  await vaultDB.putVault({ ...Add, expected: noVaultYet, record: TH.vaultAt(0) })
+  return vaultDB
+}
+
+describe("PostgresVaultDB's get, put and del, each given one ask", () => {
+  it("answers born, gotlive, replaced, deleted and gotgone as a box is put, got, replaced and deleted", async () => {
+    const vaultDB = await vaultDBWithVault()
+    expect(await vaultDB.putBox({ ...Add, expected: noBoxYet, record: TH.boxAt(0) })).to.deep.include({ ok: true, act: 'born', val: TH.boxAt(0), world: TH.vaultAt(0) })
+    expect(await vaultDB.getBox({ ...Get, ...TH.boxQuery, ifAbsent: 'fail' })).to.deep.include({ act: 'gotlive', val: TH.boxAt(0) })
+    expect(await vaultDB.putBox({ ...Repl, expected: TH.boxAt(0), record: TH.boxAt(1) })).to.deep.include({ act: 'replaced', val: TH.boxAt(1) })
+    const tombstone = TH.boxTombstoneOf(TH.boxAt(1))
+    expect(await vaultDB.delBox({ ...Del, expected: TH.boxAt(1), record: tombstone })).to.deep.include({ act: 'deleted', val: tombstone })
+    expect(await vaultDB.getBox({ ...Get, ...TH.boxQuery, ifAbsent: 'nil' })).to.deep.include({ act: 'gotgone', val: tombstone })
+  })
+
+  it("refuses stale_write for a put that expects a revision the box has moved on from, with the row stored as dbhas, and writes nothing", async () => {
+    const vaultDB = await vaultDBWithVault()
+    await vaultDB.putBox({ ...Add, expected: noBoxYet, record: TH.boxAt(0) })
+    await vaultDB.putBox({ ...Repl, expected: TH.boxAt(0), record: TH.boxAt(1) })
+    const answer = await vaultDB.tryPutBox({ ...Repl, expected: TH.boxAt(0), record: TH.boxAt(1, 'life1', { revision_tok: 'rival' }) })
+    expect(answer).to.deep.include({ ok: false, act: 'stale', dbhas: TH.boxAt(1), world: TH.vaultAt(0) })
+    expect(answer.ok ? null : answer.err.refusalkind).to.eq('stale_write')
+    expect(await vaultDB.getBox({ ...Get, ...TH.boxQuery, ifAbsent: 'fail' })).to.deep.include({ val: TH.boxAt(1) })
+  })
+
+  it("refuses a box's call for its vault: absent_vault over none or a tombstone, vault_reborn over another life, the vault row as world", async () => {
+    const empty = await TH.makeVaultDB()
+    const overVoid = await empty.tryGetBox({ ...Get, ...TH.boxQuery, ifAbsent: 'nil' })
+    expect(overVoid).to.deep.include({ ok: false, act: 'vault_void', world: noVaultYet })
+    expect(overVoid.ok ? null : overVoid.err.refusalkind).to.eq('absent_vault')
+
+    const vaultDB = await vaultDBWithVault()
+    await vaultDB.putBox({ ...Add, expected: noBoxYet, record: TH.boxAt(0) })
+    const tombstone = TH.vaultTombstoneOf(TH.vaultAt(0))
+    expect(await vaultDB.delVault({ ...Del, expected: TH.vaultAt(0), record: tombstone })).to.deep.include({ act: 'deleted', val: tombstone })
+    const overGone = await vaultDB.tryPutBox({ ...Repl, expected: TH.boxAt(0), record: TH.boxAt(1) })
+    expect(overGone).to.deep.include({ ok: false, act: 'vault_gone', world: tombstone })
+
+    const reborn = TH.vaultAt(tombstone.revision_seq + 1, 'life2')
+    expect(await vaultDB.putVault({ ...Add, expected: tombstone, record: reborn })).to.deep.include({ act: 'reborn' })
+    const overReborn = await vaultDB.tryGetBox({ ...Get, ...TH.boxQuery, ifAbsent: 'nil' })
+    expect(overReborn).to.deep.include({ ok: false, act: 'vault_reborn', world: reborn })
+    expect(overReborn.ok ? null : overReborn.err.refusalkind).to.eq('vault_reborn')
+  })
+
+  it("refuses vault_full for a box past the cap, with the room it counted, and absent_box for a del of a tombstone", async () => {
+    const vaultDB = await vaultDBWithVault({ maxBoxes: 1 })
+    await vaultDB.putBox({ ...Add, expected: noBoxYet, record: TH.boxAt(0) })
+    const second = TH.boxscopeOf('anthropic')
+    const full = await vaultDB.tryPutBox({ ...Add, expected: DB.sentinelBoxOf(second, 'life1'), record: TH.boxAt(0, 'life1', second) })
+    expect(full).to.deep.include({ ok: false, act: 'vault_full', dbhas: null })
+    expect(full.ok ? null : full.err.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
+
+    const tombstone = TH.boxTombstoneOf(TH.boxAt(0))
+    await vaultDB.delBox({ ...Del, expected: TH.boxAt(0), record: tombstone })
+    const again = await vaultDB.tryDelBox({ ...Del, expected: tombstone, record: { ...tombstone, revision_tok: 'again', revision_seq: tombstone.revision_seq + 1 } })
+    expect(again).to.deep.include({ ok: false, act: 'dubdel', dbhas: tombstone })
+    expect(again.ok ? null : again.err.refusalkind).to.eq('absent_box')
+  })
+
+  it("tells a watch of a box put and of a vault's deletion with its boxes", async () => {
+    const vaultDB = await vaultDBWithVault()
+    const notices: Notice[] = []
+    const unwatch = vaultDB.watch(TH.vaultScope, (notice) => { notices.push(notice) })
+    await vaultDB.putBox({ ...Add, expected: noBoxYet, record: TH.boxAt(0) })
+    await vaultDB.delVault({ ...Del, expected: TH.vaultAt(0), record: TH.vaultTombstoneOf(TH.vaultAt(0)) })
+    await expect.poll(() => notices.map(({ act }) => act)).to.deep.equal(['got', 'gone', 'gone'])
+    unwatch()
+  })
+})

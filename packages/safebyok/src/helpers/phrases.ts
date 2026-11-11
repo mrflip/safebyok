@@ -425,7 +425,7 @@ export const RevisionTokNotNew = "A record's revision_tok must be new: neither t
 export const ExpectedHalfVoid = "The revision a write expects is the void row's, tok and seq together, or neither of them."
 
 /** Why a write's record is refused for its life tok: a life begins over a tombstone or nothing, and lasts until it is deleted. */
-export const LifeTokMisplaced = "A record keeps the life tok of the live row it expects, a tombstone keeps its row's, and a record over a tombstone or nothing brings a new one."
+export const LifeTokMisplaced = "A record keeps the life tok of the live row it replaces. A tombstone, and a record over a tombstone or nothing, brings a new one."
 
 /** Why a box's write is refused for the row it expects: both are filed under one life of the vault. */
 export const ExpectedOfOtherVault = "A box's record and the row it expects name the same vault_tok."

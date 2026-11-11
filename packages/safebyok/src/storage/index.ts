@@ -4,7 +4,12 @@
 // == [The databases]: AdapterVaultDB, VaultDB, DeviceDB, their brands, and the two in memory
 export { AdapterVaultDB } from './vault-db'
 export type { Answer, BadAnswer, BankListed, BoxesListed, DelAct, GoodAnswer, GotAct, ListAct, Notice, PutAct, Tidied } from './vault-db'
-export type { BoxesFetched, BoxFetched, BoxWritten, Heard, Written, RowOfBox, RowOfVault, VaultDB } from './vault-db'
+export type { BoxAnswer, BoxesFetched, Heard, OkAct, RowOfBox, RowOfVault, VaultAnswer, VaultDB } from './vault-db'
+export { boxActOf, cappedActOf, classifyBox, classifyVault, isBirthAct, isOkAct, isWriteAct, vaultActOf } from './classifier'
+export type { BoxClassified, BoxFetched, VaultClassified, VaultFetched } from './classifier'
+export { boxQueryOf, vaultScopeOf } from '../shapes/shapes-storage'
+export type { BoxAsk, BoxDelAsk, BoxGetAsk, BoxPutAsk, VaultAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk } from '../shapes/shapes-storage'
+export type { BoxAct, VaultAct } from '../shapes/shapes-enums'
 export { VaultDBVerbnames } from './vault-db'
 export { IsAdapterVaultDB, IsVaultDB, isAdapterVaultDB, isVaultDB } from '../helpers/consts'
 export { DeviceDB } from './device-db'
@@ -61,7 +66,7 @@ export type { ConsistencyRefusal, ObjCheckOpts, RefusalOpts, Refusing, Story } f
 
 // == [The refusals]: an adapter's throwers
 export { sanitizeForeignError, storageBlocked, storageUnavailable, unexpectedError } from '../refusals/throwers'
-export { vaultEmpty, vaultReborn, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, storageFull, seqNotNext, deviceDBFailed } from '../refusals/throwers'
+export { actRefused, vaultEmpty, vaultReborn, vaultGone, staleWrite, camped, absentBox, boxTooLarge, vaultFull, storageFull, seqNotNext, deviceDBFailed } from '../refusals/throwers'
 export { storageFailed, identityRevoked } from '../refusals/throwers'
 export { VaultError, isVaultError, refusalkindVals } from '../refusals/errors'
 export { IsVaultError, brand, brandOf } from '../helpers/consts'

@@ -1,7 +1,14 @@
 /** A vaultDB adapter that stores its rows in Postgres. */
 
 import * as DB from 'safebyok/storage'
-import type { AdapterVaultDBOpts, Awaitable, BankScope, BoxesFetched, BoxFetched, BoxWritten, BoxQuery, BoxRecord, BoxRow, BoxTombstone, DelOpts, Heard, Written, PutOptsGiven, RowOfBox, RowOfVault, Tidied, VaultError, VaultQuery, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope } from 'safebyok/storage'
+import type {
+  AdapterVaultDBOpts, Awaitable, BankScope, BoxClassified, BoxDelAsk, BoxesFetched, BoxFetched, BoxGetAsk, BoxPutAsk, BoxQuery, BoxRecord, BoxRow, BoxTombstone, Heard,
+  RowOfBox, RowOfVault, Tidied, VaultClassified, VaultDelAsk, VaultError, VaultGetAsk, VaultPutAsk, VaultQuery, VaultRecord, VaultRow, VaultScope, VaultTombstone, WatchScope,
+} from 'safebyok/storage'
+import {
+  BirthVaultSql, BoxAndRoomSql, BoxesOfLifeSql, BoxLivesSql, DeleteBoxLifeSql, GetBoxWithVaultSql, GetVaultSql, ListBoxesWithVaultSql, ListVaultsSql, LockVaultSql, NotifySql,
+  WriteBoxSql, WriteVaultSql,
+} from './vault-queries'
 
 // == [The driver]: PostgresQueryable, PostgresClient, PostgresListen, PostgresVaultDBOpts
 
@@ -28,41 +35,12 @@ const isPostgresClient = (candidate: unknown): candidate is PostgresClient => (
 )
 
 // `custom` and `fn` return the same client and listen objects they were given, so the driver's methods keep their `this`.
-const postgresVaultDBOpts = DB.objCheck(({ custom, fn, uint }) => ({
+const postgresVaultDBOpts = DB.objCheck(({ custom, fn, int }) => ({
   ...DB.adapterVaultDBOpts.shape,
   client:   custom<PostgresClient>(isPostgresClient, 'Expected a client with query and transaction functions'),
   listen:   fn<PostgresListen>().optional(),
-  maxBoxes: uint.optional(),
+  maxBoxes: int.positive().optional(),
 }), 'bad_option')
-// --
-
-// == [The statements]: the SQL each generic call runs
-
-const ListVaultsSql = 'SELECT vaultlabel, vault FROM safebyok_vaults WHERE applabel = $1 AND user_id = $2 ORDER BY vaultlabel'
-const GetVaultSql = 'SELECT vault FROM safebyok_vaults WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3'
-const LockVaultSql = `${GetVaultSql} FOR UPDATE`
-const BirthVaultSql = `INSERT INTO safebyok_vaults (applabel, user_id, vaultlabel, vault) VALUES ($1, $2, $3, $4::text::jsonb)
-  ON CONFLICT (applabel, user_id, vaultlabel) DO NOTHING RETURNING vaultlabel`
-const WriteVaultSql = `INSERT INTO safebyok_vaults (applabel, user_id, vaultlabel, vault) VALUES ($1, $2, $3, $4::text::jsonb)
-  ON CONFLICT (applabel, user_id, vaultlabel) DO UPDATE SET vault = EXCLUDED.vault`
-
-const BoxesOfLifeSql = 'SELECT boxlabel, box FROM safebyok_boxes WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3 AND vault_tok = $4 ORDER BY boxlabel'
-const GetBoxSql = 'SELECT box FROM safebyok_boxes WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3 AND vault_tok = $4 AND boxlabel = $5'
-const WriteBoxSql = `INSERT INTO safebyok_boxes (applabel, user_id, vaultlabel, vault_tok, boxlabel, box) VALUES ($1, $2, $3, $4, $5, $6::text::jsonb)
-  ON CONFLICT (applabel, user_id, vaultlabel, vault_tok, boxlabel) DO UPDATE SET box = EXCLUDED.box`
-const BoxLivesSql = `SELECT vaultlabel, vault_tok, count(*)::int AS boxcount FROM safebyok_boxes WHERE applabel = $1 AND user_id = $2
-  GROUP BY vaultlabel, vault_tok ORDER BY vaultlabel, vault_tok`
-const DeleteBoxLifeSql = 'DELETE FROM safebyok_boxes WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3 AND vault_tok = $4'
-
-// A read of a box together with its vault is one statement, so both rows come from the same snapshot.
-const VaultOfScope = '(SELECT vault FROM safebyok_vaults WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3)'
-const GetBoxWithVaultSql = `SELECT ${VaultOfScope} AS vault, (${GetBoxSql}) AS box`
-const ListBoxesWithVaultSql = `SELECT ${VaultOfScope} AS vault, COALESCE((
-  SELECT jsonb_agg(jsonb_build_object('boxlabel', boxlabel, 'box', box) ORDER BY boxlabel)
-  FROM safebyok_boxes WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3 AND vault_tok = $4
-), '[]'::jsonb) AS boxes`
-
-const NotifySql = 'SELECT pg_notify($1, told) FROM unnest($2::text[]) AS told'
 // --
 
 // == [Notices]: vaultChannelOf, VaultPropFields, BoxPropFields, noticeTextOf, toldOf
@@ -173,7 +151,8 @@ const codeOf = (thrown: unknown): string | undefined => (
 )
 // --
 
-const firstOf = (rows: unknown[], column: string): unknown => ((rows[0] as Record<string, unknown> | undefined)?.[column] ?? null)
+/** The vault row a one-row answer has, null for none. */
+const vaultOf = (rows: unknown[]): unknown => ((rows[0] as { vault?: unknown } | undefined)?.vault ?? null)
 
 /** A vaultDB that stores its rows in your Postgres: `new PostgresVaultDB({ client: pgClientOf(pool) })`. */
 export class PostgresVaultDB extends DB.AdapterVaultDB {
@@ -195,7 +174,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   }
   // --
 
-  // == [Statements]: #query, #transact, #demandRoom
+  // == [Statements]: #query, #transact, #fetchVault, #fetchBox, #fetchForBoxWrite, #writeBox
 
   async #query(text: string, params: unknown[]): Promise<unknown[]> {
     try {
@@ -209,13 +188,37 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     } catch (err) { throw refusalOf(err) }
   }
 
-  // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** Throw `vault_full` if the put would add a live box to a vault that already has `maxBoxes` of them. */
-  async #demandRoom(tx: PostgresQueryable, record: BoxRecord, ante: unknown): Promise<void> {
-    if (DB.isLiveRow(ante)) { return }
-    const boxes = await boxesOfLife(tx, record, record.vault_tok)
-    const used = boxes.filter(({ box }) => DB.isLiveRow(box)).length
-    if (used >= this.#maxBoxes) { throw DB.vaultFull({ boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }) }
+  /** The vault row stored at a scope, null for none. */
+  async #fetchVault({ applabel, user_id, vaultlabel }: VaultScope): Promise<unknown> {
+    return vaultOf(await this.#query(GetVaultSql, [applabel, user_id, vaultlabel]))
+  }
+
+  /** A box row and its vault row, null for none, read in one statement. */
+  async #fetchBox({ applabel, user_id, vaultlabel, vault_tok, boxlabel }: BoxQuery): Promise<BoxFetched> {
+    const [fetched] = await this.#query(GetBoxWithVaultSql, [applabel, user_id, vaultlabel, vault_tok, boxlabel]) as BoxFetched[]
+    return fetched ?? { vault: null, box: null }
+  }
+
+  // The lock is a statement of its own. A statement that waits on the lock still reads everything else as of its start,
+  // and would miss the box the writer it waited for has just stored.
+  /** What a box's put or del is classified over: its vault row, locked for this transaction, its box row, and the vault's room. */
+  async #fetchForBoxWrite(tx: PostgresQueryable, { applabel, user_id, vaultlabel, vault_tok, boxlabel }: BoxQuery): Promise<BoxFetched> {
+    const vault = await lockedVaultRowOf(tx, { applabel, user_id, vaultlabel })
+    const [{ box, used }] = await rowsFrom(tx, BoxAndRoomSql, [applabel, user_id, vaultlabel, vault_tok, boxlabel]) as [{ box: unknown, used: number }]
+    return { vault, box, capacity: { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } } }
+  }
+
+  // A box's put and its del are one step here: lock the vault, fetch, classify, and store what the classifier names.
+  /** One transaction of a box's put or del. */
+  async #writeBox(ask: BoxPutAsk | BoxDelAsk): Promise<BoxClassified> {
+    return await this.#transact(async (tx) => {
+      const classified = this.classifyBox(ask, await this.#fetchForBoxWrite(tx, ask.record))
+      if (classified.write !== null) {
+        await writeBoxRow(tx, classified.write)
+        await notify(tx, ask.record, [noticeTextOf(classified.world, classified.write)])
+      }
+      return classified
+    })
   }
   // --
 
@@ -225,8 +228,8 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return await this.#query(ListVaultsSql, [applabel, user_id]) as RowOfVault[]
   }
 
-  protected async doGetVault({ applabel, user_id, vaultlabel }: VaultScope): Promise<unknown> {
-    return firstOf(await this.#query(GetVaultSql, [applabel, user_id, vaultlabel]), 'vault')
+  protected async doGetVault(ask: VaultGetAsk): Promise<VaultClassified> {
+    return this.classifyVault(ask, { vault: await this.#fetchVault(ask) })
   }
 
   protected async doListBoxes({ applabel, user_id, vaultlabel, vault_tok }: VaultQuery): Promise<BoxesFetched> {
@@ -234,75 +237,44 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return fetched ?? { vault: null, boxes: [] }
   }
 
-  protected async doGetBox({ applabel, user_id, vaultlabel, vault_tok, boxlabel }: BoxQuery): Promise<BoxFetched> {
-    const [fetched] = await this.#query(GetBoxWithVaultSql, [applabel, user_id, vaultlabel, vault_tok, boxlabel]) as BoxFetched[]
-    return fetched ?? { vault: null, box: null }
+  protected async doGetBox(ask: BoxGetAsk): Promise<BoxClassified> {
+    return this.classifyBox(ask, await this.#fetchBox(ask))
   }
 
-  protected async doPutVault(record: VaultRecord, opts: PutOptsGiven): Promise<Written> {
+  protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
     return await this.#transact(async (tx) => {
-      const ante = await lockedVaultRowOf(tx, record)
-      if (! DB.isVaultPutAllowed(ante, record, opts)) { return { isWritten: false, ante } }
-      if (! await writeVaultRow(tx, record, ante)) { return { isWritten: false, ante: await vaultRowOf(tx, record) } }
-      await notify(tx, record, [noticeTextOf(record)])
-      return { isWritten: true, ante }
+      const vault = await lockedVaultRowOf(tx, ask.record)
+      const classified = this.classifyVault(ask, { vault })
+      if (classified.write === null) { return classified }
+      // No row was there to lock for a vault's birth, so another writer's insert may land first: the ask is then classified over the row that did.
+      if (! await writeVaultRow(tx, classified.write, vault)) { return this.classifyVault(ask, { vault: await vaultRowOf(tx, ask.record) }) }
+      await notify(tx, ask.record, [noticeTextOf(classified.write)])
+      return classified
     })
   }
 
-  protected async doPutBox(record: BoxRecord, opts: PutOptsGiven): Promise<BoxWritten> {
-    return await this.#transact(async (tx) => {
-      const vault = await lockedVaultRowOf(tx, record)
-      const ante = await boxRowOf(tx, record, record.boxlabel)
-      const isWritten = DB.isLiveVaultRecord(vault, record.vault_tok) && DB.isBoxPutAllowed(ante, record, opts)
-      if (isWritten) {
-        await this.#demandRoom(tx, record, ante)
-        await writeBoxRow(tx, record, record.boxlabel, record)
-        await notify(tx, record, [noticeTextOf(vault as VaultRecord, record)])  // isLiveVaultRecord has checked it
-      }
-      return { isWritten, ante, vault }
-    })
-  }
+  protected async doPutBox(ask: BoxPutAsk): Promise<BoxClassified> { return await this.#writeBox(ask) }
 
-  protected async doDelVault(tombstone: VaultTombstone, { prior }: DelOpts): Promise<Written> {
+  protected async doDelVault(ask: VaultDelAsk): Promise<VaultClassified> {
     return await this.#transact(async (tx) => {
-      const ante = await lockedVaultRowOf(tx, tombstone)
-      const isOurs = DB.isLiveVaultRecord(ante, tombstone.vault_tok)
-      const isDamaged = (ante !== null) && (! DB.vaultRow.safeParse(ante).success)
-      const isWritten = isOurs && DB.isRowAt(ante, prior)
-      // Stop here, writing nothing, if the row is damaged or is this life's live row at another revision.
-      // For any other row (a tombstone, another life's row, or none) a repeated del still tombstones this life's boxes.
-      if ((! isWritten) && (isOurs || isDamaged)) { return { isWritten, ante } }
-      if (isWritten) { await writeVaultRow(tx, tombstone, ante) }
-      // From here on, a row we did not write is a tombstone, another life's row, or absent.
-      // Box notices are sent only when the vault row is this life's tombstone.
-      const vault = isWritten ? tombstone : ante as VaultRow | null
-      const world = (vault?.vault_tok === tombstone.vault_tok) ? vault : null
-      const texts = isWritten ? [noticeTextOf(tombstone)] : []
-      const boxes = await boxesOfLife(tx, tombstone, tombstone.vault_tok)
-      for (const { boxlabel, box } of boxes) {
-        const boxTombstone = DB.boxTombstoneOf(box, tombstone.written_at)
+      const vault = await lockedVaultRowOf(tx, ask.record)
+      const classified = this.classifyVault(ask, { vault })
+      if (classified.write === null) { return classified }
+      await writeVaultRow(tx, classified.write, vault)
+      const texts = [noticeTextOf(classified.write)]
+      const boxes = await boxesOfLife(tx, ask.record, ask.record.vault_tok)
+      for (const { box } of boxes) {
+        const boxTombstone = DB.boxTombstoneOf(box, ask.record.written_at)
         if (boxTombstone === null) { continue }
-        await writeBoxRow(tx, tombstone, boxlabel, boxTombstone)
-        if (world !== null) { texts.push(noticeTextOf(world, boxTombstone)) }
+        await writeBoxRow(tx, boxTombstone)
+        texts.push(noticeTextOf(classified.write, boxTombstone))
       }
-      await notify(tx, tombstone, texts)
-      return { isWritten, ante }
+      await notify(tx, ask.record, texts)
+      return classified
     })
   }
 
-  protected async doDelBox(tombstone: BoxTombstone, { prior }: DelOpts): Promise<BoxWritten> {
-    return await this.#transact(async (tx) => {
-      const vault = await lockedVaultRowOf(tx, tombstone)
-      const ante = await boxRowOf(tx, tombstone, tombstone.boxlabel)
-      const isDeletable = DB.isLiveBoxRecord(ante, tombstone.vault_tok) && DB.isRowAt(ante, prior)
-      const isWritten = DB.isLiveVaultRecord(vault, tombstone.vault_tok) && isDeletable
-      if (isWritten) {
-        await writeBoxRow(tx, tombstone, tombstone.boxlabel, tombstone)
-        await notify(tx, tombstone, [noticeTextOf(vault as VaultRecord, tombstone)])  // isLiveVaultRecord has checked it
-      }
-      return { isWritten, ante, vault }
-    })
-  }
+  protected async doDelBox(ask: BoxDelAsk): Promise<BoxClassified> { return await this.#writeBox(ask) }
 
   protected async doTidyGone({ applabel, user_id }: BankScope): Promise<Tidied> {
     return await this.#transact(async (tx) => {
@@ -351,8 +323,8 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   async #heardOrNull({ heard, vault_tok, boxlabel, ...scope }: Told): Promise<Heard | null> {
     if (heard !== undefined) { return heard }
     try {
-      if ((vault_tok === undefined) || (boxlabel === undefined)) { return { vault: await this.doGetVault(scope) } }
-      return await this.doGetBox({ ...scope, vault_tok, boxlabel })
+      if ((vault_tok === undefined) || (boxlabel === undefined)) { return { vault: await this.#fetchVault(scope) } }
+      return await this.#fetchBox({ ...scope, vault_tok, boxlabel })
     } catch {
       return null  // a notice is only a hint: if its rows cannot be fetched, drop it
     }
@@ -381,7 +353,7 @@ const unlistenOnceListening = async (listening: Promise<(() => unknown) | null>)
 }
 // --
 
-// == [Rows in a transaction]: rowsFrom, scopeOf, vaultRowOf, lockedVaultRowOf, writeVaultRow, boxRowOf, boxesOfLife, writeBoxRow, notify
+// == [Rows in a transaction]: rowsFrom, scopeOf, vaultRowOf, lockedVaultRowOf, writeVaultRow, boxesOfLife, writeBoxRow, notify
 
 const rowsFrom = async (queryable: PostgresQueryable, text: string, params: unknown[]): Promise<unknown[]> => {
   const { rows } = await queryable.query(text, params)
@@ -391,32 +363,28 @@ const rowsFrom = async (queryable: PostgresQueryable, text: string, params: unkn
 const scopeOf = ({ applabel, user_id, vaultlabel }: VaultScope): VaultScope => ({ applabel, user_id, vaultlabel })
 
 const vaultRowOf = async (tx: PostgresQueryable, { applabel, user_id, vaultlabel }: VaultScope): Promise<unknown> => (
-  firstOf(await rowsFrom(tx, GetVaultSql, [applabel, user_id, vaultlabel]), 'vault')
+  vaultOf(await rowsFrom(tx, GetVaultSql, [applabel, user_id, vaultlabel]))
 )
 
 // Every write first locks its vault's row (SELECT ... FOR UPDATE). Writes to one vault then run one at a time, and each compares revisions against the row as currently stored.
 const lockedVaultRowOf = async (tx: PostgresQueryable, { applabel, user_id, vaultlabel }: VaultScope): Promise<unknown> => (
-  firstOf(await rowsFrom(tx, LockVaultSql, [applabel, user_id, vaultlabel]), 'vault')
+  vaultOf(await rowsFrom(tx, LockVaultSql, [applabel, user_id, vaultlabel]))
 )
 
 /** Write the vault row. Returns false only when creating a vault (`ante` is null) and another writer's insert got there first. */
 const writeVaultRow = async (tx: PostgresQueryable, row: VaultRecord | VaultTombstone, ante: unknown): Promise<boolean> => {
-  const params = [row.applabel, row.user_id, row.vaultlabel, JSON.stringify(row)]
+  const params = [JSON.stringify(row)]
   if (ante !== null) { await tx.query(WriteVaultSql, params); return true }
   const claimed = await rowsFrom(tx, BirthVaultSql, params)
   return claimed.length > 0
 }
 
-const boxRowOf = async (tx: PostgresQueryable, { applabel, user_id, vaultlabel, vault_tok }: VaultQuery, boxlabel: string): Promise<unknown> => (
-  firstOf(await rowsFrom(tx, GetBoxSql, [applabel, user_id, vaultlabel, vault_tok, boxlabel]), 'box')
-)
-
 const boxesOfLife = async (tx: PostgresQueryable, { applabel, user_id, vaultlabel }: VaultScope, vault_tok: string): Promise<RowOfBox[]> => (
   await rowsFrom(tx, BoxesOfLifeSql, [applabel, user_id, vaultlabel, vault_tok]) as RowOfBox[]
 )
 
-const writeBoxRow = async (tx: PostgresQueryable, { applabel, user_id, vaultlabel, vault_tok }: VaultQuery, boxlabel: string, row: BoxRecord | BoxTombstone): Promise<void> => {
-  await tx.query(WriteBoxSql, [applabel, user_id, vaultlabel, vault_tok, boxlabel, JSON.stringify(row)])
+const writeBoxRow = async (tx: PostgresQueryable, row: BoxRecord | BoxTombstone): Promise<void> => {
+  await tx.query(WriteBoxSql, [JSON.stringify(row)])
 }
 
 // Postgres delivers a transaction's notifications when it commits, and discards them if it rolls back.

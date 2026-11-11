@@ -120,9 +120,21 @@ with this package for now.
 
 `safebyok_vaults` has a row per vault, keyed by `applabel`, `user_id` and `vaultlabel`;
 `safebyok_boxes` a row per box, keyed by those, the life of its vault (`vault_tok`) and its
-`boxlabel`. Each row's record is one `jsonb` column, `vault` or `box`, as safebyok wrote it. A
-deleted vault or box leaves its tombstone in place, and `tidyGone` removes the boxes of a vault's
-ended lives. Row-level security is on with no policy, so of the roles you grant the tables to,
+`boxlabel`. Each field of a row is a column of its own. The labels, the tokens and `am` are `text`;
+`fmt`, `revision_seq` and `whisper_schema_version` are `integer`; the times, `registered_at` and
+`written_at`, are `bigint`, in UTC epoch milliseconds. A field that is an object is a `jsonb`
+column: a vault's `gate`, and a box's `sidecar`, `box_key_wrapped` and `whisper_ciphered`. Your own
+SQL can read any of them, a sidecar's fields included (`sidecar->>'note'`); leave the writing to
+`PostgresVaultDB`.
+
+A deleted vault or box leaves its tombstone in place: the same row, its `am` `'x'` where a live
+row's is `'a'`, and its `jsonb` columns null. `tidyGone` removes the boxes of a vault's ended
+lives. A box row has a foreign key to the vault row at its scope, whatever that vault's
+`vault_tok`: no box row is stored where no vault row is, and **a `DELETE` of a vault row is
+refused while it has box rows**. `PostgresVaultDB` never deletes a vault row, so that is your
+own SQL's doing, and a `TRUNCATE` of the vaults table must name both tables.
+
+Row-level security is on with no policy, so of the roles you grant the tables to,
 only their owner, the role your server connects as, reaches the rows; a superuser, or a role that
 bypasses row-level security, reaches them too. A notification is not a table: any role that may
 connect can LISTEN on any user's channel and hear the rows each write changes.

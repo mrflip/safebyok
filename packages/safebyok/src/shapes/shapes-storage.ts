@@ -172,7 +172,7 @@ export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqPa
   const gateVerbOpts = obj({ prior: revision }).strict()
   const delOpts = obj({ prior: revision }).strict()
 
-  const reqParams = boxQuery.extend({ box_tok, ...revision.shape, prior: revision }).partial()
+  const reqParams = boxQuery.extend({ box_tok, ...revision.shape, expected: revision }).partial()
   const nextSeq = obj({ record: revision, prior: revision }).refine(({ record, prior }) => record.revision_seq === (prior.revision_seq + 1), Phrases.SeqNotNext)
   return { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq }
 }, [CX])
@@ -183,11 +183,11 @@ export const adapterVaultDBOpts = objCheck(({ num }) => ({
   maxRecordBytes: num.positive().optional(),
 }), 'bad_option')
 /** The check of a memory vaultDB's options, refusing 'bad_option'. */
-export const memoryVaultDBOpts = objCheck(({ uint }) => ({
+export const memoryVaultDBOpts = objCheck(({ int }) => ({
   ...adapterVaultDBOpts.shape,
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
   /** A soft cap on the live boxes one vault has; `DefaultMaxBoxes` by default. */
-  maxBoxes: uint.optional(),
+  maxBoxes: int.positive().optional(),
 }), 'bad_option')
 
 export type IfAbsentOpts = Readonly<Z.input<typeof ifAbsentOpts>>
@@ -228,9 +228,15 @@ export type Capacity = Z.infer<typeof capacity>
 /** The check that reads a row's revision and liveness without judging the rest. */
 export const rowMeta = objStrip(({ vault_tok }) => ({ ...revision.shape, am, vault_tok }), 'bad_option', [CX])
 
+// A put or del has its address in its record, and a get has it inline: one check reads either.
+const requestParams = Checker(({ obj, union }) => union([
+  obj({ record: reqParams, expected: revision.optional() }).transform(({ record, expected }) => ({ ...record, ...((expected !== undefined) && { expected }) })),
+  reqParams,
+]), 'bad_option')
+
 /** The request's safe metadata, for an answer to carry; empty when any of it fails its check, as a bad field may be anything. */
-export const reqParamsOf = (args: unknown): ReqParams => {
-  const parsed = reqParams.safeParse(args)
+export const reqParamsOf = (request: unknown): ReqParams => {
+  const parsed = requestParams.safeParse(request)
   return parsed.success ? parsed.data : {}
 }
 
@@ -321,7 +327,7 @@ export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone |
 }
 // --
 
-// == [Requests]: boxRequest, vaultRequest, BoxRequest, VaultRequest
+// == [Asks]: boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk, BoxAsk, VaultAsk, BoxGetAsk, BoxPutAsk, BoxDelAsk, VaultGetAsk, VaultPutAsk, VaultDelAsk, boxQueryOf, vaultScopeOf
 
 type Cited = { record: Revision, expected: Revision }
 
@@ -329,13 +335,16 @@ const isSeqNext        = ({ record, expected }: Cited): boolean => record.revisi
 const isRevisionTokNew = ({ record, expected }: Cited): boolean => (record.revision_tok !== expected.revision_tok) && (record.revision_tok !== VoidRevisionTok)
 const isExpectedWhole  = ({ expected }: Cited): boolean => (expected.revision_tok === VoidRevisionTok) === (expected.revision_seq === VoidRevisionSeq)
 
-/** True when a put's `lifeTok` is the one of the live row it expects, or a new one over a tombstone or nothing. */
-const isLifeTokPlaced = (lifeTok: string, expectedLifeTok: string, expectedAm: EX.Am): boolean => (
-  (expectedAm === 'a') ? (lifeTok === expectedLifeTok) : ((lifeTok !== expectedLifeTok) && (lifeTok !== VoidLifeTok))
-)
+/** True when a record's `lifeTok` is the one of the live row it replaces, or a new one where it creates the row or deletes it. */
+function isLifeTokPlaced(lifeTok: string, expectedLifeTok: string, expectedAm: EX.Am, recordAm: EX.Am): boolean {
+  if ((expectedAm === 'a') && (recordAm === 'a')) { return lifeTok === expectedLifeTok }
+  return (lifeTok !== expectedLifeTok) && (lifeTok !== VoidLifeTok)
+}
 
-/** The checks of what a box's or a vault's get, put or del asks: its `op`, its policies, and for a put or del the row it expects to find and the record it would store. */
-export const { boxRequest, vaultRequest } = Checkers('bad_record', ({ obj, lit, oneof, discrim, box_tok }) => {
+/** The checks of what a box's or a vault's get, put or del asks: its `op`, its policies, and for a put or del the row it expects to find and the record it would store.
+ * `expected` is read as a row's meta and the rest of it dropped, so the row a caller holds serves, or the sentinel row over none.
+ */
+export const { boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk } = Checkers('bad_record', ({ obj, lit, oneof, discrim, box_tok }) => {
   const ifAbsent    = oneof(EX.ifAbsentVals)
   const putPolicies = { ifAbsent: oneof(EX.putIfAbsentVals), ifPresent: oneof(EX.ifPresentVals) }
   const boxExpected = rowMeta.extend({ box_tok })
@@ -349,14 +358,14 @@ export const { boxRequest, vaultRequest } = Checkers('bad_record', ({ obj, lit, 
     .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
     .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
     .refine(({ record, expected }) => record.vault_tok === expected.vault_tok,                              Phrases.ExpectedOfOtherVault)
-    .refine(({ record, expected }) => isLifeTokPlaced(record.box_tok, expected.box_tok, expected.am),       Phrases.LifeTokMisplaced)
+    .refine(({ record, expected }) => isLifeTokPlaced(record.box_tok, expected.box_tok, expected.am, record.am),     Phrases.LifeTokMisplaced)
   const boxDel = obj({
     op: lit('del'), expected: boxExpected, record: boxTombstone,
   }).refine(isSeqNext,        Phrases.SeqNotNext)
     .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
     .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
     .refine(({ record, expected }) => record.vault_tok === expected.vault_tok,                              Phrases.ExpectedOfOtherVault)
-    .refine(({ record, expected }) => record.box_tok === expected.box_tok,                                  Phrases.LifeTokMisplaced)
+    .refine(({ record, expected }) => isLifeTokPlaced(record.box_tok, expected.box_tok, expected.am, record.am),     Phrases.LifeTokMisplaced)
 
   const vaultGet = CX.vaultScope.unwrap().extend({
     op: lit('get'), ifAbsent,
@@ -366,24 +375,45 @@ export const { boxRequest, vaultRequest } = Checkers('bad_record', ({ obj, lit, 
   }).refine(isSeqNext,        Phrases.SeqNotNext)
     .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
     .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
-    .refine(({ record, expected }) => isLifeTokPlaced(record.vault_tok, expected.vault_tok, expected.am),   Phrases.LifeTokMisplaced)
+    .refine(({ record, expected }) => isLifeTokPlaced(record.vault_tok, expected.vault_tok, expected.am, record.am), Phrases.LifeTokMisplaced)
   const vaultDel = obj({
     op: lit('del'), expected: rowMeta, record: vaultTombstone,
   }).refine(isSeqNext,        Phrases.SeqNotNext)
     .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
     .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
-    .refine(({ record, expected }) => record.vault_tok === expected.vault_tok,                              Phrases.LifeTokMisplaced)
+    .refine(({ record, expected }) => isLifeTokPlaced(record.vault_tok, expected.vault_tok, expected.am, record.am), Phrases.LifeTokMisplaced)
 
   return {
-    boxRequest:   discrim('op', [boxGet,   boxPut,   boxDel]),
-    vaultRequest: discrim('op', [vaultGet, vaultPut, vaultDel]),
+    boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel,
+    boxAsk:   discrim('op', [boxGet,   boxPut,   boxDel]),
+    vaultAsk: discrim('op', [vaultGet, vaultPut, vaultDel]),
   }
 }, [CX])
 
-/** What a box's get, put or del asks of the vaultDB. */
-export type BoxRequest   = Readonly<Z.input<typeof boxRequest>>
-/** What a vault's get, put or del asks of the vaultDB. */
-export type VaultRequest = Readonly<Z.input<typeof vaultRequest>>
+// An ask is one type, the checked one: a caller sends what the check answers, `op` included.
+/** What a box's get, put or del asks of the vaultDB, and what the vaultDB hands its adapter and the classifier. */
+export type BoxAsk      = Readonly<Z.output<typeof boxAsk>>
+/** What a vault's get, put or del asks of the vaultDB, and what the vaultDB hands its adapter and the classifier. */
+export type VaultAsk    = Readonly<Z.output<typeof vaultAsk>>
+/** What `getBox` is asked: the box's scope under its `vault_tok`, and what to answer over none. */
+export type BoxGetAsk   = Extract<BoxAsk,   { op: 'get' }>
+/** What `putBox` is asked: the record to store, the row it expects to find, and what to do over a live row or over none. */
+export type BoxPutAsk   = Extract<BoxAsk,   { op: 'put' }>
+/** What `delBox` is asked: the tombstone to store, and the row it expects to find. */
+export type BoxDelAsk   = Extract<BoxAsk,   { op: 'del' }>
+/** What `getVault` is asked: the vault's scope, and what to answer over none. */
+export type VaultGetAsk = Extract<VaultAsk, { op: 'get' }>
+/** What `putVault` is asked: the record to store, the row it expects to find, and what to do over a live row or over none. */
+export type VaultPutAsk = Extract<VaultAsk, { op: 'put' }>
+/** What `delVault` is asked: the tombstone to store, and the row it expects to find. */
+export type VaultDelAsk = Extract<VaultAsk, { op: 'del' }>
+
+// get rid of this, just make ask have a uniform shape for all ops
+/** The scope and `vault_tok` a box ask's row is fetched by. */
+export function boxQueryOf(ask: BoxAsk): BoxQuery { return (ask.op === 'get') ? ask : ask.record }
+
+/** The scope a vault ask's row is fetched by. */
+export function vaultScopeOf(ask: VaultAsk): VaultScope { return (ask.op === 'get') ? ask : ask.record }
 // --
 
 // == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow, leaseScopepath, LeaseScopepath, RawLease, bankRow, BankRow

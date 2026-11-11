@@ -4,7 +4,7 @@ import * as SX from '../../src/shapes/shapes-storage'
 import { VaultError } from '../../src/refusals/errors'
 import { boxActOf, cappedActOf, isBirthAct, isWriteAct, vaultActOf } from '../../src/storage/classifier'
 import type { BoxAct, VaultAct } from '../../src/shapes/shapes-enums'
-import type { BoxRequest, BoxRow, VaultRequest, VaultRow } from '../../src/shapes/shapes-storage'
+import type { BoxAsk, BoxRow, VaultAsk, VaultRow } from '../../src/shapes/shapes-storage'
 import { boxAt, boxFlaws, boxscope, boxscopeOf, vaultAt, vaultFlaws, vaultScope } from '../test-helpers/storage-world'
 
 // The stored row every comparison is made against stands at this seq, so a request can cite one below it and one above.
@@ -245,8 +245,8 @@ describe("the whole table of a put, a del and a get, cell by cell", () => {
 })
 
 describe("boxActOf, its vault", () => {
-  const get: BoxRequest = { op: 'get', ifAbsent: 'nil', ...boxscope, vault_tok: 'life1' }
-  const put: BoxRequest = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: SX.sentinelBoxOf(boxscope, 'life1'), record: boxAt(0) }
+  const get: BoxAsk = { op: 'get', ifAbsent: 'nil', ...boxscope, vault_tok: 'life1' }
+  const put: BoxAsk = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: SX.sentinelBoxOf(boxscope, 'life1'), record: boxAt(0) }
   const garbled = { smuggled: 'field' }
   const VaultCases = [
     [null,                  "vault_void",   'no vault row'],
@@ -271,9 +271,9 @@ const damagedRowOf = (classify: () => unknown): VaultError => {
 }
 
 describe("boxActOf and vaultActOf, a row that fails its checks", () => {
-  const get: BoxRequest = { op: 'get', ifAbsent: 'nil', ...boxscope, vault_tok: 'life1' }
-  const put: BoxRequest = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: SX.sentinelBoxOf(boxscope, 'life1'), record: boxAt(0) }
-  const vaultGet: VaultRequest = { op: 'get', ifAbsent: 'nil', ...vaultScope }
+  const get: BoxAsk = { op: 'get', ifAbsent: 'nil', ...boxscope, vault_tok: 'life1' }
+  const put: BoxAsk = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: SX.sentinelBoxOf(boxscope, 'life1'), record: boxAt(0) }
+  const vaultGet: VaultAsk = { op: 'get', ifAbsent: 'nil', ...vaultScope }
   it.each(boxFlaws)("refuses damaged_row for a box row with %s", (_flawname, flawOf) => {
     expect(() => boxActOf(get, liveVault, flawOf(liveBox))).to.throw(VaultError).with.property('refusalkind', 'damaged_row')
     expect(() => boxActOf(put, liveVault, flawOf(liveBox))).to.throw(VaultError).with.property('refusalkind', 'damaged_row')
@@ -300,8 +300,8 @@ describe("boxActOf and vaultActOf, a row that fails its checks", () => {
 })
 
 describe("boxActOf and vaultActOf, a row no working store could answer", () => {
-  const get: BoxRequest = { op: 'get', ifAbsent: 'nil', ...boxscope, vault_tok: 'life1' }
-  const vaultGet: VaultRequest = { op: 'get', ifAbsent: 'nil', ...vaultScope }
+  const get: BoxAsk = { op: 'get', ifAbsent: 'nil', ...boxscope, vault_tok: 'life1' }
+  const vaultGet: VaultAsk = { op: 'get', ifAbsent: 'nil', ...vaultScope }
   const elsewhere = boxscopeOf('anthropic')
 
   it("refuses storage_issue for a sound box row filed under another scope, or another life of its vault", () => {
@@ -353,15 +353,15 @@ describe("isBirthAct", () => {
 
 describe("boxActOf and vaultActOf, a request that fails its check", () => {
   it("refuses, storing and classifying nothing", () => {
-    const seqSkipped: BoxRequest = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: SX.sentinelBoxOf(boxscope, 'life1'), record: boxAt(3) }
+    const seqSkipped: BoxAsk = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: SX.sentinelBoxOf(boxscope, 'life1'), record: boxAt(3) }
     expect(() => boxActOf(seqSkipped, liveVault, null)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
-    const noPolicy = { op: 'get', ...vaultScope } as unknown as VaultRequest
+    const noPolicy = { op: 'get', ...vaultScope } as unknown as VaultAsk
     expect(() => vaultActOf(noPolicy, null)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
   })
 })
 
 describe("boxActOf, one box through a run of requests", () => {
-  type Write = Extract<BoxRequest, { op: 'put' | 'del' }>
+  type Write = Extract<BoxAsk, { op: 'put' | 'del' }>
   // A row as a request carries it: the record it would store, which is the row stored once it has.
   type Row = Write['record']
   type Run = Readonly<{ stored: Row | null, versions: readonly Row[], sent: readonly Write[], wrote: ReadonlySet<Write> }>

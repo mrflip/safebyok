@@ -62,10 +62,10 @@ export const vaultFlaws = [
 
 const tombstoneFieldsOf = ({ revision_tok, revision_seq }: Revision) => ({ revision_tok: `${revision_tok}x`, revision_seq: revision_seq + 1, am: 'x' as const })
 
-/** The tombstone that deletes the vault `record`, one revision on. */
-export const vaultTombstoneOf = (record: VaultRecord): VaultTombstone => SX.vaultTombstone.parse({ ...SX.vaultSparse.parse(record), ...tombstoneFieldsOf(record) })
-/** The tombstone that deletes the box `record`, one revision on. */
-export const boxTombstoneOf = (record: BoxRecord): BoxTombstone => SX.boxTombstone.parse({ ...SX.boxSparse.parse(record), ...tombstoneFieldsOf(record) })
+/** The tombstone that deletes the vault `record`, one revision on, under a life tok of its own. */
+export const vaultTombstoneOf = (record: VaultRecord): VaultTombstone => SX.vaultTombstone.parse({ ...SX.vaultSparse.parse(record), ...tombstoneFieldsOf(record), vault_tok: `${record.vault_tok}x` })
+/** The tombstone that deletes the box `record`, one revision on, under a life tok of its own. */
+export const boxTombstoneOf = (record: BoxRecord): BoxTombstone => SX.boxTombstone.parse({ ...SX.boxSparse.parse(record), ...tombstoneFieldsOf(record), box_tok: `${record.box_tok}x` })
 
 /** The revision a record stands at, as a call's prior. */
 export const priorOf = SX.revisionOf

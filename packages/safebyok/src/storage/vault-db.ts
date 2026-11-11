@@ -11,11 +11,15 @@ import { type BadOutcome, type GoodOutcome, outcomeOf, storageTroubleOf } from '
 import * as SX from '../shapes/shapes-storage'
 import * as CX from '../shapes/shapes-core'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
-import type { DelAct, GotAct, ListAct, PutAct } from '../shapes/shapes-enums'
-import type { AdapterVaultDBOpts, BoxQuery, BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox, DamagedVault, DelOpts, GateVerbOpts, IfAbsentOpts, PutOpts, PutOptsGiven, ReqParams, VaultQuery, VaultRecord, VaultRow, VaultTombstone, WatchScope } from '../shapes/shapes-storage'
+import type { ListAct, OkAct } from '../shapes/shapes-enums'
+import { type BoxClassified, type BoxFetched, type VaultClassified, type VaultFetched, classifyBox, classifyVault } from './classifier'
+import type {
+  AdapterVaultDBOpts, BoxAsk, BoxDelAsk, BoxGetAsk, BoxPutAsk, BoxRow, BoxSparse, DamagedBox, DamagedVault,
+  GateVerbOpts, ReqParams, VaultAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultQuery, VaultRecord, VaultRow, VaultTombstone, WatchScope,
+} from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
 
-// == [Answers]: GoodAnswer, BadAnswer, Answer, ListAct, GotAct, PutAct, DelAct, BankListed, BoxesListed, Tidied, Notice, answerOf
+// == [Answers]: GoodAnswer, BadAnswer, Answer, VaultAnswer, BoxAnswer, ListAct, OkAct, BankListed, BoxesListed, Tidied, Notice, answerOf
 
 /** What a verb returns: its `val`, the `act` that says what happened, and the `world` vault row. */
 export type GoodAnswer<ValT, ActT extends string, WorldT = VaultRow> = GoodOutcome<ValT> & { req_params: ReqParams, act: ActT, world: WorldT, dbhas?: unknown }
@@ -26,7 +30,12 @@ export type BadAnswer = BadOutcome & { req_params: ReqParams, act: string, world
 /** The answer of a `try*` verb: a {@link GoodAnswer} or a {@link BadAnswer}. */
 export type Answer<ValT, ActT extends string, WorldT = VaultRow> = GoodAnswer<ValT, ActT, WorldT> | BadAnswer
 
-export type { DelAct, GotAct, ListAct, PutAct } from '../shapes/shapes-enums'
+/** The answer of a vault's get, put or del: `val` is the row stored as the call leaves it, null for none. */
+export type VaultAnswer = Answer<VaultRow | null, OkAct>
+/** The answer of a box's get, put or del: `val` is the row stored as the call leaves it, null for none. */
+export type BoxAnswer = Answer<BoxRow | null, OkAct>
+
+export type { DelAct, GotAct, ListAct, OkAct, PutAct } from '../shapes/shapes-enums'
 
 /** The bank's vaults from `listVaults`, and the rows that failed their checks. */
 export type BankListed  = { vaults: (VaultRecord | VaultTombstone)[], damaged_rows: DamagedVault[] }
@@ -64,13 +73,7 @@ export const badAnswerOf = (err: VaultError): BadAnswer => {
 }
 // --
 
-// == [What storage answers]: Written, BoxWritten, RowOfVault, RowOfBox, BoxesFetched, BoxFetched, Heard
-
-/** Whether a conditional write took effect, and `ante`, the row it replaced or that stood in its way. */
-export type Written = { isWritten: boolean, ante: unknown }
-
-/** A box write's {@link Written}, with the vault row as read in the same step. */
-export type BoxWritten = Written & { vault: unknown }
+// == [What storage answers]: RowOfVault, RowOfBox, BoxesFetched, Heard
 
 /** A vault row as storage hands it up, unchecked, under its vaultlabel. */
 export type RowOfVault = { vaultlabel: string, vault: unknown }
@@ -78,8 +81,6 @@ export type RowOfVault = { vaultlabel: string, vault: unknown }
 export type RowOfBox   = { boxlabel: string, box: unknown }
 /** A vault's rows as storage hands them up, unchecked: the vault row and its box rows. */
 export type BoxesFetched = { vault: unknown, boxes: RowOfBox[] }
-/** A box row and its vault row as storage hands them up, unchecked. */
-export type BoxFetched   = { vault: unknown, box: unknown }
 // A box's notice may come without its vault row: the vault changes slowly, and arrives in its own notices.
 /** A change reported by storage's watch: a vault row, a box row, or both. */
 export type Heard = { vault?: unknown, box?: unknown }
@@ -95,26 +96,26 @@ export interface VaultDB {
   listVaults(scope: BankScope): Promise<GoodAnswer<BankListed, ListAct, BankScope>>
   /** Non-throwing form of {@link VaultDB.listVaults}. */
   tryListVaults(scope: BankScope): Promise<Answer<BankListed, ListAct, BankScope>>
-  /** The vault by scope alone, whatever its life. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
-  getVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<GoodAnswer<VaultRecord | null, GotAct>>
+  /** The vault at a scope, whatever its life. Over none stored, `ifAbsent: 'nil'` answers null, and over a tombstone, the tombstone. */
+  getVault(ask: VaultGetAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.getVault}. */
-  tryGetVault(scope: VaultScope, opts?: IfAbsentOpts): Promise<Answer<VaultRecord | null, GotAct>>
+  tryGetVault(ask: VaultGetAsk): Promise<VaultAnswer>
   /** The boxes under this `vault_tok`, sparse, with its vault row as `world`. */
   listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, ListAct>>
   /** Non-throwing form of {@link VaultDB.listBoxes}. */
   tryListBoxes(asked: VaultQuery): Promise<Answer<BoxesListed, ListAct>>
-  /** The box under this `vault_tok`, with its vault row as `world`; `ifAbsent: 'nil'` answers null over none. */
-  getBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<GoodAnswer<BoxRecord | null, GotAct>>
+  /** The box under this `vault_tok`, with its vault row as `world`. Over none stored, `ifAbsent: 'nil'` answers null, and over a tombstone, the tombstone. */
+  getBox(ask: BoxGetAsk): Promise<GoodAnswer<BoxRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.getBox}. */
-  tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts): Promise<Answer<BoxRecord | null, GotAct>>
-  /** Puts a vault, as `opts` allow. */
-  putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>>
+  tryGetBox(ask: BoxGetAsk): Promise<BoxAnswer>
+  /** Stores `ask.record` over the vault row `ask.expected`, as its policies allow. `passed` answers the live row found. */
+  putVault(ask: VaultPutAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.putVault}. */
-  tryPutVault(record: VaultRecord, opts: PutOpts): Promise<Answer<VaultRow, PutAct>>
-  /** Puts a box under a vault live at its `vault_tok`, as `opts` allow. */
-  putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>>
+  tryPutVault(ask: VaultPutAsk): Promise<VaultAnswer>
+  /** Stores `ask.record` over the box row `ask.expected`, under a vault live at its `vault_tok`, as its policies allow. `passed` answers the live row found. */
+  putBox(ask: BoxPutAsk): Promise<GoodAnswer<BoxRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.putBox}. */
-  tryPutBox(record: BoxRecord, opts: PutOpts): Promise<Answer<BoxRow, PutAct>>
+  tryPutBox(ask: BoxPutAsk): Promise<BoxAnswer>
   /** Puts `record`, the vault row at `opts.prior` with a new passphrase wayin and its `gate_epoch` one up. */
   replacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'replaced'>>
   /** Non-throwing form of {@link VaultDB.replacePassphrase}. */
@@ -127,14 +128,14 @@ export interface VaultDB {
   revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked'>>
   /** Non-throwing form of {@link VaultDB.revokePasskey}. */
   tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked'>>
-  /** Deletes a box's live row at `prior`. */
-  delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>>
+  /** Stores the tombstone `ask.record` over the live box row `ask.expected`. */
+  delBox(ask: BoxDelAsk): Promise<GoodAnswer<BoxRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.delBox}. */
-  tryDelBox(tombstone: BoxTombstone, opts: DelOpts): Promise<Answer<BoxTombstone, DelAct>>
-  /** Deletes a vault's live row at `prior`, with the boxes of its life. */
-  delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>>
+  tryDelBox(ask: BoxDelAsk): Promise<BoxAnswer>
+  /** Stores the tombstone `ask.record` over the live vault row `ask.expected`, and deletes the boxes of its life. */
+  delVault(ask: VaultDelAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.delVault}. */
-  tryDelVault(tombstone: VaultTombstone, opts: DelOpts): Promise<Answer<VaultTombstone, DelAct>>
+  tryDelVault(ask: VaultDelAsk): Promise<VaultAnswer>
   /** For hosts: removes the box rows of tombstoned or vanished vaults, and counts those left. */
   tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
   /** Non-throwing form of {@link VaultDB.tidyGone}. */
@@ -182,6 +183,40 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
   // --
 
+  // == [An ask and its answer]: classifyVault, classifyBox, vaultAnswerOf, boxAnswerOf, answerThrown
+  // A get, put or del checks its ask once and hands it on whole. Its `do*` call answers what the classifier made of the ask,
+  // and that is the answer but for its names: nothing is checked or shaped again on the way back.
+
+  /** What a vault's ask comes to over the row fetched for it. A subclass's `do*` calls this inside its atomic step, and may replace it. */
+  protected classifyVault(ask: VaultAsk, fetched: VaultFetched): VaultClassified { return classifyVault(ask, fetched) }
+
+  /** What a box's ask comes to over the rows fetched for it. A subclass's `do*` calls this inside its atomic step, and may replace it. */
+  protected classifyBox(ask: BoxAsk, fetched: BoxFetched): BoxClassified { return classifyBox(ask, fetched) }
+
+  /** The answer of a vault's `call`, made of what its ask came to. */
+  protected vaultAnswerOf(call: string, ask: VaultAsk, classified: VaultClassified): VaultAnswer {
+    const req_params = SX.reqParamsOf(ask)
+    const { act, world, row } = classified
+    if (classified.ok) { return { ok: true, req_params, act: classified.act, val: row, world } }
+    return { ok: false, req_params, act, world, dbhas: row, err: Refuse.actRefused('vault', classified.act, { call, req_params }) }
+  }
+
+  /** The answer of a box's `call`, made of what its ask came to. */
+  protected boxAnswerOf(call: string, ask: BoxAsk, classified: BoxClassified): BoxAnswer {
+    const req_params = SX.reqParamsOf(ask)
+    const { act, world, row, capacity } = classified
+    if (classified.ok) { return { ok: true, req_params, act: classified.act, val: row, world } }
+    const meta = { call, req_params, ...((act === 'vault_full') && (capacity !== null) && { capacity }) }
+    return { ok: false, req_params, act, world, dbhas: row, err: Refuse.actRefused('box', classified.act, meta) }
+  }
+
+  // Every throw under a get, put or del lands here: an ask that fails its checks, a stored row that fails its own, a store that is down.
+  /** The answer of a `call` that threw: the refusal as it came, anything else as `storage_unavailable`. A subclass may tell one refusal from another here. */
+  protected answerThrown(thrown: unknown, call: string, ask: unknown): BadAnswer {
+    return badAnswerOf(refusalOf(thrown, call, SX.reqParamsOf(ask)))
+  }
+  // --
+
   // == [Gets]: listVaults, tryListVaults, getVault, tryGetVault, listBoxes, tryListBoxes, getBox, tryGetBox
 
   /** The bank's vaults, full or tombstone, no boxes; a row failing validation goes in `damaged_rows`. */
@@ -203,23 +238,16 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Non-throwing form of {@link listVaults}. */
   async tryListVaults(scope: BankScope) { return answerOf(() => this.listVaults(scope)) }
 
-  /** The vault by scope alone, whatever its life. Over a void or gone row, `ifAbsent: 'nil'` answers null. */
-  async getVault(scope: VaultScope, opts: IfAbsentOpts = {}): Promise<GoodAnswer<VaultRecord | null, GotAct>> {
-    const req_params = SX.reqParamsOf(scope)
-    try {
-      const vaultScope = CX.vaultScope.parse(scope)
-      const { ifAbsent } = SX.ifAbsentOpts.parse(opts)
-      const found = foundVaultRowOf(await this.doGetVault(vaultScope), vaultScope)
-      if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(vaultScope)) }
-      if (found === null) { return { ok: true, req_params, act: 'gotvoid', val: null, world: SX.sentinelVaultOf(vaultScope), dbhas: null } }
-      if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.vaultGone(found) }
-      if (found.am === 'x') { return { ok: true, req_params, act: 'gotgone', val: null, world: found, dbhas: found } }
-      return { ok: true, req_params, act: 'got', val: found, world: found }
-    } catch (err) { throw refusalOf(err, 'getVault', req_params) }
-  }
+  /** The vault at a scope, whatever its life. Over none stored, `ifAbsent: 'nil'` answers null, and over a tombstone, the tombstone. */
+  async getVault(ask: VaultGetAsk) { return goodOrThrow(await this.tryGetVault(ask)) }
 
   /** Non-throwing form of {@link getVault}. */
-  async tryGetVault(scope: VaultScope, opts?: IfAbsentOpts) { return answerOf(() => this.getVault(scope, opts)) }
+  async tryGetVault(ask: VaultGetAsk): Promise<VaultAnswer> {
+    try {
+      const checked = SX.vaultGet.parse(ask)
+      return this.vaultAnswerOf('getVault', checked, await this.doGetVault(checked))
+    } catch (err) { return this.answerThrown(err, 'getVault', ask) }
+  }
 
   /** The boxes under this `vault_tok`, sparse, with its vault row as `world`. */
   async listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, ListAct>> {
@@ -227,7 +255,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const vaultQuery = SX.vaultQuery.parse(asked)
       const { vault, boxes } = await this.doListBoxes(vaultQuery)
-      const world = liveVaultOf(vault, vaultQuery)
+      const world = liveVaultOf(foundVaultRowOf(vault, vaultQuery), vaultQuery)
       return { ok: true, req_params, act: (boxes.length > 0) ? 'got' : 'gotvoid', val: listedBoxesOf(vaultQuery, boxes), world }
     } catch (err) { throw refusalOf(err, 'listBoxes', req_params) }
   }
@@ -235,82 +263,57 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Non-throwing form of {@link listBoxes}. */
   async tryListBoxes(asked: VaultQuery) { return answerOf(() => this.listBoxes(asked)) }
 
-  /** The box under this `vault_tok`, with its vault row as `world`; `ifAbsent: 'nil'` answers null over none. */
-  async getBox(asked: BoxQuery, opts: IfAbsentOpts = {}): Promise<GoodAnswer<BoxRecord | null, GotAct>> {
-    const req_params = SX.reqParamsOf(asked)
-    try {
-      const boxQuery = SX.boxQuery.parse(asked)
-      const { ifAbsent } = SX.ifAbsentOpts.parse(opts)
-      const { vault, box } = await this.doGetBox(boxQuery)
-      const world = liveVaultOf(vault, boxQuery)
-      const found = foundBoxRowOf(box, boxQuery)
-      if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.absentBox(world, null) }
-      if (found === null) { return { ok: true, req_params, act: 'gotvoid', val: null, world, dbhas: null } }
-      if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.absentBox(world, found) }
-      if (found.am === 'x') { return { ok: true, req_params, act: 'gotgone', val: null, world, dbhas: found } }
-      return { ok: true, req_params, act: 'got', val: found, world }
-    } catch (err) { throw refusalOf(err, 'getBox', req_params) }
-  }
+  /** The box under this `vault_tok`, with its vault row as `world`. Over none stored, `ifAbsent: 'nil'` answers null, and over a tombstone, the tombstone. */
+  async getBox(ask: BoxGetAsk) { return goodOrThrow(await this.tryGetBox(ask)) }
 
   /** Non-throwing form of {@link getBox}. */
-  async tryGetBox(asked: BoxQuery, opts?: IfAbsentOpts) { return answerOf(() => this.getBox(asked, opts)) }
+  async tryGetBox(ask: BoxGetAsk): Promise<BoxAnswer> {
+    try {
+      const checked = SX.boxGet.parse(ask)
+      return this.boxAnswerOf('getBox', checked, await this.doGetBox(checked))
+    } catch (err) { return this.answerThrown(err, 'getBox', ask) }
+  }
   // --
 
-  // == [Puts]: putVault, tryPutVault, putBox, tryPutBox
+  // == [Puts]: putVault, tryPutVault, #demandEnoughVolume, putBox, tryPutBox
 
-  /** Puts a vault, as `opts` allow. */
-  async putVault(record: VaultRecord, opts: PutOpts): Promise<GoodAnswer<VaultRow, PutAct>> {
-    const req_params = SX.reqParamsOf({ ...record, ...opts })
-    try {
-      const vaultRecord = SX.vaultRecord.parse(record)
-      const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
-      SX.nextSeq.parse({ record: vaultRecord, prior })
-      const { isWritten, ante } = await this.doPutVault(vaultRecord, { prior, ifAbsent, ifPresent })
-      if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: vaultRecord, world: vaultRecord } }
-      const found = foundVaultRowOf(ante, vaultRecord)
-      if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok)) }
-      if (found === null) { throw Refuse.staleWrite(SX.sentinelVaultOf(vaultRecord, vaultRecord.vault_tok), null) }
-      if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.vaultGone(found) }
-      if (found.am === 'x') { throw Refuse.staleWrite(found, found) }
-      if (ifPresent === 'get') { return { ok: true, req_params, act: 'declined', val: found, world: found } }
-      // A live row at `prior` that `repl` did not replace is of another life than the record.
-      if ((ifPresent === 'fail') || SX.isRowAt(found, prior)) { throw Refuse.camped(found, found) }
-      throw Refuse.staleWrite(found, found)
-    } catch (err) { throw refusalOf(err, 'putVault', req_params) }
-  }
+  /** Stores `ask.record` over the vault row `ask.expected`, as its policies allow. `passed` answers the live row found. */
+  async putVault(ask: VaultPutAsk) { return goodOrThrow(await this.tryPutVault(ask)) }
 
   /** Non-throwing form of {@link putVault}. */
-  async tryPutVault(record: VaultRecord, opts: PutOpts) { return answerOf(() => this.putVault(record, opts)) }
-
-  /** Puts a box under a vault live at its `vault_tok`, as `opts` allow. */
-  async putBox(record: BoxRecord, opts: PutOpts): Promise<GoodAnswer<BoxRow, PutAct>> {
-    const req_params = SX.reqParamsOf({ ...record, ...opts })
+  async tryPutVault(ask: VaultPutAsk): Promise<VaultAnswer> {
     try {
-      const boxRecord = SX.boxRecord.parse(record)
-      const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
-      SX.nextSeq.parse({ record: boxRecord, prior })
-      const recordBytes = jsonBytes(boxRecord)
-      if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
-      const { isWritten, ante, vault } = await this.doPutBox(boxRecord, { prior, ifAbsent, ifPresent })
-      const world = liveVaultOf(vault, boxRecord)
-      if (isWritten) { return { ok: true, req_params, act: writeActOf(ante), val: boxRecord, world } }
-      const found = foundBoxRowOf(ante, boxRecord)
-      if ((ifAbsent === 'fail') && (found === null)) { throw Refuse.absentBox(world, null) }
-      if (found === null) { throw Refuse.staleWrite(world, null) }
-      if ((ifAbsent === 'fail') && (found.am === 'x')) { throw Refuse.absentBox(world, found) }
-      if (found.am === 'x') { throw Refuse.staleWrite(world, found) }
-      if (ifPresent === 'get') { return { ok: true, req_params, act: 'declined', val: found, world } }
-      // A live row at `prior` that `repl` did not replace is of another life than the record.
-      if ((ifPresent === 'fail') || SX.isRowAt(found, prior)) { throw Refuse.camped(world, found) }
-      throw Refuse.staleWrite(world, found)
-    } catch (err) { throw refusalOf(err, 'putBox', req_params) }
+      const checked = SX.vaultPut.parse(ask)
+      return this.vaultAnswerOf('putVault', checked, await this.doPutVault(checked))
+    } catch (err) { return this.answerThrown(err, 'putVault', ask) }
   }
 
+  /** Throws `box_too_large` for a record over what this vaultDB stores in one row. */
+  #demandEnoughVolume({ record }: BoxPutAsk): void {
+    const recordBytes = jsonBytes(record)
+    if (recordBytes > this.#maxRecordBytes) { throw Refuse.boxTooLarge(recordBytes, this.#maxRecordBytes) }
+  }
+
+  /** Stores `ask.record` over the box row `ask.expected`, under a vault live at its `vault_tok`, as its policies allow. `passed` answers the live row found. */
+  async putBox(ask: BoxPutAsk) { return goodOrThrow(await this.tryPutBox(ask)) }
+
   /** Non-throwing form of {@link putBox}. */
-  async tryPutBox(record: BoxRecord, opts: PutOpts) { return answerOf(() => this.putBox(record, opts)) }
+  async tryPutBox(ask: BoxPutAsk): Promise<BoxAnswer> {
+    try {
+      const checked = SX.boxPut.parse(ask)
+      this.#demandEnoughVolume(checked)
+      return this.boxAnswerOf('putBox', checked, await this.doPutBox(checked))
+    } catch (err) { return this.answerThrown(err, 'putBox', ask) }
+  }
   // --
 
-  // == [Gate verbs]: replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey
+  // == [Gate verbs]: #liveVaultAt, replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey
+
+  /** The vault row stored at `asked`'s scope, where it is live in the life `asked` names. */
+  async #liveVaultAt({ applabel, user_id, vaultlabel, vault_tok }: VaultQuery): Promise<VaultRecord> {
+    const { row } = await this.doGetVault({ op: 'get', ifAbsent: 'nil', applabel, user_id, vaultlabel })
+    return liveVaultOf(row, { applabel, user_id, vaultlabel, vault_tok })
+  }
 
   /** Puts `record`, the vault row at `opts.prior` with a new passphrase wayin and its `gate_epoch` one up. */
   async replacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'replaced'>> {
@@ -318,12 +321,12 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const vaultRecord = SX.vaultRecord.parse(record)
       const { prior } = SX.gateVerbOpts.parse(opts)
-      const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
-      if (! SX.isRowAt(stored, prior)) { throw Refuse.staleWrite(stored, stored) }
+      const stored = await this.#liveVaultAt(vaultRecord)
+      if (! SX.isRowAt(stored, prior)) { throw Refuse.actRefused('vault', 'stale') }
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
       if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
       if (! isEqual(vaultRecord.gate.passkey_wayin, stored.gate.passkey_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
-      await this.putVault(vaultRecord, { prior, ifAbsent: 'fail', ifPresent: 'repl' })
+      await this.putVault({ op: 'put', ifAbsent: 'fail', ifPresent: 'repl', expected: stored, record: vaultRecord })
       return { ok: true, req_params, act: 'replaced', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'replacePassphrase', req_params) }
   }
@@ -337,13 +340,13 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const vaultRecord = SX.passkeyAddRecord.parse(record)
       const { prior } = SX.gateVerbOpts.parse(opts)
-      const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
-      if (! SX.isRowAt(stored, prior)) { throw Refuse.staleWrite(stored, stored) }
+      const stored = await this.#liveVaultAt(vaultRecord)
+      if (! SX.isRowAt(stored, prior)) { throw Refuse.actRefused('vault', 'stale') }
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
-      if (stored.gate.passkey_wayin !== null) { throw Refuse.camped(stored, stored) }
+      if (stored.gate.passkey_wayin !== null) { throw Refuse.actRefused('vault', 'camped') }
       if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
       if (! isEqual(vaultRecord.gate.passphrase_wayin, stored.gate.passphrase_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
-      await this.putVault(vaultRecord, { prior, ifAbsent: 'fail', ifPresent: 'repl' })
+      await this.putVault({ op: 'put', ifAbsent: 'fail', ifPresent: 'repl', expected: stored, record: vaultRecord })
       return { ok: true, req_params, act: 'added', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'addPasskey', req_params) }
   }
@@ -357,13 +360,18 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const vaultRecord = SX.passkeyRevokeRecord.parse(record)
       const { prior } = SX.gateVerbOpts.parse(opts)
-      const stored = liveVaultOf(await this.doGetVault(CX.vaultScope.parse(vaultRecord)), vaultRecord)
-      if (! SX.isRowAt(stored, prior)) { throw Refuse.staleWrite(stored, stored) }
+      // this needs to be transactional.
+      // better to (a) not bury the lede: this.doGetVault is important! deserves own line.
+      // also, doGetVault knows what its type is, and is likely to spread args anyway. don't put the field extraction in the caller
+      const stored = await this.#liveVaultAt(vaultRecord)
+      if (! SX.isRowAt(stored, prior)) { throw Refuse.actRefused('vault', 'stale') }
+      // these checks take place in the datastore, not here on an out-of-date row
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
+      // this will have been validated by now (make sure it has been)
       if (stored.gate.passkey_wayin === null) { return { ok: true, req_params, act: 'revoked', val: stored, world: stored } }
       if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
       if (! isEqual(vaultRecord.gate.passphrase_wayin, stored.gate.passphrase_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
-      await this.putVault(vaultRecord, { prior, ifAbsent: 'fail', ifPresent: 'repl' })
+      await this.putVault({ op: 'put', ifAbsent: 'fail', ifPresent: 'repl', expected: stored, record: vaultRecord })
       return { ok: true, req_params, act: 'revoked', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'revokePasskey', req_params) }
   }
@@ -372,77 +380,28 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts) { return answerOf(() => this.revokePasskey(record, opts)) }
   // --
 
-  // == [Dels]: delBox, tryDelBox, #answerDelBoxVoid, #answerDelBoxGone, #answerDelBoxRecord, delVault, tryDelVault, #answerDelVaultVoid, #answerDelVaultGone, #answerDelVaultRecord, tidyGone, tryTidyGone
+  // == [Dels]: delBox, tryDelBox, delVault, tryDelVault, tidyGone, tryTidyGone
 
-  /** Deletes a box's live row at `prior`. */
-  async delBox(tombstone: BoxTombstone, opts: DelOpts): Promise<GoodAnswer<BoxTombstone, DelAct>> {
-    const req_params = SX.reqParamsOf({ ...tombstone, ...opts })
-    try {
-      const boxTombstone = SX.boxTombstone.parse(tombstone)
-      const { prior } = SX.delOpts.parse(opts)
-      SX.nextSeq.parse({ record: boxTombstone, prior })
-      const { isWritten, ante, vault } = await this.doDelBox(boxTombstone, { prior })
-      const world = liveVaultOf(vault, boxTombstone)
-      if (isWritten) { return { ok: true, req_params, act: 'deleted', val: boxTombstone, world } }
-      const found = foundBoxRowOf(ante, boxTombstone)
-      if (found === null) { return this.#answerDelBoxVoid(boxTombstone, world, req_params) }
-      if (found.am === 'x') { return this.#answerDelBoxGone(found, world, req_params) }
-      return this.#answerDelBoxRecord(found, world)
-    } catch (err) { throw refusalOf(err, 'delBox', req_params) }
-  }
+  /** Stores the tombstone `ask.record` over the live box row `ask.expected`. */
+  async delBox(ask: BoxDelAsk) { return goodOrThrow(await this.tryDelBox(ask)) }
 
   /** Non-throwing form of {@link delBox}. */
-  async tryDelBox(tombstone: BoxTombstone, opts: DelOpts) { return answerOf(() => this.delBox(tombstone, opts)) }
-
-  /** The `void` answer: the box label's sentinel. */
-  #answerDelBoxVoid(boxTombstone: BoxTombstone, world: VaultRecord, req_params: ReqParams): GoodAnswer<BoxTombstone, 'void'> {
-    return { ok: true, req_params, act: 'void', val: SX.sentinelBoxOf(boxTombstone, boxTombstone.vault_tok), world }
-  }
-
-  /** The `gone` answer: the box tombstone found. */
-  #answerDelBoxGone(found: BoxTombstone, world: VaultRecord, req_params: ReqParams): GoodAnswer<BoxTombstone, 'gone'> {
-    return { ok: true, req_params, act: 'gone', val: found, world }
-  }
-
-  /** Refuses a del made from another revision of the live box row. */
-  #answerDelBoxRecord(found: BoxRecord, world: VaultRecord): never {
-    throw Refuse.staleWrite(world, found)
-  }
-
-  /** Deletes a vault's live row at `prior`, with the boxes of its life. */
-  async delVault(tombstone: VaultTombstone, opts: DelOpts): Promise<GoodAnswer<VaultTombstone, DelAct>> {
-    const req_params = SX.reqParamsOf({ ...tombstone, ...opts })
+  async tryDelBox(ask: BoxDelAsk): Promise<BoxAnswer> {
     try {
-      const vaultTombstone = SX.vaultTombstone.parse(tombstone)
-      const { prior } = SX.delOpts.parse(opts)
-      SX.nextSeq.parse({ record: vaultTombstone, prior })
-      const { isWritten, ante } = await this.doDelVault(vaultTombstone, { prior })
-      if (isWritten) { return { ok: true, req_params, act: 'deleted', val: vaultTombstone, world: vaultTombstone } }
-      const found = foundVaultRowOf(ante, vaultTombstone)
-      if (found === null) { return this.#answerDelVaultVoid(vaultTombstone, req_params) }
-      if (found.vault_tok !== vaultTombstone.vault_tok) { return this.#answerDelVaultVoid(vaultTombstone, req_params) }
-      if (found.am === 'x') { return this.#answerDelVaultGone(found, req_params) }
-      return this.#answerDelVaultRecord(found)
-    } catch (err) { throw refusalOf(err, 'delVault', req_params) }
+      const checked = SX.boxDel.parse(ask)
+      return this.boxAnswerOf('delBox', checked, await this.doDelBox(checked))
+    } catch (err) { return this.answerThrown(err, 'delBox', ask) }
   }
+
+  /** Stores the tombstone `ask.record` over the live vault row `ask.expected`, and deletes the boxes of its life. */
+  async delVault(ask: VaultDelAsk) { return goodOrThrow(await this.tryDelVault(ask)) }
 
   /** Non-throwing form of {@link delVault}. */
-  async tryDelVault(tombstone: VaultTombstone, opts: DelOpts) { return answerOf(() => this.delVault(tombstone, opts)) }
-
-  /** The `void` answer: the sentinel of the life the del names. */
-  #answerDelVaultVoid(vaultTombstone: VaultTombstone, req_params: ReqParams): GoodAnswer<VaultTombstone, 'void'> {
-    const sentinel = SX.sentinelVaultOf(vaultTombstone, vaultTombstone.vault_tok)
-    return { ok: true, req_params, act: 'void', val: sentinel, world: sentinel }
-  }
-
-  /** The `gone` answer: the life's tombstone. */
-  #answerDelVaultGone(found: VaultTombstone, req_params: ReqParams): GoodAnswer<VaultTombstone, 'gone'> {
-    return { ok: true, req_params, act: 'gone', val: found, world: found }
-  }
-
-  /** Refuses a del made from another revision of this life's live vault row. */
-  #answerDelVaultRecord(found: VaultRecord): never {
-    throw Refuse.staleWrite(found, found)
+  async tryDelVault(ask: VaultDelAsk): Promise<VaultAnswer> {
+    try {
+      const checked = SX.vaultDel.parse(ask)
+      return this.vaultAnswerOf('delVault', checked, await this.doDelVault(checked))
+    } catch (err) { return this.answerThrown(err, 'delVault', ask) }
   }
 
   /** For hosts: removes the box rows of tombstoned or vanished vaults, and counts those left. */
@@ -477,23 +436,24 @@ export abstract class AdapterVaultDB implements VaultDB {
   // --
 
   // == [Protected, for a subclass to write]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // A get, put or del is one atomic step: fetch what the classifier reads, classify, and store `classified.write` where there is one.
 
   /** Every vault row of the bank, full or tombstone. */
   protected abstract doListVaults(scope: BankScope): Awaitable<RowOfVault[]>
-  /** The vault row by scope alone. */
-  protected abstract doGetVault(scope: VaultScope): Awaitable<unknown>
+  /** Fetch the vault row at `ask`'s scope, and answer `this.classifyVault(ask, fetched)`. */
+  protected abstract doGetVault(ask: VaultGetAsk): Awaitable<VaultClassified>
   /** The vault row, and every box row under `vault_tok`, read in one step. */
   protected abstract doListBoxes(asked: VaultQuery): Awaitable<BoxesFetched>
-  /** The vault row, and the box row under `vault_tok`, read in one step. */
-  protected abstract doGetBox(asked: BoxQuery): Awaitable<BoxFetched>
-  /** Puts `record` where `isVaultPutAllowed` lets it be written over the row found, atomic on `revision_tok`. */
-  protected abstract doPutVault(record: VaultRecord, opts: PutOptsGiven): Awaitable<Written>
-  /** Puts `record` where `isBoxPutAllowed` lets it be written over the row found, under a vault row that passes `isLiveVaultRecord`. */
-  protected abstract doPutBox(record: BoxRecord, opts: PutOptsGiven): Awaitable<BoxWritten>
-  /** In one step, writes `tombstone` over a row at `opts.prior` that passes `isLiveVaultRecord`, and tombstones that life's boxes. */
-  protected abstract doDelVault(tombstone: VaultTombstone, opts: DelOpts): Awaitable<Written>
-  /** Writes `tombstone` over a row at `opts.prior` that passes `isLiveBoxRecord`, under a vault row that passes `isLiveVaultRecord`. */
-  protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxWritten>
+  /** Fetch the vault row and the box row `ask` names, in one step, and answer `this.classifyBox(ask, fetched)`. */
+  protected abstract doGetBox(ask: BoxGetAsk): Awaitable<BoxClassified>
+  /** In one step: fetch the vault row at `ask.record`'s scope, classify, and store `classified.write` where it is not null. */
+  protected abstract doPutVault(ask: VaultPutAsk): Awaitable<VaultClassified>
+  /** In one step: fetch the vault row, the box row and the vault's room for `ask.record`, classify, and store `classified.write` where it is not null. */
+  protected abstract doPutBox(ask: BoxPutAsk): Awaitable<BoxClassified>
+  /** In one step: fetch the vault row at `ask.record`'s scope, classify, and where `classified.write` is not null store it and delete that life's boxes. */
+  protected abstract doDelVault(ask: VaultDelAsk): Awaitable<VaultClassified>
+  /** In one step: fetch the vault row and the box row for `ask.record`, classify, and store `classified.write` where it is not null. */
+  protected abstract doDelBox(ask: BoxDelAsk): Awaitable<BoxClassified>
   /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
   /** Starts telling `hear` of rows that change, and returns how to stop. Storage with no watch never calls it. */
@@ -501,7 +461,13 @@ export abstract class AdapterVaultDB implements VaultDB {
   // --
 }
 
-// == [Helpers]: refusalOf, RowOfOtherAddress, isRowFound, foundVaultRowOf, foundBoxRowOf, listedRowOf, liveVaultOf, listedBoxesOf, writeActOf, jsonBytes
+// == [Helpers]: goodOrThrow, refusalOf, RowOfOtherAddress, demandVaultObject, foundVaultRowOf, listedRowOf, liveVaultOf, listedBoxesOf, jsonBytes
+
+/** `answer` where it is good; else throws its refusal. */
+function goodOrThrow<ValT, ActT extends string, WorldT>(answer: Answer<ValT, ActT, WorldT>): GoodAnswer<ValT, ActT, WorldT> {
+  if (! answer.ok) { throw answer.err }
+  return answer
+}
 
 /** The refusal a verb's throw stands for: a refusal as it came, else `storage_unavailable`. */
 const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultError => {
@@ -511,44 +477,32 @@ const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultE
 
 const RowOfOtherAddress = { kind: 'storage_issue', message: Phrases.rowOfOtherAddress } as const
 
-const demandRowObject = (raw: unknown): void => {
+function demandVaultObject(asked: VaultScope, raw: unknown): VaultRow {
   if (! CX.isPlainBag(raw)) { throw Refuse.storageIssue() }
-}
-
-/** Whether storage answered a row at all: null is its word for none. */
-const isRowFound = (raw: unknown): boolean => {
-  if (raw === null) { return false }
-  demandRowObject(raw)
-  return true
+  return SX.storedVaultRow.parseConsistent(raw, CX.vaultScope.parse(asked), RowOfOtherAddress)
 }
 
 // Checked against its scope and not its vault_tok: a vault row of another life is an answer the verbs have words for.
 /** The vault row storage answered for `asked`'s scope, null for none. */
-const foundVaultRowOf = (raw: unknown, asked: VaultScope): VaultRow | null => (
-  isRowFound(raw) ? SX.storedVaultRow.parseConsistent(raw, CX.vaultScope.parse(asked), RowOfOtherAddress) : null
-)
-
-/** The box row storage answered for `asked`'s scope and `vault_tok`, null for none. */
-const foundBoxRowOf = (raw: unknown, asked: BoxQuery): BoxRow | null => (
-  isRowFound(raw) ? SX.storedBoxRow.parseConsistent(raw, SX.boxQuery.parse(asked), RowOfOtherAddress) : null
-)
-
-/** A listing's row, checked against the `address` it is listed at; null for one that is to be set aside as damaged. */
-const listedRowOf = <RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknown, address: object): RowT | null => {
-  const parsed = rowCheck.safeParse(raw)
-  if (parsed.success) { return verifyConsistent(parsed.data, address, RowOfOtherAddress) }
-  demandRowObject(raw)
-  return null
+function foundVaultRowOf(raw: unknown, asked: VaultScope): VaultRow | null {
+  if (raw === null) { return null }
+  return demandVaultObject(asked, raw)
 }
 
-/** The vault row storage answered, where it is live in the life `asked` names. */
-const liveVaultOf = (raw: unknown, asked: VaultQuery): VaultRecord => {
-  const found = foundVaultRowOf(raw, asked)
-  if (found === null) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(asked, asked.vault_tok)) }
-  if ((found.am === 'a') && (found.vault_tok !== asked.vault_tok)) { throw Refuse.vaultReborn(found) }
-  if (found.vault_tok !== asked.vault_tok) { throw Refuse.vaultEmpty(SX.sentinelVaultOf(asked, asked.vault_tok)) }
-  if (found.am === 'x') { throw Refuse.vaultGone(found) }
-  return found
+/** A listing's row, checked against the `address` it is listed at; null for one that is to be set aside as damaged. */
+function listedRowOf<RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknown, address: object): RowT | null {
+  if (! CX.isPlainBag(raw)) { throw Refuse.storageIssue() }
+  const parsed = rowCheck.safeParse(raw)
+  return parsed.success ? verifyConsistent(parsed.data, address, RowOfOtherAddress) : null
+}
+
+// These are the classifier's three acts of a box's vault: a listing of boxes and a gate verb read a vault row with no ask to classify.
+/** `stored` where it is a vault row live in the life `asked` names; else throws as a box's call refuses for its vault. */
+function liveVaultOf(stored: VaultRow | null, asked: VaultQuery): VaultRecord {
+  if (stored === null)                      { throw Refuse.actRefused('box', 'vault_void') }
+  if (stored.am === 'x')                    { throw Refuse.actRefused('box', 'vault_gone') }
+  if (stored.vault_tok !== asked.vault_tok) { throw Refuse.actRefused('box', 'vault_reborn') }
+  return stored
 }
 
 const listedBoxesOf = ({ vault_tok, ...scope }: VaultQuery, rows: RowOfBox[]): BoxesListed => {
@@ -559,12 +513,6 @@ const listedBoxesOf = ({ vault_tok, ...scope }: VaultQuery, rows: RowOfBox[]): B
     if (found === null) { listed.damaged_rows.push(SX.damagedBoxOf(address, vault_tok)) } else { listed.boxes.push(SX.boxSparse.parse(found)) }
   }
   return listed
-}
-
-// A peek is enough: storage judged `ante` against its row check before the put was written.
-const writeActOf = (ante: unknown): 'born' | 'reborn' | 'replaced' => {
-  if (ante === null) { return 'born' }
-  return SX.isTombstoneRow(ante) ? 'reborn' : 'replaced'
 }
 
 const jsonBytes = (val: unknown): number => new TextEncoder().encode(JSON.stringify(val)).length
