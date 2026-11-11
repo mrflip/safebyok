@@ -3,7 +3,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { DefaultMaxBoxes, DefaultMaxRecordBytes } from '../../src/helpers/consts'
 import { VaultError } from '../../src/refusals/errors'
-import { VoidRevision } from '../../src/shapes/shapes-storage'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as TH from '../test-helpers'
 
@@ -42,17 +41,20 @@ describe("describeVaultDBBattery", () => {
   })
 })
 
-const putVaultIn = async (vaultDB: MemoryVaultDB): Promise<void> => { await vaultDB.putVault(TH.vaultAt(), { prior: VoidRevision }) }
+const putVaultIn = async (vaultDB: MemoryVaultDB): Promise<void> => { await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt())) }
 
-/** A box record over the default bytes, by its sidecar alone. */
-const oversizedBox = () => TH.boxAt(0, 'life1', { sidecar: { memo: 'x'.repeat(DefaultMaxRecordBytes) } })
+/** The first put of the box `boxlabel`. */
+const firstPutOf = (boxlabel: string) => TH.boxPutAskOf(TH.boxAt(0, 'life1', { boxlabel }))
+
+/** The first put of a box record over the default bytes, by its sidecar alone. */
+const oversizedPut = () => TH.boxPutAskOf(TH.boxAt(0, 'life1', { sidecar: { memo: 'x'.repeat(DefaultMaxRecordBytes) } }))
 
 describe("a VaultDB's default caps", () => {
   it("accepts a vault's hundredth box and refuses the next", async () => {
     const vaultDB = new MemoryVaultDB()
     await putVaultIn(vaultDB)
-    for (let nn = 0; nn < DefaultMaxBoxes; nn += 1) { await vaultDB.putBox(TH.boxAt(0, 'life1', { boxlabel: `box_${String(nn)}` }), { prior: VoidRevision }) }
-    const refusal = await TH.expectRefusal(vaultDB.putBox(TH.boxAt(0, 'life1', { boxlabel: 'one_too_many' }), { prior: VoidRevision }), 'vault_full')
+    for (let nn = 0; nn < DefaultMaxBoxes; nn += 1) { await vaultDB.putBox(firstPutOf(`box_${String(nn)}`)) }
+    const refusal = await TH.expectRefusal(vaultDB.putBox(firstPutOf('one_too_many')), 'vault_full')
     expect(refusal.meta?.capacity?.boxes).to.deep.equal({ used: DefaultMaxBoxes, max: 100 })
   })
 
@@ -60,13 +62,13 @@ describe("a VaultDB's default caps", () => {
     expect(DefaultMaxRecordBytes).to.be.lessThan(8000 * 0.95)
     const vaultDB = new MemoryVaultDB()
     await putVaultIn(vaultDB)
-    await TH.expectRefusal(vaultDB.putBox(oversizedBox(), { prior: VoidRevision }), 'box_too_large')
+    await TH.expectRefusal(vaultDB.putBox(oversizedPut()), 'box_too_large')
   })
 
   it("lets a host raise the cap on a record's bytes", async () => {
     const vaultDB = new MemoryVaultDB({ maxRecordBytes: 20_000 })
     await putVaultIn(vaultDB)
-    await TH.expectGood(vaultDB.tryPutBox(oversizedBox(), { prior: VoidRevision }))
+    await TH.expectGood(vaultDB.tryPutBox(oversizedPut()))
   })
 })
 

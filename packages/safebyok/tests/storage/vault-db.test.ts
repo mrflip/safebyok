@@ -3,10 +3,10 @@
 import { describe, expect, it } from 'vitest'
 import { VaultError, isVaultError } from '../../src/refusals/errors'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import * as SX from '../../src/shapes/shapes-storage'
 import { brandedVaultDB } from '../../src/shapes/shapes-vaultish'
 import { VaultDBVerbnames } from '../../src/storage/vault-db'
-import { bankScope, boxscope, vaultAt, vaultScope } from '../test-helpers/storage-world'
+import { bankScope, boxGetAskOf, boxQuery, vaultAt, vaultPutAskOf, vaultScope } from '../test-helpers/storage-world'
+import { omitting } from '../test-helpers/refusals'
 
 /** Each verb of `vaultDB`, bound, as a client of it would answer them. */
 const verbsOf = (vaultDB: MemoryVaultDB): Record<string, unknown> => Object.fromEntries(VaultDBVerbnames.map((verbname) => [verbname, vaultDB[verbname].bind(vaultDB)]))
@@ -24,10 +24,20 @@ describe("AdapterVaultDB", () => {
       expect(await vaultDB.tryListBoxes({ ...vaultScope, vault_tok: 'life1', vaultlabel: 'No Good!' })).to.deep.include({ ok: false, act: 'bad_scope' })
     })
 
-    it("getBox refuses a query without its vault_tok, or under a boxlabel failing its check", async () => {
+    it("getBox refuses an ask without its vault_tok, or under a boxlabel failing its check, naming the field", async () => {
       const vaultDB = new MemoryVaultDB()
-      expect(await vaultDB.tryGetBox(boxscope as never)).to.deep.include({ ok: false, act: 'bad_scope' })
-      expect(await vaultDB.tryGetBox({ ...boxscope, boxlabel: 'No Good!', vault_tok: 'life1' })).to.deep.include({ ok: false, act: 'bad_scope' })
+      const tokless = await vaultDB.tryGetBox(omitting(boxGetAskOf(), 'vault_tok'))
+      expect(tokless).to.deep.include({ ok: false })
+      expect(tokless.err?.meta?.fieldnames).to.deep.equal(['vault_tok'])
+      const mislabelled = await vaultDB.tryGetBox(boxGetAskOf({ ...boxQuery, boxlabel: 'No Good!' }))
+      expect(mislabelled).to.deep.include({ ok: false, req_params: {} })
+      expect(mislabelled.err?.meta?.fieldnames).to.deep.equal(['boxlabel'])
+    })
+
+    it("getBox refuses a bare query, with no op, policy or row expected", async () => {
+      const answer = await new MemoryVaultDB().tryGetBox(boxQuery as never)
+      expect(answer).to.deep.include({ ok: false })
+      expect(answer.err?.meta?.fieldnames).to.deep.equal(['op', 'ifAbsent', 'expected'])
     })
 
     it("watch refuses a scope failing its check, before it watches", () => {
@@ -63,10 +73,10 @@ describe("AdapterVaultDB", () => {
     it("agree, except that only the answer carries world and dbhas", async () => {
       const vaultDB = new MemoryVaultDB()
       const vault = vaultAt()
-      await vaultDB.putVault(vault, { prior: SX.VoidRevision })
-      const rival = vaultAt(0, 'life2')
-      const answer = await vaultDB.tryPutVault(rival, { prior: SX.VoidRevision, ifPresent: 'fail' })
-      const thrown = await thrownBy(() => vaultDB.putVault(rival, { prior: SX.VoidRevision, ifPresent: 'fail' }))
+      await vaultDB.putVault(vaultPutAskOf(vault))
+      const unwanted = vaultPutAskOf(vaultAt(1), vault, { ifPresent: 'fail' })
+      const answer = await vaultDB.tryPutVault(unwanted)
+      const thrown = await thrownBy(() => vaultDB.putVault(unwanted))
       expect(isVaultError(thrown, 'camped')).to.be.true
       expect(thrown).to.deep.include({ refusalkind: answer.act })
       const { meta } = thrown as { meta: object }
