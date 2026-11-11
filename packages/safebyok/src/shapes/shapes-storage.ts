@@ -1,7 +1,7 @@
 /** What the vaultDB and the deviceDB write and accept, and their helpers. Imported as `SX`. */
 
 import type * as Z from 'zod'
-import { Checker, Checkers, objCheck, objStrip } from '../helpers/validator'
+import { Checker, Checkers, consistent, objCheck, objStrip } from '../helpers/validator'
 import * as Phrases from '../helpers/phrases'
 import { randomId } from '../helpers/crypto'
 import * as EX from './shapes-enums'
@@ -228,9 +228,9 @@ export type Capacity = Z.infer<typeof capacity>
 /** The check that reads a row's revision and liveness without judging the rest. */
 export const rowMeta = objStrip(({ vault_tok }) => ({ ...revision.shape, am, vault_tok }), 'bad_option', [CX])
 
-// A put or del has its address in its record, and a get has it inline: one check reads either.
-const requestParams = Checker(({ obj, union }) => union([
-  obj({ record: reqParams, expected: revision.optional() }).transform(({ record, expected }) => ({ ...record, ...((expected !== undefined) && { expected }) })),
+// An ask has its address inline. A put's or del's record adds its own revision and `box_tok`.
+const requestParams = Checker(({ union }) => union([
+  reqParams.extend({ record: reqParams }).transform(({ record, ...asked }) => ({ ...record, ...asked })),
   reqParams,
 ]), 'bad_option')
 
@@ -327,13 +327,18 @@ export const boxTombstoneOf = (raw: unknown, written_at: number): BoxTombstone |
 }
 // --
 
-// == [Asks]: boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk, BoxAsk, VaultAsk, BoxGetAsk, BoxPutAsk, BoxDelAsk, VaultGetAsk, VaultPutAsk, VaultDelAsk, boxQueryOf, vaultScopeOf
+// == [Asks]: boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk, BoxAsk, VaultAsk, BoxGetAsk, BoxPutAsk, BoxDelAsk, VaultGetAsk, VaultPutAsk, VaultDelAsk
 
-type Cited = { record: Revision, expected: Revision }
+type Expecting = { expected: Revision }
+type Cited     = Expecting & { record: Revision }
 
 const isSeqNext        = ({ record, expected }: Cited): boolean => record.revision_seq === (expected.revision_seq + 1)
 const isRevisionTokNew = ({ record, expected }: Cited): boolean => (record.revision_tok !== expected.revision_tok) && (record.revision_tok !== VoidRevisionTok)
-const isExpectedWhole  = ({ expected }: Cited): boolean => (expected.revision_tok === VoidRevisionTok) === (expected.revision_seq === VoidRevisionSeq)
+const isExpectedWhole  = ({ expected }: Expecting): boolean => (expected.revision_tok === VoidRevisionTok) === (expected.revision_seq === VoidRevisionSeq)
+const isExpectedInLife = ({ vault_tok, expected }: { vault_tok: string, expected: { vault_tok: string } }): boolean => expected.vault_tok === vault_tok
+
+// An ask and its record share no field but those of the address, so the two agree where the record is at the ask's address.
+const isRecordAtAsk    = ({ record, ...asked }: { record: object }): boolean => consistent(record, asked)
 
 /** True when a record's `lifeTok` is the one of the live row it replaces, or a new one where it creates the row or deletes it. */
 function isLifeTokPlaced(lifeTok: string, expectedLifeTok: string, expectedAm: EX.Am, recordAm: EX.Am): boolean {
@@ -341,46 +346,54 @@ function isLifeTokPlaced(lifeTok: string, expectedLifeTok: string, expectedAm: E
   return (lifeTok !== expectedLifeTok) && (lifeTok !== VoidLifeTok)
 }
 
-/** The checks of what a box's or a vault's get, put or del asks: its `op`, its policies, and for a put or del the row it expects to find and the record it would store.
+// Every ask has one shape: its `op`, the address of the row asked for, its policies, the row its caller expects to find,
+// and for a put or del the record to store. So whoever is handed an ask reads the address off the ask itself, whatever its op.
+/** The checks of what a box's or a vault's get, put or del asks: its `op`, its address, its policies, the row it expects to find, and for a put or del the record it would store.
  * `expected` is read as a row's meta and the rest of it dropped, so the row a caller holds serves, or the sentinel row over none.
  */
-export const { boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk } = Checkers('bad_record', ({ obj, lit, oneof, discrim, box_tok }) => {
+export const { boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk } = Checkers('bad_record', ({ lit, oneof, discrim, box_tok }) => {
   const ifAbsent    = oneof(EX.ifAbsentVals)
   const putPolicies = { ifAbsent: oneof(EX.putIfAbsentVals), ifPresent: oneof(EX.ifPresentVals) }
   const boxExpected = rowMeta.extend({ box_tok })
+  const vaultScope  = CX.vaultScope.unwrap()
 
   const boxGet = boxQuery.extend({
-    op: lit('get'), ifAbsent,
-  })
-  const boxPut = obj({
+    op: lit('get'), ifAbsent, expected: boxExpected,
+  }).refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
+    .refine(isExpectedInLife, Phrases.ExpectedOfOtherVault)
+  const boxPut = boxQuery.extend({
     op: lit('put'), ...putPolicies, expected: boxExpected, record: boxRecord,
   }).refine(isSeqNext,        Phrases.SeqNotNext)
     .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
     .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
-    .refine(({ record, expected }) => record.vault_tok === expected.vault_tok,                              Phrases.ExpectedOfOtherVault)
+    .refine(isExpectedInLife, Phrases.ExpectedOfOtherVault)
+    .refine(isRecordAtAsk,    Phrases.RecordOfOtherAddress)
     .refine(({ record, expected }) => isLifeTokPlaced(record.box_tok, expected.box_tok, expected.am, record.am),     Phrases.LifeTokMisplaced)
-  const boxDel = obj({
+  const boxDel = boxQuery.extend({
     op: lit('del'), expected: boxExpected, record: boxTombstone,
   }).refine(isSeqNext,        Phrases.SeqNotNext)
     .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
     .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
-    .refine(({ record, expected }) => record.vault_tok === expected.vault_tok,                              Phrases.ExpectedOfOtherVault)
+    .refine(isExpectedInLife, Phrases.ExpectedOfOtherVault)
+    .refine(isRecordAtAsk,    Phrases.RecordOfOtherAddress)
     .refine(({ record, expected }) => isLifeTokPlaced(record.box_tok, expected.box_tok, expected.am, record.am),     Phrases.LifeTokMisplaced)
 
-  const vaultGet = CX.vaultScope.unwrap().extend({
-    op: lit('get'), ifAbsent,
-  })
-  const vaultPut = obj({
+  const vaultGet = vaultScope.extend({
+    op: lit('get'), ifAbsent, expected: rowMeta,
+  }).refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
+  const vaultPut = vaultScope.extend({
     op: lit('put'), ...putPolicies, expected: rowMeta, record: vaultRecord,
   }).refine(isSeqNext,        Phrases.SeqNotNext)
     .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
     .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
+    .refine(isRecordAtAsk,    Phrases.RecordOfOtherAddress)
     .refine(({ record, expected }) => isLifeTokPlaced(record.vault_tok, expected.vault_tok, expected.am, record.am), Phrases.LifeTokMisplaced)
-  const vaultDel = obj({
+  const vaultDel = vaultScope.extend({
     op: lit('del'), expected: rowMeta, record: vaultTombstone,
   }).refine(isSeqNext,        Phrases.SeqNotNext)
     .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
     .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
+    .refine(isRecordAtAsk,    Phrases.RecordOfOtherAddress)
     .refine(({ record, expected }) => isLifeTokPlaced(record.vault_tok, expected.vault_tok, expected.am, record.am), Phrases.LifeTokMisplaced)
 
   return {
@@ -395,25 +408,18 @@ export const { boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vau
 export type BoxAsk      = Readonly<Z.output<typeof boxAsk>>
 /** What a vault's get, put or del asks of the vaultDB, and what the vaultDB hands its adapter and the classifier. */
 export type VaultAsk    = Readonly<Z.output<typeof vaultAsk>>
-/** What `getBox` is asked: the box's scope under its `vault_tok`, and what to answer over none. */
+/** What `getBox` is asked: the box's address, the row its caller holds or the sentinel for none, and what to answer over none. */
 export type BoxGetAsk   = Extract<BoxAsk,   { op: 'get' }>
-/** What `putBox` is asked: the record to store, the row it expects to find, and what to do over a live row or over none. */
+/** What `putBox` is asked: the box's address, the record to store, the row it expects to find, and what to do over a live row or over none. */
 export type BoxPutAsk   = Extract<BoxAsk,   { op: 'put' }>
-/** What `delBox` is asked: the tombstone to store, and the row it expects to find. */
+/** What `delBox` is asked: the box's address, the tombstone to store, and the row it expects to find. */
 export type BoxDelAsk   = Extract<BoxAsk,   { op: 'del' }>
-/** What `getVault` is asked: the vault's scope, and what to answer over none. */
+/** What `getVault` is asked: the vault's scope, the row its caller holds or the sentinel for none, and what to answer over none. */
 export type VaultGetAsk = Extract<VaultAsk, { op: 'get' }>
-/** What `putVault` is asked: the record to store, the row it expects to find, and what to do over a live row or over none. */
+/** What `putVault` is asked: the vault's scope, the record to store, the row it expects to find, and what to do over a live row or over none. */
 export type VaultPutAsk = Extract<VaultAsk, { op: 'put' }>
-/** What `delVault` is asked: the tombstone to store, and the row it expects to find. */
+/** What `delVault` is asked: the vault's scope, the tombstone to store, and the row it expects to find. */
 export type VaultDelAsk = Extract<VaultAsk, { op: 'del' }>
-
-// get rid of this, just make ask have a uniform shape for all ops
-/** The scope and `vault_tok` a box ask's row is fetched by. */
-export function boxQueryOf(ask: BoxAsk): BoxQuery { return (ask.op === 'get') ? ask : ask.record }
-
-/** The scope a vault ask's row is fetched by. */
-export function vaultScopeOf(ask: VaultAsk): VaultScope { return (ask.op === 'get') ? ask : ask.record }
 // --
 
 // == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow, leaseScopepath, LeaseScopepath, RawLease, bankRow, BankRow

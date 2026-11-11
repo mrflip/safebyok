@@ -18,12 +18,14 @@ op is get, put or del. Vault ops use the same three on the vault row.
 - **ifPresent** (put only): what to do when the box is live. repl replaces it; get returns it unchanged (passed); fail refuses (`camped`).
 - del takes no flags.
 - **`vault_tok`, `box_tok`**: unguessable random strings the device mints, so a token names one life of the row. A new one is minted when the row is created (over void or a tombstone) and again when it is deleted, so a tombstone carries a token of its own; a write over a live row that leaves it live keeps the token. Separately, every write (create, update, delete) gives the row a new revision: a fresh `revision_tok` and `revision_seq + 1`. A box records its vault's `vault_tok` but never the vault's revision, and a vault write never touches its boxes' revisions. The token columns in the tables compare revision tokens.
-- In the `b_tok` column: eq = the stored token is the one you cited; =next = it is the one this request would write; neq = neither; birth = you cited the sentinel's token and the box is void, so there is no stored token to compare; — = not sent (get sends no box revision).
+- In the `b_tok` column: eq = the stored token is the one you cited; =next = it is the one this request would write; neq = neither; birth = you cited the sentinel's token and the box is void, so there is no stored token to compare; — = not compared (a get names the row its caller holds, and is answered what is stored whatever that row is).
 - In the `b_seq` column: birth = you cited the sentinel's seq, `-1`; stale, eq, ahead = the seq you cited is below, at or above the stored one, and any seq but the sentinel's cited against a void is ahead; @ = any seq.
 
 ## Rules
 
 ### Revisions
+
+Every request has one shape, whatever its op: the op, the address of the row asked for, its flags, and the row its caller expects to find, which is the sentinel row where it holds none. A put or del adds the record to store, filed at the same address. A get's expected row travels with it and is not compared: a get is never refused for the row its caller holds.
 
 Each box request names its vault's life token (`vault_tok`), never the vault's revision; each vault put or del names the vault's revision.
 
@@ -95,7 +97,7 @@ Returning:
 
 ## Box ops table
 
-Rows run in precedence order. `@` = any value; `—` = not sent; `=next` = the stored token is the one this request would write; `(null)` = no box row can exist. Flags are ifAbsent/ifPresent.
+Rows run in precedence order. `@` = any value; `—` = not sent, or not compared; `=next` = the stored token is the one this request would write; `(null)` = no box row can exist. Flags are ifAbsent/ifPresent.
 
 ### Vault issues (G1–G6)
 
@@ -137,7 +139,7 @@ Result: 🫱 / 🔲 / 🪦 got live / void / tombstone · 👍 saved (reqval) ·
 |      |         |         |       |        |           |           |        |
 | GL1  |    —    | —       |   @   | *live* | `gotlive` | **same**  |   🫱    |
 
-Coverage check: get sends no box revision, so 3 box states × 2 ifAbsent values = 6 cases in 5 rows; ifAbsent doesn't matter on a live box.
+Coverage check: a get's expected revision is not compared, so 3 box states × 2 ifAbsent values = 6 cases in 5 rows; ifAbsent doesn't matter on a live box.
 
 #### put
 
@@ -207,8 +209,8 @@ cases in 8 rows (eq with birth can't occur). del has no flags, so nothing splits
 ## Vault ops table
 
 Same ops, flags and conventions as the box table, applied to the vault row. Two things to note:
-get sends no vault revision (how a new device bootstraps); del keeps `vault_tok` but,
-like every write, carries a next revision.
+a get's expected row is not compared (a new device, holding nothing, cites the sentinel); del,
+like every write, carries a next revision, and its tombstone a life token of its own.
 
 ### Unconditional errors (V1–V3)
 
@@ -240,7 +242,7 @@ Every vault op passes these first, whatever revision it cites.
 |      |         |         |       |        |           |               |        |
 | VGL1 |    —    | —       |   @   | *live* | `gotlive` | **same**      |   🫱    |
 
-Coverage check: vault get sends no vault revision, so 3 vault states × 2 flags values = 6 cases in 5 rows; flags don't matter on a live vault.
+Coverage check: a vault get's expected revision is not compared, so 3 vault states × 2 flags values = 6 cases in 5 rows; flags don't matter on a live vault.
 
 ### Vault put
 

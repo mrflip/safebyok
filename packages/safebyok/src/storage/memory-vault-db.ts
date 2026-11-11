@@ -106,34 +106,34 @@ export class MemoryVaultDB extends AdapterVaultDB {
   }
 
   protected doPutVault(ask: VaultPutAsk): VaultClassified {
-    const classified = this.classifyVault(ask, { vault: this.#vaultRowOf(ask.record) })
+    const classified = this.classifyVault(ask, { vault: this.#vaultRowOf(ask) })
     if (classified.write !== null) { this.#writeVaultRow(classified.write) }
     return classified
   }
 
   protected doPutBox(ask: BoxPutAsk): BoxClassified {
-    const boxrows = this._cheat_boxRowsOf(ask.record, ask.record.vault_tok)
-    const vault = this.#vaultRowOf(ask.record)
-    const box = boxrows.get(ask.record.boxlabel) ?? null
+    const boxrows = this._cheat_boxRowsOf(ask, ask.vault_tok)
+    const vault = this.#vaultRowOf(ask)
+    const box = boxrows.get(ask.boxlabel) ?? null
     const classified = this.classifyBox(ask, { world: vault, box, capacity: this.#roomIn(boxrows) })
     if (isWriteAct(classified.act)) { this.#writeBoxRow(boxrows, vault, ask.record) }
     return classified
   }
 
   protected doDelVault(ask: VaultDelAsk): VaultClassified {
-    const classified = this.classifyVault(ask, { vault: this.#vaultRowOf(ask.record) })
+    const classified = this.classifyVault(ask, { vault: this.#vaultRowOf(ask) })
     if (classified.write !== null) {
       this.#writeVaultRow(classified.write)
       // A vault's boxes end with its life: nothing reads a box row of a life that is over.
-      this._cheat_boxRowsOf(ask.record, ask.expected.vault_tok).clear()
+      this._cheat_boxRowsOf(ask, ask.expected.vault_tok).clear()
     }
     return classified
   }
 
   protected doDelBox(ask: BoxDelAsk): BoxClassified {
-    const boxrows = this._cheat_boxRowsOf(ask.record, ask.record.vault_tok)
-    const vault = this.#vaultRowOf(ask.record)
-    const box = boxrows.get(ask.record.boxlabel) ?? null
+    const boxrows = this._cheat_boxRowsOf(ask, ask.vault_tok)
+    const vault = this.#vaultRowOf(ask)
+    const box = boxrows.get(ask.boxlabel) ?? null
     const classified = this.classifyBox(ask, { world: vault, box })
     if (isWriteAct(classified.act)) { this.#writeBoxRow(boxrows, vault, ask.record) }
     return classified

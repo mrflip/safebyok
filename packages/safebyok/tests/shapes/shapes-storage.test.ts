@@ -117,15 +117,15 @@ describe("SX.boxAsk and SX.vaultAsk", () => {
   const liveBox      = boxAt(5)
   const goneBox      = boxTombstoneOf(boxAt(4))
   const boxSentinel  = SX.sentinelBoxOf(boxscope, 'life1')
-  const boxPut       = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: liveBox, record: boxAt(6) } as const
-  const boxDel       = { op: 'del', expected: liveBox, record: boxTombstoneOf(liveBox) } as const
+  const boxPut       = { op: 'put', ...boxQuery, ifAbsent: 'add', ifPresent: 'repl', expected: liveBox, record: boxAt(6) } as const
+  const boxDel       = { op: 'del', ...boxQuery, expected: liveBox, record: boxTombstoneOf(liveBox) } as const
   const liveVault    = vaultAt(5)
-  const vaultPut     = { op: 'put', ifAbsent: 'add', ifPresent: 'repl', expected: liveVault, record: vaultAt(6) } as const
-  const vaultDel     = { op: 'del', expected: liveVault, record: vaultTombstoneOf(liveVault) } as const
+  const vaultPut     = { op: 'put', ...vaultScope, ifAbsent: 'add', ifPresent: 'repl', expected: liveVault, record: vaultAt(6) } as const
+  const vaultDel     = { op: 'del', ...vaultScope, expected: liveVault, record: vaultTombstoneOf(liveVault) } as const
 
   it("pass a get, a put over the live row it expects, and a del of it", () => {
-    expect(SX.boxAsk.parse({ op: 'get', ifAbsent: 'nil', ...boxQuery })).to.include({ op: 'get', ifAbsent: 'nil', boxlabel: 'openai' })
-    expect(SX.vaultAsk.parse({ op: 'get', ifAbsent: 'fail', ...vaultScope })).to.include({ op: 'get', vaultlabel: 'main' })
+    expect(SX.boxAsk.parse({ op: 'get', ...boxQuery, ifAbsent: 'nil', expected: liveBox })).to.include({ op: 'get', ifAbsent: 'nil', boxlabel: 'openai' })
+    expect(SX.vaultAsk.parse({ op: 'get', ...vaultScope, ifAbsent: 'fail', expected: SX.sentinelVaultOf(vaultScope) })).to.include({ op: 'get', vaultlabel: 'main' })
     for (const request of [boxPut, boxDel]) { expect(SX.boxAsk.parse(request).op).to.eq(request.op) }
     for (const request of [vaultPut, vaultDel]) { expect(SX.vaultAsk.parse(request).op).to.eq(request.op) }
   })
@@ -138,7 +138,7 @@ describe("SX.boxAsk and SX.vaultAsk", () => {
 
   it("pass a del that expects nothing, which brings a life tok of its own", () => {
     const tombstone = { ...SX.sentinelBoxOf(boxscope, 'life1'), revision_tok: 'brev0', revision_seq: 0, box_tok: 'box9' }
-    expect(SX.boxAsk.parse({ op: 'del', expected: boxSentinel, record: tombstone }).op).to.eq('del')
+    expect(SX.boxAsk.parse({ op: 'del', ...boxQuery, expected: boxSentinel, record: tombstone }).op).to.eq('del')
   })
 
   const BoxFlaws = [
@@ -161,6 +161,9 @@ describe("SX.boxAsk and SX.vaultAsk", () => {
     [{ ...boxDel, record: boxAt(6) },                                                     'a live record for a del'],
     [{ ...boxPut, ifPresent: 'clobber' },                                                 'a policy it does not know'],
     [{ ...boxPut, op: 'patch' },                                                          'an op it does not know'],
+    [{ ...boxPut, boxlabel: 'anthropic' },                                                'a record at another address than the ask names'],
+    [{ op: 'get', ...boxQuery, ifAbsent: 'nil' },                                         'a get that names no expected row'],
+    [{ op: 'get', ...boxQuery, ifAbsent: 'nil', expected: { ...liveBox, vault_tok: 'life2' } }, 'a get whose expected row is of another vault life'],
   ] as const
 
   for (const [request, blurb] of BoxFlaws) {
@@ -176,6 +179,8 @@ describe("SX.boxAsk and SX.vaultAsk", () => {
     [{ ...vaultPut, expected: vaultTombstoneOf(vaultAt(4)), record: vaultAt(6, 'life1x') }, 'the life of the tombstone it expects'],
     [{ ...vaultDel, record: { ...vaultTombstoneOf(liveVault), vault_tok: liveVault.vault_tok } }, 'a tombstone that keeps the life of the row it deletes'],
     [{ ...vaultDel, record: vaultAt(6) },                                                 'a live record for a del'],
+    [{ ...vaultPut, vaultlabel: 'spare' },                                                'a record at another scope than the ask names'],
+    [{ op: 'get', ...vaultScope, ifAbsent: 'nil' },                                       'a get that names no expected row'],
   ] as const
 
   for (const [request, blurb] of VaultFlaws) {

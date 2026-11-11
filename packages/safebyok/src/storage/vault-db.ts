@@ -311,8 +311,9 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** The vault row stored at `asked`'s scope, where it is live in the life `asked` names. */
   async #liveVaultAt({ applabel, user_id, vaultlabel, vault_tok }: VaultQuery): Promise<VaultRecord> {
-    const { row } = await this.doGetVault({ op: 'get', ifAbsent: 'nil', applabel, user_id, vaultlabel })
-    return liveVaultOf(row, { applabel, user_id, vaultlabel, vault_tok })
+    const vaultScope = { applabel, user_id, vaultlabel }
+    const { row } = await this.doGetVault({ op: 'get', ...vaultScope, ifAbsent: 'nil', expected: SX.sentinelVaultOf(vaultScope) })
+    return liveVaultOf(row, { ...vaultScope, vault_tok })
   }
 
   /** Puts `record`, the vault row at `opts.prior` with a new passphrase wayin and its `gate_epoch` one up. */
@@ -326,7 +327,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       if (stored.registered_at !== vaultRecord.registered_at) { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
       if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
       if (! isEqual(vaultRecord.gate.passkey_wayin, stored.gate.passkey_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
-      await this.putVault({ op: 'put', ifAbsent: 'fail', ifPresent: 'repl', expected: stored, record: vaultRecord })
+      await this.putVault({ op: 'put', ...CX.vaultScope.parse(vaultRecord), ifAbsent: 'fail', ifPresent: 'repl', expected: stored, record: vaultRecord })
       return { ok: true, req_params, act: 'replaced', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'replacePassphrase', req_params) }
   }
@@ -346,7 +347,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       if (stored.gate.passkey_wayin !== null) { throw Refuse.actRefused('vault', 'camped') }
       if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
       if (! isEqual(vaultRecord.gate.passphrase_wayin, stored.gate.passphrase_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
-      await this.putVault({ op: 'put', ifAbsent: 'fail', ifPresent: 'repl', expected: stored, record: vaultRecord })
+      await this.putVault({ op: 'put', ...CX.vaultScope.parse(vaultRecord), ifAbsent: 'fail', ifPresent: 'repl', expected: stored, record: vaultRecord })
       return { ok: true, req_params, act: 'added', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'addPasskey', req_params) }
   }
@@ -371,7 +372,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       if (stored.gate.passkey_wayin === null) { return { ok: true, req_params, act: 'revoked', val: stored, world: stored } }
       if (vaultRecord.gate.gate_epoch !== (stored.gate.gate_epoch + 1)) { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
       if (! isEqual(vaultRecord.gate.passphrase_wayin, stored.gate.passphrase_wayin)) { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
-      await this.putVault({ op: 'put', ifAbsent: 'fail', ifPresent: 'repl', expected: stored, record: vaultRecord })
+      await this.putVault({ op: 'put', ...CX.vaultScope.parse(vaultRecord), ifAbsent: 'fail', ifPresent: 'repl', expected: stored, record: vaultRecord })
       return { ok: true, req_params, act: 'revoked', val: vaultRecord, world: vaultRecord }
     } catch (err) { throw refusalOf(err, 'revokePasskey', req_params) }
   }
@@ -446,13 +447,13 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doListBoxes(asked: VaultQuery): Awaitable<BoxesFetched>
   /** Fetch the vault row and the box row `ask` names, in one step, and answer `this.classifyBox(ask, fetched)`. */
   protected abstract doGetBox(ask: BoxGetAsk): Awaitable<BoxClassified>
-  /** In one step: fetch the vault row at `ask.record`'s scope, classify, and store `classified.write` where it is not null. */
+  /** In one step: fetch the vault row at `ask`'s scope, classify, and store `classified.write` where it is not null. */
   protected abstract doPutVault(ask: VaultPutAsk): Awaitable<VaultClassified>
-  /** In one step: fetch the vault row, the box row and the vault's room for `ask.record`, classify, and store `classified.write` where it is not null. */
+  /** In one step: fetch the vault row, the box row and the vault's room at `ask`'s address, classify, and store `classified.write` where it is not null. */
   protected abstract doPutBox(ask: BoxPutAsk): Awaitable<BoxClassified>
-  /** In one step: fetch the vault row at `ask.record`'s scope, classify, and where `classified.write` is not null store it and delete that life's boxes. */
+  /** In one step: fetch the vault row at `ask`'s scope, classify, and where `classified.write` is not null store it and delete that life's boxes. */
   protected abstract doDelVault(ask: VaultDelAsk): Awaitable<VaultClassified>
-  /** In one step: fetch the vault row and the box row for `ask.record`, classify, and store `classified.write` where it is not null. */
+  /** In one step: fetch the vault row and the box row at `ask`'s address, classify, and store `classified.write` where it is not null. */
   protected abstract doDelBox(ask: BoxDelAsk): Awaitable<BoxClassified>
   /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>

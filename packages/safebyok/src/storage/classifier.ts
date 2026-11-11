@@ -208,12 +208,11 @@ export type BoxClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, ac
 
 /** Classify a vault's checked ask against the row an adapter fetched. Throws for a row that fails its checks. */
 export function classifyVault(ask: VaultAsk, { vault }: VaultFetched): VaultClassified {
-  const vaultScope = SX.vaultScopeOf(ask)
-  const stored     = vaultRowAt(vaultScope, vault, SX.storedVaultRow)
+  const stored     = vaultRowAt(ask, vault, SX.storedVaultRow)
   const act        = rowActOf(ask, stored)
   const { presence } = stored
   if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, world: ask.record, row: ask.record, write: ask.record, presence } }
-  const found      = { world: stored.row ?? SX.sentinelVaultOf(vaultScope), row: stored.row, write: null, presence }
+  const found      = { world: stored.row ?? SX.sentinelVaultOf(ask), row: stored.row, write: null, presence }
   return isOkAct(act) ? { ...found, ok: true, act } : { ...found, ok: false, act }
 }
 
@@ -229,15 +228,14 @@ function presenceOf(row: Meta | null): Presence {
  * Throws for a row that fails its checks, or that is not at the address asked for.
  */
 export function classifyBox(ask: BoxAsk, fetched: BoxFetched): BoxClassified {
-  const boxQuery = SX.boxQueryOf(ask)
-  const world    = vaultRowAt(boxQuery, fetched.world, boxVaultRow).row ?? SX.sentinelVaultOf(boxQuery)
+  const world    = vaultRowAt(ask, fetched.world, boxVaultRow).row ?? SX.sentinelVaultOf(ask)
   const capacity = fetched.capacity ?? null
 
   // The vault first. Under a vault that is not live in the life asked for, the box row is not read, whatever is stored for the box.
-  const vaultAct = boxVaultActOf(boxQuery, world)
+  const vaultAct = boxVaultActOf(ask, world)
   if (vaultAct !== null) { return { ok: false, act: vaultAct, world, box: null, presence: null, capacity: null } }
 
-  const box      = boxRowAt(boxQuery, fetched.box).row
+  const box      = boxRowAt(ask, fetched.box).row
   const presence = presenceOf(box)
   const stored: Stored<BoxRow> = (box === null) ? { presence: 'void', row: null } : { presence: presence as 'live' | 'gone', row: box }
   const uncapped = rowActOf(ask, stored)

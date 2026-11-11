@@ -7,7 +7,6 @@ export type { Answer, BadAnswer, BankListed, BoxesListed, DelAct, GoodAnswer, Go
 export type { BoxAnswer, BoxesFetched, Heard, OkAct, RowOfBox, RowOfVault, VaultAnswer, VaultDB } from './vault-db'
 export { boxActOf, cappedActOf, classifyBox, classifyVault, isBirthAct, isOkAct, isWriteAct, vaultActOf } from './classifier'
 export type { BoxClassified, BoxFetched, Presence, VaultClassified, VaultFetched } from './classifier'
-export { boxQueryOf, vaultScopeOf } from '../shapes/shapes-storage'
 export type { BoxAsk, BoxDelAsk, BoxGetAsk, BoxPutAsk, VaultAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk } from '../shapes/shapes-storage'
 export { writeActVals } from '../shapes/shapes-enums'
 export type { BoxAct, VaultAct, WriteAct } from '../shapes/shapes-enums'

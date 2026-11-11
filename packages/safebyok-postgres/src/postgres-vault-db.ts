@@ -202,8 +202,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
       return classified
     }
     const { act, presence } = storedVerdict.parse(answered)
-    const { record } = ask
-    const vault = DB.storedVaultRow.parseConsistent(answered.vault, { ...DB.vaultScope.parse(record), revision_tok: record.revision_tok }, RowOfOtherAddress)
+    const vault = DB.storedVaultRow.parseConsistent(answered.vault, { ...DB.vaultScope.parse(ask), revision_tok: ask.record.revision_tok }, RowOfOtherAddress)
     return { ok: true, act, world: vault, row: vault, write: null, presence }
   }
 
@@ -215,9 +214,8 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
       return classified
     }
     const { act, presence } = storedVerdict.parse(answered)
-    const { record } = ask
-    const world = worldRow.parseConsistent(answered.world, DB.vaultScope.parse(record), RowOfOtherAddress)
-    const box   = DB.storedBoxRow.parseConsistent(answered.box, { ...DB.boxQuery.parse(record), revision_tok: record.revision_tok }, RowOfOtherAddress)
+    const world = worldRow.parseConsistent(answered.world, DB.vaultScope.parse(ask), RowOfOtherAddress)
+    const box   = DB.storedBoxRow.parseConsistent(answered.box, { ...DB.boxQuery.parse(ask), revision_tok: ask.record.revision_tok }, RowOfOtherAddress)
     return { ok: true, act, world, box, presence, capacity }
   }
   // --
@@ -244,22 +242,22 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   // A put or del calls the function that can store its record over the row it expects. An ask whose policy lets it store
   // nothing over that row is only classified, over the rows as fetched: whatever is stored, the classifier names no write for it.
   protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
-    if (! mayReplace(ask)) { return this.classifyVault(ask, await this.#fetchVault(ask.record)) }
+    if (! mayReplace(ask)) { return this.classifyVault(ask, await this.#fetchVault(ask)) }
     return await this.#writeVault(ask, isBirth(ask) ? BirthVaultSql : ReviseVaultSql)
   }
 
   protected async doPutBox(ask: BoxPutAsk): Promise<BoxClassified> {
-    if (! mayReplace(ask)) { return this.classifyBox(ask, await this.#fetchBox(ask.record)) }
+    if (! mayReplace(ask)) { return this.classifyBox(ask, await this.#fetchBox(ask)) }
     return await this.#writeBox(ask, isBirth(ask) ? BirthBoxSql : ReviseBoxSql)
   }
 
   protected async doDelVault(ask: VaultDelAsk): Promise<VaultClassified> {
-    if (ask.expected.am !== 'a') { return this.classifyVault(ask, await this.#fetchVault(ask.record)) }
+    if (ask.expected.am !== 'a') { return this.classifyVault(ask, await this.#fetchVault(ask)) }
     return await this.#writeVault(ask, ReviseVaultSql)
   }
 
   protected async doDelBox(ask: BoxDelAsk): Promise<BoxClassified> {
-    if (ask.expected.am !== 'a') { return this.classifyBox(ask, await this.#fetchBox(ask.record)) }
+    if (ask.expected.am !== 'a') { return this.classifyBox(ask, await this.#fetchBox(ask)) }
     return await this.#writeBox(ask, ReviseBoxSql)
   }
 

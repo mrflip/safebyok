@@ -38,7 +38,7 @@ async function storedBox(): Promise<unknown> {
 
 async function vaultDBWithVault() {
   const vaultDB = await TH.makeVaultDB()
-  await vaultDB.putVault({ ...Add, expected: DB.sentinelVaultOf(TH.vaultScope), record: TH.vaultAt(0) })
+  await vaultDB.putVault({ ...Add, ...TH.vaultScope, expected: DB.sentinelVaultOf(TH.vaultScope), record: TH.vaultAt(0) })
   return vaultDB
 }
 
@@ -84,7 +84,7 @@ describe('BirthBoxSql', () => {
     const vaultDB = await vaultDBWithVault()
     expect(await birthBox(TH.boxAt(0, 'life2'))).to.deep.include({ ok: false, world: TH.vaultAt(0) })
     const tombstone = TH.vaultTombstoneOf(TH.vaultAt(0))
-    await vaultDB.delVault({ op: 'del', expected: TH.vaultAt(0), record: tombstone })
+    await vaultDB.delVault({ op: 'del', ...TH.vaultScope, expected: TH.vaultAt(0), record: tombstone })
     expect(await birthBox(TH.boxAt(0))).to.deep.include({ ok: false, world: tombstone })
     expect(await storedBox()).to.be.null
   })
@@ -164,7 +164,7 @@ describe('ReviseBoxSql', () => {
     const vaultDB = await vaultDBWithVault()
     await birthBox(TH.boxAt(0))
     const vaultTombstone = TH.vaultTombstoneOf(TH.vaultAt(0))
-    await vaultDB.delVault({ op: 'del', expected: TH.vaultAt(0), record: vaultTombstone })
+    await vaultDB.delVault({ op: 'del', ...TH.vaultScope, expected: TH.vaultAt(0), record: vaultTombstone })
     const swept = await storedBox()
     expect(await reviseBox(TH.boxAt(1), TH.boxAt(0))).to.deep.include({ ok: false, world: vaultTombstone, box: swept })
   })
