@@ -3,7 +3,7 @@
 A `VaultDB` for safebyok that keeps a vault's rows in this browser's
 [IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API): storage for an app with no
 backend. The rows are what any backend would have, ciphertext and a few unencrypted fields;
-nothing in them opens a vault without its passphrase or passkey.
+nothing in them unlocks a vault without its passphrase or passkey.
 
 ## Install
 

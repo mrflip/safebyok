@@ -8,12 +8,12 @@ devices through a storage layer the host plugs in.
 
 ## What a host relies on
 
-* **The backend has ciphertext it cannot open.** It can read what is visible: labels, times and
+* **The backend has ciphertext it cannot decrypt.** It can read what is visible: labels, times and
   each box's sidecar, which are authenticated but never encrypted. Put no secret in a sidecar.
-* **Nothing is recoverable, and removal is not revocation.** Nobody can open a vault whose
+* **Nothing is recoverable, and removal is not revocation.** Nobody can unlock a vault whose
   passphrase is forgotten and which has no working passkey. A replaced passphrase or revoked passkey
-  no longer opens the vault, but the vaultKey never changes, so a copy of the old record can still be
-  opened with the old passphrase or passkey.
+  no longer unlocks the vault, but the vaultKey never changes, so a copy of the old record can still
+  be unlocked with the old passphrase or passkey.
 * **State is framework-agnostic.** `Bank`, `Vault`, `Box` and `vault.boxListing` each have
   `subscribe` and `getSnapshot`, which can be passed on their own, the way `useSyncExternalStore`
   takes them. A snapshot is the same object until something changes, and never contains a whisper.
@@ -35,7 +35,7 @@ devices through a storage layer the host plugs in.
 types here do not have, trust the types.
 
 * **whisper**: the secret, always a plain JSON object, such as `{ apiKey: 'sk-...' }`. A **box**
-  holds one whisper, encrypted, along with its `boxlabel` and sidecar.
+  contains one whisper, encrypted, along with its `boxlabel` and sidecar.
 * **vault**: one user's boxes, named by `applabel`, `user_id` and `vaultlabel`. A vault that is
   deleted and made again is a new life, with a new `vault_tok` and a new `Vault` instance.
 * **bank**: a signed-in user's vaults and what they share. One per signed-in user.
@@ -71,7 +71,7 @@ await bank.hello()
 
 const vault = await bank.ensureVault({ vaultlabel: 'main' }) // none yet: asks, build_vault
 const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-...' }, sidecar: { nickname: 'work' } })
-const whisper = await box.extractWhisper() // hands it over, and keeps nothing
+const whisper = await box.extractWhisper() // returns the whisper, and the box keeps no copy
 
 vault.lock()                 // every subscriber is told before this returns
 await vault.ensureUnlocked() // no lease now: asks, unlock_vault
@@ -112,7 +112,7 @@ Easy to get wrong:
   them go to `DefaultOnLifecycle` and `DefaultOnBadNews` instead. The only exception is a vacate's
   cleanup, which still reports what it could not remove to your `onLifecycle` and `onBadNews`.
 * **A revoked identity vacates the bank**, whatever your handlers do. When your storage adapter
-  raises `identity_revoked`, the bank is vacated, its snapshot shows that refusal, and your
+  throws `identity_revoked`, the bank is vacated, its snapshot shows that refusal, and your
   `onLifecycle` receives `vacated` with the refusal as its `cause`. Make another bank once the user
   signs in again.
 * **`onLifecycle` receives the bank's lifecycle events.** Each is a `BankEvent`, distinguished by
@@ -144,17 +144,21 @@ Easy to get wrong:
 
 ## Trying storage at startup
 
-`await bank.tryProbe()` tries the whole storage path once: it replaces one box, `box1` in the vault `home`, fetches it back and opens it, so a missing grant or a blocked
-database shows up at startup, not at the user's first save. It returns an Outcome: on success, its `val` says what each step found and when, and has no whisper, ciphertext or wrapped key. It prompts the
-user if the vault is absent or locked. You can pass each label, the whisper and the sidecar. `{ maxMillisSinceRefresh }`, 1000 by default, sets how fresh the vault and box must be,
-independently of the bank's own refresh settings. The probe leaves the box in place, and it counts toward the vault's `maxBoxes`.
+`await bank.tryProbe()` tries the whole storage path once: it replaces one box, `box1` in the
+vault `home`, fetches it back and unseals it. A missing grant or a blocked database then shows up at
+startup, not at the first `putBox`. It returns an `Outcome`. On success, its `val` says what each
+step found and when, and contains no whisper, ciphertext or wrapped key. The probe prompts the user
+if the vault is absent or locked. You can pass each label, the whisper and the sidecar.
+`{ maxMillisSinceRefresh }`, 1000 by default, sets how fresh the vault and box must be, independently
+of the bank's own refresh settings. The probe leaves the box in place, and it counts toward the
+vault's `maxBoxes`.
 
 ## Showing a whisper
 
 `box.expose()` keeps a whisper on the box until `box.unexpose()`, a sweep, a vacate or a delete, and
 `box.whisper` returns it. While the whisper is hidden, `box.whisper` returns a frozen bag with no
-fields, and a put of that bag is refused. `box.exposure` says why it is hidden: `'unexposed'`,
-`'locked'`, `'veiled'` or `'showing'` (`useBoxExposure` in safebyok-react). `box.isShowing` and
+fields, and a put of that bag is refused. `box.exposure` says whether it is shown, and if not, why:
+`'unexposed'`, `'locked'`, `'veiled'` or `'showing'` (`useBoxExposure` in safebyok-react). `box.isShowing` and
 `box.isVeiled` are the two booleans, and `isWhisperedBag(val)` is true for one of those bags and
 false for a whisper. Don't compare `box.whisper` with a bag or read its mark: a second copy of
 safebyok has bags of its own. A veiled box stays veiled while its vault is locked: `box.isVeiled`
@@ -211,8 +215,8 @@ While the whisper is hidden, `box.whisper` is a bag with no fields, so the input
 replace the whisper object or edit it in place here: call `box.patchWhisper`, which makes the new
 object and notifies the hook. It merges deeply, except that an array replaces the old one.
 
-There are important considerations to building a form safely, and we have provided helpers to do so. See the
-[safebyok-react README](../safebyok-react/README.md) for details and react version compatibility.
+A form that edits a whisper safely takes more care than this. The
+[safebyok-react README](../safebyok-react/README.md) has the helpers for it, and the React versions they support.
 
 ## Entry points
 
