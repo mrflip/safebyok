@@ -157,6 +157,7 @@ true satisfies Z.core.util.AssertEqual<typeof VaultDBVerbnames[number], Exclude<
 // --
 
 const noUnwatching = (): void => undefined
+const noBadNews = (_news: VaultError): void => undefined
 
 /** The base of a vaultDB. Each verb throws its refusal and returns its answer; each `try*` answers either.
  * A subclass writes only the generic `do*` calls, each one atomic step.
@@ -461,8 +462,8 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   // == [Watch]: watch
 
-  /** Tells `onNotice` of rows that change under a bank or a vault, and returns how to stop. */
-  watch(scope: WatchScope, onNotice: (notice: Notice) => void): () => void {
+  /** Tells `onNotice` of rows that change under a bank or a vault, `onBadNews` of a watch storage ends; returns how to stop. */
+  watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void = noBadNews): () => void {
     return this.doWatch(SX.watchScope.parse(scope), ({ vault, box }) => {
       const world = (vault === undefined) ? null : SX.vaultRow.safeParse(vault)
       if ((world !== null) && (! world.success)) { return }
@@ -472,7 +473,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       }
       const val = SX.boxRow.safeParse(box)
       if (val.success) { onNotice({ act: (val.data.am === 'x') ? 'gone' : 'got', val: val.data, world: world?.data ?? null }) }
-    })
+    }, onBadNews)
   }
   // --
 
@@ -496,8 +497,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doDelBox(tombstone: BoxTombstone, opts: DelOpts): Awaitable<BoxWritten>
   /** Removes the box rows of vaults that are void, tombstoned or reborn, and counts those left in the bank. */
   protected abstract doTidyGone(scope: BankScope): Awaitable<Tidied>
-  /** Starts telling `hear` of rows that change, and returns how to stop. Storage with no watch never calls it. */
-  protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void): () => void { return noUnwatching }
+  /** Starts telling `hear` of rows that change, and `onBadNews` of a watch storage ends; returns how to stop. Storage with no watch calls neither. */
+  protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void, _onBadNews: (news: VaultError) => void): () => void { return noUnwatching }
   // --
 }
 
