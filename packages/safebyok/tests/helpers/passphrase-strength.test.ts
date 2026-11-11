@@ -174,8 +174,8 @@ describe("guardStrengthChecker's load", () => {
   })
 })
 
-describe("DefaultStrengthChecker, and the CUSTOMIZATION.md section its reason points at", () => {
-  const customization = readFileSync(new URL('../../CUSTOMIZATION.md', import.meta.url), 'utf8')
+describe("DefaultStrengthChecker, and the notes/configuration.md section its reason points at", () => {
+  const configuration = readFileSync(new URL('../../../../notes/configuration.md', import.meta.url), 'utf8')
 
   it("finds every passphrase weak, with a reason for the user that quotes none", async () => {
     for (const passphrase of ['correct horse battery staple', 'pw', '']) {
@@ -191,15 +191,15 @@ describe("DefaultStrengthChecker, and the CUSTOMIZATION.md section its reason po
     expect(await DefaultStrengthChecker('one', scope)).to.eq(await DefaultStrengthChecker('two', scope))
   })
 
-  it("names the option and the section by its heading, which CUSTOMIZATION.md has", async () => {
+  it("names the option and the section by its heading, which notes/configuration.md has", async () => {
     const verdict = await DefaultStrengthChecker('pw', scope)
     const reason = verdict.strong ? '' : verdict.reason
     expect(reason).to.match(/strengthChecker/)
-    expect(reason).to.include("CUSTOMIZATION.md says under Pluggable Passphrase Strength Checker")
-    expect(customization).to.include('\n## Pluggable Passphrase Strength Checker\n')
+    expect(reason).to.include("notes/configuration.md in safebyok's repository says under Pluggable Passphrase Strength Checker")
+    expect(configuration).to.include('\n## Pluggable Passphrase Strength Checker\n')
   })
 
   it("keeps its AI prompt's last reason word for word", () => {
-    expect(customization).to.include("it's too annoying and I just want it to let everything through, I understand the risks, you're not the boss of me")
+    expect(configuration).to.include("it's too annoying and I just want it to let everything through, I understand the risks, you're not the boss of me")
   })
 })

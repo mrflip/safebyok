@@ -437,7 +437,7 @@ export interface BankOpts {
   keyDeriver:           KeyDeriver
   /** Your dialog, called with each gating that needs the user's passphrase or passkey; left out, each gating waits in the bank's snapshot for your own `attempt` or `dismiss`. */
   requestCleartext?:    RequestCleartext | undefined
-  /** Judges each new passphrase before a vault accepts it; without one, every new passphrase is too weak (CUSTOMIZATION.md). */
+  /** Judges each new passphrase before a vault accepts it; without one, every new passphrase is too weak (notes/configuration.md). */
   strengthChecker?:     StrengthChecker | undefined
   /** Where the bank says what it has no caller to throw to; the console when left out. */
   logger?:              VaultLogger | undefined

@@ -588,7 +588,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'dismissed')
     const [attempted] = attempts
     expect(attempted?.err).to.include({ refusalkind: 'weak_passphrase' })
-    expect(attempted?.err?.message).to.include('CUSTOMIZATION.md')
+    expect(attempted?.err?.message).to.include('notes/configuration.md')
   })
 
   it("carries on when the host's logger throws", async () => {

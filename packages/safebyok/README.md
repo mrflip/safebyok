@@ -217,4 +217,4 @@ and `safebyok-graphql` are the adapters.
 * [tests/models/proof.test.ts](tests/models/proof.test.ts): a host drives a bank's whole life,
   and every step asserts what its components render. This is the real usage guide.
 * [notes/guarantees.md](../../notes/guarantees.md): where secret material lives.
-* [CUSTOMIZATION.md](CUSTOMIZATION.md): choosing a strength checker.
+* [notes/configuration.md](../../notes/configuration.md): choosing a strength checker.

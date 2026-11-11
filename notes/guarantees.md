@@ -358,7 +358,7 @@ listing's `try*` forms are each one `outcomeOf` over the throwing form too, and 
 `Proving.toJSON`, `Lease.toJSON` and `Wayin.toJSON` show no key material, and a lease that will
 not read is warned of without its record (`Lease.buildFromCache` tells the friend a `damagedLease()` built from nothing of the row, as bad news, and answers null). *Host obligation, documented:* a `strengthChecker`'s
 `reason` becomes the `weak_passphrase` message, so it must not quote the passphrase
-(CUSTOMIZATION.md).
+(notes/configuration.md).
 
 **G9. Only `Gating`, `Proving` and `Lease` have or use a key or its cleartext pre-image.** A passkey's PRF bytes count as a pre-image.
 Beside them a passphrase passes through the host functions of G1, through their wraps, and through
