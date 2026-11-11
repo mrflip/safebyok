@@ -23,7 +23,7 @@ export type PostgresListen = (channel: string, onNotify: (text: string) => void)
 /** Options for `new PostgresVaultDB(opts)`, in addition to {@link AdapterVaultDBOpts}:
  * - `client`   -- runs the queries and transactions
  * - `listen`   -- subscribes to Postgres notifications, so `watch` hears other devices' writes; without it, `watch` hears nothing
- * - `maxBoxes` -- soft cap on the live boxes in one vault (default: `DefaultMaxBoxes`)
+ * - `maxBoxes` -- soft cap on the box rows of one vault life, live and deleted together (default: `DefaultMaxBoxes`)
  */
 export type PostgresVaultDBOpts = Readonly<AdapterVaultDBOpts & { client: PostgresClient, listen?: PostgresListen, maxBoxes?: number }>
 
@@ -111,7 +111,7 @@ const codeOf = (thrown: unknown): string | undefined => (
 /** What the database answers for a vault's ask, as it comes: the vault row, and a write function's verdict. */
 type VaultAnswered = VaultFetched & { ok?: boolean, act?: unknown, presence?: unknown }
 
-/** What the database answers for a box's ask, as it comes: the vault row and the box row, and a write function's verdict and its count of the vault's live boxes. */
+/** What the database answers for a box's ask, as it comes: the vault row and the box row, a write function's verdict, and a birth's count of the vault life's box rows. */
 type BoxAnswered = BoxFetched & { ok?: boolean, act?: unknown, presence?: unknown, boxcount?: number }
 
 const { storedVerdict } = DB.Checkers('storage_issue', ({ obj, oneof }) => ({
@@ -173,7 +173,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return fetched ?? { world: null, box: null }
   }
 
-  /** A vault's room, at a count of its live boxes. */
+  /** A vault life's room, at a count of its box rows, live and deleted. */
   #roomAt(used: number): Capacity {
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }

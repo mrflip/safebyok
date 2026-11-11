@@ -77,10 +77,10 @@ Hand `vaultDB` to the core, as its README's *A host* shows.
   `ConvexReactClient` you give `ConvexProvider`, so the vault shares its socket and its signed-in
   user. `safebyok-convex` imports nothing of React's.
 * **`api`** is `api.safebyok`, the functions above.
-* **`maxBoxes`**, optional, 100 if left out, is a cap on the box rows in one vault, deleted boxes' tombstones
-  among them, under the component's own limit: a put that would add a live box past it, a new boxlabel or a box
-  reborn over its tombstone, refuses as `vault_full`. Each put counts in the mutation that stores it, so the cap is
-  exact; a replacement never refuses for it.
+* **`maxBoxes`**, optional, 100 if left out, is a cap on the box rows of one vault life, deleted boxes' tombstones
+  among them, under the component's own limit: a put of a new boxlabel past it refuses as `vault_full`, so deleting a
+  box frees no room. Each put counts in the mutation that stores it, so the cap is exact; a replacement, a delete and a
+  box put again over its own tombstone never refuse for it.
 * **`maxRecordBytes`**, optional, as every vaultDB takes it: 5,600 bytes if left out, at most Convex's 1 MiB document.
 
 **Sign in first.** Open the vault once the Convex client is authenticated (in React, once
@@ -102,7 +102,7 @@ Three tables, inside the component:
 | ----------------- | ------------------ | ------------------------------------------------------- | ------------------------------------------------------------------ |
 | `safebyok_vaults` | vault              | its scope and its vault row, live or a tombstone        | `by_scope`: `user_id`, `applabel`, `vaultlabel`                    |
 | `safebyok_boxes`  | box, in each life  | its scope, its life's `vault_tok`, and its box row      | `by_box`: `user_id`, `applabel`, `vaultlabel`, `vault_tok`, `boxlabel` |
-| `safebyok_tallies`| life of a vault    | its box rows' count and their bytes                     | `by_life`: `user_id`, `applabel`, `vaultlabel`, `vault_tok`        |
+| `safebyok_tallies`| life of a vault    | count and size of its box rows: all, and live alone    | `by_life`: `user_id`, `applabel`, `vaultlabel`, `vault_tok`        |
 
 `user_id` leads every index, so one user's rows are one range of each. Rows are stored as the core
 writes them: encrypted, each whisper, each box's boxKey and the vaultKey once for each way in; in
@@ -118,8 +118,8 @@ tables first (on the dashboard's Data page, pick the `safebyok` component).
 leaves its tombstone in its row, which counts toward both limits as a live box does; a box put
 again under the same boxlabel takes that row back. A put that would take a vault past either limit
 and leave it larger refuses as `vault_full`; a replacement no heavier, and every delete, always
-lands. **Once deleted boxes fill a vault's cap, it refuses new boxes, and boxes reborn over their
-tombstones, until the vault is deleted.** Deleting it is the only way to empty it: `delVault`
+lands. **Once deleted boxes fill a vault's cap, it refuses new boxes until the vault is deleted.**
+A box put again over its own tombstone still lands, within the byte limit. Deleting the vault is the only way to empty it: `delVault`
 deletes the box rows of the life it ends, in the same mutation, and the next life starts with none.
 `tidyGone` removes the rows of any life that ended some other way.
 

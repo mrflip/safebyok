@@ -60,9 +60,9 @@ the caller expected there would be a tombstone yet called `del` anyway
 
 ### Soft caps
 
-A vaultDB may cap how many live boxes a vault holds, and refuse a put that would add one with `vault_full`. The cap is soft. The count behind it is not taken transactionally and is not guaranteed accurate: on some datastores an exact count would mean a lock on every writer. So a vault may come to hold more boxes than its cap, and a put may refuse a little under it. Where the cap's check falls among the other checks is not assured either: a put that would refuse for another reason may refuse `vault_full` instead, or the other way about. A host that requires a hard cap installs, and migrates, triggers of its own in its datastore.
+A vaultDB may cap how many box rows a vault life holds, live and tombstone together, and refuse with `vault_full` a put that would add one. Only a `born` adds a row: a put over a box's own tombstone (`reborn`), a replace and a del take the row already there, so none is refused for the cap, and deleting a box frees no room. A vault made anew starts its life at none. The cap is soft. The count behind it is not taken transactionally and is not guaranteed accurate: on some datastores an exact count would mean a lock on every writer. So a vault life may come to hold more box rows than its cap, and a put may refuse a little under it. Where the cap's check falls among the other checks is not assured either: a put that would refuse for another reason may refuse `vault_full` instead, or the other way about. A host that requires a hard cap installs, and migrates, triggers of its own in its datastore.
 
-The adapter gauges the room as it is about to write a new live box, and the classifier names `vault_full` from the count it found. A write already made is never refused for the cap, whatever the count comes to afterwards. The cap's place among the other refusals is not promised (*Operational Checks*).
+The adapter gauges the room as it is about to write a new box row, and the classifier names `vault_full` from the count it found. A write already made is never refused for the cap, whatever the count comes to afterwards. The cap's place among the other refusals is not promised (*Operational Checks*).
 
 ### Listings
 
@@ -85,7 +85,7 @@ Precedence, first match wins, for a box:
 
 Where two refusals both hold, which of them answers is not promised, unless this note says so. The list above is the order the classifier keeps: where it had a choice it took the one that needs less code, unless the other means more to the customer. One order is promised: a stale expected revision is told so, by `stale` or the two exceptions of step 7, and no flag's refusal displaces it.
 
-The soft cap is such a case: a put that would add a live box may refuse `vault_full` at any step past the first (*Soft caps*).
+The soft cap is such a case: a put that would be `born` may refuse `vault_full` at any step past the first (*Soft caps*).
 
 Returning:
 
@@ -176,7 +176,7 @@ Coverage check: a get's expected revision is not compared, so 3 box states × 2 
 
 Coverage check: void has 2 seq values × 2 ifAbsent values = 4 cases in 3 rows. Gone has 8 `b_tok` × `b_seq` cases (a `=next` token at any seq is one), one split by ifAbsent, in 9 rows. Live has 8 cases, three split by ifPresent, in 14 rows.
 
-Soft cap: a put that would be `born` or `reborn` may refuse `vault_full` instead (err, 🔁). Its timing relative to the rows above is not assured (*Soft caps*).
+Soft cap: a put that would be `born` may refuse `vault_full` instead (err, 🔁); one that would be `reborn` never does. Its timing relative to the rows above is not assured (*Soft caps*).
 
 ### del
 
@@ -385,7 +385,7 @@ Each rule is one testable statement about what an adapter does. An atomic unit i
 - Vault replace stores the proposed revision and leaves `vault_tok` unchanged.
 - No write copies a new `vault_tok` onto existing boxes; a foreign key from (box.`vault_scope`, box.`vault_tok`) to the vault, where declared, never cascades updates.
 - A put or del writes at most once (C15): once its proposed revision is stored, or its expected revision is no longer the stored one, it writes nothing.
-- A put that would add a live box may refuse `vault_full` under the vaultDB's soft cap. The count is an estimate, taken outside any lock, and the check may run at any point in the atomic unit (*Soft caps*).
+- A put that would be `born` may refuse `vault_full` under the vaultDB's soft cap, which counts the vault life's box rows, tombstones among them. The count is an estimate, taken outside any lock, and the check may run at any point in the atomic unit (*Soft caps*).
 - A refusal never writes.
 
 ### Responding

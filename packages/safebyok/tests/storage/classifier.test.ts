@@ -328,18 +328,17 @@ describe("boxActOf and vaultActOf, a row no working store could answer", () => {
 const roomOf = (used: number) => ({ boxes: { used, max: 3 }, bytes: { used: 0, max: 1000 } })
 
 describe("cappedActOf, the soft cap on a vault's boxes", () => {
-  it("answers vault_full for an act that would add a live box to a vault at its cap", () => {
+  it("answers vault_full for a born in a vault at its cap", () => {
     expect(cappedActOf('born', roomOf(3))).to.eq('vault_full')
-    expect(cappedActOf('reborn', roomOf(4))).to.eq('vault_full')
+    expect(cappedActOf('born', roomOf(4))).to.eq('vault_full')
   })
 
-  it("answers the act itself where the vault has room", () => {
+  it("answers born where the vault has room", () => {
     expect(cappedActOf('born', roomOf(2))).to.eq('born')
-    expect(cappedActOf('reborn', roomOf(0))).to.eq('reborn')
   })
 
-  it("answers the act itself, whatever the room, where it adds no live box", () => {
-    for (const act of ['replaced', 'deleted', 'gotlive', 'passed', 'stale'] as const) { expect(cappedActOf(act, roomOf(9))).to.eq(act) }
+  it("answers the act itself, whatever the room, where it adds no box row", () => {
+    for (const act of ['reborn', 'replaced', 'deleted', 'gotlive', 'passed', 'stale'] as const) { expect(cappedActOf(act, roomOf(9))).to.eq(act) }
   })
 
   it("refuses a capacity that fails its check", () => {

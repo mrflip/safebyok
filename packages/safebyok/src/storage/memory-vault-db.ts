@@ -68,10 +68,9 @@ export class MemoryVaultDB extends AdapterVaultDB {
   }
 
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** The room a vault has for live boxes, under its soft cap `maxBoxes`. */
+  /** The room a vault life has under its soft cap `maxBoxes`, counting its box rows live and deleted. */
   #roomIn(boxrows: Map<string, unknown>): Capacity {
-    const used = [...boxrows.values()].filter((box) => SX.isLiveRow(box)).length
-    return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
+    return { boxes: { used: boxrows.size, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }
 
 

@@ -63,9 +63,6 @@ CREATE TABLE IF NOT EXISTS safebyok_boxes (
     AND jsonb_typeof(whisper_ciphered->'ciphertext_b64') = 'string', false))
 ) WITH (fillfactor = 85);
 
--- The live boxes of a vault life, for the count a box's put takes against the cap.
-CREATE INDEX IF NOT EXISTS safebyok_boxes_active ON safebyok_boxes (applabel, user_id, vaultlabel, vault_tok) WHERE am = 'a';
-
 -- Row-level security is on, with no policy. The role that owns the tables (the one your server
 -- connects as) can reach every row. No other role can reach any, including Supabase's Data API roles.
 ALTER TABLE safebyok_vaults ENABLE ROW LEVEL SECURITY;

@@ -29,8 +29,10 @@ export default defineSchema({
     user_id:    v.string(),
     vaultlabel: v.string(),
     vault_tok:  v.string(),
-    box_count:  v.number(),
-    box_bytes:  v.number(),
+    all_count:  v.number(),
+    live_count: v.number(),
+    all_size:   v.number(),
+    live_size:  v.number(),
   })
     .index('by_life', ['user_id', 'applabel', 'vaultlabel', 'vault_tok']),
 })

@@ -172,10 +172,10 @@ export function isBirthAct(act: BoxAct | VaultAct): boolean { return (act === 'b
 export function isOkAct(act: BoxAct | VaultAct): act is OkAct { return isWriteAct(act) || (EX.foundActVals as readonly string[]).includes(act) }
 
 // The cap is soft: `capacity` is a count taken outside any lock, as the write is about to be made. A write already made is never refused for it.
-/** Replace an act that would add a box with `vault_full` when the vault is at its cap. */
+/** The act, or `vault_full` for a `born` in a vault at its cap: no other act adds a box row to the count. */
 export function cappedActOf(act: BoxAct, capacity: Capacity): BoxAct {
   const { boxes } = SX.capacity.parse(capacity)
-  return (isBirthAct(act) && (boxes.used >= boxes.max)) ? 'vault_full' : act
+  return ((act === 'born') && (boxes.used >= boxes.max)) ? 'vault_full' : act
 }
 // --
 

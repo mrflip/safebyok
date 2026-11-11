@@ -188,7 +188,7 @@ export const adapterVaultDBOpts = objCheck(({ num }) => ({
 export const memoryVaultDBOpts = objCheck(({ int }) => ({
   ...adapterVaultDBOpts.shape,
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** A soft cap on the live boxes one vault has; `DefaultMaxBoxes` by default. */
+  /** A soft cap on the box rows of one vault life, live and deleted together; `DefaultMaxBoxes` by default. */
   maxBoxes: int.positive().optional(),
 }), 'bad_option')
 
@@ -208,10 +208,10 @@ export type MemoryVaultDBOpts = Readonly<Z.input<typeof memoryVaultDBOpts>>
 
 // == [Capacity]: capacity, Capacity
 
-/** How much room a vault has: boxes against the most it has, and bytes against the most its storage allows of one vault.
- * A vault reckons it from its last read; a VaultDB from storage, in `getCapacity` and a
- * `vault_full`'s `meta.capacity`. Either is an estimate: storage checks again on every write, and
- * its answer wins. A limit storage reports as `Infinity` reads as `Number.MAX_SAFE_INTEGER`.
+/** How much room a vault has: box rows against the most it may hold, and bytes against the most its storage allows of one vault.
+ * The box rows are every box of the vault's life, live and deleted together. A VaultDB counts them
+ * from storage, in a `vault_full`'s `meta.capacity`, as an estimate: storage checks again on every
+ * write. A limit storage reports as `Infinity` reads as `Number.MAX_SAFE_INTEGER`.
  *
  * @example { boxes: { used: 12, max: 100 }, bytes: { used: 48_000, max: 1_000_000 } }
  */

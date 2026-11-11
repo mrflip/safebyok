@@ -2,7 +2,6 @@
 
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
-import * as SX from '../../src/shapes/shapes-storage'
 import type { VaultRow, WatchScope } from '../../src/shapes/shapes-storage'
 import type { AdapterVaultDB, Notice, VaultDB } from '../../src/storage/vault-db'
 import {
@@ -112,8 +111,7 @@ export const describeRaces = ({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         const { written, refused } = splitOf(await Promise.all(racers))
         expect([written.length, refused.length]).to.deep.equal([1, 3])
         expect(refused.map(({ act }) => act)).to.deep.equal(['vault_full', 'vault_full', 'vault_full'])
-        const boxrows = await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')
-        expect([...boxrows.values()].filter((row) => SX.isLiveRow(row))).to.have.lengthOf(2)
+        expect(await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')).to.have.property('size', 2)
       })
     }
   })

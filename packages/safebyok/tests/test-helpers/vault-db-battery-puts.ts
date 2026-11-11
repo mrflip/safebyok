@@ -261,20 +261,51 @@ export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await rowsOf(vaultDB).boxRowsOf(vaultScope, 'life1')).to.have.property('size', 0)
     })
 
-    if (hasCap) {
-      it("refuses a new box past its VaultDB's cap, and replaces one stored", async () => {
-        const vaultDB = await makeCapped(1)
-        const vault = vaultAt()
-        await vaultDB.putVault(vaultPutAskOf(vault))
-        await vaultDB.putBox(boxPutAskOf(box))
-        const full = await vaultDB.tryPutBox(boxPutAskOf(boxAt(0, 'life1', { boxlabel: 'other' })))
-        expect(full).to.deep.include({ ok: false, act: 'vault_full', world: vault })
-        expect(full.err?.refusalkind).to.eq('vault_full')
-        expect(full.err?.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
-        expect(full.req_params).to.include({ boxlabel: 'other' })
-        expect(await vaultDB.putBox(boxPutAskOf(nextBox, box))).to.deep.include({ act: 'replaced' })
-      })
-    }
+    // A VaultDB made without a cap has none of the cases below.
+    if (! hasCap) { return }
+
+    it("refuses a new box past its VaultDB's cap, and replaces one stored", async () => {
+      const vaultDB = await makeCapped(1)
+      const vault = vaultAt()
+      await vaultDB.putVault(vaultPutAskOf(vault))
+      await vaultDB.putBox(boxPutAskOf(box))
+      const full = await vaultDB.tryPutBox(boxPutAskOf(boxAt(0, 'life1', { boxlabel: 'other' })))
+      expect(full).to.deep.include({ ok: false, act: 'vault_full', world: vault })
+      expect(full.err?.refusalkind).to.eq('vault_full')
+      expect(full.err?.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
+      expect(full.req_params).to.include({ boxlabel: 'other' })
+      expect(await vaultDB.putBox(boxPutAskOf(nextBox, box))).to.deep.include({ act: 'replaced' })
+    })
+
+    it("stores a put over a box's own tombstone at its VaultDB's cap", async () => {
+      const vaultDB = await makeCapped(1)
+      await vaultDB.putVault(vaultPutAskOf(vaultAt()))
+      await vaultDB.putBox(boxPutAskOf(box))
+      await vaultDB.delBox(boxDelAskOf(box))
+      const reborn = boxAt(boxTombstone.revision_seq + 1, 'life1', { box_tok: 'box2' })
+      expect(await vaultDB.putBox(boxPutAskOf(reborn, boxTombstone))).to.deep.include({ act: 'reborn', val: reborn })
+    })
+
+    it("counts a deleted box against its VaultDB's cap", async () => {
+      const vaultDB = await makeCapped(1)
+      await vaultDB.putVault(vaultPutAskOf(vaultAt()))
+      await vaultDB.putBox(boxPutAskOf(box))
+      await vaultDB.delBox(boxDelAskOf(box))
+      const full = await vaultDB.tryPutBox(boxPutAskOf(boxAt(0, 'life1', { boxlabel: 'other' })))
+      expect(full).to.deep.include({ ok: false, act: 'vault_full' })
+      expect(full.err?.meta?.capacity?.boxes).to.deep.equal({ used: 1, max: 1 })
+    })
+
+    it("starts a vault made anew with none of its old boxes against the cap", async () => {
+      const vaultDB = await makeCapped(1)
+      const vault = vaultAt()
+      await vaultDB.putVault(vaultPutAskOf(vault))
+      await vaultDB.putBox(boxPutAskOf(box))
+      await vaultDB.delVault(vaultDelAskOf(vault))
+      await vaultDB.putVault(vaultPutAskOf(vaultAt(2, 'life2'), vaultTombstoneOf(vault)))
+      const newLife = boxAt(0, 'life2')
+      expect(await vaultDB.putBox(boxPutAskOf(newLife))).to.deep.include({ act: 'born', val: newLife })
+    })
   })
 
   describe("a put's answer, by the row it finds and its ifAbsent and ifPresent", () => {

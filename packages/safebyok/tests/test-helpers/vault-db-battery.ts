@@ -41,7 +41,7 @@ export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
   _cheat_rowsOf: (vaultDB: DBT) => VaultDBRowCheats
   /** A second VaultDB over the same rows, as another device has; without it, the races run over one VaultDB. */
   makeTwin?: (vaultDB: DBT) => Awaitable<VaultDB>
-  /** A fresh, empty VaultDB with at most `maxBoxes` live boxes to a vault; without it, the battery has no cases of a cap. */
+  /** A fresh, empty VaultDB with at most `maxBoxes` box rows to a vault life, live and deleted; without it, the battery has no cases of a cap. */
   makeCappedVaultDB?: (maxBoxes: number) => Awaitable<DBT>
   /** A fresh backend, as a way to make a VaultDB over it signed in as a user, or signed out for null; without it, the battery has no cases of who may reach a vault. */
   makeVaultDBFor?: () => Awaitable<(user_id: string | null) => VaultDB>

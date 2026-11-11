@@ -262,9 +262,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.#demandLease(checked.stamp).unsealWith(checked.sealed, checked.stamp)
   }
 
-  /** The vault row a box's answer carries, received whole, so a gate moved elsewhere arrives with it. */
-  // `receive` refuses `otherVaultTok` for a row of another life: the one consistency guard on this path.
-  receiveWorld(world: unknown): void { this.receive(SX.vaultRow.refusingAs('record_conflict').parse(world)) }
+  // The vault listing takes it as it takes any vault row: a gate moved elsewhere arrives with it, and a newer row of another life replaces this Vault there.
+  /** Delivers the vault row a box's answer carries. */
+  receiveWorld(world: unknown): void { this.listing.receiveRow(SX.vaultRow.refusingAs('record_conflict').parse(world)) }
   // --
 
   // == [Box verbs]: hello, bringUp, getBox, fetchBox, putBox, delBox, each with its try form

@@ -83,6 +83,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async build(record: Fetched<RecordT, SparseT>): Promise<ThingT> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
     return this.buildOrReceive(record)
   }
+
+  /** {@link build} for a row that came beside another listing's answer: it answers at once, and throws where `build` rejects. */
+  receiveRow(record: Fetched<RecordT, SparseT>): ThingT { return this.buildOrReceive(record) }
   // --
 
   // == [Its world]: isLocked, ensureTimelyWorld

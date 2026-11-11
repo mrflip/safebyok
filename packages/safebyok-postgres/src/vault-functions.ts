@@ -8,7 +8,7 @@ export const VaultFunctionsSql = `-- safebyok-postgres: the functions PostgresVa
 -- A function holds no policy: its caller calls it only where it may store the record over the row it expects.
 -- It stores nothing over a row of another fmt than the record's, nor a box under a vault row of another fmt than
 -- this file's (6001): a row of a later format is one this version of safebyok cannot read.
--- Every write function takes the record to store and the row its caller expects, each as JSON, so all four are called alike.
+-- Every write function takes the record to store and the row its caller expects, each as JSON; a box's birth takes the cap besides.
 --
 -- A box's write locks nothing but the box row it stores. It reads its vault row without a lock, so a box written as its
 -- vault is deleted or created anew may land in a vault life that has ended: nothing reads such a row again, and the
@@ -121,6 +121,7 @@ BEGIN
 END $$;
 
 -- Store a box's first record, where no box row is stored at its address, in a live vault of the box's life with room under the cap.
+-- The cap counts every box row of the life, live and tombstone alike: boxcount is that count, taken without a lock.
 -- It expects no row, and reads nothing of expected_row.
 CREATE OR REPLACE FUNCTION safebyok_birth_box(new_record jsonb, expected_row jsonb, maxboxes integer)
 RETURNS TABLE (ok boolean, act text, world jsonb, box jsonb, presence text, boxcount integer)
@@ -132,8 +133,7 @@ BEGIN
   SELECT v.* INTO its_vault FROM safebyok_vaults AS v
   WHERE  (v.applabel, v.user_id, v.vaultlabel) = (new_box.applabel, new_box.user_id, new_box.vaultlabel);
   SELECT count(*)::integer INTO boxcount FROM safebyok_boxes AS b
-  WHERE  (b.applabel, b.user_id, b.vaultlabel, b.vault_tok) = (new_box.applabel, new_box.user_id, new_box.vaultlabel, new_box.vault_tok)
-    AND  b.am = 'a';
+  WHERE  (b.applabel, b.user_id, b.vaultlabel, b.vault_tok) = (new_box.applabel, new_box.user_id, new_box.vaultlabel, new_box.vault_tok);
 
   ok := false;
   IF its_vault.am = 'a' AND its_vault.vault_tok = new_box.vault_tok AND its_vault.fmt = 6001
@@ -163,10 +163,11 @@ END $$;
 
 -- Store a box's next record over the row its caller expects, live or a tombstone: a replace, a del, or a put over a tombstone.
 -- It is stored where the stored row has the expected revision_tok, am and box_tok, the record is one revision_seq past it,
--- and the vault is live in the box's life. A live record over a tombstone also needs room under the cap.
+-- and the vault is live in the box's life. It adds no box row, so the cap does not bear on it:
+-- maxboxes is taken so that both box functions are called alike, and is not read.
 -- A tombstone is never stored over a tombstone.
 CREATE OR REPLACE FUNCTION safebyok_revise_box(new_record jsonb, expected_row jsonb, maxboxes integer)
-RETURNS TABLE (ok boolean, act text, world jsonb, box jsonb, presence text, boxcount integer)
+RETURNS TABLE (ok boolean, act text, world jsonb, box jsonb, presence text)
 LANGUAGE plpgsql AS $$
 DECLARE
   new_box   safebyok_boxes := jsonb_populate_record(NULL::safebyok_boxes, new_record);
@@ -175,9 +176,6 @@ DECLARE
 BEGIN
   SELECT v.* INTO its_vault FROM safebyok_vaults AS v
   WHERE  (v.applabel, v.user_id, v.vaultlabel) = (new_box.applabel, new_box.user_id, new_box.vaultlabel);
-  SELECT count(*)::integer INTO boxcount FROM safebyok_boxes AS b
-  WHERE  (b.applabel, b.user_id, b.vaultlabel, b.vault_tok) = (new_box.applabel, new_box.user_id, new_box.vaultlabel, new_box.vault_tok)
-    AND  b.am = 'a';
 
   ok := false;
   IF its_vault.am = 'a' AND its_vault.vault_tok = new_box.vault_tok AND its_vault.fmt = 6001 THEN
@@ -192,8 +190,7 @@ BEGIN
       AND  b.box_tok = expected.box_tok
       AND  b.fmt = new_box.fmt
       AND  b.revision_seq = new_box.revision_seq - 1
-      AND  (b.am = 'a' OR new_box.am = 'a')
-      AND  (b.am = 'a' OR new_box.am <> 'a' OR boxcount < maxboxes);
+      AND  (b.am = 'a' OR new_box.am = 'a');
     ok := FOUND;
   END IF;
 

@@ -1,6 +1,6 @@
 /** safebyok's vaultDB in this browser's IndexedDB. */
 
-import type { UseStore } from 'idb-keyval'
+import { promisifyRequest, type UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type {
   AdapterVaultDBOpts, BankScope, BoxClassified, BoxDelAsk, BoxesFetched, BoxGetAsk, BoxPutAsk, Capacity, Heard,
@@ -12,7 +12,7 @@ import { bankBoxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, she
 
 /** Options for an IdbVaultDB: the AdapterVaultDB's options, plus
  * - `dbName`   -- the IndexedDB database name (default: `'safebyok'`)
- * - `maxBoxes` -- a soft cap on one vault's live boxes (default: the core's `DefaultMaxBoxes`)
+ * - `maxBoxes` -- a soft cap on the box rows of one vault life, live and deleted together (default: the core's `DefaultMaxBoxes`)
  */
 export type IdbVaultDBOpts = AdapterVaultDBOpts & { dbName?: string | undefined, maxBoxes?: number | undefined }
 
@@ -56,10 +56,9 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   // == [Room]: #roomIn
 
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** The room of the vault life `asked` names, under the soft cap `maxBoxes`: its count of live boxes, taken inside the caller's transaction. */
+  /** The room of the vault life `asked` names, under the soft cap `maxBoxes`: its count of box rows, live and deleted, taken inside the caller's transaction. */
   async #roomIn(store: IDBObjectStore, asked: VaultQuery): Promise<Capacity> {
-    const boxes = await filedIn(store, lifeRangeOf(asked))
-    const used = boxes.filter(({ row }) => DB.isLiveRow(row)).length
+    const used = await promisifyRequest(store.count(lifeRangeOf(asked)))
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }
   // --

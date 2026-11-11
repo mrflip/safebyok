@@ -55,16 +55,16 @@ describe("vault.hello", () => {
     expect(box?.sidecar).to.deep.equal({ note: 'moved' })
   })
 
-  // W2 of notes/receive-contract.md, which the models do not do yet: `it.fails` holds until they do.
-  it.fails("refuses for a vault deleted elsewhere, listing nothing", async () => {
+  it("refuses for a vault deleted elsewhere, listing nothing", async () => {
     const spy = TH.spyLogger()
     const { openNextSession, vault } = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
     const next = await openNextSession()
     await delTyping(vault)
-    await TH.expectRefusal(next.hello())
+    await TH.expectRefusal(next.hello(), 'absent_vault')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
-    expect(next.isPresent).to.be.false
+    expect(next.isEnabled).to.be.false
     expect(next.boxListing.things).to.deep.equal([])
+    expect(next.listing.at(next.scope)?.isPresent).to.be.false
   })
 
   it("passes a listing's failure up, and the next hello lists the boxes", async () => {

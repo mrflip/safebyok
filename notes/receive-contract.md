@@ -132,15 +132,14 @@ W2 is how this device learns from a box answer alone that its vault's life is ov
 ## Where this differs from the code today
 
 1. **`fateOver` is S2, and `SlotFate` goes.** `lose` is R1 and `replace` is S2. `Listing.buildOrReceive` keeps selection alone.
-2. **One table, read once.** Today a vault row is judged by `VaultListing.fateOver`, then by `Storable.reconcileCentral`, and the two do not agree: `reconcileCentral` checks `vault_tok` before age, so an older row of another life is dropped at the listing and throws at `Vault.receiveWorld`.
-3. **A box row of another `vault_tok`** is refused `storage_issue` by its listing, as F3 says (`rowOfOtherVaultTok` in `Listing.buildOrReceive`). An instance handed one directly still throws `record_conflict` (`otherVaultTok` in `reconcileCentral`), and a vault reaches that from `Vault.receiveWorld`, where deliverWorld hands the row to the vault listing (W2).
-4. **W2 does not arise today**, because the vaultDB sends no world with `vault_reborn`: the other life's row is in `dbhas`, and the box listing drops it as no row of its own. Run against the memory vaultDB, a `fetchBox` under a vault row of another life answers `vault_reborn`. The answer contract makes that row the world (C12). `Vault.receiveWorld` as it stands would then throw `record_conflict` on it inside `Listing.deliver`, and the caller would hear that in place of the answer's own refusal, which the classifier names `vault_gone` or `vault_reborn`.
+2. **One table, read once.** Today a vault row is judged by `VaultListing.fateOver`, then by `Storable.reconcileCentral`, and the two do not agree: `reconcileCentral` checks `vault_tok` before age, so an older row of another life is dropped at the listing, and would throw at an instance handed it directly.
+3. **A box row of another `vault_tok`** is refused `storage_issue` by its listing, as F3 says (`rowOfOtherVaultTok` in `Listing.buildOrReceive`). An instance handed one directly still throws `record_conflict` (`otherVaultTok` in `reconcileCentral`).
+4. **W1 tells no bad news.** `Vault.receiveWorld` hands the world to the vault listing, so W2 and W3 hold. The sentinel is `older` there and is dropped as R1, where F6 would tell the host.
 5. **F4, F5 and F6** are three throwers and three sentences today (`oneRevisionTwoToks`, `oneRevisionTwoLives`, `oneRevisionTwoFates`).
 6. **F7 is new as a refusal.** Today a vault is replaced there (`isRebirth` in `fateOver`), and a box adopts.
 7. **`shapeUnreconciled` cannot be reached** and goes.
 8. **`none` is a tag**, and what is received for it is the sentinel tombstone. Today `Storable.receive(null)` makes a tombstone at the revision in hand so that `reconcileCentral` has something to compare.
-9. **deliverWorld is `Vault.receiveWorld` today**: the Vault that owns the box listing receives the world itself, with no selection.
-10. **What an answer carries** waits on the classifier's acts. Today `recordOfAnswer` and `Listing#deliverGood` tell the cases apart by the old acts `void`, `declined` and `gone`.
+9. **What an answer carries** waits on the classifier's acts. Today `recordOfAnswer` and `Listing#deliverGood` tell the cases apart by the old acts `void`, `declined` and `gone`.
 
 ## Not in this note
 

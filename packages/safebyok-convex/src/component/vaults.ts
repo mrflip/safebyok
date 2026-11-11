@@ -82,7 +82,7 @@ export const putVault = mutation({
   },
 })
 
-// The cap the client asks for is soft, and counts box rows, tombstones among them, as the tally does. The component's own
+// The cap the client asks for is soft, and counts box rows, tombstones among them, as the tally's `all_count` does. The component's own
 // limits are hard: a write the classifier names that would take the life past them is not stored, and answers `vault_full`.
 /** Store a box put's record where the classifier names a write over the rows stored and the vault's room. Returns what the classifier answered. */
 export const putBox = mutation({
@@ -100,8 +100,8 @@ export const putBox = mutation({
     const classified = crossing(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity }))
     if (! DB.isWriteAct(classified.act)) { return classified }
     const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
-    // A put over a tombstone replaces that row, so only a new boxlabel adds to the count.
-    const growth = { box_count: (anteDoc === null ? 1 : 0), box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) }
+    // A put over a tombstone replaces that row, so only a new boxlabel adds to `all_count`.
+    const growth = Tallies.growthOf(anteDoc, boxDoc)
     if (Tallies.refuses(reckoning.tally, growth, cap)) { return roomlessOf(classified, anteDoc, capacity) }
     await writeBoxDoc(ctx.db, anteDoc, boxDoc)
     await Tallies.record(ctx.db, life, reckoning, growth)
@@ -143,8 +143,8 @@ export const delBox = mutation({
     if (DB.isWriteAct(classified.act)) {
       const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
       await writeBoxDoc(ctx.db, anteDoc, boxDoc)
-      // The tombstone replaces the row and still counts as one box row. Only the bytes change.
-      await Tallies.forget(ctx.db, life, { box_count: 0, box_bytes: Tallies.weigh(boxDoc) - Tallies.weigh(anteDoc) })
+      // The tombstone replaces the row and still counts as one box row: of the `all_*` figures, only the size changes.
+      await Tallies.forget(ctx.db, life, Tallies.growthOf(anteDoc, boxDoc))
     }
     return classified
   },

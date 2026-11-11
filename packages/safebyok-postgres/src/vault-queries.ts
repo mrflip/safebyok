@@ -58,8 +58,9 @@ export const ListBoxesWithVaultSql = `
 // --
 
 // == [A box's write]: BirthBoxSql, ReviseBoxSql
-// Each calls a function of `vault-functions.ts`. It answers one row: `ok`, `act`, `world`, `box`, `presence` and `boxcount`.
-// Both take the same parameters: the record, then the row its ask expects, each as JSON text, then the cap on live boxes.
+// Each calls a function of `vault-functions.ts`. It answers one row: `ok`, `act`, `world`, `box` and `presence`, and from a birth `boxcount`.
+// Both take the same parameters: the record, then the row its ask expects, each as JSON text, then the cap on the vault life's box rows, live and deleted.
+// A revise adds no row and does not read the cap.
 
 /** Store a box's first record, where no row is stored. */
 export const BirthBoxSql = 'SELECT * FROM safebyok_birth_box($1::text::jsonb, $2::text::jsonb, $3)'

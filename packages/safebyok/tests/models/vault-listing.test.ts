@@ -165,9 +165,8 @@ describe("a tombstone over a live vault", () => {
   })
 })
 
-// W2 of notes/receive-contract.md, which the models do not do yet: `it.fails` holds until they do.
-describe("a box answer carrying the vault's tombstone as its world", () => {
-  it.fails("ends the vault of that life with no bad news", async () => {
+describe("a box answer carrying a vault row of a later life as its world", () => {
+  it("vacates the vault for one of the new life, locked, where the vault was made anew elsewhere", async () => {
     const onBadNews = vi.fn()
     const { fakeBank, opts, demandStored, listing: born } = makeVaultWorld()
     const bornVault = await buildTyping(born, Dna, byPassphrase(Passphrase))
@@ -177,8 +176,31 @@ describe("a box answer carrying the vault's tombstone as its world", () => {
     const boxes = vault.boxListing
     await boxes.hello()
     await delTyping(bornVault)
-    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])))
-    expect(vault.isPresent).to.be.false
+    const anew = await buildTyping(born, Dna, byPassphrase(Passphrase))
+    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'vault_reborn')
+    expect(vault.isEnabled).to.be.false
+    expect(boxes.things).to.deep.equal([])
+    const listed = listing.at(Dna)
+    expect(listed).to.not.eq(vault)
+    expect(listed).to.include({ vault_tok: anew.vault_tok, isPresent: true, isLocked: true })
+    expect(onBadNews).not.toHaveBeenCalled()
+  })
+
+  it("vacates the vault for a deleted one, where the vault was deleted elsewhere", async () => {
+    const onBadNews = vi.fn()
+    const { fakeBank, opts, demandStored, listing: born } = makeVaultWorld()
+    const bornVault = await buildTyping(born, Dna, byPassphrase(Passphrase))
+    await bornVault.boxListing.create(BoxDna)
+    const listing = new VaultListing(fakeBank, hearingBadNews(opts, onBadNews))
+    const vault = await listing.build(demandStored())
+    const boxes = vault.boxListing
+    await boxes.hello()
+    await delTyping(bornVault)
+    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'absent_vault')
+    expect(vault.isEnabled).to.be.false
+    expect(boxes.things).to.deep.equal([])
+    expect(listing.at(Dna)).to.not.eq(vault)
+    expect(listing.at(Dna)?.isPresent).to.be.false
     expect(onBadNews).not.toHaveBeenCalled()
   })
 })
