@@ -97,7 +97,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
   const { vaultDB, userIdOf } = vaultResolversOpts.parse(opts)
 
   /** Return null if the request is signed in as `user_id`, else the refusal to send back. */
-  const gateRefusalOf = async (context: ContextT, user_id: string): Promise<DB.VaultError | null> => {
+  const signInRefusalOf = async (context: ContextT, user_id: string): Promise<DB.VaultError | null> => {
     const signedIn = await DB.outcomeOf(() => userIdOf(context))
     if (! signedIn.ok) { return signedIn.err }
     return (signedIn.val === user_id) ? null : DB.identityRevoked()
@@ -107,7 +107,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
    * Otherwise return a bad answer in wire form: the refusal from checking `asked` if it fails, else the sign-in refusal.
    */
   const served = async (context: ContextT, user_id: string, asked: object, verb: () => Promise<DB.Answer<unknown, string, unknown>>): Promise<CrossingAnswer> => {
-    const refusal = await gateRefusalOf(context, user_id)
+    const refusal = await signInRefusalOf(context, user_id)
     if (refusal === null) { return crossingOf(await verb()) }
     const checked = await DB.outcomeOf(() => DB.reqParamsOf(asked))
     if (! checked.ok) { return crossingOf(DB.badAnswerOf(checked.err)) }
@@ -116,7 +116,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
 
   /** Watch `scope` and yield its notices in wire form, for as long as the request stays signed in as that user. */
   const watchNotices = async (context: ContextT, scope: DB.WatchScope): Promise<AsyncIterableIterator<CrossingNotice>> => {
-    const refusal = await gateRefusalOf(context, scope.user_id)
+    const refusal = await signInRefusalOf(context, scope.user_id)
     if (refusal !== null) { return endingWith(refusal) }
     // vaultDB.watch throws `bad_scope` inside the stream's `start`, and the ReadableStream constructor rethrows it.
     const watched = await DB.outcomeOf(() => openWatch(vaultDB, scope))
@@ -128,7 +128,7 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
         if (read.done) { return read }
         // Check the sign-in again at every notice. A session revoked after it subscribed gets one last notice
         // carrying the refusal. The stream is cancelled, so the read after that is done.
-        const revoked = await gateRefusalOf(context, scope.user_id)
+        const revoked = await signInRefusalOf(context, scope.user_id)
         if (revoked === null) { return { done: false, value: { ok: true, ...read.value, err: null } } }
         await reader.cancel()
         return { done: false, value: badNoticeOf(revoked) }

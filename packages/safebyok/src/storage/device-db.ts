@@ -15,8 +15,8 @@ import type { BankRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLeas
 export abstract class DeviceDB {
   // == [Brand]: IsDeviceDB
 
-  // A getter on the class, never an own field, so the brand is neither serialized nor copied by a spread.
-  /** Always true: marks a deviceDB, so a model recognizes one from any copy of safebyok. */
+  // A getter ensures the brand is neither serialized nor copied by a spread.
+  /** Always true: marks a deviceDB for safe branding. */
   get [IsDeviceDB](): true { return true }
   // --
 

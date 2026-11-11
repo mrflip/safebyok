@@ -3,7 +3,9 @@
 import * as DB from 'safebyok/storage'
 import type { Value } from 'convex/values'
 
-/** The refusal kinds a `ConvexError` from the host's safebyok functions may carry: `identity_revoked` from the wrapper, and the kinds the core throws inside the component. */
+/** The refusal kinds a `ConvexError` from the host's safebyok functions may carry:
+ * `identity_revoked` from the wrapper, and the kinds the core throws inside the component.
+ */
 export const safebyokErrorKindVals = ['identity_revoked', 'bad_record', 'damaged_row', 'damaged_vault', 'storage_issue', 'gate_issue'] as const
 
 /** The refusal kinds that reach the client with the core's message and nothing else. The core throws them for an `ask` or a stored row that fails its checks. */

@@ -91,7 +91,7 @@ export type Heard = { vault?: unknown, box?: unknown }
 
 /** The verbs a model calls on a vaultDB, each with its `try*` form. */
 export interface VaultDB {
-  /** Always true: marks a vaultDB, so a model recognizes one from any copy of safebyok. */
+  /** Always true: marks a vaultDB for safe branding. */
   readonly [IsVaultDB]: true
   /** List the bank's vaults and tombstones, without their boxes.
    * A row that fails its checks is listed in `damaged_rows`.
@@ -129,17 +129,17 @@ export interface VaultDB {
   putBox(ask: BoxPutAsk): Promise<GoodAnswer<BoxRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.putBox}. */
   tryPutBox(ask: BoxPutAsk): Promise<BoxAnswer>
-  /** Put the properly revisioned `record`, demanding that only its passphrase wayin changed and its `gate_epoch` is new. */
+  /** Put the properly revisioned `record`, demanding a new `gate_epoch` and that its only change is to replace the passphrase wayin. */
   replacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'replaced'>>
   /** Non-throwing form of {@link VaultDB.replacePassphrase}. */
   tryReplacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'replaced'>>
-  /** Put the properly revisioned `record`, demanding that it only adds a passkey wayin and its `gate_epoch` is new.
+  /** Put the properly revisioned `record`, demanding a new `gate_epoch` and that its only change is to add a passkey wayin.
    * Refuses `camped` when a passkey wayin is already stored.
    */
   addPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'added'>>
   /** Non-throwing form of {@link VaultDB.addPasskey}. */
   tryAddPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'added'>>
-  /** Put the properly revisioned `record`, demanding that its passkey wayin is absent and its `gate_epoch` is new.
+  /** Put the properly revisioned `record`, demanding a new `gate_epoch` and that the passkey is absent.
    * @returns an answer with the stored row: @see {@link VaultDB.putVault}
    */
   revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked'>>
@@ -187,7 +187,8 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   readonly #maxRecordBytes: number
 
-  /** Always true: marks a vaultDB, so a model recognizes one from any copy of safebyok. */
+  // Brands are implemented this way to avoid the flaws of branding by string props, private symbols, weak maps or instanceof.
+  /** Always true: marks a vaultDB for safe branding. */
   get [IsVaultDB](): true { return true }
 
   /** Always true: marks an adapter vaultDB, which a client of one, such as `GraphQLVaultDB`, lacks. */
@@ -348,7 +349,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // A gate verb is a put of the vault record over its live row, tagged with the verb. The classifier runs that verb's checks
   // of the record against the stored gate, in the same step that stores it. Nothing is fetched here beforehand.
 
-  /** Put the properly revisioned `record`, demanding that only its passphrase wayin changed and its `gate_epoch` is new. */
+  /** Put the properly revisioned `record`, demanding a new `gate_epoch` and that its only change is to replace the passphrase wayin. */
   async replacePassphrase(record: VaultRecord, opts: GateVerbOpts) { return goodOrThrow(await this.tryReplacePassphrase(record, opts)) }
 
   /** Non-throwing form of {@link replacePassphrase}. */
@@ -360,7 +361,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return this.answerForRefusal(err, 'replacePassphrase', { ...record, ...opts }) }
   }
 
-  /** Put the properly revisioned `record`, demanding that it only adds a passkey wayin and its `gate_epoch` is new.
+  /** Put the properly revisioned `record`, demanding a new `gate_epoch` and that its only change is to add a passkey wayin.
    * Refuses `camped` when a passkey wayin is already stored.
    */
   async addPasskey(record: VaultRecord, opts: GateVerbOpts) { return goodOrThrow(await this.tryAddPasskey(record, opts)) }
@@ -374,7 +375,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return this.answerForRefusal(err, 'addPasskey', { ...record, ...opts }) }
   }
 
-  /** Put the properly revisioned `record`, demanding that its passkey wayin is absent and its `gate_epoch` is new.
+  /** Put the properly revisioned `record`, demanding a new `gate_epoch` and that the passkey is absent.
    * @returns an answer with the stored row: @see {@link putVault}
    */
   async revokePasskey(record: VaultRecord, opts: GateVerbOpts) { return goodOrThrow(await this.tryRevokePasskey(record, opts)) }
@@ -512,8 +513,8 @@ function listedRowOf<RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknow
   return parsed.success ? verifyConsistent(parsed.data, address, RowOfOtherAddress) : null
 }
 
-/** Fetch the `stored` vault, if live at the asked-for `vault_tok`. Otherwise throw.
- * Refusals here also become refusals for the vault-check phase of Box operations
+/** Return the given `stored` vault, if live at the asked-for `vault_tok`. Otherwise throw
+ * the appropriate refusal: `absent_vault` for a void or tombstoned vault, `vault_reborn` for another life.
  */
 function liveVaultOf(stored: VaultRow | null, asked: VaultQuery): VaultRecord {
   if (stored === null)                      { throw Refuse.actRefused('box', 'vault_void') }

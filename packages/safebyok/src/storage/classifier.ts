@@ -86,7 +86,7 @@ function getActOf({ ifAbsent }: GetAsked, { presence }: Stored): VaultAct {
 /** Classify a put: see the put table in `notes/answer-contract.md`. The first matching row wins. */
 function putActOf(asked: PutAsked, stored: Stored): VaultAct {
   const { presence } = stored
-  // The policy that applies: `ifPresent` over a live row, `ifAbsent` over a tombstone or no row.
+  // The policy that applies: `ifPresent` over a live row, `ifAbsent` over a tombstone or void row.
   const opflag       = (presence === 'live') ? asked.ifPresent : asked.ifAbsent
   const revseqCmp    = revseqCmpOf(asked, stored)
   const revtokCmp    = revtokCmpOf(asked, stored)
@@ -226,12 +226,17 @@ const GateActOf: Readonly<Record<EX.GateVerb, (record: VaultRecord, stored: Vaul
 /** The vault row an adapter fetched for a vault request, unchecked, or null for none. */
 export type VaultFetched = { vault: unknown }
 
-/** The rows an adapter fetched for a box request, unchecked: the vault row as `world` and the box row, each null for none.
- * `capacity` is the vault's {@link Capacity}, if the adapter counted it.
+/** The rows an adapter fetched for a box request, unchecked:
+ * - `box`      -- the stored box row, as fetched before any write (null for none)
+ * - `world`    -- the vault row, fetched in the same step (null for none)
+ * - `capacity` -- the vault's {@link Capacity} stats, for adapters that return it
  */
 export type BoxFetched = Readonly<{ world: unknown, box: unknown, capacity?: Capacity | null }>
 
-/** A vault request, classified against the stored row. `ok` is true for a good answer and false for a refusal, and `act` names the outcome. */
+/** A vault request, classified against the stored row.
+ * - `ok`  -- true for a good answer, false for a refusal
+ * - `act` -- directs how to route and handle the answer
+ */
 export type VaultClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct }) & {
   /** The vault row after this request: the record it stores, else the stored row, else the sentinel for none. */
   world:    VaultRow
@@ -241,7 +246,10 @@ export type VaultClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, 
   presence: Presence
 }>
 
-/** A box request, classified against the stored vault and box rows. `ok` is true for a good answer and false for a refusal, and `act` names the outcome. */
+/** A box request, classified against the stored vault and box rows.
+ * - `ok`  -- true for a good answer, false for a refusal
+ * - `act` -- directs how to route and handle the answer
+ */
 export type BoxClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct | BoxVaultAct }) & {
   /** The vault row stored, or the sentinel for none. */
   world:    VaultRow

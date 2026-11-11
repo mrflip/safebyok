@@ -419,17 +419,17 @@ export const { boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vau
 export type BoxAsk      = Readonly<Z.output<typeof boxAsk>>
 /** A vault get, put or del request, as the vaultDB receives it and passes it to its adapter and the classifier. */
 export type VaultAsk    = Readonly<Z.output<typeof vaultAsk>>
-/** A `getBox` request: the box's address, the row its caller has or the sentinel for none, and `ifAbsent`, for when no live row is stored. */
+/** A `getBox` request: the box's address, the expected row (or sentinel), and the `ifAbsent` option (see `VaultDB.getBox`). */
 export type BoxGetAsk   = Extract<BoxAsk,   { op: 'get' }>
-/** A `putBox` request: the box's address, the record to store, the row it expects to find, and `ifPresent` and `ifAbsent`, for a live row or none. */
+/** A `putBox` request: the box's address, the record to store, the expected row (or sentinel), and the `ifPresent` and `ifAbsent` options (see `VaultDB.putBox`). */
 export type BoxPutAsk   = Extract<BoxAsk,   { op: 'put' }>
-/** A `delBox` request: the box's address, the tombstone to store, and the row it expects to find. */
+/** A `delBox` request: the box's address, the tombstone to store, and the expected row. */
 export type BoxDelAsk   = Extract<BoxAsk,   { op: 'del' }>
-/** A `getVault` request: the vault's scope, the row its caller has or the sentinel for none, and `ifAbsent`, for when no live row is stored. */
+/** A `getVault` request: the vault's scope, the expected row (or sentinel), and the `ifAbsent` option (see `VaultDB.getVault`). */
 export type VaultGetAsk = Extract<VaultAsk, { op: 'get' }>
-/** A `putVault` request: the vault's scope, the record to store, the row it expects to find, `ifPresent` and `ifAbsent` for a live row or none, and its gate verb, if any. */
+/** A `putVault` request: the vault's scope, the record to store, the expected row (or sentinel), the `ifPresent` and `ifAbsent` options (see `VaultDB.putVault`), and its gate verb, if any. */
 export type VaultPutAsk = Extract<VaultAsk, { op: 'put' }>
-/** A `delVault` request: the vault's scope, the tombstone to store, and the row it expects to find. */
+/** A `delVault` request: the vault's scope, the tombstone to store, and the expected row. */
 export type VaultDelAsk = Extract<VaultAsk, { op: 'del' }>
 // --
 

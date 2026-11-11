@@ -83,7 +83,7 @@ export type GotAct = typeof gotActVals[number]
  * - `born`     -- stored where no row was
  * - `reborn`   -- stored over a tombstone
  * - `replaced` -- stored over a live row
- * - `passed`   -- nothing stored, under `ifPresent: 'get'`; the answer's `val` is the live row found
+ * - `passed`   -- (for `ifPresent: 'get'`) nothing stored, the answer's `val` is the live row found
  */
 export const putActVals = ['born', 'reborn', 'replaced', 'passed'] as const
 export type PutAct = typeof putActVals[number]

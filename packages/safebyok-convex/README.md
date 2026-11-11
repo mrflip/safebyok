@@ -80,8 +80,9 @@ Hand `vaultDB` to the core, as its README's *A host* shows.
 * **`api`** is `api.safebyok`, the functions above.
 * **`maxBoxes`** (optional, default 100) caps the box rows of one vault life, including the tombstones of deleted
   boxes, and never exceeds the component's own limit. A put of a new boxlabel past it refuses as `vault_full`, so
-  deleting a box frees no room. Each put is counted in the mutation that stores it, so the cap is exact. A replacement,
-  a delete, and a box put again over its own tombstone are never refused for it.
+  deleting a box frees no room. Like every vaultDB's, it is a soft cap. This adapter currently enforces it exactly,
+  since each put is counted in the mutation that stores it, but do not rely on that. A replacement, a delete, and a
+  box put again over its own tombstone are never refused for it.
 * **`maxRecordBytes`**, optional, as every vaultDB takes it: 5,600 bytes if left out, at most Convex's 1 MiB document.
 
 **Sign in first.** Open the vault once the Convex client is authenticated (in React, once

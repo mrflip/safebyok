@@ -50,7 +50,7 @@ export type ConvexVaultDBOpts = AdapterVaultDBOpts & {
   /** The app's safebyok functions: `api.safebyok`, not the whole `api`. */
   api: SafebyokApi
   /** A soft cap on a vault life's box rows, tombstones included. A put of a new boxlabel past it refuses `vault_full`.
-   * Defaults to `DefaultMaxBoxes`, and never exceeds the component's own limit.
+   * Defaults to `DefaultMaxBoxes`, and never exceeds the component's own limit. This adapter currently enforces it exactly.
    */
   maxBoxes?: number | undefined
 }
