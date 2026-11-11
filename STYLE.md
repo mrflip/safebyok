@@ -216,12 +216,12 @@ two apart, so this is kept by hand.
   mirror images, each clear at a glance (`CX` is the core's scope checks, `shapes/shapes-core.ts`):
 
   ```ts
-  export const box = (scope: Boxscope): BoxScopepath => {
+  export function box(scope: Boxscope): BoxScopepath {
     const        { applabel, user_id, vaultlabel, boxlabel } = CX.boxscope.parse(scope)
     return ['box', applabel, user_id, vaultlabel, boxlabel].join(ScopepathDelimiter)
   }
 
-  export const boxscope = (boxScopepath: BoxScopepath): Boxscope => {
+  export function boxscope(boxScopepath: BoxScopepath): Boxscope {
     const [_scopepathkind, applabel, user_id, vaultlabel, boxlabel] = CX.boxScopepath.parse(boxScopepath)
     return               { applabel, user_id, vaultlabel, boxlabel }
   }

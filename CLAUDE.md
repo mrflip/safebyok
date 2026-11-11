@@ -163,5 +163,5 @@ Before and after:
  * Nothing is stored here: where {@link isWriteAct} holds of the act, the caller stores the request's record, in the atomic unit it fetched the row in.
  */
 /** Classify a vault request's outcome, based on the stored row. */
-export const vaultActOf = (request: VaultRequest, vaultRaw: unknown): VaultAct =>
+export function vaultActOf(request: VaultRequest, vaultRaw: unknown): VaultAct {
 ```
