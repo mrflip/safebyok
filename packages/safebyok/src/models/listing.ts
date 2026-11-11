@@ -11,7 +11,7 @@ import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, DelOpts, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingListAnswer, ListingPutAnswer, ListingOpts, ListingWorld, ListingGetAnswer, SlotFate, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
-import { disabledError, otherVaultTokAtBirth } from '../refusals/throwers'
+import { disabledError, rowOfOtherVaultTok } from '../refusals/throwers'
 import * as Phrases from '../helpers/phrases'
 import { demandGood, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
@@ -334,6 +334,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected buildOrReceive(record: Fetched<RecordT, SparseT>): ThingT {
     this.demandEnabled()
     const sparse = this.sparseOf(record)
+    const vault_tok = this.vaultTokOfWorld()
+    if ((vault_tok !== null) && (sparse.vault_tok !== vault_tok)) { throw rowOfOtherVaultTok() }
     const listed = this.at(this.scopeOf(sparse))
     const fate = (listed === null) ? 'replace' : this.fateOver(listed, record)
     if ((listed !== null) && (fate === 'lose')) { return listed }
@@ -348,11 +350,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   /** SLOPDOC: A new instance born of `sparse`, void, for `receive` to adopt its record like any newer one. */
-  #makeThingOf(sparse: SparseT): ThingT {
-    const vault_tok = this.vaultTokOfWorld()
-    if (vault_tok !== null && sparse.vault_tok !== vault_tok) { throw otherVaultTokAtBirth() }
-    return this.makeThing({ ...sparse, ...SX.VoidRevision, am: 'x' })
-  }
+  #makeThingOf(sparse: SparseT): ThingT { return this.makeThing({ ...sparse, ...SX.VoidRevision, am: 'x' }) }
   // --
 
   // == [The watch]: onNotice

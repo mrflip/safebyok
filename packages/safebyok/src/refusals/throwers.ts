@@ -95,10 +95,10 @@ export const delOfOtherLife = (): VaultError => new VaultError('vault_mismatch',
 export const vaultStoredDamaged = ({ vaultlabel }: SX.DamagedVault): VaultError => new VaultError('damaged_row', Phrases.vaultStoredDamaged(vaultlabel))
 // --
 
-// == [Listing Throwers]: otherVaultTokAtBirth
+// == [Listing Throwers]: rowOfOtherVaultTok
 
-/** A `record_conflict` refusal: storage gave a record under another vault_tok than this listing's vault. */
-export const otherVaultTokAtBirth = (): VaultError => new VaultError('record_conflict', Phrases.OtherVaultTokAtBirth)
+/** A `storage_issue` refusal: storage answered a row under another vault_tok than this listing's vault. */
+export const rowOfOtherVaultTok = (): VaultError => new VaultError('storage_issue', Phrases.rowOfOtherAddress(['vault_tok']))
 // --
 
 // == [Storable Throwers]: partialLoadError, alreadyListedError, disabledError, absentBoxError, notListedBoxError, absentVaultError, deletedVaultError, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled

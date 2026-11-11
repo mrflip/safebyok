@@ -222,10 +222,10 @@ describe("listing: a notice without its vault row", () => {
 describe("listing: a record of another vault_tok reaches no listed instance", () => {
   const OtherVault = 'vault-tok-other'
 
-  it("refuses for a fetch answered with a record of another vault_tok, making nothing", async () => {
+  it("refuses storage_issue for a fetch answered with a record of another vault_tok, making nothing", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willGet(world.mw.answerOf(scopeOf(), fullBoxRecord({ vault_tok: OtherVault })))
-    await TH.expectRefusal(listing.fetch(scopeOf()))
+    await TH.expectRefusal(listing.fetch(scopeOf()), 'storage_issue')
     expect(listing.things).to.deep.equal([])
   })
 
@@ -233,14 +233,14 @@ describe("listing: a record of another vault_tok reaches no listed instance", ()
     const listing = boxListingOf(world.mw)
     for (const record of [tombstoneBoxRecord({ vault_tok: OtherVault, revision_seq: 2 }), sparseBoxRecord({ vault_tok: OtherVault })]) {
       world.mw.willGet(world.mw.answerOf(scopeOf(), record))
-      await TH.expectRefusal(listing.fetch(scopeOf()))
+      await TH.expectRefusal(listing.fetch(scopeOf()), 'storage_issue')
     }
     expect(listing.things).to.deep.equal([])
   })
 
   it("refuses build(record) of a record of another vault_tok, and passes over a notice of one", async () => {
     const listing = boxListingOf(world.mw)
-    await TH.expectRefusal(listing.build(fullBoxRecord({ vault_tok: OtherVault })))
+    await TH.expectRefusal(listing.build(fullBoxRecord({ vault_tok: OtherVault })), 'storage_issue')
     world.mw.seedPut(fullBoxRecord())
     await listing.hello()
     world.mw.clearCalls()
@@ -263,12 +263,14 @@ describe("listing: a record of another vault_tok reaches no listed instance", ()
     await expect(listing.create(dnaOf('draft_box'))).resolves.to.be.instanceOf(Box)
   })
 
-  it("refuses a record of another vault_tok fetched for a listed instance, saying it is another vault's", async () => {
+  it("refuses storage_issue for a fetch of a listed box answered with a record of another vault_tok, leaving the box as it was", async () => {
     const listing = boxListingOf(world.mw)
     const box = await listing.build(fullBoxRecord())
     world.mw.willGet(world.mw.answerOf(box.scope, fullBoxRecord({ vault_tok: OtherVault, revision_seq: 2, revision_tok: 'rev-a2' })))
-    const err = await TH.expectRefusal(listing.fetch(box.scope))
-    expect(err.message).to.eq(Phrases.OtherVaultTok)
+    const err = await TH.expectRefusal(listing.fetch(box.scope), 'storage_issue')
+    expect(err.message).to.eq(Phrases.rowOfOtherAddress(['vault_tok']))
+    expect(listing.at(box.scope)).to.eq(box)
+    expect(box.revision_seq).to.eq(1)
   })
 })
 

@@ -331,7 +331,7 @@ describe("box.receive(rcvd): registered_at, and a record of another vault_tok", 
     const listing = boxListingOf(world.mw)
     const box = await listing.build(fullBoxRecord())
     world.mw.willGet(world.mw.answerOf(box.scope, fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })))
-    await TH.expectRefusal(box.fetch())
+    await TH.expectRefusal(box.fetch(), 'storage_issue')
     expect(box.revision_seq).to.eq(1)
   })
 
