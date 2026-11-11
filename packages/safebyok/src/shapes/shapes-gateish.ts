@@ -68,7 +68,7 @@ export const gateProps = objCheck(() => ({
 export type GateProps = Z.infer<typeof gateProps>
 // --
 
-// == [Proofs]: passphraseCleartext, PassphraseCleartext, PrfAnswerBytes, passkeyAnswer, PasskeyAnswer, freshPasskeyAnswer
+// == [Cleartexts]: passphraseCleartext, PassphraseCleartext, PrfAnswerBytes, passkeyAnswer, PasskeyAnswer, freshPasskeyAnswer
 
 /** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` quotes none of it.
  * What a blank one means is the gating's to say.
@@ -236,7 +236,7 @@ export const leaseFriend = objCheck(({ fn }) => ({
   logger:          guardedLogger,
   /** The autolock duration: a cached row proved longer ago than this is due for locking. */
   leaseMillis,
-  /** Lock the vault: a lease that will not open calls it, as what the vault has is no use. */
+  /** Lock the vault: a lease that will not unwrap the vaultKey calls it, as what the vault has is no use. */
   lock:            fn<() => unknown>(),
   /** The record this device has cached, or null for none. */
   peekLease:       fn<() => Promise<unknown>>(),
@@ -293,7 +293,7 @@ export const { gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphra
     .transform(({ passphraseClear, passkeyClear }, ctx) => {
       if (passphraseClear !== undefined) { return { passphraseClear } }
       if (passkeyClear) { return { passkeyClear } }
-      ctx.addIssue({ code: 'custom', message: Phrases.ProofMissing })
+      ctx.addIssue({ code: 'custom', message: Phrases.CleartextMissing })
       return NEVER
     }),
   passphraseReplaceCleartexts: obj({ antePassphraseClear: passphraseCleartext, nextPassphraseClear: passphraseCleartext }).strict(),
@@ -302,20 +302,20 @@ export const { gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphra
   vaultDelCleartexts:          obj({ passphraseClear: passphraseCleartext }).strict(),
 }))
 
-/** The arguments that launch a gating on a stored vault: its kind, the vault, the vault's `unlockByProof`, and the bank's dialog or null. */
+/** The arguments that launch a gating on a stored vault: its kind, the vault, the vault's `unlockByProving`, and the bank's dialog or null. */
 export const gatingLaunchOnArgs = objStrict(({ oneof, custom, fn }) => ({
   gatingkind:    oneof(EX.gatingkindVals).exclude(['build_vault']),
   vault:         custom<Vault>((val) => hasModelkind(val, 'vault'), Phrases.VaultExpected),
-  unlockByProof: fn<UnlockByProof>(),
+  unlockByProving: fn<UnlockByProving>(),
   askUser:       custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
 
-/** The arguments that launch a `build_vault` gating: the vault listing, the scope and the row the vault is put over, `unlockByProof`, and the bank's dialog or null. */
+/** The arguments that launch a `build_vault` gating: the vault listing, the scope and the row the vault is put over, `unlockByProving`, and the bank's dialog or null. */
 export const gatingLaunchBirthArgs = objStrict(({ custom, fn }) => ({
   listing:       custom<VaultListing>((val) => hasModelkind(val, 'vault_listing'), Phrases.ListingExpected),
   scope:         vaultScope,
   expected:      SX.vaultSparse,
-  unlockByProof: fn<UnlockByProof>(),
+  unlockByProving: fn<UnlockByProving>(),
   askUser:       custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
 
@@ -329,7 +329,7 @@ export type CleartextsForGatingkind = {
 }
 // --
 
-// == [Given to a gating]: RequestCleartext, AskUser, AnyGating, GatingSnapshot, VaultForGatingkind, VaultGatingkind, UnlockByProof
+// == [Given to a gating]: RequestCleartext, AskUser, AnyGating, GatingSnapshot, VaultForGatingkind, VaultGatingkind, UnlockByProving
 
 /** The host's dialog: shown with this gating, resolving once it closes. It hands the user's cleartexts to `gating.attempt`, and its returning with no attempt under way dismisses. */
 export type RequestCleartext = (gating: AnyGating) => unknown
@@ -355,5 +355,5 @@ export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, repla
 export type VaultGatingkind = Exclude<EX.Gatingkind, 'build_vault'>
 
 /** Unlock `vault` by what `proved` proved, leased under `gate_epoch` where a gate change just wrote one: the vault's private verb a gating calls. */
-export type UnlockByProof = (vault: Vault, proved: Proving, gate_epoch?: number) => Promise<Vault>
+export type UnlockByProving = (vault: Vault, proved: Proving, gate_epoch?: number) => Promise<Vault>
 // --

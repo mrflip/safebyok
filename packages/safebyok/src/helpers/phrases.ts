@@ -210,10 +210,10 @@ export const AnswerNotAsSent = "Storage answered with a record other than the on
 export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
 
-// == [Models: provings]: ProofMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, ProofClosureThrew, KeyDeriverThrew
+// == [Models: provings]: CleartextMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, KeyDeriverThrew
 
-/** Why a proof that hands in neither a passphrase nor a passkey's answer is refused. */
-export const ProofMissing = "A proof hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
+/** Why cleartexts that hand in neither a passphrase nor a passkey's answer are refused. */
+export const CleartextMissing = "An attempt hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
 
 /** Why a passphrase whose key does not open the vault's passphrase wayin is refused. */
 export const WrongPassphrase = "That passphrase didn't unlock the vault. Check for typos and try again. If you're sure it's right, the stored vault may be damaged."
@@ -255,13 +255,13 @@ export const StampOfOtherVault = "This stamp names another vault than this one, 
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UnopenedWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, VaultDeleted
+// == [Models: leases, vaults and boxes]: DamagedLease, UndecipheredWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, VaultDeleted
 
 /** Why a lease on this device is no use: whether found so in the cache, or in force and failing to open. */
 export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
 
 /** Why a whisper that will not open under the vault's key is refused. */
-export const UnopenedWhisper = "That whisper would not open under this vault's key: it was altered in storage, or sealed under another vault. Nothing was changed."
+export const UndecipheredWhisper = "That whisper would not open under this vault's key: it was altered in storage, or sealed under another vault. Nothing was changed."
 
 /** Why a whisper that opened but is no whisper this package knows is refused. */
 export const UndecodedWhisper = "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or seal a whisper over it."

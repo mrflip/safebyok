@@ -345,7 +345,7 @@ export const makeModelsWorld = (opts: ModelsWorldOpts = {}): ModelsWorld => {
       await Promise.resolve()
       demandFakeUnlocked()
       const whisperText = sealedTexts.get(stableJsonify(stamp))
-      if (whisperText === undefined) { throw Refuse.unopenedWhisper() }
+      if (whisperText === undefined) { throw Refuse.undecipheredWhisper() }
       return whisperText
     },
     receiveWorld:    (taken) => { calls.push({ verb: 'receiveWorld', world: taken }) },

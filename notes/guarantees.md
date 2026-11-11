@@ -184,23 +184,23 @@ Activity has hidden them, and `attemptOnce` zeroes it after its attempt.
 **wayinKey.** Never naked: non-extractable from `importWrappingKeyBytes` or
 `deriveWrappingKey`. Has: `Proving.#wayinKey`, set in the constructor. Operates: `#wrapVaultKey`
 (`wrapKeyUnder`), `#unwrapVaultKey` (`unwrapKeyUnder`) through `buildWayin` and
-`buildLease`, and `checkOpens` (`unwrapKeyUnder`).
+`buildLease`, and `checkUnwraps` (`unwrapKeyUnder`).
 
 **vaultKey.** Naked, as an extractable handle in a local: `makeVaultKey` in `buildWayin`;
 `#unwrapVaultKey` with `RewrapUsage` in `buildWayin` and `buildLease`, handed to `#wrapVaultKey`
 (`wrapKeyUnder`) and `Lease.buildGranted` (`wrapKeyUnder` under the leaseKey). Operates, as a
-non-extractable one-usage handle in a local: `checkOpens` (`unwrapKeyUnder`, `CheckUsage`);
+non-extractable one-usage handle in a local: `checkUnwraps` (`unwrapKeyUnder`, `CheckUsage`);
 `Lease.#vaultKey` in `sealWith` (`wrapKey`) and `unsealWith` (`unwrapKey`), handed to
-`#opened`.
+`#decipherSealed`.
 Stored only as `vault_key_wayin_wrapped` (VaultDB) and `vault_key_lease_wrapped` (DeviceDB).
 
 **boxKey.** Naked, extractable in a local: `makeBoxKey` in `Lease.sealWith`, wrapped by
 `wrapKeyUnder` and used by `cipherBytes`. Operates, non-extractable `decrypt` only:
-`unwrapKeyUnder` in `Lease.#opened`, for `unsealWith`, used by `decipherBytes`. Stored
+`unwrapKeyUnder` in `Lease.#decipherSealed`, for `unsealWith`, used by `decipherBytes`. Stored
 only as `box_key_wrapped`.
 
 **leaseKey.** Never naked, never bytes. Made: `makeLeaseKey` in `Lease.buildGranted`, called by
-`Proving.buildLease`, from the vault's `#unlockByProof` and `#renewLease`. Carried, as the `lease_key` of a
+`Proving.buildLease`, from the vault's `#unlockByProving` and `#renewLease`. Carried, as the `lease_key` of a
 `LeaseRecord`: `Lease.#record`, the Lease the vault has in `#lease` (`#attachLease`) → `lease.cacheAsCacheCan` →
 the `LeaseFriend`'s `tryCacheLease` (made in `Vault.#makeFriend`) → `DeviceDB.stow`
 (`storage/device-db.ts`; `IdbDeviceDB`'s structured clone into IndexedDB, or `MemoryDeviceDB`'s
@@ -221,7 +221,7 @@ their `try*` forms → `box.put` → `demandPuttable` (`VX.boxPatch` or `VX.boxP
 `structuredClone`) → `Box.#edit` → `sealedRecordOf` → `stableJsonify`, the text → `vault.sealStampedString`
 (`GX.leaseSealArgs`) → `Lease.sealWith` → `TextEncoder`, `cipherBytes`, the bytes zeroed in a `finally`.
 Out: `box.extractWhisper`, `tryExtractWhisper`, `box.expose`, and `#keptWhisper` for a put that leaves the
-whisper out → `Box.#unseal` → `vault.unsealStampedString` → `Lease.unsealWith` → `#opened` (`decipherBytes`) →
+whisper out → `Box.#unseal` → `vault.unsealStampedString` → `Lease.unsealWith` → `#decipherSealed` (`decipherBytes`) →
 `TextDecoder`, the bytes zeroed in a `finally` → `deserializeWhisper` (`CX.whisper`) → the host, or `Box.#exposed`
 (*Open items*, 1). The core has no `mask` to show an outline of one.
 
@@ -272,7 +272,7 @@ Uint8Array*).
 (`makeVaultKey`), and unwrapped with `RewrapUsage` in `buildWayin` and `buildLease` (`#unwrapVaultKey`). An extractable
 handle yields its bytes to anyone who has it, so each is dropped at the end of its method and
 crosses no boundary: those methods return a `Wayin`, a `Lease` or a wrap. (b) As a
-*non-extractable* local with one usage: `checkOpens` (`CheckUsage`), and `Lease.#vaultKey`
+*non-extractable* local with one usage: `checkUnwraps` (`CheckUsage`), and `Lease.#vaultKey`
 for each cipher or decipher, which keeps nothing between calls. The pantry has the vaultKey
 only as `vault_key_lease_wrapped`, ciphertext bytes under the leaseKey; there is no handle to a
 naked vaultKey anywhere at rest, and no cache of one in memory. Kept by: `models/proving.ts`,
@@ -309,7 +309,7 @@ safebyok's protection*). Kept by: `models/lease.ts`, `storage/device-db.ts`, `sh
 none of it, answers null and leaves it in place*, one of a list of cases under one title).
 
 **G5. A boxKey is a local.** It is made fresh in `Lease.sealWith`, extractable only so that it can be wrapped. It is
-unwrapped in `#opened`, for `unsealWith`, as a non-extractable key with the `decrypt` usage only. Each is dropped at the
+unwrapped in `#decipherSealed`, for `unsealWith`, as a non-extractable key with the `decrypt` usage only. Each is dropped at the
 end of its method.
 
 **G6. The whisper's bytes are zeroed; its value is the host's.** A put (`putBox`, `box.put`, `putExposed`,
@@ -356,9 +356,9 @@ A `keyDeriver`'s `load` and a strength checker's `load` are given no passphrase.
 passes through unchanged, and any other throw is kept as the cause of `keyDeriverLoadFailed` or
 `strengthCheckerLoadFailed`. A WebCrypto
 failure that a wrong key or an altered record explains is caught and replaced, and its error is never
-kept: the unwrap that proves a wayin (`Proving.checkOpens`, `wrongProof`), the unwrap of a lease's
+kept: the unwrap that proves a wayin (`Proving.checkUnwraps`, `wrongCleartext`), the unwrap of a lease's
 vaultKey (`Lease.#vaultKey`, `damaged_lease`), and the unwrap and decipher of a whisper
-(`Lease.#opened`, `damaged_whisper`). Each such catch covers only WebCrypto calls, with their ctx built before
+(`Lease.#decipherSealed`, `damaged_whisper`). Each such catch covers only WebCrypto calls, with their ctx built before
 it, so a bug in building the ctx is never reported as a wrong proof or a damaged box. Where no wrong key or
 altered record can explain a failure, a WebCrypto error is not caught where it is thrown: in sealing
 a whisper (`Lease.sealWith`: `makeBoxKey`, `wrapKeyUnder`, `cipherBytes`), granting a lease
@@ -398,8 +398,8 @@ Lease the vault has, and `Lease.buildFromCache` checks what `DeviceDB.peek` hand
 it. A `Box` reaches the Lease only through the public `vault.sealStampedString` and `unsealStampedString`, which hand
 the lease a whisper's text and a stamp and hand back a sealed whisper or text, never a key. The `LeaseFriend` whose
 `peekLease` returns the cached row with its leaseKey handle is kept in `Lease.#friend` and made
-in `Vault.#leaseFriend`. No public `Vault` method takes a proving: a gating's act reaches `#unlockByProof`
-through `Vault.#unlockVaultByProof`, which is private, and which the vault passes to `Gating.launchOn` or `launchBirth`.
+in `Vault.#leaseFriend`. No public `Vault` method takes a proving: a gating's act reaches `#unlockByProving`
+through `Vault.#unlockVaultByProving`, which is private, and which the vault passes to `Gating.launchOn` or `launchBirth`.
 The entry points export `Gating` as a type only, so the published surface has no launcher a host could hand an unlock
 of its own. A live gating's `constructor` still reaches the statics: that goes around the published types, and the host
 is inside the trust boundary (SECURITY.md). Nothing public on a

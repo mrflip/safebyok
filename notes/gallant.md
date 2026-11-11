@@ -269,7 +269,7 @@ throw a bad outcome and discard the answer, use `demandGood`.
 **Goofus:** an outcome built only to be unbuilt, and a `valOf` whose value nobody takes.
 
 ```ts
-valOf(await outcomeOf(() => unwrapKeyUnder(this.#wayinKey, wrapped, ctx, CheckUsage), wrongProof))
+valOf(await outcomeOf(() => unwrapKeyUnder(this.#wayinKey, wrapped, ctx, CheckUsage), wrongCleartext))
 
 const hello = await outcomeOf(() => this.#bringUp())
 this.#announce({ kind: 'helloed', outcome: hello })
@@ -282,7 +282,7 @@ valOf(hello)
 try {
   await unwrapKeyUnder(this.#wayinKey, wrapped, ctx, CheckUsage)
 } catch {
-  throw wrongProof()
+  throw wrongCleartext()
 }
 
 const hello = await outcomeOf(() => this.#bringUp())
@@ -524,7 +524,7 @@ return { proved }
 
 ```ts
 if (passphraseClear !== undefined) { return { proved: await PassphraseProving.buildStored(gate, passphraseClear, world) } }
-if (! passkeyClear) { throw new VaultError('unexpected_error', Phrases.ProofMissing) }
+if (! passkeyClear) { throw new VaultError('unexpected_error', Phrases.CleartextMissing) }
 return { proved: await PasskeyProving.buildStored(gate, passkeyClear) }
 ```
 

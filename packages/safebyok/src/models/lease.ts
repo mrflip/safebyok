@@ -5,11 +5,11 @@ import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey
 import { tattoo } from '../helpers/helpers'
 import { isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import { damagedLease, leaseNotInForce, unopenedWhisper } from '../refusals/throwers'
+import { damagedLease, leaseNotInForce, undecipheredWhisper } from '../refusals/throwers'
 import type { Wayinkind } from '../shapes/shapes-enums'
 import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, type VaultStamp, LeaseFormat, leaseFriend, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper, vaultStamp } from '../shapes/shapes-gateish'
 
-/** A vault's vaultKey in force on this device, good for one `gate_epoch`. It has the key wrapped under a non-extractable leaseKey, opens it for a single call, and never hands it out. */
+/** A vault's vaultKey in force on this device, good for one `gate_epoch`. It has the key wrapped under a non-extractable leaseKey, unwraps it for a single call, and never hands it out. */
 export class Lease implements LeaseStamp {
   // == [Props]: fmt, applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, proved_at, wayinkind, #friend, #record, #vaultStamp, #isFromCache, #leaseStamp, toJSON
 
@@ -52,8 +52,8 @@ export class Lease implements LeaseStamp {
     Object.freeze(this)
   }
 
-  /** The lease cached for `gate_epoch`, or null so the vault asks for a proof. A row of another epoch or stamp is forgotten;
-   * one past autolock stays, not loaded, for a later proof to write over or `bank.autolock` to forget.
+  /** The lease cached for `gate_epoch`, or null so the vault asks the user to unlock. A row of another epoch or stamp is forgotten;
+   * one past autolock stays, not loaded, for a later unlock's lease to write over or `bank.autolock` to forget.
    * A device database that refuses, or a row that will not read, is bad news and null, the row left standing.
    */
   static async buildFromCache(friend: LeaseFriend, gate_epoch: number): Promise<Lease | null> {
@@ -96,7 +96,7 @@ export class Lease implements LeaseStamp {
 
   // == [Caching]: cacheAsCacheCan
 
-  // A refusal costs the next session a proof, not this one its lease.
+  // A refusal costs the next session an unlock, not this one its lease.
   /** Caches this lease if it can, telling the host of a refusal as bad news. */
   async cacheAsCacheCan(): Promise<void> {
     if (this.#isFromCache) { return }
@@ -151,7 +151,7 @@ export class Lease implements LeaseStamp {
   async unsealWith(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
     const checked = leaseUnsealArgs.parse({ sealed, stamp })
     const vaultKey = await this.#vaultKey('unwrapKey')
-    const bytes = await this.#opened(vaultKey, checked.sealed, checked.stamp)
+    const bytes = await this.#decipherSealed(vaultKey, checked.sealed, checked.stamp)
     try {
       this.#demandRecord()
       return new TextDecoder().decode(bytes)
@@ -160,7 +160,7 @@ export class Lease implements LeaseStamp {
     }
   }
 
-  async #opened(vaultKey: CryptoKey, sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<Uint8Array> {
+  async #decipherSealed(vaultKey: CryptoKey, sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<Uint8Array> {
     const boxKeyCtx  = this.#ctxOf(stamp, 'box_key_wrapped')
     const whisperCtx = this.#ctxOf(stamp, 'whisper_ciphered')
     // Only these two WebCrypto calls are trapped: their rejection is how a damaged whisper is learned. The calls above refuse as they are, or are bugs.
@@ -168,7 +168,7 @@ export class Lease implements LeaseStamp {
       const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, boxKeyCtx, { extractable: false, usage: ['decrypt'] })
       return await decipherBytes(boxKey, sealed.whisper_ciphered, whisperCtx)
     } catch {
-      throw unopenedWhisper()
+      throw undecipheredWhisper()
     }
   }
 

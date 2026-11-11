@@ -170,7 +170,7 @@ the cache    lease = await Lease.buildFromCache(friend, gate_epoch);   await vau
 
 friend is vault.#leaseFriend(): the stamp, the deviceDB's lease verbs bound to its scope, vault.lock
 
-vault.#attachLease(lease)                            private: by #unlockByProof, and by ensureUnlocked for a cached lease
+vault.#attachLease(lease)                            private: by #unlockByProving, and by ensureUnlocked for a cached lease
 ├─ demandAttachable                                  swept, vacated or deleted → refused, nothing cached
 ├─ this.#lease = lease
 ├─ await lease.cacheAsCacheCan()                     refused → bad news; the lease is still granted
@@ -195,7 +195,7 @@ that the vacate is written after the put. The put is awaited before `align`, bec
 `lock()`. So the attach needs no compare, and no second vacate.
 
 **A `lock()` that crosses a gate change** does not stay in effect, as with an unlock: the proof shows that this
-user may have the vault unlocked. Each of the three gate changes ends in `#unlockByProof`, which gives the vault a
+user may have the vault unlocked. Each of the three gate changes ends in `#unlockByProving`, which gives the vault a
 lease for a full term under the epoch that was written.
 
 **`sweep`, `vacate` and `delete`** leave a one-way state: every guard refuses from then on, so
@@ -270,7 +270,7 @@ bank.ensureVault(bag)
 ├─ vaultListing.at(scope)                            what hello loaded: a present vault → returned, without asking
 └─ vaultListing.buildVault(scope) → Vault.launchBirth(listing, scope)
    ├─ prior = the slot's tombstone's revision, else VoidRevision     a present vault listed → 'bad_option'
-   └─ Gating.launchBirth(listing, scope, prior, Vault.#unlockVaultByProof, askUser)
+   └─ Gating.launchBirth(listing, scope, prior, Vault.#unlockVaultByProving, askUser)
       ├─ no requestCleartext                         → 'bad_option', without asking
       ├─ listing.attachGating                          one open on this bank → 'already_asking'
       ├─ void #askHost → requestCleartext(gating)    ← host opens the dialog
@@ -294,7 +294,7 @@ gating.attempt({ passphraseClear, passkeyClear? })           a second while one 
    │    │    a newer tombstone → 'stale_write', delivered, then thrown
    │    └─ deliver(answer, record) → new Vault(what is stored), listed, locked    a declined put pins only the scope
    ├─ vault's vault_tok is not the record's → another won: refused 'gate_made_elsewhere', its Vault listed, locked
-   └─ vault.#unlockByProof(passphraseProving)
+   └─ vault.#unlockByProving(passphraseProving)
       ├─ lease = passphraseProving.buildLease(vault.#leaseFriend())    refused → the vault stays stored and listed, locked
       └─ vault.#attachLease(lease)                   cached as it attaches
 
@@ -320,7 +320,7 @@ vault.ensureUnlocked()
 ├─ #attachCachedLease: Lease.tryPeek → lease.attach → done, where one is cached; of this vault_tok and gate_epoch, and not past autolock
 │    another epoch or stamp: uncached, reads as no row;  past autolock: left, reads as no row;  refused: bad news, no row
 ├─ no requestCleartext → 'vault_locked'
-└─ Gating.launchOn(vault, 'unlock_vault', Vault.#unlockVaultByProof, askUser)
+└─ Gating.launchOn(vault, 'unlock_vault', Vault.#unlockVaultByProving, askUser)
    ├─ a gating open on this bank → refuses already_asking
    ├─ void #askHost → requestCleartext(gating)
    └─ await #concluded
@@ -332,7 +332,7 @@ gating.attempt({ passphraseClear }) or attempt({ passkeyClear })
 │    or PasskeyProving.buildStored(gate, passkeyClear)
 │    wrong → may re-enter
 └─ then the change, from { proved }                                   ── no cleartext is used past here ──
-   vault.#unlockByProof(proved)
+   vault.#unlockByProving(proved)
    ├─ lease = proved.buildLease(vault.#leaseFriend())   the proved gate's epoch, whatever arrived since
    └─ lease.attach()                                 cached after it
 
@@ -357,7 +357,7 @@ each gate change's act, past its provings
 │     │    and refuses what its row rules out, such as an addPasskey over a passkey already stored ('camped')
 │     └─ deliver(answer, record)                     checked against what it sent; a revoke pins only the scope
 │        no lock: adopt never locks on a move
-└─ vault.#unlockByProof(proved, stored.gate.gate_epoch)    a fresh lease of full term; a lock() crossing the change does not stay in effect
+└─ vault.#unlockByProving(proved, stored.gate.gate_epoch)    a fresh lease of full term; a lock() crossing the change does not stay in effect
 ```
 
 * **The lease comes after the put**, so its `gate_epoch` is the one that was written, and a refused put
@@ -382,7 +382,7 @@ each gate change's act, past its provings
 ```text
 vault.replacePassphrasePrompt()
 ├─ await ensureTimely(); demandPromptable
-└─ Gating.launchOn(vault, 'replace_passphrase', Vault.#unlockVaultByProof, askUser)
+└─ Gating.launchOn(vault, 'replace_passphrase', Vault.#unlockVaultByProving, askUser)
    →→→ user hits enter key →→→
 gating.attempt({ antePassphraseClear, nextPassphraseClear })
 ├─ the two cleartexts equal → 'same_passphrase', may re-enter
@@ -394,7 +394,7 @@ gating.attempt({ antePassphraseClear, nextPassphraseClear })
 │    weak → may re-enter
 └─ then the change, from { ante, anteProving, nextProving }           ── no cleartext is used past here ──
    ├─ nextWayin = nextProving.buildWayin(anteProving)    unwrap the vaultKey; wrap; dropped
-   └─ vaultListing.<gate verb>, then vault.#unlockByProof(anteProving, stored.gate.gate_epoch)
+   └─ vaultListing.<gate verb>, then vault.#unlockByProving(anteProving, stored.gate.gate_epoch)
       commit: vaultListing.replacePassphrase(ante, passphrase_wayin)    ← the commit; passphrase_wayin is nextWayin.pickle()
 ```
 
@@ -407,7 +407,7 @@ passphrase only from someone who has proved the current one.
 vault.addPasskeyPrompt()
 ├─ await ensureTimely(Promptly); demandPromptable    the vault's gate is refreshed first
 ├─ gate.demandPasskeyAddable                         one already there → refused, without asking
-└─ Gating.launchOn(vault, 'add_passkey', Vault.#unlockVaultByProof, askUser)
+└─ Gating.launchOn(vault, 'add_passkey', Vault.#unlockVaultByProving, askUser)
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear, passkeyClear })
 │                                                    passkeyClear spent after, unless correctable (G2)
@@ -418,7 +418,7 @@ gating.attempt({ passphraseClear, passkeyClear })
 ├─ passkeyProving = PasskeyProving.buildNovel(gate.stamp, passkeyClear, world)
 └─ then the change, from { ante, proved, passkeyProving }             ── no cleartext is used past here ──
    ├─ passkeyWayin = passkeyProving.buildWayin(proved)   unwrap the vaultKey; wrap; dropped
-   └─ vaultListing.<gate verb>, then vault.#unlockByProof(proved, stored.gate.gate_epoch)
+   └─ vaultListing.<gate verb>, then vault.#unlockByProving(proved, stored.gate.gate_epoch)
       commit: vaultListing.addPasskey(ante, passkey_wayin)                  ← the commit; passkey_wayin is passkeyWayin.pickle()
            one added before the enter key → 'camped'; after the attempt read ante → 'stale_write'
 ```
@@ -429,7 +429,7 @@ gating.attempt({ passphraseClear, passkeyClear })
 vault.revokePasskeyPrompt()
 ├─ await ensureTimely(Promptly); demandPromptable    the vault's gate is refreshed first
 ├─ the gate has no passkey                           returns the vault, without asking
-└─ Gating.launchOn(vault, 'revoke_passkey', Vault.#unlockVaultByProof, askUser)
+└─ Gating.launchOn(vault, 'revoke_passkey', Vault.#unlockVaultByProving, askUser)
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear })
 ├─ await vault.ensureTimely(Promptly)                at most one fetch; a vault found gone refuses here
@@ -437,7 +437,7 @@ gating.attempt({ passphraseClear })
 ├─ proved = PassphraseProving.buildStored(gate, passphraseClear, world)
 │    wrong → may re-enter
 └─ then the change, from { ante, proved }                             ── no cleartext is used past here ──
-   └─ vaultListing.<gate verb>, then vault.#unlockByProof(proved, stored.gate.gate_epoch)
+   └─ vaultListing.<gate verb>, then vault.#unlockByProving(proved, stored.gate.gate_epoch)
       commit: vaultListing.revokePasskey(ante)                              ← the commit
            revoked before the attempt read ante → 'revoked', nothing moved; after it → 'stale_write'
 ```
@@ -447,7 +447,7 @@ gating.attempt({ passphraseClear })
 ```text
 vault.delVaultPrompt()
 ├─ await ensureTimely(); demandPromptable
-└─ Gating.launchOn(vault, 'del_vault', Vault.#unlockVaultByProof, askUser)
+└─ Gating.launchOn(vault, 'del_vault', Vault.#unlockVaultByProving, askUser)
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear })                  no lock check: a lock does not stop a delete
 ├─ await vault.ensureTimely(Promptly)                at most one fetch; a vault found gone refuses here

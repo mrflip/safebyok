@@ -99,7 +99,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Non-throwing form of {@link extractWhisper}. */
   tryExtractWhisper(opts: TimelyOpts = {}): Promise<Outcome<Whisper>> { return outcomeOf(() => this.extractWhisper(opts)) }
 
-  /** Open the stored whisper and keep it on the instance, showing, where `box.whisper` offers it until {@link unexpose}.
+  /** Unseal the stored whisper and keep it on the instance, showing, where `box.whisper` offers it until {@link unexpose}.
    * See notes/expose_improves_security.md
    */
   async expose(opts: TimelyOpts = {}): Promise<this> {

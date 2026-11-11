@@ -156,13 +156,13 @@ export const undecodedWhisper = (): VaultError => new VaultError('damaged_whispe
 export const notExposedError = (): VaultError => new VaultError('bad_option', Phrases.NotExposed)
 // --
 
-// == [Lease Throwers]: damagedLease, unopenedWhisper, leaseNotInForce
+// == [Lease Throwers]: damagedLease, undecipheredWhisper, leaseNotInForce
 
-/** A `damaged_lease` refusal: this device's lease will not open. */
+/** A `damaged_lease` refusal: this device's lease will not unwrap the vaultKey. */
 export const damagedLease = (): VaultError => new VaultError('damaged_lease', Phrases.DamagedLease)
 
-/** A `damaged_whisper` refusal: the whisper would not open under this vault's key. */
-export const unopenedWhisper = (): VaultError => new VaultError('damaged_whisper', Phrases.UnopenedWhisper)
+/** A `damaged_whisper` refusal: the whisper would not decipher under this vault's key. */
+export const undecipheredWhisper = (): VaultError => new VaultError('damaged_whisper', Phrases.UndecipheredWhisper)
 
 /** A `vault_locked` refusal: this lease is out of force. */
 export const leaseNotInForce = (): VaultError => new VaultError('vault_locked', Phrases.LeaseNotInForce)
