@@ -47,7 +47,7 @@ export const fromB64OrNull = (b64: string): Uint8Array | null => {
 }
 // --
 
-// == [The ctx]: CipherCtxRecord, cipherCtx, ctxBound, isBoundCtx, isUnbound
+// == [The ctx]: CipherCtxRecord, cipherCtx, ctxBound, isBoundCtx, isBoundPart
 
 /** One record of a {@link cipherCtx}, a stamp or a header: a flat record of strings and numbers, encoded with its keys sorted, every field bound. */
 export type CipherCtxRecord = Readonly<Record<string, string | number>>
@@ -74,15 +74,15 @@ export const cipherCtx = (stamp: CipherCtxRecord | readonly CipherCtxRecord[], p
 const ctxBound = Checker(({ custom }) => custom((bag) => isBoundCtx(bag as CtxBag), Phrases.UnboundCipherCtx), 'unexpected_error')
 
 /** True when a ctx has a stamp and each of its parts is bound. */
-const isBoundCtx = ({ stamps, parts }: CtxBag): boolean => stamps.length > 0 && parts.every((part) => ! isUnbound(part))
+const isBoundCtx = ({ stamps, parts }: CtxBag): boolean => stamps.length > 0 && parts.every((part) => isBoundPart(part))
 
 /** A ctx's stamps and its parts, as {@link ctxBound} judges them. */
 type CtxBag = { stamps: readonly unknown[], parts: readonly (CipherCtxRecord | string)[] }
 
-/** True when `part` is undefined or null, or a record with a field set to undefined or null: what its type forbids and a caller may still hand in. */
-const isUnbound = (part: CipherCtxRecord | string | null | undefined): boolean => (
-  part === undefined || part === null
-  || (typeof part === 'object' && Object.values(part as Readonly<Record<string, unknown>>).some((val) => val === undefined || val === null))
+/** True when `part` is a string, or a record with every field set. Undefined, null, or a record with a field undefined or null is what its type forbids and a caller may still hand in. */
+const isBoundPart = (part: CipherCtxRecord | string | null | undefined): boolean => (
+  (part !== undefined) && (part !== null)
+  && ((typeof part !== 'object') || Object.values(part as Readonly<Record<string, unknown>>).every((val) => (val !== undefined) && (val !== null)))
 )
 // --
 
