@@ -185,6 +185,8 @@ describe("PostgresVaultDB's notices", () => {
   })
 })
 
+const refusingListen: PostgresListen = () => Promise.reject(new Error('connection refused'))
+
 describe("PostgresVaultDB's channels", () => {
   it("listens for a watch on its user's channel", async () => {
     const listened: string[] = []
@@ -200,6 +202,15 @@ describe("PostgresVaultDB's channels", () => {
     unwatch()
     await vi.waitFor(() => { expect(stopped).to.deep.equal(['safebyok_u1']) })
     expect(vaultChannelOf('u1')).to.eq('safebyok_u1')
+  })
+
+  it("tells a watch's onBadNews where its listen fails", async () => {
+    const watcher = await TH.vaultDBOver({ listen: refusingListen })
+    const badnews: DB.VaultError[] = []
+    const unwatch = watcher.watch(TH.bankScope, () => undefined, (news) => { badnews.push(news) })
+    await vi.waitFor(() => { expect(badnews).to.have.lengthOf(1) })
+    expect(badnews[0]?.refusalkind).to.eq('storage_unavailable')
+    unwatch()
   })
 
   it("refuses a user_id that fails its check", () => {

@@ -106,6 +106,12 @@ describe("vaultResolvers", () => {
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })
 
+  it("refuses a malformed request signed in as another user for what is malformed", async () => {
+    const schema = TH.schemaOver(await TH.serverOver())
+    const answer = DB.getBoxAnswer.parse(await sent(schema, VaultOperations.getBox, { ...TH.boxQuery, vault_tok: '' }, 'u2')) as DB.BadAnswer
+    expect(answer).to.deep.include({ ok: false, act: 'bad_option', world: null })
+  })
+
   it("returns for each verb what the VaultDB's own try* verb returns", async () => {
     await TH.emptyTables()
     const vaultDB = await TH.serverOver()

@@ -323,9 +323,9 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     })
   }
 
-  protected override doWatch(scope: WatchScope, hear: (heard: Heard) => void): () => void {
+  protected override doWatch(scope: WatchScope, hear: (heard: Heard) => void, onBadNews: (news: VaultError) => void): () => void {
     const listen = this.#listen
-    if (listen === undefined) { return super.doWatch(scope, hear) }
+    if (listen === undefined) { return super.doWatch(scope, hear, onBadNews) }
     let isHeeding = true
     const onNotify = (text: string): void => {
       const told = toldOf(text)
@@ -336,7 +336,13 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
       const heard = await this.#heardOrNull(told)
       if ((heard !== null) && isHeeding) { hear(heard) }
     }
-    const listening = listenOrNull(listen, channelOf(scope.user_id), onNotify)
+    // A listen that fails ends the watch before it heard anything.
+    const onListenFailed = (news: VaultError): void => {
+      if (! isHeeding) { return }
+      isHeeding = false
+      onBadNews(news)
+    }
+    const listening = listenOrNull(listen, channelOf(scope.user_id), onNotify, onListenFailed)
     return () => {
       if (! isHeeding) { return }
       isHeeding = false
@@ -362,11 +368,12 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
 
 // == [Listening]: listenOrNull, unlistenOnceListening
 
-/** Start listening and return the function that stops it, or null if listening failed. */
-const listenOrNull = async (listen: PostgresListen, channel: string, onNotify: (text: string) => void): Promise<(() => unknown) | null> => {
+/** Start listening and return the function that stops it; null, telling `onFailed`, where listening failed. */
+const listenOrNull = async (listen: PostgresListen, channel: string, onNotify: (text: string) => void, onFailed: (news: VaultError) => void): Promise<(() => unknown) | null> => {
   try {
     return await listen(channel, onNotify)
-  } catch {
+  } catch (err) {
+    onFailed(refusalOf(err))
     return null
   }
 }

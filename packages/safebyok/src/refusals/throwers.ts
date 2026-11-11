@@ -241,10 +241,13 @@ export const unknownKeyDeriver = (): VaultError => new VaultError('newer_format'
 
 // --
 
-// == [Helper Throwers]: strengthCheckerLoadFailed
+// == [Helper Throwers]: strengthCheckerLoadFailed, noJsonText
 
 /** An `unexpected_error` refusal: the strength checker's `load()` failed, with its error as `cause`. */
 export const strengthCheckerLoadFailed = (cause: unknown): VaultError => new VaultError('unexpected_error', Phrases.StrengthCheckerLoadFailed, { cause })
+
+/** An `unexpected_error` refusal: a value with no JSON text was handed to be serialized. */
+export const noJsonText = (): VaultError => new VaultError('unexpected_error', Phrases.NoJsonText)
 // --
 
 // == [VaultDB Throwers]: vaultEmpty, vaultMismatch, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, storageFull, seqNotNext

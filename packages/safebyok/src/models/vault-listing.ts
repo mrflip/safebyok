@@ -1,7 +1,7 @@
 /** A bank's vaults as this device has them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
 import { nowMillis } from '../helpers/clock'
-import type { Modelkind } from '../helpers/consts'
+import { type Modelkind, UNANSWERED } from '../helpers/consts'
 import { makeLifeTok } from '../helpers/crypto'
 import { VaultError } from '../refusals/errors'
 import { type Outcome, demandGood, outcomeOf, valOf } from '../refusals/outcome'
@@ -106,7 +106,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   async #gateVerbAnswered(
     ante: VaultRecord, moved: Partial<SX.Gate>, call: (record: VaultRecord, opts: GateVerbOpts) => Promise<Answer<VaultRecord, string>>, { isScopePinned = false } = {},
   ): Promise<ThingAnswer<VaultRecord>> {
-    let answer: Answer<VaultRecord, string> | null = null
+    let answer: Answer<VaultRecord, string> | typeof UNANSWERED = UNANSWERED
     try {
       const checked = this.recordOf(ante)
       this.demandEnabled()
@@ -123,7 +123,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     try {
       const listed = this.at(ante)
       if ((listed !== null) && (listed.vault_tok !== ante.vault_tok)) { throw delOfOtherLife() }
-    } catch (err) { return refusedAnswerOf(err, null) }
+    } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
     return super.tryDel(ante)
   }
   // --

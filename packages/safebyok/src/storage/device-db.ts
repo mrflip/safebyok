@@ -33,12 +33,15 @@ export abstract class DeviceDB {
   /** Non-throwing form of {@link stow}. */
   tryStow(row: LeaseRow): Promise<Outcome<void>> { return outcomeOf(() => this.stow(row)) }
 
-  /** The row stowed for this vault under this `vault_tok`, or null. */
+  /** The row stowed for this vault under this `vault_tok`, or null; `damaged_lease` where the row stowed fails its checks. */
   async peek(asked: LeaseQuery): Promise<LeaseRow | null> {
     try {
       const leaseQuery = SX.leaseQuery.parse(asked)
-      const parsed = SX.leaseRow.safeParse(await this.doPeek(leaseQuery))
-      return (parsed.success && parsed.data.vault_tok === leaseQuery.vault_tok) ? parsed.data : null
+      const stored = await this.doPeek(leaseQuery)
+      if (stored === null) { return null }
+      const parsed = SX.leaseRow.safeParse(stored)
+      if (! parsed.success) { throw Refuse.damagedLease() }
+      return (parsed.data.vault_tok === leaseQuery.vault_tok) ? parsed.data : null
     } catch (err) { throw refusalOf(err, 'peek') }
   }
 

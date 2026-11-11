@@ -172,7 +172,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Delete this thing through its listing where it is what `asked` names: a scope names whatever is there, a revision only that one, else `stale_write`. */
   async del(asked: ScopeT | SparseT, opts: TimelyOpts = {}): Promise<this> {
-    const pins = { ...SX.reqParamsOf(asked), ...this.listing.scopeOf(asked) }
+    const scope = this.listing.scopeOf(asked)
+    const pins = { ...SX.reqParams.parse(asked), ...scope }
     const { maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)
     await this.ensureDeletable({ maxMillisSinceRefresh, maxWorldMillis }); this.demandDeletable()
     verifyConsistent(this.sparse, pins, { kind: 'stale_write', message: Phrases.DelOfOtherRevision })

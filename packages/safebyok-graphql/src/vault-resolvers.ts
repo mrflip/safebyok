@@ -103,11 +103,13 @@ export const vaultResolvers = <ContextT>(opts: VaultResolversOpts<ContextT>): Va
     return (signedIn.val === user_id) ? null : DB.identityRevoked()
   }
 
-  /** Run `verb` if the request is signed in as `user_id`, and return its answer in wire form. Otherwise return the refusal in wire form. */
+  /** Run `verb` if the request is signed in as `user_id`, and return its answer in wire form. Otherwise return the refusal in wire form, or the request's own where `asked` fails its checks. */
   const served = async (context: ContextT, user_id: string, asked: object, verb: () => Promise<DB.Answer<unknown, string, unknown>>): Promise<CrossingAnswer> => {
     const refusal = await gateRefusalOf(context, user_id)
     if (refusal === null) { return crossingOf(await verb()) }
-    return crossingOf({ ok: false, err: refusal, act: refusal.refusalkind, world: null, req_params: DB.reqParamsOf(asked) })
+    const checked = await DB.outcomeOf(() => DB.reqParams.parse(asked))
+    if (! checked.ok) { return crossingOf(DB.badAnswerOf(checked.err)) }
+    return crossingOf({ ok: false, err: refusal, act: refusal.refusalkind, world: null, req_params: checked.val })
   }
 
   /** Watch `scope` and yield its notices in wire form, for as long as the request stays signed in as that user. */

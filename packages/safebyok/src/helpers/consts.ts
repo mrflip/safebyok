@@ -132,3 +132,6 @@ export const brandGuarded = <MadeT extends object>(made: MadeT): MadeT => Object
 
 /** The tag a VaultError answers true to, so `isVaultError` knows one from any copy of safebyok. */
 export const IsVaultError: unique symbol = Symbol.for('@safebyok/vaulterror')
+
+/** What a refusal met before storage answered hands `refusedAnswerOf` in place of an answer. */
+export const UNANSWERED: unique symbol = Symbol.for('@safebyok/unanswered')

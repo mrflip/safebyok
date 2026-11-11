@@ -124,7 +124,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   // Convex re-sends a watched query's whole result each time it changes, so `hear` gets only the
   // rows that differ from the previous result. The first result is the starting state, and is not
   // reported.
-  protected override doWatch(scope: WatchScope, hear: (heard: Heard) => void): () => void {
+  protected override doWatch(scope: WatchScope, hear: (heard: Heard) => void, onBadNews: (news: VaultError) => void): () => void {
     let seen: RowsWatched | null = null
     let isWatching = true
     const heed = (rows: RowsWatched): void => {
@@ -132,7 +132,10 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
       if (seen !== null) { for (const heard of changesOf(seen, rows)) { hear(heard) } }
       seen = rows
     }
-    const unsubscribe = this.#subscribe(scope, heed)
+    const fail = (thrown: unknown): void => {
+      if (isWatching) { onBadNews(refusalOf('watchRows', thrown)) }
+    }
+    const unsubscribe = this.#subscribe(scope, heed, fail)
     // Convex counts a query's watchers, and each unsubscribe call lowers that count. A second call
     // would end another watch of the same rows on the same client.
     return () => {
@@ -145,15 +148,14 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 
   // == [Watching]: #subscribe
 
-  // A failing watch has nowhere to report its error, so the error is dropped: the next call will
-  // hit the same problem and throw. When the watch recovers, its next result is compared with the
-  // last one it received.
-  #subscribe({ vaultlabel, ...bankScope }: WatchScope, heed: (rows: RowsWatched) => void): () => void {
+  // A failing watch is told to `fail`, and carries on: when it recovers, its next result is compared
+  // with the last one it received.
+  #subscribe({ vaultlabel, ...bankScope }: WatchScope, heed: (rows: RowsWatched) => void, fail: (thrown: unknown) => void): () => void {
     const args = { scope: (vaultlabel === undefined) ? bankScope : { ...bankScope, vaultlabel } }
     if ('watchQuery' in this.#client) {
       const watch = this.#client.watchQuery(this.#api.watchRows, args)
       const heedLatest = () => {
-        const rows = latestOf(watch)
+        const rows = latestOf(watch, fail)
         if (rows !== undefined) { heed(rows) }
       }
       const unsubscribe = watch.onUpdate(heedLatest)
@@ -161,7 +163,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
       heedLatest()
       return unsubscribe
     }
-    return this.#client.onUpdate(this.#api.watchRows, args, heed, () => undefined)
+    return this.#client.onUpdate(this.#api.watchRows, args, heed, fail)
   }
   // --
 }
@@ -204,11 +206,12 @@ const changesOf = (seen: RowsWatched, rows: RowsWatched): Heard[] => {
   return [...vaultsHeard, ...boxesHeard]
 }
 
-/** Return a React watch's latest result, or undefined while it has none or is failing. */
-const latestOf = (watch: { localQueryResult(): RowsWatched | undefined }): RowsWatched | undefined => {
+/** Return a React watch's latest result, or undefined while it has none or is failing, telling `fail` what it throws. */
+const latestOf = (watch: { localQueryResult(): RowsWatched | undefined }, fail: (thrown: unknown) => void): RowsWatched | undefined => {
   try {
     return watch.localQueryResult()
-  } catch {
+  } catch (err) {
+    fail(err)
     return undefined
   }
 }

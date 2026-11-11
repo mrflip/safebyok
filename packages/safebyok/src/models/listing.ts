@@ -1,6 +1,7 @@
 /** The base of a box listing and a vault listing: the live instances of one kind of thing, the watch on storage, and every storage call made for that kind of thing. */
 
 import { isEqual } from 'es-toolkit'
+import { UNANSWERED } from '../helpers/consts'
 import { verifyConsistent } from '../helpers/validator'
 import { oneAtATime } from '../helpers/one-at-a-time'
 import { nowMillis } from '../helpers/clock'
@@ -164,7 +165,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       this.demandEnabled()
       const listing = await this.#listOnce()
       return ('err' in listing) ? refusedAnswerOf(listing.err, listing.answer) : answerWithVal(listing.answer, listing.val)
-    } catch (err) { return refusedAnswerOf(err, null) }
+    } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
   }
 
   /** One storage listing, delivered, never rejecting: what every list made while it runs shares. */
@@ -208,8 +209,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       await this.ensureTimelyWorld(maxWorldMillis)
       const listed = this.at(scope)
       if (listed?.isHydratedWithin(maxMillisSinceRefresh) !== true) { return await this.tryFetch(scope, opts) }
-      return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), world: null, req_params: SX.reqParamsOf(scope) }
-    } catch (err) { return refusedAnswerOf(err, null) }
+      return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), world: null, req_params: SX.reqParams.parse(scope) }
+    } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
   }
 
   /** SLOPDOC: The instance under `scope` as it is now stored, built where none was listed. */
@@ -225,7 +226,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       const fetching = await this.#fetchJoined(scoped)
       if ('err' in fetching) { return refusedAnswerOf(fetching.err, fetching.answer) }
       return answerWithVal(fetching.answer, this.handleIfAbsent(fetching.val, scoped, ifAbsent))
-    } catch (err) { return refusedAnswerOf(err, null) }
+    } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
   }
 
   /** The storage get of the slot `scoped` names, delivered: one at a time, joined by every fetch of that slot made while it runs. */
@@ -261,7 +262,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** {@link put}, answering the vaultDB's own answer with the instance listed as its `val`. */
   async tryPut(record: RecordT, opts: PutOpts): Promise<ThingAnswer<ThingT>> {
-    let answer: ListingPutAnswer<RecordT, SparseT> | null = null
+    let answer: ListingPutAnswer<RecordT, SparseT> | typeof UNANSWERED = UNANSWERED
     try {
       const { prior, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
       const checked = this.recordOf(record)
@@ -276,7 +277,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** {@link del}, answering the vaultDB's own answer with the instance as its `val`. */
   async tryDel(record: SparseT): Promise<ThingAnswer<ThingT | null>> {
-    let answer: ListingAnswer<RecordT, SparseT> | null = null
+    let answer: ListingAnswer<RecordT, SparseT> | typeof UNANSWERED = UNANSWERED
     try {
       const sparse = this.sparseOf(record)
       this.demandEnabled()
@@ -314,7 +315,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   #deliverGood(answer: GoodAnswer<Fetched<RecordT, SparseT> | null, string, unknown>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null {
     const record = recordOfAnswer<RecordT, SparseT>(answer)
     // A declined put and a del over a tombstone answer what storage has, whose revision no one sent: only the scope is pinned.
-    const pins = ((answer.act === 'declined') || (answer.act === 'gone')) ? this.scopeOf(sent) : SX.reqParamsOf(sent)
+    const pins = ((answer.act === 'declined') || (answer.act === 'gone')) ? this.scopeOf(sent) : SX.reqParams.parse(sent)
     if (record !== null) { verifyConsistent(record, pins, { kind: 'storage_issue', message: Phrases.AnswerNotAsSent }) }
     return (record === null) ? this.#receiveNothing(this.scopeOf(sent)) : this.buildOrReceive(record)
   }
@@ -440,7 +441,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The bad news a row the listing set aside as damaged is told as. */
   protected abstract damagedStoredError(damaged: DamagedT): VaultError
   protected abstract doTryDel(tombstone: DelTombstone<SparseT>, opts: DelOpts): Promise<ListingAnswer<RecordT, SparseT>>
-  /** Start the vaultDB's watch over this listing's scope, `onBadNews` hearing of its end unbidden; returns how to stop. */
+  /** Start the vaultDB's watch over this listing's scope, `onBadNews` hearing of trouble with it; returns how to stop. */
   protected abstract watchRows(onNotice: (notice: VaultDBNotice) => void, onBadNews: (news: VaultError) => void): () => void
   /** True for a row this listing has: the vaultDB's watch tells of a vault's rows and its boxes' alike. */
   protected abstract isOwnRow(row: VaultRow | BoxRow): row is (VaultRow | BoxRow) & Fetched<RecordT, SparseT>
