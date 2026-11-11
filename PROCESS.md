@@ -39,6 +39,8 @@ A set of open PRs is made one merge line by `/restacker` (`.claude/skills/restac
 which rebases in a clone of its own, tests once at the tip, and force-pushes only under named leases.
 Doc blocks are brought to STYLE.md's rules by the `documentarian` agent
 (`.claude/agents/documentarian.md`), on a target a Coach names.
+Comments, doc blocks and READMEs across a whole target are brought to plain English by `/gallantdocs`
+(`.claude/skills/gallantdocs/SKILL.md`), a housekeeping pass that also harvests Goofus/Gallant pairs for the Coach to edit.
 
 ## The history we keep
 
