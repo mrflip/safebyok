@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import { makeLeaseKey, makeVaultKey } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
 import { PasskeySaltBytes } from '../../src/helpers/consts'
-import { guardRequestCleartext } from '../../src/models/bank'
 import { parseLogger } from '../../src/helpers/logger'
 import * as GX from '../../src/shapes/shapes-gateish'
 import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
@@ -30,22 +29,27 @@ describe("guardedLogger", () => {
   })
 })
 
-describe("gatingLaunchArgs", () => {
-  const friend = { unlockByProof: () => undefined }
-  const scope  = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
-  const askUser = guardRequestCleartext(() => undefined)
+describe("callGatingByKind", () => {
+  const vault = { modelkind: 'vault' }
+  const unlockByProof = () => Promise.resolve(vault)
 
-  it("takes a kind, a scope, the friend's verb and the bank's dialog, and refuses a friend without it", () => {
-    expect(GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend, askUser }).gatingkind).to.eq('add_passkey')
-    TH.expectSyncRefusal(() => GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend: {}, askUser }))
+  it("passes a born vault's gating kind, the vault, its unlock and the clears, handing on the vault and clears it was given", () => {
+    const clears = { passphraseClear: TH.Passphrase }
+    const checked = GX.callGatingByKind.parse({ gatingkind: 'add_passkey', vault, clears, unlockByProof })
+    expect(checked.vault).to.eq(vault)
+    expect(checked.clears).to.eq(clears)
   })
 
-  it("takes null where the host gave no dialog", () => {
-    expect(GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend, askUser: null }).askUser).to.be.null
+  it("leaves the clears unread, for the act's own check", () => {
+    const clears = new Proxy({}, { get: () => { throw new Error('read') }, ownKeys: () => { throw new Error('read') } })
+    expect(GX.callGatingByKind.parse({ gatingkind: 'del_vault', vault, clears, unlockByProof }).clears).to.eq(clears)
   })
 
-  it("refuses a dialog the bank did not wrap", () => {
-    TH.expectSyncRefusal(() => GX.gatingLaunchArgs.parse({ gatingkind: 'add_passkey', scope, friend, askUser: () => Promise.resolve(true) }), 'bad_option')
+  it("refuses a build_vault, a kind it does not know, what is no vault, and an unlock that is no function", () => {
+    TH.expectSyncRefusal(() => GX.callGatingByKind.parse({ gatingkind: 'build_vault', vault, clears: {}, unlockByProof }), 'bad_option')
+    TH.expectSyncRefusal(() => GX.callGatingByKind.parse({ gatingkind: 'open_sesame', vault, clears: {}, unlockByProof }), 'bad_option')
+    TH.expectSyncRefusal(() => GX.callGatingByKind.parse({ gatingkind: 'add_passkey', vault: { modelkind: 'box' }, clears: {}, unlockByProof }), 'bad_option')
+    TH.expectSyncRefusal(() => GX.callGatingByKind.parse({ gatingkind: 'add_passkey', vault, clears: {}, unlockByProof: null }), 'bad_option')
   })
 })
 

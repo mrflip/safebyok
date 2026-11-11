@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Gating, VaultError } from 'safebyok'
+import { type Gating, VaultError } from 'safebyok'
 import { Messages } from '../src/helpers/messages'
 import { createPasskey } from '../src/helpers/passkey'
 import { PasskeyUnlockButton } from '../src/components/passkey-unlock-button'
@@ -32,7 +32,7 @@ const buttonFor = (gating: Gating<'unlock_vault'>, extra: { takesFocus?: boolean
 const asking = () => screen.getByText(Messages.passkeyButton).getAttribute('aria-disabled')
 
 /** Make every gating attempt resolve with the refusal `err`, as the core would. */
-const refusingAttempts = (err: unknown) => vi.spyOn(Gating.prototype, 'attempt').mockResolvedValue({ ok: false, err } as never)
+const refusingAttempts = (gating: Gating, err: unknown) => TH.attemptsOf(gating).mockResolvedValue({ ok: false, err } as never)
 
 describe("PasskeyUnlockButton", () => {
   it("unlocks the vault with the passkey the user touches", async () => {
@@ -95,7 +95,7 @@ describe("PasskeyUnlockButton", () => {
     await waitFor(() => { expect(gripes).to.deep.equal([null, Messages.passkeyAskFailed]) })
     await waitFor(() => { expect(asking()).to.eq('false') })
     gating.dismiss()
-    refusingAttempts(new VaultError('dismissed', 'dismissed'))
+    refusingAttempts(gating, new VaultError('dismissed', 'dismissed'))
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await waitFor(() => { expect(gripes).to.deep.equal([null, Messages.passkeyAskFailed, null]) })
     await waitFor(() => { expect(asking()).to.eq('false') })
@@ -105,7 +105,7 @@ describe("PasskeyUnlockButton", () => {
   it("says nothing when pressed while an attempt is running", async () => {
     const { gating } = await passkeyedUnlock()
     const { gripes } = buttonFor(gating)
-    refusingAttempts(new VaultError('attempt_in_flight', 'busy'))
+    refusingAttempts(gating, new VaultError('attempt_in_flight', 'busy'))
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await waitFor(() => { expect(asking()).to.eq('false') })
     expect(gripes).to.deep.equal([null])
@@ -114,7 +114,7 @@ describe("PasskeyUnlockButton", () => {
   it("on misuse, hides itself, points to the passphrase, and reports the error to React", async () => {
     const { gating } = await passkeyedUnlock()
     const misuse = new VaultError('bad_option', 'misused')
-    refusingAttempts(misuse)
+    refusingAttempts(gating, misuse)
     const { gripes, reported } = buttonFor(gating)
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await waitFor(() => { expect(screen.queryByText(Messages.passkeyButton)).to.be.null })
@@ -152,9 +152,9 @@ describe("PassphraseModal, for a vault with a passkey", () => {
   })
 
   it("takes no press while a passphrase attempt runs", async () => {
-    const { authenticator } = await dialogFor()
+    const { gating, authenticator } = await dialogFor()
     const running = TH.makePending()
-    vi.spyOn(Gating.prototype, 'attempt').mockImplementation(async () => {
+    TH.attemptsOf(gating).mockImplementation(async () => {
       await running.promise
       return { ok: false, err: new VaultError('wrong_passphrase', 'Not that one.') } as never
     })
@@ -168,7 +168,7 @@ describe("PassphraseModal, for a vault with a passkey", () => {
   })
 
   it("keeps the passkey's message while the user types the passphrase, until they submit", async () => {
-    const { authenticator } = await dialogFor()
+    const { gating, authenticator } = await dialogFor()
     authenticator.refuseNext('UnknownError')
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await screen.findByText(Messages.passkeyAskFailed)
@@ -176,7 +176,7 @@ describe("PassphraseModal, for a vault with a passkey", () => {
     fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: 'wrong' } })
     expect(screen.getByText(Messages.passkeyAskFailed)).to.exist
     const running = TH.makePending()
-    vi.spyOn(Gating.prototype, 'attempt').mockImplementation(async () => {
+    TH.attemptsOf(gating).mockImplementation(async () => {
       await running.promise
       return { ok: false, err: new VaultError('wrong_passphrase', 'Not that one.') } as never
     })
@@ -190,8 +190,8 @@ describe("PassphraseModal, for a vault with a passkey", () => {
 
   it("keeps the passphrase when the passkey meets misuse: the button goes, and the dialog says why", async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* React reports what its Boundary caught */ })
-    await dialogFor()
-    refusingAttempts(new VaultError('bad_option', 'misused'))
+    const { gating } = await dialogFor()
+    refusingAttempts(gating, new VaultError('bad_option', 'misused'))
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await screen.findByText(Messages.passkeyTrouble)
     expect(screen.queryByText(Messages.passkeyButton)).to.be.null

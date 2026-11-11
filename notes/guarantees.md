@@ -31,17 +31,17 @@ deriver and the strength checker's wrapper. A change to one of them is a change 
 | `packages/safebyok/src/helpers/crypto.ts` | every call into WebCrypto: key makers, import, HKDF, wrap, unwrap, cipher, decipher, randomness, ctx |
 | `packages/safebyok/src/shapes/shapes-gateish.ts`, `shapes-core.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
 | `packages/safebyok/src/models/proving.ts` | the wayinKey; the vaultKey, which is unwrapped per call, passed from one proving to another inside `buildWayin(source)`, and handed only to `Lease.buildGranted`; the PRF bytes, which it reads to derive the passkeyKey and leaves for the gating to zero |
-| `packages/safebyok/src/models/gating.ts` | the chain that carries a passphrase or an answer from the host's dialog to a proving; `checkedClears`; `spendClears`, the only place the PRF bytes are zeroed; `RunForGatingkind`, which is given provings and never a cleartext |
+| `packages/safebyok/src/models/gating.ts` | the chain that carries a passphrase or an answer from the host's dialog to a proving; `checkedClears`; `spendClears`, the only place the PRF bytes are zeroed; each kind's act, which proves the cleartexts and then makes its change, passing them only to `checkedClears` and a `Proving` builder |
 | `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the vaultKey wrapped under it, unwrapped per call in `#vaultKey`; every seal and unseal of a box's whisper; `evict` and `vacate` |
-| `packages/safebyok/src/models/gate.ts` | has no key: it has wayin pickles and the vault's stamp; the passphrase proving made by a gating that builds a new vault is dropped once the `build_vault` run has built its lease |
+| `packages/safebyok/src/models/gate.ts` | has no key: it has wayin pickles and the vault's stamp; the passphrase proving made by a gating that builds a new vault is dropped once the `buildVault` act has built its lease |
 | `packages/safebyok/src/models/box.ts` | has no key: it hands the lease the whisper's JSON text and a stamp, through the Vault's seal verbs, and gets text back; it makes no bytes to zero, and the text cannot be zeroed (G6) |
 | `packages/safebyok/src/models/vault.ts` | the whisper's JSON text, passed through `sealStampedString` and `unsealStampedString` to `Lease.sealWith` and `unsealWith` and back (G6); the `Lease`, kept private in `#lease`, which no method hands out (G9) |
 | `packages/safebyok/src/deriver/argon2id-webv1.ts` | `deriveKeyBytes`, which takes the passphrase as an argument and returns the passphraseKey bytes in a buffer of its own, which `passphraseKeyOf` imports and zeroes (G1, G2) |
 | `packages/safebyok/src/helpers/passphrase-strength.ts` | `guardStrengthChecker`, whose wrapper takes the new passphrase as an argument, parses the host checker's verdict inside the wrapper, and passes anything the checker throws to `HostErrorSanitizer.refusalFor` (G1, G8, G9) |
 
 Besides these files, three host functions handle the passphrase. Each is wrapped once, in `Bank`'s constructor, and from
-there on the core has the wrapper and never the host's own function. A proving's world, a bank's friend and a gating's
-launch each refuse a function that lacks the wrapper's brand (`isGuarded`, `helpers/consts.ts`). The brand is a
+there on the core has the wrapper and never the host's own function. A proving's world and a bank's friend each refuse a
+function that lacks the wrapper's brand (`isGuarded`, `helpers/consts.ts`). The brand is a
 `Symbol.for`, which any code can set, so it catches mistakes in the core's own wiring and is not a security barrier:
 `Bank`'s constructor wraps every host function regardless. `keyDeriver` is wrapped by `guardKeyDeriver`
 (`models/proving.ts`), whose `deriveKeyBytes` replaces anything thrown with `keyDeriverThrew`. `strengthChecker` is
@@ -54,9 +54,9 @@ refuses with `requestCleartextThrew`. A host may leave `requestCleartext` out: t
 way the bank's snapshot has the live gating as `openGating`, so that a dialog can respond to it. A gating keeps no
 cleartext between attempts (G1), and its `toJSON` shows only its scope, kind and random `gatingTok`. The
 `requestCleartext` wrapper is passed along in the `BankFriend` that the bank gives its vault listing. The vault listing
-keeps it in a protected member and gives it to each vault, which keeps it private, and it reaches a gating only in the
-gating's launch args. No public member of a bank or a vault returns it. A disabled bank never asks the user: every
-`Gating.launch` comes after a check, in the same tick, that its vault or vault listing is enabled, and a sweep or a
+keeps it in a protected member and gives it to each vault, which keeps it private, and it reaches a gating only as an
+argument of `Gating.launchOn` or `launchBirth`. No public member of a bank or a vault returns it. A disabled bank never asks the user: every
+`Gating.launchOn` and `launchBirth` comes after a check, in the same tick, that its vault or vault listing is enabled, and a sweep or a
 vacate disables both before it returns. `onLifecycle` is wrapped in `Bank`'s constructor too, by `guardOnLifecycle`. It
 is given a `BankEvent`: a bag with what happened (a refusal, an outcome or a count), the live `Bank`, and the live
 `Vault` the event concerns, if there is one. It is given no secret material: neither instance hands out a key (G9). A
@@ -156,10 +156,9 @@ bytes. Everything not listed never sees the value. Private methods are named wit
 
 **Passphrase.** Naked: the host's dialog (`safebyok-react`'s `modals/passphrase-modal.tsx` and
 `provider/gating-modal.tsx`, on the old core until the package moves, keep what was typed in component state) →
-`gating.attempt` → `#attemptOnce`, inside the gating's `outcomeOf` → its kind's prove (`ProveForGatingkind`,
-`models/gating.ts`) → `checkedClears` (`GX.vaultBuildClears`, `vaultUnlockClears`, `passphraseReplaceClears`,
-`passkeyAddClears`, `passkeyRevokeClears`, `vaultDelClears`: shape only, `passphraseCleartext`), and for
-`revoke_passkey` and `del_vault` `provePassphrase` → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
+`gating.attempt` → `#attemptOnce`, inside the gating's `outcomeOf` → its kind's act (`buildVault`, `unlockVault`,
+`replacePassphrase`, `addPasskey`, `revokePasskey`, `delVault`, `models/gating.ts`) → `checkedClears` (`GX.vaultBuildClears`, `vaultUnlockClears`, `passphraseReplaceClears`,
+`passkeyAddClears`, `passkeyRevokeClears`, `vaultDelClears`: shape only, `passphraseCleartext`) → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
 `buildNovel` → `Proving.checkStrength` → the world's `strengthChecker`, as `guardStrengthChecker`
 (`helpers/passphrase-strength.ts`) wraps it → the host's `strengthChecker`; both → `passphraseKeyOf` → the world's
 `keyDeriver.deriveKeyBytes`, as `guardKeyDeriver` wraps it → `deriveKeyBytes` → the host's `keyDeriver.deriveKeyBytes`
@@ -230,13 +229,14 @@ whisper out → `Box.#unseal` → `vault.unsealStampedString` → `Lease.unsealW
 
 **G1. A passphrase is never a field.** Inside the core a passphrase is only ever a function
 argument or a local. The gating's `attempt` passes the cleartexts (`clears`) to `#attemptOnce`, which passes them to its
-kind's prove (`ProveForGatingkind`, `models/gating.ts`), whose `checkedClears` reads them. The prove passes the
+kind's act (`models/gating.ts`), whose `checkedClears` reads them. The act passes the
 passphrase to `PassphraseProving.buildNovel` or `buildStored`; `buildNovel` passes it to `Proving.checkStrength`; and
 each of the two passes it to `passphraseKeyOf`, which passes it, through the `guardKeyDeriver` wrapper and
 `deriveKeyBytes`, to the host's `keyDeriver.deriveKeyBytes` (`models/proving.ts`).
 `gating.checkStrength` passes a passphrase to `Proving.checkStrength` as the user types. No class, record, snapshot or
-closure that outlives the call keeps it: no gate, vault or `run` is ever given a passphrase. The only comparison of two
-passphrases is `antePassphraseClear === nextPassphraseClear` in `ProveForGatingkind`'s `replace_passphrase`, both
+closure that outlives the call keeps it: no gate or vault is ever given a passphrase, and
+past its `Proving` builders an act uses only the provings. The only comparison of two
+passphrases is `antePassphraseClear === nextPassphraseClear` in the `replacePassphrase` act, both
 typed by the same user (`samePassphrase`). Three host functions handle it: the dialog that collects it (either
 `requestCleartext` or a dialog rendered from the bank's `openGating`), the `strengthChecker` and the `keyDeriver`.
 *Caveat:* a JavaScript string cannot be zeroed, so copies
@@ -398,8 +398,11 @@ Lease the vault has, and `Lease.buildFromCache` checks what `DeviceDB.peek` hand
 it. A `Box` reaches the Lease only through the public `vault.sealStampedString` and `unsealStampedString`, which hand
 the lease a whisper's text and a stamp and hand back a sealed whisper or text, never a key. The `LeaseFriend` whose
 `peekLease` returns the cached row with its leaseKey handle is kept in `Lease.#friend` and made
-in `Vault.#leaseFriend`. No public `Vault` method takes a proving: a gating's run (`RunForGatingkind`) reaches
-`#unlockByProof` through `Vault.#gatingFriend`, which is private in the vault and the gating. Nothing public on a
+in `Vault.#leaseFriend`. No public `Vault` method takes a proving: a gating's act reaches `#unlockByProof`
+through `Vault.#unlockVaultByProof`, which is private, and which the vault passes to `Gating.launchOn` or `launchBirth`.
+The entry points export `Gating` as a type only, so the published surface has no launcher a host could hand an unlock
+of its own. A live gating's `constructor` still reaches the statics: that goes around the published types, and the host
+is inside the trust boundary (SECURITY.md). Nothing public on a
 `Vault` or a `Lease` hands the friend out, and a test captures it with a spy on `Proving.prototype.buildLease`.
 Neither class has a getter, field, spread, JSON or Symbol that yields a key. The row itself is also within reach of
 whoever has the deviceDB (G4). The entry points export neither `Lease` nor `Proving`, so the published surface

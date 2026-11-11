@@ -247,6 +247,13 @@ added or folded into through the subagent, and no other entry changes.
   a proving already made. `Gating.launch` no longer accepts a `run`: a caller who supplies a friend of their own hears provings, the
   same reach a supplied `run` had. The vault entrypoints are `replacePassphrasePrompt`, `addPasskeyPrompt`, `revokePasskeyPrompt` and
   `delVaultPrompt`. (Models are not yet exported from the package.)
+  amended 2026-11-11 (gating_reform): **No published route hands a host a Proving.** `src/index.ts` exports `Gating` as a type only (`export type { Gating }`, checked by `tests/index.test.ts`);
+  the public static `Gating.launch` and its `friend` are gone, and `GatingFriend`, `Vault.#gatingFriend` and `gatingLaunchArgs` with them. The launchers are `Gating.launchOn(vault, gatingkind, unlockByProof, askUser)`
+  and `Gating.launchBirth(listing, scope, prior, unlockByProof, askUser)`, called only by `Vault`, which passes its private static `Vault.#unlockVaultByProof`; `askUser` is checked by `VX.listingOpts`
+  and the `Vault` constructor, the scope by `listing.scopeOf` and `vault.scope`. Each gating kind is now one function in `models/gating.ts` that checks the clears with `checkedClears`, builds its provings, then
+  makes its change, in place of `ProveForGatingkind` and `RunForGatingkind`; `#attemptOnce` holds the clears through it and spends them after. A passphrase still goes only to `checkedClears` and the
+  `Proving` builders. Left open: a static stays reachable at runtime through any gating instance's `.constructor` (`bank.openGating.constructor.launchOn`), so a host that reaches around the published types
+  can call the launcher with an `unlockByProof` of its own and hear the Proving; the host is inside the trust boundary (SECURITY.md). Entries here that name `Gating.launch` or `gatingLaunchArgs` read as written.
 * 2026-11-03 (cleanup, branch `20261103-cleanup`): **The key that gets a thing out of storage is entered into the data with an enter-key
   step, and no verb of the models layer returns a vaultKey, wayinKey or leaseKey.** In `packages/safebyok/src/models/`, a vaultKey is
   unwrapped under the wayinKey (`Proving.#unwrapVaultKey`, extractable only to be wrapped again, dropped when the method ends) or under

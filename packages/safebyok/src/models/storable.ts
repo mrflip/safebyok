@@ -170,7 +170,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Non-throwing form of {@link hydrate}. */
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
-  /** Delete this thing through its listing where it is what `asked` names: a scope names whatever is there, a revision only that one, else `stale_write`. */
+  /** Delete, via its listing -- the asked-for record must be consistent with the listed one
+   * refuses `stale_write` if the record changes between the hydration here and the delete transaction.
+   */
   async del(asked: ScopeT | SparseT, opts: TimelyOpts = {}): Promise<this> {
     const scope = this.listing.scopeOf(asked)
     const pins = { ...SX.reqParams.parse(asked), ...scope }

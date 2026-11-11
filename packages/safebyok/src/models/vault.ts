@@ -3,11 +3,10 @@ import { verifyConsistent } from '../helpers/validator'
 import * as Phrases from '../helpers/phrases'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { type Outcome, demandGood, outcomeOf } from '../refusals/outcome'
-import type { Gatingkind } from '../shapes/shapes-enums'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import * as GX from '../shapes/shapes-gateish'
-import type { AskUser, GateProps, GatingFriend, LaunchArgs, LeaseFriend, SealedWhisper } from '../shapes/shapes-gateish'
+import type { AskUser, GateProps, LeaseFriend, SealedWhisper, UnlockByProof } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, BoxPut, BoxPutOpts, RevokeSite, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
@@ -89,7 +88,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     const listed = listing.at(checked)
     if (listed?.isPresent === true) { throw alreadyListedError() }
     const prior = SX.revisionOf(listed ?? SX.VoidRevision)
-    return Gating.launch('build_vault', { listing, scope: checked, vault: null, prior, friend: Vault.#gatingFriend, askUser })
+    return Gating.launchBirth(listing, checked, prior, Vault.#unlockVaultByProof, askUser)
   }
   // --
 
@@ -98,7 +97,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** SLOPDOC: Replaces the passphrase through a gating; the passkey stays and no other device is locked. */
   async replacePassphrasePrompt(): Promise<this> {
     await this.ensureTimely(); this.demandPromptable()
-    await Gating.launch('replace_passphrase', this.#launchArgs)
+    await Gating.launchOn(this, 'replace_passphrase', Vault.#unlockVaultByProof, this.#bankFriend.askUser)
     return this
   }
 
@@ -109,7 +108,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async addPasskeyPrompt(): Promise<this> {
     await this.ensureTimely(VX.Promptly); this.demandPromptable()
     this.gate.demandPasskeyAddable()
-    await Gating.launch('add_passkey', this.#launchArgs)
+    await Gating.launchOn(this, 'add_passkey', Vault.#unlockVaultByProof, this.#bankFriend.askUser)
     return this
   }
 
@@ -120,7 +119,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async revokePasskeyPrompt(): Promise<this> {
     await this.ensureTimely(VX.Promptly); this.demandPromptable()
     if (this.gate.pkWayin === null) { return this }
-    await Gating.launch('revoke_passkey', this.#launchArgs)
+    await Gating.launchOn(this, 'revoke_passkey', Vault.#unlockVaultByProof, this.#bankFriend.askUser)
     return this
   }
 
@@ -130,7 +129,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Delete this vault through a del_vault gating, which asks for the passphrase, leaving a tombstone in its slot and nothing of it on this device. */
   async delVaultPrompt(): Promise<this> {
     await this.ensureTimely(); this.demandPromptable()
-    await Gating.launch('del_vault', this.#launchArgs)
+    await Gating.launchOn(this, 'del_vault', Vault.#unlockVaultByProof, this.#bankFriend.askUser)
     return this
   }
 
@@ -156,7 +155,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Ask the user for proof, and unlock by it. */
   async unlock(): Promise<this> {
     await this.ensureTimely(); this.demandPromptable()
-    await Gating.launch('unlock_vault', this.#launchArgs)
+    await Gating.launchOn(this, 'unlock_vault', Vault.#unlockVaultByProof, this.#bankFriend.askUser)
     return this
   }
 
@@ -210,16 +209,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The gating's friend]: gatingFriend, launchArgs
+  // == [The gating's unlock]: unlockVaultByProof
 
-  /** The private verbs a gating's run calls past the enter key, as no public method of a vault accepts a proving (G9). */
-  static readonly #gatingFriend: GatingFriend = {
-    unlockByProof: (vault, proved, gate_epoch) => vault.#unlockByProof(proved, gate_epoch),
-  }
-
-  get #launchArgs(): LaunchArgs<Exclude<Gatingkind, 'build_vault'>> {
-    return { listing: this.listing, scope: this.scope, vault: this, prior: null, friend: Vault.#gatingFriend, askUser: this.#bankFriend.askUser }
-  }
+  // A gating comes to #unlockByProof by this, as no public method of a vault accepts a proving (G9).
+  static readonly #unlockVaultByProof: UnlockByProof = (vault, proved, gate_epoch) => vault.#unlockByProof(proved, gate_epoch)
   // --
 
   // == [The lease's friend]: leaseFriend, makeFriend, stampOfLife

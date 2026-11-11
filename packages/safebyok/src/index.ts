@@ -1,6 +1,6 @@
 export { Bank, DefaultOnBadNews, DefaultOnLifecycle, tellBadNewsTo } from './models/bank'
 export { Box } from './models/box'
-export { Gating } from './models/gating'
+export type { Gating } from './models/gating'
 export { Vault } from './models/vault'
 export { DeviceDB } from './storage/device-db'
 export { MemoryDeviceDB } from './storage/memory-device-db'

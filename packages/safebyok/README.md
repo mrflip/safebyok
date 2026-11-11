@@ -217,7 +217,7 @@ There are important considerations to building a form safely, and we have provid
 ## Entry points
 
 The `safebyok` entry point exports `Bank`,
-`Box`, `Gating`, `Vault`, their snapshot types and `VaultError`, `safebyok/dom` exports `BoxFields`, and
+`Box`, `Vault`, the `Gating` type, their snapshot types and `VaultError`, `safebyok/dom` exports `BoxFields`, and
 `safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. `safebyok/browser` exports the Argon2id derivers,
 `idbDeviceDB`, the device database in IndexedDB, `zxcvbnStrengthChecker`, and `browserOpts`, which returns all three as one options object.
 `safebyok/storage` is what a storage adapter is written against: `AdapterVaultDB` and `MemoryVaultDB`. `safebyok-indexeddb`, `safebyok-postgres`, `safebyok-convex`
