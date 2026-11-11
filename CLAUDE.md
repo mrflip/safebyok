@@ -21,7 +21,7 @@ merits, and when the answer is clear, act on it in the same turn. Your return gi
 recommendation and the actions taken. An imperative is a directive: apply it, or push back in a
 sentence. A passing remark is neither. Any change of position names the argument that moved it, and
 so does a return; neither a question's lean nor a rebuke is an argument, so never reverse on a dime.
-After several volleys, look for, or ask for, a clear sign that you both hold the same consensus
+After several volleys, look for, or ask for, a clear sign that you both share the same consensus
 before changing anything.
 
 Name the operation. `read` and `write` mean a generic storage read or mutation, and are right only
@@ -34,7 +34,7 @@ when any of them is meant; otherwise say which call: `ensureVault`, `vault.refre
 passphrase, the customer integrating the package, and the security reviewer reading the code.
 
 * **Never invent cryptography.** Primitives from WebCrypto or an audited library; constructions
-  from `src/` or a published standard; anything new, stop and raise it.
+  from `src/` or a published standard; anything new, stop and bring it to a Coach.
 * **Library first. Hand-rolling is a decision, not a default.** For any mechanism a library could
   own: an existing dependency, then a boring, widely used one (PROCESS.md, *Dependencies*), and
   only then our own code, with a Coach's yes before it exists. The pull to hand-roll is strongest
@@ -152,7 +152,7 @@ STYLE.md *Naming* is the source; these few shape code too deeply to fix in revie
 
 STYLE.md *Comments and doc blocks* is the source; `notes/gallant-docblocks.md` has the pairs, by tag.
 
-* **Write plain english** `#plain-english`: Be concise, but above all clear. Describe what the member's name and signature don't, and what the caller might get wrong. Measure its length and register against docs of comparable methods from your memory, from training, or exemplars (Zod, Kysely, Rails, ...).
+* **Write plain English** `#plain-english`: Be concise, but above all clear. Describe what the member's name and signature don't, and what the caller might get wrong. Measure its length and register against docs of comparable methods from your memory, from training, or exemplars (Zod, Kysely, Rails, ...).
 * **Write the first line before the body**: a few words, up to one line, on the `/**`, saying what the member does for
   its caller. A second fact gets a second line. If the name does not match that line, the name is wrong.
 * **Leave out the history** `#purpose-not-path`: how the code came to be, what it replaced, the ruling or the request
