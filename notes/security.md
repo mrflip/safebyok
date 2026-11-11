@@ -47,7 +47,10 @@ added or folded into through the subagent, and no other entry changes.
   that calls it, and the tables' row-level security (on, with no policy) still decides which rows that role reaches. None sets a `search_path`; each names its tables unqualified. The setup SQL ends with
   `REVOKE ALL ON FUNCTION ... FROM PUBLIC` for each of the six, since Postgres grants EXECUTE to PUBLIC by default and a hosted Postgres that serves functions over an HTTP data API
   (Supabase's) would otherwise offer them to its anonymous and authenticated roles; the role that owns them, the one the host's server connects as, keeps EXECUTE.
-  The four write functions take the record as jsonb (and the expected token, the expected `am` and the box cap as plain values) and build no SQL from them: none of the six contains dynamic SQL (`EXECUTE`).
+  The four write functions take the record to store and the row the caller expects, each as jsonb (`new_record`, `expected_row`), and the two box functions also take the cap on live boxes as an integer; they build no SQL from them: none of the six contains dynamic SQL (`EXECUTE`).
+  The two birth functions take `expected_row` and read nothing of it. amended 2026-11-11 (vaultdb_classifier): `safebyok_revise_vault` and `safebyok_revise_box` test the life token of the stored row against the row expected
+  (`vault_tok` for a vault, `box_tok` for a box), beside `revision_tok`, `am` and `revision_seq`. Before this, a vault record that cited the stored `revision_tok` under another `vault_tok` would have been stored,
+  and the box rows of the vault's old life swept with it; now nothing is stored.
   amended 2026-11-11 (vaultdb_classifier): the caller no longer supplies a channel or a notice. Each write function calls `safebyok_tell(vault, box)` once it has stored a record, in the same transaction,
   and `safebyok_tell` builds the notice from the row just stored and sends it with `pg_notify` on the channel `safebyok_<user_id>`. A vault's notice carries the vault row; a box's carries the box row
   and, new in this amendment, its vault row, which includes the `gate` (wrapped keys and key-derivation parameters, no plaintext secret). A notice of 8000 bytes or more sheds the vault row first and then every row,
