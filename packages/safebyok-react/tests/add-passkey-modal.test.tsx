@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
-import { Gating, type Bank } from 'safebyok'
+import { describe, expect, it } from 'vitest'
+import type { Bank } from 'safebyok'
 import { AddPasskeyModal } from '../src/modals/add-passkey-modal'
 import { Messages } from '../src/helpers/messages'
 import * as TH from './test-helpers'
@@ -58,7 +58,7 @@ describe("AddPasskeyModal", () => {
 
   it("does nothing when the user dismisses the browser's prompt: the gating stays open", async () => {
     const { gating, authenticator } = await shownFor()
-    const attempts = vi.spyOn(Gating.prototype, 'attempt')
+    const attempts = TH.attemptsOf(gating)
     authenticator.refuseNext('NotAllowedError')
     TH.submitPasskeyAdd(TH.Passphrase)
     await waitFor(() => { expect(authenticator.calls.create).to.have.lengthOf(1) })

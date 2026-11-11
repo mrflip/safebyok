@@ -70,6 +70,10 @@ describe("safebyok", () => {
     expectTypeOf<Front.DamagedBox>().toEqualTypeOf<Readonly<{ applabel: string, user_id: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>>()
   })
 
+  it("exports Gating as a type only: the published surface has no launcher that hands a gating an unlock", () => {
+    expect(Front).to.not.have.property('Gating')
+  })
+
   it("exports the byte counts and the minute a passkey call and an autolock setting need", () => {
     expect(Front.PasskeySaltBytes).to.eq(32)
     expect(Front.PrfAnswerBytes).to.eq(32)

@@ -298,7 +298,7 @@ const valuesShownBy = (subject: object): unknown[] => {
 }
 
 describe("a vault and a lease never reveal the lease friend or the lease key handle", () => {
-  it("a gating does not reveal its friend through its fields, Object.keys or JSON.stringify", async () => {
+  it("a gating does not reveal the vault's unlock or its act through its fields, Object.keys or JSON.stringify", async () => {
     const { vault, fakeBank: world } = await makeBornVault()
     let gatingShown: object | null = null
     world.requestCleartext = (gating) => {
@@ -307,7 +307,7 @@ describe("a vault and a lease never reveal the lease friend or the lease key han
     }
     await TH.expectRefusal(vault.addPasskeyPrompt(), 'dismissed')
     const json = JSON.stringify(gatingShown)
-    for (const named of ['friend', 'gatingFriend', 'launchArgs', 'unlockByProof']) {
+    for (const named of ['act', 'unlockByProof', 'unlockVaultByProof']) {
       expect(Object.keys(gatingShown!)).to.not.include(named)
       expect(json).to.not.include(named)
       expect(vault).to.not.have.property(named)

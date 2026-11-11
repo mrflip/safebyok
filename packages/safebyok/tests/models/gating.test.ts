@@ -5,7 +5,7 @@ import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import type { Gating } from '../../src/models/gating'
 import type { Gatingkind } from '../../src/shapes/shapes-enums'
-import type { AnyGating, ClearsForGatingkind, RequestCleartext } from '../../src/shapes/shapes-gateish'
+import type { AnyGating, CleartextsForGatingkind, RequestCleartext } from '../../src/shapes/shapes-gateish'
 import { PassphraseProving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
 import { type VaultWorldGiven, Dna, Passphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
@@ -34,7 +34,7 @@ const makeDialog = () => {
   }
 }
 
-// Compiles only while every member of AnyGating takes the same clears: a host's dialog need not narrow to attempt.
+// Compiles only while every member of AnyGating takes the same cleartexts: a host's dialog need not narrow to attempt.
 /** A host's dialog that attempts {@link Passphrase}, never narrowing on the gating's kind. */
 const unnarrowedDialog: RequestCleartext = async (gating) => { await gating.attempt({ passphraseClear }) }
 
@@ -265,6 +265,23 @@ describe("a birth through a gating", () => {
   })
 })
 
+/** An unlock no launch in these tests reaches. */
+const neverUnlocks = (): Promise<never> => Promise.reject(new Error('never called'))
+
+describe("a launcher reached through a live gating", () => {
+  it("refuses what is no vault, or no vault listing, before anything is asked or attached", async () => {
+    const { listing, gatingAt } = birthWorld()
+    const first = TH.expectRefusal(listing.buildVault(Dna), 'dismissed')
+    const gating = await gatingAt<'build_vault'>()
+    const launchers = gating.constructor as typeof Gating
+    await TH.expectRefusal(launchers.launchOn({} as never, 'unlock_vault', neverUnlocks, null), 'bad_option')
+    await TH.expectRefusal(launchers.launchBirth({} as never, Dna, { revision_tok: 'r', revision_seq: 0 }, neverUnlocks, null), 'bad_option')
+    expect(listing.openGating).to.eq(gating)
+    gating.dismiss()
+    await first
+  })
+})
+
 describe("one gating open per bank", () => {
   it("refuses a second gating while one is open", async () => {
     const { listing, gatingAt } = birthWorld()
@@ -320,7 +337,7 @@ describe("the dialog ending", () => {
 
 describe("gating.attempt", () => {
   it("accepts cleartext from a host dialog that does not narrow on the gating's kind", async () => {
-    expectTypeOf<AnyGating['attempt']>().parameter(0).toEqualTypeOf<ClearsForGatingkind[Gatingkind]>()
+    expectTypeOf<AnyGating['attempt']>().parameter(0).toEqualTypeOf<CleartextsForGatingkind[Gatingkind]>()
     const { listing } = birthWorld({ requestCleartext: unnarrowedDialog })
     const landed = await listing.buildVault(Dna)
     expect(landed.isUnlocked).to.be.true
@@ -390,8 +407,8 @@ describe("gating.attempt", () => {
     const { listing, gatingAt } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna))
     const gating = await gatingAt<'build_vault'>()
-    const clears = { get passphraseClear(): string { throw new Error(Passphrase) } }
-    const err = await TH.expectBad(gating.attempt(clears))
+    const cleartexts = { get passphraseClear(): string { throw new Error(Passphrase) } }
+    const err = await TH.expectBad(gating.attempt(cleartexts))
     await launched
     expect(err.cause).to.be.undefined
     expect(err.message).to.not.include(Passphrase)

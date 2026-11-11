@@ -5,7 +5,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { expect, onTestFinished, vi } from 'vitest'
-import { MemoryDeviceDB, type AnyGating, type Bank, type BankOpts, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok'
+import { MemoryDeviceDB, type AnyGating, type Bank, type BankOpts, type Gating, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok'
 import { Passphrase, VaultScopeGiven, anyStrengthChecker, passkeyOf, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
 import type { BankProviderProps, PassphraseGating } from '../src/shapes'
@@ -78,7 +78,7 @@ export const withoutGesture = () => {
 }
 // --
 
-// == [Open gatings]: addPasskeyTo, openGatingOf, building, unlocking, replacing, deleting, addingPasskey, revokingPasskey, passphraseGatingOf, gatingOfKind
+// == [Open gatings]: addPasskeyTo, openGatingOf, building, unlocking, replacing, deleting, addingPasskey, revokingPasskey, passphraseGatingOf, gatingOfKind, attemptsOf
 
 /** Add a passkey to `vault`, which belongs to `world`'s own bank, the way a user would in the dialog.
  * Uses `passkeyClear`, or the passkey from `passkeyOf('laptop')` when none is given.
@@ -165,6 +165,9 @@ export const passphraseGatingOf = (gating: AnyGating): PassphraseGating => {
   if (gating.gatingkind === 'build_vault' || gating.gatingkind === 'unlock_vault') { return gating }
   throw new Error(`not a passphrase gating: ${gating.gatingkind}`)
 }
+
+/** A spy on `gating.attempt`: a gating is frozen, so it goes on the prototype, and spies on every gating's attempt. */
+export const attemptsOf = (gating: Gating) => vi.spyOn(Object.getPrototypeOf(gating) as Gating, 'attempt')
 // --
 
 // == [Typing in the dialog]: submitPassphrase, submitNewPassphrase, submitReplacement, submitDeletion, submitPasskeyAdd, submitPasskeyRevoke

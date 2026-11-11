@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { ForeverMillis, Gating, MinuteMillis, VaultError } from 'safebyok'
+import { ForeverMillis, MinuteMillis, VaultError } from 'safebyok'
 import { PassphraseModal } from '../src/modals/passphrase-modal'
 import { Messages } from '../src/helpers/messages'
 import * as TH from './test-helpers'
@@ -88,7 +88,7 @@ describe("PassphraseModal, building a vault", () => {
 
   it("forgets both verdicts once React has emptied the fields after a refused attempt", async () => {
     const { gating } = await shownFor(TH.building)
-    vi.spyOn(Gating.prototype, 'attempt').mockResolvedValue({ ok: false, err: new VaultError('weak_passphrase', 'Too guessable.') } as never)
+    TH.attemptsOf(gating).mockResolvedValue({ ok: false, err: new VaultError('weak_passphrase', 'Too guessable.') } as never)
     await TH.submitNewPassphrase(TH.Passphrase)
     await screen.findByText('Too guessable.')
     expect(field('vault passphrase').value).to.eq('')
@@ -120,9 +120,9 @@ describe("PassphraseModal, unlocking a vault", () => {
   })
 
   it("says what it is doing and takes no second submit while an attempt runs", async () => {
-    await shownFor(TH.unlocking, { built: true })
+    const { gating } = await shownFor(TH.unlocking, { built: true })
     const running = TH.makePending()
-    const attempts = vi.spyOn(Gating.prototype, 'attempt').mockImplementation(async () => {
+    const attempts = TH.attemptsOf(gating).mockImplementation(async () => {
       await running.promise
       return { ok: false, err: new VaultError('wrong_passphrase', 'Not that one.') } as never
     })
@@ -145,8 +145,8 @@ describe("PassphraseModal, unlocking a vault", () => {
   })
 
   it("refuses an empty submit, attempting nothing", async () => {
-    await shownFor(TH.unlocking, { built: true })
-    const attempts = vi.spyOn(Gating.prototype, 'attempt')
+    const { gating } = await shownFor(TH.unlocking, { built: true })
+    const attempts = TH.attemptsOf(gating)
     fireEvent.click(submitButton(Messages.unlockButton))
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(attempts).not.toHaveBeenCalled()

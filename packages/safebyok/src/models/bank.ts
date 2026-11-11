@@ -109,7 +109,7 @@ export class Bank {
     this.#hostHandlers = { onLifecycle: guardOnLifecycle(onLifecycle), onBadNews }
     // A revoked identity vacates the bank whatever the host's onLifecycle does; the host hears of it as the vacate's `vacated`.
     const panic = brandGuarded((refusal: VaultError): void => { void this.vacate({ cause: refusal }) })
-    // A disabled bank asks no one: every Gating.launch follows an enabled check in the same tick.
+    // A disabled bank asks no one: every gating's launch follows an enabled check in the same tick.
     const askUser = requestCleartext === undefined ? null : guardRequestCleartext(requestCleartext)
     this.logger = parseLogger(logger)
     this.strengthChecker = guardStrengthChecker(strengthChecker)
