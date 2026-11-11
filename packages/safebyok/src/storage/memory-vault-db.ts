@@ -107,7 +107,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   protected doPutVault(ask: VaultPutAsk): VaultClassified {
     const classified = this.classifyVault(ask, { vault: this.#vaultRowOf(ask) })
-    if (classified.write !== null) { this.#writeVaultRow(classified.write) }
+    if (isWriteAct(classified.act)) { this.#writeVaultRow(ask.record) }
     return classified
   }
 
@@ -122,8 +122,8 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   protected doDelVault(ask: VaultDelAsk): VaultClassified {
     const classified = this.classifyVault(ask, { vault: this.#vaultRowOf(ask) })
-    if (classified.write !== null) {
-      this.#writeVaultRow(classified.write)
+    if (isWriteAct(classified.act)) {
+      this.#writeVaultRow(ask.record)
       // A vault's boxes end with its life: nothing reads a box row of a life that is over.
       this._cheat_boxRowsOf(ask, ask.expected.vault_tok).clear()
     }

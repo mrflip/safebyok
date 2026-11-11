@@ -3,7 +3,7 @@ import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { VaultError } from '../../src/refusals/errors'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { BoxRecord, BoxTombstone, VaultRecord, VaultTombstone } from '../../src/shapes/shapes-storage'
-import { boxAt, boxQuery, boxscope, vaultAt, vaultScope } from '../test-helpers/storage-world'
+import { boxAt, boxQuery, boxscope, gateMoveOf, passkeyWayin, passphraseWayin, vaultAt, vaultScope } from '../test-helpers/storage-world'
 
 const noVaultYet = SX.sentinelVaultOf(vaultScope)
 const noBoxYet   = SX.sentinelBoxOf(boxscope, 'life1')
@@ -125,5 +125,28 @@ describe("a vaultDB's get, put and del, each given one ask", () => {
     vaultDB._cheat_boxRowsOf(vaultScope, 'life1').set(boxscope.boxlabel, { ...boxAt(0), smuggled: 'field' })
     const damaged = await vaultDB.tryGetBox({ ...Get, ...boxQuery, ifAbsent: 'nil', expected: noBoxYet })
     expect(damaged.ok ? null : damaged.err.refusalkind).to.eq('damaged_row')
+  })
+
+  it("runs a gate verb's tests over the vault row stored: replaced, added and revoked, and stale_write, camped and gate_issue with nothing stored", async () => {
+    const vaultDB = await vaultDBWithVault()
+    const vault = vaultAt(0)
+    const otherPassphrase = { ...passphraseWayin, device_id: '00000000-0000-4000-8000-0000000000d2' }
+
+    const [rekeyed] = gateMoveOf(vault, { passphrase_wayin: otherPassphrase })
+    expect(await vaultDB.replacePassphrase(rekeyed, { prior: vault })).to.deep.include({ act: 'replaced', val: rekeyed })
+    const stale = await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))
+    expect(stale).to.deep.include({ ok: false, dbhas: rekeyed }).and.to.have.nested.property('err.refusalkind', 'stale_write')
+
+    const [keyed, keyedOpts] = gateMoveOf(rekeyed, { passkey_wayin: passkeyWayin })
+    expect(await vaultDB.addPasskey(keyed, keyedOpts)).to.deep.include({ act: 'added', val: keyed })
+    const camped = await vaultDB.tryAddPasskey(...gateMoveOf(keyed, { passkey_wayin: passkeyWayin }))
+    expect(camped).to.have.nested.property('err.refusalkind', 'camped')
+    const moved = await vaultDB.tryRevokePasskey(...gateMoveOf(keyed, { passkey_wayin: null, passphrase_wayin: passphraseWayin }))
+    expect(moved).to.deep.include({ ok: false, world: keyed }).and.to.have.nested.property('err.refusalkind', 'gate_issue')
+
+    const [unkeyed, unkeyedOpts] = gateMoveOf(keyed, { passkey_wayin: null })
+    expect(await vaultDB.revokePasskey(unkeyed, unkeyedOpts)).to.deep.include({ act: 'revoked', val: unkeyed })
+    expect(await vaultDB.revokePasskey(...gateMoveOf(unkeyed, { passkey_wayin: null }))).to.deep.include({ act: 'revoked', val: unkeyed, world: unkeyed })
+    expect(await vaultDB.getVault({ ...Get, ...vaultScope, ifAbsent: 'fail', expected: unkeyed })).to.deep.include({ val: unkeyed })
   })
 })

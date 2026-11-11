@@ -246,6 +246,8 @@ Coverage check: a vault get's expected revision is not compared, so 3 vault stat
 
 ### Vault put
 
+A gate verb (replacePassphrase, addPasskey, revokePasskey) is a vault put under `ifAbsent: fail`, `ifPresent: repl` that names its verb. Where the table below answers `replaced`, the classifier adds that verb's tests of the record against the gate of the row stored, in the atomic unit that stores the record: `camped` for a passkey added over one stored, `passed` for a passkey revoked where none is stored, and a thrown `gate_issue` for a record that changes more than its verb does. Every other row answers as for any put.
+
 | #     | `v_tok` | `v_seq` | flags | vault  | act        | returning  | result |
 | ----- | :-----: | ------- | :---: | ------ | ---------- | ---------- | :----: |
 | VPV1  |  birth  | birth   |  add  | *void* | `born`     | **reqval** |   👍    |

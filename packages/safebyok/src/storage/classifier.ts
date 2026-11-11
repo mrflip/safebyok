@@ -1,5 +1,6 @@
 /** Classify a get, put or del against the stored rows, per the tables in `notes/answer-contract.md`. */
 
+import { isEqual } from 'es-toolkit'
 import * as Phrases from '../helpers/phrases'
 import * as Refuse from '../refusals/throwers'
 import * as CX from '../shapes/shapes-core'
@@ -7,7 +8,7 @@ import * as EX from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { VaultScope } from '../shapes/shapes-core'
 import type { BoxAct, BoxVaultAct, OkAct, RefusedAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
-import type { BoxAsk, BoxQuery, BoxRow, BoxSparse, Capacity, Revision, VaultAsk, VaultRecord, VaultRow, VaultTombstone } from '../shapes/shapes-storage'
+import type { BoxAsk, BoxQuery, BoxRow, BoxSparse, Capacity, Revision, VaultAsk, VaultRecord, VaultRow } from '../shapes/shapes-storage'
 
 // == [Asked and stored]: Meta, Asked, GetAsked, PutAsked, DelAsked, Presence, Stored
 // Every function below takes what was asked first, and what is stored second.
@@ -172,6 +173,41 @@ export function cappedActOf(act: BoxAct, capacity: Capacity): BoxAct {
 }
 // --
 
+// == [Gate verbs]: replacePassphraseActOf, addPasskeyActOf, revokePasskeyActOf, GateActOf
+// A gate verb is a put of the vault's record over its live row. Each has tests of its own, of the record against the gate stored:
+// they run here, over the row the adapter fetched in the step that stores the record, and never over a row a caller read earlier.
+// Each answers `replaced` for a record to store, or the act that stops it, and throws `gate_issue` for a record that changes more than its verb does.
+
+function replacePassphraseActOf(record: VaultRecord, stored: VaultRecord): VaultAct {
+  if (stored.registered_at !== record.registered_at)                      { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
+  if (record.gate.gate_epoch !== (stored.gate.gate_epoch + 1))            { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
+  if (! isEqual(record.gate.passkey_wayin, stored.gate.passkey_wayin))    { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
+  return 'replaced'
+}
+
+// `camped`: a passkey wayin is already laid on.
+function addPasskeyActOf(record: VaultRecord, stored: VaultRecord): VaultAct {
+  if (stored.registered_at !== record.registered_at)                           { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
+  if (stored.gate.passkey_wayin !== null)                                      { return 'camped' }
+  if (record.gate.gate_epoch !== (stored.gate.gate_epoch + 1))                 { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
+  if (! isEqual(record.gate.passphrase_wayin, stored.gate.passphrase_wayin))   { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
+  return 'replaced'
+}
+
+// `passed`: there is no passkey wayin to take off, and the row stored is the answer.
+function revokePasskeyActOf(record: VaultRecord, stored: VaultRecord): VaultAct {
+  if (stored.registered_at !== record.registered_at)                           { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
+  if (stored.gate.passkey_wayin === null)                                      { return 'passed' }
+  if (record.gate.gate_epoch !== (stored.gate.gate_epoch + 1))                 { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
+  if (! isEqual(record.gate.passphrase_wayin, stored.gate.passphrase_wayin))   { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
+  return 'replaced'
+}
+
+const GateActOf: Readonly<Record<EX.GateVerb, (record: VaultRecord, stored: VaultRecord) => VaultAct>> = {
+  replacePassphrase: replacePassphraseActOf, addPasskey: addPasskeyActOf, revokePasskey: revokePasskeyActOf,
+}
+// --
+
 // == [Classifying]: VaultFetched, BoxFetched, VaultClassified, BoxClassified, classifyVault, classifyBox, vaultActOf, boxActOf
 // The classifier checks each stored row once, and hands back every part of the answer it has made on the way.
 // A row that fails its checks is thrown, for the vaultDB's handler to tell of.
@@ -184,13 +220,11 @@ export type BoxFetched = Readonly<{ world: unknown, box: unknown, capacity?: Cap
 
 /** What a vault's ask comes to over the row stored. `ok` is true for a good answer and false for a refusal, and `act` says which. */
 export type VaultClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct }) & {
-  /** The vault row as this request leaves it: the record it stores, else the row stored, else the sentinel for none. */
+  /** The vault row as this ask leaves it: the record it stores, else the row stored, else the sentinel for none. */
   world:    VaultRow
-  /** A good answer's `val`, or a refusal's `dbhas`: the record this request stores, else the row stored, null for none. */
-  row:      VaultRow | null
-  /** The record for the adapter to store, null where nothing is written. */
-  write:    VaultRecord | VaultTombstone | null
-  /** What was stored before any write. */
+  /** A good answer's `val`, or a refusal's `dbhas`: the record this ask stores, else the vault row stored, null for none. */
+  vault:    VaultRow | null
+  /** What was stored at the vault's scope before any write. */
   presence: Presence
 }>
 
@@ -206,14 +240,23 @@ export type BoxClassified = Readonly<({ ok: true, act: OkAct } | { ok: false, ac
   capacity: Capacity | null
 }>
 
-/** Classify a vault's checked ask against the row an adapter fetched. Throws for a row that fails its checks. */
+// The whole of a vault's ask is settled here, top to bottom, as a box's is in `classifyBox`.
+/** What a vault's ask comes to over the row an adapter fetched for it, per the tables of `notes/answer-contract.md`.
+ * Where `isWriteAct` holds of the act, the adapter stores `ask.record`, in the step it fetched the row in.
+ * Throws for a row that fails its checks, or that is not at the scope asked for, and `gate_issue` for a gate verb's record that fails that verb's tests.
+ */
 export function classifyVault(ask: VaultAsk, { vault }: VaultFetched): VaultClassified {
-  const stored     = vaultRowAt(ask, vault, SX.storedVaultRow)
-  const act        = rowActOf(ask, stored)
-  const { presence } = stored
-  if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, world: ask.record, row: ask.record, write: ask.record, presence } }
-  const found      = { world: stored.row ?? SX.sentinelVaultOf(ask), row: stored.row, write: null, presence }
-  return isOkAct(act) ? { ...found, ok: true, act } : { ...found, ok: false, act }
+  const stored   = vaultRowAt(ask, vault, SX.storedVaultRow)
+  const { presence, row } = stored
+  const world    = row ?? SX.sentinelVaultOf(ask)
+  const tabled   = rowActOf(ask, stored)
+
+  // A gate verb's put has tests of its own, of its record against the gate of the live row it would replace.
+  const isGatePut = (ask.op === 'put') && (ask.gateVerb !== undefined) && (tabled === 'replaced') && (row?.am === 'a')
+  const act      = isGatePut ? GateActOf[ask.gateVerb](ask.record, row) : tabled
+
+  if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, world: ask.record, vault: ask.record, presence } }
+  return isOkAct(act) ? { ok: true, act, world, vault: row, presence } : { ok: false, act, world, vault: row, presence }
 }
 
 /** What is stored where `row` is a row or none. */

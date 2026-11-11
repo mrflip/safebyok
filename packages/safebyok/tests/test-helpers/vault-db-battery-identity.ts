@@ -6,7 +6,7 @@ import * as SX from '../../src/shapes/shapes-storage'
 import type { VaultDB } from '../../src/storage/vault-db'
 import { bankScope, boxAt, boxQuery, boxTombstoneOf, passkeyWayin, passphraseWayin, priorOf, vaultAt, vaultQuery, vaultScope, vaultTombstoneOf } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
-import { gateMoveOf } from './vault-db-battery-puts'
+import { gateMoveOf } from './storage-world'
 
 const vault = vaultAt()
 const box = boxAt()

@@ -135,4 +135,27 @@ describe("PostgresVaultDB's get, put and del, each given one ask", () => {
     await expect.poll(() => notices).to.deep.equal([{ act: 'got', val: heavy, world: TH.vaultAt(0) }])
     unwatch()
   })
+
+  it("runs a gate verb's tests over the vault row stored: replaced, added and revoked, and stale_write, camped and gate_issue with nothing stored", async () => {
+    const vaultDB = await vaultDBWithVault()
+    const vault = TH.vaultAt(0)
+    const otherPassphrase = { ...TH.passphraseWayin, device_id: '00000000-0000-4000-8000-0000000000d2' }
+
+    const [rekeyed] = TH.gateMoveOf(vault, { passphrase_wayin: otherPassphrase })
+    expect(await vaultDB.replacePassphrase(rekeyed, { prior: vault })).to.deep.include({ act: 'replaced', val: rekeyed })
+    const stale = await vaultDB.tryAddPasskey(...TH.gateMoveOf(vault, { passkey_wayin: TH.passkeyWayin }))
+    expect(stale).to.deep.include({ ok: false, dbhas: rekeyed }).and.to.have.nested.property('err.refusalkind', 'stale_write')
+
+    const [keyed, keyedOpts] = TH.gateMoveOf(rekeyed, { passkey_wayin: TH.passkeyWayin })
+    expect(await vaultDB.addPasskey(keyed, keyedOpts)).to.deep.include({ act: 'added', val: keyed })
+    const camped = await vaultDB.tryAddPasskey(...TH.gateMoveOf(keyed, { passkey_wayin: TH.passkeyWayin }))
+    expect(camped).to.have.nested.property('err.refusalkind', 'camped')
+    const moved = await vaultDB.tryRevokePasskey(...TH.gateMoveOf(keyed, { passkey_wayin: null, passphrase_wayin: TH.passphraseWayin }))
+    expect(moved).to.deep.include({ ok: false, world: keyed }).and.to.have.nested.property('err.refusalkind', 'gate_issue')
+
+    const [unkeyed, unkeyedOpts] = TH.gateMoveOf(keyed, { passkey_wayin: null })
+    expect(await vaultDB.revokePasskey(unkeyed, unkeyedOpts)).to.deep.include({ act: 'revoked', val: unkeyed })
+    expect(await vaultDB.revokePasskey(...TH.gateMoveOf(unkeyed, { passkey_wayin: null }))).to.deep.include({ act: 'revoked', val: unkeyed, world: unkeyed })
+    expect(await vaultDB.getVault({ ...Get, ...TH.vaultScope, ifAbsent: 'fail', expected: unkeyed })).to.deep.include({ val: unkeyed })
+  })
 })

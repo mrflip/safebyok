@@ -181,38 +181,35 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   /** Run a vault's write function `text` for the ask's record and the row it expects. */
   async #writeVault(ask: VaultPutAsk | VaultDelAsk, text: string): Promise<VaultClassified> {
     const [answer] = await this.#query(text, [JSON.stringify(ask.record), JSON.stringify(ask.expected)]) as [VaultAnswered]
-    return this.classifyVault(ask, answer)
+    const classified = this.classifyVault(ask, answer)
+    if ((! answer.ok) && DB.isWriteAct(classified.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
+    return classified
   }
 
   /** Run a box's write function `text` for the ask's record and the row it expects. */
   async #writeBox(ask: BoxPutAsk | BoxDelAsk, text: string): Promise<BoxClassified> {
     const [answer] = await this.#query(text, [JSON.stringify(ask.record), JSON.stringify(ask.expected), this.#maxBoxes]) as [BoxAnswered]
-    return this.classifyBox(ask, answer)
+    const classified = this.classifyBox(ask, answer)
+    if ((! answer.ok) && DB.isWriteAct(classified.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
+    return classified
   }
   // --
 
   // == [Classifying]: classifyVault, classifyBox
   // A write function tests an ask and stores its record in one call. A record it stored is the answer as it stands, once its parts are checked:
   // nothing is classified. Where it stored nothing, or the ask was only fetched for, the core's classifier names what the ask comes to over the rows answered.
+  // A write the classifier names over rows the function refused to store over is a fault, thrown where the function was called.
 
   protected override classifyVault(ask: VaultAsk, answered: VaultAnswered): VaultClassified {
-    if ((answered.ok !== true) || (ask.op === 'get')) {
-      const classified = super.classifyVault(ask, answered)
-      if (classified.write !== null) { throw DB.unexpectedError(new Error(StoredNothing)) }
-      return classified
-    }
+    if ((answered.ok !== true) || (ask.op === 'get')) { return super.classifyVault(ask, answered) }
     const { act, presence } = storedVerdict.parse(answered)
     const vault = DB.storedVaultRow.parseConsistent(answered.vault, { ...DB.vaultScope.parse(ask), revision_tok: ask.record.revision_tok }, RowOfOtherAddress)
-    return { ok: true, act, world: vault, row: vault, write: null, presence }
+    return { ok: true, act, world: vault, vault, presence }
   }
 
   protected override classifyBox(ask: BoxAsk, answered: BoxAnswered): BoxClassified {
     const capacity = (answered.boxcount === undefined) ? null : this.#roomAt(answered.boxcount)
-    if ((answered.ok !== true) || (ask.op === 'get')) {
-      const classified = super.classifyBox(ask, { world: answered.world, box: answered.box, capacity })
-      if (DB.isWriteAct(classified.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
-      return classified
-    }
+    if ((answered.ok !== true) || (ask.op === 'get')) { return super.classifyBox(ask, { world: answered.world, box: answered.box, capacity }) }
     const { act, presence } = storedVerdict.parse(answered)
     const world = worldRow.parseConsistent(answered.world, DB.vaultScope.parse(ask), RowOfOtherAddress)
     const box   = DB.storedBoxRow.parseConsistent(answered.box, { ...DB.boxQuery.parse(ask), revision_tok: ask.record.revision_tok }, RowOfOtherAddress)
@@ -243,7 +240,17 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   // nothing over that row is only classified, over the rows as fetched: whatever is stored, the classifier names no write for it.
   protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
     if (! mayReplace(ask)) { return this.classifyVault(ask, await this.#fetchVault(ask)) }
+    if (ask.gateVerb !== undefined) { return await this.#putGateVerb(ask) }
     return await this.#writeVault(ask, isBirth(ask) ? BirthVaultSql : ReviseVaultSql)
+  }
+
+  // A gate verb's tests read the gate of the row stored, and the classifier makes them. So its put is classified first, over
+  // the row fetched. Where that names a write, the function stores the record only over that same revision of the row:
+  // the row tested is the row replaced, or nothing is stored and the ask is classified again over the row as it now stands.
+  async #putGateVerb(ask: VaultPutAsk): Promise<VaultClassified> {
+    const classified = this.classifyVault(ask, await this.#fetchVault(ask))
+    if (! DB.isWriteAct(classified.act)) { return classified }
+    return await this.#writeVault(ask, ReviseVaultSql)
   }
 
   protected async doPutBox(ask: BoxPutAsk): Promise<BoxClassified> {

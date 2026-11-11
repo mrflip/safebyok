@@ -337,6 +337,13 @@ const isRevisionTokNew = ({ record, expected }: Cited): boolean => (record.revis
 const isExpectedWhole  = ({ expected }: Expecting): boolean => (expected.revision_tok === VoidRevisionTok) === (expected.revision_seq === VoidRevisionSeq)
 const isExpectedInLife = ({ vault_tok, expected }: { vault_tok: string, expected: { vault_tok: string } }): boolean => expected.vault_tok === vault_tok
 
+// `addPasskey` lays a passkey wayin on and `revokePasskey` takes it off, so the record each stores has one, or none.
+function isGateVerbRecord({ gateVerb, record }: { gateVerb?: EX.GateVerb | undefined, record: { gate: { passkey_wayin: unknown } } }): boolean {
+  if (gateVerb === 'addPasskey')    { return record.gate.passkey_wayin !== null }
+  if (gateVerb === 'revokePasskey') { return record.gate.passkey_wayin === null }
+  return true
+}
+
 // An ask and its record share no field but those of the address, so the two agree where the record is at the ask's address.
 const isRecordAtAsk    = ({ record, ...asked }: { record: object }): boolean => consistent(record, asked)
 
@@ -383,10 +390,13 @@ export const { boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vau
   }).refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
   const vaultPut = vaultScope.extend({
     op: lit('put'), ...putPolicies, expected: rowMeta, record: vaultRecord,
+    /** The gate verb this put is for, whose tests the classifier adds over the live row it replaces. */
+    gateVerb: oneof(EX.gateVerbVals).optional(),
   }).refine(isSeqNext,        Phrases.SeqNotNext)
     .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
     .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
     .refine(isRecordAtAsk,    Phrases.RecordOfOtherAddress)
+    .refine(isGateVerbRecord, Phrases.GateVerbRecordMismatch)
     .refine(({ record, expected }) => isLifeTokPlaced(record.vault_tok, expected.vault_tok, expected.am, record.am), Phrases.LifeTokMisplaced)
   const vaultDel = vaultScope.extend({
     op: lit('del'), expected: rowMeta, record: vaultTombstone,
@@ -416,7 +426,7 @@ export type BoxPutAsk   = Extract<BoxAsk,   { op: 'put' }>
 export type BoxDelAsk   = Extract<BoxAsk,   { op: 'del' }>
 /** What `getVault` is asked: the vault's scope, the row its caller holds or the sentinel for none, and what to answer over none. */
 export type VaultGetAsk = Extract<VaultAsk, { op: 'get' }>
-/** What `putVault` is asked: the vault's scope, the record to store, the row it expects to find, and what to do over a live row or over none. */
+/** What `putVault` is asked: the vault's scope, the record to store, the row it expects to find, what to do over a live row or over none, and the gate verb it is for, if any. */
 export type VaultPutAsk = Extract<VaultAsk, { op: 'put' }>
 /** What `delVault` is asked: the vault's scope, the tombstone to store, and the row it expects to find. */
 export type VaultDelAsk = Extract<VaultAsk, { op: 'del' }>

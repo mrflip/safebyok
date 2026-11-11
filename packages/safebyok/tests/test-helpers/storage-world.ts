@@ -2,7 +2,7 @@
 
 import * as SX from '../../src/shapes/shapes-storage'
 import type { Boxscope, VaultScope } from '../../src/shapes/shapes-core'
-import type { BoxRecord, BoxTombstone, Revision, VaultRecord, VaultTombstone } from '../../src/shapes/shapes-storage'
+import type { BoxRecord, BoxTombstone, Gate, Revision, VaultRecord, VaultTombstone } from '../../src/shapes/shapes-storage'
 
 /** The bank the records stand in. */
 export const bankScope  = { applabel: 'acme', user_id: 'u1' }
@@ -69,5 +69,11 @@ export const boxTombstoneOf = (record: BoxRecord): BoxTombstone => SX.boxTombsto
 
 /** The revision a record stands at, as a call's prior. */
 export const priorOf = SX.revisionOf
+/** A gate verb's arguments: `vault` at its next revision, its `gate_epoch` one up and `moved` laid over its gate, and the revision `vault` stands at. */
+export const gateMoveOf = (vault: VaultRecord, moved: Partial<Gate>) => {
+  const prior = priorOf(vault)
+  const record: VaultRecord = { ...vault, ...SX.nextRevisionOf(prior, Now + 1), gate: { ...vault.gate, gate_epoch: vault.gate.gate_epoch + 1, ...moved } }
+  return [record, { prior }] as const
+}
 /** A revision no record in these tests stands at. */
 export const stale: Revision = { revision_tok: 'nope', revision_seq: 7 }

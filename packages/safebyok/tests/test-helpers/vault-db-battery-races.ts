@@ -7,7 +7,7 @@ import type { VaultRow, WatchScope } from '../../src/shapes/shapes-storage'
 import type { AdapterVaultDB, Notice, VaultDB } from '../../src/storage/vault-db'
 import { bankScope, vaultScope, boxscope, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, priorOf, vaultQuery, boxQuery } from './storage-world'
 import { aWhile, beforeNextCall } from './timing'
-import { gateMoveOf } from './vault-db-battery-puts'
+import { gateMoveOf } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
 
 /** The answers that were written, and those refused. */

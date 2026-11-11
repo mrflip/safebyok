@@ -4,18 +4,11 @@ import { describe, expect, it } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { Gate, VaultRecord } from '../../src/shapes/shapes-storage'
-import { vaultScope, boxscope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, boxFlaws, vaultFlaws, vaultTombstoneOf, boxTombstoneOf, priorOf, stale, boxQuery } from './storage-world'
+import { vaultScope, boxscope, Now, passphraseWayin, passkeyWayin, vaultAt, boxAt, boxFlaws, vaultFlaws, vaultTombstoneOf, boxTombstoneOf, priorOf, stale, boxQuery, gateMoveOf } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
 
 const anyIfPresent = ['repl', 'fail', 'get'] as const
 const anyIfAbsent  = ['add', 'fail'] as const
-
-/** A gate verb's arguments: the next record after `vault`, `moved` laid on its gate and its `gate_epoch` one up, and the revision it replaces. */
-export const gateMoveOf = (vault: VaultRecord, moved: Partial<Gate>) => {
-  const prior = priorOf(vault)
-  const record: VaultRecord = { ...vault, ...SX.nextRevisionOf(prior, Now + 1), gate: { ...vault.gate, gate_epoch: vault.gate.gate_epoch + 1, ...moved } }
-  return [record, { prior }] as const
-}
 
 /** Registers the puts' and gate verbs' cases over `world`. */
 export const describePuts = ({ fresh, putWith, rowsOf, hasCap, makeCapped }: BatteryWorld): void => {
