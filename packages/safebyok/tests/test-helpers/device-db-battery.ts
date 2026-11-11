@@ -121,10 +121,10 @@ export const describeDeviceDBBattery = <DBT extends DeviceDB>(label: string, opt
         expect(again?.proved_at).to.eq(T0)
       })
 
-      it.skipIf(noRows)("peeks null for a stored row that fails its check", async () => {
+      it.skipIf(noRows)("refuses to peek a stored row that fails its check", async () => {
         const deviceDB = await fresh()
         await rowsOf(deviceDB).plantLeaseRow(vaultScope, { ...asked, proved_at: 'yesterday' })
-        expect(await deviceDB.peek(asked)).to.be.null
+        await expectRefusal(deviceDB.peek(asked), 'damaged_lease')
       })
 
       it("refuses a malformed row or query", async () => {
