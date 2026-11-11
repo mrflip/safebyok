@@ -85,7 +85,7 @@ export type BoxesFetched = { vault: unknown, boxes: RowOfBox[] }
 export type Heard = { vault?: unknown, box?: unknown }
 // --
 
-// == [What a model calls]: VaultDB, VaultDBVerbnames
+// == [Abstract interface]: VaultDB, VaultDBVerbnames
 
 /** The verbs a model calls on a vaultDB, each with its `try*` form. */
 export interface VaultDB {
@@ -145,7 +145,7 @@ export interface VaultDB {
   watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: VaultError) => void): () => void
 }
 
-/** The name of each verb of {@link VaultDB}, as a duck check asks a vaultDB to answer each with a function. */
+/** The name of each verb of {@link VaultDB}: a duck check asks a vaultDB to answer each with a function. */
 export const VaultDBVerbnames = [
   'listVaults', 'tryListVaults', 'getVault', 'tryGetVault', 'listBoxes', 'tryListBoxes', 'getBox', 'tryGetBox',
   'putVault', 'tryPutVault', 'putBox', 'tryPutBox',
@@ -159,15 +159,15 @@ true satisfies Z.core.util.AssertEqual<typeof VaultDBVerbnames[number], Exclude<
 const noUnwatching = (): void => undefined
 const noBadNews = (_news: VaultError): void => undefined
 
-/** The base of a vaultDB. Each verb throws its refusal and returns its answer; each `try*` answers either.
- * A subclass writes only the generic `do*` calls, each one atomic step.
+/** The base of an adapter vaultDB (one that wraps a datastore rather than another vaultDB).
+ * A subclass writes the generic `do*` calls: each base operation is one atomic step.
+ * See notes/answer-contract.md for details.
  */
 export abstract class AdapterVaultDB implements VaultDB {
   // == [Props]: #maxRecordBytes, IsVaultDB, IsAdapterVaultDB
 
   readonly #maxRecordBytes: number
 
-  // A getter on the class, never an own field, so the brand neither serializes nor rides along in a spread.
   /** True: the brand a model knows a vaultDB by, from whichever copy of safebyok. */
   get [IsVaultDB](): true { return true }
 
@@ -183,39 +183,35 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
   // --
 
-  // == [An ask and its answer]: classifyVault, classifyBox, vaultAnswerOf, boxAnswerOf, answerThrown
-  // A get, put or del checks its ask once and hands it on whole. Its `do*` call answers what the classifier made of the ask,
-  // and that is the answer but for its names: nothing is checked or shaped again on the way back.
+  // == [An ask and its answer]: classifyVault, classifyBox, vaultAnswerOf, boxAnswerOf, answerForRefusal
 
-  /** What a vault's ask comes to over the row fetched for it. A subclass's `do*` calls this inside its atomic step, and may replace it. */
+  /** Tag a vault operation's outcome -- stale_write, deleted, replaced, etc. -- to route and shape the answer. */
   protected classifyVault(ask: VaultAsk, fetched: VaultFetched): VaultClassified { return classifyVault(ask, fetched) }
 
-  /** What a box's ask comes to over the rows fetched for it. A subclass's `do*` calls this inside its atomic step, and may replace it. */
+  /** Tag a box operation's outcome -- stale_write, deleted, replaced, etc. -- to route and shape the answer. */
   protected classifyBox(ask: BoxAsk, fetched: BoxFetched): BoxClassified { return classifyBox(ask, fetched) }
 
-  /** The answer of a vault's `call`, made of what its ask came to. */
-  protected vaultAnswerOf(call: string, ask: VaultAsk, classified: VaultClassified): VaultAnswer {
+  /** Convert the classified vault outcome into an answer  */
+  protected vaultAnswerOf(call: string, ask: VaultAsk, stored: VaultClassified): VaultAnswer {
     const req_params = SX.reqParamsOf(ask)
-    const { act, world, vault } = classified
-    if (classified.ok) { return { ok: true, req_params, act: classified.act, val: vault, world } }
-    return { ok: false, req_params, act, world, dbhas: vault, err: Refuse.actRefused('vault', classified.act, { call, req_params }) }
+    const { act, world, vault } = stored
+    if (stored.ok) { return { ok: true, req_params, act: stored.act, val: vault, world } }
+    return { ok: false, req_params, act, world, dbhas: vault, err: Refuse.actRefused('vault', stored.act, { call, req_params }) }
   }
 
-  /** The answer of a box's `call`, made of what its ask came to. */
-  protected boxAnswerOf(call: string, ask: BoxAsk, classified: BoxClassified): BoxAnswer {
+  /** Convert the classified box outcome into an answer. */
+  protected boxAnswerOf(call: string, ask: BoxAsk, stored: BoxClassified): BoxAnswer {
     const req_params = SX.reqParamsOf(ask)
-    const { act, world, box, capacity } = classified
-    if (classified.ok) { return { ok: true, req_params, act: classified.act, val: box, world } }
+    const { act, world, box, capacity } = stored
+    if (stored.ok) { return { ok: true, req_params, act: stored.act, val: box, world } }
     const meta = { call, req_params, ...((act === 'vault_full') && (capacity !== null) && { capacity }) }
-    return { ok: false, req_params, act, world, dbhas: box, err: Refuse.actRefused('box', classified.act, meta) }
+    return { ok: false, req_params, act, world, dbhas: box, err: Refuse.actRefused('box', stored.act, meta) }
   }
 
   // Every throw under a get, put or del lands here: an ask that fails its checks, a stored row that fails its own, a store that is down.
   /** The answer of a `call` that threw: the refusal as it came, anything else as `storage_unavailable`. A subclass may tell one refusal from another here. */
-  protected answerThrown(thrown: unknown, call: string, ask: unknown): BadAnswer {
-    // An ask that failed its check has no metadata to trust: its answer carries none.
-    const params = SX.requestParams.safeParse(ask)
-    return badAnswerOf(refusalOf(thrown, call, params.success ? params.data : {}))
+  protected answerForRefusal(err: unknown, callerlabel: string, ask: unknown): BadAnswer {
+    return badAnswerOf(refusalOf(err, callerlabel, ask))
   }
   // --
 
@@ -234,7 +230,7 @@ export abstract class AdapterVaultDB implements VaultDB {
         if (listed === null) { val.damaged_rows.push(SX.damagedVaultOf(address)) } else { val.vaults.push(listed) }
       }
       return { ok: true, req_params, act: (rows.length > 0) ? 'got' : 'gotvoid', val, world: bankScope }
-    } catch (err) { throw refusalOf(err, 'listVaults', req_params) }
+    } catch (err) { throw refusalOf(err, 'listVaults', bankScope) }
   }
 
   /** Non-throwing form of {@link listVaults}. */
@@ -247,8 +243,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryGetVault(ask: VaultGetAsk): Promise<VaultAnswer> {
     try {
       const checked = SX.vaultGet.parse(ask)
-      return this.vaultAnswerOf('getVault', checked, await this.doGetVault(checked))
-    } catch (err) { return this.answerThrown(err, 'getVault', ask) }
+      const stored = await this.doGetVault(checked)
+      return this.vaultAnswerOf('getVault', checked, stored)
+    } catch (err) { return this.answerForRefusal(err, 'getVault', ask) }
   }
 
   /** The boxes under this `vault_tok`, sparse, with its vault row as `world`. */
@@ -264,7 +261,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const act = boxVaultActOf(vaultQuery, world)
       if (act !== null) { return { ok: false, req_params, act, world, err: Refuse.actRefused('box', act, { call: 'listBoxes', req_params }) } }
       return { ok: true, req_params, act: (boxes.length > 0) ? 'got' : 'gotvoid', val: listedBoxesOf(vaultQuery, boxes), world }
-    } catch (err) { return this.answerThrown(err, 'listBoxes', asked) }
+    } catch (err) { return this.answerForRefusal(err, 'listBoxes', asked) }
   }
 
   /** The box under this `vault_tok`, with its vault row as `world`. Over none stored, `ifAbsent: 'nil'` answers null, and over a tombstone, the tombstone. */
@@ -274,8 +271,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryGetBox(ask: BoxGetAsk): Promise<BoxAnswer> {
     try {
       const checked = SX.boxGet.parse(ask)
-      return this.boxAnswerOf('getBox', checked, await this.doGetBox(checked))
-    } catch (err) { return this.answerThrown(err, 'getBox', ask) }
+      const stored = await this.doGetBox(checked)
+      return this.boxAnswerOf('getBox', checked, stored)
+    } catch (err) { return this.answerForRefusal(err, 'getBox', ask) }
   }
   // --
 
@@ -288,8 +286,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryPutVault(ask: VaultPutAsk): Promise<VaultAnswer> {
     try {
       const checked = SX.vaultPut.parse(ask)
-      return this.vaultAnswerOf('putVault', checked, await this.doPutVault(checked))
-    } catch (err) { return this.answerThrown(err, 'putVault', ask) }
+      const stored = await this.doPutVault(checked)
+      return this.vaultAnswerOf('putVault', checked, stored)
+    } catch (err) { return this.answerForRefusal(err, 'putVault', ask) }
   }
 
   /** Throws `box_too_large` for a record over what this vaultDB stores in one row. */
@@ -306,8 +305,9 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const checked = SX.boxPut.parse(ask)
       this.#demandEnoughVolume(checked)
-      return this.boxAnswerOf('putBox', checked, await this.doPutBox(checked))
-    } catch (err) { return this.answerThrown(err, 'putBox', ask) }
+      const stored = await this.doPutBox(checked)
+      return this.boxAnswerOf('putBox', checked, stored)
+    } catch (err) { return this.answerForRefusal(err, 'putBox', ask) }
   }
   // --
 
@@ -324,7 +324,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const vaultRecord = SX.vaultRecord.parse(record)
       const answer = await this.tryPutVault(gateAskOf('replacePassphrase', vaultRecord, opts))
       return answer.ok ? { ...answer, act: 'replaced', val: vaultRecord, world: vaultRecord } : answer
-    } catch (err) { return this.answerThrown(err, 'replacePassphrase', { ...record, ...opts }) }
+    } catch (err) { return this.answerForRefusal(err, 'replacePassphrase', { ...record, ...opts }) }
   }
 
   /** Puts `record`, the vault row at `opts.prior`, which has no passkey wayin, with one laid on and its `gate_epoch` one up. */
@@ -336,7 +336,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const vaultRecord = SX.passkeyAddRecord.parse(record)
       const answer = await this.tryPutVault(gateAskOf('addPasskey', vaultRecord, opts))
       return answer.ok ? { ...answer, act: 'added', val: vaultRecord, world: vaultRecord } : answer
-    } catch (err) { return this.answerThrown(err, 'addPasskey', { ...record, ...opts }) }
+    } catch (err) { return this.answerForRefusal(err, 'addPasskey', { ...record, ...opts }) }
   }
 
   /** Puts `record`, the vault row at `opts.prior` with no passkey wayin and its `gate_epoch` one up; a row with none answers as stored. */
@@ -351,7 +351,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       // `passed`: the vault stored has no passkey wayin to take off, and its row is the answer.
       const val = (answer.act === 'passed') ? liveVaultOf(answer.world, vaultRecord) : vaultRecord
       return { ...answer, act: 'revoked', val, world: val }
-    } catch (err) { return this.answerThrown(err, 'revokePasskey', { ...record, ...opts }) }
+    } catch (err) { return this.answerForRefusal(err, 'revokePasskey', { ...record, ...opts }) }
   }
   // --
 
@@ -364,8 +364,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryDelBox(ask: BoxDelAsk): Promise<BoxAnswer> {
     try {
       const checked = SX.boxDel.parse(ask)
-      return this.boxAnswerOf('delBox', checked, await this.doDelBox(checked))
-    } catch (err) { return this.answerThrown(err, 'delBox', ask) }
+      const stored = await this.doDelBox(checked)
+      return this.boxAnswerOf('delBox', checked, stored)
+    } catch (err) { return this.answerForRefusal(err, 'delBox', ask) }
   }
 
   /** Stores the tombstone `ask.record` over the live vault row `ask.expected`, and deletes the boxes of its life. */
@@ -375,8 +376,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryDelVault(ask: VaultDelAsk): Promise<VaultAnswer> {
     try {
       const checked = SX.vaultDel.parse(ask)
-      return this.vaultAnswerOf('delVault', checked, await this.doDelVault(checked))
-    } catch (err) { return this.answerThrown(err, 'delVault', ask) }
+      const stored = await this.doDelVault(checked)
+      return this.vaultAnswerOf('delVault', checked, stored)
+    } catch (err) { return this.answerForRefusal(err, 'delVault', ask) }
   }
 
   /** For hosts: removes the box rows of tombstoned or vanished vaults, and counts those left. */
@@ -386,7 +388,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const val = await this.doTidyGone(bankScope)
       return { ok: true, req_params, act: 'tidied', val, world: bankScope }
-    } catch (err) { throw refusalOf(err, 'tidyGone', req_params) }
+    } catch (err) { throw refusalOf(err, 'tidyGone', bankScope) }
   }
 
   /** Non-throwing form of {@link tidyGone}. */
@@ -444,10 +446,12 @@ function goodOrThrow<ValT, ActT extends string, WorldT>(answer: Answer<ValT, Act
   return answer
 }
 
-/** The refusal a verb's throw stands for: a refusal as it came, else `storage_unavailable`. */
-const refusalOf = (thrown: unknown, call: string, req_params: ReqParams): VaultError => {
+/** The refusal a verb's throw stands for: a refusal as it came, else `storage_unavailable`, naming the call and the metadata of what was asked. */
+const refusalOf = (thrown: unknown, call: string, ask: unknown): VaultError => {
   const refusal = storageTroubleOf(thrown)
-  return Object.assign(refusal, { meta: { ...refusal.meta, call, req_params } })
+  // A request that failed its check has no metadata to trust: its refusal carries none.
+  const params = SX.requestParams.safeParse(ask)
+  return Object.assign(refusal, { meta: { ...refusal.meta, call, req_params: params.success ? params.data : {} } })
 }
 
 /** The put a gate verb makes: `record` over the live vault row at `opts.prior`, in the same life, naming the verb. */
