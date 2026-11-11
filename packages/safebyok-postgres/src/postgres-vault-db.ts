@@ -246,14 +246,18 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
     const { expected } = ask
     if (! mayPutOver(ask)) { return this.classifyVault(ask, await this.#fetchVault(ask.record)) }
-    if (expected.revision_seq === DB.VoidRevisionSeq) { return await this.#writeVault(ask, BirthVaultSql, []) }
+    if (isBirth(ask)) {
+      return await this.#writeVault(ask, BirthVaultSql, [])
+    }
     return await this.#writeVault(ask, ReviseVaultSql, [expected.revision_tok, expected.am])
   }
 
   protected async doPutBox(ask: BoxPutAsk): Promise<BoxClassified> {
     const { expected } = ask
     if (! mayPutOver(ask)) { return this.classifyBox(ask, await this.#fetchBox(ask.record)) }
-    if (expected.revision_seq === DB.VoidRevisionSeq) { return await this.#writeBox(ask, BirthBoxSql, []) }
+    if (isBirth(ask)) {
+      return await this.#writeBox(ask, BirthBoxSql, [])
+    }
     return await this.#writeBox(ask, ReviseBoxSql, [expected.revision_tok, expected.am])
   }
 
@@ -347,13 +351,18 @@ const unlistenOnceListening = async (listening: Promise<(() => unknown) | null>)
 }
 // --
 
-// == [Rows and asks]: rowsFrom, mayPutOver
+// == [Rows and asks]: rowsFrom, isBirth, mayPutOver
 
 async function rowsFrom(queryable: PostgresQueryable, text: string, params: unknown[]): Promise<unknown[]> {
   const { rows } = await queryable.query(text, params)
   return rows
 }
 
+
+/** True where a put expects no row stored, so its record is a first one. */
+function isBirth({ expected }: BoxPutAsk | VaultPutAsk): boolean {
+  return expected.revision_seq === DB.VoidRevisionSeq
+}
 
 /** True where a put's policies let it store its record over the row it expects: over none or a tombstone under `ifAbsent: 'add'`, over a live row under `ifPresent: 'repl'`. */
 function mayPutOver({ expected, ifAbsent, ifPresent }: BoxPutAsk | VaultPutAsk): boolean {
