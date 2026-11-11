@@ -1,5 +1,5 @@
 import type { Modelkind } from '../helpers/consts'
-import { consistent } from '../helpers/validator'
+import { isConsistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
 import { type CipherCtxRecord, cipherBytes, cipherCtx, decipherBytes, makeBoxKey, makeLeaseKey, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
@@ -70,7 +70,7 @@ export class Lease implements LeaseStamp {
         await friend.tryForgetLease()
         return null
       }
-      if (! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
+      if (! isConsistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
         await friend.tryForgetLease()
         throw damagedLease()
       }

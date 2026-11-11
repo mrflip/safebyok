@@ -1,7 +1,7 @@
 /** What the vaultDB and the deviceDB write and accept, and their helpers. Imported as `SX`. */
 
 import type * as Z from 'zod'
-import { Checker, Checkers, consistent, objCheck, objStrip } from '../helpers/validator'
+import { Checker, Checkers, isConsistent, objCheck, objStrip } from '../helpers/validator'
 import * as Phrases from '../helpers/phrases'
 import { randomId } from '../helpers/crypto'
 import * as EX from './shapes-enums'
@@ -345,7 +345,7 @@ function isGateVerbRecord({ gateVerb, record }: { gateVerb?: EX.GateVerb | undef
 }
 
 // A request and its record share only the address fields, so they agree when the record is at the request's address.
-const isRecordAtAsk    = ({ record, ...asked }: { record: object }): boolean => consistent(record, asked)
+const isRecordAtAsk    = ({ record, ...asked }: { record: object }): boolean => isConsistent(record, asked)
 
 /** True when a record's `lifeTok` is that of the live row it replaces, or a new one when it creates or deletes the row. */
 function isLifeTokPlaced(lifeTok: string, expectedLifeTok: string, expectedAm: EX.Am, recordAm: EX.Am): boolean {

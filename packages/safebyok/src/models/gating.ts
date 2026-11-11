@@ -107,11 +107,11 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   }
   // --
 
-  // == [The attempt]: checkStrength, attempt, refusalOfAttempt, attemptOnce
+  // == [The attempt]: judgeStrength, attempt, refusalOfAttempt, attemptOnce
 
   /** The verdict on a passphrase, as the user types it. Nothing changes. */
-  async checkStrength(passphraseClear: string): Promise<GX.PassphraseVerdict> {
-    return Proving.checkStrength(GX.passphraseCleartext.parse(passphraseClear), this.#scope, this.#listing.world)
+  async judgeStrength(passphraseClear: string): Promise<GX.PassphraseVerdict> {
+    return Proving.judgeStrength(GX.passphraseCleartext.parse(passphraseClear), this.#scope, this.#listing.world)
   }
 
   /** SLOPDOC: The one door for a cleartext: tries what the user typed once, and answers how it went as an Outcome. */

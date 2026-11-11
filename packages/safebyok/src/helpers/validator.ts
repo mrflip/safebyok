@@ -1,4 +1,4 @@
-/** `Checkers`, `Checker`, `objCheck`, `objStrict` and `objStrip`, where every validator is made, and the {@link Kit} its builders are handed; and `consistent`, `demandConsistent` and `verifyConsistent`, which compare one bag to another, as a validator's `parseConsistent` does. */
+/** `Checkers`, `Checker`, `objCheck`, `objStrict` and `objStrip`, where every validator is made, and the {@link Kit} its builders are handed; and `isConsistent`, `demandConsistent` and `checkedConsistent`, which compare one bag to another, as a validator's `parseConsistent` does. */
 
 import * as Zod from 'zod'
 import type * as Z from 'zod'
@@ -79,7 +79,7 @@ export type Merged<SourcesT extends readonly object[]> =
  * and makes it so (`SX.vaultRow.refusingAs('record_conflict')`), rather than listing its fields twice.
  *
  * A validator of an object also has `parseConsistent(val, other, refusal?)`: it parses `val`,
- * checks the result against `other` as {@link verifyConsistent} does, and returns the result. Where they
+ * checks the result against `other` as {@link checkedConsistent} does, and returns the result. Where they
  * disagree it refuses `kind`, or the `refusal` given: its `kind`, its `message`, or both. A
  * `refusal` can also carry a `where` and `advice`, which frame a failed parse as `parse`'s do.
  *
@@ -208,7 +208,7 @@ const refusing = <SchemaT extends Z.ZodType>(kind: Refusalkind, schema: SchemaT)
     throw refusalOf(kind, result.error, framing)
   }
   const parseConsistent = (val: unknown, other: object, { where, advice, ...refusal }: Partial<ConsistencyRefusal> & Story = {}): Z.output<SchemaT> => (
-    verifyConsistent(parse(val, { where, advice }) as Z.output<SchemaT> & object, other, { kind, ...refusal })
+    checkedConsistent(parse(val, { where, advice }) as Z.output<SchemaT> & object, other, { kind, ...refusal })
   )
   // A clone, not `Object.create`: Zod binds each schema's own methods to it, so a schema that only
   // inherited them would render to JSON Schema as the one it came from, losing a pipe's or a lazy's place.
@@ -258,7 +258,7 @@ const framed = (said: string, { where, advice }: Story): string => {
 }
 // --
 
-// == [Consistency]: consistent, demandConsistent, verifyConsistent, disagreeing
+// == [Consistency]: isConsistent, demandConsistent, checkedConsistent, disagreeing
 
 /** True when `bag` agrees with `other` wherever both make an assertion: each field defined in both (present, and not undefined) is `===`.
  * A field only one of them has, or has as undefined, is passed by. The fields compared are
@@ -267,11 +267,11 @@ const framed = (said: string, { where, advice }: Story): string => {
  * is compared: hand it only the fields meant. An absent field passes, so a value an absent field
  * must fail is parsed first. Either bag not an object refuses.
  *
- * @example consistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' })   // true: no field is defined in both
+ * @example isConsistent({ user_id: 'u1', boxlabel: undefined }, { boxlabel: 'openai' })   // true: no field is defined in both
  */
-export const consistent = (bag: object, other: object): boolean => disagreeing(bag, other).length === 0
+export const isConsistent = (bag: object, other: object): boolean => disagreeing(bag, other).length === 0
 
-/** True once `bag` is {@link consistent} with `other`: a VaultError of `refusal.kind` otherwise, naming the fields that disagree in `meta.fieldnames`, and in its message unless `refusal.message` says its own.
+/** True once `bag` is {@link isConsistent} with `other`: a VaultError of `refusal.kind` otherwise, naming the fields that disagree in `meta.fieldnames`, and in its message unless `refusal.message` says its own.
  * The kind is the caller's to choose, as the caller knows what a disagreement means: a scope of
  * another user, a record of another vault. A `refusal` that is none refuses.
  *
@@ -285,8 +285,8 @@ export const demandConsistent = (bag: object, other: object, refusal: Consistenc
   throw new VaultError(kind, said ?? Phrases.fieldsDisagree(fieldnames), { meta: { fieldnames } })
 }
 
-/** `bag`, once it is {@link consistent} with `other`: refuses as {@link demandConsistent} does. For a bag already parsed; a {@link Refusing}'s `parseConsistent` is this over its `parse`. */
-export const verifyConsistent = <BagT extends object>(bag: BagT, other: object, refusal: ConsistencyRefusal): BagT => {
+/** `bag`, once it is {@link isConsistent} with `other`: refuses as {@link demandConsistent} does. For a bag already parsed; a {@link Refusing}'s `parseConsistent` is this over its `parse`. */
+export const checkedConsistent = <BagT extends object>(bag: BagT, other: object, refusal: ConsistencyRefusal): BagT => {
   demandConsistent(bag, other, refusal)
   return bag
 }

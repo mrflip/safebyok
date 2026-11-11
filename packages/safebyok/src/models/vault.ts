@@ -1,5 +1,5 @@
 import type { Modelkind } from '../helpers/consts'
-import { verifyConsistent } from '../helpers/validator'
+import { checkedConsistent } from '../helpers/validator'
 import * as Phrases from '../helpers/phrases'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { type Outcome, demandGood, outcomeOf } from '../refusals/outcome'
@@ -335,7 +335,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   #demandLease(stamp: CipherCtxRecord): Lease {
     this.demandEnabled().demandPresent()
-    verifyConsistent(stamp, this.#stampOfLife(), { kind: 'unexpected_error', message: Phrases.StampOfOtherVault })
+    checkedConsistent(stamp, this.#stampOfLife(), { kind: 'unexpected_error', message: Phrases.StampOfOtherVault })
     if (this.#lease === null) { throw unlockFirst() }
     return this.#lease
   }

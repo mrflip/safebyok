@@ -230,7 +230,7 @@ propose, not a precedent.
 **`ensure` acquires or constructs, idempotently.** `bank.ensureVault({ vaultlabel })`,
 `vault.ensureUnlocked()`: have one, or make it so, and return it, so a second call costs
 nothing. A function that only checks and refuses is not an `ensure`: it is a `check`
-(`checkBoxlabel(label)`, `checkStrength(passphrase)`), a `demand` (below), or a `parse` when it
+(`checkBoxlabel(label)`, `checkUnwraps(wrongCleartext)`), a `demand` (below), or a `parse` when it
 also returns the cleaned value (*Validation*). Reviewers: an `ensure` that returns nothing is
 misnamed.
 

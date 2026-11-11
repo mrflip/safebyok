@@ -114,7 +114,7 @@ describe("a birth through a gating", () => {
     const { listing, gatingAt } = birthWorld({ strengthChecker })
     void listing.tryBuildVault(Dna)
     const gating = await gatingAt<'build_vault'>()
-    expect(await gating.checkStrength('weak')).to.deep.equal({ strong: false, reason: "too short" })
+    expect(await gating.judgeStrength('weak')).to.deep.equal({ strong: false, reason: "too short" })
     expect(gating.isOpen).to.be.true
     gating.dismiss()
   })
@@ -123,7 +123,7 @@ describe("a birth through a gating", () => {
     const { listing, gatingAt } = birthWorld({ strengthChecker })
     void listing.tryBuildVault(Dna)
     const gating = await gatingAt<'build_vault'>()
-    await TH.expectRefusal(gating.checkStrength(null as never))
+    await TH.expectRefusal(gating.judgeStrength(null as never))
     gating.dismiss()
   })
 

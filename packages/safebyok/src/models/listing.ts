@@ -2,7 +2,7 @@
 
 import { isEqual } from 'es-toolkit'
 import { UNANSWERED } from '../helpers/consts'
-import { verifyConsistent } from '../helpers/validator'
+import { checkedConsistent } from '../helpers/validator'
 import { oneAtATime } from '../helpers/one-at-a-time'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { type GoodAnswer, type Notice as VaultDBNotice, type VaultDB, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
@@ -317,7 +317,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const record = answer.val
     // An `act: 'passed'` put returns the stored row. Its revision does not match the one sent, so only its scope is checked.
     const pins = (answer.act === 'passed') ? this.scopeOf(sent) : SX.reqParamsOf(sent)
-    if (record !== null) { verifyConsistent(record, pins, { kind: 'storage_issue', message: Phrases.AnswerNotAsSent }) }
+    if (record !== null) { checkedConsistent(record, pins, { kind: 'storage_issue', message: Phrases.AnswerNotAsSent }) }
     return (record === null) ? this.#receiveNothing(this.scopeOf(sent)) : this.buildOrReceive(record)
   }
 
@@ -412,7 +412,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Demands a `record` whose scope is `scope`, the one the answer that carries it names. */
   #demandRecordOfScope(record: Fetched<RecordT, SparseT>, scope: ScopeT): void {
-    verifyConsistent(this.scopeOf(record), scope, { kind: 'storage_issue', message: Phrases.RecordOfOtherScope })
+    checkedConsistent(this.scopeOf(record), scope, { kind: 'storage_issue', message: Phrases.RecordOfOtherScope })
   }
   // --
 

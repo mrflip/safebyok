@@ -1,7 +1,7 @@
 import { isEqual } from 'es-toolkit'
 import { nowMillis } from '../helpers/clock'
 import * as Phrases from '../helpers/phrases'
-import { verifyConsistent } from '../helpers/validator'
+import { checkedConsistent } from '../helpers/validator'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type WhisperedBag, isWhisperedBag } from '../helpers/consts'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
@@ -178,7 +178,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     const pins = { ...SX.reqParams.parse(asked), ...scope }
     const { maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)
     await this.ensureDeletable({ maxMillisSinceRefresh, maxWorldMillis }); this.demandDeletable()
-    verifyConsistent(this.sparse, pins, { kind: 'stale_write', message: Phrases.DelOfOtherRevision })
+    checkedConsistent(this.sparse, pins, { kind: 'stale_write', message: Phrases.DelOfOtherRevision })
     await this.listing.del(this.sparse)
     return this
   }

@@ -62,7 +62,7 @@ variable and zeroes them. A stored wayin is read from the gate, which also suppl
 
 ```text
 PassphraseProving.buildNovel(stamp, passphraseClear, world)
-├─ checkStrength(passphraseClear, scope)     weak → 'weak_passphrase'
+├─ judgeStrength(passphraseClear, scope)     weak → 'weak_passphrase'
 ├─ mintPassphraseHeader                      key_deriver_label, salt_b64, device_id, registered_at
 └─ passphraseKeyOf(keyDeriver, cleartext, salt)  bytes zeroed; non-extractable #wayinKey
 
@@ -94,7 +94,7 @@ proving's.
 A caller always needs the proving of the current gate itself, not only whether it succeeded: it is the only
 thing that can unwrap the vaultKey, for the next wayin and for the next lease. So there is no `demandMatch`.
 
-`gating.checkStrength`, for the live check as the user types, calls the same `checkStrength`.
+`gating.judgeStrength`, for the live check as the user types, calls the same `judgeStrength`.
 
 "May re-enter" below means a correctable refusal: the host receives the refusal, and the gating stays open,
 so the host can shake its dialog and let the user try again. Nothing retries.

@@ -26,7 +26,7 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  * it came and anything else with what it threw as the cause, so a vault that cannot check a new passphrase never opens.
  *
  * `safebyok/browser` ships `zxcvbnStrengthChecker`, or pass your own (notes/configuration.md). To ask it as the user types, call
- * `gating.checkStrength(typed)`, which answers its verdict.
+ * `gating.judgeStrength(typed)`, which answers its verdict.
  *
  * - A blank passphrase is sent back as a weak passphrase, unconditionally, without consulting the checker.
  * - The default strength checker refuses everything: see notes/configuration.md for why we do this, and instructions to supply one.

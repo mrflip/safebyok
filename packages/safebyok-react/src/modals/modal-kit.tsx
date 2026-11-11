@@ -237,7 +237,7 @@ export const useChosenPassphrase = (gating: AnyGating, source: BoundarySource) =
     setIsStrong(false)
     if (typed === '') { setAdvice(null); return }
     try {
-      const verdict = await gating.checkStrength(typed)
+      const verdict = await gating.judgeStrength(typed)
       if (askedNow !== asked.current) { return }
       setAdvice(verdict.strong ? null : verdict.reason)
       setIsStrong(verdict.strong)

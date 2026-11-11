@@ -159,11 +159,11 @@ bytes. Everything not listed never sees the value. Private methods are named wit
 `gating.attempt` → `#attemptOnce`, inside the gating's `outcomeOf` → its kind's act (`buildVault`, `unlockVault`,
 `replacePassphrase`, `addPasskey`, `revokePasskey`, `delVault`, `models/gating.ts`) → `checkedCleartexts` (`GX.vaultBuildCleartexts`, `vaultUnlockCleartexts`, `passphraseReplaceCleartexts`,
 `passkeyAddCleartexts`, `passkeyRevokeCleartexts`, `vaultDelCleartexts`: shape only, `passphraseCleartext`) → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
-`buildNovel` → `Proving.checkStrength` → the world's `strengthChecker`, as `guardStrengthChecker`
+`buildNovel` → `Proving.judgeStrength` → the world's `strengthChecker`, as `guardStrengthChecker`
 (`helpers/passphrase-strength.ts`) wraps it → the host's `strengthChecker`; both → `passphraseKeyOf` → the world's
 `keyDeriver.deriveKeyBytes`, as `guardKeyDeriver` wraps it → `deriveKeyBytes` → the host's `keyDeriver.deriveKeyBytes`
 (`argon2idDeriver`'s, from `deriver/argon2id-webv1.ts`, or the host's own). As the user types, before any attempt:
-`gating.checkStrength` → `Proving.checkStrength`, as above.
+`gating.judgeStrength` → `Proving.judgeStrength`, as above.
 Operates on it without having it: nothing; a passphrase has no handle form.
 
 **Passkey PRF answer.** Naked: `safebyok-react`'s `createPasskey`, `askPasskey` → `answerOf`,
@@ -230,10 +230,10 @@ whisper out → `Box.#unseal` → `vault.unsealStampedString` → `Lease.unsealW
 **G1. A passphrase is never a field.** Inside the core a passphrase is only ever a function
 argument or a local. The gating's `attempt` passes the cleartexts to `#attemptOnce`, which passes them to its
 kind's act (`models/gating.ts`), whose `checkedCleartexts` reads them. The act passes the
-passphrase to `PassphraseProving.buildNovel` or `buildStored`; `buildNovel` passes it to `Proving.checkStrength`; and
+passphrase to `PassphraseProving.buildNovel` or `buildStored`; `buildNovel` passes it to `Proving.judgeStrength`; and
 each of the two passes it to `passphraseKeyOf`, which passes it, through the `guardKeyDeriver` wrapper and
 `deriveKeyBytes`, to the host's `keyDeriver.deriveKeyBytes` (`models/proving.ts`).
-`gating.checkStrength` passes a passphrase to `Proving.checkStrength` as the user types. No class, record, snapshot or
+`gating.judgeStrength` passes a passphrase to `Proving.judgeStrength` as the user types. No class, record, snapshot or
 closure that outlives the call keeps it: no gate or vault is ever given a passphrase, and
 past its `Proving` builders an act uses only the provings. The only comparison of two
 passphrases is `antePassphraseClear === nextPassphraseClear` in the `replacePassphrase` act, both
@@ -390,7 +390,7 @@ the row, and returns null). *Host obligation, documented:* a `strengthChecker`'s
 
 **G9. Only `Gating`, `Proving` and `Lease` have or use a key or its cleartext pre-image.** A passkey's PRF bytes count as a pre-image.
 Besides them a passphrase passes through the host functions of G1, through their wrappers, and through
-`Proving.checkStrength` on its way to one. `src/models/proving.ts` and `src/models/lease.ts` are the only modules
+`Proving.judgeStrength` on its way to one. `src/models/proving.ts` and `src/models/lease.ts` are the only modules
 that import `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes`, `decipherBytes` or a key maker. The wayinKey lives only
 in `Proving.#wayinKey`; the leaseKey only in `Lease.#record` and the row cached on the device. The Vault keeps its
 `Lease` private, in `#lease`, and neither the Vault nor the Bank has a lease record: `Proving.buildLease` makes the

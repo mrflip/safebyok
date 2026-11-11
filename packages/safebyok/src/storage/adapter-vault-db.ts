@@ -4,7 +4,7 @@ import type * as Z from 'zod'
 import { DefaultMaxRecordSizeEst, IsAdapterVaultDB, IsVaultDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
 import * as Phrases from '../helpers/phrases'
-import { verifyConsistent } from '../helpers/validator'
+import { checkedConsistent } from '../helpers/validator'
 import type { VaultError } from '../refusals/errors'
 import { outcomeOf, storageTroubleOf } from '../refusals/outcome'
 import * as SX from '../shapes/shapes-storage'
@@ -376,7 +376,7 @@ const RowOfOtherAddress = { kind: 'storage_issue', message: Phrases.rowOfOtherAd
 function listedRowOf<RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknown, address: object): RowT | null {
   if (! CX.isPlainBag(raw)) { throw Refuse.storageIssue() }
   const parsed = rowCheck.safeParse(raw)
-  return parsed.success ? verifyConsistent(parsed.data, address, RowOfOtherAddress) : null
+  return parsed.success ? checkedConsistent(parsed.data, address, RowOfOtherAddress) : null
 }
 
 /** Return the given `stored` vault, if live at the asked-for `vault_tok`. Otherwise throw
