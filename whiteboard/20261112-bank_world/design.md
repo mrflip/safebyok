@@ -146,7 +146,7 @@ Fourteen verbs and `watch`, each with its `try*` form, against `VaultDB`'s twelv
 | `delBank` | the bank row, and every gate, vault and box row under it | the bank's tombstone | none |
 | `getVault`, `putVault`, `delVault` | a vault row | the row | the bank row |
 | `listBoxes`, `getBox`, `putBox`, `delBox` | box rows | the rows | the vault row |
-| `tidyGone` | the bank | a count | the vault and box rows of an ended life deleted |
+| `tidyGone` | the vault and box rows of an ended life, under the bank | a count of the rows deleted | none |
 | `watch` | a bank scope, or a vault scope | notices of bank, gate and vault rows, or of box rows | |
 
 `ensureBank`'s ask is `{ op, user_id, banklabel, gates: ['main'] }`, and `gates` must be exactly

@@ -25,6 +25,10 @@ What the threads have taught, newer than the plan where they disagree. Kept by t
 
 ## Lessons for later threads
 
+* *Orchestrator:* **an opus worker compacts about every ten minutes of heavy reading.** Thread 3 (size M) compacted four times, the last during its first justify. Size threads smaller than the plan did: 4 is split (4b, the battery); 8 must be cut into more than 8 and 8b before it starts. A handoff should name the files to open, so the worker reads less to find them.
+* *Thread 3:* shapes in `src/shapes/shapes-bankdb.ts` (BX), answers in `src/storage/bank-db.ts`, classifier `src/storage/bank-classifier.ts` with one entry per family (`classifyEnsureBank`, `classifyBuildBank`, `classifyStoredGate`, `classifyDelBank`, `classifyStoredVault`, `classifyStoredBox`, `classifyStoredBoxes`). `classifyDelBank` leaves the cascade to the adapter. Duplicated classifier tables and `bankBadActVals` go at thread 16.
+* *Thread 3's calls, by rules 2 and 17* (on Cleanup, *Your calls*): box verbs see only the vault row, not the bank, as today; a gate row under another `bank_tok` is no row (gate verbs refuse `ahead`, ensure and build throw `damaged_row`); no `damaged_bank` (a damaged bank row refuses `damaged_row`); `buildBank`'s policy cells refuse `bad_record` at the ask's check, not `gate_issue`.
+
 * *Orchestrator:* thread 1 put `user_id` before `banklabel` everywhere; `packages/safebyok/tests/.snapshots` is hidden from `rg` (search it by path). Convex indexes already led with `user_id, banklabel`. Stable stringify sorts keys, so field order never moves a ctx's bytes.
 * *Thread 2:* a rename's search needs `rg --no-ignore --hidden` to reach `tests/.snapshots`. `human/` and `notes/security.md` are dated ledgers and keep old names.
 * *Orchestrator:* `/code-review` returned an empty result in thread 1's reviewer worktree, with no error. A reviewer that gets an empty return reviews by hand against its charge and says so.

@@ -110,10 +110,19 @@ refusals could hold, take the one that falls out. **Size**: M.
 validators and exports. **Levels**: worker `opus`; review `medium`. **After**: 3. **Look-ahead**:
 the `do*` list it reports goes into the progress document for 5 and 13 to 15. **Size**: M-L.
 
+### 4b `bankdb_battery`
+
+*Orchestrator, split from 4 after thread 3 compacted four times on a smaller thread:* the battery
+an adapter runs to show it conforms, copied from `tests/test-helpers/vault-db-battery*` then edited
+(rule 10), run against `MemoryBankDB`, mending what it finds in 4's code. **Levels**: worker `opus`;
+review `low`. **After**: 4. **Look-ahead**: 5 and 13 to 15 run it. **Size**: M.
+
 ### 5 `bankdb_idb`
 
 `IdbBankDB` beside `IdbVaultDB` (copy then edit). **Levels**: worker `sonnet`; review `low`.
-**After**: 4. **Size**: S-M.
+**After**: 4b. *Orchestrator:* also the Coach's two IndexedDB rulings (progress document): every
+database the library opens is named `safebyok-…`, and the device row records the npm package
+version when it is ensured. **Size**: S-M.
 
 ### 6 `device_owner`
 
