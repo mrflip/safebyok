@@ -134,6 +134,8 @@ paragraph; the reviewer's guarantees check covers it). **After**: 2; beside 3 to
 **Look-ahead**: thread 8 has the Device ask `ensureBank` and launch `build_bank`; the one open
 gating lives on the Device from here. A move, not a redesign (the Coach). **Size**: M-L.
 
+*Review:* `fixed` (sonnet, medium; [#661](https://github.com/mrflip/safebyok/pull/661)). Host-function guarantee holds; three style/docs fixes. Left: the changeset's silence on the lost forced re-list and stale `Bank.make` words (both to thread 7 as two-liners); `BankAnnouncement`/`BankPanic` names and a documentarian pass (Open Matters); four races carried (Cleanup). Filed rebased onto main at `85ce9dd5b`.
+
 ### 7 `plain_del`
 
 `vault.del()` asks nobody; `vault.hello()` is `vault.beginWatch()`. **Levels**: worker `opus`;
