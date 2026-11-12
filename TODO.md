@@ -280,6 +280,13 @@ so a lock that lands during an unlock's proof leaves the vault unlocked. Still o
   the user, whereas a lock that lands one step later makes the call refuse with 'vault_locked'.
   Decide whether the opening hello is a step at which a lock makes the call refuse.
 
+### Should there be a notification for vacate, delete, sweep and lock events?
+
+The Coach (2026-11-12), not for the bank_world sprint. Thread 10 left the device's flag as the only
+enabled flag, so a thing learns of its end only by asking (`isEnabled`, or a call that refuses); a
+host or a listener hears no event at a vacate, a delete, a sweep or a lock beyond the device's one
+tell. Decide whether each of these is announced, to whom, and whether a listener can tell which.
+
 ### Must the passphrase be asked again once a vault has a passkey?
 
 The Gripefest doc's NOT YET row G530: whether asking for the passphrase again whenever a lease
