@@ -430,7 +430,7 @@ The first pairs (`create`, `demandUnsealable`) are in `notes/gallant.md`.
  * Refuses 'insecure_context' first, in a page the browser says is not a secure context. Then
  * 'bad_option' for anything but a bag, or for an option it does not take, of the wrong type or out
  * of range, every one it finds named in one refusal led by "In Bank.make's options"; then
- * 'bad_scope' for an `banklabel` that is not a label or a `user_id` that fails its check; then
+ * 'bad_scope' for a `user_id` that fails its check or a `banklabel` that is not a label; then
  * 'bad_option' for a key deriver a vault does not keep, or a clock that throws or reads out of
  * bounds. The limits are held to the default `vaultDB`'s here, and to a vault's own at its birth.
  */

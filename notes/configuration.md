@@ -73,7 +73,7 @@ spread wins. It supplies no `device_id`: keep your own, a `crypto.randomUUID()` 
 import { Bank } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 
-const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), banklabel: 'acme', user_id, device_id, vaultDB, requestCleartext })
+const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), user_id, banklabel: 'acme', device_id, vaultDB, requestCleartext })
 ```
 
 Why these live in `safebyok/browser` rather than as `Bank.make`'s defaults is
@@ -93,7 +93,7 @@ const strengthChecker = Object.assign(async (typed: string, scope: VaultScope) =
   return zxcvbnStrengthChecker(typed, scope)
 }, { load: zxcvbnStrengthChecker.load })
 
-const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), strengthChecker, banklabel: 'acme', user_id, device_id, vaultDB, requestCleartext })
+const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), strengthChecker, user_id, banklabel: 'acme', device_id, vaultDB, requestCleartext })
 ```
 
 ### Leaving it out: your own
