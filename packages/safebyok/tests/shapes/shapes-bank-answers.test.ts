@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 import * as WX from '../../src/shapes/shapes-bank-answers'
+import * as BX from '../../src/shapes/shapes-bankdb'
 import { VaultError } from '../../src/refusals/errors'
 import { MemoryBankDB } from '../../src/storage/memory-bank-db'
 import type { Answer, Notice } from '../../src/storage/bank-db'
@@ -65,11 +66,12 @@ describe("WX's answer checks", () => {
     }
   })
 
-  it("reads a delBank answer that leaves out its parent as having none", async () => {
+  it("refuses a delBank answer that leaves out its parent, main", async () => {
     const bankDB = await bankDBWithBox()
     const deleted = await bankDB.tryDelBank(bankDelAskOf(bankAt()))
+    expect(WX.delBankAnswer.parse(crossed(deleted))).to.deep.include({ ok: true, parent: BX.BankTop })
     const { parent: _parent, ...sent } = crossed(deleted) as Record<string, unknown>
-    expect(WX.delBankAnswer.parse(sent)).to.deep.include({ ok: true, parent: null })
+    expect(() => WX.delBankAnswer.parse(sent)).to.throw(VaultError).with.property('refusalkind', 'unexpected_error')
   })
 
   it("parses a serialized refusal to a VaultError of its kind, with its parent", async () => {
@@ -113,5 +115,15 @@ describe("WX's answer checks", () => {
       const sent = JSON.parse(JSON.stringify({ ok: true, ...notice }, (_ckey, field: unknown) => field ?? null)) as unknown
       expect(WX.crossedNotice.parse(sent)).to.deep.equal({ ok: true, val: notice })
     }
+  })
+
+  it("gives a bank row's notice the parent main when it crosses with none, and a vault row's notice none", () => {
+    const bankRow     = bankAt()
+    const bankNotice  = { ok: true, act: 'gotlive', val: bankRow, parent: null, err: null }
+    const vaultNotice = { ok: true, act: 'gotlive', val: vaultAt(), parent: null, err: null }
+    const bankHeard   = WX.crossedNotice.parse(bankNotice)
+    const vaultHeard  = WX.crossedNotice.parse(vaultNotice)
+    expect(bankHeard).to.deep.equal({ ok: true, val: { act: 'gotlive', val: bankRow, parent: BX.BankTop } })
+    expect(vaultHeard).to.deep.equal({ ok: true, val: { act: 'gotlive', val: vaultAt(), parent: null } })
   })
 })

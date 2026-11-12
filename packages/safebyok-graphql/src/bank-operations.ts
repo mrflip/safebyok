@@ -114,6 +114,7 @@ ${gateAnswerFragments}`,
   safebyokDelBank(ask: $ask) {
     ok act
     val { ${bankFields} }
+    parent
     dbhas { ${bankFields} }
     ask { ...SafebyokAskFields }
     err { ...SafebyokErrFields }

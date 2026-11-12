@@ -3,7 +3,7 @@
 
 import { expect, it, onTestFinished, vi } from 'vitest'
 import type * as DB from 'safebyok/storage'
-import type { BX } from 'safebyok/storage'
+import { BX } from 'safebyok/storage'
 import type { PostgresBankDB } from 'safebyok-postgres'
 import * as TH from './test-helpers'
 
@@ -55,6 +55,6 @@ TH.describeOnPostgres('battery', "PostgresBankDB over a real Postgres", () => {
     const bank = { ...BW.bankAt(), user_id }
     const other = await TH.bankDBOver(db)
     await other.buildBank(BW.bankBuildAskOf(bank, { ...BW.gateAt(), user_id }))
-    await vi.waitFor(() => { expect(notices).to.deep.include({ act: 'gotlive', val: bank, parent: null }) })
+    await vi.waitFor(() => { expect(notices).to.deep.include({ act: 'gotlive', val: bank, parent: BX.BankTop }) })
   })
 })

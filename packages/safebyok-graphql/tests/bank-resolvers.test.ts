@@ -186,7 +186,7 @@ describe("bankResolvers", () => {
     const tidied = BX.tidyGoneAnswer.parse(await sent(schema, BankOperations.tidyGone, BW.bankScope))
     expect(tidied).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 0 }, parent: BW.bankScope })
     const goneBank = BX.delBankAnswer.parse(await sentAsk(schema, BankOperations.delBank, BX.bankDel, BW.bankDelAskOf(bank)))
-    expect(goneBank).to.deep.include({ ok: true, act: 'deleted', val: BW.bankTombstoneOf(bank), parent: null })
+    expect(goneBank).to.deep.include({ ok: true, act: 'deleted', val: BW.bankTombstoneOf(bank), parent: BX.BankTop })
   })
 
   it("holds a request to the user its ask names, refusing a record filed under another user", async () => {
@@ -268,6 +268,14 @@ describe("bankResolvers' watch", () => {
     await bankDB.putBox(boxBorn)
     expect(await nextNotice()).to.have.nested.property('val.val.boxlabel', BW.boxAt().boxlabel)
     expect(listening.size).to.eq(1)
+    await stream.return(undefined)
+  })
+
+  it("reads a bank row's notice with the parent main, though it crosses with none: a GraphQL union cannot hold main", async () => {
+    const { bankDB, schema } = await watchedServer()
+    const { stream, nextNotice } = await watching(schema, { user_id: 'u1' }, BW.bankScope)
+    await bankDB.delBank(BW.bankDelAskOf(BW.bankAt()))
+    expect(await nextNotice()).to.deep.eq({ ok: true, val: { act: 'gotgone', val: BW.bankTombstoneOf(BW.bankAt()), parent: BX.BankTop } })
     await stream.return(undefined)
   })
 

@@ -137,7 +137,9 @@ export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): Bank
         // Check the sign-in again at every notice. A session revoked after it subscribed gets one last notice
         // carrying the refusal. The stream is cancelled, so the read after that is done.
         const revoked = await signInRefusalOf(context, scope.user_id)
-        if (revoked === null) { return { done: false, value: { ok: true, ...read.value, err: null } } }
+        // A GraphQL union cannot hold the string `main`: a bank row's notice crosses with a null parent, and the client restores it.
+        const { parent } = read.value
+        if (revoked === null) { return { done: false, value: { ok: true, ...read.value, parent: (parent === BX.BankTop) ? null : parent, err: null } } }
         await reader.cancel()
         return { done: false, value: badNoticeOf(revoked) }
       },

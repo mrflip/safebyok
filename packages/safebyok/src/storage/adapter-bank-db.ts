@@ -135,9 +135,9 @@ export abstract class AdapterBankDB implements BankDB {
       const checked     = BX.bankDel.parse(ask)
       const loggableAsk = BX.loggableAsk.parse(checked)
       const stored      = await this.doDelBank(checked)
-      if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.bank, parent: null } }
+      if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.bank, parent: BX.BankTop } }
       const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'delBank', ask: loggableAsk })
-      return { ok: false, ask: loggableAsk, act: stored.act, parent: null, dbhas: stored.bank, err: refusal }
+      return { ok: false, ask: loggableAsk, act: stored.act, parent: BX.BankTop, dbhas: stored.bank, err: refusal }
     } catch (err) { return this.answerForRefusal(err, 'delBank', ask) }
   }
   // --
@@ -339,7 +339,7 @@ export abstract class AdapterBankDB implements BankDB {
       const val   = BX.noticedRow.safeParse(row)
       const above = (parent === undefined) ? null : BX.noticedParent.safeParse(parent)
       if ((! val.success) || ((above !== null) && (! above.success))) { return }
-      onNotice({ act: (val.data.am === 'x') ? 'gotgone' : 'gotlive', val: val.data, parent: above?.data ?? null })
+      onNotice({ act: (val.data.am === 'x') ? 'gotgone' : 'gotlive', val: val.data, parent: BX.noticeParentOf(val.data, above?.data ?? null) })
     }, onBadNews)
   }
   // --
