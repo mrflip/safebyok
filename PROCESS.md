@@ -12,8 +12,33 @@ Work goes in **threads**: one line of work, one branch, one PR. A branch is name
 and progress for a thread that takes more than a sitting go in `whiteboard/YYYYMMDD-<label>/`.
 
 Within a thread you have standing permission to commit, push its branch, and open its PR without
-asking. Commit at natural milestones: a set of related changes, with `pnpm justify` green. Do not
-commit mid-refactor or on a timer.
+asking. Commit at natural milestones: a set of related changes, tested as you judge (*Proving*).
+Do not commit mid-refactor or on a timer.
+
+### Proving
+
+The tests are a tool for writing good code: while you build, run what you judge, a file, a
+folder or a package (`pnpm --filter <pkg> test`, `pnpm --filter <pkg> test --changed`).
+`pnpm justify` runs everything, and is for confidence that CI will pass. When a thread is
+**ready** is stated once, in the thread-worker's *Ready* step (`.claude/agents/thread-worker.md`),
+and in a line of CLAUDE.md's *Commands*; a session outside a sprint holds itself to the same.
+These run a task over the packages changed since `base` and their dependents, with `base` the
+thread's `sprintbase` (`git config branch.<branch>.sprintbase`), or `git merge-base origin/main
+HEAD` outside a sprint:
+
+```sh
+pnpm --filter "...[$base]" --filter '!{.}' lint
+pnpm --filter "...[$base]" --filter '!{.}' typecheck
+pnpm --filter "...[$base]" --filter '!{.}' test
+```
+
+`[$base]` counts a changed root file as the workspace root's alone, and the root's scripts run
+every package, so `!{.}` leaves the root out: `pnpm justify:root` proves root files (`scripts/`,
+`tests/scripts/`, root config), and `pnpm lint:workflows` a workflow. A change to what the
+packages share (`tsconfig.base.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`) is the root's too,
+yet binds every package. Each package's `test` builds its own dependencies first. Once ready,
+label the PR `ci` and push (*Pull requests*): CI runs the whole suite, and `scripts/file-thread`'s
+full justify is the gate.
 
 ### A worktree per thread
 
@@ -62,9 +87,10 @@ Comments, doc blocks and READMEs across a whole target are brought to plain Engl
 * **A PR's page shows the commits between it and its base.** In a stack every PR has base `main`
   (the "Stacked on #N" line carries the order), so it lists the PRs below it until they merge,
   then only its own commits.
-* **Every commit reaches main individually**, so each should pass `pnpm justify`. An
-  intermediate red commit is allowed only when it isolates something, say a large mechanical
-  change from the thoughtful repairs after it, and the PR says so.
+* **Every commit reaches main individually**, so each should pass `pnpm justify`, though only the
+  tip is proven (*Proving*). An intermediate red commit is allowed only when it isolates
+  something, say a large mechanical change from the thoughtful repairs after it, and the PR says
+  so.
 * **Force-push only with an explicit lease**: `--force-with-lease=<branch>:<sha you rebased from>`,
   the branch's tip when you started from it, never one fetched since. A lease read off a fresh
   fetch always matches, so it guards nothing. Never plain `--force`, and never a branch that isn't your
@@ -115,9 +141,9 @@ would change the code in the PR -- are asked in chat, and lead the PR's body unt
 
 * **Draft while you work.** Open the PR as a draft (`gh pr create --draft`) when you first push
   the branch, and push to it as the work goes: CI holds a draft's jobs until it carries the label
-  `ci` (`notes/ci.md`). When you expect it green, add the label (`gh pr edit <n> --add-label
-  ci`), then catch it up onto its base's current tip and push: CI reads the label at each push,
-  and adding it starts nothing. Then run your last `pnpm justify` while CI runs. Before you
+  `ci` (`notes/ci.md`). Once it is proven ready (*Proving*), add the label (`gh pr edit <n>
+  --add-label ci`), then catch it up onto its base's current tip and push: CI reads the label at
+  each push, and adding it starts nothing. Before you
   report back -- to the Coach, or in a sprint to the orchestrator -- it carries `ci` and its head
   was pushed after the label, whatever the report says. It stays a draft until it is ready to
   merge: in a sprint the orchestrator takes it out of draft, once it is filed and the line below

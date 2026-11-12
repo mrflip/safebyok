@@ -111,6 +111,14 @@ sprinting or not, which is why those are one sentence of when to use it.
   reviewer's fixes. The Coach agreed on 2026-11-12 that the reviewer proves only the suites its
   fixes touch, and `file-thread`'s justify is the gate: a dependent package a fix breaks comes back
   from it as exit 4, to a worker.
+* **A worker is ready on its changed packages' suites, not a full justify** (the Coach,
+  2026-11-12: "the tests are a tool for you to write good code"). CLAUDE.md asked for `pnpm
+  justify` green before every commit, many runs a thread, each spending most of its time on
+  lint and on packages the thread never touched. A worker tests as it judges, proves lint,
+  typecheck and test on what it changed and its dependents (pnpm's `...[<sprintbase>]` filter,
+  the root left out), and pushes; CI runs the whole suite beside the review, and `file-thread`'s
+  justify stays the gate. The threshold is stated once, in the worker's *Ready* step and a line of
+  CLAUDE.md, so a revision is a small edit.
 * **CI holds a draft until it carries `ci`, and reads the label only at a push.** Workers push
   drafts often, and a run on each filled the queue. A `labeled` trigger started CI the moment a
   worker labelled its PR, but it fired on every label (the Coach's `queue`, Dependabot's), and a

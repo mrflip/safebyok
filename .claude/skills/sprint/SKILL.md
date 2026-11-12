@@ -47,7 +47,7 @@ sprint directory on in full, since workers read it from theirs.
   teach, and say so in its gloss. Read the whole request before writing any of this, because
   later threads bend earlier ones: a capability built in thread 3 and reused in thread 5 is
   designed once, for both. A worker's context only grows, and is compacted at about 170k tokens,
-  so size a thread to reach its first `pnpm justify` in one context: a thread that would build
+  so size a thread to reach its readiness check in one context: a thread that would build
   two features, carries more than about four items that touch different code, or plainly runs
   long, is two threads or more.
 * *For the Coach*: anything already visible that needs a human.
@@ -130,10 +130,10 @@ Read: <what this handoff does not already carry, by section>.
 ```
 
 The worker's PR stays a draft, and CI holds a draft until it carries the label `ci`, so the worker
-pushes freely; when it expects green it adds the label, then catches up onto its base and pushes
-(`scripts/file-thread --catch-up`), which starts CI, and runs its last `pnpm justify` while CI
-runs. CI reads the label at a push and never on its own (`notes/ci.md`): a label added after the
-last push runs nothing. It never takes the PR out of draft: that is yours (*File*, below).
+pushes freely. It tests as it judges while it builds, and is ready by its *Ready* step's
+threshold (`thread-worker.md`, where it is stated once). Then it adds the label, catches up onto its base and pushes
+(`scripts/file-thread --catch-up`), which starts CI on the whole suite. CI reads the label at a
+push and never on its own (`notes/ci.md`): a label added after the last push runs nothing. It never takes the PR out of draft: that is yours (*File*, below).
 
 Every worker and reviewer sings out what it has turned to (`scripts/ohai`), and a hook logs each
 compaction with its best guess at the agent, by that `description`. To see where each agent
@@ -155,7 +155,7 @@ harness keeps apart from the main checkout.
 Review of thread <N> of sprint <sprint_name>. Thread worktree: <root>, branch <branch>, PR #<n>.
 Range: <base-sha>...<tip-sha>. Review level: <level>. Style pass: <model, if not the default>.
 The plan's gloss: <the thread's gloss, verbatim>.
-Compactions: <none | when, and before or after the worker's first justify>.
+Compactions: <none | when, and before or after the worker's readiness check>.
 ```
 
 The tip is `git -C <root> rev-parse HEAD`; the base is `git config branch.<branch>.sprintbase`

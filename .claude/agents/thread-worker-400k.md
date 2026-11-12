@@ -45,8 +45,8 @@ whole only the files you are about to edit through.
 every agent at once. Begin with who you are, as far as you know it: `scripts/ohai --begin
 --role thread-worker --sprint <sprint> --thread <N> --model <your model id> <job>`, where the
 job is building, filing or reworking a review; the script adds your branch and what the shell
-knows of you. Then sing each time you turn to a new kind of work: proving (your first
-`pnpm justify`), repairing tests, repairing lint errors, repairing types, resolving a rebase
+knows of you. Then sing each time you turn to a new kind of work: proving (your readiness
+check, or a `pnpm justify`), repairing tests, repairing lint errors, repairing types, resolving a rebase
 conflict, writing the thread file, and the report you are about to make (`ready`, `filed`,
 `blocked`). Chain it onto the command that starts the work,
 `cd <root> && scripts/ohai repairing lint errors && pnpm lint`, so it costs no turn.
@@ -59,9 +59,9 @@ the diff.
 
 ## The thread
 
-1. **Build**, committing at milestones: related changes together, `pnpm justify` green, messages
-   in PROCESS.md's *Commit messages* style, and a changeset (PROCESS.md, *Releases*). Local
-   checkpoints are yours to fold away before you first push. Stop only the processes you
+1. **Build**, committing at milestones: related changes together, tested as you judge (a file, a
+   folder, a package), messages in PROCESS.md's *Commit messages* style, and a changeset
+   (PROCESS.md, *Releases*). Local checkpoints are yours to fold away before you first push. Stop only the processes you
    started, by their PIDs, never by a pattern. Scratch files go where your handoff says.
 2. **Draft.** At your first milestone, start your thread file (*Syndication*) with what you know
    so far, push the branch with the credential helper PROCESS.md names, and open its PR as a
@@ -69,22 +69,26 @@ the diff.
    until it carries the label `ci`, so push as often as you like: each milestone at least, with
    the thread file brought up to date, since the Coach follows the thread there. Your context is
    compacted at about 170k tokens, so the thread file is your own memory as well as the Coach's.
-   A push need not wait on `pnpm justify`; `ready` does. Once pushed, a commit is not rewritten
+   A push need not wait on a proof; `ready` does. Once pushed, a commit is not rewritten
    except by a catch-up rebase.
-3. **Ready.** When you expect green -- everything committed, the thread file finished and
-   committed (`plan:`) but not yet pushed -- label, catch up, and let CI run beside your last
-   proof:
-   1. Add the label `ci` (`gh pr edit <n> --add-label ci`). CI reads it at each push; adding it
+3. **Ready.** With everything committed, and the thread file finished and committed (`plan:`)
+   but not yet pushed, prove, label and catch up:
+   1. Prove it ready (PROCESS.md, *Proving*): lint, typecheck and test green for the packages you
+      changed and their dependents (`pnpm --filter "...[$base]" --filter '!{.}' <task>`, with
+      `base=$(git config branch.<branch>.sprintbase)`), plus `pnpm justify:root` for root files
+      and `pnpm lint:workflows` for a workflow. Changed what the packages share, or judge it
+      worth the wait: the full `pnpm justify`. Red: fix and commit.
+   2. Add the label `ci` (`gh pr edit <n> --add-label ci`). CI reads it at each push; adding it
       starts nothing, so it goes on before the push.
-   2. Run `scripts/file-thread --catch-up <root>`, which rebases as filing would, onto your
+   3. Run `scripts/file-thread --catch-up <root>`, which rebases as filing would, onto your
       base's current tip (the base thread's branch on origin, or origin/main once it has merged),
       records `sprintbase`, and pushes under a lease. That push starts CI, and the unpushed
       `plan:` commit makes sure there is a push to make. On exit 3, resolve the conflict as
       *Picking up a built thread* says, then run it again.
-   3. Only then run your last `pnpm justify`, while CI runs. Red: fix, commit and push again.
 
-   Green, bring the PR's title and body up to date -- a **Tests:** line, *Open questions* -- and
-   report `ready`. The PR stays a draft: `ready` is a report, never `gh pr ready`; the
+   Then bring the PR's title and body up to date -- a **Tests:** line, *Open questions* -- and
+   report `ready`. CI runs the whole suite beside the review, and filing's full `pnpm justify`
+   is the gate. The PR stays a draft: `ready` is a report, never `gh pr ready`; the
    orchestrator, or the Coach, takes it out of draft once it is filed and the line below it is
    green. Finish the thread file for a fresh agent: rework after a review goes to one,
    so name the approaches you set aside and why, as well as the one you took.
@@ -132,7 +136,7 @@ The same facts, to different readers, at different altitudes.
   ```markdown
   # Thread N: <name> (YYYY-MM-DD)
 
-  Branch `YYYYMMDD-<label>`, PR #N, stacked on #M. Justify: <counts, or what is red and why>.
+  Branch `YYYYMMDD-<label>`, PR #N, stacked on #M. Proved: <commands and counts, or what is red and why>.
 
   * **Built**: what exists now that did not, and where.
   * **Decisions taken**: choices the plan left open, with the reason.
@@ -149,7 +153,7 @@ The same facts, to different readers, at different altitudes.
 * **The sprint doc** is the orchestrator's alone: what belongs there goes in your report.
 * **Your reports** -- the orchestrator's, which it acts on; the Coach reads your thread file and
   PR, so keep a report short. Lead with a status line: `ready` | `filed` | `blocked` |
-  `abandoned`, branch, PR number once there is one, justify results. Then a line each, where
+  `abandoned`, branch, PR number once there is one, what you proved it with and the counts. Then a line each, where
   there is something to say: what later threads need from yours; deviations and suppressions
   (`eslint-disable`, `ts-expect-error`); a **blocking** question, with what each answer would
   mean and your recommendation; what you looked up in the plan or progress document; your

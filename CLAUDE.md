@@ -76,7 +76,8 @@ govern how code is changed:
 ## Commands
 
 ```sh
-pnpm justify                       # lint, typecheck, test, build, every package: green before every commit
+pnpm justify                       # lint, typecheck, test, build, every package: slow; for confidence CI will pass
+pnpm --filter "...[$base]" --filter '!{.}' <task>  # ready: lint, typecheck, test green here, justify:root for root files (PROCESS.md, *Proving*)
 pnpm --filter safebyok <task>      # lint, typecheck, test, build in one package, its dependencies built first
 pnpm --filter safebyok add <dep>   # a package's dependency; `pnpm add -w` is for root tooling only
 pnpm changeset                     # a PR's release note; `--empty` when it needs none (PROCESS.md)
