@@ -4,10 +4,9 @@ import * as SX from '../../src/shapes/shapes-storage'
 import { type VaultError, rowsOfRefusal } from '../../src/refusals/errors'
 import { classifyBuildBank, classifyDelBank, classifyEnsureBank, classifyStoredBox, classifyStoredBoxes, classifyStoredGate, classifyStoredVault } from '../../src/storage/bank-classifier'
 import {
-  bankAt, bankBuildAskOf, bankDelAskOf, bankEnsureAsk, bankScope, bankTombstoneOf, boxAt, boxGetAskOf, boxListAsk, boxQuery, gateAt, gatePutAskOf, mainWayin, otherMainWayin, passkey0Wayin,
+  Now, bankAt, bankBuildAskOf, bankDelAskOf, bankEnsureAsk, bankScope, bankTombstoneOf, boxAt, boxGetAskOf, boxListAsk, boxQuery, gateAt, gatePutAskOf, mainWayin, otherMainWayin, passkey0Wayin,
   vaultAt, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultScope, vaultTombstoneOf,
 } from '../test-helpers/bankdb-world'
-import { Now } from '../test-helpers/storage-world'
 
 // The stored rows stand at this seq, so an ask can cite one below it and one above.
 const Seq = 5
@@ -66,7 +65,7 @@ describe("classifyStoredGate and classifyStoredVault, the row above", () => {
 })
 
 describe("classifyStoredVault, the vault tables under a live bank", () => {
-  it("gets, puts and deletes as the vaultDB's tables do", () => {
+  it("gets, puts and deletes as the bankDB's tables do", () => {
     const vault0 = vaultAt(0)
     const nilGet = vaultGetAskOf('bank1', 'nil')
     expect(classifyStoredVault(nilGet, { bank: liveBank, vault: null })).to.deep.include({ ok: true, act: 'gotvoid', vault: null, presence: 'void' })
@@ -81,7 +80,7 @@ describe("classifyStoredVault, the vault tables under a live bank", () => {
   })
 
   it("refuses damaged_row for a vault row that fails its checks", () => {
-    expect(refusalOf(() => classifyStoredVault(vaultGetAskOf(), { bank: liveBank, vault: { ...liveVault, fmt: SX.VaultFormat } })).refusalkind).to.eq('damaged_row')
+    expect(refusalOf(() => classifyStoredVault(vaultGetAskOf(), { bank: liveBank, vault: { ...liveVault, fmt: BX.VaultFormat - 1 } })).refusalkind).to.eq('damaged_row')
   })
 })
 
@@ -231,7 +230,7 @@ describe("classifyStoredBox and classifyStoredBoxes, under a bank's vault row", 
   const boxVault = vaultAt(Seq, 'bank1', 'life1')
   const get      = boxGetAskOf(boxQuery, 'nil')
 
-  it("classifies a box ask as the vaultDB does, with its vault row as the parent", () => {
+  it("classifies a box ask as the bankDB does, with its vault row as the parent", () => {
     expect(classifyStoredBox(get, { parent: boxVault, box: boxAt(Seq) })).to.deep.include({ ok: true, act: 'gotlive', parent: boxVault, box: boxAt(Seq) })
     expect(classifyStoredBox(get, { parent: null, box: null })).to.deep.include({ ok: false, act: 'vault_void', parent: BX.shellVaultOf(vaultScope) })
     expect(classifyStoredBox(get, { parent: vaultAt(Seq, 'bank1', 'life2'), box: null })).to.deep.include({ ok: false, act: 'vault_reborn' })

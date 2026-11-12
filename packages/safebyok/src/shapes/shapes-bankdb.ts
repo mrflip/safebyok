@@ -1,9 +1,9 @@
 /** What the bankDB writes and accepts: the bank, gate, vault and box rows, the asks of its verbs, and their helpers. Imported as `BX`.
- * The asks of `tidyGone` and `watch` are the vaultDB's, in `SX`.
+ * The asks of `tidyGone` and `watch` are in `SX`.
  */
 
 import type * as Z from 'zod'
-import { Checkers, isConsistent, objStrip } from '../helpers/validator'
+import { Checkers, isConsistent, objCheck, objStrip } from '../helpers/validator'
 import * as Phrases from '../helpers/phrases'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
@@ -104,7 +104,7 @@ export type VaultRow       = VaultRecord | VaultTombstone
 
 // == [Box forms]: boxSparse, boxRecord, boxTombstone, boxRow, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox
 
-// A bank's box row is the vaultDB's, with its bank's `bank_tok` beside its vault's `vault_tok`: the two name the life of
+// A bank's box row is the one in `SX`, with its bank's `bank_tok` beside its vault's `vault_tok`: the two name the life of
 // the vault it is under (`vaultLifeOf`).
 /** The checks of a bank's box rows: its sparse fields, its live record, its tombstone, and a row of either. */
 export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_option', ({ lit, discrim, bank_tok }) => {
@@ -209,7 +209,7 @@ export const { bankEnsure } = Checkers('bad_scope', ({ lit, tuple, bankScope }) 
 /** An `ensureBank` ask: the bank's scope, and the gates to answer, `['main']`. */
 export type BankEnsureAsk = Readonly<Z.output<typeof bankEnsure>>
 
-// Every ask that stores a row has the same shape as the vaultDB's: its `op`, the address of the row, the row its caller
+// Every ask that stores a row has the same shape: its `op`, the address of the row, the row its caller
 // expects to find, and the record to store. A gate verb's ask and a vault ask also cite the `bank_tok` of the bank they
 // are made under, as a box ask cites its vault's `vault_tok`.
 /** Validators of a bankDB ask that stores a row, or gets a vault row.
@@ -350,7 +350,7 @@ export type BoxDelAsk = Extract<BoxAsk, { op: 'del' }>
 export const loggableAsk = objStrip(({ obj, oneof, lit, user_id, banklabel, vaultlabel, boxlabel, bank_tok, gate_tok, vault_tok, box_tok }) => {
   const meta = obj({ ...SX.revision.shape, am: SX.am, bank_tok, gate_tok, vault_tok, box_tok }).partial()
   return {
-    op:         oneof(EX.bankAskOpVals).optional(),
+    op:         oneof(EX.askOpVals).optional(),
     user_id:    user_id.optional(),
     banklabel:  banklabel.optional(),
     gatelabel:  lit('main').optional(),
@@ -373,15 +373,23 @@ export type LoggableAsk = Readonly<Z.output<typeof loggableAsk>>
 
 // == [Adapters]: adapterBankDBOpts, memoryBankDBOpts, AdapterBankDBOpts, MemoryBankDBOpts, noticedRow, noticedParent
 
-/** The check of an `AdapterBankDB`'s options: the same as an `AdapterVaultDB`'s. */
-export const adapterBankDBOpts = SX.adapterVaultDBOpts
-/** The check of a `MemoryBankDB`'s options: the same as a `MemoryVaultDB`'s. */
-export const memoryBankDBOpts  = SX.memoryVaultDBOpts
+/** The check of an `AdapterBankDB`'s options, refusing 'bad_option'. */
+export const adapterBankDBOpts = objCheck(({ num }) => ({
+  /** The most bytes one stored box record may weigh; `DefaultMaxRecordSizeEst` by default. */
+  maxRecordSizeEst: num.positive().optional(),
+}), 'bad_option')
+/** The check of a `MemoryBankDB`'s options, refusing 'bad_option'. */
+export const memoryBankDBOpts = objCheck(({ int }) => ({
+  ...adapterBankDBOpts.shape,
+  // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
+  /** A soft cap on the box rows of one vault life, live and deleted together. Default: `DefaultMaxBoxes`. */
+  maxBoxes: int.positive().optional(),
+}), 'bad_option')
 
 /** An `AdapterBankDB`'s options: `maxRecordSizeEst`, the most bytes one stored box record may weigh. */
-export type AdapterBankDBOpts = SX.AdapterVaultDBOpts
+export type AdapterBankDBOpts = Readonly<Z.input<typeof adapterBankDBOpts>>
 /** A `MemoryBankDB`'s options: an `AdapterBankDB`'s, and `maxBoxes`, a soft cap on the box rows of one vault life. */
-export type MemoryBankDBOpts  = SX.MemoryVaultDBOpts
+export type MemoryBankDBOpts  = Readonly<Z.input<typeof memoryBankDBOpts>>
 
 // Each row's `fmt` is its own, so no row passes two of these checks.
 /** The checks of what a watch hears: a bank, gate, vault or box row, and the row above it, a bank row or a vault row. */

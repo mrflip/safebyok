@@ -7,19 +7,20 @@ import type { FakeDeploymentOpts } from '../src/testing'
 
 const deployments: ReturnType<typeof fakeDeployment>[] = []
 function deploy(opts?: FakeDeploymentOpts) {
-  const deployment = fakeDeployment(TH.hostWith(TH.bySubject), opts)
+  const deployment = fakeDeployment(TH.bankHostWith(TH.bySubject), opts)
   deployments.push(deployment)
   return deployment
 }
 
-const vault = TH.vaultAt()
-const putVaultArgs = TH.putVaultArgs(vault)
-const vaultAsked = TH.getVaultArgs()
-const watchRowsArgs = { scope: TH.bankScope }
+const { BW } = TH
+const bank = BW.bankAt()
+const buildBankArgs = { ask: BW.bankBuildAskOf(bank) }
+const bankAsked = { ask: BW.bankEnsureAsk }
+const watchRowsArgs = { scope: BW.bankScope }
 
 /** Send a mutation from a client signed in as no one, which the host refuses as `identity_revoked`. */
 function refusedMutation(deployment: ReturnType<typeof deploy>) {
-  return deployment.client(null).mutation(deployment.api.safebyok.putVault, putVaultArgs)
+  return deployment.client(null).mutation(deployment.api.safebyokBank.buildBank, buildBankArgs)
 }
 afterEach(async () => {
   await Promise.all(deployments.splice(0).map((deployment) => deployment.close()))
@@ -35,8 +36,8 @@ describe("fakeDeployment", () => {
   it("serves a ConvexClient's query and mutation, signed in as the subject it was given", async () => {
     const deployment = deploy()
     const client = deployment.client('u1')
-    await client.mutation(deployment.api.safebyok.putVault, putVaultArgs)
-    expect(await client.query(deployment.api.safebyok.getVault, vaultAsked)).to.deep.equal(vault)
+    await client.mutation(deployment.api.safebyokBank.buildBank, buildBankArgs)
+    expect(await client.query(deployment.api.safebyokBank.ensureBank, bankAsked)).to.deep.include({ bank })
   })
 
   it("connects a client of any other kind that its caller constructs, and closes it with the rest", async () => {
@@ -46,8 +47,8 @@ describe("fakeDeployment", () => {
       const inner = new ConvexClient(address, opts)
       return { inner, close: async () => { closed(); await inner.close() } }
     })
-    await made.inner.mutation(deployment.api.safebyok.putVault, putVaultArgs)
-    expect(await made.inner.query(deployment.api.safebyok.getVault, vaultAsked)).to.deep.equal(vault)
+    await made.inner.mutation(deployment.api.safebyokBank.buildBank, buildBankArgs)
+    expect(await made.inner.query(deployment.api.safebyokBank.ensureBank, bankAsked)).to.deep.include({ bank })
     await deployment.close()
     expect(closed).toHaveBeenCalledOnce()
   })
@@ -69,7 +70,7 @@ describe("fakeDeployment", () => {
     const refusal = await TH.convexRefusalOf(refusedMutation(deployment))
     expect(refusal.kind).to.eq('identity_revoked')
     expect(consoleError).toHaveBeenCalledOnce()
-    expect(String(consoleError.mock.calls[0]?.[0])).to.match(/\[CONVEX M\(safebyok:putVault\)\]/)
+    expect(String(consoleError.mock.calls[0]?.[0])).to.match(/\[CONVEX M\(safebyokBank:buildBank\)\]/)
     expect(consoleWarn).toHaveBeenCalledTimes(0)
     expect(consoleLog).toHaveBeenCalledTimes(0)
   })
@@ -80,7 +81,7 @@ describe("fakeDeployment", () => {
     const refusal = await TH.convexRefusalOf(refusedMutation(deployment))
     expect(refusal.kind).to.eq('identity_revoked')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
-    expect(spy.calls[0]?.message).to.match(/\[CONVEX M\(safebyok:putVault\)\]/)
+    expect(spy.calls[0]?.message).to.match(/\[CONVEX M\(safebyokBank:buildBank\)\]/)
   })
 
   it("hands the logger on in the options connectWith gives its maker", () => {
@@ -115,7 +116,7 @@ describe("fakeDeployment", () => {
   })
 
   it("refuses a host or options it cannot run, quoting none of what it was given", () => {
-    const host = TH.hostWith(TH.bySubject)
+    const host = TH.bankHostWith(TH.bySubject)
     function refuse(attempt: () => unknown) { return TH.thrownText(TH.expectSyncRefusal(attempt, 'bad_option')) }
     refuse(() => fakeDeployment({ api: host.api } as never))
     refuse(() => fakeDeployment({ createTest: host.createTest } as never))
@@ -129,9 +130,9 @@ describe("fakeDeployment", () => {
 
   it("runs the backend directly as a subject, or as no one, to arrange or inspect what is stored", async () => {
     const deployment = deploy()
-    await deployment.as('u1').mutation(deployment.api.safebyok.putVault, putVaultArgs)
-    expect(await deployment.as('u1').query(deployment.api.safebyok.getVault, vaultAsked)).to.deep.equal(vault)
-    const refusal = await TH.convexRefusalOf(deployment.as(null).query(deployment.api.safebyok.getVault, vaultAsked))
+    await deployment.as('u1').mutation(deployment.api.safebyokBank.buildBank, buildBankArgs)
+    expect(await deployment.as('u1').query(deployment.api.safebyokBank.ensureBank, bankAsked)).to.deep.include({ bank })
+    const refusal = await TH.convexRefusalOf(deployment.as(null).query(deployment.api.safebyokBank.ensureBank, bankAsked))
     expect(refusal.kind).to.eq('identity_revoked')
   })
 
@@ -139,17 +140,17 @@ describe("fakeDeployment", () => {
     const deployment = deploy()
     const client = deployment.client('u1')
     const heard = vi.fn()
-    client.onUpdate(deployment.api.safebyok.watchRows, watchRowsArgs, heard)
+    client.onUpdate(deployment.api.safebyokBank.watchRows, watchRowsArgs, heard)
     await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
     await vi.waitFor(() => { expect(heard).toHaveBeenCalledTimes(1) })
-    await deployment.client('u1').mutation(deployment.api.safebyok.putVault, putVaultArgs)
+    await deployment.client('u1').mutation(deployment.api.safebyokBank.buildBank, buildBankArgs)
     await vi.waitFor(() => { expect(heard.mock.calls.length).to.be.greaterThan(1) })
   })
 
   it("refuses a watched safebyok query once every socket is signed out", async () => {
     const deployment = deploy()
     const failed = vi.fn()
-    deployment.client('u1').onUpdate(deployment.api.safebyok.watchRows, watchRowsArgs, () => undefined, failed)
+    deployment.client('u1').onUpdate(deployment.api.safebyokBank.watchRows, watchRowsArgs, () => undefined, failed)
     await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
     deployment.signOut()
     await vi.waitFor(() => { expect(failed).toHaveBeenCalled() })
@@ -158,12 +159,12 @@ describe("fakeDeployment", () => {
     const deployment = deploy()
     const client = deployment.client('u1')
     const heard = vi.fn()
-    client.onUpdate(deployment.api.safebyok.watchRows, watchRowsArgs, heard)
+    client.onUpdate(deployment.api.safebyokBank.watchRows, watchRowsArgs, heard)
     await vi.waitFor(() => { expect(heard).toHaveBeenCalledTimes(1) })
-    expect(await client.query(deployment.api.safebyok.getVault, vaultAsked)).to.be.null
-    const answer = await deployment.arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyok.putVault, putVaultArgs))
-    expect(answer).to.deep.include({ ok: true, act: 'born', vault })
-    expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ vaults: [{ vaultlabel: vault.vaultlabel, vault }] })
-    expect(await client.query(deployment.api.safebyok.getVault, vaultAsked)).to.deep.equal(vault)
+    expect(await client.query(deployment.api.safebyokBank.ensureBank, bankAsked)).to.deep.include({ bank: null })
+    const answer = await deployment.arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyokBank.buildBank, buildBankArgs))
+    expect(answer).to.deep.include({ bank: null, wrote: true })
+    expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ bank })
+    expect(await client.query(deployment.api.safebyokBank.ensureBank, bankAsked)).to.deep.include({ bank })
   })
 })

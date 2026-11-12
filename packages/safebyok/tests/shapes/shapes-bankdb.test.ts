@@ -47,7 +47,7 @@ describe("BX.vaultRow", () => {
     [vault,                                              true,  'passes a live vault row of a bank'],
     [vaultTombstoneOf(vault),                            true,  'passes its tombstone'],
     [BX.shellVaultOf(vaultScope),                        true,  'passes the shell of a vault not stored'],
-    [{ ...vault, fmt: SX.VaultFormat },                  false, "refuses the vaultDB's fmt"],
+    [{ ...vault, fmt: BX.VaultFormat - 1 },              false, 'refuses an earlier fmt'],
     [{ ...vault, gate: gate },                           false, 'refuses a gate'],
     [{ ...vault, bank_tok: undefined },                  false, 'refuses a vault row without a bank_tok'],
   ])

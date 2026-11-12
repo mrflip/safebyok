@@ -5,9 +5,6 @@ vault and box rows in tables of its own, and **`ConvexBankDB`**, which writes th
 app's Convex client. Your deployment has ciphertext and the few unencrypted fields a row is found
 by. It never sees a whisper, a passphrase, or a key that could decipher one.
 
-`ConvexVaultDB`, the vaultDB before it, still ships beside it, on tables of its own, with
-`SafebyokComponent` serving its functions. It is on its way out: build on `ConvexBankDB`.
-
 ## Install
 
 ```sh
@@ -17,7 +14,7 @@ pnpm add safebyok safebyok-convex convex convex-helpers
 `safebyok`, `convex` and `convex-helpers` are peer dependencies, so the adapter and your app share
 one copy of each, and a `VaultError` from one is a `VaultError` to the other. The component runs the
 core's own checks and classifier on your deployment, and `convex-helpers` (0.1.129 or later) makes
-the vaultDB's validators from the core's checkers when your Convex CLI bundles it.
+the component's validators from the core's checkers when your Convex CLI bundles it.
 
 ## Install the component
 
@@ -108,18 +105,22 @@ Five tables, inside the component, for the bankDB:
 | ----------------------- | ------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------- |
 | `safebyok_banks`        | bank               | its scope and its bank row, live or a tombstone              | `by_scope`: `user_id`, `banklabel`                                              |
 | `safebyok_gates`        | gate               | its scope and its gate row                                   | `by_scope`: `user_id`, `banklabel`, `gatelabel`                                  |
-| `safebyok_bank_vaults`  | vault              | its scope and its vault row, live or a tombstone             | `by_scope`: `user_id`, `banklabel`, `vaultlabel`                                 |
-| `safebyok_bank_boxes`   | box, in each life  | its scope, its life's `bank_tok` and `vault_tok`, its box row | `by_box`: `user_id`, `banklabel`, `vaultlabel`, `bank_tok`, `vault_tok`, `boxlabel` |
-| `safebyok_bank_tallies` | life of a vault    | count and size of its box rows: all, and live alone         | `by_life`: `user_id`, `banklabel`, `vaultlabel`, `bank_tok`, `vault_tok`         |
+| `safebyok_vaults`       | vault              | its scope and its vault row, live or a tombstone             | `by_scope`: `user_id`, `banklabel`, `vaultlabel`                                 |
+| `safebyok_boxes`        | box, in each life  | its scope, its life's `bank_tok` and `vault_tok`, its box row | `by_box`: `user_id`, `banklabel`, `vaultlabel`, `bank_tok`, `vault_tok`, `boxlabel` |
+| `safebyok_tallies`      | life of a vault    | count and size of its box rows: all, and live alone         | `by_life`: `user_id`, `banklabel`, `vaultlabel`, `bank_tok`, `vault_tok`         |
 
 `user_id` leads every index, so one user's rows are one range of each. Rows are stored as the core
 writes them. Each whisper, each box's boxKey, and the bankKey (once for each wayin) are encrypted.
-The labels, tokens, times, salts and sidecars are unencrypted. The vaultDB keeps its own three
-tables, `safebyok_vaults`, `safebyok_boxes` and `safebyok_tallies`, until it is removed.
+The labels, tokens, times, salts and sidecars are unencrypted.
 
 **Upgrading.** Until 1.0 there is no migration. A release that changes these tables says so in its
-changelog. Convex will not deploy a schema the stored rows do not match, so clear the component's
-tables first (on the dashboard's Data page, pick the `safebyok` component).
+changelog. Convex will not deploy a schema the stored rows do not match, and it refuses to drop a
+table that still has rows, so clear the component's tables first (on the dashboard's Data page, pick
+the `safebyok` component). Coming from an older release, clear all of them: the ones
+this release no longer has (`safebyok_bank_vaults`, `safebyok_bank_boxes`, `safebyok_bank_tallies`)
+and the three it kept under their old names with other fields (`safebyok_vaults`, `safebyok_boxes`,
+`safebyok_tallies`), and the bank and gate tables with them, so no bank is left without its vaults.
+Whatever those tables held is gone: export what you need first.
 
 **How big a vault can be.** The component limits every life of a vault to **8,000 box rows** and
 **7 MiB less 1 KiB** of them as Convex weighs a document, whatever the client asks, so that one
@@ -187,8 +188,7 @@ await deployment.close()
 
 `pnpm justify` here runs lint, typecheck, tests (`convex-test` under the edge runtime, with no
 deployment) and the build with its publint and arethetypeswrong checks. The tests run the core's
-BankDB battery over `ConvexBankDB` and its VaultDB battery over `ConvexVaultDB`, each on a real
-`ConvexClient`, and `e2e/` runs the BankDB battery again over a `ConvexReactClient`, so this package
+BankDB battery over `ConvexBankDB` on a real `ConvexClient`, and `e2e/` runs it again over a `ConvexReactClient`, so this package
 lists no framework among its dev dependencies.
 
 The build follows Convex's component template: ESM only and unbundled, each of the component's

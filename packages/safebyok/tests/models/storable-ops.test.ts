@@ -12,7 +12,7 @@ const world = useModelsWorld()
 
 // == [Hydrate]: when it fetches, the world first, the thing's horizon
 
-/** A box listing of horizon `horizonMillis`, and its box `anthropic_api_key` built from the full record seeded in the VaultDB at revision 1: received at the clock's reading, so timely from then. Calls are cleared after. */
+/** A box listing of horizon `horizonMillis`, and its box `anthropic_api_key` built from the full record seeded in the BankDB at revision 1: received at the clock's reading, so timely from then. Calls are cleared after. */
 function timelyBoxOf(horizonMillis = 1000) {
   const { mw } = world
   const record = mw.fullBoxRecord()
@@ -277,7 +277,7 @@ describe("storable.del()", () => {
     expect(world.mw.callsOf('del')[0]?.expectedRevisionTok).to.equal(revision_tok)
   })
 
-  it("sends a delete of a deleted thing expecting its tombstone, which the vaultDB refuses", async () => {
+  it("sends a delete of a deleted thing expecting its tombstone, which the bankDB refuses", async () => {
     const { box } = timelyBoxOf()
     await box.del(box.scope)
     const tombstone = box._cheat_central
@@ -331,7 +331,7 @@ describe("storable verbs while the vault is locked", () => {
 
 // == [Try forms]: outcomes, never a rejection
 
-/** The refusal a VaultDB that cannot be reached answers. */
+/** The refusal a BankDB that cannot be reached answers. */
 function storageDown(): VaultError { return new VaultError('storage_unavailable', "The storage could not be reached.") }
 
 describe("storable try forms: an outcome, never a rejection", () => {
@@ -350,7 +350,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
 
   const BadCases = [
     [(box: TestableBox) => box.tryGet({ maxMillisSinceRefresh: 0 }),                                                   (box: TestableBox) => { world.mw.willGet(world.mw.refusalOf(box.scope, storageDown())) },  "storage_unavailable", 'tryFetch that storage refuses'],
-    [(box: TestableBox) => box.tryGet({ maxMillisSinceRefresh: 0 }),                                                   () => { world.mw.willGet(() => { throw new Error("socket closed") }) },         undefined,             'tryFetch whose VaultDB throws a plain Error'],
+    [(box: TestableBox) => box.tryGet({ maxMillisSinceRefresh: 0 }),                                                   () => { world.mw.willGet(() => { throw new Error("socket closed") }) },         undefined,             'tryFetch whose BankDB throws a plain Error'],
     [(box: TestableBox) => box.tryHydrate(),                                                 () => { world.mw.willEnsureTimely(() => Promise.reject(storageDown())) },         "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
     [(box: TestableBox) => box.tryPut({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'x' } }), (box: TestableBox) => { world.mw.willPut(world.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'tryPut that storage refuses as stale'],
     [(box: TestableBox) => box.tryDel(box.scope),                                                     () => { world.mw.setLocked(true) },                                      "bank_locked",        'tryDel while locked'],

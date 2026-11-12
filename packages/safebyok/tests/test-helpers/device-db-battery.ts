@@ -10,7 +10,7 @@ import * as CX from '../../src/shapes/shapes-core'
 import type { LeaseRow, LeaseScopepath } from '../../src/shapes/shapes-storage'
 import type { DeviceDB } from '../../src/storage/device-db'
 import { expectBad, expectGood, expectRefusal } from './refusals'
-import { bankScope, vaultScope } from './storage-world'
+import { bankScope, vaultScope } from './bankdb-world'
 
 // == [The hooks a DeviceDB hands the battery]: DeviceDBRowCheats, DeviceDBBatteryOpts
 

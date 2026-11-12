@@ -26,9 +26,7 @@
   "files": [
     "dist",
     "bank-functions.sql",
-    "bank-tables.sql",
-    "vault-functions.sql",
-    "vault-tables.sql"
+    "bank-tables.sql"
   ],
   "engines": {
     "node": ">=22"

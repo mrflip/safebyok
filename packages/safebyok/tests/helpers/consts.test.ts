@@ -1,16 +1,15 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { DeviceDBVersion, FarFuture, FarPast, ForeverMillis, IsGuarded, PackageVersion, VaultsDBVersion, brand, brandGuarded, brandOf, hasModelkind, isAdapterVaultDB, isDeviceDB, isGuarded, isVaultDB } from '../../src/helpers/consts'
+import { DeviceDBVersion, FarFuture, FarPast, ForeverMillis, IsGuarded, PackageVersion, brand, brandGuarded, brandOf, hasModelkind, isAdapterBankDB, isBankDB, isDeviceDB, isGuarded } from '../../src/helpers/consts'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
-import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { VaultDBVerbnames } from '../../src/storage/vault-db'
+import { BankDBVerbnames } from '../../src/storage/bank-db'
+import { MemoryBankDB } from '../../src/storage/memory-bank-db'
 import { boxListingOf, makeModelsWorld } from '../test-helpers/models-world'
 
-describe("DeviceDBVersion and VaultsDBVersion", () => {
-  it("are three zero-padded parts, so that database names sort as their versions do", () => {
+describe("DeviceDBVersion", () => {
+  it("is three zero-padded parts, so that database names sort as their versions do", () => {
     expect(DeviceDBVersion).to.match(/^\d{3}-\d{3}-\d{3}$/)
-    expect(VaultsDBVersion).to.match(/^\d{3}-\d{3}-\d{3}$/)
   })
 })
 
@@ -60,41 +59,41 @@ describe("hasModelkind", () => {
   })
 })
 
-describe("isVaultDB and isDeviceDB", () => {
-  it("recognize a VaultDB or a DeviceDB by its base class's brand, even from another copy of safebyok", () => {
-    expect(isVaultDB(new MemoryVaultDB())).to.be.true
+describe("isBankDB and isDeviceDB", () => {
+  it("recognize a BankDB or a DeviceDB by its base class's brand, even from another copy of safebyok", () => {
+    expect(isBankDB(new MemoryBankDB())).to.be.true
     expect(isDeviceDB(new MemoryDeviceDB())).to.be.true
-    expect(isVaultDB({ [Symbol.for('@safebyok/vaultdb')]: true })).to.be.true
+    expect(isBankDB({ [Symbol.for('@safebyok/bankdb')]: true })).to.be.true
     expect(isDeviceDB({ [Symbol.for('@safebyok/devicedb')]: true })).to.be.true
   })
 
-  it("are false for a look-alike object, the other kind of DB, and a copy of a VaultDB's own fields", () => {
-    const vaultDB = new MemoryVaultDB()
+  it("are false for a look-alike object, the other kind of DB, and a copy of a BankDB's own fields", () => {
+    const bankDB = new MemoryBankDB()
     expect(isDeviceDB({ tryPeek: () => null, tryStow: () => null, tryForget: () => null })).to.be.false
-    expect(isVaultDB(Object.assign({}, vaultDB))).to.be.false
-    expect(isVaultDB(new MemoryDeviceDB())).to.be.false
-    expect(isDeviceDB(vaultDB)).to.be.false
-    expect(isVaultDB(null)).to.be.false
+    expect(isBankDB(Object.assign({}, bankDB))).to.be.false
+    expect(isBankDB(new MemoryDeviceDB())).to.be.false
+    expect(isDeviceDB(bankDB)).to.be.false
+    expect(isBankDB(null)).to.be.false
     expect(isDeviceDB(undefined)).to.be.false
   })
 })
 
-describe("isAdapterVaultDB", () => {
-  it("is true of an AdapterVaultDB and false of a client that has only the VaultDB's brand", () => {
-    const vaultDB = new MemoryVaultDB()
-    const client = { [Symbol.for('@safebyok/vaultdb')]: true }
-    expect([isVaultDB(vaultDB), isAdapterVaultDB(vaultDB)]).to.deep.equal([true, true])
-    expect([isVaultDB(client), isAdapterVaultDB(client)]).to.deep.equal([true, false])
-    expect(isAdapterVaultDB({ [Symbol.for('@safebyok/adaptervaultdb')]: true })).to.be.true
+describe("isAdapterBankDB", () => {
+  it("is true of an AdapterBankDB and false of a client that has only the BankDB's brand", () => {
+    const bankDB = new MemoryBankDB()
+    const client = { [Symbol.for('@safebyok/bankdb')]: true }
+    expect([isBankDB(bankDB), isAdapterBankDB(bankDB)]).to.deep.equal([true, true])
+    expect([isBankDB(client), isAdapterBankDB(client)]).to.deep.equal([true, false])
+    expect(isAdapterBankDB({ [Symbol.for('@safebyok/adapterbankdb')]: true })).to.be.true
   })
 
-  it("is false for a plain object with every method, and for a copy of a VaultDB's own fields", () => {
-    const vaultDB = new MemoryVaultDB()
-    const verbs = Object.fromEntries(VaultDBVerbnames.map((verbname) => [verbname, vaultDB[verbname].bind(vaultDB)]))
-    expect([isVaultDB(verbs), isAdapterVaultDB(verbs)]).to.deep.equal([false, false])
-    expect(isAdapterVaultDB(Object.assign({}, vaultDB))).to.be.false
-    expect(isAdapterVaultDB(new MemoryDeviceDB())).to.be.false
-    expect(isAdapterVaultDB(null)).to.be.false
+  it("is false for a plain object with every method, and for a copy of a BankDB's own fields", () => {
+    const bankDB = new MemoryBankDB()
+    const verbs = Object.fromEntries(BankDBVerbnames.map((verbname) => [verbname, bankDB[verbname].bind(bankDB)]))
+    expect([isBankDB(verbs), isAdapterBankDB(verbs)]).to.deep.equal([false, false])
+    expect(isAdapterBankDB(Object.assign({}, bankDB))).to.be.false
+    expect(isAdapterBankDB(new MemoryDeviceDB())).to.be.false
+    expect(isAdapterBankDB(null)).to.be.false
   })
 })
 

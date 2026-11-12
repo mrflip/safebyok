@@ -5,7 +5,7 @@ import { storageUnavailable, unexpectedError } from './throwers'
  * TypeScript narrows on `ok`.
  *
  * @example
- *   const { ok, val, err } = await vaultDB.tryGetVault(scope)
+ *   const { ok, val, err } = await bankDB.tryGetVault(scope)
  *   if (! ok) { return err }
  *   val  // VaultRecord | null
  */
@@ -52,7 +52,7 @@ export function storageRefusalOf(thrown: unknown): VaultError { return (isVaultE
 
 /** `outcome`'s `val`, or its `err` thrown: the throwing form of a call that resolves an {@link Outcome} (use {@link demandGood} if you just want the throw).
  *
- * @example const listed = valOf(await vaultDB.tryGetVault(scope))  // throws the refusal, if any: what vaultDB.getVault(scope) does itself
+ * @example const listed = valOf(await bankDB.tryGetVault(scope))  // throws the refusal, if any: what bankDB.getVault(scope) does itself
  */
 export function valOf<ValT>(outcome: Outcome<ValT>): ValT {
   if (! outcome.ok) { throw outcome.err }

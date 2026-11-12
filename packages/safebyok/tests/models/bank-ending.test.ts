@@ -1,4 +1,4 @@
-/** The ending of a bank and its device, over a real vaultDB and deviceDB: autolock, lock, vacate and sweep, and what follows a vacate. */
+/** The ending of a bank and its device, over a real bankDB and deviceDB: autolock, lock, vacate and sweep, and what follows a vacate. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'

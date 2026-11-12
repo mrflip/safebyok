@@ -7,9 +7,9 @@ import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, TableNames } from './_generated/dataModel'
 import { sentenceKindVals } from '../refusals'
 import type { SafebyokErrorData } from '../refusals'
-import * as Tallies from './bank-tallies'
-import type { BoxDocGiven, Budget, Life } from './bank-tallies'
-import * as CVX from './bank-validators'
+import * as Tallies from './tallies'
+import type { BoxDocGiven, Budget, Life } from './tallies'
+import * as CVX from './validators'
 
 // One function for each of AdapterBankDB's generic calls. They are called through the host's wrapper, which has already
 // checked that the caller is the user the call names. Convex runs a mutation as one serializable transaction, so each write
@@ -72,7 +72,7 @@ export const putGate = mutation({
 })
 
 // One transaction may read 16 MiB and write 16,000 documents, and a bank holds any number of vaults, each up to the limits in
-// `bank-tallies.ts`. So the tombstone is written first, and the rows under the bank are deleted while the cascade's budget lasts.
+// `tallies.ts`. So the tombstone is written first, and the rows under the bank are deleted while the cascade's budget lasts.
 // The rows left are of the life the tombstone ended: a gate or vault row under another `bank_tok` than its bank row's reads as
 // no row, and a box row is found only by its own life's tokens. `tidyGone` deletes them.
 /** Classify a `delBank` ask against the bank row. If the act is a write, store its tombstone and delete the rows under the bank, as many as one transaction allows. */
@@ -250,13 +250,13 @@ export const tidyGone = mutation({
         lives.push(lifeOf({ ...ask, vaultlabel, bank_tok: vault.data.bank_tok, vault_tok: vault.data.vault_tok }))
       }
     }
-    await deleteWithin(ctx.db, 'safebyok_bank_vaults', endedVaultDocs, budget)
+    await deleteWithin(ctx.db, 'safebyok_vaults', endedVaultDocs, budget)
     const endedBoxQueryList = endedBoxQueries(ctx.db, ask, damagedlabels, lives)
-    for (const endedBoxes of endedBoxQueryList) { await deleteWithin(ctx.db, 'safebyok_bank_boxes', endedBoxes, budget) }
+    for (const endedBoxes of endedBoxQueryList) { await deleteWithin(ctx.db, 'safebyok_boxes', endedBoxes, budget) }
     const liveCkeys = new Set(lives.map((life) => ckeyOfLife(life)))
     const tallyDocs = await listTallyDocs(ctx.db, ask)
     const endedTallyDocs = tallyDocs.filter((tallyDoc) => (! damagedlabels.includes(tallyDoc.vaultlabel)) && (! liveCkeys.has(ckeyOfLife(tallyDoc))))
-    await deleteWithin(ctx.db, 'safebyok_bank_tallies', endedTallyDocs, budget)
+    await deleteWithin(ctx.db, 'safebyok_tallies', endedTallyDocs, budget)
     let totalCount = 0
     for (const life of lives) { totalCount += await Tallies.countBoxes(ctx.db, life) }
     return { totalCount }
@@ -335,15 +335,15 @@ function isWrite(stored: { act: DB.BoxAct | DB.VaultAct | DB.ParentBankAct } | n
 async function deleteBank(db: DatabaseWriter, scope: BankScope): Promise<void> {
   const budget = Tallies.cascadeBudget()
   await deleteWithin(db, 'safebyok_gates', listGateDocsQuery(db, scope), budget)
-  await deleteWithin(db, 'safebyok_bank_vaults', listVaultDocsQuery(db, scope), budget)
-  await deleteWithin(db, 'safebyok_bank_tallies', listTallyDocsQuery(db, scope), budget)
-  await deleteWithin(db, 'safebyok_bank_boxes', listBoxDocsQuery(db, scope), budget)
+  await deleteWithin(db, 'safebyok_vaults', listVaultDocsQuery(db, scope), budget)
+  await deleteWithin(db, 'safebyok_tallies', listTallyDocsQuery(db, scope), budget)
+  await deleteWithin(db, 'safebyok_boxes', listBoxDocsQuery(db, scope), budget)
 }
 
 /** Delete every box row of `life`, and its tally. */
 async function deleteBoxes(db: DatabaseWriter, life: Life): Promise<void> {
   const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(db, life).collect()
-  await Promise.all(boxDocs.map(({ _id }) => db.delete('safebyok_bank_boxes', _id)))
+  await Promise.all(boxDocs.map(({ _id }) => db.delete('safebyok_boxes', _id)))
   await Tallies.drop(db, life)
 }
 
@@ -367,17 +367,17 @@ function endedBoxQueries(db: DatabaseReader, { user_id, banklabel }: BankScope, 
   const ends = [...bounds, undefined]
   const between = begs.map((beg, ii) => {
     const end = ends[ii]
-    return db.query('safebyok_bank_boxes').withIndex('by_box', (idx) => {
+    return db.query('safebyok_boxes').withIndex('by_box', (idx) => {
       const bank = idx.eq('user_id', user_id).eq('banklabel', banklabel)
       if (beg === undefined) { return (end === undefined) ? bank : bank.lt('vaultlabel', end) }
       return (end === undefined) ? bank.gt('vaultlabel', beg) : bank.gt('vaultlabel', beg).lt('vaultlabel', end)
     })
   })
   const beside = lives.flatMap(({ vaultlabel, bank_tok, vault_tok }) => [
-    db.query('safebyok_bank_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).lt('bank_tok', bank_tok)),
-    db.query('safebyok_bank_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).gt('bank_tok', bank_tok)),
-    db.query('safebyok_bank_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).lt('vault_tok', vault_tok)),
-    db.query('safebyok_bank_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).gt('vault_tok', vault_tok)),
+    db.query('safebyok_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).lt('bank_tok', bank_tok)),
+    db.query('safebyok_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).gt('bank_tok', bank_tok)),
+    db.query('safebyok_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).lt('vault_tok', vault_tok)),
+    db.query('safebyok_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).gt('vault_tok', vault_tok)),
   ])
   return [...between, ...beside]
 }
@@ -414,13 +414,13 @@ async function getGateDoc(db: DatabaseReader, { user_id, banklabel }: BankScope,
 }
 
 async function getVaultDoc(db: DatabaseReader, { user_id, banklabel, vaultlabel }: VaultScope): Promise<VaultDoc | null> {
-  return await db.query('safebyok_bank_vaults')
+  return await db.query('safebyok_vaults')
     .withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel))
     .unique()
 }
 
 async function getBoxDoc(db: DatabaseReader, { user_id, banklabel, vaultlabel, bank_tok, vault_tok }: Life, boxlabel: string): Promise<BoxDoc | null> {
-  return await db.query('safebyok_bank_boxes')
+  return await db.query('safebyok_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).eq('vault_tok', vault_tok).eq('boxlabel', boxlabel))
     .unique()
 }
@@ -438,12 +438,12 @@ async function writeGateDoc(db: DatabaseWriter, anteDoc: GateDoc | null, gate: B
 
 /** Write `vault` at `scope`, in place of `anteDoc`, or as a new document. */
 async function writeVaultDoc(db: DatabaseWriter, anteDoc: VaultDoc | null, { user_id, banklabel, vaultlabel }: VaultScope, vault: BX.VaultRow): Promise<void> {
-  if (anteDoc) { await db.replace('safebyok_bank_vaults', anteDoc._id, { user_id, banklabel, vaultlabel, vault }) } else { await db.insert('safebyok_bank_vaults', { user_id, banklabel, vaultlabel, vault }) }
+  if (anteDoc) { await db.replace('safebyok_vaults', anteDoc._id, { user_id, banklabel, vaultlabel, vault }) } else { await db.insert('safebyok_vaults', { user_id, banklabel, vaultlabel, vault }) }
 }
 
 /** Write `boxDoc` in place of `anteDoc`, or as a new document. */
 async function writeBoxDoc(db: DatabaseWriter, anteDoc: BoxDoc | null, boxDoc: BoxDocGiven): Promise<void> {
-  if (anteDoc) { await db.replace('safebyok_bank_boxes', anteDoc._id, boxDoc) } else { await db.insert('safebyok_bank_boxes', boxDoc) }
+  if (anteDoc) { await db.replace('safebyok_boxes', anteDoc._id, boxDoc) } else { await db.insert('safebyok_boxes', boxDoc) }
 }
 
 /** Query the gate documents of a bank. */
@@ -456,7 +456,7 @@ async function listGateDocs(db: DatabaseReader, scope: BankScope): Promise<GateD
 
 /** Query the vault documents of a bank, or of one vault when the scope has a `vaultlabel`. */
 function listVaultDocsQuery(db: DatabaseReader, { user_id, banklabel, vaultlabel }: WatchScope) {
-  return db.query('safebyok_bank_vaults').withIndex('by_scope', (idx) => {
+  return db.query('safebyok_vaults').withIndex('by_scope', (idx) => {
     const bank = idx.eq('user_id', user_id).eq('banklabel', banklabel)
     return (vaultlabel === undefined) ? bank : bank.eq('vaultlabel', vaultlabel)
   })
@@ -467,16 +467,16 @@ async function listVaultDocs(db: DatabaseReader, scope: WatchScope): Promise<Vau
 
 /** Query the box documents of a bank, across every life. */
 function listBoxDocsQuery(db: DatabaseReader, { user_id, banklabel }: BankScope) {
-  return db.query('safebyok_bank_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel))
+  return db.query('safebyok_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel))
 }
 
 /** Query the tally documents of a bank. */
 function listTallyDocsQuery(db: DatabaseReader, { user_id, banklabel }: BankScope) {
-  return db.query('safebyok_bank_tallies').withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel))
+  return db.query('safebyok_tallies').withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel))
 }
 
 /** List the tally documents of a bank. */
-async function listTallyDocs(db: DatabaseReader, scope: BankScope): Promise<Doc<'safebyok_bank_tallies'>[]> { return await listTallyDocsQuery(db, scope).collect() }
+async function listTallyDocs(db: DatabaseReader, scope: BankScope): Promise<Doc<'safebyok_tallies'>[]> { return await listTallyDocsQuery(db, scope).collect() }
 
 /** A bank document. Its `bank` row is `unknown` until the core has checked it. */
 type BankDoc = Omit<Doc<'safebyok_banks'>, 'bank'> & { bank: unknown }
@@ -485,8 +485,8 @@ type BankDoc = Omit<Doc<'safebyok_banks'>, 'bank'> & { bank: unknown }
 type GateDoc = Omit<Doc<'safebyok_gates'>, 'gate'> & { gate: unknown }
 
 /** A vault document. Its `vault` row is `unknown` until the core has checked it. */
-type VaultDoc = Omit<Doc<'safebyok_bank_vaults'>, 'vault'> & { vault: unknown }
+type VaultDoc = Omit<Doc<'safebyok_vaults'>, 'vault'> & { vault: unknown }
 
 /** A box document. Its `box` row is `unknown` until the core has checked it. */
-type BoxDoc = Omit<Doc<'safebyok_bank_boxes'>, 'box'> & { box: unknown }
+type BoxDoc = Omit<Doc<'safebyok_boxes'>, 'box'> & { box: unknown }
 // --

@@ -15,7 +15,7 @@ export { default as schema } from './component/schema'
  *
  * @example
  *   const app = defineTestApp({ schema, components: { safebyok: { register } } })
- *   new SafebyokComponent(app.components.safebyok).api({ getUserId })
+ *   new SafebyokBankComponent(app.components.safebyok).api({ getUserId })
  */
 export const register = <ComponentPath extends string = 'safebyok'>(
   testRoot: Pick<TestConvexRoot<GenericDataModel>, 'registerComponent'>,

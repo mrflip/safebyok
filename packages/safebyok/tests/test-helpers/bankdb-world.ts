@@ -8,7 +8,6 @@ import type {
   BankBuildAsk, BankDelAsk, BankRecord, BankRow, BankTombstone, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxQuery, BoxRecord, BoxRow, BoxTombstone,
   GatePutAsk, GateRecord, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultRecord, VaultRow, VaultTombstone, Wayins,
 } from '../../src/shapes/shapes-bankdb'
-import { Now, boxAt as vaultdbBoxAt, passkeyWayin, passphraseWayin } from './storage-world'
 
 /** The bank the rows stand in. */
 export const bankScope  = { user_id: 'u1', banklabel: 'acme' }
@@ -29,8 +28,18 @@ export const bankEnsureAsk = { op: 'ensure' as const, ...bankScope, gates: ['mai
 
 /** The scope of the vault `vaultlabel` in the bank the rows stand in. */
 export function vaultScopeOf(vaultlabel: string): VaultScope { return { ...bankScope, vaultlabel } }
+/** The moment every row was registered and written at. */
+export const Now = Date.UTC(2026, 9, 15)
+
 /** The scope of the box `boxlabel` in the vault the rows stand in. */
 export function boxscopeOf(boxlabel: string): Boxscope { return { ...vaultScope, boxlabel } }
+
+const ciphered = { cipher_iv_b64: 'aXY', ciphertext_b64: 'Y3Q' }
+
+/** A passphrase wayin, its ciphertext fake. */
+export const passphraseWayin = SX.passphraseWayinRecord.parse({ wayinkind: 'passphrase', key_deriver_label: 'test', salt_b64: 'c2FsdHNhbHRzYWx0c2FsdA', device_tok: '00000000-0000-4000-8000-0000000000d1', registered_at: Now, bank_key_wayin_wrapped: ciphered })
+/** A passkey wayin, its ciphertext fake. */
+export const passkeyWayin = SX.passkeyWayinRecord.parse({ wayinkind: 'passkey', credential_id: 'cred1', prf_salt_b64: 'A'.repeat(43), device_tok: '00000000-0000-4000-8000-0000000000d1', registered_at: Now, bank_key_wayin_wrapped: ciphered })
 
 /** The bank's passphrase wayin, its ciphertext fake. */
 export const mainWayin     = BX.passphraseWayin.parse({ ...passphraseWayin, wayinlabel: 'main' })
@@ -108,7 +117,11 @@ export function vaultDelAskOf(expected: VaultRow, record: VaultTombstone = vault
 
 /** The box record at `revision_seq`, in the vault life `vault_tok` of the bank life `bank_tok`, with the fields of `extra` over its own. */
 export function boxAt(revision_seq = 0, bank_tok = 'bank1', vault_tok = 'life1', extra: object = {}): BoxRecord {
-  return BX.boxRecord.parse({ ...vaultdbBoxAt(revision_seq, vault_tok), fmt: BX.BoxFormat, bank_tok, ...extra })
+  return BX.boxRecord.parse({
+    ...boxscope, fmt: BX.BoxFormat, revision_tok: `brev${String(revision_seq)}`, revision_seq, registered_at: Now, written_at: Now, am: 'a', bank_tok, vault_tok, box_tok: 'box1',
+    whisper_codec: 'json_v1', whisper_schema_version: 1, sidecar: {}, box_key_wrapped: ciphered, whisper_ciphered: ciphered,
+    ...extra,
+  })
 }
 
 /** The tombstone that deletes the box row `record`, one revision on, under a box_tok of its own. */

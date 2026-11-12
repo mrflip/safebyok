@@ -9,8 +9,6 @@ import type { PostgresBankDBOpts, PostgresListen } from '../src/index'
 import { BootMillis, flakyClientOf } from './test-helpers'
 import type { FlakyClient } from './test-helpers'
 
-// The vaultDB's functions share names with the bankDB's, so a database holds one set: a test file uses these helpers or `test-helpers.ts`'s database, never both.
-
 // == [The database]: database, bootDatabaseFirst
 
 const made: { db?: Promise<PGlite> } = {}

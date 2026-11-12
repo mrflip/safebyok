@@ -30,8 +30,8 @@ export const InstantTooLate = "An instant is epoch milliseconds no later than 22
 
 // == [Scopes]: DatabaseInVaultScope
 
-/** Why a vaultDB or deviceDB in the scope naming a vault refuses: each goes to `Device.make`. */
-export const DatabaseInVaultScope = "A vaultDB and a deviceDB go to Device.make, never in the scope naming a vault"
+/** Why a bankDB or deviceDB in the scope naming a vault refuses: each goes to `Device.make`. */
+export const DatabaseInVaultScope = "A bankDB and a deviceDB go to Device.make, never in the scope naming a vault"
 // --
 
 // == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, BankDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, DeviceExpected, BankExpected, VaultExpected, VaultErrorExpected
@@ -160,13 +160,11 @@ export const BankLocked = "The bank is locked, so nothing was read or written: u
 export const RecordForNewBox = "A create operation found a record already present."
 // --
 
-// == [Storables]: PartialLoad, AlreadyListed, WrittenByOwnVerbs, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives
+// == [Storables]: PartialLoad, WrittenByOwnVerbs, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
-/** Why a birth makes nothing of a dna for a scope the listing already has alive. */
-export const AlreadyListed = "This listing already has an instance under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
 
 /** Why a bank or a gate is never put or deleted as a vault or a box is. */
 export const WrittenByOwnVerbs = "A bank's row and its gate's are written only by the bank's own verbs, so nothing was stored: build, change or delete the bank through its prompts."
@@ -374,28 +372,10 @@ export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed: c
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed: check your package and build settings."
 // --
 
-// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultReborn, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, GateEpochNotNext, OtherWayinMoved, boxTooLarge, VaultFull, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVault, ExpectedOfOtherVaultLife, GateVerbRecordMismatch, RecordOfOtherAddress, BankTokNotNew, GateOfOtherBank, GateNotBorn, MainGateMissing, deviceDBFailed, thrownNamed
+// == [Refusals: bankDB and deviceDB]: rowOfOtherAddress, gateIssue, RegisteredAtNotStored, OtherWayinMoved, boxTooLarge, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVaultLife, GateVerbRecordMismatch, RecordOfOtherAddress, BankTokNotNew, GateOfOtherBank, GateNotBorn, MainGateMissing, deviceDBFailed, thrownNamed
 
 /** A well-formed row out of storage, whose own `fieldnames` are not the address it was asked for at. */
 export const rowOfOtherAddress = (fieldnames: readonly string[]): string => `The vault's storage answered with a row naming another ${fieldnames.join(' and ')} than the one asked for: the database or its storage adapter has filed it under the wrong address.`
-
-/** No row stored for this life of the vault, where one was. */
-export const VaultEmpty = "Nothing is stored for this life of the vault: read the vault again by its scope."
-
-/** A live vault stored under another vault_tok than the call names. */
-export const VaultReborn = "A live vault stands here under another vault_tok, so nothing was read or written: read the vault again by its scope."
-
-/** A vault deleted, its tombstone stored. */
-export const VaultGone = "This vault was deleted."
-
-/** What is stored moved since the revision the call names. */
-export const StaleWrite = "What is stored moved since this revision was read, so nothing was written: read it again."
-
-/** A live record stored where the call was told not to replace one. */
-export const Camped = "A live record is already stored here, and this call was told not to replace it."
-
-/** No box stored under the label asked. */
-export const AbsentBox = "No box is stored under that label."
 
 /** A change of the gate refused, `why` saying which check it failed. */
 export function gateIssue(why: string): string { return `This change of the gate was refused: ${why}` }
@@ -403,17 +383,11 @@ export function gateIssue(why: string): string { return `This change of the gate
 /** Why a gate verb naming a registered_at the stored vault does not have is refused, as {@link gateIssue}'s `why`. */
 export const RegisteredAtNotStored = "its registered_at is not the stored one."
 
-/** Why a gate verb whose record does not move `gate_epoch` one up from the stored vault is refused, as {@link gateIssue}'s `why`. */
-export const GateEpochNotNext = "its gate_epoch is not one past the stored one."
-
 /** Why a gate verb whose record moves a wayin the verb leaves alone is refused, as {@link gateIssue}'s `why`. */
 export const OtherWayinMoved = "it moves a wayin this verb does not."
 
 /** A box record over the bytes its storage allows in one record. */
 export function boxTooLarge(recordSizeEst: number, maxRecordSizeEst: number): string { return `That box weighs ${String(recordSizeEst)} bytes, over the ${String(maxRecordSizeEst)} its storage allows in one record.` }
-
-/** A vault with as many boxes as its storage allows. */
-export const VaultFull = "This vault has as many boxes as its storage allows."
 
 /** A write the storage itself had no room for. */
 export const StorageFull = "The vault's storage has no room left for this write: free some, then try again. The storage adapter's own error is this error's cause."
@@ -429,9 +403,6 @@ export const ExpectedHalfVoid = "The revision a write expects is the void row's,
 
 /** Why a write's record is refused for its life tok: a life begins over a tombstone or nothing, and lasts until it is deleted. */
 export const LifeTokMisplaced = "A record keeps the life tok of the live row it replaces. A tombstone, and a record over a tombstone or nothing, brings a new one."
-
-/** Why a box request is refused for the row it expects: both must be in the same vault life. */
-export const ExpectedOfOtherVault = "A box's ask and the row it expects name the same vault_tok."
 
 /** Why a bankDB's box request is refused for the row it expects: both must be in the same life of the vault and of its bank. */
 export const ExpectedOfOtherVaultLife = "A box's ask and the row it expects name the same bank_tok and vault_tok."

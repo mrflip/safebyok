@@ -1,6 +1,6 @@
 /** The messages of safebyok-convex's own checks, gathered so their wording can be reviewed in one place. */
 
-// == [Options]: ClientExpected, ApiExpected, ComponentExpected, ConvexVaultDBAdvice, ConvexBankDBAdvice, SafebyokComponentAdvice, SafebyokApiAdvice
+// == [Options]: ClientExpected, ApiExpected, ComponentExpected, ConvexBankDBAdvice, SafebyokBankComponentAdvice, SafebyokBankApiAdvice
 
 /** Message for a `client` option that is not a Convex client. */
 export const ClientExpected = 'Expected a Convex client: query and mutation, and onUpdate or watchQuery'
@@ -11,17 +11,14 @@ export const ApiExpected = 'Expected the module of safebyok functions, each unde
 /** Message for a value that is not an installed component. */
 export const ComponentExpected = 'Expected an installed component'
 
-/** Advice for a host whose `ConvexVaultDB` options were refused. */
-export const ConvexVaultDBAdvice = "Hand it your app's Convex client (a ConvexClient, or your ConvexReactClient) and `api.safebyok` from your convex/_generated/api: the module, not the whole `api`."
-
 /** Advice for a host whose `ConvexBankDB` options were refused. */
 export const ConvexBankDBAdvice = "Hand it your app's Convex client (a ConvexClient, or your ConvexReactClient) and `api.safebyokBank` from your convex/_generated/api: the module, not the whole `api`."
 
-/** Advice for a host whose component was refused by `SafebyokComponent`. */
-export const SafebyokComponentAdvice = 'Hand it components.safebyok from your generated api: install it with app.use(safebyok) in convex.config.ts, then run Convex codegen.'
+/** Advice for a host whose component was refused by `SafebyokBankComponent`. */
+export const SafebyokBankComponentAdvice = 'Hand it components.safebyok from your generated api: install it with app.use(safebyok) in convex.config.ts, then run Convex codegen.'
 
-/** Advice for a host whose `SafebyokComponent.api` options were refused. */
-export const SafebyokApiAdvice = 'Hand it { getUserId }, a function answering who is signed in: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null.'
+/** Advice for a host whose `SafebyokBankComponent.api` options were refused. */
+export const SafebyokBankApiAdvice = 'Hand it { getUserId }, a function answering who is signed in: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null.'
 // --
 
 // == [Answers]: StoredOutOfStep

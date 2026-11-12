@@ -96,7 +96,7 @@ function forwarding(): VaultLogger {
  * else to the console, each line tagged 'safebyok:'. Pass it to Device.make or BankProvider to have
  * the vault use the default whatever its storage adapter was given.
  *
- * @example Device.make({ ...opts, vaultDB: idbVaultDB({ logger: storageLogger }), logger: DefaultLogger })  // the storage to its own, the vault to the default
+ * @example Device.make({ ...opts, bankDB: idbBankDB({ logger: storageLogger }), logger: DefaultLogger })  // the storage to its own, the vault to the default
  */
 export const DefaultLogger: VaultLogger = forwarding()
 

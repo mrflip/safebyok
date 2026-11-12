@@ -55,11 +55,11 @@ async function getGateDoc(db: ComponentDb, { user_id, banklabel }: BankScope, ga
 }
 
 async function getVaultDoc(db: ComponentDb, { user_id, banklabel, vaultlabel }: VaultScope) {
-  return await db.query('safebyok_bank_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel)).unique()
+  return await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel)).unique()
 }
 
 function lifeBoxQuery(db: ComponentDb, { user_id, banklabel, vaultlabel }: VaultScope, bank_tok: string, vault_tok: string) {
-  return db.query('safebyok_bank_boxes')
+  return db.query('safebyok_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).eq('vault_tok', vault_tok))
 }
 
@@ -86,7 +86,7 @@ function convexRowsOf(bankDB: ConvexBankDB): TH.BankDBRowCheats {
       await run(async ({ db }) => {
         const { user_id, banklabel, vaultlabel } = scope
         const vaultDoc = await getVaultDoc(db, scope)
-        if (vaultDoc) { await db.replace('safebyok_bank_vaults', vaultDoc._id, { user_id, banklabel, vaultlabel, vault: row }) } else { await db.insert('safebyok_bank_vaults', { user_id, banklabel, vaultlabel, vault: row }) }
+        if (vaultDoc) { await db.replace('safebyok_vaults', vaultDoc._id, { user_id, banklabel, vaultlabel, vault: row }) } else { await db.insert('safebyok_vaults', { user_id, banklabel, vaultlabel, vault: row }) }
       })
     },
     // A planted row is not tallied, so the life's tally is deleted and the next put recounts it.
@@ -95,11 +95,11 @@ function convexRowsOf(bankDB: ConvexBankDB): TH.BankDBRowCheats {
         const { user_id, banklabel, vaultlabel, boxlabel } = scope
         const boxDoc = await lifeBoxQuery(db, scope, bank_tok, vault_tok).filter((qq) => qq.eq(qq.field('boxlabel'), boxlabel)).unique()
         const planted = { user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel, box: row }
-        if (boxDoc) { await db.replace('safebyok_bank_boxes', boxDoc._id, planted) } else { await db.insert('safebyok_bank_boxes', planted) }
-        const tallyDoc = await db.query('safebyok_bank_tallies')
+        if (boxDoc) { await db.replace('safebyok_boxes', boxDoc._id, planted) } else { await db.insert('safebyok_boxes', planted) }
+        const tallyDoc = await db.query('safebyok_tallies')
           .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).eq('vault_tok', vault_tok))
           .unique()
-        if (tallyDoc) { await db.delete('safebyok_bank_tallies', tallyDoc._id) }
+        if (tallyDoc) { await db.delete('safebyok_tallies', tallyDoc._id) }
       })
     },
     bankRowOf: async (scope) => await run(async ({ db }) => {
@@ -192,7 +192,7 @@ describe("ConvexBankDB's constructor", () => {
 
 /** How many box rows are stored under the bank, across every life. */
 async function boxCountOf(deployment: ComponentDeployment): Promise<number> {
-  const boxDocs = await deployment.as(null).run(async ({ db }) => await db.query('safebyok_bank_boxes')
+  const boxDocs = await deployment.as(null).run(async ({ db }) => await db.query('safebyok_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', BW.bankScope.user_id).eq('banklabel', BW.bankScope.banklabel))
     .collect())
   return boxDocs.length
@@ -206,7 +206,7 @@ async function plantBoxes(deployment: ComponentDeployment, vault: BX.VaultRecord
       for (let ii = beg; ii < Math.min(beg + 2500, qty); ii += 1) {
         const boxlabel = `box${String(ii).padStart(5, '0')}`
         const box = BW.boxAt(0, bank_tok, vault_tok, { vaultlabel, boxlabel })
-        await db.insert('safebyok_bank_boxes', { ...BW.bankScope, vaultlabel, bank_tok, vault_tok, boxlabel, box })
+        await db.insert('safebyok_boxes', { ...BW.bankScope, vaultlabel, bank_tok, vault_tok, boxlabel, box })
       }
     })
   }

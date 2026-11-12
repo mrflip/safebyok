@@ -51,13 +51,13 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(world.mw.callsOf('get')).to.deep.equal([])
     })
 
-    it("rejects, rather than throws, when the VaultDB's watch throws", async () => {
+    it("rejects, rather than throws, when the BankDB's watch throws", async () => {
       const listing = boxListingOf(world.mw)
       vi.spyOn(world.mw.bankDB, 'watch').mockImplementation(() => { throw new VaultError('storage_unavailable', "The storage could not be reached.") })
       await expect(listing.hello()).rejects.toThrow(/could not be reached/)
     })
 
-    it("reports the end of the VaultDB's watch as bad news", async () => {
+    it("reports the end of the BankDB's watch as bad news", async () => {
       const listing = boxListingOf(world.mw)
       const ended = new VaultError('storage_unavailable', "The stream ended.")
       await listing.hello()
@@ -65,7 +65,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(world.mw.badnews).to.deep.equal([ended])
     })
 
-    it("panics on a vaultDB's 'identity_revoked', reporting no bad news", async () => {
+    it("panics on a bankDB's 'identity_revoked', reporting no bad news", async () => {
       const listing = boxListingOf(world.mw)
       const revoked = new VaultError('identity_revoked', "Signed out.")
       vi.spyOn(world.mw.bankDB, 'tryListBoxes').mockResolvedValueOnce({ ok: false, err: revoked, parent: null } as never)

@@ -443,7 +443,7 @@ describe("listing.tryGet", () => {
     expect(tryGetVault.mock.calls.map(([ask]) => ask.expected)).to.deep.equal([BX.shellVaultOf(scope), vault?.sparse])
   })
 
-  it("returns the vaultDB's own act when it asked storage", async () => {
+  it("returns the bankDB's own act when it asked storage", async () => {
     const { vault, listing } = await makeBornVault()
     const answer = await listing.tryGet(Dna, { maxMillisSinceRefresh: 0 })
     expect(answer).to.deep.include({ ok: true, act: 'gotlive', val: vault })

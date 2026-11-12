@@ -76,7 +76,7 @@ export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxC
   const horizonMillis = union([num.nonnegative(), lit(Infinity)]).transform((most) => Math.min(most, ForeverMillis))
   const maxMillis     = horizonMillis.optional()
   const timelyOpts    = obj({
-    /** How long ago, at most, the record in hand was refreshed from the vaultDB; Infinity for no limit. */
+    /** How long ago, at most, the record in hand was refreshed from the bankDB; Infinity for no limit. */
     maxMillisSinceRefresh: maxMillis,
     /** How long ago, at most, the world the verb runs in was refreshed; Infinity for no limit. */
     maxWorldMillis:        maxMillis,
@@ -110,7 +110,7 @@ export const { probeAsked, probeOpts } = Checkers('bad_option', ({ obj, vaultlab
     sidecar:    CX.sidecar.default({ example: true }),
   }),
   probeOpts: obj({
-    /** How long ago, at most, the trial's vault and box were refreshed from the vaultDB; apart from the bank's own refresh settings. */
+    /** How long ago, at most, the trial's vault and box were refreshed from the bankDB; apart from the bank's own refresh settings. */
     maxMillisSinceRefresh: horizonMillis.default(1000),
     /** How long ago, at most, the box got back after the put was refreshed: 0, the default, asks storage; more lets the listing answer from the box the put left. */
     maxMillisAtGetBack:    horizonMillis.default(0),
@@ -205,7 +205,7 @@ export const storableArgs = objCheck(({ custom }) => ({
 /** A vault or box in a listing. */
 export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
 
-/** The answer of a vaultDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
+/** The answer of a bankDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
 export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, EX.OkAct | EX.GateAct, unknown>
 
 /** A put's {@link ListingAnswer}, whose good form always carries a record. */
@@ -220,13 +220,13 @@ export type ListingDelOpts<SparseT> = Readonly<{ expected: SparseT }>
 /** A listing's answer from `listVaults` or `listBoxes`: the rows listed, and those set aside as damaged. */
 export type ListingListAnswer<RecordT, SparseT, DamagedT> = Answer<{ listed: readonly Fetched<RecordT, SparseT>[], damaged_rows: readonly DamagedT[] }, EX.ListAct, unknown>
 
-/** What a listing's `tryGet` answers: the vaultDB's own answer where storage was asked, or the act `timely`, with no world, where the instance listed served it. */
+/** What a listing's `tryGet` answers: the bankDB's own answer where storage was asked, or the act `timely`, with no parent, where the instance listed served it. */
 export type ListingGetAnswer<ValT> = ThingAnswer<ValT> | GoodAnswer<ValT, 'timely', null>
 
-/** What a listing's `tryPut` and `tryDel` answer: the vaultDB's own answer, with the instance listed as its `val`. */
+/** What a listing's `tryPut` and `tryDel` answer: the bankDB's own answer, with the instance listed as its `val`. */
 export type ThingAnswer<ValT> = Answer<ValT, EX.GoodAct, unknown>
 
-/** The tombstone `listing.del` sends the vaultDB: at the revision after the row it replaces, with a life token of its own. */
+/** The tombstone `listing.del` sends the bankDB: at the revision after the row it replaces, with a life token of its own. */
 export type DelTombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
 
 

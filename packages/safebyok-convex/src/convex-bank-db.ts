@@ -8,7 +8,7 @@ import { BX } from 'safebyok/storage'
 import type { BoxTidyAsk, Tidied, VaultError, WatchScope } from 'safebyok/storage'
 import * as Phrases from './phrases'
 import { isSafebyokErrorData, safebyokErrorData } from './refusals'
-import type { SafebyokBankApi } from './bank-server'
+import type { SafebyokBankApi } from './server'
 
 // == [Clients]: ConvexCalls, ConvexWatchingClient, ConvexReactWatchingClient, ConvexBankClient, ConvexBankDBOpts
 

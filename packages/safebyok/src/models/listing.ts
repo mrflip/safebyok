@@ -6,9 +6,10 @@ import { isConsistent } from '../helpers/validator'
 import { oneAtATime } from '../helpers/one-at-a-time'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { type BankDB, type Notice as BankDBNotice, answerWithVal, refusedAnswerOf } from '../storage/bank-db'
-import type { BankBadAct, DeliveryFielding, GoodAct, IfAbsent } from '../shapes/shapes-enums'
+import type { BadAct, DeliveryFielding, GoodAct, IfAbsent } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { PutOpts } from '../shapes/shapes-storage'
+import * as BX from '../shapes/shapes-bankdb'
 import type { BankRow, BoxRow, GateRecord, VaultRow } from '../shapes/shapes-bankdb'
 import * as VX from '../shapes/shapes-vaultish'
 import type { DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingDelOpts, ListingListAnswer, ListingPutAnswer, ListingPutOpts, ListingOpts, ListingGetAnswer, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
@@ -181,7 +182,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       await this.ensureTimelyWorld(maxWorldMillis)
       const listed = this.at(scope)
       if (listed?.isHydratedWithin(maxMillisSinceRefresh) === true) {
-        return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), parent: null, ask: SX.loggableAsk.parse({ op: 'get', ...scope }) }
+        return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), parent: null, ask: BX.loggableAsk.parse({ op: 'get', ...scope }) }
       }
       const got = await this.#doTryGetJoined(scope)
       if ('err' in got) { return refusedAnswerOf(got.err, got.answer) }
@@ -500,7 +501,7 @@ const deliveryFieldingOf = {
   void:    'as_db',   vault_void: 'none', vault_gone: 'none',  vault_reborn: 'none', vault_full: 'none', unclassified_storing: 'none',
   bank_void: 'none',  bank_gone: 'none',  bank_reborn: 'none',
   got:     'none',    tidied:  'none',    timely:   'none',
-} as const satisfies Record<GoodAct | BankBadAct, DeliveryFielding>
+} as const satisfies Record<GoodAct | BadAct, DeliveryFielding>
 
 // Every form has every field, null where it has none, so the plan destructures and narrows on its tags.
 /** What delivering does, decided before anything changes: which instance receives (its `making`), and what becomes of its record (its `mod`), as the `DeliveryMaking` and `DeliveryModification` tags say. */

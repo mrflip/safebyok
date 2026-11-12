@@ -18,7 +18,7 @@ function builtBoxOf(record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Te
 /** The own props that follow the record in hand, as the box has them now. */
 function followingPropsOf(box: TestableBox) { return { vault_tok: box.vault_tok, revision_tok: box.revision_tok, revision_seq: box.revision_seq, written_at: box.written_at } }
 
-/** Script the VaultDB's next `del` pending until `release`, answering `tombstone`; `entered` resolves once the VaultDB has the call. The fake timers stay where they are: `vi.waitFor` would move them. */
+/** Script the BankDB's next `del` pending until `release`, answering `tombstone`; `entered` resolves once the BankDB has the call. The fake timers stay where they are: `vi.waitFor` would move them. */
 function pendingNextDel(box: TestableBox): { entered: Promise<void>, release: () => void, sentTok: () => string | undefined } {
   let release: (() => void) | undefined
   let sentTok: string | undefined
@@ -142,7 +142,7 @@ describe("Storable own props", () => {
       expect(followingPropsOf(box)).to.include({ revision_tok: box._cheat_central.revision_tok, revision_seq: 2 })
     })
 
-    it("follow the tombstone a del writes, once the VaultDB answers", async () => {
+    it("follow the tombstone a del writes, once the BankDB answers", async () => {
       const box = builtBoxOf()
       world.mw.setNow(T0 + 500)
       const { entered, release, sentTok } = pendingNextDel(box)

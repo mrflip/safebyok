@@ -5,16 +5,14 @@ import { IsBankDB, UNANSWERED } from '../helpers/consts'
 import { type VaultError, isVaultError, rowsOfRefusal } from '../refusals/errors'
 import type { BadOutcome, GoodOutcome } from '../refusals/outcome'
 import type { BankScope } from '../shapes/shapes-core'
-import type { BankBadAct, GoodAct, GotAct, ListAct, OkAct } from '../shapes/shapes-enums'
+import type { BadAct, GoodAct, GotAct, ListAct, OkAct } from '../shapes/shapes-enums'
 import type { BoxTidyAsk, DamagedVault, WatchScope } from '../shapes/shapes-storage'
 import type {
   BankBuildAsk, BankDelAsk, BankEnsureAsk, BankRow, BankTop, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxSparse, DamagedBox,
   GateRecord, GateVerbAsk, LoggableAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultRow,
 } from '../shapes/shapes-bankdb'
-import type { Tidied } from './vault-db'
 import * as Refuse from '../refusals/throwers'
 
-export type { Tidied } from './vault-db'
 
 // == [Answers]: GoodAnswer, BadAnswer, Answer, BankEnsured, BoxesListed, EnsureBankAnswer, GateAnswer, DelBankAnswer, VaultAnswer, BoxAnswer, ListBoxesAnswer, TidyGoneAnswer, Notice, answerWithVal, refusedAnswerOf, badAnswerOf
 
@@ -23,7 +21,7 @@ export type GoodAnswer<ValT, ActT extends string, ParentT = BankRow> = GoodOutco
 
 // A refusal met while delivering a good answer keeps that answer's act: storage did what the act says (`refusedAnswerOf`).
 /** A bankDB verb's refused answer: its `err`, with the `act`, `parent` and `dbhas` the refusal carries, and what it carries of its `ask`. */
-export type BadAnswer = BadOutcome & { ask: LoggableAsk, act: BankBadAct | GoodAct, parent: unknown, dbhas?: unknown }
+export type BadAnswer = BadOutcome & { ask: LoggableAsk, act: BadAct | GoodAct, parent: unknown, dbhas?: unknown }
 
 /** A `try*` verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. */
 export type Answer<ValT, ActT extends string, ParentT = BankRow> = GoodAnswer<ValT, ActT, ParentT> | BadAnswer
@@ -32,6 +30,8 @@ export type Answer<ValT, ActT extends string, ParentT = BankRow> = GoodAnswer<Va
 export type BankEnsured = { gates: { main: GateRecord }, vaults: VaultRow[], damaged_rows: DamagedVault[] }
 /** A vault's boxes from `listBoxes`, sparse, and the rows that failed their checks. */
 export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
+/** The count of box rows left after `tidyGone`. */
+export type Tidied      = { totalCount: number }
 
 /** The answer to `ensureBank`. Its `val` is null when no live bank is stored. */
 export type EnsureBankAnswer        = Answer<BankEnsured | null, GotAct>

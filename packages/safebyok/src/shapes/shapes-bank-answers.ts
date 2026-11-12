@@ -2,22 +2,30 @@
 
 import type * as Z from 'zod'
 import { Checkers } from '../helpers/validator'
-import { VaultError, type RefusalMeta, type RefusalRows } from '../refusals/errors'
+import { VaultError, refusalkindVals, type RefusalMeta, type RefusalRows } from '../refusals/errors'
 import type { Outcome } from '../refusals/outcome'
 import type { Answer, Notice } from '../storage/bank-db'
-import * as AX from './shapes-answers'
 import * as BX from './shapes-bankdb'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import * as SX from './shapes-storage'
 import type { LoggableAsk } from './shapes-bankdb'
 
-// == [Crossed parts]: crossedAsk, damagedBox, CrossedAsk
-// A refusal crosses as a vaultDB's does (`AX.crossedErr`), and so does a damaged vault row (`AX.damagedVault`).
+// == [Crossed parts]: crossedErr, crossedAsk, damagedVault, damagedBox, CrossedErr, CrossedAsk
 
 // A failed check here is a wire out of step with this copy of safebyok, never a damaged row: 'unexpected_error'.
-/** The checks of the parts of a bankDB answer that cross the wire beside its refusal: what it carries of its ask, and a damaged box row listed. */
-export const { crossedAsk, damagedBox } = Checkers('unexpected_error', ({ obj, str, int, lit, oneof, user_id, banklabel, vaultlabel, boxlabel, bank_tok, gate_tok, vault_tok, box_tok, revision_tok }) => {
+/** The checks of the parts of a bankDB answer that cross the wire: a refusal, what the answer carries of its ask, and the damaged rows listed. */
+export const { crossedErr, crossedAsk, damagedVault, damagedBox } = Checkers('unexpected_error', ({ obj, arr, str, int, lit, oneof, user_id, banklabel, vaultlabel, boxlabel, bank_tok, gate_tok, vault_tok, box_tok, revision_tok }) => {
+  const crossedErr = obj({
+    refusalkind: oneof(refusalkindVals),
+    message:     str,
+    /** The refusal's meta as a server lets it cross: these fields alone, never its cause. */
+    meta:        obj({
+      capacity:   SX.capacity.nullable().default(null),
+      fieldnames: arr(str).nullable().default(null),
+      oplabel:    str.nullable().default(null),
+    }).strict().nullable().default(null),
+  }).strict()
   const crossedMeta = obj({
     revision_tok: revision_tok.nullable().default(null),
     revision_seq: int.nullable().default(null),
@@ -28,7 +36,7 @@ export const { crossedAsk, damagedBox } = Checkers('unexpected_error', ({ obj, s
     box_tok:      box_tok.nullable().default(null),
   }).strict()
   const crossedAsk = obj({
-    op:         oneof(EX.bankAskOpVals).nullable().default(null),
+    op:         oneof(EX.askOpVals).nullable().default(null),
     user_id:    user_id.nullable().default(null),
     banklabel:  banklabel.nullable().default(null),
     gatelabel:  lit('main').nullable().default(null),
@@ -44,9 +52,13 @@ export const { crossedAsk, damagedBox } = Checkers('unexpected_error', ({ obj, s
     gate:       crossedMeta.nullable().default(null),
   }).strict()
   // A damaged row's label is the one it is stored under, which may fail a label's check: a reason it is listed.
-  const damagedBox = obj({ user_id, banklabel, vaultlabel, boxlabel: str, bank_tok, vault_tok, am: lit('d') }).strict()
-  return { crossedAsk, damagedBox }
+  const damagedVault = obj({ user_id, banklabel, vaultlabel: str, am: lit('d') }).strict()
+  const damagedBox   = obj({ user_id, banklabel, vaultlabel, boxlabel: str, bank_tok, vault_tok, am: lit('d') }).strict()
+  return { crossedErr, crossedAsk, damagedVault, damagedBox }
 }, [CX])
+
+/** A refusal as it crosses a wire: its kind, its message and the meta a server lets cross. */
+export type CrossedErr = Z.output<typeof crossedErr>
 
 /** What a bankDB answer carries of its ask as it crosses a wire, null for each field the ask left out. */
 export type CrossedAsk = Z.output<typeof crossedAsk>
@@ -65,7 +77,7 @@ function answerOfCrossed<ValT, ActT extends string, ParentT>(crossed: Crossed<Va
 /** What an answer's check parses before {@link answerOfCrossed} makes the answer of it. */
 type Crossed<ValT, ActT extends string, ParentT> = { ask: CrossedAsk, dbhas: unknown } & (
   | { ok: true, act: ActT, val: ValT, parent: ParentT, err: null }
-  | { ok: false, act: EX.BankBadAct, val: null, parent: unknown, err: AX.CrossedErr }
+  | { ok: false, act: EX.BadAct, val: null, parent: unknown, err: CrossedErr }
 )
 
 /** `crossed` as the core has an answer's ask, each null field left out, in its rows too. */
@@ -82,7 +94,7 @@ function askOfCrossed({ expected, record, gate, ...crossed }: CrossedAsk): Logga
 function withoutNulls(crossed: object): Record<string, unknown> { return Object.fromEntries(Object.entries(crossed).filter(([, field]) => field !== null)) }
 
 /** The VaultError `crossed` stands for, its meta with what crossed and what the answer has. */
-function vaultErrorOfCrossed({ refusalkind, message, meta }: AX.CrossedErr, answered: RefusalMeta, rows: RefusalRows): VaultError {
+function vaultErrorOfCrossed({ refusalkind, message, meta }: CrossedErr, answered: RefusalMeta, rows: RefusalRows): VaultError {
   const crossedMeta = withoutNulls(meta ?? {}) as RefusalMeta
   return new VaultError(refusalkind, message, { meta: { ...crossedMeta, ...answered }, rows })
 }
@@ -101,7 +113,7 @@ export const {
   ) {
     return discrim('ok', [
       obj({ ok: lit(true), act: oneof(acts), val, parent, dbhas: dbhas.nullable().default(null), ask: crossedAsk, err: lit(null).default(null) }).strict(),
-      obj({ ok: lit(false), act: oneof(EX.bankBadActVals), val: lit(null).default(null), parent: badParent.nullable().default(null), dbhas: dbhas.nullable().default(null), ask: crossedAsk, err: AX.crossedErr }).strict(),
+      obj({ ok: lit(false), act: oneof(EX.badActVals), val: lit(null).default(null), parent: badParent.nullable().default(null), dbhas: dbhas.nullable().default(null), ask: crossedAsk, err: crossedErr }).strict(),
     ]).transform((crossed) => answerOfCrossed(crossed as Crossed<Z.output<ValT>, ActsT[number], Z.output<ParentT>>))
   }
 
@@ -109,7 +121,7 @@ export const {
   const gateish     = { parent: BX.bankRow, badParent: BX.bankRow, dbhas: BX.gateRecord }
   const vaultish    = { parent: BX.bankRow, badParent: BX.bankRow, dbhas: BX.vaultRow }
   const boxish      = { parent: BX.vaultRecord, badParent: BX.vaultRow, dbhas: BX.boxRow }
-  const bankEnsured = obj({ gates: obj({ main: BX.gateRecord }).strict(), vaults: arr(BX.vaultRow), damaged_rows: arr(AX.damagedVault) }).strict()
+  const bankEnsured = obj({ gates: obj({ main: BX.gateRecord }).strict(), vaults: arr(BX.vaultRow), damaged_rows: arr(damagedVault) }).strict()
   const boxesListed = obj({ boxes: arr(BX.boxSparse.strict()), damaged_rows: arr(damagedBox) }).strict()
   const tidied      = obj({ totalCount: uint }).strict()
 
@@ -119,7 +131,7 @@ export const {
       ok: lit(true), act: oneof(['gotlive', 'gotgone']), val: union([BX.bankRow, BX.gateRecord, BX.vaultRow, BX.boxRow]),
       parent: noticedAbove.nullable().default(null), err: lit(null).default(null),
     }).strict(),
-    obj({ ok: lit(false), act: oneof(EX.bankBadActVals), val: lit(null).default(null), parent: lit(null).default(null), err: AX.crossedErr }).strict(),
+    obj({ ok: lit(false), act: oneof(EX.badActVals), val: lit(null).default(null), parent: lit(null).default(null), err: crossedErr }).strict(),
   ]).transform((crossed): Outcome<Notice> => {
     if (crossed.ok) {
       const parent = BX.noticeParentOf(crossed.val, crossed.parent)

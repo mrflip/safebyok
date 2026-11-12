@@ -41,7 +41,7 @@ export function sanitizeForeignError(thrown: Thrown): Error {
 
 /** A `storage_unavailable` refusal: the backend could not be reached, or failed.
  * @param cause - What the backend threw, kept for debugging as {@link sanitizeForeignError} makes it.
- *   It has only what the backend has: ciphertext and unencrypted fields. True of a `VaultDB`
+ *   It has only what the backend has: ciphertext and unencrypted fields. True of a bankDB
  *   adapter, never of the device database, which is handed lease records: `DeviceDB` replaces what its
  *   subclass throws with a condition that keeps only its `name`.
  * @param message - What failed, when there is more to say than that storage failed: which read or
@@ -101,13 +101,10 @@ export function rowOfOtherWorld(received: unknown, tokname: 'bank_tok' | 'vault_
 export function writtenByOwnVerbs(): VaultError { return new VaultError('bad_option', Phrases.WrittenByOwnVerbs) }
 // --
 
-// == [Storable Throwers]: partialLoad, alreadyListed, instanceDisabled, boxAbsent, boxNotListed, vaultAbsent, deletedVault, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, nothingStoredWhereLive, deliveredNotAsSent
+// == [Storable Throwers]: partialLoad, instanceDisabled, boxAbsent, boxNotListed, vaultAbsent, deletedVault, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, nothingStoredWhereLive, deliveredNotAsSent
 
 /** A `bad_option` refusal: the record in hand is not full, and needs hydrating first. */
 export function partialLoad(): VaultError { return new VaultError('bad_option', Phrases.PartialLoad) }
-
-/** A `bad_option` refusal: the listing already has an instance under the dna's scope. */
-export function alreadyListed(): VaultError { return new VaultError('bad_option', Phrases.AlreadyListed) }
 
 /** A `disabled` refusal: this object was let go: its bank or its vault life ended, or its row was found damaged. */
 export function instanceDisabled(): VaultError { return new VaultError('disabled', Phrases.LetGoInstance) }
@@ -150,13 +147,10 @@ export function refusalOfDelivering(thrown: unknown, answer: { ask: BX.LoggableA
 
 // --
 
-// == [Box Throwers]: boxStoredDamaged, recordForNewBox, undecodedWhisper, notExposed
+// == [Box Throwers]: boxStoredDamaged, undecodedWhisper, notExposed
 
 /** A `damaged_row` refusal: this box is stored damaged and cannot be read. */
 export function boxStoredDamaged({ boxlabel }: SX.DamagedBox): VaultError { return new VaultError('damaged_row', Phrases.boxStoredDamaged(boxlabel)) }
-
-/** The refusal of a put that said only-if-new, handed a whole record. */
-export function recordForNewBox(): VaultError { return new VaultError('bad_option', Phrases.RecordForNewBox) }
 
 /** A `damaged_whisper` refusal: the box opened, but what is inside is not a whisper this package can read. */
 export function undecodedWhisper(): VaultError { return new VaultError('damaged_whisper', Phrases.UndecodedWhisper) }
@@ -260,9 +254,9 @@ export function strengthCheckerLoadFailed(cause: unknown): VaultError { return n
 export function noJsonText(): VaultError { return new VaultError('unexpected_error', Phrases.NoJsonText) }
 // --
 
-// == [VaultDB Throwers]: actRefused, vaultEmpty, vaultReborn, vaultGone, staleWrite, camped, absentBox, gateIssue, boxTooLarge, vaultFull, storageFull, seqNotNext
+// == [Refusal throwers]: actRefused, boxTooLarge, storageFull
 
-/* The refusals of a vaultDB, each read the same in an answer and an error: `meta` has the `world` and `dbhas` the answer carries. */
+/* The refusals of a bankDB, each read the same in an answer and an error: `meta` has the `parent` and `dbhas` the answer carries. */
 
 // Each refusal kind calls for one response from the caller, whichever act produced it: treat the row as missing, fetch
 // again and rewrite, leave the live row alone, or report it. An expected refusal and an impossible one never share a kind.
@@ -278,7 +272,7 @@ const RefusalkindForBoxAct = {
 
 const RefusalkindForVaultAct = { ...RefusalkindForBoxAct, void: 'absent_vault', gone: 'absent_vault', dubdel: 'absent_vault' } as const satisfies Record<EX.RefusedAct, Refusalkind>
 
-// No rows go on this error: the rows the refusal found are in its answer, as `world` and `dbhas`.
+// No rows go on this error: the rows the refusal found are in its answer, as `parent` and `dbhas`.
 /** The refusal for a get, put or del whose `act` is a refusal. Its message is its kind, and `meta.act` is the act.
  * @param rowkind - Whose call it was: a `box`'s, or a `vault`'s, which a bankDB's bank and gate verbs count as.
  * @param meta    - Extra context: the `oplabel`, its `ask`, and for `vault_full` the `capacity`.
@@ -288,49 +282,9 @@ export function actRefused(rowkind: 'box' | 'vault', act: EX.RefusedAct | EX.Box
   return new VaultError(refusalkind, refusalkind, { meta: { ...meta, act } })
 }
 
-/** A `vault_empty` refusal: nothing is stored for this life of the vault. */
-export function vaultEmpty(world: SX.VaultRow): VaultError {
-  return new VaultError('vault_empty', Phrases.VaultEmpty, { rows: { world, dbhas: null } })
-}
-
-/** A `vault_reborn` refusal: a live vault stands here under another vault_tok. */
-export function vaultReborn(stored: SX.VaultRow): VaultError {
-  return new VaultError('vault_reborn', Phrases.VaultReborn, { rows: { world: null, dbhas: stored } })
-}
-
-/** A `vault_gone` refusal: this vault was deleted. */
-export function vaultGone(tombstone: SX.VaultRow): VaultError {
-  return new VaultError('vault_gone', Phrases.VaultGone, { rows: { world: tombstone, dbhas: tombstone } })
-}
-
-/** A `stale_write` refusal: what is stored moved since this revision was read. */
-export function staleWrite(world: SX.VaultRow, dbhas: SX.VaultRow | SX.BoxRow | null): VaultError {
-  return new VaultError('stale_write', Phrases.StaleWrite, { rows: { world, dbhas } })
-}
-
-/** A `camped` refusal: a live record is stored here, and the call said not to replace it. */
-export function camped(world: SX.VaultRow, dbhas: SX.VaultRow | SX.BoxRow): VaultError {
-  return new VaultError('camped', Phrases.Camped, { rows: { world, dbhas } })
-}
-
-/** An `absent_box` refusal from a vaultDB: no box is stored under that label. */
-export function absentBox(world: SX.VaultRow, dbhas: SX.BoxRow | null): VaultError {
-  return new VaultError('absent_box', Phrases.AbsentBox, { meta: { act: (dbhas === null) ? 'void' : 'gone' }, rows: { world, dbhas } })
-}
-
-/** A `gate_issue` refusal: a change of the gate was refused for the reason `why`. */
-export function gateIssue(world: SX.VaultRow, why: string): VaultError {
-  return new VaultError('gate_issue', Phrases.gateIssue(why), { rows: { world, dbhas: world } })
-}
-
 /** A `box_too_large` refusal: the record's `recordSizeEst` exceed `maxRecordSizeEst`. */
 export function boxTooLarge(recordSizeEst: number, maxRecordSizeEst: number): VaultError {
   return new VaultError('box_too_large', Phrases.boxTooLarge(recordSizeEst, maxRecordSizeEst))
-}
-
-/** A `vault_full` refusal: the vault has as many boxes as its storage allows. */
-export function vaultFull(capacity: SX.Capacity): VaultError {
-  return new VaultError('vault_full', Phrases.VaultFull, { meta: { capacity } })
 }
 
 /** A `vault_full` refusal for a write storage itself had no room for, `cause` what the backend threw. */
@@ -338,8 +292,6 @@ export function storageFull(cause: Thrown): VaultError {
   return new VaultError('vault_full', Phrases.StorageFull, { cause: sanitizeForeignError(cause) })
 }
 
-/** A `bad_option` refusal: a record's revision_seq is not one past its prior's. */
-export function seqNotNext(): VaultError { return new VaultError('bad_option', Phrases.SeqNotNext) }
 // --
 
 // == [BankDB Throwers]: bankGateIssue, mainGateMissing

@@ -19,7 +19,7 @@ export function makeArgon2idWasmDeriver(spec: KeyDeriverSpec): Argon2idKeyDerive
 
 /** The key deriver for the supplied `Argon2idWebV1` spec, run through WebAssembly: a drop-in replacement for safebyok's `argon2idWebV1Deriver`.
  *
- * @example Device.make({ user_id: session.user_id, banklabel: 'acme', gates: ['main'], vaultDB, deviceDB, requestCleartext, keyDeriver: argon2idWasmWebV1Deriver })
+ * @example Device.make({ user_id: session.user_id, banklabel: 'acme', gates: ['main'], bankDB, deviceDB, requestCleartext, keyDeriver: argon2idWasmWebV1Deriver })
  */
 export const argon2idWasmWebV1Deriver = /* @__PURE__ */ deriverOf(Argon2idWebV1)
 
