@@ -11,6 +11,8 @@ into the done note.
    onto the one below with `--no-update-refs`. A conflict goes to a fresh `thread-worker`, handed
    the thread file and the new base, which resolves it, proves it, and pushes. When every rebase
    is clean, run `pnpm justify` once, at the top, and let CI check the middle.
+   With more than two PRs to move, run the `restacker` skill (or read it and follow it): they are
+   likely all green, so justify once at the tip, never each. One, in a line.
    Push each branch with a lease on the SHA it replaces (`--force-with-lease=<branch>:<old sha>`),
    and rewrite each PR's first line to "Stacked on #N, in the line main → #A → #B → …". Check the
    bottom stands on today's `origin/main`, not on an unmerged PR whose commits `main` already

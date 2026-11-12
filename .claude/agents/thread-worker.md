@@ -1,7 +1,7 @@
 ---
 name: thread-worker
 description: Builds one thread of a sprint in the worktree the /sprint orchestrator cut for it, as a PR, and reports; or picks up one already built, to file it or to rework a review finding. Spawned by /sprint, or by hand with the same handoff.
-autoCompactWindow: 200000
+autoCompactWindow: 300000
 # Kept in reserve: denying the Artifact tool would save about 10k tokens on every turn of
 # every worker, and a worker publishes nothing (.claude/skills/sprint/DESIGN.md).
 # disallowedTools: Artifact
@@ -67,7 +67,8 @@ the diff.
    so far, push the branch with the credential helper PROCESS.md names, and open its PR as a
    draft, per PROCESS.md, *Pull requests*. Push each milestone after it, with the thread file
    brought up to date: the Coach follows the thread there. Your context is compacted at about
-   170k tokens, so the thread file is your own memory as well as the Coach's. Once
+   170k tokens, so the thread file is your own memory as well as the Coach's. A push need not
+   wait on `pnpm justify`; `ready` does. Once
    pushed, a commit is not rewritten except by a catch-up rebase.
 3. **Ready.** With everything committed and justify green, finish the thread file, commit it
    (`plan:`), push, bring the PR's title and body up to date -- a **Tests:** line, *Open

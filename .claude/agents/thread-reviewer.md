@@ -41,7 +41,9 @@ about to make. Chain each onto the command it heralds.
 ## The job
 
 1. **Review.** `/code-review <level> <base-sha>...<tip-sha>`, with the level spelled out (it
-   otherwise reuses whatever was typed last). If it fails, or plainly reviewed something other
+   otherwise reuses whatever was typed last), and never below `medium`: at `low` it printed `(none)`
+   on ranges where `medium` found real defects. A `(none)` is unproven, not clean: rerun at `medium`
+   or review by hand, and say which. If it fails, or plainly reviewed something other
    than the range, review by hand: `git diff <base-sha>...HEAD`, file by file, with the code
    around each change, at the depth the level asks -- at `low` or `medium`, correctness bugs you
    are confident of; at `high` or `max`, wider, uncertain findings included. Say which way the

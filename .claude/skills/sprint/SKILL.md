@@ -57,14 +57,18 @@ the two would rewrite the same lines; threads in different corners of the tree a
 A thread is cut:
 
 * from `origin/main`, when it depends on nothing unmerged;
-* from the tip of the one thread it depends on, once that thread is **filed** or ready (give
-  `scripts/cut-thread` the branch, which it records so `scripts/file-thread` can rebase the thread
-  onto that branch's later tip, or onto main once it merges), and its PR says "Stacked on #N";
+* from the tip of the one thread it depends on, once that thread is **ready**, and its PR says
+  "Stacked on #N". A thread may start while the one below is in review, justify or filing, if
+  there is capacity: give `scripts/cut-thread` the branch, which it records so `scripts/file-thread`
+  rebases the thread onto that branch's reviewed tip, or onto main once it merges;
 * while it would stand on two unmerged threads, from the top of the two once you have restacked
   them into a line (`wrapup.md`, *Restack*). Never merge thread branches together.
 
 The Coach merges a sprint as **one linear line**: each PR rebased onto the one below it, every
 PR's base still `main`, so merging the top merges them all. Making that line is your job (§5).
+A PR may now and then land red, or with `.skip`s, when a later PR stacked on it mends them and
+that schedules the threads better: the Coach merges the tip of that ministack, and GitHub shows
+the run purple. Its body and its worker's report say what is red and which PR mends it.
 
 **`<sprint_name>-progress.md`** -- yours alone: a curated summary of what the threads have taught,
 newer than the plan wherever they disagree, under about 3,000 words. You write each handoff from
