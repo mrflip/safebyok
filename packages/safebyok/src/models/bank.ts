@@ -204,7 +204,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     if (! revoked.ok) { this.#bankFriend.announce({ kind: 'lease_revoke_failed', refusal: revoked.err, bank: this, where }) }
   }
 
-  /** The lease `proved` earns, attached. A lock called during the unlock does not stand: the proving says this user may have the bank unlocked. */
+  /** Attach the lease `proved` earns. A `lock()` made while the lease is being built is undone by it: the proving shows this user may unlock. */
   async #unlockByProving(proved: Proving): Promise<this> {
     const lease = await proved.buildLease(this.#leaseFriendOf(), this.maingate)
     await this.#attachLease(lease)

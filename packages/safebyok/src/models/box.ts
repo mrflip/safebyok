@@ -193,7 +193,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** {@link put}, answering the vaultDB's own answer with the box listed as its `val`. */
+  /** {@link put}, answering the bankDB's own answer with the box listed as its `val`. */
   async tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<ThingAnswer<Box>> {
     try {
       const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis } = VX.boxPutOpts.parse(opts)

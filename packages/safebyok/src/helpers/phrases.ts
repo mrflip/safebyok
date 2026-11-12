@@ -149,7 +149,7 @@ export const otherScope = (fieldnames: readonly string[]): string => `This names
 
 // == [Vault: lifecycle]: BankLocked
 
-/** Why a call that needs the vault unlocked does nothing while it is locked. */
+/** Why a call that needs the bank unlocked does nothing while it is locked. */
 export const BankLocked = "The bank is locked, so nothing was read or written: unlock it (bank.ensureUnlocked) and call again."
 
 // --

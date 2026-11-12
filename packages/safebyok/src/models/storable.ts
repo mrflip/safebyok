@@ -25,7 +25,7 @@ export function cmpRevisions(ante: Revision, post: Revision): Age {
 }
 // --
 
-/** A vault or box in this tab, kept in step with its row in the vaultDB. */
+/** A vault or box in this tab, kept in step with its row in the bankDB. */
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
   // == [Props]: scope, world, listing, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #listeners, #getSnapshot, #subscribe
 
@@ -81,7 +81,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The sparse form of central: everything but what only the full record carries. */
   get sparse(): SparseT { return this.listing.sparseOf(this.#central) }
 
-  /** When this thing's record was last refreshed from the vaultDB, or null where it never was. */
+  /** When this thing's record was last refreshed from the bankDB, or null where it never was. */
   get refreshedAt(): number | null { return this.#refreshedAt }
 
   /** Whether the record in hand is alive, damaged or gone. */

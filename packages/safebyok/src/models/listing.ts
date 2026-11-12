@@ -18,7 +18,7 @@ import { reportToPlatform } from '../refusals/report-error'
 import { type Storable, cmpRevisions } from './storable'
 
 /** Administers a list of instances while coordinating updates to its world (the vault) and coordinating its listed instances.
- * It acts as the hub for vaultDB requests because it owns instantiating,
+ * It acts as the hub for bankDB requests because it owns instantiating,
  * listing, disabling, remaking, and delisting its storable instances.
  */
 export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>, DamagedT extends ScopeT & SX.DamagedRow = ScopeT & SX.DamagedRow> {
@@ -35,7 +35,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // Keyed by scopepath, not by instance: a scope may have no instance listed to key on.
   /** The storage get of each scope under way, joined while it runs. */
   readonly #joinedGetOf = new Map<string, () => Promise<Joined<ListingAnswer<RecordT, SparseT>, ThingT | null>>>()
-  /** The rows the vaultDB's last listing set aside as damaged. */
+  /** The rows the bankDB's last listing set aside as damaged. */
   #damagedRows: readonly DamagedT[] = Object.freeze([])
   readonly #listeners = new Set<() => void>()
   #snapshot: readonly SnapshotT[] = Object.freeze([])
@@ -151,12 +151,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Storage verbs]: list, tryList, doTryListJoined, listedAt, get, tryGet, doTryGetJoined, handleIfAbsent, put, tryPut, del, tryDel
 
-  /** Enlists every row the vaultDB lists here, sets aside the rows it found damaged, and answers the instances listed.
+  /** Enlists every row the bankDB lists here, sets aside the rows it found damaged, and answers the instances listed.
    * Chute: list → tryList → #doTryListJoined → doTryList → deliverListing → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async list(): Promise<readonly ThingT[]> { return valOf(await this.tryList()) }
 
-  /** {@link list}, answering the vaultDB's own answer with the instances listed as its `val`.
+  /** {@link list}, answering the bankDB's own answer with the instances listed as its `val`.
    * Chute: tryList → #doTryListJoined → doTryList → deliverListing → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryList(): Promise<ThingAnswer<readonly ThingT[]>> {
@@ -186,7 +186,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    */
   async get(scoped: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> { return valOf(await this.tryGet(scoped, opts)) }
 
-  /** {@link get}, answering the vaultDB's own answer where storage was asked, or the act `timely` where the instance listed served it.
+  /** {@link get}, answering the bankDB's own answer where storage was asked, or the act `timely` where the instance listed served it.
    * Chute: tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryGet(scoped: ScopeT, opts: FetchOpts = {}): Promise<ListingGetAnswer<ThingT | null>> {
@@ -240,7 +240,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    */
   async put(record: RecordT, opts: PutOpts): Promise<ThingT> { return valOf(await this.tryPut(record, opts)) }
 
-  /** {@link put}, answering the vaultDB's own answer with the instance listed as its `val`.
+  /** {@link put}, answering the bankDB's own answer with the instance listed as its `val`.
    * Chute: tryPut → doTryPut → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryPut(record: RecordT, opts: PutOpts): Promise<ThingAnswer<ThingT>> {
@@ -259,7 +259,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    */
   async del(record: SparseT): Promise<ThingT | null> { return valOf(await this.tryDel(record)) }
 
-  /** {@link del}, answering the vaultDB's own answer with the instance as its `val`.
+  /** {@link del}, answering the bankDB's own answer with the instance as its `val`.
    * Chute: tryDel → doTryDel → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryDel(record: SparseT): Promise<ThingAnswer<ThingT | null>> {
@@ -339,7 +339,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // remakes it, and an older one of any life leaves it as it is. A box listed has its world's vault_tok, so the first
   // row covers a box of another vault; a vault of another vault_tok is of another life.
   /** What receiving `record` will do: which instance receives it, and what becomes of that instance's record.
-   * Throws `storage_issue` for a record of another vault_tok than the listing's, and `record_conflict` where storage
+   * Throws `storage_issue` for a record of another world than the listing's, and `record_conflict` where storage
    * and the instance listed disagree on the history of one revision.
    * Chute: recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
@@ -455,7 +455,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Panic]: panicIfRevoked
 
-  /** A refusal of the vaultDB's on its way to a caller: 'identity_revoked' vacates the bank before the caller hears the refusal. */
+  /** A refusal of the bankDB's on its way to a caller: 'identity_revoked' vacates the bank before the caller hears the refusal. */
   protected panicIfRevoked(refusal: VaultError): void {
     if (isVaultError(refusal, 'identity_revoked')) { this.bankFriend.panic(refusal) }
   }
@@ -487,21 +487,21 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected abstract makeThing(central: Fetched<RecordT, SparseT>): ThingT
   /** The refusal for a scope where no row is stored and no instance is listed. */
   protected abstract nothingStoredError(scope: ScopeT): VaultError
-  /** The vaultDB's get of this kind of thing, expecting the listed instance's row. Its answer's `val` is null when nothing is stored. */
+  /** The bankDB's get of this kind of thing, expecting the listed instance's row. Its answer's `val` is null when nothing is stored. */
   protected abstract doTryGet(scope: ScopeT): Promise<ListingAnswer<RecordT, SparseT>>
-  /** The vaultDB's put of this kind of thing. */
+  /** The bankDB's put of this kind of thing. */
   protected abstract doTryPut(record: RecordT, opts: ListingPutOpts<SparseT>): Promise<ListingAnswer<RecordT, SparseT>>
-  /** The vaultDB's listing of every row of this kind, live, gone and damaged. */
+  /** The bankDB's listing of every row of this kind, live, gone and damaged. */
   protected abstract doTryList(): Promise<ListingListAnswer<RecordT, SparseT, DamagedT>>
   /** The bad news a row the listing set aside as damaged is told as. */
   protected abstract damagedStoredError(damaged: DamagedT): VaultError
   /** The tombstone a del stores over `expected`: at the next revision, with a new life token of its own. */
   protected abstract tombstoneOver(expected: SparseT): DelTombstone<SparseT>
-  /** The vaultDB's del of this kind of thing. */
+  /** The bankDB's del of this kind of thing. */
   protected abstract doTryDel(tombstone: DelTombstone<SparseT>, opts: ListingDelOpts<SparseT>): Promise<ListingAnswer<RecordT, SparseT>>
-  /** Start the vaultDB's watch over this listing's scope, `onBadNews` hearing of trouble with it; returns how to stop. */
+  /** Start the bankDB's watch over this listing's scope, `onBadNews` hearing of trouble with it; returns how to stop. */
   protected abstract watchRows(onNotice: (notice: BankDBNotice) => void, onBadNews: (news: VaultError) => void): () => void
-  /** True for a row this listing has: the vaultDB's watch tells of a vault's rows and its boxes' alike. */
+  /** True for a row this listing has: the bankDB's watch tells of the bank's rows, its gates', its vaults' and its boxes' alike. */
   protected abstract isOwnRow(row: BankRow | GateRecord | VaultRow | BoxRow): row is Fetched<RecordT, SparseT> & (BankRow | GateRecord | VaultRow | BoxRow)
   // --
 }
