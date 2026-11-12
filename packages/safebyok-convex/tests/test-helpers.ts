@@ -17,10 +17,16 @@ export function componentTest(transactionLimits = false) { return convexTest({ s
 /** Make a host with only the component, its functions at the root, for a fake deployment whose clients may write as any user. */
 export function componentHost() { return { api: anyApi, createTest: () => componentTest() } }
 
+/** Make a host app with the component installed as `safebyok`, and the SafebyokBankComponent that wraps it. */
+export function installedBankComponent() {
+  const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
+  return { app, component: new SafebyokBankComponent(app.components.safebyok) }
+}
+
 /** Make a host app set up as the README shows for the bankDB: the component installed as `safebyok`, and its bankDB functions served from `convex/safebyokBank.ts` using `getUserId`. */
 export function bankHostWith(getUserId: GetUserId) {
-  const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
-  return app.defineModules({ safebyokBank: new SafebyokBankComponent(app.components.safebyok).api({ getUserId }) })
+  const { app, component } = installedBankComponent()
+  return app.defineModules({ safebyokBank: component.api({ getUserId }) })
 }
 
 /** Return the `data` of the ConvexError that `operation` rejects with. Fails the test if `operation` resolves. */
