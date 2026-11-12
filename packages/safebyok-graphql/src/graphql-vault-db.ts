@@ -153,7 +153,7 @@ export class GraphQLVaultDB implements VaultDB {
       const gateVerbOpts = DB.gateVerbOpts.parse(opts)
       const crossed = await this.#runMutation(VaultOperations.replacePassphrase, 'safebyokReplacePassphrase', { record: vaultRecord, opts: gateVerbOpts })
       return DB.replacePassphraseAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'replacePassphrase', { op: 'put', gateVerb: 'replacePassphrase', ...record, record }) }
+    } catch (err) { return answerForRefusal(err, 'replacePassphrase', DB.gateVerbAskOf('replacePassphrase', record)) }
   }
 
   /** Add a passkey wayin to a vault that has none. `record` is the vault row at `opts.prior` with the passkey wayin and its `gate_epoch` plus one. */
@@ -166,7 +166,7 @@ export class GraphQLVaultDB implements VaultDB {
       const gateVerbOpts = DB.gateVerbOpts.parse(opts)
       const crossed = await this.#runMutation(VaultOperations.addPasskey, 'safebyokAddPasskey', { record: vaultRecord, opts: gateVerbOpts })
       return DB.addPasskeyAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'addPasskey', { op: 'put', gateVerb: 'addPasskey', ...record, record }) }
+    } catch (err) { return answerForRefusal(err, 'addPasskey', DB.gateVerbAskOf('addPasskey', record)) }
   }
 
   /** Remove the vault's passkey wayin. `record` is the vault row at `opts.prior` without it and its `gate_epoch` plus one.
@@ -181,7 +181,7 @@ export class GraphQLVaultDB implements VaultDB {
       const gateVerbOpts = DB.gateVerbOpts.parse(opts)
       const crossed = await this.#runMutation(VaultOperations.revokePasskey, 'safebyokRevokePasskey', { record: vaultRecord, opts: gateVerbOpts })
       return DB.revokePasskeyAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'revokePasskey', { op: 'put', gateVerb: 'revokePasskey', ...record, record }) }
+    } catch (err) { return answerForRefusal(err, 'revokePasskey', DB.gateVerbAskOf('revokePasskey', record)) }
   }
   // --
 

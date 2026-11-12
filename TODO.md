@@ -166,6 +166,23 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
 
 Wanted; each has a design question to settle first, named here.
 
+### Logging: the default handlers log, and everything else reaches them
+
+The Coach's policy (2026-11-12): **the default onLifecycle and the default bad news handlers log, and everything else
+traces to one or both.** The default `onLifecycle` at debug for what is no error and warn for an error; the default
+`onBadNews` at error for a mistake (`family` `misuse` or `bad_news`) and info for a `condition`. To settle first:
+
+* `VaultLogger` has `log`, `warn` and `error` only. Debug and info mean optional `debug?` and `info?`, falling back to
+  `log`, or mapping both to `log`.
+* A lease that outlived a lock or a vacate is logged at error and handed to the platform's `reportError` today: key
+  material may stay cached on the device. Warn would make it quieter than a routine refusal.
+* What reaches neither handler today: a host listener's throw, and either handler's own throw, go to `reportToPlatform`
+  only; Bank.make's test-deriver notice is logged directly. A listener's throw told to `onBadNews` can loop where the
+  host's `onBadNews` changes the bank and a listener throws again; a handler's own throw cannot be told to itself; the
+  test-deriver notice needs an event kind of its own.
+* `notes/security.md` has five entries promising logs that no longer happen (`Bank.onPanic`, `requestCleartext`,
+  `getProof`, `deriveKeyBytes`, `ChangeBell`/`StringStore`): amend them with the policy.
+
 ### Postgres notice channels: long user_ids fail, and the listener never unlistens
 
 The Coach (2026-11-06, the sprint's Open Matters and chat): "one channel per user, use the user_id,

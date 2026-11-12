@@ -8,7 +8,7 @@ import { reportToPlatform } from '../refusals/report-error'
 import { instanceDisabled, needUnlocked, oneRevisionTwoToks, partialLoad } from '../refusals/throwers'
 import type { Age, Am, RecordShape } from '../shapes/shapes-enums'
 import * as VX from '../shapes/shapes-vaultish'
-import type { Fetched, FetchOpts, ListingOf, ListingWorld, Aligned, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
+import type { Fetched, FetchOpts, ListingOf, ListingWorld, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
 import * as SX from '../shapes/shapes-storage'
 import type { Revision } from '../shapes/shapes-storage'
 
@@ -222,10 +222,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Aligning]: align, becomeNotifiable, replaceSnapshot, tellListeners
 
   /** SLOPDOC: Brings the snapshot up to the state just adopted, notifying the subscribers where it changed. */
-  align(): Aligned {
-    this.#replaceSnapshot()
-    return { badnews: [] }
-  }
+  align(): void { this.#replaceSnapshot() }
 
   /** Make the snapshot now, if not yet made, so that each change from here on notifies the subscribers: until then there is none to replace. */
   becomeNotifiable(): this {

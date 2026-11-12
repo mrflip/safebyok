@@ -239,7 +239,7 @@ describe("Storable snapshot and subscription", () => {
       const first = box.getSnapshot()
       const listener = vi.fn()
       box.subscribe(listener)
-      expect(box.align()).to.deep.equal({ badnews: [] })
+      box.align()
       expect(listener.mock.calls).to.have.lengthOf(0)
       expect(box.getSnapshot()).to.eq(first)
     })

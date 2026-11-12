@@ -58,7 +58,7 @@ const vaultExpected = zodToConvex(DB.rowMeta)
 const boxExpected   = v.object({ ...vaultExpected.fields, box_tok: v.string() })
 const putPolicies   = { ifAbsent: zodToConvex(DB.putOptsGiven.shape.ifAbsent), ifPresent: zodToConvex(DB.putOptsGiven.shape.ifPresent) }
 const gateVerb      = v.union(...DB.gateVerbVals.map((verb) => v.literal(verb)))
-const ifAbsent      = v.union(v.literal('fail'), v.literal('nil'))
+const ifAbsent      = v.union(...DB.ifAbsentVals.map((val) => v.literal(val)))
 
 /** What `listVaults` is asked. */
 export const vaultListAsk = v.object({ ...bankScope.fields, op: v.literal('list') }) as unknown as Validator<DB.VaultListAsk, 'required', string>

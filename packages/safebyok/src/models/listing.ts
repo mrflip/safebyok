@@ -32,7 +32,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   readonly #things    = new Map<string, ThingT>()
   // Keyed by scopepath, not by instance: a scope may have no instance listed to key on.
-  /** The storage get of each scope, joined while one runs. */
+  /** The storage get of each scope under way, joined while it runs. */
   readonly #joinedGetOf = new Map<string, () => Promise<Joined<ListingAnswer<RecordT, SparseT>, ThingT | null>>>()
   /** The rows the vaultDB's last listing set aside as damaged. */
   #damagedRows: readonly DamagedT[] = Object.freeze([])
@@ -214,6 +214,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     if (getOnce === undefined) {
       getOnce = oneAtATime(async () => {
         const answer = await this.doTryGet(scope)
+        // The join ends as storage answers: delivering is synchronous, so no get can join it after, and none is kept.
+        this.#joinedGetOf.delete(scopepath)
         try {
           return { answer, val: this.deliverAnswer(answer, scope) }
         } catch (err) { return { answer, err } }

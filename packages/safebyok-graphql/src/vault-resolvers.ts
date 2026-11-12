@@ -163,9 +163,9 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
     Mutation: {
       safebyokPutVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryPutVault(ask)),
       safebyokPutBox:            async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryPutBox(ask)),
-      safebyokReplacePassphrase: async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, { op: 'put', gateVerb: 'replacePassphrase', ...record, record }, async () => await vaultDB.tryReplacePassphrase(record, opts)),
-      safebyokAddPasskey:        async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, { op: 'put', gateVerb: 'addPasskey', ...record, record }, async () => await vaultDB.tryAddPasskey(record, opts)),
-      safebyokRevokePasskey:     async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, { op: 'put', gateVerb: 'revokePasskey', ...record, record }, async () => await vaultDB.tryRevokePasskey(record, opts)),
+      safebyokReplacePassphrase: async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, DB.gateVerbAskOf('replacePassphrase', record), async () => await vaultDB.tryReplacePassphrase(record, opts)),
+      safebyokAddPasskey:        async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, DB.gateVerbAskOf('addPasskey', record), async () => await vaultDB.tryAddPasskey(record, opts)),
+      safebyokRevokePasskey:     async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, DB.gateVerbAskOf('revokePasskey', record), async () => await vaultDB.tryRevokePasskey(record, opts)),
       safebyokDelBox:            async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryDelBox(ask)),
       safebyokDelVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryDelVault(ask)),
       safebyokTidyGone:          async (_parent, { applabel, user_id }, context) => {

@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { VaultError } from '../../src/refusals/errors'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
@@ -126,16 +125,5 @@ describe("The checks of a record's base fields", () => {
     it("marks a central never stored with a seq below any a VaultDB puts", () => {
       expect(SX.VoidRevisionSeq).to.be.lessThan(0)
     })
-  })
-})
-
-describe("The check of align results", () => {
-  describe("VX.aligned", () => {
-    expectCases(VX.aligned, [
-      [{ badnews: [] },                                       true,  'passes no bad news'],
-      [{ badnews: [new VaultError('stale_write', 'x')] },     true,  'passes bad news of VaultErrors'],
-      [{ badnews: [new Error('plain')] },                     false, 'refuses bad news that is no VaultError'],
-      [{},                                                    false, 'refuses a missing badnews'],
-    ])
   })
 })

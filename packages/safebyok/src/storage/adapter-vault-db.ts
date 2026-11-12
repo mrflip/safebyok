@@ -87,8 +87,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryListVaults(ask: VaultListAsk): Promise<Answer<BankListed, ListAct, BankScope>> {
     try {
       const checked     = SX.vaultList.parse(ask)
-      const stored      = await this.doListVaults(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
+      const stored      = await this.doListVaults(checked)
       return { ok: true, ask: loggableAsk, act: stored.act, val: stored.listed, world: stored.world }
     } catch (err) { return this.answerForRefusal(err, 'listVaults', ask) }
   }
@@ -102,8 +102,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryGetVault(ask: VaultGetAsk): Promise<VaultAnswer> {
     try {
       const checked     = SX.vaultGet.parse(ask)
-      const stored      = await this.doGetVault(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
+      const stored      = await this.doGetVault(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.vault, world: stored.world } }
       const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'getVault', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, dbhas: stored.vault, err: refusal }
@@ -119,8 +119,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryListBoxes(ask: BoxListAsk): Promise<Answer<BoxesListed, ListAct>> {
     try {
       const checked     = SX.boxList.parse(ask)
-      const stored      = await this.doListBoxes(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
+      const stored      = await this.doListBoxes(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.listed, world: stored.world } }
       const refusal = Refuse.actRefused('box', stored.act, { oplabel: 'listBoxes', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, err: refusal }
@@ -136,8 +136,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryGetBox(ask: BoxGetAsk): Promise<BoxAnswer> {
     try {
       const checked     = SX.boxGet.parse(ask)
-      const stored      = await this.doGetBox(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
+      const stored      = await this.doGetBox(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.box, world: stored.world } }
       const refusal = Refuse.actRefused('box', stored.act, { oplabel: 'getBox', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, dbhas: stored.box, err: refusal }
@@ -156,8 +156,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryPutVault(ask: VaultPutAsk): Promise<VaultAnswer> {
     try {
       const checked     = SX.vaultPut.parse(ask)
-      const stored      = await this.doPutVault(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
+      const stored      = await this.doPutVault(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.vault, world: stored.world } }
       const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'putVault', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, dbhas: stored.vault, err: refusal }
@@ -180,9 +180,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryPutBox(ask: BoxPutAsk): Promise<BoxAnswer> {
     try {
       const checked     = SX.boxPut.parse(ask)
+      const loggableAsk = SX.loggableAsk.parse(checked)
       this.#demandEnoughVolume(checked)
       const stored      = await this.doPutBox(checked)
-      const loggableAsk = SX.loggableAsk.parse(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.box, world: stored.world } }
       const capacity = ((stored.act === 'vault_full') && (stored.capacity !== null)) ? { capacity: stored.capacity } : {}
       const refusal  = Refuse.actRefused('box', stored.act, { oplabel: 'putBox', ask: loggableAsk, ...capacity })
@@ -204,7 +204,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const vaultRecord = SX.vaultRecord.parse(record)
       const answer = await this.tryPutVault(gateAskOf('replacePassphrase', vaultRecord, opts))
       return answer.ok ? { ...answer, act: 'replaced', val: vaultRecord, world: vaultRecord } : answer
-    } catch (err) { return this.answerForRefusal(err, 'replacePassphrase', { op: 'put', gateVerb: 'replacePassphrase', ...record, record }) }
+    } catch (err) { return this.answerForRefusal(err, 'replacePassphrase', SX.gateVerbAskOf('replacePassphrase', record)) }
   }
 
   /** Put the properly revisioned `record`, demanding a new `gate_epoch` and that its only change is to add a passkey wayin.
@@ -218,7 +218,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const vaultRecord = SX.passkeyAddRecord.parse(record)
       const answer = await this.tryPutVault(gateAskOf('addPasskey', vaultRecord, opts))
       return answer.ok ? { ...answer, act: 'added', val: vaultRecord, world: vaultRecord } : answer
-    } catch (err) { return this.answerForRefusal(err, 'addPasskey', { op: 'put', gateVerb: 'addPasskey', ...record, record }) }
+    } catch (err) { return this.answerForRefusal(err, 'addPasskey', SX.gateVerbAskOf('addPasskey', record)) }
   }
 
   /** Put the properly revisioned `record`, demanding a new `gate_epoch` and that the passkey is absent.
@@ -235,7 +235,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       // `passed`: the stored vault has no passkey wayin to revoke, so its row is returned as stored.
       if (answer.act === 'passed') { return { ...answer, act: 'passed', val: liveVaultOf(answer.world, vaultRecord) } }
       return { ...answer, act: 'revoked', val: vaultRecord, world: vaultRecord }
-    } catch (err) { return this.answerForRefusal(err, 'revokePasskey', { op: 'put', gateVerb: 'revokePasskey', ...record, record }) }
+    } catch (err) { return this.answerForRefusal(err, 'revokePasskey', SX.gateVerbAskOf('revokePasskey', record)) }
   }
   // --
 
@@ -248,8 +248,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryDelBox(ask: BoxDelAsk): Promise<BoxAnswer> {
     try {
       const checked     = SX.boxDel.parse(ask)
-      const stored      = await this.doDelBox(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
+      const stored      = await this.doDelBox(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.box, world: stored.world } }
       const refusal = Refuse.actRefused('box', stored.act, { oplabel: 'delBox', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, dbhas: stored.box, err: refusal }
@@ -263,8 +263,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryDelVault(ask: VaultDelAsk): Promise<VaultAnswer> {
     try {
       const checked     = SX.vaultDel.parse(ask)
-      const stored      = await this.doDelVault(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
+      const stored      = await this.doDelVault(checked)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.vault, world: stored.world } }
       const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'delVault', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, world: stored.world, dbhas: stored.vault, err: refusal }
@@ -278,8 +278,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryTidyGone(ask: BoxTidyAsk): Promise<Answer<Tidied, 'tidied', BankScope>> {
     try {
       const checked     = SX.boxTidy.parse(ask)
-      const val         = await this.doTidyGone(checked)
       const loggableAsk = SX.loggableAsk.parse(checked)
+      const val         = await this.doTidyGone(checked)
       const { applabel, user_id } = checked
       return { ok: true, ask: loggableAsk, act: 'tidied', val, world: { applabel, user_id } }
     } catch (err) { return this.answerForRefusal(err, 'tidyGone', ask) }

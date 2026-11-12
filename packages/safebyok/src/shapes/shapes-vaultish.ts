@@ -63,18 +63,6 @@ export function isTombstone<SparseT extends Liveness>(fetched: SparseT): fetched
 
 // --
 
-// == [Aligning]: aligned, Aligned
-
-/** The check of what `align` hands back. Checks only. */
-export const { aligned } = Checkers('unexpected_error', ({ obj, arr, vaultError }) => ({
-  aligned:       obj({ badnews: arr(vaultError).readonly() }).readonly(),
-}), [Checks])
-
-/** Return type of `align`: `badnews`, the refusals to tell the host once. */
-export type Aligned = Z.infer<typeof aligned>
-
-// --
-
 // == [Options]: Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener, probeAsked, probeOpts, ProbeAsked, ProbeOpts, ProbeStep, ProbeReport, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts
 
 /** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */

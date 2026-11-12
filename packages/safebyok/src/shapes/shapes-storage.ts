@@ -351,7 +351,7 @@ export function boxTombstoneOf(raw: unknown, written_at: number): BoxTombstone |
 }
 // --
 
-// == [Asks]: boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk, BoxAsk, VaultAsk, BoxGetAsk, BoxPutAsk, BoxDelAsk, VaultGetAsk, VaultPutAsk, VaultDelAsk, loggableAsk, LoggableAsk
+// == [Asks]: boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk, BoxAsk, VaultAsk, BoxGetAsk, BoxPutAsk, BoxDelAsk, VaultGetAsk, VaultPutAsk, VaultDelAsk, gateVerbAskOf, loggableAsk, LoggableAsk
 
 type Expecting = { expected: Revision }
 type Cited     = Expecting & { record: Revision }
@@ -454,6 +454,13 @@ export type VaultGetAsk = Extract<VaultAsk, { op: 'get' }>
 export type VaultPutAsk = Extract<VaultAsk, { op: 'put' }>
 /** A `delVault` ask: the vault's scope, the tombstone to store, and the expected row. */
 export type VaultDelAsk = Extract<VaultAsk, { op: 'del' }>
+
+// A gate verb refused before its put ask is made, as when its record fails its check, names this in its refusal; cut to a
+// loggable ask, it keeps the verb and the record's meta.
+/** What a gate verb's refusal names as its ask: a put of `record`, tagged with `gateVerb`. */
+export function gateVerbAskOf(gateVerb: EX.GateVerb, record: VaultRecord): Readonly<VaultRecord & { op: 'put', gateVerb: EX.GateVerb, record: VaultRecord }> {
+  return { op: 'put', gateVerb, ...record, record }
+}
 
 // A record is a stored row, payload and all: an answer and a refusal carry only its meta, as they may reach a log.
 /** The check of what an answer and its refusal carry of an ask: any of its fields but a record's payload.
