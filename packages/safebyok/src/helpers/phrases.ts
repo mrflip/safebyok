@@ -271,7 +271,7 @@ export const UndecodedWhisper = "That box opened, but what was inside is not a w
 /** Why a lease dropped opens nothing. */
 export const LeaseNotInForce = "This lease is out of force, as the bank locked or the lease would not open, so nothing was read or written: unlock the bank again."
 
-/** Why an instance past a sweep, a vacate or a delete answers nothing. */
+/** Why an instance whose bank or vault ended, or whose row was found damaged, answers nothing. */
 export const LetGoInstance = "This object was let go: its bank or its vault ended, or its row was found damaged, so it answers nothing more: ask the device for its bank, and the bank for the vault, again."
 
 /** Why a vault absent from storage is refused, by its vaultlabel. */
