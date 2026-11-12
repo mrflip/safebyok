@@ -47,6 +47,15 @@ it. The Coach added four at the invocation, and the orchestrator one:
     proved and with thread 9's names, and run beside 10 to 12 in other files. This follows R7's own
     argument ("the models prove the contract before three adapters are written to it"), and spares
     porting 8's corrections and 9's renames into adapters cut earlier.
+20. **A PR may land red, or with skips, where that schedules better** (the Coach, 2026-11-12: "I
+    can merge a set of stacked prs that are intermediate red leading to a mergeable green"). A red
+    PR's body and report say what is red or skipped and which thread mends it; the line ends green.
+    A worker proves its own change with the package suites it touches, and names any red it leaves.
+21. **A stacked thread is cut from its base's ready tip**, not its filed one (orchestrator,
+    following rule 20). Where the base's review then adds commits, the orchestrator rebases the
+    stacked branch onto the reviewed tip (`git rebase --onto`) before filing it; a conflict goes to
+    a thread-worker. Agents may force-push sprint branches with a lease, and move PRs in and out of
+    draft (the Coach, 2026-11-12).
 
 ## The threads
 
@@ -110,8 +119,11 @@ review `low`. **After**: 6. **Size**: S. Net removal expected.
 
 The switch, items 1 to 7 of `threads.md` § 8. **Split** (`threads.md` asks for a green cut if the
 gloss finds one): items 8 (the new tests) and 9 (`notes/guarantees.md`, VOCABULARY.md) are thread
-8b. Items 1 to 7 stay green with the re-pointed existing suites, and are already more than one
-context comfortably holds. **Levels**: worker `opus`, effort `high`; review `medium`, the reviewer
+8b. Items 1 to 7 are already more than one context comfortably holds. *Revised under rule 20:*
+item 1 (re-pointing the test helpers through the Vault's scaffold calls) is dropped. Thread 8
+skips, by name, the suites that reach the unlock, the wayin prompts and the lease through a Vault,
+and 8b re-points them once, at the bank and `bank.maingate`, so the helpers are rewritten once,
+not twice. The Vault's scaffold calls stay, for `safebyok-react` alone, which stays green. **Levels**: worker `opus`, effort `high`; review `medium`, the reviewer
 handed an explicit checklist: each `cipherCtx` against the ctx table, `notes/guarantees.md`, the
 token table, and plain correctness, with races to *Open matters* (rules 15, 18). **After**: 5 and 7,
 restacked into one line (`wrapup.md`, *Restack*). **Look-ahead**: 9 renames what 8 writes
@@ -121,7 +133,8 @@ report and the progress document for 13 to 15. **Size**: XL.
 
 ### 8b `bank_gate_tests`
 
-`threads.md` § 8, items 8 and 9: new tests for building and deleting a bank, one lock over two
+The suites thread 8 skipped, re-pointed at the bank and `bank.maingate` (much of what thread 11
+would have done; 11 is judged again once 8b files). Then `threads.md` § 8, items 8 and 9: new tests for building and deleting a bank, one lock over two
 vaults, a bank's tombstone delivered, `ensureVault` on a locked bank; `notes/guarantees.md` (the
 table of files, G1, G3, G4, G9) and VOCABULARY.md. **Levels**: worker `opus`; review `low`.
 **After**: 8. **Size**: M.
@@ -139,7 +152,8 @@ it adds (the Coach). **Size**: L.
 
 ### 11 `bank_level_tests`
 
-**Levels**: worker `sonnet`; review `low`. **After**: 10. **Size**: M.
+**Levels**: worker `sonnet`; review `low`. **After**: 10. **Size**: M, likely shrunk by 8b
+(revised under rule 20); folded into 10 or dropped if 8b leaves little.
 
 ### 12 `react_bank`
 
