@@ -150,19 +150,17 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(listing.getSnapshot()).to.eq(listing.snapshot)
     })
 
-    it("has present things only, each as the thing's own snapshot", async () => {
+    it("has the boxlabel of each present thing only", async () => {
       const listing = boxListingOf(world.mw)
-      const full  = listing.deliverRecord(fullBoxRecord({ boxlabel: 'full_box' }))
-      const draft = await listing.create(dnaOf('draft_box'))
+      listing.deliverRecord(fullBoxRecord({ boxlabel: 'full_box' }))
+      await listing.create(dnaOf('draft_box'))
       listing.deliverRecord(tombstoneBoxRecord({ boxlabel: 'gone_box', revision_seq: 2 }))
       expect(listing.things).to.have.lengthOf(3)
-      expect(listing.snapshot).to.have.lengthOf(2)
-      expect(listing.snapshot[0]).to.eq(full.getSnapshot())
-      expect(listing.snapshot[1]).to.eq(draft.getSnapshot())
+      expect(listing.snapshot).to.deep.equal(['full_box', 'draft_box'])
       expect(Object.isFrozen(listing.snapshot)).to.be.true
     })
 
-    it("is the same array until one thing's snapshot changes, and notifies its listeners once per change", async () => {
+    it("is the same array through a thing's own change, telling no listener", async () => {
       const listing = boxListingOf(world.mw)
       let told = 0
       listing.subscribe(() => { told += 1 })
@@ -170,28 +168,11 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(told).to.eq(1)
       const before = listing.snapshot
 
-      world.mw.seedPut(fullBoxRecord())
-      await listing.get(scopeOf(), { maxMillisSinceRefresh: 0 })
+      world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
+      const box = await listing.get(scopeOf(), { maxMillisSinceRefresh: 0 })
+      expect(box?.getSnapshot()).to.include({ revision_seq: 2 })
       expect(listing.snapshot).to.eq(before)
       expect(told).to.eq(1)
-
-      world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
-      await listing.get(scopeOf(), { maxMillisSinceRefresh: 0 })
-      expect(listing.snapshot).to.not.eq(before)
-      expect(listing.snapshot[0]).to.include({ revision_seq: 2 })
-      expect(told).to.eq(2)
-    })
-
-    it("follows a change made by a box's own put, notifying once", async () => {
-      const listing = boxListingOf(world.mw)
-      world.mw.seedPut(fullBoxRecord())
-      const box = listing.deliverRecord(fullBoxRecord())
-      let told = 0
-      listing.subscribe(() => { told += 1 })
-      await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'edited' } })
-      expect(told).to.eq(1)
-      expect(listing.snapshot[0]).to.eq(box.getSnapshot())
-      expect(listing.snapshot[0]?.sidecar).to.deep.equal({ note: 'edited' })
     })
 
     it("includes a box once it is reborn, and drops it once it is deleted", async () => {
@@ -200,7 +181,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(listing.snapshot).to.deep.equal([])
       world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
       await listing.get(scopeOf(), { maxMillisSinceRefresh: 0 })
-      expect(listing.snapshot).to.deep.equal([box.getSnapshot()])
+      expect(listing.snapshot).to.deep.equal([box.scope.boxlabel])
       await listing.del(box.sparse)
       expect(listing.snapshot).to.deep.equal([])
     })

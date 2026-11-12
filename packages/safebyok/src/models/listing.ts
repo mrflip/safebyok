@@ -39,10 +39,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** The rows the last list set aside as damaged. */
   #damagedRows: readonly DamagedT[] = Object.freeze([])
   readonly #listeners = new Set<() => void>()
-  #snapshot: readonly SnapshotT[] = Object.freeze([])
+  #snapshot: readonly string[] = Object.freeze([])
   #unwatch:  (() => void) | null = null
 
-  readonly #getSnapshot = (): readonly SnapshotT[] => this.#snapshot
+  readonly #getSnapshot = (): readonly string[] => this.#snapshot
 
   readonly #subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(VX.listener.parse(listener))
@@ -60,11 +60,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    */
   get damaged_rows(): readonly DamagedT[] { return this.#damagedRows }
 
-  /** Each present instance's snapshot, in a frozen array that stays the same until one of them changes. */
-  get snapshot(): readonly SnapshotT[] { return this.#snapshot }
+  /** The label of each present instance, in a frozen array that stays the same until one comes or goes.
+   * A thing's own changes are its own snapshot's: subscribe to the thing for those.
+   */
+  get snapshot(): readonly string[] { return this.#snapshot }
 
   /** The snapshot getter for `useSyncExternalStore`, which needs no binding. */
-  get getSnapshot(): () => readonly SnapshotT[] { return this.#getSnapshot }
+  get getSnapshot(): () => readonly string[] { return this.#getSnapshot }
 
   /** The subscribe function for `useSyncExternalStore`, which needs no binding. */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
@@ -109,11 +111,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.#remakeSnapshot()
   }
 
-  /** Enlist a new `thing` at its scope, and remake the listing's snapshot whenever its own changes. */
+  /** Enlist a new `thing` at its scope. */
   #enlist(thing: ThingT): void {
     this.#things.set(this.scopepathOf(thing.scope), thing)
     thing.becomeNotifiable()
-    thing.subscribeOwn(() => { this.#remakeSnapshot() })
   }
   // --
 
@@ -433,9 +434,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** Remake the listing's snapshot from the present instances, and tell the listeners if it changed. */
   #remakeSnapshot(): void {
-    const next = this.things.filter((thing) => thing.isPresent).map((thing) => thing.getSnapshot())
-    const isSame = next.length === this.#snapshot.length && next.every((snapshot, idx) => snapshot === this.#snapshot[idx])
-    if (isSame) { return }
+    const next = this.things.filter((thing) => thing.isPresent).map((thing) => this.labelOf(thing.scope))
+    if (isEqual(next, this.#snapshot)) { return }
     this.#snapshot = Object.freeze(next)
     this.tellListeners()
   }
@@ -467,7 +467,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Defined by the concrete listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the concrete listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, labelOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers, which it does only while the thing above it does. */
   abstract get isEnabled(): boolean
@@ -476,6 +476,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Throw unless `record` belongs to the life of the thing above that this listing was made under. */
   protected abstract demandOfWorld(record: Fetched<RecordT, SparseT>): void
   protected abstract scopepathOf(scope: ScopeT): string
+  /** The label that names `scope` within the thing above: a vault's `vaultlabel`, a box's `boxlabel`. */
+  protected abstract labelOf(scope: ScopeT): string
   /** The scope of `recordish`, any form of record or a thing. Refuses a scope outside the thing above. */
   abstract scopeOf(recordish: unknown): ScopeT
   /** The sparse form of `recordish`, any form of record or a thing, as a plain copy. */

@@ -116,9 +116,6 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     this.#askUser = askUser
     this.#gateListing = new GateListing(this, listingOpts)
     this.#vaultListing = new VaultListing(this, listingOpts)
-    this.#gateListing.subscribe(() => { this.align() })
-    // A vault brought up to a lock not yet told waits for the bank's own align, which tells the lock and every vault at once.
-    this.#vaultListing.subscribe(() => { if (this.snapshot.isLocked === this.isLocked) { this.align() } })
   }
 
   /** Fix `bank_tok` on this bank, beside the base's props. */
@@ -407,7 +404,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   protected lifeTokPathOf({ bank_tok }: Fetched<BankRecord, BankSparse>): string { return bank_tok }
 
   protected makeSnapshot(): BankSnapshot {
-    return Object.freeze({ ...this.scope, device_tok: this.device_tok, isLocked: this.isLocked, maingate: this.#gateListing.snapshot[0] ?? null, vaults: this.#vaultListing.snapshot })
+    return Object.freeze({ ...this.scope, device_tok: this.device_tok, isLocked: this.isLocked })
   }
   // --
 

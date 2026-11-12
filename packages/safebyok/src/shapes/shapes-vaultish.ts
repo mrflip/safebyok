@@ -500,7 +500,7 @@ export type GuardedLifecycleHandler = (event: DeviceEvent) => Promise<void>
  */
 export type DeviceStage = 'made' | 'ready' | 'disabled'
 
-/** A device as a host renders it: its scope, how far its `ensureBank` got, the gating it has open, and its bank. */
+/** A device as a host renders it: its scope, how far its `ensureBank` got, the gating it has open, and which bank it has. */
 export interface DeviceSnapshot extends BankScope {
   /** How far the device has come: `made`, `ready` or `disabled`. */
   readonly stage:      DeviceStage
@@ -508,20 +508,16 @@ export interface DeviceSnapshot extends BankScope {
   readonly err:        VaultError | null
   /** The gating open on this device, live, for a dialog to answer; null with none. */
   readonly openGating: AnyGating | null
-  /** The snapshot of the device's bank; null while it has none ready. */
-  readonly bank:       BankSnapshot | null
+  /** The life of the bank `device.bank` returns; null while it has none. */
+  readonly bank_tok:   string | null
 }
 
-/** A bank as a host renders it: its scope, the token of this device's row, whether it is locked, and its vaults. */
+/** A bank as a host renders it: its scope, the token of this device's row, and whether it is locked. */
 export interface BankSnapshot extends BankScope {
   /** The token of this device's row in the deviceDB, as the bank was made with it. */
   readonly device_tok: string
   /** True unless this device has a lease granted and in force. */
   readonly isLocked:   boolean
-  /** A snapshot of the bank's main gate, its wayins' headers among it; null before its row has come. */
-  readonly maingate:   GateSnapshot | null
-  /** A snapshot of each vault the bank lists. */
-  readonly vaults:     readonly VaultSnapshot[]
 }
 
 // --

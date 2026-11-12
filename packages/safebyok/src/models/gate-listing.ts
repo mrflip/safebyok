@@ -112,7 +112,7 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   }
   // --
 
-  // == [Defined by the gate listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the gate listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers: its bank does. */
   get isEnabled(): boolean { return this.bank.isEnabled }
@@ -126,6 +126,8 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   protected scopepathOf(scope: GateScope): string {
     return ['gate', scope.user_id, scope.banklabel, scope.gatelabel].join('^')
   }
+
+  protected labelOf({ gatelabel }: GateScope): string { return gatelabel }
 
   protected makeThing(central: Fetched<GateRecord, GateSparse>): Gate { return new Gate(this, central) }
 

@@ -9,7 +9,7 @@ import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryBankDB } from '../../src/storage/memory-bank-db'
 import type { BankEnsureAsk, VaultGetAsk } from '../../src/shapes/shapes-bankdb'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
-import type { BankSnapshot, DeviceOpts } from '../../src/shapes/shapes-vaultish'
+import type { DeviceOpts } from '../../src/shapes/shapes-vaultish'
 import { anyStrengthChecker, testDeriver } from './builders'
 import { quietLogger } from './logging'
 import { T0, Dna, Passphrase, byPassphrase } from './vault-world'
@@ -25,9 +25,6 @@ export const VaultScopeGiven = Object.freeze({ vaultlabel: Dna.vaultlabel })
 
 /** A second vaultlabel, for a bank that has two vaults. */
 export const OtherScopeGiven = Object.freeze({ vaultlabel: 'other' })
-
-/** The vaultlabels of a snapshot's vaults, in its order. */
-export function labelsOf({ vaults }: BankSnapshot): string[] { return vaults.map(({ vaultlabel }) => vaultlabel) }
 
 /** A {@link MemoryBankDB} that refuses every bank and vault get, once told to, as a BankDB out of reach or a user signed out does. */
 export class RefusingBankDB extends MemoryBankDB {

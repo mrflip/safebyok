@@ -65,7 +65,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Getters]: scope, central, full, sparse, am, toJSON, snapshot, getSnapshot, subscribe, subscribeOwn
+  // == [Getters]: scope, central, full, sparse, am, toJSON, snapshot, getSnapshot, subscribe
 
   /** The scope this thing is stored under. */
   get scope(): ScopeT { return this.#scope }
@@ -101,9 +101,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** A function that subscribes a listener to this thing's changes and returns its unsubscribe, safe to pass without binding. */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
-
-  /** {@link subscribe}, for this thing's own changes only, even where a subclass widens `subscribe`. */
-  get subscribeOwn(): (listener: () => void) => (() => void) { return this.#subscribe }
   // --
 
   // == [Construction]: constructor, assignInitialProps, assign
