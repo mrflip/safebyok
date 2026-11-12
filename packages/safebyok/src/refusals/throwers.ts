@@ -22,6 +22,7 @@ import type { Refusalkind, RefusalMeta, Thrown } from './errors'
 import type * as EX from '../shapes/shapes-enums'
 import * as Phrases   from '../helpers/phrases'
 import type * as SX from '../shapes/shapes-storage'
+import type * as BX from '../shapes/shapes-bankdb'
 
 // == [Outcome Throwers]: sanitizeForeignError, storageUnavailable, storageBlocked, unexpectedError
 
@@ -340,6 +341,19 @@ export function storageFull(cause: Thrown): VaultError {
 
 /** A `bad_option` refusal: a record's revision_seq is not one past its prior's. */
 export function seqNotNext(): VaultError { return new VaultError('bad_option', Phrases.SeqNotNext) }
+// --
+
+// == [BankDB Throwers]: bankGateIssue, mainGateMissing
+
+/** A `gate_issue` refusal from a bankDB: a gate verb's record changes the gate row `gate` in a way the verb does not, for the reason `why`. */
+export function bankGateIssue(parent: BX.BankRow, gate: BX.GateRecord, why: string): VaultError {
+  return new VaultError('gate_issue', Phrases.gateIssue(why), { rows: { parent, dbhas: gate } })
+}
+
+/** A `damaged_row` refusal from a bankDB: the live bank `parent` is stored without its `main` gate row. */
+export function mainGateMissing(parent: BX.BankRecord): VaultError {
+  return new VaultError('damaged_row', Phrases.MainGateMissing, { rows: { parent } })
+}
 // --
 
 // == [DeviceDB Throwers]: deviceDBFailed

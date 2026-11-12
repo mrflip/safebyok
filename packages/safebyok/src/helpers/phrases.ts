@@ -373,7 +373,7 @@ export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed: c
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed: check your package and build settings."
 // --
 
-// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultReborn, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, GateEpochNotNext, OtherWayinMoved, boxTooLarge, VaultFull, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVault, GateVerbRecordMismatch, RecordOfOtherAddress, deviceDBFailed, thrownNamed
+// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultReborn, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, GateEpochNotNext, OtherWayinMoved, boxTooLarge, VaultFull, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVault, GateVerbRecordMismatch, RecordOfOtherAddress, BankTokNotNew, GateOfOtherBank, GateNotBorn, MainGateMissing, deviceDBFailed, thrownNamed
 
 /** A well-formed row out of storage, whose own `fieldnames` are not the address it was asked for at. */
 export const rowOfOtherAddress = (fieldnames: readonly string[]): string => `The vault's storage answered with a row naming another ${fieldnames.join(' and ')} than the one asked for: the database or its storage adapter has filed it under the wrong address.`
@@ -437,6 +437,18 @@ export const GateVerbRecordMismatch = "addPasskey's record has a passkey wayin, 
 
 /** Why a put or del is refused for its record: the record must be at the request's address. */
 export const RecordOfOtherAddress = "A put's or del's record is at the address its ask names."
+
+/** Why a `buildBank` ask is refused for its bank record: a bank is built under a life tok of its own. */
+export const BankTokNotNew = "buildBank's bank record brings a new bank_tok: neither the one of the row it expects, nor the void row's."
+
+/** Why a `buildBank` ask is refused for its gate record: the gate is at its bank's scope, under the bank record's bank_tok. */
+export const GateOfOtherBank = "buildBank's gate record is at its bank's scope, under its bank record's bank_tok."
+
+/** Why a `buildBank` ask is refused for its gate record: a gate is built as the first revision of a new life. */
+export const GateNotBorn = "buildBank's gate record is a first revision: revision_seq 0, with a revision_tok and a gate_tok of its own."
+
+/** A live bank row stored without its `main` gate row. */
+export const MainGateMissing = "This bank is stored without its main gate: the database or its storage adapter has lost a row."
 
 /** A device database's failure in `oplabel`, `named` the sentence naming what it threw, or blank. */
 export function deviceDBFailed(oplabel: string, named: string): string { return `This device's own storage failed in ${oplabel}: try again.${named}` }

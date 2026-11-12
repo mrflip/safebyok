@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+\\|%\\-]+$"
+        },
+        "banklabel": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
+        },
+        "vaultlabel": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
+        },
+        "fmt": {
+          "type": "number",
+          "const": 6003
+        },
+        "revision_tok": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision_seq": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "registered_at": {
+          "type": "integer",
+          "minimum": 347155200000,
+          "maximum": 9007199254740
+        },
+        "written_at": {
+          "type": "integer",
+          "minimum": 347155200000,
+          "maximum": 9007199254740
+        },
+        "am": {
+          "type": "string",
+          "const": "a"
+        },
+        "bank_tok": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vault_tok": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "user_id",
+        "banklabel",
+        "vaultlabel",
+        "fmt",
+        "revision_tok",
+        "revision_seq",
+        "registered_at",
+        "written_at",
+        "am",
+        "bank_tok",
+        "vault_tok"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+\\|%\\-]+$"
+        },
+        "banklabel": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
+        },
+        "vaultlabel": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
+        },
+        "fmt": {
+          "type": "number",
+          "const": 6003
+        },
+        "revision_tok": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision_seq": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "registered_at": {
+          "type": "integer",
+          "minimum": 347155200000,
+          "maximum": 9007199254740
+        },
+        "written_at": {
+          "type": "integer",
+          "minimum": 347155200000,
+          "maximum": 9007199254740
+        },
+        "am": {
+          "type": "string",
+          "const": "x"
+        },
+        "bank_tok": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vault_tok": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "user_id",
+        "banklabel",
+        "vaultlabel",
+        "fmt",
+        "revision_tok",
+        "revision_seq",
+        "registered_at",
+        "written_at",
+        "am",
+        "bank_tok",
+        "vault_tok"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

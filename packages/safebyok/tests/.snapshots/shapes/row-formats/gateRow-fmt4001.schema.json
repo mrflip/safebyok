@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+\\|%\\-]+$"
+    },
+    "banklabel": {
+      "type": "string",
+      "maxLength": 40,
+      "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
+    },
+    "gatelabel": {
+      "type": "string",
+      "const": "main"
+    },
+    "fmt": {
+      "type": "number",
+      "const": 4001
+    },
+    "revision_tok": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision_seq": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "registered_at": {
+      "type": "integer",
+      "minimum": 347155200000,
+      "maximum": 9007199254740
+    },
+    "written_at": {
+      "type": "integer",
+      "minimum": 347155200000,
+      "maximum": 9007199254740
+    },
+    "am": {
+      "type": "string",
+      "const": "a"
+    },
+    "bank_tok": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gate_tok": {
+      "type": "string",
+      "minLength": 1
+    },
+    "wayins": {
+      "type": "object",
+      "properties": {
+        "main": {
+          "type": "object",
+          "properties": {
+            "wayinkind": {
+              "type": "string",
+              "const": "passphrase"
+            },
+            "key_deriver_label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "salt_b64": {
+              "type": "string",
+              "minLength": 22,
+              "maxLength": 22,
+              "pattern": "^[A-Za-z0-9_\\-]+$"
+            },
+            "device_tok": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "registered_at": {
+              "type": "integer",
+              "minimum": 347155200000,
+              "maximum": 9007199254740
+            },
+            "vault_key_wayin_wrapped": {
+              "type": "object",
+              "properties": {
+                "cipher_iv_b64": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "ciphertext_b64": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "cipher_iv_b64",
+                "ciphertext_b64"
+              ],
+              "additionalProperties": false
+            },
+            "wayinlabel": {
+              "type": "string",
+              "const": "main"
+            }
+          },
+          "required": [
+            "wayinkind",
+            "key_deriver_label",
+            "salt_b64",
+            "device_tok",
+            "registered_at",
+            "vault_key_wayin_wrapped",
+            "wayinlabel"
+          ],
+          "additionalProperties": false
+        },
+        "passkey0": {
+          "type": "object",
+          "properties": {
+            "wayinkind": {
+              "type": "string",
+              "const": "passkey"
+            },
+            "credential_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "prf_salt_b64": {
+              "type": "string",
+              "minLength": 1
+            },
+            "device_tok": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "registered_at": {
+              "type": "integer",
+              "minimum": 347155200000,
+              "maximum": 9007199254740
+            },
+            "vault_key_wayin_wrapped": {
+              "type": "object",
+              "properties": {
+                "cipher_iv_b64": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "ciphertext_b64": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "cipher_iv_b64",
+                "ciphertext_b64"
+              ],
+              "additionalProperties": false
+            },
+            "wayinlabel": {
+              "type": "string",
+              "const": "passkey0"
+            }
+          },
+          "required": [
+            "wayinkind",
+            "credential_id",
+            "prf_salt_b64",
+            "device_tok",
+            "registered_at",
+            "vault_key_wayin_wrapped",
+            "wayinlabel"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "main"
+      ],
+      "additionalProperties": false
+    },
+    "auth": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "sigs": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "meta": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "user_id",
+    "banklabel",
+    "gatelabel",
+    "fmt",
+    "revision_tok",
+    "revision_seq",
+    "registered_at",
+    "written_at",
+    "am",
+    "bank_tok",
+    "gate_tok",
+    "wayins",
+    "auth",
+    "sigs",
+    "meta"
+  ],
+  "additionalProperties": false
+}
