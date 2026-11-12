@@ -7,7 +7,7 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** The vault's state before the gating is raised: absent, built, or built with a passkey. */
+/** The bank's state before the gating is raised: absent, built with a vault, or built with a vault and a passkey. */
 type Before = 'absent' | 'built' | 'passkeyed'
 
 /** Open a gating with `raise`, and render it in a GatingModal. `shown` may replace the gating that is rendered. */
@@ -32,6 +32,7 @@ describe("GatingModal", () => {
     [TH.replacing,       'built',     Messages.changeTitle,        'shows the dialog that replaces the passphrase for a replace_passphrase gating'],
     [TH.addingPasskey,   'built',     Messages.addPasskeyTitle,    'shows the dialog that adds a passkey for an add_passkey gating'],
     [TH.revokingPasskey, 'passkeyed', Messages.revokePasskeyTitle, 'shows the dialog that removes the passkey for a revoke_passkey gating'],
+    [TH.deleting,        'built',     Messages.delBankTitle,       'shows the dialog that deletes the bank for a del_bank gating'],
   ] as const
 
   for (const [raise, before, title, blurb] of DialogCases) {

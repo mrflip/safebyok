@@ -97,7 +97,7 @@ describe("KnockKnockWidget", () => {
     await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save' }).disabled).to.be.false })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await screen.findByText('Type your key first.')
-    await TH.expectProbe('unborn none')
+    await TH.expectProbe('absent none')
   })
 
   it("replaces the saved key at a second Save", async () => {
@@ -148,7 +148,7 @@ describe("KnockKnockWidget", () => {
     await knock()
     await screen.findByText('Save your Anthropic API key first.')
     expect(anthropic.seen).to.have.lengthOf(0)
-    await TH.expectProbe('unborn none')
+    await TH.expectProbe('absent none')
   })
 
   it("stays quiet when the user cancels the dialog", async () => {
@@ -160,6 +160,6 @@ describe("KnockKnockWidget", () => {
     await act(async () => { await Promise.allSettled(ensureUnlockedSpy.mock.results.map((result): unknown => result.value)) })
     expect(document.querySelector('.knock-knock .gripe')).to.be.null
     expect(field.value).to.eq(FakeApiKey)
-    await TH.expectProbe('unborn none')
+    await TH.expectProbe('absent none')
   })
 })

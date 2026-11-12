@@ -1,22 +1,22 @@
 import type { ComponentPropsWithoutRef, ComponentPropsWithRef, ReactNode, Ref } from 'react'
-import type { AnyGating, BadNewsHandler, Box, Device, DeviceDB, DeviceOpts, Gating, LifecycleHandler, RequestCleartext, Vault, VaultDB, VaultError } from 'safebyok'
+import type { AnyGating, BadNewsHandler, Box, DeviceDB, DeviceOpts, Gating, LifecycleHandler, RequestCleartext, Vault, VaultDB, VaultError } from 'safebyok'
 import { Checker, Checkers, deviceOpts, type AssertEqual, type BoxesListed, type BoxSparse, type CheckerInput, type DamagedBox, type DamagedVault, type LeaseQuery, type LeaseScopepath, type VaultRow } from 'safebyok/storage'
 import { fromB64, type WhisperFieldAttributes } from 'safebyok/utils'
 
 // The types and checkers of safebyok-react, grouped by area. This file imports nothing from a component or
 // hook, so it cannot be part of an import cycle at run time.
 
-// == [Provider]: BankProviderProps, bankProviderProps, ProviderDeviceOpts, Handlers, ContextValue, TellBadNews, GatingModalProps, BoundaryProps, BoundarySource
+// == [Provider]: BankProviderProps, bankProviderProps, ProviderDeviceOpts, Handlers, GatingModalProps, BoundaryProps, BoundarySource
 
 /** BankProvider's props: the `Device.make` options except `gates`, which it fills in, plus the signed-in `user_id` and props for the dialogs. */
 export interface BankProviderProps extends Omit<DeviceOpts, 'user_id' | 'gates' | 'requestCleartext'> {
-  /** The signed-in user's id, or null while nobody is signed in. Null does not remove cached leases: call `bank.device.vacate()` at sign-out. */
+  /** The signed-in user's id, or null while nobody is signed in. Null does not remove cached leases: call `useDevice()`'s `vacate()` at sign-out. */
   user_id:             string | null
   /** Your own function to ask the user for a passphrase or passkey. When omitted, the provider shows its built-in dialogs. */
   requestCleartext?:   RequestCleartext | undefined
-  /** The username a password manager saves the vault's passphrase under. */
+  /** The username a password manager saves the bank's passphrase under. */
   passphraseUsername?: string | undefined
-  /** The WebAuthn relying-party id for the vault's passkey. Defaults to the page's own domain. */
+  /** The WebAuthn relying-party id for the bank's passkey. Defaults to the page's own domain. */
   passkeyRpId?:        string | undefined
   children:            ReactNode
 }
@@ -39,12 +39,6 @@ export type ProviderDeviceOpts = Omit<DeviceOpts, 'user_id' | 'gates' | 'onLifec
 /** The host's callbacks for the provider's device, as of the latest render. */
 export type Handlers = { onLifecycle: LifecycleHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext | undefined }
 
-/** The provider's context value: the signed-in user's device, the vaults a hook has already called `tryBeginWatch` on, and a way to report bad news to the host. */
-export type ContextValue = { device: Device | null, watchedVaults: WeakSet<Vault>, tellBadNews: TellBadNews }
-
-/** Report refusals that no caller is waiting on to the host's `onBadNews`. Does nothing once the device is disabled. Never throws. */
-export type TellBadNews = (badnews: readonly VaultError[]) => void
-
 /** GatingModal's props: a gating of any kind, and the props its dialogs share. */
 export type GatingModalProps = {
   /** The gating this dialog is for, from `requestCleartext` or the device's snapshot. */
@@ -53,7 +47,7 @@ export type GatingModalProps = {
   leaseMillis?:        number | undefined
   /** The username a password manager saves the passphrase under. */
   passphraseUsername?: string | undefined
-  /** The WebAuthn relying-party id for the vault's passkey. Defaults to the page's own domain. */
+  /** The WebAuthn relying-party id for the bank's passkey. Defaults to the page's own domain. */
   passkeyRpId?:        string | undefined
 }
 
@@ -67,21 +61,21 @@ export type BoundaryProps = {
 }
 
 /** The component that a `boundaryRefusalOf` error message names as its source. */
-export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'AddPasskeyModal' | 'RevokePasskeyModal' | 'PasskeyUnlockButton'
+export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'AddPasskeyModal' | 'RevokePasskeyModal' | 'DelBankModal' | 'PasskeyUnlockButton'
 // --
 
 // == [Hooks]: VaultStage, VaultLifecycle
 
 /** The lifecycle stage of the vault a hook asked for.
- * - `'waiting'` -- there is no bank yet, or it is not ready
- * - `'unborn'`  -- the bank is ready and has no present vault under that vaultlabel
- * - `'present'` -- the vault exists
- * - `'spent'`   -- the bank was swept or vacated
+ * - `'bankless'` -- no bank is in hand: nobody is signed in, the bank is still coming up, none is built, or it was deleted
+ * - `'absent'`   -- the bank is in hand and has no vault under that vaultlabel: `bank.ensureVault` puts one, the bank unlocked
+ * - `'present'`  -- the vault exists
+ * - `'spent'`    -- the device was swept or vacated
  */
-export type VaultStage = 'waiting' | 'unborn' | 'present' | 'spent'
+export type VaultStage = 'bankless' | 'absent' | 'present' | 'spent'
 
-/** `useVault`'s return value: the vault's stage, the Vault object while `present`, and the reason the bank ended once `spent`. */
-export type VaultLifecycle = { stage: 'waiting' | 'unborn', vault: null } | { stage: 'present', vault: Vault } | { stage: 'spent', vault: null, cause: VaultError }
+/** `useVault`'s return value: the vault's stage, the Vault object while `present`, and the reason the device ended once `spent`. */
+export type VaultLifecycle = { stage: 'bankless' | 'absent', vault: null } | { stage: 'present', vault: Vault } | { stage: 'spent', vault: null, cause: VaultError }
 // --
 
 // == [Helpers]: CreatePasskeyOpts, AskPasskeyOpts, PasskeyChecks
@@ -139,7 +133,7 @@ export const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, i
 })
 // --
 
-// == [Components]: WhisperFieldProps, BoxWhisperFieldProps, PasskeyUnlockButtonProps, VaultControlProps
+// == [Components]: WhisperFieldProps, BoxWhisperFieldProps, PasskeyUnlockButtonProps, CreateVaultButtonProps
 
 /** WhisperField's props: an `onChange` for the text, and any `<input>` attribute except the value and the ones WhisperField sets itself. */
 export type WhisperFieldProps = Omit<ComponentPropsWithRef<'input'>, 'type' | 'name' | 'value' | 'defaultValue' | 'onChange' | keyof typeof WhisperFieldAttributes> & {
@@ -153,7 +147,7 @@ export type BoxWhisperFieldProps = Omit<ComponentPropsWithoutRef<'input'>, 'type
   path: string
 }
 
-/** Props of the button that unlocks the vault with its passkey. */
+/** Props of the button that unlocks the bank with its passkey. */
 export type PasskeyUnlockButtonProps = {
   /** The unlock gating, as the bank passed it to `requestCleartext`. */
   gating:      Gating<'unlock_bank'>
@@ -165,11 +159,11 @@ export type PasskeyUnlockButtonProps = {
   takesFocus?: boolean | undefined
 }
 
-/** Props for VaultLockControl and CreateVaultButton: the vaultlabel of the vault to act on. */
-export type VaultControlProps = { vaultlabel: string }
+/** CreateVaultButton's props: the vaultlabel of the vault it creates. */
+export type CreateVaultButtonProps = { vaultlabel: string }
 // --
 
-// == [Modals]: PassphraseFieldname, Gripe, ModalFormProps, PassphraseGating, PassphraseModalProps, ReplacePassphraseModalProps, AddPasskeyModalProps, RevokePasskeyModalProps, DelVaultModalProps
+// == [Modals]: PassphraseFieldname, Gripe, ModalFormProps, PassphraseGating, PassphraseModalProps, ReplacePassphraseModalProps, AddPasskeyModalProps, RevokePasskeyModalProps, DelBankModalProps, DelVaultModalProps
 
 /** The `name` attribute of a passphrase field. Password managers read it, and the form action looks the field up by it. */
 export type PassphraseFieldname = 'current-password' | 'new-password' | 'confirm-password'
@@ -191,6 +185,8 @@ export type ModalFormProps = {
   pendingWord:    string
   /** False to keep the submit button disabled. */
   isSubmittable?: boolean | undefined
+  /** True to focus Cancel when the dialog opens, as a confirm with no fields does; otherwise the first control has focus. */
+  cancelTakesFocus?: boolean | undefined
   /** The message for the live region, or null for none. */
   gripeText:      string | null
   /** The live region's id. */
@@ -206,10 +202,10 @@ export type ModalFormProps = {
   children?:      ReactNode
 }
 
-/** The gatings PassphraseModal handles: building a vault, and unlocking one. */
+/** The gatings PassphraseModal handles: building the bank, and unlocking it. */
 export type PassphraseGating = Gating<'build_bank'> | Gating<'unlock_bank'>
 
-/** Props of the passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
+/** Props of the passphrase dialog for a `build_bank` or an `unlock_bank` gating. */
 export type PassphraseModalProps = {
   /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              PassphraseGating
@@ -217,7 +213,7 @@ export type PassphraseModalProps = {
   leaseMillis?:        number | undefined
   /** The username a password manager saves the passphrase under. */
   passphraseUsername?: string | undefined
-  /** The relying-party id the vault's passkey was created under. Defaults to the page's own domain. */
+  /** The relying-party id the bank's passkey was created under. Defaults to the page's own domain. */
   passkeyRpId?:        string | undefined
 }
 
@@ -247,9 +243,17 @@ export type RevokePasskeyModalProps = {
   passphraseUsername?: string | undefined
 }
 
+/** Props of the dialog for a `del_bank` gating. */
+export type DelBankModalProps = {
+  /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
+  gating:              Gating<'del_bank'>
+  /** The username a password manager saves the passphrase under. */
+  passphraseUsername?: string | undefined
+}
+
 /** Props of the dialog that confirms deleting a vault. */
 export type DelVaultModalProps = {
-  /** The vault to delete. It must be unlocked: a locked vault's deletion is refused, and the dialog shows why. */
+  /** The vault to delete. Its bank must be unlocked: under a locked bank the deletion is refused, and the dialog shows why. */
   vault:  Vault
   /** Called with true once the vault is deleted, or with false on Cancel or Escape. Unmount the dialog then. */
   onDone: (deleted: boolean) => void

@@ -25,10 +25,11 @@ The Knock-Knock Machine: bring an Anthropic API key, say who's there, and Claude
 joke. Its header has the sign-in strip
 ([src/components/SessionBar.tsx](src/components/SessionBar.tsx)); a user signing in for the first
 time is asked to choose a passphrase, which builds the bank that holds the vault. Once signed in, the
-account menu ([src/components/AccountMenu.tsx](src/components/AccountMenu.tsx)): the vault's
-lock control, *Sign out*, which locks the user's vaults on this device, and *Delete account*,
-which unlocks the vault if it is locked (asking for the passphrase, or a passkey, as any unlock
-does), asks the user to confirm in `DelVaultModal`, deletes the vault, then the account. Under it,
+account menu ([src/components/AccountMenu.tsx](src/components/AccountMenu.tsx)): the bank's
+lock control, *Sign out*, which vacates the device (the bank locks, and this device forgets its
+unlock), and *Delete account*, which asks for the passphrase in the provider's dialog, deletes the
+bank with every vault in it, then the account. A user who cancelled the bank's dialog at sign-in
+is asked again by the first *Save* or *Add key*. Under it,
 [src/components/WaysIn.tsx](src/components/WaysIn.tsx) lists the bank's passphrase and passkey,
 with *Change passphrase*, and a fingerprint button to add or remove a passkey. A dialog the user
 cancels changes nothing, and the page says nothing of it.

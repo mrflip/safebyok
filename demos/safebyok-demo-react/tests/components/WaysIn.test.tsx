@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Vault } from 'safebyok'
 import { WaysIn } from '../../src/components/WaysIn'
 import * as TH from '../test-helpers'
 
@@ -12,26 +11,26 @@ afterEach(() => { vi.restoreAllMocks() })
 /** Render WaysIn beside the vault probe in a bank for `u1`, then build and unlock the vault. */
 const renderBuilt = async () => {
   await TH.renderInBank(<><WaysIn /><TH.VaultProbe /></>)
-  await TH.expectProbe('unborn none')
+  await TH.expectProbe('absent none')
   fireEvent.click(screen.getByRole('button', { name: 'Open' }))
   await TH.answerPassphraseDialog()
   await TH.expectProbe('present unlocked')
 }
 
 describe("WaysIn", () => {
-  it("shows nothing while the vault is unborn", async () => {
-    await TH.renderInBank(<><WaysIn /><TH.VaultProbe /></>)
-    await TH.expectProbe('unborn none')
+  it("shows nothing while there is no bank", async () => {
+    await TH.renderInBank(<><WaysIn /><TH.VaultProbe /></>, { isBankBuilt: false })
+    await screen.findByPlaceholderText('confirm vault passphrase')
     expect(screen.queryByText('Vault unlockers')).to.be.null
   })
 
-  it("shows the vault's passphrase, and that it has no passkey", async () => {
+  it("shows the bank's passphrase, and that it has no passkey", async () => {
     await renderBuilt()
     expect(screen.getByText(/^passphrase/)).to.not.be.null
     expect(screen.getByText('no passkey')).to.not.be.null
   })
 
-  it("changes the passphrase through the provider's dialog, and the new one unlocks the vault", async () => {
+  it("changes the passphrase through the provider's dialog, and the new one unlocks the bank", async () => {
     await renderBuilt()
     fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
     await TH.answerReplacementDialog(TH.Passphrase, NextPassphrase)
@@ -46,11 +45,11 @@ describe("WaysIn", () => {
 
   it("says nothing when the user cancels the dialog", async () => {
     await renderBuilt()
-    const prompting = vi.spyOn(Vault.prototype, 'tryReplacePassphrasePrompt')
     fireEvent.click(screen.getByRole('button', { name: 'Change passphrase' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    await TH.settlePrompts(prompting)
-    expect(screen.queryByRole('dialog')).to.be.null
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+    // The prompt settles as its gating concludes, which closed the dialog: a tick later, the page has heard it.
+    await act(async () => { await TH.wakeupAtNextTick() })
     expect(document.querySelector('.ways-in .gripe')).to.be.null
   })
 
@@ -80,11 +79,11 @@ describe("WaysIn", () => {
   it("says nothing when the user cancels the fingerprint's dialog", async () => {
     TH.installFakeAuthenticator()
     await renderBuilt()
-    const prompting = vi.spyOn(Vault.prototype, 'tryAddPasskeyPrompt')
     fireEvent.click(screen.getByRole('button', { name: 'Add fingerprint' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    await TH.settlePrompts(prompting)
-    expect(screen.queryByRole('dialog')).to.be.null
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+    // The prompt settles as its gating concludes, which closed the dialog: a tick later, the page has heard it.
+    await act(async () => { await TH.wakeupAtNextTick() })
     expect(document.querySelector('.ways-in .gripe')).to.be.null
   })
 })

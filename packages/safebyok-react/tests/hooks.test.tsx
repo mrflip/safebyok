@@ -56,25 +56,25 @@ describe("the hooks outside a BankProvider", () => {
 })
 
 describe("useVault and useVaultSnapshot", () => {
-  it("read waiting until the bank is ready, then unborn for a vault never built", async () => {
+  it("read bankless until the bank is up, then absent for a vault never put", async () => {
     const world = TH.makeBankWorld()
     await world.ensureBuilt()
     render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /></BankProvider>)
-    expect(shown('vault')).to.eq('waiting none')
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    expect(shown('vault')).to.eq('bankless none')
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
   })
 
-  it("read waiting while the device's ensureBank is refused, its snapshot still made", async () => {
+  it("read bankless while the device's ensureBank is refused, its snapshot still made", async () => {
     const world = TH.makeBankWorld()
     const spy = TH.spyLogger()
     world.bankDB._cheat_refuseGets('storage_unavailable')
     render(<BankProvider {...TH.providerPropsOf(world, { logger: spy.logger })}><TH.ShowsVault /></BankProvider>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })
-    expect(shown('vault')).to.eq('waiting none')
+    expect(shown('vault')).to.eq('bankless none')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
   })
 
-  it("read waiting while the device's ensureBank is still on its way", async () => {
+  it("read bankless while the device's ensureBank is still on its way", async () => {
     const world = TH.makeBankWorld()
     const listing = TH.makePending<never>()
     vi.spyOn(world.bankDB, 'tryEnsureBank').mockReturnValue(listing.promise)
@@ -82,8 +82,8 @@ describe("useVault and useVaultSnapshot", () => {
     await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(TH.seenBanks).to.deep.equal([])
-    expect(shown('vault')).to.eq('waiting none')
-    expect(screen.getByTestId("main").textContent).to.eq('waiting')
+    expect(shown('vault')).to.eq('bankless none')
+    expect(screen.getByTestId("main").textContent).to.eq('bankless')
   })
 
   it("give the device before its bank is up, and its vacate signs out", async () => {
@@ -110,12 +110,23 @@ describe("useVault and useVaultSnapshot", () => {
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
   })
 
-  it("read a vault deleted elsewhere as unborn", async () => {
+  it("read a vault deleted elsewhere as absent", async () => {
     const world = TH.makeBankWorld()
     const { vault } = await TH.makeBankWithVault(world)
     await vault.del(vault)
     render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /></BankProvider>)
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
+  })
+
+  it("read bankless once the bank is deleted elsewhere, the device still ready", async () => {
+    const world = TH.makeBankWorld()
+    const { bank } = await TH.makeBankWithVault(world)
+    render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsMain /></BankProvider>)
+    await waitFor(() => { expect(shown('vault')).to.eq('present locked') })
+    await bank.delPrompt()
+    await waitFor(() => { expect(shown('vault')).to.eq('bankless none') })
+    expect(shown('bank')).to.eq('u1 ready')
+    expect(TH.seenBanks).to.have.lengthOf(1)
   })
 
   it("read a vault built elsewhere as present, its snapshot following each unlock and lock", async () => {
@@ -182,6 +193,7 @@ const seenBoxes: Box[] = []
 
 /** Render what the box hooks return for `boxlabel` in the vault `main`, with the buttons a host's page would have. */
 const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
+  const bank = useBank()
   const { vault } = useVault('main')
   const boxes = useBoxes('main')
   const box = useBox('main', boxlabel)
@@ -192,7 +204,7 @@ const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
   if (box !== null && ! seenBoxes.includes(box)) { seenBoxes.push(box) }
   const make = async () => {
     if (vault === null) { return }
-    await vault.ensureUnlocked()
+    await vault.bank.ensureUnlocked()
     const made = await vault.putBox({ boxlabel, whisper: {} }, { ifPresent: 'get', ifAbsent: 'add' })
     await made.expose()
   }
@@ -203,14 +215,15 @@ const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
       <p data-testid="whisper">{whisperWords(whisper, exposure)}</p>
       <p data-testid="showing">{isShowing ? 'showing' : 'hidden'}</p>
       <button type="button" onClick={() => { void make() }}>Make</button>
-      <button type="button" onClick={() => { vault?.lock() }}>Lock</button>
-      <button type="button" onClick={() => { void vault?.ensureUnlocked() }}>Unlock</button>
+      <button type="button" onClick={() => { bank?.lock() }}>Lock</button>
+      <button type="button" onClick={() => { void bank?.ensureUnlocked() }}>Unlock</button>
     </div>
   )
 }
 
-/** Render whether `anthropic` in the vault `main` is showing and veiled, and its exposure, with buttons to veil it, unexpose it and lock its vault. */
+/** Render whether `anthropic` in the vault `main` is showing and veiled, and its exposure, with buttons to veil it, unexpose it and lock its bank. */
 const VeilPage = () => {
+  const bank = useBank()
   const { vault } = useVault('main')
   const box = useBox('main', 'anthropic')
   const isShowing = useBoxIsShowing(box)
@@ -218,7 +231,7 @@ const VeilPage = () => {
   const exposure = useBoxExposure(box)
   const expose = async () => {
     if ((vault === null) || (box === null)) { return }
-    await vault.ensureUnlocked()
+    await vault.bank.ensureUnlocked()
     await box.expose()
   }
   return (
@@ -228,8 +241,8 @@ const VeilPage = () => {
       <button type="button" onClick={() => { box?.veil() }}>Veil</button>
       <button type="button" onClick={() => { box?.unveil() }}>Unveil</button>
       <button type="button" onClick={() => { box?.unexpose() }}>Unexpose</button>
-      <button type="button" onClick={() => { vault?.lock() }}>Lock</button>
-      <button type="button" onClick={() => { void vault?.ensureUnlocked() }}>Unlock</button>
+      <button type="button" onClick={() => { bank?.lock() }}>Lock</button>
+      <button type="button" onClick={() => { void bank?.ensureUnlocked() }}>Unlock</button>
     </div>
   )
 }
@@ -318,6 +331,20 @@ describe("the box hooks", () => {
     await vault.delBox('anthropic')
     await waitFor(() => { expect(shownOfBox('box')).to.eq('none') })
     expect(shownOfBox('boxes')).to.eq('')
+  })
+
+  it("read the boxes of a vault's next life, its watch begun again", async () => {
+    const { world, vault } = await boxWorld()
+    const beginning = vi.spyOn(Vault.prototype, 'tryBeginWatch')
+    render(<BankProvider {...TH.providerPropsOf(world)}><BoxPage /></BankProvider>)
+    await waitFor(() => { expect(shownOfBox('boxes')).to.eq('anthropic') })
+    await vault.del(vault)
+    await waitFor(() => { expect(shownOfBox('boxes')).to.eq('none') })
+    const nextLife = await vault.bank.ensureVault(TH.VaultScopeGiven)
+    await nextLife.putBox({ boxlabel: 'other', whisper: { apiKey: 'sk-ant-fake-next' } }, { ifAbsent: 'add' })
+    await waitFor(() => { expect(shownOfBox('boxes')).to.eq('other') })
+    expect(shownOfBox('box')).to.eq('none')
+    expect(beginning).toHaveBeenCalledTimes(2)
   })
 
   it("read none for a box whose vault is deleted elsewhere", async () => {

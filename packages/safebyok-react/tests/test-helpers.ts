@@ -6,7 +6,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { expect, onTestFinished, vi } from 'vitest'
 import { MemoryDeviceDB, type AnyGating, type Device, type DeviceOpts, type Gating, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok'
-import { Passphrase, VaultScopeGiven, anyStrengthChecker, passkeyOf, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok/testing'
+import { Passphrase, anyStrengthChecker, passkeyOf, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
 import type { BankProviderProps, PassphraseGating } from '../src/shapes'
 
@@ -78,9 +78,9 @@ export const withoutGesture = () => {
 }
 // --
 
-// == [Open gatings]: addPasskeyTo, openGatingOf, building, unlocking, replacing, addingPasskey, revokingPasskey, passphraseGatingOf, gatingOfKind, attemptsOf
+// == [Open gatings]: addPasskeyTo, openGatingOf, building, unlocking, replacing, addingPasskey, revokingPasskey, deleting, passphraseGatingOf, gatingOfKind, attemptsOf
 
-/** Add a passkey to `vault`, which belongs to `world`'s own bank, the way a user would in the dialog.
+/** Add a passkey to the bank of `vault`, a bank of `world`'s own, the way a user would in the dialog.
  * Uses `passkeyClear`, or the passkey from `passkeyOf('laptop')` when none is given.
  *
  * @example await TH.addPasskeyTo(world, vault, await createPasskey(TH.PasskeyMaking))  // one the fake authenticator has
@@ -89,7 +89,7 @@ export const addPasskeyTo = async (world: BankWorld, vault: Vault, passkeyClear?
   const { typing } = world.dialog
   world.dialog.typing = { passphraseClear: Passphrase, passkeyClear: passkeyClear ?? await passkeyOf('laptop') }
   try {
-    await vault.addPasskeyPrompt()
+    await vault.bank.maingate.addPasskeyPrompt()
   } finally {
     world.dialog.typing = typing
   }
@@ -119,37 +119,37 @@ export const openGatingOf = async (world: BankWorld, raise: (device: Device) => 
   return { gating, raising, device, close: () => { closing.resolve(undefined) } }
 }
 
-/** The vault of `device`'s bank, which is already built. */
-async function vaultOf(device: Device): Promise<Vault> {
-  const bank = await device.ensureBank()
-  return bank.ensureVault(VaultScopeGiven)
-}
-
 /** Open a `build_bank` gating on a device whose bank is not built yet. */
 export const building = (device: Device) => device.tryEnsureBank()
 
 /** Open an `unlock_bank` gating on a device whose bank is built and locked. */
 export const unlocking = async (device: Device) => {
-  const vault = await vaultOf(device)
-  return vault.tryEnsureUnlocked()
+  const bank = await device.ensureBank()
+  return bank.tryEnsureUnlocked()
 }
 
-/** Open a `replace_passphrase` gating on a device whose vault is built, locked or not. */
+/** Open a `replace_passphrase` gating on a device whose bank is built, locked or not. */
 export const replacing = async (device: Device) => {
-  const vault = await vaultOf(device)
-  return vault.tryReplacePassphrasePrompt()
+  const bank = await device.ensureBank()
+  return bank.maingate.tryReplacePassphrasePrompt()
 }
 
-/** Open an `add_passkey` gating on a device whose vault is built and has no passkey. */
+/** Open an `add_passkey` gating on a device whose bank is built and has no passkey. */
 export const addingPasskey = async (device: Device) => {
-  const vault = await vaultOf(device)
-  return vault.tryAddPasskeyPrompt()
+  const bank = await device.ensureBank()
+  return bank.maingate.tryAddPasskeyPrompt()
 }
 
-/** Open a `revoke_passkey` gating on a device whose vault is built and has a passkey. */
+/** Open a `revoke_passkey` gating on a device whose bank is built and has a passkey. */
 export const revokingPasskey = async (device: Device) => {
-  const vault = await vaultOf(device)
-  return vault.tryRevokePasskeyPrompt()
+  const bank = await device.ensureBank()
+  return bank.maingate.tryRevokePasskeyPrompt()
+}
+
+/** Open a `del_bank` gating on a device whose bank is built, locked or not. */
+export const deleting = async (device: Device) => {
+  const bank = await device.ensureBank()
+  return bank.tryDelPrompt()
 }
 
 /** Return `gating`, typed as a gating of `gatingkind`. Throws if it is of another kind. */
@@ -169,7 +169,7 @@ export const passphraseGatingOf = (gating: AnyGating): PassphraseGating => {
 export const attemptsOf = (gating: Gating) => vi.spyOn(Object.getPrototypeOf(gating) as Gating, 'attempt')
 // --
 
-// == [Typing in the dialog]: submitPassphrase, submitNewPassphrase, submitReplacement, submitPasskeyAdd, submitPasskeyRevoke
+// == [Typing in the dialog]: submitPassphrase, submitNewPassphrase, submitReplacement, submitPasskeyAdd, submitBankDeletion, submitPasskeyRevoke
 
 /** Type the passphrase into the dialog and press Unlock. */
 export const submitPassphrase = (passphrase: string) => {
@@ -202,6 +202,12 @@ export const submitReplacement = async (antePassphrase: string, nextPassphrase: 
 export const submitPasskeyAdd = (passphrase: string) => {
   fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(screen.getByText('Add passkey'))
+}
+
+/** Type the passphrase into the delete-everything dialog and press Delete everything. */
+export const submitBankDeletion = (passphrase: string) => {
+  fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
+  fireEvent.click(screen.getByText('Delete everything'))
 }
 
 /** Type the passphrase into the remove-passkey dialog and press Remove passkey. */

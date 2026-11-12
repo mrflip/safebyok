@@ -5,7 +5,7 @@ import { isQuietRefusal } from '../lib/refusals'
 
 /** Props for a KnockForm.
  * - `extractApiKey` -- called at each knock to get the saved API key; resolves null if none is saved
- * - `isReady`       -- false until the flow's bank and vault have loaded
+ * - `isReady`       -- false until the flow's bank is up
  */
 export type KnockFormProps = { extractApiKey: () => Promise<string | null>, isReady: boolean }
 

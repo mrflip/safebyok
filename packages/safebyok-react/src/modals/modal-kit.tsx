@@ -10,9 +10,11 @@ import type { BoundarySource, Gripe, ModalFormProps, PassphraseFieldname } from 
 // == [Dialog]: showWhileMounted, ModalDialog, DialogBoundary, DialogTrouble
 
 // Show the dialog as a modal for as long as it is mounted. The browser focuses its first control, keeps Tab
-// inside it, and makes the rest of the page inert.
+// inside it, and makes the rest of the page inert. A control marked data-takes-focus is focused in its place: React
+// keeps autoFocus to itself, so the browser never sees an autofocus attribute.
 const showWhileMounted = (dialog: HTMLDialogElement) => {
   dialog.showModal()
+  dialog.querySelector<HTMLElement>('[data-takes-focus]')?.focus()
   return () => { dialog.close() }
 }
 
@@ -91,7 +93,7 @@ const SubmitButton = ({ word, pendingWord, isSubmittable }: { word: string, pend
 }
 
 /** The layout every dialog shares: title, blurb, the fields passed as children, the error line, and the submit and cancel buttons. */
-export const ModalForm = ({ onCancel, title, blurb, submitWord, pendingWord, isSubmittable = true, gripeText, gripeId, footnote, formRef, action, onReset, children }: ModalFormProps) => {
+export const ModalForm = ({ onCancel, title, blurb, submitWord, pendingWord, isSubmittable = true, cancelTakesFocus = false, gripeText, gripeId, footnote, formRef, action, onReset, children }: ModalFormProps) => {
   const titleId = useId()
   const blurbId = useId()
   return (
@@ -104,7 +106,7 @@ export const ModalForm = ({ onCancel, title, blurb, submitWord, pendingWord, isS
         {footnote !== undefined && <p className="quiet">{footnote}</p>}
         <div className="row">
           <SubmitButton word={submitWord} pendingWord={pendingWord} isSubmittable={isSubmittable} />
-          <button type="button" onClick={onCancel}>{Messages.cancelButton}</button>
+          <button type="button" data-takes-focus={cancelTakesFocus || undefined} onClick={onCancel}>{Messages.cancelButton}</button>
         </div>
       </form>
     </ModalDialog>

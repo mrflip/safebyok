@@ -47,6 +47,8 @@ describe("LabsPage", () => {
     TH.signInAs('margo')
     // A new user's bankDB is empty: the provider opens its dialog to build the bank, which leaves it unlocked.
     await TH.answerPassphraseDialog()
+    // Add key is enabled from sign-in, as it brings the bank up itself: wait for the build to land before the outage.
+    await screen.findByText('Vault unlocked')
     const flow = within(await screen.findByRole('region', { name: 'DOM form' }))
     const adding = await flow.findByRole<HTMLButtonElement>('button', { name: 'Add key' })
     await waitFor(() => { expect(adding.disabled).to.be.false })

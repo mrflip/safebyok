@@ -1,35 +1,31 @@
 import { createContext, useCallback, useContext, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { DefaultOnBadNews, DefaultOnLifecycle, Device, tellBadNewsTo, type Vault } from 'safebyok'
+import { DefaultOnBadNews, DefaultOnLifecycle, Device } from 'safebyok'
 import { bankProviderProps } from '../shapes'
-import type { BankProviderProps, ContextValue, GatingModalProps, Handlers, ProviderDeviceOpts, TellBadNews } from '../shapes'
+import type { BankProviderProps, GatingModalProps, Handlers, ProviderDeviceOpts } from '../shapes'
 import { GatingModal } from './gating-modal'
 import { useWarnOfIgnoredOpts } from './provider-hooks'
 
-// == [Context]: ContextValue, BankContext, Deviceless, useProvided
+// == [Context]: BankContext, useProvided
 
-const BankContext = createContext<ContextValue | null>(null)
+/** The provider's device, null while it has none; undefined, the default, outside any provider. */
+const BankContext = createContext<Device | null | undefined>(undefined)
 
-const tellNobody: TellBadNews = () => { /* no device, no news */ }
-
-/** The context value while the provider has no device. */
-const Deviceless: ContextValue = Object.freeze({ device: null, watchedVaults: new WeakSet<Vault>(), tellBadNews: tellNobody })
-
-/** Return the nearest BankProvider's context value. Throws an error naming `hookname` when there is no provider above. */
-export const useProvided = (hookname: string): ContextValue => {
-  const provided = useContext(BankContext)
-  if (provided === null) { throw new Error(`${hookname} needs a <BankProvider> above it.`) }
-  return provided
+/** Return the nearest BankProvider's device, or null while it has none. Throws an error naming `hookname` when there is no provider above. */
+export function useProvided(hookname: string): Device | null {
+  const device = useContext(BankContext)
+  if (device === undefined) { throw new Error(`${hookname} needs a <BankProvider> above it.`) }
+  return device
 }
 // --
 
 // == [The provider's device]: useProviderDevice
 
-/** Make the provider's device from the first render's `opts`, and keep it until unmount.
- * Returns the context value for it. Later changes to `opts` are ignored.
+/** Make the provider's device from the first render's `opts`, and keep it until unmount; null while `user_id` is null.
+ * Later changes to `opts` are ignored.
  */
-function useProviderDevice(opts: ProviderDeviceOpts, handlers: Handlers, isHostAsking: boolean, onMade: (device: Device) => void): ContextValue {
+function useProviderDevice(opts: ProviderDeviceOpts, handlers: Handlers, isHostAsking: boolean, onMade: (device: Device) => void): Device | null {
   const [madeFrom] = useState(opts)
-  const [contextValue, setContextValue] = useState<ContextValue>(Deviceless)
+  const [device, setDevice] = useState<Device | null>(null)
 
   // The device is made once but always calls the latest handlers, so a host may pass inline arrow functions.
   /** Return the handlers from the latest render. */
@@ -41,36 +37,32 @@ function useProviderDevice(opts: ProviderDeviceOpts, handlers: Handlers, isHostA
   useLayoutEffect(() => {
     const { user_id } = madeFrom
     if (user_id === null) { return }
-    const device = Device.make({
+    const made = Device.make({
       ...madeFrom, user_id, gates: ['main'],
       onLifecycle:      (event) => latest().onLifecycle(event),
       onBadNews:        (badnews) => latest().onBadNews(badnews),
       requestCleartext: isHostAsking ? (gating) => latest().requestCleartext?.(gating) : undefined,
     })
-    // Does nothing after the device is swept or vacated. The device itself calls none of the host's handlers by then.
-    const tellBadNews: TellBadNews = (badnews) => {
-      if (device.isEnabled) { tellBadNewsTo((told) => latest().onBadNews(told), device, badnews) }
-    }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the device exists only between this effect and its cleanup, and render must pass it to the context
-    setContextValue({ device, watchedVaults: new WeakSet<Vault>(), tellBadNews })
-    onMade(device)
+    setDevice(made)
+    onMade(made)
     // Not awaited: the device reports its bring-up to onLifecycle.
-    void device.tryEnsureBank()
+    void made.tryEnsureBank()
     return () => {
-      device.sweep()
-      setContextValue(Deviceless)
+      made.sweep()
+      setDevice(null)
     }
   }, [madeFrom, isHostAsking, onMade])
 
-  useWarnOfIgnoredOpts(contextValue.device, madeFrom, opts)
-  return contextValue
+  useWarnOfIgnoredOpts(device, madeFrom, opts)
+  return device
 }
 // --
 
 // == [BankProvider]: BankProvider, OpenGatingDialog, UserBankProvider
 
-/** Provide the hooks below it with the signed-in user's bank, or with no bank while `user_id` is null or the bank is coming up.
- * It also shows the built-in passphrase and passkey dialogs, unless `requestCleartext` is given.
+/** Provide the hooks below it with the signed-in user's device and its bank; with no device while `user_id` is null.
+ * It also shows the built-in dialog for the device's open gating, building or deleting the bank among them, unless `requestCleartext` is given.
  */
 export const BankProvider = (props: BankProviderProps) => {
   const { user_id, banklabel } = bankProviderProps.parse(props, { where: 'BankProvider' })
@@ -107,11 +99,10 @@ function UserBankProvider(props: BankProviderProps & { onMade: (device: Device) 
   // The device is made once, so this is fixed at the first render, like the device's other options.
   /** True when the host's `requestCleartext` handles this device's gatings, in place of the built-in dialogs. */
   const [isHostAsking] = useState(requestCleartext !== undefined)
-  const contextValue = useProviderDevice(deviceish, { onLifecycle, onBadNews, requestCleartext }, isHostAsking, onMade)
-  const { device } = contextValue
+  const device = useProviderDevice(deviceish, { onLifecycle, onBadNews, requestCleartext }, isHostAsking, onMade)
 
   return (
-    <BankContext.Provider value={contextValue}>
+    <BankContext.Provider value={device}>
       {children}
       {(device !== null) && (! isHostAsking) && (
         <OpenGatingDialog device={device} passphraseUsername={passphraseUsername} passkeyRpId={passkeyRpId} />
