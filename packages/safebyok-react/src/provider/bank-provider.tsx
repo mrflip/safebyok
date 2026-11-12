@@ -3,7 +3,7 @@ import { Bank, DefaultOnBadNews, DefaultOnLifecycle, tellBadNewsTo, type Vault }
 import { bankProviderProps } from '../shapes'
 import type { BankProviderProps, ContextValue, GatingModalProps, Handlers, ProviderBankOpts, TellBadNews } from '../shapes'
 import { GatingModal } from './gating-modal'
-import { useDeviceId, useWarnOfIgnoredOpts } from './provider-hooks'
+import { useDeviceTok, useWarnOfIgnoredOpts } from './provider-hooks'
 
 // == [Context]: ContextValue, BankContext, Bankless, useProvided
 
@@ -24,10 +24,10 @@ export const useProvided = (hookname: string): ContextValue => {
 
 // == [The provider's bank]: useProviderBank
 
-/** Make the provider's bank from the first render's `opts` once `device_id` is known, and keep it until unmount.
+/** Make the provider's bank from the first render's `opts` once `device_tok` is known, and keep it until unmount.
  * Returns the context value for it. Later changes to `opts` are ignored.
  */
-const useProviderBank = (opts: ProviderBankOpts, device_id: string | null, handlers: Handlers, isHostAsking: boolean, onMade: (bank: Bank) => void): ContextValue => {
+const useProviderBank = (opts: ProviderBankOpts, device_tok: string | null, handlers: Handlers, isHostAsking: boolean, onMade: (bank: Bank) => void): ContextValue => {
   const [madeFrom] = useState(opts)
   const [contextValue, setContextValue] = useState<ContextValue>(Bankless)
 
@@ -40,9 +40,9 @@ const useProviderBank = (opts: ProviderBankOpts, device_id: string | null, handl
   // effect so that the bank exists before the first paint.
   useLayoutEffect(() => {
     const { user_id } = madeFrom
-    if (user_id === null || device_id === null) { return }
+    if (user_id === null || device_tok === null) { return }
     const bank = Bank.make({
-      ...madeFrom, user_id, device_id,
+      ...madeFrom, user_id, device_tok,
       onLifecycle:      (event) => latest().onLifecycle(event),
       onBadNews:        (badnews) => latest().onBadNews(badnews),
       requestCleartext: isHostAsking ? (gating) => latest().requestCleartext?.(gating) : undefined,
@@ -60,7 +60,7 @@ const useProviderBank = (opts: ProviderBankOpts, device_id: string | null, handl
       bank.sweep()
       setContextValue(Bankless)
     }
-  }, [madeFrom, device_id, isHostAsking, onMade])
+  }, [madeFrom, device_tok, isHostAsking, onMade])
 
   useWarnOfIgnoredOpts(contextValue.bank, madeFrom, opts)
   return contextValue
@@ -74,7 +74,7 @@ const useProviderBank = (opts: ProviderBankOpts, device_id: string | null, handl
  */
 export const BankProvider = (props: BankProviderProps) => {
   const { user_id, banklabel, deviceDB } = bankProviderProps.parse(props, { where: 'BankProvider' })
-  const device_id = useDeviceId(deviceDB, user_id, banklabel)
+  const device_tok = useDeviceTok(deviceDB, user_id, banklabel)
   const userkey = JSON.stringify([user_id, banklabel])
 
   // When a different user signs in, the previous user's bank is vacated here. It is not done in the bank's
@@ -92,8 +92,8 @@ export const BankProvider = (props: BankProviderProps) => {
   }, [user_id, userkey])
 
   // Keyed by user, not by device. The host's app remounts when the user changes, so nothing typed carries
-  // over to the next user. It does not remount when the device_id arrives.
-  return <UserBankProvider key={userkey} {...props} device_id={device_id} onMade={onMade} />
+  // over to the next user. It does not remount when the device_tok arrives.
+  return <UserBankProvider key={userkey} {...props} device_tok={device_tok} onMade={onMade} />
 }
 
 /** Render the dialog for `bank`'s open gating, or nothing when no gating is open. */
@@ -104,13 +104,13 @@ const OpenGatingDialog = ({ bank, ...dialogProps }: Pick<GatingModalProps, 'pass
   return <GatingModal gating={openGating} leaseMillis={bank.leaseMillis} {...dialogProps} />
 }
 
-/** Provide one user's bank once its `device_id` is known, and render the dialog for its open gating. */
-const UserBankProvider = (props: BankProviderProps & { device_id: string | null, onMade: (bank: Bank) => void }) => {
-  const { passphraseUsername, passkeyRpId, children, device_id, onMade, onLifecycle = DefaultOnLifecycle, onBadNews = DefaultOnBadNews, requestCleartext, ...bankish } = props
+/** Provide one user's bank once its `device_tok` is known, and render the dialog for its open gating. */
+const UserBankProvider = (props: BankProviderProps & { device_tok: string | null, onMade: (bank: Bank) => void }) => {
+  const { passphraseUsername, passkeyRpId, children, device_tok, onMade, onLifecycle = DefaultOnLifecycle, onBadNews = DefaultOnBadNews, requestCleartext, ...bankish } = props
   // The bank is made once, so this is fixed at the first render, like the bank's other options.
   /** True when the host's `requestCleartext` handles this bank's gatings, in place of the built-in dialogs. */
   const [isHostAsking] = useState(requestCleartext !== undefined)
-  const contextValue = useProviderBank(bankish, device_id, { onLifecycle, onBadNews, requestCleartext }, isHostAsking, onMade)
+  const contextValue = useProviderBank(bankish, device_tok, { onLifecycle, onBadNews, requestCleartext }, isHostAsking, onMade)
   const { bank } = contextValue
 
   return (

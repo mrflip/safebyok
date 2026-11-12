@@ -7,13 +7,13 @@ import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import * as TH from '../test-helpers'
 
 /** The calls a MemoryDeviceDB makes of its storage, any of which the next may be. */
-const StorageCalls = ['doStow', 'doPeek', 'doForget', 'doListLeases', 'doForgetRawLease', 'doEnsureCachedBank', 'doForgetBank', 'doListBanks'] as const
+const StorageCalls = ['doStow', 'doPeek', 'doForget', 'doListLeases', 'doForgetRawLease', 'doEnsureCachedDevice', 'doForgetDevice', 'doListDevices'] as const
 
 const memoryRowsOf = (deviceDB: MemoryDeviceDB): TH.DeviceDBRowCheats => ({
-  plantLeaseRow: ({ user_id, banklabel, vaultlabel }, row) => { deviceDB._cheat_leaseRows().set(ckeyOf(user_id, banklabel, vaultlabel), { scopepath: [user_id, banklabel, vaultlabel], row }) },
-  leaseRowsOf:   () => [...deviceDB._cheat_leaseRows().values()].map(({ row }) => row),
-  plantBankRow:  ({ user_id, banklabel }, row) => { deviceDB._cheat_bankRows().set(ckeyOf(user_id, banklabel), row) },
-  bankRowsOf:    () => [...deviceDB._cheat_bankRows().values()],
+  plantLeaseRow:  ({ user_id, banklabel, vaultlabel }, row) => { deviceDB._cheat_leaseRows().set(ckeyOf(user_id, banklabel, vaultlabel), { scopepath: [user_id, banklabel, vaultlabel], row }) },
+  leaseRowsOf:    () => [...deviceDB._cheat_leaseRows().values()].map(({ row }) => row),
+  plantDeviceRow: ({ user_id, banklabel }, row) => { deviceDB._cheat_deviceRows().set(ckeyOf(user_id, banklabel), row) },
+  deviceRowsOf:   () => [...deviceDB._cheat_deviceRows().values()],
 })
 
 // Memory has no storage to fail, so the next call to it throws as a refused write would.

@@ -169,6 +169,8 @@ To be deleted at 1.0.0.
 | `Refusals.staleWrite('del')`, `StaleWriteVals`, `StaleWrite` | `Refusals.staleDel()`, `StaleDelMessage` (the kind is still `'stale_write'`) |
 | `BirthRead`, `readAt`                                  | `Birth`, `refreshedAt`                                  |
 | `applabel` (a scope's first name, stored and in every option; the scopepath's `vault^acme^u1^main`) | `banklabel`, and `user_id` now comes first in a scope: `vault^u1^acme^main` (2026-11-12, bank_world thread 1) |
+| `ensureCachedBank`, `forgetBank`, `listRawBanks`, `BankRow`, `bankRow` (the deviceDB's bank row, and each `try*` and `do*` form of its verbs; the IndexedDB database `<dbName>:bank-v001-001-001`) | `ensureCachedDevice`, `forgetDevice`, `listRawDevices`, `DeviceRow`, `deviceRow` (the device row; `<dbName>:devicerow-v001-001-001`) (2026-11-12, bank_world thread 2) |
+| `device_id`, `deviceId`, `useDeviceId` (an option, a prop, a wayin's header field, the device row) | `device_tok`, `deviceTok`, `useDeviceTok` (2026-11-12, bank_world thread 2) |
 
 ## The old design's names the new core does not have
 

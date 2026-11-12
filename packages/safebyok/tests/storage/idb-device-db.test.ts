@@ -25,15 +25,15 @@ function makeDeviceDB(dbName = freshDbName()): IdbDeviceDB {
   return deviceDB
 }
 
-/** The backdoor to a DeviceDB's lease and bank rows, through connections of its own to the DeviceDB's databases. */
+/** The backdoor to a DeviceDB's lease and device rows, through connections of its own to the DeviceDB's databases. */
 const idbRowsOf = (deviceDB: IdbDeviceDB): TH.DeviceDBRowCheats => {
   const leaseShelf = createStore(`${dbNameOf.get(deviceDB)!}:device-v001-001-001`, 'leases')
-  const bankShelf = createStore(`${dbNameOf.get(deviceDB)!}:bank-v001-001-001`, 'bank')
+  const deviceRowShelf = createStore(`${dbNameOf.get(deviceDB)!}:devicerow-v001-001-001`, 'devicerow')
   return {
-    plantLeaseRow: async ({ user_id, banklabel, vaultlabel }, row) => { await inOneStep(leaseShelf, 'readwrite', (store) => { store.put(row, [user_id, banklabel, vaultlabel]) }) },
-    leaseRowsOf:   async () => await inOneStep(leaseShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll())),
-    plantBankRow:  async ({ user_id, banklabel }, row) => { await inOneStep(bankShelf, 'readwrite', (store) => { store.put(row, [user_id, banklabel]) }) },
-    bankRowsOf:    async () => await inOneStep(bankShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll())),
+    plantLeaseRow:  async ({ user_id, banklabel, vaultlabel }, row) => { await inOneStep(leaseShelf, 'readwrite', (store) => { store.put(row, [user_id, banklabel, vaultlabel]) }) },
+    leaseRowsOf:    async () => await inOneStep(leaseShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll())),
+    plantDeviceRow: async ({ user_id, banklabel }, row) => { await inOneStep(deviceRowShelf, 'readwrite', (store) => { store.put(row, [user_id, banklabel]) }) },
+    deviceRowsOf:   async () => await inOneStep(deviceRowShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll())),
   }
 }
 
@@ -41,7 +41,7 @@ const idbRowsOf = (deviceDB: IdbDeviceDB): TH.DeviceDBRowCheats => {
 /** Makes the next transaction any DeviceDB opens fail, as it does when the browser closes the database under the page. */
 const failNextCall = async (deviceDB: IdbDeviceDB, errname = 'InvalidStateError'): Promise<void> => {
   await deviceDB.listLeases()
-  await deviceDB.listRawBanks()
+  await deviceDB.listRawDevices()
   vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementationOnce(() => {
     throw new DOMException("The database connection is closing.", errname)
   })
@@ -99,19 +99,19 @@ describe("IdbDeviceDB's database", () => {
     expect(await dbNamesNow()).to.include(`${dbName}:device-v001-001-001`)
   })
 
-  it("keeps its bank rows in a database of their own, named with its version", async () => {
+  it("keeps its device rows in a database of their own, named with its version", async () => {
     const dbName = freshDbName()
     const deviceDB = makeDeviceDB(dbName)
     await deviceDB.stow({ ...TH.vaultScope, vault_tok: 'tok_one', proved_at: Date.now(), lease_key: await makeLeaseKey() })
-    await deviceDB.ensureCachedBank(TH.bankScope)
-    expect(await dbNamesNow()).to.include.members([`${dbName}:device-v001-001-001`, `${dbName}:bank-v001-001-001`])
+    await deviceDB.ensureCachedDevice(TH.bankScope)
+    expect(await dbNamesNow()).to.include.members([`${dbName}:device-v001-001-001`, `${dbName}:devicerow-v001-001-001`])
   })
 
-  it("keeps the bank rows of each dbName apart", async () => {
+  it("keeps the device rows of each dbName apart", async () => {
     const dbName = freshDbName()
-    const made = await makeDeviceDB(dbName).ensureCachedBank(TH.bankScope)
-    expect(await makeDeviceDB(dbName).ensureCachedBank(TH.bankScope)).to.deep.equal(made)
-    expect(await makeDeviceDB().ensureCachedBank(TH.bankScope)).to.not.deep.equal(made)
+    const made = await makeDeviceDB(dbName).ensureCachedDevice(TH.bankScope)
+    expect(await makeDeviceDB(dbName).ensureCachedDevice(TH.bankScope)).to.deep.equal(made)
+    expect(await makeDeviceDB().ensureCachedDevice(TH.bankScope)).to.not.deep.equal(made)
   })
 
   it("refuses each call where there is no IndexedDB", async () => {

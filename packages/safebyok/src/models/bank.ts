@@ -32,12 +32,12 @@ export const DefaultRefreshMillis = 5 * MinuteMillis
 
 /** The signed-in user's vaults in the app, one Vault object per scope, and what they share. */
 export class Bank {
-  // == [Props]: user_id, banklabel, scope, device_id, keyDeriver, deviceDB, logger, strengthChecker, leaseMillis, boxRefreshMillis, #hostHandlers, #tellBadNews, #listeners, #vaultListing, #endCause, #vacating, #lastHello, #snapshot, #getSnapshot, #subscribe
+  // == [Props]: user_id, banklabel, scope, device_tok, keyDeriver, deviceDB, logger, strengthChecker, leaseMillis, boxRefreshMillis, #hostHandlers, #tellBadNews, #listeners, #vaultListing, #endCause, #vacating, #lastHello, #snapshot, #getSnapshot, #subscribe
 
   declare readonly user_id:   string
   declare readonly banklabel: string
   readonly scope:            BankScope
-  readonly device_id:        string
+  readonly device_tok:        string
   readonly keyDeriver:       GuardedKeyDeriver
   readonly deviceDB:         DeviceDB
   readonly logger:           VaultLogger
@@ -106,10 +106,10 @@ export class Bank {
 
   constructor(opts: BankOpts) {
     checkSecureContext()
-    const { user_id, banklabel, device_id, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews = DefaultOnBadNews, onLifecycle = DefaultOnLifecycle } = VX.bankOpts.parse(opts)
+    const { user_id, banklabel, device_tok, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews = DefaultOnBadNews, onLifecycle = DefaultOnLifecycle } = VX.bankOpts.parse(opts)
     this.scope = bankScope.parse({ user_id, banklabel })
     tattoo(this, this.scope)
-    this.device_id = device_id
+    this.device_tok = device_tok
     this.keyDeriver = guardKeyDeriver(keyDeriver)
     this.deviceDB = deviceDB
     // A disabled bank calls none of the host's functions, but in its vacate: the page may belong to the next user by then.
@@ -195,7 +195,7 @@ export class Bank {
     return this
   }
 
-  /** Sign out on this device: disable the bank, and forget every lease of this bank cached here and its bank row, settling once each forget has been tried. */
+  /** Sign out on this device: disable the bank, and forget every lease of this bank cached here and its device row, settling once each forget has been tried. */
   vacate(story: VacateStory = {}): Promise<void> {
     const { cause = bankDisabled() } = VX.vacateStory.parse(story)
     this.#disable(cause, () => { this.#vaultListing.vacate() })
@@ -225,8 +225,8 @@ export class Bank {
     return listed.ok ? good(listed.val.filter((row) => this.#isOwnLease(row))) : listed
   }
 
-  // A fresh device has no bank row: the next bank of this scope gets a new device_id.
-  /** This bank's leases revoked and its bank row forgotten on this device, then `vacated` told. */
+  // A fresh device has no device row: the next bank of this scope gets a new device_tok.
+  /** This bank's leases revoked and its device row forgotten on this device, then `vacated` told. */
   async #vacateDevice(cause: VaultError): Promise<void> {
     const unrevoked = await this.#revokeOwnLeases()
     await this.#forgetOwnBank()
@@ -249,7 +249,7 @@ export class Bank {
 
   /** A vacate's forget of this bank's row in the deviceDB, a refusal told as bad news. */
   async #forgetOwnBank(): Promise<void> {
-    const forgot = await this.deviceDB.tryForgetBank(this.scope)
+    const forgot = await this.deviceDB.tryForgetDevice(this.scope)
     if (! forgot.ok) { tellBadNewsTo(this.#hostHandlers.onBadNews, this, [forgot.err]) }
   }
 
@@ -321,7 +321,7 @@ export class Bank {
 
   #makeSnapshot(): BankSnapshot {
     const stage: BankStage = this.#isHelloed ? 'ready' : 'made'
-    return Object.freeze({ ...this.scope, stage: this.#endCause ? 'disabled' : stage, err: this.#endCause ?? null, device_id: this.device_id, vaults: this.#vaultListing.snapshot, openGating: this.#vaultListing.openGating })
+    return Object.freeze({ ...this.scope, stage: this.#endCause ? 'disabled' : stage, err: this.#endCause ?? null, device_tok: this.device_tok, vaults: this.#vaultListing.snapshot, openGating: this.#vaultListing.openGating })
   }
   // --
 

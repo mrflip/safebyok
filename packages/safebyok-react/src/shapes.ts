@@ -8,8 +8,8 @@ import { fromB64, type WhisperFieldAttributes } from 'safebyok/utils'
 
 // == [Provider]: BankProviderProps, bankProviderProps, ProviderBankOpts, Handlers, ContextValue, TellBadNews, GatingModalProps, BoundaryProps, BoundarySource
 
-/** BankProvider's props: the `Bank.make` options except `device_id`, plus the signed-in `user_id` and props for the dialogs. */
-export interface BankProviderProps extends Omit<BankOpts, 'user_id' | 'device_id' | 'requestCleartext'> {
+/** BankProvider's props: the `Bank.make` options except `device_tok`, plus the signed-in `user_id` and props for the dialogs. */
+export interface BankProviderProps extends Omit<BankOpts, 'user_id' | 'device_tok' | 'requestCleartext'> {
   /** The signed-in user's id, or null while nobody is signed in. Null does not remove cached leases: call `bank.vacate()` at sign-out. */
   user_id:             string | null
   /** Your own function to ask the user for a passphrase or passkey. When omitted, the provider shows its built-in dialogs. */
@@ -22,7 +22,7 @@ export interface BankProviderProps extends Omit<BankOpts, 'user_id' | 'device_id
 }
 
 /** Checker for {@link BankProviderProps}. */
-export const bankProviderProps = Checker(({ fn, custom, str }) => bankOpts.omit({ device_id: true }).extend({
+export const bankProviderProps = Checker(({ fn, custom, str }) => bankOpts.omit({ device_tok: true }).extend({
   user_id:            bankOpts.shape.user_id.nullable(),
   requestCleartext:   fn<RequestCleartext>().optional(),
   passphraseUsername: str.optional(),
@@ -33,8 +33,8 @@ export const bankProviderProps = Checker(({ fn, custom, str }) => bankOpts.omit(
 // The interface is written by hand so that each prop has a doc comment. This line fails to compile if it and the checker drift apart.
 true satisfies AssertEqual<BankProviderProps, CheckerInput<typeof bankProviderProps>>
 
-/** The `Bank.make` options the provider passes through: all but `device_id` and the handlers, with a `user_id` that may be null. */
-export type ProviderBankOpts = Omit<BankOpts, 'user_id' | 'device_id' | 'onLifecycle' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
+/** The `Bank.make` options the provider passes through: all but `device_tok` and the handlers, with a `user_id` that may be null. */
+export type ProviderBankOpts = Omit<BankOpts, 'user_id' | 'device_tok' | 'onLifecycle' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
 
 /** The host's callbacks for the provider's bank, as of the latest render. */
 export type Handlers = { onLifecycle: LifecycleHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext | undefined }

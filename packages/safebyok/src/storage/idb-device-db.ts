@@ -5,8 +5,8 @@ import type * as Z from 'zod'
 import { objCheck } from '../helpers/validator'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import type { BankRow, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
-import { BankDBVersion, DeviceDBVersion } from '../helpers/consts'
+import type { DeviceRow, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
+import { DeviceDBVersion, DeviceRowDBVersion } from '../helpers/consts'
 import { DeviceDB } from './device-db'
 import { versionedShelfOf } from './idb-shelf'
 import { inOneStep, rowAt } from './idb-transaction'
@@ -23,15 +23,15 @@ export interface IdbDeviceDBOpts {
 export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_option')
 // --
 
-// == [The databases]: BankScopepath, leaseScopepathOf, bankScopepathOf, leaseShelfOf, bankShelfOf
+// == [The databases]: DeviceRowScopepath, leaseScopepathOf, deviceRowScopepathOf, leaseShelfOf, deviceRowShelfOf
 
-/** Where the bank shelf files a bank's row. */
-type BankScopepath = [user_id: string, banklabel: string]
+/** Where the device row shelf files a bank's row. */
+type DeviceRowScopepath = [user_id: string, banklabel: string]
 
 /** The scopepath of the lease row at `scope`. */
 function leaseScopepathOf({ user_id, banklabel, vaultlabel }: VaultScope): LeaseScopepath { return [user_id, banklabel, vaultlabel] }
-/** The scopepath of the bank row at `scope`. */
-function bankScopepathOf({ user_id, banklabel }: BankScope): BankScopepath { return [user_id, banklabel] }
+/** The scopepath of the device row at `scope`. */
+function deviceRowScopepathOf({ user_id, banklabel }: BankScope): DeviceRowScopepath { return [user_id, banklabel] }
 
 /** The lease shelf: the device database of `dbName`, which has the leases. */
 function leaseShelfOf(dbName: string): UseStore {
@@ -42,20 +42,20 @@ function leaseShelfOf(dbName: string): UseStore {
 
 // A separate database, because a versioned shelf has a single object store: adding a second object store to the device
 // database would change its version, and every device would forget its leases.
-/** The bank shelf: the bank database of `dbName`, which has the bank rows. */
-function bankShelfOf(dbName: string): UseStore {
+/** The device row shelf: the device row database of `dbName`, which has the device rows. */
+function deviceRowShelfOf(dbName: string): UseStore {
   return versionedShelfOf({
-    dbName, dbstem: 'bank', version: BankDBVersion, storename: 'bank', oldnames: [],
+    dbName, dbstem: 'devicerow', version: DeviceRowDBVersion, storename: 'devicerow', oldnames: [],
   })
 }
 // --
 
-/** A device database that keeps this device's leases and bank rows in its browser's IndexedDB. */
+/** A device database that keeps this device's leases and device rows in its browser's IndexedDB. */
 export class IdbDeviceDB extends DeviceDB {
-  // == [Props]: #leaseShelf, #bankShelf
+  // == [Props]: #leaseShelf, #deviceRowShelf
 
   readonly #leaseShelf: UseStore
-  readonly #bankShelf: UseStore
+  readonly #deviceRowShelf: UseStore
   // --
 
   // == [Construction]: constructor
@@ -64,11 +64,11 @@ export class IdbDeviceDB extends DeviceDB {
     const { dbName = 'safebyok' } = idbDeviceDBOpts.parse(opts, { where: "In IdbDeviceDB's options" })
     super()
     this.#leaseShelf = leaseShelfOf(dbName)
-    this.#bankShelf = bankShelfOf(dbName)
+    this.#deviceRowShelf = deviceRowShelfOf(dbName)
   }
   // --
 
-  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureCachedBank, doForgetBank, doListBanks
+  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureCachedDevice, doForgetDevice, doListDevices
 
   protected async doStow(row: LeaseRow): Promise<void> {
     await inOneStep(this.#leaseShelf, 'readwrite', (store) => { store.put(row, leaseScopepathOf(row)) })
@@ -97,21 +97,21 @@ export class IdbDeviceDB extends DeviceDB {
     await inOneStep(this.#leaseShelf, 'readwrite', (store) => { store.delete(scopepath) })
   }
 
-  protected async doEnsureCachedBank(made: BankRow): Promise<unknown> {
-    return await inOneStep(this.#bankShelf, 'readwrite', async (store) => {
-      const stored = await rowAt(store, bankScopepathOf(made))
-      if (SX.bankRow.safeParse(stored).success) { return stored }
-      store.put(made, bankScopepathOf(made))
+  protected async doEnsureCachedDevice(made: DeviceRow): Promise<unknown> {
+    return await inOneStep(this.#deviceRowShelf, 'readwrite', async (store) => {
+      const stored = await rowAt(store, deviceRowScopepathOf(made))
+      if (SX.deviceRow.safeParse(stored).success) { return stored }
+      store.put(made, deviceRowScopepathOf(made))
       return made
     })
   }
 
-  protected async doForgetBank(scope: BankScope): Promise<void> {
-    await inOneStep(this.#bankShelf, 'readwrite', (store) => { store.delete(bankScopepathOf(scope)) })
+  protected async doForgetDevice(scope: BankScope): Promise<void> {
+    await inOneStep(this.#deviceRowShelf, 'readwrite', (store) => { store.delete(deviceRowScopepathOf(scope)) })
   }
 
-  protected async doListBanks(): Promise<unknown[]> {
-    return await inOneStep(this.#bankShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll()))
+  protected async doListDevices(): Promise<unknown[]> {
+    return await inOneStep(this.#deviceRowShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll()))
   }
   // --
 }

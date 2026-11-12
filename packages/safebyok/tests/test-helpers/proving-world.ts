@@ -103,23 +103,23 @@ export async function makeGrantedLease(friend: FakeLeaseFriend, opts: LeaseGrant
 export function sealStampOf(boxlabel: string, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord { return { boxlabel, box_tok: `box-tok-${boxlabel}`, revision_seq: 1, ...overrides } }
 // --
 
-// == [Provings]: TestPassphrase, DeviceId, provingWorldOf, passkeyAnswerOf, builtGateOf
+// == [Provings]: TestPassphrase, DeviceTok, provingWorldOf, passkeyAnswerOf, builtGateOf
 
 /** An obvious fake passphrase, never a real one. */
 export const TestPassphrase = GX.passphraseCleartext.parse('correct horse battery staple')
 
-/** The `device_id` a {@link provingWorldOf} world carries. */
-export const DeviceId = '00000000-0000-4000-8000-00000000000a'
+/** The `device_tok` a {@link provingWorldOf} world carries. */
+export const DeviceTok = '00000000-0000-4000-8000-00000000000a'
 
 /** What a test may say of a {@link provingWorldOf} world: the host's own deriver and checker, which it wraps as a bank does. */
-export type ProvingWorldGiven = { keyDeriver?: KeyDeriver | undefined, strengthChecker?: StrengthChecker | undefined, device_id?: string | undefined }
+export type ProvingWorldGiven = { keyDeriver?: KeyDeriver | undefined, strengthChecker?: StrengthChecker | undefined, device_tok?: string | undefined }
 
-/** A proving's world: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceId}, each wrapped as a bank wraps it. */
-export function provingWorldOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_id = DeviceId }: ProvingWorldGiven = {}): ProvingWorld {
+/** A proving's world: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceTok}, each wrapped as a bank wraps it. */
+export function provingWorldOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_tok = DeviceTok }: ProvingWorldGiven = {}): ProvingWorld {
   return {
     keyDeriver:      guardKeyDeriver(keyDeriver),
     strengthChecker: guardStrengthChecker(strengthChecker),
-    device_id,
+    device_tok,
   }
 }
 

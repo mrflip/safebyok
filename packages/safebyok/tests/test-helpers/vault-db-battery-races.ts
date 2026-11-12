@@ -96,7 +96,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       const { vaultDB, vault } = await putWith()
       const twin = await twinOf(vaultDB)
       const ours = gateMoveOf(vault, { passkey_wayin: passkeyWayin })
-      const theirs = gateMoveOf(vault, { passphrase_wayin: { ...passphraseWayin, device_id: '00000000-0000-4000-8000-0000000000d2' } })
+      const theirs = gateMoveOf(vault, { passphrase_wayin: { ...passphraseWayin, device_tok: '00000000-0000-4000-8000-0000000000d2' } })
       const { written, refused } = splitOf(await Promise.all([vaultDB.tryAddPasskey(...ours), twin.tryReplacePassphrase(...theirs)]))
       expect([written.length, refused.length]).to.deep.equal([1, 1])
       expect(refused[0]).to.deep.include({ act: 'stale', dbhas: written[0]?.val })

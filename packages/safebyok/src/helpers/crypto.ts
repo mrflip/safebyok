@@ -60,7 +60,7 @@ export type CipherCtxRecord = Readonly<Record<string, string | number>>
  * a call with no stamp, or with a part or a record's field that is undefined or null: each
  * would bind the same as some other ctx.
  *
- * @example cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', key_deriver_label, salt_b64, device_id, registered_at })
+ * @example cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', key_deriver_label, salt_b64, device_tok, registered_at })
  * @example cipherCtx([vaultStampButFormat, leaseStamp], 'vault_key_lease_wrapped')
  */
 export function cipherCtx(stamp: CipherCtxRecord | readonly CipherCtxRecord[], purpose: string, ...header: [] | [CipherCtxRecord]): Uint8Array {

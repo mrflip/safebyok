@@ -83,9 +83,9 @@ export type BoxTidyAsk   = Readonly<Z.output<typeof boxTidy>>
 // == [Wayins and gate]: passphraseWayinRecord, passkeyWayinRecord, gate, Gate
 
 /** The checks of the wayins as stored, and of the gate that has them. */
-export const { passphraseWayinRecord, passkeyWayinRecord, gate } = Checkers('bad_option', ({ obj, lit, uint, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_id, vault_key_wayin_wrapped }) => {
-  const passphraseWayinRecord = obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
-  const passkeyWayinRecord    = obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_id, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
+export const { passphraseWayinRecord, passkeyWayinRecord, gate } = Checkers('bad_option', ({ obj, lit, uint, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_tok, vault_key_wayin_wrapped }) => {
+  const passphraseWayinRecord = obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_tok, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
+  const passkeyWayinRecord    = obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_tok, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
   const gate                  = obj({ gate_epoch: uint.positive(), passphrase_wayin: passphraseWayinRecord, passkey_wayin: passkeyWayinRecord.nullable() }).strict()
   return { passphraseWayinRecord, passkeyWayinRecord, gate }
 }, [CX])
@@ -487,7 +487,7 @@ export const loggableAsk = objStrip(({ obj, oneof, user_id, banklabel, vaultlabe
 export type LoggableAsk = Readonly<Z.output<typeof loggableAsk>>
 // --
 
-// == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow, leaseScopepath, LeaseScopepath, RawLease, bankRow, BankRow
+// == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow, leaseScopepath, LeaseScopepath, RawLease, deviceRow, DeviceRow
 
 /** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */
 export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_option', ({ epochMillis }) => {
@@ -512,8 +512,8 @@ export type RawLease = { scopepath: LeaseScopepath, row: unknown }
 
 true satisfies Z.core.util.AssertEqual<LeaseScopepath, Z.infer<typeof leaseScopepath>>
 
-/** The bank row: the `device_id` this device goes by in one bank scope. */
-export const bankRow = objCheck(({ user_id, banklabel, device_id }) => ({ user_id, banklabel, device_id }), 'bad_record', [CX])
+/** The device row: the `device_tok` this device goes by in one bank scope. */
+export const deviceRow = objCheck(({ user_id, banklabel, device_tok }) => ({ user_id, banklabel, device_tok }), 'bad_record', [CX])
 
-export type BankRow      = Z.infer<typeof bankRow>
+export type DeviceRow      = Z.infer<typeof deviceRow>
 // --

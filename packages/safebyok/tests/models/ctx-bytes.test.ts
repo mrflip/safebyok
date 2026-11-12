@@ -57,7 +57,7 @@ describe("each ctx, byte for byte", () => {
   it("binds a passphrase wayin's wrap to the vault's stamp, the purpose and its whole header", async () => {
     const { gate } = await builtGateOf()
     const wayin = gate.pickle().passphrase_wayin
-    const ctx = textBytes(`[${VaultStampText},"vault_key_passphrase_wrapped",{"device_id":"${wayin.device_id}","key_deriver_label":"${wayin.key_deriver_label}","registered_at":${String(wayin.registered_at)},"salt_b64":"${wayin.salt_b64}","wayinkind":"passphrase"}]`)
+    const ctx = textBytes(`[${VaultStampText},"vault_key_passphrase_wrapped",{"device_tok":"${wayin.device_tok}","key_deriver_label":"${wayin.key_deriver_label}","registered_at":${String(wayin.registered_at)},"salt_b64":"${wayin.salt_b64}","wayinkind":"passphrase"}]`)
     const wayinKey = await importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes(passphraseCleartext.parse(TestPassphrase), fromB64(wayin.salt_b64)))
     expect(await unwrapKeyUnder(wayinKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
@@ -67,7 +67,7 @@ describe("each ctx, byte for byte", () => {
     const prfBytes = new Uint8Array(answer.prfBytes)
     const { gate } = await builtGateOf(answer)
     const wayin = gate.pickle().passkey_wayin!
-    const ctx = textBytes(`[${VaultStampText},"vault_key_passkey_wrapped",{"credential_id":"${wayin.credential_id}","device_id":"${wayin.device_id}","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(wayin.registered_at)},"wayinkind":"passkey"}]`)
+    const ctx = textBytes(`[${VaultStampText},"vault_key_passkey_wrapped",{"credential_id":"${wayin.credential_id}","device_tok":"${wayin.device_tok}","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(wayin.registered_at)},"wayinkind":"passkey"}]`)
     const passkeyKey = await deriveWrappingKey(prfBytes, ctx)
     expect(await unwrapKeyUnder(passkeyKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })

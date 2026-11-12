@@ -67,7 +67,7 @@ export function makeBankWorld() {
   const deviceDB = new MemoryDeviceDB()
   const dialog = { typing: byPassphrase(Passphrase) as object }
   const requestCleartext: RequestCleartext = async (gating) => { await gating.attempt(dialog.typing) }
-  const baseOpts: BankOpts = { ...BankScopeGiven, device_id: '00000000-0000-4000-8000-0000000000b1', vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
+  const baseOpts: BankOpts = { ...BankScopeGiven, device_tok: '00000000-0000-4000-8000-0000000000b1', vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
   /** A bank over this world's VaultDB and DeviceDB: called twice, two pages on one device. */
   const bankOn = (overrides: Partial<BankOpts> = {}): Bank => {
     const bank = Bank.make({ ...baseOpts, ...overrides })
@@ -79,7 +79,7 @@ export function makeBankWorld() {
     /** Move the clock on by `millis`; no timer fires. */
     advance:   (millis: number) => { now += millis },
     /** A bank on another device: this world's vaultDB, and a deviceDB of its own. */
-    bankOnAnotherDevice: (overrides: Partial<BankOpts> = {}): Bank => bankOn({ device_id: '00000000-0000-4000-8000-0000000000b2', deviceDB: new MemoryDeviceDB(), ...overrides }),
+    bankOnAnotherDevice: (overrides: Partial<BankOpts> = {}): Bank => bankOn({ device_tok: '00000000-0000-4000-8000-0000000000b2', deviceDB: new MemoryDeviceDB(), ...overrides }),
     leaseRows: (): unknown[] => [...deviceDB._cheat_leaseRows().values()].map(({ row }) => row),
   }
 }

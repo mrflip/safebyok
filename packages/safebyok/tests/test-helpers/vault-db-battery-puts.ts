@@ -424,7 +424,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
   describe("gate verbs", () => {
     it("replacePassphrase sets the new wayin and moves gate_epoch and the revision up by one", async () => {
       const { vaultDB, vault } = await putWith()
-      const wayin = { ...passphraseWayin, device_id: '00000000-0000-4000-8000-0000000000d2' }
+      const wayin = { ...passphraseWayin, device_tok: '00000000-0000-4000-8000-0000000000d2' }
       const { act, val, world } = await vaultDB.replacePassphrase(...gateMoveOf(vault, { passphrase_wayin: wayin }))
       expect(act).to.eq('replaced')
       expect(world).to.deep.equal(val)
@@ -439,7 +439,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       const { act, val } = await vaultDB.addPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))
       expect(act).to.eq('added')
       expect(val.gate).to.deep.equal({ gate_epoch: 2, passphrase_wayin: passphraseWayin, passkey_wayin: passkeyWayin })
-      const again = await vaultDB.tryAddPasskey(...gateMoveOf(val, { passkey_wayin: { ...passkeyWayin, device_id: '00000000-0000-4000-8000-0000000000d2' } }))
+      const again = await vaultDB.tryAddPasskey(...gateMoveOf(val, { passkey_wayin: { ...passkeyWayin, device_tok: '00000000-0000-4000-8000-0000000000d2' } }))
       expect(again).to.deep.include({ ok: false, act: 'camped', dbhas: val, world: val })
       expect(again.err?.refusalkind).to.eq('camped')
       expect(await vaultDB.getVault(vaultGetAskOf())).to.deep.include({ world: val })
@@ -482,7 +482,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
 
     it("refuses a gate verb that changes the wayin it should leave alone", async () => {
       const { vaultDB, vault } = await putWith()
-      const otherPassphrase = { ...passphraseWayin, device_id: '00000000-0000-4000-8000-0000000000d2' }
+      const otherPassphrase = { ...passphraseWayin, device_tok: '00000000-0000-4000-8000-0000000000d2' }
       expect(await vaultDB.tryReplacePassphrase(...gateMoveOf(vault, { passphrase_wayin: otherPassphrase, passkey_wayin: passkeyWayin }))).to.deep.include({ ok: false, act: 'unclassified_storing', world: vault }).and.to.have.nested.property('err.refusalkind', 'gate_issue')
       expect(await vaultDB.tryAddPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin, passphrase_wayin: otherPassphrase }))).to.deep.include({ ok: false, act: 'unclassified_storing', world: vault }).and.to.have.nested.property('err.refusalkind', 'gate_issue')
       expect(await vaultDB.getVault(vaultGetAskOf())).to.deep.include({ world: vault })

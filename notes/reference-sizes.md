@@ -43,12 +43,12 @@ Every field is ASCII, except a host's sidecar, which may not be.
 | ---------------------------------------------------------------------------- | ----- | ---------- | -------- |
 | Now: a passphrase wayin, typical labels                                      | 669   | 674        | Measured |
 | Now: a passphrase and a passkey wayin, typical labels                        | 1,029 | 1,011      | Measured |
-| Now: both wayins, every label and the `device_id` at its maximum, a 64-byte credential | 1,237 | 1,219 (1,441 with its columns) | Measured |
+| Now: both wayins, every label and the `device_tok` at its maximum, a 64-byte credential | 1,237 | 1,219 (1,441 with its columns) | Measured |
 | Larger: both wayins, 512-bit wrapped keys, a 32-byte salt, two more passphrase wayins, typical labels | 1,944 | 1,868 | Measured |
 | Larger, at maximum labels                                                    | 2,180 | 2,104      | Measured |
 | A vault tombstone                                                            | 286   | 323        | Measured |
 
-Typical labels are `acme_chat`, `auth0|` plus 24 hex characters, `main`, and a 26-character `device_id`.
+Typical labels are `acme_chat`, `auth0|` plus 24 hex characters, `main`, and a 26-character `device_tok`.
 
 * **Reading "a slightly larger key".** The vaultKey and boxKey are already AES-256, the largest key AES has, so the
   *Larger* row grows in two other ways. Each wrapped key is 512 bits, as an AES-256-SIV or HMAC-SHA-512 key would be:
@@ -140,7 +140,7 @@ Every box is in one vault, under distinct boxlabels of one length. *Full* is `{ 
 * The tuple saves the repeated field names and labels: about 45% of a medium box, falling to 3% for xl, where the
   ciphertext dominates.
 
-| `{ device_id: <SHA-256 hex>, vaults: [<vault rows>] }`                | pg_notify 7,200 B | 128 KiB | Bytes per vault | Source   |
+| `{ device_tok: <SHA-256 hex>, vaults: [<vault rows>] }`                | pg_notify 7,200 B | 128 KiB | Bytes per vault | Source   |
 | --------------------------------------------------------------------- | ----------------- | ------- | --------------- | -------- |
 | Now, a passphrase wayin                                               | 10                | 175     | 670             | Measured |
 | Now, a passphrase and a passkey wayin                                 | 6                 | 114     | 1,030           | Measured |

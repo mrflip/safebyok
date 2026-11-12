@@ -9,8 +9,8 @@ implementation.
   removed on 2026-10-18 for a different plan); what waits is the UX, a device list, and, if the Coach
   wants rotation not to sign every other device out, a key pair per wayin (`TODO.md`, *Which wayins
   a rotation keeps*). The data it needs goes
-  in with rotation: a random `device_id` per bank per device, recorded on every wayin it adds.
-  * **What we record now.** `device_id` is random, minted per bank per device, never derived from
+  in with rotation: a random `device_tok` per bank per device, recorded on every wayin it adds.
+  * **What we record now.** `device_tok` is random, minted per bank per device, never derived from
     the device; the backend can already link a user's vaults by `user_id`. That reading follows
     Apple's ban on fingerprinting and Google's guidance to use a privately stored random ID; it is
     the agents' reading, not legal advice, and the Coach is "pretty sure the device id is ok".
