@@ -140,7 +140,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   prompt that builds a route for the host's own framework.
 * **An agent skill set** for integrating safebyok (the Coach, 2026-10-22): skills a host's coding
   agent loads to wire a bank, a VaultDB and the dialogs into an app.
-* **`bank.hello()` checks that the DeviceDB responds**, not only that the strength checker
+* **`device.ensureBank()` checks that the DeviceDB responds**, not only that the strength checker
   loads (the Coach, on #258: "scheduling is up to you").
 * **The demo triggers the bank when Auth.js gets an identity** (the Coach, on #259): show the
   `BankProvider` keyed on the session's user, made once the identity is known.
@@ -179,7 +179,7 @@ traces to one or both.** The default `onLifecycle` at debug for what is no error
 * A lease that outlived a lock or a vacate is logged at error and handed to the platform's `reportError` today: key
   material may stay cached on the device. Warn would make it quieter than a routine refusal.
 * What reaches neither handler today: a host listener's throw, and either handler's own throw, go to `reportToPlatform`
-  only; Bank.make's test-deriver notice is logged directly. A listener's throw told to `onBadNews` can loop where the
+  only; Device.make's test-deriver notice is logged directly. A listener's throw told to `onBadNews` can loop where the
   host's `onBadNews` changes the bank and a listener throws again; a handler's own throw cannot be told to itself; the
   test-deriver notice needs an event kind of its own.
 * `notes/security.md` has five entries promising logs that no longer happen (`Bank.onPanic`, `requestCleartext`,

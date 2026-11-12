@@ -185,7 +185,7 @@ describe("vault.ensureTimely(maxMillis)", () => {
     TH.expectSyncRefusal(() => vault.demandPresent())
     TH.expectSyncRefusal(() => vault.demandPromptable())
     TH.expectSyncRefusal(() => vault.demandAttachable())
-    TH.expectSyncRefusal(() => vault.demandHelloable())
+    TH.expectSyncRefusal(() => vault.demandWatchable())
   })
 
   it("refuses a maxMillis out of range", async () => {

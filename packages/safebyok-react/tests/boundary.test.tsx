@@ -98,7 +98,7 @@ describe("boundaryRefusalOf", () => {
   }
 
   it("names the component a foreign throw came from", () => {
-    const { message } = boundaryRefusalOf(new TypeError('fell over'), 'DelVaultModal')
-    expect(message).to.include("safebyok-react's DelVaultModal")
+    const { message } = boundaryRefusalOf(new TypeError('fell over'), 'RevokePasskeyModal')
+    expect(message).to.include("safebyok-react's RevokePasskeyModal")
   })
 })

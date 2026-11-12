@@ -280,7 +280,7 @@ export function vaultAbsent(vaultlabel: string): string { return `No vault is st
 export function boxAbsent(boxlabel: string): string { return `No box is stored under the label ${boxlabel}.` }
 
 /** Why a put that must find a box refuses where none is listed, with nothing fetched. */
-export function boxNotListed(boxlabel: string): string { return `No box is listed under the label ${boxlabel}, though one may be stored: call vault.hello() to list what is stored.` }
+export function boxNotListed(boxlabel: string): string { return `No box is listed under the label ${boxlabel}, though one may be stored: call vault.beginWatch() to list what is stored.` }
 
 
 export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."

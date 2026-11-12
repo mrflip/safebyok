@@ -190,7 +190,7 @@ describe("boxListing.puttable(scoped, opts)", () => {
     const scope = world.mw.boxscope('void_one')
     const err = TH.expectSyncRefusal(() => listing.puttable(scope, { ifAbsent: 'fail' }), 'absent_box')
     expect(err.message).to.eq(Phrases.boxNotListed(scope.boxlabel))
-    expect(err.message).to.contain('vault.hello')
+    expect(err.message).to.contain('vault.beginWatch')
     expect(listing.at(scope)).to.be.null
   })
 

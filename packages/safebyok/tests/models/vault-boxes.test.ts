@@ -4,11 +4,11 @@ import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { parseLogger } from '../../src/helpers/logger'
 import * as TH from '../test-helpers'
-import { Passphrase, Sidecar, Whisper, boxlabel, byPassphrase, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, delTyping, storedVaultRecord, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
+import { Passphrase, Sidecar, Whisper, boxlabel, byPassphrase, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, storedVaultRecord, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
-describe("vault.hello", () => {
+describe("vault.beginWatch", () => {
   it("is not called by getBox, which lists only the box it fetched", async () => {
     const { openNextSession, tryListBoxes, tryGetBox } = await makeWorldWithBox()
     const next = await openNextSession()
@@ -27,7 +27,7 @@ describe("vault.hello", () => {
     const { openNextSession, tryListBoxes } = await makeWorldWithBox()
     const next = await openNextSession()
     tryListBoxes.mockClear()
-    await expect(next.hello()).resolves.to.eq(next)
+    await expect(next.beginWatch()).resolves.to.eq(next)
     const listed = next.boxListing.at({ ...next.scope, boxlabel })
     expect(listed?.isFull).to.be.false
     await next.getBox(boxlabel)
@@ -39,7 +39,7 @@ describe("vault.hello", () => {
     const world = await makeWorldWithBox()
     const next = world.anotherSession().deliverRecord(world.demandStored())
     expect(next.isLocked).to.be.true
-    await next.hello()
+    await next.beginWatch()
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
     const box = (await next.getBox(boxlabel))!
     await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
@@ -48,7 +48,7 @@ describe("vault.hello", () => {
   it("a put from another session reaches the box listed", async () => {
     const { vault, openNextSession } = await makeWorldWithBox()
     const next = await openNextSession()
-    await next.hello()
+    await next.beginWatch()
     const box = await next.getBox(boxlabel)
     await vault.putBox({ boxlabel, sidecar: { note: 'moved' } })
     await TH.eventually(() => box?.revision_seq === 1)
@@ -59,8 +59,8 @@ describe("vault.hello", () => {
     const spy = TH.spyLogger()
     const { openNextSession, vault } = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
     const next = await openNextSession()
-    await delTyping(vault)
-    await TH.expectRefusal(next.hello(), 'absent_vault')
+    await vault.del(vault)
+    await TH.expectRefusal(next.beginWatch(), 'absent_vault')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
     expect(next.isEnabled).to.be.false
     expect(next.boxListing.things).to.deep.equal([])
@@ -72,10 +72,10 @@ describe("vault.hello", () => {
     const { openNextSession, tryListBoxes } = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
     const next = await openNextSession()
     tryListBoxes.mockRejectedValueOnce(new Error('the wire is down'))
-    const refusal = await TH.expectRefusal(next.hello(), 'unexpected_error')
+    const refusal = await TH.expectRefusal(next.beginWatch(), 'unexpected_error')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
     expect(refusal.cause).to.have.property('message', 'the wire is down')
-    await expect(next.hello()).resolves.to.eq(next)
+    await expect(next.beginWatch()).resolves.to.eq(next)
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
   })
 })
@@ -99,7 +99,7 @@ describe("the box methods refuse a locked or deleted vault", () => {
 
     it(`${verb} refuses on a deleted vault`, async () => {
       const { vault } = await makeWorld()
-      await delTyping(vault)
+      await vault.del(vault)
       await TH.expectRefusal(call(vault))
     })
   }
@@ -261,12 +261,12 @@ describe("a row no listing can set aside", () => {
     ['names another user_id',     (row: object): unknown => ({ ...row, user_id: 'u2' }), 'storage_issue'],
   ] as const
 
-  it.each(Unlistable)("fails the whole of vault.hello where one %s", async (_blurb, rowOf, refusalkind) => {
+  it.each(Unlistable)("fails the whole of vault.beginWatch where one %s", async (_blurb, rowOf, refusalkind) => {
     const spy = TH.spyLogger()
     const { openNextSession, boxrows } = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
     boxrows.set(boxlabel, rowOf(boxrows.get(boxlabel) as object))
     const next = await openNextSession()
-    await TH.expectRefusal(next.hello(), refusalkind)
+    await TH.expectRefusal(next.beginWatch(), refusalkind)
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
   })
 })
@@ -275,7 +275,7 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
   it("lists it in damaged_rows, and refuses a get of it as 'damaged_row'", async () => {
     const { openNextSession } = await makeWorldWithRubble()
     const next = await openNextSession()
-    await next.hello()
+    await next.beginWatch()
     expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['rubble'])
     expect(next.boxListing.at({ ...next.scope, boxlabel: 'rubble' })).to.be.null
     await TH.expectRefusal(next.getBox('rubble'), 'damaged_row')
@@ -286,7 +286,7 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     const { openNextSession, boxrows } = await makeWorldWithBox()
     boxrows.set('Not A Label', { garbage: true })
     const next = await openNextSession()
-    await next.hello()
+    await next.beginWatch()
     const box = await next.getBox(boxlabel)
     expect(await box?.extractWhisper()).to.deep.equal(Whisper)
     expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['Not A Label'])
@@ -295,7 +295,7 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
   it("drops an instance listed under it from the list, disabled", async () => {
     const { vault, box: listed, boxrows } = await makeWorldWithBox()
     boxrows.set(boxlabel, { garbage: true })
-    await vault.hello()
+    await vault.beginWatch()
     expect(vault.boxListing.at(listed.scope)).to.be.null
     expect(listed.isEnabled).to.be.false
   })
@@ -312,7 +312,7 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     boxrows.set('rubble', { garbage: true })
     boxrows.set('revised', { ...boxrows.get(boxlabel) as object, boxlabel: 'revised', whisper_ciphered: 'garbled' })
     const next = await openNextSession()
-    await next.hello()
+    await next.beginWatch()
     await TH.expectBad(next.tryDelBox('rubble'), 'damaged_row')
     await TH.expectBad(next.tryDelBox('revised'), 'damaged_row')
     expect(boxrows.get('rubble')).to.deep.equal({ garbage: true })
@@ -326,7 +326,7 @@ describe("a damaged box row met by the box listing", () => {
     const { openNextSession, badnews } = await makeWorldWithRubble()
     const next = await openNextSession()
     badnews.length = 0
-    await next.hello()
+    await next.beginWatch()
     expect(badnews.map((news) => news.refusalkind)).to.deep.equal(['damaged_row'])
     expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['rubble'])
   })

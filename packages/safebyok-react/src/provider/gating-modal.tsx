@@ -1,7 +1,6 @@
 import { useEffect, type ComponentType } from 'react'
 import type { AnyGating, Gating, Gatingkind } from 'safebyok'
 import { AddPasskeyModal } from '../modals/add-passkey-modal'
-import { DelVaultModal } from '../modals/del-vault-modal'
 import { PassphraseModal } from '../modals/passphrase-modal'
 import { ReplacePassphraseModal } from '../modals/replace-passphrase-modal'
 import { RevokePasskeyModal } from '../modals/revoke-passkey-modal'
@@ -15,7 +14,6 @@ const DialogForGatingkind: { [KindT in Gatingkind]: ComponentType<KindModalProps
   replace_passphrase: ReplacePassphraseModal,
   add_passkey:        AddPasskeyModal,
   revoke_passkey:     RevokePasskeyModal,
-  del_vault:          DelVaultModal,
 }
 
 const NoDialog = ({ gating }: { gating: AnyGating }) => {

@@ -39,8 +39,8 @@ export type ProviderDeviceOpts = Omit<DeviceOpts, 'user_id' | 'gates' | 'onLifec
 /** The host's callbacks for the provider's device, as of the latest render. */
 export type Handlers = { onLifecycle: LifecycleHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext | undefined }
 
-/** The provider's context value: the signed-in user's device, the vaults a hook has already called `tryHello` on, and a way to report bad news to the host. */
-export type ContextValue = { device: Device | null, helloedVaults: WeakSet<Vault>, tellBadNews: TellBadNews }
+/** The provider's context value: the signed-in user's device, the vaults a hook has already called `tryBeginWatch` on, and a way to report bad news to the host. */
+export type ContextValue = { device: Device | null, watchedVaults: WeakSet<Vault>, tellBadNews: TellBadNews }
 
 /** Report refusals that no caller is waiting on to the host's `onBadNews`. Does nothing once the device is disabled. Never throws. */
 export type TellBadNews = (badnews: readonly VaultError[]) => void
@@ -67,7 +67,7 @@ export type BoundaryProps = {
 }
 
 /** The component that a `boundaryRefusalOf` error message names as its source. */
-export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'DelVaultModal' | 'AddPasskeyModal' | 'RevokePasskeyModal' | 'PasskeyUnlockButton'
+export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'AddPasskeyModal' | 'RevokePasskeyModal' | 'PasskeyUnlockButton'
 // --
 
 // == [Hooks]: VaultStage, VaultLifecycle
@@ -177,10 +177,10 @@ export type PassphraseFieldname = 'current-password' | 'new-password' | 'confirm
 /** The message a dialog shows for a refused attempt, with the refusal's kind, which identifies the field at fault. */
 export type Gripe = { text: string, refusalkind: string }
 
-/** Props of `ModalForm`, the layout every gating dialog shares. */
+/** Props of `ModalForm`, the layout every dialog shares. */
 export type ModalFormProps = {
-  /** The gating this dialog is for. Cancel and Escape dismiss it. */
-  gating:         AnyGating
+  /** Called on Cancel and on Escape: a gating's dialog dismisses its gating. */
+  onCancel:       () => void
   /** The heading. It is also the dialog's accessible name. */
   title:          string
   /** The paragraph under the heading. It is also the dialog's accessible description. */
@@ -203,7 +203,7 @@ export type ModalFormProps = {
   /** Called after React clears the fields following an attempt. */
   onReset?:       (() => void) | undefined
   /** The fields, rendered between the blurb and the live region. */
-  children:       ReactNode
+  children?:      ReactNode
 }
 
 /** The gatings PassphraseModal handles: building a vault, and unlocking one. */
@@ -247,12 +247,12 @@ export type RevokePasskeyModalProps = {
   passphraseUsername?: string | undefined
 }
 
-/** Props of the dialog for a `del_vault` gating. */
+/** Props of the dialog that confirms deleting a vault. */
 export type DelVaultModalProps = {
-  /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
-  gating:              Gating<'del_vault'>
-  /** The username a password manager saves the passphrase under. */
-  passphraseUsername?: string | undefined
+  /** The vault to delete. It must be unlocked: a locked vault's deletion is refused, and the dialog shows why. */
+  vault:  Vault
+  /** Called with true once the vault is deleted, or with false on Cancel or Escape. Unmount the dialog then. */
+  onDone: (deleted: boolean) => void
 }
 // --
 

@@ -259,7 +259,7 @@ second field.
 | `ensureVault`    | A Vault listed, the only one of its scope: unlocked, or locked by a `lock()` after the attach                                                                                              | Nothing stored; has only what the answer delivered. Another won: `gate_made_elsewhere`, its Vault listed, locked |
 | `ensureUnlocked` | Unlocked, a lease in force at its attach                                                                                                                                                  | `dismissed`: no lease granted, none cached by this call                                       |
 | A gate change    | The record has the next gate, its epoch one up. Unlocked under that epoch, a fresh lease of full term, whatever lock came before or crossed                                                 | Nothing stored, unless the answer was lost; the lease as it was                                      |
-| `delVaultPrompt` | A tombstone stored and its box rows tombstoned; nothing of it on this device; the Vault tombstoned, still listed                                                                           | Nothing stored, unless the answer was lost; the Vault locked, and otherwise as it was                |
+| `vault.del`      | A tombstone stored and its box rows tombstoned; nothing of it on this device; the Vault tombstoned, still listed                                                                           | Nothing stored, unless the answer was lost; the Vault as it was                                      |
 | `gating.attempt` | At most one under way; its gate read once; no cleartext kept                                                                                                                                  | The same; correctable: the gating still open; any other: settled                                     |
 
 ## `build_vault`
@@ -441,40 +441,28 @@ gating.attempt({ passphraseClear })
            revoked before the attempt read ante → 'passed', nothing moved; after it → 'stale_write'
 ```
 
-### `del_vault`
+### `vault.del`
+
+Deleting a vault asks nobody (bank_world, ruling R5): an unlocked vault is the user's to delete.
 
 ```text
-vault.delVaultPrompt()
-├─ await ensureTimely(); demandPromptable
-└─ Gating.launchOn(vault, 'del_vault', Vault.#unlockVaultByProving, askUser)
-   →→→ user hits enter key →→→
-gating.attempt({ passphraseClear })                  no lock check: a lock does not stop a delete
-├─ await vault.ensureTimely(Promptly)                at most one fetch; a vault found gone refuses here
-├─ ante = vault.fullRecord, gate = vault.gate        this attempt's, from here on
-├─ proved = PassphraseProving.buildStored(gate, passphraseClear, world)
-│    wrong → may re-enter
-└─ then the change, from { ante, proved }                             ── no cleartext is used past here ──
-   ├─ vault.lock()                                   sync, no throw: the lease revoked, the boxes aligned
-   └─ vault.del(ante)                                Storable's
-      ├─ await ensureDeletable()                     hydrates
-      ├─ demandDeletable                             enabled only: a lock does not stop a delete
-      ├─ vault.sparse consistent with ante           scope, vault_tok and revision; moved since the proof → 'stale_write', nothing sent
-      └─ vaultListing.del(vault.sparse) → tryDel
-         ├─ a vault listed of another vault_tok      → 'vault_reborn', nothing sent
-         └─ Listing.tryDel: the tombstone at nextRevisionOf(the sparse record's revision)
-            ├─ vaultDB.tryDelVault(tombstone, { prior })    ← the commit: a tombstone, its boxes cascading
-            │    moved → 'stale_write', nothing stored
-            └─ deliverAnswer(answer, tombstone) → receiveRecord → adopt(tombstone)
-               ├─ vault.#revokeLease('tombstone')    refused → announced 'lease_revoke_failed'; the tombstone stays
-               └─ boxListing.vacate()                boxes disabled and delisted, nothing deleted; the vault stays listed, tombstoned
+vault.del(vault)                                     Storable's, under an unlocked vault
+├─ await ensureDeletable()                           hydrates
+├─ demandDeletable                                   enabled and unlocked: a locked vault refuses 'vault_locked', nothing sent
+├─ vault.sparse consistent with what was asked       scope, vault_tok and revision; moved → 'stale_write', nothing sent
+└─ vaultListing.del(vault.sparse) → tryDel
+   ├─ a vault listed of another vault_tok            → 'vault_reborn', nothing sent
+   └─ Listing.tryDel: the tombstone at nextRevisionOf(the sparse record's revision)
+      ├─ vaultDB.tryDelVault(tombstone, { prior })    ← the commit: a tombstone, its boxes cascading
+      │    moved → 'stale_write', nothing stored
+      └─ deliverAnswer(answer, tombstone) → receiveRecord → adopt(tombstone)
+         ├─ vault.#revokeLease('tombstone')          refused → announced 'lease_revoke_failed'; the tombstone stays
+         └─ boxListing.vacate()                      boxes disabled and delisted, nothing deleted; the vault stays listed, tombstoned
 ```
 
-The lock comes first because it is synchronous and safe: from then on no box can be unsealed under a lease while
-the tombstone is sent. Locked is also a normal state, so a refused delete leaves a Vault that reports locked and
-nothing half done. The cost is one passphrase entry, because the lock's vacate forgets the cached lease. The box listing's vacate
-comes last, because it cannot be undone. The proof unlocks nothing here, because no lease follows it. The delete is made over the
-revision `vault.del` hydrated to, not the attempt's `ante`. Another device receives the tombstone, and its Vault ends the same way. A rebirth is a new
-Vault.
+Nothing locks first, so a box may be unsealed under the lease until the tombstone lands, as during a box's delete, and a
+refused delete leaves the vault as it was. The box listing's vacate comes last, because it cannot be undone. Another
+device receives the tombstone, and its Vault ends the same way. A rebirth is a new Vault.
 
 The vaultDB owns the cascade: removing a vault tombstones its box rows by scope and `vault_tok`, so no
 client has to walk them. The `vault_tok` keeps a late or repeated cascade away from a rebirth's boxes, which have the
@@ -491,8 +479,8 @@ stored is another vault_tok, or nothing          nothing written, whatever the r
 Repeated deletes do not advance the revision. Whoever repeats a delete may not have the current token, having lost the first
 answer. Advancing the revision would wake every device's watch for nothing, and could cause a rebirth that has that
 tombstone as its `prior` to be refused. The package does not retry: a repeat is the host calling the verb again,
-which its Vault allows until the tombstone arrives. After that `vault.delVaultPrompt()` refuses, because the vault is not
-present; `vault.del(vault.scope)` still repeats the delete, over the tombstone's revision, and the vaultDB answers `gone` and cascades.
+which its Vault allows until the tombstone arrives. After that `vault.del()` refuses, because the tombstone revoked the
+lease.
 
 A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or `vault_empty` or `vault_gone`). The damaged_row field will contain a generated tombstone if one is found with that scope *and vault_tok*, null otherwise. In both cases the value is forensic: do not instantiate, do not delivere. (Discovering a row is exceptionally unlikely as they were to have been transactionally removed with the vault deletion. `bank.doctor()` will establish comfort if needed)
 
@@ -501,7 +489,7 @@ A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or
 * Storage's conditional put is atomic on `revision_tok`.
 * The deviceDB's calls take effect in the order they were made (*The lease*).
 * `lock()` removes the cached lease even on a vault already reporting locked.
-* The deviceDB has `cache`, `peek` and `vacate`, by scope and `vault_tok`: `vacate` and `del_vault` both need a removal.
+* The deviceDB has `cache`, `peek` and `vacate`, by scope and `vault_tok`: `vacate` and `vault.del` both need a removal.
 * Every put validates `prior.revision_tok` and `prior.revision_seq` against the row, and that the record's `revision_seq`
   is `prior.revision_seq` plus one. A birth where no row is stored sends `VS.NeverStored`, which has a known `revision_tok` and a
   `revision_seq` of -1. The shell is a value and not a null, so the invariant applies to it too.

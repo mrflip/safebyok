@@ -22,7 +22,7 @@ const BuildForm = ({ gating, leaseMillis, passphraseUsername }: PassphraseModalP
   )
   return (
     <ModalForm
-      gating={gating}
+      onCancel={() => { gating.dismiss() }}
       title={Messages.chooseTitle}
       blurb={Messages.chooseBlurb}
       submitWord={Messages.createButton}
@@ -63,7 +63,7 @@ const UnlockForm = ({ gating, leaseMillis, passphraseUsername, passkeyRpId }: Pa
 
   return (
     <ModalForm
-      gating={gating}
+      onCancel={() => { gating.dismiss() }}
       title={Messages.unlockTitle}
       blurb={Messages.unlockBlurb}
       submitWord={Messages.unlockButton}

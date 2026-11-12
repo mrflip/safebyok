@@ -26,8 +26,8 @@ joke. Its header has the sign-in strip
 ([src/components/SessionBar.tsx](src/components/SessionBar.tsx)) and, once signed in, the
 account menu ([src/components/AccountMenu.tsx](src/components/AccountMenu.tsx)): the vault's
 lock control, *Sign out*, which locks the user's vaults on this device, and *Delete account*,
-which deletes the vault through the provider's dialog (the passphrase it asks for is the
-confirmation), then the account. Under it,
+which unlocks the vault if it is locked (asking for the passphrase, or a passkey, as any unlock
+does), asks the user to confirm in `DelVaultModal`, deletes the vault, then the account. Under it,
 [src/components/WaysIn.tsx](src/components/WaysIn.tsx) lists the vault's passphrase and passkey,
 with *Change passphrase*, and a fingerprint button to add or remove a passkey. A dialog the user
 cancels changes nothing, and the page says nothing of it.

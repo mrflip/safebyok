@@ -210,7 +210,7 @@ describe("The cached lease, used only by ensureUnlocked", () => {
     expect(await vaultRoundTrip(vault, again)).to.eq('sk-test')
   })
 
-  it("is not looked up at a hello", async () => {
+  it("is not looked up at a beginWatch", async () => {
     const { gate: _gate, ...sparse } = await storedVaultRecord()
     const tombstone = { ...sparse, am: 'x' as const }
     const { listing, deviceDB } = makeVaultWorld(tombstone as never)

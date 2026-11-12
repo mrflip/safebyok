@@ -489,7 +489,7 @@ export type BankAnnouncement =
 /** What `onLifecycle` hears: what happened in the device's life, told by its `kind`, and the device it happened to. */
 export type DeviceEvent = { readonly device: Device } & BankAnnouncement
 
-/** `Device.make`'s `onLifecycle`: hears what happened in the device's life, as a bring-up or a vault's hello, a vacate or a cached lease that outlived its revoke. */
+/** `Device.make`'s `onLifecycle`: hears what happened in the device's life, as a bring-up or a vault's beginWatch, a vacate or a cached lease that outlived its revoke. */
 export type LifecycleHandler = (event: DeviceEvent) => unknown
 
 /** `onLifecycle` as a device keeps it, wrapped by `guardOnLifecycle`. Never throws. */

@@ -36,7 +36,7 @@ describe("the README's script", () => {
     })
     const bank = await device.ensureBank()
     const vault = await bank.ensureVault({ vaultlabel: 'main' })
-    await vault.hello()
+    await vault.beginWatch()
     await vault.putBox({ boxlabel: 'stripe', whisper: Stored })
     const box = (await vault.getBox('stripe'))!
     expect(doppler.get).toHaveBeenCalledOnce()

@@ -12,10 +12,10 @@ export type LoggedCall = {
 }
 
 /** A VaultLogger that logs nowhere and keeps every call it hears, in order, for a test to look at
- * -- bar the one notice `Bank.make` gives of a `test_` key deriver's label ({@link TestDeriverNotice}),
+ * -- bar the one notice `Device.make` gives of a `test_` key deriver's label ({@link TestDeriverNotice}),
  * which every vault opened through `testDeriver` would otherwise add to every count.
  *
- * @returns The `logger` to hand Bank.make, and the `calls` it has heard so far.
+ * @returns The `logger` to hand Device.make, and the `calls` it has heard so far.
  *
  * @example
  *   const spy = TH.spyLogger()
@@ -36,7 +36,7 @@ export function spyLogger() {
 
 /** A VaultLogger for a test that has nothing to say about logging: it swallows `log`, and lets
  * `warn` and `error` through to the console as the default logger would, so a warning no test
- * meant to provoke still shows in the test output -- bar the one notice `Bank.make` gives of a
+ * meant to provoke still shows in the test output -- bar the one notice `Device.make` gives of a
  * `test_` key deriver's label ({@link TestDeriverNotice}), which every vault opened through
  * `testDeriver` would otherwise print. `memoryVaultOpts` hands it to every vault by
  * default. A test that provokes a warning on purpose, or looks at what a vault logged, hands

@@ -543,7 +543,7 @@ await this.#ensureGreeted(); this.demandBoxesUsable()
 
 **Goofus again, proposed and dropped:** a `delBox` that fetches first, so a host that skipped `hello` never meets a `stale_write`.
 
-**Gallant:** no `#isGreeted`. A host that skips `vault.hello` has no list and no pushes, and `vault.delBox` on a box it doesn't
+**Gallant:** no `#isGreeted`. A host that skips `vault.beginWatch` has no list and no pushes, and `vault.delBox` on a box it doesn't
 have fails stale, with the frontier delivered. The host chose that.
 
 *Status: Fixed.*

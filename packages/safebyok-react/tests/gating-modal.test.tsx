@@ -32,7 +32,6 @@ describe("GatingModal", () => {
     [TH.replacing,       'built',     Messages.changeTitle,        'shows the dialog that replaces the passphrase for a replace_passphrase gating'],
     [TH.addingPasskey,   'built',     Messages.addPasskeyTitle,    'shows the dialog that adds a passkey for an add_passkey gating'],
     [TH.revokingPasskey, 'passkeyed', Messages.revokePasskeyTitle, 'shows the dialog that removes the passkey for a revoke_passkey gating'],
-    [TH.deleting,        'built',     Messages.delVaultTitle,      'shows the dialog that deletes the vault for a del_vault gating'],
   ] as const
 
   for (const [raise, before, title, blurb] of DialogCases) {

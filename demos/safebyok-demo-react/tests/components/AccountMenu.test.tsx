@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { Vault } from 'safebyok'
 import * as TH from '../test-helpers'
 
 /** Render the session bar with a fresh fake auth beside the vault probe, in a bank for `u1`, and sign in as margo. */
@@ -57,7 +56,7 @@ describe("AccountMenu", () => {
     await TH.expectProbe('present locked')
   })
 
-  it("deletes the vault and the account behind the provider's dialog alone", async () => {
+  it("deletes the vault and the account behind its confirming dialog alone", async () => {
     const confirm = vi.spyOn(globalThis, 'confirm')
     const { auth } = await renderWithVault()
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
@@ -70,13 +69,25 @@ describe("AccountMenu", () => {
 
   it("keeps the account and the vault when the user cancels the dialog", async () => {
     const { auth } = await renderWithVault()
-    const prompting = vi.spyOn(Vault.prototype, 'tryDelVaultPrompt')
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    await TH.settlePrompts(prompting)
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
     expect(auth.getSnapshot()?.userlabel).to.eq('margo')
     expect(document.querySelector('.account-menu .gripe')).to.be.null
     await TH.expectProbe('present unlocked')
+  })
+
+  it("unlocks a locked vault before it confirms the deletion", async () => {
+    const { auth } = await renderWithVault()
+    const menu = within(screen.getByRole('region', { name: 'Account' }))
+    fireEvent.click(menu.getByRole('button', { name: 'Lock' }))
+    await TH.expectProbe('present locked')
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    await TH.answerPassphraseDialog()
+    await TH.answerDeletionDialog()
+    await screen.findByPlaceholderText('username')
+    expect(auth.getSnapshot()).to.be.null
+    await TH.expectProbe('unborn none')
   })
 
   it("deletes an account whose vault was never born once the user confirms", async () => {

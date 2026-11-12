@@ -92,7 +92,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, delVaultPrompt, each with its try form
+  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, each with its try form
 
   /** SLOPDOC: Replaces the passphrase through a gating; the passkey stays and no other device is locked. */
   async replacePassphrasePrompt(): Promise<this> {
@@ -125,17 +125,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Non-throwing form of {@link revokePasskeyPrompt}. */
   tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
-
-  /** Delete this vault through a del_vault gating, which asks for the passphrase, leaving its tombstone listed and nothing of it on this device. */
-  async delVaultPrompt(): Promise<this> {
-    await this.ensureTimely(); this.demandPromptable()
-    await Gating.launchOn(this, 'del_vault', Vault.#unlockVaultByProving, this.#bankFriend.askUser)
-    return this
-  }
-
-  /** Non-throwing form of {@link delVaultPrompt}. */
-  tryDelVaultPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.delVaultPrompt()) }
-
   // --
 
   // == [Unlocking]: ensureUnlocked, unlock, each with its try form
@@ -269,14 +258,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   receiveWorld(world: unknown): void { this.listing.deliverRecord(SX.vaultRow.refusingAs('record_conflict').parse(world)) }
   // --
 
-  // == [Box verbs]: hello, bringUp, getBox, fetchBox, putBox, delBox, each with its try form
+  // == [Box verbs]: beginWatch, bringUp, getBox, fetchBox, putBox, delBox, each with its try form
 
   /** List this vault's boxes and start their watch. */
-  async hello(): Promise<this> {
-    this.demandHelloable()
-    const hello = await outcomeOf(() => this.#bringUp())
-    this.#bankFriend.announce({ kind: 'helloed', outcome: hello, vault: this })
-    demandGood(hello)
+  async beginWatch(): Promise<this> {
+    this.demandWatchable()
+    const brought = await outcomeOf(() => this.#bringUp())
+    this.#bankFriend.announce({ kind: 'helloed', outcome: brought, vault: this })
+    demandGood(brought)
     return this
   }
 
@@ -286,8 +275,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     await this.boxListing.list()
   }
 
-  /** Non-throwing form of {@link hello}. */
-  tryHello(): Promise<Outcome<this>> { return outcomeOf(() => this.hello()) }
+  /** Non-throwing form of {@link beginWatch}. */
+  tryBeginWatch(): Promise<Outcome<this>> { return outcomeOf(() => this.beginWatch()) }
 
   /** Hydrate and return the box listed at `boxlabel` (i.e. fetch if stale). A missing box is null for `ifAbsent: 'nil'`, or refused for `ifAbsent: 'fail'`.
    * Chute: vault.getBox → listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
@@ -327,7 +316,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
   // --
 
-  // == [Guards]: isLocked, isUnlocked, demandLease, demandDeletable, demandPromptable, demandAttachable, demandHelloable, demandPresent, ensureTimely
+  // == [Guards]: isLocked, isUnlocked, demandLease, demandPromptable, demandAttachable, demandWatchable, demandPresent, ensureTimely
 
   /** The vault's own lock, not its world's: the bank has none. */
   get isLocked(): boolean { return this.#lease === null }
@@ -342,18 +331,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.#lease
   }
 
-  // The passphrase's proving is the del_vault gating's, and its run locks the vault before it deletes: a lock does not stop a delete.
-  /** A delete needs the vault enabled. */
-  override demandDeletable(): this { return this.demandEnabled() }
-
   /** A prompt needs the vault enabled and present. */
   demandPromptable(): this { return this.demandEnabled().demandPresent() }
 
   /** An attach needs the vault enabled and present. */
   demandAttachable(): this { return this.demandEnabled().demandPresent() }
 
-  /** A hello needs the vault enabled and present. */
-  demandHelloable(): this { return this.demandEnabled().demandPresent() }
+  /** A watch needs the vault enabled and present. */
+  demandWatchable(): this { return this.demandEnabled().demandPresent() }
 
   /** Demand that this vault is present. */
   demandPresent(): this {

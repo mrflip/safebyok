@@ -118,7 +118,7 @@ describe("device.ensureBank", () => {
     expect(device.snapshot).to.equal(snapshot)
   })
 
-  it("reports each bring-up's outcome to onLifecycle, naming the vault for a vault's hello", async () => {
+  it("reports each bring-up's outcome to onLifecycle, naming the vault for a vault's beginWatch", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     const onLifecycle = vi.fn()
@@ -130,7 +130,7 @@ describe("device.ensureBank", () => {
     const bank = await device.ensureBank()
     expect(onLifecycle).toHaveBeenLastCalledWith({ kind: 'helloed', outcome: { ok: true, val: undefined }, vault: null, device })
     const vault = bank.vaultAt(VaultScopeGiven)
-    await vault?.hello()
+    await vault?.beginWatch()
     expect(onLifecycle).toHaveBeenLastCalledWith({ kind: 'helloed', outcome: { ok: true, val: undefined }, vault, device })
     expect(onLifecycle).toHaveBeenCalledTimes(3)
   })
@@ -152,7 +152,7 @@ describe("device.ensureBank", () => {
     const world = makeBankWorld()
     const { bank: elsewhere, vault } = await makeBankWithVault(world)
     await elsewhere.ensureVault(OtherScopeGiven)
-    await vault.delVaultPrompt()
+    await vault.del(vault)
     const requestCleartext = vi.fn()
     const bank = await world.bankOnAnotherDevice({ requestCleartext })
     expect(requestCleartext).not.toHaveBeenCalled()
@@ -263,7 +263,7 @@ describe("device.ensureBank", () => {
     const { vault } = await makeBankWithVault(world)
     const bank = await world.bankOnAnotherDevice()
     const listed = bank.vaultAt(VaultScopeGiven)
-    await vault.delVaultPrompt()
+    await vault.del(vault)
     await TH.eventually(() => bank.vaultAt(VaultScopeGiven) !== listed)
     const gone = bank.vaultAt(VaultScopeGiven)
     expect(gone?.isPresent).to.be.false

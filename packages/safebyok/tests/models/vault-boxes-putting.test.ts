@@ -73,7 +73,7 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     const oldLife = old?.box_tok
     await vault.delBox(boxlabel)
     const next = await openNextSession()
-    await next.hello()
+    await next.beginWatch()
     const reborn = await next.putBox({ boxlabel, whisper: { apiKey: 'sk-test-0001' } })
     expect(reborn.isPresent).to.be.true
     expect(reborn.box_tok).not.to.eq(oldLife)
@@ -96,7 +96,7 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     const row = boxrows.get(boxlabel)
     boxrows.delete(boxlabel)
     const next = await openNextSession()
-    await next.hello()
+    await next.beginWatch()
     boxrows.set(boxlabel, row)
     await TH.expectRefusal(next.putBox({ boxlabel, whisper: { apiKey: 'sk-test-0001' } }), 'stale_write')
     const delivered = await next.getBox(boxlabel)
@@ -121,7 +121,7 @@ describe("the box's birth: vault.putBox with no box listed", () => {
   })
 })
 
-describe("a void instance, then a put: no hello, no fetch", () => {
+describe("a void instance, then a put: no beginWatch, no fetch", () => {
   it("with nothing stored, is written at seq 0 under a real box_tok, and the whisper opens", async () => {
     const { vault, tryGetBox } = await makeWorld()
     const box = await vault.boxListing.puttable({ ...vault.scope, boxlabel }).put({ whisper: Whisper })
@@ -216,10 +216,10 @@ describe("a void instance, then a put: no hello, no fetch", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-0001' })
   })
 
-  it("under ifAbsent 'fail', refuses 'absent_box' with the sentence naming vault.hello, putting nothing", async () => {
+  it("under ifAbsent 'fail', refuses 'absent_box' with the sentence naming vault.beginWatch, putting nothing", async () => {
     const { next, tryPutBox } = await nextUnlisted()
     const err = await TH.expectRefusal(next.putBox({ boxlabel, whisper: Whisper }, { ifAbsent: 'fail' }), 'absent_box')
-    expect(err.message).to.contain('vault.hello')
+    expect(err.message).to.contain('vault.beginWatch')
     expect(tryPutBox).not.toHaveBeenCalled()
   })
 })

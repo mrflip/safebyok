@@ -169,7 +169,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   get modelkind(): 'gating' { return 'gating' satisfies Modelkind }
 }
 
-// == [The acts]: buildVault, unlockVault, replacePassphrase, addPasskey, revokePasskey, delVault, ActOnVault
+// == [The acts]: buildVault, unlockVault, replacePassphrase, addPasskey, revokePasskey, ActOnVault
 
 // Each act proves the cleartexts, then makes its change. A cleartext goes only to checkedCleartexts and a Proving builder (G1); the
 // change hears provings, and comes to the vault's private unlock by unlockByProving (G9).
@@ -240,24 +240,11 @@ const revokePasskey = async (vault: Vault, cleartexts: unknown, unlockByProving:
   return unlockByProving(vault, proved, stored.gate.gate_epoch)
 }
 
-/** Delete `vault`, proved by its passphrase. */
-const delVault = async (vault: Vault, cleartexts: unknown): Promise<Vault> => {
-  const { passphraseClear } = checkedCleartexts(GX.vaultDelCleartexts, cleartexts)
-  const { ante, gate      } = await timelyAnte(vault)
-  await PassphraseProving.buildStored(gate, passphraseClear, vault.world)
-
-  // The lock first: no box unseals under a lease while the tombstone goes out. The delete goes over the revision proved, as
-  // a gate verb's record does, and the answer delivered vacates its boxes.
-  vault.lock()
-  return vault.del(ante)
-}
-
 const ActOnVault: Record<VaultGatingkind, (vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving) => Promise<Vault>> = {
   unlock_vault:       unlockVault,
   replace_passphrase: replacePassphrase,
   add_passkey:        addPasskey,
   revoke_passkey:     revokePasskey,
-  del_vault:          delVault,
 }
 // --
 
