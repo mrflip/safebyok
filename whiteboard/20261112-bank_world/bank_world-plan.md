@@ -304,7 +304,7 @@ The Coach's tooling asks, as one PR stacked on #676: a CLAUDE.md line sizing eve
 `notes/security.md` through its `sonnet` subagent. *Orchestrator:* before it, the Coach asked
 (2026-11-12) for one `documentarian` run over the files the line changed, as its own PR, instead
 of each review leaving narrated doc blocks behind. Also owed here: the Coach's put-off ruling on
-whether a wayin change keeps making other devices prove again (asked at the sprint's end). *Orchestrator:* also `Listing.lock()` renamed `alignLock()`: it only fans out each thing's `alignLock()` and locks nothing (the Coach, 2026-11-12: `lock()` is the bank's alone; no compatibility layer before a public release).
+whether a wayin change keeps making other devices prove again (asked at the sprint's end). *Orchestrator:* also one cascade instead of three (the Coach's questions, 2026-11-12; the orchestrator's recommendation, name pending the Coach): Storable gets a protected `children` (Bank: its vault listing; Vault: its box listing; others none) and one internal cascade, children first and then `this.align()`, which Vault and Box override only to drop what they hold once delisted. `Bank.#alignAll`, `Listing.lock()` and `alignLock()` collapse into it. `align()` stays self-only: it runs on every record a thing receives. `lock()` is the bank's alone; no compatibility layer before a public release.
 **Size**: M.
 
 ## For the Coach
