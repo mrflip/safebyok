@@ -1,4 +1,4 @@
-/** A bank's vaults as this device has them: the vault listing, and what it is given to reach the bankDB and the bank. */
+/** A bank's vaults as this device has them: the vault listing, handed its bank. */
 
 import { nowMillis } from '../helpers/clock'
 import { type Modelkind, UNANSWERED } from '../helpers/consts'
@@ -10,41 +10,48 @@ import * as SX from '../shapes/shapes-storage'
 import * as BX from '../shapes/shapes-bankdb'
 import type { BankRow, BoxRow, GateRecord, VaultRecord, VaultRow, VaultSparse } from '../shapes/shapes-bankdb'
 import * as VX from '../shapes/shapes-vaultish'
-import type { DelTombstone, Fetched, ListingDelOpts, ListingListAnswer, ListingOpts, ListingPutOpts, ThingAnswer, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
+import type { DelTombstone, Fetched, ListingDelOpts, ListingListAnswer, ListingOpts, ListingPutOpts, ThingAnswer, VaultSnapshot } from '../shapes/shapes-vaultish'
 import { type EnsureBankAnswer, type Notice, refusedAnswerOf } from '../storage/bank-db'
 import { vaultAbsent, delOfOtherLife, rowOfOtherWorld, vaultStoredDamaged } from '../refusals/throwers'
+import type { Bank } from './bank'
 import { BoxListing } from './box-listing'
 import { Listing } from './listing'
 import { Vault } from './vault'
 
 /** One bank's vaults, by vaultlabel. */
 export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, VaultSnapshot, Vault, SX.DamagedVault> {
-  // == [Props]: world
+  // == [Props]: bank
 
-  declare readonly world: VaultWorld
+  /** The bank whose vaults these are. */
+  readonly bank: Bank
   // --
 
-  // == [Construction]: constructor, boxListingOf, scopeOf, sparseOf, recordOf
+  // == [Construction]: constructor, scopeOf, sparseOf, recordOf
 
-  constructor(world: VaultWorld, opts: ListingOpts) {
-    VX.vaultWorld.parse(world)
-    super(world, opts)
+  /** The listing of `bank`'s vaults. */
+  constructor(bank: Bank, opts: ListingOpts) {
+    const checked = VX.listedUnder.bank.parse(bank)
+    super(checked.device, opts)
+    this.bank = checked
     Object.freeze(this)
   }
 
-  /** The listing of `vault`'s boxes, its watch not started. */
-  boxListingOf(vault: Vault): BoxListing {
-    return new BoxListing(vault, { scope: vault.scope, bankDB: this.bankDB, maxMillisSinceRefresh: this.world.boxRefreshMillis, bankFriend: this.bankFriend })
-  }
-
   /** The scope of `vaultish`, which must be this bank's: no listing answers for another's. */
-  scopeOf(vaultish: unknown):  VaultScope  { return vaultScope.parseConsistent(vaultish, this.world.scope, { message: Phrases.otherScope }) }
+  scopeOf(vaultish: unknown):  VaultScope  { return vaultScope.parseConsistent(vaultish, this.bank.scope, { message: Phrases.otherScope }) }
 
   /** Parse `vaultish` as a {@link VaultSparse}. */
   sparseOf(vaultish: unknown): VaultSparse { return BX.vaultSparse.parse(vaultish) }
 
   /** Parse `vaultish` as a {@link VaultRecord} of this bank. */
-  recordOf(vaultish: unknown): VaultRecord { return BX.vaultRecord.parseConsistent(vaultish, this.world.scope, { message: Phrases.otherScope }) }
+  recordOf(vaultish: unknown): VaultRecord { return BX.vaultRecord.parseConsistent(vaultish, this.bank.scope, { message: Phrases.otherScope }) }
+  // --
+
+  // == [A vault's boxes]: boxListingOf
+
+  /** The listing of `vault`'s boxes, under the life of the vault it has now, its watch not started. */
+  boxListingOf(vault: Vault): BoxListing {
+    return new BoxListing(vault, { bankDB: this.bankDB, maxMillisSinceRefresh: this.bank.boxRefreshMillis })
+  }
   // --
 
   // == [A birth's form]: recordOfBirth
@@ -52,7 +59,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** The record of a vault born under `scope`, at the revision after `expected`'s: of this life of the bank, and a new life of its own. */
   recordOfBirth(scope: VaultScope, expected: SX.Revision): VaultRecord {
     const written_at = nowMillis()
-    return { ...scope, fmt: BX.VaultFormat, ...SX.nextRevisionOf(expected, written_at), registered_at: written_at, am: 'a', bank_tok: this.world.bank_tok, vault_tok: makeLifeTok() }
+    return { ...scope, fmt: BX.VaultFormat, ...SX.nextRevisionOf(expected, written_at), registered_at: written_at, am: 'a', bank_tok: this.bank.bank_tok, vault_tok: makeLifeTok() }
   }
   // --
 
@@ -72,8 +79,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   #listingOfEnsured(answer: EnsureBankAnswer): ListingListAnswer<VaultRecord, VaultSparse, SX.DamagedVault> {
     if (! answer.ok) { return answer }
     if (answer.val === null) { return { ...answer, act: 'gotvoid', val: { listed: [], damaged_rows: [] } } }
-    this.world.receiveParent(answer.parent)
-    this.world.gateListing.deliverRecord(answer.val.gates.main)
+    this.bank.receiveParent(answer.parent)
+    this.bank.gateListing.deliverRecord(answer.val.gates.main)
     return { ...answer, act: 'got', parent: null, val: { listed: answer.val.vaults, damaged_rows: answer.val.damaged_rows } }
   }
   // --
@@ -90,13 +97,21 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 
-  // == [Defined by the vault listing]: isOneLifePerInstance, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the vault listing]: isEnabled, demandEnabled, receiveParent, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
-  // A Vault object is one life of its vault: a vault deleted, or made anew, is a new instance (`notes/deliver-contract.md`, L2).
-  protected get isOneLifePerInstance(): true { return true }
+  /** Whether this listing answers: its bank does. */
+  get isEnabled(): boolean { return this.bank.isEnabled }
+
+  /** Demand that this listing's bank answers. */
+  demandEnabled(): this {
+    this.bank.demandEnabled()
+    return this
+  }
+
+  protected receiveParent(parent: unknown): void { this.bank.receiveParent(parent) }
 
   protected demandOfWorld(record: Fetched<VaultRecord, VaultSparse>): void {
-    if (record.bank_tok !== this.world.bank_tok) { throw rowOfOtherWorld(record, 'bank_tok') }
+    if (record.bank_tok !== this.bank.bank_tok) { throw rowOfOtherWorld(record, 'bank_tok') }
   }
 
   protected scopepathOf(scope: VaultScope): string {
@@ -104,21 +119,21 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>): Vault {
-    return new Vault(this.world, this, central, this.bankFriend)
+    return new Vault(this, central)
   }
 
   protected nothingStoredError(scope: VaultScope): VaultError { return vaultAbsent(scope) }
 
   // The bank's ensureBank lists its vaults.
   protected async doTryList() {
-    return this.#listingOfEnsured(await this.bankDB.tryEnsureBank({ op: 'ensure', ...this.world.scope, gates: ['main'] }))
+    return this.#listingOfEnsured(await this.bankDB.tryEnsureBank({ op: 'ensure', ...this.bank.scope, gates: ['main'] }))
   }
 
   protected damagedStoredError(damaged: SX.DamagedVault): VaultError { return vaultStoredDamaged(damaged) }
 
   protected doTryGet(scope: VaultScope) {
     const expected = this.at(scope)?.sparse ?? BX.shellVaultOf(scope)
-    return this.bankDB.tryGetVault({ op: 'get', ...scope, bank_tok: this.world.bank_tok, ifAbsent: 'nil', expected })
+    return this.bankDB.tryGetVault({ op: 'get', ...scope, bank_tok: this.bank.bank_tok, ifAbsent: 'nil', expected })
   }
 
   protected doTryPut(record: VaultRecord, { expected, ifAbsent, ifPresent }: ListingPutOpts<VaultSparse>) {
@@ -137,8 +152,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // The bank's one watch: each notice goes to the bank's listing, then its gate's, then this one, and each keeps the rows of its own kind.
   protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void {
-    const { listing, gateListing } = this.world
-    return this.bankDB.watch(this.world.scope, (notice) => { listing.deliverNotice(notice); gateListing.deliverNotice(notice); onNotice(notice) }, onBadNews)
+    const { listing, gateListing } = this.bank
+    return this.bankDB.watch(this.bank.scope, (notice) => { listing.deliverNotice(notice); gateListing.deliverNotice(notice); onNotice(notice) }, onBadNews)
   }
 
   /** A vault row: the bank's watch also tells of its bank, gate and box rows. */

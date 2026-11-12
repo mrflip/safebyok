@@ -91,9 +91,10 @@ describe("gate.pickle() and gate.toJSON()", () => {
     expect(gate.snapshot.wayins).to.not.have.property('passkey0')
   })
 
-  it("Object.keys shows its stamp and revision alone: no Wayin, no wayin record", async () => {
+  it("Object.keys shows its scope, its bank's life and its revision alone: no Wayin, no wayin record", async () => {
     const { gate } = await builtGate({ passkey: true })
-    expect(Object.keys(gate)).to.have.members(['user_id', 'banklabel', 'gatelabel', 'bank_tok', 'gate_tok', 'registered_at', 'revision_tok', 'revision_seq', 'written_at'])
+    expect(Object.keys(gate)).to.have.members(['user_id', 'banklabel', 'gatelabel', 'bank_tok', 'registered_at', 'revision_tok', 'revision_seq', 'written_at'])
+    expect(gate.toJSON()).to.include({ gate_tok: gate.gate_tok })
   })
 
   it("is sealed, its scope and lives read-only", async () => {

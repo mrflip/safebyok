@@ -50,7 +50,7 @@ describe("A refused forget of the lease row", () => {
   })
 
   describe("with no onLifecycle and no reportError", () => {
-    it("still vacates the bank and its vault, logging each refusal at error", async () => {
+    it("still vacates the device, logging each refusal at error", async () => {
       const spy = TH.spyLogger()
       const { bank, vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { logger: parseLogger(spy.logger) })
       deviceDB.forget.mockRejectedValue(Refusal)
@@ -62,7 +62,7 @@ describe("A refused forget of the lease row", () => {
     })
   })
 
-  it("with no onLifecycle, is reported to reportError and the bank and its vault are vacated", async () => {
+  it("with no onLifecycle, is reported to reportError and the device is vacated", async () => {
     const reported = stubReportError()
     const spy = TH.spyLogger()
     const { bank, vault, listing, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { logger: parseLogger(spy.logger) })
@@ -73,12 +73,12 @@ describe("A refused forget of the lease row", () => {
     expect(reported).toHaveBeenCalledWith(Refusal)
     expect(bank.isEnabled).to.be.false
     expect(vault.isEnabled).to.be.false
-    expect(listing.at(vault.scope)).to.be.null
+    expect(listing.at(vault.scope)).to.eq(vault)
     expect(deviceDB.forget).toHaveBeenCalledTimes(2)
   })
 })
 
-describe("sweep and vacate", () => {
+describe("the device's sweep and vacate, as its bank, vault and boxes meet them", () => {
   const BoxDna = { boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test' }, sidecar: {} }
   async function makeVaultWithBox() {
     const born = await makeBornVault()
@@ -91,38 +91,34 @@ describe("sweep and vacate", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test' })
   })
 
-  it("the bank's sweep keeps the cached lease row, locks the bank, and disables and delists the vault and its boxes", async () => {
-    const { bank, vault, listing, box, deviceDB } = await makeVaultWithBox()
-    const { boxListing } = vault
+  it("the device's sweep keeps the cached lease row, locks the bank, and ends the vault and its boxes, dropping an exposed whisper", async () => {
+    const { bank, vault, box, deviceDB } = await makeVaultWithBox()
     await box.expose()
     deviceDB.peek.mockClear()
-    expect(bank.sweep()).to.equal(bank)
-    expect(vault.isLocked).to.be.true
-    expect(vault.isEnabled).to.be.false
+    bank.device.sweep()
+    expect(bank).to.include({ isLocked: true, isEnabled: false })
+    expect(vault).to.include({ isLocked: true, isEnabled: false })
     expect(box.isEnabled).to.be.false
-    expect(listing.at(vault.scope)).to.be.null
-    expect(boxListing.at(box.scope)).to.be.null
     expect(box.whisper).to.equal(ENCRYPTED)
     expect(deviceDB.cachedNow()).not.to.be.null
     expect(deviceDB.forget).not.toHaveBeenCalled()
     expect(deviceDB.peek).not.toHaveBeenCalled()
   })
 
-  it("the bank's vacate also forgets the cached lease row, and leaves the bankDB untouched", async () => {
-    const { bank, vault, listing, box, deviceDB, demandStored } = await makeVaultWithBox()
+  it("the device's vacate also forgets the cached lease row, and leaves the bankDB untouched", async () => {
+    const { bank, vault, box, deviceDB, demandStored } = await makeVaultWithBox()
     const stored = demandStored()
-    bank.vacate()
+    void bank.device.vacate()
     expect(vault.isLocked).to.be.true
     expect(box.isEnabled).to.be.false
-    expect(listing.at(vault.scope)).to.be.null
     await TH.eventually(() => deviceDB.cachedNow() === null)
     expect(demandStored()).to.eq(stored)
   })
 
-  it("after the bank's sweep, every guard and call refuses, and lock, sweep and vacate are no-ops", async () => {
+  it("after the device's sweep, every guard and call refuses, and a lock changes nothing", async () => {
     const { bank, vault, box, deviceDB } = await makeVaultWithBox()
-    bank.sweep()
-    TH.expectSyncRefusal(() => vault.demandEnabled())
+    bank.device.sweep()
+    TH.expectSyncRefusal(() => vault.demandEnabled(), 'disabled')
     TH.expectSyncRefusal(() => vault.demandUnlocked())
     TH.expectSyncRefusal(() => box.demandPuttable({ whisper: { apiKey: 'sk-test' } }))
     TH.expectSyncRefusal(() => box.demandUnsealable())
@@ -130,39 +126,39 @@ describe("sweep and vacate", () => {
     await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)))
     await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }))
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp))
-    expect(vault.lock().sweep().vacate()).to.equal(vault)
-    expect(box.lock().sweep().vacate()).to.equal(box)
+    expect(vault.lock()).to.equal(vault)
+    expect(bank.lock()).to.equal(bank)
+    expect(box.alignLock()).to.equal(box)
     expect(deviceDB.forget).not.toHaveBeenCalled()
   })
 
-  it("after a sweep, vault.boxListing is still the same listing, and its methods refuse", async () => {
+  it("after the device's sweep, the vault's box listings refuse", async () => {
     const { vault } = await makeVaultWithBox()
     const boxes = vault.boxListing
-    vault.sweep()
-    expect(vault.boxListing).to.eq(boxes)
-    await TH.expectRefusal(boxes.hello())
+    vault.bank.device.sweep()
+    await TH.expectRefusal(boxes.hello(), 'disabled')
+    await TH.expectRefusal(vault.boxListing.hello(), 'disabled')
   })
 
-  it("after a sweep, a vault's record stays readable", async () => {
+  it("after the device's sweep, a vault's record stays readable", async () => {
     const { vault, demandStored } = await makeBornVault()
-    vault.sweep()
+    vault.bank.device.sweep()
     expect(vault.toJSON()).to.deep.equal(demandStored())
   })
 
-  it("after a sweep, hydrate refuses only when it would fetch", async () => {
+  it("after the device's sweep, hydrate refuses only when it would fetch", async () => {
     const { vault, box } = await makeVaultWithBox()
-    box.sweep()
+    vault.bank.device.sweep()
     await expect(box.hydrate()).resolves.to.eq(box)
     await TH.expectRefusal(box.hydrate({ maxMillisSinceRefresh: 0 }))
-    vault.sweep()
     await expect(vault.hydrate()).resolves.to.eq(vault)
     await TH.expectRefusal(vault.hydrate({ maxMillisSinceRefresh: 0 }))
   })
 
-  it("expose refuses when a sweep lands during its unseal, and leaves no whisper on the box", async () => {
-    const { box } = await makeVaultWithBox()
+  it("expose refuses when the device's sweep lands during its unseal, and leaves no whisper on the box", async () => {
+    const { vault, box } = await makeVaultWithBox()
     vi.spyOn(Vault.prototype, 'unsealStampedString').mockImplementationOnce(() => {
-      box.sweep()
+      vault.bank.device.sweep()
       return Promise.resolve('{"apiKey":"sk-test"}')
     })
     await TH.expectRefusal(box.expose())
@@ -170,60 +166,57 @@ describe("sweep and vacate", () => {
     expect(box.snapshot.isExposed).to.be.false
   })
 
-  it("ensureUnlocked refuses without showing a dialog when the bank's sweep lands during its lease lookup", async () => {
+  it("ensureUnlocked refuses without showing a dialog when the device's sweep lands during its lease lookup", async () => {
     const { bank, vault, dialog, deviceDB } = await makeBornVault()
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const requestCleartext = vi.fn()
     dialog.requestCleartext = requestCleartext
     deviceDB.peek.mockImplementationOnce(() => {
-      bank.sweep()
+      bank.device.sweep()
       return Promise.resolve(null)
     })
     await TH.expectRefusal(vault.ensureUnlocked())
     expect(requestCleartext).not.toHaveBeenCalled()
   })
 
-  it("a swept listing refuses a put or a delete before reaching the bankDB", async () => {
+  it("the vault listing of a swept device refuses a put or a delete before reaching the bankDB", async () => {
     const { listing, demandStored } = await makeBornVault()
     const stored = demandStored()
-    listing.sweep()
+    listing.bank.device.sweep()
     await TH.expectRefusal(listing.put(stored, { expected: stored }), 'disabled')
     await TH.expectRefusal(listing.del(stored), 'disabled')
     expect(demandStored()).to.eq(stored)
   })
 
-  it("a box listing swept with its vault refuses a create", async () => {
+  it("the box listing of a swept device refuses a create", async () => {
     const { vault, box } = await makeVaultWithBox()
     const boxes = vault.boxListing
-    vault.sweep()
-    await TH.expectRefusal(boxes.create({ ...box.scope, ...BoxDna, boxlabel: 'other_key' }))
+    vault.bank.device.sweep()
+    await TH.expectRefusal(boxes.create({ ...box.scope, ...BoxDna, boxlabel: 'other_key' }), 'disabled')
   })
 
-  it("a swept listing is empty and refuses every further call", async () => {
+  it("the vault listing of a swept device refuses every further call", async () => {
     const { listing, vault, demandStored } = await makeBornVault()
     const record = demandStored()
     await listing.hello()
-    expect(listing.sweep()).to.equal(listing)
+    listing.bank.device.sweep()
     expect(vault.isEnabled).to.be.false
-    expect(listing.things).to.have.lengthOf(0)
-    await TH.expectRefusal(listing.hello())
-    await TH.expectRefusal(listing.get(vault.scope, { maxMillisSinceRefresh: 0 }))
-    TH.expectSyncRefusal(() => listing.deliverRecord(record))
-    expect(listing.vacate()).to.equal(listing)
-    expect(listing.things).to.have.lengthOf(0)
+    await TH.expectRefusal(listing.hello(), 'disabled')
+    await TH.expectRefusal(listing.get(vault.scope, { maxMillisSinceRefresh: 0 }), 'disabled')
+    TH.expectSyncRefusal(() => listing.deliverRecord(record), 'disabled')
   })
 
-  it("a listener's throw goes to reportError, and the sweep still goes through", async () => {
+  it("a listener's throw goes to reportError, and the device's sweep still goes through", async () => {
     const reported = stubReportError()
-    const { vault, listing } = await makeBornVault()
+    const { vault } = await makeBornVault()
     vault.becomeNotifiable()
     const thrown = new Error('the listener threw')
     vault.subscribe(() => { throw thrown })
     vault.lock()
     expect(reported).toHaveBeenCalledWith(thrown)
-    vault.sweep()
-    expect(listing.at(vault.scope)).to.be.null
+    vault.bank.device.sweep()
+    expect(vault.isEnabled).to.be.false
   })
 })
 

@@ -94,7 +94,7 @@ export function vaultStoredDamaged({ vaultlabel }: SX.DamagedVault): VaultError 
 
 // == [Listing Throwers]: rowOfOtherWorld, writtenByOwnVerbs
 
-/** A `storage_issue` refusal: storage answered a row under another `tokname` than this listing's world: a box of another vault, a vault or a gate of another bank. */
+/** A `storage_issue` refusal: storage answered a row under another `tokname` than the thing above this listing: a box of another vault life, a vault or a gate of another bank. */
 export function rowOfOtherWorld(received: unknown, tokname: 'bank_tok' | 'vault_tok'): VaultError { return new VaultError('storage_issue', Phrases.rowOfOtherAddress([tokname]), { rows: { dbhas: received } }) }
 
 /** A `bad_option` refusal: a bank's row or its gate's is written only by the bank's own verbs, never put or deleted through its listing. */
@@ -109,7 +109,7 @@ export function partialLoad(): VaultError { return new VaultError('bad_option', 
 /** A `bad_option` refusal: the listing already has an instance under the dna's scope. */
 export function alreadyListed(): VaultError { return new VaultError('bad_option', Phrases.AlreadyListed) }
 
-/** A `disabled` refusal: this object was let go by a sweep, a vacate or a delete. */
+/** A `disabled` refusal: this object was let go: its bank or its vault life ended, or its row was found damaged. */
 export function instanceDisabled(): VaultError { return new VaultError('disabled', Phrases.LetGoInstance) }
 
 /** An `absent_box` refusal: no box is stored under the label given. */

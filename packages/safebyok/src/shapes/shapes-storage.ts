@@ -190,8 +190,8 @@ export const { ifPresent, ifAbsent, putIfAbsent, anyIfAbsent } = Checkers('bad_o
 export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, nextSeq } = Checkers('bad_option', ({ obj, orDefault }) => {
   const ifAbsentOpts = obj({ ifAbsent: orDefault(ifAbsent, 'fail') })
   const putOptsGiven = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent })
-  // The row a put or del expects to find is parsed here as a row's meta, and its other fields are kept for code that knows its kind.
-  const expected = obj({ ...revision.shape, am, ...vaulted.shape }).loose()
+  // The row a put or del expects to find is parsed here as a row's meta, and its other fields, a life tok among them, are kept for code that knows its kind.
+  const expected = obj({ ...revision.shape, am }).loose()
   const putOpts = obj({ expected, ifAbsent: orDefault(putOptsGiven.shape.ifAbsent, 'add'), ifPresent: orDefault(putOptsGiven.shape.ifPresent, 'repl') })
   // A gate verb and a deletion say for themselves what a put over a missing or present row does: neither takes ifAbsent or ifPresent.
   const gateVerbOpts = obj({ prior: revision }).strict()

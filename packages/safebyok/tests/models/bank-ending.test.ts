@@ -239,7 +239,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
     expect(device.snapshot.err).to.include({ refusalkind: 'disabled' })
     expect(device.snapshot.bank).to.be.null
     expect(device.bank).to.be.null
-    expect(bank.snapshot.vaults).to.deep.equal([])
+    expect(bank.isEnabled).to.be.false
     expect(seen).toHaveBeenCalled()
     await TH.eventually(() => world.leaseRows().length === 1)
     await TH.expectRefusal(device.ensureBank(), 'disabled')
@@ -361,7 +361,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
     requestCleartext.mockClear()
     onLifecycle.mockClear()
     const refusal = new VaultError('storage_unavailable', 'no storage')
-    vi.spyOn(world.deviceDB, 'forget').mockRejectedValue(refusal)
+    const forget = vi.spyOn(world.deviceDB, 'forget').mockRejectedValue(refusal)
     const listing = TH.pendingNextCall(world.deviceDB, 'tryListLeases')
     const vacating = bank.device.vacate()
     await listing.reached
@@ -376,7 +376,8 @@ describe("bank.lock, device.vacate, device.sweep", () => {
       [{ kind: 'vacated', cause: bank.device.snapshot.err, unrevoked: 1, device: bank.device }],
     ])
     expect([requestCleartext, onBadNews].map((handler) => handler.mock.calls.length)).to.deep.equal([0, 0])
-    await TH.eventually(() => reported.mock.calls.some(([err]) => err === refusal))
+    expect(forget).toHaveBeenCalledOnce()
+    expect(reported).not.toHaveBeenCalled()
     expect(vault.isEnabled).to.be.false
     expect(spy.calls.map(({ message }) => message)).to.include(news.message)
     vi.unstubAllGlobals()
@@ -452,7 +453,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
     const { bank, vault } = await makeBankWithVault(world)
     bank.device.sweep()
     expect(bank.device.snapshot.stage).to.eq('disabled')
-    expect(bank.snapshot.vaults).to.deep.equal([])
+    expect(bank.isEnabled).to.be.false
     expect(vault.isEnabled).to.be.false
     expect(vault.isUnlocked).to.be.false
     expect(world.leaseRows()).to.have.lengthOf(1)

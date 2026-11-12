@@ -59,11 +59,10 @@ describe("vault.beginWatch", () => {
     const { openNextSession, vault } = await makeWorldWithBox()
     const next = await openNextSession()
     await vault.del(vault)
-    await TH.eventually(() => ! next.isEnabled)
-    await TH.expectRefusal(next.beginWatch())
-    expect(next.isEnabled).to.be.false
+    await TH.eventually(() => ! next.isPresent)
+    await TH.expectRefusal(next.beginWatch(), 'vault_gone')
     expect(next.boxListing.things).to.deep.equal([])
-    expect(next.listing.at(next.scope)?.isPresent).to.be.false
+    expect(next.listing.at(next.scope)).to.eq(next)
   })
 
   it("passes a listing's failure up, and the next hello lists the boxes", async () => {

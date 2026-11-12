@@ -562,11 +562,11 @@ describe("what ends a gating", () => {
     expect(gating.isOpen).to.be.false
   })
 
-  it("concludes an open unlock where the bank alone is vacated", async () => {
+  it("concludes an open unlock on a vacate of the device", async () => {
     const { bank, vault, gatingAt } = await lockedVault()
     const unlocking = TH.expectRefusal(vault.ensureUnlocked())
     await gatingAt<'unlock_bank'>()
-    bank.vacate()
+    void bank.device.vacate()
     await unlocking
   })
 })

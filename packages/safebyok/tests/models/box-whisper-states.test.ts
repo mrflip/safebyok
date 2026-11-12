@@ -199,27 +199,21 @@ describe("the veil from behind a lock", () => {
 })
 
 describe("the endings of a box exposed", () => {
-  const EndingCases = [
-    ['sweep',  (box: TestableBox) => box.sweep()],
-    ['vacate', (box: TestableBox) => box.vacate()],
-  ] as const
-  for (const [ending, end] of EndingCases) {
-    it(`a ${ending} clears the value`, async () => {
-      const box = await showingOf()
-      end(box)
-      expect(box.whisper).to.eq(ENCRYPTED)
-      expect(box.veil()).to.eq(box)
-      expect(box.unexpose()).to.eq(box)
-      TH.expectSyncRefusal(() => box.unveil())
-    })
+  it("the device's end clears the value", async () => {
+    const box = await showingOf()
+    world.mw.disable()
+    expect(box.whisper).to.eq(ENCRYPTED)
+    expect(box.veil()).to.eq(box)
+    expect(box.unexpose()).to.eq(box)
+    TH.expectSyncRefusal(() => box.unveil())
+  })
 
-    it(`a ${ending} clears the veil`, async () => {
-      const box = await veiledOf()
-      end(box)
-      expect(box.isVeiled).to.be.false
-      expect(box.getSnapshot().isVeiled).to.be.false
-    })
-  }
+  it("the device's end clears the veil", async () => {
+    const box = await veiledOf()
+    world.mw.disable()
+    expect(box.isVeiled).to.be.false
+    expect(box.getSnapshot().isVeiled).to.be.false
+  })
 
   it("a tombstone received clears the value and the veil", async () => {
     const box = await veiledOf()

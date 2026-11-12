@@ -23,7 +23,7 @@ const Checks = Checkers('bad_option', ({ obj, custom }) => {
 
 /** A bank's gate as this device has it, kept in step with its row: a change is a bankDB gate verb's, and the gate receives the row it puts. */
 export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapshot> {
-  // == [Props]: user_id, banklabel, gatelabel, bank_tok, gate_tok, world, listing, #inHand
+  // == [Props]: user_id, banklabel, gatelabel, bank_tok, listing, #inHand
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly user_id:   string
@@ -31,16 +31,20 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   declare readonly gatelabel: GateScope['gatelabel']
   /** The life of the bank this gate is of, inscribed once by `assignInitialProps`. */
   declare readonly bank_tok:  string
-  /** This gate's life, inscribed once by `assignInitialProps` and kept by every gate verb. */
-  declare readonly gate_tok:  string
-  declare readonly world:     Bank
   declare readonly listing:   GateListing
 
   /** The wayins of the record in hand, as records and as Wayins, made again when a record received brings others. */
   #inHand: WayinsInHand | null = null
   // --
 
-  // == [Getters]: wayins, main, passkey0, bankStamp, stamp
+  // == [Getters]: bank, gate_tok, wayins, main, passkey0, bankStamp, stamp
+
+  /** The bank this gate is of. */
+  get bank(): Bank { return this.listing.bank }
+
+  // A Gate stands for its scope through its lives, as a Box does: its stamp follows the row in hand.
+  /** This gate's life, as the record in hand has it: kept by every gate verb. */
+  get gate_tok(): string { return this.central.gate_tok }
 
   /** The wayin records of the record in hand, frozen. */
   get wayins(): Wayins { return this.#wayinsInHand().wayins }
@@ -52,7 +56,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   get passkey0(): Wayin | null { return this.#wayinsInHand().passkey0 }
 
   /** The stamp of the bank this gate is of: what each wayin's ctx binds before the gate's own. */
-  get bankStamp(): BankStamp { return this.world.stamp }
+  get bankStamp(): BankStamp { return this.bank.stamp }
 
   /** This gate's stamp, fixed for its life: what each wayin's ctx binds. */
   get stamp(): GateStamp { return gateStamp.parse(this) }
@@ -71,9 +75,9 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
 
   // == [Construction]: assignInitialProps, recordOfBirth
 
-  /** Inscribes this gate's `bank_tok` and `gate_tok` beside what the base inscribes. */
+  /** Inscribes this gate's `bank_tok` beside what the base inscribes. */
   protected override assignInitialProps(central: Fetched<GateRecord, GateSparse>): void {
-    tattoo(this, { bank_tok: central.bank_tok, gate_tok: central.gate_tok }, { configurable: false })
+    tattoo(this, { bank_tok: central.bank_tok }, { configurable: false })
     super.assignInitialProps(central)
   }
 
@@ -91,8 +95,8 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
 
   /** Replace the passphrase through a replace_passphrase gating. The passkey stays, and the bankKey does not change. */
   async replacePassphrasePrompt(): Promise<this> {
-    await this.ensureTimely(VX.Promptly); this.world.demandPromptable()
-    await this.world.prompt('replace_passphrase')
+    await this.ensureTimely(VX.Promptly); this.bank.demandPromptable()
+    await this.bank.prompt('replace_passphrase')
     return this
   }
 
@@ -101,9 +105,9 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
 
   /** Add a passkey through an add_passkey gating. */
   async addPasskeyPrompt(): Promise<this> {
-    await this.ensureTimely(VX.Promptly); this.world.demandPromptable()
+    await this.ensureTimely(VX.Promptly); this.bank.demandPromptable()
     this.demandPasskeyAddable()
-    await this.world.prompt('add_passkey')
+    await this.bank.prompt('add_passkey')
     return this
   }
 
@@ -112,9 +116,9 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
 
   /** Revoke the passkey through a revoke_passkey gating. With none it answers at once, nobody asked. The bankKey does not change: a device that has it keeps it to its lock. */
   async revokePasskeyPrompt(): Promise<this> {
-    await this.ensureTimely(VX.Promptly); this.world.demandPromptable()
+    await this.ensureTimely(VX.Promptly); this.bank.demandPromptable()
     if (this.passkey0 === null) { return this }
-    await this.world.prompt('revoke_passkey')
+    await this.bank.prompt('revoke_passkey')
     return this
   }
 
@@ -131,7 +135,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   // == [Guards]: isLocked, demandPasskeyAddable, demandPresent, ensureTimely
 
   /** Whether the bank is locked, read live. */
-  get isLocked(): boolean { return this.world.isLocked }
+  get isLocked(): boolean { return this.bank.isLocked }
 
   /** Demands that this gate have no passkey: the one check before anyone is asked for one. */
   demandPasskeyAddable(): void {
@@ -141,7 +145,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   // A gate row is never tombstoned: only the instance its listing has just made, before it receives its record, is not present.
   /** Demand that this gate is present. */
   demandPresent(): this {
-    if (! this.isPresent) { throw mainGateMissing(this.world.sparse) }
+    if (! this.isPresent) { throw mainGateMissing(this.bank.sparse) }
     return this
   }
 

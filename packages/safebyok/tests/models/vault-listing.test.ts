@@ -55,15 +55,13 @@ function laySecondVaultRow(world: Awaited<ReturnType<typeof makeBornVault>>): Va
   return record
 }
 
-// A tombstone is of a life of its own, so the vault of the life deleted is vacated, and the tombstone's instance is listed in its place.
-async function expectLandedGone(vault: Vault, { listing }: Pick<Awaited<ReturnType<typeof makeBornVault>>, 'listing'>) {
+// A tombstone is of a life of its own, which the vault listed takes on: it stands for its scope through its lives.
+/** Past its forget, `vault` stands listed as the tombstone of a life after `lived`, the vault_tok it had. */
+async function expectLandedGone(vault: Vault, lived: string, { listing }: Pick<Awaited<ReturnType<typeof makeBornVault>>, 'listing'>) {
   await forgotten()
-  const gone = listing.at(Dna)
-  expect(gone).to.not.eq(vault)
-  expect(gone?.vault_tok).to.not.eq(vault.vault_tok)
-  expect(gone?.isPresent).to.be.false
-  expect(gone?.isEnabled).to.be.true
-  expect(vault.isEnabled).to.be.false
+  expect(listing.at(Dna)).to.eq(vault)
+  expect(vault.vault_tok).to.not.eq(lived)
+  expect(vault).to.include({ isPresent: false, isEnabled: true })
   expect(listing.snapshot).to.deep.equal([])
 }
 
@@ -83,13 +81,14 @@ describe("a tombstone over a live vault", () => {
     const { vault, listing, demandStored, restoreRow } = world
     const boxes = vault.boxListing
     const box = await boxes.create(BoxDna)
+    const lived = vault.vault_tok
     restoreRow(tombstoneOver(demandStored()))
     expect(await listing.get(Dna, { maxMillisSinceRefresh: 0, ifAbsent: 'nil' })).to.be.null
-    await expectLandedGone(vault, world)
-    await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }))
+    await expectLandedGone(vault, lived, world)
+    await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }), 'disabled')
     expect(box.isEnabled).to.be.false
-    await TH.expectRefusal(listing.get(Dna, { maxMillisSinceRefresh: 0 }))
-    expect(vault.boxListing).to.eq(boxes)
+    await TH.expectRefusal(listing.get(Dna, { maxMillisSinceRefresh: 0 }), 'vault_gone')
+    expect(vault.boxListing).to.not.eq(boxes)
   })
 
   it("leaves the bank unlocked and its lease cached when the vault is first listed as a tombstone", async () => {
@@ -105,7 +104,7 @@ describe("a tombstone over a live vault", () => {
 })
 
 describe("a box answer carrying a vault row of a later life as its parent", () => {
-  it("vacates the vault for one of the new life, locked, where the vault was made anew elsewhere", async () => {
+  it("hands the vault the new life, locked, letting its boxes go, where the vault was made anew elsewhere", async () => {
     const world = await makeBornVault()
     const { bank, vault: bornVault, badnews } = world
     await bornVault.boxListing.create(BoxDna)
@@ -115,16 +114,15 @@ describe("a box answer carrying a vault row of a later life as its parent", () =
     await boxes.hello()
     await bornVault.del(bornVault)
     const anew = await bank.ensureVault({ vaultlabel: Dna.vaultlabel })
-    await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }))
-    expect(vault.isEnabled).to.be.false
-    expect(boxes.things).to.deep.equal([])
-    const listed = listing.at(Dna)
-    expect(listed).to.not.eq(vault)
-    expect(listed).to.include({ vault_tok: anew.vault_tok, isPresent: true, isLocked: true })
+    await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }), 'disabled')
+    expect(boxes.isEnabled).to.be.false
+    expect(listing.at(Dna)).to.eq(vault)
+    expect(vault).to.include({ vault_tok: anew.vault_tok, isPresent: true, isLocked: true, isEnabled: true })
+    expect(vault.boxListing).to.not.eq(boxes)
     expect(badnews).to.deep.equal([])
   })
 
-  it("vacates the vault for a deleted one, where the vault was deleted elsewhere", async () => {
+  it("hands the vault its tombstone, letting its boxes go, where the vault was deleted elsewhere", async () => {
     const world = await makeBornVault()
     const { vault: bornVault, badnews } = world
     await bornVault.boxListing.create(BoxDna)
@@ -133,11 +131,10 @@ describe("a box answer carrying a vault row of a later life as its parent", () =
     const boxes = vault.boxListing
     await boxes.hello()
     await bornVault.del(bornVault)
-    await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }))
-    expect(vault.isEnabled).to.be.false
-    expect(boxes.things).to.deep.equal([])
-    expect(listing.at(Dna)).to.not.eq(vault)
-    expect(listing.at(Dna)?.isPresent).to.be.false
+    await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }), 'disabled')
+    expect(boxes.isEnabled).to.be.false
+    expect(listing.at(Dna)).to.eq(vault)
+    expect(vault.isPresent).to.be.false
     expect(badnews).to.deep.equal([])
   })
 })
@@ -165,13 +162,13 @@ describe("vault.del(vault)", () => {
   it("leaves the vault deleted, and the bank unlocked", async () => {
     const world = await makeBornVault()
     const boxes = world.vault.boxListing
+    const lived = world.vault.vault_tok
     await world.vault.del(world.vault)
-    await expectLandedGone(world.vault, world)
-    await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }))
+    await expectLandedGone(world.vault, lived, world)
+    await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }), 'disabled')
     expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
-    await TH.expectRefusal(world.vault.ensureTimely(0), 'disabled')
-    const gone = await world.listing.at(Dna)?.ensureTimely(0)
-    TH.expectSyncRefusal(() => gone?.demandPresent(), 'vault_gone')
+    const gone = await world.vault.ensureTimely(0)
+    TH.expectSyncRefusal(() => gone.demandPresent(), 'vault_gone')
     expect(world.bank.isUnlocked).to.be.true
   })
 })
@@ -181,58 +178,63 @@ describe("vault.del(vault.scope)", () => {
     const world = await makeBornVault()
     const asked = vi.fn()
     world.dialog.requestCleartext = asked
+    const lived = world.vault.vault_tok
     expect(await world.vault.del(world.vault.scope)).to.eq(world.vault)
-    await expectLandedGone(world.vault, world)
+    await expectLandedGone(world.vault, lived, world)
     expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
     expect(asked).not.toHaveBeenCalled()
   })
 })
 
 describe("a newer record of another vault_tok over a live vault", () => {
-  it("refuses the old vault's fetch and hydrate", async () => {
+  it("is taken on by the vault's fetch and hydrate", async () => {
     const fetching = await makeBornVault()
-    fetching.restoreRow(otherLifeAt(fetching.demandStored(), 5))
-    await TH.expectRefusal(fetching.vault.get({ maxMillisSinceRefresh: 0 }))
+    const fetched = otherLifeAt(fetching.demandStored(), 5)
+    fetching.restoreRow(fetched)
+    expect(await fetching.vault.get({ maxMillisSinceRefresh: 0 })).to.eq(fetching.vault)
+    expect(fetching.vault.vault_tok).to.eq(fetched.vault_tok)
     const hydrating = await makeBornVault()
-    hydrating.restoreRow(otherLifeAt(hydrating.demandStored(), 5))
-    await TH.expectBad(hydrating.vault.tryHydrate({ maxMillisSinceRefresh: 0 }))
+    const hydrated = otherLifeAt(hydrating.demandStored(), 5)
+    hydrating.restoreRow(hydrated)
+    await TH.expectGood(hydrating.vault.tryHydrate({ maxMillisSinceRefresh: 0 }))
+    expect(hydrating.vault.vault_tok).to.eq(hydrated.vault_tok)
   })
 
-  it("replaces the old vault with a new one, the bank's lease untouched", async () => {
+  it("is taken on by the vault listed, its boxes let go, the bank's lease untouched", async () => {
     const { bank, vault, listing, deviceDB, demandStored, restoreRow } = await makeBornVault()
+    const boxes = vault.boxListing
     const other = otherLifeAt(demandStored(), 5)
     restoreRow(other)
-    const rebuilt = await listing.get(Dna, { maxMillisSinceRefresh: 0 })
-    expect(rebuilt).to.not.eq(vault)
-    expect(rebuilt?.vault_tok).to.eq(other.vault_tok)
-    expect(listing.at(Dna)).to.eq(rebuilt)
-    expect(listing.things).to.deep.equal([rebuilt])
-    expect(vault.isEnabled).to.be.false
+    const fetched = await listing.get(Dna, { maxMillisSinceRefresh: 0 })
+    expect(fetched).to.eq(vault)
+    expect(vault.vault_tok).to.eq(other.vault_tok)
+    expect(listing.things).to.deep.equal([vault])
+    expect(boxes.isEnabled).to.be.false
+    expect(vault.boxListing).to.not.eq(boxes)
     await forgotten()
     expect(bank.isUnlocked).to.be.true
     expect(deviceDB.cachedNow()).not.to.be.null
   })
 
-  it("also replaces the old vault when it is a tombstone", async () => {
+  it("is taken on by the vault listed when it is a tombstone", async () => {
     const { vault, listing, demandStored, restoreRow } = await makeBornVault()
     const tombstone = tombstoneOver(otherLifeAt(demandStored(), 5))
     restoreRow(tombstone)
-    await TH.expectRefusal(listing.get(Dna, { maxMillisSinceRefresh: 0 }))
-    expect(listing.at(Dna)?.vault_tok).to.eq(tombstone.vault_tok)
-    expect(listing.at(Dna)?.isPresent).to.be.false
-    expect(vault.isEnabled).to.be.false
+    await TH.expectRefusal(listing.get(Dna, { maxMillisSinceRefresh: 0 }), 'vault_gone')
+    expect(listing.at(Dna)).to.eq(vault)
+    expect(vault).to.include({ vault_tok: tombstone.vault_tok, isPresent: false })
   })
 })
 
-describe("an old instance replaced by its own call", () => {
-  it("vault.del(vault.scope) refuses and leaves the new vault stored", async () => {
+describe("a delete naming the life a vault had before its fetch found another", () => {
+  it("refuses, and leaves the new life stored", async () => {
     const { vault, demandStored, restoreRow, storedNow } = await makeBornVault()
+    const ante = vault.sparse
     const other = otherLifeAt(demandStored(), 5)
     restoreRow(other)
-    await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }))
-    await TH.expectRefusal(vault.del(vault.scope))
+    await vault.get({ maxMillisSinceRefresh: 0 })
+    await TH.expectRefusal(vault.del(ante), 'stale_write')
     expect(storedNow()).to.include({ am: 'a', vault_tok: other.vault_tok, revision_seq: 5 })
-    TH.expectSyncRefusal(() => vault.demandDeletable())
   })
 })
 
@@ -270,13 +272,13 @@ describe("building over a tombstone", () => {
     expect(listing.at({ ...Dna, vaultlabel: 'another_vault' })).to.be.null
   })
 
-  it("a birth's listing.put over a tombstone lists a new vault of the record", async () => {
+  it("a birth's listing.put over a tombstone hands the vault listed the record's life", async () => {
     const { vault, listing, tombstone } = await deleted()
     const record = listing.recordOfBirth(Dna, tombstone)
     const reborn = await listing.put(record, { expected: tombstone, ifAbsent: 'add', ifPresent: 'get' })
+    expect(reborn).to.eq(vault)
     expect(reborn.vault_tok).to.eq(record.vault_tok)
     expect(listing.at(Dna)).to.eq(reborn)
-    expect(vault.isEnabled).to.be.false
   })
 
   it("a birth's listing.put with nothing ever stored is written", async () => {
@@ -347,7 +349,7 @@ describe("a damaged row", () => {
 })
 
 describe("a damaged row met by listing the bank's vaults", () => {
-  it("vacates the listed vault and keeps the row in damaged_rows", async () => {
+  it("lets the listed vault go and keeps the row in damaged_rows", async () => {
     const { vault, listing, restoreRow, badnews } = await makeBornVault()
     restoreRow({ garbage: true } as never)
     await listing.list()
@@ -394,11 +396,11 @@ describe("the listing's methods return the bankDB's answer", () => {
   it("tryDel returns the del's act, with the vault listed under its tombstone as its val", async () => {
     const { vault, listing } = await makeBornVault()
     vault.lock()
-    const answer = await listing.tryDel(vault.sparse)
-    expect(answer).to.deep.include({ ok: true, act: 'deleted', val: listing.at(Dna) })
-    expect(answer.val).to.include({ isPresent: false })
-    expect(answer.val?.vault_tok).to.not.eq(vault.vault_tok)
-    expect(vault.isEnabled).to.be.false
+    const ante = vault.sparse
+    const answer = await listing.tryDel(ante)
+    expect(answer).to.deep.include({ ok: true, act: 'deleted', val: vault })
+    expect(vault).to.include({ isPresent: false })
+    expect(vault.vault_tok).to.not.eq(ante.vault_tok)
   })
 
   it("tryDel returns a bad answer for a delete naming another vault life, deleting nothing", async () => {

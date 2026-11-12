@@ -6,7 +6,7 @@ import type { Gating } from '../../src/models/gating'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 import { Passphrase, makeBornVault, useVaultWorlds } from '../test-helpers/vault-world'
-import type { BoxWorld } from '../../src/shapes/shapes-vaultish'
+import type { Vault } from '../../src/models/vault'
 
 const world = useModelsWorld()
 useVaultWorlds()
@@ -102,7 +102,7 @@ describe("A lock called during a box verb", () => {
 
 /** A stored box whose next unseal runs `crossing` with the whisper opened, before it comes back to `box.expose`. */
 async function boxCrossingUnseal(crossing: (box: TestableBox) => unknown) {
-  const unsealStampedString: BoxWorld['unsealStampedString'] = async (sealed, stamp) => {
+  const unsealStampedString: Vault['unsealStampedString'] = async (sealed, stamp) => {
     const whisperText = await world.mw.world.unsealStampedString(sealed, stamp)
     crossing(box)
     return whisperText
@@ -113,8 +113,8 @@ async function boxCrossingUnseal(crossing: (box: TestableBox) => unknown) {
 }
 
 describe("An ending called while box.expose unseals", () => {
-  it.each(['sweep', 'vacate'] as const)("a %s refuses, and leaves nothing exposed", async (ending) => {
-    const box = await boxCrossingUnseal((crossed) => crossed[ending]())
+  it("the device's end refuses, and leaves nothing exposed", async () => {
+    const box = await boxCrossingUnseal(() => { world.mw.disable() })
     await TH.expectRefusal(box.expose())
     expect(box.isEnabled).to.be.false
     expect(box.whisper).to.eq(ENCRYPTED)

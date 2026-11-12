@@ -11,8 +11,6 @@ useVaultWorlds()
 
 const BankScope = Object.freeze({ user_id: Dna.user_id, banklabel: Dna.banklabel })
 const GateScope = Object.freeze({ ...BankScope, gatelabel: 'main' as const })
-// The generic put's options check the expected row as a vaulted one, so it carries a vault_tok to reach the listing's own refusal.
-const NoVault = 'no-vault-tok'
 
 /** The message of the refusal `operation` rejects with: which thrower refused, where the kind is no contract. */
 async function refusalMessageOf(operation: Promise<unknown>): Promise<string> {
@@ -24,7 +22,7 @@ describe("BankListing's entrypoints", () => {
   it("refuses the generic put and del, as only its own verbs write a bank row, calling no bankDB verb", async () => {
     const { bank, bankDB, storedBankNow } = await makeBornVault()
     const deleting = vi.spyOn(bankDB, 'tryDelBank')
-    const putting = bank.listing.put(storedBankNow() as never, { expected: { ...bank.sparse, vault_tok: NoVault } })
+    const putting = bank.listing.put(storedBankNow() as never, { expected: bank.sparse })
     expect(await refusalMessageOf(putting)).to.eq(writtenByOwnVerbs().message)
     expect(await refusalMessageOf(bank.listing.del(bank.sparse))).to.eq(writtenByOwnVerbs().message)
     expect(deleting).not.toHaveBeenCalled()
@@ -61,7 +59,7 @@ describe("GateListing's entrypoints", () => {
     const { bank, bankDB } = await makeBornVault()
     const replacing = vi.spyOn(bankDB, 'tryReplacePassphrase')
     const gate = bank.maingate
-    const putting = bank.gateListing.put(gate.pickle(), { expected: { ...gate.sparse, vault_tok: NoVault } })
+    const putting = bank.gateListing.put(gate.pickle(), { expected: gate.sparse })
     expect(await refusalMessageOf(putting)).to.eq(writtenByOwnVerbs().message)
     expect(await refusalMessageOf(bank.gateListing.del(gate.sparse))).to.eq(writtenByOwnVerbs().message)
     expect(replacing).not.toHaveBeenCalled()
@@ -94,7 +92,8 @@ describe("GateListing's entrypoints", () => {
 
   it("refuses a gate demanded of a bank the bankDB no longer has", async () => {
     const world = await makeBornVault()
-    const listing = new GateListing(world.bank, listingOptsOf(world))
+    const { bankDB, maxMillisSinceRefresh } = listingOptsOf(world)
+    const listing = new GateListing(world.bank, { bankDB, maxMillisSinceRefresh })
     world.bankDB._cheat_shelfOf(BankScope).bank = null
     world.bankDB._cheat_shelfOf(BankScope).gaterows.clear()
     expect(await refusalMessageOf(listing.get(GateScope, { ifAbsent: 'fail' }))).to.eq(mainGateMissing(world.bank.sparse).message)

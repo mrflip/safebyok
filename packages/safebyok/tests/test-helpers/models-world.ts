@@ -1,4 +1,4 @@
-/** The test world of `src/models/`: a fake vault (the {@link BoxWorld}), a {@link TestableBankDB} over one live bank and vault row, one log of every call made to them, and the builders of the records they have.
+/** The test world of `src/models/`: a fake vault (the {@link FakeVault}), with its bank and device, a {@link TestableBankDB} over one live bank and vault row, one log of every call made to them, and the builders of the records they have.
  * Import it directly, not through `TH`: `src/models/` is not exported, and the door
  * `tests/test-helpers.ts` is published as `safebyok/testing`.
  *
@@ -20,19 +20,19 @@
 import type { GotAct } from '../../src/shapes/shapes-enums'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { _cheat_clock } from '../../src/helpers/clock'
-import { brandGuarded } from '../../src/helpers/consts'
 import { VaultError, isVaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
-import { guardRequestCleartext } from '../../src/models/device'
 import type { Vault } from '../../src/models/vault'
 import * as CX from '../../src/shapes/shapes-core'
 import type { Boxscope } from '../../src/shapes/shapes-core'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as BX from '../../src/shapes/shapes-bankdb'
 import * as VX from '../../src/shapes/shapes-vaultish'
-import { type DeviceAnnouncement, type BankFriend, type BoxDna, type BoxWorld, type Fetched, type BoxListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
+import { type DeviceAnnouncement, type BoxDna, type Fetched, type ListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
 import type { Revision, WatchScope } from '../../src/shapes/shapes-storage'
+import type { SealedWhisper } from '../../src/shapes/shapes-gateish'
+import type { CipherCtxRecord } from '../../src/helpers/crypto'
 import { type BankRecord, type BoxDelAsk, type BoxGetAsk, type BoxPutAsk, type BoxTombstone, type LoggableAsk, type VaultRecord, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-bankdb'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryBankDB } from '../../src/storage/memory-bank-db'
@@ -124,12 +124,58 @@ export type BoxAnswer = ListingAnswer<BoxRecord, BoxSparse>
 export type ModelsWatch = { onNotice: (notice: Notice) => void, onBadNews: ((news: VaultError) => void) | undefined, active: boolean }
 // --
 
-// == [The world]: FakeBoxKeyWrapped, FakeWhisperCiphered, ModelsWorldOpts, ModelsWorld, makeModelsWorld, boxListingOf
+// == [The world]: FakeBoxKeyWrapped, FakeWhisperCiphered, FakeDevice, FakeBank, FakeVault, ModelsWorldOpts, ModelsWorld, makeModelsWorld, boxListingOf
 
 /** The sealed parts of every record the fake seal seals: constants that wrap no key and open under none. */
 export const FakeBoxKeyWrapped   = fakeCiphered('fake-box-key-wrapped')
 /** The `whisper_ciphered` of every record the fake seal seals. */
 export const FakeWhisperCiphered = fakeCiphered('fake-whisper-ciphered')
+
+/** The device a box listing reaches through its vault's bank: what it is told, logged. */
+export type FakeDevice = {
+  readonly modelkind: 'device'
+  readonly isEnabled: boolean
+  /** Refuse 'disabled' once {@link ModelsWorld.disable} has run. */
+  demandEnabled(): FakeDevice
+  /** Log each news in {@link ModelsWorld.badnews}. */
+  tellBadNews(badnews: readonly unknown[]): void
+  /** Log the announcement in {@link ModelsWorld.announced}. */
+  announce(announcement: DeviceAnnouncement): void
+  /** Log the cause in {@link ModelsWorld.panics}, and end the fake device. */
+  vacate(story?: { cause?: VaultError }): Promise<void>
+}
+
+/** The bank a box listing reaches through its vault: its lock and whether it answers, read live. */
+export type FakeBank = {
+  readonly modelkind: 'bank'
+  readonly isLocked:  boolean
+  readonly isEnabled: boolean
+  readonly device:    FakeDevice
+  /** Refuse 'disabled' once {@link ModelsWorld.disable} has run. */
+  demandEnabled(): FakeBank
+}
+
+/** The vault, as far as a box listing and its boxes reach into it. */
+export type FakeVault = {
+  readonly modelkind:  'vault'
+  readonly scope:      typeof WorldVault.scope
+  readonly bank_tok:   string
+  readonly vault_tok:  string
+  readonly isEnabled:  boolean
+  readonly bank:       FakeBank
+  /** Refuse 'disabled' once {@link ModelsWorld.disable} has run. */
+  demandEnabled(): FakeVault
+  /** Hear each {@link ModelsWorld.setLocked}. */
+  subscribe(listener: () => void): () => void
+  /** Seal `whisperText` by the fake seal, refusing 'bank_locked' while locked. */
+  sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper>
+  /** Open what the fake seal sealed under `stamp`, refusing 'bank_locked' while locked. */
+  unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
+  /** Log the vault row an answer carried, as a call. */
+  receiveParent(parent: unknown): void
+  /** Log the call, and wait on any answer scripted for it. */
+  ensureTimely(maxMillis?: number): Promise<unknown>
+}
 
 /** How {@link makeModelsWorld} starts the world. */
 export type ModelsWorldOpts = {
@@ -147,20 +193,18 @@ export type ModelsWorldOpts = {
  */
 export type ModelsWorld = {
   /** The vault, as the listing is given it. */
-  world:  BoxWorld
+  world:  FakeVault
   /** The world with `overrides` laid over it, its lock still read live, as a spread of it would not. */
-  worldWith(overrides: Partial<BoxWorld>): BoxWorld
+  worldWith(overrides: Partial<FakeVault>): FakeVault
   bankDB: TestableBankDB
   /** Every call made to the world and the bankDB, in order, oldest first. A live array. */
   calls:  readonly ModelsCall[]
   /** The refusals the listing told as bad news, oldest first. A live array. */
   badnews: readonly VaultError[]
-  /** The refusals the listing panicked with, oldest first. A live array. */
+  /** The causes the device was vacated for, oldest first. A live array. */
   panics:  readonly VaultError[]
-  /** What the listing announced, oldest first. A live array. */
+  /** What the device was told to announce, oldest first. A live array. */
   announced: readonly DeviceAnnouncement[]
-  /** The bank's private calls, as the listing is handed them: its panic logs each refusal in `panics`, its announcements in `announced`, its bad news in `badnews`. */
-  bankFriend: BankFriend
   /** The bankDB's own box rows, by boxlabel: the one vault's boxes. */
   stored: Map<string, unknown>
 
@@ -178,9 +222,11 @@ export type ModelsWorld = {
   setNow(ms: number): void
   /** Move the clock on by `ms` and, under fake timers, fire every timer that falls due, each with the clock at its due time. */
   advance(ms: number): Promise<void>
-  /** Lock or unlock the vault, telling the world's subscribers, then aligning each box listed in a listing over this world, as a vault does. */
+  /** Lock or unlock the vault, telling the world's subscribers, then locking each listing over this world, as a bank's lock or unlock does. */
   setLocked(isLocked: boolean): void
-  /** The box listings made over this world by {@link boxListingOf}, whose boxes `setLocked` aligns. */
+  /** End the device for good, as its sweep or vacate does: the vault and the bank no longer answer, and each listing over this world is locked. */
+  disable(): void
+  /** The box listings made over this world by {@link boxListingOf}, which `setLocked` and `disable` lock. */
   listings: Set<BoxListing>
   /** End the watches and put real timers back. Call it in `afterEach`. */
   dispose(): void
@@ -313,6 +359,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
   let now = opts.now ?? T0
   const clockNow = (): number => (fakeTimers ? Date.now() : now)
   let isLocked = opts.isLocked ?? false
+  let isEnabled = true
   const worldListeners = new Set<() => void>()
   const listings = new Set<BoxListing>()
   if (fakeTimers) { vi.useFakeTimers({ now }) }
@@ -337,13 +384,34 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
   function demandFakeUnlocked(): void {
     if (isLocked) { throw Refuse.needUnlocked() }
   }
-  // The fake stands in for the vault, which `ensureTimely` answers; no box reads the answer.
-  function standIn(): Vault { return world as unknown as Vault }
+  function demandFakeEnabled(): void {
+    if (! isEnabled) { throw Refuse.deviceDisabled() }
+  }
 
-  const world: BoxWorld = {
+  const device: FakeDevice = {
+    modelkind: 'device',
+    get isEnabled() { return isEnabled },
+    demandEnabled() { demandFakeEnabled(); return device },
+    tellBadNews:   (told) => { badnews.push(...told.map((news) => (isVaultError(news) ? news : Refuse.unexpectedError(news)))) },
+    announce:      (announcement) => { announced.push(announcement) },
+    vacate:        async ({ cause = Refuse.deviceDisabled() } = {}) => { panics.push(cause); isEnabled = false; await Promise.resolve() },
+  }
+  const bank: FakeBank = {
+    modelkind: 'bank',
+    get isLocked()  { return isLocked },
+    get isEnabled() { return isEnabled },
+    device,
+    demandEnabled() { demandFakeEnabled(); return bank },
+  }
+
+  const world: FakeVault = {
+    modelkind:    'vault',
+    scope:        WorldVault.scope,
     bank_tok:     WorldVault.bank_tok,
     vault_tok:    WorldVault.vault_tok,
-    get isLocked() { return isLocked },
+    get isEnabled() { return isEnabled },
+    bank,
+    demandEnabled() { demandFakeEnabled(); return world },
     subscribe:    (listener) => { worldListeners.add(listener); return () => { worldListeners.delete(listener) } },
     sealStampedString: async (whisperText, stamp) => {
       await Promise.resolve()
@@ -363,7 +431,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
       calls.push({ verb: 'ensureTimely', maxMillis })
       const { scripted, answer } = ensureTimelyScript.take(maxMillis)
       if (scripted) { await answer }
-      return standIn()
+      return world
     },
   }
 
@@ -389,13 +457,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
 
   return {
     world, bankDB, calls, badnews, panics, announced, stored, watches, listings,
-    worldWith: (overrides) => ({ ...world, get isLocked() { return isLocked }, ...overrides }),
-    bankFriend: {
-      panic:       brandGuarded((refusal: VaultError) => { panics.push(refusal) }),
-      announce:    brandGuarded((announcement: DeviceAnnouncement) => { announced.push(announcement) }),
-      tellBadNews: brandGuarded((told: readonly unknown[]) => { badnews.push(...told.map((news) => (isVaultError(news) ? news : Refuse.unexpectedError(news)))) }),
-      askUser:     guardRequestCleartext(() => undefined),
-    },
+    worldWith: (overrides) => Object.assign(Object.create(world) as FakeVault, overrides),
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
     clearCalls: () => { calls.length = 0; badnews.length = 0; panics.length = 0; announced.length = 0 },
 
@@ -408,9 +470,11 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
       if (next === isLocked) { return }
       isLocked = next
       for (const listener of worldListeners) { listener() }
-      for (const listing of listings) {
-        for (const box of listing.things) { box.align() }
-      }
+      for (const listing of listings) { listing.lock() }
+    },
+    disable: () => {
+      isEnabled = false
+      for (const listing of listings) { listing.lock() }
     },
     dispose,
 
@@ -474,7 +538,7 @@ export class TestableBox extends Box {
 /** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `deliverRecord`, `create`, `get`, `put`, `del` and `at` give a `TestableBox`. */
 export class TestableBoxListing extends BoxListing {
   protected override makeThing(central: Fetched<BoxRecord, BoxSparse>): TestableBox {
-    return new TestableBox(this.world, this, central)
+    return new TestableBox(this, central)
   }
 
   /** {@link BoxListing.deliverRecord}, answering a {@link TestableBox}. */
@@ -507,16 +571,16 @@ function testableOf(box: Box): TestableBox {
 
 function nullOrTestableOf(box: Box | null): TestableBox | null { return (box === null ? null : testableOf(box)) }
 
-/** A {@link BoxListing} over the world's vault and bankDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es, aligned at each `setLocked`. `overrides` replaces its world or any of its options; the horizon is ten minutes. */
+/** A {@link BoxListing} over the world's vault and bankDB, its bad news logged in `badnews`, its boxes {@link TestableBox}es, locked at each `setLocked` and `disable`. `overrides` replaces its vault or any of its options; the horizon is ten minutes. */
 export function boxListingOf(mw: ModelsWorld, overrides: BoxListingOverrides = {}): TestableBoxListing {
-  const { world = mw.world, scope = WorldVault.scope, bankDB = mw.bankDB, maxMillisSinceRefresh = 10 * 60_000, bankFriend = mw.bankFriend } = overrides
-  const listing = new TestableBoxListing(world, { scope, bankDB, maxMillisSinceRefresh, bankFriend })
+  const { world = mw.world, bankDB = mw.bankDB, maxMillisSinceRefresh = 10 * 60_000 } = overrides
+  const listing = new TestableBoxListing(world as unknown as Vault, { bankDB, maxMillisSinceRefresh })
   mw.listings.add(listing)
   return listing
 }
 
-/** What {@link boxListingOf} may be told in place of the world's own: the box listing's world, vault scope, bankDB, horizon or the bank's friend. */
-export type BoxListingOverrides = Partial<BoxListingOpts & { world: BoxWorld }>
+/** What {@link boxListingOf} may be told in place of the world's own: the box listing's vault, bankDB or horizon. */
+export type BoxListingOverrides = Partial<ListingOpts & { world: FakeVault }>
 // --
 
 // == [Faked seal]: fakeSealBoxListingOf
@@ -526,7 +590,7 @@ export type BoxListingOverrides = Partial<BoxListingOpts & { world: BoxWorld }>
  * @example fakeSealBoxListingOf(mw, {}, () => { mw.setLocked(true) })   // the vault locks during each seal
  */
 export function fakeSealBoxListingOf(mw: ModelsWorld, overrides: BoxListingOverrides = {}, duringSeal: () => void = () => undefined): TestableBoxListing {
-  const sealStampedString: BoxWorld['sealStampedString'] = async (whisperText, stamp) => {
+  const sealStampedString: FakeVault['sealStampedString'] = async (whisperText, stamp) => {
     await mw.world.sealStampedString(whisperText, stamp)
     duringSeal()
     return { box_key_wrapped: fakeCiphered(`boxkey-${String(stamp['revision_tok'])}`), whisper_ciphered: fakeCiphered(`whisper-${String(stamp['revision_tok'])}`) }
