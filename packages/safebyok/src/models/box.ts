@@ -88,7 +88,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get isLocked(): boolean { return this.listing.isLocked }
   // --
 
-  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unexpose, #dropExposed, veil, unveil, patchWhisper, replaceExposed, unseal
+  // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unexpose, #doUnexpose, veil, unveil, patchWhisper, replaceExposed, unseal
 
   /** The timely stored whisper, keeping nothing on the instance. */
   async extractWhisper(opts: TimelyOpts = {}): Promise<Whisper> {
@@ -112,14 +112,14 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** Discard the whisper kept on the instance, and its veil, from any state. */
   unexpose(): this {
-    this.#dropExposed()
+    this.#doUnexpose()
     this.align()
     return this
   }
 
-  // Apart from unexpose, as a discard aligns only once its box is delisted, and a receive aligns once its adopt is done.
+  // called internally by adopt, sweepContents, vacateContents and unexpose itself
   /** Drop the whisper exposed and its veil; the caller aligns. */
-  #dropExposed(): void {
+  #doUnexpose(): void {
     this.#exposed = null
     this.#isVeiled = false
   }
@@ -189,7 +189,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       return await this.listing.tryPut(record, { expected, ifAbsent, ifPresent })
     } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
   }
-
 
   /** Seal the whisper exposed, veiled or not, and put it; `patch` may name a sidecar, never a whisper. */
   async putExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<this> {
@@ -263,12 +262,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** A record gone takes the whisper exposed, and its veil, with it. */
   protected override adopt(central: Fetched<BoxRecord, BoxSparse>): void {
     super.adopt(central)
-    if (this.isTombstoneRecord(central)) { this.#dropExposed() }
+    if (this.isTombstoneRecord(central)) { this.#doUnexpose() }
   }
 
-  protected override sweepContents(): void { this.#dropExposed() }
+  protected override sweepContents(): void { this.#doUnexpose() }
 
-  protected override vacateContents(): void { this.#dropExposed() }
+  protected override vacateContents(): void { this.#doUnexpose() }
 
   /** A box record alive that carries its sealed whisper. */
   protected isFullRecord(fetched: BoxSparse): fetched is BoxRecord {

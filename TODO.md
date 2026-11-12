@@ -12,6 +12,8 @@ What is the difference between refusals and errors
 
 Assess the vaultDB integrity checks contract for gate verbs
 
+change logger.log to logger.info, add logger.debug and logger.notice
+
 ## Loud
 
 Add a helper like objStrict, objDuckish, implementing the duckish type (an otherwise-strict type allowing certain specified fields that are validated, ignored and stripped)
