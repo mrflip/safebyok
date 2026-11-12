@@ -445,13 +445,13 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await vaultDB.getVault(vaultGetAskOf())).to.deep.include({ world: val })
     })
 
-    it("revokePasskey removes a stored passkey, and with none stored returns act 'revoked' and changes nothing", async () => {
+    it("revokePasskey removes a stored passkey, and with none stored returns act 'passed' and the row as stored", async () => {
       const { vaultDB, vault } = await putWith()
       const { val: withPasskey } = await vaultDB.addPasskey(...gateMoveOf(vault, { passkey_wayin: passkeyWayin }))
       const { act, val } = await vaultDB.revokePasskey(...gateMoveOf(withPasskey, { passkey_wayin: null }))
       expect(act).to.eq('revoked')
       expect(val.gate).to.deep.equal({ gate_epoch: 3, passphrase_wayin: passphraseWayin, passkey_wayin: null })
-      expect(await vaultDB.revokePasskey(...gateMoveOf(val, { passkey_wayin: null }))).to.deep.include({ act: 'revoked', val, world: val })
+      expect(await vaultDB.revokePasskey(...gateMoveOf(val, { passkey_wayin: null }))).to.deep.include({ act: 'passed', val, world: val })
       expect(await vaultDB.getVault(vaultGetAskOf())).to.deep.include({ world: val })
     })
 

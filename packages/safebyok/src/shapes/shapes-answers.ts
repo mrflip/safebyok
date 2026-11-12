@@ -130,7 +130,7 @@ export const {
     putVaultAnswer:          answerCheck({ val: SX.vaultRow, acts: EX.putActVals, ...vaultish }),
     replacePassphraseAnswer: answerCheck({ val: SX.vaultRecord, acts: ['replaced'], ...vaultish }),
     addPasskeyAnswer:        answerCheck({ val: SX.vaultRecord, acts: ['added'], ...vaultish }),
-    revokePasskeyAnswer:     answerCheck({ val: SX.vaultRecord, acts: ['revoked'], ...vaultish }),
+    revokePasskeyAnswer:     answerCheck({ val: SX.vaultRecord, acts: ['revoked', 'passed'], ...vaultish }),
     delVaultAnswer:          answerCheck({ val: SX.vaultTombstone, acts: EX.delActVals, ...vaultish }),
     listBoxesAnswer:         answerCheck({ val: boxesListed, acts: EX.listActVals, world: SX.vaultRecord, badWorld: SX.vaultRow, dbhas: SX.vaultRow }),
     getBoxAnswer:            answerCheck({ val: SX.boxRow.nullable(), acts: EX.gotActVals, ...boxish }),

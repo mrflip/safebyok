@@ -118,9 +118,9 @@ export interface VaultDB {
   /** Put the properly revisioned `record`, demanding a new `gate_epoch` and that the passkey is absent.
    * @returns an answer with the stored row: @see {@link VaultDB.putVault}
    */
-  revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked'>>
+  revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked' | 'passed'>>
   /** Non-throwing form of {@link VaultDB.revokePasskey}. */
-  tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked'>>
+  tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked' | 'passed'>>
   /** Store the tombstone `ask.record` over the live box row `ask.expected`. */
   delBox(ask: BoxDelAsk): Promise<GoodAnswer<BoxRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.delBox}. */

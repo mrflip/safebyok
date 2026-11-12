@@ -172,10 +172,10 @@ export class GraphQLVaultDB implements VaultDB {
   /** Remove the vault's passkey wayin. `record` is the vault row at `opts.prior` without it and its `gate_epoch` plus one.
    * A stored row that already has no passkey is returned unchanged.
    */
-  async revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked'>> { return goodAnswerOf(await this.tryRevokePasskey(record, opts)) }
+  async revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked' | 'passed'>> { return goodAnswerOf(await this.tryRevokePasskey(record, opts)) }
 
   /** Non-throwing form of {@link revokePasskey}. */
-  async tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked'>> {
+  async tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked' | 'passed'>> {
     try {
       const vaultRecord  = DB.passkeyRevokeRecord.parse(record)
       const gateVerbOpts = DB.gateVerbOpts.parse(opts)
