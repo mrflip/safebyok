@@ -103,7 +103,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.build(fullBoxRecord())
       world.mw.clearCalls()
-      world.mw.willPut(world.mw.answerOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })))
+      world.mw.willPut({ ...world.mw.answerOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })), act: 'replaced' })
       await TH.expectRefusal(listing.put(listing.recordOf(box), { expected: box.sparse }))
       expect(box.revision_tok).to.eq('rev-a1')
       expect(world.mw.badnews).to.deep.equal([])
@@ -295,9 +295,9 @@ describe("listing: an answer names the scope of the record it carries", () => {
 
   it("refuses a put or a del answered with a record of another scope", async () => {
     const listing = boxListingOf(world.mw)
-    world.mw.willPut(world.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
+    world.mw.willPut({ ...world.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })), act: 'replaced' })
     await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { expected: shellBoxRecord('asked_box') }))
-    world.mw.willDel(world.mw.answerOf(scopeOf('asked_box'), tombstoneBoxRecord({ boxlabel: 'other_box', revision_seq: 2 })))
+    world.mw.willDel({ ...world.mw.answerOf(scopeOf('asked_box'), tombstoneBoxRecord({ boxlabel: 'other_box', revision_seq: 2 })), act: 'deleted' })
     await TH.expectRefusal(listing.del(sparseBoxRecord({ boxlabel: 'asked_box' })))
     world.mw.willPut(world.mw.staleWriteOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box', revision_seq: 5 })))
     await TH.expectRefusal(listing.put(fullBoxRecord({ boxlabel: 'asked_box', revision_seq: 0 }), { expected: shellBoxRecord('asked_box') }), 'stale_write')

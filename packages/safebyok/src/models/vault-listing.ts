@@ -10,8 +10,8 @@ import { type VaultScope, vaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import { type DelTombstone, type Fetched, type ListingDelOpts, type ListingOpts, type ListingPutOpts, type SlotFate, type ThingAnswer, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
-import type { BoxRow, GateVerbOpts, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
+import { type DelTombstone, type Fetched, type ListingDelOpts, type ListingOpts, type ListingPutOpts, type SlotStep, type ThingAnswer, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
+import type { BoxRow, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { type Answer, type Notice, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
 import { vaultAbsent, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
@@ -74,48 +74,58 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 
-  // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form, gateVerbAnswered, tryDel
+  // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form, gateMoveOf, tryDel
+  // The val is the record the verb wrote: the vault listed may have a newer one by the time the answer is delivered.
 
   /** Lay a new passphrase wayin on the vault at `ante`, and answer the record stored. Nothing locks: the vaultKey does not change. */
   async replacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<VaultRecord> { return valOf(await this.tryReplacePassphrase(ante, passphrase_wayin)) }
 
   /** {@link replacePassphrase}, answering the vaultDB's own answer. */
-  tryReplacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<ThingAnswer<VaultRecord>> {
-    return this.#gateVerbAnswered(ante, { passphrase_wayin }, (record, opts) => this.vaultDB.tryReplacePassphrase(record, opts))
+  async tryReplacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<ThingAnswer<VaultRecord>> {
+    let answer: Answer<VaultRecord, string> | typeof UNANSWERED = UNANSWERED
+    try {
+      const { record, prior } = this.#gateMoveOf(ante, { passphrase_wayin })
+      answer = await this.vaultDB.tryReplacePassphrase(record, { prior })
+      this.deliver(answer, record)
+      return answerWithVal(answer, valOf(answer))
+    } catch (err) { return refusedAnswerOf(err, answer) }
   }
 
   /** Lay a passkey wayin on the vault at `ante`, and answer the record stored. */
   async addPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<VaultRecord> { return valOf(await this.tryAddPasskey(ante, passkey_wayin)) }
 
   /** {@link addPasskey}, answering the vaultDB's own answer. */
-  tryAddPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<ThingAnswer<VaultRecord>> {
-    return this.#gateVerbAnswered(ante, { passkey_wayin }, (record, opts) => this.vaultDB.tryAddPasskey(record, opts))
+  async tryAddPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<ThingAnswer<VaultRecord>> {
+    let answer: Answer<VaultRecord, string> | typeof UNANSWERED = UNANSWERED
+    try {
+      const { record, prior } = this.#gateMoveOf(ante, { passkey_wayin })
+      answer = await this.vaultDB.tryAddPasskey(record, { prior })
+      this.deliver(answer, record)
+      return answerWithVal(answer, valOf(answer))
+    } catch (err) { return refusedAnswerOf(err, answer) }
   }
 
-  /** Null the passkey wayin of the vault at `ante`, and answer the record stored. */
+  /** Null the passkey wayin of the vault at `ante`, and answer the record stored, or the row stored where it has no passkey wayin. */
   async revokePasskey(ante: VaultRecord): Promise<VaultRecord> { return valOf(await this.tryRevokePasskey(ante)) }
 
   /** {@link revokePasskey}, answering the vaultDB's own answer. */
-  tryRevokePasskey(ante: VaultRecord): Promise<ThingAnswer<VaultRecord>> {
-    return this.#gateVerbAnswered(ante, { passkey_wayin: null }, (record, opts) => this.vaultDB.tryRevokePasskey(record, opts), { isScopePinned: true })
-  }
-
-  // The val is the record the verb wrote: the vault listed may have a newer one by the time the answer is delivered.
-  // A revoke over a vault with no passkey answers as stored, not as sent: its scope is all that can be pinned.
-  /** The answer `call` brings for the vault at `ante` with `moved` laid on its gate, its record delivered to the vault listed. */
-  async #gateVerbAnswered(
-    ante: VaultRecord, moved: Partial<SX.Gate>, call: (record: VaultRecord, opts: GateVerbOpts) => Promise<Answer<VaultRecord, string>>, { isScopePinned = false } = {},
-  ): Promise<ThingAnswer<VaultRecord>> {
+  async tryRevokePasskey(ante: VaultRecord): Promise<ThingAnswer<VaultRecord>> {
     let answer: Answer<VaultRecord, string> | typeof UNANSWERED = UNANSWERED
     try {
-      const checked = this.recordOf(ante)
-      this.demandEnabled()
-      const prior = SX.revisionOf(checked)
-      const record: VaultRecord = { ...checked, ...SX.nextRevisionOf(prior, nowMillis()), gate: { ...checked.gate, ...moved, gate_epoch: checked.gate.gate_epoch + 1 } }
-      answer = await call(record, { prior })
-      await this.deliver(answer, isScopePinned ? this.scopeOf(record) : record)
+      const { record, prior } = this.#gateMoveOf(ante, { passkey_wayin: null })
+      answer = await this.vaultDB.tryRevokePasskey(record, { prior })
+      this.deliver(answer, record)
       return answerWithVal(answer, valOf(answer))
     } catch (err) { return refusedAnswerOf(err, answer) }
+  }
+
+  /** The record of the vault at `ante` with `moved` laid on its gate, at the next revision and gate_epoch, and the revision it expects. */
+  #gateMoveOf(ante: VaultRecord, moved: Partial<SX.Gate>): { record: VaultRecord, prior: SX.Revision } {
+    const checked = this.recordOf(ante)
+    this.demandEnabled()
+    const prior = SX.revisionOf(checked)
+    const record: VaultRecord = { ...checked, ...SX.nextRevisionOf(prior, nowMillis()), gate: { ...checked.gate, ...moved, gate_epoch: checked.gate.gate_epoch + 1 } }
+    return { record, prior }
   }
 
   /** {@link Listing.tryDel}, refusing first a delete that names another life than the vault listed; its boxes cascade in the vaultDB. */
@@ -167,17 +177,17 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   #dismissGatingOfGoneListing(): void { this.#openGating?.dismiss() }
   // --
 
-  // == [Defined by the vault listing]: vaultTokOfWorld, fateOver, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the vault listing]: vaultTokOfWorld, slotStepOf, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   protected vaultTokOfWorld(): null { return null }
 
-  /** An older record loses to the vault listed. A newer one replaces it where it is of another `vault_tok`, or alive over a tombstone. */
-  protected override fateOver(listed: Vault, record: Fetched<VaultRecord, VaultSparse>): SlotFate {
+  /** The vault listed keeps over an older record. A newer one remakes its slot where it is of another `vault_tok`, or alive over a tombstone. */
+  protected override slotStepOf(listed: Vault, record: Fetched<VaultRecord, VaultSparse>): SlotStep {
     const age = cmpRevisions(listed, record)
-    if (age === 'older') { return 'lose' }
+    if (age === 'older') { return 'keep' }
     const isOtherLife = record.vault_tok !== listed.vault_tok
     const isRebirth = (! listed.isPresent) && (! VX.isTombstone(record))
-    return ((age === 'newer') && (isOtherLife || isRebirth)) ? 'replace' : 'receive'
+    return ((age === 'newer') && (isOtherLife || isRebirth)) ? 'remake' : 'receive'
   }
 
   protected scopepathOf(scope: VaultScope): string {

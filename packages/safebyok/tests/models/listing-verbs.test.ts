@@ -194,7 +194,7 @@ describe("listing: an answer is for the scope the call asked about", () => {
 
   it("refuses a put answered at a revision it did not send, the box unmoved", async () => {
     const { listing, box, next } = await putable()
-    world.mw.willPut(world.mw.answerOf(box.scope, { ...next, revision_tok: 'rev-of-another' }))
+    world.mw.willPut({ ...world.mw.answerOf(box.scope, { ...next, revision_tok: 'rev-of-another' }), act: 'replaced' })
     await TH.expectRefusal(listing.put(next, { expected: box.sparse }), 'storage_issue')
     expect(box._cheat_central).to.deep.equal(fullBoxRecord())
   })
@@ -208,7 +208,7 @@ describe("listing: an answer is for the scope the call asked about", () => {
 
   it("refuses a del answered with a tombstone it did not send, the box unmoved", async () => {
     const { listing, box } = await putable()
-    world.mw.willDel(({ scope }) => world.mw.answerOf(scope, tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-of-another' })))
+    world.mw.willDel(({ scope }) => ({ ...world.mw.answerOf(scope, tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-of-another' })), act: 'deleted' }))
     await TH.expectRefusal(listing.del(box.sparse), 'storage_issue')
     expect(box._cheat_central).to.deep.equal(fullBoxRecord())
   })
