@@ -9,8 +9,9 @@
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
 * **Status** (2026-11-13, early): #679 and #676 merged. Ready, one line: #681 → #682 → #684 →
-  #683 → 18 #685 → 19 #686 (#686 the top, filed at 089907992). T #680 ready, on main. Now the
-  second Closer Look. Then 17. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
+  #683 → 18 #685 → 19 #686 (#686 the top, filed at 089907992). T #680 ready, on main. The
+  second Closer Look running (opus, at 089907992). 17 `bank_docs` (opus) and 17r `bank_renames`
+  (sonnet) building beside it, both from #686; the wrapup restack lines them up. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
 not copied again here. What follows is the gloss.
@@ -305,6 +306,8 @@ The Coach (2026-11-12, in chat): "yes hooray! so, align to children, and local s
 *Review:* `fixed` (sonnet, medium; [#686](https://github.com/mrflip/safebyok/pull/686)). No snapshot embeds another's; dropping the upward listeners leaves no consumer stale; the discard remake in `Device.dismissGatingAtDiscard` is needed (without it the new test fails at `bank_tok` null). One fix: that method's doc block. Left, to the React rework (next sprint): `useBoxes` returns labels (rename `useBoxlabels`); the demo's `WaysIn` reads the gate without an `isPresent` check (its TODO entry); copied empty-store helpers lack doc blocks; `Listing`'s `SnapshotT` only constrains `ThingT` (a generics cleanup). Filed at 089907992, rebased onto 18's tip.
 
 ### 17 `bank_docs`
+
+*Orchestrator, 2026-11-13:* split in two, since its owed items run past four in different code: 17 keeps the Coach's text (READMEs, SECURITY.md, notes/, TODO, the changesets as one note) and the prose owed to it (the Chute exception in STYLE.md, VOCABULARY's *lease* and Vault-per-life lines, the stale design notes, the changeset corrections, the delBank-race docs note), `opus`; **17r `bank_renames`** takes the code: the Coach's renames below, `hooks.ts`'s banner and `VaultLifecycle`, the `delUnlocked` helper, and the `ensureUnlocked` calls before `ensureVault` in `bank-controls.tsx` and `KnockKnockWidget.tsx`, `sonnet`, review `medium`. Both cut from #686 (19); the wayin-proving ruling stays the Coach's, at the end.
 
 **Levels**: worker `opus`; review `none` unless its diff carries code. **After**: 16.
 `notes/security.md` through its `sonnet` subagent. *Orchestrator:* before it, the Coach asked
