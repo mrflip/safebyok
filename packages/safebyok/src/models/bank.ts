@@ -92,6 +92,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   /** The bank's one gate, which each unlock proves against. */
   get maingate(): Gate {
+    this.demandEnabled()
     const gate = this.#gateListing.at({ ...this.scope, gatelabel: 'main' })
     if (gate === null) { throw mainGateMissing(this.sparse) }
     return gate
@@ -220,7 +221,9 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   }
 
   /** Bring each vault listed, and its boxes, up to this bank's lock, which their snapshots show. */
-  #alignVaults(): void { this.#vaultListing.lock() }
+  #alignVaults(): void {
+    for (const vault of this.#vaultListing.things) { vault.alignLock() }
+  }
   // --
 
   // == [The gating's unlock]: unlockBankByProving

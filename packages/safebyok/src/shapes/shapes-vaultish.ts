@@ -20,7 +20,7 @@ import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
-import type * as BX from './shapes-bankdb'
+import * as BX from './shapes-bankdb'
 import * as GX from './shapes-gateish'
 import type { AnyGating, AskUser, RequestCleartext } from './shapes-gateish'
 import type { StrengthChecker } from '../helpers/passphrase-strength'
@@ -289,7 +289,7 @@ const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown
 
 /** The checks of what a caller hands `create` (`boxDna`) and `put` (`boxPatch`, and `boxPatchNew` where `ifPresent` is 'fail'). */
 export const { boxDna, boxPatch, boxPatchNew } = Checkers('bad_option', ({ lit, oneof, user_id, banklabel, vaultlabel, boxlabel }) => {
-  const factory = SX.boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
+  const factory = BX.boxSparse.pick({ fmt: true, am: true, bank_tok: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
     user_id, banklabel, vaultlabel, boxlabel,
     whisper: whisper.default({}),
@@ -297,7 +297,7 @@ export const { boxDna, boxPatch, boxPatchNew } = Checkers('bad_option', ({ lit, 
     whisper_codec:          lit('json_v1').default('json_v1'),
     whisper_schema_version: lit(1).default(1),
   }).strict().transform((dna) => omit(dna, factory.keyof().options))
-  const patchFields = SX.boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
+  const patchFields = BX.boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
   const pickHalves  = ({ whisper, sidecar, user_id, banklabel, vaultlabel, boxlabel }: Z.output<typeof patchFields>) => ({ whisper, sidecar, user_id, banklabel, vaultlabel, boxlabel })
   const boxPatch    = patchFields.transform(pickHalves)
   // A whole record's whisper_ciphered is recycled, so a put told to only create refuses one, before pickHalves drops it.
@@ -395,14 +395,15 @@ export interface VaultSnapshot extends VaultScope {
 /** The check of a deviceDB as a model is handed one, by its brand: an instance of a class extending DeviceDB, from whichever copy of safebyok. */
 export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDeviceDB, Phrases.DeviceDBExpected), 'bad_option')
 
-/** The check of a vault listing's world past {@link listingWorld}: what a vault and its boxes need of the bank. Checks only. */
-export const vaultWorld = Checker(({ bankScope, bank_tok, custom, fn }) => listingWorld.extend({
+/** The check of a vault listing's world past {@link listingWorld}: what a vault and its boxes need of the bank, and the lock verbs a vault passes on. Checks only. */
+export const vaultWorld = Checker(({ bankScope, bank_tok, bool, custom, fn }) => listingWorld.extend({
   scope: bankScope, bank_tok, boxRefreshMillis: horizonMillis, sealWith: fn(), unsealWith: fn(),
+  isUnlocked: bool, lock: fn(), ensureUnlocked: fn(), unlock: fn(),
   gateListing: custom<object>((val) => hasModelkind(val, 'gate_listing'), Phrases.ListingExpected),
 }), 'bad_option', [CX])
 
-/** The bank, as far as its vaults reach into it. */
-export type VaultWorld = Pick<Bank, keyof ListingWorld | 'scope' | 'bank_tok' | 'boxRefreshMillis' | 'sealWith' | 'unsealWith' | 'gateListing'>
+/** The bank, as far as its vaults reach into it, its lock verbs among them. */
+export type VaultWorld = Pick<Bank, keyof ListingWorld | 'scope' | 'bank_tok' | 'boxRefreshMillis' | 'sealWith' | 'unsealWith' | 'gateListing' | 'isUnlocked' | 'lock' | 'ensureUnlocked' | 'unlock'>
 
 /** The check of what a bank is made with, past its listing's options: the device that makes it, and the token of its device row, which the device has once its `ensureBank` has ensured the row. */
 export const bankArgs = objCheck(({ custom, device_tok }) => ({

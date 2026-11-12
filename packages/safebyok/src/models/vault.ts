@@ -13,6 +13,7 @@ import type { SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, BoxPut, BoxPutOpts, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
 import { deletedVault } from '../refusals/throwers'
+import type { Bank } from './bank'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
@@ -66,14 +67,29 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The lock]: lock
+  // == [The bank's lock]: lock, alignLock, ensureUnlocked, unlock, each with its try form
+
+  /** Lock the bank this vault is of: {@link Bank.lock}. */
+  override lock(): this { this.world.lock(); return this }
 
   /** Tell the listeners, this vault's and its boxes', the bank's lock has moved. A no-op past a discard; never throws. */
-  override lock(): this {
+  alignLock(): this {
     super.lock()
     this.#boxListing?.lock()
     return this
   }
+
+  /** The bank this vault is of unlocked: {@link Bank.ensureUnlocked}. */
+  async ensureUnlocked(): Promise<this> { await this.world.ensureUnlocked(); return this }
+
+  /** Non-throwing form of {@link ensureUnlocked}. */
+  tryEnsureUnlocked(): Promise<Outcome<this>> { return outcomeOf(() => this.ensureUnlocked()) }
+
+  /** Unlock the bank this vault is of: {@link Bank.unlock}. */
+  async unlock(): Promise<this> { await this.world.unlock(); return this }
+
+  /** Non-throwing form of {@link unlock}. */
+  tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
   // --
 
   // == [The boxes' world]: sealStampedString, unsealStampedString, stampsOf, receiveParent
@@ -160,10 +176,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
   // --
 
-  // == [Guards]: isLocked, demandWatchable, demandPresent, ensureTimely
+  // == [Guards]: isLocked, isUnlocked, demandWatchable, demandPresent, ensureTimely
 
   /** Whether the bank is locked, read live: a vault has no lock of its own. */
   get isLocked(): boolean { return this.world.isLocked }
+
+  /** Whether the bank is unlocked, read live. */
+  get isUnlocked(): boolean { return this.world.isUnlocked }
 
   /** A watch needs the vault enabled and present. */
   demandWatchable(): this { return this.demandEnabled().demandPresent() }
