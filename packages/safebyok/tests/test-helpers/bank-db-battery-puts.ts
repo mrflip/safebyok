@@ -555,7 +555,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       }
     })
 
-    it("refuses a record whose registered_at is not the stored one, under each verb", async () => {
+    it("refuses a record whose registered_at is not the stored one, under replacePassphrase and revokePasskey", async () => {
       const { bankDB, gate } = await putWith()
       const { val: withPasskey } = await bankDB.addPasskey(gatePutAskOf('addPasskey', gate, WithPasskey))
       const unregistered = { ...withPasskey, registered_at: Now + 5 }
@@ -564,10 +564,14 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
         await bankDB.tryRevokePasskey(gatePutAskOf('revokePasskey', unregistered, MainOnly)),
       ]
       for (const answer of answers) { expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' }) }
-      const { bankDB: unkeyed, gate: bare } = await putWith()
-      expect(await unkeyed.tryAddPasskey(gatePutAskOf('addPasskey', { ...bare, registered_at: Now + 5 }, WithPasskey))).to.deep.include({ ok: false, act: 'unclassified_storing' })
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(withPasskey)
-      expect(await rowsOf(unkeyed).gateRowOf(gateScope)).to.deep.equal(bare)
+    })
+
+    // A bankDB over a shared store may empty it for each bankDB made, so each case makes one.
+    it("refuses an addPasskey whose registered_at is not the stored one", async () => {
+      const { bankDB, gate } = await putWith()
+      expect(await bankDB.tryAddPasskey(gatePutAskOf('addPasskey', { ...gate, registered_at: Now + 5 }, WithPasskey))).to.deep.include({ ok: false, act: 'unclassified_storing' })
+      expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(gate)
     })
 
     it("refuses a gate verb that changes the wayin it should leave alone", async () => {

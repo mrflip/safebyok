@@ -21,6 +21,8 @@ export { describeVaultDBBattery } from './test-helpers/vault-db-battery'
 export type { VaultDBBatteryOpts, VaultDBRowCheats } from './test-helpers/vault-db-battery'
 export { describeBankDBBattery } from './test-helpers/bank-db-battery'
 export type { BankDBBatteryOpts, BankDBRowCheats } from './test-helpers/bank-db-battery'
+// The scopes, records and asks the bankDB battery is built from, as one namespace: many share a name with the vaultDB's.
+export * as BW from './test-helpers/bankdb-world'
 export { describeDeviceDBBattery } from './test-helpers/device-db-battery'
 export type { DeviceDBBatteryOpts, DeviceDBRowCheats } from './test-helpers/device-db-battery'
 export { bankScope, vaultScope, boxscope, vaultQuery, boxQuery, vaultListAsk, boxListAsk, boxTidyAsk, vaultScopeOf, boxscopeOf, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, gateMoveOf,
