@@ -239,7 +239,7 @@ mechanical.
 ### 10 `one_enabled`
 
 **Levels**: worker `opus`; review `medium`. **After**: 9. **Look-ahead**: should remove more than
-it adds (the Coach). **Size**: L.
+it adds (the Coach). **Size**: L. *Orchestrator:* ready as #677 (src +515/−517; two compactions on the 400k window, at ~366k and again 13 minutes later); in review. Its calls on a gate of another `gate_tok`, the default `onLifecycle` and an ended bank's snapshot are Open Matters rows.
 *Orchestrator:* the Coach ruled on #667 (Open Matters): **one tell per lock and unlock**. Today
 `bank.lock()` tells the device for the bank, then again as its vaults align, so for one tell a vault
 reads unlocked under a locked bank; 8c had filed, so it lands here with the lifecycle (no liminal
@@ -248,6 +248,8 @@ state). The proof story that pins two paints pins one.
 struck from this thread.
 
 ### 11 `bank_level_tests`
+
+*Orchestrator, 2026-11-12:* folded into 8d, cut from 10's ready tip with 11's text verbatim.
 
 **Levels**: worker `sonnet`; review `low`. **After**: 10. **Size**: M, likely shrunk by 8b
 (revised under rule 20); folded into 10 or dropped if 8b leaves little.
@@ -278,7 +280,7 @@ battery. A refusal's null parent (no row fetched) stays. **Levels**: worker `son
 
 ### G `guarantees_bank` (added 2026-11-12)
 
-The Coach (Coach notes): the bank-* drafts are "for swapping in atop the notes/ versions when you wish. They were written prospectively, though, so I might have a sonnet merge them as you go, with the code overriding both." *Orchestrator:* `guarantees-bank.md` merged into `notes/guarantees.md` now, the code at 9's tip overriding both; what the draft anticipated of thread 10 is not claimed, and listed for 8d. Thread 10 leaves `notes/guarantees.md` alone and reports the lines it falsifies. `deliver-contract-bank.md` stays with 10. **Levels**: worker `sonnet`; review `medium` (sonnet), checking each claim against the code. **After**: 9 (stacked on #674), beside 10. **Size**: S-M, docs.
+The Coach (Coach notes): the bank-* drafts are "for swapping in atop the notes/ versions when you wish. They were written prospectively, though, so I might have a sonnet merge them as you go, with the code overriding both." *Orchestrator:* `guarantees-bank.md` merged into `notes/guarantees.md` now, the code at 9's tip overriding both; what the draft anticipated of thread 10 is not claimed, and listed for 8d. Thread 10 leaves `notes/guarantees.md` alone and reports the lines it falsifies. `deliver-contract-bank.md` stays with 10. **Levels**: worker `sonnet`; review `medium` (sonnet), checking each claim against the code. **After**: 9 (stacked on #674), beside 10. **Size**: S-M, docs. *Orchestrator:* ready as #678 (docs only, so no review, per the skill); then rebased onto 10's ready tip (#677) and a second leg brings the note up to 10's lifecycle, so 8d edits no guarantees. Found: `Bank.autolock` holds the lease row (with its key handle) from `DeviceDB.tryPeek` (TOP row, Open Matters). The draft is promoted and removed from this directory, as is `deliver-contract-bank.md` (10 promoted it).
 
 ### 16 `vaultdb_out`
 
