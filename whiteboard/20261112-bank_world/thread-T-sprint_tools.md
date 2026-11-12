@@ -66,8 +66,8 @@ sprint's numbered threads. Justify: green (every package; root 287 tests; action
 * **Discoveries**:
   - The release workflow's Version PR opens as a draft, so CI now holds it until the Coach
     labels it `ci` or marks it ready (notes/releasing.md says so).
-  - A skipped matrix job may report no `node-compat (22)` check; harmless on a draft, which
-    cannot merge, but unverified on GitHub.
+  - A skipped matrix job reports a bare `node-compat`, not `node-compat (22)` (seen on #680's
+    held run); harmless on a draft, which cannot merge. The `ci` label's run started at once.
   - The scratch test: a `git clone --shared` world (scratchpad `sprint_tools/setup.sh`) with
     two stacked threads (the second cut from the first's older tip), a sprint branch, a base
     branch with plan-only, base-only, patch-equivalent and conflicting commits, a pre-existing
