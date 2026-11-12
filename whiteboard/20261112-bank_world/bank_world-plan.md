@@ -104,6 +104,8 @@ mirror the gate verbs' policy table inside their databases, so the classifier's 
 read one-for-one against `design.md`, *The gate verbs' policy*. Rule 17 applies: where two
 refusals could hold, take the one that falls out. **Size**: M.
 
+*Review:* `fixed` (sonnet, medium; [#660](https://github.com/mrflip/safebyok/pull/660)). Policy rows and row-above refusals one for one with design.md; one padding fix. Left: two `vaultRow` cases share a title until 16; the thread file's *Decisions* line on gate verbs and a missing main gate says `damaged_row` where code and BE4 say `ahead`/`void` (rule 17; the code stands); doc blocks for a documentarian. Filed rebased onto main at `7d7ee80b6`.
+
 ### 4 `bankdb_adapter`
 
 `BankDB`, `AdapterBankDB`, `MemoryBankDB`, the battery (copy then edit, rule 10), the wire
