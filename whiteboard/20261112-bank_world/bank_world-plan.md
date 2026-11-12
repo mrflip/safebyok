@@ -217,7 +217,7 @@ and each handoff quotes it. The line is red from 8a's tip to 8c's (rule 20).
 * **8c `bank_prompts`**: the gate's prompts and verbs, `del_bank`, `autolock`, a bank tombstone
   delivered; unskips 8b's skips; React compiles. **Levels**: worker `opus`; review `medium`.
   **After**: 8b.
-* **8d `bank_gate_tests`**: the former 8b below. **After**: 8c. *Orchestrator:* after 9, so its new tests and the guarantees it promotes use the bank-key names (9 and 8d both edit `notes/guarantees.md` and VOCABULARY). *Orchestrator, 2026-11-12 (new session):* after 10, stacked on its ready tip, not beside it: 10 is the critical path (10, 11, 12, 16, 17), 8d's new bank tests are better written over 10's lifecycle than rebased across it, and the line needs no restack between them. 8d is judged then against 11: 8c already rewrote `vault-gate.test.ts` over the bank, so 11's re-pointing may fold into 8d.
+* **8d `bank_gate_tests`**: the former 8b below. **After**: 8c. *Orchestrator:* after 9, so its new tests and the guarantees it promotes use the bank-key names (9 and 8d both edit `notes/guarantees.md` and VOCABULARY). *Orchestrator, 2026-11-12 (new session):* after 10, stacked on its ready tip, not beside it: 10 is the critical path (10, 11, 12, 16, 17), 8d's new bank tests are better written over 10's lifecycle than rebased across it, and the line needs no restack between them. 8d is judged then against 11: 8c already rewrote `vault-gate.test.ts` over the bank, so 11's re-pointing may fold into 8d. Owed here from 9's review: `notes/guarantees.md` G3 still says the wayins are stored only in the VaultDB; the promotion of `guarantees-bank.md` corrects it.
 
 ### 8b `bank_gate_tests` (now 8d)
 
@@ -230,6 +230,7 @@ table of files, G1, G3, G4, G9) and VOCABULARY.md. **Levels**: worker `opus`; re
 ### 9 `bankkey_rename`
 
 **Levels**: worker `sonnet`; review `medium`, reading each purpose string. **After**: 8b. *Orchestrator:* ready as #674 (+89/−89 src in safebyok; only safebyok-graphql among the adapters spells the fields; no `fmt` moved, a YOLO call); in review.
+*Review:* `fixed` (sonnet, medium; [#674](https://github.com/mrflip/safebyok/pull/674)). Every code hunk a pure name swap; five doc and changeset fixes (doc blocks reading "the bank's bankKey", `@example` ctx stamps, three missed "vault key"s, VOCABULARY's passkeyKey row, the changeset's `fmt` reason). Left: `Bank.unlock`/`delPrompt`/`ensureUnlocked` refresh without `VX.Promptly` (a two-line directive to 10); the ride-along untested (Cleanup); G3's "(VaultDB)" (8d); VOCABULARY's *wayin, as stored* row (17).
 **Look-ahead**: 13 to 15 are cut after this, so it renames only what is in its base. **Size**: M,
 mechanical.
 
