@@ -1,6 +1,6 @@
 # Thread 7: plain_del (2026-11-12)
 
-Branch `20261112-plain_del`, PR #TBD, stacked on [#661](https://github.com/mrflip/safebyok/pull/661) (thread 6,
+Branch `20261112-plain_del`, PR [#662](https://github.com/mrflip/safebyok/pull/662), stacked on [#661](https://github.com/mrflip/safebyok/pull/661) (thread 6,
 device_owner). Justify: green (core 3005, react 261, demo 98, e2e 504, the rest unchanged).
 
 * **Built**:
