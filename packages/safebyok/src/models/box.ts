@@ -21,25 +21,27 @@ import { Storable } from './storable'
 import type { Vault } from './vault'
 import { refusedAnswerOf } from '../storage/bank-db'
 
-/** A box as this device has it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
+/** A box in this tab, with its record's fields as its own props.
+ * Its whisper opens while the bank is unlocked.
+ */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   // == [Props]: user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, listing, #exposed, #isVeiled
 
-  /** The scope, tattooed on by Storable's constructor. */
+  /** The fields of this box's scope. */
   declare readonly user_id:    string
   declare readonly banklabel:  string
   declare readonly vaultlabel: string
   declare readonly boxlabel:   string
-  /** The life of the bank this box lies in, inscribed once by `assignInitialProps` and never moved. */
+  /** The life of this box's bank. It never changes. */
   declare readonly bank_tok:   string
-  /** The vault this box lies in, inscribed once by `assignInitialProps` and never moved. */
+  /** The life of this box's vault. It never changes. */
   declare readonly vault_tok:  string
 
   declare readonly listing: BoxListing
 
-  /** The whisper the host asked to keep open on the instance, a plain object it may edit: hidden while the vault is locked, kept until {@link unexpose} or a vault modification clears the box. */
+  /** The whisper exposed, a plain object the host may edit, or null. */
   #exposed: Whisper | null = null
-  /** Whether {@link veil} is hiding the whisper exposed. */
+  /** Whether the whisper exposed is veiled. */
   #isVeiled = false
   // --
 
@@ -54,13 +56,13 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** The storage format of the record in hand. */
   get fmt(): number { return this.central.fmt }
 
-  /** The life of the box under its boxlabel, as the record in hand has it: minted at its birth, and kept by every later revision of that life. */
+  /** This box's life, as the record in hand has it. A box deleted and put again has another. */
   get box_tok(): string { return this.central.box_tok }
 
-  /** The sidecar of the record in hand, which only the full record carries; null otherwise. It has nothing secret, so it shows whether the vault is locked or not. */
+  /** The box's {@link Sidecar}, readable while the bank is locked, or null where the record in hand is not full. */
   get sidecar(): Sidecar | null { return this.full?.sidecar ?? null }
 
-  /** The sealed parts of the record in hand; null where it is not full. */
+  /** The wrapped boxKey of the record in hand, or null where the record is not full. */
   get box_key_wrapped():        BoxRecord['box_key_wrapped'] | null  { return this.full?.box_key_wrapped ?? null }
   /** The whisper's codec in the record in hand, or null where the record is not full. */
   get whisper_codec():          'json_v1' | null                     { return this.full?.whisper_codec ?? null }
@@ -69,8 +71,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** The ciphered whisper in the record in hand, or null where the record is not full. */
   get whisper_ciphered():       BoxRecord['whisper_ciphered'] | null { return this.full?.whisper_ciphered ?? null }
 
-  /** The whisper exposed on this instance, or a bag standing in for it while it hides. Ask {@link exposure} why, never the bag.
-   * See notes/expose_improves_security.md
+  /** The whisper exposed on this box, or a placeholder object while it is hidden.
+   * Ask {@link exposure} why it is hidden: never inspect the placeholder.
    */
   get whisper(): Whisper {
     if (this.#exposed === null) { return ENCRYPTED }
@@ -80,8 +82,11 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
 
   // Taken in the order `whisper` picks its bag.
-  /** Where the whisper stands, read live: `showing`, or why `whisper` hides it.
-   * `locked` means the whisper is exposed but hidden while the vault is locked; it is not the vault's lock, for which ask `isLocked` (an unexposed box in a locked vault answers `unexposed`).
+  /** Whether {@link whisper} shows the whisper, or why it does not:
+   * - `'unexposed'` -- nothing is exposed, whether or not the bank is locked
+   * - `'locked'`    -- exposed, but hidden while the bank is locked
+   * - `'veiled'`    -- exposed, but hidden by {@link veil}
+   * - `'showing'`   -- exposed and shown
    */
   get exposure(): BoxExposure {
     if (this.#exposed === null) { return 'unexposed' }
@@ -90,19 +95,19 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return 'showing'
   }
 
-  /** True where {@link whisper} shows the value: exposed, unlocked and unveiled; read live. */
+  /** Whether {@link whisper} shows the whisper: exposed, unlocked and not veiled. */
   get isShowing(): boolean { return this.exposure === 'showing' }
 
-  /** True while {@link veil} hides the whisper exposed, whatever the lock; read live. */
+  /** Whether {@link veil} has hidden the whisper exposed, whether or not the bank is locked. */
   get isVeiled(): boolean { return this.#isVeiled }
 
-  /** Whether this box's bank is locked, read live. */
+  /** Whether this box's bank is locked. */
   get isLocked(): boolean { return this.bank.isLocked }
   // --
 
   // == [Construction]: assignInitialProps
 
-  /** Inscribes the `bank_tok` and `vault_tok` of the vault life this box lies in, beside what the base inscribes. */
+  /** Set `bank_tok` and `vault_tok`, and the props the base sets. */
   protected override assignInitialProps(central: Fetched<BoxRecord, BoxSparse>): void {
     tattoo(this, { bank_tok: central.bank_tok, vault_tok: central.vault_tok }, { configurable: false })
     super.assignInitialProps(central)
@@ -111,7 +116,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unexpose, #doUnexpose, veil, unveil, patchWhisper, replaceExposed, unseal
 
-  /** The timely stored whisper, keeping nothing on the instance. */
+  /** The timely stored whisper.
+   * Extracting it authenticates that the box record, all but its sidecar, has not been modified since it was sealed.
+   */
   async extractWhisper(opts: TimelyOpts = {}): Promise<Whisper> {
     await this.ensureUnsealable(opts); this.demandUnsealable()
     return this.#unseal(this.demandFullProps())
@@ -120,9 +127,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Non-throwing form of {@link extractWhisper}. */
   tryExtractWhisper(opts: TimelyOpts = {}): Promise<Outcome<Whisper>> { return outcomeOf(() => this.extractWhisper(opts)) }
 
-  /** Unseal the stored whisper and keep it on the instance, showing, where `box.whisper` offers it until {@link unexpose}.
-   * See notes/expose_improves_security.md
-   */
+  // Why keeping a whisper on the box is safe: notes/expose_improves_security.md.
+  /** Unseal the stored whisper and keep it on this box, where {@link whisper} shows it until {@link unexpose}. */
   async expose(opts: TimelyOpts = {}): Promise<this> {
     const exposed = await this.extractWhisper(opts)
     this.demandExposable()
@@ -131,7 +137,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** Discard the whisper kept on the instance, and its veil, from any state. */
+  /** Discard the whisper exposed, and its veil. Safe to call in any state. */
   unexpose(): this {
     this.#doUnexpose()
     this.align()
@@ -139,22 +145,20 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
 
   // called internally by adopt, alignLock and unexpose itself
-  /** Drop the whisper exposed and its veil; the caller aligns. */
+  /** Drop the whisper exposed and its veil, without aligning. */
   #doUnexpose(): void {
     this.#exposed = null
     this.#isVeiled = false
   }
 
-  /** Hide the whisper exposed, keeping it, from any state. */
+  /** Hide the whisper exposed, keeping it. Safe to call in any state. */
   veil(): this {
     this.#isVeiled = true
     this.align()
     return this
   }
 
-  /** Stop hiding the whisper exposed; a locked vault still hides it.
-   * See notes/expose_improves_security.md
-   */
+  /** Stop veiling the whisper exposed. A locked bank still hides it. */
   unveil(): this {
     if (this.#exposed === null) { throw notExposed() }
     this.#isVeiled = false
@@ -162,7 +166,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** Merge `patch` over the whisper exposed, shown or hidden, into a new object, arrays replaced, and tell the subscribers; nothing is written. */
+  /** Merge `patch` into the whisper exposed, even while it is hidden, and tell the subscribers. Nothing is stored.
+   * The result is a new object, and an array in `patch` replaces the whole array.
+   */
   patchWhisper(patch: Whisper): this {
     const given = VX.whisperPatch.parse(patch)
     this.demandEnabled()
@@ -171,7 +177,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  /** Swap in a new whisper exposed, and tell the subscribers even where the snapshot, which has none of it, has not moved. */
+  /** Swap in a new whisper exposed, and tell the subscribers whether or not the snapshot changed. */
   #replaceExposed(exposed: Whisper): void {
     const ante = this.snapshot
     this.#exposed = exposed
@@ -179,7 +185,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     if (this.snapshot === ante) { this.tellListeners() }
   }
 
-  /** The whisper of `record`, opened through the vault's seal verbs and checked by `CX.whisper`. */
+  /** The whisper of `record`. */
   async #unseal(record: BoxRecord): Promise<Whisper> {
     const { box_key_wrapped, whisper_ciphered } = record
     const whisperText = await this.vault.unsealStampedString({ box_key_wrapped, whisper_ciphered }, boxStampOf(record))
@@ -189,17 +195,26 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Putting]: put, tryPut, putExposed, tryPutExposed, edit, keptWhisper
 
-  /** Seals `patch` over the record in hand and puts it, answering this box; a deleted box is reborn.
+  /** Seal `patch` over the record as its next revision, and store it, resolving this box.
    *
-   * A lock does not interrupt or reverse a put once its write has begun. A patch leaving out the whisper or the sidecar keeps
-   * the stored half, so a sparse box is fetched first unless the patch carries both; a box behind storage answers `stale_write`.
+   * A patch that leaves out the whisper or the sidecar keeps the stored one, but may fetch the box first to get it.
+   * A lock does not interrupt or reverse a put once its write has begun.
+   * - `ifPresent` -- what to do over a live box:
+   *   - `'repl'` -- replace it (default)
+   *   - `'fail'` -- refuse `camped`
+   *   - `'get'`  -- store nothing, and resolve this box holding the stored record
+   * - `ifAbsent`  -- what to do where the box was never stored, or deleted:
+   *   - `'add'`  -- store it as a new life of the box, its whisper and sidecar `{}` where left out (default)
+   *   - `'fail'` -- refuse `absent_box`
+   *
+   * Refuses `stale_write` when storage has a newer revision. The box then holds that revision: edit from it.
    */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
     demandGood(await this.tryPut(patch, opts))
     return this
   }
 
-  /** {@link put}, answering the bankDB's own answer with the box listed as its `val`. */
+  /** {@link put}, resolving the bankDB's answer instead of throwing, with this box as its `val`. */
   async tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<ThingAnswer<Box>> {
     try {
       const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis } = VX.boxPutOpts.parse(opts)
@@ -211,7 +226,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
   }
 
-  /** Seal the whisper exposed, veiled or not, and put it; `patch` may name a sidecar, never a whisper. */
+  /** Put the whisper exposed, veiled or not, with the sidecar `patch` names, if any. */
   async putExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<this> {
     const { sidecar } = VX.boxExposedPatch.parse(patch)
     if (this.#exposed === null) { throw notExposed() }
@@ -233,16 +248,18 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return { record, expected }
   }
 
-  /** The stored whisper, unsealed from the record in hand, for a patch that leaves the whisper out. */
+  /** The whisper of the record in hand. */
   #storedWhisper(): Promise<Whisper> { return this.#unseal(this.demandFullProps()) }
   // --
 
   // == [Guards]: demandUnsealable, demandPuttable, #givenOf, demandExposable, demandPresent, ensureUnsealable, ensurePuttable
 
-  /** Demands that the box be enabled and present, with a full record, and the vault unlocked. */
+  /** Throw unless `isEnabled`, unlocked, `isPresent` and `isFull`. */
   demandUnsealable(): this { return this.demandEnabled().demandUnlocked().demandPresent().demandFull() }
 
-  /** The parsed `patch`, refused unless a put of it under `opts` may go ahead now. */
+  /** Parse `patch` for a put under `opts`, throwing unless the put may go ahead now.
+   * It asks `isEnabled`, unlocked, and, where `patch` leaves out the whisper or the sidecar, a whole record in hand.
+   */
   demandPuttable(patch: BoxPatch, { ifPresent }: BoxPutOpts = {}): BoxPatchParsed {
     const given = this.#givenOf(patch, ifPresent)
     this.demandEnabled().demandUnlocked()
@@ -250,13 +267,13 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return given
   }
 
-  /** `patch` parsed as one of this box's, for a put under `ifPresent`. */
+  /** `patch`, parsed for a put under `ifPresent` and checked against this box's scope. */
   #givenOf(patch: BoxPatch, ifPresent?: BoxPutOpts['ifPresent']): BoxPatchParsed {
     const patchCheck = (ifPresent === 'fail') ? VX.boxPatchNew : VX.boxPatch
     return patchCheck.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
   }
 
-  /** Keeping a whisper on the instance needs the box enabled and the vault unlocked. */
+  /** Throw unless `isEnabled` and unlocked. */
   demandExposable(): this { return this.demandEnabled().demandUnlocked() }
 
   /** Demand that this box is present. */
@@ -269,7 +286,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   ensureUnsealable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
 
   // A sparse box under a patch of both halves needs nothing fetched: the put's revision check is what catches a stale one.
-  /** Bring this box and its vault timely enough for a put of `patch`, fetching a sparse record only where `patch` keeps part of it. */
+  /** `hydrate` this box for a put of `patch`, leaving a sparse record unfetched where `patch` has both the whisper and the sidecar. */
   async ensurePuttable(patch: BoxPatch, opts: TimelyOpts = {}): Promise<this> {
     const given = this.#givenOf(patch)
     if (this.isWholeRecord(this.central) || ! isOfBothHalves(given)) { return this.hydrate(opts) }
@@ -282,7 +299,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // A lock only hides the whisper exposed, so that edits survive to the unlock (notes/expose_improves_security.md). A
   // box that no longer answers will never show it again.
-  /** Tell the listeners the bank's lock has moved; once this box no longer answers, its whisper exposed goes, and its veil. Never throws.
+  /** Realign with the bank's lock, and drop the whisper exposed and its veil once this box is not `isEnabled`. Never throws.
    * @internal
    */
   override alignLock(): this {
@@ -293,18 +310,18 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Protected, overriding Storable's]: adopt, isFullRecord, lifeTokPathOf, makeSnapshot
 
-  /** A record gone takes the whisper exposed, and its veil, with it. */
+  /** Adopt `central`, dropping the whisper exposed and its veil where it is a tombstone. */
   protected override adopt(central: Fetched<BoxRecord, BoxSparse>): void {
     super.adopt(central)
     if (this.isTombstoneRecord(central)) { this.#doUnexpose() }
   }
 
-  /** A box record alive that carries its sealed whisper. */
+  /** Whether `fetched` is alive and has its sealed whisper. */
   protected isFullRecord(fetched: BoxSparse): fetched is BoxRecord {
     return (fetched.am === 'a') && ('whisper_ciphered' in fetched)
   }
 
-  /** A box's life is its vault's and its own: {@link BX.vaultLifeOf}, then `box_tok`. */
+  /** The life of `record`: its vault's life ({@link BX.vaultLifeOf}), then its `box_tok`. */
   protected lifeTokPathOf(record: Fetched<BoxRecord, BoxSparse>): string { return `${BX.vaultLifeOf(record)}-${record.box_tok}` }
 
   protected makeSnapshot(): BoxSnapshot {
@@ -324,19 +341,19 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 
-  /** Answers 'box', which marks this model to a check: {@link Modelkind}. */
+  /** Always `'box'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'box' { return 'box' satisfies Modelkind }
 }
 
 // == [Patches]: isOfBothHalves
 
-/** Whether `given` carries both the whisper and the sidecar, so that a put of it needs nothing from the record stored. */
+/** Whether `given` has both the whisper and the sidecar. */
 function isOfBothHalves({ whisper, sidecar }: BoxPatchParsed): boolean { return (whisper !== undefined) && (sidecar !== undefined) }
 // --
 
 // == [Merging]: mergedOver
 
-/** `patch` merged over a copy of `whisper`, arrays replaced, as a plain object merge. */
+/** `patch` merged over a copy of `whisper`, arrays replaced. */
 function mergedOver(whisper: Whisper, patch: Whisper): Whisper {
   return mergeWith(cloneDeep(whisper), patch, (_was, val) => (Array.isArray(val) ? val : undefined))
 }
@@ -345,18 +362,21 @@ function mergedOver(whisper: Whisper, patch: Whisper): Whisper {
 // == [The seal]: sealedRecordOf, boxStampOf, deserializeWhisper
 
 // The sidecar is laid beside the seal, never in it, so storage may change it and the whisper still opens.
-/** The full record of `base` with `sidecar`, `whisper` sealed through `vault`: as json_v1, bound with its key to the box's stamp. Of `base`, only its sparse fields are taken. */
+/** The full record of `base`, with `sidecar` in the clear and `whisper` sealed through `vault`.
+ * The whisper is ciphered, as JSON text, under a fresh boxKey. Both are bound to the stamps of the box, its vault and
+ * its bank: they open only for this revision of this box, unchanged. Only the sparse fields of `base` are taken.
+ */
 async function sealedRecordOf(vault: Pick<Vault, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: Whisper): Promise<BoxRecord> {
   const sparse = BX.boxSparse.parse(base)
   const { box_key_wrapped, whisper_ciphered } = await vault.sealStampedString(stableJsonify(whisper), boxStampOf(sparse))
   return BX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })
 }
 
-/** The box's stamp, which the lease binds both sealed parts to: every sparse field of `record`, and not its sidecar. */
+/** The box's stamp: every sparse field of `record`, and not its sidecar. */
 function boxStampOf(record: BoxSparse): CipherCtxRecord { return BX.boxSparse.parse(record) }
 
 // What JSON.parse throws is replaced, never kept as a cause: a SyntaxError can quote the text it failed on.
-/** The whisper `text` holds as JSON; `damaged_whisper` where it holds none, or holds what is not a whisper. */
+/** Parse the whisper in the JSON `text`, throwing `damaged_whisper` for anything else. */
 function deserializeWhisper(text: string): Whisper {
   let parsed: unknown
   try {

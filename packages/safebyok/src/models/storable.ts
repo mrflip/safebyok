@@ -14,7 +14,9 @@ import type { Revision } from '../shapes/shapes-storage'
 
 // == [Revisions]: cmpRevisions
 
-/** How `post` compares to `ante`: the later `revision_seq` is newer. The same seq under another `revision_tok` is two puts written as one revision. */
+/** Compare `post` with `ante` by `revision_seq`: the higher is newer.
+ * Throws where they share a `revision_seq` under different `revision_tok`s.
+ */
 export function cmpRevisions(ante: Revision, post: Revision): Age {
   if (post.revision_seq < ante.revision_seq) { return 'older' }
   if (post.revision_seq > ante.revision_seq) { return 'newer' }
@@ -29,32 +31,31 @@ export function cmpRevisions(ante: Revision, post: Revision): Age {
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
   // == [Props]: scope, listing, revision_tok, revision_seq, registered_at, written_at, #central, #snapshot, #refreshedAt, #listeners, #getSnapshot, #subscribe
 
-  /** Adorned in the constructor: readable, left out of enumeration and JSON. */
+  /** The listing this thing is in. It is left out of enumeration and JSON. */
   declare readonly listing: ListingOf<ScopeT, RecordT, SparseT>
 
-  /** The revision and times of the record in hand, as plain own props, assigned before the seal by `assignInitialProps` and again by `assign` at each adopt: `registered_at` only at birth and for a record of another life. */
+  /** The revision and times of the record in hand, as own props. */
   declare revision_tok:  string
   declare revision_seq:  number
   declare registered_at: number
   declare written_at:    number
 
-  /** The scope, set once and frozen: the listing keys and watches by it, and the verbs name it. Its props are also tattooed on, so the thing ducks as its record; a getter keeps `scope` itself off the duck. */
+  // The scope's fields are own props too, so the thing ducks as its record; `scope` itself is a getter, kept off the duck.
+  /** The scope, frozen. */
   readonly #scope: ScopeT
 
-  /** The latest record this device knows is stored: full, sparse or a tombstone, void on a new instance. */
+  /** The record in hand: the latest this device knows is stored, full, sparse or a tombstone. */
   #central: Fetched<RecordT, SparseT>
-  /** Made when `snapshot` is first asked for, and again by each `align` once one exists. */
+  /** The snapshot, or null until first asked for. */
   #snapshot: SnapshotT | null = null
-  /** When storage last answered with a record not older than central that left the record in hand whole; null until it has. */
+  /** When storage last confirmed the record in hand while it was whole, or null. */
   #refreshedAt: number | null = null
   readonly #listeners = new Set<() => void>()
 
-  /** Unbound callback to acquire the snapshot */
+  /** `snapshot`, as a function safe to pass without binding. */
   readonly #getSnapshot = (): SnapshotT => this.snapshot
 
-  /** Unbound callback to enroll the given listener for push notifications
-   * Invoke the returned unsubscribe function to unenroll the listener
-   */
+  /** Add `listener`, returning a function that removes it. Safe to pass without binding. */
   readonly #subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(VX.listener.parse(listener))
     return () => { this.#listeners.delete(listener) }
@@ -66,18 +67,18 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The scope this thing is stored under. */
   get scope(): ScopeT { return this.#scope }
 
-  /** The most recent view of the stored record. */
+  /** The record in hand: the latest this device knows is stored. */
   protected get central(): Fetched<RecordT, SparseT> { return this.#central }
 
-  /** The record in hand where it is the full record, else null. */
+  /** The record in hand if it is full, else null. */
   protected get full(): RecordT | null {
     return this.isFullRecord(this.#central) ? this.#central : null
   }
 
-  /** The sparse form of central: everything but what only the full record carries. */
+  /** The record in hand, in its sparse form. */
   get sparse(): SparseT { return this.listing.sparseOf(this.#central) }
 
-  /** When this thing's record was last refreshed from the bankDB, or null where it never was. */
+  /** When this thing's record was last refreshed from the bankDB, or null if never. */
   get refreshedAt(): number | null { return this.#refreshedAt }
 
   /** Whether the record in hand is alive, damaged or gone. */
@@ -86,25 +87,27 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The {@link sparse} form of this thing, for `JSON.stringify`. */
   toJSON(): SparseT { return this.sparse }
 
-  /** Direct public access to the snapshot */
+  /** This thing's frozen snapshot: the same object until something it shows changes. */
   get snapshot(): SnapshotT {
     if (this.#snapshot === null) { this.#snapshot = this.makeSnapshot() }
     return this.#snapshot
   }
 
-  /** Public access to the unbound "hand over yer snapshot" callback */
+  /** A function returning {@link snapshot}, safe to pass without binding, as `useSyncExternalStore` wants. */
   get       getSnapshot(): () => SnapshotT { return this.#getSnapshot }
 
-  /** Public access to the unbound "make me a subscriber" callback */
+  /** A function that subscribes a listener to this thing's changes and returns its unsubscribe, safe to pass without binding. */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
 
-  /** As {@link subscribe}, for this thing's own changes alone, where a subclass widens `subscribe`. */
+  /** {@link subscribe}, for this thing's own changes only, even where a subclass widens `subscribe`. */
   get subscribeOwn(): (listener: () => void) => (() => void) { return this.#subscribe }
   // --
 
   // == [Construction]: constructor, assignInitialProps, assign
 
-  /** A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
+  /** Make the thing for `central`, in `listing`.
+   * A subclass sets its own props in `assignInitialProps`, and needs no constructor.
+   */
   constructor(listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>) {
     VX.storableArgs.parse({ listing, central })
     adorn(this, 'listing', listing)
@@ -115,14 +118,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     Object.seal(this)
   }
 
-  /** SLOPDOC: Inscribes the own props before the seal; a subclass adds its own the same way, never as #fields. */
+  /** Set the props that mirror `central`, before this instance is sealed. A subclass extends it to add its own. */
   protected assignInitialProps(central: Fetched<RecordT, SparseT>): void {
     tattoo(this, this.scope, { configurable: false })
     this.registered_at = central.registered_at
     this.assign(central)
   }
 
-  /** SLOPDOC: Assigns the mutable own props from the record about to be in hand; a subclass adds its own from it. */
+  /** Set the props that change with each revision from `record`, about to become the record in hand. */
   protected assign(record: Fetched<RecordT, SparseT>): void {
     const { revision_tok, revision_seq, written_at, registered_at } = record
     if (! this.isOfLife(record)) { this.registered_at = registered_at }
@@ -134,7 +137,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Storable ops]: get, hydrate, del, each with its try form
 
-  /** This thing, its record fetched unless timely within `opts.maxMillisSinceRefresh`; refused if absent, unless `ifAbsent: 'nil'`.
+  /** This thing, its record fetched unless refreshed within `maxMillisSinceRefresh`.
+   * - `ifAbsent: 'fail'` -- refuse where the thing was never stored, or deleted (default)
+   * - `ifAbsent: 'nil'`  -- resolve this thing there, absent
+   *
    * Chute: thing.get → listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async get(opts: FetchOpts = {}): Promise<this> {
@@ -150,7 +156,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryGet(opts: FetchOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.get(opts)) }
 
   // A thing let go answers from the record it has while that is timely: only a fetch needs it enabled.
-  /** This thing, its world timely and its record fetched unless timely within `opts.maxMillisSinceRefresh`.
+  /** This thing, whole and refreshed within `maxMillisSinceRefresh` (default: its listing's), fetched if not.
+   * An absent thing resolves too: ask {@link isPresent}.
    * Chute: thing.hydrate → thing.get → listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
@@ -163,8 +170,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Non-throwing form of {@link hydrate}. */
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
-  /** Delete, via its listing -- the asked-for record must be consistent with the listed one
-   * refuses `stale_write` if the record changes between the hydration here and the delete transaction.
+  /** Delete this thing, as `asked` names it, and resolve it.
+   * `asked` is a scope, or a record whose revision must be the one stored: otherwise it refuses `stale_write`.
    */
   async del(asked: ScopeT | SparseT, opts: TimelyOpts = {}): Promise<this> {
     const scope = this.listing.scopeOf(asked)
@@ -183,19 +190,19 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Receiving]: receiveRecord, markRefreshed, isOfLife, shapeOf
   // The listing decides what a record received does here (`Listing.#recordDeliveringOf`): an instance judges nothing.
 
-  /** Adopt `record`, mark this instance refreshed once whole, and tell the subscribers. */
+  /** Adopt `record` from storage, mark this thing refreshed if it is whole, and tell the subscribers of any change. */
   receiveRecord(record: Fetched<RecordT, SparseT>): void {
     this.adopt(record)
     if (this.#isWhole) { this.#refreshedAt = nowMillis() }
     this.align()
   }
 
-  /** Mark this instance refreshed, once whole: storage answered the record in hand. */
+  /** Mark this thing refreshed, if the record in hand is whole: storage has just confirmed it. */
   markRefreshed(): void {
     if (this.#isWhole) { this.#refreshedAt = nowMillis() }
   }
 
-  /** Whether `record` is of the life of the record in hand: the same `lifeTokPathOf`. */
+  /** Whether `record` is of the same life as the record in hand. */
   isOfLife(record: Fetched<RecordT, SparseT>): boolean {
     return this.lifeTokPathOf(record) === this.lifeTokPathOf(this.#central)
   }
@@ -203,7 +210,11 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The shape of the record in hand: see {@link shapeOf}. */
   get shape(): RecordShape { return this.shapeOf(this.#central) }
 
-  /** The shape of `record`: 'gone' for a tombstone, 'full' for a record `isFullRecord` accepts, 'sparse' for any other. */
+  /** The shape of `record`:
+   * - `'gone'`   -- a tombstone
+   * - `'full'`   -- a full record (`isFullRecord`)
+   * - `'sparse'` -- any other
+   */
   shapeOf(record: Fetched<RecordT, SparseT>): RecordShape {
     if (this.isTombstoneRecord(record)) { return 'gone' }
     if (this.isFullRecord(record))      { return 'full' }
@@ -213,16 +224,16 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Aligning]: align, becomeNotifiable, replaceSnapshot, tellListeners
 
-  /** SLOPDOC: Brings the snapshot up to the state just adopted, notifying the subscribers where it changed. */
+  /** Remake the snapshot, if one was made, and tell the subscribers if it changed. */
   align(): void { this.#replaceSnapshot() }
 
-  /** Make the snapshot now, if not yet made, so that each change from here on notifies the subscribers: until then there is none to replace. */
+  /** Make the snapshot now, so that every later change tells the subscribers. */
   becomeNotifiable(): this {
     this.#snapshot ??= this.makeSnapshot()
     return this
   }
 
-  /** Replace the snapshot with a new one, and notify all listeners. Until `snapshot` is first asked for there is none to replace: that ask makes it. */
+  /** Replace the snapshot and tell the listeners, if one was made and it changed. */
   #replaceSnapshot(): void {
     if (this.#snapshot === null) { return }
     const nextSnapshot = this.makeSnapshot()
@@ -231,7 +242,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.tellListeners()
   }
 
-  /** Tell every listener, for a subclass whose change a snapshot's fields cannot show. */
+  /** Call every listener, for a change the snapshot does not show. A listener that throws does not stop the rest. */
   protected tellListeners(): void {
     this.#listeners.forEach((listener) => {
       try {
@@ -247,7 +258,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // A thing's one duty at a lock and at its end: tell its listeners, and, once it no longer answers, drop what it has
   // of secrets. The base has none.
-  /** Tell the listeners the bank's lock has moved. Never throws. Locks nothing: a host locks the bank.
+  /** Realign with the bank's lock. Never throws, and locks nothing: a host calls `bank.lock()`.
    * @internal
    */
   alignLock(): this {
@@ -258,32 +269,32 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Guards]: isEnabled, isLocked, isTimely, isHydratedWithin, isRefreshedWithin, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, demandDeletable, demandUnlocked, demandEnabled, demandFull, demandWhole, demandFullProps, ensureDeletable
 
-  /** Whether this thing answers: its listing does, and it is the instance listed at its scope. */
+  /** Whether its listing is enabled and still lists this instance at its scope. */
   get isEnabled(): boolean { return this.listing.isEnabled && this.listing.isListed(this) }
 
-  /** Whether this thing's bank is locked, read live. */
+  /** Whether this thing's bank is locked. */
   protected abstract get isLocked(): boolean
 
-  /** Whether the record in hand was refreshed within the thing's horizon: never before storage has answered. */
+  /** Whether the record in hand was refreshed within its listing's `maxMillisSinceRefresh`. False until storage has answered. */
   get isTimely(): boolean { return this.#isRefreshedWithin(this.listing.maxMillisSinceRefresh) }
 
-  /** Whether the whole record is in hand, refreshed within `maxMillis`: what `hydrate` takes as it is. */
+  /** Whether the record in hand is whole, and was refreshed within `maxMillis`. */
   isHydratedWithin(maxMillis: number): boolean { return this.#isWhole && this.#isRefreshedWithin(maxMillis) }
 
   #isRefreshedWithin(maxMillis: number): boolean {
     return this.#refreshedAt !== null && nowMillis() - this.#refreshedAt < maxMillis
   }
 
-  /** The record in hand is not a tombstone: the thing is not gone. */
+  /** Whether the record in hand is not a tombstone. */
   get isPresent(): boolean { return ! VX.isTombstone(this.#central) }
 
-  /** True where the record in hand has every field filled; false for a sparse view, as a listing's query hands back, or for a tombstone. */
+  /** Whether the record in hand is full. False for a tombstone, and for the sparse record a listing returns. */
   get isFull(): boolean { return this.isFullRecord(this.#central) }
 
-  /** True where the record in hand is whole: {@link isFull}, or a tombstone; only a sparse record is not. */
+  /** Whether the record in hand is full or a tombstone. */
   get #isWhole(): boolean { return this.isWholeRecord(this.#central) }
 
-  /** Whether `record` is whole (full, or a tombstone), as stored in BankDB. A sparse record is not whole. */
+  /** Whether `record` is whole: full, or a tombstone. */
   protected isWholeRecord(record: Fetched<RecordT, SparseT>): record is RecordT | Tombstone<SparseT> {
     return this.isTombstoneRecord(record) || this.isFullRecord(record)
   }
@@ -293,13 +304,13 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return VX.isTombstone(record)
   }
 
-  /** Throw unless this thing is enabled and its bank is unlocked. */
+  /** Throw unless {@link isEnabled} and unlocked. */
   demandDeletable(): this { return this.demandEnabled().demandUnlocked() }
 
   /** Demand that this thing's bank is unlocked. */
   demandUnlocked(): this { if (this.isLocked)    { throw needUnlocked() }                               return this }
 
-  /** Demand that this thing answers: see {@link isEnabled}. */
+  /** Throw unless {@link isEnabled}. */
   demandEnabled():  this {
     this.listing.demandEnabled()
     if (! this.listing.isListed(this)) { throw instanceDisabled() }
@@ -312,7 +323,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Demand that the record in hand is whole: full, or a tombstone. */
   demandWhole():    this { if (! this.#isWhole)  { throw partialLoad() }                          return this }
 
-  /** The full record in hand. */
+  /** The record in hand, throwing unless it is full. */
   protected demandFullProps(): RecordT {
     if (this.full !== null) { return this.full }
     throw partialLoad()
@@ -325,17 +336,18 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Protected, for a subclass to override]: adopt, demandPresent, isFullRecord, lifeTokPathOf, makeSnapshot
 
   // Every adopt is followed by an align, which the snapshot is made from: an adopt left unaligned would leave it behind.
-  /** Assign the props of `central`, judged against the central adopted until now, then keep it, frozen; the snapshot waits for `align`. */
+  /** Make `central` the record in hand, frozen, and set the props from it. The snapshot waits for {@link align}. */
   protected adopt(central: Fetched<RecordT, SparseT>): void {
     this.assign(central)
     this.#central = Object.freeze(central)
   }
 
+  /** Throw unless `isPresent`. */
   abstract demandPresent(): this
 
-  /** Whether `fetched` is a full record, alive: a tombstone never is. */
+  /** Whether `fetched` is a full, live record. */
   protected abstract isFullRecord(fetched: SparseT): fetched is RecordT
-  /** The life of the thing `record` is of: the life toks that a birthday mints, joined. Two records of one scope with different paths are of different lives of it. */
+  /** The life of `record`: the life toks minted at its birth, joined. Records of one scope are of one life only if these match. */
   protected abstract lifeTokPathOf(record: Fetched<RecordT, SparseT>): string
   protected abstract makeSnapshot(): SnapshotT
   // --
