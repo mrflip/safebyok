@@ -92,7 +92,6 @@ Copied from `unrace-progress.md` at the sprint's end. The names are as they were
 * If an instance arrives during `putBox`'s `ensureTimely`, the birth reaches `demandNotHeld`, which refuses with `bad_option` (thread 9's review).
 * A second `attempt` with the same answer, made while the first is running, zeroes the bytes in use, so the first refuses with `bad_option` (thread 10's review).
 * A tombstone or sparse record that arrives during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).
-* When a `del_vault`'s `lock()` has its forget refused and there is no `onPanic`, the vault is vacated during the delete, and `listing.del` is still written (thread 11).
 * A tombstone or discard that arrives between the gate verb and the lease concludes the gating as failed, although the row moved (thread 11's review).
 * A gate verb refused with `vault_gone` or `vault_reborn` delivers nothing, so the Vault still reports present until its next fetch, box answer or notice (thread 11's review).
 * When two `hello`s cross, the last one answered sets the stage (thread 12).

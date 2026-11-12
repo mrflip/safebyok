@@ -102,7 +102,7 @@ assertions check.
 
 | Goofus | Gallant |
 |---|---|
-| [vault.hello] "starts the box listing's watch, so another session's put reaches the box held" | "a put from another session reaches the box held" |
+| [vault.beginWatch] "starts the box listing's watch, so another session's put reaches the box held" | "a put from another session reaches the box held" |
 | [isCondition] "narrows to a VaultError, so the caller can read its kind and message" | "narrows to a VaultError" |
 | [the friend a vault hands its leases] "binds the deviceDB's lease verbs to the vault's scope, so no verb takes one" | "calls the deviceDB under the vault's own scope" |
 

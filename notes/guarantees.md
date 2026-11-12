@@ -168,8 +168,8 @@ bytes. Everything not listed never sees the value. Private methods are named wit
 **Passphrase.** Naked: the host's dialog (`safebyok-react`'s `modals/passphrase-modal.tsx` and
 `provider/gating-modal.tsx`, on the old core until the package moves, keep what was typed in component state) →
 `gating.attempt` → `#attemptOnce`, inside the gating's `outcomeOf` → its kind's act (`buildVault`, `unlockVault`,
-`replacePassphrase`, `addPasskey`, `revokePasskey`, `delVault`, `models/gating.ts`) → `checkedCleartexts` (`GX.vaultBuildCleartexts`, `vaultUnlockCleartexts`, `passphraseReplaceCleartexts`,
-`passkeyAddCleartexts`, `passkeyRevokeCleartexts`, `vaultDelCleartexts`: shape only, `passphraseCleartext`) → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
+`replacePassphrase`, `addPasskey`, `revokePasskey`, `models/gating.ts`) → `checkedCleartexts` (`GX.vaultBuildCleartexts`, `vaultUnlockCleartexts`, `passphraseReplaceCleartexts`,
+`passkeyAddCleartexts`, `passkeyRevokeCleartexts`: shape only, `passphraseCleartext`) → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
 `buildNovel` → `Proving.judgeStrength` → the world's `strengthChecker`, as `guardStrengthChecker`
 (`helpers/passphrase-strength.ts`) wraps it → the host's `strengthChecker`; both → `passphraseKeyOf` → the world's
 `keyDeriver.deriveKeyBytes`, as `guardKeyDeriver` wraps it → `deriveKeyBytes` → the host's `keyDeriver.deriveKeyBytes`

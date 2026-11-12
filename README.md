@@ -45,7 +45,7 @@ Has vault​s and box​es scoped by user_id, banklabel, vaultlabel and boxlabel
   - Device.make({ user_id, banklabel, gates: ['main'], vaultDB, deviceDB, keyDeriver, requestCleartext, ... })​: Device, non-async, one per signed-in user
   - device.ensureBank(): Bank, once the deviceDB has this device's row and the vaults are listed; device.vacate() at sign-out
   - bank.ensureVault({ vaultlabel }, { vaultDB?, deviceDB? }?): Vault, born from one read of storage (never absent: `novel` until its passphrase is set)
-  - vault.hello() (reads storage once its picture has aged; never asks the user)
+  - vault.beginWatch() (reads storage once its picture has aged; never asks the user)
   - ensureUnlocked, lock​, putWayin(slotlabel)​, delWayin(slotlabel)​, del(), getBox(boxlabel)​, getWhisper(boxlabel)​, putBox({ boxlabel, sidecar? }, whisper?)​, delBox(boxlabel)
   - a gating, handed to the app's requestCleartext, is the one place the user is asked for the passphrase or passkey
 * a pantry​ keeping keys

@@ -38,7 +38,7 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-10-22 (the Coach, primitives sprint, ruling against a turn queue): **no ordering among a
   vault's box calls.** `getBox`, `putBox` and `delBox` calls in flight together on one vault, for
   different boxes or the same `boxlabel`, settle in no promised order. The vault joins concurrent
-  calls in two places only: its storage refresh (a `hello()` during a refresh joins it rather than
+  calls in two places only: its storage refresh (a `beginWatch()` during a refresh joins it rather than
   waiting behind it) and its gating (one prompt at a time). Nothing queues the box calls. A vaultDB's
   expectation (`vault_tok`, `gate_epoch`, a box's `revision_tok`) prevents a lost update, not a
   reordering. A host that needs an order awaits each call before making the next.
@@ -64,6 +64,8 @@ not as a settled ruling, and check it against the current design before relying 
   a delete the vaultDB refuses still logs the user out of this device, and they log back in to try
   the delete again. That is unpleasant, and could leave them thinking the vault is gone from their other
   devices when it is not. The verb does refuse, so a host can say so. The Coach: "Still: WONTFIX."
+  Superseded 2026-11-12 (bank_world, plain_del, ruling R5): `vault.del()` no longer locks first, so a
+  refused delete leaves the vault as it was.
 * 2026-11-03 (unrace, `whiteboard/20261102-newdesign/newdesign-proof.md`, *The lease*): **a `lock()` during
   the cache's `Lease.buildFromCache` loses.** The vault reports unlocked on the lease built from the cache, the lock's forget
   stands, and the next session asks the user to unlock again. The next `lock()` ends that session.

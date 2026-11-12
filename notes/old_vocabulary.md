@@ -176,6 +176,9 @@ To be deleted at 1.0.0.
 | `BankEvent`, `BankStage`; the bank snapshot's `stage`, `err` and `openGating` | `DeviceEvent`, `DeviceStage`; the device snapshot's (`DeviceSnapshot`) (2026-11-12, device_owner) |
 | `bank.vacate()`, `bank.sweep()`, `bank.isEnabled`, `bank.autolockMinutes` | `device.vacate()`, `device.sweep()`, `device.isEnabled`, `device.autolockMinutes`; the one gating open, `device.openGating` (2026-11-12, device_owner) |
 | `device_tok` (a `Bank.make` option); `useDeviceTok` (`safebyok-react`) | gone: the device asks the deviceDB for its row at `device.ensureBank()`; the bank has it as `bank.device_tok` (2026-11-12, device_owner) |
+| `vault.hello()`, `vault.tryHello()`                    | `vault.beginWatch()`, `vault.tryBeginWatch()`; `helloedVaults` (`safebyok-react`'s context) is `watchedVaults` (2026-11-12, plain_del) |
+| `vault.delVaultPrompt()`, `tryDelVaultPrompt()`; the `del_vault` gatingkind, its act and `vaultDelCleartexts` | `vault.del(vault)`, asking nobody, under an unlocked vault (2026-11-12, plain_del) |
+| `DelVaultModal`'s `gating` prop (`safebyok-react`)    | `vault` and `onDone(deleted)`: a plain confirm the host mounts (2026-11-12, plain_del) |
 
 ## The old design's names the new core does not have
 
