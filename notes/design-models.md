@@ -28,7 +28,7 @@ Removed from the interface, and so absent from every table: every `cleartexts` p
 * 👌 ok=success (general)
 * 📗 ok=read
 * 👍 ok=modified: modification was successfully transactionally applied, no changes since last update
-* 💸 decrypted: whisper is authenticated against cached vault key, box key, vault, and its non-sidecar metadata
+* 💸 decrypted: whisper is authenticated against the cached bankKey, boxKey, vault, and its non-sidecar metadata
 * 🫆 encrypted: whisper cannot be decrypted without the device, and is prohibitively difficult to decrypt even with it.
 * 🛵 sidecar:
 * ☢️ hot stuff: secret key, cleartext or preimage

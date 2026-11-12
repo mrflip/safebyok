@@ -85,7 +85,7 @@ describe("Lease.buildGranted(friend, bankKey, opts)", () => {
 
   const GrantRefusalCases = [
     [() => ({ bankKey: makeLeaseKey() }),                                        'refuses a bankKey that is not extractable'],
-    [() => ({ bankKey: 'a vault key' }),                                         'refuses a bankKey that is not a CryptoKey'],
+    [() => ({ bankKey: 'a bank key' }),                                          'refuses a bankKey that is not a CryptoKey'],
     [() => ({ opts: { ...GrantedAs, gate: TH.omitting(WorldGate, 'revision_tok') } }), 'refuses a cited gate with no revision_tok'],
     [() => ({ opts: { ...GrantedAs, gate: { ...WorldGate, gatelabel: 'other' } } }), 'refuses a cited gate of a gatelabel no gate has'],
     [() => ({ opts: { ...GrantedAs, wayinkind: 'carrier pigeon' } }),             'refuses an unknown wayinkind'],
