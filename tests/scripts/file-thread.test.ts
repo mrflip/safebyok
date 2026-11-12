@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync, type SpawnSyncReturns } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -28,6 +28,7 @@ describe('scripts/file-thread', () => {
   let git: (...args: string[]) => string
   let commit: (where: string, filename: string, body: string) => string
   let file: (prove: string) => ReturnType<typeof spawnSync>
+  let catchUp: () => SpawnSyncReturns<string>
   beforeEach(() => {
     scratch = realpathSync(TH.makeScratchDir('file-thread-test-'))
     main = path.join(scratch, 'byok')
@@ -44,6 +45,7 @@ describe('scripts/file-thread', () => {
       return git('-C', where, 'rev-parse', 'HEAD')
     }
     file = (prove: string) => spawnSync(Script, ['--prove', prove, root], { cwd: main, encoding: 'utf8', env })
+    catchUp = () => spawnSync(Script, ['--catch-up', root], { cwd: main, encoding: 'utf8', env })
     execFileSync('git', ['init', '--quiet', '--bare', '--initial-branch', 'main', origin], { env })
     mkdirSync(main)
     git('init', '--quiet', '--initial-branch', 'main')
@@ -210,13 +212,11 @@ describe('scripts/file-thread', () => {
   })
 
   describe('with --catch-up', () => {
-    const catchUp = () => spawnSync(Script, ['--catch-up', root], { cwd: main, encoding: 'utf8', env: isolatedEnv(scratch) })
-
     it('rebases onto where main has moved and pushes, without proving or removing the worktree', () => {
       cutAndBuild('origin/main')
       const moved = mainMoves()
       const result = catchUp()
-      expect(result.status, String(result.stderr)).to.eq(0)
+      expect(result.status, result.stderr).to.eq(0)
       expect(result.stdout).to.include(`${Branch} caught up: rebased onto origin/main`)
       expect(git('rev-parse', `origin/${Branch}~1`)).to.eq(moved)
       expect(git('rev-parse', `origin/${Branch}`)).to.eq(git('rev-parse', Branch))
