@@ -99,7 +99,9 @@ export abstract class DeviceDB {
 
   // == [Device verbs]: ensureCachedDevice, tryEnsureCachedDevice, forgetDevice, tryForgetDevice, listRawDevices, tryListRawDevices
 
-  /** The device row of this bank scope, made with a fresh random `device_tok` on the first call. Its `package_version` is this safebyok's, whatever an earlier call stored. */
+  /** The device row of this bank scope, made with a fresh random `device_tok` on the first call.
+   * Its `package_version` is this safebyok's, whatever an earlier call stored.
+   */
   async ensureCachedDevice(scope: BankScope): Promise<DeviceRow> {
     try {
       const { user_id, banklabel } = CX.bankScope.parse(scope)
