@@ -1,6 +1,6 @@
 # Thread 6: device_owner (2026-11-12)
 
-Branch `20261112-device_owner`, PR #661, cut from thread 2's tip 459b81429 (#658, since merged into main). Justify: green, every package (safebyok 3009, react 262, fastkey 43, graphql 376, e2e 504, demo 97, ...).
+Branch `20261112-device_owner`, PR #661, cut from thread 2's tip 459b81429 (#658, since merged into main). Justify: green, every package, after the rebase onto c23d53f9c (#660) (safebyok 3131, react 262, fastkey 43, graphql 376, e2e 504, demo 97, ...).
 
 `src/` lines against 459b81429: safebyok +583 -452, safebyok-react +121 -134, safebyok-fastkey +1 -1 (doc only).
 
