@@ -17,7 +17,7 @@ export const componentHost = () => ({ api: anyApi, createTest: () => convexTest(
 export const rootBankApi = anyApi['banks'] as unknown as SafebyokBankApi
 
 /** A host app as the README has it, built from `safebyok-convex`'s published entries: its bankDB functions served from `convex/safebyokBank.ts` through `getUserId`. */
-export const bankHostWith = (getUserId: GetUserId) => {
+export function bankHostWith(getUserId: GetUserId) {
   const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
   return app.defineModules({ safebyokBank: new SafebyokBankComponent(app.components.safebyok).api({ getUserId }) })
 }
@@ -29,4 +29,4 @@ export const bySubject: GetUserId = async (ctx) => {
 }
 
 /** The args of `buildBank`: the build of `record` and its `main` gate over no bank, as a client sends it once the core has checked it. */
-export const buildBankArgs = (record: DB.BX.BankRecord) => ({ ask: DB.BX.bankBuild.parse(BW.bankBuildAskOf(record)) })
+export function buildBankArgs(record: DB.BX.BankRecord) { return { ask: DB.BX.bankBuild.parse(BW.bankBuildAskOf(record)) } }

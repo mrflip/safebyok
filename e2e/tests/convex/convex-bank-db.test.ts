@@ -52,22 +52,22 @@ const madeOf = (bankDB: ConvexBankDB) => {
   return made
 }
 
-const getBankDoc = async (db: ComponentDb, { user_id, banklabel }: BankScope) => (
-  await db.query('safebyok_banks').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel)).unique()
-)
+async function getBankDoc(db: ComponentDb, { user_id, banklabel }: BankScope) {
+  return await db.query('safebyok_banks').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel)).unique()
+}
 
-const getGateDoc = async (db: ComponentDb, { user_id, banklabel }: BankScope, gatelabel: string) => (
-  await db.query('safebyok_gates').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('gatelabel', gatelabel)).unique()
-)
+async function getGateDoc(db: ComponentDb, { user_id, banklabel }: BankScope, gatelabel: string) {
+  return await db.query('safebyok_gates').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('gatelabel', gatelabel)).unique()
+}
 
-const getVaultDoc = async (db: ComponentDb, { user_id, banklabel, vaultlabel }: VaultScope) => (
-  await db.query('safebyok_bank_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel)).unique()
-)
+async function getVaultDoc(db: ComponentDb, { user_id, banklabel, vaultlabel }: VaultScope) {
+  return await db.query('safebyok_bank_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel)).unique()
+}
 
-const lifeBoxQuery = (db: ComponentDb, { user_id, banklabel, vaultlabel }: VaultScope, bank_tok: string, vault_tok: string) => (
-  db.query('safebyok_bank_boxes')
+function lifeBoxQuery(db: ComponentDb, { user_id, banklabel, vaultlabel }: VaultScope, bank_tok: string, vault_tok: string) {
+  return db.query('safebyok_bank_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).eq('vault_tok', vault_tok))
-)
+}
 
 const convexRowsOf = (bankDB: ConvexBankDB): TH.BankDBRowCheats => {
   const { deployment } = madeOf(bankDB)
