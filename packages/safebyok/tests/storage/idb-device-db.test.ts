@@ -199,10 +199,10 @@ describe("IdbDeviceDB's wipe of the old databases", () => {
   it("leaves another dbName's databases and the vault database untouched", async () => {
     const dbName = freshDbName()
     const otherName = freshDbName()
-    await plantClosedDB(`${otherName}:device_db`, 'records')
+    await plantClosedDB(`safebyok-${otherName}:device_db`, 'records')
     await plantClosedDB(`safebyok-${dbName}:vaults`, 'rows')
     await makeDeviceDB(dbName).listLeases()
     await TH.aWhile()
-    expect(await dbNamesNow()).to.include.members([`${otherName}:device_db`, `safebyok-${dbName}:vaults`])
+    expect(await dbNamesNow()).to.include.members([`safebyok-${otherName}:device_db`, `safebyok-${dbName}:vaults`])
   })
 })
