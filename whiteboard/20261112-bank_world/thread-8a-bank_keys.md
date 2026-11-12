@@ -1,6 +1,6 @@
 # Thread 8a: bank_keys (2026-11-12)
 
-Branch `20261112-bank_keys`, PR #TBD, stacked on #662 (thread 7, `20261112-plain_del`). Justify: **red by design**, mended by 8b. My suites are green and tsc and lint are clean on my files; see *What is red*.
+Branch `20261112-bank_keys`, PR #665, cut from #662 (thread 7, `20261112-plain_del`, since merged; the PR is filed against main). Justify: **red by design**, mended by 8b. My suites are green and tsc and lint are clean on my files; see *What is red*.
 
 * **Built**: the ruled ctx table, in `src/shapes/shapes-gateish.ts`, `src/models/{wayin,gate,proving,lease}.ts` and the deviceDB.
   - `bankStamp` `{user_id, banklabel, bank_tok, registered_at}` and `gateStamp` `{user_id, banklabel, gatelabel, gate_tok, registered_at}` are stripping objChecks beside `vaultStamp`, which is unchanged. `citedGate` `{gatelabel, gate_tok, revision_tok}` is what a lease cites, and a Gate or its record passes it.
