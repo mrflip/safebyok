@@ -9,7 +9,7 @@ import { damagedLease, leaseNotInForce, undecipheredWhisper } from '../refusals/
 import type { Wayinkind } from '../shapes/shapes-enums'
 import { type BankStamp, type CitedGate, type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, LeaseFormat, bankStamp, leaseFriend, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper } from '../shapes/shapes-gateish'
 
-/** A bank's bankKey in force on this device, good for one revision of its gate. It has the key wrapped under a non-extractable leaseKey, unwraps it for a single call, and never hands it out. */
+/** A bankKey in force on this device, good for one revision of its bank's gate. It has the key wrapped under a non-extractable leaseKey, unwraps it for a single call, and never hands it out. */
 export class Lease implements LeaseStamp {
   // == [Props]: fmt, user_id, banklabel, bank_tok, registered_at, gatelabel, gate_tok, gate_revision_tok, proved_at, wayinkind, #bankFriend, #record, #bankStamp, #isFromCache, #leaseStamp, toJSON
 

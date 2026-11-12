@@ -49,7 +49,7 @@ export function fakeCiphered(tag: string): FakeCiphered {
 export function scopeOf(user_id: string, vaultlabel = 'main'): VaultScope { return { user_id, banklabel: 'acme', vaultlabel } }
 
 /** A shape-valid passphrase wayin of a vault record's gate, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
- * never decrypt. It wraps the vault's first bankKey, and was sealed by the bank world's first device.
+ * never decrypt. It wraps the first bankKey, and was sealed by the bank world's first device.
  */
 export function wayinOf(tag: string, overrides: Partial<VaultGate['passphrase_wayin']> = {}): VaultGate['passphrase_wayin'] {
   return {

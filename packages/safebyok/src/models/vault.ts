@@ -116,7 +116,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [The boxes' world]: sealStampedString, unsealStampedString, stampsOf, receiveParent
 
-  /** `whisperText` sealed under a fresh boxKey under the bank's bankKey, both bound to the bank, this vault and `stamp`. */
+  /** `whisperText` sealed under a fresh boxKey under the bankKey, both bound to the bank, this vault and `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
     return this.world.sealWith(whisperText, this.#stampsOf(stamp))
   }
