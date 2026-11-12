@@ -113,9 +113,9 @@ Easy to get wrong:
 * With no `strengthChecker`, every new passphrase is refused as `weak_passphrase`, so no vault can
   be built. `browserOpts` supplies `zxcvbnStrengthChecker`, whose dictionary loads at `device.ensureBank()`.
 * The core sets no timers. Call `bank.autolock()` after `ensureBank` and on a timer of your own.
-* `vault.hello()` lists a vault's boxes and starts watching them. Until you call it,
+* `vault.beginWatch()` lists a vault's boxes and starts watching them. Until you call it,
   `vault.boxListing` is empty and nothing is watched, so a change made on another device does not
-  arrive until the next `vault.hello()`.
+  arrive until the next `vault.beginWatch()`.
 * `device.vacate()` is sign-out. It disables the device and its bank, then removes this bank's
   cached leases and its device row from the deviceDB. It does not touch the vaultDB, and it resolves
   once each removal has been tried. The next device's `ensureBank` for that user gets a new
@@ -134,7 +134,7 @@ Easy to get wrong:
   `onLifecycle` receives `vacated` with the refusal as its `cause`. Make another device once the user
   signs in again.
 * **`onLifecycle` receives the device's lifecycle events.** Each is a `DeviceEvent`, distinguished by
-  its `kind`: `helloed`, with the outcome of each `vault.hello()` and of each `device.ensureBank()`
+  its `kind`: `helloed`, with the outcome of each `vault.beginWatch()` and of each `device.ensureBank()`
   until the bank is up; `lease_revoke_failed`, when a cached lease could not be removed, with
   `where` it happened and the vault, if there is one; and `vacated`. If you pass no `onLifecycle`,
   `DefaultOnLifecycle` handles them. For a lease that a lock or a vacate could not remove, it logs
@@ -197,7 +197,7 @@ const device = Device.make({
 })
 const bank = await device.ensureBank()
 const vault = await bank.ensureVault({ vaultlabel: 'main' })
-await vault.hello()
+await vault.beginWatch()
 const box = await vault.getBox('stripe')
 
 await box.expose()

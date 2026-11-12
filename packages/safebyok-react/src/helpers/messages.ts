@@ -45,7 +45,7 @@ export const Messages = {
   revokePasskeyButton: 'Remove passkey',
   removingButton:      'Removing…',
   delVaultTitle:      'Delete your vault',
-  delVaultBlurb:      'Every secret in this vault will be deleted for good and cannot be recovered. Secrets on other devices will disappear as they reconnect. Enter your vault passphrase to permanently delete it:',
+  delVaultBlurb:      'Every secret in this vault will be deleted for good and cannot be recovered. Secrets on other devices will disappear as they reconnect.',
   delVaultButton:     'Delete vault',
   deletingButton:     'Deleting…',
 
@@ -75,5 +75,4 @@ export const Doing: Record<Gatingkind, string> = {
   replace_passphrase: 'change your passphrase',
   add_passkey:        'add the passkey',
   revoke_passkey:     'remove the passkey',
-  del_vault:          'delete your vault',
 }

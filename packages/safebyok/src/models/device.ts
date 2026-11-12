@@ -346,7 +346,7 @@ function heedRevokeFailed({ refusal, vault, where, device }: Extract<DeviceEvent
   vault?.vacate()
 }
 
-/** The `onLifecycle` a device has when given none: a lease that outlived a lock or a vacate, and a vacate with a cause, to the logger at error and the platform, the vault vacated; a hello refused but by the device's end to the logger. */
+/** The `onLifecycle` a device has when given none: a lease that outlived a lock or a vacate, and a vacate with a cause, to the logger at error and the platform, the vault vacated; a bring-up or beginWatch refused but by the device's end to the logger. */
 export const DefaultOnLifecycle: LifecycleHandler = (event) => {
   switch (event.kind) {
   case 'lease_revoke_failed': {

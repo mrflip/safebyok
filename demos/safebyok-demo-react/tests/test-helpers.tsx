@@ -75,10 +75,9 @@ export const answerReplacementDialog = async (antePassphrase: string, nextPassph
   fireEvent.click(button)
 }
 
-/** Wait for the delete-vault dialog, type `passphrase`, and press Delete vault. */
-export const answerDeletionDialog = async (passphrase = Passphrase) => {
-  fireEvent.change(await screen.findByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete vault' }))
+/** Wait for the dialog that confirms deleting the vault, and press Delete vault. */
+export const answerDeletionDialog = async () => {
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete vault' }))
 }
 
 /** Wait for the add-passkey dialog, type `passphrase`, and press Add passkey. {@link installFakeAuthenticator} answers the browser's own prompt. */

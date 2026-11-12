@@ -78,7 +78,7 @@ export const withoutGesture = () => {
 }
 // --
 
-// == [Open gatings]: addPasskeyTo, openGatingOf, building, unlocking, replacing, deleting, addingPasskey, revokingPasskey, passphraseGatingOf, gatingOfKind, attemptsOf
+// == [Open gatings]: addPasskeyTo, openGatingOf, building, unlocking, replacing, addingPasskey, revokingPasskey, passphraseGatingOf, gatingOfKind, attemptsOf
 
 /** Add a passkey to `vault`, which belongs to `world`'s own bank, the way a user would in the dialog.
  * Uses `passkeyClear`, or the passkey from `passkeyOf('laptop')` when none is given.
@@ -134,12 +134,6 @@ export const replacing = async (bank: Bank) => {
   return vault.tryReplacePassphrasePrompt()
 }
 
-/** Open a `del_vault` gating on a bank whose vault is built, locked or not. */
-export const deleting = async (bank: Bank) => {
-  const vault = await bank.ensureVault(VaultScopeGiven)
-  return vault.tryDelVaultPrompt()
-}
-
 /** Open an `add_passkey` gating on a bank whose vault is built and has no passkey. */
 export const addingPasskey = async (bank: Bank) => {
   const vault = await bank.ensureVault(VaultScopeGiven)
@@ -169,7 +163,7 @@ export const passphraseGatingOf = (gating: AnyGating): PassphraseGating => {
 export const attemptsOf = (gating: Gating) => vi.spyOn(Object.getPrototypeOf(gating) as Gating, 'attempt')
 // --
 
-// == [Typing in the dialog]: submitPassphrase, submitNewPassphrase, submitReplacement, submitDeletion, submitPasskeyAdd, submitPasskeyRevoke
+// == [Typing in the dialog]: submitPassphrase, submitNewPassphrase, submitReplacement, submitPasskeyAdd, submitPasskeyRevoke
 
 /** Type the passphrase into the dialog and press Unlock. */
 export const submitPassphrase = (passphrase: string) => {
@@ -198,11 +192,6 @@ export const submitReplacement = async (antePassphrase: string, nextPassphrase: 
   await pressOnceEnabled('Change passphrase')
 }
 
-/** Type the passphrase into the deletion dialog and press Delete vault. */
-export const submitDeletion = (passphrase: string) => {
-  fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
-  fireEvent.click(screen.getByText('Delete vault'))
-}
 
 /** Type the passphrase into the add-passkey dialog and press Add passkey. */
 export const submitPasskeyAdd = (passphrase: string) => {

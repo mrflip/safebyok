@@ -11,7 +11,7 @@ import { VaultListing } from '../../src/models/vault-listing'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import * as TH from '../test-helpers'
 import { isZeroed } from '../test-helpers/proving-world'
-import { NewPassphrase, Passphrase, addPasskeyTyping, byPassphrase, delTyping, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, replaceTyping, revokeTyping, hearingBadNews, storedVaultRecord, unlockTyping, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
+import { NewPassphrase, Passphrase, addPasskeyTyping, byPassphrase, delUnlocked, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, replaceTyping, revokeTyping, hearingBadNews, storedVaultRecord, unlockTyping, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -222,7 +222,7 @@ describe("vault.replacePassphrasePrompt()", () => {
 
   it("refuses a vault deleted since the last fetch, its tombstone listed before the refusal is thrown", async () => {
     const { vault, listing, demandStored, anotherSession } = await makeBornVault()
-    await delTyping(anotherSession().deliverRecord(demandStored()))
+    await delUnlocked(anotherSession().deliverRecord(demandStored()))
     expect(vault.isPresent).to.be.true
     await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase))
     expect(vault.isEnabled).to.be.false
@@ -393,19 +393,22 @@ describe("a gate change on other sessions", () => {
   })
 })
 
-describe("vault.delVaultPrompt()", () => {
+describe("vault.del()", () => {
   it("demandUnlocked on a tombstoned vault says locked, and demandPresent says gone", async () => {
     const { vault, listing } = await makeBornVault()
-    await delTyping(vault)
+    await vault.del(vault)
     const gone = listing.at(vault.scope)
     TH.expectSyncRefusal(() => gone?.demandUnlocked(), 'vault_locked')
     TH.expectSyncRefusal(() => gone?.demandPresent(), 'vault_gone')
   })
 
-  it("deletes the vault and its boxes, and forgets the cached lease", async () => {
-    const { vault, listing, storedNow, deviceDB } = await makeBornVault()
+  it("deletes the vault and its boxes, asking nobody, and forgets the cached lease", async () => {
+    const born = await makeBornVault()
+    const { vault, listing, storedNow, deviceDB } = born
+    const { shown } = dialogOf(born)
     const boxes = vault.boxListing
-    expect(await delTyping(vault)).to.equal(vault)
+    expect(await vault.del(vault)).to.equal(vault)
+    expect(shown).to.have.lengthOf(0)
     const tombstone = storedNow()
     expect(tombstone).to.include({ am: 'x' })
     expect(tombstone?.vault_tok).to.not.eq(vault.vault_tok)
@@ -416,48 +419,18 @@ describe("vault.delVaultPrompt()", () => {
     await TH.expectRefusal(boxes.get({ ...vault.scope, boxlabel: 'anthropic_api_key' }, { maxMillisSinceRefresh: 0 }))
   })
 
-  it("leaves the dialog open on a wrong passphrase, the vault unlocked and nothing stored", async () => {
+  it("refuses 'vault_locked' a locked vault, asking nobody and storing nothing", async () => {
     const born = await makeBornVault()
     const { vault, storedNow } = born
     const ante = storedNow()
-    const { gatingAt } = dialogOf(born)
-    const deleting = vault.delVaultPrompt()
-    const gating = await gatingAt<'del_vault'>()
-    await TH.expectBad(gating.attempt({ passphraseClear: 'not it' }), 'wrong_passphrase')
-    expect(gating.isOpen).to.be.true
-    expect(storedNow()).to.equal(ante)
-    expect(vault.isUnlocked).to.be.true
-    await TH.expectGood(gating.attempt({ passphraseClear: Passphrase }))
-    await deleting
-    expect(storedNow()).to.include({ am: 'x' })
-  })
-
-  it("is not stopped by a lock", async () => {
-    const born = await makeBornVault()
-    const { vault, storedNow } = born
-    const { gatingAt } = dialogOf(born)
-    const deleting = vault.delVaultPrompt()
-    const gating = await gatingAt<'del_vault'>()
+    const { shown } = dialogOf(born)
     vault.lock()
-    expect(gating.isOpen).to.be.true
-    await TH.expectGood(gating.attempt({ passphraseClear: Passphrase }))
-    await deleting
-    expect(storedNow()).to.include({ am: 'x' })
-  })
-
-  it("refuses when the listing is swept while its dialog is open", async () => {
-    const born = await makeBornVault()
-    const { vault, listing, storedNow } = born
-    const ante = storedNow()
-    const { gatingAt } = dialogOf(born)
-    const deleting = TH.expectRefusal(vault.delVaultPrompt())
-    await gatingAt<'del_vault'>()
-    listing.sweep()
-    await deleting
+    await TH.expectRefusal(vault.del(vault), 'vault_locked')
+    expect(shown).to.have.lengthOf(0)
     expect(storedNow()).to.equal(ante)
   })
 
-  it("refuses 'stale_write' a row moved since the attempt read it", async () => {
+  it("refuses 'stale_write' a row moved since the del read it", async () => {
     const born = await makeBornVault()
     const { vault, demandStored, storedNow, putBehindOurBack, opts: { vaultDB } } = born
     const tryDelVault = vaultDB.tryDelVault.bind(vaultDB)
@@ -465,9 +438,8 @@ describe("vault.delVaultPrompt()", () => {
       putBehindOurBack(demandStored())
       return tryDelVault(...args)
     })
-    await TH.expectRefusal(delTyping(vault), 'stale_write')
+    await TH.expectRefusal(vault.del(vault), 'stale_write')
     expect(storedNow()).to.include({ am: 'a' })
-    expect(vault.isLocked).to.be.true
     expect(vault.isPresent).to.be.true
     expect(vault.revision_seq).to.eq(demandStored().revision_seq)
   })
@@ -476,20 +448,19 @@ describe("vault.delVaultPrompt()", () => {
     const onLifecycle = vi.fn()
     const { vault, storedNow, deviceDB } = await makeBornVault({ passphraseClear: Passphrase }, { onLifecycle })
     deviceDB.forget.mockRejectedValue(new VaultError('storage_unavailable', 'the disk is full'))
-    await delTyping(vault)
+    await vault.del(vault)
     expect(storedNow()).to.include({ am: 'x' })
     await TH.eventually(() => onLifecycle.mock.calls.length > 0)
     expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', vault }))
   })
 
-  it("refuses a deleted vault without showing a dialog", async () => {
-    const born = await makeBornVault()
-    const { vault, demandStored, anotherSession } = born
-    await delTyping(anotherSession().deliverRecord(demandStored()))
-    const { shown } = dialogOf(born)
+  it("refuses a vault deleted on another session", async () => {
+    const { vault, demandStored, storedNow, anotherSession } = await makeBornVault()
+    await delUnlocked(anotherSession().deliverRecord(demandStored()))
+    const tombstone = storedNow()
     await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }))
-    await TH.expectRefusal(vault.delVaultPrompt())
-    expect(shown).to.have.lengthOf(0)
+    await TH.expectRefusal(vault.del(vault))
+    expect(storedNow()).to.equal(tombstone)
   })
 })
 

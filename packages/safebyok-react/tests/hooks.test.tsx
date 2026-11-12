@@ -113,7 +113,7 @@ describe("useVault and useVaultSnapshot", () => {
   it("read a vault deleted elsewhere as unborn", async () => {
     const world = TH.makeBankWorld()
     const { vault } = await TH.makeBankWithVault(world)
-    await vault.delVaultPrompt()
+    await vault.del(vault)
     render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /></BankProvider>)
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
   })
@@ -130,14 +130,14 @@ describe("useVault and useVaultSnapshot", () => {
     await waitFor(() => { expect(shown('vault')).to.eq('present locked') })
   })
 
-  it("say hello to each vault once, however many components ask for it", async () => {
+  it("begin the watch on each vault once, however many components ask for it", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
-    const hello = vi.spyOn(Vault.prototype, 'tryHello')
+    const beginning = vi.spyOn(Vault.prototype, 'tryBeginWatch')
     render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><TH.ShowsVault /></BankProvider>)
     await waitFor(() => { expect(screen.getAllByTestId('vault').map(({ textContent }) => textContent)).to.deep.equal(['present locked', 'present locked']) })
     await act(async () => { await TH.wakeupAtNextTick() })
-    expect(hello).toHaveBeenCalledOnce()
+    expect(beginning).toHaveBeenCalledOnce()
   })
 
   it("leave a refused vault hello to the bank, which tells the host's onLifecycle", async () => {
@@ -324,7 +324,7 @@ describe("the box hooks", () => {
     const { world, vault } = await boxWorld()
     render(<BankProvider {...TH.providerPropsOf(world)}><BoxPage /></BankProvider>)
     await waitFor(() => { expect(shownOfBox('box')).to.eq('revision 0, sealed') })
-    await vault.delVaultPrompt()
+    await vault.del(vault)
     await waitFor(() => { expect(shownOfBox('box')).to.eq('none') })
     expect(shownOfBox('boxes')).to.eq('none')
   })

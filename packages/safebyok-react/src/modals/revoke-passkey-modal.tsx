@@ -21,7 +21,7 @@ const RevokePasskeyForm = ({ gating, passphraseUsername }: RevokePasskeyModalPro
 
   return (
     <ModalForm
-      gating={gating}
+      onCancel={() => { gating.dismiss() }}
       title={Messages.revokePasskeyTitle}
       blurb={Messages.revokePasskeyBlurb}
       submitWord={Messages.revokePasskeyButton}

@@ -83,8 +83,11 @@ export async function addPasskeyTyping(vault: Vault, passphrase: string, tag: st
 /** `vault.revokePasskeyPrompt()`, the user typing `passphrase` at the dialog, should it be shown. */
 export function revokeTyping(vault: Vault, passphrase: string): Promise<Vault> { return askTyping(vault.world, byPassphrase(passphrase), () => vault.revokePasskeyPrompt()) }
 
-/** `vault.delVaultPrompt()`, the user typing `passphrase` at the dialog. */
-export function delTyping(vault: Vault, passphrase: string = Passphrase): Promise<Vault> { return askTyping(vault.world, byPassphrase(passphrase), () => vault.delVaultPrompt()) }
+/** `vault.del()`, the vault unlocked first by the lease cached on this device where it has none. */
+export async function delUnlocked(vault: Vault): Promise<Vault> {
+  await vault.ensureUnlocked()
+  return vault.del(vault)
+}
 
 /** How long a lease these worlds grant lasts: an hour. */
 export const LeaseMillis = 60 * 60_000

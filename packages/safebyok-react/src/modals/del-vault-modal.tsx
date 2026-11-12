@@ -1,37 +1,28 @@
-import { useRef } from 'react'
+import { useActionState, useId } from 'react'
 import { Messages } from '../helpers/messages'
 import type { DelVaultModalProps } from '../shapes'
-import { DialogBoundary, ModalForm, PassphraseField, UsernameField, textOf, useAttemptAction } from './modal-kit'
+import { ModalForm } from './modal-kit'
 
-/** Render the dialog for a `del_vault` gating: the user enters the vault's passphrase to delete the vault. */
-export const DelVaultModal = (props: DelVaultModalProps) => (
-  <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
-    <DelVaultForm {...props} />
-  </DialogBoundary>
-)
-
-const DelVaultForm = ({ gating, passphraseUsername }: DelVaultModalProps) => {
-  const fieldRef = useRef<HTMLInputElement>(null)
-  const { gripe, gripeId, action } = useAttemptAction(
-    gating,
-    'DelVaultModal',
-    (form) => gating.attempt({ passphraseClear: textOf(form, 'current-password') }),
-    () => fieldRef,
-  )
+/** Render the dialog that asks the user to confirm deleting the vault, and deletes it on Delete. */
+export const DelVaultModal = ({ vault, onDone }: DelVaultModalProps) => {
+  const gripeId = useId()
+  const [gripe, action] = useActionState(async (): Promise<string | null> => {
+    const deleted = await vault.tryDel(vault)
+    if (! deleted.ok) { return deleted.err.message }
+    onDone(true)
+    return null
+  }, null)
 
   return (
     <ModalForm
-      gating={gating}
+      onCancel={() => { onDone(false) }}
       title={Messages.delVaultTitle}
       blurb={Messages.delVaultBlurb}
       submitWord={Messages.delVaultButton}
       pendingWord={Messages.deletingButton}
-      gripeText={gripe?.text ?? null}
+      gripeText={gripe}
       gripeId={gripeId}
       action={action}
-    >
-      <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)} />
-      <PassphraseField ref={fieldRef} fieldname="current-password" fieldlabel={Messages.passphraseField} invalidBy={gripe === null ? undefined : gripeId} />
-    </ModalForm>
+    />
   )
 }

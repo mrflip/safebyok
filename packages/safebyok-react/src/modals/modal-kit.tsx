@@ -7,7 +7,7 @@ import { useRevealToggle } from '../hooks/reveal-toggle'
 import { Boundary, boundaryRefusalOf } from '../provider/boundary'
 import type { BoundarySource, Gripe, ModalFormProps, PassphraseFieldname } from '../shapes'
 
-// == [Dialog]: showWhileMounted, GatingDialog, DialogBoundary, DialogTrouble
+// == [Dialog]: showWhileMounted, ModalDialog, DialogBoundary, DialogTrouble
 
 // Show the dialog as a modal for as long as it is mounted. The browser focuses its first control, keeps Tab
 // inside it, and makes the rest of the page inert.
@@ -16,21 +16,21 @@ const showWhileMounted = (dialog: HTMLDialogElement) => {
   return () => { dialog.close() }
 }
 
-const GatingDialog = ({ gating, role, labelledBy, describedBy, children }: {
-  gating:      AnyGating
+const ModalDialog = ({ onCancel, role, labelledBy, describedBy, children }: {
+  onCancel:    () => void
   role?:       'alertdialog' | undefined
   labelledBy:  string
   describedBy: string
   children:    ReactNode
 }) => (
-  // The browser would close the dialog on Escape by itself. Prevent that and dismiss the gating instead, so the gating decides when the dialog closes.
+  // The browser would close the dialog on Escape by itself. Prevent that and call onCancel instead, so whoever mounted the dialog decides when it closes.
   <dialog
     ref={showWhileMounted}
     className="modal"
     role={role}
     aria-labelledby={labelledBy}
     aria-describedby={describedBy}
-    onCancel={(evt) => { evt.preventDefault(); gating.dismiss() }}
+    onCancel={(evt) => { evt.preventDefault(); onCancel() }}
   >
     {children}
   </dialog>
@@ -45,13 +45,13 @@ const DialogTrouble = ({ gating }: { gating: AnyGating }) => {
   const titleId = useId()
   const wordId = useId()
   return (
-    <GatingDialog gating={gating} role="alertdialog" labelledBy={titleId} describedBy={wordId}>
+    <ModalDialog onCancel={() => { gating.dismiss() }} role="alertdialog" labelledBy={titleId} describedBy={wordId}>
       <h3 id={titleId}>{Messages.troubleTitle}</h3>
       <p className="gripe" id={wordId}>{Messages.troubleWord(Doing[gating.gatingkind])}</p>
       <div className="row">
         <button type="button" onClick={() => { gating.dismiss() }}>{Messages.closeButton}</button>
       </div>
-    </GatingDialog>
+    </ModalDialog>
   )
 }
 // --
@@ -90,12 +90,12 @@ const SubmitButton = ({ word, pendingWord, isSubmittable }: { word: string, pend
   return <button type="submit" disabled={pending || (! isSubmittable)}>{pending ? pendingWord : word}</button>
 }
 
-/** The layout every gating dialog shares: title, blurb, the fields passed as children, the error line, and the submit and cancel buttons. */
-export const ModalForm = ({ gating, title, blurb, submitWord, pendingWord, isSubmittable = true, gripeText, gripeId, footnote, formRef, action, onReset, children }: ModalFormProps) => {
+/** The layout every dialog shares: title, blurb, the fields passed as children, the error line, and the submit and cancel buttons. */
+export const ModalForm = ({ onCancel, title, blurb, submitWord, pendingWord, isSubmittable = true, gripeText, gripeId, footnote, formRef, action, onReset, children }: ModalFormProps) => {
   const titleId = useId()
   const blurbId = useId()
   return (
-    <GatingDialog gating={gating} labelledBy={titleId} describedBy={blurbId}>
+    <ModalDialog onCancel={onCancel} labelledBy={titleId} describedBy={blurbId}>
       <form ref={formRef} action={action} onReset={onReset}>
         <h3 id={titleId}>{title}</h3>
         <p className="quiet" id={blurbId}>{blurb}</p>
@@ -104,10 +104,10 @@ export const ModalForm = ({ gating, title, blurb, submitWord, pendingWord, isSub
         {footnote !== undefined && <p className="quiet">{footnote}</p>}
         <div className="row">
           <SubmitButton word={submitWord} pendingWord={pendingWord} isSubmittable={isSubmittable} />
-          <button type="button" onClick={() => { gating.dismiss() }}>{Messages.cancelButton}</button>
+          <button type="button" onClick={onCancel}>{Messages.cancelButton}</button>
         </div>
       </form>
-    </GatingDialog>
+    </ModalDialog>
   )
 }
 

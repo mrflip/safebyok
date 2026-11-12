@@ -282,10 +282,10 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
 
 // --
 
-// == [The gating's forms]: gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, vaultDelCleartexts, gatingLaunchOnArgs, gatingLaunchBirthArgs, CleartextsForGatingkind
+// == [The gating's forms]: gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, gatingLaunchOnArgs, gatingLaunchBirthArgs, CleartextsForGatingkind
 
 /** What the user hands an attempt, by the kind of gating; a cleartext is only ever checked here, in the attempt's own call. */
-export const { gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, vaultDelCleartexts } = Checkers('bad_option', ({ oneof, obj }) => ({
+export const { gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts } = Checkers('bad_option', ({ oneof, obj }) => ({
   gatingkind:              oneof(EX.gatingkindVals),
   vaultBuildCleartexts:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
   vaultUnlockCleartexts:       obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
@@ -298,7 +298,6 @@ export const { gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphra
   passphraseReplaceCleartexts: obj({ antePassphraseClear: passphraseCleartext, nextPassphraseClear: passphraseCleartext }).strict(),
   passkeyAddCleartexts:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer }).strict(),
   passkeyRevokeCleartexts:     obj({ passphraseClear: passphraseCleartext }).strict(),
-  vaultDelCleartexts:          obj({ passphraseClear: passphraseCleartext }).strict(),
 }))
 
 /** The arguments that launch a gating on a stored vault: its kind, the vault, the vault's `unlockByProving`, and the bank's dialog or null. */
@@ -324,7 +323,6 @@ export type CleartextsForGatingkind = {
   replace_passphrase: Z.input<typeof passphraseReplaceCleartexts>
   add_passkey:        Z.input<typeof passkeyAddCleartexts>
   revoke_passkey:     Z.input<typeof passkeyRevokeCleartexts>
-  del_vault:          Z.input<typeof vaultDelCleartexts>
 }
 // --
 
@@ -341,14 +339,14 @@ export type AnyGating = { [KindT in EX.Gatingkind]: Gating<KindT> }[EX.Gatingkin
 
 /** A gating as a host's dialog renders it: the vault it asks for, and what it asks for. */
 export interface GatingSnapshot extends VaultScope {
-  /** What the gating does once the user's cleartext proves the gate: build, unlock or delete the vault, or change its gate. */
+  /** What the gating does once the user's cleartext proves the gate: build or unlock the vault, or change its gate. */
   readonly gatingkind: EX.Gatingkind
   /** Unique to this gating, for a dialog to key on. */
   readonly gatingTok:  string
 }
 
 /** The vault each kind of gating acts on, null for a `build_vault` whose vault does not exist yet. */
-export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault, del_vault: Vault }
+export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault }
 
 /** A gating of a vault already born: every kind but `build_vault`. */
 export type VaultGatingkind = Exclude<EX.Gatingkind, 'build_vault'>

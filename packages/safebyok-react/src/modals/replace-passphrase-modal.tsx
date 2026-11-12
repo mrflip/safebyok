@@ -23,7 +23,7 @@ const ReplacePassphraseForm = ({ gating, passphraseUsername }: ReplacePassphrase
 
   return (
     <ModalForm
-      gating={gating}
+      onCancel={() => { gating.dismiss() }}
       title={Messages.changeTitle}
       blurb={Messages.changeBlurb}
       submitWord={Messages.changeButton}

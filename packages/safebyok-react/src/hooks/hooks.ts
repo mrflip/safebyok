@@ -43,7 +43,7 @@ export const useVault = (vaultlabel: string): VaultLifecycle => useVaultFor('use
 
 /** Same as {@link useVault}. `hookname` is the hook named in the error when there is no provider. */
 const useVaultFor = (hookname: string, vaultlabel: string): VaultLifecycle => {
-  const { device, helloedVaults } = useProvided(hookname)
+  const { device, watchedVaults } = useProvided(hookname)
   const snapshot = useSyncExternalStore(device?.subscribe ?? subscribeToNothing, device?.getSnapshot ?? getNothing, getNothing)
   const lifecycle = useMemo((): VaultLifecycle => {
     if (device === null || snapshot === null) { return WaitingLifecycle }
@@ -56,11 +56,11 @@ const useVaultFor = (hookname: string, vaultlabel: string): VaultLifecycle => {
   }, [device, snapshot, vaultlabel])
   const { vault } = lifecycle
   useEffect(() => {
-    if (vault === null || helloedVaults.has(vault)) { return }
-    helloedVaults.add(vault)
-    // Not awaited: the device reports the hello to onLifecycle.
-    void vault.tryHello()
-  }, [vault, helloedVaults])
+    if (vault === null || watchedVaults.has(vault)) { return }
+    watchedVaults.add(vault)
+    // Not awaited: the device reports the watch begun, or refused, to onLifecycle.
+    void vault.tryBeginWatch()
+  }, [vault, watchedVaults])
   return lifecycle
 }
 

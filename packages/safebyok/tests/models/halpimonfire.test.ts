@@ -60,7 +60,7 @@ describe("A lock called during a box verb", () => {
     const { vault, vaultDB } = await makeBornVault()
     const tryListBoxes = vaultDB.tryListBoxes.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryListBoxes').mockImplementationOnce((...args) => { vault.lock(); return tryListBoxes(...args) })
-    await expect(vault.hello()).resolves.to.eq(vault)
+    await expect(vault.beginWatch()).resolves.to.eq(vault)
     await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } }), 'vault_locked')
   })
 

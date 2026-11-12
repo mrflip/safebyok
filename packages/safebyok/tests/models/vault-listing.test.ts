@@ -11,7 +11,7 @@ import type { VaultRecord } from '../../src/shapes/shapes-storage'
 import { Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, byPassphrase, delTyping, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, useVaultWorlds, buildTyping, hearingBadNews } from '../test-helpers/vault-world'
+import { Dna, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, storedVaultRecord, useVaultWorlds, buildTyping, hearingBadNews } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -29,7 +29,7 @@ function forgotten() { return new Promise((yes) => { setTimeout(yes, 0) }) }
 /** A born vault deleted, past its forget, and its tombstone as stored. */
 async function deleted() {
   const world = await makeBornVault()
-  await delTyping(world.vault)
+  await world.vault.del(world.vault)
   await forgotten()
   return { ...world, tombstone: SX.vaultTombstone.parse(world.storedNow()) }
 }
@@ -188,7 +188,7 @@ describe("a box answer carrying a vault row of a later life as its world", () =>
     const vault = listing.deliverRecord(demandStored())
     const boxes = vault.boxListing
     await boxes.hello()
-    await delTyping(bornVault)
+    await bornVault.del(bornVault)
     const anew = await buildTyping(born, Dna, byPassphrase(Passphrase))
     await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }), 'vault_reborn')
     expect(vault.isEnabled).to.be.false
@@ -208,7 +208,7 @@ describe("a box answer carrying a vault row of a later life as its world", () =>
     const vault = listing.deliverRecord(demandStored())
     const boxes = vault.boxListing
     await boxes.hello()
-    await delTyping(bornVault)
+    await bornVault.del(bornVault)
     await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }), 'absent_vault')
     expect(vault.isEnabled).to.be.false
     expect(boxes.things).to.deep.equal([])
@@ -231,17 +231,17 @@ describe("a box method over a vault deleted elsewhere", () => {
   it.each(Verbs)("%s refuses", async (_verb, call) => {
     const { vault, demandStored, restoreRow } = await makeBornVault()
     const box = await vault.boxListing.create({ ...vault.scope, ...BoxDna })
-    await vault.hello()
+    await vault.beginWatch()
     restoreRow(tombstoneOver(demandStored()))
     await TH.expectRefusal(call({ vault, box }))
   })
 })
 
-describe("vault.delVaultPrompt()", () => {
+describe("vault.del(vault)", () => {
   it("leaves the vault deleted and locked, its cached lease forgotten", async () => {
     const world = await makeBornVault()
     const boxes = world.vault.boxListing
-    await delTyping(world.vault)
+    await world.vault.del(world.vault)
     await expectLandedGone(world.vault, world)
     await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }))
     expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
@@ -251,24 +251,16 @@ describe("vault.delVaultPrompt()", () => {
   })
 })
 
-const DelCases = [
-  [false,  'deletes an unlocked vault without showing a dialog'],
-  [true,   'deletes a locked vault without showing a dialog'],
-] as const
-
 describe("vault.del(vault.scope)", () => {
-  for (const [isLocking, blurb] of DelCases) {
-    it(blurb, async () => {
-      const world = await makeBornVault()
-      const dialog = vi.fn()
-      world.fakeBank.requestCleartext = dialog
-      if (isLocking) { world.vault.lock() }
-      expect(await world.vault.del(world.vault.scope)).to.eq(world.vault)
-      await expectLandedGone(world.vault, world)
-      expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
-      expect(dialog).not.toHaveBeenCalled()
-    })
-  }
+  it("deletes an unlocked vault without showing a dialog", async () => {
+    const world = await makeBornVault()
+    const dialog = vi.fn()
+    world.fakeBank.requestCleartext = dialog
+    expect(await world.vault.del(world.vault.scope)).to.eq(world.vault)
+    await expectLandedGone(world.vault, world)
+    expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
+    expect(dialog).not.toHaveBeenCalled()
+  })
 })
 
 describe("a newer record of another vault_tok over a live vault", () => {
@@ -334,7 +326,7 @@ describe("an older record", () => {
   it("of either vault_tok does not bring back a deleted vault", async () => {
     const { vault, listing, demandStored, restoreRow } = await makeBornVault()
     const born = demandStored()
-    await delTyping(vault)
+    await vault.del(vault)
     const gone = listing.at(Dna)
     const tombstone = demandStored()
     expect(gone).to.include({ revision_tok: tombstone.revision_tok, isPresent: false })

@@ -1,53 +1,51 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DelVaultModal } from '../src/modals/del-vault-modal'
 import { Messages } from '../src/helpers/messages'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** Open a del_vault gating on a vault built with {@link TH.Passphrase}, and render it in a DelVaultModal. */
+/** Render a DelVaultModal over a vault just built, and so unlocked, with a spy for its `onDone`. */
 const shownFor = async () => {
-  const world = TH.makeBankWorld()
-  await TH.makeBankWithVault(world)
-  const opened = await TH.openGatingOf(world, TH.deleting)
-  render(<DelVaultModal gating={TH.gatingOfKind(opened.gating, 'del_vault')} />)
-  return { ...opened }
+  const { bank, vault } = await TH.makeBankWithVault()
+  const onDone = vi.fn()
+  render(<DelVaultModal vault={vault} onDone={onDone} />)
+  return { bank, vault, onDone }
 }
 
 const alertText = () => screen.getByRole('alert').textContent
 
 describe("DelVaultModal", () => {
-  it("deletes the vault on its passphrase, naming the user and the vault, and the gating concludes", async () => {
-    const { bank, raising } = await shownFor()
+  it("deletes the vault on Delete, asking nothing more, and calls onDone with true", async () => {
+    const { bank, onDone } = await shownFor()
     expect(screen.getByText(Messages.delVaultTitle)).to.exist
-    expect(screen.getByDisplayValue('u1 (main vault)')).to.exist
-    TH.submitDeletion(TH.Passphrase)
-    expect(await raising).to.include({ ok: true })
+    expect(screen.queryByPlaceholderText(Messages.passphraseField)).to.be.null
+    fireEvent.click(screen.getByText(Messages.delVaultButton))
+    await waitFor(() => { expect(onDone).toHaveBeenCalledWith(true) })
     expect(bank.vaultAt(TH.VaultScopeGiven)?.isPresent).to.not.be.true
   })
 
-  it("shows a wrong passphrase in place, deleting nothing, and deletes on the right one", async () => {
-    const { bank, gating, raising } = await shownFor()
-    TH.submitDeletion('not the passphrase')
+  const CancelCases = [
+    ['Cancel', () => { fireEvent.click(screen.getByText(Messages.cancelButton)) }],
+    ['Escape', () => { fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true })) }],
+  ] as const
+
+  for (const [how, cancel] of CancelCases) {
+    it(`calls onDone with false on ${how}, and the vault stays`, async () => {
+      const { bank, onDone } = await shownFor()
+      cancel()
+      expect(onDone).toHaveBeenCalledExactlyOnceWith(false)
+      expect(bank.vaultAt(TH.VaultScopeGiven)?.isPresent).to.be.true
+    })
+  }
+
+  it("shows the refusal of a locked vault in place, deleting nothing", async () => {
+    const { bank, vault, onDone } = await shownFor()
+    act(() => { vault.lock() })
+    fireEvent.click(screen.getByText(Messages.delVaultButton))
     await waitFor(() => { expect(alertText()).to.not.eq('') })
-    expect(gating.isOpen).to.be.true
+    expect(onDone).not.toHaveBeenCalled()
     expect(bank.vaultAt(TH.VaultScopeGiven)?.isPresent).to.be.true
-    TH.submitDeletion(TH.Passphrase)
-    expect(await raising).to.include({ ok: true })
-  })
-
-  it("dismisses the gating on Cancel, and the vault stays", async () => {
-    const { bank, raising } = await shownFor()
-    fireEvent.click(screen.getByText(Messages.cancelButton))
-    expect(await raising).to.include({ ok: false })
-    expect(bank.vaultAt(TH.VaultScopeGiven)?.isPresent).to.be.true
-  })
-
-  it("stays open through a lock, which does not stop a deletion", async () => {
-    const { bank, gating } = await shownFor()
-    act(() => { bank.lock() })
-    expect(gating.isOpen).to.be.true
-    TH.submitDeletion(TH.Passphrase)
   })
 })

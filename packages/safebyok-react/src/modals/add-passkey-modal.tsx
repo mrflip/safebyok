@@ -32,7 +32,7 @@ const AddPasskeyForm = ({ gating, passphraseUsername, passkeyRpId }: AddPasskeyM
 
   return (
     <ModalForm
-      gating={gating}
+      onCancel={() => { gating.dismiss() }}
       title={Messages.addPasskeyTitle}
       blurb={Messages.addPasskeyBlurb}
       submitWord={Messages.addPasskeyButton}

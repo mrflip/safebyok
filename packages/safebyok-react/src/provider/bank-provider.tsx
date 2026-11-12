@@ -12,7 +12,7 @@ const BankContext = createContext<ContextValue | null>(null)
 const tellNobody: TellBadNews = () => { /* no device, no news */ }
 
 /** The context value while the provider has no device. */
-const Deviceless: ContextValue = Object.freeze({ device: null, helloedVaults: new WeakSet<Vault>(), tellBadNews: tellNobody })
+const Deviceless: ContextValue = Object.freeze({ device: null, watchedVaults: new WeakSet<Vault>(), tellBadNews: tellNobody })
 
 /** Return the nearest BankProvider's context value. Throws an error naming `hookname` when there is no provider above. */
 export const useProvided = (hookname: string): ContextValue => {
@@ -52,7 +52,7 @@ function useProviderDevice(opts: ProviderDeviceOpts, handlers: Handlers, isHostA
       if (device.isEnabled) { tellBadNewsTo((told) => latest().onBadNews(told), device, badnews) }
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the device exists only between this effect and its cleanup, and render must pass it to the context
-    setContextValue({ device, helloedVaults: new WeakSet<Vault>(), tellBadNews })
+    setContextValue({ device, watchedVaults: new WeakSet<Vault>(), tellBadNews })
     onMade(device)
     // Not awaited: the device reports its bring-up to onLifecycle.
     void device.tryEnsureBank()

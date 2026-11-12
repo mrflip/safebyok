@@ -178,11 +178,10 @@ describe("the proof", () => {
     revealUi.expectRenders([JSON.stringify(ApiKey.whisper)])
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
 
-    // Delete: the user proves it, the list empties, and the vault object goes quiet, locked: its tombstone is of another life, and another instance.
-    dialog.typing = byPassphrase(Passphrase)
-    await vault.delVaultPrompt()
-    expect(dialog.shown.splice(0)).to.deep.equal(['del_vault'])
-    deviceUi.expectRenders(['ready: main unlocked (asking del_vault)', 'ready: main locked (asking del_vault)', 'ready: no vaults (asking del_vault)', 'ready: no vaults'])
+    // Delete: nobody is asked, the list empties, and the vault object goes quiet, locked: its tombstone is of another life, and another instance.
+    await vault.del(vault)
+    expect(dialog.shown.splice(0)).to.deep.equal([])
+    deviceUi.expectRenders(['ready: no vaults'])
     vaultUi.expectRenders(['main locked'])
     await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }), 'disabled')
     const gone = bank.vaultAt(VaultScopeGiven)
@@ -218,7 +217,7 @@ describe("the proof", () => {
     nextPageUi.expectRenders(['ready: main unlocked'])
 
     // It opens what the page before it sealed: the lease it picked up has the same vaultKey.
-    await pickedUp.hello()
+    await pickedUp.beginWatch()
     const nextBoxesUi = mountComponent(pickedUp.boxListing, boxList)
     nextBoxesUi.expectRenders(['anthropic_api_key'])
     const opened = await pickedUp.getBox(ApiKey.boxlabel)
@@ -395,7 +394,7 @@ describe("the proof", () => {
   it("a second device's changes reach this device's components through the watch", async () => {
     const { world, device, vault, dialog } = await buildHost()
     const box = await vault.putBox(ApiKey)
-    await vault.hello()
+    await vault.beginWatch()
     const deviceUi = mountComponent(device, deviceStatus)
     const boxesUi = mountComponent(vault.boxListing, boxList)
     deviceUi.expectRenders(['ready: main unlocked'])
@@ -420,7 +419,7 @@ describe("the proof", () => {
     await phoneVault.putBox({ ...ApiKey, boxlabel: 'gemini_api_key' })
     await ticks(1)
     boxesUi.expectRenders([])
-    await vault.hello()
+    await vault.beginWatch()
     boxesUi.expectRenders(['anthropic_api_key, openai_api_key, gemini_api_key'])
 
     // It replaces the passphrase: this device stays unlocked and has the new gate; a later unlock takes the new passphrase.
@@ -439,8 +438,7 @@ describe("the proof", () => {
     deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
 
     // It deletes the vault: this device locks, forgets its lease, and the vault leaves the list.
-    phone.typing = byPassphrase(NewPassphrase)
-    await phoneVault.delVaultPrompt()
+    await phoneVault.del(phoneVault)
     await ticks(1)
     deviceUi.expectRenders(['ready: no vaults'])
     expect(vault.isUnlocked).to.be.false
