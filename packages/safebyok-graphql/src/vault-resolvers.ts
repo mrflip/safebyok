@@ -31,7 +31,7 @@ export type VaultFieldArgs = {
 /** A vaultDB answer in wire form: every field of its schema type is present, and null where the answer has no value. */
 export type CrossingAnswer = {
   ok:         boolean
-  act:        string
+  act:        DB.GoodAct | DB.BadAct
   val:        unknown
   world:      unknown
   dbhas:      unknown
@@ -42,7 +42,7 @@ export type CrossingAnswer = {
 /** A watch notice in wire form, or the refusal that ends the watch. */
 export type CrossingNotice = {
   ok:    boolean
-  act:   string
+  act:   'got' | 'gone' | DB.BadAct
   val:   DB.VaultRow | DB.BoxRow | null
   world: DB.VaultRow | null
   err:   DB.CrossedErr | null
@@ -106,12 +106,12 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
   /** Run `verb` if the request is signed in as `user_id`, and return its answer in wire form.
    * Otherwise return a bad answer in wire form: the refusal from checking `ask` if it fails, else the sign-in refusal.
    */
-  async function serveSignedIn(context: ContextT, user_id: string, ask: object, verb: () => Promise<DB.Answer<unknown, string, unknown>>): Promise<CrossingAnswer> {
+  async function serveSignedIn(context: ContextT, user_id: string, ask: object, verb: () => Promise<DB.Answer<unknown, DB.GoodAct, unknown>>): Promise<CrossingAnswer> {
     const refusal = await signInRefusalOf(context, user_id)
     if (refusal === null) { return crossingOf(await verb()) }
     const loggableAsk = await DB.outcomeOf(() => DB.loggableAsk.parse(ask))
     if (! loggableAsk.ok) { return crossingOf(DB.badAnswerOf(loggableAsk.err)) }
-    return crossingOf({ ok: false, err: refusal, act: refusal.refusalkind, world: null, ask: loggableAsk.val })
+    return crossingOf({ ok: false, err: refusal, act: 'unclassified', world: null, ask: loggableAsk.val })
   }
 
   /** Watch `scope` and yield its notices in wire form, for as long as the request stays signed in as that user. */
@@ -212,7 +212,7 @@ const safebyokEpochMillis = new GraphQLScalarType<number, number>({
 // == [Helpers]: crossingOf, crossedErrOf, badNoticeOf, endingWith, openWatch, typenameOf
 
 /** Convert `answer` to wire form. */
-function crossingOf(answer: DB.Answer<unknown, string, unknown>): CrossingAnswer {
+function crossingOf(answer: DB.Answer<unknown, DB.GoodAct, unknown>): CrossingAnswer {
   return {
     ok:         answer.ok,
     act:        answer.act,
@@ -240,7 +240,7 @@ function crossedErrOf({ refusalkind, message, meta }: DB.VaultError): DB.Crossed
 }
 
 /** Make the notice that ends a watch, carrying `refusal`. */
-function badNoticeOf(refusal: DB.VaultError): CrossingNotice { return { ok: false, act: refusal.refusalkind, val: null, world: null, err: crossedErrOf(refusal) } }
+function badNoticeOf(refusal: DB.VaultError): CrossingNotice { return { ok: false, act: 'unclassified', val: null, world: null, err: crossedErrOf(refusal) } }
 
 /** Make the iterator for a watch refused before it started: it yields one notice carrying the refusal, then ends. */
 function endingWith(refusal: DB.VaultError): AsyncIterableIterator<CrossingNotice> {

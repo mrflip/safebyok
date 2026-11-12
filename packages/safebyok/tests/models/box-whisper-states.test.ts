@@ -223,7 +223,7 @@ describe("the endings of a box exposed", () => {
 
   it("a tombstone received clears the value and the veil", async () => {
     const box = await veiledOf()
-    box.receive(world.mw.tombstoneBoxRecord({ box_tok: box.box_tok, revision_seq: box.revision_seq + 1, revision_tok: 'rev-gone' }))
+    box.listing.receiveRow(world.mw.tombstoneBoxRecord({ box_tok: box.box_tok, revision_seq: box.revision_seq + 1, revision_tok: 'rev-gone' }))
     expect(box.isPresent).to.be.false
     expect(box.whisper).to.eq(ENCRYPTED)
     expect(box.isVeiled).to.be.false

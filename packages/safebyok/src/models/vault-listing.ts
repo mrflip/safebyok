@@ -1,5 +1,6 @@
 /** A bank's vaults as this device has them: the vault listing, and what it is given to reach the vaultDB and the bank. */
 
+import type { GateAct, OkAct } from '../shapes/shapes-enums'
 import { nowMillis } from '../helpers/clock'
 import { type Modelkind, UNANSWERED } from '../helpers/consts'
 import { makeLifeTok } from '../helpers/crypto'
@@ -10,14 +11,13 @@ import { type VaultScope, vaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import { type DelTombstone, type Fetched, type ListingDelOpts, type ListingOpts, type ListingPutOpts, type SlotStep, type ThingAnswer, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
+import { type DelTombstone, type Fetched, type ListingDelOpts, type ListingOpts, type ListingPutOpts, type ThingAnswer, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
 import type { BoxRow, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { type Answer, type Notice, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
 import { vaultAbsent, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
 import type { Gate } from './gate'
 import { Listing } from './listing'
-import { cmpRevisions } from './storable'
 import { Vault } from './vault'
 
 /** One bank's vaults, by vaultlabel. */
@@ -82,7 +82,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** {@link replacePassphrase}, answering the vaultDB's own answer. */
   async tryReplacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<ThingAnswer<VaultRecord>> {
-    let answer: Answer<VaultRecord, string> | typeof UNANSWERED = UNANSWERED
+    let answer: Answer<VaultRecord, OkAct | GateAct> | typeof UNANSWERED = UNANSWERED
     try {
       const { record, prior } = this.#gateMoveOf(ante, { passphrase_wayin })
       answer = await this.vaultDB.tryReplacePassphrase(record, { prior })
@@ -96,7 +96,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** {@link addPasskey}, answering the vaultDB's own answer. */
   async tryAddPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<ThingAnswer<VaultRecord>> {
-    let answer: Answer<VaultRecord, string> | typeof UNANSWERED = UNANSWERED
+    let answer: Answer<VaultRecord, OkAct | GateAct> | typeof UNANSWERED = UNANSWERED
     try {
       const { record, prior } = this.#gateMoveOf(ante, { passkey_wayin })
       answer = await this.vaultDB.tryAddPasskey(record, { prior })
@@ -110,7 +110,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** {@link revokePasskey}, answering the vaultDB's own answer. */
   async tryRevokePasskey(ante: VaultRecord): Promise<ThingAnswer<VaultRecord>> {
-    let answer: Answer<VaultRecord, string> | typeof UNANSWERED = UNANSWERED
+    let answer: Answer<VaultRecord, OkAct | GateAct> | typeof UNANSWERED = UNANSWERED
     try {
       const { record, prior } = this.#gateMoveOf(ante, { passkey_wayin: null })
       answer = await this.vaultDB.tryRevokePasskey(record, { prior })
@@ -177,18 +177,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   #dismissGatingOfGoneListing(): void { this.#openGating?.dismiss() }
   // --
 
-  // == [Defined by the vault listing]: vaultTokOfWorld, slotStepOf, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the vault listing]: vaultTokOfWorld, isOneLifePerInstance, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   protected vaultTokOfWorld(): null { return null }
 
-  /** The vault listed keeps over an older record. A newer one remakes its slot where it is of another `vault_tok`, or alive over a tombstone. */
-  protected override slotStepOf(listed: Vault, record: Fetched<VaultRecord, VaultSparse>): SlotStep {
-    const age = cmpRevisions(listed, record)
-    if (age === 'older') { return 'keep' }
-    const isOtherLife = record.vault_tok !== listed.vault_tok
-    const isRebirth = (! listed.isPresent) && (! VX.isTombstone(record))
-    return ((age === 'newer') && (isOtherLife || isRebirth)) ? 'remake' : 'receive'
-  }
+  // A Vault object is one life of its vault: a vault deleted, or made anew, is a new instance (`notes/receive-contract.md`, L2).
+  protected get isOneLifePerInstance(): true { return true }
 
   protected scopepathOf(scope: VaultScope): string {
     return ['vault', scope.applabel, scope.user_id, scope.vaultlabel].join('^')

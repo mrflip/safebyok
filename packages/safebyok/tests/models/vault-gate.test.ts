@@ -41,7 +41,7 @@ describe("a gate changed on another device", () => {
     await unlockTyping(theirs, byPassphrase(Passphrase))
     await replaceTyping(theirs, Passphrase, NewPassphrase)
     const received = putBehindOurBack(other.demandStored())
-    vault.receive(received)
+    vault.listing.receiveRow(received)
     expect(vault.gate.pickle()).to.deep.equal(received.gate)
     expect(received.gate.passphrase_wayin).not.to.deep.equal(record.gate.passphrase_wayin)
     expect(vault.isUnlocked).to.be.true

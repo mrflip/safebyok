@@ -39,7 +39,7 @@ describe("Box own props", () => {
     const keys = Object.keys(box)
     const received = world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' })
     world.mw.seedPut(received)
-    box.receive(received)
+    box.listing.receiveRow(received)
     expect(Object.keys(box)).to.have.members(keys)
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'edited' } })
     expect(Object.keys(box)).to.have.members(keys)
@@ -120,7 +120,7 @@ describe("Box sidecar, locked or not", () => {
     const before = box.getSnapshot()
     const listener = vi.fn()
     box.subscribe(listener)
-    box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', sidecar: { note: 'newer' } }))
+    box.listing.receiveRow(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', sidecar: { note: 'newer' } }))
     expect(listener.mock.calls).to.have.lengthOf(1)
     expect(box.getSnapshot()).to.not.eq(before)
     expect(box.getSnapshot().sidecar).to.deep.equal({ note: 'newer' })
@@ -235,7 +235,7 @@ describe("Box snapshot", () => {
 
 // == [Receive]: success noted on a whole record, registered_at over a tombstone, another vault_tok throws
 
-describe("box.receive(rcvd): a whole record makes the box timely", () => {
+describe("box.listing.receiveRow(rcvd): a whole record makes the box timely", () => {
   const ReceivedCases = [
     // whole:
     [() => fullBoxRecord(),                true,  'a full record'],
@@ -249,7 +249,7 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
       const box = await boxListingOf(world.mw, { maxMillisSinceRefresh: 1000 }).create(boxDnaOf(world.mw.boxscope('anthropic_api_key')))
       world.mw.setNow(T0 + 1000)
       expect(box.isTimely).to.be.false
-      box.receive(rcvdOf())
+      box.listing.receiveRow(rcvdOf())
       expect(box.isTimely).to.eq(timely)
     })
   }
@@ -264,30 +264,30 @@ describe("box.receive(rcvd): a whole record makes the box timely", () => {
       const box = await boxListingOf(world.mw, { maxMillisSinceRefresh: 1000 }).build(fullBoxRecord())
       world.mw.setNow(T0 + 1000)
       expect(box.isTimely).to.be.false
-      box.receive(rcvdOf())
+      box.listing.receiveRow(rcvdOf())
       expect(box.isTimely).to.be.true
       expect(box.revision_seq).to.eq(1)
     })
   }
 })
 
-describe("box.receive(rcvd): registered_at, and a record of another vault_tok", () => {
+describe("box.listing.receiveRow(rcvd): registered_at, and a record of another vault_tok", () => {
   it("keeps registered_at over a newer living record registered at another time", async () => {
     const box = await builtOf(fullBoxRecord())
-    box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', registered_at: T0 + 7 }))
+    box.listing.receiveRow(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', registered_at: T0 + 7 }))
     expect(box.registered_at).to.eq(T0)
     expect(box.revision_seq).to.eq(2)
   })
 
   it("takes registered_at and box_tok from a record of another life received over a listed tombstone", async () => {
     const box = await builtOf(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
-    box.receive(fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-b3', box_tok: 'box-tok-b', registered_at: T0 + 7 }))
+    box.listing.receiveRow(fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-b3', box_tok: 'box-tok-b', registered_at: T0 + 7 }))
     expect(box).to.include({ registered_at: T0 + 7, box_tok: 'box-tok-b', vault_tok: 'vault-tok-u1', revision_seq: 3 })
   })
 
   it("takes registered_at and box_tok from a newer record of another life received over a box listed alive", async () => {
     const box = await builtOf(fullBoxRecord())
-    box.receive(fullBoxRecord({ revision_seq: 4, revision_tok: 'rev-b4', box_tok: 'box-tok-b', registered_at: T0 + 7 }))
+    box.listing.receiveRow(fullBoxRecord({ revision_seq: 4, revision_tok: 'rev-b4', box_tok: 'box-tok-b', registered_at: T0 + 7 }))
     expect(box).to.include({ registered_at: T0 + 7, box_tok: 'box-tok-b', revision_seq: 4 })
   })
 
@@ -305,7 +305,7 @@ describe("box.receive(rcvd): registered_at, and a record of another vault_tok", 
       it(`throws for ${blurb} under another vault_tok over ${listedBlurb}, keeping its own copy`, async () => {
         const box = await boxListingOf(world.mw).build(listedOf())
         const central = box._cheat_central
-        TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: seq, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })))
+        TH.expectSyncRefusal(() => box.listing.receiveRow(fullBoxRecord({ revision_seq: seq, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })))
         expect(box._cheat_central).to.eq(central)
         expect(box.vault_tok).to.eq('vault-tok-u1')
       })
@@ -315,15 +315,15 @@ describe("box.receive(rcvd): registered_at, and a record of another vault_tok", 
   it("throws for a record under another vault_tok even when its joined tok path equals the box's own", async () => {
     const box = await builtOf(fullBoxRecord())
     const central = box._cheat_central
-    TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-u1-box', box_tok: 'tok-a' })))
+    TH.expectSyncRefusal(() => box.listing.receiveRow(fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-u1-box', box_tok: 'tok-a' })))
     expect(box._cheat_central).to.eq(central)
   })
 
   it("throws over a box just created, and for a tombstone under another vault_tok", async () => {
     const box = await boxListingOf(world.mw).create(boxDnaOf(world.mw.boxscope('drafted')))
     const other = { boxlabel: 'drafted', vault_tok: 'vault-tok-other' }
-    TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ ...other, revision_seq: 1 })))
-    TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ ...other, revision_seq: 1 })))
+    TH.expectSyncRefusal(() => box.listing.receiveRow(fullBoxRecord({ ...other, revision_seq: 1 })))
+    TH.expectSyncRefusal(() => box.listing.receiveRow(tombstoneBoxRecord({ ...other, revision_seq: 1 })))
     expect(box).to.include({ vault_tok: 'vault-tok-u1', revision_seq: 0 })
   })
 

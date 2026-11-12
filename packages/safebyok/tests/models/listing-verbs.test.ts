@@ -357,11 +357,11 @@ describe("listing.tryPut and listing.tryFetch return the vaultDB's answer", () =
     expect(answer.ask).to.include({ boxlabel: box.boxlabel })
   })
 
-  it("returns a refusal made before the call as a bad answer whose act is the refusal kind", async () => {
+  it("returns a refusal made before the call as a bad answer whose act is 'unclassified'", async () => {
     const listing = boxListingOf(world.mw)
     const answer = await listing.tryPut({ garbage: true } as never, { expected: shellBoxRecord() })
     expect(answer).to.deep.include({ ok: false, world: null, ask: {} })
-    expect(answer.act).to.eq(answer.err?.refusalkind)
+    expect(answer.act).to.eq('unclassified')
   })
 
   it("returns a fetch's instance as val, with the vaultDB's act", async () => {

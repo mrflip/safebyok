@@ -79,9 +79,12 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.shellBoxOf(scope, this.world.vault_tok)) }
   // --
 
-  // == [Defined by the box listing]: vaultTokOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the box listing]: vaultTokOfWorld, isOneLifePerInstance, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   protected vaultTokOfWorld(): string { return this.world.vault_tok }
+
+  // A Box object lives through its box's lives: a record of a new life is received into it.
+  protected get isOneLifePerInstance(): false { return false }
 
   protected scopepathOf(scope: Boxscope): string {
     return ['box', scope.applabel, scope.user_id, scope.vaultlabel, scope.boxlabel].join('^')

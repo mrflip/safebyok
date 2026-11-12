@@ -63,32 +63,25 @@ export function isTombstone<SparseT extends Liveness>(fetched: SparseT): fetched
 
 // --
 
-// == [Reconciling]: reconciled, aligned, Reconciled, Aligned
+// == [Aligning]: aligned, Aligned
 
-/** The checks of what reconciling passes: `reconciled`, what `reconcileCentral` hands back; and `aligned`, what `align` and `receive` hand back. Checks only. */
-export const { reconciled, aligned } = Checkers('unexpected_error', ({ obj, arr, oneof, vaultError }) => ({
-  reconciled:    obj({ central: SX.sparseBase, policy: oneof(EX.centralPolicyVals) }),
+/** The check of what `align` hands back. Checks only. */
+export const { aligned } = Checkers('unexpected_error', ({ obj, arr, vaultError }) => ({
   aligned:       obj({ badnews: arr(vaultError).readonly() }).readonly(),
 }), [Checks])
 
-/** Return type of `reconcileCentral`: the central that results, and the policy that chose it. {@link reconciled} checks what the base knows of one. */
-export type Reconciled<RecordT, SparseT> = Readonly<{ central: Fetched<RecordT, SparseT>, policy: EX.CentralPolicy }>
-
-/** Return type of `align` and `receive`: `badnews`, the refusals to tell the host once. */
+/** Return type of `align`: `badnews`, the refusals to tell the host once. */
 export type Aligned = Z.infer<typeof aligned>
 
 // --
 
-// == [Options]: Promptly, ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener, probeAsked, probeOpts, ProbeAsked, ProbeOpts, ProbeStep, ProbeReport, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts
+// == [Options]: Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener, probeAsked, probeOpts, ProbeAsked, ProbeOpts, ProbeStep, ProbeReport, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts
 
 /** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */
 export const Promptly = 2000
 
 /** SLOPDOC: The checks of the options a storable and its verbs accept. */
-export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, oneof, orDefault, fn }) => {
-  const ifPresent     = oneof(EX.ifPresentVals)
-  const ifAbsent      = oneof(EX.ifAbsentVals)
-  const putIfAbsent   = oneof(EX.putIfAbsentVals)
+export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, orDefault, fn }) => {
   // A caller's Infinity, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
   const horizonMillis = union([num.nonnegative(), lit(Infinity)]).transform((most) => Math.min(most, ForeverMillis))
   const maxMillis     = horizonMillis.optional()
@@ -100,22 +93,22 @@ export const { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timel
   })
   const fetchOpts     = timelyOpts.extend({
     /** What an absent thing does: `fail`, the default, refuses with the listing's absent refusal; `nil` resolves null. */
-    ifAbsent: orDefault(ifAbsent, 'fail'),
+    ifAbsent: orDefault(SX.ifAbsent, 'fail'),
   })
   const boxPutOpts    = timelyOpts.extend({
     /** What an absent box does: `add`, the default, creates it. */
-    ifAbsent:  orDefault(putIfAbsent, 'add'),
+    ifAbsent:  orDefault(SX.putIfAbsent, 'add'),
     /** What a present box does: `repl`, the default, replaces it. */
-    ifPresent: orDefault(ifPresent, 'repl'),
+    ifPresent: orDefault(SX.ifPresent, 'repl'),
   })
   const boxCreateOpts = timelyOpts.extend({
     /** Always `add`: a create creates. */
     ifAbsent:  orDefault(lit('add'), 'add'),
     /** What a present box does: `fail`, the default, refuses. */
-    ifPresent: orDefault(ifPresent, 'fail'),
+    ifPresent: orDefault(SX.ifPresent, 'fail'),
   })
   const listener      = fn<() => void>()
-  return { ifPresent, ifAbsent, putIfAbsent, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener }
+  return { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener }
 })
 
 /** The checks of what `bank.tryProbe` is handed: where its trial box goes and what it holds, and how fresh its record must be. */
@@ -138,7 +131,7 @@ export type ProbeAsked = Z.input<typeof probeAsked>
 export type ProbeOpts = Z.input<typeof probeOpts>
 
 /** One storage verb's answer as `bank.tryProbe` reports it: sparse rows, no wrapped key or ciphertext, and when it came back. */
-export type ProbeStep = Readonly<{ ok: true, act: string, ask: SX.LoggableAsk, val: SX.BoxSparse, world: SX.VaultSparse, timestamp: number }>
+export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: SX.LoggableAsk, val: SX.BoxSparse, world: SX.VaultSparse, timestamp: number }>
 
 /** How `bank.tryProbe` went, step by step: the box and vault as found, the put, the fetch back, and that the box opened. */
 export type ProbeReport = Readonly<{
@@ -230,16 +223,16 @@ export const storableArgs = objCheck(({ custom }) => ({
 
 // --
 
-// == [Given to a listing]: Thing, ListingAnswer, ListingPutAnswer, ListingPutOpts, ListingDelOpts, DelTombstone, SlotStep, ListingOf
+// == [Given to a listing]: Thing, ListingAnswer, ListingPutAnswer, ListingPutOpts, ListingDelOpts, DelTombstone, ListingOf
 
 /** A vault or box in a listing. */
 export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
 
 /** The answer of a vaultDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
-export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, string, unknown>
+export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, EX.OkAct | EX.GateAct, unknown>
 
 /** A put's {@link ListingAnswer}, whose good form always carries a record. */
-export type ListingPutAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT>, string, unknown>
+export type ListingPutAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT>, EX.OkAct | EX.GateAct, unknown>
 
 /** A listing put's options besides its record: the row it expects to find, in sparse form, and `ifPresent` and `ifAbsent`, for a live row or none. */
 export type ListingPutOpts<SparseT> = Readonly<{ expected: SparseT, ifAbsent: EX.PutIfAbsent, ifPresent: EX.IfPresent }>
@@ -254,13 +247,11 @@ export type ListingListAnswer<RecordT, SparseT, DamagedT> = Answer<{ listed: rea
 export type ListingGetAnswer<ValT> = ThingAnswer<ValT> | GoodAnswer<ValT, 'timely', null>
 
 /** What a listing's `tryPut` and `tryFetch` answer: the vaultDB's own answer, with the instance listed as its `val`. */
-export type ThingAnswer<ValT> = Answer<ValT, string, unknown>
+export type ThingAnswer<ValT> = Answer<ValT, EX.GoodAct, unknown>
 
 /** The tombstone `listing.del` sends the vaultDB: at the revision after the row it replaces, with a life token of its own. */
 export type DelTombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
 
-/** What a listing does with a record meeting the instance in its slot: the instance receives it, or keeps as it is, or the slot is remade of the record. */
-export type SlotStep = 'receive' | 'keep' | 'remake'
 
 /** The listing a storable is made in, as it sees it: its own kind of thing, whatever snapshot the concrete class makes. */
 export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> =

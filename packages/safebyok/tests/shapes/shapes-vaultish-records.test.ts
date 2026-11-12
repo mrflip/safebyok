@@ -129,17 +129,7 @@ describe("The checks of a record's base fields", () => {
   })
 })
 
-describe("The checks of reconcile and align results", () => {
-  describe("VX.reconciled", () => {
-    expectCases(VX.reconciled, [
-      [{ central: sparse, policy: 'same' },  true,  'passes a central and the policy that chose it'],
-      [{ central: gone,   policy: 'gone' },  true,  'passes a tombstone central'],
-      [{ central: sparse },                  false, 'refuses a missing policy'],
-      [{ policy: 'same' },                   false, 'refuses a missing central'],
-      [{ central: sparse, policy: 'edit' },  false, 'refuses a policy that is no row of reconcileCentral'],
-    ])
-  })
-
+describe("The check of align results", () => {
   describe("VX.aligned", () => {
     expectCases(VX.aligned, [
       [{ badnews: [] },                                       true,  'passes no bad news'],

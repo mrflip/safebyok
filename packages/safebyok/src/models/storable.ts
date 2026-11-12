@@ -5,10 +5,10 @@ import { checkedConsistent } from '../helpers/validator'
 import { adorn, tattoo } from '../helpers/helpers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
-import { instanceDisabled, needUnlocked, oneRevisionTwoFates, oneRevisionTwoLives, oneRevisionTwoToks, otherVaultTok, partialLoad, shapeUnreconciled } from '../refusals/throwers'
+import { instanceDisabled, needUnlocked, oneRevisionTwoToks, partialLoad } from '../refusals/throwers'
 import type { Age, Am, RecordShape } from '../shapes/shapes-enums'
 import * as VX from '../shapes/shapes-vaultish'
-import type { Fetched, FetchOpts, ListingOf, ListingWorld, Reconciled, Aligned, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
+import type { Fetched, FetchOpts, ListingOf, ListingWorld, Aligned, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
 import * as SX from '../shapes/shapes-storage'
 import type { Revision } from '../shapes/shapes-storage'
 
@@ -132,7 +132,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** SLOPDOC: Assigns the mutable own props from the record about to be in hand; a subclass adds its own from it. */
   protected assign(record: Fetched<RecordT, SparseT>): void {
     const { revision_tok, revision_seq, written_at, registered_at } = record
-    if (! this.#sameLife(record)) { this.registered_at = registered_at }
+    if (! this.isOfLife(record)) { this.registered_at = registered_at }
     this.revision_tok = revision_tok
     this.revision_seq = revision_seq
     this.written_at   = written_at
@@ -183,58 +183,32 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   tryDel(asked: ScopeT | SparseT, opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.del(asked, opts)) }
   // --
 
-  // == [Receiving]: receive, tombstoneFor
+  // == [Receiving]: receiveRecord, markRefreshed, isOfLife, shapeOf
+  // The listing decides what a record received does here (`Listing.#deliveringOfRecord`): an instance judges nothing.
 
-  /** SLOPDOC: Receives what storage said: judges it against the record in hand, then adopts and aligns it. */
-  receive(rcvd: Fetched<RecordT, SparseT> | null): Aligned {
-    if (! this.#isEnabled) { return { badnews: [] } }
-    const answer = rcvd ?? this.tombstoneFor(this.#central)
-    const { central, policy } = this.reconcileCentral(answer, this.classifyRecordShape(answer))
-    const isAdopting = central !== this.#central
-    if (isAdopting) { this.adopt(central) }
-    if ((policy !== 'older') && this.#isWhole) { this.#refreshedAt = nowMillis() }
-    return isAdopting ? this.align() : { badnews: [] }
+  /** Adopt `record`, mark this instance refreshed once whole, and tell the subscribers. A no-op past a discard. */
+  receiveRecord(record: Fetched<RecordT, SparseT>): void {
+    if (! this.#isEnabled) { return }
+    this.adopt(record)
+    if (this.#isWhole) { this.#refreshedAt = nowMillis() }
+    this.align()
   }
 
-  /** A tombstone made here, from the sparse props in hand, under `revision`, written now. */
-  protected tombstoneFor(revision: Revision): Tombstone<SparseT> {
-    const { revision_tok, revision_seq } = revision
-    return { ...this.sparse, revision_tok, revision_seq, written_at: nowMillis(), am: 'x' }
-  }
-  // --
-
-  // == [Reconcile]: reconcileCentral, sameLife, classifyRecordShape
-
-  /** SLOPDOC: Judges `rcvd` against the central adopted, answering the central that results and the policy applied. */
-  protected reconcileCentral(rcvd: Fetched<RecordT, SparseT>, rcvdShape: RecordShape): Reconciled<RecordT, SparseT> {
-    // The vault_tok first, whatever the life: a joined life tok path cannot tell 'a-b' + 'c' from 'a' + 'b-c'.
-    if ((rcvd.vault_tok !== this.vault_tok))                     { throw otherVaultTok() }
-    const central = this.#central
-    const age = cmpRevisions(central, rcvd)
-    if ((age === 'same') && (! this.#sameLife(rcvd)))            { throw oneRevisionTwoLives() }
-    const centralShape = this.classifyRecordShape(central)
-    if ((age === 'older'))                                       { return { central, policy: 'older' } }
-    if ((age === 'same')) {
-      if ((rcvdShape !== 'gone') && (centralShape === 'gone'))   { throw oneRevisionTwoFates() }
-      if ((rcvdShape === 'gone') && (centralShape !== 'gone'))   { throw oneRevisionTwoFates() }
-      if ((rcvdShape === 'gone') && (centralShape === 'gone'))   { return { central, policy: 'same' } }
-      if ((rcvdShape === 'sparse'))                              { return { central, policy: 'same' } }
-      if ((rcvdShape === 'full') && (centralShape === 'full'))   { return { central, policy: 'same' } }
-      if ((rcvdShape === 'full') && (centralShape === 'sparse')) { return { central: rcvd, policy: 'fill' } }
-    } else {
-      if (rcvdShape === 'gone') { return { central: rcvd, policy: 'gone' } }
-      return { central: rcvd, policy: 'adopt' }
-    }
-    throw shapeUnreconciled()
+  /** Mark this instance refreshed, once whole: storage answered the record in hand. A no-op past a discard. */
+  markRefreshed(): void {
+    if (this.#isEnabled && this.#isWhole) { this.#refreshedAt = nowMillis() }
   }
 
-  /** Whether `record` is of the life of the central adopted: the same `lifeTokPathOf`. */
-  #sameLife(record: Fetched<RecordT, SparseT>): boolean {
+  /** Whether `record` is of the life of the record in hand: the same `lifeTokPathOf`. */
+  isOfLife(record: Fetched<RecordT, SparseT>): boolean {
     return this.lifeTokPathOf(record) === this.lifeTokPathOf(this.#central)
   }
 
+  /** The shape of the record in hand: see {@link shapeOf}. */
+  get shape(): RecordShape { return this.shapeOf(this.#central) }
+
   /** The shape of `record`: 'gone' for a tombstone, 'full' for a record `isFullRecord` accepts, 'sparse' for any other. */
-  protected classifyRecordShape(record: Fetched<RecordT, SparseT>): RecordShape {
+  shapeOf(record: Fetched<RecordT, SparseT>): RecordShape {
     if (this.isTombstoneRecord(record)) { return 'gone' }
     if (this.isFullRecord(record))      { return 'full' }
     return 'sparse'

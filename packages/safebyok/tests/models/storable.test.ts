@@ -104,13 +104,13 @@ describe("Storable own props", () => {
 
     it("follow a newer record received", async () => {
       const box = await builtBoxOf()
-      box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', written_at: T0 + 1000 }))
+      box.listing.receiveRow(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', written_at: T0 + 1000 }))
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-a2', revision_seq: 2, written_at: T0 + 1000 })
     })
 
     it("follow a received tombstone", async () => {
       const box = await builtBoxOf()
-      box.receive(world.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2', written_at: T0 + 1000 }))
+      box.listing.receiveRow(world.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2', written_at: T0 + 1000 }))
       expect(box.isPresent).to.be.false
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-x2', revision_seq: 2, written_at: T0 + 1000 })
     })
@@ -118,7 +118,7 @@ describe("Storable own props", () => {
     it("keep the vault_tok of birth, which no received record changes", async () => {
       const box = await builtBoxOf(tombstoneBoxRecord())
       const { scope } = box
-      TH.expectSyncRefusal(() => box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', vault_tok: 'vault-tok-u2' })))
+      TH.expectSyncRefusal(() => box.listing.receiveRow(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', vault_tok: 'vault-tok-u2' })))
       expect(box.vault_tok).to.eq('vault-tok-u1')
       expect(Object.getOwnPropertyDescriptor(box, 'vault_tok')).to.include({ writable: false, configurable: false })
       expect(box.scope).to.eq(scope)
@@ -127,7 +127,7 @@ describe("Storable own props", () => {
 
     it("do not change when an older record is received", async () => {
       const box = await builtBoxOf(fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-a3', written_at: T0 + 30 }))
-      box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', written_at: T0 + 20 }))
+      box.listing.receiveRow(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', written_at: T0 + 20 }))
       expect(followingPropsOf(box)).to.deep.equal({ vault_tok: 'vault-tok-u1', revision_tok: 'rev-a3', revision_seq: 3, written_at: T0 + 30 })
     })
 
@@ -200,7 +200,7 @@ describe("Storable snapshot and subscription", () => {
       const first = box.getSnapshot()
       box.align()
       expect(box.getSnapshot()).to.eq(first)
-      box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', sidecar: { note: 'two' } }))
+      box.listing.receiveRow(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2', sidecar: { note: 'two' } }))
       const second = box.getSnapshot()
       expect(second).to.not.eq(first)
       expect(Object.isFrozen(second)).to.be.true
@@ -214,7 +214,7 @@ describe("Storable snapshot and subscription", () => {
       const box = new TestableBox(mw.world, boxListingOf(mw), mw.fullBoxRecord())
       const listener = vi.fn()
       box.subscribe(listener)
-      box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+      box.receiveRecord(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
       expect(listener.mock.calls).to.have.lengthOf(0)
       expect(box.getSnapshot()).to.include({ revision_seq: 2 })
     })
@@ -227,7 +227,7 @@ describe("Storable snapshot and subscription", () => {
       expect(box.becomeNotifiable()).to.eq(box)
       const made = box.getSnapshot()
       expect(box.becomeNotifiable().getSnapshot()).to.eq(made)
-      box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+      box.receiveRecord(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
       expect(listener.mock.calls).to.have.lengthOf(1)
       expect(box.getSnapshot()).to.include({ revision_seq: 2 })
     })
@@ -249,7 +249,7 @@ describe("Storable snapshot and subscription", () => {
       const first = box.getSnapshot()
       const listener = vi.fn()
       box.subscribe(listener)
-      box.receive(fullBoxRecord())
+      box.listing.receiveRow(fullBoxRecord())
       expect(listener.mock.calls).to.have.lengthOf(0)
       expect(box.getSnapshot()).to.eq(first)
     })
@@ -260,7 +260,7 @@ describe("Storable snapshot and subscription", () => {
       const [one, other] = [vi.fn(), vi.fn()]
       box.subscribe(one)
       box.subscribe(other)
-      box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+      box.listing.receiveRow(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
       expect(one.mock.calls).to.have.lengthOf(1)
       expect(other.mock.calls).to.have.lengthOf(1)
     })
@@ -270,7 +270,7 @@ describe("Storable snapshot and subscription", () => {
       box.getSnapshot()
       const seen: number[] = []
       box.subscribe(() => { seen.push(box.getSnapshot().revision_seq) })
-      box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+      box.listing.receiveRow(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
       expect(seen).to.deep.equal([2])
     })
 
@@ -301,9 +301,9 @@ describe("Storable snapshot and subscription", () => {
       const [leaving, staying] = [vi.fn(), vi.fn()]
       const unsubscribe = box.subscribe(leaving)
       box.subscribe(staying)
-      box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+      box.listing.receiveRow(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
       unsubscribe()
-      box.receive(world.mw.fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-a3' }))
+      box.listing.receiveRow(world.mw.fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-a3' }))
       expect(leaving.mock.calls).to.have.lengthOf(1)
       expect(staying.mock.calls).to.have.lengthOf(2)
     })
@@ -316,7 +316,7 @@ describe("Storable snapshot and subscription", () => {
       box.subscribe(staying)
       unsubscribe()
       unsubscribe()
-      box.receive(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
+      box.listing.receiveRow(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
       expect(leaving.mock.calls).to.have.lengthOf(0)
       expect(staying.mock.calls).to.have.lengthOf(1)
     })

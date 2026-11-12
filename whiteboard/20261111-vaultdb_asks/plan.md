@@ -5,7 +5,7 @@ Worktree `/workspace/byok-vaultdb_asks`, branch `20261111-vaultdb_asks`, on `mai
 ## Status
 
 * Part 1, the vaultDB buttonup: built and committed, with the Coach's rulings of 2026-11-11.
-* Part 2, delivery by a plan: the first cut is built and committed; the second cut waits on the Coach.
+* Part 2, delivery by a plan: built, both cuts, with the Coach's names of 2026-11-12.
 
 ## Part 1: the vaultDB buttonup
 
@@ -36,38 +36,19 @@ classifier returned; its `catch` makes the refusal (`answerForRefusal`). An adap
   the whole thing among friends rather than name a slice of it. The tables take the stored row, null for none, and read presence from it.
 * No public release yet: wire and signature changes need no shims.
 
-## Part 2: delivery by a plan
-
-### First cut (built)
+## Part 2: delivery by a plan (built)
 
 | step | where | decides from |
 |---|---|---|
-| 1. the world | `deliver`: `this.world.receiveWorld(answer.world)` | the answer's `world`; it may vacate this listing |
-| 2. which row | `#deliveryPlanOf`, by `RowOfAct` | the act alone: `stored` (val, pinned to the record sent), `found` (val, pinned to the scope), `dbhas` (pinned to the scope), `nothing_stored`, or none |
-| 3. which instance | `#rowPlanOf`, then `slotStepOf` (the vault listing's override) | what is listed at the row's scope |
-| 4. do it | `#carryOut(plan)` | `SlotPlan.step`: `none`, `absent`, `make`, `keep`, `receive`, `remake` |
-| 5. receive | `Storable.receive` -> `reconcileCentral` -> `adopt`, `align` | the thing's own receive table |
+| 1. the world | `deliver`: `this.world.receiveWorld(answer.world)` | the answer's `world`; a vault deleted or made anew remakes the Vault, which vacates its boxes |
+| 2. where the record is | `#deliveringOf`, by `deliverableFieldingTagOf` (`as const satisfies` every act) | the act alone: `as_sent`, `as_got`, `as_db`, `void`, `none` |
+| 3. the receive table | `#deliveringOfRecord` | the record against the instance listed, read once: `making` (`listed`, `make`, `remake`) and `mod` (`older`, `same`, `adopt`), or a `record_conflict` |
+| 4. do it | `#carryOut(delivering)` | `making` and `mod`; the thing adopts (`receiveRecord`) or is marked refreshed (`markRefreshed`), and judges nothing |
 
-* `deliver` is synchronous: a refusal's row is received, and `panicIfRevoked` runs, before any other answer is delivered.
-* The gate verbs are put-shaped, each a straight line through `#gateMoveOf(ante, moved)`.
-* Act split: `revokePasskey` over a vault with no passkey answers `passed`, so the act table pins it to the scope.
-
-### Call stack, from `tryPut`
-
-* `deliver`: one hop; the three moves and the refusal's tail read in place.
-* The world: the deepest, about eight hops over three files (`Vault.receiveWorld` -> `receiveRow` -> `buildOrReceive` ->
-  `#rowPlanOf` -> `slotStepOf` -> `#carryOut` -> `Vault.receive` -> `reconcileCentral` -> `Vault.adopt`), and it can
-  vacate the box listing that is delivering. A reader must know it.
-* `#deliveryPlanOf`: one hop; `RowOfAct` is a table, the validators need no click; `#rowPlanOf` one more, `slotStepOf` in another file.
-* `#carryOut`: one hop, then `receive` in `Storable` and its subclasses' `adopt`.
-
-Decisions now live in four places: `RowOfAct`, the two planners, `slotStepOf`, and `reconcileCentral`.
-
-### Second cut (for the Coach's yes)
-
-Fold `slotStepOf` and `reconcileCentral`'s verdict (`older`, `same`, `fill`, `adopt`, `gone`) into the plan, so that
-`Storable` adopts what the plan says and judges nothing: `notes/receive-contract.md`'s one table, read once. Then the
-world's step is a plan of the vault listing's like any other row's.
+* `slotStepOf`, `SlotStep`, `reconcileCentral`, `receive`, `tombstoneFor`, `CentralPolicy`, `Reconciled`, `shapeUnreconciled` are gone.
+  A vault listing says `isOneLifePerInstance`; a box listing does not.
+* Acts are closed sets: `goodActVals`, `badActVals`; a refusal the classifier never saw is `unclassified`, its refusalkind on `err`.
+* The policy validators (`ifPresent`, `ifAbsent`, `putIfAbsent`, `anyIfAbsent`) live once, in `shapes-storage`.
 
 ## Leftovers
 

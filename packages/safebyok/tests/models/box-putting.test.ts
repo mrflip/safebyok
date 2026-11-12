@@ -152,7 +152,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
 
   it("refuses 'stale_write' when a newer revision arrives during the seal", async () => {
     const rival = fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-rival' })
-    const listing = fakeSealBoxListingOf(world.mw, {}, () => { world.mw.seedPut(rival); box.receive(rival) })
+    const listing = fakeSealBoxListingOf(world.mw, {}, () => { world.mw.seedPut(rival); box.listing.receiveRow(rival) })
     const box = await listing.build(fullBoxRecord())
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }), 'stale_write')
     expect(world.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-rival', revision_seq: 2 })
