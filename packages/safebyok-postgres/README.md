@@ -1,7 +1,7 @@
 # safebyok-postgres
 
-safebyok's vaultDB in [Postgres](https://www.postgresql.org): the SQL that makes two tables, and
-**`PostgresVaultDB`**, which writes vault and box rows to them from your server. Your database has
+safebyok's bankDB in [Postgres](https://www.postgresql.org): the SQL that makes four tables, and
+**`PostgresBankDB`**, which writes bank, gate, vault and box rows to them from your server. Your database has
 ciphertext and the few unencrypted fields a row is found by. It never sees a whisper, a passphrase,
 or any key that could decipher one.
 
@@ -19,8 +19,8 @@ from one is a `VaultError` to the other.
 
 ## Make the tables and the functions
 
-`VaultTablesSql` is the SQL of the tables, for Postgres 14 or later. The package also ships it as
-`vault-tables.sql`, to copy into your migrations. It creates only what is missing, so it is safe to
+`BankTablesSql` is the SQL of the tables, for Postgres 14 or later. The package also ships it as
+`bank-tables.sql`, to copy into your migrations. It creates only what is missing, so it is safe to
 run again. Until 1.0 there is no migration: a release that changes the tables says so in its
 changelog, and you drop them and run it again.
 
@@ -29,29 +29,34 @@ a live row has and a tombstone lacks, and the outline of each `jsonb` field. A r
 (SQLSTATE `23514`) is one safebyok could not have read back. They do not check `fmt`: a row in a
 later format may sit beside these, and the functions never overwrite it.
 
-`VaultFunctionsSql` is the SQL of the functions `PostgresVaultDB` calls to write a row, shipped as
-`vault-functions.sql`. Run it after the tables, and **again with each upgrade of this package**:
+`BankFunctionsSql` is the SQL of the functions `PostgresBankDB` calls to write a row, shipped as
+`bank-functions.sql`. Run it after the tables, and **again with each upgrade of this package**:
 each run replaces the functions. They run with the caller's privileges, and only their owner, the
 role that ran the file, may call them. So run both files as the role your pool connects as, or grant
 that role `EXECUTE`.
 
 ```ts
-import { VaultFunctionsSql, VaultTablesSql } from 'safebyok-postgres'
+import { BankFunctionsSql, BankTablesSql } from 'safebyok-postgres'
 
-await pool.query(VaultTablesSql)    // pg runs several statements in one query without parameters
-await pool.query(VaultFunctionsSql)
-await pglite.exec(VaultTablesSql)
-await pglite.exec(VaultFunctionsSql)
+await pool.query(BankTablesSql)    // pg runs several statements in one query without parameters
+await pool.query(BankFunctionsSql)
+await pglite.exec(BankTablesSql)
+await pglite.exec(BankFunctionsSql)
 ```
+
+**Coming from `PostgresVaultDB`**: drop its tables and functions first (`DROP TABLE safebyok_boxes,
+safebyok_vaults` and `DROP FUNCTION` each `safebyok_` function), then run both files. The rows it
+stored are not read by `PostgresBankDB`: each user's bank starts empty. Its functions share names
+with these, so one database holds one set.
 
 ## Use
 
 ```ts
 import { Pool } from 'pg'
-import { PostgresVaultDB, pgClientOf } from 'safebyok-postgres'
+import { PostgresBankDB, pgClientOf } from 'safebyok-postgres'
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-const vaultDB = new PostgresVaultDB({ client: pgClientOf(pool) })
+const bankDB = new PostgresBankDB({ client: pgClientOf(pool) })
 ```
 
 * **`client`** runs a statement (`query`) and a transaction (`transaction`). A PGlite works as it
@@ -64,10 +69,10 @@ const vaultDB = new PostgresVaultDB({ client: pgClientOf(pool) })
   past it is refused with `vault_full`. A deleted box's tombstone still counts, so deleting a box frees no room. A vault
   made anew starts at zero. The cap is exact at moderate write rates. A strict cap would take concurrency machinery this
   package does not add.
-* **`maxRecordSizeEst`**, optional, as every vaultDB takes it: 5,600 bytes if left out, so a box's row fits a `NOTIFY`.
+* **`maxRecordSizeEst`**, optional, as every bankDB takes it: 5,600 bytes if left out, so a box's row fits a `NOTIFY`.
 
-`PostgresVaultDB` writes what it is handed under the scope it is handed. **Your route decides who
-may reach which bank**: check the signed-in user before a request reaches the vaultDB, and build
+`PostgresBankDB` writes what it is handed under the scope it is handed. **Your route decides who
+may reach which bank**: check the signed-in user before a request reaches the bankDB, and build
 each scope's `user_id` from that check, never from the request.
 
 A failed statement is refused with `storage_unavailable`, its cause the driver's message and code.
@@ -75,15 +80,17 @@ A missing table or privilege (SQLSTATE class `42`) is a setup fault, refused wit
 
 ## Hearing other writes
 
-Each write sends a notification on its user's channel, `vaultChannelOf(user_id)`, which is
+Each write sends a notification on its user's channel, `bankChannelOf(user_id)`, which is
 `safebyok_` followed by the user_id, as it commits. The database function `safebyok_tell` builds it:
-a JSON object with the written row's address under `at`, a vault's row under `vault`, and a box's
-row under `box` with its vault's row under `vault`. Postgres refuses a notification of 8,000 bytes
-or more. A notification that is too large drops a box's vault row first, then every row, and the
-listener fetches what is stored at the address. `listen(channel, onNotify)` passes the text of each
+a JSON object with the written row's address under `at`, the row under `row`, and the row above it
+under `parent`: a gate's or a vault's bank row, a box's vault row. A box's address carries its
+vault's life, `bank_tok` and `vault_tok`. Postgres refuses a notification of 8,000 bytes or more.
+A notification that is too large drops the row above first, then the row, and the listener fetches
+what is stored at the address. Deleting a bank sends one notification, of its tombstone: the gate,
+vault and box rows deleted with it send none. `listen(channel, onNotify)` passes the text of each
 notification on that channel to `onNotify`, unchanged, and returns a function that stops listening.
-A watch hears a box with its vault's row as `world`, or with a null `world` when the vault row did
-not fit. Any role that can connect to the database can `LISTEN` on a channel, and so can read the
+A watch hears a box with its vault's row as its parent, or with a null parent when the vault row did
+not fit. A bank or gate row is heard only by a watch of the whole bank. Any role that can connect to the database can `LISTEN` on a channel, and so can read the
 rows a notification carries: the same ciphertext and wrapped keys the tables contain.
 
 LISTEN needs a connection of its own for as long as it listens, so share one among every watch.
@@ -120,7 +127,7 @@ const listen: PostgresListen = async (channel, onNotify) => {
   listeners.add(onNotify)
   return () => listeners.delete(onNotify)
 }
-const vaultDB = new PostgresVaultDB({ client: pgClientOf(pool), listen })
+const bankDB = new PostgresBankDB({ client: pgClientOf(pool), listen })
 ```
 
 A write made just after a watch's first LISTEN can go unheard, as can any notification while the
@@ -136,21 +143,26 @@ with this package for now.
 
 ## What is stored
 
-`safebyok_vaults` has a row per vault, keyed by `user_id`, `banklabel` and `vaultlabel`.
-`safebyok_boxes` has a row per box, keyed by those, the life of its vault (`vault_tok`) and its
-`boxlabel`. Each field of a row is a column of its own. The labels, the tokens and `am` are `text`.
-`fmt`, `revision_seq` and `whisper_schema_version` are `integer`. The times, `registered_at` and
-`written_at`, are `bigint`, in UTC epoch milliseconds. A field that is an object is a `jsonb`
-column: a vault's `gate`, and a box's `sidecar`, `box_key_wrapped` and `whisper_ciphered`. Your own
-SQL can read any of them, a sidecar's fields included (`sidecar->>'note'`), but leave the writing
-to `PostgresVaultDB`.
+`safebyok_banks` has a row per bank, keyed by `user_id` and `banklabel`. `safebyok_gates` has a row
+per gate of a bank, keyed by those and `gatelabel`; today every bank has one, `main`, holding the
+bank's wayins in `wayins`. `safebyok_vaults` has a row per vault, keyed by the bank's key and
+`vaultlabel`. `safebyok_boxes` has a row per box, keyed by the vault's key, the life of its vault
+(`bank_tok` and `vault_tok`) and its `boxlabel`. Each field of a row is a column of its own. The
+labels, the tokens and `am` are `text`. `fmt`, `revision_seq` and `whisper_schema_version` are
+`integer`. The times, `registered_at` and `written_at`, are `bigint`, in UTC epoch milliseconds.
+A field that is an object is a `jsonb` column: a gate's `wayins`, `auth`, `sigs` and `meta`, and a
+box's `sidecar`, `box_key_wrapped` and `whisper_ciphered`. Your own SQL can read any of them, a
+sidecar's fields included (`sidecar->>'note'`), but leave the writing to `PostgresBankDB`.
 
-A deleted vault or box leaves its tombstone in place: the same row, its `am` `'x'` where a live
-row's is `'a'`, and its `jsonb` columns null. The box rows of a vault's ended lives are deleted by
-the vault's next write, or by `tidyGone`. A box row has a foreign key to the vault row at its scope, whatever that vault's
-`vault_tok`: no box row is stored where no vault row is, and **a `DELETE` of a vault row is
-refused while it has box rows**. `PostgresVaultDB` never deletes a vault row, so that is your
-own SQL's doing, and a `TRUNCATE` of the vaults table must name both tables.
+A deleted bank, vault or box leaves its tombstone in place: the same row, its `am` `'x'` where a
+live row's is `'a'`, and a box's `jsonb` columns null. Deleting a bank deletes every gate, vault and
+box row under it, in the same transaction; building it again does the same to any left. A vault or
+box row under another `bank_tok` than its bank row's, or a box row under another life than its
+vault row's, is of an ended life: no read returns it, and `tidyGone` deletes it. Each gate, vault
+and box row has a foreign key to the bank row at its scope, whatever that bank's `bank_tok`: no row
+is stored where no bank row is, and **a `DELETE` of a bank row is refused while rows stand under
+it**. `PostgresBankDB` never deletes a bank row, so that is your own SQL's doing, and a `TRUNCATE`
+of the banks table must name all four tables.
 
 Row-level security is on with no policy, so of the roles you grant the tables to, only their
 owner, the role your server connects as, can reach the rows. A superuser, or a role that bypasses
@@ -161,19 +173,23 @@ connect can LISTEN on any user's channel and hear the rows each write changes.
 connect and LISTEN: this package grants nothing and creates no role or policy.
 
 Each write is one conditional `INSERT` or `UPDATE`, which takes effect only if the stored row still
-has the revision the write expects at that moment. A box write locks only its box row, and reads its
-vault row without a lock, so writers under one vault do not wait for each other. Two things follow:
+has the revision the write expects at that moment. A gate verb's policy is part of that condition:
+the function stores a gate row only where the verb may change it. A vault write reads its bank row,
+and a box write its vault row, without a lock, so writers under one bank do not wait for each other.
+A new row's foreign key takes a share lock on its bank row, which waits only on a `DELETE` of that
+row. Two things follow:
 
-* A box written while its vault is deleted or created anew may land in the life that has ended. No
-  read returns it, and the vault's next write or `tidyGone` deletes it. If you write boxes heavily
-  under vaults that get deleted and are not written again, call `tidyGone` now and then.
+* A vault or box written while its bank or vault is deleted or built anew may land in the life that
+  has ended. No read returns it, and `tidyGone`, or the bank built anew, deletes it. If you write
+  boxes heavily under vaults that get deleted and are not written again, call `tidyGone` now and
+  then.
 * The box cap is soft. Writers racing to add their first box can pass it together, and `tidyGone`
   does not trim the rows they add.
 
 ## On Supabase
 
-Supabase is Postgres, so this package runs there as it is: put `vault-tables.sql` in a migration
-and run `PostgresVaultDB` on your server, connected with the database connection string.
+Supabase is Postgres, so this package runs there as it is: put `bank-tables.sql` and
+`bank-functions.sql` in a migration and run `PostgresBankDB` on your server, connected with the database connection string.
 
 * **Keep the tables out of the Data API.** The tables come with row-level security on and no
   policy, so the `anon` and `authenticated` roles reach nothing: leave them so.
@@ -186,6 +202,12 @@ This package has not been run against Supabase: this section is a reading of its
 
 `pnpm justify` runs its lint, typecheck, tests and build, with publint and arethetypeswrong. The
 tests run against [PGlite](https://pglite.dev), a real Postgres compiled to WebAssembly and run
-in-process, through the battery every vaultDB runs (`describeVaultDBBattery`, from
-`safebyok/testing`), with a second PostgresVaultDB over the same database as another device. The
+in-process, through the battery every bankDB runs (`describeBankDBBattery`, from
+`safebyok/testing`), with a second PostgresBankDB over the same database as another device. The
 same battery runs over a real Postgres in `e2e/tests/postgres/`, when `SAFEBYOK_PG_URL` reaches one.
+
+## The vaultDB
+
+`PostgresVaultDB`, `VaultTablesSql`, `VaultFunctionsSql` and `vaultChannelOf` are kept, unchanged,
+for hosts that still run safebyok's vaultDB, until the core retires it. They are documented in this
+package's 0.5 README.

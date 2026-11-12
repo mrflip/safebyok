@@ -1,11 +1,11 @@
-/** A real Postgres for this directory's tests: a database to a file, the PostgresVaultDBs over it, and the battery's backdoor to its rows. */
+/** A real Postgres for this directory's tests: a database to a file, the PostgresBankDBs over it, and the battery's backdoor to its rows; and the PostgresVaultDBs safebyok-graphql's tests still host. */
 
 import { afterAll, afterEach, beforeAll, describe } from 'vitest'
 import { Client, Pool, escapeIdentifier } from 'pg'
-import type { Boxscope, VaultScope } from 'safebyok/storage'
+import type { BankScope, Boxscope, VaultScope } from 'safebyok/storage'
 import * as TH from 'safebyok/testing'
-import { PostgresVaultDB, VaultFunctionsSql, VaultTablesSql, pgClientOf, vaultChannelOf } from 'safebyok-postgres'
-import type { PostgresListen, PostgresVaultDBOpts } from 'safebyok-postgres'
+import { BankFunctionsSql, BankTablesSql, PostgresBankDB, PostgresVaultDB, VaultFunctionsSql, VaultTablesSql, bankChannelOf, pgClientOf } from 'safebyok-postgres'
+import type { PostgresBankDBOpts, PostgresListen, PostgresVaultDBOpts } from 'safebyok-postgres'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
 export * from 'safebyok/testing'
@@ -46,7 +46,7 @@ export type FileDatabase = {
   devicePool: () => Pool
   /** A connection of its own to it, as a listener has; ended with the devices. */
   client: () => Promise<Client>
-  /** Empties both tables. */
+  /** Empties every table. */
   empty: () => Promise<void>
   /** Ends every pool and connection made since the last call. */
   endDevices: () => Promise<void>
@@ -63,8 +63,16 @@ const urlNaming = (url: string, database: string): string => {
   return named.href
 }
 
+/** The tables a file database holds: the bankDB's, or the vaultDB's. Their functions share names, so a database holds one set. */
+export type Tableset = 'bank' | 'vault'
+
+const SqlOf = {
+  bank:  { tables: BankTablesSql, functions: BankFunctionsSql, truncate: 'TRUNCATE safebyok_boxes, safebyok_vaults, safebyok_gates, safebyok_banks' },
+  vault: { tables: VaultTablesSql, functions: VaultFunctionsSql, truncate: 'TRUNCATE safebyok_vaults, safebyok_boxes' },
+} as const
+
 /** A database for this file alone, its tables made, created before its first test and dropped after its last: `const getDb = TH.useFileDatabase()`. */
-export const useFileDatabase = (): (() => FileDatabase) => {
+export function useFileDatabase(tableset: Tableset = 'bank'): () => FileDatabase {
   const url = postgresUrl()
   const made: { db?: FileDatabase, drop?: () => Promise<void> } = {}
   // A pool or client with no 'error' listener crashes the run when the server drops it; heard, the drop fails the test it fell in.
@@ -99,8 +107,8 @@ export const useFileDatabase = (): (() => FileDatabase) => {
         await dropper.end()
       }
     }
-    await host.query(VaultTablesSql)
-    await host.query(VaultFunctionsSql)
+    await host.query(SqlOf[tableset].tables)
+    await host.query(SqlOf[tableset].functions)
     const devices: { end: () => Promise<void> }[] = []
     made.db = {
       host,
@@ -115,7 +123,7 @@ export const useFileDatabase = (): (() => FileDatabase) => {
         devices.push({ end: () => client.end() })
         return client
       },
-      empty:      async () => { await host.query('TRUNCATE safebyok_vaults, safebyok_boxes') },
+      empty:      async () => { await host.query(SqlOf[tableset].truncate) },
       endDevices: async () => { await Promise.all(devices.splice(0).map((device) => device.end())) },
     }
   }, 60_000)
@@ -136,9 +144,9 @@ export const useFileDatabase = (): (() => FileDatabase) => {
 }
 // --
 
-// == [VaultDBs]: listenOver, VaultDBOverOpts, vaultDBOver, freshVaultDB
+// == [Listening]: listenOver
 
-/** A `listen` as the package's README has it, over a connection of its own, already listening for the battery's user. */
+/** A `listen` as the package's README has it, over a connection of its own, already listening for the batteries' users. */
 export const listenOver = async (db: FileDatabase): Promise<PostgresListen> => {
   const listenersOf = new Map<string, Set<(text: string) => void>>()
   const listener = await db.client()
@@ -160,11 +168,34 @@ export const listenOver = async (db: FileDatabase): Promise<PostgresListen> => {
     listeners.add(onNotify)
     return () => listeners.delete(onNotify)
   }
-  // A watch's first LISTEN races the writes made just after it, so the battery's user is listened for before any watch.
-  const unlisten = await listen(vaultChannelOf(TH.bankScope.user_id), () => undefined)
-  unlisten()
+  // A watch's first LISTEN races the writes made just after it, so the batteries' users are listened for before any watch.
+  const user_ids = new Set([TH.BW.bankScope.user_id, TH.bankScope.user_id])
+  for (const user_id of user_ids) {
+    const unlisten = await listen(bankChannelOf(user_id), () => undefined)
+    unlisten()
+  }
   return listen
 }
+// --
+
+// == [BankDBs]: BankDBOverOpts, bankDBOver, freshBankDB
+
+export type BankDBOverOpts = Omit<PostgresBankDBOpts, 'client' | 'listen'>
+
+/** A PostgresBankDB over `db` as one server has it: a pool and a listener of its own. */
+export async function bankDBOver(db: FileDatabase, opts: BankDBOverOpts = {}): Promise<PostgresBankDB> {
+  return new PostgresBankDB({ ...opts, client: pgClientOf(db.devicePool()), listen: await listenOver(db) })
+}
+
+/** A bankDB over `db` once the last test's bankDBs are ended and the tables emptied. */
+export async function freshBankDB(db: FileDatabase, opts: BankDBOverOpts = {}): Promise<PostgresBankDB> {
+  await db.endDevices()
+  await db.empty()
+  return await bankDBOver(db, opts)
+}
+// --
+
+// == [VaultDBs]: VaultDBOverOpts, vaultDBOver, freshVaultDB
 
 export type VaultDBOverOpts = Omit<PostgresVaultDBOpts, 'client' | 'listen'>
 
@@ -181,12 +212,100 @@ export const freshVaultDB = async (db: FileDatabase, opts: VaultDBOverOpts = {})
 }
 // --
 
-// == [Rows]: recordOf, rowsOf
+// == [Bank rows]: recordOf, planting, bankRowsOf
 
 /** The record a table row was stored from: each column a field, a null column left out. */
 const recordOf = (row: Record<string, unknown>): Record<string, unknown> => (
   Object.fromEntries(Object.entries(row).filter(([, val]) => val !== null))
 )
+
+/** Run a plant's statements in one transaction on the host's pool, with the foreign keys unchecked: a planted row need not stand under a bank row. The role must be a superuser. */
+async function planting(db: FileDatabase, statements: [string, unknown[]][]): Promise<void> {
+  await pgClientOf(db.host).transaction(async (tx) => {
+    await tx.query('SET LOCAL session_replication_role = replica')
+    for (const [text, params] of statements) { await tx.query(text, params) }
+  })
+}
+
+// A bank row is planted by an upsert, never a delete and an insert, so the rows under it stay.
+const PlantBankSql = `
+  INSERT INTO safebyok_banks
+  SELECT * FROM jsonb_populate_record(NULL::safebyok_banks, $3::text::jsonb || jsonb_build_object('user_id', $1::text, 'banklabel', $2::text))
+  ON CONFLICT (user_id, banklabel)
+  DO UPDATE SET (fmt, am, revision_tok, revision_seq, registered_at, written_at, bank_tok)
+    = (EXCLUDED.fmt, EXCLUDED.am, EXCLUDED.revision_tok, EXCLUDED.revision_seq, EXCLUDED.registered_at, EXCLUDED.written_at, EXCLUDED.bank_tok)
+`
+const UnplantGateSql = 'DELETE FROM safebyok_gates WHERE (user_id, banklabel, gatelabel) = ($1, $2, $3)'
+const PlantGateSql = `
+  INSERT INTO safebyok_gates
+  SELECT * FROM jsonb_populate_record(NULL::safebyok_gates, $4::text::jsonb || jsonb_build_object('user_id', $1::text, 'banklabel', $2::text, 'gatelabel', $3::text))
+`
+const UnplantBankVaultSql = 'DELETE FROM safebyok_vaults WHERE (user_id, banklabel, vaultlabel) = ($1, $2, $3)'
+const PlantBankVaultSql = `
+  INSERT INTO safebyok_vaults
+  SELECT * FROM jsonb_populate_record(NULL::safebyok_vaults, $4::text::jsonb || jsonb_build_object('user_id', $1::text, 'banklabel', $2::text, 'vaultlabel', $3::text))
+`
+// A box row's life is part of its address. A planted row that names a life of its own is stored under that life, as a store keyed by scope alone would hold it.
+const BankBoxRowSql = `
+  jsonb_build_object('bank_tok', $4::text, 'vault_tok', $5::text) || $7::text::jsonb
+  || jsonb_build_object('user_id', $1::text, 'banklabel', $2::text, 'vaultlabel', $3::text, 'boxlabel', $6::text)
+`
+const UnplantBankBoxSql = `
+  DELETE FROM safebyok_boxes AS box
+  USING  jsonb_populate_record(NULL::safebyok_boxes, ${BankBoxRowSql}) AS planted
+  WHERE  (box.user_id, box.banklabel, box.vaultlabel, box.bank_tok, box.vault_tok, box.boxlabel)
+       = (planted.user_id, planted.banklabel, planted.vaultlabel, planted.bank_tok, planted.vault_tok, planted.boxlabel)
+`
+const PlantBankBoxSql = `INSERT INTO safebyok_boxes SELECT * FROM jsonb_populate_record(NULL::safebyok_boxes, ${BankBoxRowSql})`
+
+/** The first row `text` finds in `db`, as the record it was stored from, or null for none. */
+async function recordFound(db: FileDatabase, text: string, params: unknown[]): Promise<Record<string, unknown> | null> {
+  const { rows } = await db.host.query<{ row: Record<string, unknown> }>(text, params)
+  return (rows[0] === undefined) ? null : recordOf(rows[0].row)
+}
+
+/** The bankDB battery's backdoor to the rows in `db`, by SQL on the host's pool.
+ * A planted row's address is the scope's, whatever the row names, except a box row's life, and a field with no column is dropped.
+ * The tables refuse a row that is no object, one missing a field every row has, and a number field that is no integer.
+ */
+export function bankRowsOf(db: FileDatabase): TH.BankDBRowCheats {
+  return {
+    plantBankRow: async ({ user_id, banklabel }: BankScope, row: unknown) => {
+      await planting(db, [[PlantBankSql, [user_id, banklabel, JSON.stringify(row)]]])
+    },
+    plantGateRow: async ({ user_id, banklabel, gatelabel }: BankScope & { gatelabel: string }, row: unknown) => {
+      const address = [user_id, banklabel, gatelabel]
+      await planting(db, [[UnplantGateSql, address], [PlantGateSql, [...address, JSON.stringify(row)]]])
+    },
+    plantVaultRow: async ({ user_id, banklabel, vaultlabel }: VaultScope, row: unknown) => {
+      const address = [user_id, banklabel, vaultlabel]
+      await planting(db, [[UnplantBankVaultSql, address], [PlantBankVaultSql, [...address, JSON.stringify(row)]]])
+    },
+    plantBoxRow: async ({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, bank_tok: string, vault_tok: string, row: unknown) => {
+      const params = [user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel, JSON.stringify(row)]
+      await planting(db, [[UnplantBankBoxSql, params], [PlantBankBoxSql, params]])
+    },
+    bankRowOf: async ({ user_id, banklabel }: BankScope) => await recordFound(
+      db, 'SELECT to_jsonb(stored) AS row FROM safebyok_banks AS stored WHERE (user_id, banklabel) = ($1, $2)', [user_id, banklabel],
+    ),
+    gateRowOf: async ({ user_id, banklabel, gatelabel }: BankScope & { gatelabel: string }) => await recordFound(
+      db, 'SELECT to_jsonb(stored) AS row FROM safebyok_gates AS stored WHERE (user_id, banklabel, gatelabel) = ($1, $2, $3)', [user_id, banklabel, gatelabel],
+    ),
+    vaultRowOf: async ({ user_id, banklabel, vaultlabel }: VaultScope) => await recordFound(
+      db, 'SELECT to_jsonb(stored) AS row FROM safebyok_vaults AS stored WHERE (user_id, banklabel, vaultlabel) = ($1, $2, $3)', [user_id, banklabel, vaultlabel],
+    ),
+    boxRowsOf: async ({ user_id, banklabel, vaultlabel }: VaultScope, bank_tok: string, vault_tok: string) => {
+      const { rows } = await db.host.query<{ boxlabel: string, row: Record<string, unknown> }>(
+        'SELECT boxlabel, to_jsonb(stored) AS row FROM safebyok_boxes AS stored WHERE (user_id, banklabel, vaultlabel, bank_tok, vault_tok) = ($1, $2, $3, $4, $5)',
+        [user_id, banklabel, vaultlabel, bank_tok, vault_tok],
+      )
+      return new Map(rows.map(({ boxlabel, row }) => [boxlabel, recordOf(row)]))
+    },
+  }
+}
+// --
+
+// == [Vault rows]: vaultRowsOf
 
 // A vault row is planted by an upsert, never a delete and an insert: deleting a vault row deletes its box rows.
 const PlantVaultSql = `
@@ -203,11 +322,11 @@ const PlantBoxSql = `
     || jsonb_build_object('user_id', $1::text, 'banklabel', $2::text, 'vaultlabel', $3::text, 'vault_tok', $4::text, 'boxlabel', $5::text))
 `
 
-/** The battery's backdoor to the rows in `db`, by SQL on the host's pool.
+/** The vaultDB battery's backdoor to the rows in a vault tableset's `db`, by SQL on the host's pool.
  * A planted row's address is the scope's, whatever the row names, and a field with no column is dropped.
  * The tables refuse a row failing its checks, a row of a later fmt excepted, and a box row with no vault row at its scope.
  */
-export const rowsOf = (db: FileDatabase): TH.VaultDBRowCheats => ({
+export const vaultRowsOf = (db: FileDatabase): TH.VaultDBRowCheats => ({
   plantVaultRow: async ({ user_id, banklabel, vaultlabel }: VaultScope, row: unknown) => {
     await db.host.query(PlantVaultSql, [user_id, banklabel, vaultlabel, JSON.stringify(row)])
   },

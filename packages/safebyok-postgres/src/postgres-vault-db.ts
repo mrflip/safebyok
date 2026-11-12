@@ -2,23 +2,16 @@
 
 import * as DB from 'safebyok/storage'
 import type {
-  AdapterVaultDBOpts, Awaitable, BoxAsk, BoxDelAsk, BoxesFetched, BoxesStored, BoxFetched, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, BoxQuery, BoxStored, Capacity, Heard,
+  AdapterVaultDBOpts, BoxAsk, BoxDelAsk, BoxesFetched, BoxesStored, BoxFetched, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, BoxQuery, BoxStored, Capacity, Heard,
   RowOfVault, Tidied, VaultAsk, VaultDelAsk, VaultError, VaultFetched, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultScope, VaultsStored, VaultStored, WatchScope,
 } from 'safebyok/storage'
 import {
   BirthBoxSql, BirthVaultSql, BoxLivesSql, DeleteBoxLifeSql, GetBoxWithVaultSql, GetVaultSql, ListBoxesWithVaultSql, ListVaultsSql, ReviseBoxSql, ReviseVaultSql,
 } from './vault-queries'
+import { isPostgresClient } from './postgres-bank-db'
+import type { PostgresClient, PostgresListen, PostgresQueryable } from './postgres-bank-db'
 
-// == [The driver]: PostgresQueryable, PostgresClient, PostgresListen, PostgresVaultDBOpts
-
-/** A pool or connection that runs one parameterized statement and returns its rows. */
-export type PostgresQueryable = { query: (text: string, params?: unknown[]) => Promise<{ rows: unknown[] }> }
-
-/** A {@link PostgresQueryable} that also runs `work` as one transaction: a PGlite, or `pgClientOf(pool)`. */
-export type PostgresClient = PostgresQueryable & { transaction: <ValT>(work: (tx: PostgresQueryable) => Promise<ValT>) => Promise<ValT> }
-
-/** A host's LISTEN: calls `onNotify` with the text of each notification on `channel`, and returns a function that stops listening. */
-export type PostgresListen = (channel: string, onNotify: (text: string) => void) => Awaitable<() => unknown>
+// == [The driver]: PostgresVaultDBOpts
 
 /** Options for `new PostgresVaultDB(opts)`, in addition to {@link AdapterVaultDBOpts}:
  * - `client`   -- runs the queries and transactions
@@ -26,12 +19,6 @@ export type PostgresListen = (channel: string, onNotify: (text: string) => void)
  * - `maxBoxes` -- soft cap on the box rows of one vault life, live and deleted together (default: `DefaultMaxBoxes`)
  */
 export type PostgresVaultDBOpts = Readonly<AdapterVaultDBOpts & { client: PostgresClient, listen?: PostgresListen, maxBoxes?: number }>
-
-const isPostgresClient = (candidate: unknown): candidate is PostgresClient => (
-  (typeof candidate === 'object') && (candidate !== null)
-  && ('query' in candidate) && (typeof candidate.query === 'function')
-  && ('transaction' in candidate) && (typeof candidate.transaction === 'function')
-)
 
 // `custom` and `fn` return the same client and listen objects they were given, so the driver's methods keep their `this`.
 const postgresVaultDBOpts = DB.objCheck(({ custom, fn, int }) => ({

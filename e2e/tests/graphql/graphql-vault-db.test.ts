@@ -7,7 +7,7 @@ import type { Notice } from 'safebyok/storage'
 import type { GraphQLVaultDB } from 'safebyok-graphql'
 import * as TH from './test-helpers'
 
-const getDb = TH.useFileDatabase()
+const getDb = TH.useFileDatabase('vault')
 TH.useServers()
 
 const serverOf = new WeakMap<GraphQLVaultDB, TH.Server>()
@@ -43,7 +43,7 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
     makeVaultDB:          async (opts = {}) => await freshBrowser(opts),
     makeCappedVaultDB:    async (maxBoxes) => await freshBrowser({ maxBoxes }),
     makeTwin:             twinOf,
-    _cheat_rowsOf:        () => TH.rowsOf(getDb()),
+    _cheat_rowsOf:        () => TH.vaultRowsOf(getDb()),
     _cheat_adapterOf:     (browser) => serverOf.get(browser)!.vaultDB,
   })
 
@@ -82,6 +82,6 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
     const born = TH.vaultPutAskOf(TH.vaultAt())
     await TH.expectRefusal(intruder.putVault(born), 'identity_revoked')
     await TH.expectRefusal(TH.browserAt(server, () => null).listVaults(TH.vaultListAsk), 'identity_revoked')
-    expect(await TH.rowsOf(getDb()).vaultRowOf(TH.vaultScope)).to.be.null
+    expect(await TH.vaultRowsOf(getDb()).vaultRowOf(TH.vaultScope)).to.be.null
   })
 })

@@ -30,8 +30,8 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
   pool and a listening connection for each device, so the statements in a race run at the same
   moment on separate connections. PGlite, which every test in the adapter's package uses, runs one
   statement at a time and cannot show that. Each file makes a database of its own and drops it.
-  * [battery.test.ts](tests/postgres/battery.test.ts) -- the `VaultDB` battery and its races,
-    the same `describeVaultDBBattery` the adapter runs over PGlite, and a watch hearing another
+  * [battery.test.ts](tests/postgres/battery.test.ts) -- the bankDB battery and its races,
+    the same `describeBankDBBattery` the adapter runs over PGlite, and a watch hearing another
     server's writes through a real `LISTEN`.
   * [races.test.ts](tests/postgres/races.test.ts) -- writers racing for a vault's last place, each
     on its own pool. The cap is soft: at least one racer is written, and the rest are refused as
@@ -39,7 +39,8 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
   * [test-helpers.ts](tests/postgres/test-helpers.ts) -- the file databases, the devices, and
     **`OnRealPostgres`, the list of suites that run against the server**. The rest of the
     Postgres tests stay in `packages/safebyok-postgres`, over a PGlite. To run one more suite on the
-    server, add it to the list.
+    server, add it to the list. A file database holds the bankDB's tables, or, for
+    `tests/graphql/`, the vaultDB's: their functions share names.
 
 * [tests/graphql/](tests/graphql) -- `safebyok-graphql`'s README recipe, both halves, over real
   sockets: `GraphQLVaultDB` over an urql Client posting to Yoga servers, each on its own port and
