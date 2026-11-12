@@ -10,7 +10,7 @@ import { bankScopepathOf, boxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, gat
 
 /** Options for an IdbBankDB: the AdapterBankDB's options, plus
  * - `dbName`   -- scopes the database names: `safebyok-<dbName>:…`, or `safebyok:…` if left out
- * - `maxBoxes` -- a soft cap on the box rows of one vault life, live and deleted together (default: the core's `DefaultMaxBoxes`)
+ * - `maxBoxes` -- a soft cap on the box rows of one vault life, tombstones included (default: the core's `DefaultMaxBoxes`)
  */
 export type IdbBankDBOpts = BX.AdapterBankDBOpts & { dbName?: string | undefined, maxBoxes?: number | undefined }
 
@@ -57,7 +57,7 @@ export class IdbBankDB extends DB.AdapterBankDB {
   // == [Room]: #roomIn
 
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** The capacity of the vault life `life` names, by its `bank_tok` and `vault_tok`: its box rows, live and deleted, counted in the caller's transaction, against the soft cap `maxBoxes`. */
+  /** The capacity of the vault life `life`: its box rows, tombstones included, counted in `store`'s transaction, against `maxBoxes`. */
   async #roomIn(store: IDBObjectStore, life: BX.BoxQuery): Promise<DB.Capacity> {
     const used = await promisifyRequest(store.count(lifeRangeOf(life)))
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }

@@ -1,4 +1,6 @@
-/** The SQL that PostgresBankDB runs: one statement per constant, each written out whole so it can be read, and run by hand, on its own. */
+/** The SQL that PostgresBankDB runs, one whole statement per constant. */
+
+// Each is written out whole, so it can be read, and run by hand, on its own.
 
 // Each query returns a row as one JSON object shaped like the record it was stored from, so that a bigint column arrives
 // as a number (a driver returns a bare bigint as text). `safebyok_record` drops the null columns: the record had no such field.
@@ -46,7 +48,7 @@ export const GetGateWithBankSql = `
 
 /** Store a bank's first record and its main gate, if no row is stored. */
 export const BirthBankSql = 'SELECT * FROM safebyok_birth_bank($1::text::jsonb, $2::text::jsonb, $3::text::jsonb)'
-/** Store a bank's next record over the row expected, ending everything under it. */
+/** Store a bank's next record over the row expected, replacing every row under the bank with its new main gate, if any. */
 export const ReviseBankSql = 'SELECT * FROM safebyok_revise_bank($1::text::jsonb, $2::text::jsonb, $3::text::jsonb)'
 /** Store a gate verb's record over the gate row expected, if the verb's policy allows it. */
 export const PutGateSql = 'SELECT * FROM safebyok_put_gate($1::text::jsonb, $2::text::jsonb, $3)'
