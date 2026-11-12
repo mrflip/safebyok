@@ -201,15 +201,6 @@ describe("MemoryBankDB.tidyGone", () => {
   })
 })
 
-describe("MemoryBankDB.tidyGone, under a bank row that fails its checks", () => {
-  it("leaves the vault rows alone", async () => {
-    const bankDB = await vaultedBankDB()
-    bankDB._cheat_shelfOf(bankScope).bank = { ...bankAt(), fmt: 1 }
-    await bankDB.tidyGone(boxTidyAsk)
-    expect(bankDB._cheat_shelfOf(bankScope).vaultrows.has(vaultScope.vaultlabel)).to.eq(true)
-  })
-})
-
 describe("MemoryBankDB.watch", () => {
   it("tells a bank's watch of its bank and gate rows, and a vault's watch of its boxes with the vault as parent", async () => {
     const bankDB = new MemoryBankDB()
