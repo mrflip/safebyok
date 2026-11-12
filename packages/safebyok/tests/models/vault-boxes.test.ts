@@ -79,7 +79,7 @@ describe("vault.beginWatch", () => {
   })
 })
 
-describe("the box methods refuse a locked or deleted vault", () => {
+describe("the box methods on a locked or deleted vault", () => {
   const Verbs = [
     ['getBox',   false, (vault) => vault.getBox(boxlabel)],
     ['fetchBox', false, (vault) => vault.fetchBox(boxlabel)],
@@ -87,12 +87,12 @@ describe("the box methods refuse a locked or deleted vault", () => {
     ['delBox',   true,  (vault) => vault.delBox(boxlabel)],
   ] as const satisfies readonly (readonly [string, boolean, (vault: Awaited<ReturnType<typeof makeWorld>>['vault']) => Promise<unknown>])[]
 
-  for (const [verb, refusesLocked, call] of Verbs) {
-    if (refusesLocked) {
-      it(`${verb} refuses 'bank_locked' while locked`, async () => {
+  for (const [verb, asksUnlock, call] of Verbs) {
+    if (asksUnlock) {
+      it(`${verb} asks for the unlock while locked, refusing 'dismissed' where the user dismisses it`, async () => {
         const { vault } = await makeWorld()
         vault.bank.lock()
-        await TH.expectRefusal(call(vault), 'bank_locked')
+        await TH.expectRefusal(call(vault), 'dismissed')
       })
     }
 
@@ -113,7 +113,7 @@ describe("the box methods refuse a locked or deleted vault", () => {
   it("a refused put's whisper does not appear in the refusal", async () => {
     const { vault } = await makeWorld()
     vault.bank.lock()
-    const err = await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }), 'bank_locked')
+    const err = await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }), 'dismissed')
     expect(JSON.stringify(err.meta ?? {})).not.to.include(Whisper)
     expect(err.message).not.to.include(Whisper)
   })

@@ -361,11 +361,24 @@ describe("a sidecar-only put", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-0001' })
   })
 
-  it("refuses 'bank_locked' while locked, putting nothing", async () => {
+  it("asks for the unlock while locked, and puts once the user unlocks", async () => {
+    const { vault, box, tryPutBox, dialog } = await makeWorldWithBox()
+    const shown: string[] = []
+    dialog.requestCleartext = async (gating) => { shown.push(gating.gatingkind); await gating.attempt(byPassphrase(Passphrase)) }
+    vault.bank.lock()
+    tryPutBox.mockClear()
+    await box.put({ sidecar: { note: 'home' } })
+    expect(shown).to.deep.equal(['unlock_bank'])
+    expect(tryPutBox).toHaveBeenCalledOnce()
+    expect(box.sidecar).to.deep.equal({ note: 'home' })
+    expect(vault.bank.isUnlocked).to.be.true
+  })
+
+  it("asks for the unlock while locked, putting nothing where the user dismisses it", async () => {
     const { vault, box, tryPutBox } = await makeWorldWithBox()
     vault.bank.lock()
     tryPutBox.mockClear()
-    await TH.expectRefusal(box.put({ sidecar: { note: 'home' } }), 'bank_locked')
+    await TH.expectRefusal(box.put({ sidecar: { note: 'home' } }), 'dismissed')
     expect(tryPutBox).not.toHaveBeenCalled()
   })
 })

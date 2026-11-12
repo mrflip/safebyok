@@ -8,10 +8,10 @@ TH.sweepBankWorlds()
 
 /** Render a DelVaultModal over a vault just built, and so unlocked, with a spy for its `onDone`. */
 const shownFor = async () => {
-  const { bank, vault } = await TH.makeBankWithVault()
+  const { world, bank, vault } = await TH.makeBankWithVault()
   const onDone = vi.fn()
   render(<DelVaultModal vault={vault} onDone={onDone} />)
-  return { bank, vault, onDone }
+  return { world, bank, vault, onDone }
 }
 
 const alertText = () => screen.getByRole('alert').textContent
@@ -45,9 +45,19 @@ describe("DelVaultModal", () => {
     expect(document.activeElement).to.have.property('textContent', Messages.cancelButton)
   })
 
-  it("shows the refusal of a vault under a locked bank in place, deleting nothing", async () => {
+  it("unlocks a locked bank first, asking the user, then deletes the vault and calls onDone with true", async () => {
     const { bank, onDone } = await shownFor()
     act(() => { bank.lock() })
+    fireEvent.click(screen.getByText(Messages.delVaultButton))
+    await waitFor(() => { expect(onDone).toHaveBeenCalledWith(true) })
+    expect(bank.isUnlocked).to.be.true
+    expect(bank.vaultAt(TH.VaultScopeGiven)?.isPresent).to.not.be.true
+  })
+
+  it("shows the refusal in place where the user does not unlock a locked bank, deleting nothing", async () => {
+    const { world, bank, onDone } = await shownFor()
+    act(() => { bank.lock() })
+    world.dialog.typing = TH.byPassphrase('not the passphrase')
     fireEvent.click(screen.getByText(Messages.delVaultButton))
     await waitFor(() => { expect(alertText()).to.not.eq('') })
     expect(onDone).not.toHaveBeenCalled()

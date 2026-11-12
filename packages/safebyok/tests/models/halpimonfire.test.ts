@@ -55,12 +55,12 @@ describe("A lock called while an unlock proves", () => {
 })
 
 describe("A lock called during a box verb", () => {
-  it("during hello lets it resolve, and the next putBox refuses 'bank_locked'", async () => {
+  it("during hello lets it resolve, and the next putBox asks for the unlock", async () => {
     const { vault, bankDB } = await makeBornVault()
     const tryListBoxes = bankDB.tryListBoxes.bind(bankDB)
     vi.spyOn(bankDB, 'tryListBoxes').mockImplementationOnce((...args) => { vault.bank.lock(); return tryListBoxes(...args) })
     await expect(vault.beginWatch()).resolves.to.eq(vault)
-    await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } }), 'bank_locked')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } }), 'dismissed')
   })
 
   it("during fetchBox's get still returns the box, whose whisper refuses 'bank_locked'", async () => {

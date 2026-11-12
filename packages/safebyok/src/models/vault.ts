@@ -156,7 +156,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
   // --
 
-  // == [Guards]: isLocked, demandWatchable, demandPresent, ensureTimely
+  // == [Guards]: isLocked, demandWatchable, demandPresent, ensureUnlocked, ensureTimely
 
   // A vault has no lock of its own: a host asks the bank.
   /** Whether this vault's bank is locked. */
@@ -168,6 +168,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Demand that this vault is present. */
   demandPresent(): this {
     if (! this.isPresent) { throw deletedVault() }
+    return this
+  }
+
+  // An unlocked bank is left as it is: the gate fetch the bank's own ensureUnlocked makes first is too dear to pay on every put and del.
+  /** Unlock this vault's bank if it is locked: see {@link Bank.ensureUnlocked}. */
+  async ensureUnlocked(): Promise<this> {
+    if (this.isLocked) { await this.bank.ensureUnlocked() }
     return this
   }
 

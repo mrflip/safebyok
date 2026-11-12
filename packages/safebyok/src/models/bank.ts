@@ -7,7 +7,7 @@ import type { VaultLogger } from '../helpers/logger'
 import type { GuardedStrengthChecker } from '../helpers/passphrase-strength'
 import { type Outcome, demandGood, good, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
-import { actRefused, mainGateMissing, needUnlocked } from '../refusals/throwers'
+import { actRefused, mainGateMissing, needUnlocked, writtenByOwnVerbs } from '../refusals/throwers'
 import { type BankScope, type BankedVaultScope, type VaultScope, bankedVaultScope } from '../shapes/shapes-core'
 import type { LeaseDated } from '../shapes/shapes-storage'
 import * as BX from '../shapes/shapes-bankdb'
@@ -147,7 +147,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   receiveParent(parent: unknown): void { this.listing.deliverRecord(BX.bankRow.refusingAs('record_conflict').parse(parent)) }
   // --
 
-  // == [Prompting]: prompt, ensureUnlocked, unlock, delPrompt, each with its try form
+  // == [Prompting]: prompt, ensureUnlocked, unlock, del, delPrompt, each with its try form
 
   /** Ask the user through a gating of `gatingkind`, resolving this bank once the change it names is made. */
   async prompt(gatingkind: BankGatingkind): Promise<this> {
@@ -175,6 +175,10 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   /** Non-throwing form of {@link unlock}. */
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
+
+  // A bank's delete needs the user's passphrase: the bank listing's del is called only by the del_bank gating.
+  /** Refuses: delete a bank with {@link delPrompt}. */
+  override del(): Promise<this> { return Promise.reject(writtenByOwnVerbs()) }
 
   /** Delete this bank, its gate, its vaults and their boxes, once the user proves it through a `del_bank` gating.
    * This Bank is then disabled for good, and the device has no bank until the next `device.ensureBank()`.
@@ -305,15 +309,12 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     return this.#vaultListing.at(this.vaultScopeOf(scope))
   }
 
-  /** The vault at `scope`, as listed or stored, creating it if absent (void or tombstoned).
-   * Unless the vault is already listed, this needs the bank unlocked: precede with `await bank.ensureUnlocked()`.
-   */
+  /** The vault at `scope`, as listed or stored, creating it if absent (void or tombstoned). A locked bank will do. */
   async ensureVault(scope: BankedVaultScope): Promise<Vault> {
     const asked = this.vaultScopeOf(scope)
     this.demandEnabled()
     const listed = this.#vaultListing.at(asked)
     if (listed?.isPresent === true) { return listed }
-    this.demandUnlocked()
     const expected = listed?.sparse ?? BX.shellVaultOf(asked)
     return this.#vaultListing.put(this.#vaultListing.recordOfBirth(asked, expected), { expected, ifAbsent: 'add', ifPresent: 'get' })
   }

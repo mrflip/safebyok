@@ -3,7 +3,7 @@ import { nowMillis } from '../helpers/clock'
 import { Checkers } from '../helpers/validator'
 import { tattoo } from '../helpers/helpers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import { mainGateMissing, passkeyAlreadyAdded } from '../refusals/throwers'
+import { mainGateMissing, passkeyAlreadyAdded, writtenByOwnVerbs } from '../refusals/throwers'
 import type { GateScope } from '../shapes/shapes-core'
 import { type GateRecord, type GateSparse, type Wayins, GateFormat, gateRecord } from '../shapes/shapes-bankdb'
 import { type BankStamp, type GateStamp, bankStamp, gateStamp } from '../shapes/shapes-gateish'
@@ -136,13 +136,16 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
   // --
 
-  // == [Methods]: pickle
+  // == [Methods]: del, pickle
+
+  /** Refuses: a gate is deleted only with its bank, by `bank.delPrompt()`. */
+  override del(): Promise<this> { return Promise.reject(writtenByOwnVerbs()) }
 
   /** This gate's current row, as a frozen plain {@link GateRecord}. */
   pickle(): GateRecord { return Object.freeze({ ...this.demandFullProps(), wayins: this.wayins }) }
   // --
 
-  // == [Guards]: isLocked, demandPasskeyAddable, demandPresent, ensureTimely
+  // == [Guards]: isLocked, demandPasskeyAddable, demandPresent, ensureUnlocked, ensureTimely
 
   /** True while this gate's bank is locked. */
   get isLocked(): boolean { return this.bank.isLocked }
@@ -156,6 +159,13 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   /** Demand that this gate is present. */
   demandPresent(): this {
     if (! this.isPresent) { throw mainGateMissing(this.bank.sparse) }
+    return this
+  }
+
+  // An unlocked bank is left as it is: the gate fetch the bank's own ensureUnlocked makes first is too dear to pay on every put and del.
+  /** Unlock this gate's bank if it is locked: see {@link Bank.ensureUnlocked}. */
+  async ensureUnlocked(): Promise<this> {
+    if (this.isLocked) { await this.bank.ensureUnlocked() }
     return this
   }
 

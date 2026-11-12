@@ -28,6 +28,17 @@ describe("BankListing's entrypoints", () => {
     expect(bank.isPresent).to.be.true
   })
 
+  it("refuses the bank's and the gate's own del, which go only through bank.delPrompt(), asking nobody and calling no bankDB verb", async () => {
+    const { bank, bankDB } = await makeBornVault()
+    const deleting = vi.spyOn(bankDB, 'tryDelBank')
+    bank.lock()
+    expect(await refusalMessageOf(bank.del())).to.eq(writtenByOwnVerbs().message)
+    expect(await refusalMessageOf(bank.maingate.del())).to.eq(writtenByOwnVerbs().message)
+    expect(deleting).not.toHaveBeenCalled()
+    expect(bank.isPresent).to.be.true
+    expect(bank.device.openGating).to.be.null
+  })
+
   it("refuses a del over an ante that is no bank row, calling no bankDB verb", async () => {
     const { bank, bankDB } = await makeBornVault()
     const deleting = vi.spyOn(bankDB, 'tryDelBank')

@@ -36,18 +36,20 @@ describe("bank.ensureVault", () => {
     expect(bank.isLocked).to.be.true
   })
 
-  it("refuses 'bank_locked' a vault not yet stored in a locked bank, asking nobody and storing nothing", async () => {
+  it("stores a vault not yet stored in a locked bank, asking nobody, the bank left locked", async () => {
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const { world, bank } = await makeBankWithVault(makeBankWorld(), { requestCleartext })
     requestCleartext.mockClear()
     bank.lock()
-    await TH.expectRefusal(bank.ensureVault(OtherScopeGiven), 'bank_locked')
+    const vault = await bank.ensureVault(OtherScopeGiven)
+    expect(vault.isPresent).to.be.true
     expect(requestCleartext).not.toHaveBeenCalled()
-    expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
-    expect(world.bankDB._cheat_shelfOf(BankScopeGiven).vaultrows.size).to.eq(1)
+    expect(bank.isLocked).to.be.true
+    expect(labelsOf(bank.snapshot)).to.have.members([Dna.vaultlabel, vault.vaultlabel])
+    expect(world.bankDB._cheat_shelfOf(BankScopeGiven).vaultrows.size).to.eq(2)
   })
 
-  it("refuses while an unlock's gating is open", async () => {
+  it("stores a vault while an unlock's gating is open, the unlock going on", async () => {
     const world = makeBankWorld()
     let closeDialog = nothing
     let showDialog = nothing
@@ -59,9 +61,12 @@ describe("bank.ensureVault", () => {
     } })
     const asking = bank.ensureUnlocked()
     await shown
-    await TH.expectRefusal(bank.ensureVault(OtherScopeGiven))
+    const vault = await bank.ensureVault(OtherScopeGiven)
+    expect(vault.isPresent).to.be.true
+    expect(bank.isLocked).to.be.true
     closeDialog()
     await asking
+    expect(bank.isUnlocked).to.be.true
   })
 
   it("tryEnsureVault returns a refusal as an Outcome", async () => {
