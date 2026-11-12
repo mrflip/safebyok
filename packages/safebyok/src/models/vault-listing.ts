@@ -66,11 +66,12 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return this.deliverListing(this.#listingOfEnsured(answer))
   }
 
-  // The bank and gate rows are delivered here, so the listing answered carries no parent. No live bank lists no vault.
+  // A live bank's rows are delivered here, so the listing answered carries no parent. No live bank lists no vault, and
+  // its bank row, a tombstone among them, goes on as the listing's parent.
   /** An ensureBank `answer` as a listing's answer of the vault rows, the bank row and its main gate row delivered first. */
   #listingOfEnsured(answer: EnsureBankAnswer): ListingListAnswer<VaultRecord, VaultSparse, SX.DamagedVault> {
     if (! answer.ok) { return answer }
-    if (answer.val === null) { return { ...answer, act: 'gotvoid', parent: null, val: { listed: [], damaged_rows: [] } } }
+    if (answer.val === null) { return { ...answer, act: 'gotvoid', val: { listed: [], damaged_rows: [] } } }
     this.world.receiveParent(answer.parent)
     this.world.gateListing.deliverRecord(answer.val.gates.main)
     return { ...answer, act: 'got', parent: null, val: { listed: answer.val.vaults, damaged_rows: answer.val.damaged_rows } }
@@ -134,7 +135,11 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return this.bankDB.tryDelVault({ op: 'del', user_id, banklabel, vaultlabel, bank_tok, expected, record: tombstone })
   }
 
-  protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.bankDB.watch(this.world.scope, onNotice, onBadNews) }
+  // The bank's one watch: each notice goes to the bank's listing, then its gate's, then this one, and each keeps the rows of its own kind.
+  protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void {
+    const { listing, gateListing } = this.world
+    return this.bankDB.watch(this.world.scope, (notice) => { listing.deliverNotice(notice); gateListing.deliverNotice(notice); onNotice(notice) }, onBadNews)
+  }
 
   /** A vault row: the bank's watch also tells of its bank, gate and box rows. */
   protected isOwnRow(row: BankRow | GateRecord | VaultRow | BoxRow): row is VaultRow { return ('vaultlabel' in row) && ! ('boxlabel' in row) }

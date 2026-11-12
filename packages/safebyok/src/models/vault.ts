@@ -15,6 +15,7 @@ import type { BankFriend, BoxPut, BoxPutOpts, Fetched, FetchOpts, TimelyOpts, Va
 import { deletedVault } from '../refusals/throwers'
 import type { Bank } from './bank'
 import type { Box } from './box'
+import type { Gate } from './gate'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 import type { VaultListing } from './vault-listing'
@@ -90,6 +91,27 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   /** Non-throwing form of {@link unlock}. */
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
+  // --
+
+  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, each with its try form
+
+  /** Replace the bank's passphrase: {@link Gate.replacePassphrasePrompt}. */
+  async replacePassphrasePrompt(): Promise<this> { await this.world.maingate.replacePassphrasePrompt(); return this }
+
+  /** Non-throwing form of {@link replacePassphrasePrompt}. */
+  tryReplacePassphrasePrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrasePrompt()) }
+
+  /** Add a passkey to the bank's gate: {@link Gate.addPasskeyPrompt}. */
+  async addPasskeyPrompt(): Promise<this> { await this.world.maingate.addPasskeyPrompt(); return this }
+
+  /** Non-throwing form of {@link addPasskeyPrompt}. */
+  tryAddPasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskeyPrompt()) }
+
+  /** Revoke the passkey of the bank's gate: {@link Gate.revokePasskeyPrompt}. */
+  async revokePasskeyPrompt(): Promise<this> { await this.world.maingate.revokePasskeyPrompt(); return this }
+
+  /** Non-throwing form of {@link revokePasskeyPrompt}. */
+  tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
   // --
 
   // == [The boxes' world]: sealStampedString, unsealStampedString, stampsOf, receiveParent

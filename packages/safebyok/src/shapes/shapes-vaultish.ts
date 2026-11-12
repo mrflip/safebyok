@@ -399,11 +399,12 @@ export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDevice
 export const vaultWorld = Checker(({ bankScope, bank_tok, bool, custom, fn }) => listingWorld.extend({
   scope: bankScope, bank_tok, boxRefreshMillis: horizonMillis, sealWith: fn(), unsealWith: fn(),
   isUnlocked: bool, lock: fn(), ensureUnlocked: fn(), unlock: fn(),
+  listing:     custom<object>((val) => hasModelkind(val, 'bank_listing'), Phrases.ListingExpected),
   gateListing: custom<object>((val) => hasModelkind(val, 'gate_listing'), Phrases.ListingExpected),
 }), 'bad_option', [CX])
 
 /** The bank, as far as its vaults reach into it, its lock verbs among them. */
-export type VaultWorld = Pick<Bank, keyof ListingWorld | 'scope' | 'bank_tok' | 'boxRefreshMillis' | 'sealWith' | 'unsealWith' | 'gateListing' | 'isUnlocked' | 'lock' | 'ensureUnlocked' | 'unlock'>
+export type VaultWorld = Pick<Bank, keyof ListingWorld | 'scope' | 'bank_tok' | 'boxRefreshMillis' | 'sealWith' | 'unsealWith' | 'listing' | 'gateListing' | 'maingate' | 'isUnlocked' | 'lock' | 'ensureUnlocked' | 'unlock'>
 
 /** The check of what a bank is made with, past its listing's options: the device that makes it, and the token of its device row, which the device has once its `ensureBank` has ensured the row. */
 export const bankArgs = objCheck(({ custom, device_tok }) => ({
@@ -546,6 +547,8 @@ export interface BankSnapshot extends BankScope {
   readonly device_tok: string
   /** True unless this device has a lease granted and in force. */
   readonly isLocked:   boolean
+  /** A snapshot of the bank's main gate, its wayins' headers among it; null before its row has come. */
+  readonly maingate:   GateSnapshot | null
   /** A snapshot of each vault the bank lists. */
   readonly vaults:     readonly VaultSnapshot[]
 }

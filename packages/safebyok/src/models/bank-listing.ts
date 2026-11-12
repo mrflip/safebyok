@@ -10,7 +10,7 @@ import { type BankStamp, type GateStamp, bankStamp, gateStamp } from '../shapes/
 import * as SX from '../shapes/shapes-storage'
 import { type BankScope, bankScope } from '../shapes/shapes-core'
 import * as BX from '../shapes/shapes-bankdb'
-import type { BankRecord, BankRow, BankSparse, BoxRow, GateRecord, VaultRow } from '../shapes/shapes-bankdb'
+import type { BankRecord, BankRow, BankSparse, BankTombstone, BoxRow, GateRecord, VaultRow } from '../shapes/shapes-bankdb'
 import type { BankSnapshot, Fetched, ListingOpts } from '../shapes/shapes-vaultish'
 import { Bank } from './bank'
 import type { Device } from './device'
@@ -42,7 +42,7 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
   recordOf(bankish: unknown): BankRecord { return BX.bankRecord.parseConsistent(bankish, this.world.scope, { message: Phrases.otherScope }) }
   // --
 
-  // == [A birth]: stampsOfBirth, recordOfBirth, build
+  // == [A birth and a death]: stampsOfBirth, recordOfBirth, build, delBank
 
   /** A new life's stamps, the bank's and its main gate's, one pair per attempt to build a bank. */
   stampsOfBirth(): { bank: BankStamp, gate: GateStamp } {
@@ -70,6 +70,15 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
     const bank = this.deliverRecord(answer.parent)
     bank.gateListing.deliverRecord(answer.val)
     return bank
+  }
+
+  /** Store a tombstone over the bank row `ante`, which deletes the bank's gate, its vaults and their boxes, and answer the bank listed: gone, or null where nothing was stored. */
+  async delBank(ante: BankSparse): Promise<Bank | null> {
+    const expected = this.sparseOf(ante)
+    this.demandEnabled()
+    const record: BankTombstone = { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), am: 'x', bank_tok: makeLifeTok() }
+    const answer = await this.bankDB.tryDelBank({ op: 'del', ...this.world.scope, expected, record })
+    return this.deliverAnswer(answer, record)
   }
   // --
 

@@ -64,7 +64,7 @@ export class Device {
   readonly #listeners = new Set<() => void>()
   /** The token of this device's row in the deviceDB, once an `ensureBank` has ensured the row; null until then. */
   #deviceTok:           string | null = null
-  /** The bank once an `ensureBank` has made it, even before it is brought up; null until then, and after a sweep or a vacate. */
+  /** The bank an `ensureBank` brought up; null until then, and after a sweep or a vacate. */
   #bank:                Bank | null = null
   #openGating:          AnyGating | null = null
   /** Why a sweep or a vacate disabled the device, its snapshot's refusal from then on; null while it is enabled. */
@@ -85,8 +85,12 @@ export class Device {
 
   // == [Getters]: bank, device_tok, openGating, autolockMinutes, snapshot, getSnapshot, subscribe, toJSON
 
-  /** The bank, once an `ensureBank` has brought it up; null before, and after a sweep or a vacate. */
-  get bank(): Bank | null { return this.#isReady ? this.#bank : null }
+  // A bank deleted, or let go for a newer life of it, is no longer the device's: the next ensureBank brings up the one listed.
+  /** The bank, once an `ensureBank` has brought it up; null before, after a sweep or a vacate, and once the bank is deleted or built anew. */
+  get bank(): Bank | null {
+    const bank = this.#isReady ? this.#bank : null
+    return ((bank?.isEnabled === true) && bank.isPresent) ? bank : null
+  }
 
   /** The token of this device's row in the deviceDB, which each wayin records; null until an `ensureBank` has ensured the row. */
   get device_tok(): string | null { return this.#deviceTok }
@@ -167,7 +171,8 @@ export class Device {
     this.#deviceTok = device_tok
     await this.keyDeriver.load()
     await this.strengthChecker.load()
-    const bank = this.#bank ?? await this.#fetchBank()
+    const listed = this.#bankListing.at(this.scope)
+    const bank = ((listed?.isEnabled === true) && listed.isPresent) ? listed : await this.#fetchBank()
     this.#bank = bank
     await bank.vaultListing.hello()
     return bank

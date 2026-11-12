@@ -13,7 +13,7 @@ import type { LeaseDated } from '../shapes/shapes-storage'
 import * as BX from '../shapes/shapes-bankdb'
 import type { BankRecord, BankSparse } from '../shapes/shapes-bankdb'
 import * as GX from '../shapes/shapes-gateish'
-import type { AskUser, BankStamp, LeaseFriend, SealedWhisper, UnlockByProving } from '../shapes/shapes-gateish'
+import type { AskUser, BankGatingkind, BankStamp, LeaseFriend, SealedWhisper, UnlockByProving } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, BankSnapshot, Fetched, ListingOpts, RevokeSite } from '../shapes/shapes-vaultish'
 import type { GoodAnswer } from '../storage/bank-db'
@@ -147,7 +147,13 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   receiveParent(parent: unknown): void { this.listing.deliverRecord(BX.bankRow.refusingAs('record_conflict').parse(parent)) }
   // --
 
-  // == [Unlocking]: ensureUnlocked, unlock, each with its try form
+  // == [Prompting]: prompt, ensureUnlocked, unlock, delPrompt, each with its try form
+
+  /** Ask the user, through a gating of `gatingkind`, to prove the change it names, and answer this bank once it is made. */
+  async prompt(gatingkind: BankGatingkind): Promise<this> {
+    await Gating.launchOn(this, gatingkind, Bank.#unlockBankByProving, this.#bankFriend.askUser)
+    return this
+  }
 
   /** This bank unlocked: as it stands, else by the lease cached on this device, else by {@link unlock}. */
   async ensureUnlocked(): Promise<this> {
@@ -164,12 +170,20 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   /** Ask the user for a passphrase or passkey, and unlock by its proving. */
   async unlock(): Promise<this> {
     await this.maingate.ensureTimely(); this.demandPromptable()
-    await Gating.launchOn(this, 'unlock_bank', Bank.#unlockBankByProving, this.#bankFriend.askUser)
-    return this
+    return this.prompt('unlock_bank')
   }
 
   /** Non-throwing form of {@link unlock}. */
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
+
+  /** Delete this bank, its gate, its vaults and their boxes through a del_bank gating, which asks for the passphrase. Its tombstone stays listed, and the device has no bank until its next `ensureBank`. */
+  async delPrompt(): Promise<this> {
+    await this.maingate.ensureTimely(); this.demandPromptable()
+    return this.prompt('del_bank')
+  }
+
+  /** Non-throwing form of {@link delPrompt}. */
+  tryDelPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.delPrompt()) }
   // --
 
   // == [The lease]: lock, autolock, revokeLease, unlockByProving, attachLease, alignVaults
@@ -385,7 +399,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   protected lifeTokPathOf({ bank_tok }: Fetched<BankRecord, BankSparse>): string { return bank_tok }
 
   protected makeSnapshot(): BankSnapshot {
-    return Object.freeze({ ...this.scope, device_tok: this.device_tok, isLocked: this.isLocked, vaults: this.#vaultListing.snapshot })
+    return Object.freeze({ ...this.scope, device_tok: this.device_tok, isLocked: this.isLocked, maingate: this.#gateListing.snapshot[0] ?? null, vaults: this.#vaultListing.snapshot })
   }
   // --
 

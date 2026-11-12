@@ -2,11 +2,13 @@ import { type Modelkind, hasModelkind } from '../helpers/consts'
 import { nowMillis } from '../helpers/clock'
 import { Checkers } from '../helpers/validator'
 import { tattoo } from '../helpers/helpers'
+import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { mainGateMissing, passkeyAlreadyAdded } from '../refusals/throwers'
 import type { GateScope } from '../shapes/shapes-core'
 import { type GateRecord, type GateSparse, type Wayins, GateFormat, gateRecord } from '../shapes/shapes-bankdb'
 import { type BankStamp, type GateStamp, bankStamp, gateStamp } from '../shapes/shapes-gateish'
 import { VoidRevision, nextRevisionOf } from '../shapes/shapes-storage'
+import * as VX from '../shapes/shapes-vaultish'
 import type { Fetched, GateSnapshot } from '../shapes/shapes-vaultish'
 import type { Bank } from './bank'
 import type { GateListing } from './gate-listing'
@@ -83,6 +85,41 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
       bank_tok: checked.bank.bank_tok, wayins: wayinsOf(checked.main, checked.passkey0), auth: {}, sigs: {}, meta: {},
     })
   }
+  // --
+
+  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, each with its try form
+
+  /** Replace the passphrase through a replace_passphrase gating. The passkey stays, and the vaultKey does not change. */
+  async replacePassphrasePrompt(): Promise<this> {
+    await this.ensureTimely(); this.world.demandPromptable()
+    await this.world.prompt('replace_passphrase')
+    return this
+  }
+
+  /** Non-throwing form of {@link replacePassphrasePrompt}. */
+  tryReplacePassphrasePrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrasePrompt()) }
+
+  /** Add a passkey through an add_passkey gating. */
+  async addPasskeyPrompt(): Promise<this> {
+    await this.ensureTimely(VX.Promptly); this.world.demandPromptable()
+    this.demandPasskeyAddable()
+    await this.world.prompt('add_passkey')
+    return this
+  }
+
+  /** Non-throwing form of {@link addPasskeyPrompt}. */
+  tryAddPasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskeyPrompt()) }
+
+  /** Revoke the passkey through a revoke_passkey gating. With none it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
+  async revokePasskeyPrompt(): Promise<this> {
+    await this.ensureTimely(VX.Promptly); this.world.demandPromptable()
+    if (this.passkey0 === null) { return this }
+    await this.world.prompt('revoke_passkey')
+    return this
+  }
+
+  /** Non-throwing form of {@link revokePasskeyPrompt}. */
+  tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
   // --
 
   // == [Methods]: pickle

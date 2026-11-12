@@ -119,7 +119,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   /** Start the watch. */
   async hello(): Promise<void> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
     this.demandEnabled()
-    this.#unwatch ??= this.watchRows(this.#onNotice, (news) => { this.bankFriend.tellBadNews([news]) })
+    this.#unwatch ??= this.watchRows(this.deliverNotice, (news) => { this.bankFriend.tellBadNews([news]) })
   }
 
   /** End the watch. The instances stay as they are. */
@@ -414,13 +414,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [The watch]: onNotice
+  // == [The watch]: deliverNotice
 
   // A notice is not an answer: it has no ask and no sent, and its record is the claim, as a listed row's is.
-  /** Delivers a watch notice of this listing's kind: its world, then its record, any refusal told as bad news.
-   * Chute: #onNotice → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
+  /** Delivers a watch notice of this listing's kind, and passes over any other: its world, then its record, any refusal told as bad news. Bound.
+   * Chute: deliverNotice → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
-  readonly #onNotice = (notice: BankDBNotice): void => {
+  readonly deliverNotice = (notice: BankDBNotice): void => {
     const { val, parent } = notice
     if ((! this.#isEnabled) || (! this.isOwnRow(val))) { return }
     try {

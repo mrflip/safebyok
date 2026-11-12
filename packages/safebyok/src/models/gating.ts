@@ -6,11 +6,12 @@ import { type Outcome, bad, outcomeOf, valOf } from '../refusals/outcome'
 import * as EX from '../shapes/shapes-enums'
 import type { Gatingkind } from '../shapes/shapes-enums'
 import type { BankScope } from '../shapes/shapes-core'
+import * as BX from '../shapes/shapes-bankdb'
 import type { BankSparse } from '../shapes/shapes-bankdb'
 import * as GX from '../shapes/shapes-gateish'
 import type { AnyGating, AskUser, BankForGatingkind, BankGatingkind, CleartextsForGatingkind, GatingSnapshot, ProvingWorld, UnlockByProving, WayinHeader } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import { attemptInFlight, cleartextsThrew, gateMadeElsewhere, gatingDismissed, gatingConcluded, requestCleartextThrew } from '../refusals/throwers'
+import { attemptInFlight, cleartextsThrew, gateMadeElsewhere, gatingDismissed, gatingConcluded, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import type { Bank } from './bank'
 import type { BankListing } from './bank-listing'
 import type { Device } from './device'
@@ -170,7 +171,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   get modelkind(): 'gating' { return 'gating' satisfies Modelkind }
 }
 
-// == [The acts]: buildBank, unlockBank, ActOnBank
+// == [The acts]: buildBank, unlockBank, replacePassphrase, addPasskey, revokePasskey, delBank, ActOnBank
 
 // Each act proves the cleartexts, then makes its change. A cleartext goes only to checkedCleartexts and a Proving builder (G1); the
 // change hears provings, and comes to the bank's private unlock by unlockByProving (G9).
@@ -196,19 +197,79 @@ async function buildBank(listing: BankListing, world: ProvingWorld, expected: Ba
 /** Unlock `bank` by the passphrase or the passkey. */
 async function unlockBank(bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
   const { passphraseClear, passkeyClear } = checkedCleartexts(GX.bankUnlockCleartexts, cleartexts)
-  const gate = await bank.maingate.ensureTimely(VX.Promptly); bank.demandPromptable()
+  const gate = await timelyGate(bank)
   const proved = (passphraseClear === undefined)
     ? await PasskeyProving.buildStored(gate, passkeyClear)
     : await PassphraseProving.buildStored(gate, passphraseClear, bank)
   return unlockByProving(bank, proved)
 }
 
+// Each gate change grants a lease to the bank citing the gate row it wrote. The old lease stays in force for the moments between: the vaultKey did not change.
+
+/** Replace the passphrase of `bank`, proved by the one it has. */
+async function replacePassphrase(bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
+  const { antePassphraseClear, nextPassphraseClear } = checkedCleartexts(GX.passphraseReplaceCleartexts, cleartexts)
+  if (antePassphraseClear === nextPassphraseClear) { throw samePassphrase() }
+  const gate        = await timelyGate(bank)
+  const anteProving = await PassphraseProving.buildStored(gate, antePassphraseClear, bank)
+  const nextProving = await PassphraseProving.buildNovel(bank.stamp, gate.stamp, nextPassphraseClear, bank)
+
+  const nextWayin = await nextProving.buildWayin(anteProving)
+  await bank.gateListing.replacePassphrase(gate.pickle(), BX.passphraseWayin.parse(nextWayin.pickle()))
+  return unlockByProving(bank, anteProving)
+}
+
+/** Add a passkey to `bank`, proved by its passphrase. */
+async function addPasskey(bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
+  const { passphraseClear, passkeyClear } = checkedCleartexts(GX.passkeyAddCleartexts, cleartexts)
+  const gate           = await timelyGate(bank)
+  const proved         = await PassphraseProving.buildStored(gate, passphraseClear, bank)
+  const passkeyProving = await PasskeyProving.buildNovel(bank.stamp, gate.stamp, passkeyClear, bank)
+
+  const passkeyWayin = await passkeyProving.buildWayin(proved)
+  await bank.gateListing.addPasskey(gate.pickle(), BX.passkeyWayin.parse(passkeyWayin.pickle()))
+  return unlockByProving(bank, proved)
+}
+
+/** Revoke the passkey of `bank`, proved by its passphrase. */
+async function revokePasskey(bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
+  const { passphraseClear } = checkedCleartexts(GX.passkeyRevokeCleartexts, cleartexts)
+  const gate   = await timelyGate(bank)
+  const proved = await PassphraseProving.buildStored(gate, passphraseClear, bank)
+
+  await bank.gateListing.revokePasskey(gate.pickle())
+  return unlockByProving(bank, proved)
+}
+
+/** Delete `bank`, proved by its passphrase. */
+async function delBank(bank: Bank, cleartexts: unknown): Promise<Bank> {
+  const { passphraseClear } = checkedCleartexts(GX.bankDelCleartexts, cleartexts)
+  const gate = await timelyGate(bank)
+  await PassphraseProving.buildStored(gate, passphraseClear, bank)
+
+  // The lock first: no box unseals under a lease while the tombstone goes out. The delete goes over the bank row the
+  // proving's gate came with, and the tombstone delivered vacates the gate and the vaults.
+  bank.lock()
+  await bank.listing.delBank(bank.sparse)
+  return bank
+}
+
 const ActOnBank: Record<BankGatingkind, (bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving) => Promise<Bank>> = {
-  unlock_bank: unlockBank,
+  unlock_bank:        unlockBank,
+  replace_passphrase: replacePassphrase,
+  add_passkey:        addPasskey,
+  revoke_passkey:     revokePasskey,
+  del_bank:           delBank,
 }
 // --
 
-// == [An act's helpers]: checkedCleartexts, isCorrectable, spendCleartexts
+// == [An act's helpers]: timelyGate, checkedCleartexts, isCorrectable, spendCleartexts
+
+/** The main gate of `bank`, refreshed promptly, the bank enabled and present. */
+async function timelyGate(bank: Bank): Promise<Gate> {
+  const gate = await bank.maingate.ensureTimely(VX.Promptly); bank.demandPromptable()
+  return gate
+}
 
 /** The cleartexts through their checker. A throw that is not one of this library's is replaced whole, keeping nothing of it (G8). */
 function checkedCleartexts<CleartextsT>(checker: { parse: (cleartexts: unknown) => CleartextsT }, cleartexts: unknown): CleartextsT {

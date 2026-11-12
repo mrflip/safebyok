@@ -1,13 +1,17 @@
 /** A bank's gate as this device has it: the stub listing a Gate is made in, whose row comes with its bank's. */
 
-import type { Modelkind } from '../helpers/consts'
+import { nowMillis } from '../helpers/clock'
+import { type Modelkind, UNANSWERED } from '../helpers/consts'
 import * as Phrases from '../helpers/phrases'
 import type { VaultError } from '../refusals/errors'
+import { valOf } from '../refusals/outcome'
 import { mainGateMissing, rowOfOtherWorld, writtenByOwnVerbs } from '../refusals/throwers'
 import { type GateScope, gateScope } from '../shapes/shapes-core'
 import * as BX from '../shapes/shapes-bankdb'
-import type { BankRow, BoxRow, GateRecord, GateSparse, VaultRow } from '../shapes/shapes-bankdb'
-import type { Fetched, GateSnapshot, ListingOpts } from '../shapes/shapes-vaultish'
+import type { BankRow, BoxRow, GateRecord, GateSparse, VaultRow, Wayins } from '../shapes/shapes-bankdb'
+import * as SX from '../shapes/shapes-storage'
+import type { Fetched, GateSnapshot, ListingOpts, ThingAnswer } from '../shapes/shapes-vaultish'
+import { type GateAnswer, answerWithVal, refusedAnswerOf } from '../storage/bank-db'
 import type { Bank } from './bank'
 import { Gate } from './gate'
 import { Listing } from './listing'
@@ -36,6 +40,67 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
 
   /** Parse `gateish` as a {@link GateRecord} of this bank. */
   recordOf(gateish: unknown): GateRecord { return BX.gateRecord.parseConsistent(gateish, this.world.scope, { message: Phrases.otherScope }) }
+  // --
+
+  // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form, gateMoveOf
+  // The val is the record the verb wrote: the gate listed may have a newer one by the time the answer is delivered.
+
+  /** Lay a new passphrase wayin on the gate at `ante`, and answer the record stored. Nothing locks: the vaultKey does not change. */
+  async replacePassphrase(ante: GateRecord, main: Wayins['main']): Promise<GateRecord> { return valOf(await this.tryReplacePassphrase(ante, main)) }
+
+  /** {@link replacePassphrase}, answering the bankDB's own answer.
+   * Chute: tryReplacePassphrase → bankDB.tryReplacePassphrase → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
+   */
+  async tryReplacePassphrase(ante: GateRecord, main: Wayins['main']): Promise<ThingAnswer<GateRecord>> {
+    let answer: GateAnswer | typeof UNANSWERED = UNANSWERED
+    try {
+      const { record, expected } = this.#gateMoveOf(ante, (wayins) => ({ ...wayins, main }))
+      answer = await this.bankDB.tryReplacePassphrase({ op: 'put', ...this.scopeOf(record), bank_tok: record.bank_tok, expected, record })
+      this.deliverAnswer(answer, record)
+      return answerWithVal(answer, valOf(answer))
+    } catch (err) { return refusedAnswerOf(err, answer) }
+  }
+
+  /** Lay a passkey wayin on the gate at `ante`, and answer the record stored. */
+  async addPasskey(ante: GateRecord, passkey0: NonNullable<Wayins['passkey0']>): Promise<GateRecord> { return valOf(await this.tryAddPasskey(ante, passkey0)) }
+
+  /** {@link addPasskey}, answering the bankDB's own answer.
+   * Chute: tryAddPasskey → bankDB.tryAddPasskey → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
+   */
+  async tryAddPasskey(ante: GateRecord, passkey0: NonNullable<Wayins['passkey0']>): Promise<ThingAnswer<GateRecord>> {
+    let answer: GateAnswer | typeof UNANSWERED = UNANSWERED
+    try {
+      const { record, expected } = this.#gateMoveOf(ante, (wayins) => ({ ...wayins, passkey0 }))
+      answer = await this.bankDB.tryAddPasskey({ op: 'put', ...this.scopeOf(record), bank_tok: record.bank_tok, expected, record })
+      this.deliverAnswer(answer, record)
+      return answerWithVal(answer, valOf(answer))
+    } catch (err) { return refusedAnswerOf(err, answer) }
+  }
+
+  /** Take the passkey wayin off the gate at `ante`, and answer the record stored, or the row stored where it has no passkey wayin. */
+  async revokePasskey(ante: GateRecord): Promise<GateRecord> { return valOf(await this.tryRevokePasskey(ante)) }
+
+  /** {@link revokePasskey}, answering the bankDB's own answer.
+   * Chute: tryRevokePasskey → bankDB.tryRevokePasskey → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
+   */
+  async tryRevokePasskey(ante: GateRecord): Promise<ThingAnswer<GateRecord>> {
+    let answer: GateAnswer | typeof UNANSWERED = UNANSWERED
+    try {
+      const { record, expected } = this.#gateMoveOf(ante, ({ main }) => ({ main }))
+      answer = await this.bankDB.tryRevokePasskey({ op: 'put', ...this.scopeOf(record), bank_tok: record.bank_tok, expected, record })
+      this.deliverAnswer(answer, record)
+      return answerWithVal(answer, valOf(answer))
+    } catch (err) { return refusedAnswerOf(err, answer) }
+  }
+
+  // A gate verb moves only the gate row's revision: its gate_tok, and the bank's, stay as they are.
+  /** The record of the gate at `ante` with its wayins moved by `move`, at the next revision, and the row it expects. */
+  #gateMoveOf(ante: GateRecord, move: (wayins: Wayins) => Wayins): { record: GateRecord, expected: GateRecord } {
+    const expected = this.recordOf(ante)
+    this.demandEnabled()
+    const record: GateRecord = { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), wayins: move(expected.wayins) }
+    return { record, expected }
+  }
   // --
 
   // == [Defined by the gate listing]: isOneLifePerInstance, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
