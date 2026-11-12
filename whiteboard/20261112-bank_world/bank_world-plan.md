@@ -240,6 +240,7 @@ mechanical.
 
 **Levels**: worker `opus`; review `medium`. **After**: 9. **Look-ahead**: should remove more than
 it adds (the Coach). **Size**: L. *Orchestrator:* ready as #677 (src +515/−517; two compactions on the 400k window, at ~366k and again 13 minutes later); in review. Its calls on a gate of another `gate_tok`, the default `onLifecycle` and an ended bank's snapshot are Open Matters rows.
+*Review:* `fixed` (sonnet, medium; [#677](https://github.com/mrflip/safebyok/pull/677)). One tell per lock and unlock, and nothing after a sweep or vacate, both confirmed against the code; two comments fixed. Left: a Vault's box watch stops across a new life (12); `onLifecycle` vacating the device (Open Matters); exported `putOpts`/`delOpts` without `vault_tok`, public `tellBadNews`/`announce`, prototype getters (left); doc-block and test-title style (the documentarian run before 17).
 *Orchestrator:* the Coach ruled on #667 (Open Matters): **one tell per lock and unlock**. Today
 `bank.lock()` tells the device for the bank, then again as its vaults align, so for one tell a vault
 reads unlocked under a locked bank; 8c had filed, so it lands here with the lifecycle (no liminal
@@ -255,6 +256,8 @@ struck from this thread.
 (revised under rule 20); folded into 10 or dropped if 8b leaves little.
 
 ### 12 `react_bank`
+
+*Orchestrator, from 10:* a Vault keeps one object through its lives, and its box watch is not restarted at a new life: React re-asks `vault.boxListing` and calls `vault.beginWatch()` again when the snapshot's `vault_tok` changes. `device.sweep()`/`vacate()` are the only lifecycle calls; rename a thing's `alignLock()` to `lock()` once the `Vault.lock()` scaffold goes.
 
 **Levels**: worker `opus`; review `medium`. **After**: 11. The report itemizes the React cost
 (state, effects, branches, added and removed). **Size**: L.
