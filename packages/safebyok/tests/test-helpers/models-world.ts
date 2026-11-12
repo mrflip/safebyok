@@ -17,6 +17,7 @@
  * builders make, opens to a 'damaged_whisper', as under the real vault.
  */
 
+import type { GotAct } from '../../src/shapes/shapes-enums'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { _cheat_clock } from '../../src/helpers/clock'
 import { brandGuarded } from '../../src/helpers/consts'
@@ -283,7 +284,7 @@ export class TestableVaultDB extends MemoryVaultDB {
 }
 
 function factsOf(scope: Boxscope) { return { ask: { op: 'get', ...scope } as LoggableAsk } }
-function gotActOf(val: Fetched<BoxRecord, BoxSparse> | null): string {
+function gotActOf(val: Fetched<BoxRecord, BoxSparse> | null): GotAct {
   if (val === null) { return 'gotvoid' }
   return VX.isTombstone(val) ? 'gotgone' : 'gotlive'
 }
@@ -322,7 +323,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
   const stored = vaultDB._cheat_boxRowsOf(WorldVault.scope, WorldVault.vault_tok)
   const ensureTimelyScript = new Script<number | undefined>()
   const scopeFor = (boxlabel: string): Boxscope => CX.boxscope.parse({ ...WorldVault.scope, boxlabel })
-  const refusalOf = (scope: Boxscope, err: VaultError, world: unknown = null, dbhas?: unknown): BoxAnswer => ({ ok: false, err, world, act: err.refusalkind, ...factsOf(scope), ...((dbhas !== undefined) && { dbhas }) })
+  const refusalOf = (scope: Boxscope, err: VaultError, world: unknown = null, dbhas?: unknown): BoxAnswer => ({ ok: false, err, world, act: err.meta?.act ?? 'unclassified', ...factsOf(scope), ...((dbhas !== undefined) && { dbhas }) })
 
   // The fake seal: the text sealed, by the stamp it was sealed under.
   const sealedTexts = new Map<string, string>()
@@ -416,7 +417,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
     refusalOf,
     staleWriteOf: (scope, storedNow, worldNow = null) => {
       const err = Refuse.staleWrite(worldVaultRow(), (storedNow ?? null) as BoxRow | null)
-      return { ...refusalOf(scope, err, worldNow, storedNow), act: 'stale' }
+      return { ok: false, err, world: worldNow, act: 'stale', ...factsOf(scope), ...((storedNow !== undefined) && { dbhas: storedNow }) }
     },
 
     notify: async (record, worldNow = worldVaultRow()) => {

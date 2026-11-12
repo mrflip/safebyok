@@ -5,6 +5,7 @@ import * as SX from '../../src/shapes/shapes-storage'
 import type { Awaitable } from '../../src/helpers/helpers'
 import type { VaultScope } from '../../src/shapes/shapes-core'
 import type { Tidied, VaultDB } from '../../src/storage/vault-db'
+import type { VaultError } from '../../src/refusals/errors'
 import {
   vaultScope, boxscope, vaultListAsk, boxListAsk, boxTidyAsk, boxQuery, vaultScopeOf, boxscopeOf, vaultAt, boxAt, FlawedVaultRows, FlawedBoxRows,
   vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf, boxDelAskOf,
@@ -36,13 +37,17 @@ async function isHeld(row: unknown, plant: () => Awaitable<void>, readBack: () =
 }
 
 /** The acts `calls` answer, each call made once the last has answered. */
-async function actsOf(...calls: (() => Promise<{ act: string }>)[]): Promise<string[]> {
+async function actsOf(...calls: (() => Promise<{ ok: boolean, act: string, err?: VaultError }>)[]): Promise<string[]> {
   const acts: string[] = []
   for (const call of calls) {
-    const { act } = await call()
-    acts.push(act)
+    acts.push(refusedWithOf(await call()))
   }
   return acts
+}
+
+/** What `answer` says happened: its act, or for a refusal the classifier never saw, the refusalkind. */
+function refusedWithOf(answer: { ok: boolean, act: string, err?: VaultError }): string {
+  return ((answer.act === 'unclassified') && (answer.err !== undefined)) ? answer.err.refusalkind : answer.act
 }
 
 /** The box row `boxlabel` under the life `vault_tok` of the vault at `scope`, as stored. */
@@ -54,7 +59,7 @@ async function boxRowOf(rows: VaultDBRowCheats, scope: VaultScope, vault_tok: st
 /** What tidyGone answers over the world's bank: the count of box rows it leaves, or the act it refuses with. */
 async function tidiedOf(vaultDB: VaultDB): Promise<Tidied | string> {
   const tidied = await vaultDB.tryTidyGone(boxTidyAsk)
-  return tidied.ok ? tidied.val : tidied.act
+  return tidied.ok ? tidied.val : refusedWithOf(tidied)
 }
 
 /** What each verb answers over the world's vault row, as `vault` and `box` would call it, and the rows they leave. */
@@ -62,8 +67,8 @@ async function vaultAnswersOver(vaultDB: VaultDB, rows: VaultDBRowCheats) {
   const got = await vaultDB.tryGetVault(vaultGetAskOf())
   const listed = await vaultDB.tryListVaults(vaultListAsk)
   return {
-    getVault:   { act: got.act, world: got.world, fieldnames: got.err?.meta?.fieldnames },
-    listVaults: listed.ok ? { damaged_rows: listed.val.damaged_rows } : { act: listed.act, fieldnames: listed.err.meta?.fieldnames },
+    getVault:   { act: refusedWithOf(got), world: got.world, fieldnames: got.err?.meta?.fieldnames },
+    listVaults: listed.ok ? { damaged_rows: listed.val.damaged_rows } : { act: refusedWithOf(listed), fieldnames: listed.err.meta?.fieldnames },
     putVault:   await actsOf(...anyIfPresent.map((ifPresent) => () => vaultDB.tryPutVault(vaultPutAskOf(nextVault, vault, { ifPresent })))),
     delVault:   await actsOf(() => vaultDB.tryDelVault(vaultDelAskOf(vault)), () => vaultDB.tryDelVault(vaultDelAskOf(noVaultYet))),
     getBox:     await actsOf(() => vaultDB.tryGetBox(boxGetAskOf()), () => vaultDB.tryGetBox(boxGetAskOf({ ...boxQuery, boxlabel: 'never_put' }))),
@@ -101,8 +106,8 @@ async function boxAnswersOver(vaultDB: VaultDB, rows: VaultDBRowCheats) {
   const got = await vaultDB.tryGetBox(boxGetAskOf())
   const listed = await vaultDB.tryListBoxes(boxListAsk)
   return {
-    getBox:    { act: got.act, fieldnames: got.err?.meta?.fieldnames },
-    listBoxes: listed.ok ? { damaged_rows: listed.val.damaged_rows } : { act: listed.act, fieldnames: listed.err.meta?.fieldnames },
+    getBox:    { act: refusedWithOf(got), fieldnames: got.err?.meta?.fieldnames },
+    listBoxes: listed.ok ? { damaged_rows: listed.val.damaged_rows } : { act: refusedWithOf(listed), fieldnames: listed.err.meta?.fieldnames },
     putBox:    await actsOf(...anyIfPresent.map((ifPresent) => () => vaultDB.tryPutBox(boxPutAskOf(nextBox, box, { ifPresent })))),
     delBox:    await actsOf(() => vaultDB.tryDelBox(boxDelAskOf(box)), () => vaultDB.tryDelBox(boxDelAskOf(noBoxYet))),
     boxRow:    await boxRowOf(rows, vaultScope, 'life1', 'openai'),

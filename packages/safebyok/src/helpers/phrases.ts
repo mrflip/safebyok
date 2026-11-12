@@ -159,7 +159,7 @@ export const VaultLocked = "The vault locked mid-operation. Please unlock again 
 export const RecordForNewBox = "A create operation found a record already present."
 // --
 
-// == [Storables]: PartialLoad, AlreadyListed, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: PartialLoad, AlreadyListed, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
@@ -206,8 +206,6 @@ export const RecordOfOtherScope = "Storage delivered a misnamed record. This sho
 /** Why a good answer whose record differs from what was sent in scope, life or revision is not adopted. */
 export const AnswerNotAsSent = "Storage answered with a record other than the one it was asked about. This should not happen: report this as a bug."
 
-/** Why a pair of shapes no row of the reconcile table names is refused: a bug. */
-export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
 
 // == [Models: provings]: CleartextMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, KeyDeriverThrew

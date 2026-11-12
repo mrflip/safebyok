@@ -174,12 +174,22 @@ export const { passkeyAddRecord, passkeyRevokeRecord } = Checkers('bad_option', 
 })
 // --
 
+// == [Policies]: ifPresent, ifAbsent, putIfAbsent, anyIfAbsent
+
+/** The checks of an ask's policies: `ifPresent`, a get's `ifAbsent`, a put's `ifAbsent`, and either `ifAbsent`, as an answer's ask may carry. */
+export const { ifPresent, ifAbsent, putIfAbsent, anyIfAbsent } = Checkers('bad_option', ({ oneof, union }) => {
+  const ifAbsent    = oneof(EX.ifAbsentVals)
+  const putIfAbsent = oneof(EX.putIfAbsentVals)
+  return { ifPresent: oneof(EX.ifPresentVals), ifAbsent, putIfAbsent, anyIfAbsent: union([ifAbsent, putIfAbsent]) }
+})
+// --
+
 // == [Options]: ifAbsentOpts, putOpts, gateVerbOpts, delOpts, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsParsed, GateVerbOpts, DelOpts, AdapterVaultDBOpts, MemoryVaultDBOpts
 
 /** The checks of the options a vaultDB verb accepts, and of a write's record against its prior revision. */
-export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, nextSeq } = Checkers('bad_option', ({ obj, oneof, orDefault }) => {
-  const ifAbsentOpts = obj({ ifAbsent: orDefault(oneof(EX.ifAbsentVals), 'fail') })
-  const putOptsGiven = obj({ prior: revision, ifAbsent: oneof(EX.putIfAbsentVals), ifPresent: oneof(EX.ifPresentVals) })
+export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, nextSeq } = Checkers('bad_option', ({ obj, orDefault }) => {
+  const ifAbsentOpts = obj({ ifAbsent: orDefault(ifAbsent, 'fail') })
+  const putOptsGiven = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent })
   // The row a put or del expects to find is parsed here as a row's meta, and its other fields are kept for code that knows its kind.
   const expected = obj({ ...revision.shape, am, ...vaulted.shape }).loose()
   const putOpts = obj({ expected, ifAbsent: orDefault(putOptsGiven.shape.ifAbsent, 'add'), ifPresent: orDefault(putOptsGiven.shape.ifPresent, 'repl') })
@@ -374,8 +384,7 @@ function isLifeTokPlaced(lifeTok: string, expectedLifeTok: string, expectedAm: E
  * `expected` is parsed as a row's meta and its other fields dropped, so a caller may pass the row it has, or the shell row for none.
  */
 export const { boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk } = Checkers('bad_record', ({ lit, oneof, discrim, box_tok }) => {
-  const ifAbsent    = oneof(EX.ifAbsentVals)
-  const putPolicies = { ifAbsent: oneof(EX.putIfAbsentVals), ifPresent: oneof(EX.ifPresentVals) }
+  const putPolicies = { ifAbsent: putIfAbsent, ifPresent }
   const boxExpected = rowMeta.extend({ box_tok })
   const vaultScope  = CX.vaultScope.unwrap()
 
@@ -450,7 +459,7 @@ export type VaultDelAsk = Extract<VaultAsk, { op: 'del' }>
 /** The check of what an answer and its refusal carry of an ask: any of its fields but a record's payload.
  * Each field is optional, so a refusal made before the ask was whole carries what of it was sound.
  */
-export const loggableAsk = objStrip(({ obj, oneof, union, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok }) => {
+export const loggableAsk = objStrip(({ obj, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok }) => {
   const meta = obj({ ...revision.shape, am, vault_tok, box_tok }).partial()
   return {
     op:         oneof(EX.askOpVals).optional(),
@@ -459,8 +468,8 @@ export const loggableAsk = objStrip(({ obj, oneof, union, applabel, user_id, vau
     vaultlabel: vaultlabel.optional(),
     boxlabel:   boxlabel.optional(),
     vault_tok:  vault_tok.optional(),
-    ifAbsent:   union([oneof(EX.ifAbsentVals), oneof(EX.putIfAbsentVals)]).optional(),
-    ifPresent:  oneof(EX.ifPresentVals).optional(),
+    ifAbsent:   anyIfAbsent.optional(),
+    ifPresent:  ifPresent.optional(),
     gateVerb:   oneof(EX.gateVerbVals).optional(),
     expected:   meta.optional(),
     record:     meta.optional(),

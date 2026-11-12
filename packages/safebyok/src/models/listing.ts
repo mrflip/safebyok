@@ -6,16 +6,16 @@ import { checkedConsistent } from '../helpers/validator'
 import { oneAtATime } from '../helpers/one-at-a-time'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { type Notice as VaultDBNotice, type VaultDB, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
-import type { IfAbsent } from '../shapes/shapes-enums'
+import type { BadAct, DeliveryFielding, GoodAct, IfAbsent } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingDelOpts, ListingListAnswer, ListingPutAnswer, ListingPutOpts, ListingOpts, ListingWorld, ListingGetAnswer, SlotStep, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
-import { instanceDisabled, rowOfOtherVaultTok, storageIssue, unexpectedError } from '../refusals/throwers'
+import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingDelOpts, ListingListAnswer, ListingPutAnswer, ListingPutOpts, ListingOpts, ListingWorld, ListingGetAnswer, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
+import { instanceDisabled, oneRevisionTwoFates, oneRevisionTwoLives, otherVaultTok, rowOfOtherVaultTok, storageIssue, unexpectedError } from '../refusals/throwers'
 import * as Phrases from '../helpers/phrases'
 import { outcomeOf, valOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
-import type { Storable } from './storable'
+import { type Storable, cmpRevisions } from './storable'
 
 /** Administers a list of instances while coordinating updates to its world (the vault) and coordinating its listed instances.
  * It acts as the hub for vaultDB requests because it owns instantiating,
@@ -294,7 +294,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // --
 
-  // == [Delivering an answer]: deliver, deliveryPlanOf, rowPlanOf, carryOut, buildOrReceive
+  // == [Delivering an answer]: deliver, deliveringOf, deliveringOfRecord, carryOut, buildOrReceive
 
   /** The pipeline every storage answer follows, from its world through the instance listed to the caller.
    * Delivers updated records to: (! = unconventional practice)
@@ -312,80 +312,90 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected deliver(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null {
     this.demandEnabled()
     if (answer.world !== null) { this.world.receiveWorld(answer.world) }
-    if (answer.ok) { return this.#carryOut(this.#deliveryPlanOf(answer, sent)) }
-    // A refusal's stored row is received for what it tells; whatever receiving it meets is bad news, and the refusal is thrown.
+    if (answer.ok) { return this.#carryOut(this.#deliveringOf(answer, sent)) }
+    // A refusal's stored record is received for what it tells; whatever receiving it meets is bad news, and the refusal is thrown.
     // All of it runs before the next await, so a revoked identity panics before any other answer is delivered.
     try {
-      this.#carryOut(this.#deliveryPlanOf(answer, sent))
+      this.#carryOut(this.#deliveringOf(answer, sent))
     } catch (err) { this.bankFriend.tellBadNews([isVaultError(err) ? err : unexpectedError(err)]) }
     this.panicIfRevoked(answer.err)
     throw answer.err
   }
 
-  // What an answer carries is read from its act alone, by `RowOfAct`. A row the act says was stored must be the record
-  // sent, at its revision; a row found need only be of the scope sent.
-  /** What delivering `answer` to the slot `sent` names will do, decided before anything changes.
-   * Throws `storage_issue` for a row of another scope or revision than `sent` asks for.
+  // The answer passed its verb's check, and is trusted: its act alone says where its record is (`deliverableFieldingTagOf`).
+  /** What delivering `answer` to the instance listed at `sent`'s scope will do, decided before anything changes.
+   * Throws `storage_issue` for a record of another scope or revision than `sent`, and `record_conflict` for news that
+   * nothing is stored where a live instance is listed.
    */
-  #deliveryPlanOf(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): SlotPlan<Fetched<RecordT, SparseT>, ThingT> {
-    const rowkind = RowOfAct[answer.act] ?? 'none'
-    if (rowkind === 'none')           { return { step: 'none' } }
-    const scope   = this.scopeOf(sent)
-    const listed  = this.at(scope)
-    if (rowkind === 'nothing_stored') { return (listed === null) ? { step: 'none' } : { step: 'absent', listed } }
-    const row: unknown = answer.ok ? answer.val : (answer.dbhas ?? null)
-    if ((rowkind === 'dbhas') && ((row === null) || (! this.isOwnRow(row as VaultRow | BoxRow)))) { return { step: 'none' } }
-    if (row === null)                 { throw storageIssue() }
-    const pins   = (rowkind === 'stored') ? { ...scope, ...SX.revisionPins.parse(sent) } : scope
-    const record = checkedConsistent(row as Fetched<RecordT, SparseT>, pins, { kind: 'storage_issue', message: (rowkind === 'dbhas') ? Phrases.RecordOfOtherScope : Phrases.AnswerNotAsSent })
-    return this.#rowPlanOf(record)
+  #deliveringOf(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Delivering<Fetched<RecordT, SparseT>, ThingT> {
+    const fielding = deliverableFieldingTagOf[answer.act]
+    if (fielding === 'none') { return { making: 'none' } }
+    const scope    = this.scopeOf(sent)
+    const listed   = this.at(scope)
+    if (fielding === 'void') {
+      if (listed === null)  { return { making: 'none' } }
+      if (listed.isPresent) { throw oneRevisionTwoFates() }
+      return { making: 'listed', listed, mod: 'same' }
+    }
+    const record = (answer.ok ? answer.val : answer.dbhas) as Fetched<RecordT, SparseT>
+    const pins   = (fielding === 'as_sent') ? { ...scope, ...SX.revisionPins.parse(sent) } : scope
+    checkedConsistent(record, pins, { kind: 'storage_issue', message: (fielding === 'as_db') ? Phrases.RecordOfOtherScope : Phrases.AnswerNotAsSent })
+    return this.#deliveringOfRecord(record)
   }
 
-  // An instance is made only where none is listed, at the void revision, so that `receive` adopts the record like any newer one.
-  /** What receiving `row` at its slot will do: make an instance where none is listed, else as `slotStepOf` judges the one listed.
-   * Throws `storage_issue` for a row of another vault_tok than the listing's.
+  // The receive table of `notes/receive-contract.md`, read once: the first row that matches wins. A vault listing makes
+  // an instance of each life (`isOneLifePerInstance`): a newer record of another life, or one alive over a tombstone,
+  // remakes it, and an older one of any life leaves it as it is.
+  /** What receiving `record` will do: which instance receives it, and what becomes of that instance's record.
+   * Throws `storage_issue` for a record of another vault_tok than the listing's, and `record_conflict` where storage
+   * and the instance listed disagree on the history of one revision.
    */
-  #rowPlanOf(row: Fetched<RecordT, SparseT>): SlotPlan<Fetched<RecordT, SparseT>, ThingT> {
-    const sparse    = this.sparseOf(row)
+  #deliveringOfRecord(record: Fetched<RecordT, SparseT>): Delivering<Fetched<RecordT, SparseT>, ThingT> {
     const vault_tok = this.vaultTokOfWorld()
-    if ((vault_tok !== null) && (sparse.vault_tok !== vault_tok)) { throw rowOfOtherVaultTok() }
-    const listed    = this.at(this.scopeOf(sparse))
-    if (listed === null) { return { step: 'make', row } }
-    const step      = this.slotStepOf(listed, row)
-    if (step === 'keep') { return { step, listed } }
-    return { step, listed, row }
+    if ((vault_tok !== null) && (record.vault_tok !== vault_tok)) { throw rowOfOtherVaultTok() }
+    const listed     = this.at(this.scopeOf(record))
+    if (listed === null) { return { making: 'make', mod: 'adopt', record } }
+    const age        = cmpRevisions(listed, record)
+    const isSameLife = listed.isOfLife(record)
+    const rcvdShape  = listed.shapeOf(record)
+    const heldShape  = listed.shape
+    const isRebirth  = (heldShape === 'gone') && (rcvdShape !== 'gone')
+    const isPerLife  = this.isOneLifePerInstance
+    if (isPerLife && (age === 'older'))                                   { return { making: 'listed', listed, mod: 'older' } }
+    if (isPerLife && (age === 'newer') && ((! isSameLife) || isRebirth)) { return { making: 'remake', listed, mod: 'adopt', record } }
+    if (record.vault_tok !== listed.vault_tok)                           { throw otherVaultTok() }
+    if ((age === 'same') && (! isSameLife))                              { throw oneRevisionTwoLives() }
+    if (age === 'older')                                                 { return { making: 'listed', listed, mod: 'older' } }
+    if (age === 'newer')                                                 { return { making: 'listed', listed, mod: 'adopt', record } }
+    if ((rcvdShape === 'gone') !== (heldShape === 'gone'))               { throw oneRevisionTwoFates() }
+    if ((rcvdShape === 'full') && (heldShape === 'sparse'))              { return { making: 'listed', listed, mod: 'adopt', record } }
+    return { making: 'listed', listed, mod: 'same' }
   }
 
-  // The one place an instance is made and enlisted: `makeThing` is called from here alone.
-  /** Do what `plan` says, and answer the instance the slot is left with, or null where none is listed. */
-  #carryOut(plan: SlotPlan<Fetched<RecordT, SparseT>, ThingT>): ThingT | null {
-    if (plan.step === 'none') { return null }
+  // The one place an instance is made and enlisted: `makeThing` is called from here alone, at the void revision.
+  /** Do what `delivering` says, and answer the instance it leaves listed, or null for none. */
+  #carryOut(delivering: Delivering<Fetched<RecordT, SparseT>, ThingT>): ThingT | null {
+    if (delivering.making === 'none') { return null }
     this.demandEnabled()
-    if (plan.step === 'keep') { return plan.listed }
-    if (plan.step === 'absent') {
-      this.bankFriend.tellBadNews(plan.listed.receive(null).badnews)
+    if (delivering.making === 'listed') {
+      if (delivering.mod === 'adopt') { delivering.listed.receiveRecord(delivering.record) } else if (delivering.mod === 'same') { delivering.listed.markRefreshed() }
       this.#remakeSnapshot()
-      return plan.listed
+      return delivering.listed
     }
-    if (plan.step === 'receive') {
-      this.bankFriend.tellBadNews(plan.listed.receive(plan.row).badnews)
-      this.#remakeSnapshot()
-      return plan.listed
-    }
-    const thing = this.makeThing({ ...this.sparseOf(plan.row), ...SX.VoidRevision, am: 'x' })
-    this.bankFriend.tellBadNews(thing.receive(plan.row).badnews)
+    const thing = this.makeThing({ ...this.sparseOf(delivering.record), ...SX.VoidRevision, am: 'x' })
+    thing.receiveRecord(delivering.record)
     this.#enlist(thing)
-    if (plan.step === 'remake') { plan.listed.vacate() }
+    if (delivering.making === 'remake') { delivering.listed.vacate() }
     this.#remakeSnapshot()
     return thing
   }
 
-  /** The instance under the scope of `record`: made, brought up to it, or remade, as its slot plan says. */
+  /** The instance under the scope of `record`: made, brought up to it, or remade, as delivering it decides. */
   protected buildOrReceive(record: Fetched<RecordT, SparseT>): ThingT {
     this.demandEnabled()
-    const plan = this.#rowPlanOf(record)
-    // A row's plan always leaves an instance listed: it makes, keeps, receives or remakes.
-    return this.#carryOut(plan)!
+    const delivering = this.#deliveringOfRecord(record)
+    // A record's delivering always leaves an instance listed: it never makes `none`.
+    return this.#carryOut(delivering)!
   }
   // --
 
@@ -445,10 +455,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Defined by the concrete listing]: slotStepOf, vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the concrete listing]: isOneLifePerInstance, vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
-  /** What receiving `record` does to `listed`, the instance in its slot: by default, `listed` receives it. */
-  protected slotStepOf(_listed: ThingT, _record: Fetched<RecordT, SparseT>): SlotStep { return 'receive' }
+  /** True where an instance is one life of its thing: a record of a newer life remakes it, rather than being received into it. */
+  protected abstract get isOneLifePerInstance(): boolean
 
   /** The `vault_tok` every record of this listing lies under, being the vault's own; null for a listing whose records make their own, as a vault's do. */
   protected abstract vaultTokOfWorld(): string | null
@@ -481,38 +491,27 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // --
 }
 
-// == [Helpers]: RowOfAct, SlotPlan, Joined, putAnswerOf
+// == [Helpers]: deliverableFieldingTagOf, Delivering, Joined, putAnswerOf
 
-// The acts are the classifier's and the gate verbs': `notes/answer-contract.md`. An act not named here, a `vault_*` act of a
-// box answer or a refusal made outside the classifier, carries no row of this listing.
-/** Where an answer's row is, by its act:
- * - `stored` -- in `val`: the record sent, as stored
- * - `found`  -- in `val`: the row stored, found unchanged
- * - `dbhas`  -- in `dbhas`: the row stored, which the refusal met
- * - `nothing_stored` -- no row: storage answered that nothing is stored at the scope
- */
-const RowOfAct: Readonly<Partial<Record<string, 'stored' | 'found' | 'dbhas' | 'nothing_stored'>>> = {
-  born:    'stored', reborn: 'stored', replaced: 'stored', deleted: 'stored', added: 'stored', revoked: 'stored',
-  gotlive: 'found',  gotgone: 'found', passed: 'found',
-  gotvoid: 'nothing_stored',
-  stale:   'dbhas',  camped: 'dbhas',  gone: 'dbhas', dubdel: 'dbhas', retcon: 'dbhas', clash: 'dbhas', forked: 'dbhas', ahead: 'dbhas',
-}
+// The acts are the classifier's and the gate verbs': `notes/answer-contract.md`. A box's `vault_*` act, an unclassified
+// refusal, and the acts of a list or a housekeeping verb carry no record of this listing.
+/** Where an answer's record is, by its act: see {@link DeliveryFielding}. */
+const deliverableFieldingTagOf = {
+  born:    'as_sent', reborn:  'as_sent', replaced: 'as_sent', deleted: 'as_sent', added: 'as_sent', revoked: 'as_sent',
+  gotlive: 'as_got',  gotgone: 'as_got',  passed:   'as_got',
+  gotvoid: 'void',
+  stale:   'as_db',   camped:  'as_db',   gone:     'as_db',   dubdel:  'as_db',   retcon: 'as_db', clash: 'as_db', forked: 'as_db', ahead: 'as_db',
+  void:    'none',    vault_void: 'none', vault_gone: 'none',  vault_reborn: 'none', vault_full: 'none', unclassified: 'none',
+  got:     'none',    tidied:  'none',    timely:   'none',
+} as const satisfies Record<GoodAct | BadAct, DeliveryFielding>
 
-/** What delivering a row does at its slot:
- * - `none`    -- nothing: there is no row of this listing, and no instance to tell
- * - `absent`  -- the instance listed is told that nothing is stored
- * - `make`    -- an instance is made of the row, where none is listed
- * - `keep`    -- the instance listed is newer, and stays as it is
- * - `receive` -- the instance listed receives the row
- * - `remake`  -- an instance is made of the row, and the one listed, of another life, is vacated
- */
-type SlotPlan<RowT, ThingT> = Readonly<
-  | { step: 'none' }
-  | { step: 'absent', listed: ThingT }
-  | { step: 'keep', listed: ThingT }
-  | { step: 'make', row: RowT }
-  | { step: 'receive', listed: ThingT, row: RowT }
-  | { step: 'remake', listed: ThingT, row: RowT }
+/** What delivering does, decided before anything changes: which instance receives (its `making`), and what becomes of its record (its `mod`), as the `DeliveryMaking` and `DeliveryModification` tags say. */
+type Delivering<RecordT, ThingT> = Readonly<
+  | { making: 'none' }
+  | { making: 'listed', listed: ThingT, mod: 'older' | 'same' }
+  | { making: 'listed', listed: ThingT, mod: 'adopt', record: RecordT }
+  | { making: 'make', mod: 'adopt', record: RecordT }
+  | { making: 'remake', listed: ThingT, mod: 'adopt', record: RecordT }
 >
 
 /** A joined storage call's answer, with what delivering it made, or the refusal delivering met. */

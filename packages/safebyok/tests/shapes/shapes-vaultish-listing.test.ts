@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { ForeverMillis } from '../../src/helpers/consts'
 import * as GX from '../../src/shapes/shapes-gateish'
 import * as VX from '../../src/shapes/shapes-vaultish'
+import * as SX from '../../src/shapes/shapes-storage'
 import { boxListingOf, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord } from '../test-helpers/models-world'
 import { expectCases } from '../test-helpers/cases'
 import * as TH from '../test-helpers'
@@ -69,8 +70,8 @@ describe("The checks of options", () => {
   })
 })
 
-describe("VX.ifAbsent and VX.fetchOpts", () => {
-  expectCases(VX.ifAbsent, [
+describe("SX.ifAbsent and VX.fetchOpts", () => {
+  expectCases(SX.ifAbsent, [
     ["fail",     true,  'passes fail'],
     ["nil",      true,  'passes nil'],
     ["create",   false, 'refuses create, which fetch does not offer'],
@@ -109,9 +110,9 @@ describe("VX.boxCreateOpts", () => {
   })
 })
 
-describe("VX.ifPresent and VX.boxPutOpts", () => {
+describe("SX.ifPresent and VX.boxPutOpts", () => {
 
-  expectCases(VX.ifPresent, [
+  expectCases(SX.ifPresent, [
     ["repl",     true,  'passes repl'],
     ["fail",     true,  'passes fail'],
     ["get",      true,  'passes get'],

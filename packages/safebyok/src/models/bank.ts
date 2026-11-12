@@ -1,4 +1,5 @@
 import { ForeverMillis, MinuteMillis, brandGuarded, type Modelkind } from '../helpers/consts'
+import type { GoodAct } from '../shapes/shapes-enums'
 import { nowMillis } from '../helpers/clock'
 import { Checkers } from '../helpers/validator'
 import { isTestDeriver } from '../deriver/basederiver'
@@ -448,7 +449,7 @@ const DefaultHandlers: Handlers = { onLifecycle: guardOnLifecycle(DefaultOnLifec
 // == [Helpers]: millisOf, checkSecureContext, probeStepOf
 
 /** A storage verb's answer with no wrapped key or ciphertext left in it, and when it came back. */
-function probeStepOf({ act, ask, val, world }: GoodAnswer<Box | null, string, unknown>): VX.ProbeStep {
+function probeStepOf({ act, ask, val, world }: GoodAnswer<Box | null, GoodAct, unknown>): VX.ProbeStep {
   return { ok: true, act, ask, val: SX.boxSparse.parse(val?.sparse), world: SX.vaultSparse.parse(world), timestamp: nowMillis() }
 }
 

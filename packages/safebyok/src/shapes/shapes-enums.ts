@@ -7,9 +7,9 @@ export const amVals = ['a', 'd', 'x'] as const
 export type Am = typeof amVals[number]
 // --
 
-// == [Reconciling]: recordShapeVals, RecordShape, ageVals, Age, centralPolicyVals, CentralPolicy
+// == [Delivering]: recordShapeVals, RecordShape, ageVals, Age, deliveryFieldingVals, DeliveryFielding, deliveryMakingVals, DeliveryMaking, deliveryModificationVals, DeliveryModification
 
-/** The shapes of a record as `classifyRecordShape` tells them: `sparse`, `full` or `gone` (a tombstone). */
+/** The shapes of a record as a thing's `shapeOf` tells them: `sparse`, `full` or `gone` (a tombstone). */
 export const recordShapeVals = ['sparse', 'full', 'gone'] as const
 export type RecordShape = typeof recordShapeVals[number]
 
@@ -17,9 +17,32 @@ export type RecordShape = typeof recordShapeVals[number]
 export const ageVals = ['older', 'same', 'newer'] as const
 export type Age = typeof ageVals[number]
 
-/** Every policy `reconcileCentral` may choose: `older` and `same` make no change; `fill`, `adopt` replace the #central record; `gone` becomes a tombstone. */
-export const centralPolicyVals = ['older', 'same', 'fill', 'adopt', 'gone'] as const
-export type CentralPolicy = typeof centralPolicyVals[number]
+/** Where a listing finds the record an answer delivers, by its act:
+ * - `as_sent` -- in `val`, and it must be the record sent, at its revision
+ * - `as_got`  -- in `val`, and it must be of the scope sent
+ * - `as_db`   -- in `dbhas`, and it must be of the scope sent
+ * - `void`    -- nowhere: storage answered that nothing is stored at the scope
+ * - `none`    -- nowhere: the answer says nothing of the record, as a box's `vault_*` act or an unclassified refusal
+ */
+export const deliveryFieldingVals = ['as_sent', 'as_got', 'as_db', 'void', 'none'] as const
+export type DeliveryFielding = typeof deliveryFieldingVals[number]
+
+/** Which instance receives what a listing delivers:
+ * - `none`   -- no instance: there is nothing to receive, or none is listed to tell
+ * - `listed` -- the instance listed at the record's scope
+ * - `make`   -- one made of the record, where none is listed
+ * - `remake` -- one made of the record, and the one listed, of another life, vacated
+ */
+export const deliveryMakingVals = ['none', 'listed', 'make', 'remake'] as const
+export type DeliveryMaking = typeof deliveryMakingVals[number]
+
+/** What becomes of the record of the instance that receives:
+ * - `older` -- unchanged, and not marked refreshed: the record received is older
+ * - `same`  -- unchanged, and marked refreshed: storage has the record in hand
+ * - `adopt` -- the record received replaces it: newer, a tombstone, or the full record over a sparse one
+ */
+export const deliveryModificationVals = ['older', 'same', 'adopt'] as const
+export type DeliveryModification = typeof deliveryModificationVals[number]
 // --
 
 // == [Policies]: askOpVals, AskOp, ifPresentVals, IfPresent, ifAbsentVals, IfAbsent, putIfAbsentVals, PutIfAbsent
@@ -97,7 +120,7 @@ export const gateVerbVals = ['replacePassphrase', 'addPasskey', 'revokePasskey']
 export type GateVerb = typeof gateVerbVals[number]
 // --
 
-// == [Classified acts]: writeActVals, WriteAct, foundActVals, FoundAct, OkAct, refusedActVals, RefusedAct, boxVaultActVals, BoxVaultAct, VaultAct, BoxAct
+// == [Classified acts]: writeActVals, WriteAct, foundActVals, FoundAct, OkAct, refusedActVals, RefusedAct, boxVaultActVals, BoxVaultAct, VaultAct, BoxAct, gateActVals, GateAct, goodActVals, GoodAct, badActVals, BadAct
 
 /** The acts of a put or del that stored its record: `born` over nothing, `reborn` over a tombstone, `replaced` over a live row, or `deleted`. */
 export const writeActVals = ['born', 'reborn', 'replaced', 'deleted'] as const
@@ -123,4 +146,16 @@ export type BoxVaultAct = typeof boxVaultActVals[number]
 export type VaultAct = WriteAct | FoundAct | RefusedAct
 /** Every act a box's get, put or del is classified as: those of its own row, and those of its vault. */
 export type BoxAct   = VaultAct | BoxVaultAct
+
+/** The acts only a gate verb answers: `added` for `addPasskey`, `revoked` for `revokePasskey`. Its others are a put's. */
+export const gateActVals = ['added', 'revoked'] as const
+export type GateAct = typeof gateActVals[number]
+
+/** Every act a good answer carries, a listing's `timely` among them: the instance listed served a get, and storage was not asked. */
+export const goodActVals = [...writeActVals, ...foundActVals, ...gateActVals, 'got', 'tidied', 'timely'] as const
+export type GoodAct = typeof goodActVals[number]
+
+/** Every act a refused answer carries; `unclassified` for a refusal the classifier never saw: a bad ask, storage out of reach, a revoked identity. */
+export const badActVals = [...refusedActVals, ...boxVaultActVals, 'unclassified'] as const
+export type BadAct = typeof badActVals[number]
 // --

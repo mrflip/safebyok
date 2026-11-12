@@ -217,7 +217,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         const { vaultDB, vault } = await putWith()
         await failNextCall(vaultDB)
         const answer = await vaultDB.tryGetVault(vaultGetAskOf())
-        expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null })
+        expect(answer).to.deep.include({ ok: false, act: 'unclassified', world: null }).and.to.have.nested.property('err.refusalkind', 'storage_unavailable')
         expect(answer.ask).to.deep.include(vaultScope)
         expect(isVaultError(answer.err, 'storage_unavailable')).to.be.true
         expect(await vaultDB.getVault(vaultGetAskOf())).to.deep.include({ val: vault })

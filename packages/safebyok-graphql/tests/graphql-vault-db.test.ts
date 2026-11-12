@@ -71,7 +71,7 @@ function watched(atOnce?: FakeResult) {
 }
 
 const gotNotice = { safebyokWatch: { __typename: 'SafebyokNotice', ok: true, act: 'got', val: { __typename: 'SafebyokVaultRecord', ...TH.vaultAt() }, world: null, err: null } }
-const revokedNotice = { safebyokWatch: { ok: false, act: 'identity_revoked', val: null, world: null, err: { refusalkind: 'identity_revoked', message: 'Signed out', meta: null } } }
+const revokedNotice = { safebyokWatch: { ok: false, act: 'unclassified', val: null, world: null, err: { refusalkind: 'identity_revoked', message: 'Signed out', meta: null } } }
 // --
 
 describe("GraphQLVaultDB's constructor", () => {
@@ -95,7 +95,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     const combined = new CombinedError({ graphQLErrors: [new GraphQLError('Cannot query field "safebyokGetVault" on type "Query".')] })
     const { vaultDB } = fakeClient({ error: combined })
     const answer = await vaultDB.tryGetVault(TH.vaultGetAskOf())
-    expect(answer).to.deep.include({ ok: false, act: 'unexpected_error', world: null })
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified', world: null }).and.to.have.nested.property('err.refusalkind', 'unexpected_error')
     expect(answer.ask).to.deep.include(TH.vaultScope)
     expect(DB.isVaultError(answer.err, 'unexpected_error')).to.be.true
     expect(answer.err?.cause).to.be.undefined
@@ -190,7 +190,7 @@ describe("GraphQLVaultDB's watch", () => {
 
   it("passes on unchanged the refusal that ends a stream", () => {
     const { streams, badnews } = watched()
-    const scopeNotice = { safebyokWatch: { ok: false, act: 'bad_scope', val: null, world: null, err: { refusalkind: 'bad_scope', message: 'No such scope', meta: null } } }
+    const scopeNotice = { safebyokWatch: { ok: false, act: 'unclassified', val: null, world: null, err: { refusalkind: 'bad_scope', message: 'No such scope', meta: null } } }
     streams[0]?.({ data: scopeNotice, hasNext: true })
     streams[0]?.({ data: scopeNotice, hasNext: false })
     expect(badnews).to.have.length(1)

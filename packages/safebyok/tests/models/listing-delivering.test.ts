@@ -112,7 +112,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     it("is thrown to a fetch of a scope not yet listed, and nothing is listed or reported", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.seedPut(fullBoxRecord())
-      const refused = vi.spyOn(Box.prototype, 'receive').mockImplementationOnce(() => { throw new VaultError('record_conflict', "Refused.") })
+      const refused = vi.spyOn(Box.prototype, 'receiveRecord').mockImplementationOnce(() => { throw new VaultError('record_conflict', "Refused.") })
       try {
         await TH.expectRefusal(listing.fetch(scopeOf()))
       } finally {
@@ -249,11 +249,11 @@ describe("listing: a record of another vault_tok reaches no listed instance", ()
     expect(listing.at(scopeOf('other_box'))).to.be.null
   })
 
-  it("throws a 'stale_write' whose record has another vault_tok without delivering that record", async () => {
+  it("tells a record of another vault_tok that a refusal carried as bad news, delivering nothing, and throws the refusal", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willPut(world.mw.staleWriteOf(scopeOf(), fullBoxRecord({ vault_tok: OtherVault, revision_seq: 5 })))
     await TH.expectRefusal(listing.put(fullBoxRecord({ revision_seq: 0 }), { expected: shellBoxRecord() }), 'stale_write')
-    expect(world.mw.badnews).to.deep.equal([])
+    expect(world.mw.badnews.map((news) => news.refusalkind)).to.deep.equal(['storage_issue'])
     expect(listing.things).to.deep.equal([])
   })
 

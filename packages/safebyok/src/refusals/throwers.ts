@@ -102,7 +102,7 @@ export function vaultStoredDamaged({ vaultlabel }: SX.DamagedVault): VaultError 
 export function rowOfOtherVaultTok(): VaultError { return new VaultError('storage_issue', Phrases.rowOfOtherAddress(['vault_tok'])) }
 // --
 
-// == [Storable Throwers]: partialLoad, alreadyListed, instanceDisabled, boxAbsent, boxNotListed, vaultAbsent, deletedVault, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok, shapeUnreconciled
+// == [Storable Throwers]: partialLoad, alreadyListed, instanceDisabled, boxAbsent, boxNotListed, vaultAbsent, deletedVault, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok
 
 /** A `bad_option` refusal: the record in hand is not full, and needs hydrating first. */
 export function partialLoad(): VaultError { return new VaultError('bad_option', Phrases.PartialLoad) }
@@ -137,8 +137,6 @@ export function oneRevisionTwoFates(): VaultError { return new VaultError('recor
 /** A `record_conflict` refusal: this record is stored under another vault_tok than this device does. */
 export function otherVaultTok(): VaultError { return new VaultError('record_conflict', Phrases.OtherVaultTok) }
 
-/** An `unexpected_error` refusal: `Storable` met a shape it cannot reconcile, which is a bug. */
-export function shapeUnreconciled(): VaultError { return new VaultError('unexpected_error', Phrases.ShapeUnreconciled) }
 // --
 
 // == [Box Throwers]: boxStoredDamaged, recordForNewBox, undecodedWhisper, notExposed

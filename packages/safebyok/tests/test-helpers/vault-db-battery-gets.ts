@@ -92,7 +92,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       const { vaultDB, vault } = await putWith()
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, fmt: SX.VaultFormat + 1 })
       const answer = await vaultDB.tryGetVault(vaultGetAskOf(vaultScope, 'nil'))
-      expect(answer).to.deep.include({ ok: false, act: 'damaged_row', world: null })
+      expect(answer).to.deep.include({ ok: false, act: 'unclassified', world: null }).and.to.have.nested.property('err.refusalkind', 'damaged_row')
       expect(answer.ask).to.deep.include(vaultScope)
       expect(answer.err?.meta?.fieldnames).to.deep.equal(['fmt'])
     })
@@ -207,7 +207,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       const { vaultDB, box } = await putWith({ box: true })
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { ...box, fmt: SX.BoxFormat + 1 })
       const answer = await vaultDB.tryGetBox(boxGetAskOf(boxQuery, 'nil'))
-      expect(answer).to.deep.include({ ok: false, act: 'damaged_row' })
+      expect(answer).to.deep.include({ ok: false, act: 'unclassified' }).and.to.have.nested.property('err.refusalkind', 'damaged_row')
       expect(answer.err?.meta?.fieldnames).to.deep.equal(['fmt'])
     })
 
@@ -216,7 +216,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, fmt: SX.VaultFormat + 1 })
       for (const boxlabel of ['openai', 'never_put']) {
         const answer = await vaultDB.tryGetBox(boxGetAskOf({ ...boxQuery, boxlabel }, 'nil'))
-        expect(answer).to.deep.include({ ok: false, act: 'damaged_vault' })
+        expect(answer).to.deep.include({ ok: false, act: 'unclassified' }).and.to.have.nested.property('err.refusalkind', 'damaged_vault')
         expect(answer.err?.meta?.fieldnames).to.deep.equal(['fmt'])
       }
     })

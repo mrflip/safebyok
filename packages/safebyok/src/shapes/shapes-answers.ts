@@ -14,7 +14,7 @@ import type { LoggableAsk } from './shapes-storage'
 
 // A failed check here is a wire out of step with this copy of safebyok, never a damaged row: 'unexpected_error'.
 /** The checks of the parts of a vaultDB answer that cross the wire: a refusal, what the answer carries of its ask, and the damaged rows listed. */
-export const { crossedErr, crossedAsk, damagedVault, damagedBox } = Checkers('unexpected_error', ({ obj, arr, str, int, lit, oneof, union, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok, revision_tok }) => {
+export const { crossedErr, crossedAsk, damagedVault, damagedBox } = Checkers('unexpected_error', ({ obj, arr, str, int, lit, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok, revision_tok }) => {
   const crossedErr = obj({
     refusalkind: oneof(refusalkindVals),
     message:     str,
@@ -39,8 +39,8 @@ export const { crossedErr, crossedAsk, damagedVault, damagedBox } = Checkers('un
     vaultlabel: vaultlabel.nullable().default(null),
     boxlabel:   boxlabel.nullable().default(null),
     vault_tok:  vault_tok.nullable().default(null),
-    ifAbsent:   union([oneof(EX.ifAbsentVals), oneof(EX.putIfAbsentVals)]).nullable().default(null),
-    ifPresent:  oneof(EX.ifPresentVals).nullable().default(null),
+    ifAbsent:   SX.anyIfAbsent.nullable().default(null),
+    ifPresent:  SX.ifPresent.nullable().default(null),
     gateVerb:   oneof(EX.gateVerbVals).nullable().default(null),
     expected:   crossedMeta.nullable().default(null),
     record:     crossedMeta.nullable().default(null),
@@ -71,7 +71,7 @@ function answerOfCrossed<ValT, ActT extends string, WorldT>(crossed: Crossed<Val
 /** What an answer's check parses before {@link answerOfCrossed} makes the answer of it. */
 type Crossed<ValT, ActT extends string, WorldT> = { ask: CrossedAsk, dbhas: unknown } & (
   | { ok: true, act: ActT, val: ValT, world: WorldT, err: null }
-  | { ok: false, act: string, val: null, world: unknown, err: CrossedErr }
+  | { ok: false, act: EX.BadAct, val: null, world: unknown, err: CrossedErr }
 )
 
 /** `crossed` as the core has an answer's ask, each null field left out, in its rows too. */
@@ -96,7 +96,7 @@ function vaultErrorOfCrossed({ refusalkind, message, meta }: CrossedErr, answere
 export const {
   listVaultsAnswer, getVaultAnswer, putVaultAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delVaultAnswer,
   listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer, crossedNotice,
-} = Checkers('unexpected_error', ({ obj, arr, str, uint, lit, oneof, union, discrim }) => {
+} = Checkers('unexpected_error', ({ obj, arr, uint, lit, oneof, union, discrim }) => {
   /** What makes the check of one verb's answer: its `val`, its acts, and its `world` and `dbhas`, good or refused. */
   type AnswerParts<ValT extends Z.ZodType, ActsT extends readonly [string, ...string[]], WorldT extends Z.ZodType> = {
     val: ValT, acts: ActsT, world: WorldT, badWorld: Z.ZodType, dbhas: Z.ZodType,
@@ -106,7 +106,7 @@ export const {
   ) {
     return discrim('ok', [
       obj({ ok: lit(true), act: oneof(acts), val, world, dbhas: dbhas.nullable().default(null), ask: crossedAsk, err: lit(null).default(null) }).strict(),
-      obj({ ok: lit(false), act: str, val: lit(null).default(null), world: badWorld.nullable().default(null), dbhas: dbhas.nullable().default(null), ask: crossedAsk, err: crossedErr }).strict(),
+      obj({ ok: lit(false), act: oneof(EX.badActVals), val: lit(null).default(null), world: badWorld.nullable().default(null), dbhas: dbhas.nullable().default(null), ask: crossedAsk, err: crossedErr }).strict(),
     ]).transform((crossed) => answerOfCrossed(crossed as Crossed<Z.output<ValT>, ActsT[number], Z.output<WorldT>>))
   }
 
@@ -118,7 +118,7 @@ export const {
 
   const crossedNotice = discrim('ok', [
     obj({ ok: lit(true), act: oneof(['got', 'gone']), val: union([SX.vaultRow, SX.boxRow]), world: SX.vaultRow.nullable().default(null), err: lit(null).default(null) }).strict(),
-    obj({ ok: lit(false), act: str, val: lit(null).default(null), world: lit(null).default(null), err: crossedErr }).strict(),
+    obj({ ok: lit(false), act: oneof(EX.badActVals), val: lit(null).default(null), world: lit(null).default(null), err: crossedErr }).strict(),
   ]).transform((crossed): Outcome<Notice> => {
     if (crossed.ok) { return { ok: true, val: { act: crossed.act, val: crossed.val, world: crossed.world } } }
     return { ok: false, err: vaultErrorOfCrossed(crossed.err, { act: crossed.act }, {}) }

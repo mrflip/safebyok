@@ -417,13 +417,13 @@ describe("storable.hydrate(opts): timeliness after a fetch", () => {
 
 // == [Rebirth, sentences]: a deletion arriving again after a put, phrases.ts
 
-describe("storable.receive(rcvd): after a put over a deleted box", () => {
+describe("storable.listing.receiveRow(rcvd): after a put over a deleted box", () => {
   it("keeps a rebirth when the old deletion arrives again", async () => {
     const gone = tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' })
     world.mw.seedPut(gone)
     const box = await fakeSealBoxListingOf(world.mw).build(gone)
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} })
-    box.receive(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
+    box.listing.receiveRow(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
     expect(box.isPresent).to.be.true
   })
 })
@@ -431,7 +431,7 @@ describe("storable.receive(rcvd): after a put over a deleted box", () => {
 describe("storable refusal sentences, from phrases.ts", () => {
   it("says a revision conflict is a bug to report", async () => {
     const { box } = await timelyBoxOf()
-    const err = TH.expectSyncRefusal(() => box.receive(tombstoneBoxRecord({ revision_seq: 1, revision_tok: 'rev-a1' })))
+    const err = TH.expectSyncRefusal(() => box.listing.receiveRow(tombstoneBoxRecord({ revision_seq: 1, revision_tok: 'rev-a1' })))
     expect(err.message).to.eq(Phrases.OneRevisionTwoFates)
     expect(err.family).to.eq('condition')
     const twoToks = TH.expectSyncRefusal(() => cmpRevisions({ revision_tok: 'a', revision_seq: 1 }, { revision_tok: 'b', revision_seq: 1 }))
@@ -452,10 +452,10 @@ describe("storable refusal sentences, from phrases.ts", () => {
     expect(notFull.message).to.eq(Phrases.PartialLoad)
   })
 
-  it("throws a record under another vault_tok with the sentence phrases.ts has", async () => {
+  it("throws a box record under another vault_tok than its listing's with the sentence phrases.ts has", async () => {
     const { box } = await timelyBoxOf()
-    const err = TH.expectSyncRefusal(() => box.receive(fullBoxRecord({ revision_seq: 2, vault_tok: 'vault-tok-other' })))
-    expect(err.message).to.eq(Phrases.OtherVaultTok)
+    const err = TH.expectSyncRefusal(() => box.listing.receiveRow(fullBoxRecord({ revision_seq: 2, vault_tok: 'vault-tok-other' })))
+    expect(err.message).to.eq(Phrases.rowOfOtherAddress(['vault_tok']))
   })
 })
 // --
