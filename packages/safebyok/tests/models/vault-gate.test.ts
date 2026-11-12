@@ -57,7 +57,7 @@ function deafened<WorldT extends Born>(born: WorldT): WorldT {
 }
 
 /** A strength checker that finds 'weak' weak and anything else strong. */
-const weakIfAsked: StrengthChecker = (passphrase: string) => (passphrase === 'weak' ? { strong: false as const, reason: "too short" } : { strong: true as const })
+const weakIfAsked: StrengthChecker = (passphrase: string) => (passphrase === 'weak' ? { strong: false as const, reason: 'too short' } : { strong: true as const })
 
 const NewWhisper = Object.freeze({ apiKey: 'sk-test-1111' })
 
@@ -67,7 +67,7 @@ const Stamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
 describe("a lease cache that refuses", () => {
   it("leaves the passphrase replaced and the bank unlocked, and reports to onBadNews", async () => {
     const { bank, deviceDB, badnews } = await makeBornVault()
-    const refusal = new VaultError('storage_unavailable', "the disk is full")
+    const refusal = new VaultError('storage_unavailable', 'the disk is full')
     deviceDB.tryStow.mockResolvedValueOnce(TH.bad(refusal))
     await expect(replaceTyping(bank, Passphrase, NewPassphrase)).resolves.to.eq(bank.maingate)
     expect(bank.isUnlocked).to.be.true
