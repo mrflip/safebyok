@@ -47,13 +47,13 @@ export type ConvexBankDBOpts = BX.AdapterBankDBOpts & {
   client: ConvexBankClient
   /** The app's safebyok bankDB functions: `api.safebyokBank`, not the whole `api`. */
   api: SafebyokBankApi
-  /** A soft cap on a vault life's box rows, tombstones included. A put of a new boxlabel past it refuses `vault_full`.
-   * Defaults to `DefaultMaxBoxes`, and never exceeds the component's own limit. This adapter currently enforces it exactly.
+  /** A soft cap on a vault life's box rows, tombstones included (default: `DefaultMaxBoxes`).
+   * A put of a new boxlabel past it refuses `vault_full`. The component's own limit applies whatever the cap.
    */
   maxBoxes?: number | undefined
 }
 
-/** The bank row, and every gate row, vault row and box row of a live vault in a watch's scope, as `watchRows` returns them. */
+/** What `watchRows` returns: the bank row, every gate and vault row in scope, and the box rows of each live vault. */
 type RowsWatched = {
   bank:   unknown,
   gates:  { gatelabel: string, gate: unknown }[],
@@ -219,7 +219,7 @@ async function runOrRefuse<ValT>(oplabel: string, thunk: () => Promise<ValT>): P
 
 // On a dev deployment Convex's error text may quote the call's arguments, so its message is never
 // passed on. A refusal from the host's safebyok functions is recognized by its `data`, which only they make.
-/** The refusal for `thrown`: one sent by the host's safebyok functions is rebuilt as itself, and anything else becomes `storage_unavailable`, naming `oplabel`. */
+/** The refusal for `thrown`: a refusal sent by the host's safebyok functions, else `storage_unavailable` naming `oplabel`. */
 function refusalOf(oplabel: string, thrown: unknown): VaultError {
   if ((thrown instanceof ConvexError) && isSafebyokErrorData(thrown.data)) { return refusalOfCrossed(thrown.data) }
   return DB.storageFailed(oplabel, thrown)
@@ -233,7 +233,7 @@ function refusalOfCrossed(data: unknown): VaultError {
 }
 
 // A disagreement is a component out of step with this copy of safebyok, never a damaged row: the classifier checked the rows.
-/** `stored`, the outcome classified here, once it agrees with what the component did: a write act where it wrote, and none where it did not. */
+/** Return `stored`, demanding that its act is a write exactly when the component wrote. */
 function storedAsWritten<StoredT extends { act: DB.BoxAct | DB.VaultAct | DB.ParentBankAct }>(stored: StoredT, wrote: boolean): StoredT {
   if (BX.isWriteAct(stored.act) !== wrote) { throw DB.unexpectedError(new Error(Phrases.StoredOutOfStep)) }
   return stored
@@ -241,7 +241,7 @@ function storedAsWritten<StoredT extends { act: DB.BoxAct | DB.VaultAct | DB.Par
 
 // Both results come from Convex's own serializer, so an unchanged row serializes the same way twice. A bank or gate row has
 // no vaultlabel, so only a watch of the whole bank hears it.
-/** Return the rows in `rows` that are new or changed since `seen`, each with the row above it. */
+/** The notices for the rows in `rows` that are new or changed since `seen`, each with its parent row. */
 function changesOf({ vaultlabel }: WatchScope, seen: RowsWatched, rows: RowsWatched): BX.Heard[] {
   const seenGates  = new Map(seen.gates.map(({ gatelabel, gate }) => [gatelabel, JSON.stringify(gate)]))
   const seenVaults = new Map(seen.vaults.map(({ vaultlabel: label, vault }) => [label, JSON.stringify(vault)]))
@@ -261,10 +261,10 @@ function changesOf({ vaultlabel }: WatchScope, seen: RowsWatched, rows: RowsWatc
   return [...banksHeard, ...gatesHeard, ...vaultsHeard, ...boxesHeard]
 }
 
-/** The notice of `row`, with `parent` as the row above it unless that is null. */
+/** The notice for `row`, with `parent` unless it is null. */
 function heardOf(row: unknown, parent: unknown): BX.Heard { return (parent === null) ? { row } : { row, parent } }
 
-/** Return a React watch's latest result, or undefined while it has none or is failing, telling `fail` what it throws. */
+/** A React watch's latest result, or undefined while it has none. A failing watch passes its error to `fail`, and gives undefined. */
 function latestOf(watch: { localQueryResult(): RowsWatched | undefined }, fail: (thrown: unknown) => void): RowsWatched | undefined {
   try {
     return watch.localQueryResult()

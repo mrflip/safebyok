@@ -47,8 +47,8 @@ export class SafebyokBankComponent {
     this.#component = componentCheck.parse(component, { where: 'SafebyokBankComponent', advice: Phrases.SafebyokBankComponentAdvice })
   }
 
-  /** Build the public functions a `ConvexBankDB` calls. Export them, under these names, from one module of the host's `convex/`.
-   * Each one refuses `identity_revoked` unless the caller is signed in as the `user_id` named in its scope or `ask`.
+  /** Build the public functions a `ConvexBankDB` calls, to export under these names from one module of the host's `convex/`.
+   * Each refuses `identity_revoked` unless the caller is signed in as the `user_id` its scope or `ask` names.
    */
   api<DataModel extends GenericDataModel>(opts: SafebyokApiOpts<DataModel>) {
     // Validate only, and keep using `opts` itself: `getUserId` is called on the host's own object, so one that relies on `this` still works.
@@ -185,12 +185,12 @@ export type SafebyokBankApi = {
 
 // == [Checks]: componentCheck, safebyokApiOpts, scopeUser
 
-/** Validator for the component handed to {@link SafebyokBankComponent}: an object or a function, never undefined or null. */
+/** Validator for the component handed to {@link SafebyokBankComponent}: an object or a function, not null. */
 const componentCheck = DB.Checker(({ custom }) => custom<ComponentApi>((candidate) => ((typeof candidate === 'object') || (typeof candidate === 'function')) && (candidate !== null), Phrases.ComponentExpected), 'bad_option')
 
 /** Validator for {@link SafebyokApiOpts}. */
 const safebyokApiOpts = DB.objCheck(({ fn }) => ({ getUserId: fn<GetUserId>() }), 'bad_option')
 
-/** Validator for the `user_id` an ask or a watch's scope names, any other field left for the component to check. */
+/** Validator for the `user_id` an ask or a watch's scope names. It strips the other fields, which the component checks. */
 const scopeUser = DB.objCheck(({ user_id }) => ({ user_id }), { refusalkind: 'identity_revoked', extras: 'strip' })
 // --

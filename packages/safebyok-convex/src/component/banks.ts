@@ -56,7 +56,7 @@ export const buildBank = mutation({
 })
 
 // The classifier runs each gate verb's policy, so the policy runs here, on the gate row this mutation fetched.
-/** Classify a gate verb's ask against the bank row and the gate row, its verb's policy included, and store its gate record if the act is a write. */
+/** Classify a gate verb's ask against the bank row and the gate row, under the verb's policy, and store its gate record if the act is a write. */
 export const putGate = mutation({
   args:    CVX.askArgs,
   returns: CVX.gateWritten,
@@ -264,7 +264,7 @@ export const tidyGone = mutation({
 })
 
 // A Convex query reads whole documents, so a bank-wide watch reads every box row of the bank's live vaults each time it runs.
-/** List the bank row, and every gate row, vault row and box row of a live vault in `scope`, for a client to subscribe to. A vault's scope has no gate rows. */
+/** List the bank row, every gate and vault row in `scope`, and the box rows of each live vault, for a client to subscribe to. */
 export const watchRows = query({
   args:    CVX.watchRowsArgs,
   returns: CVX.rowsWatched,
@@ -315,7 +315,7 @@ function crossingOf(thrown: unknown): unknown {
 }
 
 // The client classifies the same rows with the same classifier, and throws the refusal itself, with its rows.
-/** What `classify` returns, or null when it refuses a row stored. */
+/** What `classify` returns, or null if it refuses. */
 function storedOrNull<StoredT>(classify: () => StoredT): StoredT | null {
   try {
     return classify()
@@ -359,7 +359,7 @@ async function deleteWithin<TableT extends TableNames>(db: DatabaseWriter, table
 // The box index runs vaultlabel, bank_tok, vault_tok, boxlabel. A box row of an ended life lies under a vaultlabel with no live
 // vault row, or beside the one live life of its vaultlabel: under another bank_tok, or under its bank_tok and another vault_tok.
 // Each range excludes its bounds, so no query reads a box row of a live life, or one under a vaultlabel in `sparedlabels`.
-/** Queries for the box rows of the bank at `scope` of no life in `lives`, and under no vaultlabel in `sparedlabels`. */
+/** Queries for the bank's box rows that belong to no life in `lives` and lie under no vaultlabel in `sparedlabels`. */
 function endedBoxQueries(db: DatabaseReader, { user_id, banklabel }: BankScope, sparedlabels: readonly string[], lives: readonly Life[]) {
   // The index orders strings by code unit, as `<` does, and a label is ASCII.
   const bounds = [...new Set([...sparedlabels, ...lives.map(({ vaultlabel }) => vaultlabel)])].toSorted(byCodeUnits)
@@ -391,7 +391,7 @@ function byCodeUnits(aa: string, bb: string): number {
   return (aa < bb) ? -1 : 1
 }
 
-/** Return the life an ask or a record belongs to: its vault's scope, `bank_tok` and `vault_tok`. */
+/** The {@link Life} of an ask or a record, without its other fields. */
 function lifeOf({ user_id, banklabel, vaultlabel, bank_tok, vault_tok }: Life): Life { return { user_id, banklabel, vaultlabel, bank_tok, vault_tok } }
 
 /** A map key for `life`, among the lives of one bank. */

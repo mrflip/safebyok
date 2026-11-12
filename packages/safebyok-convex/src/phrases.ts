@@ -1,4 +1,6 @@
-/** The messages of safebyok-convex's own checks, gathered so their wording can be reviewed in one place. */
+/** The messages and advice of safebyok-convex's own checks. */
+
+// Gathered here so their wording can be reviewed in one place.
 
 // == [Options]: ClientExpected, ApiExpected, ComponentExpected, ConvexBankDBAdvice, SafebyokBankComponentAdvice, SafebyokBankApiAdvice
 
@@ -23,6 +25,6 @@ export const SafebyokBankApiAdvice = 'Hand it { getUserId }, a function answerin
 
 // == [Answers]: StoredOutOfStep
 
-/** Message for a write whose component stored the record where the classifier here found no write, or stored nothing where it found one. */
+/** Message for a component and a client that disagree on whether a write was stored. */
 export const StoredOutOfStep = 'The component stored the record where this copy of safebyok found no write, or stored nothing where it found one.'
 // --
