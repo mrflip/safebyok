@@ -82,10 +82,11 @@ a thread, and its commits never force a restack. It joins the line last, on top.
 
 **The sprint doc** is where the Coach watches, from any device. With the Claude Docs tools in the
 session, birth one doc named for the sprint, with four tabs: *Open Matters* and *Resolved*, which
-`/turbochat` sets up; *Progress*: a lead linking the plan and the progress document on GitHub
-(`https://github.com/mrflip/safebyok/blob/<branch>/<path>`), then one table row per thread,
-`Thread | Status | PR | Thread file | Review`, the thread file linked on the thread's branch; and
-*Cleanup*, second in the tray: a one-line lead, then *Your calls*, a table `Matter | My call |
+`/turbochat` sets up; *Progress*: a one-line lead, then a list of GitHub links, since only those
+open on a phone (`https://github.com/mrflip/safebyok/blob/<branch>/<path>`) -- the plan, the
+progress document, the design, the threads and the rulings on the sprint branch, then one line
+per thread, added as it is cut, linking its thread file on its own branch -- with no status
+table: statuses live in the plan; and *Cleanup*, second in the tray: a one-line lead, then *Your calls*, a table `Matter | My call |
 Lands in`, and *Finally*, a checklist of what the sprint owes before it closes (§3).
 Give the Coach its link once in chat. Load the docs skill and guides and edit it cell by cell,
 as turbochat says; never copy a
@@ -103,7 +104,8 @@ lowest number first, while fewer than the cap are underway; refill as threads fi
 runs three steps.
 
 **Build.** `scripts/cut-thread <label> <base>` cuts its worktree from the base §1 gives it, and
-records that base for its reviewer and its filing. (Run the scripts as `<sprint root>/scripts/...`
+records that base for its reviewer and its filing; add the thread's line to *Progress*, its
+thread file linked on its branch. (Run the scripts as `<sprint root>/scripts/...`
 once the sprint has its worktree: the main checkout may be on a branch that lacks them.) Spawn
 one `thread-worker` with `run_in_background: true`, the thread's worker model and effort where
 they differ from the agent's, and a `description` naming the thread (`Thread 3: vault_record`),
@@ -197,8 +199,8 @@ gets no review: the review follows the resume that finishes it.
    (`git -C <root> log --oneline -5`), its tree is clean, and its PR carries `ci` and is pushed
    (`gh pr view <branch> --json labels,headRefOid` against the worktree's HEAD). Trust the
    reports for the rest.
-2. **Tell the Coach.** A line in chat -- thread, verdict, PR link -- and the thread's row in
-   *Progress*. Each item of the report's *Open matters*, and each YOLO decision, becomes a
+2. **Tell the Coach.** A line in chat -- thread, verdict, PR link -- and the thread's status
+   line in the plan. Each item of the report's *Open matters*, and each YOLO decision, becomes a
    `drafting` row of its own in *Open Matters* in the same pass -- one item, one row, never
    rolled up -- tagged with where it was asked (`#N`, thread N); say in chat why you left any
    out. Start the row with **TOP** when the matter blocks other work, changes a contract or a
@@ -258,7 +260,7 @@ Default rules, absent other guidance:
   rebase conflict that takes judgment about which behaviour wins is the Coach's.
 * **A worker that compacts** is doing what its cap asks, until compaction starts to cost more
   than it saves. On the first compaction, tell the worker nothing. Note it on the thread's
-  *Progress* row and in its review handoff, so the reviewer looks harder at the work that spans
+  status line in the plan and in its review handoff, so the reviewer looks harder at the work that spans
   it. A second compaction means the thread outgrew one context, which is a planning lesson for
   the progress document: check later threads' glosses for the same shape, and split any that
   have it. A third, or a second soon after the first, means the worker is thrashing. Resume it with a directive to commit what is sound, bring its thread
@@ -272,7 +274,7 @@ Default rules, absent other guidance:
   or, while the other thread's PR is filed but unmerged, amend it there. It needs no thread of
   its own, and no row.
 * **Pause the sprint** -- start no new threads, let those underway reach their next report and
-  keep them there, update the status lines and *Progress*, write
+  keep them there, update the status lines, write
   `human/YYYYMMDD-sprint_<name>_paused.md` in the sprint worktree saying exactly where things
   stand (which threads filed, which wait in which worktree, and why), commit and push, say so in
   chat, and end your turn -- when:
