@@ -1,4 +1,4 @@
-/** The bank of `src/models/` end to end, over a real vaultDB and deviceDB: ensureVault, its device row and its snapshot. */
+/** The bank of `src/models/` end to end, over a real bankDB and deviceDB: ensureVault, its device row and its snapshot. */
 
 import { describe, expect, it, vi } from 'vitest'
 import * as TH from '../test-helpers'
@@ -20,7 +20,7 @@ describe("bank.ensureVault", () => {
   })
 
   // BankedVaultScope @example
-  it("builds an unlocked vault by asking, then returns the same vault without asking again", async () => {
+  it("puts a vault in a bank unlocked by asking, then returns the same vault without asking again", async () => {
     const { bank, vault } = await makeBankWithVault()
     expect(vault).to.include({ ...BankScopeGiven, ...VaultScopeGiven })
     expect(vault.isUnlocked).to.be.true
@@ -35,14 +35,18 @@ describe("bank.ensureVault", () => {
     expect(vault.isLocked).to.be.true
   })
 
-  it("refuses while a gating is open", async () => {
+  it("refuses while an unlock's gating is open", async () => {
     const world = makeBankWorld()
     let closeDialog = nothing
+    let showDialog = nothing
+    const shown = new Promise<void>((resolve) => { showDialog = resolve })
     const bank = await world.bankOn({ requestCleartext: async (gating) => {
+      showDialog()
       await new Promise<void>((resolve) => { closeDialog = resolve })
       await gating.attempt(byPassphrase(Passphrase))
     } })
-    const asking = bank.ensureVault(VaultScopeGiven)
+    const asking = bank.ensureUnlocked()
+    await shown
     await TH.expectRefusal(bank.ensureVault(OtherScopeGiven))
     closeDialog()
     await asking
@@ -80,9 +84,9 @@ describe("the bank's device_tok", () => {
 })
 
 describe("the bank's snapshot", () => {
-  it("is frozen, and serializes as itself", async () => {
+  it("is frozen, and the bank serializes as its row", async () => {
     const { bank } = await makeBankWithVault()
     expect(Object.isFrozen(bank.snapshot)).to.be.true
-    expect(bank.toJSON()).to.equal(bank.snapshot)
+    expect(bank.toJSON()).to.deep.equal(bank.sparse)
   })
 })

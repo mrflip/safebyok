@@ -10,7 +10,7 @@ import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } fr
 import { VaultError } from '../../src/refusals/errors'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
-import { _cheat_vaultKeyBytesOf, builtGateOf, DeviceTok, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WorldBankStamp, WorldGate, WorldGateStamp } from '../test-helpers/proving-world'
+import { _cheat_vaultKeyBytesOf, builtGateOf, listedGateOf, DeviceTok, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WorldBankStamp, WorldGate, WorldGateStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -563,13 +563,13 @@ describe("the ctx a wayin is wrapped under", () => {
   for (const [altered, blurb] of HeaderCases) {
     it(`keeps a passphrase wayin shut under ${blurb}`, async () => {
       const { gate } = await builtGateOf()
-      const moved = new Gate(WorldBankStamp, { ...gate.pickle(), wayins: { main: { ...gate.wayins.main, ...altered } } })
+      const moved = await listedGateOf({ ...gate.pickle(), wayins: { main: { ...gate.wayins.main, ...altered } } })
       await TH.expectRefusal(PassphraseProving.buildStored(moved, TestPassphrase, provingWorldOf()), 'wrong_passphrase')
     })
 
     it(`keeps a passkey wayin shut under ${blurb}`, async () => {
       const { gate, answerOf } = await gateWithBoth()
-      const moved = new Gate(WorldBankStamp, { ...gate.pickle(), wayins: { ...gate.wayins, passkey0: { ...gate.wayins.passkey0!, ...altered } } })
+      const moved = await listedGateOf({ ...gate.pickle(), wayins: { ...gate.wayins, passkey0: { ...gate.wayins.passkey0!, ...altered } } })
       await TH.expectRefusal(PasskeyProving.buildStored(moved, answerOf()), 'wrong_passkey')
     })
   }

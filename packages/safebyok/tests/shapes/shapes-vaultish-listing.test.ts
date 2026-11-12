@@ -161,11 +161,11 @@ describe("The checks of the world and the listing", () => {
   })
 
   describe("VX.listingOpts", () => {
-    const opts = { vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000, bankFriend: mw.bankFriend }
+    const opts = { bankDB: mw.bankDB, maxMillisSinceRefresh: 1000, bankFriend: mw.bankFriend }
     expectCases(VX.listingOpts, [
-      [opts,                                                     true,  'passes the test vaultDB, a horizon and the calls the bank branded'],
+      [opts,                                                     true,  'passes the test bankDB, a horizon and the calls the bank branded'],
       [{ ...opts, maxMillisSinceRefresh: Infinity },             true,  'passes a horizon of Infinity'],
-      [{ ...opts, vaultDB: { tryPutBox: () => null } },          false, 'refuses a vaultDB with no tryGetBox'],
+      [{ ...opts, bankDB: { tryPutBox: () => null } },           false, 'refuses a bankDB with no tryGetBox'],
       [{ ...opts, maxMillisSinceRefresh: -1 },                   false, 'refuses a negative horizon'],
       [{ ...opts, maxMillisSinceRefresh: undefined },            false, 'refuses a missing horizon'],
       [{ ...opts, bankFriend: { ...mw.bankFriend, panic: () => undefined } },               false, 'refuses a panic the bank did not brand'],

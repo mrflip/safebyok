@@ -5,8 +5,8 @@ import * as Front from '../src/index'
 
 describe("safebyok", () => {
   it("exports each type its exported signatures name", () => {
-    expectTypeOf<Front.DeviceOpts['vaultDB']>().toEqualTypeOf<Front.VaultDB>()
-    expectTypeOf<Front.AdapterVaultDB>().toExtend<Front.DeviceOpts['vaultDB']>()
+    expectTypeOf<Front.DeviceOpts['bankDB']>().toEqualTypeOf<Front.BankDB>()
+    expectTypeOf<Front.AdapterBankDB>().toExtend<Front.DeviceOpts['bankDB']>()
     expectTypeOf<Front.DeviceOpts['deviceDB']>().toEqualTypeOf<Front.DeviceDB>()
     expectTypeOf<Front.DeviceOpts['keyDeriver']>().toEqualTypeOf<Front.KeyDeriver>()
     expectTypeOf<Front.DeviceOpts['strengthChecker']>().toEqualTypeOf<Front.StrengthChecker | undefined>()
@@ -14,7 +14,7 @@ describe("safebyok", () => {
     expectTypeOf<Parameters<Front.RequestCleartext>[0]>().toEqualTypeOf<Front.AnyGating>()
     expectTypeOf<Front.KeyDeriver['salt_size']>().toEqualTypeOf<typeof Front.PassphraseSaltSize>()
     expectTypeOf<Parameters<Front.GuardedKeyDeriver['deriveKeyBytes']>[0]>().toEqualTypeOf<Front.PassphraseCleartext>()
-    expectTypeOf<ReturnType<Front.Gating<'build_vault'>['judgeStrength']>>().toEqualTypeOf<Promise<Front.PassphraseVerdict>>()
+    expectTypeOf<ReturnType<Front.Gating<'build_bank'>['judgeStrength']>>().toEqualTypeOf<Promise<Front.PassphraseVerdict>>()
     expectTypeOf<Front.VaultError['refusalkind']>().toEqualTypeOf<Front.Refusalkind>()
     expectTypeOf<Front.VaultError['family']>().toEqualTypeOf<Front.RefusalFamily>()
     expectTypeOf<Parameters<Front.Vault['getBox']>[1]>().toEqualTypeOf<Front.FetchOpts | undefined>()

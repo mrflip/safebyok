@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ENCRYPTED, LOCKED, VEILED } from '../../src/helpers/consts'
 import type { BoxExposure } from '../../src/shapes/shapes-enums'
 import type { Fetched } from '../../src/shapes/shapes-vaultish'
-import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
+import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-bankdb'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxListingOf, fullBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 

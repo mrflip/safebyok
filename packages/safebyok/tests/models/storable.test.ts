@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Fetched } from '../../src/shapes/shapes-vaultish'
-import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
+import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-bankdb'
 import { Box } from '../../src/models/box'
 import { cmpRevisions, Storable } from '../../src/models/storable'
 import * as Phrases from '../../src/helpers/phrases'

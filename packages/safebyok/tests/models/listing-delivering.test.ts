@@ -5,12 +5,13 @@ import * as Phrases from '../../src/helpers/phrases'
 import { VaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import * as SX from '../../src/shapes/shapes-storage'
+import * as BX from '../../src/shapes/shapes-bankdb'
 import * as TH from '../test-helpers'
 import { TestableBox, TestableBoxListing, boxDnaOf, boxListingOf, fullBoxRecord, shellBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
 const world = useModelsWorld()
 
-function shell() { return SX.shellBoxOf(world.mw.boxscope('anthropic_api_key'), world.mw.world.vault_tok) }
+function shell() { return BX.shellBoxOf({ ...world.mw.boxscope('anthropic_api_key'), bank_tok: world.mw.world.bank_tok, vault_tok: world.mw.world.vault_tok }) }
 
 // == [Helpers of the pipeline tests]: scopeOf, dnaOf
 
@@ -28,7 +29,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       world.mw.willGet(world.mw.refusalOf(box.scope, err, 'a world'))
       const outcome = await listing.tryGet(box.scope, { maxMillisSinceRefresh: 0 })
       expect(outcome.err).to.eq(err)
-      expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', world: 'a world' }])
+      expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', parent: 'a world' }])
       expect(box.revision_seq).to.eq(1)
     })
 
@@ -44,7 +45,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       world.mw.seedPut(fullBoxRecord())
       world.mw.willGet(world.mw.answerOf(scopeOf(), fullBoxRecord(), 'the world now'))
       await boxListingOf(world.mw).get(scopeOf(), { maxMillisSinceRefresh: 0 })
-      expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', world: 'the world now' }])
+      expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', parent: 'the world now' }])
     })
     it("refuses a fetch of a malformed scope, before the world or storage is called", async () => {
       const listing = boxListingOf(world.mw)

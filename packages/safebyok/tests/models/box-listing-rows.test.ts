@@ -57,7 +57,7 @@ describe("BoxListing: an absent box", () => {
     it("takes the world of the answer before it refuses", async () => {
       world.mw.willGet(world.mw.answerOf(scope(), null, 'a world'))
       await TH.expectRefusal(boxListingOf(world.mw).get(scope(), { maxMillisSinceRefresh: 0 }), 'absent_box')
-      expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', world: 'a world' }])
+      expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', parent: 'a world' }])
     })
   })
 

@@ -11,18 +11,18 @@ import { WorldVault, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tom
 
 const world = useModelsWorld()
 
-function good(): BoxListingOpts { return { scope: WorldVault.scope, vaultDB: world.mw.vaultDB, maxMillisSinceRefresh: 1000, bankFriend: world.mw.bankFriend } }
+function good(): BoxListingOpts { return { scope: WorldVault.scope, bankDB: world.mw.bankDB, maxMillisSinceRefresh: 1000, bankFriend: world.mw.bankFriend } }
 
 function dna() { return boxDnaOf(world.mw.boxscope('anthropic_api_key')) }
 
 const Label = 'anthropic_api_key'
 
-/** Every verb a listing calls on its vaultDB, with no brand: a duck. */
-function vaultDBDuck() { return Object.fromEntries(['tryGetVault', 'tryPutVault', 'tryDelVault', 'tryListBoxes', 'tryGetBox', 'tryPutBox', 'tryDelBox', 'watch'].map((verb) => [verb, () => null])) }
+/** Every verb a listing calls on its bankDB, with no brand: a duck. */
+function bankDBDuck() { return Object.fromEntries(['tryEnsureBank', 'tryGetVault', 'tryPutVault', 'tryDelVault', 'tryListBoxes', 'tryGetBox', 'tryPutBox', 'tryDelBox', 'watch'].map((verb) => [verb, () => null])) }
 
 describe("BoxListing", () => {
   describe("new BoxListing(world, opts)", () => {
-    it("makes a listing from a world, a vaultDB and a horizon without calling them", () => {
+    it("makes a listing from a world, a bankDB and a horizon without calling them", () => {
       const listing = new BoxListing(world.mw.world, good())
       expect(listing).to.be.instanceOf(BoxListing)
       expect(listing.things).to.deep.equal([])
@@ -32,8 +32,8 @@ describe("BoxListing", () => {
 
     const bads: readonly (readonly [blurb: string, args: () => readonly [world: unknown, opts: unknown]])[] = [
       ['no world',                    () => [undefined, good()]],
-      ['no vaultDB',                  () => [world.mw.world, { ...good(), vaultDB: undefined }]],
-      ['an unbranded look-alike of a vaultDB', () => [world.mw.world, { ...good(), vaultDB: vaultDBDuck() }]],
+      ['no bankDB',                   () => [world.mw.world, { ...good(), bankDB: undefined }]],
+      ['an unbranded look-alike of a bankDB', () => [world.mw.world, { ...good(), bankDB: bankDBDuck() }]],
       ['no horizon',                  () => [world.mw.world, { ...good(), maxMillisSinceRefresh: undefined }]],
       ['a negative horizon',          () => [world.mw.world, { ...good(), maxMillisSinceRefresh: -1 }]],
       ['a world among its options',   () => [world.mw.world, { ...good(), world: world.mw.world }]],

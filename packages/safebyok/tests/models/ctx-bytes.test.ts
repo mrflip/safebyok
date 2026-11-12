@@ -29,7 +29,7 @@ const BankStampFields = ['user_id', 'banklabel', 'bank_tok', 'registered_at'] as
 const GateStampFields = ['user_id', 'banklabel', 'gatelabel', 'gate_tok', 'registered_at'] as const
 const VaultStampFields = ['user_id', 'banklabel', 'vaultlabel', 'vault_tok', 'registered_at'] as const
 const LeaseStampFields = ['fmt', ...BankStampFields, 'gatelabel', 'gate_tok', 'gate_revision_tok', 'proved_at', 'wayinkind'] as const
-const BoxStampFields = ['user_id', 'banklabel', 'vaultlabel', 'boxlabel', 'fmt', 'vault_tok', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'box_tok', 'whisper_codec', 'whisper_schema_version'] as const
+const BoxStampFields = ['user_id', 'banklabel', 'vaultlabel', 'boxlabel', 'fmt', 'bank_tok', 'vault_tok', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'box_tok', 'whisper_codec', 'whisper_schema_version'] as const
 
 /** The stamps a box hands a seal when no real vault is wanted: {@link WorldVaultStamp}, then a box's. */
 const SealStamps = [WorldVaultStamp, sealStampOf('anthropic')] as const
@@ -109,7 +109,7 @@ describe("each ctx, byte for byte", () => {
     function field(fieldname: string): string { return JSON.stringify(boxStamp[fieldname]) }
     expect(boxStamp).to.not.have.property('sidecar')
     const vaultText = `{"banklabel":"acme","registered_at":${JSON.stringify(vaultStamp['registered_at'])},"user_id":"u1","vault_tok":${JSON.stringify(vaultStamp['vault_tok'])},"vaultlabel":"main"}`
-    const boxText = `{"am":${field('am')},"banklabel":${field('banklabel')},"box_tok":${field('box_tok')},"boxlabel":"anthropic","fmt":${field('fmt')},"registered_at":${field('registered_at')},"revision_seq":${field('revision_seq')},"revision_tok":${field('revision_tok')},"user_id":${field('user_id')},"vault_tok":${field('vault_tok')},"vaultlabel":${field('vaultlabel')},"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${field('written_at')}}`
+    const boxText = `{"am":${field('am')},"bank_tok":${field('bank_tok')},"banklabel":${field('banklabel')},"box_tok":${field('box_tok')},"boxlabel":"anthropic","fmt":${field('fmt')},"registered_at":${field('registered_at')},"revision_seq":${field('revision_seq')},"revision_tok":${field('revision_tok')},"user_id":${field('user_id')},"vault_tok":${field('vault_tok')},"vaultlabel":${field('vaultlabel')},"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${field('written_at')}}`
     const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, textBytes(`[${BankStampText},${vaultText},${boxText},"box_key_wrapped"]`), { extractable: false, usage: ['decrypt'] })
     const opened = await decipherBytes(boxKey, sealed.whisper_ciphered, textBytes(`[${BankStampText},${vaultText},${boxText},"whisper_ciphered"]`))
     expect(new TextDecoder().decode(opened)).to.eq(WhisperText)

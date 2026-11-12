@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Phrases from '../../src/helpers/phrases'
 import * as SX from '../../src/shapes/shapes-storage'
+import * as BX from '../../src/shapes/shapes-bankdb'
 import * as TH from '../test-helpers'
 import { ENCRYPTED, LOCKED } from '../../src/helpers/consts'
 import { Passphrase, Sidecar, Whisper, boxlabel, byPassphrase, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
@@ -14,7 +15,7 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     const { vault, boxrows, tryPutBox } = await makeWorld()
     const box = await vault.putBox({ boxlabel, whisper: Whisper, sidecar: Sidecar })
     expect(tryPutBox).toHaveBeenCalledOnce()
-    expect(tryPutBox.mock.calls[0]?.[0]).to.deep.include({ expected: SX.shellBoxOf({ ...vault.scope, boxlabel }, vault.vault_tok) })
+    expect(tryPutBox.mock.calls[0]?.[0]).to.deep.include({ expected: BX.shellBoxOf({ ...vault.scope, boxlabel, bank_tok: vault.bank_tok, vault_tok: vault.vault_tok }) })
     expect(box.isPresent).to.be.true
     expect(box.sidecar).to.deep.equal(Sidecar)
     expect(await box.extractWhisper()).to.deep.equal(Whisper)

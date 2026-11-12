@@ -5,7 +5,8 @@ import { DefaultLogger, setDefaultLogger } from '../../src/helpers/logger'
 import { ForeverMillis, isGuarded } from '../../src/helpers/consts'
 import type { Bank } from '../../src/models/bank'
 import { type Device, DefaultOnLifecycle, guardOnLifecycle, guardRequestCleartext, tellBadNewsTo } from '../../src/models/device'
-import { DefaultLeaseMillis, type Vault } from '../../src/models/vault'
+import { DefaultLeaseMillis } from '../../src/models/bank'
+import type { Vault } from '../../src/models/vault'
 import type { BadNews, BankFriend, DeviceEvent } from '../../src/shapes/shapes-vaultish'
 import { deviceDisabled } from '../../src/refusals/throwers'
 import type { AnyGating } from '../../src/shapes/shapes-gateish'
@@ -31,7 +32,7 @@ describe("a page that is not a secure context", () => {
 
   it("refuses Device.make, before it touches storage", () => {
     const world = makeBankWorld()
-    const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
+    const listVaults = vi.spyOn(world.bankDB, 'tryEnsureBank')
     vi.stubGlobal('isSecureContext', false)
     const err = TH.expectSyncRefusal(() => world.deviceOn(), 'insecure_context')
     expect(err.message).to.match(/https/)
@@ -110,7 +111,7 @@ describe("device.ensureBank", () => {
     const device = world.deviceOnAnotherDevice()
     const bank = await device.ensureBank()
     const listed = bank.vaultAt(VaultScopeGiven)
-    const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
+    const listVaults = vi.spyOn(world.bankDB, 'tryEnsureBank')
     const { snapshot } = device
     expect(await device.ensureBank()).to.equal(bank)
     expect(listVaults).not.toHaveBeenCalled()
@@ -123,10 +124,10 @@ describe("device.ensureBank", () => {
     await makeBankWithVault(world)
     const onLifecycle = vi.fn()
     const device = world.deviceOn({ onLifecycle })
-    world.vaultDB._cheat_refuseGets('storage_unavailable')
+    world.bankDB._cheat_refuseGets('storage_unavailable')
     const refusal = await TH.expectRefusal(device.ensureBank(), 'storage_unavailable')
     expect(onLifecycle).toHaveBeenLastCalledWith({ kind: 'helloed', outcome: { ok: false, err: refusal }, vault: null, device })
-    world.vaultDB._cheat_refuseGets(null)
+    world.bankDB._cheat_refuseGets(null)
     const bank = await device.ensureBank()
     expect(onLifecycle).toHaveBeenLastCalledWith({ kind: 'helloed', outcome: { ok: true, val: undefined }, vault: null, device })
     const vault = bank.vaultAt(VaultScopeGiven)
@@ -139,7 +140,7 @@ describe("device.ensureBank", () => {
     const onLifecycle = vi.fn()
     const world = makeBankWorld()
     const device = world.deviceOn({ onLifecycle })
-    const answer = TH.pendingNextAnswer(world.vaultDB, 'tryListVaults')
+    const answer = TH.pendingNextAnswer(world.bankDB, 'tryEnsureBank')
     const ensuring = device.tryEnsureBank()
     await answer.reached
     device.sweep()
@@ -165,20 +166,20 @@ describe("device.ensureBank", () => {
     const world = makeBankWorld()
     const spy = TH.spyLogger()
     const device = world.deviceOn({ logger: spy.logger })
-    world.vaultDB._cheat_refuseGets('storage_unavailable')
+    world.bankDB._cheat_refuseGets('storage_unavailable')
     const refusal = await TH.expectRefusal(device.ensureBank(), 'storage_unavailable')
     expect(refusal.refusalkind).to.eq('storage_unavailable')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
     expect(device.snapshot).to.include({ stage: 'made', err: null, bank: null })
     expect(device.bank).to.be.null
-    world.vaultDB._cheat_refuseGets(null)
+    world.bankDB._cheat_refuseGets(null)
     const bank = await device.ensureBank()
     expect(device.snapshot).to.include({ stage: 'ready', err: null, bank: bank.snapshot })
   })
 
   it("refuses when the strength checker fails to load, with its error as the cause", async () => {
     const world = makeBankWorld()
-    const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
+    const listVaults = vi.spyOn(world.bankDB, 'tryEnsureBank')
     const thrown = new Error('no word list here')
     const spy = TH.spyLogger()
     const device = world.deviceOn({ logger: spy.logger, strengthChecker: Object.assign((() => ({ strong: true })) as typeof anyStrengthChecker, { load: () => Promise.reject(thrown) }) })
@@ -192,7 +193,7 @@ describe("device.ensureBank", () => {
 
   it("refuses when the key deriver fails to load, with its error as the cause", async () => {
     const world = makeBankWorld()
-    const listVaults = vi.spyOn(world.vaultDB, 'tryListVaults')
+    const listVaults = vi.spyOn(world.bankDB, 'tryEnsureBank')
     const thrown = new Error('no wasm here')
     const spy = TH.spyLogger()
     const device = world.deviceOn({ logger: spy.logger, keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load: () => Promise.reject(thrown) }) })
@@ -228,7 +229,7 @@ describe("device.ensureBank", () => {
 
   it("reports a damaged vault row as bad news, and readies the bank without it", async () => {
     const world = makeBankWorld()
-    world.vaultDB._cheat_vaultRowsOf(BankScopeGiven).set('broken', { am: 'a', nonsense: true })
+    world.bankDB._cheat_shelfOf(BankScopeGiven).vaultrows.set('broken', { am: 'a', nonsense: true })
     const onBadNews = vi.fn()
     const device = world.deviceOn({ onBadNews })
     await device.ensureBank()
@@ -239,7 +240,7 @@ describe("device.ensureBank", () => {
 
   it("reports a vault whose stored passphrase salt will not decode as a damaged row", async () => {
     const { world } = await makeBankWithVault()
-    const rows = world.vaultDB._cheat_vaultRowsOf(BankScopeGiven)
+    const rows = world.bankDB._cheat_shelfOf(BankScopeGiven).vaultrows
     const row = rows.get(Dna.vaultlabel) as { gate: { passphrase_wayin: object } }
     rows.set(Dna.vaultlabel, { ...row, gate: { ...row.gate, passphrase_wayin: { ...row.gate.passphrase_wayin, salt_b64: `${'A'.repeat(21)}B` } } })
     const onBadNews = vi.fn()
@@ -348,7 +349,7 @@ describe("DefaultOnLifecycle", () => {
     vi.stubGlobal('reportError', undefined)
     const spy = TH.spyLogger()
     const device = { vacate: vi.fn(), logger: spy.logger } as unknown as Device
-    DefaultOnLifecycle({ kind: 'lease_revoke_failed', refusal: Refusal, vault: null, where: 'vacate', device })
+    DefaultOnLifecycle({ kind: 'lease_revoke_failed', refusal: Refusal, bank: null, where: 'vacate', device })
     expect(spy.calls).to.deep.equal([{ level: 'error', message: Refusal.message, story: { oplabel: 'Device.onLifecycle', refusalkind: 'storage_unavailable' }, err: undefined }])
     expect(JSON.stringify(spy.calls)).not.to.include(Passphrase)
     vi.unstubAllGlobals()
@@ -364,7 +365,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     vi.stubGlobal('reportError', reported)
     const spy = TH.spyLogger()
     const fresh = world.deviceOn({ onBadNews, logger: spy.logger })
-    world.vaultDB._cheat_refuseGets('identity_revoked')
+    world.bankDB._cheat_refuseGets('identity_revoked')
     const refusal = await TH.expectRefusal(fresh.ensureBank(), 'identity_revoked')
     await TH.eventually(() => world.leaseRows().length === 0)
     await TH.eventually(() => reported.mock.calls.length > 0)
@@ -380,7 +381,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
   it("vacates the device when any vault's call is refused for a revoked identity", async () => {
     const spy = TH.spyLogger()
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { logger: spy.logger })
-    world.vaultDB._cheat_refuseGets('identity_revoked')
+    world.bankDB._cheat_refuseGets('identity_revoked')
     const refusal = await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }), 'identity_revoked')
     expect(vault.isEnabled).to.be.false
     expect(bank.snapshot.vaults).to.deep.equal([])
@@ -394,7 +395,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     const onLifecycle = vi.fn()
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle })
     onLifecycle.mockClear()
-    world.vaultDB._cheat_refuseGets('identity_revoked')
+    world.bankDB._cheat_refuseGets('identity_revoked')
     const refusal = await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }), 'identity_revoked')
     expect(bank.device.snapshot).to.include({ stage: 'disabled', err: refusal })
     expect(onLifecycle).not.toHaveBeenCalled()
@@ -408,7 +409,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle })
     onLifecycle.mockClear()
     const revoked = new VaultError('identity_revoked', 'signed out')
-    vi.spyOn(world.vaultDB, 'tryListBoxes').mockResolvedValue({ ok: false, err: revoked, world: null } as never)
+    vi.spyOn(world.bankDB, 'tryListBoxes').mockResolvedValue({ ok: false, err: revoked, parent: null } as never)
     await TH.expectRefusal(vault.boxListing.list(), 'identity_revoked')
     expect(bank.device.isEnabled).to.be.false
     await TH.eventually(() => onLifecycle.mock.calls.length > 0)
@@ -422,8 +423,8 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     const device = world.deviceOn({ onLifecycle })
-    world.vaultDB._cheat_refuseGets('identity_revoked')
-    const answer = TH.pendingNextAnswer(world.vaultDB, 'tryListVaults')
+    world.bankDB._cheat_refuseGets('identity_revoked')
+    const answer = TH.pendingNextAnswer(world.bankDB, 'tryEnsureBank')
     const ensuring = device.tryEnsureBank()
     await answer.reached
     device.sweep()
@@ -444,7 +445,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     const { world, bank, vault } = await makeBankWithVault(makeBankWorld(), { onLifecycle, logger: spy.logger })
     const other = await bank.ensureVault(OtherScopeGiven)
     onLifecycle.mockClear()
-    world.vaultDB._cheat_refuseGets('identity_revoked')
+    world.bankDB._cheat_refuseGets('identity_revoked')
     const fetched = await Promise.all([vault.tryGet({ maxMillisSinceRefresh: 0 }), other.tryGet({ maxMillisSinceRefresh: 0 })])
     expect(fetched.map((outcome) => (outcome.ok ? null : outcome.err.refusalkind))).to.deep.equal(['identity_revoked', 'disabled'])
     await TH.eventually(() => onLifecycle.mock.calls.length > 0)
@@ -458,7 +459,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
   it("reports a damaged vault row even when another row's delivery refuses the listing", async () => {
     const onBadNews = vi.fn()
     const { world, bank } = await makeBankWithVault(makeBankWorld(), { onBadNews })
-    const rows = world.vaultDB._cheat_vaultRowsOf(BankScopeGiven)
+    const rows = world.bankDB._cheat_shelfOf(BankScopeGiven).vaultrows
     rows.set(Dna.vaultlabel, { ...(rows.get(Dna.vaultlabel) as object), revision_tok: 'rev-other' })
     rows.set('broken', { am: 'a', nonsense: true })
     await TH.expectRefusal(bank.vaultListing.list())

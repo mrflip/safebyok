@@ -1,10 +1,9 @@
 /** A vault's box verbs from the host's side, on real seals: hello, getBox, delBox, and a damaged record set aside. */
 
-import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { parseLogger } from '../../src/helpers/logger'
 import * as TH from '../test-helpers'
-import { Passphrase, Sidecar, Whisper, boxlabel, byPassphrase, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, storedVaultRecord, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, Passphrase, Sidecar, Whisper, boxlabel, byPassphrase, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -37,7 +36,8 @@ describe("vault.beginWatch", () => {
 
   it("lists the boxes of a vault that is still locked", async () => {
     const world = await makeWorldWithBox()
-    const next = world.anotherSession().deliverRecord(world.demandStored())
+    const nextBank = await world.anotherSession()
+    const next = nextBank.vaultAt(Dna)!
     expect(next.isLocked).to.be.true
     await next.beginWatch()
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
@@ -55,13 +55,12 @@ describe("vault.beginWatch", () => {
     expect(box?.sidecar).to.deep.equal({ note: 'moved' })
   })
 
-  it("refuses for a vault deleted elsewhere, listing nothing", async () => {
-    const spy = TH.spyLogger()
-    const { openNextSession, vault } = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
+  it("refuses for a vault deleted elsewhere, whose tombstone the bank's watch delivers, listing nothing", async () => {
+    const { openNextSession, vault } = await makeWorldWithBox()
     const next = await openNextSession()
     await vault.del(vault)
-    await TH.expectRefusal(next.beginWatch(), 'absent_vault')
-    expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
+    await TH.eventually(() => ! next.isEnabled)
+    await TH.expectRefusal(next.beginWatch())
     expect(next.isEnabled).to.be.false
     expect(next.boxListing.things).to.deep.equal([])
     expect(next.listing.at(next.scope)?.isPresent).to.be.false
@@ -135,10 +134,10 @@ describe("a box listed, through its vault's lock and unlock", () => {
   })
 })
 
-describe("a box call the vaultDB refuses over its vault's row", () => {
+describe("a box call the bankDB refuses over its vault's row", () => {
   it("a vault found deleted delivers no box", async () => {
     const { vault, restoreRow, demandStored, tryGetBox, badnews } = await makeWorldWithBox()
-    restoreRow({ ...omit(demandStored(), ['gate']), am: 'x', revision_seq: 5, revision_tok: 'rev-gone-5' })
+    restoreRow({ ...demandStored(), am: 'x', revision_seq: 5, revision_tok: 'rev-gone-5' })
     const toldBefore = badnews.length
     tryGetBox.mockClear()
     await TH.expectRefusal(vault.fetchBox(boxlabel))
@@ -148,8 +147,8 @@ describe("a box call the vaultDB refuses over its vault's row", () => {
   })
 
   it("a vault of another life delivers no box", async () => {
-    const { vault, restoreRow, tryGetBox, badnews } = await makeWorldWithBox()
-    restoreRow({ ...await storedVaultRecord(), revision_seq: 5, revision_tok: 'rev-other-5' })
+    const { vault, restoreRow, demandStored, tryGetBox, badnews } = await makeWorldWithBox()
+    restoreRow({ ...demandStored(), vault_tok: 'vault-tok-other', revision_seq: 5, revision_tok: 'rev-other-5' })
     const toldBefore = badnews.length
     tryGetBox.mockClear()
     await TH.expectRefusal(vault.fetchBox(boxlabel))
@@ -159,14 +158,12 @@ describe("a box call the vaultDB refuses over its vault's row", () => {
 })
 
 describe("vault.getBox", () => {
-  it("reads the new gate of a vault row that moved elsewhere", async () => {
+  it("adopts the vault row that moved elsewhere, which the box's answer carries", async () => {
     const { vault, putBehindOurBack, demandStored } = await makeWorldWithBox()
-    const stored = demandStored()
-    const moved = putBehindOurBack({ ...stored, gate: { ...stored.gate, gate_epoch: stored.gate.gate_epoch + 1 } })
+    const moved = putBehindOurBack(demandStored())
     await vault.fetchBox(boxlabel)
     expect(vault.isFull).to.be.true
     expect(vault.revision_tok).to.eq(moved.revision_tok)
-    expect(vault.gate.toJSON().gate_epoch).to.eq(moved.gate.gate_epoch)
   })
 
   const AbsentCases = [

@@ -1,4 +1,4 @@
-/** The test world of the models' cryptography (`Lease`, `Proving`, `Wayin`, `Gate`): a fake lease friend with a spy on each verb, a proving world over a fast key deriver, passkey answers, and the loudly named backdoor that opens a wayin from outside.
+/** The test world of the models' cryptography (`Lease`, `Proving`, `Wayin`, `Gate`): a fake lease friend with a spy on each verb, a proving world over a fast key deriver, passkey answers, a gate listed in a bank, and the loudly named backdoor that opens a wayin from outside.
  * Import it directly, not through `TH`, as `models-world.ts` is: `src/models/` is not exported.
  *
  * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving or a lease
@@ -9,18 +9,23 @@
 import { afterEach, beforeEach, type Mock, vi } from 'vitest'
 import { PasskeySaltSize } from '../../src/helpers/consts'
 import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
+import { Device } from '../../src/models/device'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving, guardKeyDeriver } from '../../src/models/proving'
 import { type StrengthChecker, guardStrengthChecker } from '../../src/helpers/passphrase-strength'
+import * as BX from '../../src/shapes/shapes-bankdb'
+import type { GateRecord } from '../../src/shapes/shapes-bankdb'
 import * as GX from '../../src/shapes/shapes-gateish'
+import { MemoryBankDB } from '../../src/storage/memory-bank-db'
+import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { type BankStamp, type CitedGate, type GateStamp, type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingWorld, type VaultStamp } from '../../src/shapes/shapes-gateish'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/refusals/outcome'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { anyStrengthChecker, testDeriver } from './builders'
 import { parseLogger } from '../../src/helpers/logger'
-import { type LoggedCall, spyLogger } from './logging'
+import { type LoggedCall, quietLogger, spyLogger } from './logging'
 import { T0 } from './models-world'
 
 export { T0 } from './models-world'
@@ -145,14 +150,25 @@ export function passkeyAnswerOf(overrides: Partial<GX.PasskeyAnswer> = {}): GX.P
   }
 }
 
-/** A gate of {@link WorldGateStamp}, made as a birth makes it, of {@link TestPassphrase} and any passkey `answer`, which it leaves unspent, beside the passphrase's proving. */
+/** A gate of {@link WorldGateStamp}, made as a birth makes it, of {@link TestPassphrase} and any passkey `answer`, which it leaves unspent, beside the passphrase's proving: listed in a bank's gate listing, as a device's ensureBank lists it. */
 export async function builtGateOf(answer?: GX.PasskeyAnswer): Promise<{ gate: Gate, proving: PassphraseProving }> {
   const world = provingWorldOf()
   const proving = await PassphraseProving.buildNovel(WorldBankStamp, WorldGateStamp, GX.passphraseCleartext.parse(TestPassphrase), world)
   const passkeyProving = answer && await PasskeyProving.buildNovel(WorldBankStamp, WorldGateStamp, answer, world)
   const passphraseWayin = await proving.buildWayin(NOVEL)
   const passkeyWayin = await passkeyProving?.buildWayin(proving) ?? null
-  return { gate: Gate.make(WorldBankStamp, WorldGateStamp, passphraseWayin, passkeyWayin), proving }
+  return { gate: await listedGateOf(Gate.recordOfBirth(WorldBankStamp, WorldGateStamp, passphraseWayin, passkeyWayin)), proving }
+}
+
+/** The Gate of `record`, a gate row of {@link WorldBankStamp}'s bank, as a device's ensureBank lists it: a bankDB holds that bank's row and `record`, and a device ensures the bank. */
+export async function listedGateOf(record: GateRecord): Promise<Gate> {
+  const bankDB = new MemoryBankDB()
+  const shelf = bankDB._cheat_shelfOf(WorldBankStamp)
+  shelf.bank = BX.bankRecord.parse({ ...WorldBankStamp, fmt: BX.BankFormat, revision_tok: 'bank-revision-tok-1', revision_seq: 0, written_at: WorldBankStamp.registered_at, am: 'a' })
+  shelf.gaterows.set('main', record)
+  const device = Device.make({ user_id: WorldBankStamp.user_id, banklabel: WorldBankStamp.banklabel, gates: ['main'], bankDB, deviceDB: new MemoryDeviceDB(), keyDeriver: testDeriver, logger: quietLogger })
+  const bank = await device.ensureBank()
+  return bank.maingate
 }
 // --
 

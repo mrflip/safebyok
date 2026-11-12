@@ -1,53 +1,66 @@
-/** A vault's unlocking: ensureUnlocked and the lock, and the lease it has by unlock or by the cache. */
+/** A vault's unlocking, which is its bank's: ensureUnlocked and the lock, and the lease the bank has by unlock or by the cache. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { makeLeaseKey } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
 import { VaultError } from '../../src/refusals/errors'
 import { passphraseCleartext } from '../../src/shapes/shapes-gateish'
+import type { Bank } from '../../src/models/bank'
+import type { Vault } from '../../src/models/vault'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
-import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { LeaseMillis, NewPassphrase, Passphrase, byPasskey, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, makeProving, replaceTyping, revokeTyping, storedVaultRecord, T0, useVaultWorlds, vaultRoundTrip, unlockVerbTyping, unlockTyping, hearingBadNews } from '../test-helpers/vault-world'
+import { provingWorldOf } from '../test-helpers/proving-world'
+import { Dna, LeaseMillis, Passphrase, byPassphrase, makeBornVault, useVaultWorlds, vaultRoundTrip, unlockVerbTyping, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
+
+/** The vault of the next session on `born`'s device: a new device over the same bankDB and deviceDB, its bank ensured and locked. */
+async function nextVaultOf(born: { anotherSession: () => Promise<{ vaultAt: (scope: typeof Dna) => Vault | null }> }): Promise<Vault> {
+  const bank = await born.anotherSession()
+  const vault = bank.vaultAt(Dna)
+  if (vault === null) { throw new Error('the next session lists no vault') }
+  return vault
+}
 
 const Stamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
 
 describe("proving.buildWayin", () => {
-  it("refuses a second wayin of a proving that has one, and a source proving of another vault", async () => {
-    const { vault, fakeBank: world } = await makeBornVault()
-    const mine = await PassphraseProving.buildStored(vault.gate, passphraseCleartext.parse(Passphrase), world)
+  it("refuses a second wayin of a proving that has one, and a source proving of another gate", async () => {
+    const { bank } = await makeBornVault()
+    const { maingate } = bank
+    const world = provingWorldOf()
+    const mine = await PassphraseProving.buildStored(maingate, passphraseCleartext.parse(Passphrase), world)
     await TH.expectRefusal(mine.buildWayin(NOVEL))
-    const novel = await PassphraseProving.buildNovel(vault.gate.stamp, passphraseCleartext.parse('a new passphrase'), world)
-    await TH.expectRefusal(novel.buildWayin(await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })))
+    const novel = await PassphraseProving.buildNovel(bank.stamp, maingate.stamp, passphraseCleartext.parse('a new passphrase'), world)
+    const other = await PassphraseProving.buildNovel(bank.stamp, { ...maingate.stamp, gate_tok: 'gate-tok-other' }, passphraseCleartext.parse(Passphrase), world)
+    await other.buildWayin(NOVEL)
+    await TH.expectRefusal(novel.buildWayin(other))
     const wayin = await novel.buildWayin(mine)
     expect(wayin.wayinkind).to.eq('passphrase')
   })
 })
 
-describe("Vault.ensureUnlocked and the vault's lock", () => {
+describe("Vault.ensureUnlocked and the bank's lock", () => {
   it("ensureUnlocked shows no dialog for an unlocked vault, where unlock always asks for proof", async () => {
-    const { vault, fakeBank } = await makeBornVault()
-    const dialog = vi.fn()
-    fakeBank.requestCleartext = dialog
+    const { vault, dialog } = await makeBornVault()
+    const asked = vi.fn()
+    dialog.requestCleartext = asked
     await expect(vault.ensureUnlocked()).resolves.to.eq(vault)
-    expect(dialog).not.toHaveBeenCalled()
+    expect(asked).not.toHaveBeenCalled()
     await TH.expectBad(vault.tryUnlock(), 'dismissed')
-    expect(dialog).toHaveBeenCalledOnce()
+    expect(asked).toHaveBeenCalledOnce()
   })
 
   it("only ensureUnlocked uses the cached lease, where unlock still asks for proof", async () => {
-    const { fakeBank, opts, demandStored } = await makeBornVault()
-    const dialog = vi.fn()
-    fakeBank.requestCleartext = dialog
-    const next = new VaultListing(fakeBank, opts).deliverRecord(demandStored())
+    const asked = vi.fn()
+    const born = await makeBornVault(byPassphrase(Passphrase), { requestCleartext: asked })
+    const next = await nextVaultOf(born)
     await TH.expectBad(next.tryUnlock(), 'dismissed')
     expect(next.isUnlocked).to.be.false
-    expect(dialog).toHaveBeenCalledOnce()
+    expect(asked).toHaveBeenCalledOnce()
     await next.ensureUnlocked()
     expect(next.isUnlocked).to.be.true
-    expect(dialog).toHaveBeenCalledOnce()
+    expect(asked).toHaveBeenCalledOnce()
   })
 
   it("seal and unseal refuse a stamp of another vault, or of another life of this one", async () => {
@@ -59,11 +72,11 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
   })
 
   it("is born unlocked, with its lease cached", async () => {
-    const { vault, deviceDB } = await makeBornVault()
+    const { bank, vault, deviceDB } = await makeBornVault()
     expect(vault.isUnlocked).to.be.true
     expect(vault.isLocked).to.be.false
     expect(deviceDB.tryStow).toHaveBeenCalledOnce()
-    expect(deviceDB.cachedNow()).to.deep.include({ gate_epoch: vault.gate.gate_epoch, wayinkind: 'passphrase' })
+    expect(deviceDB.cachedNow()).to.deep.include({ gate_tok: bank.maingate.gate_tok, gate_revision_tok: bank.maingate.revision_tok, wayinkind: 'passphrase' })
     expect(await vault.ensureUnlocked()).to.equal(vault)
     expect(await vaultRoundTrip(vault, vault)).to.eq('sk-test')
   })
@@ -78,7 +91,6 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     const { vault, deviceDB } = await makeBornVault()
     const sealed = await vault.sealStampedString('sk-test', Stamp)
     expect(vault.lock()).to.equal(vault)
-    expect(vault.isLocked).to.be.true
     expect(vault.isLocked).to.be.true
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'bank_locked')
     await TH.expectRefusal(vault.unsealStampedString(sealed, Stamp), 'bank_locked')
@@ -103,27 +115,6 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     vault.lock()
     expect(listener).toHaveBeenCalledOnce()
     expect(vault.getSnapshot().isLocked).to.be.true
-  })
-
-  it("unlocks a vault listed sparse by proof, its full record fetched for the gate", async () => {
-    const { demandStored } = await makeBornVault()
-    const record = demandStored()
-    const { listing } = makeVaultWorld(record)
-    const vault = listing.deliverRecord(listing.sparseOf(record))
-    expect(vault.isLocked).to.be.true
-    await unlockTyping(vault, byPassphrase(Passphrase))
-    expect(vault.isUnlocked).to.be.true
-    expect(vault.isFull).to.be.true
-  })
-
-  it("vault.unlock fetches the full record of a vault listed sparse", async () => {
-    const { demandStored } = await makeBornVault()
-    const record = demandStored()
-    const { listing } = makeVaultWorld(record)
-    const vault = listing.deliverRecord(listing.sparseOf(record))
-    await unlockVerbTyping(vault, byPassphrase(Passphrase))
-    expect(vault.isUnlocked).to.be.true
-    expect(vault.isFull).to.be.true
   })
 
   it("refuses a seal or an unseal that a lock interrupts", async () => {
@@ -153,15 +144,17 @@ describe("An unlock, by proof or by the cached lease", () => {
     expect(deviceDB.cachedNow()).to.deep.include({ proved_at: bornRow.proved_at + 1 })
   })
 
-  it("refuses after a sweep, leaving the vault locked and the cached row in place", async () => {
-    const { demandStored, anotherSession, deviceDB } = await makeBornVault()
-    const vault = anotherSession().deliverRecord(demandStored())
+  it("refuses after the bank's sweep, leaving the vault locked and the cached row in place", async () => {
+    const born = await makeBornVault()
+    const { deviceDB } = born
+    const vault = await nextVaultOf(born)
+    const bank = vault.world as Bank
     const kept = deviceDB.cachedNow()
     expect(kept).not.to.be.null
     const peeked = TH.pendingNextAnswer(deviceDB.memoryDB, 'peek')
     const ensuring = vault.ensureUnlocked()
     await peeked.reached
-    vault.sweep()
+    bank.sweep()
     peeked.release()
     await TH.expectRefusal(ensuring)
     expect(vault.isLocked).to.be.true
@@ -184,87 +177,53 @@ describe("An unlock, by proof or by the cached lease", () => {
   })
 
   it("keeps the lease when the deviceDB refuses to cache it, and reports bad news", async () => {
-    const onBadNews = vi.fn()
-    const { fakeBank, opts, deviceDB, demandStored } = await makeBornVault()
-    const record = demandStored()
-    const listing = new VaultListing(fakeBank, hearingBadNews(opts, onBadNews))
-    const vault = listing.deliverRecord(record)
+    const { vault, deviceDB, badnews } = await makeBornVault()
     deviceDB.tryStow.mockResolvedValueOnce(TH.bad(new VaultError('storage_unavailable', 'the disk is full')))
     vault.lock()
     await unlockTyping(vault, byPassphrase(Passphrase))
     expect(vault.isUnlocked).to.be.true
-    expect(onBadNews).toHaveBeenCalledOnce()
-    listing.goodbye()
+    expect(badnews).to.have.lengthOf(1)
   })
 })
 
 describe("The cached lease, used only by ensureUnlocked", () => {
   it("unlocks the next session at its ensureUnlocked, without a dialog", async () => {
-    const { vault, demandStored, anotherSession } = await makeBornVault()
-    const later = anotherSession()
-    const again = later.deliverRecord(demandStored())
-    await later.hello()
+    const born = await makeBornVault()
+    const again = await nextVaultOf(born)
     expect(again.isLocked).to.be.true
     expect(await again.ensureUnlocked()).to.equal(again)
     expect(again.isUnlocked).to.be.true
-    expect(await vaultRoundTrip(vault, again)).to.eq('sk-test')
+    expect(await vaultRoundTrip(born.vault, again)).to.eq('sk-test')
   })
 
   it("is not looked up at a beginWatch", async () => {
-    const { gate: _gate, ...sparse } = await storedVaultRecord()
-    const tombstone = { ...sparse, am: 'x' as const }
-    const { listing, deviceDB } = makeVaultWorld(tombstone as never)
-    listing.deliverRecord(tombstone)
-    await listing.hello()
-    expect(deviceDB.peek).not.toHaveBeenCalled()
-  })
-
-  it("is forgotten, not used, when it was cached under an older gate", async () => {
-    const { vault, demandStored, anotherSession, deviceDB } = await makeBornVault()
-    vault.lock()
-    await unlockTyping(vault, byPassphrase(Passphrase))
-    const stale = deviceDB.cachedNow()
-    await replaceTyping(vault, Passphrase, NewPassphrase)
-    deviceDB.layCached(stale)
-    const again = anotherSession().deliverRecord(demandStored())
-    await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
-    expect(deviceDB.cachedNow()).to.be.null
-    await unlockTyping(again, byPassphrase(NewPassphrase))
-    expect(again.isUnlocked).to.be.true
-  })
-
-  it("is not used when another device cached it before the gate changed", async () => {
-    const { vault, demandStored } = await makeBornVaultWithPasskey()
-    const other = makeVaultWorld(demandStored(), { device_tok: '00000000-0000-4000-8000-000000000002' })
-    const theirs = other.listing.deliverRecord(other.demandStored())
-    await unlockTyping(theirs, byPasskey('laptop'))
-    await revokeTyping(vault, Passphrase)
-    other.putBehindOurBack(demandStored())
-    const again = other.anotherSession().deliverRecord(other.demandStored())
-    expect(other.deviceDB.cachedNow()).not.to.be.null
-    await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
-    expect(again.gate.pkWayin).to.be.null
-    expect(other.deviceDB.cachedNow()).to.be.null
+    const born = await makeBornVault()
+    const vault = await nextVaultOf(born)
+    born.deviceDB.peek.mockClear()
+    await vault.beginWatch()
+    expect(born.deviceDB.peek).not.toHaveBeenCalled()
   })
 
   it("is used up to leaseMillis old, and ignored when any older", async () => {
-    const { demandStored, anotherSession, advance, deviceDB } = await makeBornVault()
+    const born = await makeBornVault()
+    const { advance, deviceDB } = born
     advance(LeaseMillis)
-    const within = anotherSession().deliverRecord(demandStored())
+    const within = await nextVaultOf(born)
     await within.ensureUnlocked()
     expect(within.isUnlocked).to.be.true
     advance(1)
-    const past = anotherSession().deliverRecord(demandStored())
+    const past = await nextVaultOf(born)
     await TH.expectRefusal(past.ensureUnlocked(), 'dismissed')
     expect(past.isLocked).to.be.true
     expect(deviceDB.cachedNow()).to.not.be.null
   })
 
   it("locks the vault and is forgotten when it fails at its first seal", async () => {
-    const { demandStored, anotherSession, deviceDB } = await makeBornVault()
+    const born = await makeBornVault()
+    const { deviceDB } = born
     const cached = deviceDB.cachedNow() as Record<string, unknown>
     deviceDB.layCached({ ...cached, lease_key: await makeLeaseKey() })
-    const again = anotherSession().deliverRecord(demandStored())
+    const again = await nextVaultOf(born)
     await again.ensureUnlocked()
     await TH.expectRefusal(again.sealStampedString('sk-test', Stamp), 'damaged_lease')
     expect(again.isLocked).to.be.true
@@ -273,39 +232,37 @@ describe("The cached lease, used only by ensureUnlocked", () => {
   })
 
   it("is reported as bad news when its row is not a valid lease, and the user is asked for proof", async () => {
-    const onBadNews = vi.fn()
-    const { fakeBank, opts, demandStored, deviceDB } = await makeBornVault()
+    const born = await makeBornVault()
+    const { deviceDB, badnews } = born
     const cached = deviceDB.cachedNow() as Record<string, unknown>
     deviceDB.layCached({ ...cached, lease_key: 'no key at all' })
-    const listing = new VaultListing(fakeBank, hearingBadNews(opts, onBadNews))
-    const again = listing.deliverRecord(demandStored())
+    const again = await nextVaultOf(born)
     await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
-    expect(onBadNews.mock.calls[0]?.[0]).to.deep.include({ refusalkind: 'damaged_lease' })
+    expect(badnews[0]).to.deep.include({ refusalkind: 'damaged_lease' })
     await unlockTyping(again, byPassphrase(Passphrase))
     expect(again.isUnlocked).to.be.true
-    listing.goodbye()
   })
 
   it("is used at the next ensureUnlocked when another session cached it after this vault first looked", async () => {
-    const { vault, demandStored, anotherSession, deviceDB } = await makeBornVault()
-    const record = demandStored()
+    const born = await makeBornVault()
+    const { vault, deviceDB } = born
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    const again = anotherSession().deliverRecord(record)
+    const again = await nextVaultOf(born)
     await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
     await unlockTyping(vault, byPassphrase(Passphrase))
     await again.ensureUnlocked()
     expect(await vaultRoundTrip(vault, again)).to.eq('sk-test')
   })
 
-  it("is forgotten at lock() even by a vault that has no lease", async () => {
-    const { demandStored, anotherSession, deviceDB } = await makeBornVault()
-    const record = demandStored()
-    const idle = anotherSession().deliverRecord(record)
+  it("is forgotten at lock() even by a bank that has no lease", async () => {
+    const born = await makeBornVault()
+    const { deviceDB } = born
+    const idle = await nextVaultOf(born)
     expect(idle.isLocked).to.be.true
     idle.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    const again = anotherSession().deliverRecord(record)
+    const again = await nextVaultOf(born)
     await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
   })
 })

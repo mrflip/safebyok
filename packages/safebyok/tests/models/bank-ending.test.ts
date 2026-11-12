@@ -267,7 +267,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const device = world.deviceOn({ onLifecycle })
-    const row = { ...BankScopeGiven, vaultlabel: 'unlisted', vault_tok: makeLifeTok(), proved_at: T0 }
+    const row = { ...BankScopeGiven, bank_tok: makeLifeTok(), proved_at: T0 }
     vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValue({ ok: true, val: [row] })
     const forget = vi.spyOn(world.deviceDB, 'forget').mockRejectedValue(refusal)
     const vacating = device.vacate()
@@ -398,7 +398,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
     const refusal = new VaultError('storage_unavailable', 'no storage')
     const onLifecycle = vi.fn(async ({ device }: { device: Device }) => { await device.vacate() })
     const device = world.deviceOn({ onLifecycle })
-    const row = { ...BankScopeGiven, vaultlabel: 'unlisted', vault_tok: makeLifeTok(), proved_at: T0 }
+    const row = { ...BankScopeGiven, bank_tok: makeLifeTok(), proved_at: T0 }
     vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValue({ ok: true, val: [row] })
     vi.spyOn(world.deviceDB, 'forget').mockRejectedValue(refusal)
     await device.vacate()
@@ -514,9 +514,9 @@ describe("a bank past a vacate", () => {
   it.each([
     ['a plain vacate', [], async ({ bank }: Vacating) => { await bank.device.vacate() }],
     ['identity_revoked', ['error'], async ({ world, vault }: Vacating) => {
-      world.vaultDB._cheat_refuseGets('identity_revoked')
+      world.bankDB._cheat_refuseGets('identity_revoked')
       await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }), 'identity_revoked')
-      world.vaultDB._cheat_refuseGets(null)
+      world.bankDB._cheat_refuseGets(null)
     }],
   ] as const)("refuses ensureVault, vaultAt and ensureBank after %s, and the next bank returns the stored vault without asking", async (_label, loggedLevels, vacating) => {
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })

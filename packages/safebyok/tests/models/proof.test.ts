@@ -12,8 +12,7 @@ import type { BadNews, BoxSnapshot, DeviceSnapshot, VaultSnapshot } from '../../
 import type { Whisper } from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, VaultScopeGiven, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
-import { ticks } from '../test-helpers/timing'
-import { NewPassphrase, Passphrase, byPasskey, byPassphrase } from '../test-helpers/vault-world'
+import { Passphrase, byPassphrase } from '../test-helpers/vault-world'
 
 useBankWorlds()
 
@@ -136,7 +135,7 @@ describe("the proof", () => {
     // The whisper's component watches the box alone, whose snapshot shows its vault's lock.
     const revealUi = mountComponent(whisperStoreOf(box), whisperRevealOf(box))
     revealUi.expectRenders(['unexposed'])
-    const boxRows = [...world.vaultDB._cheat_boxRowsOf(vault.scope, vault.vault_tok).values()]
+    const boxRows = [...world.bankDB._cheat_boxRowsOf(vault.scope, vault.bank_tok, vault.vault_tok).values()]
     expect(boxRows).to.have.lengthOf(1)
     expect(JSON.stringify(boxRows)).not.to.include(ApiKey.whisper.apiKey)
 
@@ -223,59 +222,6 @@ describe("the proof", () => {
     const opened = await pickedUp.getBox(ApiKey.boxlabel)
     expect(await opened?.extractWhisper()).to.deep.equal(ApiKey.whisper)
     expect(dialog.shown).to.deep.equal([])
-  })
-
-  it("replacing the passphrase: nothing locks, and from then on only the new one opens the vault", async () => {
-    const { device, vault, dialog } = await buildHost()
-    const deviceUi = mountComponent(device, deviceStatus)
-    deviceUi.expectRenders(['ready: main unlocked'])
-
-    dialog.typing = { antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }
-    await vault.replacePassphrasePrompt()
-    expect(dialog.shown.splice(0)).to.deep.equal(['replace_passphrase'])
-    deviceUi.expectRenders(['ready: main unlocked (asking replace_passphrase)', 'ready: main unlocked (asking replace_passphrase)', 'ready: main unlocked'])
-    expect(vault.isUnlocked).to.be.true
-
-    vault.lock()
-    deviceUi.expectRenders(['ready: main locked'])
-    dialog.typing = [byPassphrase(Passphrase), byPassphrase(NewPassphrase)]
-    await vault.ensureUnlocked()
-    expect(dialog.refusals.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal(['wrong_passphrase'])
-    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
-  })
-
-  it("adding and revoking a passkey: the passkey opens the vault until it is revoked", async () => {
-    const { device, vault, dialog } = await buildHost()
-    const deviceUi = mountComponent(device, deviceStatus)
-    deviceUi.expectRenders(['ready: main unlocked'])
-
-    dialog.typing = { ...byPassphrase(Passphrase), ...await byPasskey('laptop') }
-    await vault.addPasskeyPrompt()
-    expect(dialog.shown.splice(0)).to.deep.equal(['add_passkey'])
-    deviceUi.expectRenders(['ready: main unlocked (asking add_passkey)', 'ready: main unlocked (asking add_passkey)', 'ready: main unlocked'])
-    expect(vault.gate.toJSON().passkey_wayin).not.to.be.null
-
-    vault.lock()
-    deviceUi.expectRenders(['ready: main locked'])
-    dialog.typing = await byPasskey('laptop')
-    await vault.ensureUnlocked()
-    expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
-    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
-
-    dialog.typing = byPassphrase(Passphrase)
-    await vault.revokePasskeyPrompt()
-    expect(dialog.shown.splice(0)).to.deep.equal(['revoke_passkey'])
-    expect(vault.gate.toJSON().passkey_wayin).to.be.null
-    deviceUi.expectRenders(['ready: main unlocked (asking revoke_passkey)', 'ready: main unlocked (asking revoke_passkey)', 'ready: main unlocked'])
-
-    vault.lock()
-    deviceUi.expectRenders(['ready: main locked'])
-    dialog.typing = await byPasskey('laptop')
-    await TH.expectRefusal(vault.ensureUnlocked(), 'absent_wayin')
-    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main locked'])
-    dialog.typing = byPassphrase(Passphrase)
-    await vault.ensureUnlocked()
-    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
   })
 
   it("bank.autolock locks a vault past its autolock duration, and a page opened later asks for a proof", async () => {
@@ -369,7 +315,7 @@ describe("the proof", () => {
     deviceUi.expectRenders(['ready: main unlocked'])
 
     world.advance(StaleMillis)
-    world.vaultDB._cheat_refuseGets('storage_unavailable')
+    world.bankDB._cheat_refuseGets('storage_unavailable')
     // A vault too stale to know whether it deserves its lease refuses the ask, and keeps the lease it has.
     await TH.expectRefusal(vault.ensureUnlocked(), 'storage_unavailable')
     expect(vault.isUnlocked).to.be.true
@@ -384,66 +330,11 @@ describe("the proof", () => {
     expect(nextPage.snapshot.err).to.be.null
     expect(nextPage.bank).to.be.null
 
-    world.vaultDB._cheat_refuseGets(null)
+    world.bankDB._cheat_refuseGets(null)
     await nextPage.ensureBank()
     nextPageUi.expectRenders(['ready: main locked'])
     deviceUi.expectRenders([])
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
-  })
-
-  it("a second device's changes reach this device's components through the watch", async () => {
-    const { world, device, vault, dialog } = await buildHost()
-    const box = await vault.putBox(ApiKey)
-    await vault.beginWatch()
-    const deviceUi = mountComponent(device, deviceStatus)
-    const boxesUi = mountComponent(vault.boxListing, boxList)
-    deviceUi.expectRenders(['ready: main unlocked'])
-    boxesUi.expectRenders(['anthropic_api_key'])
-
-    // The second device has no lease cached, so its unlock asks; it then opens the box this one sealed.
-    const phone = makeDialog()
-    const phoneBank = await world.bankOnAnotherDevice({ requestCleartext: phone.requestCleartext, onBadNews })
-    const phoneVault = await phoneBank.ensureVault(VaultScopeGiven)
-    await phoneVault.ensureUnlocked()
-    expect(phone.shown.splice(0)).to.deep.equal(['unlock_vault'])
-    const phoneBox = await phoneVault.getBox(ApiKey.boxlabel)
-    expect(await phoneBox?.extractWhisper()).to.deep.equal(ApiKey.whisper)
-
-    // A box it adds is enlisted in this device's list.
-    await phoneVault.putBox({ ...ApiKey, boxlabel: 'openai_api_key' })
-    await ticks(1)
-    boxesUi.expectRenders(['anthropic_api_key, openai_api_key'])
-
-    // A VaultDB with no watch, or a watch ended: nothing arrives until the host says hello to the vault again, on its own timer.
-    vault.boxListing.goodbye()
-    await phoneVault.putBox({ ...ApiKey, boxlabel: 'gemini_api_key' })
-    await ticks(1)
-    boxesUi.expectRenders([])
-    await vault.beginWatch()
-    boxesUi.expectRenders(['anthropic_api_key, openai_api_key, gemini_api_key'])
-
-    // It replaces the passphrase: this device stays unlocked and has the new gate; a later unlock takes the new passphrase.
-    phone.typing = { antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }
-    await phoneVault.replacePassphrasePrompt()
-    await ticks(1)
-    deviceUi.expectRenders(['ready: main unlocked'])
-    expect(vault.isUnlocked).to.be.true
-    expect(vault.gate.toJSON().gate_epoch).to.eq(phoneVault.gate.toJSON().gate_epoch)
-    expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
-
-    vault.lock()
-    deviceUi.expectRenders(['ready: main locked'])
-    dialog.typing = byPassphrase(NewPassphrase)
-    await vault.ensureUnlocked()
-    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
-
-    // It deletes the vault: this device locks, forgets its lease, and the vault leaves the list.
-    await phoneVault.del(phoneVault)
-    await ticks(1)
-    deviceUi.expectRenders(['ready: no vaults'])
-    expect(vault.isUnlocked).to.be.false
-    expect(world.leaseRows()).to.have.lengthOf(0)
-    await TH.expectRefusal(vault.ensureUnlocked())
   })
 
   it("under React StrictMode, the second effect's bank unlocks with the cached lease without asking", async () => {

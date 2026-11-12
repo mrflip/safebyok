@@ -4,7 +4,7 @@ import * as Phrases from '../../src/helpers/phrases'
 import { describe, expect, it, vi } from 'vitest'
 import { ENCRYPTED, LOCKED } from '../../src/helpers/consts'
 import type { BoxSnapshot, Fetched } from '../../src/shapes/shapes-vaultish'
-import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
+import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-bankdb'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxDnaOf, boxListingOf, fakeSealBoxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
 
@@ -28,13 +28,13 @@ function snapshotOf(record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Bo
 const SnapshotKeys = ['user_id', 'banklabel', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'isFull', 'isPresent', 'isExposed', 'isVeiled', 'isLocked']
 
 describe("Box own props", () => {
-  it("are exactly nine: the four scope fields, registered_at, vault_tok and the three revision fields", () => {
+  it("are exactly ten: the four scope fields, registered_at, bank_tok, vault_tok and the three revision fields", () => {
     const box = boxOf()
-    expect(Object.keys(box)).to.have.members(['user_id', 'banklabel', 'vaultlabel', 'boxlabel', 'registered_at', 'vault_tok', 'revision_tok', 'revision_seq', 'written_at'])
-    expect(Object.keys(box)).to.have.lengthOf(9)
+    expect(Object.keys(box)).to.have.members(['user_id', 'banklabel', 'vaultlabel', 'boxlabel', 'registered_at', 'bank_tok', 'vault_tok', 'revision_tok', 'revision_seq', 'written_at'])
+    expect(Object.keys(box)).to.have.lengthOf(10)
   })
 
-  it("stay nine through a receive, a put and a del", async () => {
+  it("stay ten through a receive, a put and a del", async () => {
     const box = boxOf()
     const keys = Object.keys(box)
     const received = world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' })

@@ -53,7 +53,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
 
     it("rejects, rather than throws, when the VaultDB's watch throws", async () => {
       const listing = boxListingOf(world.mw)
-      vi.spyOn(world.mw.vaultDB, 'watch').mockImplementation(() => { throw new VaultError('storage_unavailable', "The storage could not be reached.") })
+      vi.spyOn(world.mw.bankDB, 'watch').mockImplementation(() => { throw new VaultError('storage_unavailable', "The storage could not be reached.") })
       await expect(listing.hello()).rejects.toThrow(/could not be reached/)
     })
 
@@ -68,7 +68,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     it("panics on a vaultDB's 'identity_revoked', reporting no bad news", async () => {
       const listing = boxListingOf(world.mw)
       const revoked = new VaultError('identity_revoked', "Signed out.")
-      vi.spyOn(world.mw.vaultDB, 'tryListBoxes').mockResolvedValueOnce({ ok: false, err: revoked, world: null } as never)
+      vi.spyOn(world.mw.bankDB, 'tryListBoxes').mockResolvedValueOnce({ ok: false, err: revoked, parent: null } as never)
       await expect(listing.list()).rejects.toBe(revoked)
       expect(world.mw.panics).to.deep.equal([revoked])
       expect(world.mw.badnews).to.deep.equal([])
@@ -109,7 +109,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       const box = listing.at(scopeOf())
       expect(box?.isFull).to.be.true
       expect(listing.snapshot).to.have.lengthOf(1)
-      expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', world: 'a world' }])
+      expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', parent: 'a world' }])
       expect(world.mw.callsOf('get')).to.deep.equal([])
     })
 
