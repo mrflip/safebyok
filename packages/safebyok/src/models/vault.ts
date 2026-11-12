@@ -64,7 +64,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // == [The bank's lock]: alignLock, letBoxesGo
 
   /** Tell the listeners, this vault's and its boxes', the bank's lock has moved; once this vault no longer answers, its boxes go. Never throws.
-   * @internal The bank's to call.
+   * @internal
    */
   override alignLock(): this {
     super.alignLock()

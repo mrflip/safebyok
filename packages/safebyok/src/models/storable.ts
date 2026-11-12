@@ -248,7 +248,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // A thing's one duty at a lock and at its end: tell its listeners, and, once it no longer answers, drop what it has
   // of secrets. The base has none.
   /** Tell the listeners the bank's lock has moved. Never throws. Locks nothing: a host locks the bank.
-   * @internal The bank's to call.
+   * @internal
    */
   alignLock(): this {
     this.align()
