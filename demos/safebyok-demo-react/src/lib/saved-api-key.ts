@@ -26,9 +26,11 @@ export const extractSavedApiKey = async (vault: Vault | null, boxlabel: string):
 }
 
 /** Return the `boxlabel` box in the user's vault, exposed so that its field can show the saved key.
- * Creates the vault and an empty box if either is missing, and unlocks the vault if needed.
+ * Creates the vault and an empty box if either is missing, and unlocks the bank if needed, which may ask the user.
  */
 export const ensureApiKeyBoxExposed = async (bank: Bank, boxlabel: string): Promise<Box> => {
+  // A vault is built only in an unlocked bank.
+  await bank.ensureUnlocked()
   const vault = await bank.ensureVault({ vaultlabel: ApiKeyVaultlabel })
   await vault.ensureUnlocked()
   const box = await vault.putBox({ boxlabel, whisper: {} }, { ifPresent: 'get', ifAbsent: 'add' })

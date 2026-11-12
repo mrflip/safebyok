@@ -16,7 +16,7 @@ export const KnockKnockWidget = () => {
   const [isSaved, setIsSaved] = useState(false)
   const isReady = (bank !== null) && (stage !== 'waiting')
 
-  // The dialogs that build or unlock the vault open from this click.
+  // The dialog that unlocks the bank opens from this click.
   const save = async (evt: SyntheticEvent<HTMLFormElement>) => {
     evt.preventDefault()
     const form = evt.currentTarget
@@ -26,6 +26,8 @@ export const KnockKnockWidget = () => {
     if ((typeof apiKey !== 'string') || (apiKey === '')) { setGripe('Type your key first.'); return }
     try {
       if (bank === null) { return }
+      // A vault is built only in an unlocked bank.
+      await bank.ensureUnlocked()
       const vaultNow = await bank.ensureVault({ vaultlabel: ApiKeyVaultlabel })
       await vaultNow.ensureUnlocked()
       await vaultNow.putBox({ boxlabel: WidgetApiKeyBoxlabel, whisper: { apiKey } }, { ifAbsent: 'add', ifPresent: 'repl' })

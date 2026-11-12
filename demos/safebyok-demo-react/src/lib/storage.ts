@@ -1,20 +1,20 @@
 import { browserOpts } from 'safebyok/browser'
 import { prefixedStorage, type StringStorage } from './string-storage'
-import { OutageVaultDB } from './outage-vault-db'
+import { OutageBankDB } from './outage-bank-db'
 
 // The demo's storage wiring. The vault's rows live in this browser's IndexedDB, standing in for the
 // remote database a backend would have: ciphertext that never opens without the passphrase. A real
-// app hands the provider a vaultDB over its own backend (Convex, REST) instead. The device's leases
+// app hands the provider a bankDB over its own backend (Convex, REST) instead. The device's leases
 // live in IndexedDB too, so an unlocked vault stays unlocked through a reload until its lease ends.
 
 /** The app's name, which namespaces its storage and its vaults. */
 export const Banklabel = 'safebyok_demo'
 
-/** The vault's storage: this browser's IndexedDB, behind the demo's outage switch. */
-export const vaultDB = new OutageVaultDB({ dbName: Banklabel })
+/** The bank's storage: this browser's IndexedDB, behind the demo's outage switch. */
+export const bankDB = new OutageBankDB({ dbName: Banklabel })
 
-/** The BankProvider's options for every user, apart from `user_id`: the browser defaults and the vaultDB. */
-export const bankOpts = { ...browserOpts({ dbName: Banklabel }), banklabel: Banklabel, vaultDB }
+/** The BankProvider's options for every user, apart from `user_id`: the browser defaults and the bankDB. */
+export const bankOpts = { ...browserOpts({ dbName: Banklabel }), banklabel: Banklabel, bankDB }
 
 /** Storage for the fake auth's account rows: scaffolding that stands in for a backend. */
 export const dbStorage: StringStorage = prefixedStorage('safebyok-demo:db:')

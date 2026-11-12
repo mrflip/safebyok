@@ -23,12 +23,13 @@ The landing page ([index.html](index.html), [src/pages/LandingPage.tsx](src/page
 
 The Knock-Knock Machine: bring an Anthropic API key, say who's there, and Claude finishes the
 joke. Its header has the sign-in strip
-([src/components/SessionBar.tsx](src/components/SessionBar.tsx)) and, once signed in, the
+([src/components/SessionBar.tsx](src/components/SessionBar.tsx)); a user signing in for the first
+time is asked to choose a passphrase, which builds the bank that holds the vault. Once signed in, the
 account menu ([src/components/AccountMenu.tsx](src/components/AccountMenu.tsx)): the vault's
 lock control, *Sign out*, which locks the user's vaults on this device, and *Delete account*,
 which unlocks the vault if it is locked (asking for the passphrase, or a passkey, as any unlock
 does), asks the user to confirm in `DelVaultModal`, deletes the vault, then the account. Under it,
-[src/components/WaysIn.tsx](src/components/WaysIn.tsx) lists the vault's passphrase and passkey,
+[src/components/WaysIn.tsx](src/components/WaysIn.tsx) lists the bank's passphrase and passkey,
 with *Change passphrase*, and a fingerprint button to add or remove a passkey. A dialog the user
 cancels changes nothing, and the page says nothing of it.
 
@@ -48,8 +49,8 @@ own box, and knocks with that key through [src/lib/anthropic.ts](src/lib/anthrop
   *Done* hides the field again.
 
 The labs page's aside, *Behind the scenes*, is for developers: its *Backend online* switch
-([src/lib/outage-vault-db.ts](src/lib/outage-vault-db.ts)) takes the vaultDB offline, so every
-vaultDB call refuses as it would with an unreachable backend. The landing page is the app without
+([src/lib/outage-bank-db.ts](src/lib/outage-bank-db.ts)) takes the bankDB offline, so every
+bankDB call refuses as it would with an unreachable backend. The landing page is the app without
 this aside.
 
 ## Where the layers live
@@ -59,7 +60,7 @@ this aside.
 | the library | the `safebyok` workspace package (`packages/safebyok/src/`) |
 | React plumbing | the `safebyok-react` workspace package (provider, hooks, controls, the dialogs) |
 | app scaffolding a host replaces | [src/lib/auth.ts](src/lib/auth.ts) (fake sign-in over localStorage; a real app brings its own auth and passes `user_id` to the provider), [src/lib/storage.ts](src/lib/storage.ts) (the bank's options: this browser's IndexedDB standing in for a backend) |
-| developer tools | [src/lib/outage-vault-db.ts](src/lib/outage-vault-db.ts), [src/components/OutageSwitch.tsx](src/components/OutageSwitch.tsx) |
+| developer tools | [src/lib/outage-bank-db.ts](src/lib/outage-bank-db.ts), [src/components/OutageSwitch.tsx](src/components/OutageSwitch.tsx) |
 | the app itself | [src/components/](src/components/), [src/lib/anthropic.ts](src/lib/anthropic.ts) |
 
 Tests live in `tests/`, mirroring `src/`. Tests of the scaffolding (the fake sign-in, and the

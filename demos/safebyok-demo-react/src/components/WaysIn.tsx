@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import type { Outcome, Vault } from 'safebyok'
-import { passkeysAvailable, useVault, useVaultSnapshot } from 'safebyok-react'
+import { passkeysAvailable, useBankSnapshot, useVault } from 'safebyok-react'
 import { isQuietRefusal } from '../lib/refusals'
 
 /** The main vault's ways in (its passphrase, and its passkey if it has one), with buttons to change them. */
 export const WaysIn = () => {
   const { stage, vault } = useVault('main')
-  // Subscribe only to re-render on changes: replacing the passphrase or adding a passkey makes a new revision, and the gate below is read again.
-  useVaultSnapshot('main')
+  // The ways in are the bank's: its main gate holds the passphrase, and the passkey where there is one.
+  const maingate = useBankSnapshot()?.maingate ?? null
   const [gripe, setGripe] = useState<string | null>(null)
 
-  if (stage !== 'present') { return null }
-  const { passphrase_wayin, passkey_wayin } = vault.gate.toJSON()
+  if (stage !== 'present' || maingate === null) { return null }
+  const { main: passphrase_wayin, passkey0: passkey_wayin = null } = maingate.wayins
 
   // Each button calls a vault method, and the provider shows that method's dialog. The vault stays unlocked afterwards.
   const prompt = async (verb: () => Promise<Outcome<Vault>>) => {
