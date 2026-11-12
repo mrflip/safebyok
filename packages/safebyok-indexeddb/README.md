@@ -36,6 +36,12 @@ Hand it to the core wherever a `VaultDB` is asked for.
   time, but the contract is a soft cap: do not rely on that.
 * An option it cannot use is refused with `bad_option`.
 
+## The bankDB
+
+`idbBankDB({ dbName, maxRecordSizeEst, maxBoxes })` makes an `IdbBankDB`, the same adapter for a `BankDB`: it keeps a bank's
+bank, gate, vault and box rows in `safebyok-<dbName>:bank-v001-001-001`, so every database this library writes begins
+`safebyok-`. It reads nothing `IdbVaultDB` wrote. Its options are those above.
+
 ## What it promises
 
 * **Each call is one IndexedDB transaction.** A put or a del fetches the rows it depends on and

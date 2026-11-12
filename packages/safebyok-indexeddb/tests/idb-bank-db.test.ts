@@ -1,4 +1,4 @@
-/** Tests for IdbVaultDB: the battery every VaultDB must pass, then what is specific to this adapter (options, separate databases and users, IndexedDB failures). */
+/** Tests for IdbBankDB: the battery every bankDB must pass, then what is specific to this adapter (options, separate databases and users, IndexedDB failures). */
 
 // Import fake-indexeddb first: it installs IndexedDB's globals before the adapter loads, with real transactions and structured clone but no browser.
 import 'fake-indexeddb/auto'
@@ -6,32 +6,37 @@ import { createStore, promisifyRequest } from 'idb-keyval'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as TH from 'safebyok/testing'
 import * as DB from 'safebyok/storage'
-import { IdbVaultDB, idbVaultDB } from '../src/idb-vault-db'
-import type { IdbVaultDBOpts } from '../src/idb-vault-db'
-import { boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, vaultScopepathOf } from '../src/shelf'
+import { BankDBVersion, bankScopepathOf, boxPlaceOf, boxScopepathOf, filedIn, gateScopepathOf, lifeRangeOf, vaultScopepathOf } from '../src/bank-shelf'
+import { IdbBankDB, idbBankDB } from '../src/idb-bank-db'
+import type { IdbBankDBOpts } from '../src/idb-bank-db'
 
-// == [World]: makeVaultDB, idbRowsOf, failNextCall, dbNamesNow, plantClosedDB
+const BW = TH.BankDBWorld
 
-/** The database name each VaultDB under test was made with. */
-const dbNameOf = new WeakMap<IdbVaultDB, string>()
+// == [World]: databaseNameOf, makeBankDB, idbRowsOf, failNextCall, dbNamesNow, plantClosedDB
 
-/** The `maxBoxes` each VaultDB under test was made with, so its twin gets the same cap. */
-const maxBoxesOf = new WeakMap<IdbVaultDB, number>()
+/** The database name each BankDB under test was made with. */
+const dbNameOf = new WeakMap<IdbBankDB, string>()
 
-/** Make a VaultDB on a fresh database that no other test has touched. */
-const makeVaultDB = (opts: IdbVaultDBOpts = {}): IdbVaultDB => {
+/** The `maxBoxes` each BankDB under test was made with, so its twin gets the same cap. */
+const maxBoxesOf = new WeakMap<IdbBankDB, number>()
+
+/** The name of the IndexedDB database a BankDB made with `dbName` opens. */
+const databaseNameOf = (dbName: string): string => `safebyok-${dbName}:bank-v${BankDBVersion}`
+
+/** Make a BankDB on a fresh database that no other test has touched. */
+const makeBankDB = (opts: IdbBankDBOpts = {}): IdbBankDB => {
   const dbName = `test-${crypto.randomUUID()}`
-  const vaultDB = new IdbVaultDB({ ...opts, dbName })
-  dbNameOf.set(vaultDB, dbName)
-  if (opts.maxBoxes !== undefined) { maxBoxesOf.set(vaultDB, opts.maxBoxes) }
-  return vaultDB
+  const bankDB = new IdbBankDB({ ...opts, dbName })
+  dbNameOf.set(bankDB, dbName)
+  if (opts.maxBoxes !== undefined) { maxBoxesOf.set(bankDB, opts.maxBoxes) }
+  return bankDB
 }
 
-/** The IndexedDB connection a VaultDB runs its transactions on, captured during a `listVaults` call. */
-async function connectionOf(vaultDB: IdbVaultDB): Promise<unknown> {
+/** The IndexedDB connection a BankDB runs its transactions on, captured during an `ensureBank` call. */
+async function connectionOf(bankDB: IdbBankDB): Promise<unknown> {
   const transaction = vi.spyOn(IDBDatabase.prototype, 'transaction')
   try {
-    await vaultDB.listVaults(TH.vaultListAsk)
+    await bankDB.ensureBank(BW.bankEnsureAsk)
     return transaction.mock.contexts[0]
   } finally {
     transaction.mockRestore()
@@ -39,31 +44,37 @@ async function connectionOf(vaultDB: IdbVaultDB): Promise<unknown> {
 }
 
 // Compare connections, not shelves: if the forgotten shelf's name were wrong, the twin would quietly share the first connection.
-/** Make a second VaultDB on the same database with its own connection, as another tab would have. */
-const makeTwin = async (vaultDB: IdbVaultDB): Promise<IdbVaultDB> => {
-  const dbName = dbNameOf.get(vaultDB)!
-  TH._cheat_forgetShelf(`${dbName}:vaults-v${DB.VaultsDBVersion}`)
-  const twin = new IdbVaultDB({ dbName, maxBoxes: maxBoxesOf.get(vaultDB) })
-  const [ours, theirs] = [await connectionOf(vaultDB), await connectionOf(twin)]
+/** Make a second BankDB on the same database with its own connection, as another tab would have. */
+const makeTwin = async (bankDB: IdbBankDB): Promise<IdbBankDB> => {
+  const dbName = dbNameOf.get(bankDB)!
+  TH._cheat_forgetShelf(databaseNameOf(dbName))
+  const twin = new IdbBankDB({ dbName, maxBoxes: maxBoxesOf.get(bankDB) })
+  const [ours, theirs] = [await connectionOf(bankDB), await connectionOf(twin)]
   expect(theirs, 'the twin on a connection of its own').to.be.instanceOf(IDBDatabase).and.not.eq(ours)
   return twin
 }
 
-/** Test backdoors to a VaultDB's stored rows, through a separate connection to its database. */
-const idbRowsOf = (vaultDB: IdbVaultDB): TH.VaultDBRowCheats => {
-  const shelf = createStore(`${dbNameOf.get(vaultDB)!}:vaults-v${DB.VaultsDBVersion}`, 'rows')
+/** Test backdoors to a BankDB's stored rows, through a separate connection to its database. */
+const idbRowsOf = (bankDB: IdbBankDB): TH.BankDBRowCheats => {
+  const shelf = createStore(databaseNameOf(dbNameOf.get(bankDB)!), 'rows')
+  const plant = async (row: unknown, scopepath: IDBValidKey): Promise<void> => { await DB.inOneStep(shelf, 'readwrite', (store) => { store.put(row, scopepath) }) }
+  const rowAt = async (scopepath: IDBValidKey): Promise<unknown> => await DB.inOneStep(shelf, 'readonly', (store) => DB.rowAt(store, scopepath))
   return {
-    plantVaultRow: async (scope, row) => { await DB.inOneStep(shelf, 'readwrite', (store) => { store.put(row, vaultScopepathOf(scope)) }) },
-    plantBoxRow:   async (scope, vault_tok, row) => { await DB.inOneStep(shelf, 'readwrite', (store) => { store.put(row, boxScopepathOf({ ...scope, vault_tok })) }) },
-    vaultRowOf:    async (scope) => await DB.inOneStep(shelf, 'readonly', (store) => DB.rowAt(store, vaultScopepathOf(scope))),
-    boxRowsOf:     async (scope, vault_tok) => {
-      const filed = await DB.inOneStep(shelf, 'readonly', (store) => filedIn(store, lifeRangeOf({ ...scope, vault_tok })))
+    plantBankRow:  async (scope, row) => { await plant(row, bankScopepathOf(scope)) },
+    plantGateRow:  async (scope, row) => { await plant(row, gateScopepathOf(scope)) },
+    plantVaultRow: async (scope, row) => { await plant(row, vaultScopepathOf(scope)) },
+    plantBoxRow:   async (scope, bank_tok, vault_tok, row) => { await plant(row, boxScopepathOf({ ...scope, bank_tok, vault_tok })) },
+    bankRowOf:     async (scope) => await rowAt(bankScopepathOf(scope)),
+    gateRowOf:     async (scope) => await rowAt(gateScopepathOf(scope)),
+    vaultRowOf:    async (scope) => await rowAt(vaultScopepathOf(scope)),
+    boxRowsOf:     async (scope, bank_tok, vault_tok) => {
+      const filed = await DB.inOneStep(shelf, 'readonly', (store) => filedIn(store, lifeRangeOf({ ...scope, bank_tok, vault_tok })))
       return new Map(filed.map(({ scopepath, row }) => [boxPlaceOf(scopepath).boxlabel, row]))
     },
   }
 }
 
-/** Make the next transaction any VaultDB opens fail, as it does when the browser closes the database while the page is using it. */
+/** Make the next transaction any BankDB opens fail, as it does when the browser closes the database while the page is using it. */
 const failNextCall = (): void => {
   vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementationOnce(() => {
     throw new DOMException('The database connection is closing.', 'InvalidStateError')
@@ -95,96 +106,97 @@ afterEach(() => {
 })
 // --
 
-TH.describeVaultDBBattery("IdbVaultDB", {
-  makeVaultDB,
+TH.describeBankDBBattery("IdbBankDB", {
+  makeBankDB,
   makeTwin,
   _cheat_rowsOf:       idbRowsOf,
-  makeCappedVaultDB:   (maxBoxes) => makeVaultDB({ maxBoxes }),
+  makeCappedBankDB:    (maxBoxes) => makeBankDB({ maxBoxes }),
   _cheat_failNextCall: failNextCall,
 })
 
-describe("IdbVaultDB's options", () => {
-  it("takes a dbName and the AdapterVaultDB's own options", () => {
-    expect(new IdbVaultDB({ dbName: 'mine', maxRecordSizeEst: 1000 })).to.be.instanceOf(IdbVaultDB)
-    expect(idbVaultDB()).to.be.instanceOf(IdbVaultDB)
+describe("IdbBankDB's options", () => {
+  it("takes a dbName and the AdapterBankDB's own options", () => {
+    expect(new IdbBankDB({ dbName: 'mine', maxRecordSizeEst: 1000 })).to.be.instanceOf(IdbBankDB)
+    expect(idbBankDB()).to.be.instanceOf(IdbBankDB)
   })
 
   it("refuses a dbName, a maxRecordSizeEst or a field it cannot use", () => {
     for (const opts of [{ dbName: '' }, { dbName: 7 }, { maxRecordSizeEst: -1 }, { dbname: 'mine' }]) {
-      expect(() => new IdbVaultDB(opts as never)).to.throw(DB.VaultError).with.property('refusalkind', 'bad_option')
+      expect(() => new IdbBankDB(opts as never)).to.throw(DB.VaultError).with.property('refusalkind', 'bad_option')
     }
   })
 })
 
-describe("IdbVaultDB's databases", () => {
+describe("IdbBankDB's databases", () => {
   it("keeps the rows of each dbName apart", async () => {
-    const vaultDB = makeVaultDB()
-    const other = makeVaultDB()
-    await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
-    const { val: otherListed } = await other.listVaults(TH.vaultListAsk)
-    const twin = await makeTwin(vaultDB)
-    const { val: twinListed } = await twin.listVaults(TH.vaultListAsk)
-    expect(otherListed.vaults).to.be.empty
-    expect(twinListed.vaults).to.have.lengthOf(1)
+    const bankDB = makeBankDB()
+    const other = makeBankDB()
+    await bankDB.buildBank(BW.bankBuildAskOf())
+    const { val: otherEnsured } = await other.ensureBank(BW.bankEnsureAsk)
+    const twin = await makeTwin(bankDB)
+    const { val: twinEnsured } = await twin.ensureBank(BW.bankEnsureAsk)
+    expect(otherEnsured).to.be.null
+    expect(twinEnsured).to.not.be.null
   })
 
   it("keeps apart the rows of users whose ids share a beginning", async () => {
-    const vaultDB = makeVaultDB()
+    const bankDB = makeBankDB()
     const longer = { ...TH.bankScope, user_id: `${TH.bankScope.user_id}0` }
-    await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
-    await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt(0, 'life1', longer)))
-    await vaultDB.putBox(TH.boxPutAskOf(TH.boxAt(0, 'life1', longer)))
-    const { val: listed } = await vaultDB.listVaults(TH.vaultListAsk)
-    const { val: boxesListed } = await vaultDB.listBoxes({ op: 'list', ...TH.vaultScope, vault_tok: 'life1' })
-    const { val: tidied } = await vaultDB.tidyGone(TH.boxTidyAsk)
-    expect(listed.vaults).to.have.lengthOf(1)
-    expect(boxesListed.boxes).to.be.empty
+    await bankDB.buildBank(BW.bankBuildAskOf())
+    await bankDB.putVault(BW.vaultPutAskOf(BW.vaultAt()))
+    await bankDB.putBox(BW.boxPutAskOf(BW.boxAt()))
+    await bankDB.buildBank(BW.bankBuildAskOf({ ...BW.bankAt(), ...longer }, { ...BW.gateAt(), ...longer }))
+    const { val: ensured } = await bankDB.ensureBank({ ...BW.bankEnsureAsk, ...longer })
+    const { val: tidied } = await bankDB.tidyGone({ ...TH.boxTidyAsk, ...longer })
+    expect(ensured?.vaults).to.be.empty
     expect(tidied.totalCount).to.eq(0)
   })
 
-  it("notifies a watch of a write from another VaultDB over the same database", async () => {
-    const vaultDB = makeVaultDB()
+  it("notifies a watch of a write from another BankDB over the same database", async () => {
+    const bankDB = makeBankDB()
     const notices: unknown[] = []
-    const unwatch = vaultDB.watch(TH.bankScope, (notice) => { notices.push(notice) })
-    const twin = await makeTwin(vaultDB)
-    await twin.putVault(TH.vaultPutAskOf(TH.vaultAt()))
+    const unwatch = bankDB.watch(TH.bankScope, (notice) => { notices.push(notice) })
+    const twin = await makeTwin(bankDB)
+    await twin.buildBank(BW.bankBuildAskOf())
     await TH.eventually(() => notices.length > 0)
-    expect(notices).to.have.lengthOf(1)
+    expect(notices.length).to.be.greaterThan(0)
     unwatch()
   })
 })
 
-describe("IdbVaultDB's database name and wipe", () => {
-  it("names its database with its version", async () => {
-    const vaultDB = makeVaultDB()
-    await vaultDB.listVaults(TH.vaultListAsk)
-    expect(await dbNamesNow()).to.include(`${dbNameOf.get(vaultDB)!}:vaults-v${DB.VaultsDBVersion}`)
-    expect(DB.VaultsDBVersion).to.match(/^\d{3}-\d{3}-\d{3}$/)
+describe("IdbBankDB's database name and wipe", () => {
+  it("names its database for this library and its version, whatever the host's dbName", async () => {
+    const bankDB = makeBankDB()
+    await bankDB.ensureBank(BW.bankEnsureAsk)
+    const names = await dbNamesNow()
+    expect(names).to.include(databaseNameOf(dbNameOf.get(bankDB)!))
+    expect(names.filter((dbname) => dbname.includes(dbNameOf.get(bankDB)!))).to.satisfy((own: string[]) => own.every((dbname) => dbname.startsWith('safebyok-')))
+    expect(BankDBVersion).to.match(/^\d{3}-\d{3}-\d{3}$/)
   })
 
-  it("deletes the unversioned vault database and every older version's, without reading them, on its first call", async () => {
+  it("deletes every older version's bank database, without reading them, on its first call", async () => {
     const dbName = `test-${crypto.randomUUID()}`
-    const oldnames = [`${dbName}:vaults`, `${dbName}:vaults-v1`, `${dbName}:vaults-v001-001-000`, `${dbName}:vaults-v000-009-009`]
+    const oldnames = [`safebyok-${dbName}:bank-v1`, `safebyok-${dbName}:bank-v001-001-000`, `safebyok-${dbName}:bank-v000-009-009`]
     for (const oldname of oldnames) { await plantClosedDB(oldname) }
     expect(await dbNamesNow()).to.include.members(oldnames)
-    await new IdbVaultDB({ dbName }).listVaults(TH.vaultListAsk)
+    await new IdbBankDB({ dbName }).ensureBank(BW.bankEnsureAsk)
     await vi.waitFor(async () => {
       const dbnames = await dbNamesNow()
       expect(dbnames.filter((dbname) => oldnames.includes(dbname))).to.deep.equal([])
     })
   })
 
-  it("leaves untouched a newer version's database, another dbName's, and the device database", async () => {
+  it("leaves untouched a newer version's database, another dbName's, and the vault and device databases", async () => {
     const dbName = `test-${crypto.randomUUID()}`
-    const kept = [`${dbName}:vaults-v001-002-000`, `${dbName}:device_db`, `${dbName}:device-v001-001-001`, `other-${dbName}:vaults`]
+    const kept = [`safebyok-${dbName}:bank-v001-002-000`, `${dbName}:vaults-v001-001-001`, `${dbName}:device_db`, `${dbName}:device-v001-001-001`, `safebyok-other-${dbName}:bank-v000-000-001`]
     for (const keptname of kept) { await plantClosedDB(keptname) }
-    await new IdbVaultDB({ dbName }).listVaults(TH.vaultListAsk)
+    await new IdbBankDB({ dbName }).ensureBank(BW.bankEnsureAsk)
     await TH.aWhile()
     expect(await dbNamesNow()).to.include.members(kept)
   })
 })
 
-describe("IdbVaultDB's refusals", () => {
+describe("IdbBankDB's refusals", () => {
   const TroubleCases = [
     ["QuotaExceededError", "vault_full",          /no room left/,     'refuses a write IndexedDB has no room for'],
     ["InvalidStateError",  "storage_unavailable", /closed under it/,  'refuses a call once the database is closed under it'],
@@ -194,24 +206,24 @@ describe("IdbVaultDB's refusals", () => {
 
   for (const [errname, refusalkind, said, blurb] of TroubleCases) {
     it(blurb, async () => {
-      const vaultDB = makeVaultDB()
+      const bankDB = makeBankDB()
       vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementationOnce(() => { throw new DOMException('IndexedDB says no.', errname) })
-      const putting = vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
-      const refusal = await TH.expectRefusal(putting, refusalkind)
+      const building = bankDB.buildBank(BW.bankBuildAskOf())
+      const refusal = await TH.expectRefusal(building, refusalkind)
       expect(refusal.message).to.match(said)
       expect(refusal.cause).to.have.property('name', errname)
     })
   }
 
   it("refuses a write whose transaction aborted before it committed", async () => {
-    const vaultDB = makeVaultDB()
+    const bankDB = makeBankDB()
     vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementationOnce(function (this: IDBObjectStore) {
       this.transaction.abort()
       return undefined as never
     })
-    const putting = vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
-    await TH.expectRefusal(putting, 'storage_unavailable')
-    expect(await idbRowsOf(vaultDB).vaultRowOf(TH.vaultScope)).to.be.null
+    const building = bankDB.buildBank(BW.bankBuildAskOf())
+    await TH.expectRefusal(building, 'storage_unavailable')
+    expect(await idbRowsOf(bankDB).bankRowOf(TH.bankScope)).to.be.null
   })
 
   const AbsentCases = [
@@ -221,9 +233,9 @@ describe("IdbVaultDB's refusals", () => {
 
   for (const [absent, blurb] of AbsentCases) {
     it(blurb, async () => {
-      const vaultDB = makeVaultDB()
+      const bankDB = makeBankDB()
       vi.stubGlobal('indexedDB', absent)
-      const refusal = await TH.expectRefusal(vaultDB.getVault(TH.vaultGetAskOf()), 'storage_blocked')
+      const refusal = await TH.expectRefusal(bankDB.ensureBank(BW.bankEnsureAsk), 'storage_blocked')
       expect(refusal.message).to.match(/no IndexedDB/)
     })
   }
