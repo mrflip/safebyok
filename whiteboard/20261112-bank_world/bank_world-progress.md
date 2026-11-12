@@ -30,7 +30,9 @@ What the threads have taught, newer than the plan where they disagree. Kept by t
 * *Coach, 2026-11-12:* `tidyGone`'s ask carries the scope only; the store judges by the bank row it finds there (confirmed: `BoxTidyAsk`, no `bank_tok`). Thread 4's review guard for a damaged bank row in `doTidyGone` is reverted in 4b under ground rule 24.
 * *Coach, 2026-11-12 (row c8):* an older client's `tidyGone` under a later-`fmt` or mutilated bank row is not a path to guard: "Postgres, convex (and graphql) will be running functions (or calling nested vaultDB) controlled by the app, not on the device, and so they can never get out of sync. ... it's fair to run tidy gone after having mutilated the bank row, but remember that it can't read anything ever at that point so its contract is vicariously satisfied either way." No guard, check or test for it in any adapter; told 4b's reviewer, 5 and 13.
 * *Coach, 2026-11-12 (#669):* a vault birth racing delBank may leave a stray vault row: "yes, it will stick around, and that's acceptable. We may offer postgres users advice or code to run lock-ier stored functions under the same contract but with tighter atomicity." No fix in the adapters; a docs note at most (17).
-* *Open, asked back (#668):* what scopes an IndexedDB database's name. My answer on the row: only the host's `dbName` (rows are keyed `user_id, banklabel` already); no `dbName` gives `safebyok:bank-v…`, one gives `safebyok-<dbName>:bank-v…`, done in 5b for the bank and device databases together.
+* *Coach, 2026-11-12 (#668):* nothing beyond the host's `dbName` scopes an IndexedDB database's name: `safebyok:<store>-v…` with no `dbName`, `safebyok-<dbName>:<store>-v…` with one, the bank and device databases together (thread 5b).
+* *Coach, 2026-11-12 (#670):* Convex's budgeted `delBank`/`tidyGone` stay as built: the contract is unchanged (`{ totalCount }` says nothing of rows left), and there is no scheduled continuation.
+* *Coach, 2026-11-12 (#667):* one tell per lock and unlock (thread 10).
 
 ## The BankDB `do*` list
 

@@ -156,6 +156,10 @@ package version when `device.ensureBank()` ensures it, refreshed when an ensure 
 Coach: "on hello, when peekOrStow'ing the device id, to also write the npm package version"); a
 layout version bumped wherever thread 1's key reorder left one naming an old shape. **Levels**:
 worker `sonnet`; review `medium`. **After**: 8c (8a and 8b change these files). **Size**: S.
+*Orchestrator, 2026-11-12 (new session):* started from 8c's ready tip beside 9 (it was on the frontier
+once 8c was ready). It also takes the Coach's ruling on #668: nothing beyond the host's `dbName` scopes
+a database's name; `safebyok:<store>-v…` with no `dbName`, `safebyok-<dbName>:<store>-v…` with one, for
+the bank and device databases together.
 
 ### 6 `device_owner`
 
@@ -234,6 +238,10 @@ mechanical.
 
 **Levels**: worker `opus`; review `medium`. **After**: 9. **Look-ahead**: should remove more than
 it adds (the Coach). **Size**: L.
+*Orchestrator:* the Coach ruled on #667 (Open Matters): **one tell per lock and unlock**. Today
+`bank.lock()` tells the device for the bank, then again as its vaults align, so for one tell a vault
+reads unlocked under a locked bank; 8c had filed, so it lands here with the lifecycle (no liminal
+state). The proof story that pins two paints pins one.
 *Orchestrator:* `Storable`'s `vault_tok` moving down to `Vault` and `Box` landed in 8b (dff295ea6);
 struck from this thread.
 
