@@ -33,14 +33,16 @@ true satisfies Z.core.util.AssertEqual<GraphQLBankDBOpts, Z.input<typeof graphQL
 
 // == [The BankDB]: GraphQLBankDB
 
-/** A browser-side bankDB that sends each call to your GraphQL server: `new GraphQLBankDB({ client })`. */
+/** A browser-side bankDB that sends each call to your GraphQL server: `new GraphQLBankDB({ client })`.
+ * It checks each ask before sending it, and each answer the server returns.
+ */
 export class GraphQLBankDB implements BX.BankDB {
   // == [Props]: #client, IsBankDB
 
   readonly #client: GraphQLBankClient
 
   // A class getter, not an own field, so the brand is left out of JSON and of object spreads.
-  /** The brand that marks this object as a bankDB, recognized even across duplicate copies of safebyok. */
+  /** Always true: marks a bankDB for safe branding. */
   get [DB.IsBankDB](): true { return true }
   // --
 
@@ -55,9 +57,7 @@ export class GraphQLBankDB implements BX.BankDB {
   // == [Bank verbs]: ensureBank, tryEnsureBank, buildBank, tryBuildBank, delBank, tryDelBank
   // Each verb checks its ask, sends it, and parses the answer that crosses back. An ask that fails its check is never sent.
 
-  /** Get the bank row, and for a live bank its `main` gate row and its vault rows.
-   * A vault row that fails its checks is listed in `damaged_rows`. `val` is null when no live bank is stored.
-   */
+  /** Get the bank row, and for a live bank its `main` gate row and its vault rows ({@link BX.BankDB.ensureBank}). */
   async ensureBank(ask: BX.BankEnsureAsk): Promise<BX.GoodAnswer<BX.BankEnsured | null, GotAct>> { return goodAnswerOf(await this.tryEnsureBank(ask)) }
 
   /** Non-throwing form of {@link ensureBank}. */
@@ -69,9 +69,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'ensureBank', ask) }
   }
 
-  /** Store the bank record `ask.record` and its `main` gate row `ask.gate` together, over no bank or its tombstone.
-   * Under the `passed` act, nothing is stored, and `val` is the live bank's gate row.
-   */
+  /** Store a new bank record and its `main` gate row together ({@link BX.BankDB.buildBank}). */
   async buildBank(ask: BX.BankBuildAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryBuildBank(ask)) }
 
   /** Non-throwing form of {@link buildBank}. */
@@ -83,7 +81,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'buildBank', ask) }
   }
 
-  /** Store the tombstone `ask.record` over the live bank row `ask.expected`, and delete every gate, vault and box row under the bank. */
+  /** Store the bank's tombstone, and delete every gate, vault and box row under it ({@link BX.BankDB.delBank}). */
   async delBank(ask: BX.BankDelAsk): Promise<BX.GoodAnswer<BX.BankRow | null, OkAct, typeof BX.BankTop>> { return goodAnswerOf(await this.tryDelBank(ask)) }
 
   /** Non-throwing form of {@link delBank}. */
@@ -98,7 +96,7 @@ export class GraphQLBankDB implements BX.BankDB {
 
   // == [Gate verbs]: replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey
 
-  /** Store the gate record `ask.record`, whose only change is to replace the passphrase wayin. Refuses `gate_issue` for any other change. */
+  /** Store a gate record whose only change is a new passphrase wayin ({@link BX.BankDB.replacePassphrase}). */
   async replacePassphrase(ask: BX.GateVerbAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryReplacePassphrase(ask)) }
 
   /** Non-throwing form of {@link replacePassphrase}. */
@@ -109,9 +107,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'replacePassphrase', { ...ask, gateVerb: 'replacePassphrase' }) }
   }
 
-  /** Store the gate record `ask.record`, whose only change is to add a passkey wayin.
-   * Refuses `camped` when a passkey wayin is already stored, and `gate_issue` for any other change.
-   */
+  /** Store a gate record whose only change is an added passkey wayin ({@link BX.BankDB.addPasskey}). */
   async addPasskey(ask: BX.GateVerbAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryAddPasskey(ask)) }
 
   /** Non-throwing form of {@link addPasskey}. */
@@ -122,9 +118,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'addPasskey', { ...ask, gateVerb: 'addPasskey' }) }
   }
 
-  /** Store the gate record `ask.record`, whose only change is to remove the passkey wayin. Refuses `gate_issue` for any other change.
-   * Under the `passed` act, nothing is stored: the gate row has no passkey wayin, and `val` is that row.
-   */
+  /** Store a gate record whose only change is a removed passkey wayin ({@link BX.BankDB.revokePasskey}). */
   async revokePasskey(ask: BX.GateVerbAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryRevokePasskey(ask)) }
 
   /** Non-throwing form of {@link revokePasskey}. */
@@ -138,9 +132,7 @@ export class GraphQLBankDB implements BX.BankDB {
 
   // == [Vault verbs]: getVault, tryGetVault, putVault, tryPutVault, delVault, tryDelVault
 
-  /** Get the vault row at a scope, whatever its life, in a bank live under `bank_tok`.
-   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone stored; otherwise both refuse.
-   */
+  /** Get the vault row at a scope, whatever its life ({@link BX.BankDB.getVault}). */
   async getVault(ask: BX.VaultGetAsk): Promise<BX.GoodAnswer<BX.VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryGetVault(ask)) }
 
   /** Non-throwing form of {@link getVault}. */
@@ -152,9 +144,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'getVault', ask) }
   }
 
-  /** Store `ask.record` over the vault row `ask.expected`, in a bank live under `bank_tok`, as `ifPresent` and `ifAbsent` allow.
-   * Under the `passed` act, nothing is stored, and `val` is the live row found.
-   */
+  /** Store `ask.record` over the vault row `ask.expected` ({@link BX.BankDB.putVault}). */
   async putVault(ask: BX.VaultPutAsk): Promise<BX.GoodAnswer<BX.VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryPutVault(ask)) }
 
   /** Non-throwing form of {@link putVault}. */
@@ -166,7 +156,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'putVault', ask) }
   }
 
-  /** Store the tombstone `ask.record` over the live vault row `ask.expected`, and delete the boxes of that vault life. */
+  /** Store the vault's tombstone, and delete the boxes of that vault life ({@link BX.BankDB.delVault}). */
   async delVault(ask: BX.VaultDelAsk): Promise<BX.GoodAnswer<BX.VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryDelVault(ask)) }
 
   /** Non-throwing form of {@link delVault}. */
@@ -181,10 +171,10 @@ export class GraphQLBankDB implements BX.BankDB {
 
   // == [Box verbs]: listBoxes, tryListBoxes, getBox, tryGetBox, putBox, tryPutBox, delBox, tryDelBox
 
-  /** List a vault's boxes, sparse, with its vault row as `parent`. Refuses when the vault is not live under `bank_tok` and `vault_tok`. */
+  /** List a vault's boxes, sparse, with its vault row as `parent` ({@link BX.BankDB.listBoxes}). */
   async listBoxes(ask: BX.BoxListAsk): Promise<BX.GoodAnswer<BX.BoxesListed, ListAct, BX.VaultRow>> { return goodAnswerOf(await this.tryListBoxes(ask)) }
 
-  /** Non-throwing form of {@link listBoxes}. When the vault row refuses, `parent` is that stored row. */
+  /** Non-throwing form of {@link listBoxes}. */
   async tryListBoxes(ask: BX.BoxListAsk): Promise<BX.ListBoxesAnswer> {
     try {
       const { user_id, banklabel, vaultlabel, bank_tok, vault_tok } = BX.boxList.parse(ask)
@@ -193,9 +183,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'listBoxes', ask) }
   }
 
-  /** Get a box row, with its vault row as `parent`. Refuses when the vault is not live under `bank_tok` and `vault_tok`.
-   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone stored; otherwise both refuse.
-   */
+  /** Get a box row, with its vault row as `parent` ({@link BX.BankDB.getBox}). */
   async getBox(ask: BX.BoxGetAsk): Promise<BX.GoodAnswer<BX.BoxRow | null, OkAct, BX.VaultRow>> { return goodAnswerOf(await this.tryGetBox(ask)) }
 
   /** Non-throwing form of {@link getBox}. */
@@ -207,9 +195,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'getBox', ask) }
   }
 
-  /** Store `ask.record` over the box row `ask.expected`, in a vault live under `bank_tok` and `vault_tok`, as `ifPresent` and `ifAbsent` allow.
-   * Under the `passed` act, nothing is stored, and `val` is the live row found.
-   */
+  /** Store `ask.record` over the box row `ask.expected` ({@link BX.BankDB.putBox}). */
   async putBox(ask: BX.BoxPutAsk): Promise<BX.GoodAnswer<BX.BoxRow | null, OkAct, BX.VaultRow>> { return goodAnswerOf(await this.tryPutBox(ask)) }
 
   /** Non-throwing form of {@link putBox}. */
@@ -221,7 +207,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'putBox', ask) }
   }
 
-  /** Store the tombstone `ask.record` over the live box row `ask.expected`. */
+  /** Store the box's tombstone ({@link BX.BankDB.delBox}). */
   async delBox(ask: BX.BoxDelAsk): Promise<BX.GoodAnswer<BX.BoxRow | null, OkAct, BX.VaultRow>> { return goodAnswerOf(await this.tryDelBox(ask)) }
 
   /** Non-throwing form of {@link delBox}. */
@@ -236,7 +222,7 @@ export class GraphQLBankDB implements BX.BankDB {
 
   // == [Housekeeping]: tidyGone, tryTidyGone
 
-  /** For hosts: delete the vault and box rows of an ended life under the bank, and count the box rows left. */
+  /** Delete the vault and box rows of the bank's ended lives, and count the box rows left ({@link BX.BankDB.tidyGone}). */
   async tidyGone(ask: BoxTidyAsk): Promise<BX.GoodAnswer<Tidied, 'tidied', BankScope>> { return goodAnswerOf(await this.tryTidyGone(ask)) }
 
   /** Non-throwing form of {@link tidyGone}. */
@@ -251,9 +237,9 @@ export class GraphQLBankDB implements BX.BankDB {
 
   // == [Watch]: watch
 
-  /** Call `onNotice` when a row changes in a bank or a vault. Returns a function that stops the watch.
-   * If the stream fails or the server ends it, `onBadNews` is called once and the watch does not resubscribe.
-   * A watch that ends because the session is no longer signed in (`identity_revoked`) stops without calling it.
+  /** Call `onNotice` when a row changes in a bank or a vault, until the returned function is called ({@link BX.BankDB.watch}).
+   * At the first trouble, or when the server ends the stream, the watch ends and calls `onBadNews` once. To resume, call `watch` again.
+   * A watch ended by `identity_revoked` stops without calling `onBadNews`.
    */
   watch(scope: WatchScope, onNotice: (notice: BX.Notice) => void, onBadNews?: (news: DB.VaultError) => void): () => void {
     const { user_id, banklabel, vaultlabel = null } = DB.watchScope.parse(scope)
@@ -305,15 +291,15 @@ export class GraphQLBankDB implements BX.BankDB {
 // == [Asks and answers]: gateVerbAskOf, answerForRefusal, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, hearNotice
 
 // The mutation names the verb, so the ask sent leaves it out.
-/** Check `ask` as `gateVerb`'s and return it without `gateVerb`, as the verb's mutation sends it. */
+/** Check `ask` as a `gateVerb` ask, and return it without `gateVerb`. */
 function gateVerbAskOf(gateVerb: GateVerb, ask: BX.GateVerbAsk): BX.GateVerbAsk {
   const { gateVerb: _gateVerb, ...sent } = BX.gatePut.parse({ ...ask, gateVerb })
   return sent
 }
 
 // Every throw in a verb ends up here: an ask that fails its check, a server out of reach, or an answer that fails its own.
-/** The bad answer for a verb that threw: a refusal as it came, anything else `unexpected_error`.
- * Its meta names the `oplabel`, and carries what it may of the ask as `ask`.
+/** The bad answer for a verb that threw: its refusal, or `unexpected_error` for anything else.
+ * Its meta names `oplabel`, and carries the loggable fields of `ask`, if it has them.
  */
 function answerForRefusal(thrown: unknown, oplabel: string, ask: unknown): BX.BadAnswer {
   const refusal = DB.isVaultError(thrown) ? thrown : DB.unexpectedError(thrown)
@@ -335,7 +321,7 @@ function fieldOf({ error: err, data }: OperationResult<unknown>, fieldname: stri
   return (data as Record<string, unknown>)[fieldname]
 }
 
-/** Convert a failed operation to a refusal: a network failure reads as storage out of reach, a GraphQL error as a schema the server does not serve. */
+/** The refusal for a failed operation: {@link networkTroubleOf} for a network failure, else {@link schemaNotServed}. */
 function troubleOf(err: CombinedError): DB.VaultError { return (err.networkError === undefined) ? schemaNotServed() : networkTroubleOf(err) }
 
 // A GraphQL error means the client and server disagree about the schema. A retry will not fix that, so it is never
@@ -416,10 +402,10 @@ const rowOf: Drop = (val) => dropTypename(val, { wayins: wayinsOf, box_key_wrapp
 /** The drop for a list of rows. */
 const rowsOf: Drop = (val) => (Array.isArray(val) ? val.map((row) => rowOf(row)) : val)
 
-/** The drop for what ensureBank answers: its gates and its vaults, but not its `damaged_rows`. */
+/** The drop for an `ensureBank` value: its gates and its vaults. Its `damaged_rows` are left as sent. */
 const ensuredOf: Drop = (val) => dropTypename(val, { gates: (gates) => dropTypename(gates, { main: rowOf }), vaults: rowsOf })
 
-/** The drop for a listing of boxes: its rows, but not its `damaged_rows`. */
+/** The drop for a listing of boxes: its rows. Its `damaged_rows` are left as sent. */
 const listedOf: Drop = (val) => dropTypename(val, { boxes: rowsOf })
 
 const askOf: Drop = (val) => dropTypename(val, { expected: dropTypename, record: dropTypename, gate: dropTypename })
