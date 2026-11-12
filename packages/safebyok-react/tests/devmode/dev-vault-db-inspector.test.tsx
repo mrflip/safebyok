@@ -10,7 +10,7 @@ TH.sweepBankWorlds()
 const renderOverBox = async () => {
   const { world, vault } = await TH.makeBankWithVault()
   await vault.putBox({ boxlabel: 'anthropic', whisper: { apiKey: 'sk-ant-fake-stored' } }, { ifAbsent: 'add' })
-  render(<BankProvider {...TH.providerPropsOf(world)}><DevVaultDBInspector vaultDB={world.vaultDB} /></BankProvider>)
+  render(<BankProvider {...TH.providerPropsOf(world)}><DevVaultDBInspector vaultDB={world.bankDB} /></BankProvider>)
   await waitFor(() => { expect(boxRow('anthropic')).to.exist })
   return { world, vault }
 }
@@ -43,7 +43,7 @@ describe("DevVaultDBInspector", () => {
 
   it("lists a damaged box row with getBox and no delBox", async () => {
     const { world, vault } = await renderOverBox()
-    world.vaultDB._cheat_boxRowsOf(vault.scope, vault.snapshot.vault_tok).set('mangled', { am: 'a', fmt: 'nonsense' })
+    world.bankDB._cheat_boxRowsOf(vault.scope, vault.snapshot.vault_tok).set('mangled', { am: 'a', fmt: 'nonsense' })
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
     await waitFor(() => { expect(boxRow('mangled').dataset['am']).to.eq('d') })
     expect(within(boxRow('mangled')).getByRole('button', { name: 'getBox' })).to.exist
@@ -52,7 +52,7 @@ describe("DevVaultDBInspector", () => {
 
   it("leaves a damaged box row's revision and time blank", async () => {
     const { world, vault } = await renderOverBox()
-    world.vaultDB._cheat_boxRowsOf(vault.scope, vault.snapshot.vault_tok).set('mangled', { am: 'a', revision_seq: 9 })
+    world.bankDB._cheat_boxRowsOf(vault.scope, vault.snapshot.vault_tok).set('mangled', { am: 'a', revision_seq: 9 })
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
     await waitFor(() => { expect(boxRow('mangled').dataset['am']).to.eq('d') })
     const cells = within(boxRow('mangled')).getAllByRole('cell').map((cell) => cell.textContent)

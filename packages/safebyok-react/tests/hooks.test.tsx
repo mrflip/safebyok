@@ -65,7 +65,7 @@ describe("useVault and useVaultSnapshot", () => {
   it("read waiting while the device's ensureBank is refused, its snapshot still made", async () => {
     const world = TH.makeBankWorld()
     const spy = TH.spyLogger()
-    world.vaultDB._cheat_refuseGets('storage_unavailable')
+    world.bankDB._cheat_refuseGets('storage_unavailable')
     render(<BankProvider {...TH.providerPropsOf(world, { logger: spy.logger })}><TH.ShowsVault /></BankProvider>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })
     expect(shown('vault')).to.eq('waiting none')
@@ -75,7 +75,7 @@ describe("useVault and useVaultSnapshot", () => {
   it("read waiting while the device's ensureBank is still on its way", async () => {
     const world = TH.makeBankWorld()
     const listing = TH.makePending<never>()
-    vi.spyOn(world.vaultDB, 'tryListVaults').mockReturnValue(listing.promise)
+    vi.spyOn(world.bankDB, 'tryListVaults').mockReturnValue(listing.promise)
     render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsMain /></BankProvider>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })
     await act(async () => { await TH.wakeupAtNextTick() })
@@ -86,7 +86,7 @@ describe("useVault and useVaultSnapshot", () => {
 
   it("give the device before its bank is up, and its vacate signs out", async () => {
     const world = TH.makeBankWorld()
-    world.vaultDB._cheat_refuseGets('storage_unavailable')
+    world.bankDB._cheat_refuseGets('storage_unavailable')
     const spy = TH.spyLogger()
     render(<BankProvider {...TH.providerPropsOf(world, { logger: spy.logger })}><TH.ShowsVault /><SignsOut /></BankProvider>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })

@@ -156,7 +156,7 @@ export type BoxWhisperFieldProps = Omit<ComponentPropsWithoutRef<'input'>, 'type
 /** Props of the button that unlocks the vault with its passkey. */
 export type PasskeyUnlockButtonProps = {
   /** The unlock gating, as the bank passed it to `requestCleartext`. */
-  gating:      Gating<'unlock_vault'>
+  gating:      Gating<'unlock_bank'>
   /** Called with a message to show the user, or with null to clear the last message. */
   onGripe:     (gripe: string | null) => void
   /** The relying-party id the passkey was created under. Defaults to the page's own domain. */
@@ -207,7 +207,7 @@ export type ModalFormProps = {
 }
 
 /** The gatings PassphraseModal handles: building a vault, and unlocking one. */
-export type PassphraseGating = Gating<'build_vault'> | Gating<'unlock_vault'>
+export type PassphraseGating = Gating<'build_bank'> | Gating<'unlock_bank'>
 
 /** Props of the passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
 export type PassphraseModalProps = {

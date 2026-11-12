@@ -64,7 +64,7 @@ export const DeviceTok = '00000000-0000-4000-8000-0000000000c1'
  *   render(<BankProvider {...TH.providerPropsOf(world)}><Shows /></BankProvider>)
  */
 export const providerPropsOf = (world: BankWorld, overrides: Partial<Omit<BankProviderProps, 'children'>> = {}): Omit<BankProviderProps, 'children'> => ({
-  user_id: 'u1', banklabel: 'acme', vaultDB: world.vaultDB, deviceDB: new MemoryDeviceDB(),
+  user_id: 'u1', banklabel: 'acme', bankDB: world.bankDB, deviceDB: new MemoryDeviceDB(),
   keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, ...overrides,
 })
 
@@ -155,7 +155,7 @@ export const gatingOfKind = <KindT extends Gatingkind>(gating: AnyGating, gating
 
 /** Return `gating`, typed as a `build_vault` or `unlock_vault` gating. Throws if it is of another kind. */
 export const passphraseGatingOf = (gating: AnyGating): PassphraseGating => {
-  if (gating.gatingkind === 'build_vault' || gating.gatingkind === 'unlock_vault') { return gating }
+  if (gating.gatingkind === 'build_bank' || gating.gatingkind === 'unlock_bank') { return gating }
   throw new Error(`not a passphrase gating: ${gating.gatingkind}`)
 }
 

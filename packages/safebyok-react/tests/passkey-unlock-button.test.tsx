@@ -16,11 +16,11 @@ const passkeyedUnlock = async () => {
   const { vault } = await TH.makeBankWithVault(world)
   await TH.addPasskeyTo(world, vault, await createPasskey(TH.PasskeyMaking))
   const opened = await TH.openGatingOf(world, TH.unlocking)
-  return { ...opened, gating: TH.gatingOfKind(opened.gating, 'unlock_vault'), authenticator, world }
+  return { ...opened, gating: TH.gatingOfKind(opened.gating, 'unlock_bank'), authenticator, world }
 }
 
 /** Render the button for `gating`. Returns the gripes it passed to `onGripe`, and the errors React reported. */
-const buttonFor = (gating: Gating<'unlock_vault'>, extra: { takesFocus?: boolean } = {}) => {
+const buttonFor = (gating: Gating<'unlock_bank'>, extra: { takesFocus?: boolean } = {}) => {
   const gripes: (string | null)[] = []
   const ui = <PasskeyUnlockButton gating={gating} onGripe={(gripe) => { gripes.push(gripe) }} {...extra} />
   return { ...TH.renderReporting(ui), ui, gripes }
@@ -46,10 +46,10 @@ describe("PasskeyUnlockButton", () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
     const { gating } = await TH.openGatingOf(world, TH.unlocking)
-    buttonFor(TH.gatingOfKind(gating, 'unlock_vault'))
+    buttonFor(TH.gatingOfKind(gating, 'unlock_bank'))
     expect(screen.queryByText(Messages.passkeyButton)).to.be.null
     TH.installFakeAuthenticator()
-    buttonFor(TH.gatingOfKind(gating, 'unlock_vault'))
+    buttonFor(TH.gatingOfKind(gating, 'unlock_bank'))
     expect(screen.queryByText(Messages.passkeyButton)).to.be.null
   })
 

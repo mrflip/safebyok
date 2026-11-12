@@ -308,7 +308,7 @@ describe("BankProvider's handlers", () => {
 
   it("reports a refused ensureBank to onLifecycle, and nothing to onBadNews", async () => {
     const world = TH.makeBankWorld()
-    vi.spyOn(world.vaultDB, 'tryListVaults').mockResolvedValue(badAnswerOf(Refusal))
+    vi.spyOn(world.bankDB, 'tryListVaults').mockResolvedValue(badAnswerOf(Refusal))
     const [onLifecycle, onBadNews] = [vi.fn<LifecycleHandler>(), vi.fn<BadNewsHandler>()]
     provided({ onLifecycle, onBadNews }, world)
     await waitFor(() => { expect(onLifecycle).toHaveBeenCalled() })
@@ -320,7 +320,7 @@ describe("BankProvider's handlers", () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const world = TH.makeBankWorld()
-    vi.spyOn(world.vaultDB, 'tryListVaults').mockResolvedValue(badAnswerOf(Refusal))
+    vi.spyOn(world.bankDB, 'tryListVaults').mockResolvedValue(badAnswerOf(Refusal))
     const thrown = new Error('the handler broke')
     provided({ onLifecycle: () => { throw thrown } }, world)
     await waitFor(() => { expect(reported).toHaveBeenCalledWith(thrown) })
@@ -331,7 +331,7 @@ describe("BankProvider's handlers", () => {
   it("reports a refused ensureBank to the onLifecycle last rendered", async () => {
     const world = TH.makeBankWorld()
     const pendingListVaults: { refuse?: (err: VaultError) => void } = {}
-    vi.spyOn(world.vaultDB, 'tryListVaults').mockReturnValue(new Promise((resolve) => { pendingListVaults.refuse = (err) => { resolve(badAnswerOf(err)) } }))
+    vi.spyOn(world.bankDB, 'tryListVaults').mockReturnValue(new Promise((resolve) => { pendingListVaults.refuse = (err) => { resolve(badAnswerOf(err)) } }))
     const [first, last] = [vi.fn<LifecycleHandler>(), vi.fn<LifecycleHandler>()]
     const { props, rerender } = provided({ onLifecycle: first }, world)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })
@@ -344,7 +344,7 @@ describe("BankProvider's handlers", () => {
   it("reports an ensureBank that a sign-out crossed to neither onLifecycle, onBadNews nor the logger", async () => {
     const world = TH.makeBankWorld()
     const pendingListVaults: { refuse?: (err: VaultError) => void } = {}
-    vi.spyOn(world.vaultDB, 'tryListVaults').mockReturnValue(new Promise((resolve) => { pendingListVaults.refuse = (err) => { resolve(badAnswerOf(err)) } }))
+    vi.spyOn(world.bankDB, 'tryListVaults').mockReturnValue(new Promise((resolve) => { pendingListVaults.refuse = (err) => { resolve(badAnswerOf(err)) } }))
     const [onLifecycle, onBadNews] = [vi.fn(), vi.fn()]
     const spy = TH.spyLogger()
     const { props, rerender } = provided({ onLifecycle, onBadNews, logger: spy.logger }, world)
@@ -567,7 +567,7 @@ describe("BankProvider's dialog", () => {
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
-    expect(handed.map(({ gatingkind }) => gatingkind)).to.deep.equal(['build_vault'])
+    expect(handed.map(({ gatingkind }) => gatingkind)).to.deep.equal(['build_bank'])
     expect(dialogShown()).to.be.false
   })
 
@@ -579,7 +579,7 @@ describe("BankProvider's dialog", () => {
     rerender({ ...props, requestCleartext: async (gating) => { handed.push(gating); await gating.attempt(TH.byPassphrase(TH.Passphrase)) } })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
-    expect(handed.map(({ gatingkind }) => gatingkind)).to.deep.equal(['build_vault'])
+    expect(handed.map(({ gatingkind }) => gatingkind)).to.deep.equal(['build_bank'])
     expect(first).not.toHaveBeenCalled()
   })
 
