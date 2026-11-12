@@ -42,7 +42,7 @@ describe("vault.beginWatch", () => {
     await next.beginWatch()
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
     const box = (await next.getBox(boxlabel))!
-    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
+    await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
   })
 
   it("a put from another session reaches the box listed", async () => {
@@ -90,10 +90,10 @@ describe("the box methods refuse a locked or deleted vault", () => {
 
   for (const [verb, refusesLocked, call] of Verbs) {
     if (refusesLocked) {
-      it(`${verb} refuses 'vault_locked' while locked`, async () => {
+      it(`${verb} refuses 'bank_locked' while locked`, async () => {
         const { vault } = await makeWorld()
         vault.lock()
-        await TH.expectRefusal(call(vault), 'vault_locked')
+        await TH.expectRefusal(call(vault), 'bank_locked')
       })
     }
 
@@ -114,7 +114,7 @@ describe("the box methods refuse a locked or deleted vault", () => {
   it("a refused put's whisper does not appear in the refusal", async () => {
     const { vault } = await makeWorld()
     vault.lock()
-    const err = await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }), 'vault_locked')
+    const err = await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }), 'bank_locked')
     expect(JSON.stringify(err.meta ?? {})).not.to.include(Whisper)
     expect(err.message).not.to.include(Whisper)
   })

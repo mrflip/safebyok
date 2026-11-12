@@ -10,7 +10,7 @@
  * in `afterEach`, as vitest's `restoreMocks` does not put real timers back: {@link useModelsWorld}
  * makes a new world before each test and disposes it after.
  *
- * The seal. The fake vault's seal verbs refuse 'vault_locked' while it reports locked, and
+ * The seal. The fake vault's seal verbs refuse 'bank_locked' while it reports locked, and
  * otherwise keep each whisper's text by the stamp it was sealed under and give it back for that
  * stamp alone: its sealed parts are the constants
  * {@link FakeBoxKeyWrapped} and {@link FakeWhisperCiphered}. A record it never sealed, as the
@@ -30,7 +30,7 @@ import * as CX from '../../src/shapes/shapes-core'
 import type { Boxscope } from '../../src/shapes/shapes-core'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
-import { type BankAnnouncement, type BankFriend, type BoxDna, type BoxWorld, type Fetched, type BoxListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
+import { type DeviceAnnouncement, type BankFriend, type BoxDna, type BoxWorld, type Fetched, type BoxListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
 import { type BoxDelAsk, type BoxGetAsk, type BoxPutAsk, type BoxRow, type BoxTombstone, type LoggableAsk, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -153,7 +153,7 @@ export type ModelsWorld = {
   /** The refusals the listing panicked with, oldest first. A live array. */
   panics:  readonly VaultError[]
   /** What the listing announced, oldest first. A live array. */
-  announced: readonly BankAnnouncement[]
+  announced: readonly DeviceAnnouncement[]
   /** The bank's private calls, as the listing is handed them: its panic logs each refusal in `panics`, its announcements in `announced`, its bad news in `badnews`. */
   bankFriend: BankFriend
   /** The vaultDB's own box rows, by boxlabel: the one vault's boxes. */
@@ -316,7 +316,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
   const calls: ModelsCall[] = []
   const badnews: VaultError[] = []
   const panics: VaultError[] = []
-  const announced: BankAnnouncement[] = []
+  const announced: DeviceAnnouncement[] = []
   const watches: ModelsWatch[] = []
   const vaultDB = new TestableVaultDB(calls, watches)
   vaultDB._cheat_vaultRowsOf(WorldVault.scope).set(WorldVault.scope.vaultlabel, worldVaultRow())
@@ -328,7 +328,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
   // The fake seal: the text sealed, by the stamp it was sealed under.
   const sealedTexts = new Map<string, string>()
   function demandFakeUnlocked(): void {
-    if (isLocked) { throw Refuse.unlockFirst() }
+    if (isLocked) { throw Refuse.needUnlocked() }
   }
   // The fake stands in for the vault, which `ensureTimely` answers; no box reads the answer.
   function standIn(): Vault { return world as unknown as Vault }
@@ -384,7 +384,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
     worldWith: (overrides) => ({ ...world, get isLocked() { return isLocked }, ...overrides }),
     bankFriend: {
       panic:       brandGuarded((refusal: VaultError) => { panics.push(refusal) }),
-      announce:    brandGuarded((announcement: BankAnnouncement) => { announced.push(announcement) }),
+      announce:    brandGuarded((announcement: DeviceAnnouncement) => { announced.push(announcement) }),
       tellBadNews: brandGuarded((told: readonly unknown[]) => { badnews.push(...told.map((news) => (isVaultError(news) ? news : Refuse.unexpectedError(news)))) }),
       askUser:     guardRequestCleartext(() => undefined),
     },

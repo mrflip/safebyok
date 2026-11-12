@@ -69,11 +69,11 @@ const BoxExposures: Record<keyof typeof Shows, BoxExposure> = { value: 'showing'
 const StateTable = [
   //                        shows         veil         unveil        unexpose     expose           lock        unlock
   ['unexposed',        'encrypted', 'encrypted', 'refused',    'encrypted', 'value',        'encrypted', 'encrypted'],
-  ['unexposedLocked',  'encrypted', 'encrypted', 'refused',    'encrypted', 'vault_locked', 'encrypted', 'encrypted'],
+  ['unexposedLocked',  'encrypted', 'encrypted', 'refused',    'encrypted', 'bank_locked', 'encrypted', 'encrypted'],
   ['showing',          'value',     'veiled',    'value',      'encrypted', 'value',        'locked',    'value'],
   ['veiled',           'veiled',    'veiled',    'value',      'encrypted', 'value',        'locked',    'veiled'],
-  ['locked',           'locked',    'locked',    'locked',     'encrypted', 'vault_locked', 'locked',    'value'],
-  ['lockedVeiled',     'locked',    'locked',    'locked',     'encrypted', 'vault_locked', 'locked',    'veiled'],
+  ['locked',           'locked',    'locked',    'locked',     'encrypted', 'bank_locked', 'locked',    'value'],
+  ['lockedVeiled',     'locked',    'locked',    'locked',     'encrypted', 'bank_locked', 'locked',    'veiled'],
 ] as const
 
 const OperationOrder = ['veil', 'unveil', 'unexpose', 'expose', 'lock', 'unlock'] as const
@@ -94,7 +94,7 @@ describe("box.whisper, state by operation", () => {
       const cell = cells[idx]!
       it(`${state}, ${operation}: ${cell}`, async () => {
         const box = await StateMakers[state]()
-        if ((cell === 'refused') || (cell === 'vault_locked')) {
+        if ((cell === 'refused') || (cell === 'bank_locked')) {
           await TH.expectRefusal((async () => Operations[operation](box))(), (cell === 'refused') ? undefined : cell)
           expectShows(box, shows)
           return
@@ -277,11 +277,11 @@ describe("box.putExposed", () => {
     expect(await box.extractWhisper()).to.deep.equal(Exposed)
   })
 
-  it("refuses 'vault_locked' while locked, veiled or not", async () => {
+  it("refuses 'bank_locked' while locked, veiled or not", async () => {
     for (const makeState of [StateMakers.locked, StateMakers.lockedVeiled]) {
       const box = await makeState()
       world.mw.clearCalls()
-      await TH.expectRefusal(box.putExposed(), 'vault_locked')
+      await TH.expectRefusal(box.putExposed(), 'bank_locked')
       expect(world.mw.callsOf('put')).to.deep.equal([])
       world.mw.setLocked(false)
     }

@@ -59,7 +59,7 @@ describe("Locking, and the sessions after it on this device", () => {
     const { vault: again } = await openNextSession()
     expect(again.isLocked).to.be.true
     const box = await boxIn(again)
-    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
+    await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
     await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
     await TH.expectRefusal(unlockTyping(again, byPassphrase('not the passphrase')), 'wrong_passphrase')
     await unlockTyping(again, byPassphrase(Passphrase))
@@ -105,7 +105,7 @@ describe("The lock, with a box exposed", () => {
     vault.lock()
     expect(vault.isLocked).to.be.true
     expect(box.whisper).to.equal(LOCKED)
-    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
+    await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const { vault: again } = await openNextSession()
     expect(again.isLocked).to.be.true

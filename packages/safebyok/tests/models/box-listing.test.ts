@@ -205,7 +205,7 @@ describe("boxListing.puttable(scoped, opts)", () => {
     const listing = boxListingOf(world.mw)
     world.mw.setLocked(true)
     const shell = listing.puttable(world.mw.boxscope(Label))
-    await TH.expectRefusal(shell.put({ whisper: { apiKey: 'sk-test-0000' } }), 'vault_locked')
+    await TH.expectRefusal(shell.put({ whisper: { apiKey: 'sk-test-0000' } }), 'bank_locked')
     expect(world.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
   })
 
@@ -237,10 +237,10 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
     })
   }
 
-  it("refuses 'vault_locked' for a sound dna created while the vault is locked", async () => {
+  it("refuses 'bank_locked' for a sound dna created while the vault is locked", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.setLocked(true)
-    await TH.expectRefusal(listing.create(dna()), 'vault_locked')
+    await TH.expectRefusal(listing.create(dna()), 'bank_locked')
     expect(listing.snapshot).to.deep.equal([])
   })
 

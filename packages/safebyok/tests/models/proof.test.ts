@@ -157,7 +157,7 @@ describe("the proof", () => {
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     boxesUi.expectRenders(['anthropic_api_key'])
     revealUi.expectRenders(['locked'])
-    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
+    await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
     await expect(vault.getBox(ApiKey.boxlabel)).resolves.to.eq(box)
 
     // The user closes the dialog: the unlock refuses dismissed, and nothing moves.

@@ -7,7 +7,7 @@ import type { Lease } from '../../src/models/lease'
 import type { VaultScope } from '../../src/shapes/shapes-core'
 import type * as GX from '../../src/shapes/shapes-gateish'
 import { type RequestCleartext, passphraseCleartext } from '../../src/shapes/shapes-gateish'
-import type { BankAnnouncement, BankFriend, BoxWorld, LifecycleHandler, ListingOpts, VaultWorld } from '../../src/shapes/shapes-vaultish'
+import type { DeviceAnnouncement, BankFriend, BoxWorld, LifecycleHandler, ListingOpts, VaultWorld } from '../../src/shapes/shapes-vaultish'
 import { type VaultError, isVaultError } from '../../src/refusals/errors'
 import * as Refuse from '../../src/refusals/throwers'
 import type { VaultTombstone, VaultRecord } from '../../src/shapes/shapes-storage'
@@ -162,7 +162,7 @@ export function makeVaultWorld(stored0: VaultRecord | null = null, worldOverride
   const vaultrows = vaultDB._cheat_vaultRowsOf(Dna)
   if (stored0 !== null) { vaultrows.set(Dna.vaultlabel, stored0) }
   const storedNow = (): VaultRecord | null => (vaultrows.get(Dna.vaultlabel) ?? null) as VaultRecord | null
-  const announce = brandGuarded((announcement: BankAnnouncement): void => { void hostLifecycle({ ...announcement, device: fakeBank.device }) })
+  const announce = brandGuarded((announcement: DeviceAnnouncement): void => { void hostLifecycle({ ...announcement, device: fakeBank.device }) })
   /** The bad news the listings and vaults told, oldest first. A live array. */
   const badnews: VaultError[] = []
   const bankFriend: BankFriend = {

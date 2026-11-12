@@ -13,14 +13,14 @@ const world = useModelsWorld()
 useVaultWorlds()
 
 describe("a lock() called during a put", () => {
-  it("during the seal refuses 'vault_locked', putting nothing", async () => {
+  it("during the seal refuses 'bank_locked', putting nothing", async () => {
     const lock = { during: false }
     const listing = fakeSealBoxListingOf(world.mw, {}, () => { if (lock.during) { world.mw.setLocked(true) } })
     const record = fullBoxRecord()
     world.mw.seedPut(record)
     const box = listing.deliverRecord(record)
     lock.during = true
-    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sealed while locking' } }), 'vault_locked')
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sealed while locking' } }), 'bank_locked')
     expect(world.mw.callsOf('put')).to.deep.equal([])
   })
 
@@ -56,37 +56,37 @@ describe("A lock called while an unlock proves", () => {
 })
 
 describe("A lock called during a box verb", () => {
-  it("during hello lets it resolve, and the next putBox refuses 'vault_locked'", async () => {
+  it("during hello lets it resolve, and the next putBox refuses 'bank_locked'", async () => {
     const { vault, vaultDB } = await makeBornVault()
     const tryListBoxes = vaultDB.tryListBoxes.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryListBoxes').mockImplementationOnce((...args) => { vault.lock(); return tryListBoxes(...args) })
     await expect(vault.beginWatch()).resolves.to.eq(vault)
-    await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } }), 'vault_locked')
+    await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } }), 'bank_locked')
   })
 
-  it("during fetchBox's get still returns the box, whose whisper refuses 'vault_locked'", async () => {
+  it("during fetchBox's get still returns the box, whose whisper refuses 'bank_locked'", async () => {
     const { vault, vaultDB } = await makeBornVault()
     await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
     const tryGetBox = vaultDB.tryGetBox.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.lock(); return tryGetBox(...args) })
     const box = (await vault.fetchBox('anthropic_api_key'))!
-    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
+    await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
   })
 
-  it("during extractWhisper's fetch refuses 'vault_locked'", async () => {
+  it("during extractWhisper's fetch refuses 'bank_locked'", async () => {
     const { vault, vaultDB } = await makeBornVault()
     const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
     const tryGetBox = vaultDB.tryGetBox.bind(vaultDB)
     vi.spyOn(vaultDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.lock(); return tryGetBox(...args) })
-    await TH.expectRefusal(box.extractWhisper({ maxMillisSinceRefresh: 0 }), 'vault_locked')
+    await TH.expectRefusal(box.extractWhisper({ maxMillisSinceRefresh: 0 }), 'bank_locked')
   })
 
-  it("during extractWhisper's decipher refuses 'vault_locked', handing back no whisper", async () => {
+  it("during extractWhisper's decipher refuses 'bank_locked', handing back no whisper", async () => {
     const { vault } = await makeBornVault()
     const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
     const decrypt = crypto.subtle.decrypt.bind(crypto.subtle)
     vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce((...args) => { vault.lock(); return decrypt(...args) })
-    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
+    await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
     vi.restoreAllMocks()
   })
 
@@ -121,9 +121,9 @@ describe("An ending called while box.expose unseals", () => {
     expect(box.whisper).to.eq(ENCRYPTED)
   })
 
-  it("a lock() refuses 'vault_locked', and leaves nothing exposed", async () => {
+  it("a lock() refuses 'bank_locked', and leaves nothing exposed", async () => {
     const box = await boxCrossingUnseal(() => { world.mw.setLocked(true) })
-    await TH.expectRefusal(box.expose(), 'vault_locked')
+    await TH.expectRefusal(box.expose(), 'bank_locked')
     world.mw.setLocked(false)
     expect(box.whisper).to.eq(ENCRYPTED)
   })

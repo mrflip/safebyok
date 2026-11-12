@@ -76,13 +76,10 @@ export function insecureContext(): VaultError { return new VaultError('insecure_
 export function deviceDisabled(): VaultError { return new VaultError('disabled', Phrases.DeviceLetGo) }
 // --
 
-// == [Vault Throwers]: needUnlocked, unlockFirst
+// == [Vault Throwers]: needUnlocked
 
-/** A `vault_locked` refusal: the vault is locked, and `ensureUnlocked()` will ask the user. */
-export function needUnlocked(): VaultError { return new VaultError('vault_locked', Phrases.VaultLocked) }
-
-/** A `vault_locked` refusal: the vault has no lease for a seal or unseal to use. */
-export function unlockFirst(): VaultError { return new VaultError('vault_locked', Phrases.UnlockFirst) }
+/** A `bank_locked` refusal: the bank is locked, so nothing was read or written, and `bank.ensureUnlocked()` will ask the user. */
+export function needUnlocked(): VaultError { return new VaultError('bank_locked', Phrases.BankLocked) }
 
 // --
 
@@ -173,8 +170,8 @@ export function damagedLease(): VaultError { return new VaultError('damaged_leas
 /** A `damaged_whisper` refusal: the whisper would not decipher under this vault's key. */
 export function undecipheredWhisper(): VaultError { return new VaultError('damaged_whisper', Phrases.UndecipheredWhisper) }
 
-/** A `vault_locked` refusal: this lease is out of force. */
-export function leaseNotInForce(): VaultError { return new VaultError('vault_locked', Phrases.LeaseNotInForce) }
+/** A `bank_locked` refusal: this lease is out of force. */
+export function leaseNotInForce(): VaultError { return new VaultError('bank_locked', Phrases.LeaseNotInForce) }
 // --
 
 // == [Gating Throwers]: alreadyAsking, requestCleartextThrew, cleartextsThrew, samePassphrase, gateMadeElsewhere, gatingDismissed, gatingConcluded, attemptInFlight

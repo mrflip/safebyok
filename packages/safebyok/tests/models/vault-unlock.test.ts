@@ -80,8 +80,8 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     expect(vault.lock()).to.equal(vault)
     expect(vault.isLocked).to.be.true
     expect(vault.isLocked).to.be.true
-    await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'vault_locked')
-    await TH.expectRefusal(vault.unsealStampedString(sealed, Stamp), 'vault_locked')
+    await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp), 'bank_locked')
+    await TH.expectRefusal(vault.unsealStampedString(sealed, Stamp), 'bank_locked')
     await TH.eventually(() => deviceDB.cachedNow() === null)
     await TH.expectRefusal(vault.ensureUnlocked(), 'dismissed')
     await TH.expectRefusal(unlockTyping(vault, byPassphrase('not the passphrase')), 'wrong_passphrase')
@@ -132,7 +132,7 @@ describe("Vault.ensureUnlocked and the vault's lock", () => {
     const sealing = vault.sealStampedString('sk-test', Stamp)
     const unsealing = vault.unsealStampedString(sealed, Stamp)
     vault.lock()
-    await Promise.all([TH.expectRefusal(sealing, 'vault_locked'), TH.expectRefusal(unsealing, 'vault_locked')])
+    await Promise.all([TH.expectRefusal(sealing, 'bank_locked'), TH.expectRefusal(unsealing, 'bank_locked')])
   })
 
   it("seals nothing another vault can open", async () => {

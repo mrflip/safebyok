@@ -10,7 +10,7 @@ import type { AskUser, GateProps, LeaseFriend, SealedWhisper, UnlockByProving } 
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, BoxPut, BoxPutOpts, RevokeSite, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
 import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
-import { alreadyListed, deletedVault, unlockFirst } from '../refusals/throwers'
+import { alreadyListed, deletedVault, needUnlocked } from '../refusals/throwers'
 import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Gate } from './gate'
@@ -327,7 +327,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   #demandLease(stamp: CipherCtxRecord): Lease {
     this.demandEnabled().demandPresent()
     checkedConsistent(stamp, this.#stampOfLife(), { kind: 'unexpected_error', message: Phrases.StampOfOtherVault })
-    if (this.#lease === null) { throw unlockFirst() }
+    if (this.#lease === null) { throw needUnlocked() }
     return this.#lease
   }
 

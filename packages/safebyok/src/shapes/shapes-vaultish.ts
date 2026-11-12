@@ -157,9 +157,9 @@ export type ListingWorld = Pick<Bank | Vault, 'isLocked' | 'ensureTimely' | 'rec
 /** The bank's private calls, handed down to each listing and vault as it is made. */
 export interface BankFriend {
   /** Vacate the bank for a revoked identity. */
-  readonly panic:       BankPanic
+  readonly panic:       DevicePanic
   /** Tell the host's `onLifecycle` what happened, through the bank, which names itself. Never throws. */
-  readonly announce:    BankAnnounce
+  readonly announce:    DeviceAnnounce
   /** Tell the host's `onBadNews` each news no caller waits on: a refusal as it is, anything else thrown as `unexpected_error`, a `disabled` refusal not at all. Never throws. */
   readonly tellBadNews: (badnews: readonly unknown[]) => void
   /** Show the host's dialog, wrapped by `guardRequestCleartext`; null with none. */
@@ -184,12 +184,12 @@ function answersEachVerb(val: object): boolean {
 export const brandedVaultDB = Checker(({ custom }) => custom<VaultDB>((val) => isVaultDB(val) && answersEachVerb(val), Phrases.VaultDBExpected), 'bad_option')
 
 /** The check of the bank's panic as a listing or a vault is handed it, by the brand the bank gave it. */
-export const bankPanic = Checker(({ custom }) => custom<BankPanic>(isGuarded, Phrases.GuardedExpected), 'bad_option')
+export const bankPanic = Checker(({ custom }) => custom<DevicePanic>(isGuarded, Phrases.GuardedExpected), 'bad_option')
 
 /** The check of the bank's private calls as a listing or a vault is handed them, each by the brand the bank gave it. */
 export const bankFriend = objCheck(({ custom }) => ({
   panic:       bankPanic,
-  announce:    custom<BankAnnounce>(isGuarded, Phrases.GuardedExpected),
+  announce:    custom<DeviceAnnounce>(isGuarded, Phrases.GuardedExpected),
   tellBadNews: custom<BankFriend['tellBadNews']>(isGuarded, Phrases.GuardedExpected),
   askUser:     custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
@@ -389,7 +389,7 @@ export const bankArgs = objCheck(({ custom, device_tok }) => ({
 
 // --
 
-// == [The device]: positiveMinutes, refreshMinutes, deviceOpts, DeviceOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, RevokeSite, BankAnnouncement, DeviceEvent, LifecycleHandler, GuardedLifecycleHandler, BankAnnounce, BankPanic, DeviceStage, DeviceSnapshot, BankSnapshot
+// == [The device]: positiveMinutes, refreshMinutes, deviceOpts, DeviceOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, RevokeSite, DeviceAnnouncement, DeviceEvent, LifecycleHandler, GuardedLifecycleHandler, DeviceAnnounce, DevicePanic, DeviceStage, DeviceSnapshot, BankSnapshot
 
 /** The checks of a device's durations in minutes: `positiveMinutes` for the autolock, and `refreshMinutes` for a refresh interval, which may be zero. */
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
@@ -481,13 +481,13 @@ export const tellBadNewsToArgs = objCheck(({ fn, custom, arr }) => ({
 export type RevokeSite = 'lock' | 'tombstone' | 'vacate' | 'undeleted'
 
 /** What the device and its bank's listings and vaults announce through it: a {@link DeviceEvent} before the device names itself. */
-export type BankAnnouncement =
+export type DeviceAnnouncement =
   | { readonly kind: 'lease_revoke_failed', readonly refusal: VaultError, readonly vault: Vault | null, readonly where: RevokeSite }
   | { readonly kind: 'vacated', readonly cause: VaultError, readonly unrevoked: number }
   | { readonly kind: 'helloed', readonly outcome: Outcome<void>, readonly vault: Vault | null }
 
 /** What `onLifecycle` hears: what happened in the device's life, told by its `kind`, and the device it happened to. */
-export type DeviceEvent = { readonly device: Device } & BankAnnouncement
+export type DeviceEvent = { readonly device: Device } & DeviceAnnouncement
 
 /** `Device.make`'s `onLifecycle`: hears what happened in the device's life, as a bring-up or a vault's beginWatch, a vacate or a cached lease that outlived its revoke. */
 export type LifecycleHandler = (event: DeviceEvent) => unknown
@@ -496,10 +496,10 @@ export type LifecycleHandler = (event: DeviceEvent) => unknown
 export type GuardedLifecycleHandler = (event: DeviceEvent) => Promise<void>
 
 /** How a vault or a listing tells the host's `onLifecycle` through the device: handed to each as it is made. Never throws. */
-export type BankAnnounce = (announcement: BankAnnouncement) => void
+export type DeviceAnnounce = (announcement: DeviceAnnouncement) => void
 
 /** How a listing vacates the device for a revoked identity: handed to each as it is made. Never throws. */
-export type BankPanic = (refusal: VaultError) => void
+export type DevicePanic = (refusal: VaultError) => void
 
 /** `made` until an `ensureBank` succeeds; `ready` after one does; `disabled` once the device is swept or vacated, the snapshot's `err` saying why. */
 export type DeviceStage = 'made' | 'ready' | 'disabled'

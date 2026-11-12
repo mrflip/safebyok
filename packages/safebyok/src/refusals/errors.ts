@@ -17,7 +17,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   or the dev overlay. Never show it to the user, and never retry it. `bad_scope`,
  *   `bad_option`, `bad_record`, `insecure_context`, `unexpected_error`, `gate_issue`, `disabled`.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
- *   show a message, retry, or have the user free room. `vault_locked`, `wrong_passphrase`,
+ *   show a message, retry, or have the user free room. `bank_locked`, `wrong_passphrase`,
  *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `box_too_large`, `vault_full`,
  *   `stale_write`, `record_conflict`, `storage_unavailable`, `storage_blocked`, `gate_made_elsewhere`,
@@ -39,7 +39,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  * altered, since decryption fails alike; the message says so.
  */
 export const refusalkindVals = [
-  'vault_locked',        // a whisper was asked for before the vault was unlocked
+  'bank_locked',         // a whisper was asked for before the bank was unlocked
   'wrong_passphrase',    // the passphrase given did not unlock the vault
   'weak_passphrase',     // a new passphrase the vault's strengthChecker finds too easy to guess
   'wrong_passkey',       // the passkey's answer did not unlock the vault, or was for another salt
@@ -86,7 +86,7 @@ export type RefusalFamily = typeof refusalFamilyVals[number]
 
 /** The family of each refusalkind in {@link refusalkindVals}, which a VaultError's `family` is read from. */
 export const RefusalFamilyForKind = {
-  vault_locked:        'condition',
+  bank_locked:        'condition',
   wrong_passphrase:    'condition',
   weak_passphrase:     'condition',
   wrong_passkey:       'condition',
@@ -229,7 +229,7 @@ export function thrownNameOf(thrown: unknown): string | null {
  *
  * @example
  *   try { await box.extractWhisper() } catch (err) {
- *     if (isVaultError(err, 'vault_locked')) { promptForPassphrase() }
+ *     if (isVaultError(err, 'bank_locked')) { promptForPassphrase() }
  *   }
  */
 export const isVaultError = (err: unknown, refusalkind?: Refusalkind): err is VaultError => (

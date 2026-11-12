@@ -55,7 +55,7 @@ describe("VaultError", () => {
     expect(full.meta).to.deep.equal({ capacity })
     const stale = new VaultError('stale_write', 'Read it again.', { meta: { act: 'void' } })
     expect(stale.meta).to.deep.equal({ act: 'void' })
-    const plain = new VaultError('vault_locked', 'Unlock it first.')
+    const plain = new VaultError('bank_locked', 'Unlock it first.')
     expect(plain.meta).to.be.undefined
     expect(Object.keys(plain)).to.not.include('meta')
   })
@@ -99,7 +99,7 @@ const FamilyCases = [
   ["insecure_context",    "misuse",    'serving the app over plain http is a deployment bug'],
   ["unexpected_error",    "misuse",    'a throw that is no refusal is a bug, in safebyok or in a function the app handed it'],
   // conditions: normal operation, which may reach the user; bad news: told to the user, nobody's bug
-  ["vault_locked",        "condition", 'a locked vault asks for the passphrase'],
+  ["bank_locked",        "condition", 'a locked vault asks for the passphrase'],
   ["wrong_passphrase",    "condition", 'a mistyped passphrase asks again'],
   ["weak_passphrase",     "condition", 'a passphrase too easy to guess asks the user for another'],
   ["wrong_passkey",       "condition", 'a passkey that does not open the vault asks again, or for a passphrase'],
@@ -186,8 +186,8 @@ describe("isVaultError", () => {
   // isVaultError @example
   it("tells a refusal of the kind asked", () => {
     const prompted: string[] = []
-    function handle(err: unknown) { if (isVaultError(err, 'vault_locked')) { prompted.push('passphrase') } }
-    handle(new VaultError('vault_locked', 'Unlock the vault first.'))
+    function handle(err: unknown) { if (isVaultError(err, 'bank_locked')) { prompted.push('passphrase') } }
+    handle(new VaultError('bank_locked', 'Unlock the vault first.'))
     handle(new VaultError('absent_box', 'No box under that label.'))
     expect(prompted).to.deep.equal(['passphrase'])
   })
@@ -198,19 +198,19 @@ describe("isVaultError", () => {
     expect(Other.VaultError).to.not.eq(VaultError)
     expect(isVaultError(new Other.VaultError('identity_revoked', 'Sign in again to reach this vault.'))).to.be.true
     expect(isVaultError(new Other.VaultError('identity_revoked', 'Sign in again to reach this vault.'), 'identity_revoked')).to.be.true
-    expect(isVaultError(new Other.VaultError('identity_revoked', 'Sign in again to reach this vault.'), 'vault_locked')).to.be.false
+    expect(isVaultError(new Other.VaultError('identity_revoked', 'Sign in again to reach this vault.'), 'bank_locked')).to.be.false
   })
 
   it("is true for an error whose class wears the brand every copy of safebyok shares", () => {
     const proto = Object.defineProperty(Object.create(Error.prototype) as object, Symbol.for('@safebyok/vaulterror'), { get: () => true })
-    const stranger = Object.assign(Object.create(proto) as object, { refusalkind: 'vault_locked' })
+    const stranger = Object.assign(Object.create(proto) as object, { refusalkind: 'bank_locked' })
     expect(isVaultError(stranger)).to.be.true
-    expect(isVaultError(stranger, 'vault_locked')).to.be.true
+    expect(isVaultError(stranger, 'bank_locked')).to.be.true
     expect(isVaultError(stranger, 'absent_box')).to.be.false
   })
 
   it("is false for a copy of a VaultError's own fields", () => {
-    const refusal = new VaultError('vault_locked', 'Unlock the vault first.')
+    const refusal = new VaultError('bank_locked', 'Unlock the vault first.')
     expect(isVaultError(Object.assign({}, refusal))).to.be.false
   })
 

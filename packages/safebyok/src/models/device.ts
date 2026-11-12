@@ -11,7 +11,7 @@ import { reportToPlatform } from '../refusals/report-error'
 import { type BankScope, bankScope } from '../shapes/shapes-core'
 import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BadNewsHandler, BankAnnouncement, BankFriend, DeviceEvent, DeviceOpts, DeviceSnapshot, DeviceStage, GuardedLifecycleHandler, LifecycleHandler, VacateStory } from '../shapes/shapes-vaultish'
+import type { BadNewsHandler, DeviceAnnouncement, BankFriend, DeviceEvent, DeviceOpts, DeviceSnapshot, DeviceStage, GuardedLifecycleHandler, LifecycleHandler, VacateStory } from '../shapes/shapes-vaultish'
 import type { DeviceDB } from '../storage/device-db'
 import type { VaultDB } from '../storage/vault-db'
 import { alreadyAsking, deviceDisabled, insecureContext, unexpectedError } from '../refusals/throwers'
@@ -58,7 +58,7 @@ export class Device {
   })
   // Not awaited: an announcement is news of what happened, and nothing waits on the host's answer.
   /** Tell the host's `onLifecycle` what happened, its bank's every listing and vault coming straight here: the friend they announce through. */
-  readonly #announce = brandGuarded((announcement: BankAnnouncement): void => { void this.#handlers.onLifecycle({ ...announcement, device: this }) })
+  readonly #announce = brandGuarded((announcement: DeviceAnnouncement): void => { void this.#handlers.onLifecycle({ ...announcement, device: this }) })
   /** The device's private calls, handed to its bank as it is made. */
   readonly #bankFriend: BankFriend
   readonly #listeners = new Set<() => void>()
@@ -232,7 +232,7 @@ export class Device {
   }
 
   /** A vacate's word to the host's own `onLifecycle`, past the disable. */
-  #tellHost(announcement: BankAnnouncement): void {
+  #tellHost(announcement: DeviceAnnouncement): void {
     // Not awaited: a host's onLifecycle that awaits device.vacate() is handed this vacate, and each would wait on the other.
     void this.#hostHandlers.onLifecycle({ ...announcement, device: this })
   }

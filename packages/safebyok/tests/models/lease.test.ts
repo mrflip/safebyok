@@ -138,7 +138,7 @@ describe("lease.cacheAsCacheCan()", () => {
     const friend = fakeLeaseFriendOf()
     const lease = await makeGrantedLease(friend)
     lease.evict()
-    await TH.expectRefusal(lease.cacheAsCacheCan(), 'vault_locked')
+    await TH.expectRefusal(lease.cacheAsCacheCan(), 'bank_locked')
     expect(friend.tellBadNews).not.toHaveBeenCalled()
     expect(friend.cached).to.be.null
   })
@@ -360,13 +360,13 @@ describe("lease.revoke(), lease.evict() and isGranted", () => {
     expect(friend.cached).to.not.be.null
   })
 
-  it("sealWith and unsealWith refuse 'vault_locked' once revoked", async () => {
+  it("sealWith and unsealWith refuse 'bank_locked' once revoked", async () => {
     const { lease } = await grantedWorld()
     const stamps = sealStampsOf('b1')
     const sealed = await lease.sealWith(WhisperText, stamps)
     await lease.revoke()
-    await TH.expectRefusal(lease.sealWith(WhisperText, stamps), 'vault_locked')
-    await TH.expectRefusal(lease.unsealWith(sealed, stamps), 'vault_locked')
+    await TH.expectRefusal(lease.sealWith(WhisperText, stamps), 'bank_locked')
+    await TH.expectRefusal(lease.unsealWith(sealed, stamps), 'bank_locked')
   })
 })
 
@@ -496,7 +496,7 @@ describe("a tampered lease record", () => {
       expect(friend.lock).toHaveBeenCalledTimes(1)
       expect(got!.isGranted).to.be.false
       expect(friend.forgetLease).not.toHaveBeenCalled()
-      await TH.expectRefusal(got!.sealWith(WhisperText, stamps), 'vault_locked')
+      await TH.expectRefusal(got!.sealWith(WhisperText, stamps), 'bank_locked')
       expect(friend.lock).toHaveBeenCalledTimes(1)
     })
   }

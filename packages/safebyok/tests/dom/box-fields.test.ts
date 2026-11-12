@@ -270,7 +270,7 @@ describe("fields.put", () => {
     expect(veiled.message).to.eq(Phrases.PuttingVeiledFields)
     box.unveil()
     world.mw.setLocked(true)
-    await TH.expectRefusal(BoxFields.of(box).put(), 'vault_locked')
+    await TH.expectRefusal(BoxFields.of(box).put(), 'bank_locked')
   })
 
   it("has a try form that returns an Outcome", async () => {

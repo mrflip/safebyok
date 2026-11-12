@@ -33,8 +33,8 @@ describe("box.extractWhisper(): refused from its guard", () => {
     // absent, refused ahead of the seal:
     [() => tombstoneBoxRecord({ revision_seq: 2 }),      false,   "absent_box",       'a deleted box'],
     // locked, refused first:
-    [() => tombstoneBoxRecord({ revision_seq: 2 }),      true,    "vault_locked",     'a deleted box while the vault is locked'],
-    [() => fullBoxRecord(),                              true,    "vault_locked",     'a full box while the vault is locked'],
+    [() => tombstoneBoxRecord({ revision_seq: 2 }),      true,    "bank_locked",     'a deleted box while the vault is locked'],
+    [() => fullBoxRecord(),                              true,    "bank_locked",     'a full box while the vault is locked'],
     // present and full, past the guard to a lease that never sealed it:
     [() => fullBoxRecord(),                              false,   "damaged_whisper",  'a full box whose whisper will not open'],
   ] as const
@@ -94,10 +94,10 @@ describe("box.whisper through a lock", () => {
     expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-edited', org: 'acme' })
   })
 
-  it("refuses 'vault_locked' at an expose while locked, keeping the exposed whisper", async () => {
+  it("refuses 'bank_locked' at an expose while locked, keeping the exposed whisper", async () => {
     const box = await exposedOf()
     world.mw.setLocked(true)
-    await TH.expectRefusal(box.expose(), 'vault_locked')
+    await TH.expectRefusal(box.expose(), 'bank_locked')
     world.mw.setLocked(false)
     expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-0000' })
   })

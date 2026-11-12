@@ -360,11 +360,11 @@ describe("a sidecar-only put", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-0001' })
   })
 
-  it("refuses 'vault_locked' while locked, putting nothing", async () => {
+  it("refuses 'bank_locked' while locked, putting nothing", async () => {
     const { vault, box, tryPutBox } = await makeWorldWithBox()
     vault.lock()
     tryPutBox.mockClear()
-    await TH.expectRefusal(box.put({ sidecar: { note: 'home' } }), 'vault_locked')
+    await TH.expectRefusal(box.put({ sidecar: { note: 'home' } }), 'bank_locked')
     expect(tryPutBox).not.toHaveBeenCalled()
   })
 })
@@ -380,10 +380,10 @@ describe("extractWhisper", () => {
     expect(await box.tryExtractWhisper()).to.deep.include({ ok: true, val: { apiKey: 'sk-test-0000', deep: { orgId: null } } })
   })
 
-  it("refuses 'vault_locked' once locked", async () => {
+  it("refuses 'bank_locked' once locked", async () => {
     const { vault, box } = await makeWorldWithBox()
     vault.lock()
-    await TH.expectRefusal(box.extractWhisper(), 'vault_locked')
+    await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
   })
 })
 

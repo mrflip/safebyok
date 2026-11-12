@@ -398,7 +398,7 @@ describe("vault.del()", () => {
     const { vault, listing } = await makeBornVault()
     await vault.del(vault)
     const gone = listing.at(vault.scope)
-    TH.expectSyncRefusal(() => gone?.demandUnlocked(), 'vault_locked')
+    TH.expectSyncRefusal(() => gone?.demandUnlocked(), 'bank_locked')
     TH.expectSyncRefusal(() => gone?.demandPresent(), 'vault_gone')
   })
 
@@ -419,13 +419,13 @@ describe("vault.del()", () => {
     await TH.expectRefusal(boxes.get({ ...vault.scope, boxlabel: 'anthropic_api_key' }, { maxMillisSinceRefresh: 0 }))
   })
 
-  it("refuses 'vault_locked' a locked vault, asking nobody and storing nothing", async () => {
+  it("refuses 'bank_locked' a locked vault, asking nobody and storing nothing", async () => {
     const born = await makeBornVault()
     const { vault, storedNow } = born
     const ante = storedNow()
     const { shown } = dialogOf(born)
     vault.lock()
-    await TH.expectRefusal(vault.del(vault), 'vault_locked')
+    await TH.expectRefusal(vault.del(vault), 'bank_locked')
     expect(shown).to.have.lengthOf(0)
     expect(storedNow()).to.equal(ante)
   })

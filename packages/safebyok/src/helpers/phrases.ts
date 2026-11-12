@@ -146,10 +146,10 @@ export const WhisperBagShape = "An object in a whisper or a sidecar is a plain o
 export const otherScope = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's, which serves one app and one signed-in user. Use the bank of the app and user it belongs to.`
 // --
 
-// == [Vault: lifecycle]: VaultLocked
+// == [Vault: lifecycle]: BankLocked
 
 /** Why a call that needs the vault unlocked does nothing while it is locked. */
-export const VaultLocked = "The vault locked mid-operation. Please unlock again to carry on."
+export const BankLocked = "The bank is locked, so nothing was read or written: unlock it (bank.ensureUnlocked) and call again."
 
 // --
 
@@ -253,7 +253,7 @@ export const StampOfOtherVault = "This stamp names another vault than this one, 
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UndecipheredWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, VaultDeleted
+// == [Models: leases, vaults and boxes]: DamagedLease, UndecipheredWhisper, UndecodedWhisper, LeaseNotInForce, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, VaultDeleted
 
 /** Why a lease on this device is no use: whether found so in the cache, or in force and failing to open. */
 export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
@@ -265,11 +265,7 @@ export const UndecipheredWhisper = "That whisper would not open under this vault
 export const UndecodedWhisper = "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or seal a whisper over it."
 
 /** Why a lease dropped opens nothing. */
-export const LeaseNotInForce = "This lease is out of force, as the vault locked or the lease would not open, so nothing was read or written: unlock the vault again."
-
-/** Why a call that needs the vault unlocked is refused while it is locked. */
-export const UnlockFirst = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
-
+export const LeaseNotInForce = "This lease is out of force, as the bank locked or the lease would not open, so nothing was read or written: unlock the bank again."
 
 /** Why an instance past a sweep, a vacate or a delete answers nothing. */
 export const LetGoInstance = "This object was let go, by a sweep, a vacate or a delete, so it answers nothing more: ask the bank for the vault again."
