@@ -75,6 +75,8 @@ scopepath order (`user_id` first) is what a search misses, so the worker greps f
 shape, scopepath builder and SQL key by hand. Pre-1.0: schemas and the Convex component are edited
 in place, no migration (CLAUDE.md). **Size**: L but mechanical.
 
+*Review:* `fixed` (sonnet, low; [#657](https://github.com/mrflip/safebyok/pull/657)). One commit: two `Bank.make` examples in `notes/configuration.md` and a doc block in `notes/gallant-docblocks.md` still put `banklabel` first. Nothing left. Style pass skipped as low value on a rename.
+
 ### 2 `device_row`
 
 The deviceDB's bank row is the device row; `device_id` is `device_tok`. **Levels**: worker
