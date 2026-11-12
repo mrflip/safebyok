@@ -39,9 +39,13 @@ What the threads have taught, newer than the plan where they disagree. Kept by t
 
 (thread 8 and after)
 
+* *Thread 8b leg 2, for 8c:* no listing delivers gate notices, so a gate change on another device is heard only at the next `ensureBank`; a newer bank life arriving as a parent row remakes the Bank in its listing while the Device still holds the old one; the bank snapshot lacks `maingate`. `autolock` was pulled forward into 8b (peeks the bank's one lease row). `lease_revoke_failed` now names the bank, and the default `onLifecycle` vacates that Bank. `Device.device_tok` is null before `ensureBank`. One new thrower, `writtenByOwnVerbs` (`bad_option`), for a stub listing's put/del; `rowOfOtherVaultTok` became `rowOfOtherWorld(received, tokname)`.
+
 * *Thread 13 (PostgresBankDB, #669), the contract probe:* no correction to `AdapterBankDB` or design.md. delBank's cascade fits one stored-function call (one UPDATE flips the bank row; gate, vault and box rows deleted by scope, unconditionally); the only notice is the bank tombstone. The gate policy fits as conditions in one UPDATE (`put_gate`, which fetches the bank row itself). `tidyGone` judges by the bank row at the ask's scope in the same statement (a correlated `NOT EXISTS`), then boxes against their vault rows. The life pair sits in the box table's primary key, so an `ifAbsent` put inserts beside another life's row. Every read fetches the row above in the same statement; every write inside its function. The ladder decided: blunt cascades, nothing added at the hot end (a box write fetches its vault row only, never the bank row), the whole gate policy in SQL. For 14 and 15: copy this shape; one database holds one set of functions (vault and bank share names) until 16 drops the vault set; `safebyok/testing` exports the bankDB world as `TH.BW` (thread 5 named it `BankDBWorld`: one name at the restack, `BW`).
 
 ## Lessons for later threads
+
+* *Orchestrator:* **a 400k window fits the models' switch.** 8b's leg 1 at 200k landed two steps through two compactions; leg 2 on `thread-worker-400k` (the Coach's agent) landed steps 3 to 8 (+988/-738 src) in one context, ending near 351k with no compaction. Heavy model threads (8c, 10, 12) and the adapter threads go to `thread-worker-400k`.
 
 * *Orchestrator:* **the models' switch outruns one opus context by a wide margin.** 8a compacted five times; 8b's first worker compacted twice in reading and landed only renames. Legs on one branch, each with a narrow handoff naming its steps and files, at default effort, are the working shape. Threads 10 and 12 should be sized the same way.
 
