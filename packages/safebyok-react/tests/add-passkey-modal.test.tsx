@@ -14,14 +14,11 @@ const shownFor = async (opts: TH.FakeAuthenticatorOpts = {}) => {
   await TH.makeBankWithVault(world)
   const opened = await TH.openGatingOf(world, TH.addingPasskey)
   const ui = <AddPasskeyModal gating={TH.gatingOfKind(opened.gating, 'add_passkey')} />
-  return { ...opened, ...render(ui), ui, authenticator }
+  return { ...opened, ...render(ui), ui, authenticator, bank: await opened.device.ensureBank() }
 }
 
-/** Return the credential id of the passkey on `bank`'s vault, or null when it has none. */
-const passkeyOf = (bank: Bank) => {
-  const wayin = bank.vaultAt(TH.VaultScopeGiven)?.gate.toJSON().passkey_wayin
-  return wayin?.wayinkind === 'passkey' ? wayin.credential_id : null
-}
+/** Return the credential id of the passkey on `bank`'s gate, or null when it has none. */
+const passkeyOf = (bank: Bank) => bank.maingate.passkey0?.credential_id ?? null
 
 const alertText = () => screen.getByRole('alert').textContent
 
@@ -34,7 +31,7 @@ describe("AddPasskeyModal", () => {
     expect(passkeyOf(bank)).to.equal(authenticator.credentialIds()[0])
     const [call] = authenticator.calls.create
     expect(call?.publicKey?.rp.name).to.equal(gating.banklabel)
-    expect(call?.publicKey?.user).to.include({ name: 'u1 (main vault)' })
+    expect(call?.publicKey?.user).to.include({ name: 'u1 (acme vault)' })
   })
 
   it("shows a wrong passphrase in place, adding nothing, and adds a passkey made anew on the right one", async () => {

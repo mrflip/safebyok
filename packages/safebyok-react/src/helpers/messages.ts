@@ -75,4 +75,5 @@ export const Doing: Record<Gatingkind, string> = {
   replace_passphrase: 'change your passphrase',
   add_passkey:        'add the passkey',
   revoke_passkey:     'remove the passkey',
+  del_bank:           'delete your vault',
 }

@@ -13,7 +13,7 @@ const WeekMillis = 7 * 24 * 60 * MinuteMillis
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
 /** Open a gating with `raise`, and render it in a PassphraseModal. */
-const shownFor = async (raise: typeof TH.building, opts: { built?: boolean, bankOpts?: Parameters<typeof TH.openGatingOf>[2], leaseMillis?: number } = {}) => {
+const shownFor = async (raise: Parameters<typeof TH.openGatingOf>[1], opts: { built?: boolean, bankOpts?: Parameters<typeof TH.openGatingOf>[2], leaseMillis?: number } = {}) => {
   const world = TH.makeBankWorld()
   if (opts.built === true) { await TH.makeBankWithVault(world) }
   const opened = await TH.openGatingOf(world, raise, opts.bankOpts)
@@ -30,7 +30,7 @@ describe("PassphraseModal, building a vault", () => {
   it("chooses the first passphrase, naming the user and the vault", async () => {
     const { raising } = await shownFor(TH.building)
     expect(screen.getByText(Messages.chooseTitle)).to.exist
-    expect(screen.getByDisplayValue('u1 (main vault)')).to.exist
+    expect(screen.getByDisplayValue('u1 (acme vault)')).to.exist
     await TH.submitNewPassphrase(TH.Passphrase)
     expect(await raising).to.include({ ok: true })
   })

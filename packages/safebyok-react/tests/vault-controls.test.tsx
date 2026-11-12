@@ -107,7 +107,9 @@ describe("CreateVaultButton", () => {
   })
 
   it("is disabled until the device's ensureBank lands", async () => {
-    render(<BankProvider {...TH.providerPropsOf(TH.makeBankWorld())}><CreateVaultButton vaultlabel="main" /></BankProvider>)
+    const world = TH.makeBankWorld()
+    await world.ensureBuilt()
+    render(<BankProvider {...TH.providerPropsOf(world)}><CreateVaultButton vaultlabel="main" /></BankProvider>)
     const button = screen.getByRole('button', { name: 'Create vault' })
     expect(button.hasAttribute('disabled')).to.be.true
     await waitFor(() => { expect(button.hasAttribute('disabled')).to.be.false })

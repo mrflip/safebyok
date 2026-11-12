@@ -35,7 +35,7 @@ describe("ReplacePassphraseModal", () => {
   it("replaces the passphrase, naming the user and the vault, and the gating concludes", async () => {
     const { world, raising } = await shownFor()
     expect(screen.getByText(Messages.changeTitle)).to.exist
-    expect(screen.getByDisplayValue('u1 (main vault)')).to.exist
+    expect(screen.getByDisplayValue('u1 (acme vault)')).to.exist
     await TH.submitReplacement(TH.Passphrase, NextPassphrase)
     expect(await raising).to.include({ ok: true })
     expect(await unlocksWith(world, NextPassphrase)).to.be.true

@@ -14,7 +14,7 @@ export const AddPasskeyModal = (props: AddPasskeyModalProps) => (
 
 const AddPasskeyForm = ({ gating, passphraseUsername, passkeyRpId }: AddPasskeyModalProps) => {
   const fieldRef = useRef<HTMLInputElement>(null)
-  const username = passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)
+  const username = passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.banklabel)
 
   const addPasskey = async (form: FormData) => {
     const passphraseClear = textOf(form, 'current-password')

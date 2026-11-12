@@ -5,7 +5,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { expect, onTestFinished, vi } from 'vitest'
-import { MemoryDeviceDB, type AnyGating, type Bank, type DeviceOpts, type Gating, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok'
+import { MemoryDeviceDB, type AnyGating, type Device, type DeviceOpts, type Gating, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok'
 import { Passphrase, VaultScopeGiven, anyStrengthChecker, passkeyOf, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
 import type { BankProviderProps, PassphraseGating } from '../src/shapes'
@@ -98,51 +98,57 @@ export const addPasskeyTo = async (world: BankWorld, vault: Vault, passkeyClear?
 /** `createPasskey` options for tests: a relying party and a user, named as a host would name them. */
 export const PasskeyMaking = { rp: { name: 'Acme' }, user: { name: 'u1 (main vault)', displayName: 'u1' } }
 
-/** Call `raise` on a new bank, on another device, over `world`'s vaultDB, and return the gating it opens.
+/** Call `raise` on a new device, on another device, over `world`'s bankDB, and return the gating it opens.
  * The gating stays open until it concludes or the test calls `close`, as it would while a host's dialog is showing. `raising` is the pending outcome of `raise`.
  *
  * @example
  *   await TH.makeBankWithVault(world)
  *   const { gating, raising, close } = await TH.openGatingOf(world, TH.unlocking)
  */
-export const openGatingOf = async (world: BankWorld, raise: (bank: Bank) => Promise<Outcome<unknown>>, overrides: Partial<DeviceOpts> = {}) => {
+export const openGatingOf = async (world: BankWorld, raise: (device: Device) => Promise<Outcome<unknown>>, overrides: Partial<DeviceOpts> = {}) => {
   const handed = makePending<AnyGating>()
   const closing = makePending()
   const requestCleartext: RequestCleartext = async (gating) => {
     handed.resolve(gating)
     await Promise.race([gating.whenConcluded, closing.promise])
   }
-  const bank = await world.bankOnAnotherDevice({ requestCleartext, ...overrides })
-  const raising = raise(bank)
+  const device = world.deviceOnAnotherDevice({ requestCleartext, ...overrides })
+  const raising = raise(device)
   const unasked = (async () => { throw new Error(`settled with nobody asked: ${JSON.stringify(await raising)}`) })()
   const gating = await Promise.race([handed.promise, unasked])
-  return { gating, raising, bank, close: () => { closing.resolve(undefined) } }
+  return { gating, raising, device, close: () => { closing.resolve(undefined) } }
 }
 
-/** Open a `build_vault` gating on a bank whose vault is not built yet. */
-export const building = (bank: Bank) => bank.tryEnsureVault(VaultScopeGiven)
+/** The vault of `device`'s bank, which is already built. */
+async function vaultOf(device: Device): Promise<Vault> {
+  const bank = await device.ensureBank()
+  return bank.ensureVault(VaultScopeGiven)
+}
 
-/** Open an `unlock_vault` gating on a bank whose vault is built and locked on its device. */
-export const unlocking = async (bank: Bank) => {
-  const vault = await bank.ensureVault(VaultScopeGiven)
+/** Open a `build_bank` gating on a device whose bank is not built yet. */
+export const building = (device: Device) => device.tryEnsureBank()
+
+/** Open an `unlock_bank` gating on a device whose bank is built and locked. */
+export const unlocking = async (device: Device) => {
+  const vault = await vaultOf(device)
   return vault.tryEnsureUnlocked()
 }
 
-/** Open a `replace_passphrase` gating on a bank whose vault is built, locked or not. */
-export const replacing = async (bank: Bank) => {
-  const vault = await bank.ensureVault(VaultScopeGiven)
+/** Open a `replace_passphrase` gating on a device whose vault is built, locked or not. */
+export const replacing = async (device: Device) => {
+  const vault = await vaultOf(device)
   return vault.tryReplacePassphrasePrompt()
 }
 
-/** Open an `add_passkey` gating on a bank whose vault is built and has no passkey. */
-export const addingPasskey = async (bank: Bank) => {
-  const vault = await bank.ensureVault(VaultScopeGiven)
+/** Open an `add_passkey` gating on a device whose vault is built and has no passkey. */
+export const addingPasskey = async (device: Device) => {
+  const vault = await vaultOf(device)
   return vault.tryAddPasskeyPrompt()
 }
 
-/** Open a `revoke_passkey` gating on a bank whose vault is built and has a passkey. */
-export const revokingPasskey = async (bank: Bank) => {
-  const vault = await bank.ensureVault(VaultScopeGiven)
+/** Open a `revoke_passkey` gating on a device whose vault is built and has a passkey. */
+export const revokingPasskey = async (device: Device) => {
+  const vault = await vaultOf(device)
   return vault.tryRevokePasskeyPrompt()
 }
 
@@ -153,7 +159,7 @@ export const gatingOfKind = <KindT extends Gatingkind>(gating: AnyGating, gating
   throw new Error(`not a ${gatingkind} gating: ${gating.gatingkind}`)
 }
 
-/** Return `gating`, typed as a `build_vault` or `unlock_vault` gating. Throws if it is of another kind. */
+/** Return `gating`, typed as a `build_bank` or `unlock_bank` gating. Throws if it is of another kind. */
 export const passphraseGatingOf = (gating: AnyGating): PassphraseGating => {
   if (gating.gatingkind === 'build_bank' || gating.gatingkind === 'unlock_bank') { return gating }
   throw new Error(`not a passphrase gating: ${gating.gatingkind}`)
