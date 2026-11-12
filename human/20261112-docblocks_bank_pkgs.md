@@ -1,8 +1,9 @@
 # 2026-11-12: Documentarian pass on bank_world's adapters -- GraphQL verbs now point at BankDB
 
 The documentarian run over the files sprint bank_world's line changed outside the core: the adapters and the client, as one
-PR in two groups. This entry is group 1's: `safebyok-convex`, `safebyok-graphql`, `safebyok-indexeddb`, `safebyok-postgres`.
-Group 2 (`safebyok-react`) adds to it. Doc blocks only: no behaviour, name, `@example` code or running comment changed,
+PR in two groups. Group 1 did `safebyok-convex`, `safebyok-graphql`, `safebyok-indexeddb` and `safebyok-postgres`; group 2
+did `safebyok-react` (`bank-controls.tsx`, `hooks.ts`, `bank-provider.tsx`, `shapes.ts`), and its parts are marked
+**(react)** below. Doc blocks only: no behaviour, name, `@example` code or running comment changed,
 apart from four reasons moved out of doc blocks into `//` comments.
 
 ## Open questions
@@ -20,6 +21,14 @@ apart from four reasons moved out of doc blocks into `//` comments.
    comment says "a host calls it again to delete the rest", but `Tidied` gives a host nothing to tell it when to.
    Changing that is behaviour, so it's out of scope. I left the doc block saying "as many as one transaction allows" and
    added no "call again".
+4. **(react) `BankProvider` now says it remounts its children and vacates the previous user's device.** The old block
+   said neither, and both were only in the `//` comments. Both are things a host would otherwise get wrong (state typed
+   under one user is gone after a switch; the old user's leases are forgotten). The vacate happens when the next user's
+   device is made, so a switch through a null `user_id` vacates nothing until someone signs in, and `user_id`'s own
+   block still tells a host to call `vacate()` at sign-out. Cut the line if the block is meant to stay at two.
+5. **(react) The hooks section banner in `hooks.ts` lists `VaultStage, VaultLifecycle`**, which live in `shapes.ts`, and
+   `VaultLifecycle` spells out the stage literals instead of using `VaultStage`. Both are code, not doc blocks, so I left
+   them.
 
 ## Where the code and the old prose disagreed
 
@@ -35,6 +44,15 @@ apart from four reasons moved out of doc blocks into `//` comments.
 * **`PostgresBankDBOpts.listen`** said `watch` "hears other devices' writes". With `listen`, it hears every write to the
   user's channel, this device's own included. The block drops "other devices'".
 
+* **(react) `LeaseRowLineProps`** said "A null handler means the row has no such button". Only `onForgetRaw` can be null.
+  The block now names it.
+* **(react) `useDevice`** said "null while nobody is signed in". It is also null on the provider's first render, before its
+  layout effect makes the device. The block now says "null while there is none, as when nobody is signed in".
+* **(react) `UserBankProvider`** said it renders the dialog for the open gating. It does only when `requestCleartext` is
+  not given. The block now says so.
+* **(react) `Listing`** said "the rows from the last listing". On a failed listing the code keeps the rows from the last one
+  that succeeded. The `val` field's block says so.
+
 ## Proposed renames
 
 * `Tallies.refuses(tally, growth, maxBoxes)` -> `wouldPassLimit`: it is a yes/no predicate (STYLE.md: a boolean query is
@@ -43,6 +61,10 @@ apart from four reasons moved out of doc blocks into `//` comments.
   of speech: the block has to explain it as "a notice of one write, broadcast to every watch".
 * `Tallies.weigh(boxDoc)` -> `sizeOf`, low priority: it is pure and returns a number, and the verbs table gives a pure
   function a `fooOf` name.
+* **(react)** devmode's `Listing<ValT>` (shapes.ts) -> `PanelListing`: the core's `Listing` is the model class every
+  listing extends, and the same name for a panel's last rows and error misleads a reader who knows the core.
+* **(react)** `useProvided(hookname)` -> `useProvidedDevice`, low priority: the first line is "Return the nearest
+  BankProvider's device", and the name leaves out what is provided.
 
 ## Doc-block lines, before -> after
 
@@ -60,9 +82,16 @@ apart from four reasons moved out of doc blocks into `//` comments.
 | safebyok-indexeddb/src/idb-bank-db.ts | 13 | 13 |
 | safebyok-postgres/src/bank-queries.ts | 17 | 17 |
 | safebyok-postgres/src/postgres-bank-db.ts | 35 | 35 |
+| safebyok-react/src/components/bank-controls.tsx | 3 | 7 |
+| safebyok-react/src/hooks/hooks.ts | 17 | 25 |
+| safebyok-react/src/provider/bank-provider.tsx | 13 | 16 |
+| safebyok-react/src/shapes.ts | 85 | 89 |
 
 These blocks were already short. The work was in the wording, not the length. `tallies.ts` grew because `Tally` became a
-two-item list, and `validators.ts` grew because `boxPutWritten`'s second fact got its own line.
+two-item list, and `validators.ts` grew because `boxPutWritten`'s second fact got its own line. The react files grew
+because one-line blocks joined by semicolons became a headline and a second line, and because a few blocks gained the
+fact a host would otherwise get wrong (where a failure goes, the box watch, the whisper placeholder, the remount).
+`shapes.ts` grew because `AskPasskeyOpts` and `Listing` got a block per field.
 
 ## Changes, member by member
 
@@ -126,6 +155,39 @@ hand) moved to a `//`. `ReviseBankSql`: see the disagreements above.
 `maxBoxes` now says "tombstones included". `refusalOf`: names the two kinds it chooses between. `#roomAt`: "tombstones
 included".
 
+**(react) components/bank-controls.tsx.** `BankLockControl`: "Render whether ... ; nothing while there is no bank"
+became a headline and a second line, which adds that a failed unlock goes to the provider's `onBadNews` and a dismissed
+dialog does not. `CreateVaultButton`: "the bank first, built or unlocked where it needs to be" -> "building or unlocking
+the bank first if needed"; added that it is disabled while nobody is signed in, and where failures go. `tellUnlessDismissed`:
+"Tell `device`'s host of `err`" -> "Send `err` to `device`'s `onBadNews`".
+
+**(react) provider/bank-provider.tsx.** `BankContext`: the gapped list became two sentences. `useProvided`: the throw got
+its own line. `useProviderDevice`: "keep it until unmount" -> "sweep it at unmount"; added that it starts bringing up the
+bank, that ignored changes to `opts` are warned of (`useWarnOfIgnoredOpts`), and that the device always calls the latest
+`handlers`. `latest`: a phrase. `BankProvider`: the semicolon went; "the built-in dialog for the device's open gating,
+building or deleting the bank among them" -> "a built-in dialog for each gating the device opens"; added the remount and
+the vacate (open question 4). `UserBankProvider`: the dialog only without `requestCleartext` (see the disagreements).
+`isHostAsking`: "in place of" -> "instead of".
+
+**(react) hooks/hooks.ts.** `useDevice`: "Its `vacate()` is sign-out" -> "Call its `vacate()` at sign-out"
+(`#say-what-to-do`). `useBank`: the semicolon list became a second sentence. `useBankSnapshot`: "whose `isLocked` is the
+one lock its vaults and boxes share" got its own line: "covers every vault and box in the bank: they share one lock".
+`useDeviceSnapshot`: the field list shrank (see dropped facts). `useDeviceSnapshotFor`, `useVaultFor`: "Same as {@link
+...}." (a sibling comparison) -> "{@link ...}, naming `hookname` in the error when there is no provider". `watchedLives`:
+reordered. `useVault`: added that it begins the box watch, so the host need not call `vault.beginWatch()`. `useBoxes`:
+"the present boxes" (the listing's snapshot holds only present ones). `useBox`: "until" -> "while" (it goes null again
+when the box is deleted). `useBoxIsShowing`, `useBoxExposure`: two fragments became one sentence each. `useWhisper`:
+added "ask {@link useBoxExposure}, never the placeholder's identity", which the core's `ENCRYPTED` block asks of every
+caller (the placeholder is `ENCRYPTED`, `LOCKED` or `VEILED`, frozen per copy of safebyok).
+
+**(react) shapes.ts.** `BankProviderProps`: "which it fills in" (a hung clause) went. `VaultStage`: "in hand" -> "up";
+the dangling "the bank unlocked" became "Call `bank.ensureVault` on the unlocked bank to create one"; `bankless` also
+covers a bank built anew elsewhere, as `useBank` says. `VaultLifecycle`: "What `useVault` returns", as group 1 opened the
+return validators. `AskPasskeyOpts`: the inline list became a block per field, worded as `CreatePasskeyOpts.timeout` and
+`passkeyRpId` are. `Gripe`: the "which" clause became a sentence naming `refusalkind`. `ModalFormProps.onCancel` and
+`.cancelTakesFocus`: the colon and the semicolon became sentences, and "a confirm" -> "a confirmation". `Listing`: a block
+per field (see the disagreements). `LeaseRowLineProps`: names `onForgetRaw`. The rest were already plain.
+
 ## Dropped facts
 
 Facts I dropped that STYLE.md does not plainly cut. Put back what matters:
@@ -150,3 +212,9 @@ Facts I dropped that STYLE.md does not plainly cut. Put back what matters:
 * `GraphQLBankDB.watch`: "because the session is no longer signed in", now just the kind `identity_revoked`.
 * `IdbBankDB.#roomIn`: "by its `bank_tok` and `vault_tok`", and "soft" before cap (the options say soft).
 * `BoxScopepath`: "It includes the `bank_tok` and `vault_tok`". The tuple shows them, and the `//` above keeps the reason.
+* **(react)** `useDeviceSnapshot`: "why it ended" from the field list. `DeviceSnapshot.err` carries it, and `VaultLifecycle`
+  gives it as `cause` once `spent`.
+* **(react)** `BankProviderProps`: "`gates`, which it fills in" (the provider passes `['main']`).
+* **(react)** `BankProvider`: "building or deleting the bank among them", now "each gating the device opens".
+* **(react)** `useProviderDevice`: "keep it until unmount", now "sweep it at unmount" (a StrictMode rerun makes a fresh
+  device; the `//` in the body says so).
