@@ -11,9 +11,13 @@ export const VaultFunctionsSql = `-- safebyok-postgres: the functions PostgresVa
 -- Each write function takes the record to store and the row the caller expects, both as JSON. The box functions
 -- also take the cap on box rows.
 --
--- A box write locks only the box row. It reads the vault row without a lock, so a box written while its vault is
--- deleted or created anew may be written into a vault life that has ended. Nothing reads such a row again, and the vault's
--- next write, or tidyGone, deletes it.
+-- A box write locks only the box row. This is on purpose: a lock on the vault row would make every writer under one
+-- vault wait its turn, to guard against a rare race. Two things follow.
+-- - It reads the vault row without a lock, so a box written while its vault is deleted or created anew may be
+--   written into a vault life that has ended. Nothing reads such a row again, and the vault's next write, or
+--   tidyGone, deletes it.
+-- - It counts the vault life's box rows without a lock, so writers racing to add their first box may pass the cap
+--   together. The cap is soft, and tidyGone does not trim it.
 -- Each statement sees what was committed when it started. So when nothing is stored, the rows returned are the rows
 -- as they stand after any wait on another writer.
 --
