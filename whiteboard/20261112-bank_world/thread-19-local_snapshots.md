@@ -1,6 +1,6 @@
 # Thread 19: local_snapshots (2026-11-12)
 
-Branch `20261112-local_snapshots`, PR #TBD, stacked on #685 (thread 18, align_children). Justify: green
+Branch `20261112-local_snapshots`, PR #686, stacked on #685 (thread 18, align_children). Justify: green
 (safebyok 2966, react 263, demo 99, e2e 549, the adapters all pass).
 
 * **Built**: each Storable's snapshot shows its own state only.
