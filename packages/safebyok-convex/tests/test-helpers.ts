@@ -60,10 +60,10 @@ export function sentAskOf<AskT extends DB.VaultAsk | DB.BoxAsk>(ask: AskT): AskT
 }
 
 /** The args of `getVault`: the get of the vault at `scope`, by a caller that holds no row of it. */
-export const getVaultArgs = (scope: DB.VaultScope = vaultScope) => ({ ask: sentAskOf(vaultGetAskOf(scope)) })
+export function getVaultArgs(scope: DB.VaultScope = vaultScope) { return { ask: sentAskOf(vaultGetAskOf(scope)) } }
 
 /** The args of `getBox`: the get of the box `boxQuery` names, by a caller that holds no row of it. */
-export const getBoxArgs = (boxQuery: DB.BoxQuery) => ({ ask: sentAskOf(boxGetAskOf(boxQuery)) })
+export function getBoxArgs(boxQuery: DB.BoxQuery) { return { ask: sentAskOf(boxGetAskOf(boxQuery)) } }
 
 /** The args of `putVault`: the put of `record` over the row `ante`, or over none. */
 export function putVaultArgs(record: DB.VaultRecord, ante: DB.VaultRow | null = null) { return { ask: sentAskOf(vaultPutAskOf(record, ante)) } }
