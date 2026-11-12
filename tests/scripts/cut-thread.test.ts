@@ -80,7 +80,7 @@ describe('scripts/cut-thread', () => {
     expect(git('config', `branch.${Today}-deriver_shim.sprintbasebranch`)).to.eq('vault_split')
   })
 
-  it('records the name of a base branch given as origin/..., and none for main or a bare SHA', () => {
+  it("records the name of a base branch given as origin/..., and none for main or a bare SHA", () => {
     git('switch', '--quiet', '--create', 'vault_split')
     git('push', '--quiet', 'origin', 'vault_split')
     git('switch', '--quiet', 'main')

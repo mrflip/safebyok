@@ -106,7 +106,7 @@ describe('scripts/file-thread', () => {
     expect(git('rev-parse', `origin/${Branch}`)).to.eq(review)
   })
 
-  it('leaves a stacked thread that records no base branch on the thread it stands on', () => {
+  it("leaves a stacked thread that records no base branch on the thread it stands on", () => {
     git('switch', '--quiet', '--create', 'vault_split')
     const below = commit(main, 'vault.ts', 'export {}\n')
     git('switch', '--quiet', 'main')
@@ -118,7 +118,7 @@ describe('scripts/file-thread', () => {
     expect(git('rev-parse', `origin/${Branch}~1`)).to.eq(below)
   })
 
-  describe('a thread stacked on a base branch that cut-thread recorded', () => {
+  describe("a thread stacked on a base branch that cut-thread recorded", () => {
     let below: string
     beforeEach(() => {
       git('switch', '--quiet', '--create', 'vault_split')
@@ -128,7 +128,7 @@ describe('scripts/file-thread', () => {
       cutAndBuild('vault_split', 'vault_split')
     })
 
-    it('rebases onto the base branch when it gained commits, and records the new base', () => {
+    it("rebases onto the base branch when it gained commits, and records the new base", () => {
       const gained = baseGains()
       const result = file('true')
       expect(result.status, String(result.stderr)).to.eq(0)
@@ -138,7 +138,7 @@ describe('scripts/file-thread', () => {
       expect(git('config', `branch.${Branch}.sprintbase`)).to.eq(gained)
     })
 
-    it('rebases onto the base branch when it was itself rebased onto main', () => {
+    it("rebases onto the base branch when it was itself rebased onto main", () => {
       mainMoves()
       const rebased = baseRebased()
       expect(rebased).not.to.eq(below)
@@ -149,7 +149,7 @@ describe('scripts/file-thread', () => {
       expect(git('config', `branch.${Branch}.sprintbase`)).to.eq(rebased)
     })
 
-    it('rebases onto main when the base branch, rebased onto main, has merged', () => {
+    it("rebases onto main when the base branch, rebased onto main, has merged", () => {
       mainMoves()
       baseRebased()
       git('merge', '--quiet', '--no-ff', '--message', 'Merge vault_split', 'vault_split')
@@ -162,7 +162,7 @@ describe('scripts/file-thread', () => {
       expect(git('config', `branch.${Branch}.sprintbase`)).to.eq(merged)
     })
 
-    it('rebases onto main when the base branch has merged as cut', () => {
+    it("rebases onto main when the base branch has merged as cut", () => {
       git('merge', '--quiet', '--no-ff', '--message', 'Merge vault_split', 'vault_split')
       const merged = git('rev-parse', 'HEAD')
       git('push', '--quiet', 'origin', 'main')
@@ -171,7 +171,7 @@ describe('scripts/file-thread', () => {
       expect(git('rev-parse', `origin/${Branch}~1`)).to.eq(merged)
     })
 
-    it('files as cut when the base branch has not moved, and moves no other branch', () => {
+    it("files as cut when the base branch has not moved, and moves no other branch", () => {
       const other = git('rev-parse', 'vault_split')
       const result = file('true')
       expect(result.status, String(result.stderr)).to.eq(0)
@@ -180,9 +180,9 @@ describe('scripts/file-thread', () => {
       expect(git('rev-parse', 'vault_split')).to.eq(other)
     })
 
-    it('stops on a conflict with the base branch, undoing the rebase and pushing nothing', () => {
+    it("stops on a conflict with the base branch, undoing the rebase and pushing nothing", () => {
       git('switch', '--quiet', 'vault_split')
-      commit(main, 'shim.ts', 'the base\'s shim\n')
+      commit(main, 'shim.ts', "the base's shim\n")
       git('push', '--quiet', 'origin', 'vault_split')
       git('switch', '--quiet', 'main')
       const tip = git('-C', root, 'rev-parse', 'HEAD')
