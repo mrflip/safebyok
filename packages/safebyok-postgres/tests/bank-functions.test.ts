@@ -18,7 +18,7 @@ type Answered = { ok: boolean, act: string | null, presence: string | null }
 async function answerOf(text: string, params: unknown[]): Promise<Answered & Record<string, unknown>> {
   const db = await BH.database()
   const { rows } = await db.query<Answered & Record<string, unknown>>(text, params.map((param) => ((typeof param === 'object') && (param !== null)) ? JSON.stringify(param) : param))
-  expect(rows).to.have.length(1)
+  expect(rows).to.have.lengthOf(1)
   return rows[0]!
 }
 
@@ -52,12 +52,12 @@ describe("safebyok_put_gate", () => {
     const gate = BW.gateAt()
     const withPasskey = BW.gateAt(0, 'bank1', WithPasskey)
     const breaches: [string, Record<string, unknown>, unknown, string][] = [
-      ['a moved registered_at',             { ...BW.gatePutAskOf('replacePassphrase', gate, { main: BW.otherMainWayin }).record, registered_at: 1 }, gate, 'replacePassphrase'],
-      ['a passkey wayin added by replace',  BW.gatePutAskOf('replacePassphrase', gate, { main: BW.otherMainWayin, passkey0: BW.passkey0Wayin }).record, gate, 'replacePassphrase'],
+      ['a moved registered_at',              { ...BW.gatePutAskOf('replacePassphrase', gate, { main: BW.otherMainWayin }).record, registered_at: 1 }, gate, 'replacePassphrase'],
+      ['a passkey wayin added by replace',   BW.gatePutAskOf('replacePassphrase', gate, { main: BW.otherMainWayin, passkey0: BW.passkey0Wayin }).record, gate, 'replacePassphrase'],
       ['the main wayin moved by addPasskey', BW.gatePutAskOf('addPasskey', gate, { main: BW.otherMainWayin, passkey0: BW.passkey0Wayin }).record, gate, 'addPasskey'],
-      ['a revokePasskey with none stored',  BW.gatePutAskOf('revokePasskey', gate, BW.MainOnly).record, gate, 'revokePasskey'],
-      ['a stale revision',                  BW.gatePutAskOf('replacePassphrase', withPasskey, { main: BW.otherMainWayin }).record, { ...gate, revision_tok: 'gone' }, 'replacePassphrase'],
-      ['another bank life',                 { ...BW.gatePutAskOf('addPasskey', gate, WithPasskey).record, bank_tok: 'bank0' }, gate, 'addPasskey'],
+      ['a revokePasskey with none stored',   BW.gatePutAskOf('revokePasskey', gate, BW.MainOnly).record, gate, 'revokePasskey'],
+      ['a stale revision',                   BW.gatePutAskOf('replacePassphrase', withPasskey, { main: BW.otherMainWayin }).record, { ...gate, revision_tok: 'gone' }, 'replacePassphrase'],
+      ['another bank life',                  { ...BW.gatePutAskOf('addPasskey', gate, WithPasskey).record, bank_tok: 'bank0' }, gate, 'addPasskey'],
     ]
     for (const [breach, record, expected, gateVerb] of breaches) {
       expect(await answerOf(PutGateSql, [record, expected, gateVerb]), breach).to.deep.include({ ok: false, act: null, presence: null, bank: BW.bankAt(), gate })
