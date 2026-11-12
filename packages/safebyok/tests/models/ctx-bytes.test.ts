@@ -24,7 +24,7 @@ const VaultStampText = `{"applabel":"acme","registered_at":${String(T0)},"user_i
 
 const VaultStampFields = ['applabel', 'user_id', 'vaultlabel', 'vault_tok', 'registered_at'] as const
 const LeaseStampFields = ['fmt', ...VaultStampFields, 'gate_epoch', 'proved_at', 'wayinkind'] as const
-const BoxStampFields = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'fmt', 'vault_tok', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'box_tok', 'whisper_codec', 'whisper_schema_version', 'sidecar'] as const
+const BoxStampFields = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'fmt', 'vault_tok', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'box_tok', 'whisper_codec', 'whisper_schema_version'] as const
 
 /** A lease of `stamp`'s vault over a vaultKey the test holds, its record cached on the friend. */
 async function leaseOver(vaultKey: CryptoKey, overrides: Partial<typeof WorldStamp> = {}) {
@@ -85,8 +85,8 @@ describe("each ctx, byte for byte", () => {
     const { lease } = await leaseOver(vaultKey)
     const sealed = await lease.sealWith(WhisperText, stamp)
     function field(fieldname: string): string { return JSON.stringify(stamp[fieldname]) }
-    expect(stamp['sidecar']).to.eq('{"label":"work account"}')
-    const boxText = `{"am":${field('am')},"applabel":${field('applabel')},"box_tok":${field('box_tok')},"boxlabel":"anthropic","fmt":${field('fmt')},"registered_at":${field('registered_at')},"revision_seq":${field('revision_seq')},"revision_tok":${field('revision_tok')},"sidecar":${field('sidecar')},"user_id":${field('user_id')},"vault_tok":${field('vault_tok')},"vaultlabel":${field('vaultlabel')},"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${field('written_at')}}`
+    expect(stamp).to.not.have.property('sidecar')
+    const boxText = `{"am":${field('am')},"applabel":${field('applabel')},"box_tok":${field('box_tok')},"boxlabel":"anthropic","fmt":${field('fmt')},"registered_at":${field('registered_at')},"revision_seq":${field('revision_seq')},"revision_tok":${field('revision_tok')},"user_id":${field('user_id')},"vault_tok":${field('vault_tok')},"vaultlabel":${field('vaultlabel')},"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${field('written_at')}}`
     const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, textBytes(`[${VaultStampText},${boxText},"box_key_wrapped"]`), { extractable: false, usage: ['decrypt'] })
     const opened = await decipherBytes(boxKey, sealed.whisper_ciphered, textBytes(`[${VaultStampText},${boxText},"whisper_ciphered"]`))
     expect(new TextDecoder().decode(opened)).to.eq(WhisperText)

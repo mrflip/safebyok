@@ -368,7 +368,8 @@ added or folded into through the subagent, and no other entry changes.
   string, which cannot be zeroed; `Lease.sealWith` and `unsealWith` zero only the bytes they encode or decipher themselves. Before
   this, the caller's serialized bytes were zeroed by the lease. Amended 2026-11-03 (vault_boxes, branch `20261103-vault_boxes`):
   `box.send({ sidecar })` with no whisper (`Box.#edit`, `#keptWhisper`, `#unseal`) unseals the stored whisper and seals it again
-  under the new stamp, as the stamp binds the sidecar, so a metadata-only update opens the whisper; its value is held as a string,
+  under the new stamp, as the stamp binds the sidecar, so a metadata-only update opens the whisper (amended 2026-11-12 (sidecar_unsealed): the stamp no longer binds the sidecar,
+  but still binds the revision, so a sidecar-only put still unseals and reseals the whisper); its value is held as a string,
   not zeroable, from the unseal to the seal. (Models are not yet exported from the package.)
 * 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`): **The friend is a public
   route to a lease row.** `vault.leaseFriend()` and `lease.friend` are public, and `friend.peekLease()` answers the row this device
@@ -544,7 +545,7 @@ added or folded into through the subagent, and no other entry changes.
   and now `registered_at`, which was left out on purpose before. A box's two ciphered fields bind the vault's stamp without its `format`
   (scope, `vault_tok`, `registered_at`) and the box's own BoxStamp: every field of the box record but its two ciphered ones (`format`,
   `boxlabel`, `revision_tok`, `whisper_codec`, `whisper_schema_version`, `sidecar` as its JSON with keys sorted, `registered_at`,
-  `written_at`, `vault_tok`). A lease's wrap binds the vault's stamp without its `format` and the lease's LeaseStamp (`format`, scope,
+  `written_at`, `vault_tok`; amended 2026-11-12 (sidecar_unsealed): the `sidecar` is no longer in the BoxStamp, which is every sparse field of the box record alone, `boxStampOf` in `models/box.ts`). A lease's wrap binds the vault's stamp without its `format` and the lease's LeaseStamp (`format`, scope,
   `vault_tok`, `gate_epoch`, `ask_passphrase_at`). The vault's stamp is new in a box's and a lease's ctx: before, they bound only the
   vault's scope and `vault_tok`.
   (3) The vault's `format` is left out of a box's and a lease's ctx so that a future vault format bump does not make every box and lease
@@ -1077,7 +1078,7 @@ added or folded into through the subagent, and no other entry changes.
   `Wayin` and `Lease` hold a reference to their Vault and read scope, key deriver, lease length and
   time (the public `vault.now()`) from it, inside that same trust of the host's realm; the opened
   vaultKey is held only in a private field of an opened `Lease`; `vault_key_epoch` is removed from
-  every stored record; a box's sidecar is a JSON object (`{}` for none; amended 2026-10-21 (trust_lines), third round: once any JSON value), bound by its key-sorted JSON.
+  every stored record; a box's sidecar is a JSON object (`{}` for none; amended 2026-10-21 (trust_lines), third round: once any JSON value), bound by its key-sorted JSON (amended 2026-11-12 (sidecar_unsealed): not bound; see the sidecar entry of 2026-10-16).
 
 * 2026-10-21 (thread checker, branch 20261021-checker): **one guard is the only caller of a host's
   strength checker, and a checker's `load` runs at every `hello()`.** (1) `guardStrengthChecker`
@@ -1509,7 +1510,7 @@ added or folded into through the subagent, and no other entry changes.
   the vault's `vault_id`, the purpose, and every visible header field, rebuilt on every seal and open
   and never stored. `registered_at` and the sidecar carry forward from `over` only when `over` opens
   under the vaultKey, so a sidecar planted in storage is never sealed into a revision that reads
-  clean. Inputs are checked at the door (`bad_whisper`, `bad_option`, `bad_label`, `absent_vault`),
+  clean (amended 2026-11-12 (sidecar_unsealed): the box's stamp no longer binds the sidecar, so a sidecar in storage is unauthenticated whether or not `over` opens). Inputs are checked at the door (`bad_whisper`, `bad_option`, `bad_label`, `absent_vault`),
   quoting nothing; the seal ends in `Box.make`, so what it returns has passed the record schema, and
   it writes nothing. (4) `box.tryOpen(vaultKey)` (an Outcome; `open` throws) is the old
   `decipherBox`: a vaultKey that is no CryptoKey is `bad_option`; a box whose `vault_key_epoch` is
@@ -2484,7 +2485,7 @@ added or folded into through the subagent, and no other entry changes.
   keep `registered_at`; `created_at` and `updated_at` are gone from both records. None of the
   times is in the cipherCtx (the ctx is still the positional list), so a backend
   can alter them undetected; binding the whole header is TODO.md's roadmap 3, not yet built.
-  (Built since: the sweep entry below binds both times and the sidecar.)
+  (Built since: the sweep entry below binds both times and the sidecar; amended 2026-11-12 (sidecar_unsealed): the sidecar is no longer bound.)
 * 2026-10-15: until 1.0.0 a stored-shape change carries no migration (the Coach's ruling). A
   box or vault props written with `created_at`/`updated_at`, or a lease with
   `expires_at`, fails its schema: the vault refuses it as `corrupt_record` (amended 2026-10-21
@@ -2974,9 +2975,9 @@ added or folded into through the subagent, and no other entry changes.
   by construction, not by two calls agreeing.) (2026-10-19, #201: `PasskeyProof.wayinKeyFor(wayin)` runs that HKDF over the PRF bytes with
   the wayin's whole wayinCtx as `info`.) Every wayin's wrap binds the vault props' `registered_at` (amended 2026-10-21 (trust_lines): it binds the vault's scope and `vault_id`, not the vault props' `registered_at`, which a backend can alter without stopping a wayin opening; the wayin's own `registered_at` stays in its header, bound; amended 2026-10-26 (cipher_ctx): see the entry of that date). A box's two
   encryptions bind its whole visible header (`format`, `boxlabel`, `revision_tok`, `sidecar_json`
-  (amended 2026-10-21 (trust_lines): `sidecar`, bound as its key-sorted JSON),
+  (amended 2026-10-21 (trust_lines): `sidecar`, bound as its key-sorted JSON; amended 2026-11-12 (sidecar_unsealed): the sidecar is not bound),
   `registered_at`, `written_at`: every field but the two ciphered ones, as Zod's parse leaves the
-  record), so a backend that alters a sidecar or a time
+  record), so a backend that alters a sidecar (amended 2026-11-12 (sidecar_unsealed): no longer refused; only a time or other bound field is) or a time
   makes `getBox()` refuse `corrupt_record` (amended 2026-10-21 (fault_kinds): `damaged_box`); a future field is bound the day it is added to the
   schema. While the vault is locked, the listing still shows these fields unverified: nothing
   checks them before a box is opened. The lease binds `ask_passphrase_at`, under its own
@@ -3408,11 +3409,11 @@ added or folded into through the subagent, and no other entry changes.
   and unreachable by any verb; `vault.del()` or `delDamagedVault` still removes it. The refusal kind for a name that fails its
   check is `bad_scope`, which replaces `bad_label` (the earlier entries' `bad_label` is this kind, by its old name).
 * 2026-10-16; 2026-10-18; 2026-10-19: **a box's sidecar is any JSON, bound; its whisper's codec
-  and schema version are reserved, bound too** (push_to_100_a, thread 2; G023, G025, G040). Amended 2026-10-21 (trust_lines): the sidecar
+  and schema version are reserved, bound too** (push_to_100_a, thread 2; G023, G025, G040). Amended 2026-11-12 (sidecar_unsealed, branch `20261111-pushto100`; a Coach's ruling): **the sidecar is no longer bound.** The box's stamp (`boxStampOf`, `models/box.ts`) is every sparse field of the box record alone (scope, `fmt`, `am`, `vault_tok`, `box_tok`, `revision_tok`, `revision_seq`, `registered_at`, `written_at`, `whisper_codec`, `whisper_schema_version`), so neither `box_key_wrapped` nor `whisper_ciphered` binds the sidecar as additional data. Storage, or anyone who can write it, can change a sidecar, or swap one between boxes or revisions, and the whisper still opens; the snapshot shows the sidecar as stored, unauthenticated, before and after unsealing. The documented guidance to hosts: a field that must be server-readable and authenticated is kept in both the whisper and the sidecar, and the host compares the two after unsealing. A box sealed with the sidecar bound no longer opens (`damaged_whisper`); until 1.0.0 there is no migration. The sentences below that say the sidecar is bound, swapped sidecars are refused, or the snapshot shows it unverified only until the box is opened, describe what was written before this amendment. Amended 2026-10-21 (trust_lines): the sidecar
   is stored as the JSON value itself, in the field `sidecar` (once the text `sidecar_json`), box
   format `safebyok-box-v8`: Postgres `jsonb NOT NULL DEFAULT '{}'`, Convex a record, GraphQL a non-null
   `SafebyokSidecar`; always a JSON object (`{}` for none), and `putBox` refuses any other as `bad_option`
-  (third round: it was any JSON value, `jsonb` nullable and Convex `v.any()`). The box ctx binds `stableJsonify(sidecar)` (keys sorted), computed at seal and at open, so a
+  (third round: it was any JSON value, `jsonb` nullable and Convex `v.any()`). The box ctx binds `stableJsonify(sidecar)` (keys sorted; amended 2026-11-12 (sidecar_unsealed): it no longer does), computed at seal and at open, so a
   backend that normalizes JSON does not break opening; the sentences below on the stored text kept
   byte for byte, on Postgres `text` and never `jsonb`, and on the record being its own stable
   re-serialization no longer hold. There is no validator for Postgres's limits: a sidecar Postgres
@@ -3422,7 +3423,7 @@ added or folded into through the subagent, and no other entry changes.
   box (`safebyok-box-v6`) holds `sidecar_json`, the host's sidecar as stable-serialized JSON
   text, always written (`{}` when the host gave none, so an absent sidecar and an empty one are one
   record and one ctx), and `whisper_codec` (`json_v1`) and `whisper_schema_version` (`1`).
-  All three join the header both of the box's encryptions bind, so a sidecar swapped between
+  All three join the header both of the box's encryptions bind (amended 2026-11-12 (sidecar_unsealed): all but the sidecar), so a sidecar swapped between
   boxes, emptied, or merely respaced in storage makes `getBox()` refuse it (`damaged_box`);
   the bound value is the stored text itself, never a re-serialization, so a store must keep it
   byte for byte (Postgres keeps it as `text`, never `jsonb`). The record's check also requires
@@ -3432,10 +3433,10 @@ added or folded into through the subagent, and no other entry changes.
   `damaged_box`, so one bad record never hides the rest. A `putBox()` carries the stored
   sidecar and `registered_at` forward only from a record that deciphers: over one that will not, its
   sidecar becomes `{}` unless one is given, and its `registered_at` is now, so a sidecar planted in
-  storage is never sealed into a fresh revision that reads clean (found in review). What the sidecar reveals: everything in
+  storage is never sealed into a fresh revision that reads clean (found in review; amended 2026-11-12 (sidecar_unsealed): the sidecar is unauthenticated whether or not the old record deciphers). What the sidecar reveals: everything in
   it, in the clear, to anyone who reads storage, and its size; the vault never interprets it,
   checks only that it is a JSON object (amended 2026-10-21 (trust_lines), third round: once any JSON), and the snapshot shows it unverified until the box is opened, as
-  every visible field is. Its size is capped only with the whisper's (`maxWhisperBytes` counts
+  every visible field is (amended 2026-11-12 (sidecar_unsealed): it stays unverified after the box is opened). Its size is capped only with the whisper's (`maxWhisperBytes` counts
   both), so a host cannot put a sidecar of megabytes in front of the listing through the vault.
   Reserving the codec fields now means a later codec (padding, G026) or a whisper shape version
   changes no bound field set and re-encrypts nothing. Two ctx fixes ride along: the box's
@@ -3471,7 +3472,7 @@ added or folded into through the subagent, and no other entry changes.
   (`box_key_wrapped` under the vaultKey, `whisper_ciphered` under the boxKey) are bound, as additional data, to every
   field of a box that never changes once first stored (the vault's scope and `vault_tok`, the boxlabel,
   `registered_at`, the format, codec and schema version) and to every other visible field of the revision
-  (`revision_tok`, sidecar, `written_at`). The ctx bytes are unchanged (`lease.ts` `#boxCtxOf` via `cipherCtx`) (amended 2026-10-26 (cipher_ctx): see the entry of that date); only
+  (`revision_tok`, sidecar, `written_at`; amended 2026-11-12 (sidecar_unsealed): not the sidecar). The ctx bytes are unchanged (`lease.ts` `#boxCtxOf` via `cipherCtx`) (amended 2026-10-26 (cipher_ctx): see the entry of that date); only
   the doc blocks in `box.ts` now state the rule, and a later thread (8) applies it to wayins. The box's stamp (scope,
   `vault_tok`, `vault_epoch`, `gate_epoch`, as the vault stood when the box was read or sealed) is no part of the
   record and is not authenticated; it is non-enumerable on the Box object and read only for the vault's consistency
@@ -4032,7 +4033,7 @@ added or folded into through the subagent, and no other entry changes.
   `registered_at` forward only from a record that opens under the vault's key (amended 2026-10-21
   (trust_lines): the lease holding it; `Box.seal` refuses an `over` of another vault, `vault_locked`) (`recordOpens`, `vault.ts`, formerly
   `openedWhisperOf`), so a sidecar or time planted in storage is not sealed into a fresh revision that
-  reads clean; the function returns only a boolean and the deciphered whisper is dropped unread.
+  reads clean (amended 2026-11-12 (sidecar_unsealed): for the sidecar, no longer: it is unauthenticated whether or not the old record opens); the function returns only a boolean and the deciphered whisper is dropped unread.
   Not taken: unwrapping only the old boxKey, whose AES-GCM additional data binds the whole
   header, would vouch for the header without deciphering the whisper, but a record with only its
   whisper ciphertext altered would then carry its sidecar forward. Amended 2026-10-22 (lease_box): `vault.putBox({
@@ -4040,7 +4041,7 @@ added or folded into through the subagent, and no other entry changes.
   (deciphering the whisper into memory for the length of the call), and seals it again under a fresh boxKey and
   revision, written over the revision read (a store expectation; a write landing between is `stale_write`).
   **Leaving out the sidecar alone** also reads and opens the box, so a sidecar or `registered_at` altered in storage
-  is never sealed into a fresh, authenticated revision; a box that will not open is written over as new, keeping
+  is never sealed into a fresh, authenticated revision (amended 2026-11-12 (sidecar_unsealed): the sidecar is never authenticated; the whisper is still unsealed and resealed, as the stamp binds the revision); a box that will not open is written over as new, keeping
   nothing. **A whole put** (both given) reads nothing and adopts the listing's revision and `registered_at` as its
   base (the Coach's ruling): the listing is not authenticated, so a `registered_at` altered in storage can be sealed
   into the new revision on that path. `recordOpens` and `box.tryOpen` are gone. Amended 2026-10-22 (box_seal): this

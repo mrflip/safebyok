@@ -160,9 +160,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** The whisper of `record`, opened through the vault's seal verbs and checked by `CX.whisper`. */
   async #unseal(record: BoxRecord): Promise<Whisper> {
-    const { sidecar, box_key_wrapped, whisper_ciphered } = record
-    const stamp = boxStampOf(SX.boxSparse.parse(record), sidecar)
-    const whisperText = await this.world.unsealStampedString({ box_key_wrapped, whisper_ciphered }, stamp)
+    const { box_key_wrapped, whisper_ciphered } = record
+    const whisperText = await this.world.unsealStampedString({ box_key_wrapped, whisper_ciphered }, boxStampOf(record))
     return deserializeWhisper(whisperText)
   }
   // --
@@ -207,7 +206,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     const expected = this.central
     const written_at = nowMillis()
     const next = { ...expected, ...SX.nextRevisionOf(expected, written_at), am: 'a' as const }
-    // A whisper left out is unsealed and resealed all the same, as the stamp binds the sidecar.
+    // A whisper left out is unsealed and resealed all the same, as the stamp binds the revision.
     const record = this.isTombstoneRecord(expected)
       ? await sealedRecordOf(this.world, { ...next, registered_at: written_at, box_tok: makeLifeTok() }, sidecar ?? {}, whisper ?? {})
       : await sealedRecordOf(this.world, next, sidecar ?? this.demandFullProps().sidecar, whisper ?? await this.#storedWhisper())
@@ -316,16 +315,16 @@ function mergedOver(whisper: Whisper, patch: Whisper): Whisper {
 
 // == [The seal]: sealedRecordOf, boxStampOf, deserializeWhisper
 
+// The sidecar is laid beside the seal, never in it, so storage may change it and the whisper still opens.
 /** The full record of `base` with `sidecar`, `whisper` sealed through `world`: as json_v1, bound with its key to the box's stamp. Of `base`, only its sparse fields are taken. */
 async function sealedRecordOf(world: Pick<BoxWorld, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: Whisper): Promise<BoxRecord> {
   const sparse = SX.boxSparse.parse(base)
-  const stamp = boxStampOf(sparse, sidecar)
-  const { box_key_wrapped, whisper_ciphered } = await world.sealStampedString(stableJsonify(whisper), stamp)
+  const { box_key_wrapped, whisper_ciphered } = await world.sealStampedString(stableJsonify(whisper), boxStampOf(sparse))
   return SX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })
 }
 
-/** The box's stamp, which the lease binds both sealed parts to: every sparse field of the record, and its sidecar as stable JSON. */
-function boxStampOf(sparse: BoxSparse, sidecar: Sidecar): CipherCtxRecord { return { ...sparse, sidecar: stableJsonify(sidecar) } }
+/** The box's stamp, which the lease binds both sealed parts to: every sparse field of `record`, and not its sidecar. */
+function boxStampOf(record: BoxSparse): CipherCtxRecord { return SX.boxSparse.parse(record) }
 
 // What JSON.parse throws is replaced, never kept as a cause: a SyntaxError can quote the text it failed on.
 /** The whisper `text` holds as JSON; `damaged_whisper` where it holds none, or holds what is not a whisper. */

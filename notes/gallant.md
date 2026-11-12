@@ -1056,7 +1056,7 @@ async extractWhisper(opts: TimelyOpts = {}): Promise<WhisperHolder>
 **Gallant:**
 
 ```ts
-/** The timely stored whisper object. Extracting the whisper authenticates that (sidecar included) the object has not been modified since it was sealed */
+/** The timely stored whisper object. Extracting the whisper authenticates that the object, all but its sidecar, has not been modified since it was sealed */
 async extractWhisper(opts: TimelyOpts = {}): Promise<Whisper>
 ```
 

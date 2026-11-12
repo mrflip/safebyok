@@ -147,7 +147,7 @@ own verbs (*Changing the gate*). The patch hooks belong to `Box`.
   crossing is stated in one sentence (`whiteboard/20261102-newdesign/reference-timings.md`), not fine-tuned
 * A box birth: when no box is listed, `vault.putBox` lists a void box (`boxListing.puttable`). That box's `box.put` makes
   the record with the shell as its prior, seals it and puts it (`born` or `reborn`), and the answer is delivered. A
-  `box.put` of only a sidecar unseals and reseals, because the box stamp binds the sidecar
+  `box.put` of only a sidecar unseals and reseals, because the box stamp binds the revision
 * A cached lease that clearly must be removed is never left in place quietly. When a user who has proved authority and
   intent to unlock crosses something that says lock, the case is ambiguous, and we settle it with clear code and a stated
   rule: `#attachLease` checks at its start and then carries through

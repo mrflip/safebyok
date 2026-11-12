@@ -29,13 +29,22 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-1111' })
   })
 
-  it("opens the sealed record in another listing, and refuses 'damaged_whisper' when its sidecar is altered", async () => {
+  it("opens the sealed record in another listing, and opens it with its sidecar altered, as the seal leaves the sidecar out", async () => {
     const { boxes, boxesOf } = await sealWorld()
     const built = await boxes.create(BoxDna)
     const sealed = built._cheat_central
     const intact = await boxesOf().build(sealed)
     expect(await intact.extractWhisper()).to.deep.equal(Whisper)
     const altered = await boxesOf().build({ ...sealed, sidecar: { account: 'home' } } as BoxRecord)
+    expect(await altered.extractWhisper()).to.deep.equal(Whisper)
+    expect(altered.sidecar).to.deep.equal({ account: 'home' })
+  })
+
+  it("refuses 'damaged_whisper' when a field of the stamp is altered", async () => {
+    const { boxes, boxesOf } = await sealWorld()
+    const built = await boxes.create(BoxDna)
+    const sealed = built._cheat_central
+    const altered = await boxesOf().build({ ...sealed, written_at: sealed.written_at + 1 })
     await TH.expectRefusal(altered.extractWhisper(), 'damaged_whisper')
   })
 

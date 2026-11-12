@@ -8,8 +8,9 @@ devices through a storage layer the host plugs in.
 
 ## What a host relies on
 
-* **The backend has ciphertext it cannot decrypt.** It can read what is visible: labels, times and
-  each box's sidecar, which are authenticated but never encrypted. Put no secret in a sidecar.
+* **The backend has ciphertext it cannot decrypt.** It can read labels and times, which are
+  authenticated but never encrypted, and each box's sidecar, which is neither: the backend can read
+  and change a sidecar, and the box still opens. Put no secret in a sidecar (*Whisper and sidecar*).
 * **Nothing is recoverable, and removal is not revocation.** Nobody can unlock a vault whose
   passphrase is forgotten and which has no working passkey. A replaced passphrase or revoked passkey
   no longer unlocks the vault, but the vaultKey never changes, so a copy of the old record can still
@@ -46,6 +47,20 @@ types here do not have, trust the types.
   `requestCleartext` if you gave one.
 * **lease**: a grant that lets this device unlock again without asking the user, until
   `autolockMinutes` have passed.
+
+## Whisper and sidecar
+
+A box keeps two JSON objects of your app's. The whisper is sealed: encrypted, and bound to the box's
+labels, times and revision, so that a whisper altered or moved in storage refuses to open. The
+sidecar is laid beside it, unsealed, so that your server may read it and change it. A field the
+server should read but must not change unnoticed goes in both: the sidecar's copy for the server, the
+whisper's for your app, which compares the two once the box is unsealed to see what changed.
+
+| A field kept in       | Server-readable | Server-writable | Authenticated                      |
+|-----------------------|-----------------|-----------------|------------------------------------|
+| the whisper           | no              | no              | yes                                |
+| both, copied          | yes             | up to you       | yes: compare to see what changed   |
+| the sidecar           | yes             | yes             | no                                 |
 
 ## A host
 

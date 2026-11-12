@@ -520,7 +520,7 @@ A member that will not describe in a line is a smell: report it.
   against those two from memory: a kind of lesser salience goes unnamed. Where a caller meets a refusal in normal use, say
   what to do instead `#say-what-to-do`: `Precede with await bank.hello(), repeated to force a refresh`.
 * **The guarantee is the line worth writing** `#say-the-guarantee`. What the call proves, or what a caller could get wrong about a secret, goes
-  in: `Extracting the whisper authenticates that (sidecar included) the object has not been modified since it was sealed`.
+  in: `Extracting the whisper authenticates that the object, all but its sidecar, has not been modified since it was sealed`.
 * **The lower-yield rules** (option lists, guards' predicates, the reason above, pointing instead of redefining,
   `@param`, `@example`, sectioning a long file) are in `notes/more_style.md`, with their tags; a review may still cite one.
 * **Facts come from the code** `#facts-from-the-code`, never from the old prose or the test titles. Where they disagree, write what the code does

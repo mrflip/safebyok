@@ -121,10 +121,10 @@ export const { whisper, whisperBag } = Checkers('bad_option', ({ lazy, union, st
 
 /** A box's sidecar: your app's own JSON object beside the whisper, `{}` for none, shown while the vault is locked. Never put secret material in it.
  * It is stored in the clear, as the JSON object it is (a `jsonb` column, say, which a server can
- * query), so anyone who can read the database can read it. It is in the box's stamp as its JSON
- * with keys sorted: a sidecar altered in storage makes the box refuse to open, while one whose
- * keys storage reorders still opens. safebyok never looks inside it: check its shape before
- * `putBox()`, which refuses one that fails it.
+ * query), so anyone who can read the database can read it, and change it: it is not authenticated,
+ * and the whisper opens whatever storage did to it. A field the server should read but must not
+ * change unnoticed goes in the whisper too, so that you can compare the two once the box is unsealed. safebyok never
+ * looks inside it: check its shape before `putBox()`, which refuses one that fails it.
  *
  * @example sidecar.safeParse('work account').success  // false: a sidecar is an object -- { note: 'work account' }
  */
