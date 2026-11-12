@@ -6,7 +6,7 @@
 * **Default levels**: review `low`; worker `opus` (agent default effort); reviewer `sonnet`
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
-* **Status**: planned; thread 1 starting.
+* **Status**: thread 1 building. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
 not copied again here. What follows is the gloss.
