@@ -258,6 +258,7 @@ is room"). 15 waits on 13's filing: graphql's e2e runs over the Postgres functio
 
 **Levels**: worker `sonnet`; review `low`. **After**: 12 to 15, restacked into one line.
 **Size**: M, removal.
+*Orchestrator:* pulled forward into 15 (#671): the e2e Postgres helpers' vault tableset (`Tableset`, `SqlOf`, `vaultDBOver`, `freshVaultDB`, `vaultRowsOf`); `useFileDatabase()` takes no argument; safebyok-graphql no longer touches the vault adapter. Struck here. Owed here from 14 and 13's reviews: drop the vault tables then rename Convex's `safebyok_bank_*` tables without `bank_` (move `capacity`, `watchScope` out of `validators.ts` first); prune `refusals.ts`'s `gate_issue` crossing; move (not copy) the Postgres vault channel and watch tests to the bank file.
 
 ### 17 `bank_docs`
 
