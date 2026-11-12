@@ -22,7 +22,7 @@ const nothing = (): void => undefined
 
 /** `news`, told as bad news by `bank`: its autolock, whose peek at the cached lease `world`'s deviceDB refuses with it. */
 async function tellByAutolock(world: ReturnType<typeof makeBankWorld>, bank: Bank, news: VaultError): Promise<void> {
-  vi.spyOn(world.deviceDB, 'tryPeek').mockResolvedValueOnce({ ok: false, err: news })
+  vi.spyOn(world.deviceDB, 'peek').mockRejectedValueOnce(news)
   await bank.autolock()
 }
 

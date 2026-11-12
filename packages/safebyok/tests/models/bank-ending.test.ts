@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
 import type { Device } from '../../src/models/device'
 import * as Phrases from '../../src/helpers/phrases'
+import { nowMillis } from '../../src/helpers/clock'
 import { makeLifeTok } from '../../src/helpers/crypto'
+import { Lease } from '../../src/models/lease'
+import { good } from '../../src/refusals/outcome'
 import type { LeaseRow } from '../../src/shapes/shapes-storage'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
@@ -30,6 +33,17 @@ describe("bank.autolock", () => {
     expect(bank.isLocked).to.be.true
     expect(bank.snapshot.isLocked).to.be.true
     await TH.eventually(() => world.leaseRows().length === 0)
+  })
+
+  it("locks by the expiry its cached lease reports", async () => {
+    const { world, bank } = await makeBankWithVault()
+    world.advance(AutolockMillis + 1)
+    const tryExpiresAt = vi.spyOn(Lease, 'tryExpiresAt').mockResolvedValueOnce(good(nowMillis() + 1))
+    await bank.autolock()
+    expect(bank.isUnlocked).to.be.true
+    await bank.autolock()
+    expect(bank.isLocked).to.be.true
+    expect(tryExpiresAt).toHaveBeenCalledTimes(2)
   })
 
   it("is not called by ensureBank", async () => {
@@ -166,7 +180,7 @@ describe("bank.autolock", () => {
     const onBadNews = vi.fn()
     const bank = await world.bankOn({ onBadNews })
     const refusal = new VaultError('storage_unavailable', 'no storage')
-    vi.spyOn(world.deviceDB, 'tryPeek').mockResolvedValueOnce({ ok: false, err: refusal })
+    vi.spyOn(world.deviceDB, 'peek').mockRejectedValueOnce(refusal)
     await bank.autolock()
     expect(onBadNews).toHaveBeenCalledWith({ news: refusal, device: bank.device })
   })
@@ -177,7 +191,7 @@ describe("bank.autolock", () => {
     const spy = TH.spyLogger()
     const bank = await world.bankOn({ onBadNews, logger: spy.logger })
     const refusal = new VaultError('storage_unavailable', 'no storage')
-    vi.spyOn(world.deviceDB, 'tryPeek').mockResolvedValueOnce({ ok: false, err: refusal })
+    vi.spyOn(world.deviceDB, 'peek').mockRejectedValueOnce(refusal)
     const locking = bank.autolock()
     bank.device.sweep()
     await locking
@@ -376,7 +390,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
     const vacating = bank.device.vacate()
     await listing.reached
     const news = new VaultError('storage_unavailable', 'news past the disable')
-    vi.spyOn(world.deviceDB, 'tryPeek').mockResolvedValueOnce({ ok: false, err: news })
+    vi.spyOn(world.deviceDB, 'peek').mockRejectedValueOnce(news)
     await bank.autolock()
     expect([requestCleartext, onLifecycle, onBadNews].map((handler) => handler.mock.calls.length)).to.deep.equal([0, 0, 0])
     listing.release()

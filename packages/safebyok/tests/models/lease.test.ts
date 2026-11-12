@@ -144,6 +144,26 @@ describe("lease.cacheAsCacheCan()", () => {
   })
 })
 
+describe("Lease.expiresAt(friend) and tryExpiresAt(friend)", () => {
+  it("answers the cached lease's proving time plus the autolock duration", async () => {
+    const { friend } = await grantedWorld()
+    vi.setSystemTime(T0 + FriendLeaseMillis + 1)
+    expect(await Lease.expiresAt(friend)).to.eq(T0 + FriendLeaseMillis)
+    expect(friend.cached).not.to.be.null
+  })
+
+  it("answers null when the device has no cached lease", async () => {
+    expect(await Lease.expiresAt(fakeLeaseFriendOf())).to.be.null
+  })
+
+  it("refuses a cached row that will not read, and tryExpiresAt returns the refusal", async () => {
+    const friend = fakeLeaseFriendOf()
+    friend.cached = { ...Stamped, lease_key: 'not a key' }
+    await TH.expectRefusal(Lease.expiresAt(friend), 'damaged_lease')
+    expect(await Lease.tryExpiresAt(friend)).to.have.nested.property('err.refusalkind', 'damaged_lease')
+  })
+})
+
 describe("Lease.buildFromCache(friend, gate)", () => {
   it("returns null when the device has no cached lease", async () => {
     expect(await Lease.buildFromCache(fakeLeaseFriendOf(), WorldGate)).to.be.null
