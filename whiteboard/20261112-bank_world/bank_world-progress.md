@@ -40,6 +40,8 @@ What the threads have taught, newer than the plan where they disagree. Kept by t
 
 ## Lessons for later threads
 
+* *Orchestrator:* **the models' switch outruns one opus context by a wide margin.** 8a compacted five times; 8b's first worker compacted twice in reading and landed only renames. Legs on one branch, each with a narrow handoff naming its steps and files, at default effort, are the working shape. Threads 10 and 12 should be sized the same way.
+
 * *Orchestrator:* **an opus worker compacts about every ten minutes of heavy reading.** Thread 3 (size M) compacted four times, the last during its first justify. Size threads smaller than the plan did: 4 is split (4b, the battery); 8 must be cut into more than 8 and 8b before it starts. A handoff should name the files to open, so the worker reads less to find them.
 * *Thread 3:* shapes in `src/shapes/shapes-bankdb.ts` (BX), answers in `src/storage/bank-db.ts`, classifier `src/storage/bank-classifier.ts` with one entry per family (`classifyEnsureBank`, `classifyBuildBank`, `classifyStoredGate`, `classifyDelBank`, `classifyStoredVault`, `classifyStoredBox`, `classifyStoredBoxes`). `classifyDelBank` leaves the cascade to the adapter. Duplicated classifier tables and `bankBadActVals` go at thread 16.
 * *Thread 3's calls, by rules 2 and 17* (on Cleanup, *Your calls*): box verbs see only the vault row, not the bank, as today; a gate row under another `bank_tok` is no row (gate verbs refuse `ahead`, ensure and build throw `damaged_row`); no `damaged_bank` (a damaged bank row refuses `damaged_row`); `buildBank`'s policy cells refuse `bad_record` at the ask's check, not `gate_issue`.

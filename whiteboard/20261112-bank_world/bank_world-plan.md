@@ -199,6 +199,12 @@ and each handoff quotes it. The line is red from 8a's tip to 8c's (rule 20).
   `unlock_bank`; the vault listing by `ensureBank`; the fixture builders moved once; `Storable`'s
   `vault_tok` down (pulled forward from 10). **Levels**: worker `opus`, effort `high`; review
   `medium`. **After**: 8a and 4, restacked into one line.
+  *Orchestrator, after 8b's first worker stopped at its release valve with only the renames
+  (`bank_locked`, one thrower, `Device*` announcement types):* the rest of 8b goes in three legs
+  on the same branch and PR (#667), each a fresh worker continuing from the thread file's ten-step
+  plan: leg 1 steps 1 to 4 (shapes, Storable's `vault_tok`, Gate and Bank Storables, the lease to
+  the bank, `ensureVault`); leg 2 steps 5 to 8 (`Device.ensureBank`, listing delivery, Vault
+  stripped, gating); leg 3 steps 9 and 10 (fixtures, skips, React, VOCABULARY). One review at the end.
 * **8c `bank_prompts`**: the gate's prompts and verbs, `del_bank`, `autolock`, a bank tombstone
   delivered; unskips 8b's skips; React compiles. **Levels**: worker `opus`; review `medium`.
   **After**: 8b.
