@@ -60,8 +60,8 @@ export type CipherCtxRecord = Readonly<Record<string, string | number>>
  * a call with no stamp, or with a part or a record's field that is undefined or null: each
  * would bind the same as some other ctx.
  *
- * @example cipherCtx(vaultStamp, 'bank_key_passphrase_wrapped', { wayinkind: 'passphrase', key_deriver_label, salt_b64, device_tok, registered_at })
- * @example cipherCtx([vaultStampButFormat, leaseStamp], 'bank_key_lease_wrapped')
+ * @example cipherCtx([bankStamp, gateStamp], 'bank_key_passphrase_wrapped', { wayinkind: 'passphrase', wayinlabel: 'main', key_deriver_label, salt_b64, device_tok, registered_at })
+ * @example cipherCtx([bankStamp, leaseStamp], 'bank_key_lease_wrapped')
  */
 export function cipherCtx(stamp: CipherCtxRecord | readonly CipherCtxRecord[], purpose: string, ...header: [] | [CipherCtxRecord]): Uint8Array {
   const stamps: readonly CipherCtxRecord[] = Array.isArray(stamp) ? stamp : [stamp as CipherCtxRecord]
@@ -123,7 +123,7 @@ export function importWrappingKeyBytes(keyBytes: Uint8Array): Promise<CryptoKey>
  * where, so the same bytes put to another use make another key. The bytes stay with the caller:
  * drop them promptly.
  *
- * @example await deriveWrappingKey(prfBytes, cipherCtx(vaultStamp, 'bank_key_passkey_wrapped', header))
+ * @example await deriveWrappingKey(prfBytes, cipherCtx([bankStamp, gateStamp], 'bank_key_passkey_wrapped', header))
  */
 export async function deriveWrappingKey(keyBytes: Uint8Array, info: Uint8Array): Promise<CryptoKey> {
   const inputKey = await crypto.subtle.importKey('raw', keyBytes as BufferSource, 'HKDF', false, ['deriveKey'])
