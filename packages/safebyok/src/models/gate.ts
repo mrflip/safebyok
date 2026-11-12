@@ -45,7 +45,7 @@ export class Gate {
 
   // == [Construction]: constructor, make
 
-  /** The gate `record` stores, of the bank `bank` stamps: refused 'bad_option' where the record is of another bank or another life of it. */
+  /** The gate `record` stores, of the bank `bank` stamps. A record of another bank, or another life of it, is refused. */
   constructor(bank: BankStamp, record: GateRecord) {
     const checkedBank = bankStamp.parse(bank)
     const checked = gateRecord.parse(record)
@@ -58,7 +58,7 @@ export class Gate {
     Object.freeze(this)
   }
 
-  /** A gate born with `bank`, under the stamp `gate`, at the first revision of its row: what `buildBank` puts beside the bank row. */
+  /** A gate born with `bank`, under the stamp `gate`, at the first revision of its row. */
   static make(bank: BankStamp, gate: GateStamp, main: Wayin, passkey0: Wayin | null): Gate {
     const checked = Checks.gateMakeArgs.parse({ bank, gate, main, passkey0 })
     return new Gate(checked.bank, {
