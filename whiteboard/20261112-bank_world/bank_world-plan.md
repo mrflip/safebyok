@@ -57,9 +57,8 @@ it. The Coach added four at the invocation, and the orchestrator one:
     a thread-worker. Agents may force-push sprint branches with a lease, and move PRs in and out of
     draft (the Coach, 2026-11-12).
 22. **A push need not wait on `pnpm justify`; `ready` does. A restack of more than two PRs goes
-    through the `restacker` skill, justified once at the tip** (the Coach, 2026-11-12; the skill
-    text itself is proposed in `sprint-skill-guidance.md`, since the harness refuses an agent's
-    edit of `.claude/`).
+    through the `restacker` skill, justified once at the tip** (the Coach, 2026-11-12; now also
+    in the `/sprint` skill, `wrapup.md` and `thread-worker.md`, on this sprint's branch).
 23. **Bank-world drafts of the contract notes** (the Coach suggested, 2026-11-12):
     `guarantees-bank.md` and `deliver-contract-bank.md` in this directory describe the target.
     A worker or reviewer judging bank-world code reads them beside today's `notes/`; the thread
