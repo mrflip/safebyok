@@ -91,7 +91,17 @@ bound to a `ctx` as additional data (`crypto.ts`, `cipherCtx`). The ctx names th
 (scope, `vault_tok`, `registered_at`), a purpose string unique to
 the kind of field, and the record's own visible header or stamp. So a wrap or a ciphertext moved
 to another vault, slot, box, lease or purpose does not open, and a visible field altered in
-storage (a sidecar, a salt, a deadline) makes its record refuse to open.
+storage (a box's time or revision, a salt, a deadline) makes its record refuse to open. A box's
+sidecar is the one unencrypted field that no ctx binds, so that the server may change it: a sidecar
+altered in storage leaves the whisper opening. The box's stamp is its sparse fields alone
+(`boxStampOf`, `models/box.ts`). A field a host wants readable in storage and authenticated is kept
+in both the whisper and the sidecar, and the host compares the two once the box is unsealed:
+
+| A field kept in       | Server-readable | Server-writable | Authenticated                      |
+|-----------------------|-----------------|-----------------|------------------------------------|
+| the whisper           | no              | no              | yes                                |
+| both, copied          | yes             | up to the host  | yes: compare to see what changed   |
+| the sidecar           | yes             | yes             | no                                 |
 
 ## Bytes, handles, and the three datastores
 
@@ -127,8 +137,9 @@ attempt is done (`attemptThenZero`).
 
 ## The secret values
 
-Eight values are secret. Everything else safebyok writes or shows is either public or
-*visible*: readable wherever it is stored, authenticated by the ctx that binds it, and never secret.
+Eight values are secret. Everything else safebyok writes or shows is public, or *visible*:
+readable wherever it is stored, authenticated by the ctx that binds it, and never secret. A box's
+sidecar is public and unauthenticated.
 
 | Value | Form | Where it may exist | For how long | Who touches it |
 |---|---|---|---|---|
@@ -144,8 +155,8 @@ Eight values are secret. Everything else safebyok writes or shows is either publ
 Not secret, by design: every salt (`salt_b64`, `prf_salt_b64`), a passkey's `credential_id`,
 `device_id`, `key_deriver_label`, every label and `user_id` (a scope name; a host that treats its
 user ids as sensitive digests them before they reach safebyok), `vault_tok`, every epoch,
-`registered_at` and `ask_passphrase_at`, a box's sidecar (visible, authenticated, never
-encrypted), and every wrap and ciphertext. The snapshot shows no salt and no wrap, so an offline
+`registered_at` and `ask_passphrase_at`, a box's sidecar (unencrypted and unauthenticated, as
+*The construction* says), and every wrap and ciphertext. The snapshot shows no salt and no wrap, so an offline
 guess has nothing to start from (README, *The passphrase and the passkey*).
 
 ## Access points, value by value

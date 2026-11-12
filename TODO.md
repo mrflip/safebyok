@@ -407,14 +407,6 @@ drops and revokes it, but without calling `lock()`. Decide whether that path sho
 itself (which would end a pending gating and conclude `lockLanded`), taking care that the lock does
 not recurse into the call that found the damage.
 
-### The sidecar out of the seal (next)
-
-The Coach (2026-11-10): "the sidecar is not supposed to be sealed, we should handle that next." Today the box's stamp, which both seals are
-bound to, contains the sidecar as stable JSON, so a sidecar-only `putBox` must decipher the whisper and seal it again (`Box.#edit`), and needs
-the vault unlocked. Take the sidecar out of the stamp. The core README says a sidecar is "authenticated but never encrypted", and only
-the stamp authenticates it: say whether that promise is dropped, or what authenticates the sidecar instead. This replaces the 2026-10-22
-question of how a `putBox` that leaves the whisper out is expressed.
-
 ### Who keeps the lease's expiry
 
 The Coach (2026-10-22): have only the passphrase proving, or a parent object, hold the lease's
