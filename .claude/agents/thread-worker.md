@@ -67,7 +67,8 @@ the diff.
    so far, push the branch with the credential helper PROCESS.md names, and open its PR as a
    draft, per PROCESS.md, *Pull requests*. Push each milestone after it, with the thread file
    brought up to date: the Coach follows the thread there. Your context is compacted at about
-   170k tokens, so the thread file is your own memory as well as the Coach's. Once
+   170k tokens, so the thread file is your own memory as well as the Coach's. A push need not
+   wait on `pnpm justify`; `ready` does. Once
    pushed, a commit is not rewritten except by a catch-up rebase.
 3. **Ready.** With everything committed and justify green, finish the thread file, commit it
    (`plan:`), push, bring the PR's title and body up to date -- a **Tests:** line, *Open
