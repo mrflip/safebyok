@@ -29,7 +29,7 @@ describe("A refused forget of the lease row", () => {
     const { bank, deviceDB, friend } = await makeBornVaultAndFriend(byPassphrase(Passphrase), { onLifecycle })
     deviceDB.forget.mockRejectedValueOnce(Refusal)
     await TH.expectBad(friend.tryForgetLease(), 'storage_unavailable')
-    const revokeFailures = () => onLifecycle.mock.calls.filter(([told]) => told.kind === 'lease_revoke_failed')
+    function revokeFailures() { return onLifecycle.mock.calls.filter(([told]) => told.kind === 'lease_revoke_failed') }
     await TH.eventually(() => revokeFailures().length > 0)
     expect(revokeFailures()).to.have.lengthOf(1)
     expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal, bank, where: 'undeleted' }))
