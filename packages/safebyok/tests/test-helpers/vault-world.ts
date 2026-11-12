@@ -83,7 +83,7 @@ export async function addPasskeyTyping(vault: Vault, passphrase: string, tag: st
 /** `vault.revokePasskeyPrompt()`, the user typing `passphrase` at the dialog, should it be shown. */
 export function revokeTyping(vault: Vault, passphrase: string): Promise<Vault> { return askTyping(vault.world, byPassphrase(passphrase), () => vault.revokePasskeyPrompt()) }
 
-/** `vault.del()`, the vault unlocked first by the lease cached on this device where it has none. */
+/** `vault.del(vault)` once `ensureUnlocked` has unlocked it, which these tests expect to do by the lease cached on this device. */
 export async function delUnlocked(vault: Vault): Promise<Vault> {
   await vault.ensureUnlocked()
   return vault.del(vault)
