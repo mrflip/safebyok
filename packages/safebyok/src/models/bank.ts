@@ -37,7 +37,7 @@ export class Bank {
   declare readonly user_id:   string
   declare readonly banklabel: string
   readonly scope:            BankScope
-  readonly device_tok:        string
+  readonly device_tok:       string
   readonly keyDeriver:       GuardedKeyDeriver
   readonly deviceDB:         DeviceDB
   readonly logger:           VaultLogger

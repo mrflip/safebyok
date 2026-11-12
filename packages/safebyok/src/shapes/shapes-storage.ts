@@ -515,5 +515,5 @@ true satisfies Z.core.util.AssertEqual<LeaseScopepath, Z.infer<typeof leaseScope
 /** The device row: the `device_tok` this device goes by in one bank scope. */
 export const deviceRow = objCheck(({ user_id, banklabel, device_tok }) => ({ user_id, banklabel, device_tok }), 'bad_record', [CX])
 
-export type DeviceRow      = Z.infer<typeof deviceRow>
+export type DeviceRow = Z.infer<typeof deviceRow>
 // --
