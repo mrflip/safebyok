@@ -14,14 +14,13 @@ Branch `20261112-bankdb_idb`, PR #TBD, stacked on [#666](https://github.com/mrfl
   `delVault` deletes the box range of that life. A cascade rings no notice.
 * **Database name**: `safebyok-<dbName>:bank-v001-001-001` (the shelf's `dbName` is `safebyok-${dbName}`, stem `bank`, no
   `oldnames`). `BankDBVersion` is a constant in `bank-shelf.ts`, not the core's `consts.ts`, to keep the core untouched.
-* **Decisions taken**: `isLifeOver` (a vault row missing, a tombstone or of another life; false for a row that fails its
-  checks) is copied from `memory-bank-db.ts`; it is private there. `doTidyGone` copies memory's too: it sweeps vault rows of
-  an ended bank life, then box rows whose life is over. A notice's `parent` is `stored.parent`.
+* **Decisions taken**: `doTidyGone` sweeps the vault rows of an ended bank life, then the box rows whose pair of lives is
+  over, reading rows as rows with no parse and no guard (the Coach, 2026-11-12: a mutilated bank row is no path, and rule 24).
+  Memory's version still parses; the ruling was for this adapter. A notice's `parent` is `stored.parent`.
 * **Deviations**: one core test-helper line: `packages/safebyok/tests/test-helpers.ts` now exports
   `BankDBWorld` (`export * as`, the bankdb-world records and asks), because a package's tests reach helpers only through
   `safebyok/testing` and its names collide with storage-world's. `IdbVaultDB` and `shelf.ts` untouched (thread 16).
 * **Discoveries**: the default `dbName` `'safebyok'` gives the database `safebyok-safebyok:bank-...`, as the Coach's
   `safebyok-<dbName>` pattern says; see For the Coach. The `vault_full` refusal is still the kind for a full box cap.
-* **For the Coach**: (1) the doubled `safebyok-safebyok` of the default; recommend leaving it, or defaulting `dbName` to
-  something else when thread 5b settles the device database's prefix. (2) Export `isLifeOver` from the core's `BX` so both
-  adapters share it? Recommend yes in a later thread (it is five lines).
+* **For the Coach**: the doubled `safebyok-safebyok` of the default `dbName`; recommend leaving it, or defaulting `dbName`
+  to something else when thread 5b settles the device database's prefix.

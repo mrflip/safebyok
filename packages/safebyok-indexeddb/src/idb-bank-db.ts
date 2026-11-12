@@ -17,7 +17,7 @@ export type IdbBankDBOpts = BX.AdapterBankDBOpts & { dbName?: string | undefined
 const idbBankDBOpts = DB.objCheck(({ str, uint }) => ({ ...DB.adapterVaultDBOpts.shape, dbName: str.min(1).optional(), maxBoxes: uint.optional() }), 'bad_option')
 // --
 
-// == [Helpers]: Rung, isHeardBy, isLifeOver
+// == [Helpers]: Rung, isHeardBy, bankScopeOf
 
 /** A notice of one write, broadcast to every watch on the database: the scope written under, and the row written. A bank or gate row has no vaultlabel. */
 type Rung = { scope: BankScope & { vaultlabel?: string }, heard: BX.Heard }
@@ -29,13 +29,6 @@ function isHeardBy(watched: WatchScope, scope: Rung['scope']): boolean {
 
 /** The bank scope of an ask or a row, without its other fields. */
 function bankScopeOf({ user_id, banklabel }: BankScope): BankScope { return { user_id, banklabel } }
-
-/** True when `raw`, a vault row, is missing, a tombstone, or of a life other than `life`; false when it fails its checks. */
-function isLifeOver(raw: unknown, life: string): boolean {
-  if (raw === null) { return true }
-  const parsed = BX.vaultRow.safeParse(raw)
-  return parsed.success && ((parsed.data.am === 'x') || (BX.vaultLifeOf(parsed.data) !== life))
-}
 // --
 
 /** A bankDB stored in this browser's IndexedDB. Its watch reports writes from every tab. */
@@ -194,21 +187,22 @@ export class IdbBankDB extends DB.AdapterBankDB {
     return stored
   }
 
-  // A row that fails its checks is left alone: it is neither of this life nor provably of an ended one.
+  // The rows are trusted to be rows: a row damaged inside the datastore is out of scope.
   protected async doTidyGone(ask: DB.BoxTidyAsk): Promise<BX.Tidied> {
     return await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const [bank, vaults, boxes] = await Promise.all([DB.rowAt(store, bankScopepathOf(ask)), filedIn(store, vaultsRangeOf(ask)), filedIn(store, boxesRangeOf(ask))])
-      const liveBank = BX.bankRow.safeParse(bank)
-      const bank_tok = (liveBank.success && (liveBank.data.am === 'a')) ? liveBank.data.bank_tok : null
-      const vaultOfLabel = new Map<string, unknown>()
+      const [bankRaw, vaults, boxes] = await Promise.all([DB.rowAt(store, bankScopepathOf(ask)), filedIn(store, vaultsRangeOf(ask)), filedIn(store, boxesRangeOf(ask))])
+      const bank = bankRaw as BX.BankRow | null
+      const bank_tok = (bank?.am === 'a') ? bank.bank_tok : null
+      const vaultOfLabel = new Map<string, BX.VaultRow>()
       for (const { scopepath, row } of vaults) {
-        const vault = BX.vaultRow.safeParse(row)
-        if (vault.success && (vault.data.bank_tok !== bank_tok)) { store.delete(scopepath) } else { vaultOfLabel.set(vaultlabelOf(scopepath), row) }
+        const vault = row as BX.VaultRow
+        if (vault.bank_tok === bank_tok) { vaultOfLabel.set(vaultlabelOf(scopepath), vault) } else { store.delete(scopepath) }
       }
       let totalCount = 0
       for (const { scopepath } of boxes) {
         const { vaultlabel, ...tokpair } = boxPlaceOf(scopepath)
-        if (isLifeOver(vaultOfLabel.get(vaultlabel) ?? null, BX.vaultLifeOf(tokpair))) { store.delete(scopepath) } else { totalCount += 1 }
+        const vault = vaultOfLabel.get(vaultlabel)
+        if ((vault === undefined) || (vault.am === 'x') || (BX.vaultLifeOf(vault) !== BX.vaultLifeOf(tokpair))) { store.delete(scopepath) } else { totalCount += 1 }
       }
       return { totalCount }
     })
