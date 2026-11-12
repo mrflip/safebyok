@@ -275,7 +275,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
   it("refuses the old vault's fetch and hydrate", async () => {
     const fetching = await makeBornVault()
     fetching.restoreRow(await otherLifeAt(5))
-    await TH.expectRefusal(fetching.vault.fetch())
+    await TH.expectRefusal(fetching.vault.get({ maxMillisSinceRefresh: 0 }))
     const hydrating = await makeBornVault()
     hydrating.restoreRow(await otherLifeAt(5))
     await TH.expectBad(hydrating.vault.tryHydrate({ maxMillisSinceRefresh: 0 }))
@@ -312,7 +312,7 @@ describe("an old instance replaced by its own call", () => {
     const { vault, restoreRow, storedNow } = await makeBornVault()
     const other = await otherLifeAt(5)
     restoreRow(other)
-    await TH.expectRefusal(vault.fetch())
+    await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }))
     await TH.expectRefusal(vault.del(vault.scope))
     expect(storedNow()).to.include({ am: 'a', vault_tok: other.vault_tok, revision_seq: 5 })
     TH.expectSyncRefusal(() => vault.demandDeletable())
@@ -619,7 +619,7 @@ describe("a listing shares one storage call among concurrent requests", () => {
   it("joins fetches of one slot made while one runs, the instance's own among them, into one get", async () => {
     const { vault, listing, opts } = await makeBornVault()
     const tryGetVault = vi.spyOn(opts.vaultDB, 'tryGetVault')
-    const [fetched, refetched, own] = await Promise.all([listing.get(Dna, { maxMillisSinceRefresh: 0 }), listing.get(Dna, { maxMillisSinceRefresh: 0 }), vault.fetch()])
+    const [fetched, refetched, own] = await Promise.all([listing.get(Dna, { maxMillisSinceRefresh: 0 }), listing.get(Dna, { maxMillisSinceRefresh: 0 }), vault.get({ maxMillisSinceRefresh: 0 })])
     expect([fetched, refetched, own]).to.deep.equal([vault, vault, vault])
     expect(tryGetVault).toHaveBeenCalledOnce()
   })

@@ -331,7 +331,7 @@ describe("box.listing.deliverRecord(rcvd): registered_at, and a record of anothe
     const listing = boxListingOf(world.mw)
     const box = listing.deliverRecord(fullBoxRecord())
     world.mw.willGet(world.mw.answerOf(box.scope, fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-other', vault_tok: 'vault-tok-other' })))
-    await TH.expectRefusal(box.fetch(), 'storage_issue')
+    await TH.expectRefusal(box.get({ maxMillisSinceRefresh: 0 }), 'storage_issue')
     expect(box.revision_seq).to.eq(1)
   })
 
@@ -352,7 +352,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
   const whisper = { apiKey: 'sk-test-0000' }
   const BadArgCases = [
     [(box: TestableBox) => box.put({ whisper, sidecar: {} }, { maxMillisSinceRefresh: -1 }),     'put with opts out of range'],
-    [(box: TestableBox) => box.fetch({ ifAbsent: 'shrug' as never }),                             'fetch with an ifAbsent it does not accept'],
+    [(box: TestableBox) => box.get({ maxMillisSinceRefresh: 0, ifAbsent: 'shrug' as never }),                             'get with an ifAbsent it does not accept'],
     [(box: TestableBox) => box.hydrate({ maxMillisSinceRefresh: -1 }),                            'hydrate with opts out of range'],
     [(box: TestableBox) => box.del(box.scope, { maxWorldMillis: -1 }),                                       'del with opts out of range'],
     [(box: TestableBox) => box.extractWhisper({ maxWorldMillis: -1 }),                             'extractWhisper with opts out of range'],

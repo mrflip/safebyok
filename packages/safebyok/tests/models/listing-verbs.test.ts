@@ -22,7 +22,7 @@ function putable() {
 }
 // --
 
-describe("listing.fetch(scope): nothing stored for a live listed box", () => {
+describe("listing.get(scope): nothing stored for a live listed box", () => {
   it("refuses, and leaves the box unchanged", async () => {
     const listing = boxListingOf(world.mw)
     const box = listing.deliverRecord(fullBoxRecord())
@@ -36,7 +36,7 @@ describe("listing.fetch(scope): nothing stored for a live listed box", () => {
   })
 })
 
-describe("listing.fetch(scope): the row it says it expects", () => {
+describe("listing.get(scope): the row it says it expects", () => {
   it("expects the shell row for a box not listed, and the listed box's own row from then on", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(fullBoxRecord())

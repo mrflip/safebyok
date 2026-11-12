@@ -123,7 +123,7 @@ describe("storable.hydrate(opts): the world first", () => {
   })
 })
 
-describe("storable.fetch(opts): one fetch at a time", () => {
+describe("storable.get(opts): one fetch at a time", () => {
   it("joins the fetch under way: overlapping calls make one get and share its answer", async () => {
     const { box } = timelyBoxOf(1000)
     const pending = makePending()
@@ -132,9 +132,9 @@ describe("storable.fetch(opts): one fetch at a time", () => {
       await pending.promise
       return world.mw.answerOf(scope, world.mw.fullBoxRecord())
     })
-    const first = box.fetch()
+    const first = box.get({ maxMillisSinceRefresh: 0 })
     await vi.advanceTimersByTimeAsync(0)
-    const second = box.fetch()
+    const second = box.get({ maxMillisSinceRefresh: 0 })
     await vi.advanceTimersByTimeAsync(0)
     expect(world.mw.callsOf('get')).to.have.lengthOf(1)
     pending.open()
@@ -150,8 +150,8 @@ describe("storable.fetch(opts): one fetch at a time", () => {
       await pending.promise
       return world.mw.answerOf(scope, world.mw.tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-gone' }))
     })
-    const failing = box.fetch({ ifAbsent: 'fail' })
-    const nilling = box.fetch({ ifAbsent: 'nil' })
+    const failing = box.get({ maxMillisSinceRefresh: 0, ifAbsent: 'fail' })
+    const nilling = box.get({ maxMillisSinceRefresh: 0, ifAbsent: 'nil' })
     await vi.advanceTimersByTimeAsync(0)
     pending.open()
     await TH.expectRefusal(failing, 'absent_box')
@@ -161,8 +161,8 @@ describe("storable.fetch(opts): one fetch at a time", () => {
 
   it("starts a fetch of its own once the one under way has ended", async () => {
     const { box } = timelyBoxOf(1000)
-    await box.fetch()
-    await box.fetch()
+    await box.get({ maxMillisSinceRefresh: 0 })
+    await box.get({ maxMillisSinceRefresh: 0 })
     expect(world.mw.callsOf('get')).to.have.lengthOf(2)
   })
 })
@@ -336,7 +336,7 @@ function storageDown(): VaultError { return new VaultError('storage_unavailable'
 
 describe("storable try forms: an outcome, never a rejection", () => {
   const GoodCases = [
-    [(box: TestableBox) => box.tryFetch(),                                                   'tryFetch of a stored record'],
+    [(box: TestableBox) => box.tryGet({ maxMillisSinceRefresh: 0 }),                                                   'tryGet of a stored record'],
     [(box: TestableBox) => box.tryHydrate(),                                                 'tryHydrate of a timely record'],
     [(box: TestableBox) => box.tryPut({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'x' } }), 'tryPut that storage takes'],
     [(box: TestableBox) => box.tryDel(box.scope),                                                     'tryDel that storage takes'],
@@ -349,8 +349,8 @@ describe("storable try forms: an outcome, never a rejection", () => {
   }
 
   const BadCases = [
-    [(box: TestableBox) => box.tryFetch(),                                                   (box: TestableBox) => { world.mw.willGet(world.mw.refusalOf(box.scope, storageDown())) },  "storage_unavailable", 'tryFetch that storage refuses'],
-    [(box: TestableBox) => box.tryFetch(),                                                   () => { world.mw.willGet(() => { throw new Error("socket closed") }) },         undefined,             'tryFetch whose VaultDB throws a plain Error'],
+    [(box: TestableBox) => box.tryGet({ maxMillisSinceRefresh: 0 }),                                                   (box: TestableBox) => { world.mw.willGet(world.mw.refusalOf(box.scope, storageDown())) },  "storage_unavailable", 'tryFetch that storage refuses'],
+    [(box: TestableBox) => box.tryGet({ maxMillisSinceRefresh: 0 }),                                                   () => { world.mw.willGet(() => { throw new Error("socket closed") }) },         undefined,             'tryFetch whose VaultDB throws a plain Error'],
     [(box: TestableBox) => box.tryHydrate(),                                                 () => { world.mw.willEnsureTimely(() => Promise.reject(storageDown())) },         "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
     [(box: TestableBox) => box.tryPut({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'x' } }), (box: TestableBox) => { world.mw.willPut(world.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'tryPut that storage refuses as stale'],
     [(box: TestableBox) => box.tryDel(box.scope),                                                     () => { world.mw.setLocked(true) },                                      "vault_locked",        'tryDel while locked'],

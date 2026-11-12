@@ -184,7 +184,7 @@ describe("the proof", () => {
     expect(dialog.shown.splice(0)).to.deep.equal(['del_vault'])
     bankUi.expectRenders(['ready: main unlocked (asking del_vault)', 'ready: main locked (asking del_vault)', 'ready: no vaults (asking del_vault)', 'ready: no vaults'])
     vaultUi.expectRenders(['main locked'])
-    await TH.expectRefusal(vault.fetch(), 'disabled')
+    await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }), 'disabled')
     const gone = bank.vaultAt(VaultScopeGiven)
     expect(gone).not.to.eq(vault)
     expect(gone?.vault_tok).not.to.eq(vault.vault_tok)

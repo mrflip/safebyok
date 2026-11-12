@@ -139,23 +139,23 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Storable ops]: fetch, hydrate, del, each with its try form
+  // == [Storable ops]: get, hydrate, del, each with its try form
 
-  /** This thing as it is stored now, through the listing, which joins any get of its scope under way.
-   * Chute: **thing.fetch** → thing.hydrate → listing.get → tryGet → (joined by scope) #doGet → deliverAnswer
+  /** This thing, its record fetched unless timely within `opts.maxMillisSinceRefresh`; refused if absent, unless `ifAbsent: 'nil'`.
+   * Chute: **thing.get** → thing.hydrate → listing.get → tryGet → (joined by scope) #doTryGetJoined → doTryGet, then deliverAnswer
    */
-  async fetch(opts: FetchOpts = {}): Promise<this> {
-    const { ifAbsent, maxWorldMillis } = VX.fetchOpts.parse(opts)
-    await this.hydrate({ maxMillisSinceRefresh: 0, maxWorldMillis })
+  async get(opts: FetchOpts = {}): Promise<this> {
+    const { ifAbsent, maxMillisSinceRefresh, maxWorldMillis } = VX.fetchOpts.parse(opts)
+    await this.hydrate({ maxMillisSinceRefresh, maxWorldMillis })
     if (ifAbsent === 'fail') { this.demandPresent() }
     return this
   }
 
-  /** Non-throwing form of {@link fetch}. */
-  tryFetch(opts: FetchOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.fetch(opts)) }
+  /** Non-throwing form of {@link get}. */
+  tryGet(opts: FetchOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.get(opts)) }
 
   /** This thing, its world timely and its record fetched unless timely within `opts.maxMillisSinceRefresh`.
-   * Chute: thing.fetch | thing.ensureDeletable | box.ensureUnsealable | box.ensurePuttable | vault.ensureTimely → **thing.hydrate** → listing.get → tryGet → (joined by scope) #doGet → deliverAnswer
+   * Chute: thing.get | thing.ensureDeletable | box.ensureUnsealable | box.ensurePuttable | vault.ensureTimely → **thing.hydrate** → listing.get → tryGet → (joined by scope) #doTryGetJoined → doTryGet, then deliverAnswer
    */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const { maxMillisSinceRefresh = this.listing.maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)

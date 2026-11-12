@@ -186,7 +186,7 @@ describe("sweep and vacate", () => {
     TH.expectSyncRefusal(() => box.demandUnsealable())
     TH.expectSyncRefusal(() => box.demandExposable())
     await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)))
-    await TH.expectRefusal(vault.fetch())
+    await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }))
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp))
     expect(vault.lock().sweep().vacate()).to.equal(vault)
     expect(box.lock().sweep().vacate()).to.equal(box)

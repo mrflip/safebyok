@@ -55,7 +55,7 @@ describe("a gate changed on another device", () => {
     await unlockTyping(theirs, byPassphrase(Passphrase))
     await replaceTyping(vault, Passphrase, NewPassphrase)
     other.putBehindOurBack(demandStored())
-    await theirs.fetch()
+    await theirs.get({ maxMillisSinceRefresh: 0 })
     expect(theirs.gate.pickle().passphrase_wayin).to.deep.equal(demandStored().gate.passphrase_wayin)
     expect(theirs.isUnlocked).to.be.true
     expect(await vaultRoundTrip(theirs, theirs)).to.eq('sk-test')
@@ -211,7 +211,7 @@ describe("vault.replacePassphrasePrompt()", () => {
       const answer = await commit(record, opts)
       const stored = demandStored()
       putBehindOurBack({ ...stored, gate: { ...stored.gate, gate_epoch: landedEpoch + 1 } })
-      await vault.fetch()
+      await vault.get({ maxMillisSinceRefresh: 0 })
       return answer
     })
     await replaceTyping(vault, Passphrase, NewPassphrase)
@@ -242,7 +242,7 @@ describe("vault.replacePassphrasePrompt()", () => {
     const { vault, demandStored, putBehindOurBack, fakeBank: world } = born
     world.strengthChecker = guardStrengthChecker(async () => {
       const moved = putBehindOurBack(demandStored())
-      await vault.fetch()
+      await vault.get({ maxMillisSinceRefresh: 0 })
       expect(vault.revision_seq).to.eq(moved.revision_seq)
       return { strong: true as const }
     })
@@ -387,7 +387,7 @@ describe("a gate change on other sessions", () => {
     const theirs = anotherSession().deliverRecord(demandStored())
     await unlockTyping(theirs, { passphraseClear: Passphrase })
     await replaceTyping(vault, Passphrase, NewPassphrase)
-    await theirs.fetch()
+    await theirs.get({ maxMillisSinceRefresh: 0 })
     expect(theirs.gate.pickle()).to.deep.equal(demandStored().gate)
     expect(theirs.isUnlocked).to.be.true
   })
@@ -487,7 +487,7 @@ describe("vault.delVaultPrompt()", () => {
     const { vault, demandStored, anotherSession } = born
     await delTyping(anotherSession().deliverRecord(demandStored()))
     const { shown } = dialogOf(born)
-    await TH.expectRefusal(vault.fetch())
+    await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }))
     await TH.expectRefusal(vault.delVaultPrompt())
     expect(shown).to.have.lengthOf(0)
   })
@@ -498,7 +498,7 @@ describe("listing.del(ante)", () => {
     const { vault, listing, demandStored, storedNow, putBehindOurBack } = await makeBornVault()
     const ante = vault.fullRecord
     putBehindOurBack(demandStored())
-    await vault.fetch()
+    await vault.get({ maxMillisSinceRefresh: 0 })
     await TH.expectRefusal(listing.del(ante), 'stale_write')
     expect(storedNow()).to.include({ am: 'a' })
   })

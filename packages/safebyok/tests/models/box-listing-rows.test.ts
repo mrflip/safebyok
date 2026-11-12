@@ -23,7 +23,7 @@ function listedBox() {
 }
 
 describe("BoxListing: an absent box", () => {
-  describe("listing.fetch(scope) of nothing stored", () => {
+  describe("listing.get(scope) of nothing stored", () => {
     it("refuses 'absent_box' for a box not listed", async () => {
       const listing = boxListingOf(world.mw)
       await TH.expectRefusal(listing.get(scope(), { maxMillisSinceRefresh: 0 }), 'absent_box')
@@ -61,7 +61,7 @@ describe("BoxListing: an absent box", () => {
     })
   })
 
-  describe("listing.fetch(scope) of a stored tombstone", () => {
+  describe("listing.get(scope) of a stored tombstone", () => {
     for (const [form, tombstone, am] of [['deleted', gone, 'x']] as const) {
       function seedTombstone() { world.mw.seedPut(tombstone()) }
 
@@ -116,11 +116,11 @@ describe("BoxListing: an absent box", () => {
     })
   })
 
-  describe("box.fetch(opts) and box.hydrate(opts) of an absent box", () => {
+  describe("box.get(opts) and box.hydrate(opts) of an absent box", () => {
     it("refuses 'absent_box' from box.fetch by default, and resolves the box under 'nil'", async () => {
       const box = boxListingOf(world.mw).deliverRecord(gone())
-      await TH.expectRefusal(box.fetch(), 'absent_box')
-      expect(await box.fetch({ ifAbsent: 'nil' })).to.eq(box)
+      await TH.expectRefusal(box.get({ maxMillisSinceRefresh: 0 }), 'absent_box')
+      expect(await box.get({ maxMillisSinceRefresh: 0, ifAbsent: 'nil' })).to.eq(box)
     })
 
     it("hydrates an absent box without refusing", async () => {

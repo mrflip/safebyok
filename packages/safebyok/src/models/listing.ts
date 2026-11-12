@@ -150,7 +150,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Storage verbs]: list, tryList, listRows, listedAt, get, tryGet, doGet, handleIfAbsent, put, tryPut, del, tryDel
+  // == [Storage verbs]: list, tryList, listRows, listedAt, get, tryGet, doTryGetJoined, handleIfAbsent, put, tryPut, del, tryDel
 
   /** Enlists every row the vaultDB lists here, sets aside the rows it found damaged, and answers the instances listed.
    * Chute: bank and vault bring-up → **list** → tryList → (joined) #listRows → deliverListing
@@ -183,14 +183,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   #listedAt(damaged: DamagedT): ThingT | null { return this.#things.get(this.scopepathOf(damaged)) ?? null }
 
   /** The instance under `scoped`: the one listed, no older than `opts` allows, or fetched where none is; null under `ifAbsent: 'nil'`.
-   * Chute: thing.hydrate | vault.getBox → **listing.get** → tryGet → (joined by scope) #doGet → deliverAnswer
+   * Chute: thing.hydrate | vault.getBox → **listing.get** → tryGet → (joined by scope) #doTryGetJoined → doTryGet, then deliverAnswer
    */
   async get(scoped: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> { return valOf(await this.tryGet(scoped, opts)) }
 
-  // A get joins any get of the same scope under way: the storage get and its delivery are shared, each caller's
-  // `ifAbsent` its own.
   /** {@link get}, answering the vaultDB's own answer where storage was asked, or the act `timely` where the instance listed served it.
-   * Chute: listing.get | bank.tryProbe → **tryGet** → (joined by scope) #doGet → deliverAnswer
+   * Chute: listing.get | bank.tryProbe → **tryGet** → (joined by scope) #doTryGetJoined → doTryGet, then deliverAnswer
    */
   async tryGet(scoped: ScopeT, opts: FetchOpts = {}): Promise<ListingGetAnswer<ThingT | null>> {
     try {
@@ -202,26 +200,30 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       if (listed?.isHydratedWithin(maxMillisSinceRefresh) === true) {
         return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), world: null, ask: SX.loggableAsk.parse({ op: 'get', ...scope }) }
       }
-      const scopepath = this.scopepathOf(scope)
-      let getOnce = this.#joinedGetOf.get(scopepath)
-      if (getOnce === undefined) {
-        getOnce = oneAtATime(() => this.#doGet(scope))
-        this.#joinedGetOf.set(scopepath, getOnce)
-      }
-      const got = await getOnce()
+      const got = await this.#doTryGetJoined(scope)
       if ('err' in got) { return refusedAnswerOf(got.err, got.answer) }
       return answerWithVal(got.answer, this.handleIfAbsent(got.val, scope, ifAbsent))
     } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
   }
 
-  /** One storage get of `scope`, delivered, never rejecting.
-   * Chute: tryGet → (joined by scope) **#doGet** → doTryGet, then deliverAnswer
+  // A get joins any get of the same scope under way: the storage get and its delivery are shared, each caller's
+  // `ifAbsent` its own.
+  /** The storage get of `scope`, delivered, never rejecting: one at a time, joined by every get of that scope made while it runs.
+   * Chute: tryGet → (joined by scope) **#doTryGetJoined** → doTryGet, then deliverAnswer
    */
-  async #doGet(scope: ScopeT): Promise<Joined<ListingAnswer<RecordT, SparseT>, ThingT | null>> {
-    const answer = await this.doTryGet(scope)
-    try {
-      return { answer, val: this.deliverAnswer(answer, scope) }
-    } catch (err) { return { answer, err } }
+  #doTryGetJoined(scope: ScopeT): Promise<Joined<ListingAnswer<RecordT, SparseT>, ThingT | null>> {
+    const scopepath = this.scopepathOf(scope)
+    let getOnce = this.#joinedGetOf.get(scopepath)
+    if (getOnce === undefined) {
+      getOnce = oneAtATime(async () => {
+        const answer = await this.doTryGet(scope)
+        try {
+          return { answer, val: this.deliverAnswer(answer, scope) }
+        } catch (err) { return { answer, err } }
+      })
+      this.#joinedGetOf.set(scopepath, getOnce)
+    }
+    return getOnce()
   }
 
   /** `found` when present. Anything else is refused under `ifAbsent: 'fail'`, and null under `ifAbsent: 'nil'`. */
@@ -285,7 +287,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    *   - ~~or building a new instance from scratch with the props~~,
    *   - or making a shell (!) and updating it (!)
    * - and finally notifying listeners, sharing bad news, and returning the appropriate instance
-   * Chute: #doGet | tryPut | tryDel | tryReplacePassphrase | tryAddPasskey | tryRevokePasskey → **deliverAnswer** → world.receiveWorld, then answerDeliveringOf → recordDeliveringOf → doDeliverRecord
+   * Chute: #doTryGetJoined | tryPut | tryDel | tryReplacePassphrase | tryAddPasskey | tryRevokePasskey → **deliverAnswer** → world.receiveWorld, then answerDeliveringOf → recordDeliveringOf → doDeliverRecord
    */
   protected deliverAnswer(answer: ListingPutAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT
   protected deliverAnswer(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null
