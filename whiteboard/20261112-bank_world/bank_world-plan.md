@@ -8,10 +8,12 @@
   the rest); worker `opus` (agent default effort); reviewer `sonnet`
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
-* **Status** (2026-11-12, late): 8a to 10 merged. Ready to merge, out of draft: 8d #679 → 12 #681
-  (green at 21e9cf444, core 3395; #681 the top). In review: 16 #682 (stacked on #681, caught up
-  onto 21e9cf444, green at 30a070450; review raised to medium) and T #680 (tooling, on #676).
-  G #678 (draft, to the top at wrapup). Then the documentarian run, then
+* **Status** (2026-11-12, later): 8a to 10 merged. Ready to merge, out of draft: 8d #679 → 12 #681 →
+  16 #682 (filed at 43f699a1e, review fixed; #682 the top). T #680 reviewed twice and reworked to the
+  Coach's justify ruling; filing waits on the timing table's thresholds. Documentarian, as two PRs
+  stacked on #682, side by side: core (three groups) and adapters with React (two). A Closer Look at
+  43f699a1e is running; threads do not wait on it or its triage (the Coach). G #678 (draft, to the
+  top at wrapup). Then
   17. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
