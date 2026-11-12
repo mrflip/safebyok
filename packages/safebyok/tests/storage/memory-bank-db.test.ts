@@ -1,6 +1,6 @@
-/** MemoryBankDB: a handful of cases per verb family, enough to show it answers each verb. The battery every bankDB runs is apart. */
+/** MemoryBankDB: the battery every bankDB runs, and a handful of cases of its own per verb family. */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DefaultMaxRecordSizeEst, isAdapterBankDB, isBankDB } from '../../src/helpers/consts'
 import { BankDBVerbnames } from '../../src/storage/bank-db'
 import { MemoryBankDB } from '../../src/storage/memory-bank-db'
@@ -11,6 +11,50 @@ import {
   gateAt, gatePutAskOf, mainWayin, otherMainWayin, passkey0Wayin, vaultAt, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultScope,
 } from '../test-helpers/bankdb-world'
 import * as TH from '../test-helpers'
+
+/** The calls a MemoryBankDB makes of its storage, any of which the next may be. */
+const StorageCalls = [
+  'doEnsureBank', 'doBuildBank', 'doPutGate', 'doDelBank', 'doGetVault', 'doPutVault', 'doDelVault',
+  'doListBoxes', 'doGetBox', 'doPutBox', 'doDelBox', 'doTidyGone',
+] as const
+
+function memoryRowsOf(bankDB: MemoryBankDB): TH.BankDBRowCheats {
+  return {
+    plantBankRow:  (scope, row) => { bankDB._cheat_shelfOf(scope).bank = row },
+    plantGateRow:  (scope, row) => { bankDB._cheat_shelfOf(scope).gaterows.set(scope.gatelabel, row) },
+    plantVaultRow: (scope, row) => { bankDB._cheat_shelfOf(scope).vaultrows.set(scope.vaultlabel, row) },
+    plantBoxRow:   (scope, bank_tok, vault_tok, row) => { bankDB._cheat_boxRowsOf(scope, bank_tok, vault_tok).set(scope.boxlabel, row) },
+    bankRowOf:     (scope) => bankDB._cheat_shelfOf(scope).bank,
+    gateRowOf:     (scope) => bankDB._cheat_shelfOf(scope).gaterows.get(scope.gatelabel) ?? null,
+    vaultRowOf:    (scope) => bankDB._cheat_shelfOf(scope).vaultrows.get(scope.vaultlabel) ?? null,
+    boxRowsOf:     (scope, bank_tok, vault_tok) => new Map(bankDB._cheat_boxRowsOf(scope, bank_tok, vault_tok)),
+  }
+}
+
+// Memory has no storage to fail, so the next call to it throws as a dropped connection would.
+function failNextCall(bankDB: MemoryBankDB): void {
+  type StorageCall = typeof StorageCalls[number]
+  const spies = StorageCalls.map((call) => vi.spyOn(bankDB as unknown as Record<StorageCall, () => unknown>, call))
+  const fail = (): never => {
+    for (const spy of spies) { spy.mockRestore() }
+    throw new Error('socket closed')
+  }
+  for (const spy of spies) { spy.mockImplementationOnce(fail) }
+}
+
+TH.describeBankDBBattery("MemoryBankDB's battery", {
+  makeBankDB:          (opts) => new MemoryBankDB(opts),
+  makeCappedBankDB:    (maxBoxes) => new MemoryBankDB({ maxBoxes }),
+  _cheat_rowsOf:       memoryRowsOf,
+  _cheat_failNextCall: failNextCall,
+})
+
+describe("describeBankDBBattery", () => {
+  it("refuses opts that lack a hook it needs", () => {
+    expect(() => { TH.describeBankDBBattery("none", { _cheat_rowsOf: memoryRowsOf } as never) }).to.throw(VaultError)
+    expect(() => { TH.describeBankDBBattery("none", { makeBankDB: () => new MemoryBankDB() } as never) }).to.throw(VaultError)
+  })
+})
 
 /** A bankDB holding the bank `bank1`, built with its `main` gate. */
 async function builtBankDB(): Promise<MemoryBankDB> {

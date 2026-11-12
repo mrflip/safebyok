@@ -2,7 +2,8 @@
 
 import * as BX from '../../src/shapes/shapes-bankdb'
 import * as SX from '../../src/shapes/shapes-storage'
-import type { GateVerb, IfAbsent } from '../../src/shapes/shapes-enums'
+import type { BankScope, Boxscope, VaultScope } from '../../src/shapes/shapes-core'
+import type { GateVerb, IfAbsent, IfPresent, PutIfAbsent } from '../../src/shapes/shapes-enums'
 import type {
   BankBuildAsk, BankDelAsk, BankRecord, BankRow, BankTombstone, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxQuery, BoxRecord, BoxRow, BoxTombstone,
   GatePutAsk, GateRecord, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultRecord, VaultRow, VaultTombstone, Wayins,
@@ -25,6 +26,11 @@ export const boxListAsk: BoxListAsk = { op: 'list', ...vaultScope, bank_tok: 'ba
 export const boxTidyAsk = { op: 'tidy_gone' as const, ...bankScope }
 /** The `ensureBank` ask of the bank the rows stand in. */
 export const bankEnsureAsk = { op: 'ensure' as const, ...bankScope, gates: ['main'] as ['main'] }
+
+/** The scope of the vault `vaultlabel` in the bank the rows stand in. */
+export function vaultScopeOf(vaultlabel: string): VaultScope { return { ...bankScope, vaultlabel } }
+/** The scope of the box `boxlabel` in the vault the rows stand in. */
+export function boxscopeOf(boxlabel: string): Boxscope { return { ...vaultScope, boxlabel } }
 
 /** The bank's passphrase wayin, its ciphertext fake. */
 export const mainWayin     = BX.passphraseWayin.parse({ ...passphraseWayin, wayinlabel: 'main' })
@@ -49,9 +55,9 @@ export function gateAt(revision_seq = 0, bank_tok = 'bank1', wayins: Wayins = Ma
   })
 }
 
-/** The vault record at `revision_seq` under the bank life `bank_tok`, in the vault life `vault_tok`. */
-export function vaultAt(revision_seq = 0, bank_tok = 'bank1', vault_tok = 'life1'): VaultRecord {
-  return BX.vaultRecord.parse({ ...vaultScope, fmt: BX.VaultFormat, revision_tok: `vrev${String(revision_seq)}`, revision_seq, registered_at: Now, written_at: Now, am: 'a', bank_tok, vault_tok })
+/** The vault record at `revision_seq` under the bank life `bank_tok`, in the vault life `vault_tok`, with the fields of `extra` over its own. */
+export function vaultAt(revision_seq = 0, bank_tok = 'bank1', vault_tok = 'life1', extra: object = {}): VaultRecord {
+  return BX.vaultRecord.parse({ ...vaultScope, fmt: BX.VaultFormat, revision_tok: `vrev${String(revision_seq)}`, revision_seq, registered_at: Now, written_at: Now, am: 'a', bank_tok, vault_tok, ...extra })
 }
 
 function tombstoneFieldsOf({ revision_tok, revision_seq }: SX.Revision) { return { revision_tok: `${revision_tok}x`, revision_seq: revision_seq + 1, am: 'x' as const } }
@@ -61,9 +67,13 @@ export function bankTombstoneOf(record: BankRow): BankTombstone { return BX.bank
 /** The tombstone that deletes the vault row `record`, one revision on, under a vault_tok of its own. */
 export function vaultTombstoneOf(record: VaultRow): VaultTombstone { return BX.vaultTombstone.parse({ ...record, ...tombstoneFieldsOf(record), vault_tok: `${record.vault_tok}x` }) }
 
-/** The `buildBank` ask of `record` and its gate over `expected`, or over none for null. */
+function bankScopeOf({ user_id, banklabel }: BankScope): BankScope { return { user_id, banklabel } }
+function vaultScopeOfRow({ user_id, banklabel, vaultlabel }: VaultScope): VaultScope { return { user_id, banklabel, vaultlabel } }
+
+/** The `buildBank` ask of `record` and its gate over `expected`, or over none for null, at the record's scope. */
 export function bankBuildAskOf(record: BankRecord = bankAt(), gate: GateRecord = gateAt(0, record.bank_tok), expected: BankRow | null = null): BankBuildAsk {
-  return { op: 'build', ...bankScope, expected: expected ?? BX.shellBankOf(bankScope), record, gate }
+  const scope = bankScopeOf(record)
+  return { op: 'build', ...scope, expected: expected ?? BX.shellBankOf(scope), record, gate }
 }
 
 /** A gate verb's ask: the gate row `stored` at its next revision with `wayins`, under its own bank life unless `bank_tok` is given. */
@@ -74,27 +84,31 @@ export function gatePutAskOf(gateVerb: GateVerb, stored: GateRecord, wayins: Way
 
 /** The `delBank` ask of the bank row `expected`, storing `record`: its tombstone, unless given. */
 export function bankDelAskOf(expected: BankRow, record: BankTombstone = bankTombstoneOf(expected)): BankDelAsk {
-  return { op: 'del', ...bankScope, expected, record }
+  return { op: 'del', ...bankScopeOf(expected), expected, record }
 }
 
-/** The get of the vault, under the bank life `bank_tok`, by a caller that holds no row of it. */
-export function vaultGetAskOf(bank_tok = 'bank1', ifAbsent: IfAbsent = 'fail'): VaultGetAsk {
-  return { op: 'get', ...vaultScope, bank_tok, ifAbsent, expected: BX.shellVaultOf(vaultScope) }
+/** The get of the vault at `scope`, under the bank life `bank_tok`, by a caller that holds no row of it. */
+export function vaultGetAskOf(bank_tok = 'bank1', ifAbsent: IfAbsent = 'fail', scope: VaultScope = vaultScope): VaultGetAsk {
+  return { op: 'get', ...vaultScopeOfRow(scope), bank_tok, ifAbsent, expected: BX.shellVaultOf(scope) }
 }
 
-/** The put of the vault `record` over the row `expected`, or over none for null, under its own bank life. It adds and replaces. */
-export function vaultPutAskOf(record: VaultRecord, expected: VaultRow | null = null): VaultPutAsk {
-  return { op: 'put', ...vaultScope, bank_tok: record.bank_tok, ifAbsent: 'add', ifPresent: 'repl', expected: expected ?? BX.shellVaultOf(vaultScope), record }
+/** The policies of a put, any of them given; the rest add and replace. */
+type PutPolicies = { ifAbsent?: PutIfAbsent, ifPresent?: IfPresent }
+
+/** The put of the vault `record` over the row `expected`, or over none for null, at its scope and under its own bank life. It adds and replaces unless `policies` says otherwise. */
+export function vaultPutAskOf(record: VaultRecord, expected: VaultRow | null = null, policies: PutPolicies = {}): VaultPutAsk {
+  const scope = vaultScopeOfRow(record)
+  return { op: 'put', ...scope, bank_tok: record.bank_tok, ifAbsent: 'add', ifPresent: 'repl', ...policies, expected: expected ?? BX.shellVaultOf(scope), record }
 }
 
-/** The del of the vault row `expected`, storing its tombstone, under its own bank life. */
-export function vaultDelAskOf(expected: VaultRow): VaultDelAsk {
-  return { op: 'del', ...vaultScope, bank_tok: expected.bank_tok, expected, record: vaultTombstoneOf(expected) }
+/** The del of the vault row `expected`, storing `record`: its tombstone, unless given. It is made at the row's scope, under its own bank life. */
+export function vaultDelAskOf(expected: VaultRow, record: VaultTombstone = vaultTombstoneOf(expected)): VaultDelAsk {
+  return { op: 'del', ...vaultScopeOfRow(expected), bank_tok: expected.bank_tok, expected, record }
 }
 
-/** The box record `boxlabel` at `revision_seq`, in the vault life `vault_tok` of the bank life `bank_tok`. */
-export function boxAt(revision_seq = 0, bank_tok = 'bank1', vault_tok = 'life1', boxlabel = 'openai'): BoxRecord {
-  return BX.boxRecord.parse({ ...vaultdbBoxAt(revision_seq, vault_tok), fmt: BX.BoxFormat, boxlabel, bank_tok })
+/** The box record at `revision_seq`, in the vault life `vault_tok` of the bank life `bank_tok`, with the fields of `extra` over its own. */
+export function boxAt(revision_seq = 0, bank_tok = 'bank1', vault_tok = 'life1', extra: object = {}): BoxRecord {
+  return BX.boxRecord.parse({ ...vaultdbBoxAt(revision_seq, vault_tok), fmt: BX.BoxFormat, bank_tok, ...extra })
 }
 
 /** The tombstone that deletes the box row `record`, one revision on, under a box_tok of its own. */
@@ -107,12 +121,12 @@ export function boxGetAskOf(asked: BoxQuery = boxQuery, ifAbsent: IfAbsent = 'fa
   return { op: 'get', ...boxQueryOf(asked), ifAbsent, expected: BX.shellBoxOf(asked) }
 }
 
-/** The put of the box `record` over the row `expected`, or over none for null, in its own vault life. It adds and replaces. */
-export function boxPutAskOf(record: BoxRecord, expected: BoxRow | null = null): BoxPutAsk {
-  return { op: 'put', ...boxQueryOf(record), ifAbsent: 'add', ifPresent: 'repl', expected: expected ?? BX.shellBoxOf(record), record }
+/** The put of the box `record` over the row `expected`, or over none for null, in its own vault life. It adds and replaces unless `policies` says otherwise. */
+export function boxPutAskOf(record: BoxRecord, expected: BoxRow | null = null, policies: PutPolicies = {}): BoxPutAsk {
+  return { op: 'put', ...boxQueryOf(record), ifAbsent: 'add', ifPresent: 'repl', ...policies, expected: expected ?? BX.shellBoxOf(record), record }
 }
 
-/** The del of the box row `expected`, storing its tombstone, in its own vault life. */
-export function boxDelAskOf(expected: BoxRow): BoxDelAsk {
-  return { op: 'del', ...boxQueryOf(expected), expected, record: boxTombstoneOf(expected) }
+/** The del of the box row `expected`, storing `record`: its tombstone, unless given. It is made in the row's own vault life. */
+export function boxDelAskOf(expected: BoxRow, record: BoxTombstone = boxTombstoneOf(expected)): BoxDelAsk {
+  return { op: 'del', ...boxQueryOf(expected), expected, record }
 }
