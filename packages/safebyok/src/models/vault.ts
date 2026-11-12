@@ -61,11 +61,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The bank's lock]: lock, letBoxesGo
+  // == [The bank's lock]: alignLock, letBoxesGo
 
-  /** Tell the listeners, this vault's and its boxes', the bank's lock has moved; once this vault no longer answers, its boxes go. Never throws. */
-  override lock(): this {
-    super.lock()
+  /** Tell the listeners, this vault's and its boxes', the bank's lock has moved; once this vault no longer answers, its boxes go. Never throws.
+   * @internal The bank's to call.
+   */
+  override alignLock(): this {
+    super.alignLock()
     if (this.isEnabled) { this.#boxListing?.lock() } else { this.#letBoxesGo() }
     return this
   }

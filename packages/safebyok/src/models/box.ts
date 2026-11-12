@@ -138,7 +138,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  // called internally by adopt, lock and unexpose itself
+  // called internally by adopt, alignLock and unexpose itself
   /** Drop the whisper exposed and its veil; the caller aligns. */
   #doUnexpose(): void {
     this.#exposed = null
@@ -278,14 +278,16 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 
-  // == [The lock]: lock
+  // == [The lock]: alignLock
 
   // A lock only hides the whisper exposed, so that edits survive to the unlock (notes/expose_improves_security.md). A
   // box that no longer answers will never show it again.
-  /** Tell the listeners the bank's lock has moved; once this box no longer answers, its whisper exposed goes, and its veil. Never throws. */
-  override lock(): this {
+  /** Tell the listeners the bank's lock has moved; once this box no longer answers, its whisper exposed goes, and its veil. Never throws.
+   * @internal The bank's to call.
+   */
+  override alignLock(): this {
     if (! this.isEnabled) { this.#doUnexpose() }
-    return super.lock()
+    return super.alignLock()
   }
   // --
 

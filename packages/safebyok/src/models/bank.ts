@@ -192,7 +192,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   /** Lock the bank, its vaults and their boxes before returning, and forget the row cached on this device; past the bank's end, leave that row.
    * A failed revoke is announced as `lease_revoke_failed` and does not throw.
    */
-  override lock(): this {
+  lock(): this {
     if (this.isEnabled) {
       void this.#revokeLease('lock')
       return this
@@ -242,7 +242,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   // The vaults first, the bank's own align last: the device is told once, every vault's lock and the bank's together.
   /** Bring each vault listed, and its boxes, up to this bank's lock, which their snapshots show, and then this bank's own snapshot. */
   #alignAll(): void {
-    for (const vault of this.#vaultListing.things) { vault.lock() }
+    for (const vault of this.#vaultListing.things) { vault.alignLock() }
     this.align()
   }
   // --
