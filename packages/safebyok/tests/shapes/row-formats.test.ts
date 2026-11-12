@@ -11,11 +11,11 @@ import * as SX from '../../src/shapes/shapes-storage'
 // Only a change that leaves the rows it accepts alone may rewrite a file under the same number.
 describe("the row validators against their format numbers", () => {
   it.each([
-    ['boxRow',   SX.boxRow,   SX.BoxFormat],
-    ['vaultRow', SX.vaultRow, SX.VaultFormat],
-    ['bankRow',  BX.bankRow,  BX.BankFormat],
+    ['boxRow',   SX.boxRow,     SX.BoxFormat],
+    ['vaultRow', SX.vaultRow,   SX.VaultFormat],
+    ['bankRow',  BX.bankRow,    BX.BankFormat],
     ['gateRow',  BX.gateRecord, BX.GateFormat],
-    ['vaultRow', BX.vaultRow, BX.VaultFormat],
+    ['vaultRow', BX.vaultRow,   BX.VaultFormat],
   ] as const)("%s is the shape its format number names", async (rowname, rowCheck, format) => {
     const schema = Zod.toJSONSchema(rowCheck, { unrepresentable: 'any' })
     await expect(`${JSON.stringify(schema, null, 2)}\n`).toMatchFileSnapshot(`../.snapshots/shapes/row-formats/${rowname}-fmt${String(format)}.schema.json`)
