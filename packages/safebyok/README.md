@@ -180,8 +180,8 @@ fields, and a put of that bag is refused. `box.exposure` says whether it is show
 `box.isVeiled` are the two booleans, and `isWhisperedBag(val)` is true for one of those bags and
 false for a whisper. Don't compare `box.whisper` with a bag or read its mark: a second copy of
 safebyok has bags of its own. A veiled box stays veiled while its vault is locked: `box.isVeiled`
-is still true, and `box.exposure` is `'locked'`. A box's snapshot has `isExposed` and `isVeiled`.
-`isLocked` is on its vault's snapshot (`vault.getSnapshot()`), not the box's. `box.veil()` hides
+is still true, and `box.exposure` is `'locked'`. A box's snapshot has `isExposed`, `isVeiled`, and
+`isLocked`, its bank's lock; a vault's snapshot has no lock of its own. `box.veil()` hides
 the whisper and `box.unveil()` shows it again, and the veil is cleared when the whisper is removed.
 A lock hides the whisper, and an unlock shows it again. `box.subscribe` notifies its listeners of
 each of these changes.

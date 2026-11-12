@@ -210,7 +210,7 @@ const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
   }
   return (
     <div>
-      <p data-testid="boxes">{boxes === null ? 'none' : boxes.map((listed) => listed.boxlabel).join(',')}</p>
+      <p data-testid="boxes">{boxes === null ? 'none' : boxes.join(',')}</p>
       <p data-testid="box">{boxWords(snapshot)}</p>
       <p data-testid="whisper">{whisperWords(whisper, exposure)}</p>
       <p data-testid="showing">{isShowing ? 'showing' : 'hidden'}</p>

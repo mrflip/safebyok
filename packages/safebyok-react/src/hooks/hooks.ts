@@ -3,10 +3,11 @@ import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type Device, type De
 import { useProvided } from '../provider/bank-provider'
 import type { VaultLifecycle } from '../shapes'
 
-// == [Bank hooks]: useDevice, useBank, useBankSnapshot, useDeviceSnapshot, subscribeToNothing, getNothing
+// == [Bank hooks]: useDevice, useBank, useBankFor, useBankSnapshot, useDeviceSnapshot, useDeviceSnapshotFor, subscribeToNothing, getNothing
 
 const unsubscribeFromNothing = () => { /* nothing to unsubscribe from */ }
-const subscribeToNothing = () => unsubscribeFromNothing
+/** A subscribe for `useSyncExternalStore` while there is nothing to watch. */
+export const subscribeToNothing = () => unsubscribeFromNothing
 const getNothing = () => null
 
 /** Return the signed-in user's device from the nearest BankProvider, or null while there is none, as when nobody is signed in.
@@ -17,17 +18,23 @@ export function useDevice(): Device | null { return useProvided('useDevice') }
 /** Return the signed-in user's bank from the nearest BankProvider, or null.
  * It is null until the bank is up, and null again once the bank is deleted or built anew elsewhere, or the device ends.
  */
-export function useBank(): Bank | null {
-  const device = useProvided('useBank')
+export function useBank(): Bank | null { return useBankFor('useBank') }
+
+/** {@link useBank}, naming `hookname` in the error when there is no provider. */
+function useBankFor(hookname: string): Bank | null {
+  const device = useProvided(hookname)
   return useSyncExternalStore(device?.subscribe ?? subscribeToNothing, () => device?.bank ?? null, getNothing)
 }
 
 /** Return the live snapshot of the signed-in user's bank, or null while {@link useBank} returns null.
  * Its `isLocked` covers every vault and box in the bank: they share one lock.
  */
-export function useBankSnapshot(): BankSnapshot | null { return useDeviceSnapshotFor('useBankSnapshot')?.bank ?? null }
+export function useBankSnapshot(): BankSnapshot | null {
+  const bank = useBankFor('useBankSnapshot')
+  return useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, bank?.getSnapshot ?? getNothing, getNothing)
+}
 
-/** Return the live snapshot of the signed-in user's device, with its stage, open gating and bank, or null while there is no device. */
+/** Return the live snapshot of the signed-in user's device, with its stage, open gating and its bank's `bank_tok`, or null while there is no device. */
 export function useDeviceSnapshot(): DeviceSnapshot | null { return useDeviceSnapshotFor('useDeviceSnapshot') }
 
 /** {@link useDeviceSnapshot}, naming `hookname` in the error when there is no provider. */
@@ -56,17 +63,18 @@ export const useVault = (vaultlabel: string): VaultLifecycle => useVaultFor('use
 const useVaultFor = (hookname: string, vaultlabel: string): VaultLifecycle => {
   const device = useProvided(hookname)
   const snapshot = useSyncExternalStore(device?.subscribe ?? subscribeToNothing, device?.getSnapshot ?? getNothing, getNothing)
-  // The device's snapshot changes with its bank's, and so with each vault's life, lock and presence.
+  // The device's snapshot changes with its bank, the vault listing's with each vault's presence, and the vault's own with its life.
+  const bank = (snapshot?.err === null) ? (device?.bank ?? null) : null
+  const vaultlabels = useSyncExternalStore(bank?.vaultListing.subscribe ?? subscribeToNothing, bank?.vaultListing.getSnapshot ?? getNothing, getNothing)
   const lifecycle = useMemo((): VaultLifecycle => {
     if (snapshot === null) { return BanklessLifecycle }
     if (snapshot.err !== null) { return { stage: 'spent', vault: null, cause: snapshot.err } }
-    const bank = device?.bank ?? null
-    if (bank === null) { return BanklessLifecycle }
-    const vault = bank.vaultAt({ vaultlabel })
-    return vault?.isPresent === true ? { stage: 'present', vault } : AbsentLifecycle
-  }, [device, snapshot, vaultlabel])
+    if ((bank === null) || (vaultlabels === null)) { return BanklessLifecycle }
+    const vault = vaultlabels.includes(vaultlabel) ? bank.vaultAt({ vaultlabel }) : null
+    return (vault === null) ? AbsentLifecycle : { stage: 'present', vault }
+  }, [snapshot, bank, vaultlabels, vaultlabel])
   const { vault } = lifecycle
-  const vaultTok = vault?.vault_tok ?? null
+  const vaultTok = useSyncExternalStore(vault?.subscribe ?? subscribeToNothing, vault?.getSnapshot ?? getNothing, getNothing)?.vault_tok ?? null
   useEffect(() => {
     if ((vault === null) || (vaultTok === null) || (watchedLives.get(vault) === vaultTok)) { return }
     watchedLives.set(vault, vaultTok)
@@ -85,8 +93,8 @@ export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
 
 // == [Box hooks]: useBoxes, useBox, useBoxSnapshot, useBoxIsShowing, useBoxExposure, useWhisper
 
-/** Return the snapshots of the present boxes in the signed-in user's vault named `vaultlabel`, or null while the vault is not `present`. */
-export const useBoxes = (vaultlabel: string): readonly BoxSnapshot[] | null => {
+/** Return the boxlabels of the present boxes in the signed-in user's vault named `vaultlabel`, or null while the vault is not `present`. */
+export const useBoxes = (vaultlabel: string): readonly string[] | null => {
   const { vault } = useVaultFor('useBoxes', vaultlabel)
   const boxes = vault?.boxListing ?? null
   return useSyncExternalStore(boxes?.subscribe ?? subscribeToNothing, boxes?.getSnapshot ?? getNothing, getNothing)

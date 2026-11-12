@@ -91,6 +91,18 @@ In order. A later item that depends on an earlier one says so.
   what each step saves, is in whiteboard/20261108-query_efficiently/query_efficiently.md. Its cost is
   worked out in notes/reference-sizes.md, *A bank hello on Convex*. To be done after the fate makeover.
 
+* **safebyok-react's hooks over snapshots that no longer cascade.** Thread 19 of the bank_world sprint: each
+  snapshot shows its own state only, and a listing's is its labels. What React lost, and the stopgaps standing in:
+  * `useBoxes` hands back the boxlabels of the present boxes, no longer each box's snapshot; a list that shows a
+    box's sidecar or exposure needs a component per box (`useBox`, `useBoxSnapshot`), or a hook that does it.
+  * The demo's `WaysIn` reads the main gate's snapshot through its own `useSyncExternalStore` over
+    `bank.gateListing.at(...)`, as `useBankSnapshot()` no longer has `maingate`. It wants a hook for the main gate.
+  * The dev inspector's vaultlabel picker reads `bank.vaultListing` through its own `useSyncExternalStore`, as
+    `useBankSnapshot()` no longer has `vaults`. It wants a hook for the vaultlabels.
+  * `useVault` subscribes to three stores (the device, the bank's vault listing and the vault itself) to see
+    the bank, the vault's presence and its life; `useBankSnapshot` subscribes to the device and the bank.
+  The React rework, a later thread of the sprint, owns all four.
+
 ## Side quests
 
 Straightforward, likely to be done, not needed yet. Each is a thread cut from `main`.
