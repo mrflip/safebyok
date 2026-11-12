@@ -640,14 +640,14 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       ['delVault',          async (bankDB: BankDB) => await bankDB.tryDelVault(vaultDelAskOf(vaultAt()))],
     ] as const
 
-    it.each(AboveAsks)("%s refuses as bank_void over no bank row, with the shell bank row as parent", async (_verbname, verb) => {
+    it.each(AboveAsks)("%s refuses over no bank row, with the shell bank row as parent", async (_verbname, verb) => {
       const bankDB = await fresh()
       expect(await verb(bankDB)).to.deep.include({ ok: false, act: 'bank_void', parent: BX.shellBankOf(bankScope) })
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.be.null
       expect(await rowsOf(bankDB).vaultRowOf(vaultScope)).to.be.null
     })
 
-    it.each(AboveAsks)("%s refuses as bank_gone under the bank's tombstone, with the tombstone as parent", async (_verbname, verb) => {
+    it.each(AboveAsks)("%s refuses under the bank's tombstone, with the tombstone as parent", async (_verbname, verb) => {
       const { bankDB, bank } = await putWith({ vault: false })
       await bankDB.delBank(bankDelAskOf(bank))
       expect(await verb(bankDB)).to.deep.include({ ok: false, act: 'bank_gone', parent: bankTombstoneOf(bank) })
@@ -655,7 +655,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await rowsOf(bankDB).vaultRowOf(vaultScope)).to.be.null
     })
 
-    it.each(AboveAsks)("%s refuses as bank_reborn under a bank live in another life, with that bank row as parent", async (_verbname, verb) => {
+    it.each(AboveAsks)("%s refuses under a bank live in another life, with that bank row as parent", async (_verbname, verb) => {
       const bankDB = await fresh()
       const reborn = bankAt(0, 'bank2')
       const gate = gateAt(0, 'bank2')

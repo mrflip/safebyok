@@ -107,7 +107,7 @@ export type BatteryWorld = {
 /** Stands in for a hook the bankDB did not give, in a case not registered without it. */
 function notGiven(hookname: string) { return (): never => { throw new TypeError(`The bankDB gave the battery no ${hookname}.`) } }
 
-// Every bankDB a world's hooks are handed is one its own factories made, so the narrowing to DBT has;
+// Every bankDB a world's hooks are handed is one its own factories made, so narrowing one to DBT is safe;
 // a world given no `_cheat_adapterOf` was handed AdapterBankDBs.
 function worldOf<DBT extends BankDB>(opts: BankDBBatteryOpts<DBT>): BatteryWorld {
   const { makeBankDB, _cheat_rowsOf, makeTwin, makeCappedBankDB, makeBankDBFor, _cheat_failNextCall, _cheat_adapterOf, watches = true, boxNoticesCarryVault = true } = opts
