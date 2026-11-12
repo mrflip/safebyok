@@ -18,11 +18,11 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
 
 * [tests/convex/](tests/convex) -- `safebyok-convex` with `ConvexReactClient`, over the fake
   deployment `safebyok-convex/testing` ships:
-  * [convex-vault-db.test.ts](tests/convex/convex-vault-db.test.ts) -- the `VaultDB` battery, the
-    refusals, the subscriptions and sign-out, and a vault on two devices (one `ConvexClient`, one
-    `ConvexReactClient`), each run over the React client. Its loops are copies of the ones in
-    `packages/safebyok-convex/tests/convex-vault-db.test.ts`, which run over `ConvexClient`: a
-    change to a looped test is made in both.
+  * [convex-bank-db.test.ts](tests/convex/convex-bank-db.test.ts) -- the `BankDB` battery over
+    `ConvexBankDB`, and a host's own functions serving the user signed in, refusing anyone else,
+    and notifying a second watch on the same client. Its battery hooks are copies of the ones in
+    `packages/safebyok-convex/tests/convex-bank-db.test.ts`, which run over `ConvexClient`: a
+    change to one is made in both.
   * [test-helpers.ts](tests/convex/test-helpers.ts) -- a host app built from `safebyok-convex`'s
     published entries alone, as a host's own tests would.
 
