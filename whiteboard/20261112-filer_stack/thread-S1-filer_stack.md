@@ -1,6 +1,6 @@
 # Thread S1: filer_stack (2026-11-12)
 
-Branch `20261112-filer_stack`, PR pending, not stacked. Justify: pending (see PR).
+Branch `20261112-filer_stack`, PR #664, not stacked. Justify: green (tests/scripts 281; safebyok 3129; all packages and e2e pass).
 
 * **Built**: `scripts/cut-thread` records a base given as a branch (local, or `origin/...`; never
   main) as `branch.<branch>.sprintbasebranch`. `scripts/file-thread` catches a stacked branch up with
