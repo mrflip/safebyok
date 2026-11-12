@@ -23,11 +23,11 @@ pnpm add safebyok safebyok-fastkey
 Pass the deriver as `keyDeriver`:
 
 ```ts
-import { Bank } from 'safebyok'
+import { Device } from 'safebyok'
 import { argon2idWasmWebV1Deriver } from 'safebyok-fastkey'
 
-const bank = Bank.make({ user_id: session.user_id, banklabel: 'acme', device_tok: deviceTok, vaultDB, deviceDB, strengthChecker, requestCleartext, keyDeriver: argon2idWasmWebV1Deriver })
-await bank.hello()
+const device = Device.make({ user_id: session.user_id, banklabel: 'acme', gates: ['main'], vaultDB, deviceDB, strengthChecker, requestCleartext, keyDeriver: argon2idWasmWebV1Deriver })
+const bank = await device.ensureBank()
 const vault = await bank.ensureVault({ vaultlabel: 'main' })
 ```
 

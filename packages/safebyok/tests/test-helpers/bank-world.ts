@@ -1,22 +1,23 @@
-/** The test world of a models bank: a real {@link MemoryVaultDB} and {@link MemoryDeviceDB} any number of banks share, a dialog that types what the test says, and a clock the test moves. */
+/** The test world of a models device and its bank: a real {@link MemoryVaultDB} and {@link MemoryDeviceDB} any number of devices share, a dialog that types what the test says, and a clock the test moves. */
 
 import { afterEach } from 'vitest'
 import { _cheat_clock } from '../../src/helpers/clock'
 import { VaultError, type Refusalkind } from '../../src/refusals/errors'
-import { Bank } from '../../src/models/bank'
+import type { Bank } from '../../src/models/bank'
+import { Device } from '../../src/models/device'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { VaultGetAsk, VaultListAsk } from '../../src/shapes/shapes-storage'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
-import type { BankOpts, BankSnapshot } from '../../src/shapes/shapes-vaultish'
+import type { BankSnapshot, DeviceOpts } from '../../src/shapes/shapes-vaultish'
 import { anyStrengthChecker, testDeriver } from './builders'
 import { quietLogger } from './logging'
 import { T0, Dna, Passphrase, byPassphrase } from './vault-world'
 
-/** The autolock duration these worlds hand a bank. */
+/** The autolock duration these worlds hand a device. */
 export const AutolockMinutes = 60
 
-/** The bank scope these worlds hand `Bank.make`. */
+/** The bank scope these worlds hand `Device.make`. */
 export const BankScopeGiven = Object.freeze({ user_id: Dna.user_id, banklabel: Dna.banklabel })
 
 /** The vault scope a test hands `bank.ensureVault`. */
@@ -50,16 +51,16 @@ export class RefusingVaultDB extends MemoryVaultDB {
   }
 }
 
-const madeBanks: Bank[] = []
+const madeDevices: Device[] = []
 
-/** Sweep every bank a test made, after it, so no watch outlives its test: call it once at the top of a test file. */
+/** Sweep every device a test made, after it, so no watch outlives its test: call it once at the top of a test file. */
 export const useBankWorlds = (): void => {
   afterEach(() => {
-    for (const bank of madeBanks.splice(0)) { bank.sweep() }
+    for (const device of madeDevices.splice(0)) { device.sweep() }
   })
 }
 
-/** A vaultDB, a deviceDB, a scripted dialog and a movable clock for tests of a bank. */
+/** A vaultDB, a deviceDB, a scripted dialog and a movable clock for tests of a device and its bank. */
 export function makeBankWorld() {
   let now = T0
   _cheat_clock(() => now)
@@ -67,28 +68,31 @@ export function makeBankWorld() {
   const deviceDB = new MemoryDeviceDB()
   const dialog = { typing: byPassphrase(Passphrase) as object }
   const requestCleartext: RequestCleartext = async (gating) => { await gating.attempt(dialog.typing) }
-  const baseOpts: BankOpts = { ...BankScopeGiven, device_tok: '00000000-0000-4000-8000-0000000000b1', vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
-  /** A bank over this world's VaultDB and DeviceDB: called twice, two pages on one device. */
-  const bankOn = (overrides: Partial<BankOpts> = {}): Bank => {
-    const bank = Bank.make({ ...baseOpts, ...overrides })
-    madeBanks.push(bank)
-    return bank
+  const baseOpts: DeviceOpts = { ...BankScopeGiven, gates: ['main'], vaultDB, deviceDB, keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, requestCleartext, autolockMinutes: AutolockMinutes }
+  /** A device over this world's VaultDB and DeviceDB, its bank not yet ensured: called twice, two pages on one device. */
+  function deviceOn(overrides: Partial<DeviceOpts> = {}): Device {
+    const device = Device.make({ ...baseOpts, ...overrides })
+    madeDevices.push(device)
+    return device
   }
+  /** A device on another device: this world's vaultDB, and a deviceDB of its own. */
+  function deviceOnAnotherDevice(overrides: Partial<DeviceOpts> = {}): Device { return deviceOn({ deviceDB: new MemoryDeviceDB(), ...overrides }) }
   return {
-    vaultDB, deviceDB, dialog, bankOn,
+    vaultDB, deviceDB, dialog, deviceOn, deviceOnAnotherDevice,
+    /** The bank of a new {@link deviceOn}, ensured. */
+    bankOn:    (overrides: Partial<DeviceOpts> = {}): Promise<Bank> => deviceOn(overrides).ensureBank(),
+    /** The bank of a new {@link deviceOnAnotherDevice}, ensured. */
+    bankOnAnotherDevice: (overrides: Partial<DeviceOpts> = {}): Promise<Bank> => deviceOnAnotherDevice(overrides).ensureBank(),
     /** Move the clock on by `millis`; no timer fires. */
     advance:   (millis: number) => { now += millis },
-    /** A bank on another device: this world's vaultDB, and a deviceDB of its own. */
-    bankOnAnotherDevice: (overrides: Partial<BankOpts> = {}): Bank => bankOn({ device_tok: '00000000-0000-4000-8000-0000000000b2', deviceDB: new MemoryDeviceDB(), ...overrides }),
     leaseRows: (): unknown[] => [...deviceDB._cheat_leaseRows().values()].map(({ row }) => row),
   }
 }
 export type BankWorld = ReturnType<typeof makeBankWorld>
 
-/** A bank past its `hello`, with the vault of `Dna` built in it and unlocked. */
-export async function makeBankWithVault(world: BankWorld = makeBankWorld(), overrides: Partial<BankOpts> = {}) {
-  const bank = world.bankOn(overrides)
-  await bank.hello()
+/** A bank ensured, with the vault of `Dna` built in it and unlocked. */
+export async function makeBankWithVault(world: BankWorld = makeBankWorld(), overrides: Partial<DeviceOpts> = {}) {
+  const bank = await world.bankOn(overrides)
   const vault = await bank.ensureVault(VaultScopeGiven)
   return { world, bank, vault }
 }

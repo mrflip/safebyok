@@ -1,4 +1,4 @@
-/** The checks and types of what's stored and listed: records, options, listings, boxes, vaults and banks, imported as `VX`. */
+/** The checks and types of what's stored and listed: records, options, listings, boxes, vaults, banks and the device, imported as `VX`. */
 
 import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
@@ -9,6 +9,7 @@ import * as Phrases from '../helpers/phrases'
 import type { KeyDeriver } from '../deriver/basederiver'
 import type { VaultLogger } from '../helpers/logger'
 import type { Bank } from '../models/bank'
+import type { Device } from '../models/device'
 import type { Listing } from '../models/listing'
 import type { Storable } from '../models/storable'
 import type { Vault } from '../models/vault'
@@ -366,35 +367,42 @@ export interface VaultSnapshot extends VaultScope {
 
 // --
 
-// == [The vault's world]: brandedDeviceDB, vaultWorld, VaultWorld
+// == [The vault's world]: brandedDeviceDB, vaultWorld, VaultWorld, bankArgs
 
 /** The check of a deviceDB as a model is handed one, by its brand: an instance of a class extending DeviceDB, from whichever copy of safebyok. */
 export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDeviceDB, Phrases.DeviceDBExpected), 'bad_option')
 
 /** The check of a vault listing's world past {@link listingWorld}: what a vault's gate, lease and boxes need of the bank. Checks only. */
-export const vaultWorld = Checker(({ bankScope }) => listingWorld.extend({
+export const vaultWorld = Checker(({ bankScope, custom }) => listingWorld.extend({
   ...GX.provingWorld.shape, scope: bankScope, logger: GX.guardedLogger, leaseMillis: GX.leaseMillis, deviceDB: brandedDeviceDB, boxRefreshMillis: horizonMillis,
+  device: custom<Device>((val) => hasModelkind(val, 'device'), Phrases.DeviceExpected),
 }), 'bad_option', [CX])
 
 /** The bank, as far as its vaults reach into it. */
-export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 'scope' | 'logger' | 'leaseMillis' | 'deviceDB' | 'boxRefreshMillis'>
+export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 'scope' | 'logger' | 'leaseMillis' | 'deviceDB' | 'boxRefreshMillis' | 'device'>
+
+/** The check of what a bank is made with, past its listing's options: the device that makes it, and the token of its device row. */
+export const bankArgs = objCheck(({ custom, device_tok }) => ({
+  device: custom<Device>((val) => hasModelkind(val, 'device'), Phrases.DeviceExpected),
+  device_tok,
+}), 'bad_option', [CX])
 
 // --
 
-// == [The bank]: positiveMinutes, refreshMinutes, bankOpts, BankOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, RevokeSite, BankAnnouncement, BankEvent, LifecycleHandler, GuardedLifecycleHandler, BankAnnounce, BankPanic, BankStage, BankSnapshot
+// == [The device]: positiveMinutes, refreshMinutes, deviceOpts, DeviceOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, RevokeSite, BankAnnouncement, DeviceEvent, LifecycleHandler, GuardedLifecycleHandler, BankAnnounce, BankPanic, DeviceStage, DeviceSnapshot, BankSnapshot
 
-/** The checks of a bank's durations in minutes: `positiveMinutes` for the autolock, and `refreshMinutes` for a refresh interval, which may be zero. */
+/** The checks of a device's durations in minutes: `positiveMinutes` for the autolock, and `refreshMinutes` for a refresh interval, which may be zero. */
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
   positiveMinutes: union([num.positive(), lit(Infinity)], Phrases.PositiveMinutesShape),
   refreshMinutes:  union([num.nonnegative(), lit(Infinity)], Phrases.MinutesShape),
 }))
 
 // The host's functions and logger are checked once, by the guard that wraps each; here they are only named.
-/** The check of the options handed to `Bank.make`. */
-export const bankOpts = objCheck(({ fn, custom, user_id, banklabel, device_tok }) => ({
+/** The check of the options handed to `Device.make`. */
+export const deviceOpts = objCheck(({ fn, custom, tuple, lit, user_id, banklabel }) => ({
   user_id,
   banklabel,
-  device_tok,
+  gates:               tuple([lit('main')], Phrases.GatesShape).readonly(),
   vaultDB:             brandedVaultDB,
   deviceDB:            brandedDeviceDB,
   keyDeriver:          custom<KeyDeriver>(),
@@ -408,25 +416,25 @@ export const bankOpts = objCheck(({ fn, custom, user_id, banklabel, device_tok }
   onLifecycle:         fn<LifecycleHandler>().optional(),
 }), { refusalkind: 'bad_option' }, [CX])
 
-/** What a host hands `Bank.make`: who the bank is for, where it writes, and the functions it calls back. */
-export interface BankOpts {
+/** What a host hands `Device.make`: who the bank is for, where it writes, and the functions it calls back. */
+export interface DeviceOpts {
   /** The signed-in user's stable, opaque id from your own auth, hashed first if it contains anything sensitive. */
-  user_id:               string
+  user_id:              string
   /** Your app's own label, so several apps can share one backend. */
-  banklabel:             string
-  /** Your token for this device, a random UUID you keep per device. */
-  device_tok:           string
+  banklabel:            string
+  /** The bank's gates: `['main']`, the only list accepted. */
+  gates:                readonly ['main']
   /** The VaultDB the vaults are synchronized through, from a storage adapter. */
   vaultDB:              VaultDB
   /** The device database that caches each vault's lease. */
   deviceDB:             DeviceDB
   /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
   keyDeriver:           KeyDeriver
-  /** Your dialog, called with each gating that needs the user's passphrase or passkey; left out, each gating waits in the bank's snapshot for your own `attempt` or `dismiss`. */
+  /** Your dialog, called with each gating that needs the user's passphrase or passkey; left out, each gating waits in the device's snapshot for your own `attempt` or `dismiss`. */
   requestCleartext?:    RequestCleartext | undefined
   /** Judges each new passphrase before a vault accepts it; without one, every new passphrase is too weak (notes/configuration.md). */
   strengthChecker?:     StrengthChecker | undefined
-  /** Where the bank says what it has no caller to throw to; the console when left out. */
+  /** Where the device says what it has no caller to throw to; the console when left out. */
   logger?:              VaultLogger | undefined
   /** How long an unlock lasts on this device, in minutes, `Infinity` for until locked; 14 days when left out. */
   autolockMinutes?:     number | undefined
@@ -434,18 +442,18 @@ export interface BankOpts {
   vaultRefreshMinutes?: number | undefined
   /** How recently a box's record must have been fetched to be trusted, in minutes; 5 when left out. */
   boxRefreshMinutes?:   number | undefined
-  /** Hears each refusal no caller waits on while the bank is enabled and in its vacate's forget; else `DefaultOnBadNews`, the bank's logger. */
+  /** Hears each refusal no caller waits on while the device is enabled and in its vacate's forget; else `DefaultOnBadNews`, the device's logger. */
   onBadNews?:           BadNewsHandler | undefined
-  /** Hears what happened in the bank's life, and no secret material, while the bank is enabled and in its vacate's forget; `DefaultOnLifecycle` when left out. */
+  /** Hears what happened in the device's life, and no secret material, while the device is enabled and in its vacate's forget; `DefaultOnLifecycle` when left out. */
   onLifecycle?:         LifecycleHandler | undefined
 }
 
-true satisfies Z.core.util.AssertEqual<BankOpts, Z.input<typeof bankOpts>>
+true satisfies Z.core.util.AssertEqual<DeviceOpts, Z.input<typeof deviceOpts>>
 
-/** The check of what `bank.vacate` may be told. */
+/** The check of what `device.vacate` may be told. */
 export const vacateStory = objCheck(({ vaultError }) => ({ cause: vaultError.optional() }), 'bad_option', [Checks])
 
-/** What `bank.vacate` may be told: the refusal that called for it, which its snapshot then shows. */
+/** What `device.vacate` may be told: the refusal that called for it, which its snapshot then shows. */
 export interface VacateStory {
   /** The refusal that called for the vacate; `disabled` when left out. */
   cause?: VaultError | undefined
@@ -453,61 +461,67 @@ export interface VacateStory {
 
 true satisfies Z.core.util.AssertEqual<VacateStory, Z.input<typeof vacateStory>>
 
-/** What `onBadNews` hears: a refusal no caller waits on, and the bank it reached. */
+/** What `onBadNews` hears: a refusal no caller waits on, and the device it reached. */
 export interface BadNews {
-  readonly news: VaultError
-  readonly bank: Bank
+  readonly news:   VaultError
+  readonly device: Device
 }
 
-/** `Bank.make`'s `onBadNews`: hears each refusal no caller waits on. */
+/** `Device.make`'s `onBadNews`: hears each refusal no caller waits on. */
 export type BadNewsHandler = (badnews: BadNews) => unknown
 
-/** The check of what `tellBadNewsTo` is handed: a handler, the bank the news reached, and the news. */
+/** The check of what `tellBadNewsTo` is handed: a handler, the device the news reached, and the news. */
 export const tellBadNewsToArgs = objCheck(({ fn, custom, arr }) => ({
   onBadNews: fn<BadNewsHandler>(),
-  bank:      custom<Bank>((val) => hasModelkind(val, 'bank'), Phrases.BankExpected),
+  device:    custom<Device>((val) => hasModelkind(val, 'device'), Phrases.DeviceExpected),
   badnews:   arr(custom<VaultError>(isVaultError, Phrases.VaultErrorExpected)),
 }), 'bad_option')
 
-/** Where a cached lease outlived its revoke: a vault's lock, tombstone or vacate, the bank's vacate, or a row of another epoch or life met at an unlock. */
+/** Where a cached lease outlived its revoke: a vault's lock, tombstone or vacate, the device's vacate, or a row of another epoch or life met at an unlock. */
 export type RevokeSite = 'lock' | 'tombstone' | 'vacate' | 'undeleted'
 
-/** What a bank's listings and vaults announce through it: a {@link BankEvent} before the bank names itself. */
+/** What the device and its bank's listings and vaults announce through it: a {@link DeviceEvent} before the device names itself. */
 export type BankAnnouncement =
   | { readonly kind: 'lease_revoke_failed', readonly refusal: VaultError, readonly vault: Vault | null, readonly where: RevokeSite }
   | { readonly kind: 'vacated', readonly cause: VaultError, readonly unrevoked: number }
   | { readonly kind: 'helloed', readonly outcome: Outcome<void>, readonly vault: Vault | null }
 
-/** What `onLifecycle` hears: what happened in the bank's life, told by its `kind`, and the bank it happened to. */
-export type BankEvent = { readonly bank: Bank } & BankAnnouncement
+/** What `onLifecycle` hears: what happened in the device's life, told by its `kind`, and the device it happened to. */
+export type DeviceEvent = { readonly device: Device } & BankAnnouncement
 
-/** `Bank.make`'s `onLifecycle`: hears what happened in the bank's life, as a hello, a vacate or a cached lease that outlived its revoke. */
-export type LifecycleHandler = (event: BankEvent) => unknown
+/** `Device.make`'s `onLifecycle`: hears what happened in the device's life, as a bring-up or a vault's hello, a vacate or a cached lease that outlived its revoke. */
+export type LifecycleHandler = (event: DeviceEvent) => unknown
 
-/** `onLifecycle` as a bank keeps it, wrapped by `guardOnLifecycle`. Never throws. */
-export type GuardedLifecycleHandler = (event: BankEvent) => Promise<void>
+/** `onLifecycle` as a device keeps it, wrapped by `guardOnLifecycle`. Never throws. */
+export type GuardedLifecycleHandler = (event: DeviceEvent) => Promise<void>
 
-/** How a vault or a listing tells the host's `onLifecycle` through its bank: handed to each as it is made. Never throws. */
+/** How a vault or a listing tells the host's `onLifecycle` through the device: handed to each as it is made. Never throws. */
 export type BankAnnounce = (announcement: BankAnnouncement) => void
 
-/** How a listing vacates its bank for a revoked identity: handed to each as it is made. Never throws. */
+/** How a listing vacates the device for a revoked identity: handed to each as it is made. Never throws. */
 export type BankPanic = (refusal: VaultError) => void
 
-/** `made` until a `hello` succeeds; `ready` after one does; `disabled` once the bank is swept or vacated, the snapshot's `err` saying why. */
-export type BankStage = 'made' | 'ready' | 'disabled'
+/** `made` until an `ensureBank` succeeds; `ready` after one does; `disabled` once the device is swept or vacated, the snapshot's `err` saying why. */
+export type DeviceStage = 'made' | 'ready' | 'disabled'
 
-/** A bank as a host renders it: its scope, how far its `hello` got, its vaults, and the gating it has open. */
-export interface BankSnapshot extends BankScope {
-  /** How far the bank has come: `made`, `ready` or `disabled`. */
-  readonly stage:      BankStage
-  /** Why the bank is disabled, or null. */
+/** A device as a host renders it: its scope, how far its `ensureBank` got, the gating it has open, and its bank. */
+export interface DeviceSnapshot extends BankScope {
+  /** How far the device has come: `made`, `ready` or `disabled`. */
+  readonly stage:      DeviceStage
+  /** Why the device is disabled, or null. */
   readonly err:        VaultError | null
-  /** Your token for this device, as `Bank.make` was given it. */
+  /** The gating open on this device, live, for a dialog to answer; null with none. */
+  readonly openGating: AnyGating | null
+  /** The snapshot of the device's bank; null while it has none ready. */
+  readonly bank:       BankSnapshot | null
+}
+
+/** A bank as a host renders it: its scope, the token of this device's row, and its vaults. */
+export interface BankSnapshot extends BankScope {
+  /** The token of this device's row in the deviceDB, as the bank was made with it. */
   readonly device_tok: string
   /** A snapshot of each vault the bank lists. */
   readonly vaults:     readonly VaultSnapshot[]
-  /** The gating open on this bank, live, for a dialog to answer; null with none. */
-  readonly openGating: AnyGating | null
 }
 
 // --

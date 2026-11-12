@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Bank, MemoryDeviceDB, type Vault } from 'safebyok'
+import { Device, MemoryDeviceDB, type Vault } from 'safebyok'
 import { MemoryVaultDB } from 'safebyok/storage'
 import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok/testing'
 import { ApiKeyVaultlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../../src/lib/saved-api-key'
@@ -7,16 +7,15 @@ import { ApiKeyVaultlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '..
 const Boxlabel = 'anthropic_api_key_test'
 const FakeApiKey = 'sk-ant-fake-saved-key'
 
-/** Make a bank on in-memory storage, with `hello()` already called. Its dialog answers at once with the right passphrase. */
+/** Bring up a bank on in-memory storage. Its dialog answers at once with the right passphrase. */
 const makeBank = async () => {
-  const bank = Bank.make({
-    user_id: 'u1', banklabel: 'acme', device_tok: '00000000-0000-4000-8000-0000000000d1',
+  const device = Device.make({
+    user_id: 'u1', banklabel: 'acme', gates: ['main'],
     vaultDB: new MemoryVaultDB(), deviceDB: new MemoryDeviceDB(),
     keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger,
     requestCleartext: async (gating) => { await gating.attempt({ passphraseClear: Passphrase }) },
   })
-  await bank.hello()
-  return bank
+  return device.ensureBank()
 }
 
 /** Build and unlock the user's vault. */

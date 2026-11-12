@@ -1,4 +1,5 @@
 import type { Bank } from '../models/bank'
+import type { Device } from '../models/device'
 import type { Box } from '../models/box'
 import type { BoxListing } from '../models/box-listing'
 import type { Gate } from '../models/gate'
@@ -92,7 +93,7 @@ export function isWhisperedBag(val: unknown): val is WhisperedBag { return (type
 // ESM and CommonJS builds. A getter sits on the prototype, so it is no own key that a spread or Object.keys would meet.
 /** The model class each `modelkind` names: `ClassForModelkind['box']` is `Box`. */
 export type ClassForModelkind = {
-  bank: Bank, vault: Vault, box: Box, vault_listing: VaultListing, box_listing: BoxListing, gating: Gating, gate: Gate, wayin: Wayin, lease: Lease, proving: Proving,
+  device: Device, bank: Bank, vault: Vault, box: Box, vault_listing: VaultListing, box_listing: BoxListing, gating: Gating, gate: Gate, wayin: Wayin, lease: Lease, proving: Proving,
 }
 
 /** What each model's `modelkind` getter answers: `box.modelkind` is `'box'`. */

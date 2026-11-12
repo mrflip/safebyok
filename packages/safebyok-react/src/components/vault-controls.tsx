@@ -1,6 +1,6 @@
 import { isVaultError, type Outcome } from 'safebyok'
 import { Messages } from '../helpers/messages'
-import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from '../hooks/hooks'
+import { useBank, useVault, useVaultSnapshot } from '../hooks/hooks'
 import { useProvided } from '../provider/bank-provider'
 import type { TellBadNews, VaultControlProps } from '../shapes'
 
@@ -31,13 +31,12 @@ export const VaultLockControl = ({ vaultlabel }: VaultControlProps) => {
 export const CreateVaultButton = ({ vaultlabel }: VaultControlProps) => {
   const bank = useBank()
   const { tellBadNews } = useProvided('CreateVaultButton')
-  const isReady = (useBankSnapshot()?.stage === 'ready')
   const create = async () => {
-    if ((bank === null) || (! isReady)) { return }
+    if (bank === null) { return }
     tellUnlessDismissed(tellBadNews, await bank.tryEnsureVault({ vaultlabel }))
   }
   return (
-    <button type="button" className="create-vault-button" disabled={! isReady} onClick={() => { void create() }}>
+    <button type="button" className="create-vault-button" disabled={bank === null} onClick={() => { void create() }}>
       {Messages.createButton}
     </button>
   )

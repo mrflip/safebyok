@@ -27,7 +27,7 @@ function graphemeCount(typed: string): number {
   return typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter().segment(typed)].length : (typed.match(/./gsu) ?? []).length
 }
 
-// The dictionary is most of zxcvbn's weight, so it comes in as a chunk of its own, at the bank's hello, never at import.
+// The dictionary is most of zxcvbn's weight, so it comes in as a chunk of its own, at the device's ensureBank, never at import.
 // A failed import leaves the judge unbuilt, so the next load tries again.
 /** A strength checker with a zxcvbn judge of its own, built over the common dictionary at its first load. */
 function makeZxcvbnStrengthChecker() {
@@ -55,6 +55,6 @@ function makeZxcvbnStrengthChecker() {
   return Object.freeze(Object.assign(judgeStrength, { load }))
 }
 
-/** The strength checker a browser app hands `Bank.make`: {@link MinPassphraseChars} characters, then a zxcvbn score of {@link MinZxcvbnScore}. */
+/** The strength checker a browser app hands `Device.make`: {@link MinPassphraseChars} characters, then a zxcvbn score of {@link MinZxcvbnScore}. */
 export const zxcvbnStrengthChecker: StrengthChecker & { readonly load: () => Promise<void> } = /* @__PURE__ */ makeZxcvbnStrengthChecker()
 // --

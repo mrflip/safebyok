@@ -14,8 +14,8 @@ Whispers are encrypted on this device before anything reaches storage. The page 
 browser defaults, `browserOpts` from `safebyok/browser`: Argon2id to derive keys, zxcvbn to check a
 new passphrase's strength, and the device's leases in this browser's IndexedDB. The vault's rows
 are in IndexedDB too, in their own database (through `safebyok-indexeddb`), which stands in for a
-backend. Only the fake sign-in's rows are in localStorage. The `device_tok` each user's bank is made
-with is kept with the leases, because the provider gets it from the deviceDB.
+backend. Only the fake sign-in's rows are in localStorage. The `device_tok` each user's bank records
+is kept with the leases, because the device asks the deviceDB for it.
 
 ## The pages
 

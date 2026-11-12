@@ -316,7 +316,7 @@ const Checks = Checkers('bad_option', ({ custom, obj, oneof, str, union }) => ({
     message: union([str, custom<(fieldnames: readonly string[]) => string>((val) => typeof val === 'function')]).optional(),
   }).strict(),
   story:              obj({
-    /** Where the input was judged, a lead-in before the failures: `In Bank.make's options`. */
+    /** Where the input was judged, a lead-in before the failures: `In Device.make's options`. */
     where:  str.optional(),
     /** What to do, a sentence after the failures: `Leave it out for the bank's own.` */
     advice: str.optional(),

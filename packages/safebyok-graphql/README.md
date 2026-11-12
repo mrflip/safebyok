@@ -7,7 +7,7 @@ safebyok's vaultDB over [GraphQL](https://graphql.org), in two halves:
   called on the vaultDB your server hosts ([`safebyok-postgres`](../safebyok-postgres)'s, or your
   own), and returns that verb's answer, for the signed-in user's bank only.
 * **In the browser**, `safebyok-graphql`: **`new GraphQLVaultDB({ client })`**, the vaultDB over
-  your app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `Bank.make`.
+  your app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `Device.make`.
   It takes the Client alone. Limits such as `maxBoxes` and `maxRecordSizeEst` are set on the vaultDB
   your server hosts and hands to `vaultResolvers`. The browser half sets none.
 
@@ -72,17 +72,17 @@ The browser:
 
 ```ts
 import { Client, fetchExchange } from '@urql/core'
-import { Bank } from 'safebyok'
+import { Device } from 'safebyok'
 import { GraphQLVaultDB } from 'safebyok-graphql'
 
 const client = new Client({ url: '/api/graphql', exchanges: [fetchExchange], fetchSubscriptions: true })
-const bank = Bank.make({ user_id: session.user_id, banklabel: 'acme', vaultDB: new GraphQLVaultDB({ client }), ... })
+const device = Device.make({ user_id: session.user_id, banklabel: 'acme', gates: ['main'], vaultDB: new GraphQLVaultDB({ client }), ... })
 ```
 
 Your app's own Client works: `GraphQLVaultDB` sends every query `network-only`, so a document
 cache in front of it changes nothing. `fetchSubscriptions: true` carries `watch` over server-sent
 events, and a Client with a WebSocket exchange for subscriptions works as well. When a watch's
-stream ends, by a closing result, an error or a refusal, the bank's `onBadNews` is called once:
+stream ends, by a closing result, an error or a refusal, the device's `onBadNews` is called once:
 with `storage_unavailable`, with `unexpected_error` for a GraphQL error, or with the refusal itself.
 The watch does not subscribe again. Whether to start over is up to you, and a watch that has ended
 starts again on `goodbye()` then `hello()`. A stream that ends with an `identity_revoked` refusal
@@ -104,11 +104,11 @@ ends, and the browser does not subscribe again. A `getUserId` that looks the ses
 rather than reading what the request carried, is what lets a revoked session's stream end. An
 idle stream stays open until its next change.
 
-**When the signed-in user changes, vacate the bank and make another.** A bank, its vaults and its
-boxes keep the `user_id` they were made with for life, and nothing in safebyok moves them to a new
-one. On sign-out, or a sign-in as someone else, call `bank.vacate()` and make a new bank with
-`Bank.make` for the new user. The resolvers refuse the old bank's calls as `identity_revoked`, and
-that is all they do about it.
+**When the signed-in user changes, vacate the device and make another.** A device, its bank, its
+vaults and its boxes keep the `user_id` they were made with for life, and nothing in safebyok moves
+them to a new one. On sign-out, or a sign-in as someone else, call `device.vacate()` and make a new
+device with `Device.make` for the new user. The resolvers refuse the old bank's calls as
+`identity_revoked`, and that is all they do about it.
 
 `tidyGone`, which removes the box rows of deleted vaults and counts those left, is an operation like
 the rest, behind the same sign-in check: a host calls `tidyGone({ user_id, banklabel })` on its

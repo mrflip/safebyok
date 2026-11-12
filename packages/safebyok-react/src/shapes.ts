@@ -1,16 +1,16 @@
 import type { ComponentPropsWithoutRef, ComponentPropsWithRef, ReactNode, Ref } from 'react'
-import type { AnyGating, BadNewsHandler, Bank, BankOpts, Box, DeviceDB, Gating, LifecycleHandler, RequestCleartext, Vault, VaultDB, VaultError } from 'safebyok'
-import { Checker, Checkers, bankOpts, type AssertEqual, type BoxesListed, type BoxSparse, type CheckerInput, type DamagedBox, type DamagedVault, type LeaseQuery, type LeaseScopepath, type VaultRow } from 'safebyok/storage'
+import type { AnyGating, BadNewsHandler, Box, Device, DeviceDB, DeviceOpts, Gating, LifecycleHandler, RequestCleartext, Vault, VaultDB, VaultError } from 'safebyok'
+import { Checker, Checkers, deviceOpts, type AssertEqual, type BoxesListed, type BoxSparse, type CheckerInput, type DamagedBox, type DamagedVault, type LeaseQuery, type LeaseScopepath, type VaultRow } from 'safebyok/storage'
 import { fromB64, type WhisperFieldAttributes } from 'safebyok/utils'
 
 // The types and checkers of safebyok-react, grouped by area. This file imports nothing from a component or
 // hook, so it cannot be part of an import cycle at run time.
 
-// == [Provider]: BankProviderProps, bankProviderProps, ProviderBankOpts, Handlers, ContextValue, TellBadNews, GatingModalProps, BoundaryProps, BoundarySource
+// == [Provider]: BankProviderProps, bankProviderProps, ProviderDeviceOpts, Handlers, ContextValue, TellBadNews, GatingModalProps, BoundaryProps, BoundarySource
 
-/** BankProvider's props: the `Bank.make` options except `device_tok`, plus the signed-in `user_id` and props for the dialogs. */
-export interface BankProviderProps extends Omit<BankOpts, 'user_id' | 'device_tok' | 'requestCleartext'> {
-  /** The signed-in user's id, or null while nobody is signed in. Null does not remove cached leases: call `bank.vacate()` at sign-out. */
+/** BankProvider's props: the `Device.make` options except `gates`, which it fills in, plus the signed-in `user_id` and props for the dialogs. */
+export interface BankProviderProps extends Omit<DeviceOpts, 'user_id' | 'gates' | 'requestCleartext'> {
+  /** The signed-in user's id, or null while nobody is signed in. Null does not remove cached leases: call `bank.device.vacate()` at sign-out. */
   user_id:             string | null
   /** Your own function to ask the user for a passphrase or passkey. When omitted, the provider shows its built-in dialogs. */
   requestCleartext?:   RequestCleartext | undefined
@@ -22,8 +22,8 @@ export interface BankProviderProps extends Omit<BankOpts, 'user_id' | 'device_to
 }
 
 /** Checker for {@link BankProviderProps}. */
-export const bankProviderProps = Checker(({ fn, custom, str }) => bankOpts.omit({ device_tok: true }).extend({
-  user_id:            bankOpts.shape.user_id.nullable(),
+export const bankProviderProps = Checker(({ fn, custom, str }) => deviceOpts.omit({ gates: true }).extend({
+  user_id:            deviceOpts.shape.user_id.nullable(),
   requestCleartext:   fn<RequestCleartext>().optional(),
   passphraseUsername: str.optional(),
   passkeyRpId:        str.optional(),
@@ -33,23 +33,23 @@ export const bankProviderProps = Checker(({ fn, custom, str }) => bankOpts.omit(
 // The interface is written by hand so that each prop has a doc comment. This line fails to compile if it and the checker drift apart.
 true satisfies AssertEqual<BankProviderProps, CheckerInput<typeof bankProviderProps>>
 
-/** The `Bank.make` options the provider passes through: all but `device_tok` and the handlers, with a `user_id` that may be null. */
-export type ProviderBankOpts = Omit<BankOpts, 'user_id' | 'device_tok' | 'onLifecycle' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
+/** The `Device.make` options the provider passes through: all but `gates` and the handlers, with a `user_id` that may be null. */
+export type ProviderDeviceOpts = Omit<DeviceOpts, 'user_id' | 'gates' | 'onLifecycle' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
 
-/** The host's callbacks for the provider's bank, as of the latest render. */
+/** The host's callbacks for the provider's device, as of the latest render. */
 export type Handlers = { onLifecycle: LifecycleHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext | undefined }
 
-/** The provider's context value: the signed-in user's bank, the vaults a hook has already called `tryHello` on, and a way to report bad news to the host. */
-export type ContextValue = { bank: Bank | null, helloedVaults: WeakSet<Vault>, tellBadNews: TellBadNews }
+/** The provider's context value: the signed-in user's device, the vaults a hook has already called `tryHello` on, and a way to report bad news to the host. */
+export type ContextValue = { device: Device | null, helloedVaults: WeakSet<Vault>, tellBadNews: TellBadNews }
 
-/** Report refusals that no caller is waiting on to the host's `onBadNews`. Does nothing once the bank is disabled. Never throws. */
+/** Report refusals that no caller is waiting on to the host's `onBadNews`. Does nothing once the device is disabled. Never throws. */
 export type TellBadNews = (badnews: readonly VaultError[]) => void
 
 /** GatingModal's props: a gating of any kind, and the props its dialogs share. */
 export type GatingModalProps = {
-  /** The gating this dialog is for, from `requestCleartext` or the bank's snapshot. */
+  /** The gating this dialog is for, from `requestCleartext` or the device's snapshot. */
   gating:              AnyGating
-  /** The bank's `leaseMillis`, used for the line that says how long an unlock lasts. */
+  /** The device's `leaseMillis`, used for the line that says how long an unlock lasts. */
   leaseMillis?:        number | undefined
   /** The username a password manager saves the passphrase under. */
   passphraseUsername?: string | undefined
@@ -213,7 +213,7 @@ export type PassphraseGating = Gating<'build_vault'> | Gating<'unlock_vault'>
 export type PassphraseModalProps = {
   /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              PassphraseGating
-  /** The bank's `leaseMillis`, used for the line that says how long an unlock lasts. */
+  /** The device's `leaseMillis`, used for the line that says how long an unlock lasts. */
   leaseMillis?:        number | undefined
   /** The username a password manager saves the passphrase under. */
   passphraseUsername?: string | undefined

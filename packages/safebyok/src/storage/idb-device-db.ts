@@ -116,7 +116,7 @@ export class IdbDeviceDB extends DeviceDB {
   // --
 }
 
-/** A device database in this browser's IndexedDB, for a browser app to pass to `Bank.make`. */
+/** A device database in this browser's IndexedDB, for a browser app to pass to `Device.make`. */
 export function idbDeviceDB(opts?: IdbDeviceDBOpts): IdbDeviceDB { return new IdbDeviceDB(opts) }
 
 true satisfies Z.core.util.AssertEqual<IdbDeviceDBOpts, Z.input<typeof idbDeviceDBOpts>>

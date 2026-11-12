@@ -9,7 +9,7 @@ import type { VaultScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
 import type { PassphraseVerdict } from '../shapes/shapes-gateish'
 
-/** `Bank.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
+/** `Device.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
  * It is handed the passphrase as typed, and the vault's scope: words a guesser who knows the user
  * tries first. The vault runs it on each new passphrase before any key derivation: the one an
  * `initialize_gate` gating creates a vault with, and each one a `change_passphrase` gating sets.
@@ -20,9 +20,9 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  * quote it.
  *
  * A checker that needs something fetched or built first, such as a dictionary, carries it as
- * `load`, which each bank's `hello()` runs. Make the checker once, before any bank, and hand the
+ * `load`, which each device's `ensureBank()` runs. Make the checker once, before any device, and hand the
  * same one to each; make `load` cost nothing once it has succeeded, and forget a failure. Call
- * `load` yourself only to warm up. A `load` that fails refuses the hello, a `VaultError` it throws as
+ * `load` yourself only to warm up. A `load` that fails refuses the `ensureBank()`, a `VaultError` it throws as
  * it came and anything else with what it threw as the cause, so a vault that cannot check a new passphrase never opens.
  *
  * `safebyok/browser` ships `zxcvbnStrengthChecker`, or pass your own (notes/configuration.md). To ask it as the user types, call
@@ -38,7 +38,7 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  */
 export type StrengthChecker = {
   (passphrase: string, scope: VaultScope): PassphraseVerdict | Promise<PassphraseVerdict>
-  /** Fetch or build what the checker needs before it can judge; each bank's `hello()` runs it. */
+  /** Fetch or build what the checker needs before it can judge; each device's `ensureBank()` runs it. */
   load?: (() => void | Promise<void>) | undefined
 }
 
@@ -54,7 +54,7 @@ export const StrongVerdict: PassphraseVerdict = Object.freeze({ strong: true })
 /** The verdict {@link DefaultStrengthChecker} answers of every passphrase: a word to the user, and one to the app's makers. */
 const DefaultVerdict: PassphraseVerdict = Object.freeze({
   strong: false,
-  reason: "This app can't accept a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Bank.make needs a strengthChecker, such as zxcvbnStrengthChecker from safebyok/browser, as notes/configuration.md in safebyok's repository says under Pluggable Passphrase Strength Checker.",
+  reason: "This app can't accept a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Device.make needs a strengthChecker, such as zxcvbnStrengthChecker from safebyok/browser, as notes/configuration.md in safebyok's repository says under Pluggable Passphrase Strength Checker.",
 })
 
 /** The strength checker of a vault whose host chose none: every passphrase is too weak, so no vault can be made, nor a passphrase changed.

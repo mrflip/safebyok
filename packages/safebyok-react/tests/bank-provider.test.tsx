@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Bank, MemoryDeviceDB, VaultError, type AnyGating, type BadNewsHandler, type LifecycleHandler } from 'safebyok'
+import { Device, MemoryDeviceDB, VaultError, type AnyGating, type BadNewsHandler, type Bank, type LifecycleHandler } from 'safebyok'
 import { badAnswerOf } from 'safebyok/storage'
 import { BankProvider } from '../src/provider/bank-provider'
 import { Messages } from '../src/helpers/messages'
@@ -51,14 +51,14 @@ describe("BankProvider's bank", () => {
     expect(shown('vault')).to.eq('waiting none')
   })
 
-  it("makes the signed-in user's bank, says hello, and sweeps it when the user changes", async () => {
+  it("makes the signed-in user's device, brings up its bank, and ends it when the user changes", async () => {
     const { props, rerender } = provided()
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
     rerender({ ...props, user_id: 'u2' })
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     const [first, second] = TH.seenBanks
     expect(TH.seenBanks).to.have.lengthOf(2)
-    expect(first?.isEnabled).to.eq(false)
+    expect(first?.device.isEnabled).to.eq(false)
     expect(second?.user_id).to.eq('u2')
   })
 
@@ -68,7 +68,7 @@ describe("BankProvider's bank", () => {
     rerender({ ...props, banklabel: 'globex' })
     await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(2) })
     expect(TH.seenBanks.map(({ banklabel }) => banklabel)).to.deep.equal(['acme', 'globex'])
-    expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
+    expect(TH.seenBanks[0]?.device.isEnabled).to.eq(false)
   })
 
   it("makes each bank with the device_tok its deviceDB keeps for the bank's scope", async () => {
@@ -89,65 +89,75 @@ describe("BankProvider's bank", () => {
     const { unmount } = provided()
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
     unmount()
-    expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
+    expect(TH.seenBanks[0]?.device.isEnabled).to.eq(false)
   })
 
-  // StrictMode runs the effect twice at mount, before the device_tok has arrived. The effect makes its bank
-  // only once, when the device_tok arrives.
-  it("makes one bank under StrictMode, once the device_tok lands", async () => {
-    const making = vi.spyOn(Bank, 'make')
+  // StrictMode runs the effect twice at mount: the first device is swept before its deviceDB answers.
+  it("makes two devices under StrictMode, sweeps the first, and brings up the second", async () => {
+    const making = vi.spyOn(Device, 'make')
     render(<StrictMode><BankProvider {...TH.providerPropsOf(TH.makeBankWorld())}><TH.ShowsVault /></BankProvider></StrictMode>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    const [made] = making.mock.results.map((result) => result.value as Bank)
-    expect(making.mock.results).to.have.lengthOf(1)
-    expect(made?.isEnabled).to.be.true
-    expect(TH.seenBanks.at(-1)).to.eq(made)
+    const [first, second] = making.mock.results.map((result) => result.value as Device)
+    expect(making.mock.results).to.have.lengthOf(2)
+    expect(first?.isEnabled).to.be.false
+    expect(first?.bank).to.be.null
+    expect(second?.isEnabled).to.be.true
+    expect(TH.seenBanks).to.deep.equal([second?.bank])
   })
 
-  it("provides no bank until its deviceDB responds", async () => {
+  it("provides its device, and no bank, until its deviceDB answers", async () => {
     const { deviceDB, answer } = deviceDBPending('u1')
-    const making = vi.spyOn(Bank, 'make')
     provided({ deviceDB })
     await act(async () => { await TH.wakeupAtNextTick() })
-    expect(shown('bank')).to.eq('none')
-    expect(making).not.toHaveBeenCalled()
+    expect(shown('bank')).to.eq('u1 made')
+    expect(shown('vault')).to.eq('waiting none')
+    expect(TH.seenBanks).to.have.lengthOf(0)
     answer()
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
   })
 
-  it("waits for the next user's device_tok before making their bank", async () => {
+  it("provides no bank for the next user until their deviceDB answers", async () => {
     const { deviceDB, answer } = deviceDBPending('u2')
     const { props, rerender } = provided({ deviceDB })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    const making = vi.spyOn(Bank, 'make')
+    const making = vi.spyOn(Device, 'make')
     rerender({ ...props, user_id: 'u2' })
     await act(async () => { await TH.wakeupAtNextTick() })
-    expect(shown('bank')).to.eq('none')
-    expect(making).not.toHaveBeenCalled()
+    expect(shown('bank')).to.eq('u2 made')
+    expect(TH.seenBanks).to.have.lengthOf(1)
     answer()
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     const { device_tok } = await deviceDB.ensureCachedDevice({ user_id: 'u2', banklabel: 'acme' })
-    expect(making.mock.calls.map(([opts]) => [opts.user_id, opts.device_tok])).to.deep.equal([['u2', device_tok]])
+    expect(making.mock.calls.map(([opts]) => [opts.user_id, opts.gates])).to.deep.equal([['u2', ['main']]])
+    expect(TH.seenBanks[1]?.device_tok).to.eq(device_tok)
   })
 
-  it("makes no bank when the user signs out before its deviceDB responds", async () => {
+  it("ends with no bank, its device swept, when the user signs out before its deviceDB answers", async () => {
     const { deviceDB, answer } = deviceDBPending('u1')
-    const making = vi.spyOn(Bank, 'make')
+    const making = vi.spyOn(Device, 'make')
     const { props, rerender } = provided({ deviceDB })
     rerender({ ...props, user_id: null })
     answer()
     await act(async () => { await TH.wakeupAtNextTick() })
-    expect(making).not.toHaveBeenCalled()
+    const [made] = making.mock.results.map((result) => result.value as Device)
+    expect(made?.isEnabled).to.be.false
+    expect(made?.bank).to.be.null
+    expect(TH.seenBanks).to.have.lengthOf(0)
     expect(shown('bank')).to.eq('none')
   })
 
-  it("throws a refused ensureCachedDevice to the nearest error boundary", async () => {
+  it("reports a refused ensureCachedDevice to onLifecycle, not the error boundary, and leaves its device made", async () => {
+    const refusal = new VaultError('storage_unavailable', 'the disk is full')
     const deviceDB = new MemoryDeviceDB()
-    vi.spyOn(deviceDB, 'ensureCachedDevice').mockRejectedValue(new VaultError('storage_unavailable', 'the disk is full'))
-    const props = TH.providerPropsOf(TH.makeBankWorld(), { deviceDB })
-    const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
-    await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
-    expect(reported[0]).to.include({ refusalkind: 'storage_unavailable' })
+    vi.spyOn(deviceDB, 'ensureCachedDevice').mockRejectedValue(refusal)
+    const onLifecycle = vi.fn<LifecycleHandler>()
+    const props = TH.providerPropsOf(TH.makeBankWorld(), { deviceDB, onLifecycle })
+    render(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
+    await waitFor(() => { expect(onLifecycle).toHaveBeenCalled() })
+    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'helloed', outcome: { ok: false, err: refusal }, vault: null }))
+    expect(screen.queryByText(/^caught: /)).to.be.null
+    expect(shown('bank')).to.eq('u1 made')
+    expect(TH.seenBanks).to.have.lengthOf(0)
   })
 
   it("throws a deviceDB that is no DeviceDB to the nearest error boundary", async () => {
@@ -157,7 +167,7 @@ describe("BankProvider's bank", () => {
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })
   })
 
-  it("throws an option Bank.make does not accept to the nearest error boundary", async () => {
+  it("throws an option Device.make does not accept to the nearest error boundary", async () => {
     const props = { ...TH.providerPropsOf(TH.makeBankWorld()), leaseHours: 3 } as Props
     const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
     await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
@@ -166,7 +176,7 @@ describe("BankProvider's bank", () => {
 })
 
 describe("BankProvider's props", () => {
-  it("keeps its bank when a prop it was made with changes", async () => {
+  it("keeps its device when a prop it was made with changes", async () => {
     const spy = TH.spyLogger()
     const { props, rerender } = provided({ logger: spy.logger })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
@@ -178,7 +188,7 @@ describe("BankProvider's props", () => {
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
   })
 
-  it("says once, through the bank's logger, that a change to a prop it was made with is ignored", async () => {
+  it("says once, through the device's logger, that a change to a prop it was made with is ignored", async () => {
     const spy = TH.spyLogger()
     const { props, rerender } = provided({ logger: spy.logger })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
@@ -222,7 +232,7 @@ describe("BankProvider's props", () => {
   })
 })
 
-/** Render a provider over a vault that another device built, and unlock it through the dialog. Also returns the deviceDB where the provider's bank caches its lease. */
+/** Render a provider over a vault that another device built, and unlock it through the dialog. Also returns the deviceDB where the provider's device caches its lease. */
 const unlockedProvided = async (overrides: Partial<Props> = {}) => {
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)
@@ -259,12 +269,12 @@ describe("BankProvider at sign-out", () => {
     await waitFor(async () => { expect(await leaseUsers(deviceDB)).to.deep.equal([]) })
   })
 
-  it("vacates the last user's bank at a switch, and not the next user's", async () => {
+  it("vacates the last user's device at a switch, and not the next user's", async () => {
     const { props, rerender, deviceDB } = await unlockedProvided()
     rerender({ ...props, user_id: 'u2' })
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     await waitFor(async () => { expect(await leaseUsers(deviceDB)).to.deep.equal([]) })
-    expect(TH.seenBanks.map(({ user_id, isEnabled }) => [user_id, isEnabled])).to.deep.equal([['u1', false], ['u2', true]])
+    expect(TH.seenBanks.map(({ user_id, device }) => [user_id, device.isEnabled])).to.deep.equal([['u1', false], ['u2', true]])
   })
 
   it("leaves the cached leases at an unmount, and through StrictMode's double effects", async () => {
@@ -296,7 +306,7 @@ describe("BankProvider's handlers", () => {
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })
   })
 
-  it("reports a refused hello to onLifecycle, and nothing to onBadNews", async () => {
+  it("reports a refused ensureBank to onLifecycle, and nothing to onBadNews", async () => {
     const world = TH.makeBankWorld()
     vi.spyOn(world.vaultDB, 'tryListVaults').mockResolvedValue(badAnswerOf(Refusal))
     const [onLifecycle, onBadNews] = [vi.fn<LifecycleHandler>(), vi.fn<BadNewsHandler>()]
@@ -318,27 +328,27 @@ describe("BankProvider's handlers", () => {
     vi.unstubAllGlobals()
   })
 
-  it("reports a refused hello to the onLifecycle last rendered", async () => {
+  it("reports a refused ensureBank to the onLifecycle last rendered", async () => {
     const world = TH.makeBankWorld()
     const pendingListVaults: { refuse?: (err: VaultError) => void } = {}
     vi.spyOn(world.vaultDB, 'tryListVaults').mockReturnValue(new Promise((resolve) => { pendingListVaults.refuse = (err) => { resolve(badAnswerOf(err)) } }))
     const [first, last] = [vi.fn<LifecycleHandler>(), vi.fn<LifecycleHandler>()]
     const { props, rerender } = provided({ onLifecycle: first }, world)
-    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })
     rerender({ ...props, onLifecycle: last })
     pendingListVaults.refuse?.(Refusal)
     await waitFor(() => { expect(last).toHaveBeenCalledOnce() })
     expect(first).not.toHaveBeenCalled()
   })
 
-  it("reports a hello that a sign-out crossed to neither onLifecycle, onBadNews nor the logger", async () => {
+  it("reports an ensureBank that a sign-out crossed to neither onLifecycle, onBadNews nor the logger", async () => {
     const world = TH.makeBankWorld()
     const pendingListVaults: { refuse?: (err: VaultError) => void } = {}
     vi.spyOn(world.vaultDB, 'tryListVaults').mockReturnValue(new Promise((resolve) => { pendingListVaults.refuse = (err) => { resolve(badAnswerOf(err)) } }))
     const [onLifecycle, onBadNews] = [vi.fn(), vi.fn()]
     const spy = TH.spyLogger()
     const { props, rerender } = provided({ onLifecycle, onBadNews, logger: spy.logger }, world)
-    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })
     rerender({ ...props, user_id: null })
     await waitFor(() => { expect(shown('bank')).to.eq('none') })
     pendingListVaults.refuse?.(Refusal)
@@ -429,12 +439,12 @@ describe("BankProvider's dialog", () => {
     expect(dialogShown()).to.be.false
   })
 
-  it("opens the dialog for the gating the bank has", async () => {
+  it("opens the dialog for the gating the device has", async () => {
     provided()
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(screen.queryByText(Messages.chooseTitle)).to.not.be.null })
-    expect(onlyBank().snapshot.openGating).to.not.be.null
+    expect(onlyBank().device.openGating).to.not.be.null
   })
 
   it("shows the dialog when the user's gesture is already used up", async () => {
@@ -466,29 +476,29 @@ describe("BankProvider's dialog", () => {
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(dialogShown()).to.be.true })
-    const gating = onlyBank().snapshot.openGating
+    const gating = onlyBank().device.openGating
     fireEvent.click(screen.getByText(Messages.cancelButton))
     await waitFor(() => { expect(dialogShown()).to.be.false })
     expect(gating?.isOpen).to.be.false
-    expect(onlyBank().snapshot.openGating).to.be.null
+    expect(onlyBank().device.openGating).to.be.null
     expect(shown('vault')).to.eq('unborn none')
   })
 
-  it("closes the dialog at a sweep of the bank", async () => {
+  it("closes the dialog at a sweep of the device", async () => {
     provided()
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(dialogShown()).to.be.true })
-    act(() => { onlyBank().sweep() })
+    act(() => { onlyBank().device.sweep() })
     expect(dialogShown()).to.be.false
   })
 
-  it("closes the dialog at a vacate of the bank", async () => {
+  it("closes the dialog at a vacate of the device", async () => {
     provided()
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(dialogShown()).to.be.true })
-    await act(async () => { await onlyBank().vacate() })
+    await act(async () => { await onlyBank().device.vacate() })
     expect(dialogShown()).to.be.false
   })
 
@@ -500,17 +510,17 @@ describe("BankProvider's dialog", () => {
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(dialogShown()).to.be.true })
     const bank = onlyBank()
-    const first = bank.snapshot.openGating
+    const first = bank.device.openGating
     fireEvent.change(passphraseFieldOf(), { target: { value: 'half typed' } })
     const vault = bank.vaultAt({ vaultlabel: 'main' })!
     await act(async () => {
       first?.dismiss()
       void vault.tryEnsureUnlocked()
-      await vi.waitFor(() => { expect(bank.snapshot.openGating).to.not.equal(first); expect(bank.snapshot.openGating).to.not.be.null })
+      await vi.waitFor(() => { expect(bank.device.openGating).to.not.equal(first); expect(bank.device.openGating).to.not.be.null })
     })
     await waitFor(() => { expect(dialogShown()).to.be.true })
     expect(passphraseFieldOf().value).to.eq('')
-    expect(bank.snapshot.openGating).to.not.equal(first)
+    expect(bank.device.openGating).to.not.equal(first)
     TH.submitPassphrase(TH.Passphrase)
     await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
     expect(dialogShown()).to.be.false

@@ -120,7 +120,7 @@ describe("guardStrengthChecker", () => {
       const broken: StrengthChecker = () => Promise.reject(thrown)
       const err = await TH.expectRefusal(guardStrengthChecker(broken)('acme acme acme', scope))
       expect(err).to.not.eq(thrown)
-      expect(err.message).to.match(/strengthChecker handed to Bank.make threw/)
+      expect(err.message).to.match(/strengthChecker handed to Device.make threw/)
       expect(err.cause).to.be.undefined
       expect(err.meta).to.be.undefined
       expect(TH.thrownText(err)).to.not.include('acme acme acme')
@@ -130,7 +130,7 @@ describe("guardStrengthChecker", () => {
   for (const field of ['strong', 'reason'] as const) {
     it(`refuses a verdict whose ${field} is a getter that throws, carrying nothing of the throw`, async () => {
       const err = await TH.expectRefusal(guardStrengthChecker(lazyCheckerThrowingOn(field))('acme acme acme', scope))
-      expect(err.message).to.match(/strengthChecker handed to Bank.make threw/)
+      expect(err.message).to.match(/strengthChecker handed to Device.make threw/)
       expect(err.cause).to.be.undefined
       expect(err.meta).to.be.undefined
       expect(TH.thrownText(err)).to.not.include('acme acme acme')

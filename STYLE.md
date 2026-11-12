@@ -27,7 +27,7 @@ propose the exception.
   `safebyok/storage` as `DB` (`DB.vaultRow`).
 * **The core's `src/shapes/` holds the validators a module exports**, and no other module exports
   one. A validator a module keeps to itself stays beside its only user, made in a `Checkers` call
-  at module level (`helpers/validator.ts`'s and `gate.ts`'s `Checks`, `bank.ts`'s `HostChecks`).
+  at module level (`helpers/validator.ts`'s and `gate.ts`'s `Checks`, `device.ts`'s `HostChecks`).
 * **Pick fields by destructuring the parsed output.** Where a pick by a list of names is truly
   needed, write `fieldnames.map((fieldname) => scope[fieldname])`: a pick helper returns an
   object, whose key order *Order comes from an explicit list* rules out.
@@ -375,7 +375,7 @@ validator splits it into its parts before checking them.
 * **A shape's type is `Z.infer` of its validator, or an interface checked against it: choose by
   the reader.** An in-repo bag's is `Z.infer`, with a `/** */` on each prop. A host-facing contract,
   whose `.d.ts` is the product, gets an `interface` with a doc block on each member, and an
-  equality assertion beside its checker keeps the two from drifting (`BankOpts`).
+  equality assertion beside its checker keeps the two from drifting (`DeviceOpts`).
 * **Name the important primitives.** A value a host writes by hand gets a plain alias
   (`Boxlabel`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
   `PassphraseCleartext`), so it exists only once parsed and two of a kind never trade places.
@@ -518,7 +518,7 @@ A member that will not describe in a line is a smell: report it.
   kinds, and a class or module doc may say in one sentence what misuse refuses. The only kind worth naming is a condition the
   caller branches on in normal use: `stale_write` on a put, `wrong_passphrase` on an unlock. Before naming one, taste it
   against those two from memory: a kind of lesser salience goes unnamed. Where a caller meets a refusal in normal use, say
-  what to do instead `#say-what-to-do`: `Precede with await bank.hello(), repeated to force a refresh`.
+  what to do instead `#say-what-to-do`: `Precede with await vault.hello(), repeated to force a refresh`.
 * **The guarantee is the line worth writing** `#say-the-guarantee`. What the call proves, or what a caller could get wrong about a secret, goes
   in: `Extracting the whisper authenticates that the object, all but its sidecar, has not been modified since it was sealed`.
 * **The lower-yield rules** (option lists, guards' predicates, the reason above, pointing instead of redefining,
@@ -536,7 +536,7 @@ Vitest, in each package's `tests/`, path for path with its `src/`: `src/foo/bar.
 `tests/foo/bar.test.ts`. A test file past about 1,500 lines becomes a folder, `tests/foo/bar/`, of
 `bar-<theme>.test.ts` files named for what a reader would look for (`bar-races`, `bar-refusals`),
 with the helpers they share in a `world.ts` beside them. A module reached only through another's
-public verb (`vault-opts.ts` through `Bank.make`) is tested beside that verb. Every export is
+public verb (`vault-opts.ts` through `Device.make`) is tested beside that verb. Every export is
 tested, in proportion to what it does and what a caller could get wrong.
 
 * **Test helpers come through one door, `tests/test-helpers.ts`, star-imported as `TH`**

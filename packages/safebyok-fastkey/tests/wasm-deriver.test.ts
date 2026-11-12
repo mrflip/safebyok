@@ -1,6 +1,6 @@
 import { argon2id } from 'hash-wasm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { type Bank, type BankOpts, VaultError, isVaultError } from 'safebyok'
+import { type Bank, type DeviceOpts, VaultError, isVaultError } from 'safebyok'
 import { Argon2idWebV1, makeArgon2idDeriver, argon2idWebV1Deriver, type KeyDeriver, type KeyDeriverSpec } from 'safebyok/browser'
 import * as TH from 'safebyok/testing'
 import { makeArgon2idWasmDeriver, argon2idWasmWebV1Deriver } from '../src/wasm-deriver'
@@ -211,13 +211,12 @@ function twoDevices(firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) {
   return {
     world,
     first:  () => world.bankOn({ keyDeriver: firstDeriver }),
-    second: (overrides: Partial<BankOpts> = {}) => world.bankOnAnotherDevice({ keyDeriver: secondDeriver, ...overrides }),
+    second: (overrides: Partial<DeviceOpts> = {}) => world.bankOnAnotherDevice({ keyDeriver: secondDeriver, ...overrides }),
   }
 }
 
 /** Build and unlock the vault on `bank`, then store {@link FakeWhisper} in one of its boxes. */
 async function putFakeBox(bank: Bank): Promise<void> {
-  await bank.hello()
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
   await vault.putBox({ boxlabel: 'openai', whisper: FakeWhisper })
 }
@@ -233,35 +232,27 @@ async function expectWhisperOpens(bank: Bank): Promise<void> {
 
 // Each test runs the real Argon2id at the supplied spec on both devices.
 describe("a vault shared between the two derivers", () => {
-  it("is accepted by Bank.make under the supplied label", async () => {
-    const bank = TH.makeBankWorld().bankOn({ keyDeriver: argon2idWasmWebV1Deriver })
-    await bank.hello()
+  it("is accepted by Device.make under the supplied label", async () => {
+    const bank = await TH.makeBankWorld().bankOn({ keyDeriver: argon2idWasmWebV1Deriver })
     const vault = await bank.ensureVault(TH.VaultScopeGiven)
     expect(vault.isUnlocked).to.be.true
   })
 
   it("made through WebAssembly opens through the core's deriver", { timeout: 60_000 }, async () => {
     const devices = twoDevices(argon2idWasmWebV1Deriver, argon2idWebV1Deriver)
-    const first = devices.first()
-    await putFakeBox(first)
-    const second = devices.second()
-    await second.hello()
-    await expectWhisperOpens(second)
+    await putFakeBox(await devices.first())
+    await expectWhisperOpens(await devices.second())
   })
 
   it("made through the core's deriver opens through WebAssembly, and refuses a wrong passphrase there", { timeout: 60_000 }, async () => {
     const devices = twoDevices(argon2idWebV1Deriver, argon2idWasmWebV1Deriver)
-    const first = devices.first()
-    await putFakeBox(first)
-    const mistyped = devices.second({
+    await putFakeBox(await devices.first())
+    const mistyped = await devices.second({
       requestCleartext: async (gating) => { await TH.expectBad(gating.attempt(TH.byPassphrase('correct horse battery stapler')), 'wrong_passphrase') },
     })
-    await mistyped.hello()
     const vault = await mistyped.ensureVault(TH.VaultScopeGiven)
     await expect(vault.ensureUnlocked()).rejects.toThrow(/dismissed/u)
-    const second = devices.second()
-    await second.hello()
-    await expectWhisperOpens(second)
+    await expectWhisperOpens(await devices.second())
   })
 })
 

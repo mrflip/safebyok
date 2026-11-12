@@ -1,21 +1,35 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type BoxSnapshot, type VaultSnapshot, type Whisper, type BoxExposure } from 'safebyok'
+import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type Device, type DeviceSnapshot, type BoxSnapshot, type VaultSnapshot, type Whisper, type BoxExposure } from 'safebyok'
 import { useProvided } from '../provider/bank-provider'
 import type { VaultLifecycle } from '../shapes'
 
-// == [Bank hooks]: useBank, useBankSnapshot, subscribeToNothing, getNothing
+// == [Bank hooks]: useDevice, useBank, useBankSnapshot, useDeviceSnapshot, subscribeToNothing, getNothing
 
 const unsubscribeFromNothing = () => { /* nothing to unsubscribe from */ }
 const subscribeToNothing = () => unsubscribeFromNothing
 const getNothing = () => null
 
-/** Return the signed-in user's bank from the nearest BankProvider, or null while there is none. */
-export const useBank = (): Bank | null => useProvided('useBank').bank
+/** Return the signed-in user's device from the nearest BankProvider, or null while nobody is signed in.
+ * Its `vacate()` is sign-out, whether or not its bank is up.
+ */
+export function useDevice(): Device | null { return useProvided('useDevice').device }
 
-/** Return the live snapshot of the signed-in user's bank, or null while the provider has no bank. */
-export const useBankSnapshot = (): BankSnapshot | null => {
-  const { bank } = useProvided('useBankSnapshot')
-  return useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, bank?.getSnapshot ?? getNothing, getNothing)
+/** Return the signed-in user's bank from the nearest BankProvider, or null until it is up and once it has ended. */
+export function useBank(): Bank | null {
+  const { device } = useProvided('useBank')
+  return useSyncExternalStore(device?.subscribe ?? subscribeToNothing, () => device?.bank ?? null, getNothing)
+}
+
+/** Return the live snapshot of the signed-in user's bank, or null while {@link useBank} answers null. */
+export function useBankSnapshot(): BankSnapshot | null { return useDeviceSnapshotFor('useBankSnapshot')?.bank ?? null }
+
+/** Return the live snapshot of the signed-in user's device: its stage, why it ended, its open gating and its bank's snapshot. Null while nobody is signed in. */
+export function useDeviceSnapshot(): DeviceSnapshot | null { return useDeviceSnapshotFor('useDeviceSnapshot') }
+
+/** Same as {@link useDeviceSnapshot}. `hookname` is the hook named in the error when there is no provider. */
+function useDeviceSnapshotFor(hookname: string): DeviceSnapshot | null {
+  const { device } = useProvided(hookname)
+  return useSyncExternalStore(device?.subscribe ?? subscribeToNothing, device?.getSnapshot ?? getNothing, getNothing)
 }
 // --
 
@@ -29,23 +43,24 @@ export const useVault = (vaultlabel: string): VaultLifecycle => useVaultFor('use
 
 /** Same as {@link useVault}. `hookname` is the hook named in the error when there is no provider. */
 const useVaultFor = (hookname: string, vaultlabel: string): VaultLifecycle => {
-  const { bank, helloedVaults } = useProvided(hookname)
-  const snapshot = useSyncExternalStore(bank?.subscribe ?? subscribeToNothing, bank?.getSnapshot ?? getNothing, getNothing)
+  const { device, helloedVaults } = useProvided(hookname)
+  const snapshot = useSyncExternalStore(device?.subscribe ?? subscribeToNothing, device?.getSnapshot ?? getNothing, getNothing)
   const lifecycle = useMemo((): VaultLifecycle => {
-    if (bank === null || snapshot === null) { return WaitingLifecycle }
-    // A sweep or a vacate publishes a new snapshot whose `err` is the reason the bank ended, so this memo runs again then.
-    if ((! bank.isEnabled) && (snapshot.err !== null)) { return { stage: 'spent', vault: null, cause: snapshot.err } }
-    if (snapshot.stage !== 'ready') { return WaitingLifecycle }
+    if (device === null || snapshot === null) { return WaitingLifecycle }
+    // A sweep or a vacate publishes a new snapshot whose `err` is the reason the device ended, so this memo runs again then.
+    if ((! device.isEnabled) && (snapshot.err !== null)) { return { stage: 'spent', vault: null, cause: snapshot.err } }
+    const { bank } = device
+    if (bank === null) { return WaitingLifecycle }
     const vault = bank.vaultAt({ vaultlabel })
     return vault?.isPresent === true ? { stage: 'present' as const, vault } : UnbornLifecycle
-  }, [bank, snapshot, vaultlabel])
+  }, [device, snapshot, vaultlabel])
   const { vault } = lifecycle
   useEffect(() => {
-    if (bank === null || vault === null || helloedVaults.has(vault)) { return }
+    if (vault === null || helloedVaults.has(vault)) { return }
     helloedVaults.add(vault)
-    // Not awaited: the bank reports the hello to onLifecycle.
+    // Not awaited: the device reports the hello to onLifecycle.
     void vault.tryHello()
-  }, [bank, vault, helloedVaults])
+  }, [vault, helloedVaults])
   return lifecycle
 }
 

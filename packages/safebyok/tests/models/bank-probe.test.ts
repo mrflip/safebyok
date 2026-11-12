@@ -10,8 +10,7 @@ useBankWorlds()
 const HomeBox = { vaultlabel: 'home', boxlabel: 'box1' }
 
 async function readyBankOn(world: BankWorld = makeBankWorld()) {
-  const bank = world.bankOn()
-  await bank.hello()
+  const bank = await world.bankOn()
   return { world, bank }
 }
 
@@ -92,8 +91,7 @@ describe("bank.tryProbe", () => {
     const world = makeBankWorld()
     const { bank } = await readyBankOn(world)
     await TH.expectGood(bank.tryProbe({ whisper: { note: 'mine' } }))
-    const elsewhere = world.bankOnAnotherDevice()
-    await elsewhere.hello()
+    const elsewhere = await world.bankOnAnotherDevice()
     await TH.expectGood(elsewhere.tryProbe({ whisper: { note: 'theirs' } }))
     world.advance(2000)
     await TH.expectGood(bank.tryProbe({ whisper: { note: 'mine again' } }))
@@ -104,8 +102,7 @@ describe("bank.tryProbe", () => {
     const world = makeBankWorld()
     const { bank } = await readyBankOn(world)
     await TH.expectGood(bank.tryProbe({ whisper: { note: 'mine' } }))
-    const elsewhere = world.bankOnAnotherDevice()
-    await elsewhere.hello()
+    const elsewhere = await world.bankOnAnotherDevice()
     await TH.expectGood(elsewhere.tryProbe({ whisper: { note: 'theirs' } }))
     world.advance(2000)
     await TH.expectBad(bank.tryProbe({ whisper: { note: 'late' } }, { maxMillisSinceRefresh: 60_000 }), 'stale_write')
@@ -119,10 +116,11 @@ describe("bank.tryProbe", () => {
     expect(err.meta?.oplabel).to.eq('putBox')
   })
 
-  it("returns a bad Outcome before hello, and for an invalid label or horizon", async () => {
-    const world = makeBankWorld()
-    await TH.expectBad(world.bankOn().tryProbe())
-    const { bank } = await readyBankOn(world)
+  it("returns a bad Outcome once its device is swept, and for an invalid label or horizon", async () => {
+    const { bank: swept } = await readyBankOn()
+    swept.device.sweep()
+    await TH.expectBad(swept.tryProbe(), 'disabled')
+    const { bank } = await readyBankOn()
     await TH.expectBad(bank.tryProbe({ boxlabel: '' }), 'bad_option')
     await TH.expectBad(bank.tryProbe({}, { maxMillisSinceRefresh: -1 }), 'bad_option')
   })

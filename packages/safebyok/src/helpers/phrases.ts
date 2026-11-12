@@ -1,4 +1,4 @@
-/** What the checks say when input fails them, every such sentence in one place, and the sentences of bank.ts's and vault.ts's own refusals and a vault's bad news (a refusal they pass on from another module, refusals/throwers.ts or gating.ts, keeps its words there): so wording and tone are reviewed together, and so is the rule that none quotes the input.
+/** What the checks say when input fails them, every such sentence in one place, and the sentences of device.ts's, bank.ts's and vault.ts's own refusals and a vault's bad news (a refusal they pass on from another module, refusals/throwers.ts or gating.ts, keeps its words there): so wording and tone are reviewed together, and so is the rule that none quotes the input.
  * The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts.
  */
 
@@ -30,20 +30,20 @@ export const InstantTooLate = "An instant is epoch milliseconds no later than 22
 
 // == [Scopes]: DatabaseInVaultScope
 
-/** Why a vaultDB or deviceDB in the scope naming a vault refuses: each goes to `Bank.make`. */
-export const DatabaseInVaultScope = "A vaultDB and a deviceDB go to Bank.make, never in the scope naming a vault"
+/** Why a vaultDB or deviceDB in the scope naming a vault refuses: each goes to `Device.make`. */
+export const DatabaseInVaultScope = "A vaultDB and a deviceDB go to Device.make, never in the scope naming a vault"
 // --
 
-// == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, VaultDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, BankExpected, VaultExpected, VaultErrorExpected
+// == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, VaultDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, DeviceExpected, VaultExpected, VaultErrorExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
 
 /** A host's bare function, or anything else, where a bank's world has that function as the bank wraps it. */
-export const GuardedExpected = "Expected a host's function as Bank.make wraps it"
+export const GuardedExpected = "Expected a host's function as Device.make wraps it"
 
 /** A host's bare logger, or anything else, where a bank's world has its logger as the bank guards it. */
-export const GuardedLoggerExpected = "Expected a logger as Bank.make guards it"
+export const GuardedLoggerExpected = "Expected a logger as Device.make guards it"
 
 /** Anything but a vaultDB branded by safebyok and answering each of its verbs, where a vaultDB is asked. */
 export const VaultDBExpected = "Expected a VaultDB: an adapter or client branded by safebyok, answering each of its verbs"
@@ -63,8 +63,8 @@ export const CtxStampExpected = "Expected a flat object of strings and numbers, 
 /** The listing a storable is made in. */
 export const ListingExpected = "Expected a Listing"
 
-/** Anything but a Bank, where one is named. */
-export const BankExpected = "Expected a Bank"
+/** Anything but a Device, where one is named. */
+export const DeviceExpected = "Expected a Device"
 export const VaultExpected = "Expected a Vault"
 
 /** Anything but a VaultError, where bad news is told. */
@@ -314,12 +314,12 @@ export const GateMadeElsewhere = "This vault's passphrase was just set on anothe
 
 export const GatingConcluded = "This prompt has ended -- it was answered, dismissed, or refused for good -- so this attempt did nothing: ask again if the user still wants the vault."
 
-export const RequestCleartextThrew = "The requestCleartext handed to Bank.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
+export const RequestCleartextThrew = "The requestCleartext handed to Device.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
 
 export const CleartextsThrew = "Reading what was handed to this attempt threw, so nothing was tried. What it threw is left out, as it may quote the passphrase: hand attempt a plain object."
 
 
-export const StrengthCheckerThrew = "The strengthChecker handed to Bank.make threw, or answered a verdict that throws when read. What it threw is left out, as it heard the passphrase: have it catch its own failures."
+export const StrengthCheckerThrew = "The strengthChecker handed to Device.make threw, or answered a verdict that throws when read. What it threw is left out, as it heard the passphrase: have it catch its own failures."
 
 export const SamePassphrase = "The new passphrase is the one the vault has already, so nothing was changed: choose another."
 
@@ -330,11 +330,12 @@ export function suppliedSpecChanged(label: string): string { return `A key deriv
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault has real secrets, open it with argon2idWebV1Deriver (from safebyok/browser), or another vetted Argon2id deriver."
 // --
 
-// == [The models' bank]: BankHelloFirst, BankLetGo, vaultStoredDamaged, boxStoredDamaged
+// == [The models' device and bank]: DeviceLetGo, GatesShape, vaultStoredDamaged, boxStoredDamaged
 
-export const BankHelloFirst = "This bank isn't ready: call bank.hello() and wait for it first."
+export const DeviceLetGo = "This device was let go, by a sweep or a vacate, so it and its bank answer nothing more: make another with Device.make."
 
-export const BankLetGo = "This bank was let go, by a sweep or a vacate, so it answers nothing more: make another with Bank.make."
+/** A `gates` option other than `['main']`. */
+export const GatesShape = "gates is ['main']: a bank has its main gate and no other"
 
 /** Bad news of a vault row `listVaults` set aside. */
 export function vaultStoredDamaged(vaultlabel: string): string { return `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.` }
@@ -364,12 +365,12 @@ export const UnboundCipherCtx = "A cipher ctx was handed no stamp, or a part or 
 export const NoJsonText = "A value with no JSON text (undefined, a function or a symbol) was handed to be serialized, so nothing was sealed or bound. This is a bug in the code calling it."
 
 /** The host's strengthChecker answering no verdict. */
-export const StrengthCheckerMisanswered = "The strengthChecker handed to Bank.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text."
+export const StrengthCheckerMisanswered = "The strengthChecker handed to Device.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text."
 
-/** The strengthChecker's load() failing at bank.hello(). */
+/** The strengthChecker's load() failing at device.ensureBank(). */
 export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed: check your package and build settings."
 
-/** The keyDeriver's load() failing at bank.hello(). */
+/** The keyDeriver's load() failing at device.ensureBank(). */
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed: check your package and build settings."
 // --
 

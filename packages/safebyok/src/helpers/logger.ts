@@ -3,7 +3,7 @@ import { consoleLogger } from './console-logger'
 
 /** Where a vault says what it has nobody to throw to, such as a background refresh that failed.
  * Pass one to the storage adapter's factory as `logger`, and the vault opened over it uses it too.
- * Pass Bank.make one of its own to keep them apart. With none anywhere, it is the {@link
+ * Pass Device.make one of its own to keep them apart. With none anywhere, it is the {@link
  * DefaultLogger}.
  *
  * Each call has a plain-language `message`, a `story` of facts to filter on (`oplabel` names the
@@ -14,8 +14,8 @@ import { consoleLogger } from './console-logger'
  * What a logger throws or rejects with is ignored. A logger typed `story?: Record<string, any>`
  * fits, and so does the console.
  *
- * @example Bank.make({ ...opts, logger: { log: () => {}, warn: () => {}, error: () => {} } })  // silent
- * @example Bank.make({ ...opts, logger: console })  // untagged, a missing story or error printed as undefined or null
+ * @example Device.make({ ...opts, logger: { log: () => {}, warn: () => {}, error: () => {} } })  // silent
+ * @example Device.make({ ...opts, logger: console })  // untagged, a missing story or error printed as undefined or null
  */
 export interface VaultLogger {
   /** Something worth knowing, with nothing to act on. */
@@ -93,15 +93,15 @@ function forwarding(): VaultLogger {
 
 /** The logger every storage adapter, vault, provider and datastore uses when given none of its own.
  * It hands each call on, as it is made, to the logger last handed {@link setDefaultLogger}, or
- * else to the console, each line tagged 'safebyok:'. Pass it to Bank.make or BankProvider to have
+ * else to the console, each line tagged 'safebyok:'. Pass it to Device.make or BankProvider to have
  * the vault use the default whatever its storage adapter was given.
  *
- * @example Bank.make({ ...opts, vaultDB: idbVaultDB({ logger: storageLogger }), logger: DefaultLogger })  // the storage to its own, the vault to the default
+ * @example Device.make({ ...opts, vaultDB: idbVaultDB({ logger: storageLogger }), logger: DefaultLogger })  // the storage to its own, the vault to the default
  */
 export const DefaultLogger: VaultLogger = forwarding()
 
 /** Send what safebyok would say to the console to `logger` instead, from everything made before this call or after.
- * Call it once, as the app starts. A logger handed to an adapter's factory, to Bank.make or to
+ * Call it once, as the app starts. A logger handed to an adapter's factory, to Device.make or to
  * BankProvider still wins there. It is guarded as {@link parseLogger} guards one, and refused
  * alike.
  *

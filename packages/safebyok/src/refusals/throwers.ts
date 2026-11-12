@@ -67,16 +67,13 @@ export const unexpectedError = (thrown: Thrown): VaultError => (
 )
 // --
 
-// == [Bank Throwers]: insecureContext, helloFirst, bankDisabled
+// == [Device Throwers]: insecureContext, deviceDisabled
 
 /** An `insecure_context` refusal: the page is not a secure context. */
 export function insecureContext(): VaultError { return new VaultError('insecure_context', Phrases.InsecureContext) }
 
-/** A `bad_option` refusal: the bank is not ready until `bank.hello()` returns. */
-export function helloFirst(): VaultError { return new VaultError('bad_option', Phrases.BankHelloFirst) }
-
-/** A `disabled` refusal: this bank was let go by a sweep or a vacate. */
-export function bankDisabled(): VaultError { return new VaultError('disabled', Phrases.BankLetGo) }
+/** A `disabled` refusal: this device was let go by a sweep or a vacate, and its bank with it. */
+export function deviceDisabled(): VaultError { return new VaultError('disabled', Phrases.DeviceLetGo) }
 // --
 
 // == [Vault Throwers]: needUnlocked, unlockFirst

@@ -5,12 +5,12 @@ import * as Front from '../src/index'
 
 describe("safebyok", () => {
   it("exports each type its exported signatures name", () => {
-    expectTypeOf<Front.BankOpts['vaultDB']>().toEqualTypeOf<Front.VaultDB>()
-    expectTypeOf<Front.AdapterVaultDB>().toExtend<Front.BankOpts['vaultDB']>()
-    expectTypeOf<Front.BankOpts['deviceDB']>().toEqualTypeOf<Front.DeviceDB>()
-    expectTypeOf<Front.BankOpts['keyDeriver']>().toEqualTypeOf<Front.KeyDeriver>()
-    expectTypeOf<Front.BankOpts['strengthChecker']>().toEqualTypeOf<Front.StrengthChecker | undefined>()
-    expectTypeOf<Front.BankOpts['logger']>().toEqualTypeOf<Front.VaultLogger | undefined>()
+    expectTypeOf<Front.DeviceOpts['vaultDB']>().toEqualTypeOf<Front.VaultDB>()
+    expectTypeOf<Front.AdapterVaultDB>().toExtend<Front.DeviceOpts['vaultDB']>()
+    expectTypeOf<Front.DeviceOpts['deviceDB']>().toEqualTypeOf<Front.DeviceDB>()
+    expectTypeOf<Front.DeviceOpts['keyDeriver']>().toEqualTypeOf<Front.KeyDeriver>()
+    expectTypeOf<Front.DeviceOpts['strengthChecker']>().toEqualTypeOf<Front.StrengthChecker | undefined>()
+    expectTypeOf<Front.DeviceOpts['logger']>().toEqualTypeOf<Front.VaultLogger | undefined>()
     expectTypeOf<Parameters<Front.RequestCleartext>[0]>().toEqualTypeOf<Front.AnyGating>()
     expectTypeOf<Front.KeyDeriver['salt_size']>().toEqualTypeOf<typeof Front.PassphraseSaltSize>()
     expectTypeOf<Parameters<Front.GuardedKeyDeriver['deriveKeyBytes']>[0]>().toEqualTypeOf<Front.PassphraseCleartext>()
@@ -22,18 +22,20 @@ describe("safebyok", () => {
     expectTypeOf<Parameters<Front.Box['put']>[0]>().toEqualTypeOf<Front.BoxPatch>()
     expectTypeOf<Parameters<Front.Box['expose']>[0]>().toEqualTypeOf<Front.TimelyOpts | undefined>()
     expectTypeOf<Front.Box['isLocked']>().toEqualTypeOf<boolean>()
-    expectTypeOf<Front.BankSnapshot['stage']>().toEqualTypeOf<Front.BankStage>()
+    expectTypeOf<Front.DeviceSnapshot['stage']>().toEqualTypeOf<Front.DeviceStage>()
     expectTypeOf<Front.GatingSnapshot['gatingkind']>().toEqualTypeOf<Front.Gatingkind>()
     expectTypeOf<Front.Box['scope']>().toEqualTypeOf<Front.Boxscope>()
     expectTypeOf<Front.Bank['scope']>().toEqualTypeOf<Front.BankScope>()
+    expectTypeOf<Front.Device['bank']>().toEqualTypeOf<Front.Bank | null>()
+    expectTypeOf<Front.DeviceSnapshot['bank']>().toEqualTypeOf<Front.BankSnapshot | null>()
     expectTypeOf<Front.VaultError['meta']>().toEqualTypeOf<Front.RefusalMeta | undefined>()
     expectTypeOf<ConstructorParameters<typeof Front.Vault>[3]>().toEqualTypeOf<Front.BankFriend>()
     expectTypeOf<Front.BankFriend['panic']>().toEqualTypeOf<Front.BankPanic>()
     expectTypeOf<Front.BankFriend['announce']>().toEqualTypeOf<Front.BankAnnounce>()
     expectTypeOf<Parameters<Front.BankAnnounce>[0]>().toEqualTypeOf<Front.BankAnnouncement>()
-    expectTypeOf<Parameters<Front.LifecycleHandler>[0]>().toEqualTypeOf<Front.BankEvent>()
-    expectTypeOf<Front.BankOpts['onLifecycle']>().toEqualTypeOf<Front.LifecycleHandler | undefined>()
-    expectTypeOf<Extract<Front.BankEvent, { kind: 'lease_revoke_failed' }>['where']>().toEqualTypeOf<Front.RevokeSite>()
+    expectTypeOf<Parameters<Front.LifecycleHandler>[0]>().toEqualTypeOf<Front.DeviceEvent>()
+    expectTypeOf<Front.DeviceOpts['onLifecycle']>().toEqualTypeOf<Front.LifecycleHandler | undefined>()
+    expectTypeOf<Extract<Front.DeviceEvent, { kind: 'lease_revoke_failed' }>['where']>().toEqualTypeOf<Front.RevokeSite>()
     expectTypeOf<Front.BankFriend['askUser']>().toEqualTypeOf<Front.AskUser | null>()
     expectTypeOf<Parameters<typeof Front.tellBadNewsTo>[0]>().toEqualTypeOf<Front.BadNewsHandler>()
   })
@@ -51,9 +53,9 @@ describe("safebyok", () => {
     expect(Front.PassphraseSaltSize).to.eq(16)
   })
 
-  it("exports the DeviceDB a host hands Bank.make: the DeviceDB base to extend, and MemoryDeviceDB", () => {
+  it("exports the DeviceDB a host hands Device.make: the DeviceDB base to extend, and MemoryDeviceDB", () => {
     expect(new Front.MemoryDeviceDB()).toBeInstanceOf(Front.DeviceDB)
-    expectTypeOf<Front.MemoryDeviceDB>().toExtend<Front.BankOpts['deviceDB']>()
+    expectTypeOf<Front.MemoryDeviceDB>().toExtend<Front.DeviceOpts['deviceDB']>()
   })
 
   it("exports what a React host's gating dialogs branch on: the correctable refusal kinds and the types of a gating's state", () => {
@@ -66,7 +68,7 @@ describe("safebyok", () => {
     expectTypeOf<Front.Vault['isLocked']>().toEqualTypeOf<boolean>()
     expectTypeOf<Front.Bank['isLocked']>().toEqualTypeOf<boolean>()
     expectTypeOf<Front.VaultSnapshot['isLocked']>().toEqualTypeOf<boolean>()
-    expectTypeOf<Front.BankSnapshot['stage']>().toEqualTypeOf<Front.BankStage>()
+    expectTypeOf<Front.DeviceSnapshot['stage']>().toEqualTypeOf<Front.DeviceStage>()
     expectTypeOf<Front.DamagedBox>().toEqualTypeOf<Readonly<{ user_id: string, banklabel: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>>()
   })
 

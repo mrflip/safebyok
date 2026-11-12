@@ -100,14 +100,13 @@ describe("CreateVaultButton", () => {
     await waitFor(() => { expect(button.hasAttribute('disabled')).to.be.false })
     fireEvent.click(button)
     await waitFor(() => { expect(asked).to.deep.equal(['build_vault']) })
-    const bank = world.bankOnAnotherDevice()
     await waitFor(async () => {
-      await bank.hello()
+      const bank = await world.bankOnAnotherDevice()
       expect(bank.vaultAt({ vaultlabel: 'main' })?.isPresent).to.be.true
     })
   })
 
-  it("is disabled until the bank's hello lands", async () => {
+  it("is disabled until the device's ensureBank lands", async () => {
     render(<BankProvider {...TH.providerPropsOf(TH.makeBankWorld())}><CreateVaultButton vaultlabel="main" /></BankProvider>)
     const button = screen.getByRole('button', { name: 'Create vault' })
     expect(button.hasAttribute('disabled')).to.be.true

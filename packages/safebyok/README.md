@@ -15,10 +15,10 @@ devices through a storage layer the host plugs in.
   passphrase is forgotten and which has no working passkey. A replaced passphrase or revoked passkey
   no longer unlocks the vault, but the vaultKey never changes, so a copy of the old record can still
   be unlocked with the old passphrase or passkey.
-* **State is framework-agnostic.** `Bank`, `Vault`, `Box` and `vault.boxListing` each have
+* **State is framework-agnostic.** `Device`, `Bank`, `Vault`, `Box` and `vault.boxListing` each have
   `subscribe` and `getSnapshot`, which can be passed on their own, the way `useSyncExternalStore`
   takes them. A snapshot is the same object until something changes, and never contains a whisper.
-  It is plain data, except for the bank's `openGating`, which is the live gating your dialog calls.
+  It is plain data, except for the device's `openGating`, which is the live gating your dialog calls.
 * **The core speaks only to interfaces**: a `VaultDB` for what syncs, a `DeviceDB` for what stays
   on this device, and a `KeyDeriver`. Each adapter is its own package. The core uses no Node
   built-ins, so it runs wherever the host does.
@@ -39,11 +39,13 @@ types here do not have, trust the types.
   contains one whisper, encrypted, along with its `boxlabel` and sidecar.
 * **vault**: one user's boxes, named by `user_id`, `banklabel` and `vaultlabel`. A vault that is
   deleted and made again is a new life, with a new `vault_tok` and a new `Vault` instance.
+* **device**: the signed-in user's presence on this browser. It holds your options and functions,
+  and brings up the bank.
 * **bank**: a signed-in user's vaults and what they share. One per signed-in user.
 * **wayin**: one way into a vault: its passphrase or its passkey. A vault has one passphrase and at
   most one passkey; together they are its **gate**.
 * **gating**: one request for the user's passphrase or passkey, and the only place where UI meets
-  the vault. It appears in the bank's snapshot as `openGating`, and the bank passes it to your
+  the vault. It appears in the device's snapshot as `openGating`, and the device passes it to your
   `requestCleartext` if you gave one.
 * **lease**: a grant that lets this device unlock again without asking the user, until
   `autolockMinutes` have passed.
@@ -65,13 +67,13 @@ whisper's for your app, which compares the two once the box is unsealed to see w
 ## A host
 
 ```ts
-import { Bank } from 'safebyok'
+import { Device } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 
-const bank = Bank.make({
+const device = Device.make({
   ...browserOpts({ dbName: 'acme' }), // keyDeriver, deviceDB and strengthChecker; a field after it wins
   user_id: session.user_id, banklabel: 'acme',
-  device_tok: deviceTok, // a crypto.randomUUID() you keep for this device
+  gates: ['main'], // the only gates accepted for now
   vaultDB, // see below
   requestCleartext: async (gating) => {
     if (gating.gatingkind !== 'build_vault' && gating.gatingkind !== 'unlock_vault') { return }
@@ -82,7 +84,7 @@ const bank = Bank.make({
     }
   },
 })
-await bank.hello()
+const bank = await device.ensureBank() // asks the deviceDB for this device's row, then lists the vaults
 
 const vault = await bank.ensureVault({ vaultlabel: 'main' }) // none yet: asks, build_vault
 const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-...' }, sidecar: { nickname: 'work' } })
@@ -93,13 +95,13 @@ await vault.ensureUnlocked() // no lease now: asks, unlock_vault
 ```
 
 **Rendering the dialog from the snapshot.** If you leave `requestCleartext` out, a gating calls
-none of your functions. It stays open in `bank.snapshot.openGating` until a call to its `attempt`
-or `dismiss` concludes it. Render your dialog while `openGating` is not null. The bank notifies its
+none of your functions. It stays open in `device.snapshot.openGating` until a call to its `attempt`
+or `dismiss` concludes it. Render your dialog while `openGating` is not null. The device notifies its
 subscribers when a gating opens and when it concludes (by the user's answer, a sweep or a vacate),
 so the dialog closes by itself. A lock leaves the gating open.
 
 ```ts
-const { openGating } = useSyncExternalStore(bank.subscribe, bank.getSnapshot)
+const { openGating } = useSyncExternalStore(device.subscribe, device.getSnapshot)
 // Render a dialog while openGating is not null. Its Cancel calls openGating.dismiss().
 ```
 
@@ -109,35 +111,36 @@ dialog.
 Easy to get wrong:
 
 * With no `strengthChecker`, every new passphrase is refused as `weak_passphrase`, so no vault can
-  be built. `browserOpts` supplies `zxcvbnStrengthChecker`, whose dictionary loads at `bank.hello()`.
-* The core sets no timers. Call `bank.autolock()` after `hello` and on a timer of your own.
+  be built. `browserOpts` supplies `zxcvbnStrengthChecker`, whose dictionary loads at `device.ensureBank()`.
+* The core sets no timers. Call `bank.autolock()` after `ensureBank` and on a timer of your own.
 * `vault.hello()` lists a vault's boxes and starts watching them. Until you call it,
   `vault.boxListing` is empty and nothing is watched, so a change made on another device does not
   arrive until the next `vault.hello()`.
-* `bank.vacate()` is sign-out. It disables the bank, then removes this bank's cached leases and its
-  device row from the deviceDB. It does not touch the vaultDB, and it resolves once each removal has
-  been tried. The next `deviceDB.ensureCachedDevice` for that user mints a new `device_tok`. Await it
-  before the page unloads: a lease it could not remove is reported to your `onLifecycle` as
-  `lease_revoke_failed`, and a `vacated` event follows once the removals have settled, with the
-  number of leases left behind (`unrevoked`). If listing the leases is refused, or the device row
-  cannot be removed, that is reported to your `onBadNews`.
-* **A swept or vacated bank cannot be used again.** From the moment you call `sweep` or `vacate`,
-  `bank.isEnabled` is permanently false, `hello`, `ensureVault` and `vaultAt` refuse with
-  `disabled`, and the bank stops calling your functions: the events and refusals it would have sent
-  them go to `DefaultOnLifecycle` and `DefaultOnBadNews` instead. The only exception is a vacate's
+* `device.vacate()` is sign-out. It disables the device and its bank, then removes this bank's
+  cached leases and its device row from the deviceDB. It does not touch the vaultDB, and it resolves
+  once each removal has been tried. The next device's `ensureBank` for that user gets a new
+  `device_tok`. Await it before the page unloads: a lease it could not remove is reported to your
+  `onLifecycle` as `lease_revoke_failed`, and a `vacated` event follows once the removals have
+  settled, with the number of leases left behind (`unrevoked`). If listing the leases is refused, or
+  the device row cannot be removed, that is reported to your `onBadNews`.
+* **A swept or vacated device cannot be used again.** From the moment you call `device.sweep()` or
+  `device.vacate()`, `device.isEnabled` is permanently false, `device.bank` is null, `ensureBank`,
+  `ensureVault` and `vaultAt` refuse with `disabled`, and the device stops calling your functions:
+  the events and refusals it would have sent them go to `DefaultOnLifecycle` and `DefaultOnBadNews`
+  instead. The only exception is a vacate's
   cleanup, which still reports what it could not remove to your `onLifecycle` and `onBadNews`.
-* **A revoked identity vacates the bank**, whatever your handlers do. When your storage adapter
-  throws `identity_revoked`, the bank is vacated, its snapshot shows that refusal, and your
-  `onLifecycle` receives `vacated` with the refusal as its `cause`. Make another bank once the user
+* **A revoked identity vacates the device**, whatever your handlers do. When your storage adapter
+  throws `identity_revoked`, the device is vacated, its snapshot shows that refusal, and your
+  `onLifecycle` receives `vacated` with the refusal as its `cause`. Make another device once the user
   signs in again.
-* **`onLifecycle` receives the bank's lifecycle events.** Each is a `BankEvent`, distinguished by
-  its `kind`: `helloed`, with the outcome of each `bank.hello()` and `vault.hello()`;
-  `lease_revoke_failed`, when a cached lease could not be removed, with `where` it happened and the
-  vault, if there is one; and `vacated`. If you pass no `onLifecycle`, `DefaultOnLifecycle` handles
-  them. For a lease that a lock or a vacate could not remove, it logs an error, reports it to the
-  platform and vacates the vault. It reports a vacate's cause the same way, unless the cause is
-  `disabled`. It logs a warning for anything else that went wrong. Your own `onLifecycle` replaces
-  that policy; to keep the default's policy as well, call it from yours:
+* **`onLifecycle` receives the device's lifecycle events.** Each is a `DeviceEvent`, distinguished by
+  its `kind`: `helloed`, with the outcome of each `vault.hello()` and of each `device.ensureBank()`
+  until the bank is up; `lease_revoke_failed`, when a cached lease could not be removed, with
+  `where` it happened and the vault, if there is one; and `vacated`. If you pass no `onLifecycle`,
+  `DefaultOnLifecycle` handles them. For a lease that a lock or a vacate could not remove, it logs
+  an error, reports it to the platform and vacates the vault. It reports a vacate's cause the same
+  way, unless the cause is `disabled`. It logs a warning for anything else that went wrong. Your own
+  `onLifecycle` replaces that policy; to keep the default's policy as well, call it from yours:
 
   ```ts
   const onLifecycle: LifecycleHandler = (event) => {
@@ -146,16 +149,16 @@ Easy to get wrong:
   }
   ```
 * **`onBadNews` receives the refusals that no caller is waiting on**, often several around one
-  lifecycle event. If you pass none, `DefaultOnBadNews` logs a warning for each through the bank's
+  lifecycle event. If you pass none, `DefaultOnBadNews` logs a warning for each through the device's
   logger.
-* **Only the bank calls your `onBadNews`**: it has no `tellBadNews` method. To pass a refusal from
-  your own code to a handler the way the bank does, call `tellBadNewsTo(onBadNews, bank, [err])`.
+* **Only the device calls your `onBadNews`**: it has no `tellBadNews` method. To pass a refusal from
+  your own code to a handler the way the device does, call `tellBadNewsTo(onBadNews, device, [err])`.
   It does not wait for the handler, and if the handler throws, the error is reported to the
   platform.
-* **When the signed-in user changes, vacate the bank and make another.** A bank and everything it
-  hands out keep the `user_id` they were made with for as long as they exist; safebyok never moves
+* **When the signed-in user changes, vacate the device and make another.** A device and everything
+  it hands out keep the `user_id` they were made with for as long as they exist; safebyok never moves
   them to a new one, and does not notice the change for you. On sign-out, or a sign-in as someone
-  else, call `bank.vacate()`, then `Bank.make` for the new user.
+  else, call `device.vacate()`, then `Device.make` for the new user.
 
 ## Trying storage at startup
 
@@ -165,7 +168,7 @@ startup, not at the first `putBox`. It returns an `Outcome`. On success, its `va
 step found and when, and contains no whisper, ciphertext or wrapped key. The probe prompts the user
 if the vault is absent or locked. You can pass each label, the whisper and the sidecar.
 `{ maxMillisSinceRefresh }`, 1000 by default, sets how fresh the vault and box must be, independently
-of the bank's own refresh settings. The probe leaves the box in place, and it counts toward the
+of the device's own refresh settings. The probe leaves the box in place, and it counts toward the
 vault's `maxBoxes`.
 
 ## Showing a whisper
@@ -186,13 +189,13 @@ each of these changes.
 **A script.** Fetch the passphrase in `requestCleartext`, with a token the container already has:
 
 ```ts
-const bank = Bank.make({
+const device = Device.make({
   /* ... */
   requestCleartext: async (gating) => {
     await gating.attempt({ passphraseClear: await doppler.get('VAULT_PASSPHRASE') })
   },
 })
-await bank.hello()
+const bank = await device.ensureBank()
 const vault = await bank.ensureVault({ vaultlabel: 'main' })
 await vault.hello()
 const box = await vault.getBox('stripe')
@@ -235,7 +238,7 @@ A form that edits a whisper safely takes more care than this. The
 
 ## Entry points
 
-The `safebyok` entry point exports `Bank`,
+The `safebyok` entry point exports `Device`, `Bank`,
 `Box`, `Vault`, the `Gating` type, their snapshot types and `VaultError`, `safebyok/dom` exports `BoxFields`, and
 `safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. `safebyok/browser` exports the Argon2id derivers,
 `idbDeviceDB`, the device database in IndexedDB, `zxcvbnStrengthChecker`, and `browserOpts`, which returns all three as one options object.
@@ -244,7 +247,7 @@ and `safebyok-graphql` are the adapters.
 
 ## Next
 
-* [tests/models/proof.test.ts](tests/models/proof.test.ts): a host takes a bank through its whole
+* [tests/models/proof.test.ts](tests/models/proof.test.ts): a host takes a device and its bank through its whole
   lifecycle, and every step asserts what its components render. This is the real usage guide.
 * [notes/guarantees.md](../../notes/guarantees.md): where secret material lives.
 * [notes/configuration.md](../../notes/configuration.md): choosing a strength checker.
