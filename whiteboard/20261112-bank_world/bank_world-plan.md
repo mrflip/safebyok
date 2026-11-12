@@ -8,10 +8,10 @@
   the rest); worker `opus` (agent default effort); reviewer `sonnet`
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
-* **Status** (2026-11-12, late night): the line #679 → #681 → #682 → #684 → #683 ready (#683 the top);
-  T #680 ready on #676 (the Coach's thresholds at da81cf665). 18 #685 ready (draft, in review, sonnet
-  medium; took the Coach's unlock ruling too). Building: 19 `local_snapshots` from 18's ready tip.
-  When 18 and 19 have filed, a second Closer Look. Then
+* **Status** (2026-11-13, early): ready, one line: #679 → #681 → #682 → #684 → #683 → 18 #685
+  (#685 the top; filed at 758adb115 after a rework to the Coach's demandUnlocked ruling and a
+  second review). T #680 ready on #676. 19 #686 ready, in review (sonnet, medium); its filing
+  rebases it onto #685. Then a second Closer Look. Then
   17. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
