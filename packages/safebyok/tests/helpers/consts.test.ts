@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import fs from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { DeviceDBVersion, FarFuture, FarPast, ForeverMillis, IsGuarded, PackageVersion, VaultsDBVersion, brand, brandGuarded, brandOf, hasModelkind, isAdapterVaultDB, isDeviceDB, isGuarded, isVaultDB } from '../../src/helpers/consts'
@@ -166,7 +166,7 @@ describe("isGuarded", () => {
 
 describe("PackageVersion", () => {
   it("is the version in package.json, which `pnpm release:version` keeps it to", () => {
-    const manifest = JSON.parse(readFileSync(path.join(import.meta.dirname, '../../package.json'), 'utf8')) as { version: string }
+    const manifest = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../../package.json'), 'utf8')) as { version: string }
     expect(PackageVersion).to.eq(manifest.version)
   })
 })
