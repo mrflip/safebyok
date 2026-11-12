@@ -493,7 +493,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
 
 describe("device.isEnabled", () => {
   it.each([
-    ['a sweep', (device: Device) => { device.sweep() }],
+    ['a sweep',  (device: Device) => { device.sweep() }],
     ['a vacate', async (device: Device) => { await device.vacate() }],
   ] as const)("is true from Device.make until %s, and never again", async (_label, ending) => {
     const { device } = await makeBankWorld().bankOn()

@@ -66,9 +66,9 @@ describe("Device.make", () => {
   it.each([
     ['missing',                       undefined],
     ['empty',                         []],
-    ['another gate',                  ['other']],
-    ['the main gate twice',           ['main', 'main']],
-    ['a string, not a list',          'main'],
+    ['another gate',                  ["other"]],
+    ['the main gate twice',           ["main", "main"]],
+    ['a string, not a list',          "main"],
   ])("refuses gates that are %s", (_what, gates) => {
     TH.expectSyncRefusal(() => makeBankWorld().deviceOn({ gates: gates as never }), 'bad_option')
   })
