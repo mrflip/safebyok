@@ -27,7 +27,7 @@
 #   directory for a person.
 #
 # With --catch-up it only catches the branch up and pushes it: no proof, and the worktree stays. A
-# thread-worker runs it when it expects green, before taking its PR out of draft and running its
+# thread-worker runs it when it expects green, before labelling its draft PR `ci` and running its
 # last `pnpm justify` while CI runs (.claude/agents/thread-worker.md, *The thread*).
 #
 # Environment: FILE_THREAD_RETRY_PAUSE, the seconds to wait between tries at deleting a leftover

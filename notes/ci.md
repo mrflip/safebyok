@@ -6,10 +6,11 @@ or wants to know why a check failed. A thread needs none of it: what a PR must c
 
 ## On every pull request
 
-CI runs on every PR that is not a draft, over the root and every workspace package. A draft is
-held: its jobs are skipped, so it can be pushed as often as its author likes without filling the
-queue, and marking it ready runs them. Mergify's batch PRs are drafts too, and always run, since
-the queue waits on their checks. Two jobs must pass:
+CI runs on every PR that is not a draft, or is a draft carrying the label `ci`, over the root and
+every workspace package. Any other draft is held: its jobs are skipped, so it can be pushed as
+often as its author likes without filling the queue, and adding `ci` or marking it ready runs
+them. Adding any other label runs nothing and cancels nothing. Mergify's batch PRs are drafts
+too, and always run, since the queue waits on their checks. Two jobs must pass:
 
 * `lint-typecheck` runs lint and typecheck, requires a changeset, checks that the Postgres image
   digest in `ci.yml` matches `e2e/compose.yaml`, and runs `actionlint` over the workflows through

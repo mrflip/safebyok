@@ -127,9 +127,10 @@ Look-ahead: <what later threads need from this one, if anything>.
 Read: <what this handoff does not already carry, by section>.
 ```
 
-The worker's PR stays a draft through the build, and CI holds a draft, so it pushes freely; when it
-expects green it catches up onto its base (`scripts/file-thread --catch-up`), takes the PR out of
-draft, which starts CI, and runs its last `pnpm justify` while CI runs.
+The worker's PR stays a draft, and CI holds a draft until it carries the label `ci`, so the worker
+pushes freely; when it expects green it catches up onto its base (`scripts/file-thread
+--catch-up`), adds the label, which starts CI, and runs its last `pnpm justify` while CI runs.
+It never takes the PR out of draft: that is yours (*File*, below).
 
 Every worker and reviewer sings out what it has turned to (`scripts/ohai`), and a hook logs each
 compaction with its best guess at the agent, by that `description`. To see where each agent
@@ -164,8 +165,14 @@ justify`: filing runs that, and is the gate.
 
 **File.** Run `scripts/file-thread <root>` in the background: it catches the branch up (a stacked
 one is rebased onto its base thread's new tip, or onto main once the base has merged, so never
-rebase it by hand), proves it, pushes it, and removes the worktree. When it exits 3 (a conflict with main, or with its base thread's new tip) or 4 (red), spawn
-a fresh `thread-worker`:
+rebase it by hand), proves it, pushes it, and removes the worktree. When it exits 3 (a conflict
+with main, or with its base thread's new tip) or 4 (red), spawn a fresh `thread-worker`.
+
+A filed PR stays a draft until you judge it ready for the Coach to merge: filed, with everything
+below it in the line filed and green. Then take it out of draft (`gh pr ready <n>`), and say so
+in the thread's line in chat. Never put one back.
+
+The worker's handoff for a stopped filing:
 
 ```
 File thread <N> of sprint <sprint_name>. Worktree: <root>, branch <branch>, PR #<n>.
@@ -187,8 +194,9 @@ gets no review: the review follows the resume that finishes it.
 ## 3. As each report comes in
 
 1. **Verify, cheaply.** For `ready`: the worker's commits are in its worktree
-   (`git -C <root> log --oneline -5`), its tree is clean, and its PR is out of draft
-   (`gh pr view <branch> --json isDraft`). Trust the reports for the rest.
+   (`git -C <root> log --oneline -5`), its tree is clean, and its PR carries `ci` and is pushed
+   (`gh pr view <branch> --json labels,headRefOid` against the worktree's HEAD). Trust the
+   reports for the rest.
 2. **Tell the Coach.** A line in chat -- thread, verdict, PR link -- and the thread's row in
    *Progress*. Each item of the report's *Open matters*, and each YOLO decision, becomes a
    `drafting` row of its own in *Open Matters* in the same pass -- one item, one row, never

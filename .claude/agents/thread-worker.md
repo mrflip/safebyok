@@ -65,23 +65,25 @@ the diff.
    started, by their PIDs, never by a pattern. Scratch files go where your handoff says.
 2. **Draft.** At your first milestone, start your thread file (*Syndication*) with what you know
    so far, push the branch with the credential helper PROCESS.md names, and open its PR as a
-   draft, per PROCESS.md, *Pull requests*. The PR stays a draft through the build, and CI runs
-   nothing on a draft, so push as often as you like: each milestone at least, with the thread
-   file brought up to date, since the Coach follows the thread there. Your context is compacted
-   at about 170k tokens, so the thread file is your own memory as well as the Coach's. A push
-   need not wait on `pnpm justify`; `ready` does. Once pushed, a commit is not rewritten except
-   by a catch-up rebase.
+   draft, per PROCESS.md, *Pull requests*. The PR stays a draft, and CI runs nothing on a draft
+   until it carries the label `ci`, so push as often as you like: each milestone at least, with
+   the thread file brought up to date, since the Coach follows the thread there. Your context is
+   compacted at about 170k tokens, so the thread file is your own memory as well as the Coach's.
+   A push need not wait on `pnpm justify`; `ready` does. Once pushed, a commit is not rewritten
+   except by a catch-up rebase.
 3. **Ready.** When you expect green -- everything committed, the thread file finished and
    committed (`plan:`) -- catch up and let CI run beside your last proof:
    1. `scripts/file-thread --catch-up <root>`: the rebase filing would do, onto your base's
       current tip (the base thread's branch on origin, or origin/main once it has merged), with
       `sprintbase` recorded, then a push under a lease. On exit 3, resolve the conflict as
       *Picking up a built thread* says, then run it again.
-   2. Take the PR out of draft (`gh pr ready`), which starts CI.
-   3. Only then run your last `pnpm justify`, while CI runs. Red: fix, commit and push again. The
-      PR stays out of draft; never put it back.
+   2. Add the label `ci` (`gh pr edit <n> --add-label ci`), which starts CI on the draft.
+   3. Only then run your last `pnpm justify`, while CI runs. Red: fix, commit and push again.
+
    Green, bring the PR's title and body up to date -- a **Tests:** line, *Open questions* -- and
-   report `ready`. Finish the thread file for a fresh agent: rework after a review goes to one,
+   report `ready`. The PR stays a draft: `ready` is a report, never `gh pr ready`; the
+   orchestrator, or the Coach, takes it out of draft once it is filed and the line below it is
+   green. Finish the thread file for a fresh agent: rework after a review goes to one,
    so name the approaches you set aside and why, as well as the one you took.
 
 ## Picking up a built thread
@@ -156,5 +158,5 @@ The same facts, to different readers, at different altitudes.
 
 Merge a PR or enable auto-merge. Tag, publish, or change a version number. Write to the main
 checkout, the sprint's worktree, or another thread's. Push any branch but your own; force-push
-except with an explicit lease, after a catch-up rebase; or put a PR back into draft once it is out.
+except with an explicit lease, after a catch-up rebase; or take a PR out of draft, or put one back.
 Discard uncommitted work without making it reachable first. Read anything named `secret`.

@@ -1,25 +1,27 @@
 name: CI
 
-# A draft pull request is held: its jobs are skipped, so a worker can push a draft as often as it
-# likes without filling the queue, and taking it out of draft (`ready_for_review`) runs them
-# (PROCESS.md, Pull requests). Mergify's batch pull requests (.mergify.yml) are drafts on
-# `mergify/merge-queue/` branches, and its merge conditions wait on their checks, so they always
-# run. A skipped job's check reads as passed to the ruleset, but a draft cannot merge, and a
-# skipped matrix job reports no `node-compat (22)` at all, which the ruleset shows as expected.
+# A draft pull request is held, its jobs skipped, so a worker can push a draft as often as it
+# likes without filling the queue, until it carries the label `ci` (added when the worker expects
+# green) or is taken out of draft (PROCESS.md, Pull requests). Adding any other label runs nothing,
+# in a concurrency group of its own, so it cancels no run. Mergify's batch pull requests
+# (.mergify.yml) are drafts on `mergify/merge-queue/` branches, and its merge conditions wait on
+# their checks, so they always run. A skipped job's check reads as passed to the ruleset, but a
+# draft cannot merge, and a skipped matrix job reports no `node-compat (22)` at all, which the
+# ruleset shows as expected.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   push:
     branches: [main]
 
-# A new push to a pull request cancels that pull request's run still in progress: only the latest
-# commit's result matters there. Pushes to main share one group and run one at a time, so a run of
-# merges never holds more runners than one run's jobs, and pull requests keep the rest. A run in
-# progress on main always finishes; one still waiting is replaced by a newer push, so a commit
-# merged while another waited has no run of its own, and the commit after it, which holds it,
-# answers for both.
+# A new push to a pull request, or the label `ci`, cancels that pull request's run still in
+# progress: only the latest commit's result matters there. Pushes to main share one group and run
+# one at a time, so a run of merges never holds more runners than one run's jobs, and pull requests
+# keep the rest. A run in progress on main always finishes; one still waiting is replaced by a
+# newer push, so a commit merged while another waited has no run of its own, and the commit after
+# it, which holds it, answers for both.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.action == 'labeled' && github.event.label.name != 'ci' && github.run_id || github.head_ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -37,7 +39,12 @@ jobs:
   # request's branch is not refused here: a stack's pull requests land in order, each as one merge
   # commit with its SHAs unchanged (.mergify.yml), which keeps main's history semi-linear (PROCESS.md).
   lint-typecheck:
-    if: ${{ !github.event.pull_request.draft || startsWith(github.head_ref, 'mergify/merge-queue/') }}
+    if: >-
+      ${{ github.event_name != 'pull_request'
+      || (github.event.action != 'labeled' || github.event.label.name == 'ci')
+      && (!github.event.pull_request.draft
+      || contains(github.event.pull_request.labels.*.name, 'ci')
+      || startsWith(github.head_ref, 'mergify/merge-queue/')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -110,7 +117,12 @@ jobs:
   # warning, and checks each package as a consumer would see it (publint, arethetypeswrong: each
   # tsdown.config.ts), and a failed build fails this step before any test runs.
   test-build:
-    if: ${{ !github.event.pull_request.draft || startsWith(github.head_ref, 'mergify/merge-queue/') }}
+    if: >-
+      ${{ github.event_name != 'pull_request'
+      || (github.event.action != 'labeled' || github.event.label.name == 'ci')
+      && (!github.event.pull_request.draft
+      || contains(github.event.pull_request.labels.*.name, 'ci')
+      || startsWith(github.head_ref, 'mergify/merge-queue/')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -127,7 +139,12 @@ jobs:
   # the platform floor (`engines`), and a failure there is a gate; the newest Node reports, and a
   # failure there is news. The floor's check, `node-compat (22)`, is the one for the main ruleset.
   node-compat:
-    if: ${{ !github.event.pull_request.draft || startsWith(github.head_ref, 'mergify/merge-queue/') }}
+    if: >-
+      ${{ github.event_name != 'pull_request'
+      || (github.event.action != 'labeled' || github.event.label.name == 'ci')
+      && (!github.event.pull_request.draft
+      || contains(github.event.pull_request.labels.*.name, 'ci')
+      || startsWith(github.head_ref, 'mergify/merge-queue/')) }}
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.node != 22 }}
     strategy:
@@ -151,7 +168,12 @@ jobs:
   # of its own. Which suites run here is the one list in e2e/tests/postgres/test-helpers.ts.
   # Not required by the ruleset until it has run a while.
   postgres:
-    if: ${{ !github.event.pull_request.draft || startsWith(github.head_ref, 'mergify/merge-queue/') }}
+    if: >-
+      ${{ github.event_name != 'pull_request'
+      || (github.event.action != 'labeled' || github.event.label.name == 'ci')
+      && (!github.event.pull_request.draft
+      || contains(github.event.pull_request.labels.*.name, 'ci')
+      || startsWith(github.head_ref, 'mergify/merge-queue/')) }}
     runs-on: ubuntu-latest
     services:
       postgres:
