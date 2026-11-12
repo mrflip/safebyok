@@ -1,9 +1,9 @@
 # Thread 8b: bank_switch (2026-11-12)
 
-Branch `20261112-bank_switch`, PR #667, base main. **Rework leg 3 landed plan steps 9 and 10, as far as named
-below.** Red by design (ground rule 20) until 8c. safebyok: `src` and `tests` typecheck and lint clean; vitest red in
-four files, 29 cases (*Still red*), plus the named 8c skips. safebyok-react: 48 tsc errors, all the gate verbs' or the
-old vaultDB's (*Still red*). `src` since the base: +1333 / -985; leg 3 alone: +36 / -11.
+Branch `20261112-bank_switch`, PR #667, base main. **Rework leg 4 made safebyok green** (plan steps 9 and 10 done).
+Red by design (ground rule 20) until 8c, in safebyok-react only. safebyok: typecheck and lint clean; vitest 3142
+passed, 70 skipped (the named 8c skips), 0 failed. safebyok-react: 48 tsc errors, vitest 94 failed / 167 passed
+(*Still red*). `src` since the base: +1333 / -985; leg 4 changed tests only.
 
 * **Built**, earlier legs: `vault_locked` is `bank_locked` (one thrower `needUnlocked`); `Device...` announcement
   types; `Listing` asks `bankDB` and hands `answer.parent` to `world.receiveParent`; `Storable` tattoos only the
@@ -24,23 +24,27 @@ old vaultDB's (*Still red*). `src` since the base: +1333 / -985; leg 3 alone: +3
   - Suites rewritten to the bank: gate, proving, box suites, vault, vault-life, vault-lease, vault-unlock,
     vault-listing, vault-boxes, halpimonfire, gating (build_bank/unlock_bank), bank, bank-probe; device and proof
     in part.
+* **Built**, leg 4 (commit 4a88706e7, tests only): device, bank-ending, proof, readme-recipes over the bank.
+  `bank-world` exposes `ensureBuilt`; a case meaning a built bank calls it first, and one over empty storage now
+  builds through the world's dialog (`build_bank`). `tellByAutolock` and autolock's cases refuse `tryPeek` (autolock
+  peeks its own row; it no longer lists). `lease_revoke_failed` cases name `bank`. The open gating is `unlock_bank`
+  with no vaultlabel, and a sweep or vacate of the vault waiting on it keeps it open (moved to the "keeps" cases);
+  the birth's-gating sweep case is now a build's. bank-ending's "old rows of an unlisted vault and another vault
+  life" became "an old lease row of another bank life". The proof's paints: see *Discoveries*.
 * **Skipped, naming 8c** (ground rule waived for these): `vault-gate.test.ts` whole, `@ts-nocheck` and one listed
   `eslint-disable`, every describe `.skip`; it also holds, under `// == [From <suite>]` banners, what moved there:
   halpimonfire's gate change, vault-life's and vault-lease's gate changes, vault-unlock's cached lease across a gate
   change, vault-listing's gate verbs and buildVault/launchBirth cases, three proof stories (gate prompts, vault
   delete). In `gating.test.ts`, three `it.skip` with a `// 8c:` line: another kind's cleartexts, a bank deleted
   during the dialog, a newer bank life during a build.
-* **Dropped, subject gone** (not 8c): vault.test's gate-in-record, sparse-vault and VaultListing world checks;
+* **Dropped, subject gone** (not 8c): device.test's vault-row salt that will not decode (the row has no gate; a
+  gate-row version would test a row damaged inside the datastore, ground rule 24); vault.test's gate-in-record, sparse-vault and VaultListing world checks;
   vault-unlock's two sparse-vault unlocks; vault-listing's lease forget on a vault tombstone (a vault's tombstone no
   longer touches the bank's lease; one test now says so); gating's birth of a second vault through a gating.
-* **Still red**, for the next leg or 8c:
-  - safebyok vitest: device.test 16, bank-ending 6 (autolock and lifecycle, not its delete or tombstone cases),
-    proof 5, readme-recipes 2. Most meet `device.ensureBank()` over a world with no bank (it now opens a build_bank
-    gating the vi.fn dialog dismisses: `bank-world`'s `ensureBuilt` first would serve), `onLifecycle` hearing
-    `helloed` beside `lease_revoke_failed`, and snapshots that name `unlock_vault`. Not looked into case by case.
+* **Still red**, for 8c and later:
   - safebyok-react tsc 48: the replace/add/revoke modals and their tests and `shapes.ts` (8c's gatingkinds),
     `test-helpers.ts` (the vault's prompts, 8c), `bank-provider`/`hooks` tests spying `tryListVaults` and passing a
-    `vaultDB`, and the devmode vault-db inspector, which still takes a VaultDB. React tests not run.
+    `vaultDB`, and the devmode vault-db inspector, which still takes a VaultDB. Its vitest: 12 files, 94 cases.
 
 * **Decisions taken**:
   - Steps 3 and 4 landed as one commit: `consts.ts` names both new modelkinds.
@@ -67,6 +71,13 @@ old vaultDB's (*Still red*). `src` since the base: +1333 / -985; leg 3 alone: +3
   - A newer bank life delivered as a parent remakes the Bank in its listing while the Device keeps the old one in
     `#bank`, and a vault listing mid-delivery meets its bank vacated. 8c (tombstones).
   - The old vaultDB stack (`storage/vault-db.ts`, adapters, classifier) is still in `src`, unreferenced by models.
+  - The proof's renders, read diff by diff in leg 4 (beyond the rename): (1) every lock and unlock tells the device
+    twice, the bank aligning before its vaults, so one tell shows a vault row `unlocked` under a locked bank (on a
+    lock) or `locked` under an unlocked one (on an unlock). Both tells land inside the one synchronous call, so React
+    batches them; a host painting on each tell sees the glitch. Not fixed in src: no order removes it, only one
+    tell per lock would. (2) A vault's delete no longer locks its object, so the deleted vault's own snapshot stays
+    as it was (`main unlocked`) and its boxes paint once, not twice: the decision already listed below. (3) The bank's
+    build paints `made (asking build_bank)`, `made`, `ready`; a vault built in an unlocked bank asks nobody.
 * **For the Coach**:
   - `writtenByOwnVerbs`, the one new thrower (kind `bad_option`).
   - `lease_revoke_failed` names the bank, and the default vacates the bank: a contract change.
