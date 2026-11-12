@@ -63,7 +63,7 @@ export const CtxStampExpected = "Expected a flat object of strings and numbers, 
 /** The listing a storable is made in. */
 export const ListingExpected = "Expected a Listing"
 
-/** Anything but a Bank, where one is named. */
+/** Anything but a Device, where one is named. */
 export const DeviceExpected = "Expected a Device"
 export const VaultExpected = "Expected a Vault"
 
