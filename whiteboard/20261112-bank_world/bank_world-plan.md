@@ -211,7 +211,7 @@ and each handoff quotes it. The line is red from 8a's tip to 8c's (rule 20).
 * **8c `bank_prompts`**: the gate's prompts and verbs, `del_bank`, `autolock`, a bank tombstone
   delivered; unskips 8b's skips; React compiles. **Levels**: worker `opus`; review `medium`.
   **After**: 8b.
-* **8d `bank_gate_tests`**: the former 8b below. **After**: 8c.
+* **8d `bank_gate_tests`**: the former 8b below. **After**: 8c. *Orchestrator:* after 9, so its new tests and the guarantees it promotes use the bank-key names (9 and 8d both edit `notes/guarantees.md` and VOCABULARY).
 
 ### 8b `bank_gate_tests` (now 8d)
 
