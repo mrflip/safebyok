@@ -1,90 +1,77 @@
 # Thread 8b: bank_switch (2026-11-12)
 
-Branch `20261112-bank_switch`, PR #667, base main. **Partial: rework leg 1 stopped under the release valve
-(second compaction) after plan steps 1 and 2.** Red by design (ground rule 20): safebyok tsc 226 errors in 26
-files, 93 in `src/models/{vault-listing,vault,gating,box-listing,listing,bank}.ts`, every one a seam steps 3 to 10
-own; vitest 39 of 82 files fail (model fixtures, vault, gating: steps 7 to 9). `tests/storage/bank-db.test.ts`
-passes.
+Branch `20261112-bank_switch`, PR #667, base main. **Partial: rework leg 2 landed plan steps 3 to 8; `src` compiles
+and lints clean.** Red by design (ground rule 20): safebyok tsc 639 errors, every one in `tests/` (fixtures and
+suites: step 9); safebyok-react tsc (step 10, and 8c). vitest: `tests/storage` passes; `tests/shapes` fails 7, all
+through `models-world` fixtures. `src` since the base: +1314 / -991 lines (leg 2 alone: +988 / -738).
 
-* **Built**, earlier leg (commit `refusals: ...`): `vault_locked` is `bank_locked`; one thrower `needUnlocked`;
-  `BankAnnouncement`/`BankAnnounce`/`BankPanic` are `Device...`; changeset `.changeset/20261112-bank_switch.md`.
-* **Built**, leg 1:
-  - **Step 1** (d537ee876): the WIP patch applied and deleted (`listing.ts` asks `bankDB`, hands
-    `answer.parent` to `world.receiveParent`, abstract `demandOfWorld(record)`; `gatingkindVals = ['build_bank',
-    'unlock_bank']`). `shapes-vaultish.ts` as the plan's step 1 says, except `storableArgs.listing`'s new kinds
-    (below). `VX.storableBase` (revision, times, am) is the storable base and `tombstone`'s. `Phrases.BankDBExpected`
-    replaces `VaultDBExpected`. `receiveWorld` is `receiveParent` throughout src and tests. `shapes-gateish.ts`
-    `gatingLaunchOnArgs` excludes `build_bank` (was `build_vault`) so the shapes load; gating's shapes stay step 8's.
-    The `brandedVaultDB` test moved to `tests/storage/bank-db.test.ts` as `brandedBankDB`. Changeset line:
-    `Device.make` takes a `bankDB`.
-  - **Step 2** (dff295ea6, **pulled forward from thread 10**): `Storable` tattoos only the scope; `Vault` and
-    `Box` each declare `vault_tok` and override `assignInitialProps` to tattoo it before `super`.
+* **Built**, earlier legs: `vault_locked` is `bank_locked` (one thrower `needUnlocked`); `Device...` announcement
+  types; `Listing` asks `bankDB` and hands `answer.parent` to `world.receiveParent`; `Storable` tattoos only the
+  scope (`vault_tok` moved down, pulled forward from thread 10).
+* **Built**, leg 2 (commits 97e81d750, b4c4836f7, bfa81d650, 09b9529ff):
+  - `Gate extends Storable` (`gate.ts`), made in the stub `GateListing` (`gate-listing.ts`). `BX.gateSparse` is
+    the row without `wayins`, `am` any; `wayins`, `main`, `passkey0` are getters over the full record, memoized
+    by its identity; `bankStamp` is the bank's `stamp`. `Gate.recordOfBirth` replaces `Gate.make`.
+  - `Bank extends Storable` of the bank row (`bank.ts`), made in the stub `BankListing` (`bank-listing.ts`),
+    world the `Device`. The Vault's unlocking, lease and lease's friend moved in nearly verbatim; `maingate` is
+    the gate listing's `main`; `sealWith`/`unsealWith(text, stamps)`; `ensureVault` puts `ifAbsent:'add'`,
+    `ifPresent:'get'`, `demandUnlocked` only where none is listed. `autolock` peeks the one lease row (**pulled
+    forward from 8c**: the old one no longer compiled). `DefaultLeaseMillis` moved to `bank.ts`.
+  - `Device` answers the `ListingWorld` duck, keeps `device_tok` (null before `ensureBank`) and `#bankListing`.
+    `#fetchBank` asks `ensureBank` once: val null launches `Bank.launchBirth`; else the bank row goes to the bank
+    listing, then `bank.vaultListing.deliverEnsured(answer)` delivers bank row, gate row, vault rows. Startup no
+    longer calls `vaultListing.list()`. Sweep and vacate discard the bank listing.
+  - `VaultListing` and `BoxListing` on BX rows and verbs (`bank_tok`, `vault_tok`); vault `doTryList` is
+    `ensureBank` through the same `#listingOfEnsured` (no live bank lists none); `recordOfBirth(scope, expected)`.
+    Gate verbs and `buildVault` gone from the vault listing.
+  - `Vault` lost gate, lease, prompts, friend, `launchBirth`; tattoos `bank_tok`; seals through
+    `world.sealWith(text, [vaultStamp, boxStamp])`; `isLocked` is the bank's; `lock()` aligns itself and its boxes.
+    `VaultWorld` is now `scope, bank_tok, boxRefreshMillis, sealWith, unsealWith, gateListing` (lighter).
+  - `Box` tattoos `bank_tok`; its life is `vaultLifeOf-box_tok`; its stamp `BX.boxSparse` (with `bank_tok`).
+  - Gating (**step 8, pulled into this leg**): holds the Device; `BankForGatingkind {build_bank: null, unlock_bank:
+    Bank}`; `UnlockByProving = (bank, proved)`; `GatingSnapshot extends BankScope`. Build act: stamps from
+    `BankListing.stampsOfBirth()`, `Gate.recordOfBirth`, `BankListing.recordOfBirth`, `BankListing.build` (calls
+    `tryBuildBank`, delivers bank row then gate row); another device's bank first refuses `gate_made_elsewhere`.
+    The proving world is `GX.provingWorld.parse(device)` at launch. `bankBuildCleartexts`/`bankUnlockCleartexts`
+    renamed; replace/add/revoke checkers kept for 8c.
+  - Exports: types `Gate`, `GateListing`, `BankListing`, `GateSnapshot`, `BankGatingkind`; `VaultForGatingkind`
+    is `BankForGatingkind`. Changeset brought up to date.
 
-* **Next leg starts at step 3.** Nothing of step 3 is in the tree. Design worked out for it:
-  - `Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapshot>`. `GateSparse` is the record
-    **without `wayins`** (`BX.gateRecord.omit({ wayins: true })`), so `sparse` and `toJSON()` never carry a
-    wrapped vault key (offline brute-force material); today's `toJSON` shows only wayin headers, and the snapshot
-    keeps that by `wayinlabel`. `isFullRecord`: `'wayins' in fetched`. `lifeTokPathOf`: bank_tok, gate_tok.
-    `assignInitialProps` tattoos `bank_tok`, `gate_tok`. `main`/`passkey0`: getters over
-    `demandFullProps().wayins`, memoized by the wayins' identity as `Vault.gate` is today. `stamp` =
-    `gateStamp.parse(this)`; `bankStamp` from the world (the Bank). `pickle`, `demandPasskeyAddable` stay.
-  - `Gate.recordOfBirth(bank, gate, main, passkey0): GateRecord` is `Gate.make`'s body without the `new`. Callers:
-    `gating.ts` (`Gate.make`, the build act), `tests/test-helpers/proving-world.ts`; `new Gate(` in `vault.ts`
-    and tests.
-  - `GateListing` stub (vault-listing.ts the template; world = the Bank; `isOneLifePerInstance` true; modelkind
-    `gate_listing`, added to `Modelkind`/`ClassForModelkind` in `helpers/consts.ts` and to `storableArgs.listing`):
-    `doTryGet`/`doTryList` ask `bankDB.tryEnsureBank` and answer `gates.main` (or null / `[]`), parent the bank
-    row; `doTryPut`/`doTryDel` throw a new thrower (a gate is written only by `buildBank` and the gate verbs);
-    `demandOfWorld` refuses another `bank_tok` through a new `rowOfOtherBankTok`, sibling of
-    `rowOfOtherVaultTok` in throwers.ts *[Listing Throwers]*; `watchRows` a no-op; `nothingStoredError` an open
-    matter (there is no `absent_bank` kind).
-  - Step 4, `BankListing`, the same shape with the Device as world; the Device answers the `ListingWorld` duck.
-    The lease and its friend: `lease.ts` needs no edit; `device-db.ts`'s `peek`/`forget`/`tryForget` take a
-    `LeaseQuery {user_id, banklabel, bank_tok}`, `tryStow(row)`.
-  - Read for the stubs: sprint `design.md` § *Bank* and § *Gate* ("`BankListing` and `GateListing` are stubs
-    (ruled)"), `threads.md` § 8 item 8. If a stub wants real work, say so: the Coach's fallback is a subclass
-    `Listable` of `Storable` for `Vault` and `Box`.
+* **Next leg starts at step 9.** Nothing of 9 or 10 is in the tree.
+  9. Fixtures: `tests/test-helpers/models-world.ts` first (TestableBoxListing passes no `bank_tok` world),
+     then `bank-world`, `vault-world`; `proving-world.ts` `builtGateOf` uses `Gate.make` (now `recordOfBirth`
+     plus a Gate made through a bank's gate listing). `gate.test.ts` rewrites around a listed Gate. Skip by name
+     with a line naming 8c: `vault-gate`, gating's gate-kind cases, bank-ending's delete and tombstone cases.
+     Autolock in `bank.test` may pass as built here: try before skipping. `tests/index.test.ts` lists exports.
+  10. React: minimal edits for the renamed gatingkinds and `gating.bank`; the vault prompts' callers are 8c's.
+     VOCABULARY's vault-record entry (nested gate, `gate_epoch`) retired.
 
-* **Plan, remaining** (steps 1 and 2 done):
-  3. `Gate extends Storable` through a stub `GateListing` (above).
-  4. `Bank extends Storable` of the bank row through a stub `BankListing`, world the `Device` (`isLocked`
-     false, `ensureTimely` answers itself, `receiveParent` no-op). vault.ts *[Unlocking]*, *[The lease]*, *[The
-     lease's friend]* move to bank.ts nearly verbatim; `maingate`, `ensureUnlocked`, `unlock` (`unlock_bank`),
-     `lock`, `sealWith/unsealWith(text, stamps)` demanding the lease; `ensureVault` = putVault `ifAbsent:'add'`,
-     `ifPresent:'get'`, refusing `bank_locked` only where it would put (judged by the listing).
-  5. `Device.ensureBank` asks `bankDB.ensureBank({op:'ensure', user_id, banklabel, gates:['main']})` once: val
-     null launches `build_bank` (Device is its proving world, keeps `device_tok`); else the bank row goes to
-     `BankListing`, the gate row to the bank's `GateListing`, the vault rows via `deliverListing` with
-     `parent: null`. `VaultListing.doTryList` asks `ensureBank` the same way; val null lists empty. Startup asks
-     `ensureBank` once, not twice.
-  6. Vault listing's `isOwnRow` excludes bank and gate rows. Box listing asks the BX box verbs with `bank_tok`,
-     `vault_tok` (`BoxWorld` already picks `bank_tok`, red until step 7).
-  7. `Vault` loses gate, lease, prompts, friend; seals through `world.sealWith(text, [vaultStamp, boxStamp])`;
-     gains `bank_tok`. Its snapshot keeps `isLocked` (the bank's) to limit churn.
-  8. Gating holds the `Device` and a proving world; `BankForGatingkind {build_bank: null, unlock_bank: Bank}`;
-     `UnlockByProving = (bank, proved) => Promise<Bank>`; `GatingSnapshot extends BankScope`. Drop the
-     `build_bank` exclude bridge in shapes-gateish if it no longer fits.
-  9. Fixture builders (`models-world`, `bank-world`, `vault-world`) move to the bank; skip by name with a line
-     naming 8c: `vault-gate`, gating's gate-kind cases, bank-ending's delete and tombstone cases, bank.test's autolock.
-  10. React: minimal edits; VOCABULARY's vault-record entry (nested gate, `gate_epoch`) retired.
-
-* **Decisions taken**: each step committed once its own files compile, the rest left red at named seams.
-  `storableArgs.listing` gains `gate_listing`/`bank_listing` in steps 3/4, with their `Modelkind` entries.
-
+* **Decisions taken**:
+  - Steps 3 and 4 landed as one commit: `consts.ts` names both new modelkinds.
+  - A stub's `nothingStoredError`/`damagedStoredError` reuse existing throwers (Coach): the gate `mainGateMissing`
+    (param widened to `BankSparse`), the bank `actRefused('vault', 'bank_void')`. `rowOfOtherVaultTok` became
+    `rowOfOtherWorld(received, tokname)`, used by the gate, vault and box listings.
+  - Stub `doTryPut`/`tombstoneOver`/`doTryDel` throw one new thrower, `writtenByOwnVerbs` (`bad_option`): no
+    existing one says "use the bank's verbs". Reachable through `Storable.del` on a bank or gate.
+  - Stubs' `watchRows` start nothing; the vault listing watches the bank scope and keeps vault rows only.
+  - `Bank.ensureTimely` resolves at once, as before: the bank row arrives as every gate and vault answer's parent.
+    The unlock refreshes `maingate` (one `ensureBank`), which also refreshes the bank row.
+  - `lease_revoke_failed` carries `bank` (was `vault`); the default vacates that Bank, as it vacated the vault.
+  - The bank snapshot gains `isLocked` only, not `maingate` (8c, with the gate prompts' dialogs).
+  - `Device.device_tok` is `string | null`; the Bank checks it through the existing `bankArgs` at construction.
 * **Deviations**:
-  - Rebased onto `origin/main` before building (BankDB, #663, was not under 8a). Tag
-    `20261112-bank_switch-prerebase` keeps the old base.
-  - Step 1 applied by exact-match scripted replacements with asserts, not Edit (equivalent, avoided the quoting
-    trouble perl had).
-  - The `build_bank` exclude bridge in shapes-gateish, step 8's file, so test files load.
-  - Stopped short of the thread's goals under the release valve, twice.
-
-* **Discoveries**: the thread is larger than one context. Leg 1 landed two steps in about 160 src lines
-  changed; Gate and Bank (steps 3, 4) are each about a leg.
-
+  - Rebased onto `origin/main` before leg 1 (tag `20261112-bank_switch-prerebase`).
+  - Steps 6 to 8 done in this leg though the handoff named 3 to 5: the vault listing's switch, the Vault losing its
+    lease and the gating are one step (cut: *Atomic*), and `src` would not compile at a narrower seam.
+* **Discoveries**:
+  - A gate row changed on another device is heard only on the next `ensureBank`: no listing delivers gate
+    notices. 8c (gate verbs) should decide.
+  - A newer bank life delivered as a parent remakes the Bank in its listing while the Device keeps the old one in
+    `#bank`, and a vault listing mid-delivery meets its bank vacated. 8c (tombstones).
+  - The old vaultDB stack (`storage/vault-db.ts`, adapters, classifier) is still in `src`, unreferenced by models.
 * **For the Coach**:
-  - `BankAnnounce` was renamed `DeviceAnnounce` beside the two the ruling named.
-  - Open: the gate's (and bank's) `nothingStoredError` kind, with no `absent_bank`; `GateSparse` without
-    `wayins`; the stubs' put and del throw.
+  - `writtenByOwnVerbs`, the one new thrower (kind `bad_option`).
+  - `lease_revoke_failed` names the bank, and the default vacates the bank: a contract change.
+  - `vault.lock()` no longer locks anything; a host must call `bank.lock()`.
   - Carried: `ensureVault`'s `bank_locked` judged by the listing; vault listing lists empty on a val-null
-    `ensureBank` until 8c; `Gate.make` becomes `recordOfBirth`; vault snapshot keeps `isLocked`.
+    `ensureBank` until 8c; vault snapshot keeps `isLocked`.
