@@ -165,7 +165,10 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   ensureTimely(maxMillis?: number): Promise<this> { return this.hydrate({ maxMillisSinceRefresh: maxMillis }) }
   // --
 
-  // == [Protected, overriding Storable's]: isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Protected, overriding Storable's]: children, isFullRecord, lifeTokPathOf, makeSnapshot
+
+  /** None: a gate has nothing listed below it. */
+  protected get children(): readonly [] { return [] }
 
   /** True for a live gate record that has its `wayins`. */
   protected isFullRecord(fetched: GateSparse): fetched is GateRecord {

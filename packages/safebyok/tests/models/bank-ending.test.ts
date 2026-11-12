@@ -363,7 +363,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
     const vacating = device.vacate({ cause })
     expect(device.isEnabled).to.be.false
     expect(() => device.demandEnabled()).to.throw(Phrases.DeviceLetGo)
-    expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(Phrases.DeviceLetGo)
+    expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(Phrases.LetGoInstance)
     expect(device.snapshot).to.include({ stage: 'disabled', err: cause })
     await listing.reached
     await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'disabled')
@@ -551,8 +551,8 @@ describe("a bank past a vacate", () => {
     await vacating({ world, bank, vault })
     await TH.eventually(() => spy.calls.length >= loggedLevels.length)
     expect(spy.calls.map((call) => call.level)).to.deep.equal(loggedLevels)
-    await expect(bank.ensureVault(VaultScopeGiven)).rejects.toThrow(Phrases.DeviceLetGo)
-    expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(Phrases.DeviceLetGo)
+    await expect(bank.ensureVault(VaultScopeGiven)).rejects.toThrow(Phrases.LetGoInstance)
+    expect(() => bank.vaultAt(VaultScopeGiven)).to.throw(Phrases.LetGoInstance)
     await expect(bank.device.ensureBank()).rejects.toThrow(Phrases.DeviceLetGo)
     expect(bank.device.openGating).to.be.null
     expect(requestCleartext).not.toHaveBeenCalled()
