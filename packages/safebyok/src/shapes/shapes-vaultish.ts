@@ -22,7 +22,7 @@ import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxs
 import * as SX from './shapes-storage'
 import type * as BX from './shapes-bankdb'
 import * as GX from './shapes-gateish'
-import type { AnyGating, AskUser, ProvingWorld, RequestCleartext } from './shapes-gateish'
+import type { AnyGating, AskUser, RequestCleartext } from './shapes-gateish'
 import type { StrengthChecker } from '../helpers/passphrase-strength'
 
 // == [Checks]: Checks
@@ -123,11 +123,11 @@ export type ProbeAsked = Z.input<typeof probeAsked>
 export type ProbeOpts = Z.input<typeof probeOpts>
 
 /** One storage verb's answer as `bank.tryProbe` reports it: sparse rows, no wrapped key or ciphertext, and when it came back. */
-export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: BX.LoggableAsk, val: SX.BoxSparse, parent: BX.VaultRow, timestamp: number }>
+export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: BX.LoggableAsk, val: BX.BoxSparse, parent: BX.VaultRow, timestamp: number }>
 
 /** How `bank.tryProbe` went, step by step: the box and vault as found, the put, the fetch back, and that the box opened. */
 export type ProbeReport = Readonly<{
-  timely: Readonly<{ box: SX.BoxSparse | null, vault: SX.VaultSparse, boxRefreshedAt: number | null, vaultRefreshedAt: number | null, timestamp: number }>
+  timely: Readonly<{ box: BX.BoxSparse | null, vault: BX.VaultSparse, boxRefreshedAt: number | null, vaultRefreshedAt: number | null, timestamp: number }>
   put:    ProbeStep
   fetch:  ProbeStep
   unseal: Readonly<{ ok: true, timestamp: number }>
@@ -395,14 +395,14 @@ export interface VaultSnapshot extends VaultScope {
 /** The check of a deviceDB as a model is handed one, by its brand: an instance of a class extending DeviceDB, from whichever copy of safebyok. */
 export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDeviceDB, Phrases.DeviceDBExpected), 'bad_option')
 
-/** The check of a vault listing's world past {@link listingWorld}: what a vault's gate, lease and boxes need of the bank. Checks only. */
-export const vaultWorld = Checker(({ bankScope, custom }) => listingWorld.extend({
-  ...GX.provingWorld.shape, scope: bankScope, logger: GX.guardedLogger, leaseMillis: GX.leaseMillis, deviceDB: brandedDeviceDB, boxRefreshMillis: horizonMillis,
-  device: custom<Device>((val) => hasModelkind(val, 'device'), Phrases.DeviceExpected),
+/** The check of a vault listing's world past {@link listingWorld}: what a vault and its boxes need of the bank. Checks only. */
+export const vaultWorld = Checker(({ bankScope, bank_tok, custom, fn }) => listingWorld.extend({
+  scope: bankScope, bank_tok, boxRefreshMillis: horizonMillis, sealWith: fn(), unsealWith: fn(),
+  gateListing: custom<object>((val) => hasModelkind(val, 'gate_listing'), Phrases.ListingExpected),
 }), 'bad_option', [CX])
 
 /** The bank, as far as its vaults reach into it. */
-export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 'scope' | 'logger' | 'leaseMillis' | 'deviceDB' | 'boxRefreshMillis' | 'device'>
+export type VaultWorld = Pick<Bank, keyof ListingWorld | 'scope' | 'bank_tok' | 'boxRefreshMillis' | 'sealWith' | 'unsealWith' | 'gateListing'>
 
 /** The check of what a bank is made with, past its listing's options: the device that makes it, and the token of its device row, which the device has once its `ensureBank` has ensured the row. */
 export const bankArgs = objCheck(({ custom, device_tok }) => ({

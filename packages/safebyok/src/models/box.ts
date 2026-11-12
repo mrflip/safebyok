@@ -8,25 +8,28 @@ import * as CX from '../shapes/shapes-core'
 import type { Sidecar, Boxscope, Whisper } from '../shapes/shapes-core'
 import type { BoxExposure } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
+import * as BX from '../shapes/shapes-bankdb'
 import * as VX from '../shapes/shapes-vaultish'
 import { type BoxExposedPatch, type BoxPatch, type BoxPatchParsed, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type Fetched, type ThingAnswer, type TimelyOpts } from '../shapes/shapes-vaultish'
-import type { BoxRecord, BoxSparse } from '../shapes/shapes-storage'
+import type { BoxRecord, BoxSparse } from '../shapes/shapes-bankdb'
 import { stableJsonify } from '../helpers/stable-jsonify'
 import { tattoo } from '../helpers/helpers'
 import { boxAbsent, notExposed, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
-import { refusedAnswerOf } from '../storage/vault-db'
+import { refusedAnswerOf } from '../storage/bank-db'
 
 /** A box as this device has it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
-  // == [Props]: user_id, banklabel, vaultlabel, boxlabel, vault_tok, world, listing, #exposed, #isVeiled
+  // == [Props]: user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, world, listing, #exposed, #isVeiled
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly user_id:    string
   declare readonly banklabel:  string
   declare readonly vaultlabel: string
   declare readonly boxlabel:   string
+  /** The life of the bank this box lies in, inscribed once by `assignInitialProps` and never moved. */
+  declare readonly bank_tok:   string
   /** The vault this box lies in, inscribed once by `assignInitialProps` and never moved. */
   declare readonly vault_tok:  string
 
@@ -93,9 +96,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Construction]: assignInitialProps
 
-  /** Inscribes the `vault_tok` of the vault this box lies in, beside what the base inscribes. */
+  /** Inscribes the `bank_tok` and `vault_tok` of the vault life this box lies in, beside what the base inscribes. */
   protected override assignInitialProps(central: Fetched<BoxRecord, BoxSparse>): void {
-    tattoo(this, { vault_tok: central.vault_tok }, { configurable: false })
+    tattoo(this, { bank_tok: central.bank_tok, vault_tok: central.vault_tok }, { configurable: false })
     super.assignInitialProps(central)
   }
   // --
@@ -286,8 +289,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return (fetched.am === 'a') && ('whisper_ciphered' in fetched)
   }
 
-  /** A box's life is its vault's and its own: `vault_tok-box_tok`. */
-  protected lifeTokPathOf({ vault_tok, box_tok }: Fetched<BoxRecord, BoxSparse>): string { return `${vault_tok}-${box_tok}` }
+  /** A box's life is its vault's and its own: {@link BX.vaultLifeOf}, then `box_tok`. */
+  protected lifeTokPathOf(record: Fetched<BoxRecord, BoxSparse>): string { return `${BX.vaultLifeOf(record)}-${record.box_tok}` }
 
   protected makeSnapshot(): BoxSnapshot {
     return Object.freeze({
@@ -329,13 +332,13 @@ function mergedOver(whisper: Whisper, patch: Whisper): Whisper {
 // The sidecar is laid beside the seal, never in it, so storage may change it and the whisper still opens.
 /** The full record of `base` with `sidecar`, `whisper` sealed through `world`: as json_v1, bound with its key to the box's stamp. Of `base`, only its sparse fields are taken. */
 async function sealedRecordOf(world: Pick<BoxWorld, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: Whisper): Promise<BoxRecord> {
-  const sparse = SX.boxSparse.parse(base)
+  const sparse = BX.boxSparse.parse(base)
   const { box_key_wrapped, whisper_ciphered } = await world.sealStampedString(stableJsonify(whisper), boxStampOf(sparse))
-  return SX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })
+  return BX.boxRecord.parse({ ...sparse, sidecar, box_key_wrapped, whisper_ciphered })
 }
 
 /** The box's stamp, which the lease binds both sealed parts to: every sparse field of `record`, and not its sidecar. */
-function boxStampOf(record: BoxSparse): CipherCtxRecord { return SX.boxSparse.parse(record) }
+function boxStampOf(record: BoxSparse): CipherCtxRecord { return BX.boxSparse.parse(record) }
 
 // What JSON.parse throws is replaced, never kept as a cause: a SyntaxError can quote the text it failed on.
 /** The whisper `text` holds as JSON; `damaged_whisper` where it holds none, or holds what is not a whisper. */

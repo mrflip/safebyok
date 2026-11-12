@@ -15,9 +15,8 @@ import type { BadNewsHandler, DeviceAnnouncement, BankFriend, DeviceEvent, Devic
 import type { DeviceDB } from '../storage/device-db'
 import type { BankDB } from '../storage/bank-db'
 import { alreadyAsking, deviceDisabled, insecureContext, unexpectedError } from '../refusals/throwers'
-import { Bank, listOwnLeases } from './bank'
+import { Bank, DefaultLeaseMillis, listOwnLeases } from './bank'
 import { BankListing } from './bank-listing'
-import { DefaultLeaseMillis } from './vault'
 import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
 
 // == [Given to a device]: DefaultRefreshMillis

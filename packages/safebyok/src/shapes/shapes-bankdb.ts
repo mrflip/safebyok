@@ -83,18 +83,19 @@ export type GateSparse = Readonly<Z.infer<typeof gateSparse>>
 export type Wayins     = Readonly<Z.infer<typeof wayins>>
 // --
 
-// == [Vault forms]: vaultRecord, vaultTombstone, vaultRow, VaultRecord, VaultTombstone, VaultRow
+// == [Vault forms]: vaultSparse, vaultRecord, vaultTombstone, vaultRow, VaultSparse, VaultRecord, VaultTombstone, VaultRow
 
 // A bank's vault row has nothing encrypted, so its record is its sparse form, and its tombstone has the same fields.
-/** The checks of a bank's vault rows: its live record, its tombstone, and a row of either. */
-export const { vaultRecord, vaultTombstone, vaultRow } = Checkers('bad_option', ({ lit, discrim, bank_tok, vault_tok }) => {
+/** The checks of a bank's vault rows: its sparse fields, its live record, its tombstone, and a row of either. */
+export const { vaultSparse, vaultRecord, vaultTombstone, vaultRow } = Checkers('bad_option', ({ lit, discrim, bank_tok, vault_tok }) => {
   const vaultSparse    = CX.vaultScope.unwrap().extend({ fmt: lit(VaultFormat), ...SX.revision.shape, ...SX.times.shape, am: SX.am, bank_tok, vault_tok })
   const vaultRecord    = vaultSparse.extend({ am: lit('a') }).strict()
   const vaultTombstone = vaultSparse.extend({ am: lit('x') }).strict()
   const vaultRow       = discrim('am', [vaultRecord, vaultTombstone])
-  return { vaultRecord, vaultTombstone, vaultRow }
+  return { vaultSparse, vaultRecord, vaultTombstone, vaultRow }
 }, [CX])
 
+export type VaultSparse    = Readonly<Z.infer<typeof vaultSparse>>
 export type VaultRecord    = Readonly<Z.infer<typeof vaultRecord>>
 export type VaultTombstone = Readonly<Z.infer<typeof vaultTombstone>>
 /** A bank's vault row as stored: live, or a tombstone. */

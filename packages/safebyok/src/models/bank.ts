@@ -9,7 +9,6 @@ import { type Outcome, demandGood, good, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { actRefused, mainGateMissing, needUnlocked } from '../refusals/throwers'
 import { type BankScope, type BankedVaultScope, type VaultScope, bankedVaultScope } from '../shapes/shapes-core'
-import * as SX from '../shapes/shapes-storage'
 import type { LeaseDated } from '../shapes/shapes-storage'
 import * as BX from '../shapes/shapes-bankdb'
 import type { BankRecord, BankSparse } from '../shapes/shapes-bankdb'
@@ -30,6 +29,12 @@ import type { GuardedKeyDeriver, Proving } from './proving'
 import { Storable } from './storable'
 import type { Vault } from './vault'
 import { VaultListing } from './vault-listing'
+
+// == [Defaults]: DefaultLeaseMillis
+
+/** How long a lease lasts where the host names no `autolockMinutes`: fourteen days. */
+export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
+// --
 
 /** The signed-in user's bank on this device, kept in step with its row: its main gate, its one lease, and its vaults, one Vault object per scope. Made by the {@link Device}, through `device.ensureBank()`. */
 export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapshot> {
@@ -390,6 +395,6 @@ export async function listOwnLeases(deviceDB: DeviceDB, { user_id, banklabel }: 
 
 /** A storage verb's answer with no wrapped key or ciphertext left in it, and when it came back. */
 function probeStepOf({ act, ask, val, parent }: GoodAnswer<Box | null, GoodAct, unknown>): VX.ProbeStep {
-  return { ok: true, act, ask, val: SX.boxSparse.parse(val?.sparse), parent: BX.vaultRow.parse(parent), timestamp: nowMillis() }
+  return { ok: true, act, ask, val: BX.boxSparse.parse(val?.sparse), parent: BX.vaultRow.parse(parent), timestamp: nowMillis() }
 }
 // --
