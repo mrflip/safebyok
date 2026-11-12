@@ -2,7 +2,7 @@
   "name": "safebyok-postgres",
   "private": false,
   "version": "0.5.0",
-  "description": "Postgres storage for safebyok: two tables holding vault and box rows, a column to each field, and the VaultDB over them, through the driver you already use.",
+  "description": "Postgres storage for safebyok: four tables holding bank, gate, vault and box rows, a column to each field, and the BankDB over them, through the driver you already use.",
   "keywords": [
     "safebyok",
     "postgres",
@@ -25,6 +25,8 @@
   "sideEffects": false,
   "files": [
     "dist",
+    "bank-functions.sql",
+    "bank-tables.sql",
     "vault-functions.sql",
     "vault-tables.sql"
   ],

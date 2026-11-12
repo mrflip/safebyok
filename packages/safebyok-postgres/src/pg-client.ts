@@ -1,7 +1,7 @@
 /** A PostgresClient built on a pg Pool. Each transaction runs on one connection checked out of the pool. */
 
 import * as DB from 'safebyok/storage'
-import type { PostgresClient, PostgresQueryable } from './postgres-vault-db'
+import type { PostgresClient, PostgresQueryable } from './postgres-bank-db'
 
 // == [The pool]: PgPool, PgPoolClient, pgPool
 
