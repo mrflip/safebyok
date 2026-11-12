@@ -191,7 +191,7 @@ export const putBox = mutation({
     const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
     // A put over a tombstone replaces that row, so only a new boxlabel adds to `all_count`.
     const growth = Tallies.growthOf(anteDoc, boxDoc)
-    if (Tallies.refuses(reckoning.tally, growth, cap)) { return { ...fetched, wrote: false, roomless: true } }
+    if (Tallies.wouldPassLimit(reckoning.tally, growth, cap)) { return { ...fetched, wrote: false, roomless: true } }
     await writeBoxDoc(ctx.db, anteDoc, boxDoc)
     await Tallies.record(ctx.db, life, reckoning, growth)
     return { ...fetched, wrote: true, roomless: false }
