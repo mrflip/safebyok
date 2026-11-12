@@ -1,4 +1,4 @@
-/** A vault's boxes as this device has them: the box listing, handed its vault, under one life of it. */
+/** The box listing: one vault's boxes, under one life of the vault. */
 
 import { VaultError } from '../refusals/errors'
 import type { Modelkind } from '../helpers/consts'
@@ -23,14 +23,14 @@ import type { Vault } from './vault'
 export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnapshot, Box, DamagedBox> {
   // == [Props]: user_id, banklabel, vaultlabel, bank_tok, vault_tok, scope, bank, vault
 
-  /** The scope of the vault listed, and the life of it this listing was made under, tattooed on by the constructor. */
+  /** The vault's scope, and the bank and vault life this listing was made under (these five fields). */
   declare readonly user_id:    string
   declare readonly banklabel:  string
   declare readonly vaultlabel: string
   declare readonly bank_tok:   string
   declare readonly vault_tok:  string
   readonly scope:              VaultScope
-  /** The bank the vault is of. */
+  /** The vault's bank. */
   readonly bank:               Bank
   /** The vault whose boxes these are. */
   readonly vault:              Vault
@@ -50,7 +50,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     Object.freeze(this)
   }
 
-  /** The scope of `boxish`, which must be this vault's: no listing answers for another's. */
+  /** The scope of `boxish`, which must be in this vault. */
   scopeOf(boxish: unknown):  Boxscope  { return boxscope.parseConsistent(boxish, this.scope) }
 
   /** Parse `boxish` as a {@link BoxSparse}. */
@@ -62,7 +62,9 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Methods]: puttable, create, tryCreate, shellFor
 
-  /** The box a put of `scoped` goes through: the one listed, or a void one made where none is listed. */
+  /** The box to put `scoped` through: the one listed, or else a void box, listed now.
+   * Under `ifAbsent: 'fail'`, refuses where none is listed.
+   */
   puttable(scoped: unknown, opts: BoxPutOpts = {}): Box {
     const { ifAbsent } = VX.boxPutOpts.parse(opts)
     const scope = this.scopeOf(scoped)
@@ -71,10 +73,15 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return listed ?? this.#shellFor(scope)
   }
 
-  /** The box a delete of `scoped` goes through: the one listed, or a void one made where none is listed. */
+  /** The box to delete `scoped` through: the one listed, or else a void box, listed now. */
   deletable(scoped: unknown): Box { return this.puttable(scoped) }
 
-  /** Seals a new box and puts it where no live record stands, answering the box listed. */
+  /** Create a new box for whisper (encrypted) and sidecar (readable), sealed against the box metadata.
+   * See `sealedRecordOf` in models/box.ts for what "encrypted" and "sealed" mean. Over a live box:
+   * - `ifPresent: 'fail'` (default): refuse
+   * - `ifPresent: 'repl'`: replace it
+   * - `ifPresent: 'get'`: put nothing, and return the live box
+   */
   async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box> {
     const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis } = VX.boxCreateOpts.parse(opts)
     const dna = boxDna.parse(input)
@@ -84,16 +91,16 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** Non-throwing form of {@link create}. */
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
-  /** A void box listed under `scope`. */
+  /** A void box, newly listed at `scope`. */
   #shellFor(scope: Boxscope): Box { return this.deliverRecord(BX.shellBoxOf(this.#queryOf(scope))) }
 
-  /** `scope` under the life of the vault this listing was made under: its `bank_tok` and `vault_tok`. */
+  /** `scope` with the `bank_tok` and `vault_tok` this listing was made under. */
   #queryOf(scope: Boxscope): BoxQuery { return { ...scope, bank_tok: this.bank_tok, vault_tok: this.vault_tok } }
   // --
 
   // == [Above it]: ensureTimelyWorld
 
-  /** The vault refreshed within `maxMillis`, by default its own horizon. */
+  /** Refresh the vault, unless it was refreshed within `maxMillis` (default: the vault's own horizon). */
   override async ensureTimelyWorld(maxMillis?: number): Promise<void> { await this.vault.ensureTimely(VX.maxMillis.parse(maxMillis)) }
   // --
 
@@ -102,7 +109,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   /** Whether this listing answers: its vault does, and is still of the life this listing was made under. */
   get isEnabled(): boolean { return this.vault.isEnabled && (this.vault.vault_tok === this.vault_tok) }
 
-  /** Demand that this listing's vault answers, and is still of the life this listing was made under. */
+  /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
     this.vault.demandEnabled()
     if (this.vault.vault_tok !== this.vault_tok) { throw instanceDisabled() }
@@ -156,10 +163,10 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.bankDB.watch(this.scope, onNotice, onBadNews) }
 
-  /** A box row of this life of the vault: one under another life is no row. */
+  /** Whether `row` is a box row of the vault life this listing was made under. */
   protected isOwnRow(row: BankRow | GateRecord | VaultRow | BoxRow): row is BoxRow { return ('boxlabel' in row) && (BX.vaultLifeOf(row) === BX.vaultLifeOf(this)) }
   // --
 
-  /** Answers 'box_listing', which marks this model to a check: {@link Modelkind}. */
+  /** Always `'box_listing'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'box_listing' { return 'box_listing' satisfies Modelkind }
 }

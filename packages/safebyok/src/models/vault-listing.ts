@@ -1,4 +1,4 @@
-/** A bank's vaults as this device has them: the vault listing, handed its bank. */
+/** The vault listing: one bank's vaults. */
 
 import { nowMillis } from '../helpers/clock'
 import { type Modelkind, UNANSWERED } from '../helpers/consts'
@@ -36,7 +36,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** The scope of `vaultish`, which must be this bank's: no listing answers for another's. */
+  /** The scope of `vaultish`, which must be in this bank. */
   scopeOf(vaultish: unknown):  VaultScope  { return vaultScope.parseConsistent(vaultish, this.bank.scope, { message: Phrases.otherScope }) }
 
   /** Parse `vaultish` as a {@link VaultSparse}. */
@@ -48,7 +48,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [A vault's boxes]: boxListingOf
 
-  /** The listing of `vault`'s boxes, under the life of the vault it has now, its watch not started. */
+  /** A new listing of `vault`'s boxes under the vault's current life, with no watch started. */
   boxListingOf(vault: Vault): BoxListing {
     return new BoxListing(vault, { bankDB: this.bankDB, maxMillisSinceRefresh: this.bank.boxRefreshMillis })
   }
@@ -56,7 +56,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [A birth's form]: recordOfBirth
 
-  /** The record of a vault born under `scope`, at the revision after `expected`'s: of this life of the bank, and a new life of its own. */
+  /** A new live vault record at `scope`, at the revision after `expected`, under this bank life and a new vault life. */
   recordOfBirth(scope: VaultScope, expected: SX.Revision): VaultRecord {
     const written_at = nowMillis()
     return { ...scope, fmt: BX.VaultFormat, ...SX.nextRevisionOf(expected, written_at), registered_at: written_at, am: 'a', bank_tok: this.bank.bank_tok, vault_tok: makeLifeTok() }
@@ -65,7 +65,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [Delivering what ensureBank answers]: deliverEnsured, listingOfEnsured
 
-  /** The vaults an ensureBank `answer` lists, delivered as a listing's: the bank row to the bank, its main gate row to the bank's gate, then each vault row.
+  /** Deliver an ensureBank `answer` to the bank, its gate and this listing, and return the vaults.
    * Chute: deliverEnsured → listingOfEnsured → deliverListing → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   deliverEnsured(answer: EnsureBankAnswer): readonly Vault[] {
@@ -75,7 +75,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // A live bank's rows are delivered here, so the listing answered carries no parent. No live bank lists no vault, and
   // its bank row, a tombstone among them, goes on as the listing's parent.
-  /** An ensureBank `answer` as a listing's answer of the vault rows, the bank row and its main gate row delivered first. */
+  /** Deliver the bank and gate rows of an ensureBank `answer`, and return it as a listing of its vault rows. */
   #listingOfEnsured(answer: EnsureBankAnswer): ListingListAnswer<VaultRecord, VaultSparse, SX.DamagedVault> {
     if (! answer.ok) { return answer }
     if (answer.val === null) { return { ...answer, act: 'gotvoid', val: { listed: [], damaged_rows: [] } } }
@@ -87,7 +87,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   // == [Deleting]: tryDel
 
-  /** {@link Listing.tryDel}, refusing first a delete that names another life than the vault listed; its boxes cascade in the bankDB. */
+  /** Non-throwing form of {@link Listing.del}. The vault's boxes are deleted with it.
+   * Refuses where `ante` names another life than the vault listed.
+   */
   override async tryDel(ante: VaultSparse): Promise<ThingAnswer<Vault | null>> {
     try {
       const listed = this.at(ante)
@@ -102,7 +104,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** Whether this listing answers: its bank does. */
   get isEnabled(): boolean { return this.bank.isEnabled }
 
-  /** Demand that this listing's bank answers. */
+  /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
     this.bank.demandEnabled()
     return this
@@ -156,10 +158,10 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     return this.bankDB.watch(this.bank.scope, (notice) => { listing.deliverNotice(notice); gateListing.deliverNotice(notice); onNotice(notice) }, onBadNews)
   }
 
-  /** A vault row: the bank's watch also tells of its bank, gate and box rows. */
+  /** Whether `row` is a vault row. */
   protected isOwnRow(row: BankRow | GateRecord | VaultRow | BoxRow): row is VaultRow { return ('vaultlabel' in row) && ! ('boxlabel' in row) }
   // --
 
-  /** Answers 'vault_listing', which marks this model to a check: {@link Modelkind}. */
+  /** Always `'vault_listing'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'vault_listing' { return 'vault_listing' satisfies Modelkind }
 }

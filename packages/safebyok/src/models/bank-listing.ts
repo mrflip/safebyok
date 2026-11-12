@@ -1,4 +1,4 @@
-/** A device's bank as it has it: the stub listing a Bank is made in, whose row comes with every answer about its gate and vaults. */
+/** The bank listing: a stub listing of the device's one bank, whose row comes with every answer about its gate and vaults. */
 
 import type { Modelkind } from '../helpers/consts'
 import { nowMillis } from '../helpers/clock'
@@ -20,11 +20,11 @@ import { Listing } from './listing'
 // Nothing in the design extends this listing: there is no `device.banks`. It uses what `Listing` gives, so that the
 // bank row is delivered to its Bank, newer judged from older, as a vault's is. Its one slot is the device's bank: a Bank
 // that has ended stays listed, and the device makes another listing for the next one.
-/** One device's bank, by its scope: the device's own, the only one. */
+/** The device's one bank, listed at the device's scope. */
 export class BankListing extends Listing<BankScope, BankRecord, BankSparse, BankSnapshot, Bank> {
   // == [Props]: #askUser
 
-  /** The host's dialog, guarded, which each bank made here is handed; null with none. */
+  /** The host's dialog, guarded, handed to each bank made here; null if the host gave none. */
   readonly #askUser: AskUser | null
   // --
 
@@ -38,7 +38,7 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
     Object.freeze(this)
   }
 
-  /** The scope of `bankish`, which must be the device's: no listing answers for another's. */
+  /** The scope of `bankish`, which must be the device's. */
   scopeOf(bankish: unknown):  BankScope  { return bankScope.parseConsistent(bankish, this.device.scope, { message: Phrases.otherScope }) }
 
   /** Parse `bankish` as a {@link BankSparse}. */
@@ -50,7 +50,7 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
 
   // == [A birth and a death]: stampsOfBirth, recordOfBirth, build, delBank
 
-  /** A new life's stamps, the bank's and its main gate's, one pair per attempt to build a bank. */
+  /** Fresh stamps for a new bank and its main gate. Make one pair per attempt to build a bank. */
   stampsOfBirth(): { bank: BankStamp, gate: GateStamp } {
     const registered_at = nowMillis()
     return {
@@ -59,13 +59,15 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
     }
   }
 
-  /** The record of a birth under the stamp `bank`, at the revision after `expected`'s. */
+  /** A new live bank record under the stamp `bank`, at the revision after `expected`. */
   recordOfBirth(bank: BankStamp, expected: SX.Revision): BankRecord {
     return { ...bank, fmt: BX.BankFormat, ...SX.nextRevisionOf(expected, nowMillis()), am: 'a' }
   }
 
   // The bankDB answers the gate row put, the bank row put as its parent; under `passed`, the live ones it found.
-  /** Store `record` and its main gate `gate` over the bank row `expected`, and answer the bank listed: the one built, or the live one some other device built first. */
+  /** Put `record` and its main gate `gate` over the bank row `expected`, and return the listed bank.
+   * Where another device built a live bank first, nothing is put, and that bank is returned.
+   */
   async build(record: BankRecord, gate: GateRecord, expected: BankSparse): Promise<Bank> {
     this.demandEnabled()
     const answer = await this.bankDB.tryBuildBank({ op: 'build', ...this.device.scope, expected, record, gate })
@@ -78,7 +80,7 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
     return bank
   }
 
-  /** Store a tombstone over the bank row `ante`, which deletes the bank's gate, its vaults and their boxes, and answer the bank listed: gone, or null where nothing was stored. */
+  /** Delete the live bank at `ante`'s revision, with its gate, vaults and boxes, and return the listed bank, now tombstoned. */
   async delBank(ante: BankSparse): Promise<Bank | null> {
     const expected = this.sparseOf(ante)
     this.demandEnabled()
@@ -93,7 +95,7 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
   /** Whether this listing answers: its device does. */
   get isEnabled(): boolean { return this.device.isEnabled }
 
-  /** Demand that this listing's device answers. */
+  /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
     this.device.demandEnabled()
     return this
@@ -138,14 +140,14 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
   // == [Helpers]: doTryEnsure
 
   // A bank has no row above it. Its tombstone is a row stored, and no row at all is `gotvoid`.
-  /** The bankDB's ensureBank, answering the bank row as its `val`, and no parent. */
+  /** The bankDB's ensureBank, with the bank row as its `val` (null for none) and no parent. */
   async #doTryEnsure() {
     const answer = await this.bankDB.tryEnsureBank({ op: 'ensure', ...this.device.scope, gates: ['main'] })
     return answer.ok ? { ...answer, val: (answer.act === 'gotvoid') ? null : answer.parent, parent: null } : answer
   }
   // --
 
-  /** Answers 'bank_listing', which marks this model to a check: {@link Modelkind}. */
+  /** Always `'bank_listing'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'bank_listing' { return 'bank_listing' satisfies Modelkind }
 }
 
