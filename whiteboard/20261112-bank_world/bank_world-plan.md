@@ -250,6 +250,10 @@ struck from this thread.
 10 to 12. **Look-ahead**: the `do*` list from 4 and any contract correction from 8, from the
 progress document. **Size**: M-L each.
 
+*Orchestrator, after 13 (no contract correction):* 14 starts now from 4b's filed branch, on
+`thread-worker-400k`, with 13 as its template (the Coach's text: "after thread 4, whenever there
+is room"). 15 waits on 13's filing: graphql's e2e runs over the Postgres functions.
+
 ### 16 `vaultdb_out`
 
 **Levels**: worker `sonnet`; review `low`. **After**: 12 to 15, restacked into one line.
