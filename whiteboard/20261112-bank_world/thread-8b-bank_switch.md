@@ -1,6 +1,6 @@
 # Thread 8b: bank_switch (2026-11-12)
 
-Branch `20261112-bank_switch`, stacked on #665 (8a). **Partial: stopped under the release valve** (second
+Branch `20261112-bank_switch`, PR #667, stacked on #665 (8a). **Partial: stopped under the release valve** (second
 compaction) after the renames. Justify: red exactly as 8a's tip is, no wider: safebyok tsc 51 errors, 23 in
 `src/models/{bank,gating,vault,vault-listing}.ts` and 28 in 9 test files; vitest 19 files, 397 of 3218 cases failing (the
 same cases as at 8a's tip, `vault_locked` renamed in their titles); safebyok-react tsc red as 8a left it.
