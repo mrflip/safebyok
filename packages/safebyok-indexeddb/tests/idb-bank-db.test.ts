@@ -21,7 +21,7 @@ const dbNameOf = new WeakMap<IdbBankDB, string>()
 const maxBoxesOf = new WeakMap<IdbBankDB, number>()
 
 /** The name of the IndexedDB database a BankDB made with `dbName` opens. */
-const databaseNameOf = (dbName: string): string => `safebyok-${dbName}:bank-v${BankDBVersion}`
+function databaseNameOf(dbName: string): string { return `safebyok-${dbName}:bank-v${BankDBVersion}` }
 
 /** Make a BankDB on a fresh database that no other test has touched. */
 const makeBankDB = (opts: IdbBankDBOpts = {}): IdbBankDB => {
@@ -57,8 +57,8 @@ const makeTwin = async (bankDB: IdbBankDB): Promise<IdbBankDB> => {
 /** Test backdoors to a BankDB's stored rows, through a separate connection to its database. */
 const idbRowsOf = (bankDB: IdbBankDB): TH.BankDBRowCheats => {
   const shelf = createStore(databaseNameOf(dbNameOf.get(bankDB)!), 'rows')
-  const plant = async (row: unknown, scopepath: IDBValidKey): Promise<void> => { await DB.inOneStep(shelf, 'readwrite', (store) => { store.put(row, scopepath) }) }
-  const rowAt = async (scopepath: IDBValidKey): Promise<unknown> => await DB.inOneStep(shelf, 'readonly', (store) => DB.rowAt(store, scopepath))
+  async function plant(row: unknown, scopepath: IDBValidKey): Promise<void> { await DB.inOneStep(shelf, 'readwrite', (store) => { store.put(row, scopepath) }) }
+  async function rowAt(scopepath: IDBValidKey): Promise<unknown> { return await DB.inOneStep(shelf, 'readonly', (store) => DB.rowAt(store, scopepath)) }
   return {
     plantBankRow:  async (scope, row) => { await plant(row, bankScopepathOf(scope)) },
     plantGateRow:  async (scope, row) => { await plant(row, gateScopepathOf(scope)) },
