@@ -162,7 +162,7 @@ export class PostgresBankDB extends DB.AdapterBankDB {
   }
   // --
 
-  // == [Statements]: #query, #firstRow, #transact, #fetchBank, #fetchGate, #fetchVault, #fetchBox, #roomAt, #writeBank, #writeVault, #writeBox
+  // == [Statements]: #query, #firstRow, #transact, #fetchBank, #fetchGate, #fetchVault, #fetchBox, #roomAt, #writeVault, #writeBox
 
   async #query(text: string, params: unknown[]): Promise<unknown[]> {
     try {
