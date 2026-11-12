@@ -130,7 +130,7 @@ export const {
     replacePassphraseAnswer: answerCheck({ val: BX.gateRecord, acts: gateActs, ...gateish }),
     addPasskeyAnswer:        answerCheck({ val: BX.gateRecord, acts: gateActs, ...gateish }),
     revokePasskeyAnswer:     answerCheck({ val: BX.gateRecord, acts: gateActs, ...gateish }),
-    delBankAnswer:           answerCheck({ val: BX.bankTombstone, acts: EX.delActVals, parent: lit(null), badParent: lit(null), dbhas: BX.bankRow }),
+    delBankAnswer:           answerCheck({ val: BX.bankTombstone, acts: EX.delActVals, parent: lit(null).default(null), badParent: lit(null), dbhas: BX.bankRow }),
     getVaultAnswer:          answerCheck({ val: BX.vaultRow.nullable(), acts: EX.gotActVals, ...vaultish }),
     putVaultAnswer:          answerCheck({ val: BX.vaultRow, acts: EX.putActVals, ...vaultish }),
     delVaultAnswer:          answerCheck({ val: BX.vaultTombstone, acts: EX.delActVals, ...vaultish }),
