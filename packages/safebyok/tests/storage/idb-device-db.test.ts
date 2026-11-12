@@ -107,7 +107,7 @@ describe("IdbDeviceDB's database", () => {
     expect(await dbNamesNow()).to.include.members([`safebyok-${dbName}:device-v002-001-001`, `safebyok-${dbName}:devicerow-v002-001-001`])
   })
 
-  it("names its databases `safebyok:…` when it has no dbName, and `safebyok-<dbName>:…` when it has one", async () => {
+  it("names its databases `safebyok:…` when it has no dbName", async () => {
     const deviceDB = new IdbDeviceDB()
     await deviceDB.stow({ ...TH.bankScope, bank_tok: 'tok_one', proved_at: Date.now(), lease_key: await makeLeaseKey() })
     await deviceDB.ensureCachedDevice(TH.bankScope)
