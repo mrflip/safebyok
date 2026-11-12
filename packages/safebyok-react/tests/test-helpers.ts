@@ -192,7 +192,6 @@ export const submitReplacement = async (antePassphrase: string, nextPassphrase: 
   await pressOnceEnabled('Change passphrase')
 }
 
-
 /** Type the passphrase into the add-passkey dialog and press Add passkey. */
 export const submitPasskeyAdd = (passphrase: string) => {
   fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
