@@ -285,6 +285,10 @@ battery. A refusal's null parent (no row fetched) stays. **Levels**: worker `son
 
 The Coach (Coach notes): the bank-* drafts are "for swapping in atop the notes/ versions when you wish. They were written prospectively, though, so I might have a sonnet merge them as you go, with the code overriding both." *Orchestrator:* `guarantees-bank.md` merged into `notes/guarantees.md` now, the code at 9's tip overriding both; what the draft anticipated of thread 10 is not claimed, and listed for 8d. Thread 10 leaves `notes/guarantees.md` alone and reports the lines it falsifies. `deliver-contract-bank.md` stays with 10. **Levels**: worker `sonnet`; review `medium` (sonnet), checking each claim against the code. **After**: 9 (stacked on #674), beside 10. **Size**: S-M, docs. *Orchestrator:* ready as #678 (docs only, so no review, per the skill); then rebased onto 10's ready tip (#677) and a second leg brings the note up to 10's lifecycle, so 8d edits no guarantees. Found: `Bank.autolock` holds the lease row (with its key handle) from `DeviceDB.tryPeek` (TOP row, Open Matters). The draft is promoted and removed from this directory, as is `deliver-contract-bank.md` (10 promoted it).
 
+### T `sprint_tools` (added 2026-11-12)
+
+The Coach's tooling asks, as one PR stacked on #676: a CLAUDE.md line sizing every Agent call's model, `thread-reviewer` pinned to sonnet; reviewers prove only what their fixes touch; draft PRs skip CI and workers take them out of draft before their last justify, rebased at their stack position; a base-sync agent that moves the base checkout onto the line plus a squashed plan commit, reconciling its uncommitted changes against a snapshot; the doc's *Progress* tab shrinks to a lead. **Levels**: worker `opus`; review `medium` (sonnet) for the workflow and agent. **Size**: M.
+
 ### 16 `vaultdb_out`
 
 **Levels**: worker `sonnet`; review `low`. **After**: 12 to 15, restacked into one line.

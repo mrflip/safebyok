@@ -33,6 +33,9 @@ What the threads have taught, newer than the plan where they disagree. Kept by t
 * *Coach, 2026-11-12 (#668):* nothing beyond the host's `dbName` scopes an IndexedDB database's name: `safebyok:<store>-v…` with no `dbName`, `safebyok-<dbName>:<store>-v…` with one, the bank and device databases together (thread 5b).
 * *Coach, 2026-11-12 (#670):* Convex's budgeted `delBank`/`tidyGone` stay as built: the contract is unchanged (`{ totalCount }` says nothing of rows left), and there is no scheduled continuation.
 * *Coach, 2026-11-12 (#667):* one tell per lock and unlock (thread 10).
+* *Coach, 2026-11-12 (#678, autolock):* the lease reports its own expiry, a method opaque to the Bank; "even now [the ground truth is] the live lease held by the bank, not what's in the cache". Lease storage semantics (CAS, per tab, notify) are reworked after the sprint. Thread 8d builds the method.
+* *Coach, 2026-11-12 (#677):* Vault, Box and Gate stand through their lives; the Bank is remade by the Device; "Don't rip out remake either way" (replacement evaluated after the sprint). A refused lease revoke at a lock vacates the device ("the best hope for resolving the situation would have nothing trying to access it"); a bank-level vacate comes later (TODO, with whether it belongs on `Storable`).
+* *Coach, 2026-11-12:* every Agent call names its model (CLAUDE.md line, thread T); reviewers prove only what their fixes touch, `file-thread` is the gate; workers keep PRs in draft (no CI) and take them out just before their last justify; the base checkout carries the line and the plan, kept in tune by a base-sync agent (thread T, #676's stack).
 
 ## The BankDB `do*` list
 
