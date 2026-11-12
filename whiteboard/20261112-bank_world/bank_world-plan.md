@@ -161,7 +161,24 @@ restacked into one line (`wrapup.md`, *Restack*). **Look-ahead**: 9 renames what
 of rule 11 and does not tidy them. Any correction 8 makes to the BankDB contract is recorded in its
 report and the progress document for 13 to 15. **Size**: XL.
 
-### 8b `bank_gate_tests`
+### 8 is cut into 8a, 8b, 8c and 8d
+
+*Orchestrator, 2026-11-12, revising the two entries below:* an opus planner read the code and cut
+thread 8 in three, with the former 8b becoming 8d: `thread-8-cut.md` in this directory is the cut,
+and each handoff quotes it. The line is red from 8a's tip to 8c's (rule 20).
+* **8a `bank_keys`**: stamps, ctx, lease (`fmt` 7003), `Gate` as a value, the deviceDB's lease key.
+  **Levels**: worker `opus`; review `medium`, checking each ctx against the ruled table.
+  **After**: 7, filed. It needs nothing of 4 or 5.
+* **8b `bank_switch`**: the models onto `bankDB`; lease and unlock to the bank; `build_bank`,
+  `unlock_bank`; the vault listing by `ensureBank`; the fixture builders moved once; `Storable`'s
+  `vault_tok` down (pulled forward from 10). **Levels**: worker `opus`, effort `high`; review
+  `medium`. **After**: 8a and 4, restacked into one line.
+* **8c `bank_prompts`**: the gate's prompts and verbs, `del_bank`, `autolock`, a bank tombstone
+  delivered; unskips 8b's skips; React compiles. **Levels**: worker `opus`; review `medium`.
+  **After**: 8b.
+* **8d `bank_gate_tests`**: the former 8b below. **After**: 8c.
+
+### 8b `bank_gate_tests` (now 8d)
 
 The suites thread 8 skipped, re-pointed at the bank and `bank.maingate` (much of what thread 11
 would have done; 11 is judged again once 8b files). Then `threads.md` § 8, items 8 and 9: new tests for building and deleting a bank, one lock over two

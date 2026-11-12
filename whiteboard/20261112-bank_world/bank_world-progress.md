@@ -23,7 +23,8 @@ What the threads have taught, newer than the plan where they disagree. Kept by t
 
 ## The BankDB `do*` list
 
-(thread 4 fills this in)
+*Thread 4:* each `do*` call fetches, judges and stores its whole verb in one atomic unit; the `classify*` calls are protected methods of `AdapterBankDB`, so a store that judges in-database (Postgres, Convex) overrides them.
+`doEnsureBank`, `doBuildBank`, `doPutGate` (the three gate verbs, by `ask.gateVerb`), `doDelBank` (gate, vault and box rows with the bank), `doGetVault`, `doPutVault`, `doDelVault` (clears that life's boxes), `doListBoxes`, `doGetBox`, `doPutBox`, `doDelBox`, `doTidyGone`, `doWatch` (a no-op unless overridden). Exported from `safebyok/storage`; the barrel `src/storage/bankdb.ts` goes out as `BX`; wire checks `src/shapes/shapes-bank-answers.ts`. `BX.vaultLifeOf` gives a box's parent life. Recorded: gate verbs answer `replaced`/`passed`; `bank_void`/`bank_gone` refuse `absent_vault`, `bank_reborn` refuses `vault_reborn`; `tidyGone` counts rows left; `Heard` is `{ row, parent }`.
 
 ## Contract corrections found by the models
 
