@@ -3,7 +3,9 @@
 * **Date**: 2026-11-12. **Issued by**: the Coach, with `threads.md`, `design.md` and `rulings.md`
   beside this file (carried verbatim from the base checkout in the first `plan:` commit).
 * **Mode**: YOLO.
-* **Default levels**: review `low`; worker `opus` (agent default effort); reviewer `sonnet`
+* **Default levels**: review `medium` (revised: `/code-review low` returned `(none)` where `medium`
+  found real defects; a thread's "`low`" below now means a `medium` code review with a light hand on
+  the rest); worker `opus` (agent default effort); reviewer `sonnet`
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
 * **Status**: thread 1 building. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
