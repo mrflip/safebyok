@@ -8,10 +8,9 @@
   the rest); worker `opus` (agent default effort); reviewer `sonnet`
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
-* **Status** (2026-11-12, 19:40Z): the Coach merged 8a to 10 (#665 to #677). Open: 8d #679 (reviewed,
-  filing), 12 (building, 400k), G #678 (draft, the living guarantees note, to the top at wrapup), T
-  (tooling, on #676, building), #676 (the Coach's `.claude` sweep, squashed). Then 16 and 17. PRs stay
-  draft until the orchestrator judges them ready to merge (the Coach). Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
+* **Status** (2026-11-12, 20:00Z): 8a to 10 merged. Filed: 8d #679 (on main, draft until judged
+  ready). In review: 12 #681. G #678 (draft, living guarantees note, top at wrapup). T (tooling, on #676).
+  Next: 16, then 17. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
 not copied again here. What follows is the gloss.
@@ -259,7 +258,7 @@ struck from this thread.
 
 *Orchestrator, from 10:* a Vault keeps one object through its lives, and its box watch is not restarted at a new life: React re-asks `vault.boxListing` and calls `vault.beginWatch()` again when the snapshot's `vault_tok` changes. `device.sweep()`/`vacate()` are the only lifecycle calls; rename a thing's `alignLock()` to `lock()` once the `Vault.lock()` scaffold goes.
 
-**Levels**: worker `opus` (400k); review `medium`. **After**: 10 (11 folded into 8d), cut from its filed tip beside 8d; its core-scaffold deletion is its last commit, so the restack onto 8d stays small. The report itemizes the React cost
+**Levels**: worker `opus` (400k); review `medium`. **After**: 10 (11 folded into 8d), cut from its filed tip beside 8d; its core-scaffold deletion is its last commit, so the restack onto 8d stays small. *Orchestrator:* ready as #681 (react +204/−153, demo +57/−62, core +19/−62; two compactions); in review, with a YOLO directive: the align duty goes back to `alignLock()` (internal), since `lock()` on a Vault would compile in a host and silently lock nothing. 8c's four React questions decided in its report. 8d filed onto main (2e16465aa). The report itemizes the React cost
 (state, effects, branches, added and removed). **Size**: L.
 
 ### 13 `bankdb_postgres`, 14 `bankdb_convex`, 15 `bankdb_graphql`
