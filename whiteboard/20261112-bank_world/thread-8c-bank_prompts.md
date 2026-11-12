@@ -2,8 +2,7 @@
 
 Branch `20261112-bank_prompts`, PR #673, stacked on #667 (8b). Justify: every package green
 (safebyok 3397, react 255, fastkey 43, indexeddb 376, postgres 433, convex 508, graphql 408,
-e2e 549, root 285). **Red: `demos/safebyok-demo-react`** (lint 7, typecheck 4, tests 67 of 98),
-left for thread 12, which threads.md gives "the `bankDB` prop and `IdbBankDB` in the demo".
+e2e 549, root 285, demo-react 98). Leg 2 ported the demo minimally; thread 12 still owns its UX.
 
 * **Built**
   * `Gate`: `replacePassphrasePrompt`, `addPasskeyPrompt`, `revokePasskeyPrompt` (each with a `try`
@@ -50,7 +49,18 @@ left for thread 12, which threads.md gives "the `bankDB` prop and `IdbBankDB` in
   vault-listing.test's); all 7 "building a vault by its gate" (`buildVault`, `launchBirth` gone).
   React: six `DevVaultDBInspector` cases over a bank's rows (no bank writes a VaultDB; thread 16
   retires it), keeping its signed-out case.
-* **Deviations**: the demo left red (above). React's `CreateVaultButton`, `ShowsVault` and the
+* **Leg 2, the demo** (src +63 −48, counting the outage file as a rename): `OutageBankDB` wraps
+  `IdbBankDB` the way `OutageVaultDB` wrapped the vaultDB (all twelve `do*` calls; the watch, as
+  before, is not switched off); `storage.ts` passes `bankDB`; `WaysIn` reads
+  `useBankSnapshot()?.maingate` (`main`, `passkey0`) in place of `vault.gate`; the widget flow and
+  `ensureApiKeyBoxExposed` call `bank.ensureUnlocked()` before `bank.ensureVault`, since a vault is
+  built only in an unlocked bank. The labs page drops `DevVaultDBInspector` (it takes a VaultDB; a
+  bank has none). Tests: `renderInBank` is async and pre-builds u1's bank from another device, so
+  it opens locked and each flow's one dialog is the bank's unlock; `{ isBankBuilt: false }` leaves
+  the store empty, and the account menu's first case and the labs page's outage case answer the
+  `build_bank` dialog at sign-in. The three cancel cases spy `Bank.ensureUnlocked`, where the dialog
+  now opens. No skips, no disables.
+* **Deviations**: React's `CreateVaultButton`, `ShowsVault` and the
   provider's dialog tests were moved minimally: "builds the vault from a click" became "builds the
   bank from its dialog, then the vault from a click"; the other dialog cases open the unlock dialog.
 * **Discoveries**
@@ -62,7 +72,13 @@ left for thread 12, which threads.md gives "the `bankDB` prop and `IdbBankDB` in
   * An empty bankDB makes `ensureBank` open `build_bank` at sign-in: every React or demo test that
     expects a ready bank over a fresh world must build one first.
 * **Set aside**: re-reading `gate.pickle()` after the proving (a row landing mid-proving would pass
-  unseen); the lease citing `bank.maingate` after the write (cites a newer row); building the demo
-  onto the bank now (its UX waits on thread 12's React design).
-* **For the Coach**: two device tells per lock and unlock (carried, unchanged); a gate row landing
+  unseen); the lease citing `bank.maingate` after the write (cites a newer row); in leg 2, driving
+  every demo test through the empty-store `build_bank` dialog (each test would answer before it
+  clicks, a restructure of all 98; pre-building keeps their subject, a returning user), and making
+  React's `CreateVaultButton` unlock first (a React choice, thread 12's).
+* **For the Coach**: over a locked bank with no vault yet (a returning user on a new device),
+  React's `CreateVaultButton` refuses `locked` and the demo's account menu shows the bad news: the
+  demo's flows unlock first, the account menu's button cannot. Thread 12. A user who cancels the
+  `build_bank` dialog at sign-in is left with no bank until they sign in again (React calls
+  `ensureBank` once per device). Two device tells per lock and unlock (carried, unchanged); a gate row landing
   between a gate verb's write and its lease grant (a race: an open-matters line, no fix).
