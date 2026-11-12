@@ -131,15 +131,15 @@ W2 is how this device learns from a box answer alone that its vault's life is ov
 
 ## Where this differs from the code today
 
-1. **`fateOver` becomes S2, and `SlotFate` is removed.** Its `lose` is R1, and its `replace` is S2. `Listing.buildOrReceive` keeps only selection.
-2. **One table, read once.** Today a vault row is judged by `VaultListing.fateOver`, then by `Storable.reconcileCentral`, and the two do not agree: `reconcileCentral` checks `vault_tok` before age, so an older row of another life is dropped at the listing, and would throw at an instance handed it directly.
-3. **A box row of another `vault_tok`** is refused `storage_issue` by its listing, as F3 says (`rowOfOtherVaultTok` in `Listing.buildOrReceive`). An instance handed one directly still throws `record_conflict` (`otherVaultTok` in `reconcileCentral`).
-4. **W1 reports no bad news.** `Vault.receiveWorld` passes the world to the vault listing, so W2 and W3 already apply. The shell is `older` there and is dropped as R1, where F6 would report it to the host.
+1. **Selection judges R1 and S2 in `slotStepOf`.** The vault listing's `slotStepOf` answers `keep` for R1 and `remake` for S2, so `Listing.#rowPlanOf` does more than select, and a `keep` never reaches the receive table.
+2. **One table, read once.** Today a vault row is judged by `VaultListing.slotStepOf`, then by `Storable.reconcileCentral`, and the two do not agree: `reconcileCentral` checks `vault_tok` before age, so an older row of another life is kept past at the listing (`keep`), and would throw `record_conflict` at an instance handed it directly. The receive table still judges inside `reconcileCentral`.
+3. **A row of another `vault_tok` at a box listing** is refused `storage_issue` by its listing, as F3 says, when an answer carries it in `val` (`rowOfOtherVaultTok` in `Listing.#rowPlanOf`). When a refusal carries it in `dbhas`, it is set aside without a finding, and the refusal is thrown. An instance handed one directly still throws `record_conflict` (`otherVaultTok` in `reconcileCentral`).
+4. **W1 reports no bad news.** `Vault.receiveWorld` passes the world to the vault listing (`receiveRow`), so W2 and W3 already apply. The shell is `older` there and is kept past as R1, where F6 would report it to the host.
 5. **F4, F5 and F6** are three throwers and three sentences today (`oneRevisionTwoToks`, `oneRevisionTwoLives`, `oneRevisionTwoFates`).
-6. **F7 is new as a refusal.** Today a vault is replaced there (`isRebirth` in `fateOver`), and a box adopts.
+6. **F7 is new as a refusal.** Today a vault is remade there (`isRebirth` in `slotStepOf`), and a box adopts.
 7. **`shapeUnreconciled` cannot be reached**, and is removed.
-8. **`none` is a tag**, and what is received for it is the shell tombstone. Today `Storable.receive(null)` makes a tombstone at the instance's revision so that `reconcileCentral` has something to compare.
-9. **What an answer carries** is read from `val`, not from the act. Today `Listing#deliverGood` receives a null `val` as `none`, and checks any other `val` against the request's params (only its scope for `passed`) before receiving it.
+8. **`none` is a tag**, and what is received for it is the shell tombstone. Today a `gotvoid` act is delivered as `Storable.receive(null)` where an instance is listed, which makes a tombstone at the instance's revision so that `reconcileCentral` has something to compare.
+9. **A stored record is checked by its tokens.** The act says what an answer carries (`RowOfAct`), as the table above does. For an act that stored the request's record, `deliver` refuses `storage_issue` unless the row's scope, `revision_tok`, `revision_seq` and life token equal the request's. The contract says the record is equal.
 
 ## Not in this note
 

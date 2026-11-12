@@ -56,7 +56,8 @@ added or folded into through the subagent, and no other entry changes.
   or deleted and made anew, on another device) vacates the Vault of the ended life at once, which disables and locks it and empties its box listing, and lists a new Vault in its place: one that reads as deleted
   for a tombstone, or a new locked vault for a live row. So an unlocked Vault of an ended life no longer stays unlocked until the vault listing next fetches its own row. The caller hears the answer's own
   refusal (`absent_vault` or `vault_reborn`); before, the Vault refused the row with `record_conflict` and stayed as it was. An older row is dropped; a newer row of the same life is adopted as before, and a
-  `gate` changed elsewhere arrives with it. The choosing is the vault listing's existing selection (`VaultListing.fateOver`); no state, lock, retry or guard was added.
+  `gate` changed elsewhere arrives with it. The choosing is the vault listing's existing selection (`VaultListing.fateOver`; amended 2026-11-12 (vaultdb_asks): `VaultListing.slotStepOf`, answering `'receive'`, `'keep'` or `'remake'`,
+  and `Listing.deliver` now plans from the answer's act first and then carries the plan out); no state, lock, retry or guard was added.
   Where no vault row is stored at all, the answer's `world` is the sentinel row, which is older than any row held and is dropped silently; `notes/receive-contract.md` (F6, W1) says that finding should be
   told to the host as bad news, and that is not built.
 
@@ -106,6 +107,11 @@ added or folded into through the subagent, and no other entry changes.
   of a gate-moving write, as it already can for a put; storage no longer stamps them. Separately, `Listing.deliver` now refuses a good storage answer whose scope, life or
   revision differs from what was sent. A declined put and a `del` over a tombstone answer what storage has, and `deliver` pins only the scope; `revokePasskey` over a vault
   with no passkey answers the stored row and pins only the scope.
+  Amended 2026-11-12 (vaultdb_asks): `Listing.deliver` now plans first, from the act alone (the `RowOfAct` table, `models/listing.ts`), and `#carryOut` then acts on the plan; `#deliverGood` and the
+  `isScopePinned` option are gone. A `stored` act (`born`, `reborn`, `replaced`, `deleted`, `added`, `revoked`) must carry the record sent, at its revision, or `deliver` refuses `storage_issue`; a `found`
+  act (`gotlive`, `gotgone`, `passed`) or a refusal's `dbhas` row need only be of the scope sent. So the put that passes (act `passed`, `ifPresent: 'get'`; "a declined put" above) and a `del` over a tombstone
+  (act `dubdel`) pin only the scope because of their acts. `revokePasskey` over a vault with no passkey wayin now answers `passed`, with the row as stored, where it answered `revoked`, and pins only the
+  scope for the same reason, not because of an option.
   Amended 2026-11-10 (gate_mint): **`putVault` replaces a live vault row, gate included, without the gate verbs' checks.** `VaultDB.putVault` takes the same `PutOpts` as `putBox`
   (`ifPresent` 'repl' by default, 'fail' or 'get'; it once refused 'repl', so that a live vault row moved only by a gate verb). A host calling `putVault(record, { prior })` directly
   over a live vault at `prior` replaces its gate, `gate_epoch`, `registered_at` and wayins with any that parse, but not its `vault_tok`: `isVaultPutAllowed` refuses a live row of another
@@ -207,7 +213,7 @@ added or folded into through the subagent, and no other entry changes.
   (4) Handlers are heard while the bank is enabled, and after a sweep or a vacate only from the vacate's own scrub, which tells `lease_revoke_failed` per refused row and then `vacated` once it settles, neither awaited,
   so a host handler that awaits `bank.vacate()` cannot deadlock. A disabled bank routes every other event to `DefaultOnLifecycle`, whose only action, a vault's vacate, is a no-op on a vault already let go.
   A bank row the scrub cannot forget is now told as bad news (`onBadNews`), not as a panic (it replaces the bank_followups sentence that sent a refused forget to `onPanic`). Where this entry says a disabled
-  bank's panic goes to a handler that only reports to the platform, or that `DefaultOnPanic` logs each panic, read `DefaultOnLifecycle`, whose error log is `{ call: 'Bank.onLifecycle', refusalkind }` with the message only.
+  bank's panic goes to a handler that only reports to the platform, or that `DefaultOnPanic` logs each panic, read `DefaultOnLifecycle`, whose error log is `{ call: 'Bank.onLifecycle', refusalkind }` (amended 2026-11-12 (vaultdb_asks): `{ oplabel: 'Bank.onLifecycle', refusalkind }`; the logger's story names its operation as `oplabel`) with the message only.
   (5) `BankFriend` gains `announce`, branded by `brandGuarded` and checked by `isGuarded` like `panic`, `tellBadNews` and `askUser`; it is protected in TypeScript only, on `Listing.bankFriend`, as the others are,
   so a host holding a vault listing can reach it at runtime and make the bank tell its `onLifecycle` an event the bank did not see.
 
@@ -1044,13 +1050,13 @@ added or folded into through the subagent, and no other entry changes.
   none of the names above survives. Every
   operation of `safebyok-graphql`'s schema now answers one typed object, the same fields as its verb's `try*` answer
   (`ok`, `act`, `val`, `world`, `dbhas`, `req_params` (amended 2026-11-11 (vaultdb_asks): `ask`, a `SafebyokAsk` that never holds a record's payload; see the 2026-11-11 vaultdb_asks entry at the top), `err`), and a refusal of any kind is that answer's `err` field
-  (`SafebyokErr`: `refusalkind`, `message`, and `meta` of `capacity`, `fieldnames` and `call` alone, never a record or
+  (`SafebyokErr`: `refusalkind`, `message`, and `meta` of `capacity`, `fieldnames` and `call` (amended 2026-11-12 (vaultdb_asks): `oplabel`, the verb that refused, such as `putVault`; `crossedErr`, `crossedErrOf`) alone, never a record or
   a cause), not a GraphQL error; there are no `landed` flag, `SafebyokPutBoxAnswer`, `SafebyokPutVaultPropsAnswer` or
   `SafebyokStoredRecord` scalar (the mutations are `safebyokPutVault` and `safebyokPutBox`). On a `stale_write` the
   winning rows travel as the answer's typed `world` and `dbhas` (`SafebyokVaultRow`, `SafebyokRow`), and a damaged
   row in a listing as a `SafebyokJson` of `damaged_rows`; `GraphQLVaultDB` checks the answer against the core's own checker
   (`DB.putBoxAnswer` and its kin) and throws the same VaultError, its `meta` holding `world` and `dbhas`
-  again, so the VaultDB layer's `err.meta` is unchanged. A GraphQL error, whose text can quote a variable sent (the
+  again, so the VaultDB layer's `err.meta` is unchanged (amended 2026-11-12 (vaultdb_asks): a refusal's `world` and `dbhas` are not on `meta`; they ride on the answer, and on the error as `RowsOfRefusal`, a symbol property that is not enumerable, read by `rowsOfRefusal`, so a log of the error does not carry them). A GraphQL error, whose text can quote a variable sent (the
   record), is refused in the browser as `unexpected_error` with no cause, and a failed fetch as
   `storage_unavailable`, its cause naming only the error, the HTTP status and a code. Residual: the winning rows
   are in the response `data`, which a host's response logging can still write down; the package README does not
@@ -1863,7 +1869,8 @@ added or folded into through the subagent, and no other entry changes.
   is stored, so the winner reported is the latest committed, locked row and not the statement's
   snapshot; Convex: one mutation; IndexedDB and `localVaultDB`: one transaction or synchronous
   step; GraphQL: the server's VaultDB). When the stored box is not the one expected, the write
-  is `stale_write` and `err.meta.box_stored` is the whole stored box record, its wrapped boxKey
+  is `stale_write` and `err.meta.box_stored` (amended 2026-11-12 (vaultdb_asks): the whole stored box is the answer's `dbhas`, and on the thrown error a `RowsOfRefusal` symbol property, not enumerable, read by `rowsOfRefusal`,
+  `refusals/errors.ts`; `meta` itself carries only `capacity`, `fieldnames`, `oplabel`, `act` and `ask`, so a log of a refusal's `meta` holds no record) is the whole stored box record, its wrapped boxKey
   (`box_key_wrapped`) and ciphered whisper (`whisper_ciphered`) included, held by the base class to
   the check `getBox` makes: a record that fails becomes a `DamagedBox` (`{ boxlabel, damaged: true,
   revision_tok }`), and nothing stored is `null`. The Coach's intent: it comes in as a read, so
@@ -1882,7 +1889,8 @@ added or folded into through the subagent, and no other entry changes.
   `vault_mismatch` (condition) is a box write whose vault props (`vault_id`, `vault_key_epoch`; amended 2026-10-21 (trust_lines): `vault_id` alone) are no
   longer the stored ones; it carries no meta, since vault props (salts, wrapped vaultKey) never ride on a
   refusal (the a_sec2 ruling). Amended 2026-10-22 (lease_box): **a box read names the vault it expects**:
-  `VaultDB.getBox(scope, boxlabel, { vault_tok })` compares the stored vault props' `vault_tok` in the same atomic
+  `VaultDB.getBox(scope, boxlabel, { vault_tok })` (amended 2026-11-12 (vaultdb_asks): `getBox(ask)`, a `BoxGetAsk` that names the `vault_tok` and the expected row, and whose refusals are by act, `vault_void`, `vault_gone`
+  and `vault_reborn`, as `absent_vault` or `vault_reborn`; there is no `vault_mismatch` refusalkind now) compares the stored vault props' `vault_tok` in the same atomic
   step as the read (every adapter: local, IndexedDB, Convex component query, Postgres single statement, GraphQL field
   argument) and refuses `vault_mismatch` for none, a tombstone, or another life. The vault maps it to `vault_gone`
   and marks its picture stale so the next hello reads storage, rather than opening a box of a vault made anew
@@ -2542,7 +2550,7 @@ added or folded into through the subagent, and no other entry changes.
   set by a caller; `bad_news` (`damaged_vault`, `damaged_wayin`, `damaged_box`, `newer_format`,
   `rolled_back`, `identity_revoked`) was `condition`, and `isCondition` is true for both (amended
   2026-10-21 (fault_kinds): `corrupt_record` is in the `misuse` family, no longer `condition`). It
-  also gains `meta?` (`box_stored`, `capacity`; amended 2026-10-19, a_sec2, #206: `vault_props_stored`
+  also gains `meta?` (`box_stored` (amended 2026-11-12 (vaultdb_asks): no longer on `meta`; a refusal's rows ride on `RowsOfRefusal`, and `RefusalMeta` holds `capacity`, `fieldnames`, `oplabel`, `act` and `ask`), `capacity`; amended 2026-10-19, a_sec2, #206: `vault_props_stored`
   is removed, see below): stored records as storage holds them (ciphertext and visible fields) and
   counts only, never secret material; amended 2026-10-21 (C1): a refused `putBox` that finds a
   different box stored now fills `box_stored` with the whole stored record, ciphertext and
@@ -2556,7 +2564,7 @@ added or folded into through the subagent, and no other entry changes.
   `Number.MAX_SAFE_INTEGER`) and refuses a `vault_full` without a sound one as `corrupt_record`.
   It crosses the GraphQL wire as `extensions.meta.capacity` (amended 2026-10-22 (wire_meta): no longer; amended 2026-11-07 (docblock_trim): it is the `capacity`
   of the `err.meta` of `safebyokPutBox`'s answer in the response `data`); the Postgres route recipe in the
-  README now sends a refusal's `meta` whole, which from a `VaultDB` verb is only `box_stored` (stale
+  README (amended 2026-11-12 (vaultdb_asks): gone from the README; see the 2026-10-15 `safebyok-postgres` entry) now sends a refusal's `meta` whole, which from a `VaultDB` verb is only `box_stored` (stale
   write) or `capacity` (`vault_full`). The vault still locks
   on `identity_revoked` and `rolled_back` from storage: (amended 2026-10-28 (heed_inline): `RefusalPolicy.heed`
   and the `HeededVaultDB` wrapper are deleted; the vault holds a plain `VaultDB` and at each of its six call sites
@@ -3063,7 +3071,8 @@ added or folded into through the subagent, and no other entry changes.
   scope and boxlabel, a route's vault props, boxes and expectations are validated only as the
   core's VaultDB validates them. A driver's error rides as `cause` and may quote key columns, or
   (a malformed record refused by a NOT NULL) the whole failing row, its ciphertext included; the
-  README's route recipe sends the browser only a refusal's kind and message (amended 2026-10-21
+  README's route recipe (amended 2026-11-12 (vaultdb_asks): `packages/safebyok-postgres/README.md` no longer has a route recipe, `route-recipe.test.ts` is gone, and neither `answerOf`, `boxShown`, `wayinShown`
+  nor `checkedAnswer` is in the tree; the `{ result, meta }` wire and its allowlist below describe code that no longer exists) sends the browser only a refusal's kind and message (amended 2026-10-21
   (store_rulings, #217): and its `meta`, whole: only `box_stored` or `capacity` from a `VaultDB` verb;
   amended 2026-10-22 (route_meta, branch 20261022-route_meta): no longer whole, and it sent more than that: a
   refusal that listed a record (`box_listed`, `wayin_listed`) carried a wrapped vaultKey, ciphertext or a
@@ -3108,7 +3117,7 @@ added or folded into through the subagent, and no other entry changes.
   VaultError through the optional third parameter of `VaultDB.watch`, `onBadNews`, which the core's listings route to the bank's bad-news
   channel (the host's `onBadNews`, else `logger.warn`); an `identity_revoked` notice ends the watch quietly, as before. The reported error carries
   no server text: a GraphQL error is `unexpected_error` with no cause, a network error is the sanitized cause of the 2026-10-17 GraphQL entry
-  below, a closing result is `storage_unavailable` with the fixed phrase `WatchEnded` and meta `{ call: 'watch' }`. `tidyGone` and `tryTidyGone`
+  below, a closing result is `storage_unavailable` with the fixed phrase `WatchEnded` and meta `{ call: 'watch' }` (amended 2026-11-12 (vaultdb_asks): `{ oplabel: 'watch' }`). `tidyGone` and `tryTidyGone`
   are now verbs of the public `VaultDB` and cross as the mutation `safebyokTidyGone(applabel, user_id)`, served behind the same `user_id` gate
   as every other operation (`served(context, scope.user_id, ...)`): refused `identity_revoked`, without calling the vaultDB, unless it is the
   signed-in user's bank.)
