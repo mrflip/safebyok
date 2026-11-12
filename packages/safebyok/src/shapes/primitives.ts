@@ -27,7 +27,7 @@ export const Patterns = Object.freeze({
 /** The most characters a label contains. */
 export const MaxLabelChars = 40
 
-/** An banklabel, a vaultlabel or a boxlabel: lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two to {@link MaxLabelChars} characters.
+/** A banklabel, a vaultlabel or a boxlabel: lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two to {@link MaxLabelChars} characters.
  * Check a label a user types with `safeParse` before handing it to the vault, which refuses one
  * that fails.
  *

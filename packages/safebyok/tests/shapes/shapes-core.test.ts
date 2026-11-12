@@ -215,12 +215,12 @@ const ScopeCases = [
   [TH.scopeOf('u'.repeat(100)),                       true,   'a user_id of a hundred characters, the most it has'],
   // refused, a name failing its check:
   [TH.scopeOf('u'.repeat(101)),                       false,  'a user_id over a hundred characters'],
-  [{ ...TH.scopeOf('u1'), banklabel: 'Acme: Ünïcode' },  false,  'an banklabel that is no label'],
+  [{ ...TH.scopeOf('u1'), banklabel: 'Acme: Ünïcode' },  false,  'a banklabel that is no label'],
   [{ ...TH.scopeOf('u1'), user_id: '' },              false,  'an empty user_id'],
   [{ ...TH.scopeOf('u1'), vaultlabel: 'tab\there' },  false,  'a vaultlabel containing a control character'],
-  [{ ...TH.scopeOf('u1'), banklabel: 'cafe\u{301}' },  false,  'an banklabel outside ASCII'],
+  [{ ...TH.scopeOf('u1'), banklabel: 'cafe\u{301}' },  false,  'a banklabel outside ASCII'],
   // refused:
-  [{ ...TH.scopeOf('u1'), banklabel: 42 },             false,  'an banklabel that is not text'],
+  [{ ...TH.scopeOf('u1'), banklabel: 42 },             false,  'a banklabel that is not text'],
   [{ user_id: 'u1', banklabel: 'acme' },              false,  'a scope missing its vaultlabel'],
 ] as const
 
