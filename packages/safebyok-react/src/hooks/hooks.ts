@@ -12,22 +12,22 @@ const getNothing = () => null
 /** Return the signed-in user's device from the nearest BankProvider, or null while nobody is signed in.
  * Its `vacate()` is sign-out, whether or not its bank is up.
  */
-export const useDevice = (): Device | null => useProvided('useDevice').device
+export function useDevice(): Device | null { return useProvided('useDevice').device }
 
 /** Return the signed-in user's bank from the nearest BankProvider, or null until it is up and once it has ended. */
-export const useBank = (): Bank | null => {
+export function useBank(): Bank | null {
   const { device } = useProvided('useBank')
   return useSyncExternalStore(device?.subscribe ?? subscribeToNothing, () => device?.bank ?? null, getNothing)
 }
 
 /** Return the live snapshot of the signed-in user's bank, or null while {@link useBank} answers null. */
-export const useBankSnapshot = (): BankSnapshot | null => useDeviceSnapshotFor('useBankSnapshot')?.bank ?? null
+export function useBankSnapshot(): BankSnapshot | null { return useDeviceSnapshotFor('useBankSnapshot')?.bank ?? null }
 
 /** Return the live snapshot of the signed-in user's device: its stage, why it ended, its open gating and its bank's snapshot. Null while nobody is signed in. */
-export const useDeviceSnapshot = (): DeviceSnapshot | null => useDeviceSnapshotFor('useDeviceSnapshot')
+export function useDeviceSnapshot(): DeviceSnapshot | null { return useDeviceSnapshotFor('useDeviceSnapshot') }
 
 /** Same as {@link useDeviceSnapshot}. `hookname` is the hook named in the error when there is no provider. */
-const useDeviceSnapshotFor = (hookname: string): DeviceSnapshot | null => {
+function useDeviceSnapshotFor(hookname: string): DeviceSnapshot | null {
   const { device } = useProvided(hookname)
   return useSyncExternalStore(device?.subscribe ?? subscribeToNothing, device?.getSnapshot ?? getNothing, getNothing)
 }

@@ -27,7 +27,7 @@ export const useProvided = (hookname: string): ContextValue => {
 /** Make the provider's device from the first render's `opts`, and keep it until unmount.
  * Returns the context value for it. Later changes to `opts` are ignored.
  */
-const useProviderDevice = (opts: ProviderDeviceOpts, handlers: Handlers, isHostAsking: boolean, onMade: (device: Device) => void): ContextValue => {
+function useProviderDevice(opts: ProviderDeviceOpts, handlers: Handlers, isHostAsking: boolean, onMade: (device: Device) => void): ContextValue {
   const [madeFrom] = useState(opts)
   const [contextValue, setContextValue] = useState<ContextValue>(Deviceless)
 
@@ -94,7 +94,7 @@ export const BankProvider = (props: BankProviderProps) => {
 }
 
 /** Render the dialog for `device`'s open gating, or nothing when no gating is open. */
-const OpenGatingDialog = ({ device, ...dialogProps }: Pick<GatingModalProps, 'passphraseUsername' | 'passkeyRpId'> & { device: Device }) => {
+function OpenGatingDialog({ device, ...dialogProps }: Pick<GatingModalProps, 'passphraseUsername' | 'passkeyRpId'> & { device: Device }) {
   const { openGating } = useSyncExternalStore(device.subscribe, device.getSnapshot)
   if (openGating === null) { return null }
   // No key is needed here: each dialog keys its form by its gating's `gatingTok`.
@@ -102,7 +102,7 @@ const OpenGatingDialog = ({ device, ...dialogProps }: Pick<GatingModalProps, 'pa
 }
 
 /** Provide one user's device and its bank, and render the dialog for its open gating. */
-const UserBankProvider = (props: BankProviderProps & { onMade: (device: Device) => void }) => {
+function UserBankProvider(props: BankProviderProps & { onMade: (device: Device) => void }) {
   const { passphraseUsername, passkeyRpId, children, onMade, onLifecycle = DefaultOnLifecycle, onBadNews = DefaultOnBadNews, requestCleartext, ...deviceish } = props
   // The device is made once, so this is fixed at the first render, like the device's other options.
   /** True when the host's `requestCleartext` handles this device's gatings, in place of the built-in dialogs. */

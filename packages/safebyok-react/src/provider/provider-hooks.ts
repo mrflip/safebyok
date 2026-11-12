@@ -10,7 +10,7 @@ const changedFieldnames = (was: Record<string, unknown>, now: Record<string, unk
 )
 
 /** Warn once, through `device`'s logger, when options have changed since the device was made. The device ignores such changes. */
-export const useWarnOfIgnoredOpts = (device: Device | null, wasOpts: ProviderDeviceOpts, nowOpts: ProviderDeviceOpts): void => {
+export function useWarnOfIgnoredOpts(device: Device | null, wasOpts: ProviderDeviceOpts, nowOpts: ProviderDeviceOpts): void {
   const toldOfIgnored = useRef(false)
   useEffect(() => {
     if (device === null || toldOfIgnored.current) { return }
