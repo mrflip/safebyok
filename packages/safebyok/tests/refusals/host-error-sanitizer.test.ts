@@ -66,7 +66,7 @@ describe("HostErrorSanitizer.refusalFor", () => {
     async function deriveOrRefuse(passphrase: string) {
       let handed: unknown
       try { handed = await keyDeriver.deriveKeyBytes(passphrase) } catch (err) {
-        throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', 'The keyDeriver handed to Bank.make threw rather than deriving a key. What it threw is left out of this report, as the deriver hears the passphrase.')
+        throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', 'The keyDeriver handed to Device.make threw rather than deriving a key. What it threw is left out of this report, as the deriver hears the passphrase.')
       }
       return handed
     }

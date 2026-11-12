@@ -4,7 +4,7 @@ import { VaultError } from '../../src/refusals/errors'
 import { DefaultLogger, asError, isGuardedLogger, parseLogger, setDefaultLogger, type VaultLogger } from '../../src/helpers/logger'
 import * as TH from '../test-helpers'
 
-/** What a host might hand Bank.make as its logger that is not one. */
+/** What a host might hand Device.make as its logger that is not one. */
 const NotLoggers = [
   [{},                                                         'an empty object'],
   [{ log: () => undefined, warn: () => undefined },            'a logger without error'],
