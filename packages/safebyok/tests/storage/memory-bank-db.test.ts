@@ -5,7 +5,7 @@ import { DefaultMaxRecordSizeEst, isAdapterBankDB, isBankDB } from '../../src/he
 import { BankDBVerbnames } from '../../src/storage/bank-db'
 import { MemoryBankDB } from '../../src/storage/memory-bank-db'
 import { VaultError } from '../../src/refusals/errors'
-import { BankTop } from '../../src/shapes/shapes-bankdb'
+import * as BX from '../../src/shapes/shapes-bankdb'
 import type { Notice } from '../../src/storage/bank-db'
 import {
   bankAt, bankBuildAskOf, bankDelAskOf, bankEnsureAsk, bankScope, boxAt, boxDelAskOf, boxGetAskOf, boxListAsk, boxPutAskOf, boxQuery, boxTidyAsk,
@@ -116,7 +116,7 @@ describe("MemoryBankDB's bank verbs", () => {
     await bankDB.putBox(boxPutAskOf(boxAt()))
     const answer = await bankDB.delBank(bankDelAskOf(bankAt()))
     expect(answer.act).to.eq('deleted')
-    expect(answer.parent).to.eq(BankTop)
+    expect(answer.parent).to.eq(BX.BankTop)
     const shelf = bankDB._cheat_shelfOf(bankScope)
     expect(shelf.gaterows.size).to.eq(0)
     expect(shelf.vaultrows.size).to.eq(0)

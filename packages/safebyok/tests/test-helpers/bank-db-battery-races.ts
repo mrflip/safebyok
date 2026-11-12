@@ -3,7 +3,8 @@
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
 import type { WatchScope } from '../../src/shapes/shapes-storage'
-import { BankTop, type VaultRow } from '../../src/shapes/shapes-bankdb'
+import * as BX from '../../src/shapes/shapes-bankdb'
+import type { VaultRow } from '../../src/shapes/shapes-bankdb'
 import type { BankDB, Notice } from '../../src/storage/bank-db'
 import type { AdapterBankDB } from '../../src/storage/adapter-bank-db'
 import {
@@ -185,7 +186,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         await bankDB.delBank(bankDelAskOf(bank))
         await vi.waitFor(() => {
           expect(notices.map(({ act, val }) => ({ act, val }))).to.deep.include.members([{ act: 'gotlive', val: replaced }, { act: 'gotgone', val: tombstone }])
-          expect(notices).to.deep.include({ act: 'gotgone', val: tombstone, parent: BankTop })
+          expect(notices).to.deep.include({ act: 'gotgone', val: tombstone, parent: BX.BankTop })
         })
       })
 
