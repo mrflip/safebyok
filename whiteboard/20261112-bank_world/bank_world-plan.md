@@ -8,10 +8,10 @@
   the rest); worker `opus` (agent default effort); reviewer `sonnet`
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
-* **Status** (2026-11-12, 18:00Z): 1 to 7, 4b, 5, 13 to 15 and BP merged. The line 8a #665, 8b #667,
-  8c #673, 5b #675, 9 #674 restacked onto main (with BP) and green at 9's tip (876bb2330, 6362 tests);
-  #674 is the top. 10 building on the 400k worker; 8d waits on 10. A sweep of the Coach's base edits
-  goes to its own PR. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
+* **Status** (2026-11-12, 18:50Z): 1 to 7, 4b, 5, 13 to 15, BP merged. Filed, open: 8a #665, 8b #667,
+  8c #673, 5b #675, 9 #674 (green, #674 the top of that line), 10 #677 (b139df407). G #678 filing (a
+  one-line conflict with 5b being resolved). Building: 8d (tests, with 11) and 12 (React, 400k), both
+  from 10. Then 16 and 17. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
 not copied again here. What follows is the gloss.
@@ -259,7 +259,7 @@ struck from this thread.
 
 *Orchestrator, from 10:* a Vault keeps one object through its lives, and its box watch is not restarted at a new life: React re-asks `vault.boxListing` and calls `vault.beginWatch()` again when the snapshot's `vault_tok` changes. `device.sweep()`/`vacate()` are the only lifecycle calls; rename a thing's `alignLock()` to `lock()` once the `Vault.lock()` scaffold goes.
 
-**Levels**: worker `opus`; review `medium`. **After**: 11. The report itemizes the React cost
+**Levels**: worker `opus` (400k); review `medium`. **After**: 10 (11 folded into 8d), cut from its filed tip beside 8d; its core-scaffold deletion is its last commit, so the restack onto 8d stays small. The report itemizes the React cost
 (state, effects, branches, added and removed). **Size**: L.
 
 ### 13 `bankdb_postgres`, 14 `bankdb_convex`, 15 `bankdb_graphql`
