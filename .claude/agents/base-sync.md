@@ -136,20 +136,24 @@ report `bailed`.
    ```sh
    # `git cherry` marks `+` a commit whose patch the new tree has no copy of; one whose change is
    # held anyway is caught below, as `held`. Without a sprint, drop the second `git cherry`, the
-   # `<sprint>` in rev-list, and the loop's squash test.
+   # `<sprint>` in rev-list, and the loop's two squash tests.
    { git cherry HEAD "$old"; git cherry HEAD <sprint>; } | awk '$1 == "+" { print $2 }' > "$snap/unheld"
    git rev-list --reverse --topo-order --no-merges "$old" <sprint> --not HEAD \
      | grep -Fxf "$snap/unheld" > "$snap/candidates"
    ```
 
-   Then pick them in order. A candidate reachable from the sprint branch whose every path is in
-   `plan-paths` is skipped: the squash is the sprint's version of those paths. Every other one, a
-   base-only plan commit included, is picked, dated as written so a second run makes the same SHA:
+   Then pick them in order. A candidate whose subject ends `squashed by base-sync` is an earlier
+   run's plan squash, which the new one replaces: picking it would bring back a plan line the sprint
+   has since changed, so it is skipped as `superseded`. A candidate reachable from the sprint
+   branch whose every path is in `plan-paths` is skipped: the squash is the sprint's version of
+   those paths. Every other one, a base-only plan commit included, is picked, dated as written so
+   a second run makes the same SHA:
 
    ```sh
    pick() { GIT_COMMITTER_DATE="$(git log -1 --format=%aI "$1")" git -c rerere.enabled=false cherry-pick "${@:2}" "$1"; }
    empty() { [ -z "$(git diff --name-only --diff-filter=U)" ] && git diff --cached --quiet; }
    while read -r c; do
+     if git log -1 --format=%s "$c" | grep -q ', squashed by base-sync$'; then echo "$c superseded"; continue; fi
      if git merge-base --is-ancestor "$c" <sprint> \
        && git diff-tree --no-commit-id --name-only -r "$c" | grep -vqFxf "$snap/plan-paths"; then :
      elif git merge-base --is-ancestor "$c" <sprint>; then echo "$c squashed"; continue; fi
@@ -190,8 +194,8 @@ Skip this and step 5 when there was no stash. Otherwise write the table, one row
 
 ```sh
 t=$snap/tmp; mkdir -p "$snap/merged"
-{ git diff --name-status --no-renames "$old" "$stash"
-  git rev-parse -q --verify "$stash^3" > /dev/null && git ls-tree -r --name-only "$stash^3" | awk '{ print "U\t" $0 }'
+{ git -c core.quotePath=false diff --name-status --no-renames "$old" "$stash"
+  git rev-parse -q --verify "$stash^3" > /dev/null && git -c core.quotePath=false ls-tree -r --name-only "$stash^3" | awk '{ print "U\t" $0 }'
 } | while IFS=$'\t' read -r kind p; do
   src=$stash; [ "$kind" = U ] && src=$stash^3
   mine=$(git rev-parse -q --verify "$src:$p"); base=$(git rev-parse -q --verify "$old:$p"); now=$(git rev-parse -q --verify "$new:$p")
