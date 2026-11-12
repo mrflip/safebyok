@@ -118,6 +118,8 @@ refusals could hold, take the one that falls out. **Size**: M.
 validators and exports. **Levels**: worker `opus`; review `medium`. **After**: 3. **Look-ahead**:
 the `do*` list it reports goes into the progress document for 5 and 13 to 15. **Size**: M-L.
 
+*Review:* `fixed` (sonnet, medium; [#663](https://github.com/mrflip/safebyok/pull/663)). `MemoryBankDB.doTidyGone` swept vault rows under a damaged bank row; fixed with a test. The four safety hatches judged sound. Left: cascade notices and other-life box rows, stated in answer-contract by 4b; the BX barrel kept; doc blocks for the documentarian. Filed at `28d353f26`, on main.
+
 ### 4b `bankdb_battery`
 
 *Orchestrator, split from 4 after thread 3 compacted four times on a smaller thread:* the battery
