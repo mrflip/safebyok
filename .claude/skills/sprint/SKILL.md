@@ -131,8 +131,9 @@ Read: <what this handoff does not already carry, by section>.
 
 The worker's PR stays a draft, and CI holds a draft until it carries the label `ci`, so the worker
 pushes freely. It tests as it judges while it builds, and is ready by its *Ready* step's
-threshold (`thread-worker.md`, where it is stated once). Then it adds the label, catches up onto its base and pushes
-(`scripts/file-thread --catch-up`), which starts CI on the whole suite. CI reads the label at a
+threshold (`thread-worker.md`, where it is stated once): it labels and pushes once its touched
+packages pass, and asks for review on a green `pnpm justify`. The label and the catch-up push
+(`scripts/file-thread --catch-up`) start CI on the whole suite. CI reads the label at a
 push and never on its own (`notes/ci.md`): a label added after the last push runs nothing. It never takes the PR out of draft: that is yours (*File*, below).
 
 Every worker and reviewer sings out what it has turned to (`scripts/ohai`), and a hook logs each

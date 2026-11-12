@@ -71,27 +71,24 @@ the diff.
    compacted at about 170k tokens, so the thread file is your own memory as well as the Coach's.
    A push need not wait on a proof; `ready` does. Once pushed, a commit is not rewritten
    except by a catch-up rebase.
-3. **Ready.** With everything committed, and the thread file finished and committed (`plan:`)
-   but not yet pushed, prove, label and catch up:
-   1. Prove it ready (PROCESS.md, *Proving*): lint, typecheck and test green for the packages you
-      changed and their dependents (`pnpm --filter "...[$base]" --filter '!{.}' <task>`, with
-      `base=$(git config branch.<branch>.sprintbase)`), plus `pnpm justify:root` for root files
-      and `pnpm lint:workflows` for a workflow. Changed what the packages share, or judge it
-      worth the wait: the full `pnpm justify`. Red: fix and commit.
-   2. Add the label `ci` (`gh pr edit <n> --add-label ci`). CI reads it at each push; adding it
-      starts nothing, so it goes on before the push.
-   3. Run `scripts/file-thread --catch-up <root>`, which rebases as filing would, onto your
+3. **Ready.** While you build, test what bears on the change: a file or a package, as you judge
+   (PROCESS.md, *Proving*). With everything committed, and the thread file finished and committed
+   (`plan:`) but not yet pushed:
+   1. Once the packages you touched pass their tests and typecheck, add the label `ci`
+      (`gh pr edit <n> --add-label ci`; CI reads it at each push, so it goes on before the push),
+      then run `scripts/file-thread --catch-up <root>`, which rebases as filing would, onto your
       base's current tip (the base thread's branch on origin, or origin/main once it has merged),
       records `sprintbase`, and pushes under a lease. That push starts CI, and the unpushed
       `plan:` commit makes sure there is a push to make. On exit 3, resolve the conflict as
       *Picking up a built thread* says, then run it again.
+   2. Run `pnpm justify`: it is ready when that is green, CI running beside it. Red: fix and
+      commit. Run it again after any rebase.
 
    Then bring the PR's title and body up to date -- a **Tests:** line, *Open questions* -- and
-   report `ready`. CI runs the whole suite beside the review, and filing's full `pnpm justify`
-   is the gate. The PR stays a draft: `ready` is a report, never `gh pr ready`; the
-   orchestrator, or the Coach, takes it out of draft once it is filed and the line below it is
-   green. Finish the thread file for a fresh agent: rework after a review goes to one,
-   so name the approaches you set aside and why, as well as the one you took.
+   report `ready`. Filing's `pnpm justify` is the gate. The PR stays a draft: `ready` is a report,
+   never `gh pr ready`; the orchestrator, or the Coach, takes it out of draft once it is filed and
+   the line below it is green. Finish the thread file for a fresh agent: rework after a review
+   goes to one, so name the approaches you set aside and why, as well as the one you took.
 
 ## Picking up a built thread
 

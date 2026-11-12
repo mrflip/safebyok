@@ -17,28 +17,23 @@ Do not commit mid-refactor or on a timer.
 
 ### Proving
 
-The tests are a tool for writing good code: while you build, run what you judge, a file, a
-folder or a package (`pnpm --filter <pkg> test`, `pnpm --filter <pkg> test --changed`).
-`pnpm justify` runs everything, and is for confidence that CI will pass. When a thread is
-**ready** is stated once, in the thread-worker's *Ready* step (`.claude/agents/thread-worker.md`),
-and in a line of CLAUDE.md's *Commands*; a session outside a sprint holds itself to the same.
-These run a task over the packages changed since `base` and their dependents, with `base` the
-thread's `sprintbase` (`git config branch.<branch>.sprintbase`), or `git merge-base origin/main
-HEAD` outside a sprint:
+The tests are a tool for writing good code: while you build, run the ones that bear on the
+change, as you judge. A file: `pnpm --filter <pkg> exec vitest run <path>`, the path relative to
+the package. A package: `pnpm --filter <pkg> test` (a package that depends on
+another rebuilds it first). `pnpm justify:root` proves the root's files (`scripts/`,
+`tests/scripts/`, root config) and `pnpm lint:workflows` a workflow.
 
-```sh
-pnpm --filter "...[$base]" --filter '!{.}' lint
-pnpm --filter "...[$base]" --filter '!{.}' typecheck
-pnpm --filter "...[$base]" --filter '!{.}' test
-```
+Push to the draft and add the label `ci` once the packages you touched pass their tests and
+typecheck (`pnpm --filter <pkg> typecheck`): CI's run then goes alongside your last justify.
+**Ready**, the ask for review, is `pnpm justify` green (the first run in a
+fresh worktree adds the eslint cold start). It is stated in the thread-worker's *Ready* step
+(`.claude/agents/thread-worker.md`) and in a line of CLAUDE.md's *Commands*; a session outside a
+sprint holds itself to the same. Run it again after any rebase, and at filing, where
+`scripts/file-thread` runs it as the gate.
 
-`[$base]` counts a changed root file as the workspace root's alone, and the root's scripts run
-every package, so `!{.}` leaves the root out: `pnpm justify:root` proves root files (`scripts/`,
-`tests/scripts/`, root config), and `pnpm lint:workflows` a workflow. A change to what the
-packages share (`tsconfig.base.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`) is the root's too,
-yet binds every package. Each package's `test` builds its own dependencies first. Once ready,
-label the PR `ci` and push (*Pull requests*): CI runs the whole suite, and `scripts/file-thread`'s
-full justify is the gate.
+Do not select by change with pnpm's `...[<base>]` filter: it selects the root when a root file
+changed, whose `test` runs every package again, and its packages run one at a time, each
+rebuilding its dependencies. It is slower than `pnpm justify`.
 
 ### A worktree per thread
 
