@@ -17,6 +17,10 @@ What the threads have taught, newer than the plan where they disagree. Kept by t
 
 * *Coach, 2026-11-12:* a box row carries `bank_tok` beside `vault_tok`; its parent life is `${bank_tok}/${vault_tok}`, one string to the classifier, two predicates in SQL. BankDB's box row is BX's own, `fmt` 5003. Sent to thread 4 as a directive mid-build. It closes thread 3's "box verbs see only the vault row".
 
+* *Coach, 2026-11-12:* keep `useDevice` and `useDeviceSnapshot` (new public hooks, thread 6).
+* *Coach, 2026-11-12, for threads 8, 10 and 12:* rename `BankAnnouncement` and `BankPanic` to `DeviceAnnouncement` and `DevicePanic` in thread 8. "Keep an eye out for other things that were liminal in the lifecycle, like handlers that were permitted to pass messages for a brief time after sweep/vacate/etc. I suspect Device will end up holding most of what Bank did and Bank what vault did. A Device does not need to sweep as aggressively as a bank did, it does have to respect the Provider lifetime." (Standing rule: lifecycle calls slam shut first, sync, before any async; no liminal state; handlers during cleanup, never after.)
+* *Coach, 2026-11-12:* one documentarian pass after thread 16 (plan, thread 17's gloss).
+
 ## The BankDB `do*` list
 
 (thread 4 fills this in)

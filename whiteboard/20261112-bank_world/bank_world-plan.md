@@ -38,10 +38,14 @@ it. The Coach added four at the invocation, and the orchestrator one:
 17. **A refusal's kind is a contract only where a host switches on it**: `stale_write` and
     `wrong_passphrase` today. Elsewhere, where two refusals could apply, the one that needs no extra
     code wins: no code chooses between them and no test pins which.
-18. **Reviewers file plain reports; they do not hunt.** Their charge is ten bug reports, not ten
-    bugs found. Through threads 3 to 12 the tree carries two contracts and scaffolds on purpose:
-    report what is plainly wrong in what the thread built, check the ctx table and the guarantees
-    where the thread touches them, and put every edge case under *Open matters* (rules 2, 3).
+18. **Reviewers look hard, and report plainly** (revised on the Coach's word, 2026-11-12: "I do
+    want them to be aggressive, but we mustn't let an opus high be led a merry muckle by a sonnet
+    medium's neuroses"). Be aggressive about what is wrong in what the thread built: a defect on a
+    real code path, a broken guarantee, the ctx table not followed, a contract misread. Weigh a
+    worry about a race or an edge case by how likely a real path reaches it, and send it to *Open
+    matters* rather than into rework: a reviewer's worry does not set a builder chasing a case no
+    caller reaches. Through threads 3 to 12 the tree carries two contracts and scaffolds on
+    purpose; they are not findings.
 19. **Adapters wait for the contract to settle** (orchestrator). Threads 13 to 15 are cut once
     thread 9 files, from the line's tip, so they are written once, against the contract thread 8
     proved and with thread 9's names, and run beside 10 to 12 in other files. This follows R7's own
@@ -200,7 +204,9 @@ progress document. **Size**: M-L each.
 ### 17 `bank_docs`
 
 **Levels**: worker `opus`; review `none` unless its diff carries code. **After**: 16.
-`notes/security.md` through its `sonnet` subagent. Also owed here: the Coach's put-off ruling on
+`notes/security.md` through its `sonnet` subagent. *Orchestrator:* before it, the Coach asked
+(2026-11-12) for one `documentarian` run over the files the line changed, as its own PR, instead
+of each review leaving narrated doc blocks behind. Also owed here: the Coach's put-off ruling on
 whether a wayin change keeps making other devices prove again (asked at the sprint's end).
 **Size**: M.
 
