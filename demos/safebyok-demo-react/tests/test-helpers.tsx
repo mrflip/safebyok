@@ -35,7 +35,7 @@ export const renderInBank = async (ui: ReactNode, { isBankBuilt = true }: { isBa
 }
 
 /** Build `user_id`'s bank in `bankDB` from a device of its own, which is then swept. */
-const buildBank = async (bankDB: MemoryBankDB, user_id: string) => {
+async function buildBank(bankDB: MemoryBankDB, user_id: string): Promise<void> {
   const device = Device.make({
     user_id, banklabel: 'acme', gates: ['main'], bankDB, deviceDB: new MemoryDeviceDB(),
     keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger,

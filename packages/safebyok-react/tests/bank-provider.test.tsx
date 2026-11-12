@@ -18,7 +18,7 @@ const shown = (testid: 'bank' | 'vault') => screen.getByTestId(testid).textConte
 const dialogShown = () => screen.queryByRole('dialog') !== null
 
 /** A world with the banks these tests sign into already built, as another device builds them. */
-const builtWorld = async () => {
+async function builtWorld(): Promise<TH.BankWorld> {
   const world = TH.makeBankWorld()
   const scopes = [{ user_id: 'u1', banklabel: 'acme' }, { user_id: 'u2', banklabel: 'acme' }, { user_id: 'u1', banklabel: 'globex' }]
   await Promise.all(scopes.map((scope) => world.deviceOnAnotherDevice(scope).ensureBank()))
