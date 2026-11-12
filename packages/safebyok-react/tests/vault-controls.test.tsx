@@ -33,7 +33,7 @@ describe("VaultLockControl", () => {
     render(<BankProvider {...TH.providerPropsOf(TH.makeBankWorld(), { requestCleartext })}><VaultLockControl vaultlabel="main" /></BankProvider>)
     fireEvent.click(await screen.findByRole('button', { name: 'Create vault' }))
     await waitFor(() => { expect(lockWords()).to.eq('Vault unlocked') })
-    expect(asked).to.deep.equal(['build_vault'])
+    expect(asked).to.deep.equal(['build_bank'])
     expect(screen.getByRole('button', { name: 'Lock' })).to.exist
   })
 
@@ -46,7 +46,7 @@ describe("VaultLockControl", () => {
     expect(asked).to.deep.equal([])
     fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
     await waitFor(() => { expect(lockWords()).to.eq('Vault unlocked') })
-    expect(asked).to.deep.equal(['unlock_vault'])
+    expect(asked).to.deep.equal(['unlock_bank'])
     fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
     await waitFor(() => { expect(lockWords()).to.eq('Vault locked') })
     expect(screen.getByText('Vault locked').parentElement?.dataset['locked']).to.eq('true')
@@ -83,7 +83,7 @@ describe("VaultLockControl", () => {
     const { requestCleartext } = typingPassphrase()
     render(<BankProvider {...TH.providerPropsOf(world, { requestCleartext, onBadNews: ({ news: told }) => { news.push(told) } })}><VaultLockControl vaultlabel="main" /></BankProvider>)
     await waitFor(() => { expect(lockWords()).to.eq('Vault locked') })
-    world.vaultDB._cheat_refuseGets('storage_unavailable')
+    world.bankDB._cheat_refuseGets('storage_unavailable')
     world.advance(60 * MinuteMillis)
     fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
     await waitFor(() => { expect(news.map(({ refusalkind }) => refusalkind)).to.include('storage_unavailable') })
@@ -99,7 +99,7 @@ describe("CreateVaultButton", () => {
     const button = screen.getByRole('button', { name: 'Create vault' })
     await waitFor(() => { expect(button.hasAttribute('disabled')).to.be.false })
     fireEvent.click(button)
-    await waitFor(() => { expect(asked).to.deep.equal(['build_vault']) })
+    await waitFor(() => { expect(asked).to.deep.equal(['build_bank']) })
     await waitFor(async () => {
       const bank = await world.bankOnAnotherDevice()
       expect(bank.vaultAt({ vaultlabel: 'main' })?.isPresent).to.be.true
@@ -107,7 +107,9 @@ describe("CreateVaultButton", () => {
   })
 
   it("is disabled until the device's ensureBank lands", async () => {
-    render(<BankProvider {...TH.providerPropsOf(TH.makeBankWorld())}><CreateVaultButton vaultlabel="main" /></BankProvider>)
+    const world = TH.makeBankWorld()
+    await world.ensureBuilt()
+    render(<BankProvider {...TH.providerPropsOf(world)}><CreateVaultButton vaultlabel="main" /></BankProvider>)
     const button = screen.getByRole('button', { name: 'Create vault' })
     expect(button.hasAttribute('disabled')).to.be.true
     await waitFor(() => { expect(button.hasAttribute('disabled')).to.be.false })

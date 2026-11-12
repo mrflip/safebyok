@@ -18,9 +18,9 @@ function hookOf<ValT>(subscribe: (listener: () => void) => () => void, read: () 
   return { painted, unsubscribe, current: () => painted.at(-1) as ValT }
 }
 
-/** A box whose whisper is {@link Stored}, on a bank that asks as a dialog would, in a vault unlocked. */
+/** A box whose whisper is {@link Stored}, on a bank built here by a dialog that types the passphrase, in a vault unlocked. */
 async function makeRecipeBox(): Promise<{ vault: Vault, box: Box }> {
-  const bank = await makeBankWorld().bankOn()
+  const bank = await makeBankWorld().deviceOn().ensureBank()
   const vault = await bank.ensureVault({ vaultlabel: 'main' })
   const box = await vault.putBox({ boxlabel: 'stripe', whisper: Stored })
   return { vault, box }

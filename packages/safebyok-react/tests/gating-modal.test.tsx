@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { AnyGating, Bank } from 'safebyok'
+import type { AnyGating } from 'safebyok'
 import { GatingModal } from '../src/provider/gating-modal'
 import { Messages } from '../src/helpers/messages'
 import * as TH from './test-helpers'
@@ -11,7 +11,7 @@ TH.sweepBankWorlds()
 type Before = 'absent' | 'built' | 'passkeyed'
 
 /** Open a gating with `raise`, and render it in a GatingModal. `shown` may replace the gating that is rendered. */
-const shownFor = async (raise: (bank: Bank) => ReturnType<typeof TH.building>, before: Before, shown = (gating: AnyGating) => gating) => {
+const shownFor = async (raise: Parameters<typeof TH.openGatingOf>[1], before: Before, shown = (gating: AnyGating) => gating) => {
   const world = TH.makeBankWorld()
   if (before !== 'absent') {
     const { vault } = await TH.makeBankWithVault(world)
@@ -27,8 +27,8 @@ const forged = (gating: AnyGating): AnyGating => Object.create(gating, { gatingk
 
 describe("GatingModal", () => {
   const DialogCases = [
-    [TH.building,        'absent',    Messages.chooseTitle,        'shows the passphrase dialog, choosing, for a build_vault gating'],
-    [TH.unlocking,       'built',     Messages.unlockTitle,        'shows the passphrase dialog, unlocking, for an unlock_vault gating'],
+    [TH.building,        'absent',    Messages.chooseTitle,        'shows the passphrase dialog, choosing, for a build_bank gating'],
+    [TH.unlocking,       'built',     Messages.unlockTitle,        'shows the passphrase dialog, unlocking, for an unlock_bank gating'],
     [TH.replacing,       'built',     Messages.changeTitle,        'shows the dialog that replaces the passphrase for a replace_passphrase gating'],
     [TH.addingPasskey,   'built',     Messages.addPasskeyTitle,    'shows the dialog that adds a passkey for an add_passkey gating'],
     [TH.revokingPasskey, 'passkeyed', Messages.revokePasskeyTitle, 'shows the dialog that removes the passkey for a revoke_passkey gating'],

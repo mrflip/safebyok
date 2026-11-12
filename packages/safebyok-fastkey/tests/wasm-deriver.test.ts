@@ -205,26 +205,26 @@ describe("makeArgon2idWasmDeriver's bounds", () => {
   })
 })
 
-/** Make two banks on one vaultDB, each on its own device with its own key deriver. */
+/** Two devices over one bankDB, each with its own key deriver: the first builds the bank, the second finds it locked. */
 function twoDevices(firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) {
   const world = TH.makeBankWorld()
   return {
     world,
-    first:  () => world.bankOn({ keyDeriver: firstDeriver }),
-    second: (overrides: Partial<DeviceOpts> = {}) => world.bankOnAnotherDevice({ keyDeriver: secondDeriver, ...overrides }),
+    first:  () => world.deviceOn({ keyDeriver: firstDeriver }).ensureBank(),
+    second: (overrides: Partial<DeviceOpts> = {}) => world.deviceOnAnotherDevice({ keyDeriver: secondDeriver, ...overrides }).ensureBank(),
   }
 }
 
-/** Build and unlock the vault on `bank`, then store {@link FakeWhisper} in one of its boxes. */
+/** Build the vault on `bank`, unlocked by its build, then store {@link FakeWhisper} in one of its boxes. */
 async function putFakeBox(bank: Bank): Promise<void> {
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
   await vault.putBox({ boxlabel: 'openai', whisper: FakeWhisper })
 }
 
-/** Unlock the vault on `bank` (the test world's dialog types the passphrase), and check that the box the other device stored is there. */
+/** Unlock `bank` (the test world's dialog types the passphrase), and check that the box the other device stored is there. */
 async function expectWhisperOpens(bank: Bank): Promise<void> {
+  await bank.ensureUnlocked()
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
-  await vault.ensureUnlocked()
   const box = (await vault.getBox('openai'))!
   await box.expose()
   expect(box.whisper).to.deep.equal(FakeWhisper)
@@ -233,7 +233,7 @@ async function expectWhisperOpens(bank: Bank): Promise<void> {
 // Each test runs the real Argon2id at the supplied spec on both devices.
 describe("a vault shared between the two derivers", () => {
   it("is accepted by Device.make under the supplied label", async () => {
-    const bank = await TH.makeBankWorld().bankOn({ keyDeriver: argon2idWasmWebV1Deriver })
+    const bank = await TH.makeBankWorld().deviceOn({ keyDeriver: argon2idWasmWebV1Deriver }).ensureBank()
     const vault = await bank.ensureVault(TH.VaultScopeGiven)
     expect(vault.isUnlocked).to.be.true
   })
@@ -250,8 +250,7 @@ describe("a vault shared between the two derivers", () => {
     const mistyped = await devices.second({
       requestCleartext: async (gating) => { await TH.expectBad(gating.attempt(TH.byPassphrase('correct horse battery stapler')), 'wrong_passphrase') },
     })
-    const vault = await mistyped.ensureVault(TH.VaultScopeGiven)
-    await expect(vault.ensureUnlocked()).rejects.toThrow(/dismissed/u)
+    await expect(mistyped.ensureUnlocked()).rejects.toThrow(/dismissed/u)
     await expectWhisperOpens(await devices.second())
   })
 })

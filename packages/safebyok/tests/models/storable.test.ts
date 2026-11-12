@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Fetched } from '../../src/shapes/shapes-vaultish'
-import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
+import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-bankdb'
 import { Box } from '../../src/models/box'
 import { cmpRevisions, Storable } from '../../src/models/storable'
 import * as Phrases from '../../src/helpers/phrases'
@@ -326,11 +326,11 @@ describe("Storable snapshot and subscription", () => {
 describe("Storable put guards: ensurePuttable, demandPuttable", () => {
   const Patch = { whisper: { apiKey: 'sk-test-0000' } }
 
-  it("demandPuttable returns the parsed patch while unlocked, and refuses 'vault_locked' while locked", () => {
+  it("demandPuttable returns the parsed patch while unlocked, and refuses 'bank_locked' while locked", () => {
     const box = builtBoxOf()
     expect(box.demandPuttable({ ...box.scope, sidecar: { note: 'sent' } })).to.deep.include({ sidecar: { note: 'sent' } })
     world.mw.setLocked(true)
-    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'vault_locked')
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'bank_locked')
   })
 
   it("demandPuttable refuses a bad patch first, whether locked or over a record not whole", () => {
@@ -344,7 +344,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     const box = boxListingOf(world.mw).deliverRecord(sparseBoxRecord())
     TH.expectSyncRefusal(() => box.demandPuttable(Patch))
     world.mw.setLocked(true)
-    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'vault_locked')
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'bank_locked')
     box.vacate()
     TH.expectSyncRefusal(() => box.demandPuttable(Patch))
   })
@@ -354,7 +354,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     const Both = { ...Patch, sidecar: { note: 'sent' } }
     expect(box.demandPuttable(Both)).to.deep.include(Both)
     world.mw.setLocked(true)
-    TH.expectSyncRefusal(() => box.demandPuttable(Both), 'vault_locked')
+    TH.expectSyncRefusal(() => box.demandPuttable(Both), 'bank_locked')
   })
 
   it("demandPuttable under ifPresent 'fail' refuses a whole record, saying its data would be recycled", () => {
@@ -378,7 +378,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     const box = builtBoxOf()
     world.mw.setLocked(true)
     await expect(box.ensurePuttable({ whisper: { apiKey: 'sk-test-0000' } })).resolves.to.eq(box)
-    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
+    await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} }), 'bank_locked')
   })
 
   it("put calls ensurePuttable once, and a bad patch puts nothing", async () => {

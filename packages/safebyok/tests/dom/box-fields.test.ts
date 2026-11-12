@@ -218,7 +218,7 @@ describe("fields.put", () => {
     BoxFields.of(box).bind('org.name')(nameEl)
     keyEl.value = 'sk-saved'
     nameEl.value = 'zenith'
-    const tryPutBox = vi.spyOn(world.mw.vaultDB, 'tryPutBox')
+    const tryPutBox = vi.spyOn(world.mw.bankDB, 'tryPutBox')
     expect(await BoxFields.of(box).put()).to.eq(box)
     expect(tryPutBox).toHaveBeenCalledOnce()
     const merged = { ...Stored, apiKey: 'sk-saved', org: { name: 'zenith', seats: 3 } }
@@ -270,7 +270,7 @@ describe("fields.put", () => {
     expect(veiled.message).to.eq(Phrases.PuttingVeiledFields)
     box.unveil()
     world.mw.setLocked(true)
-    await TH.expectRefusal(BoxFields.of(box).put(), 'vault_locked')
+    await TH.expectRefusal(BoxFields.of(box).put(), 'bank_locked')
   })
 
   it("has a try form that returns an Outcome", async () => {

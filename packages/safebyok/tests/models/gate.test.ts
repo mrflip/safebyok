@@ -1,104 +1,112 @@
 import { describe, expect, it } from 'vitest'
 import { Gate } from '../../src/models/gate'
-import { type GateProps, FirstGateEpoch } from '../../src/shapes/shapes-gateish'
+import { type GateRecord, GateFormat, gateSparse } from '../../src/shapes/shapes-bankdb'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
-import { builtGateOf, passkeyAnswerOf, provingWorldOf, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
+import { builtGateOf, listedGateOf, passkeyAnswerOf, provingWorldOf, TestPassphrase, useFakeClock, WorldBankStamp, WorldGateStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
 function builtGate({ passkey = false } = {}) { return builtGateOf(passkey ? passkeyAnswerOf() : undefined) }
 
-describe("Gate.make(stamp, passphraseWayin, passkeyWayin)", () => {
-  it("is of the first epoch, with the wayins handed", async () => {
-    const proving = await PassphraseProving.buildNovel(WorldStamp, TestPassphrase, provingWorldOf())
+const GateFields = ['user_id', 'banklabel', 'gatelabel', 'fmt', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'am', 'bank_tok', 'gate_tok', 'wayins', 'auth', 'sigs', 'meta']
+
+describe("Gate.recordOfBirth(bank, gate, main, passkey0)", () => {
+  it("is a gate row at its first revision, of the stamps, with the wayins handed", async () => {
+    const proving = await PassphraseProving.buildNovel(WorldBankStamp, WorldGateStamp, TestPassphrase, provingWorldOf())
     const wayin = await proving.buildWayin(NOVEL)
-    const gate = Gate.make(WorldStamp, wayin, null)
-    expect(gate.gate_epoch).to.eq(FirstGateEpoch)
-    expect(gate.passphrase_wayin).to.deep.equal(wayin.pickle())
-    expect(gate.passkey_wayin).to.be.null
+    const record = Gate.recordOfBirth(WorldBankStamp, WorldGateStamp, wayin, null)
+    expect(record).to.include({ ...WorldGateStamp, fmt: GateFormat, revision_seq: 0, am: 'a', bank_tok: WorldBankStamp.bank_tok })
+    expect(record.wayins).to.deep.equal({ main: wayin.pickle() })
+    const gate = await listedGateOf(record)
+    expect(gate.main.pickle()).to.deep.equal(wayin.pickle())
+    expect(gate.passkey0).to.be.null
   })
 
   it("refuses a wayin record in place of a Wayin", async () => {
     const { gate } = await builtGate()
-    TH.expectSyncRefusal(() => Gate.make(WorldStamp, gate.passphrase_wayin as never, null))
+    TH.expectSyncRefusal(() => Gate.recordOfBirth(WorldBankStamp, WorldGateStamp, gate.wayins.main as never, null))
   })
 })
 
-describe("new Gate(stamp, props): the props check", () => {
-  it("makes the same gate again from a gate's pickle", async () => {
+describe("a gate row as a device's ensureBank lists it: the record check", () => {
+  it("lists the same gate again from a gate's pickle", async () => {
     const { gate } = await builtGate({ passkey: true })
-    const again = new Gate(WorldStamp, gate.pickle())
+    const again = await listedGateOf(gate.pickle())
     expect(again.pickle()).to.deep.equal(gate.pickle())
     expect(again.toJSON()).to.deep.equal(gate.toJSON())
   })
 
-  const PropsCases = [
-    [(props: GateProps) => ({ ...props, passkey_wayin: undefined }),              'no passkey_wayin, where a gate with no passkey says null'],
-    [(props: GateProps) => ({ passphrase_wayin: props.passkey_wayin, passkey_wayin: props.passphrase_wayin }), "its two wayins in each other's field"],
-    [(props: GateProps) => ({ ...props, passkey_wayin: props.passphrase_wayin }), 'a passphrase wayin in the passkey field'],
-    [(props: GateProps) => ({ ...props, passphrase_wayin: null }),                'no passphrase wayin'],
-    [(props: GateProps) => ({ ...props, gate_epoch: 0 }),                         'gate_epoch 0'],
-    [(props: GateProps) => ({ ...props, gate_epoch: undefined }),                 'no gate_epoch'],
-    [() => null,                                                                  'null'],
+  const RecordCases = [
+    [(record: GateRecord) => ({ ...record, wayins: { main: record.wayins.passkey0, passkey0: record.wayins.main } }), "its two wayins in each other's field"],
+    [(record: GateRecord) => ({ ...record, wayins: { ...record.wayins, passkey0: record.wayins.main } }),             'a passphrase wayin in the passkey field'],
+    [(record: GateRecord) => ({ ...record, wayins: { passkey0: record.wayins.passkey0 } }),                           'no passphrase wayin'],
+    [(record: GateRecord) => ({ ...record, wayins: { ...record.wayins, passkey0: null } }),                           'passkey0 null, where a gate with no passkey has none'],
+    [(record: GateRecord) => TH.omitting(record, 'gate_tok'),                                                         'no gate_tok'],
+    [(record: GateRecord) => ({ ...record, bank_tok: 'bank-tok-other' }),                                             "another life's bank_tok"],
+    [(record: GateRecord) => ({ ...record, banklabel: 'other' }),                                                     'another banklabel'],
+    [(record: GateRecord) => ({ ...record, user_id: 'u2' }),                                                          'another user_id'],
+    [() => null,                                                                                                      'null'],
   ] as const
 
-  for (const [propsOf, blurb] of PropsCases) {
-    it(`refuses props with ${blurb}`, async () => {
+  for (const [recordOf, blurb] of RecordCases) {
+    it(`refuses a record with ${blurb}`, async () => {
       const { gate } = await builtGate({ passkey: true })
-      TH.expectSyncRefusal(() => new Gate(WorldStamp, propsOf(gate.pickle())))
+      const record = recordOf(gate.pickle()) as GateRecord
+      await TH.expectRefusal(listedGateOf(record))
     })
   }
 
-  it("refuses a stamp with no vault_tok", async () => {
-    const { gate } = await builtGate()
-    TH.expectSyncRefusal(() => new Gate(TH.omitting(WorldStamp, 'vault_tok'), gate.pickle()))
-  })
-
-  it("quotes none of refused props in its refusal: no ciphertext", async () => {
+  it("quotes none of a refused record in its refusal: no ciphertext", async () => {
     const { gate } = await builtGate({ passkey: true })
-    const { passphrase_wayin, passkey_wayin } = gate.pickle()
-    const err = TH.expectSyncRefusal(() => new Gate(WorldStamp, { gate_epoch: FirstGateEpoch, passphrase_wayin: passkey_wayin, passkey_wayin: passphrase_wayin }))
-    expect(TH.thrownText(err)).to.not.include(passphrase_wayin.vault_key_wayin_wrapped.ciphertext_b64)
+    const record = gate.pickle()
+    const { main, passkey0 } = record.wayins
+    const err = await TH.expectRefusal(listedGateOf({ ...record, wayins: { main: passkey0, passkey0: main } } as never))
+    expect(TH.thrownText(err)).to.not.include(main.vault_key_wayin_wrapped.ciphertext_b64)
   })
 })
 
 describe("gate.pickle() and gate.toJSON()", () => {
-  it("pickle() is its epoch and the two wayin records, frozen", async () => {
+  it("pickle() is the gate row, its wayin records frozen", async () => {
     const { gate } = await builtGate({ passkey: true })
     const pickle = gate.pickle()
-    expect(Object.keys(pickle)).to.have.members(['gate_epoch', 'passphrase_wayin', 'passkey_wayin'])
-    expect(pickle.passphrase_wayin).to.deep.equal(gate.ppWayin.pickle())
-    expect(pickle.passkey_wayin).to.deep.equal(gate.pkWayin!.pickle())
+    expect(Object.keys(pickle)).to.have.members(GateFields)
+    expect(pickle.wayins.main).to.deep.equal(gate.main.pickle())
+    expect(pickle.wayins.passkey0).to.deep.equal(gate.passkey0!.pickle())
     expect(Object.isFrozen(pickle)).to.be.true
-    expect(Object.isFrozen(pickle.passphrase_wayin)).to.be.true
+    expect(Object.isFrozen(pickle.wayins.main)).to.be.true
   })
 
-  it("toJSON() is its epoch and the two wayins' headers, with no wrapped vaultKey", async () => {
+  it("toJSON() is the gate's sparse row: no wayin, no wrapped vaultKey", async () => {
     const { gate } = await builtGate({ passkey: true })
-    expect(TH.jsonOf(gate)).to.deep.equal({ gate_epoch: FirstGateEpoch, passphrase_wayin: gate.ppWayin.toJSON(), passkey_wayin: gate.pkWayin!.toJSON() })
+    const sparse = gateSparse.parse(gate.pickle())
+    expect(TH.jsonOf(gate)).to.deep.equal(TH.jsonOf(sparse))
     expect(JSON.stringify(gate)).to.not.include('ciphertext_b64')
   })
 
-  it("toJSON() shows passkey_wayin null for a gate with no passkey", async () => {
+  it("its snapshot shows each wayin's header, and no passkey0 for a gate with no passkey", async () => {
+    const { gate: both } = await builtGate({ passkey: true })
+    expect(both.snapshot.wayins).to.deep.equal({ main: both.main.toJSON(), passkey0: both.passkey0!.toJSON() })
     const { gate } = await builtGate()
-    expect(gate.toJSON().passkey_wayin).to.be.null
+    expect(gate.snapshot.wayins).to.not.have.property('passkey0')
   })
 
-  it("Object.keys shows its epoch and the two wayin records alone: no Wayin, no stamp", async () => {
+  it("Object.keys shows its stamp and revision alone: no Wayin, no wayin record", async () => {
     const { gate } = await builtGate({ passkey: true })
-    expect(Object.keys(gate)).to.have.members(['gate_epoch', 'passphrase_wayin', 'passkey_wayin'])
+    expect(Object.keys(gate)).to.have.members(['user_id', 'banklabel', 'gatelabel', 'bank_tok', 'gate_tok', 'registered_at', 'revision_tok', 'revision_seq', 'written_at'])
   })
 
-  it("is frozen, its wayin records read-only", async () => {
+  it("is sealed, its scope and lives read-only", async () => {
     const { gate } = await builtGate()
-    expect(Object.isFrozen(gate)).to.be.true
-    expect(() => { (gate as { passkey_wayin: unknown }).passkey_wayin = gate.passphrase_wayin }).to.throw(TypeError)
+    expect(Object.isSealed(gate)).to.be.true
+    expect(() => { (gate as { gate_tok: unknown }).gate_tok = 'gate-tok-other' }).to.throw(TypeError)
+    expect(() => { (gate as { banklabel: unknown }).banklabel = 'other' }).to.throw(TypeError)
   })
 
-  it("keeps the stamp it was given", async () => {
+  it("keeps the bank's stamp it was given, and its own", async () => {
     const { gate } = await builtGate()
-    expect(gate.stamp).to.deep.equal(WorldStamp)
+    expect(gate.bankStamp).to.deep.equal(WorldBankStamp)
+    expect(gate.stamp).to.deep.equal(WorldGateStamp)
   })
 })
 

@@ -5,8 +5,8 @@ import * as Front from '../src/index'
 
 describe("safebyok", () => {
   it("exports each type its exported signatures name", () => {
-    expectTypeOf<Front.DeviceOpts['vaultDB']>().toEqualTypeOf<Front.VaultDB>()
-    expectTypeOf<Front.AdapterVaultDB>().toExtend<Front.DeviceOpts['vaultDB']>()
+    expectTypeOf<Front.DeviceOpts['bankDB']>().toEqualTypeOf<Front.BankDB>()
+    expectTypeOf<Front.AdapterBankDB>().toExtend<Front.DeviceOpts['bankDB']>()
     expectTypeOf<Front.DeviceOpts['deviceDB']>().toEqualTypeOf<Front.DeviceDB>()
     expectTypeOf<Front.DeviceOpts['keyDeriver']>().toEqualTypeOf<Front.KeyDeriver>()
     expectTypeOf<Front.DeviceOpts['strengthChecker']>().toEqualTypeOf<Front.StrengthChecker | undefined>()
@@ -14,7 +14,7 @@ describe("safebyok", () => {
     expectTypeOf<Parameters<Front.RequestCleartext>[0]>().toEqualTypeOf<Front.AnyGating>()
     expectTypeOf<Front.KeyDeriver['salt_size']>().toEqualTypeOf<typeof Front.PassphraseSaltSize>()
     expectTypeOf<Parameters<Front.GuardedKeyDeriver['deriveKeyBytes']>[0]>().toEqualTypeOf<Front.PassphraseCleartext>()
-    expectTypeOf<ReturnType<Front.Gating<'build_vault'>['judgeStrength']>>().toEqualTypeOf<Promise<Front.PassphraseVerdict>>()
+    expectTypeOf<ReturnType<Front.Gating<'build_bank'>['judgeStrength']>>().toEqualTypeOf<Promise<Front.PassphraseVerdict>>()
     expectTypeOf<Front.VaultError['refusalkind']>().toEqualTypeOf<Front.Refusalkind>()
     expectTypeOf<Front.VaultError['family']>().toEqualTypeOf<Front.RefusalFamily>()
     expectTypeOf<Parameters<Front.Vault['getBox']>[1]>().toEqualTypeOf<Front.FetchOpts | undefined>()
@@ -30,9 +30,9 @@ describe("safebyok", () => {
     expectTypeOf<Front.DeviceSnapshot['bank']>().toEqualTypeOf<Front.BankSnapshot | null>()
     expectTypeOf<Front.VaultError['meta']>().toEqualTypeOf<Front.RefusalMeta | undefined>()
     expectTypeOf<ConstructorParameters<typeof Front.Vault>[3]>().toEqualTypeOf<Front.BankFriend>()
-    expectTypeOf<Front.BankFriend['panic']>().toEqualTypeOf<Front.BankPanic>()
-    expectTypeOf<Front.BankFriend['announce']>().toEqualTypeOf<Front.BankAnnounce>()
-    expectTypeOf<Parameters<Front.BankAnnounce>[0]>().toEqualTypeOf<Front.BankAnnouncement>()
+    expectTypeOf<Front.BankFriend['panic']>().toEqualTypeOf<Front.DevicePanic>()
+    expectTypeOf<Front.BankFriend['announce']>().toEqualTypeOf<Front.DeviceAnnounce>()
+    expectTypeOf<Parameters<Front.DeviceAnnounce>[0]>().toEqualTypeOf<Front.DeviceAnnouncement>()
     expectTypeOf<Parameters<Front.LifecycleHandler>[0]>().toEqualTypeOf<Front.DeviceEvent>()
     expectTypeOf<Front.DeviceOpts['onLifecycle']>().toEqualTypeOf<Front.LifecycleHandler | undefined>()
     expectTypeOf<Extract<Front.DeviceEvent, { kind: 'lease_revoke_failed' }>['where']>().toEqualTypeOf<Front.RevokeSite>()
@@ -98,7 +98,7 @@ describe("safebyok", () => {
   })
 
   it("exports the brand helpers and the VaultError brand", () => {
-    const refusal = new Front.VaultError('vault_locked', 'Unlock the vault first.')
+    const refusal = new Front.VaultError('bank_locked', 'Unlock the vault first.')
     expect(Front.brandOf(refusal, Front.IsVaultError)).to.be.true
     const Mine = Symbol.for('@example/mine')
     expect(Front.brandOf(Front.brand({}, Mine), Mine)).to.be.true

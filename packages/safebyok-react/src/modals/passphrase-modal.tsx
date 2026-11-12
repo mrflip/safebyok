@@ -8,11 +8,11 @@ import { ChosenPassphraseFields, DialogBoundary, ModalForm, PassphraseField, Use
 /** Render the passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
 export const PassphraseModal = (props: PassphraseModalProps) => (
   <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
-    {props.gating.gatingkind === 'build_vault' ? <BuildForm {...props} gating={props.gating} /> : <UnlockForm {...props} gating={props.gating} />}
+    {props.gating.gatingkind === 'build_bank' ? <BuildForm {...props} gating={props.gating} /> : <UnlockForm {...props} gating={props.gating} />}
   </DialogBoundary>
 )
 
-const BuildForm = ({ gating, leaseMillis, passphraseUsername }: PassphraseModalProps & { gating: Gating<'build_vault'> }) => {
+const BuildForm = ({ gating, leaseMillis, passphraseUsername }: PassphraseModalProps & { gating: Gating<'build_bank'> }) => {
   const { chosenRef, confirmRef, ...chosen } = useChosenPassphrase(gating, 'PassphraseModal')
   const { gripe, gripeId, action } = useAttemptAction(
     gating,
@@ -34,13 +34,13 @@ const BuildForm = ({ gating, leaseMillis, passphraseUsername }: PassphraseModalP
       action={action}
       onReset={chosen.reset}
     >
-      <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)} />
+      <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.banklabel)} />
       <ChosenPassphraseFields chosen={chosen} chosenRef={chosenRef} confirmRef={confirmRef} chosenLabel={Messages.passphraseField} confirmLabel={Messages.confirmField} chosenInvalidBy={gripe === null ? undefined : gripeId} />
     </ModalForm>
   )
 }
 
-const UnlockForm = ({ gating, leaseMillis, passphraseUsername, passkeyRpId }: PassphraseModalProps & { gating: Gating<'unlock_vault'> }) => {
+const UnlockForm = ({ gating, leaseMillis, passphraseUsername, passkeyRpId }: PassphraseModalProps & { gating: Gating<'unlock_bank'> }) => {
   const fieldRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const [passkeyGripe, setPasskeyGripe] = useState<string | null>(null)
@@ -77,7 +77,7 @@ const UnlockForm = ({ gating, leaseMillis, passphraseUsername, passkeyRpId }: Pa
       action={action}
     >
       {offering && <PasskeyUnlockButton gating={gating} rpId={passkeyRpId} onGripe={hearPasskey} />}
-      <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)} />
+      <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.banklabel)} />
       <PassphraseField ref={fieldRef} fieldname="current-password" fieldlabel={Messages.passphraseField} invalidBy={gripe === null ? undefined : gripeId} />
     </ModalForm>
   )

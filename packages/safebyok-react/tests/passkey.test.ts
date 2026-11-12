@@ -270,7 +270,7 @@ describe("a passkey unlock, end to end", () => {
     const { gating, raising } = await TH.openGatingOf(world, TH.unlocking)
     const passkeyClear = await askPasskey(gating.passkeyHeader)
     if (passkeyClear === null) { throw new Error('dismissed') }
-    expect(await TH.gatingOfKind(gating, 'unlock_vault').attempt({ passkeyClear })).to.include({ ok: true })
+    expect(await TH.gatingOfKind(gating, 'unlock_bank').attempt({ passkeyClear })).to.include({ ok: true })
     expect(await raising).to.include({ ok: true })
   })
 

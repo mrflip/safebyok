@@ -1,4 +1,4 @@
-/** A vault's lease through a gate change, a refused forget of its row, and the discards down the chain. */
+/** A bank's lease as its vaults see it: a refused forget of its row, and the discards down the chain. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
@@ -6,7 +6,7 @@ import { ENCRYPTED } from '../../src/helpers/consts'
 import { parseLogger } from '../../src/helpers/logger'
 import { Vault } from '../../src/models/vault'
 import * as TH from '../test-helpers'
-import { NewPassphrase, Passphrase, byPassphrase, makeBornVault, makeBornVaultAndFriend, replaceTyping, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
+import { Passphrase, byPassphrase, makeBornVault, makeBornVaultAndFriend, useVaultWorlds, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -21,116 +21,57 @@ function stubReportError() {
 
 afterEach(() => { vi.unstubAllGlobals() })
 
-async function expectChangeUnlocked({ vault, deviceDB, demandStored }: Awaited<ReturnType<typeof makeBornVault>>, epoch0: number): Promise<void> {
-  expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
-  expect(vault.isUnlocked).to.be.true
-  await TH.eventually(() => deviceDB.cachedNow() !== null)
-}
-
-describe("A lease renewed through a gate change", () => {
-  it("is attached under the epoch that was written, without the vault ever reporting locked", async () => {
-    const { vault, deviceDB, demandStored } = await makeBornVault()
-    const sealed = await vault.sealStampedString('sk-test', Stamp)
-    const epoch0 = vault.gate.gate_epoch
-    vault.becomeNotifiable()
-    const lockings: boolean[] = []
-    vault.subscribe(() => { lockings.push(vault.isLocked) })
-    await replaceTyping(vault, Passphrase, NewPassphrase)
-    expect(vault.isUnlocked).to.be.true
-    expect(lockings).to.not.include(true)
-    expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
-    expect(deviceDB.cachedNow()).to.deep.include({ gate_epoch: epoch0 + 1 })
-    expect(await vault.unsealStampedString(sealed, Stamp)).to.eq('sk-test')
-  })
-
-  it("unlocks a vault that was locked at the start, and writes the change", async () => {
-    const { vault, deviceDB, demandStored } = await makeBornVault()
-    const epoch0 = vault.gate.gate_epoch
-    vault.lock()
-    await TH.eventually(() => deviceDB.cachedNow() === null)
-    await replaceTyping(vault, Passphrase, NewPassphrase)
-    expect(vault.isUnlocked).to.be.true
-    expect(demandStored().gate.gate_epoch).to.eq(epoch0 + 1)
-    expect(deviceDB.cachedNow()).to.not.be.null
-  })
-
-  it("leaves the vault unlocked where a lock() came after the attempt was submitted", async () => {
-    const born = await makeBornVault()
-    const { vault } = born
-    const epoch0 = vault.gate.gate_epoch
-    const world = born.fakeBank
-    const { requestCleartext: asBefore } = world
-    world.requestCleartext = async (gating) => {
-      const attempting = gating.attempt({ antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase })
-      vault.lock()
-      await attempting
-    }
-    await vault.replacePassphrasePrompt()
-    world.requestCleartext = asBefore
-    await expectChangeUnlocked(born, epoch0)
-  })
-
-  it("leaves the vault unlocked where a lock() came as the commit was written", async () => {
-    const born = await makeBornVault()
-    const { vault, opts: { vaultDB } } = born
-    const epoch0 = vault.gate.gate_epoch
-    const commit = vaultDB.tryReplacePassphrase.bind(vaultDB)
-    vi.spyOn(vaultDB, 'tryReplacePassphrase').mockImplementationOnce(async (record, opts) => {
-      const written = await commit(record, opts)
-      vault.lock()
-      return written
-    })
-    await replaceTyping(vault, Passphrase, NewPassphrase)
-    await expectChangeUnlocked(born, epoch0)
-  })
-})
-
 describe("A refused forget of the lease row", () => {
   const Refusal = new VaultError('storage_unavailable', 'the disk is full')
 
   it("is returned by the friend's tryForgetLease as a bad Outcome and reported to onLifecycle once", async () => {
-    const onLifecycle = vi.fn()
-    const { vault, deviceDB, friend } = await makeBornVaultAndFriend(byPassphrase(Passphrase), { onLifecycle })
+    const onLifecycle = vi.fn<(told: { kind: string }) => void>()
+    const { bank, deviceDB, friend } = await makeBornVaultAndFriend(byPassphrase(Passphrase), { onLifecycle })
     deviceDB.forget.mockRejectedValueOnce(Refusal)
     await TH.expectBad(friend.tryForgetLease(), 'storage_unavailable')
-    await TH.eventually(() => onLifecycle.mock.calls.length > 0)
-    expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal, vault, where: 'undeleted' }))
+    function revokeFailures() { return onLifecycle.mock.calls.filter(([told]) => told.kind === 'lease_revoke_failed') }
+    await TH.eventually(() => revokeFailures().length > 0)
+    expect(revokeFailures()).to.have.lengthOf(1)
+    expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal, bank, where: 'undeleted' }))
   })
 
-  it("is reported to onLifecycle, leaving the vault locked and enabled", async () => {
+  it("is reported to onLifecycle, leaving the bank and its vault locked and enabled", async () => {
     const reported = stubReportError()
-    const onLifecycle = vi.fn(() => Promise.reject(new Error('the host broke')))
-    const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onLifecycle })
+    const onLifecycle = vi.fn((told: { kind: string }) => (told.kind === 'lease_revoke_failed' ? Promise.reject(new Error('the host broke')) : undefined))
+    const { bank, vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onLifecycle })
     deviceDB.forget.mockRejectedValueOnce(Refusal)
     vault.lock()
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => reported.mock.calls.length === 1)
-    expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal, vault, where: 'lock' }))
+    expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal, bank, where: 'lock' }))
+    expect(bank.isEnabled).to.be.true
     expect(vault.isEnabled).to.be.true
     expect(deviceDB.cachedNow()).not.to.be.null
   })
 
   describe("with no onLifecycle and no reportError", () => {
-    it("still vacates the vault, logging each refusal at error", async () => {
+    it("still vacates the bank and its vault, logging each refusal at error", async () => {
       const spy = TH.spyLogger()
-      const { vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { logger: parseLogger(spy.logger) })
+      const { bank, vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { logger: parseLogger(spy.logger) })
       deviceDB.forget.mockRejectedValue(Refusal)
       vault.lock()
-      await TH.eventually(() => ! vault.isEnabled)
+      await TH.eventually(() => ! bank.isEnabled)
+      expect(vault.isEnabled).to.be.false
       expect(deviceDB.forget).toHaveBeenCalledTimes(2)
       expect(spy.calls.map((call) => call.level)).to.deep.equal(['error', 'error'])
     })
   })
 
-  it("with no onLifecycle, is reported to reportError and the vault is vacated", async () => {
+  it("with no onLifecycle, is reported to reportError and the bank and its vault are vacated", async () => {
     const reported = stubReportError()
     const spy = TH.spyLogger()
-    const { vault, listing, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { logger: parseLogger(spy.logger) })
+    const { bank, vault, listing, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { logger: parseLogger(spy.logger) })
     deviceDB.forget.mockRejectedValue(Refusal)
     vault.lock()
     await TH.eventually(() => reported.mock.calls.length === 2)
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error', 'error'])
     expect(reported).toHaveBeenCalledWith(Refusal)
+    expect(bank.isEnabled).to.be.false
     expect(vault.isEnabled).to.be.false
     expect(listing.at(vault.scope)).to.be.null
     expect(deviceDB.forget).toHaveBeenCalledTimes(2)
@@ -150,11 +91,12 @@ describe("sweep and vacate", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test' })
   })
 
-  it("sweep keeps the cached lease row, locks the vault, and disables and delists the vault and its boxes", async () => {
-    const { vault, listing, box, deviceDB } = await makeVaultWithBox()
+  it("the bank's sweep keeps the cached lease row, locks the bank, and disables and delists the vault and its boxes", async () => {
+    const { bank, vault, listing, box, deviceDB } = await makeVaultWithBox()
     const { boxListing } = vault
     await box.expose()
-    expect(vault.sweep()).to.equal(vault)
+    deviceDB.peek.mockClear()
+    expect(bank.sweep()).to.equal(bank)
     expect(vault.isLocked).to.be.true
     expect(vault.isEnabled).to.be.false
     expect(box.isEnabled).to.be.false
@@ -166,10 +108,10 @@ describe("sweep and vacate", () => {
     expect(deviceDB.peek).not.toHaveBeenCalled()
   })
 
-  it("vacate also forgets the cached lease row, and leaves the vaultDB untouched", async () => {
-    const { vault, listing, box, deviceDB, demandStored } = await makeVaultWithBox()
+  it("the bank's vacate also forgets the cached lease row, and leaves the bankDB untouched", async () => {
+    const { bank, vault, listing, box, deviceDB, demandStored } = await makeVaultWithBox()
     const stored = demandStored()
-    vault.vacate()
+    bank.vacate()
     expect(vault.isLocked).to.be.true
     expect(box.isEnabled).to.be.false
     expect(listing.at(vault.scope)).to.be.null
@@ -177,9 +119,9 @@ describe("sweep and vacate", () => {
     expect(demandStored()).to.eq(stored)
   })
 
-  it("after a sweep, every guard and call refuses, and lock, sweep and vacate are no-ops", async () => {
-    const { vault, box, deviceDB } = await makeVaultWithBox()
-    vault.sweep()
+  it("after the bank's sweep, every guard and call refuses, and lock, sweep and vacate are no-ops", async () => {
+    const { bank, vault, box, deviceDB } = await makeVaultWithBox()
+    bank.sweep()
     TH.expectSyncRefusal(() => vault.demandEnabled())
     TH.expectSyncRefusal(() => vault.demandUnlocked())
     TH.expectSyncRefusal(() => box.demandPuttable({ whisper: { apiKey: 'sk-test' } }))
@@ -204,8 +146,7 @@ describe("sweep and vacate", () => {
   it("after a sweep, a vault's record stays readable", async () => {
     const { vault, demandStored } = await makeBornVault()
     vault.sweep()
-    expect(vault.fullRecord).to.deep.equal(demandStored())
-    expect(vault.gate.gate_epoch).to.eq(demandStored().gate.gate_epoch)
+    expect(vault.toJSON()).to.deep.equal(demandStored())
   })
 
   it("after a sweep, hydrate refuses only when it would fetch", async () => {
@@ -229,21 +170,21 @@ describe("sweep and vacate", () => {
     expect(box.snapshot.isExposed).to.be.false
   })
 
-  it("ensureUnlocked refuses without showing a dialog when a sweep lands during its lease lookup", async () => {
-    const { vault, fakeBank, deviceDB } = await makeBornVault()
+  it("ensureUnlocked refuses without showing a dialog when the bank's sweep lands during its lease lookup", async () => {
+    const { bank, vault, dialog, deviceDB } = await makeBornVault()
     vault.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
-    const dialog = vi.fn()
-    fakeBank.requestCleartext = dialog
+    const requestCleartext = vi.fn()
+    dialog.requestCleartext = requestCleartext
     deviceDB.peek.mockImplementationOnce(() => {
-      vault.sweep()
+      bank.sweep()
       return Promise.resolve(null)
     })
     await TH.expectRefusal(vault.ensureUnlocked())
-    expect(dialog).not.toHaveBeenCalled()
+    expect(requestCleartext).not.toHaveBeenCalled()
   })
 
-  it("a swept listing refuses a put or a delete before reaching the vaultDB", async () => {
+  it("a swept listing refuses a put or a delete before reaching the bankDB", async () => {
     const { listing, demandStored } = await makeBornVault()
     const stored = demandStored()
     listing.sweep()
@@ -297,28 +238,28 @@ function valuesShownBy(subject: object): unknown[] {
   return shown
 }
 
-describe("a vault and a lease never reveal the lease friend or the lease key handle", () => {
-  it("a gating does not reveal the vault's unlock or its act through its fields, Object.keys or JSON.stringify", async () => {
-    const { vault, fakeBank: world } = await makeBornVault()
+describe("a bank, a vault and a lease never reveal the lease friend or the lease key handle", () => {
+  it("a gating does not reveal the bank's unlock or its act through its fields, Object.keys or JSON.stringify", async () => {
+    const { bank, dialog } = await makeBornVault()
     let gatingShown: object | null = null
-    world.requestCleartext = (gating) => {
+    dialog.requestCleartext = (gating) => {
       gatingShown = gating
       gating.dismiss()
     }
-    await TH.expectRefusal(vault.addPasskeyPrompt(), 'dismissed')
+    await TH.expectRefusal(bank.unlock())
     const json = JSON.stringify(gatingShown)
-    for (const named of ['act', 'unlockByProving', 'unlockVaultByProving']) {
+    for (const named of ['act', 'unlockByProving', 'unlockBankByProving']) {
       expect(Object.keys(gatingShown!)).to.not.include(named)
       expect(json).to.not.include(named)
-      expect(vault).to.not.have.property(named)
+      expect(bank).to.not.have.property(named)
     }
   })
 
-  it("a vault and its lease reveal neither through a field, a getter, Object.keys or JSON.stringify", async () => {
-    const { vault, deviceDB, friend, lease } = await makeBornVaultAndFriend()
+  it("a bank, its vault and its lease reveal neither through a field, a getter, Object.keys or JSON.stringify", async () => {
+    const { bank, vault, deviceDB, friend, lease } = await makeBornVaultAndFriend()
     const row = deviceDB.cachedNow() as Record<string, unknown>
     expect(row['lease_key']).to.be.an.instanceof(CryptoKey)
-    for (const subject of [vault, lease]) {
+    for (const subject of [bank, vault, lease]) {
       const shown = valuesShownBy(subject)
       expect(shown).to.not.include(friend)
       expect(shown).to.not.include(row['lease_key'])
@@ -329,6 +270,7 @@ describe("a vault and a lease never reveal the lease friend or the lease key han
         expect(json).to.not.include(named)
       }
     }
+    expect('leaseFriend' in bank).to.be.false
     expect('leaseFriend' in vault).to.be.false
     expect('friend' in lease).to.be.false
   })

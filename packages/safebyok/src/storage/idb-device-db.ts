@@ -3,7 +3,7 @@
 import { promisifyRequest, type UseStore } from 'idb-keyval'
 import type * as Z from 'zod'
 import { objCheck } from '../helpers/validator'
-import type { BankScope, VaultScope } from '../shapes/shapes-core'
+import type { BankScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { DeviceRow, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 import { DeviceDBVersion, DeviceRowDBVersion } from '../helpers/consts'
@@ -29,7 +29,7 @@ export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optio
 type DeviceRowScopepath = [user_id: string, banklabel: string]
 
 /** The scopepath of the lease row at `scope`. */
-function leaseScopepathOf({ user_id, banklabel, vaultlabel }: VaultScope): LeaseScopepath { return [user_id, banklabel, vaultlabel] }
+function leaseScopepathOf({ user_id, banklabel }: BankScope): LeaseScopepath { return [user_id, banklabel] }
 /** The scopepath of the device row at `scope`. */
 function deviceRowScopepathOf({ user_id, banklabel }: BankScope): DeviceRowScopepath { return [user_id, banklabel] }
 
@@ -74,14 +74,14 @@ export class IdbDeviceDB extends DeviceDB {
     await inOneStep(this.#leaseShelf, 'readwrite', (store) => { store.put(row, leaseScopepathOf(row)) })
   }
 
-  protected async doPeek(scope: VaultScope): Promise<unknown> {
+  protected async doPeek(scope: BankScope): Promise<unknown> {
     return await inOneStep(this.#leaseShelf, 'readonly', (store) => rowAt(store, leaseScopepathOf(scope)))
   }
 
   protected async doForget(asked: LeaseQuery): Promise<void> {
     await inOneStep(this.#leaseShelf, 'readwrite', async (store) => {
       const stored = SX.leaseRow.safeParse(await rowAt(store, leaseScopepathOf(asked)))
-      if (stored.success && (stored.data.vault_tok === asked.vault_tok)) { store.delete(leaseScopepathOf(asked)) }
+      if (stored.success && (stored.data.bank_tok === asked.bank_tok)) { store.delete(leaseScopepathOf(asked)) }
     })
   }
 

@@ -310,10 +310,10 @@ describe("storable verbs while the vault is locked", () => {
     [(box: TestableBox) => box.del(box.scope),                                                          'del'],
   ] as const
   for (const [verb, verbname] of EntryCases) {
-    it(`refuses ${verbname} at its entry with 'vault_locked', writing nothing`, async () => {
+    it(`refuses ${verbname} at its entry with 'bank_locked', writing nothing`, async () => {
       const { box } = timelyBoxOf()
       world.mw.setLocked(true)
-      await TH.expectRefusal(verb(box), 'vault_locked')
+      await TH.expectRefusal(verb(box), 'bank_locked')
       expect(world.mw.calls.map((call) => call.verb)).not.to.include.members(['put', 'del'])
     })
   }
@@ -353,7 +353,7 @@ describe("storable try forms: an outcome, never a rejection", () => {
     [(box: TestableBox) => box.tryGet({ maxMillisSinceRefresh: 0 }),                                                   () => { world.mw.willGet(() => { throw new Error("socket closed") }) },         undefined,             'tryFetch whose VaultDB throws a plain Error'],
     [(box: TestableBox) => box.tryHydrate(),                                                 () => { world.mw.willEnsureTimely(() => Promise.reject(storageDown())) },         "storage_unavailable", "tryHydrate whose world's ensureTimely refuses"],
     [(box: TestableBox) => box.tryPut({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'x' } }), (box: TestableBox) => { world.mw.willPut(world.mw.staleWriteOf(box.scope, undefined)) }, "stale_write",         'tryPut that storage refuses as stale'],
-    [(box: TestableBox) => box.tryDel(box.scope),                                                     () => { world.mw.setLocked(true) },                                      "vault_locked",        'tryDel while locked'],
+    [(box: TestableBox) => box.tryDel(box.scope),                                                     () => { world.mw.setLocked(true) },                                      "bank_locked",        'tryDel while locked'],
   ] as const
   for (const [tryVerb, arrange, refusalkind, blurb] of BadCases) {
     it(`resolves a bad outcome with its refusal: ${blurb}`, async () => {
@@ -444,8 +444,8 @@ describe("storable refusal sentences, from phrases.ts", () => {
   it("refuses a locked put and a record not full with the sentences phrases.ts has", async () => {
     const { box } = timelyBoxOf()
     world.mw.setLocked(true)
-    const locked = await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} }), 'vault_locked')
-    expect(locked.message).to.eq(Phrases.VaultLocked)
+    const locked = await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: {} }), 'bank_locked')
+    expect(locked.message).to.eq(Phrases.BankLocked)
     world.mw.setLocked(false)
     const sparse = boxListingOf(world.mw).deliverRecord(sparseBoxRecord({ boxlabel: 'sparse_one' }))
     const notFull = TH.expectSyncRefusal(() => sparse.demandFull())

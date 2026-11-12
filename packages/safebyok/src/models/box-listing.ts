@@ -1,18 +1,19 @@
-/** A vault's boxes as this device has them: the box listing, and what it is given to reach the vaultDB and the vault. */
+/** A vault's boxes as this device has them: the box listing, and what it is given to reach the bankDB and the vault. */
 
 import { VaultError } from '../refusals/errors'
 import type { Modelkind } from '../helpers/consts'
 import { nowMillis } from '../helpers/clock'
 import { makeLifeTok } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
-import { boxAbsent, boxStoredDamaged, boxNotListed } from '../refusals/throwers'
+import { boxAbsent, boxStoredDamaged, boxNotListed, rowOfOtherWorld } from '../refusals/throwers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
+import * as BX from '../shapes/shapes-bankdb'
 import * as VX from '../shapes/shapes-vaultish'
 import { type BoxCreateOpts, type BoxDna, type BoxListingOpts, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type DelTombstone, type Fetched, type ListingDelOpts, type ListingPutOpts, boxDna } from '../shapes/shapes-vaultish'
-import type { BoxRow, DamagedBox, VaultRow, BoxRecord, BoxSparse } from '../shapes/shapes-storage'
-import type { Notice } from '../storage/vault-db'
+import type { BankRow, BoxQuery, BoxRow, DamagedBox, GateRecord, VaultRow, BoxRecord, BoxSparse } from '../shapes/shapes-bankdb'
+import type { Notice } from '../storage/bank-db'
 import { Box } from './box'
 import { Listing } from './listing'
 
@@ -45,10 +46,10 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   scopeOf(boxish: unknown):  Boxscope  { return boxscope.parseConsistent(boxish, this.scope) }
 
   /** Parse `boxish` as a {@link BoxSparse}. */
-  sparseOf(boxish: unknown): BoxSparse { return SX.boxSparse.parse(boxish) }
+  sparseOf(boxish: unknown): BoxSparse { return BX.boxSparse.parse(boxish) }
 
   /** Parse `boxish` as a {@link BoxRecord} of this vault. */
-  recordOf(boxish: unknown): BoxRecord { return SX.boxRecord.parseConsistent(boxish, this.scope) }
+  recordOf(boxish: unknown): BoxRecord { return BX.boxRecord.parseConsistent(boxish, this.scope) }
   // --
 
   // == [Methods]: puttable, create, tryCreate, shellFor
@@ -76,15 +77,21 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
   /** A void box listed under `scope`. */
-  #shellFor(scope: Boxscope): Box { return this.deliverRecord(SX.shellBoxOf(scope, this.world.vault_tok)) }
+  #shellFor(scope: Boxscope): Box { return this.deliverRecord(BX.shellBoxOf(this.#queryOf(scope))) }
+
+  /** `scope` under the life of the vault listed: its `bank_tok` and `vault_tok`. */
+  #queryOf(scope: Boxscope): BoxQuery { return { ...scope, bank_tok: this.world.bank_tok, vault_tok: this.world.vault_tok } }
   // --
 
-  // == [Defined by the box listing]: vaultTokOfWorld, isOneLifePerInstance, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
-
-  protected vaultTokOfWorld(): string { return this.world.vault_tok }
+  // == [Defined by the box listing]: isOneLifePerInstance, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   // A Box object lives through its box's lives: a record of a new life is received into it.
   protected get isOneLifePerInstance(): false { return false }
+
+  protected demandOfWorld(record: Fetched<BoxRecord, BoxSparse>): void {
+    if (record.bank_tok !== this.world.bank_tok)   { throw rowOfOtherWorld(record, 'bank_tok') }
+    if (record.vault_tok !== this.world.vault_tok) { throw rowOfOtherWorld(record, 'vault_tok') }
+  }
 
   protected scopepathOf(scope: Boxscope): string {
     return ['box', scope.user_id, scope.banklabel, scope.vaultlabel, scope.boxlabel].join('^')
@@ -97,21 +104,22 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   protected nothingStoredError(scope: Boxscope): VaultError { return boxAbsent(scope) }
 
   protected async doTryList() {
-    const answer = await this.vaultDB.tryListBoxes({ op: 'list', ...this.scope, vault_tok: this.world.vault_tok })
+    const { bank_tok, vault_tok } = this.world
+    const answer = await this.bankDB.tryListBoxes({ op: 'list', ...this.scope, bank_tok, vault_tok })
     return answer.ok ? { ...answer, val: { listed: answer.val.boxes, damaged_rows: answer.val.damaged_rows } } : answer
   }
 
   protected damagedStoredError(damaged: DamagedBox): VaultError { return boxStoredDamaged(damaged) }
 
   protected doTryGet(scope: Boxscope) {
-    const { vault_tok } = this.world
-    const expected = this.at(scope)?.sparse ?? SX.shellBoxOf(scope, vault_tok)
-    return this.vaultDB.tryGetBox({ op: 'get', ...scope, vault_tok, ifAbsent: 'nil', expected })
+    const asked = this.#queryOf(scope)
+    const expected = this.at(scope)?.sparse ?? BX.shellBoxOf(asked)
+    return this.bankDB.tryGetBox({ op: 'get', ...asked, ifAbsent: 'nil', expected })
   }
 
   protected doTryPut(record: BoxRecord, { expected, ifAbsent, ifPresent }: ListingPutOpts<BoxSparse>) {
-    const { user_id, banklabel, vaultlabel, boxlabel, vault_tok } = record
-    return this.vaultDB.tryPutBox({ op: 'put', user_id, banklabel, vaultlabel, boxlabel, vault_tok, ifAbsent, ifPresent, expected, record })
+    const { user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok } = record
+    return this.bankDB.tryPutBox({ op: 'put', user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, ifAbsent, ifPresent, expected, record })
   }
 
   protected tombstoneOver(expected: BoxSparse): DelTombstone<BoxSparse> {
@@ -119,14 +127,14 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   protected doTryDel(tombstone: DelTombstone<BoxSparse>, { expected }: ListingDelOpts<BoxSparse>) {
-    const { user_id, banklabel, vaultlabel, boxlabel, vault_tok } = tombstone
-    return this.vaultDB.tryDelBox({ op: 'del', user_id, banklabel, vaultlabel, boxlabel, vault_tok, expected, record: tombstone })
+    const { user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok } = tombstone
+    return this.bankDB.tryDelBox({ op: 'del', user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, expected, record: tombstone })
   }
 
-  protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.vaultDB.watch(this.scope, onNotice, onBadNews) }
+  protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.bankDB.watch(this.scope, onNotice, onBadNews) }
 
-  /** A box row of this life of the vault: one under another `vault_tok` is no row. */
-  protected isOwnRow(row: VaultRow | BoxRow): row is BoxRow { return ('boxlabel' in row) && (row.vault_tok === this.world.vault_tok) }
+  /** A box row of this life of the vault: one under another life is no row. */
+  protected isOwnRow(row: BankRow | GateRecord | VaultRow | BoxRow): row is BoxRow { return ('boxlabel' in row) && (BX.vaultLifeOf(row) === BX.vaultLifeOf(this.world)) }
   // --
 
   /** Answers 'box_listing', which marks this model to a check: {@link Modelkind}. */

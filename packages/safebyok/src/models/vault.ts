@@ -1,70 +1,50 @@
 import type { Modelkind } from '../helpers/consts'
 import { checkedConsistent } from '../helpers/validator'
+import { tattoo } from '../helpers/helpers'
 import * as Phrases from '../helpers/phrases'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { type Outcome, demandGood, outcomeOf } from '../refusals/outcome'
 import type { VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
+import * as BX from '../shapes/shapes-bankdb'
+import type { VaultRecord, VaultSparse } from '../shapes/shapes-bankdb'
 import * as GX from '../shapes/shapes-gateish'
-import type { AskUser, GateProps, LeaseFriend, SealedWhisper, UnlockByProving } from '../shapes/shapes-gateish'
+import type { SealedWhisper } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BankFriend, BoxPut, BoxPutOpts, RevokeSite, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
-import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
-import { alreadyListed, deletedVault, unlockFirst } from '../refusals/throwers'
+import type { BankFriend, BoxPut, BoxPutOpts, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
+import { deletedVault } from '../refusals/throwers'
+import type { Bank } from './bank'
 import type { Box } from './box'
+import type { Gate } from './gate'
 import type { BoxListing } from './box-listing'
-import { Gate } from './gate'
-import { Gating } from './gating'
-import { Lease } from './lease'
-import type { Proving } from './proving'
 import { Storable } from './storable'
 import type { VaultListing } from './vault-listing'
 
-// == [Defaults]: DefaultLeaseMillis
-
-/** How long a lease lasts where the host names no `autolockMinutes`: fourteen days. */
-export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
-// --
-
-/** SLOPDOC: A vault as this device has it: a storable that ducks as its record, and the world its boxes live in. */
+/** A vault as this device has it: a storable that ducks as its record, and the world its boxes live in, sealed under its bank's lease. */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> {
-  // == [Props]: user_id, banklabel, vaultlabel, world, listing, #bankFriend, #lease, #vaultFriend, #boxListing, #gate
+  // == [Props]: user_id, banklabel, vaultlabel, bank_tok, vault_tok, world, listing, #bankFriend, #boxListing
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly user_id:    string
   declare readonly banklabel:  string
   declare readonly vaultlabel: string
+  /** The life of the bank this vault is of, inscribed once by `assignInitialProps`. */
+  declare readonly bank_tok:   string
+  /** This vault's life, inscribed once by `assignInitialProps` and never moved. */
+  declare readonly vault_tok:  string
   declare readonly world:      VaultWorld
   declare readonly listing:    VaultListing
 
   /** The bank's private calls, as the listing handed them. */
   readonly #bankFriend: BankFriend
 
-  /** The lease granted on this device, and null is what locked means. */
-  #lease: Lease | null = null
-
-  #vaultFriend: LeaseFriend | null = null
-
   #boxListing: BoxListing | null = null
-
-  #gate: { props: GateProps, gate: Gate } | null = null
   // --
 
-  // == [Getters]: fmt, fullRecord, gate, boxListing
+  // == [Getters]: fmt, boxListing
 
   /** The storage format of the record in hand. */
   get fmt(): number { return this.central.fmt }
-
-  /** The full record in hand, what a gate change spreads into its params. */
-  get fullRecord(): VaultRecord { return this.demandFullProps() }
-
-  // Made on first read, not at align: the base constructor aligns before this class's fields exist.
-  /** The Gate of the record in hand, the same while the record's `gate` is the same object, so a record received remakes it. */
-  get gate(): Gate {
-    const full = this.demandFullProps()
-    if (this.#gate?.props !== full.gate) { this.#gate = { props: full.gate, gate: new Gate(full, full.gate) } }
-    return this.#gate.gate
-  }
 
   /** The listing of this vault's boxes, made once, on first asking. */
   get boxListing(): BoxListing {
@@ -73,7 +53,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Construction]: constructor, launchBirth
+  // == [Construction]: constructor, assignInitialProps
 
   /** Construct the storable vault, adopting its bank friend. */
   constructor(world: VaultWorld, listing: VaultListing, central: Fetched<VaultRecord, VaultSparse>, bankFriend: BankFriend) {
@@ -81,181 +61,83 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#bankFriend = VX.bankFriend.parse(bankFriend)
   }
 
-  /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the tombstone listed, if one is. */
-  static async launchBirth(listing: VaultListing, scope: VaultScope, askUser: AskUser | null): Promise<Vault> {
-    const checked = listing.scopeOf(scope)
-    listing.demandEnabled()
-    const listed = listing.at(checked)
-    if (listed?.isPresent === true) { throw alreadyListed() }
-    const expected = listed?.sparse ?? SX.shellVaultOf(checked)
-    return Gating.launchBirth(listing, checked, expected, Vault.#unlockVaultByProving, askUser)
+  /** Inscribes this vault's `bank_tok` and `vault_tok` beside what the base inscribes. */
+  protected override assignInitialProps(central: Fetched<VaultRecord, VaultSparse>): void {
+    tattoo(this, { bank_tok: central.bank_tok, vault_tok: central.vault_tok }, { configurable: false })
+    super.assignInitialProps(central)
   }
   // --
 
-  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, each with its try form
+  // == [The bank's lock]: lock, alignLock, ensureUnlocked, unlock, each with its try form
 
-  /** SLOPDOC: Replaces the passphrase through a gating; the passkey stays and no other device is locked. */
-  async replacePassphrasePrompt(): Promise<this> {
-    await this.ensureTimely(); this.demandPromptable()
-    await Gating.launchOn(this, 'replace_passphrase', Vault.#unlockVaultByProving, this.#bankFriend.askUser)
+  /** Lock the bank this vault is of: {@link Bank.lock}. */
+  override lock(): this { this.world.lock(); return this }
+
+  /** Tell the listeners, this vault's and its boxes', the bank's lock has moved. A no-op past a discard; never throws. */
+  alignLock(): this {
+    super.lock()
+    this.#boxListing?.lock()
     return this
   }
 
-  /** Non-throwing form of {@link replacePassphrasePrompt}. */
-  tryReplacePassphrasePrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrasePrompt()) }
-
-  /** Add a passkey through an add_passkey gating. */
-  async addPasskeyPrompt(): Promise<this> {
-    await this.ensureTimely(VX.Promptly); this.demandPromptable()
-    this.gate.demandPasskeyAddable()
-    await Gating.launchOn(this, 'add_passkey', Vault.#unlockVaultByProving, this.#bankFriend.askUser)
-    return this
-  }
-
-  /** Non-throwing form of {@link addPasskeyPrompt}. */
-  tryAddPasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskeyPrompt()) }
-
-  /** Revoke the passkey through a revoke_passkey gating. With none it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
-  async revokePasskeyPrompt(): Promise<this> {
-    await this.ensureTimely(VX.Promptly); this.demandPromptable()
-    if (this.gate.pkWayin === null) { return this }
-    await Gating.launchOn(this, 'revoke_passkey', Vault.#unlockVaultByProving, this.#bankFriend.askUser)
-    return this
-  }
-
-  /** Non-throwing form of {@link revokePasskeyPrompt}. */
-  tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
-  // --
-
-  // == [Unlocking]: ensureUnlocked, unlock, each with its try form
-
-  /** This vault timely and unlocked: as it stands, else by the lease cached on this device, else by {@link unlock}. */
-  async ensureUnlocked(): Promise<this> {
-    await this.ensureTimely(); this.demandPromptable()
-    if (this.isUnlocked) { return this }
-    const cached = await Lease.buildFromCache(this.#leaseFriend(), this.gate.gate_epoch)
-    if (cached) { await this.#attachLease(cached); return this }
-    return this.unlock()
-  }
+  /** The bank this vault is of unlocked: {@link Bank.ensureUnlocked}. */
+  async ensureUnlocked(): Promise<this> { await this.world.ensureUnlocked(); return this }
 
   /** Non-throwing form of {@link ensureUnlocked}. */
   tryEnsureUnlocked(): Promise<Outcome<this>> { return outcomeOf(() => this.ensureUnlocked()) }
 
-  /** Ask the user for a passphrase or passkey, and unlock by its proving. */
-  async unlock(): Promise<this> {
-    await this.ensureTimely(); this.demandPromptable()
-    await Gating.launchOn(this, 'unlock_vault', Vault.#unlockVaultByProving, this.#bankFriend.askUser)
-    return this
-  }
+  /** Unlock the bank this vault is of: {@link Bank.unlock}. */
+  async unlock(): Promise<this> { await this.world.unlock(); return this }
 
   /** Non-throwing form of {@link unlock}. */
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
   // --
 
-  // == [The lease]: lock, revokeLease, unlockByProving, attachLease, alignBoxes
+  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, each with its try form
 
-  /** Lock the vault and its boxes before returning, and forget the row cached on this device.
-   * A failed revoke is announced as `lease_revoke_failed` and does not throw. A no-op on a vault discarded.
-   */
-  override lock(): this {
-    if (! this.isEnabled) { return this }
-    void this.#revokeLease('lock')
-    return this
-  }
+  /** Replace the bank's passphrase: {@link Gate.replacePassphrasePrompt}. */
+  async replacePassphrasePrompt(): Promise<this> { await this.world.maingate.replacePassphrasePrompt(); return this }
 
-  /** SLOPDOC: Drops any lease granted and forgets the row cached on this device, announcing a failed revoke at `where`. */
-  async #revokeLease(where: Exclude<RevokeSite, 'undeleted'>): Promise<void> {
-    // The lease goes first, so a refused forget leaves none; the forget starts before any await, so forgets start in call order.
-    const granted = this.#lease
-    this.#lease = null
-    const revoking = granted?.tryRevoke() ?? Lease.tryForget(this.#leaseFriend())
-    this.align()
-    this.#alignBoxes()
-    const revoked = await revoking
-    if (! revoked.ok) { this.#bankFriend.announce({ kind: 'lease_revoke_failed', refusal: revoked.err, vault: this, where }) }
-  }
+  /** Non-throwing form of {@link replacePassphrasePrompt}. */
+  tryReplacePassphrasePrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrasePrompt()) }
 
-  /** The lease `proved` earns, attached. A lock called during the unlock does not stand: the proving says this user may have the vault unlocked. */
-  async #unlockByProving(proved: Proving, gate_epoch?: number): Promise<this> {
-    const lease = await proved.buildLease(this.#leaseFriend(), gate_epoch)
-    await this.#attachLease(lease)
-    return this
-  }
+  /** Add a passkey to the bank's gate: {@link Gate.addPasskeyPrompt}. */
+  async addPasskeyPrompt(): Promise<this> { await this.world.maingate.addPasskeyPrompt(); return this }
 
-  /** Attach `lease` to this vault, and cache it on this device. */
-  async #attachLease(lease: Lease): Promise<void> {
-    this.demandAttachable()
-    this.#lease = lease
-    await lease.cacheAsCacheCan()
-    this.align()
-    this.#alignBoxes()
-  }
+  /** Non-throwing form of {@link addPasskeyPrompt}. */
+  tryAddPasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskeyPrompt()) }
 
-  /** Bring each box listed up to this vault's lock, which its snapshot shows. */
-  #alignBoxes(): void {
-    const boxes = this.#boxListing?.things ?? []
-    for (const box of boxes) { box.align() }
-  }
+  /** Revoke the passkey of the bank's gate: {@link Gate.revokePasskeyPrompt}. */
+  async revokePasskeyPrompt(): Promise<this> { await this.world.maingate.revokePasskeyPrompt(); return this }
+
+  /** Non-throwing form of {@link revokePasskeyPrompt}. */
+  tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
   // --
 
-  // == [The gating's unlock]: unlockVaultByProving
+  // == [The boxes' world]: sealStampedString, unsealStampedString, stampsOf, receiveParent
 
-  // A gating comes to #unlockByProving by this, as no public method of a vault accepts a proving (G9).
-  static readonly #unlockVaultByProving: UnlockByProving = (vault, proved, gate_epoch) => vault.#unlockByProving(proved, gate_epoch)
-  // --
-
-  // == [The lease's friend]: leaseFriend, makeFriend, stampOfLife
-
-  /** All a lease or a proving hears of this vault, made once. */
-  #leaseFriend(): LeaseFriend {
-    this.#vaultFriend ??= this.#makeVaultFriend()
-    return this.#vaultFriend
-  }
-
-  #makeVaultFriend(): LeaseFriend {
-    const { world: { logger, deviceDB, leaseMillis } } = this
-    const stamp = GX.vaultStamp.parse(this)
-    const asked = this.#stampOfLife()
-    return {
-      ...stamp,
-      logger,
-      leaseMillis,
-      lock:            () => { this.lock() },
-      peekLease:       () => deviceDB.peek(asked),
-      tryCacheLease:   (record) => deviceDB.tryStow(record),
-      forgetLease:     () => deviceDB.forget(asked),
-      tryForgetLease:  async (): Promise<Outcome<void>> => {
-        const outcome = await deviceDB.tryForget(asked)
-        if (! outcome.ok) { this.#bankFriend.announce({ kind: 'lease_revoke_failed', refusal: outcome.err, vault: this, where: 'undeleted' }) }
-        return outcome
-      },
-      tellBadNews:     (badnews) => { this.#bankFriend.tellBadNews(badnews) },
-    }
-  }
-
-  /** What a seal's stamp or a lease has to agree with: this vault's scope and this life of it. */
-  #stampOfLife(): VaultScope & { vault_tok: string } { return { ...this.scope, vault_tok: this.vault_tok } }
-  // --
-
-  // == [The boxes' world]: sealStampedString, unsealStampedString, receiveWorld
-
-  /** `whisperText` sealed under a fresh boxKey under this vault's key, both bound to `stamp`. */
+  /** `whisperText` sealed under a fresh boxKey under the bank's vaultKey, both bound to the bank, this vault and `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
-    const checked = GX.leaseSealArgs.parse({ whisperText, stamp })
-    return this.#demandLease(checked.stamp).sealWith(checked.whisperText, checked.stamp)
+    return this.world.sealWith(whisperText, this.#stampsOf(stamp))
   }
 
-  /** The text `sealed` contains, bound to `stamp`. */
+  /** The text `sealed` contains, bound to the bank, this vault and `stamp`. */
   async unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
-    const checked = GX.leaseUnsealArgs.parse({ sealed, stamp })
-    return this.#demandLease(checked.stamp).unsealWith(checked.sealed, checked.stamp)
+    return this.world.unsealWith(sealed, this.#stampsOf(stamp))
   }
 
-  // The vault listing receives the `world` as it would a row from any vault request:
-  // a gate changed on another device comes with it, and a newer row from another life
+  /** This vault's stamp, then `stamp`, which must be of this vault's scope and life. */
+  #stampsOf(stamp: CipherCtxRecord): CipherCtxRecord[] {
+    this.demandEnabled().demandPresent()
+    const life = { ...this.scope, bank_tok: this.bank_tok, vault_tok: this.vault_tok }
+    checkedConsistent(stamp, life, { kind: 'unexpected_error', message: Phrases.StampOfOtherVault })
+    return [GX.vaultStamp.parse(this), stamp]
+  }
+
+  // The vault listing receives the parent as it would a row from any vault request: a newer row from another life
   // replaces this Vault in the listing.
   /** Deliver the vault row a box answer carries. */
-  receiveWorld(world: unknown): void { this.listing.deliverRecord(SX.vaultRow.refusingAs('record_conflict').parse(world)) }
+  receiveParent(parent: unknown): void { this.listing.deliverRecord(BX.vaultRow.refusingAs('record_conflict').parse(parent)) }
   // --
 
   // == [Box verbs]: beginWatch, bringUp, getBox, fetchBox, putBox, delBox, each with its try form
@@ -316,26 +198,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
   // --
 
-  // == [Guards]: isLocked, isUnlocked, demandLease, demandPromptable, demandAttachable, demandWatchable, demandPresent, ensureTimely
+  // == [Guards]: isLocked, isUnlocked, demandWatchable, demandPresent, ensureTimely
 
-  /** The vault's own lock, not its world's: the bank has none. */
-  get isLocked(): boolean { return this.#lease === null }
+  /** Whether the bank is locked, read live: a vault has no lock of its own. */
+  get isLocked(): boolean { return this.world.isLocked }
 
-  /** True while this vault has a lease granted. */
-  get isUnlocked(): boolean { return this.#lease !== null }
-
-  #demandLease(stamp: CipherCtxRecord): Lease {
-    this.demandEnabled().demandPresent()
-    checkedConsistent(stamp, this.#stampOfLife(), { kind: 'unexpected_error', message: Phrases.StampOfOtherVault })
-    if (this.#lease === null) { throw unlockFirst() }
-    return this.#lease
-  }
-
-  /** A prompt needs the vault enabled and present. */
-  demandPromptable(): this { return this.demandEnabled().demandPresent() }
-
-  /** An attach needs the vault enabled and present. */
-  demandAttachable(): this { return this.demandEnabled().demandPresent() }
+  /** Whether the bank is unlocked, read live. */
+  get isUnlocked(): boolean { return this.world.isUnlocked }
 
   /** A watch needs the vault enabled and present. */
   demandWatchable(): this { return this.demandEnabled().demandPresent() }
@@ -352,38 +221,24 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Protected, overriding Storable's]: adopt, sweepContents, vacateContents, isFullRecord, lifeTokPathOf, makeSnapshot
 
-  /** Adopt `central`. A tombstone locks the vault, forgets the cached row and vacates the boxes, the vault staying listed.
-   * A failed revoke is announced as `lease_revoke_failed`, and the tombstone stands.
-   */
+  /** Adopt `central`. A tombstone vacates the boxes, the vault staying listed. */
   protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {
     super.adopt(central)
     if (this.isPresent) { return }
-    void this.#revokeLease('tombstone')
     this.#boxListing?.vacate()
   }
 
-  /** The lease dropped, the row cached left for the next session, and the boxes swept. */
-  protected override sweepContents(): void {
-    this.#lease?.evict()
-    this.#lease = null
-    this.#boxListing?.sweep()
-    this.world.device.dismissGatingAtDiscard(this)
-  }
+  /** The boxes swept. */
+  protected override sweepContents(): void { this.#boxListing?.sweep() }
 
-  /** Locked, the row cached forgotten, and the boxes vacated. */
-  protected override vacateContents(): void {
-    void this.#revokeLease('vacate')
-    this.#boxListing?.vacate()
-    this.world.device.dismissGatingAtDiscard(this)
-  }
+  /** The boxes vacated. */
+  protected override vacateContents(): void { this.#boxListing?.vacate() }
 
-  /** A full vault record is one alive that carries its `gate`; a sparse one or a tombstone is not. */
-  protected isFullRecord(fetched: VaultSparse): fetched is VaultRecord {
-    return fetched.am === 'a' && 'gate' in fetched
-  }
+  /** A vault row has nothing encrypted: a full one is one alive. */
+  protected isFullRecord(fetched: VaultSparse): fetched is VaultRecord { return fetched.am === 'a' }
 
-  /** A vault's life is its `vault_tok`. */
-  protected lifeTokPathOf({ vault_tok }: Fetched<VaultRecord, VaultSparse>): string { return vault_tok }
+  /** A vault's life is its bank's and its own: {@link BX.vaultLifeOf}. */
+  protected lifeTokPathOf(record: Fetched<VaultRecord, VaultSparse>): string { return BX.vaultLifeOf(record) }
 
   protected makeSnapshot(): VaultSnapshot {
     return Object.freeze({

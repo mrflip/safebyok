@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
-import * as GX from '../../src/shapes/shapes-gateish'
 import { LOCKED } from '../../src/helpers/consts'
 import * as SX from '../../src/shapes/shapes-storage'
+import * as BX from '../../src/shapes/shapes-bankdb'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
 import { expectCases } from '../test-helpers/cases'
@@ -17,9 +17,9 @@ const gone      = tombstoneBoxRecord({ revision_seq: 2 })
 const baseProps = { revision_tok: 'rev-a1', revision_seq: 1, registered_at: T0, written_at: T0, am: 'a', vault_tok: 'vault-tok-u1' }
 const scope     = mw.boxscope('anthropic_api_key')
 
-describe("SX.boxRecord and SX.boxSparse", () => {
-  describe("SX.boxRecord", () => {
-    expectCases(SX.boxRecord, [
+describe("BX.boxRecord and BX.boxSparse", () => {
+  describe("BX.boxRecord", () => {
+    expectCases(BX.boxRecord, [
       [full,                                            true,  'passes a full record'],
       [{ ...full, sidecar: {} },                        true,  'passes an empty sidecar'],
       [sparse,                                          false, 'refuses a sparse record: it is the full one'],
@@ -36,36 +36,36 @@ describe("SX.boxRecord and SX.boxSparse", () => {
     ])
 
     it("hands back a plain copy of a full record", () => {
-      const parsed = SX.boxRecord.parse(full)
+      const parsed = BX.boxRecord.parse(full)
       expect(parsed).to.deep.equal(full)
       expect(parsed).to.not.eq(full)
     })
 
     it("passes a Box instance, and returns a plain object of its fields", () => {
       const box = boxListingOf(mw).deliverRecord(full)
-      const parsed = SX.boxRecord.parse(box)
+      const parsed = BX.boxRecord.parse(box)
       expect(parsed).to.deep.equal(full)
       expect(parsed).to.not.be.instanceOf(Box)
     })
 
     it("refuses a plain object with a field a Box does not have", () => {
       const box = boxListingOf(mw).deliverRecord(full)
-      TH.expectSyncRefusal(() => SX.boxRecord.parse({ ...SX.boxRecord.parse(box), extra: 1 }))
+      TH.expectSyncRefusal(() => BX.boxRecord.parse({ ...BX.boxRecord.parse(box), extra: 1 }))
     })
 
     it("refuses a Box that is not full", () => {
       const box = boxListingOf(mw).deliverRecord(sparse)
-      TH.expectSyncRefusal(() => SX.boxRecord.parse(box))
+      TH.expectSyncRefusal(() => BX.boxRecord.parse(box))
     })
 
     it("refuses without quoting its input", () => {
-      const err = TH.expectSyncRefusal(() => SX.boxRecord.parse({ ...full, sidecar: 'SECRET-SIDECAR', extra: 'SECRET-EXTRA' }))
+      const err = TH.expectSyncRefusal(() => BX.boxRecord.parse({ ...full, sidecar: 'SECRET-SIDECAR', extra: 'SECRET-EXTRA' }))
       expect(err.message).to.not.include('SECRET')
     })
   })
 
-  describe("SX.boxSparse", () => {
-    expectCases(SX.boxSparse, [
+  describe("BX.boxSparse", () => {
+    expectCases(BX.boxSparse, [
       [sparse,                                  true,  'passes a sparse record'],
       [full,                                    true,  'passes a full record, stripping what is not sparse'],
       [gone,                                    true,  'passes a tombstone'],
@@ -77,30 +77,30 @@ describe("SX.boxRecord and SX.boxSparse", () => {
     ])
 
     it("strips the sidecar and the sealed parts, which only the full record carries", () => {
-      const parsed = SX.boxSparse.parse(full)
+      const parsed = BX.boxSparse.parse(full)
       expect(parsed).to.not.have.any.keys('sidecar', 'box_key_wrapped', 'whisper_ciphered')
       expect(parsed).to.deep.equal(sparse)
     })
 
     it("keeps the whisper's codec and schema version, so a sparse record can be sealed over as it is", () => {
-      const parsed = SX.boxSparse.parse(full)
+      const parsed = BX.boxSparse.parse(full)
       expect(parsed.whisper_codec).to.eq('json_v1')
       expect(parsed.whisper_schema_version).to.eq(1)
     })
 
     it("strips a field it does not accept, where boxRecord refuses it", () => {
-      expect(SX.boxSparse.parse({ ...sparse, extra: 1 })).to.deep.equal(sparse)
+      expect(BX.boxSparse.parse({ ...sparse, extra: 1 })).to.deep.equal(sparse)
     })
 
     it("takes its fields from a Box", () => {
       const box = boxListingOf(mw).deliverRecord(full)
-      expect(SX.boxSparse.parse(box)).to.deep.equal(sparse)
+      expect(BX.boxSparse.parse(box)).to.deep.equal(sparse)
     })
   })
 
-  it("use box format 5002", () => {
-    expect(SX.BoxFormat).to.eq(5002)
-    expect(full.fmt).to.eq(SX.BoxFormat)
+  it("use box format 5003", () => {
+    expect(BX.BoxFormat).to.eq(5003)
+    expect(full.fmt).to.eq(BX.BoxFormat)
   })
 })
 
@@ -109,7 +109,8 @@ describe("VX.boxDna", () => {
   const filled = { ...dna, whisper_codec: 'json_v1', whisper_schema_version: 1 }
   const { box_key_wrapped, whisper_ciphered } = full
   // A dna carries no revision_seq, so the factory's props stop at the rest.
-  const { revision_seq: _revision_seq, ...factoryProps } = baseProps
+  const { revision_seq: _revision_seq, ...vaultishProps } = baseProps
+  const factoryProps = { ...vaultishProps, bank_tok: 'bank-tok-u1' }
 
   expectCases(VX.boxDna, [
     // the scope, the whisper and the sidecar, and what a caller may give beside them:
@@ -117,7 +118,7 @@ describe("VX.boxDna", () => {
     [{ ...dna, whisper: { key: 'sk-ant-fake', orgId: null } }, true, 'passes a whisper that is an object, null inside it'],
     [{ ...dna, sidecar: { account: 'work' } },              true,  'passes a sidecar with a field'],
     [{ ...dna, whisper_codec: undefined },                  true,  'passes optional props given as undefined'],
-    [{ ...dna, ...factoryProps, fmt: SX.BoxFormat },       true,  'passes the props the factory controls, each passing its check'],
+    [{ ...dna, ...factoryProps, fmt: BX.BoxFormat },       true,  'passes the props the factory controls, each passing its check'],
     // the whisper and the sidecar, each defaulting:
     [scope,                                                 true,  'passes the scope alone'],
     [{ ...scope, whisper: { apiKey: 'sk-ant-fake' } },         true,  'passes a whisper with no sidecar'],
@@ -155,7 +156,7 @@ describe("VX.boxDna", () => {
   })
 
   it("strips the props the factory controls", () => {
-    const parsed = VX.boxDna.parse({ ...dna, ...factoryProps, fmt: SX.BoxFormat })
+    const parsed = VX.boxDna.parse({ ...dna, ...factoryProps, fmt: BX.BoxFormat })
     expect(parsed).to.deep.equal(filled)
     expect(parsed).to.not.have.any.keys('fmt', 'am', 'vault_tok', 'revision_tok', 'registered_at', 'written_at')
   })
@@ -196,7 +197,7 @@ describe("VX.boxDna and VX.boxPatch", () => {
     ])
 
     it("strips the props the factory controls and fills the whisper's codec", () => {
-      const given = { ...scope, whisper, sidecar: {}, fmt: SX.BoxFormat, am: 'x', vault_tok: 'tok-u1', revision_tok: 'rev-given', registered_at: T0, written_at: T0 }
+      const given = { ...scope, whisper, sidecar: {}, fmt: BX.BoxFormat, am: 'x', vault_tok: 'tok-u1', revision_tok: 'rev-given', registered_at: T0, written_at: T0 }
       expect(VX.boxDna.parse(given)).to.deep.equal({ ...scope, whisper, sidecar: {}, whisper_codec: 'json_v1', whisper_schema_version: 1 })
     })
   })
@@ -240,7 +241,7 @@ describe("SX.vaultRecord and SX.vaultSparse", () => {
   const { boxlabel: _boxlabel, ...vaultscope } = scope
   const sparseVault = { ...vaultscope, fmt: SX.VaultFormat, ...baseProps }
 
-  const gate = { gate_epoch: GX.FirstGateEpoch, passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
+  const gate = { gate_epoch: 1, passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
 
   expectCases(SX.vaultRecord, [
     [{ ...sparseVault, gate },       true,  'passes a record with its gate, a passphrase wayin and no passkey'],

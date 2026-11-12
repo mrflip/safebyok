@@ -4,7 +4,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Bank } from 'safebyok'
 import { useBox } from 'safebyok-react'
-import type { MemoryVaultDB } from 'safebyok/storage'
+import type { MemoryBankDB } from 'safebyok/storage'
 import { ApiKeyVaultlabel, WidgetApiKeyBoxlabel } from '../../src/lib/saved-api-key'
 import { KnockKnockWidget } from '../../src/components/KnockKnockWidget'
 import * as TH from '../test-helpers'
@@ -49,48 +49,50 @@ const knock = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Knock' }))
 }
 
-/** The box rows `vaultDB` has stored for the API key's vault, by boxlabel. */
-const storedBoxRows = (vaultDB: MemoryVaultDB) => {
-  const vaultrow = vaultDB._cheat_vaultRowsOf({ user_id: 'u1', banklabel: 'acme' }).get(ApiKeyVaultlabel) as { vault_tok: string }
-  return vaultDB._cheat_boxRowsOf({ user_id: 'u1', banklabel: 'acme', vaultlabel: ApiKeyVaultlabel }, vaultrow.vault_tok)
+/** The box rows `bankDB` has stored for the API key's vault, by boxlabel. */
+const storedBoxRows = (bankDB: MemoryBankDB) => {
+  const { bank, vaultrows } = bankDB._cheat_shelfOf({ user_id: 'u1', banklabel: 'acme' })
+  const { bank_tok } = bank as { bank_tok: string }
+  const { vault_tok } = vaultrows.get(ApiKeyVaultlabel) as { vault_tok: string }
+  return bankDB._cheat_boxRowsOf({ user_id: 'u1', banklabel: 'acme', vaultlabel: ApiKeyVaultlabel }, bank_tok, vault_tok)
 }
 
 describe("KnockKnockWidget", () => {
   it("shows no key saved before any Save", async () => {
-    renderFlow()
+    await renderFlow()
     const field = await apiKeyField()
     expect(field.value).to.eq('')
     expect(screen.getByText('No key saved yet.')).to.not.be.null
   })
 
   it("saves what was typed, encrypted, in a box of its own", async () => {
-    const { vaultDB } = renderFlow()
+    const { bankDB } = await renderFlow()
     await saveKey()
-    const boxrows = storedBoxRows(vaultDB)
+    const boxrows = storedBoxRows(bankDB)
     expect([...boxrows.keys()]).to.deep.equal([WidgetApiKeyBoxlabel])
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
   it("clears the field after Save", async () => {
-    renderFlow()
+    await renderFlow()
     const field = await saveKey()
     expect(field.value).to.eq('')
   })
 
   it("says a key is saved once one is", async () => {
-    renderFlow()
+    await renderFlow()
     await saveKey()
     expect(screen.queryByText('No key saved yet.')).to.be.null
   })
 
   it("saves under StrictMode", async () => {
-    TH.renderInBank(<StrictMode><KnockKnockWidget /><TH.VaultProbe /></StrictMode>)
+    await TH.renderInBank(<StrictMode><KnockKnockWidget /><TH.VaultProbe /></StrictMode>)
     await saveKey()
     await TH.expectProbe('present unlocked')
   })
 
   it("asks for a key on a Save with nothing typed", async () => {
-    renderFlow()
+    await renderFlow()
     await apiKeyField()
     await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save' }).disabled).to.be.false })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -101,7 +103,7 @@ describe("KnockKnockWidget", () => {
   it("replaces the saved key at a second Save", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
-    renderFlow()
+    await renderFlow()
     await saveKey()
     await typeAndSave('sk-ant-second-key')
     await waitFor(() => { expect(screen.getByText('Saved.')).to.not.be.null })
@@ -113,7 +115,7 @@ describe("KnockKnockWidget", () => {
   it("knocks with the saved key", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
-    renderFlow()
+    await renderFlow()
     await saveKey()
     await knock()
     await screen.findByText(Punchline)
@@ -123,7 +125,7 @@ describe("KnockKnockWidget", () => {
   it("knocks with the saved key after a lock", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
-    renderFlow()
+    await renderFlow()
     await saveKey()
     fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
     await TH.expectProbe('present locked')
@@ -134,7 +136,7 @@ describe("KnockKnockWidget", () => {
   })
 
   it("never exposes the key", async () => {
-    TH.renderInBank(<><KnockKnockWidget /><ExposureProbe /></>)
+    await TH.renderInBank(<><KnockKnockWidget /><ExposureProbe /></>)
     await saveKey()
     await waitFor(() => { expect(screen.getByTestId('exposure').textContent).to.eq('sealed') })
   })
@@ -142,7 +144,7 @@ describe("KnockKnockWidget", () => {
   it("asks for the key at a knock before one is saved", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
-    renderFlow()
+    await renderFlow()
     await knock()
     await screen.findByText('Save your Anthropic API key first.')
     expect(anthropic.seen).to.have.lengthOf(0)
@@ -150,12 +152,12 @@ describe("KnockKnockWidget", () => {
   })
 
   it("stays quiet when the user cancels the dialog", async () => {
-    renderFlow()
-    const ensureVaultSpy = vi.spyOn(Bank.prototype, 'ensureVault')
+    await renderFlow()
+    const ensureUnlockedSpy = vi.spyOn(Bank.prototype, 'ensureUnlocked')
     const field = await typeAndSave(FakeApiKey)
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    await waitFor(() => { expect(ensureVaultSpy).toHaveBeenCalled() })
-    await act(async () => { await Promise.allSettled(ensureVaultSpy.mock.results.map((result): unknown => result.value)) })
+    await waitFor(() => { expect(ensureUnlockedSpy).toHaveBeenCalled() })
+    await act(async () => { await Promise.allSettled(ensureUnlockedSpy.mock.results.map((result): unknown => result.value)) })
     expect(document.querySelector('.knock-knock .gripe')).to.be.null
     expect(field.value).to.eq(FakeApiKey)
     await TH.expectProbe('unborn none')

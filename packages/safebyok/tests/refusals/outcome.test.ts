@@ -34,7 +34,7 @@ describe("Outcome", () => {
       return val
     }
     expect(answer(good(7))).to.eq(7)
-    const locked = bad(new VaultError('vault_locked', 'Unlock it first.'))
+    const locked = bad(new VaultError('bank_locked', 'Unlock it first.'))
     expect(answer(locked)).to.be.instanceOf(VaultError)
   })
 

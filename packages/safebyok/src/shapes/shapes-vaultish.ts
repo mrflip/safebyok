@@ -3,7 +3,7 @@
 import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
-import { ForeverMillis, hasModelkind, isDeviceDB, isGuarded, isVaultDB } from '../helpers/consts'
+import { ForeverMillis, hasModelkind, isBankDB, isDeviceDB, isGuarded } from '../helpers/consts'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import * as Phrases from '../helpers/phrases'
 import type { KeyDeriver } from '../deriver/basederiver'
@@ -15,13 +15,14 @@ import type { Storable } from '../models/storable'
 import type { Vault } from '../models/vault'
 import type { DeviceDB } from '../storage/device-db'
 import type { Outcome } from '../refusals/outcome'
-import { type Answer, type GoodAnswer, type ListAct, type VaultDB, VaultDBVerbnames } from '../storage/vault-db'
+import { type Answer, type BankDB, type GoodAnswer, BankDBVerbnames } from '../storage/bank-db'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
+import * as BX from './shapes-bankdb'
 import * as GX from './shapes-gateish'
-import type { AnyGating, AskUser, ProvingWorld, RequestCleartext } from './shapes-gateish'
+import type { AnyGating, AskUser, RequestCleartext } from './shapes-gateish'
 import type { StrengthChecker } from '../helpers/passphrase-strength'
 
 // == [Checks]: Checks
@@ -33,27 +34,27 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 
 // --
 
-// == [Record forms]: liveness, tombstone, isTombstone, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna
+// == [Record forms]: storableBase, liveness, tombstone, isTombstone, Liveness, SparseBase, Tombstone, Fetched, Dna
+
+/** The check of what every stored row has in common, whatever it is: its revision, its times and its `am`. */
+export const storableBase = Checker(({ obj }) => obj({ ...SX.revision.shape, ...SX.times.shape, am: SX.am }), 'bad_option')
 
 /** The checks of a record's `am`, and of a tombstone's fields. */
 export const { liveness, tombstone } = Checkers('bad_record', ({ obj, lit }) => ({
   liveness:  obj({ am: SX.am }),
-  tombstone: SX.sparseBase.extend({ am: lit('x') }),
+  tombstone: storableBase.extend({ am: lit('x') }),
 }))
 
 /** Whether a record is alive, damaged or gone: its `am`. */
 export type Liveness = Readonly<Z.infer<typeof liveness>>
 
-/** The `vault_tok` of the vault a record lies in, which every storable records and seals; a vault's is its own. */
-export type Vaulted = Readonly<Z.infer<typeof SX.vaulted>>
-
-/** The least a sparse form carries: the scope, and what {@link SX.sparseBase} checks, the revision, the times, whether it is alive and the vault it lies in. */
-export type SparseBase<ScopeT> = ScopeT & SX.Revision & SX.Times & Liveness & Vaulted
+/** The least a sparse form carries: the scope, and what {@link storableBase} checks, the revision, the times and whether it is alive. */
+export type SparseBase<ScopeT> = ScopeT & SX.Revision & SX.Times & Liveness
 
 /** The sparse form of a deleted thing: its sparse props stay, and the user's content is gone. */
 export type Tombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
 
-/** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link SX.sparseBase} checks what the base knows of any of the three. */
+/** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link storableBase} checks what the base knows of any of the three. */
 export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 
 /** The DNA of a storable, what a caller hands `listing.create`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
@@ -122,11 +123,11 @@ export type ProbeAsked = Z.input<typeof probeAsked>
 export type ProbeOpts = Z.input<typeof probeOpts>
 
 /** One storage verb's answer as `bank.tryProbe` reports it: sparse rows, no wrapped key or ciphertext, and when it came back. */
-export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: SX.LoggableAsk, val: SX.BoxSparse, world: SX.VaultSparse, timestamp: number }>
+export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: BX.LoggableAsk, val: BX.BoxSparse, parent: BX.VaultRow, timestamp: number }>
 
 /** How `bank.tryProbe` went, step by step: the box and vault as found, the put, the fetch back, and that the box opened. */
 export type ProbeReport = Readonly<{
-  timely: Readonly<{ box: SX.BoxSparse | null, vault: SX.VaultSparse, boxRefreshedAt: number | null, vaultRefreshedAt: number | null, timestamp: number }>
+  timely: Readonly<{ box: BX.BoxSparse | null, vault: BX.VaultSparse, boxRefreshedAt: number | null, vaultRefreshedAt: number | null, timestamp: number }>
   put:    ProbeStep
   fetch:  ProbeStep
   unseal: Readonly<{ ok: true, timestamp: number }>
@@ -146,20 +147,20 @@ export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 
 // --
 
-// == [The listing's world]: listingWorld, ListingWorld, BankFriend, ListingOpts, answersEachVerb, brandedVaultDB, bankPanic, bankFriend, listingOpts
+// == [The listing's world]: listingWorld, ListingWorld, BankFriend, ListingOpts, answersEachVerb, brandedBankDB, bankPanic, bankFriend, listingOpts
 
-/** The check of the world a listing lives in, the bank for vaults and the vault for boxes, as far as the base reaches into it. Checks only. */
-export const listingWorld = objCheck(({ fn, bool }) => ({ isLocked: bool, ensureTimely: fn(), receiveWorld: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
+/** The check of the world a listing lives in, the device for its bank, the bank for its gates and vaults, the vault for its boxes, as far as the base reaches into it. Checks only. */
+export const listingWorld = objCheck(({ fn, bool }) => ({ isLocked: bool, ensureTimely: fn(), receiveParent: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
 
-/** The world a listing lives in, as far as the base reaches into it: the bank for vaults, the vault for boxes. */
-export type ListingWorld = Pick<Bank | Vault, 'isLocked' | 'ensureTimely' | 'receiveWorld'>
+/** The world a listing lives in, as far as the base reaches into it: the device for its bank, the bank for its gates and vaults, the vault for its boxes. */
+export type ListingWorld = Pick<Device | Bank | Vault, 'isLocked' | 'ensureTimely' | 'receiveParent'>
 
 /** The bank's private calls, handed down to each listing and vault as it is made. */
 export interface BankFriend {
   /** Vacate the bank for a revoked identity. */
-  readonly panic:       BankPanic
+  readonly panic:       DevicePanic
   /** Tell the host's `onLifecycle` what happened, through the bank, which names itself. Never throws. */
-  readonly announce:    BankAnnounce
+  readonly announce:    DeviceAnnounce
   /** Tell the host's `onBadNews` each news no caller waits on: a refusal as it is, anything else thrown as `unexpected_error`, a `disabled` refusal not at all. Never throws. */
   readonly tellBadNews: (badnews: readonly unknown[]) => void
   /** Show the host's dialog, wrapped by `guardRequestCleartext`; null with none. */
@@ -168,35 +169,35 @@ export interface BankFriend {
 
 /** The options a listing is made with, after its world. */
 export type ListingOpts = {
-  vaultDB:               VaultDB
+  bankDB:                BankDB
   /** The refresh horizon of each thing the listing makes: how long after its last refresh the record in hand stays timely. */
   maxMillisSinceRefresh: number
   /** The bank's private calls, handed down to the listing as it is made. */
   bankFriend:            BankFriend
 }
 
-/** True for an object answering each of {@link VaultDBVerbnames} with a function. */
+/** True for an object answering each of {@link BankDBVerbnames} with a function. */
 function answersEachVerb(val: object): boolean {
-  return VaultDBVerbnames.every((verbname) => typeof (val as Partial<Record<string, unknown>>)[verbname] === 'function')
+  return BankDBVerbnames.every((verbname) => typeof (val as Partial<Record<string, unknown>>)[verbname] === 'function')
 }
 
-/** The check of a vaultDB as a model is handed one: branded, from whichever copy of safebyok, and answering each verb with a function. */
-export const brandedVaultDB = Checker(({ custom }) => custom<VaultDB>((val) => isVaultDB(val) && answersEachVerb(val), Phrases.VaultDBExpected), 'bad_option')
+/** The check of a bankDB as a model is handed one: branded, from whichever copy of safebyok, and answering each verb with a function. */
+export const brandedBankDB = Checker(({ custom }) => custom<BankDB>((val) => isBankDB(val) && answersEachVerb(val), Phrases.BankDBExpected), 'bad_option')
 
 /** The check of the bank's panic as a listing or a vault is handed it, by the brand the bank gave it. */
-export const bankPanic = Checker(({ custom }) => custom<BankPanic>(isGuarded, Phrases.GuardedExpected), 'bad_option')
+export const bankPanic = Checker(({ custom }) => custom<DevicePanic>(isGuarded, Phrases.GuardedExpected), 'bad_option')
 
 /** The check of the bank's private calls as a listing or a vault is handed them, each by the brand the bank gave it. */
 export const bankFriend = objCheck(({ custom }) => ({
   panic:       bankPanic,
-  announce:    custom<BankAnnounce>(isGuarded, Phrases.GuardedExpected),
+  announce:    custom<DeviceAnnounce>(isGuarded, Phrases.GuardedExpected),
   tellBadNews: custom<BankFriend['tellBadNews']>(isGuarded, Phrases.GuardedExpected),
   askUser:     custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
 
 /** The check of a listing's options. Checks only. */
 export const listingOpts = objCheck(() => ({
-  vaultDB:               brandedVaultDB,
+  bankDB:                brandedBankDB,
   maxMillisSinceRefresh: horizonMillis,
   bankFriend,
 }), 'bad_option')
@@ -208,8 +209,8 @@ export const listingOpts = objCheck(() => ({
 /** The check of a storable's constructor arguments, as far as the base can tell. Checks only. */
 export const storableArgs = objCheck(({ custom }) => ({
   world:   listingWorld,
-  listing: custom<object>((val) => hasModelkind(val, 'vault_listing', 'box_listing'), Phrases.ListingExpected),
-  central: SX.sparseBase,
+  listing: custom<object>((val) => hasModelkind(val, 'bank_listing', 'gate_listing', 'vault_listing', 'box_listing'), Phrases.ListingExpected),
+  central: storableBase,
 }), 'bad_option')
 
 // --
@@ -232,7 +233,7 @@ export type ListingPutOpts<SparseT> = Readonly<{ expected: SparseT, ifAbsent: EX
 export type ListingDelOpts<SparseT> = Readonly<{ expected: SparseT }>
 
 /** A listing's answer from `listVaults` or `listBoxes`: the rows listed, and those set aside as damaged. */
-export type ListingListAnswer<RecordT, SparseT, DamagedT> = Answer<{ listed: readonly Fetched<RecordT, SparseT>[], damaged_rows: readonly DamagedT[] }, ListAct, unknown>
+export type ListingListAnswer<RecordT, SparseT, DamagedT> = Answer<{ listed: readonly Fetched<RecordT, SparseT>[], damaged_rows: readonly DamagedT[] }, EX.ListAct, unknown>
 
 /** What a listing's `tryGet` answers: the vaultDB's own answer where storage was asked, or the act `timely`, with no world, where the instance listed served it. */
 export type ListingGetAnswer<ValT> = ThingAnswer<ValT> | GoodAnswer<ValT, 'timely', null>
@@ -288,7 +289,7 @@ const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown
 
 /** The checks of what a caller hands `create` (`boxDna`) and `put` (`boxPatch`, and `boxPatchNew` where `ifPresent` is 'fail'). */
 export const { boxDna, boxPatch, boxPatchNew } = Checkers('bad_option', ({ lit, oneof, user_id, banklabel, vaultlabel, boxlabel }) => {
-  const factory = SX.boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
+  const factory = BX.boxSparse.pick({ fmt: true, am: true, bank_tok: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
     user_id, banklabel, vaultlabel, boxlabel,
     whisper: whisper.default({}),
@@ -296,7 +297,7 @@ export const { boxDna, boxPatch, boxPatchNew } = Checkers('bad_option', ({ lit, 
     whisper_codec:          lit('json_v1').default('json_v1'),
     whisper_schema_version: lit(1).default(1),
   }).strict().transform((dna) => omit(dna, factory.keyof().options))
-  const patchFields = SX.boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
+  const patchFields = BX.boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
   const pickHalves  = ({ whisper, sidecar, user_id, banklabel, vaultlabel, boxlabel }: Z.output<typeof patchFields>) => ({ whisper, sidecar, user_id, banklabel, vaultlabel, boxlabel })
   const boxPatch    = patchFields.transform(pickHalves)
   // A whole record's whisper_ciphered is recycled, so a put told to only create refuses one, before pickHalves drops it.
@@ -329,19 +330,41 @@ export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<Box
 
 // == [The box's world]: boxWorld, BoxWorld, boxListingOpts, BoxListingOpts
 
-/** The check of a box listing's world past {@link listingWorld}: the vault's `vault_tok`, its demand, and its seal verbs. Checks only. */
-export const boxWorld = Checker(({ fn, vault_tok }) => listingWorld.extend({
-  vault_tok, subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn(),
+/** The check of a box listing's world past {@link listingWorld}: the vault's `bank_tok` and `vault_tok`, its demand, and its seal verbs. Checks only. */
+export const boxWorld = Checker(({ fn, bank_tok, vault_tok }) => listingWorld.extend({
+  bank_tok, vault_tok, subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn(),
 }), 'bad_option', [CX])
 
 /** The vault, as far as its boxes reach into it. */
-export type BoxWorld = Pick<Vault, keyof ListingWorld | 'vault_tok' | 'subscribe' | 'sealStampedString' | 'unsealStampedString'>
+export type BoxWorld = Pick<Vault, keyof ListingWorld | 'bank_tok' | 'vault_tok' | 'subscribe' | 'sealStampedString' | 'unsealStampedString'>
 
 /** The check of a box listing's options: a listing's, and the scope of the vault it lists. Checks only. */
 export const boxListingOpts = Checker(({ vaultScope }) => listingOpts.extend({ scope: vaultScope }), 'bad_option', [CX])
 
 /** The options a box listing is made with, after its world: a listing's, and the scope of the vault it lists. */
 export type BoxListingOpts = ListingOpts & { scope: VaultScope }
+
+// --
+
+// == [The gate's forms]: GateSnapshot
+
+/** A gate as a dialog renders it: its scope, its life and revision, and each wayin's header, by `wayinlabel`. */
+export interface GateSnapshot extends CX.GateScope {
+  /** The life of the bank the gate is of. */
+  readonly bank_tok:      string
+  /** The life of the gate, kept by every gate verb. */
+  readonly gate_tok:      string
+  /** The token of the revision in hand, new at each gate verb. */
+  readonly revision_tok:  string
+  /** The count of the revision in hand, higher on the later one. */
+  readonly revision_seq:  number
+  /** When this life of the gate began. */
+  readonly registered_at: number
+  /** When the revision in hand was written. */
+  readonly written_at:    number
+  /** Each wayin's header, with no wrapped vaultKey: `main`, and `passkey0` where the gate has one. */
+  readonly wayins:        Readonly<{ main: GX.WayinHeader, passkey0?: GX.WayinHeader }>
+}
 
 // --
 
@@ -372,16 +395,18 @@ export interface VaultSnapshot extends VaultScope {
 /** The check of a deviceDB as a model is handed one, by its brand: an instance of a class extending DeviceDB, from whichever copy of safebyok. */
 export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDeviceDB, Phrases.DeviceDBExpected), 'bad_option')
 
-/** The check of a vault listing's world past {@link listingWorld}: what a vault's gate, lease and boxes need of the bank. Checks only. */
-export const vaultWorld = Checker(({ bankScope, custom }) => listingWorld.extend({
-  ...GX.provingWorld.shape, scope: bankScope, logger: GX.guardedLogger, leaseMillis: GX.leaseMillis, deviceDB: brandedDeviceDB, boxRefreshMillis: horizonMillis,
-  device: custom<Device>((val) => hasModelkind(val, 'device'), Phrases.DeviceExpected),
+/** The check of a vault listing's world past {@link listingWorld}: what a vault and its boxes need of the bank, and the lock verbs a vault passes on. Checks only. */
+export const vaultWorld = Checker(({ bankScope, bank_tok, bool, custom, fn }) => listingWorld.extend({
+  scope: bankScope, bank_tok, boxRefreshMillis: horizonMillis, sealWith: fn(), unsealWith: fn(),
+  isUnlocked: bool, lock: fn(), ensureUnlocked: fn(), unlock: fn(),
+  listing:     custom<object>((val) => hasModelkind(val, 'bank_listing'), Phrases.ListingExpected),
+  gateListing: custom<object>((val) => hasModelkind(val, 'gate_listing'), Phrases.ListingExpected),
 }), 'bad_option', [CX])
 
-/** The bank, as far as its vaults reach into it. */
-export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 'scope' | 'logger' | 'leaseMillis' | 'deviceDB' | 'boxRefreshMillis' | 'device'>
+/** The bank, as far as its vaults reach into it, its lock verbs among them. */
+export type VaultWorld = Pick<Bank, keyof ListingWorld | 'scope' | 'bank_tok' | 'boxRefreshMillis' | 'sealWith' | 'unsealWith' | 'listing' | 'gateListing' | 'maingate' | 'isUnlocked' | 'lock' | 'ensureUnlocked' | 'unlock'>
 
-/** The check of what a bank is made with, past its listing's options: the device that makes it, and the token of its device row. */
+/** The check of what a bank is made with, past its listing's options: the device that makes it, and the token of its device row, which the device has once its `ensureBank` has ensured the row. */
 export const bankArgs = objCheck(({ custom, device_tok }) => ({
   device: custom<Device>((val) => hasModelkind(val, 'device'), Phrases.DeviceExpected),
   device_tok,
@@ -389,7 +414,7 @@ export const bankArgs = objCheck(({ custom, device_tok }) => ({
 
 // --
 
-// == [The device]: positiveMinutes, refreshMinutes, deviceOpts, DeviceOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, RevokeSite, BankAnnouncement, DeviceEvent, LifecycleHandler, GuardedLifecycleHandler, BankAnnounce, BankPanic, DeviceStage, DeviceSnapshot, BankSnapshot
+// == [The device]: positiveMinutes, refreshMinutes, deviceOpts, DeviceOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, RevokeSite, DeviceAnnouncement, DeviceEvent, LifecycleHandler, GuardedLifecycleHandler, DeviceAnnounce, DevicePanic, DeviceStage, DeviceSnapshot, BankSnapshot
 
 /** The checks of a device's durations in minutes: `positiveMinutes` for the autolock, and `refreshMinutes` for a refresh interval, which may be zero. */
 export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
@@ -403,7 +428,7 @@ export const deviceOpts = objCheck(({ fn, custom, tuple, lit, user_id, banklabel
   user_id,
   banklabel,
   gates:               tuple([lit('main')], Phrases.GatesShape).readonly(),
-  vaultDB:             brandedVaultDB,
+  bankDB:              brandedBankDB,
   deviceDB:            brandedDeviceDB,
   keyDeriver:          custom<KeyDeriver>(),
   requestCleartext:    custom<RequestCleartext>().optional(),
@@ -424,8 +449,8 @@ export interface DeviceOpts {
   banklabel:            string
   /** The bank's gates: `['main']`, the only list accepted. */
   gates:                readonly ['main']
-  /** The VaultDB the vaults are synchronized through, from a storage adapter. */
-  vaultDB:              VaultDB
+  /** The BankDB the bank is synchronized through, from a storage adapter. */
+  bankDB:               BankDB
   /** The device database that caches each vault's lease. */
   deviceDB:             DeviceDB
   /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
@@ -477,17 +502,17 @@ export const tellBadNewsToArgs = objCheck(({ fn, custom, arr }) => ({
   badnews:   arr(custom<VaultError>(isVaultError, Phrases.VaultErrorExpected)),
 }), 'bad_option')
 
-/** Where a cached lease outlived its revoke: a vault's lock, tombstone or vacate, the device's vacate, or a row of another epoch or life met at an unlock. */
+/** Where a cached lease outlived its revoke: the bank's lock, tombstone or vacate, the device's vacate, or a row of another gate revision or life met at an unlock. */
 export type RevokeSite = 'lock' | 'tombstone' | 'vacate' | 'undeleted'
 
 /** What the device and its bank's listings and vaults announce through it: a {@link DeviceEvent} before the device names itself. */
-export type BankAnnouncement =
-  | { readonly kind: 'lease_revoke_failed', readonly refusal: VaultError, readonly vault: Vault | null, readonly where: RevokeSite }
+export type DeviceAnnouncement =
+  | { readonly kind: 'lease_revoke_failed', readonly refusal: VaultError, readonly bank: Bank | null, readonly where: RevokeSite }
   | { readonly kind: 'vacated', readonly cause: VaultError, readonly unrevoked: number }
   | { readonly kind: 'helloed', readonly outcome: Outcome<void>, readonly vault: Vault | null }
 
 /** What `onLifecycle` hears: what happened in the device's life, told by its `kind`, and the device it happened to. */
-export type DeviceEvent = { readonly device: Device } & BankAnnouncement
+export type DeviceEvent = { readonly device: Device } & DeviceAnnouncement
 
 /** `Device.make`'s `onLifecycle`: hears what happened in the device's life, as a bring-up or a vault's beginWatch, a vacate or a cached lease that outlived its revoke. */
 export type LifecycleHandler = (event: DeviceEvent) => unknown
@@ -496,10 +521,10 @@ export type LifecycleHandler = (event: DeviceEvent) => unknown
 export type GuardedLifecycleHandler = (event: DeviceEvent) => Promise<void>
 
 /** How a vault or a listing tells the host's `onLifecycle` through the device: handed to each as it is made. Never throws. */
-export type BankAnnounce = (announcement: BankAnnouncement) => void
+export type DeviceAnnounce = (announcement: DeviceAnnouncement) => void
 
 /** How a listing vacates the device for a revoked identity: handed to each as it is made. Never throws. */
-export type BankPanic = (refusal: VaultError) => void
+export type DevicePanic = (refusal: VaultError) => void
 
 /** `made` until an `ensureBank` succeeds; `ready` after one does; `disabled` once the device is swept or vacated, the snapshot's `err` saying why. */
 export type DeviceStage = 'made' | 'ready' | 'disabled'
@@ -516,10 +541,14 @@ export interface DeviceSnapshot extends BankScope {
   readonly bank:       BankSnapshot | null
 }
 
-/** A bank as a host renders it: its scope, the token of this device's row, and its vaults. */
+/** A bank as a host renders it: its scope, the token of this device's row, whether it is locked, and its vaults. */
 export interface BankSnapshot extends BankScope {
   /** The token of this device's row in the deviceDB, as the bank was made with it. */
   readonly device_tok: string
+  /** True unless this device has a lease granted and in force. */
+  readonly isLocked:   boolean
+  /** A snapshot of the bank's main gate, its wayins' headers among it; null before its row has come. */
+  readonly maingate:   GateSnapshot | null
   /** A snapshot of each vault the bank lists. */
   readonly vaults:     readonly VaultSnapshot[]
 }

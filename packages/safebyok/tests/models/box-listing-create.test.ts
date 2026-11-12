@@ -3,7 +3,7 @@
 import { ENCRYPTED } from '../../src/helpers/consts'
 import { describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
-import * as SX from '../../src/shapes/shapes-storage'
+import * as BX from '../../src/shapes/shapes-bankdb'
 import type { BoxDna } from '../../src/shapes/shapes-vaultish'
 import * as TH from '../test-helpers'
 import { FakeBoxKeyWrapped, FakeWhisperCiphered, boxDnaOf, boxListingOf, fullBoxRecord, shellBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
@@ -45,9 +45,9 @@ describe("BoxListing", () => {
       expect(listing.snapshot[0]).to.include({ boxlabel: 'anthropic_api_key' })
     })
 
-    it("goes straight through: ensureTimely, put, receiveWorld, and no get", async () => {
+    it("goes straight through: ensureTimely, put, receiveParent, and no get", async () => {
       await boxListingOf(world.mw).create(dna())
-      expect(world.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely', 'put', 'receiveWorld'])
+      expect(world.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely', 'put', 'receiveParent'])
     })
 
     it("leaves the scope free for another create when the put is refused", async () => {
@@ -232,7 +232,7 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
     const [put] = world.mw.callsOf('put')
     expect(put?.expectedRevisionTok).to.be.null
     expect(put?.record).to.include({ revision_seq: 0, am: 'a' })
-    expect(SX.boxRecord.parse(put?.record)).to.deep.equal(put?.record)
+    expect(BX.boxRecord.parse(put?.record)).to.deep.equal(put?.record)
   })
 
   it("seals the dna's sidecar in beside the whisper", async () => {
@@ -241,10 +241,10 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
     expect(box.isFull).to.be.true
   })
 
-  it("refuses 'vault_locked' while the vault is locked, listing and sealing nothing", async () => {
+  it("refuses 'bank_locked' while the vault is locked, listing and sealing nothing", async () => {
     world.mw.setLocked(true)
     const listing = boxListingOf(world.mw)
-    await TH.expectRefusal(listing.create({ ...dna(), whisper: { apiKey: 'sk-test-0000' } }), 'vault_locked')
+    await TH.expectRefusal(listing.create({ ...dna(), whisper: { apiKey: 'sk-test-0000' } }), 'bank_locked')
     expect(listing.snapshot).to.deep.equal([])
     expect(world.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
   })

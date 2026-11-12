@@ -18,7 +18,7 @@ function kindClause(refusalkind: Refusalkind | undefined): string { return (refu
  * @param refusalkind - The refusal's expected `refusalkind`; left out, any VaultError passes.
  * @returns The refusal, for a closer look at its message or cause.
  *
- * @example await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'vault_locked')
+ * @example await TH.expectRefusal(vault.getWhisper('anthropic_api_key'), 'bank_locked')
  */
 export async function expectRefusal(operation: Promise<unknown>, refusalkind?: Refusalkind): Promise<VaultError> {
   let refusal: unknown = NotRefused

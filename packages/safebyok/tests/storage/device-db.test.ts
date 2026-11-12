@@ -6,7 +6,7 @@ import { makeLeaseKey } from '../../src/helpers/crypto'
 import { DeviceDB } from '../../src/storage/device-db'
 import * as TH from '../test-helpers'
 
-const asked = { user_id: 'u1', banklabel: 'acme', vaultlabel: 'main', vault_tok: 'tok_one' }
+const asked = { user_id: 'u1', banklabel: 'acme', bank_tok: 'tok_one' }
 
 /** A DeviceDB whose every generic call throws what it is told. */
 class BrokenDeviceDB extends DeviceDB {
@@ -32,7 +32,7 @@ describe("a deviceDB whose generic call throws", () => {
       ['peek',       await TH.expectBad(deviceDB.tryPeek(asked), 'storage_unavailable')],
       ['forget',     await TH.expectBad(deviceDB.tryForget(asked), 'storage_unavailable')],
       ['listLeases', await TH.expectBad(deviceDB.tryListLeases(), 'storage_unavailable')],
-      ['forgetRawLease', await TH.expectBad(deviceDB.tryForgetRawLease(['u1', 'acme', 'main']), 'storage_unavailable')],
+      ['forgetRawLease', await TH.expectBad(deviceDB.tryForgetRawLease(['u1', 'acme']), 'storage_unavailable')],
       ['ensureCachedDevice', await TH.expectBad(deviceDB.tryEnsureCachedDevice(asked), 'storage_unavailable')],
       ['forgetDevice', await TH.expectBad(deviceDB.tryForgetDevice(asked), 'storage_unavailable')],
       ['listRawDevices', await TH.expectBad(deviceDB.tryListRawDevices(), 'storage_unavailable')],

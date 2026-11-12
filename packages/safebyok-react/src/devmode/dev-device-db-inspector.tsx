@@ -15,7 +15,7 @@ export const DevDeviceDBInspector = ({ deviceDB }: DevDeviceDBInspectorProps) =>
 
 // == [Leases]: LeaseRowsTable, LeaseRowLine, LeaseColumns, ListedLease, listedOfRaw, cellOf
 
-const LeaseColumns = ['user_id', 'banklabel', 'vaultlabel', 'vault_tok', 'proved_at'] as const
+const LeaseColumns = ['user_id', 'banklabel', 'bank_tok', 'proved_at'] as const
 
 const listedOfRaw = ({ scopepath, row }: { scopepath: LeaseScopepath, row: unknown }): ListedLease => (
   { scopepath, row: ((typeof row === 'object') && (row !== null)) ? { ...row } : {} }
@@ -62,7 +62,7 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
               {listing.rows.map(({ row, scopepath }, ii) => (
                 <LeaseRowLine
                   // The index is part of the key because a damaged row may lack the fields that identify it.
-                  key={`${String(row['vaultlabel'])}/${String(row['vault_tok'])}/${String(ii)}`}
+                  key={`${String(row['banklabel'])}/${String(row['bank_tok'])}/${String(ii)}`}
                   row={row}
                   scopepath={scopepath}
                   onForget={(asked) => callThenRelist('forget', async () => { await deviceDB.forget(asked); return 'forgotten' })}

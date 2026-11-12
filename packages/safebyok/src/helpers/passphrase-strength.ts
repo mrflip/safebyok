@@ -5,12 +5,12 @@ import * as Phrases from './phrases'
 import { strengthCheckerLoadFailed } from '../refusals/throwers'
 import * as HostErrorSanitizer from '../refusals/host-error-sanitizer'
 import * as CX from '../shapes/shapes-core'
-import type { VaultScope } from '../shapes/shapes-core'
+import type { BankScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
 import type { PassphraseVerdict } from '../shapes/shapes-gateish'
 
 /** `Device.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
- * It is handed the passphrase as typed, and the vault's scope: words a guesser who knows the user
+ * It is handed the passphrase as typed, and the bank's scope: words a guesser who knows the user
  * tries first. The vault runs it on each new passphrase before any key derivation: the one an
  * `initialize_gate` gating creates a vault with, and each one a `change_passphrase` gating sets.
  * It never runs when a vault unlocks, and never hears a blank passphrase. One that throws, or
@@ -37,14 +37,14 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  *   const strengthChecker = Object.assign((typed: string) => judge(typed), { load: () => loadWordList() })
  */
 export type StrengthChecker = {
-  (passphrase: string, scope: VaultScope): PassphraseVerdict | Promise<PassphraseVerdict>
+  (passphrase: string, scope: BankScope): PassphraseVerdict | Promise<PassphraseVerdict>
   /** Fetch or build what the checker needs before it can judge; each device's `ensureBank()` runs it. */
   load?: (() => void | Promise<void>) | undefined
 }
 
 /** A strength checker as a bank keeps it: the host's, made to honor its contract by {@link guardStrengthChecker}. */
 export type GuardedStrengthChecker = {
-  (passphrase: string, scope: VaultScope): Promise<PassphraseVerdict>
+  (passphrase: string, scope: BankScope): Promise<PassphraseVerdict>
   readonly load: () => Promise<void>
 }
 
@@ -70,9 +70,9 @@ const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "
 /** `hostChecker`, made to honor its contract: the one way a vault, or a dialog checking as the user types, asks it. */
 export function guardStrengthChecker(hostChecker: StrengthChecker): GuardedStrengthChecker {
   const host = GX.strengthChecker.parse(hostChecker, { where: 'strengthChecker' })
-  const check = async (passphrase: string, scope: VaultScope): Promise<PassphraseVerdict> => {
+  const check = async (passphrase: string, scope: BankScope): Promise<PassphraseVerdict> => {
     // Frozen, so the host's checker can change nothing of what it is told.
-    const told = CX.vaultScope.parse(scope)
+    const told = CX.bankScope.parse(scope)
     const typed = GX.passphraseCleartext.parse(passphrase)
     if (! typed.trim()) { return BlankVerdict }
     let answered: unknown

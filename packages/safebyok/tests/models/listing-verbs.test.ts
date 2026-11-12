@@ -346,21 +346,21 @@ describe("listing.put and listing.del: the row they say they expect", () => {
 // --
 
 describe("listing.tryPut and listing.tryFetch return the vaultDB's answer", () => {
-  it("carries the put's act, ask and world, with the instance listed as its val", async () => {
+  it("carries the put's act, ask and parent, with the instance listed as its val", async () => {
     const listing = boxListingOf(world.mw)
     const box = listing.deliverRecord(fullBoxRecord())
     world.mw.seedPut(fullBoxRecord())
     const answer = await listing.tryPut(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }), { expected: box.sparse })
     expect(answer).to.deep.include({ ok: true, val: box })
     expect(answer).to.have.property('act')
-    expect(answer).to.have.property('world')
+    expect(answer).to.have.property('parent')
     expect(answer.ask).to.include({ boxlabel: box.boxlabel })
   })
 
   it("returns a refusal made before the call as a bad answer whose act is unclassified_storing", async () => {
     const listing = boxListingOf(world.mw)
     const answer = await listing.tryPut({ garbage: true } as never, { expected: shellBoxRecord() })
-    expect(answer).to.deep.include({ ok: false, world: null, ask: {} })
+    expect(answer).to.deep.include({ ok: false, parent: null, ask: {} })
     expect(answer.act).to.eq('unclassified_storing')
   })
 

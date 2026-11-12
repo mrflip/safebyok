@@ -23,7 +23,7 @@ export const lockWordOf = (snapshot: VaultSnapshot | null): string => {
 export const seenBanks: Bank[] = []
 
 /** Render what the hooks report about the device and the vault named `vaultlabel`, as text, with the buttons a host's page would have.
- * Open builds or unlocks the vault from a click, and Lock locks it.
+ * Open unlocks the bank and builds the vault from a click, and Lock locks it.
  *
  * @example
  *   render(<BankProvider {...props}><TH.ShowsVault /></BankProvider>)
@@ -37,8 +37,8 @@ export const ShowsVault = ({ vaultlabel = 'main' }: { vaultlabel?: string }) => 
   useEffect(() => { if (bank !== null && ! seenBanks.includes(bank)) { seenBanks.push(bank) } }, [bank])
   const open = async () => {
     if (bank === null) { return }
-    const ensured = await bank.tryEnsureVault({ vaultlabel })
-    if (ensured.ok) { await ensured.val.tryEnsureUnlocked() }
+    const unlocked = await bank.tryEnsureUnlocked()
+    if (unlocked.ok) { await bank.tryEnsureVault({ vaultlabel }) }
   }
   return (
     <div>

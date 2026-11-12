@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { ENCRYPTED, LOCKED, VEILED, Whispered, brandOf, isWhisperedBag } from '../../src/helpers/consts'
 import type { Whisper } from '../../src/shapes/shapes-core'
 import type { BoxWorld, Fetched } from '../../src/shapes/shapes-vaultish'
-import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-storage'
+import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-bankdb'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { type TestableBox, boxListingOf, fullBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
@@ -33,8 +33,8 @@ describe("box.extractWhisper(): refused from its guard", () => {
     // absent, refused ahead of the seal:
     [() => tombstoneBoxRecord({ revision_seq: 2 }),      false,   "absent_box",       'a deleted box'],
     // locked, refused first:
-    [() => tombstoneBoxRecord({ revision_seq: 2 }),      true,    "vault_locked",     'a deleted box while the vault is locked'],
-    [() => fullBoxRecord(),                              true,    "vault_locked",     'a full box while the vault is locked'],
+    [() => tombstoneBoxRecord({ revision_seq: 2 }),      true,    "bank_locked",     'a deleted box while the vault is locked'],
+    [() => fullBoxRecord(),                              true,    "bank_locked",     'a full box while the vault is locked'],
     // present and full, past the guard to a lease that never sealed it:
     [() => fullBoxRecord(),                              false,   "damaged_whisper",  'a full box whose whisper will not open'],
   ] as const
@@ -60,7 +60,7 @@ describe("box.extractWhisper(): a decrypted value that is not a valid whisper", 
   for (const [blurb, text] of OpenedCases) {
     it(`refuses 'damaged_whisper' for ${blurb}, quoting none of it`, async () => {
       const base = world.mw.world
-      const leasedWorld: BoxWorld = { vault_tok: base.vault_tok, get isLocked() { return base.isLocked }, receiveWorld: (taken) => { base.receiveWorld(taken) }, ensureTimely: (maxMillis) => base.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text), subscribe: (listener) => base.subscribe(listener) }
+      const leasedWorld: BoxWorld = { bank_tok: base.bank_tok, vault_tok: base.vault_tok, get isLocked() { return base.isLocked }, receiveParent: (taken) => { base.receiveParent(taken) }, ensureTimely: (maxMillis) => base.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text), subscribe: (listener) => base.subscribe(listener) }
       const box = boxListingOf(world.mw, { world: leasedWorld }).deliverRecord(fullBoxRecord())
       const err = await TH.expectRefusal(box.extractWhisper(), 'damaged_whisper')
       expect(err.message).to.eq(Phrases.UndecodedWhisper)
@@ -94,10 +94,10 @@ describe("box.whisper through a lock", () => {
     expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-edited', org: 'acme' })
   })
 
-  it("refuses 'vault_locked' at an expose while locked, keeping the exposed whisper", async () => {
+  it("refuses 'bank_locked' at an expose while locked, keeping the exposed whisper", async () => {
     const box = await exposedOf()
     world.mw.setLocked(true)
-    await TH.expectRefusal(box.expose(), 'vault_locked')
+    await TH.expectRefusal(box.expose(), 'bank_locked')
     world.mw.setLocked(false)
     expect(box.whisper).to.deep.equal({ apiKey: 'sk-test-0000' })
   })

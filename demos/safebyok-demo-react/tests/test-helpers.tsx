@@ -2,8 +2,8 @@
 import type { ReactNode } from 'react'
 import { expect, onTestFinished, vi, type MockInstance } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryDeviceDB, type VaultSnapshot } from 'safebyok'
-import { MemoryVaultDB } from 'safebyok/storage'
+import { Device, MemoryDeviceDB, type VaultSnapshot } from 'safebyok'
+import { MemoryBankDB } from 'safebyok/storage'
 import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok/testing'
 import { BankProvider, useBank, useVault, useVaultSnapshot } from 'safebyok-react'
 import { SessionBar } from '../src/components/SessionBar'
@@ -14,21 +14,35 @@ import type { StringStorage } from '../src/lib/string-storage'
 
 export * from 'safebyok/testing'
 
-/** Render `ui` inside a BankProvider signed in as `user_id`, with a fresh in-memory vaultDB and the cheap test deriver. Returns that `vaultDB`.
+/** Render `ui` inside a BankProvider signed in as `u1`, with the cheap test deriver, over a fresh in-memory bankDB. Returns that `bankDB`.
+ * The bankDB holds u1's bank, built with {@link Passphrase} as another device builds it, so it opens locked; with `isBankBuilt: false` it is
+ * empty, and the provider opens its dialog to build the bank.
  *
- * @example TH.renderInBank(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
+ * @example await TH.renderInBank(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
-export const renderInBank = (ui: ReactNode, user_id: string | null = 'u1') => {
-  const vaultDB = new MemoryVaultDB()
+export const renderInBank = async (ui: ReactNode, { isBankBuilt = true }: { isBankBuilt?: boolean } = {}) => {
+  const bankDB = new MemoryBankDB()
+  if (isBankBuilt) { await buildBank(bankDB, 'u1') }
   render(
     <BankProvider
-      user_id={user_id} banklabel="acme" vaultDB={vaultDB} deviceDB={new MemoryDeviceDB()}
+      user_id="u1" banklabel="acme" bankDB={bankDB} deviceDB={new MemoryDeviceDB()}
       keyDeriver={testDeriver} strengthChecker={anyStrengthChecker} logger={quietLogger}
     >
       {ui}
     </BankProvider>,
   )
-  return { vaultDB }
+  return { bankDB }
+}
+
+/** Build `user_id`'s bank in `bankDB` from a device of its own, which is then swept. */
+async function buildBank(bankDB: MemoryBankDB, user_id: string): Promise<void> {
+  const device = Device.make({
+    user_id, banklabel: 'acme', gates: ['main'], bankDB, deviceDB: new MemoryDeviceDB(),
+    keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger,
+    requestCleartext: async (gating) => { await gating.attempt({ passphraseClear: Passphrase }) },
+  })
+  await device.ensureBank()
+  device.sweep()
 }
 
 /** Make a fresh, empty in-memory StringStorage for the fake auth under test. */
@@ -165,9 +179,9 @@ export const lockWordOf = (snapshot: VaultSnapshot | null): string => {
 }
 
 /** A probe to render beside a component under test. It shows the 'main' vault's stage and lock as `<stage> <locked|unlocked|none>`,
- * with an Open button that builds or unlocks the vault through the provider's dialog, and a Lock button.
+ * with an Open button that unlocks the bank through the provider's dialog and builds the vault, and a Lock button.
  *
- * @example TH.renderInBank(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
+ * @example await TH.renderInBank(<><SessionBar auth={auth} /><TH.VaultProbe /></>)
  */
 export const VaultProbe = () => {
   const bank = useBank()
@@ -175,6 +189,8 @@ export const VaultProbe = () => {
   const snapshot = useVaultSnapshot('main')
   const open = async () => {
     if (bank === null) { return }
+    const unlocked = await bank.tryEnsureUnlocked()
+    if (! unlocked.ok) { return }
     const ensured = await bank.tryEnsureVault({ vaultlabel: 'main' })
     if (ensured.ok) { await ensured.val.tryEnsureUnlocked() }
   }

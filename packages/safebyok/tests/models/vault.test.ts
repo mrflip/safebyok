@@ -1,131 +1,94 @@
-import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import * as Phrases from '../../src/helpers/phrases'
 import { Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, T0, makeBornVault, makeBornVaultAndFriend, makeVaultWorld, makeProving, storedVaultRecord, useVaultWorlds, buildTyping, byPassphrase } from '../test-helpers/vault-world'
+import { Dna, Passphrase, T0, byPassphrase, listingOptsOf, makeBornVault, makeBornVaultAndFriend, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
-describe("VaultListing.buildVault", () => {
-  it("builds the vault's gate from the passphrase typed, and stores it in a new vault record", async () => {
-    const { listing, storedNow } = makeVaultWorld()
-    const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
-    expect(vault.gate.passphrase_wayin.wayinkind).to.eq('passphrase')
-    expect(vault.gate.passkey_wayin).to.be.null
-    expect(vault.gate.stamp).to.deep.equal({ ...Dna, vault_tok: vault.vault_tok, registered_at: T0 })
+describe("bank.ensureVault", () => {
+  it("stores a new vault record of the bank, at its first revision", async () => {
+    const { bank, vault, storedNow } = await makeBornVault()
+    expect(vault.bank_tok).to.eq(bank.bank_tok)
     expect(vault.revision_seq).to.eq(0)
-    expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
+    expect(vault.registered_at).to.eq(T0)
+    expect(storedNow()).to.deep.equal(vault.toJSON())
   })
 
-  it("builds nothing when the dialog throws", async () => {
-    const { listing, storedNow } = makeVaultWorld(null, { requestCleartext: () => { throw new Error("the user closed the dialog") } })
-    await TH.expectRefusal(listing.buildVault(Dna))
-    expect(listing.things).to.have.lengthOf(0)
-    const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
-    expect(storedNow()?.gate).to.deep.include(vault.gate.pickle())
+  it("builds no bank when the dialog throws", async () => {
+    const { device, bankDB } = makeVaultWorld({ requestCleartext: () => { throw new Error("the user closed the dialog") } })
+    await TH.expectRefusal(device.ensureBank())
+    expect(bankDB._cheat_shelfOf(Dna).bank).to.be.null
   })
 
-  it("refuses a dna for a scope already listed, before the dialog is shown", async () => {
-    const { listing, fakeBank } = makeVaultWorld()
-    const vault = await buildTyping(listing, Dna, byPassphrase(Passphrase))
-    const dialog = vi.fn()
-    fakeBank.requestCleartext = dialog
-    await TH.expectRefusal(listing.buildVault(Dna))
-    expect(dialog).not.toHaveBeenCalled()
-    expect(listing.at(Dna)).to.equal(vault)
+  it("answers the vault already listed at its scope, without asking", async () => {
+    const { bank, vault, dialog } = await makeBornVault()
+    const requestCleartext = vi.fn()
+    dialog.requestCleartext = requestCleartext
+    await expect(bank.ensureVault({ vaultlabel: Dna.vaultlabel })).resolves.to.equal(vault)
+    expect(requestCleartext).not.toHaveBeenCalled()
   })
 })
 
 describe("VaultListing.build of a record, and its constructor", () => {
-  it("builds the vault with the gate its record carries", async () => {
-    const record = await storedVaultRecord()
-    const { listing } = makeVaultWorld(record)
-    const vault = listing.deliverRecord(record)
-    expect(vault.gate.pickle()).to.deep.equal(record.gate)
-    expect(vault.gate).to.equal(vault.gate)
-  })
-
   it("listing.recordOf(vault) returns the record the vault was built from", async () => {
-    const record = await storedVaultRecord()
-    const { listing } = makeVaultWorld(record)
-    const vault = listing.deliverRecord(record)
-    expect(listing.recordOf(vault)).to.deep.equal(record)
+    const { listing, vault, demandStored } = await makeBornVault()
+    expect(listing.recordOf(vault)).to.deep.equal(demandStored())
   })
 
-  it("builds a sparse vault whose gate refuses until it is hydrated", async () => {
-    const record = await storedVaultRecord()
-    const { listing } = makeVaultWorld(record)
-    const vault = listing.deliverRecord(listing.sparseOf(record))
-    TH.expectSyncRefusal(() => vault.gate)
-    await vault.hydrate()
-    expect(vault.gate.pickle()).to.deep.equal(record.gate)
-  })
-
-  it("refuses a world without what a vault's gate and lease need", () => {
-    const { fakeBank, opts } = makeVaultWorld()
-    TH.expectSyncRefusal(() => new VaultListing(TH.omitting(fakeBank, 'deviceDB'), opts))
-    TH.expectSyncRefusal(() => new VaultListing(TH.omitting(fakeBank, 'keyDeriver'), opts))
-    TH.expectSyncRefusal(() => new VaultListing(TH.omitting(fakeBank, 'leaseMillis'), opts))
-    TH.expectSyncRefusal(() => new VaultListing(TH.omitting(fakeBank, 'boxRefreshMillis'), opts))
-  })
-
-  it("refuses a deviceDB that is a duck of one, and a host's bare function or logger where the bank has it guarded", () => {
-    const { fakeBank, opts } = makeVaultWorld()
-    const duck = { tryPeek: vi.fn(), tryStow: vi.fn(), tryForget: vi.fn() }
-    const err = TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, deviceDB: duck as never }, opts))
-    expect(err.message).to.include(Phrases.DeviceDBExpected)
-    TH.expectSyncRefusal(() => new VaultListing(fakeBank, { ...opts, bankFriend: { ...opts.bankFriend, panic: vi.fn() as never } }))
-    TH.expectSyncRefusal(() => new VaultListing(fakeBank, { ...opts, bankFriend: { ...opts.bankFriend, announce: vi.fn() as never } }))
-    TH.expectSyncRefusal(() => new VaultListing(fakeBank, { ...opts, bankFriend: { ...opts.bankFriend, askUser: vi.fn() as never } }))
-    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, logger: TH.quietLogger }, opts))
-    TH.expectSyncRefusal(() => new VaultListing({ ...fakeBank, keyDeriver: TH.testDeriver as never }, opts))
+  it("refuses a host's bare function where the bank has it guarded", async () => {
+    const born = await makeBornVault()
+    const { bank } = born
+    const opts = listingOptsOf(born)
+    TH.expectSyncRefusal(() => new VaultListing(bank, { ...opts, bankFriend: { ...opts.bankFriend, panic: vi.fn() as never } }))
+    TH.expectSyncRefusal(() => new VaultListing(bank, { ...opts, bankFriend: { ...opts.bankFriend, announce: vi.fn() as never } }))
+    TH.expectSyncRefusal(() => new VaultListing(bank, { ...opts, bankFriend: { ...opts.bankFriend, askUser: vi.fn() as never } }))
   })
 
   it("refuses a panic the bank did not brand, where a vault is made", async () => {
-    const { vault, fakeBank, listing, opts } = await makeBornVault(byPassphrase(Passphrase))
-    TH.expectSyncRefusal(() => new Vault(fakeBank, listing, vault.fullRecord, vi.fn() as never), 'bad_option')
-    TH.expectSyncRefusal(() => new Vault(fakeBank, listing, vault.fullRecord, { ...opts.bankFriend, panic: vi.fn() as never }), 'bad_option')
+    const born = await makeBornVault(byPassphrase(Passphrase))
+    const { bank, vault, listing } = born
+    const { bankFriend } = listingOptsOf(born)
+    TH.expectSyncRefusal(() => new Vault(bank, listing, vault.toJSON(), vi.fn() as never), 'bad_option')
+    TH.expectSyncRefusal(() => new Vault(bank, listing, vault.toJSON(), { ...bankFriend, panic: vi.fn() as never }), 'bad_option')
   })
 })
 
-describe("proving.buildLease(friend)", () => {
-  it("grants a lease to the vault the proving belongs to, caching nothing", async () => {
-    const { vault, deviceDB, friend } = await makeBornVaultAndFriend()
-    const proving = await makeProving(vault)
+describe("proving.buildLease(friend, gate)", () => {
+  it("grants a lease to the bank and gate the proving belongs to, caching nothing", async () => {
+    const { deviceDB, proving, friend, gate } = await makeBornVaultAndFriend()
     deviceDB.tryStow.mockClear()
-    const lease = await proving.buildLease(friend)
+    const lease = await proving.buildLease(friend, gate)
     expect(lease.isGranted).to.be.true
     expect(deviceDB.tryStow).not.toHaveBeenCalled()
     lease.evict()
   })
 
-  it("refuses a vault of another stamp, before any key is touched", async () => {
-    const { deviceDB, friend } = await makeBornVaultAndFriend()
-    const proving = await makeProving({ vault_tok: 'vault-tok-other', registered_at: T0 })
+  it("refuses a gate of another life, before any key is touched", async () => {
+    const { deviceDB, proving, friend, gate } = await makeBornVaultAndFriend()
     deviceDB.tryStow.mockClear()
-    const err = await TH.expectRefusal(proving.buildLease(friend))
-    expect(err.message).to.eq(Phrases.LeaseOfOtherVault)
+    const err = await TH.expectRefusal(proving.buildLease(friend, { ...gate, gate_tok: 'gate-tok-other' }))
+    expect(err.message).to.eq(Phrases.LeaseOfOtherGate)
     expect(deviceDB.tryStow).not.toHaveBeenCalled()
   })
 })
 
-describe("the friend a vault hands its leases", () => {
-  it("calls the deviceDB under the vault's own scope", async () => {
-    const { vault, deviceDB, friend } = await makeBornVaultAndFriend()
+describe("the friend a bank hands its leases", () => {
+  it("calls the deviceDB under the bank's own scope", async () => {
+    const { bank, deviceDB, friend } = await makeBornVaultAndFriend()
     await friend.peekLease()
     await friend.forgetLease()
-    const asked = { ...vault.scope, vault_tok: vault.vault_tok }
+    const asked = { ...bank.scope, bank_tok: bank.bank_tok }
     expect(deviceDB.peek).toHaveBeenCalledWith(asked)
     expect(deviceDB.forget).toHaveBeenCalledWith(asked)
   })
 })
 
-describe("vault.receiveWorld(world)", () => {
-  it("refuses a world that is no vault row", async () => {
+describe("vault.receiveParent(parent)", () => {
+  it("refuses a parent that is no vault row", async () => {
     const { vault } = await makeBornVault()
-    TH.expectSyncRefusal(() => { vault.receiveWorld({ am: 'nope' }) }, 'record_conflict')
+    TH.expectSyncRefusal(() => { vault.receiveParent({ am: 'nope' }) }, 'record_conflict')
   })
 })
 
@@ -133,7 +96,7 @@ const Horizon = 10 * 60_000
 
 async function bornWithGets() {
   const born = await makeBornVault()
-  return { ...born, gets: vi.spyOn(born.opts.vaultDB, 'tryGetVault') }
+  return { ...born, gets: vi.spyOn(born.bankDB, 'tryGetVault') }
 }
 
 describe("vault.ensureTimely(maxMillis)", () => {
@@ -179,12 +142,10 @@ describe("vault.ensureTimely(maxMillis)", () => {
   it("resolves for a vault its fetch finds deleted, leaving the refusal to the guards that need it present", async () => {
     const { vault, demandStored, restoreRow } = await bornWithGets()
     const stored = demandStored()
-    restoreRow({ ...omit(stored, ['gate']), am: 'x' as const, revision_seq: stored.revision_seq + 1, revision_tok: 'rev-gone' })
+    restoreRow({ ...stored, am: 'x' as const, revision_seq: stored.revision_seq + 1, revision_tok: 'rev-gone' })
     await expect(vault.ensureTimely(0)).resolves.to.equal(vault)
     expect(vault.demandEnabled()).to.equal(vault)
     TH.expectSyncRefusal(() => vault.demandPresent())
-    TH.expectSyncRefusal(() => vault.demandPromptable())
-    TH.expectSyncRefusal(() => vault.demandAttachable())
     TH.expectSyncRefusal(() => vault.demandWatchable())
   })
 

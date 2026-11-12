@@ -30,7 +30,7 @@ const RevokePasskeyForm = ({ gating, passphraseUsername }: RevokePasskeyModalPro
       gripeId={gripeId}
       action={action}
     >
-      <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.vaultlabel)} />
+      <UsernameField username={passphraseUsername ?? Messages.passphraseUsername(gating.user_id, gating.banklabel)} />
       <PassphraseField ref={fieldRef} fieldname="current-password" fieldlabel={Messages.passphraseField} invalidBy={gripe === null ? undefined : gripeId} />
     </ModalForm>
   )

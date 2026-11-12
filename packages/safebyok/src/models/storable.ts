@@ -25,16 +25,14 @@ export function cmpRevisions(ante: Revision, post: Revision): Age {
 }
 // --
 
-/** A vault or box in this tab, kept in step with its row in the vaultDB. */
+/** A vault or box in this tab, kept in step with its row in the bankDB. */
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
-  // == [Props]: scope, world, listing, vault_tok, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #listeners, #getSnapshot, #subscribe
+  // == [Props]: scope, world, listing, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #listeners, #getSnapshot, #subscribe
 
   /** Adorned in the constructor: readable, left out of enumeration and JSON. */
   declare readonly world:   ListingWorld
   declare readonly listing: ListingOf<ScopeT, RecordT, SparseT>
 
-  /** The vault this thing lies in, inscribed once by `assignInitialProps` and never moved. */
-  declare readonly vault_tok: string
   /** The revision and times of the record in hand, as plain own props, assigned before the seal by `assignInitialProps` and again by `assign` at each adopt: `registered_at` only at birth and for a record of another life. */
   declare revision_tok:  string
   declare revision_seq:  number
@@ -83,7 +81,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The sparse form of central: everything but what only the full record carries. */
   get sparse(): SparseT { return this.listing.sparseOf(this.#central) }
 
-  /** When this thing's record was last refreshed from the vaultDB, or null where it never was. */
+  /** When this thing's record was last refreshed from the bankDB, or null where it never was. */
   get refreshedAt(): number | null { return this.#refreshedAt }
 
   /** Whether the record in hand is alive, damaged or gone. */
@@ -124,7 +122,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** SLOPDOC: Inscribes the own props before the seal; a subclass adds its own the same way, never as #fields. */
   protected assignInitialProps(central: Fetched<RecordT, SparseT>): void {
-    tattoo(this, { ...this.scope, vault_tok: central.vault_tok }, { configurable: false })
+    tattoo(this, this.scope, { configurable: false })
     this.registered_at = central.registered_at
     this.assign(central)
   }

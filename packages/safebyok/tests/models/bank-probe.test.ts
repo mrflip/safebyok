@@ -40,8 +40,8 @@ describe("bank.tryProbe", () => {
 
   it("stamps each step with when it came back, in order", async () => {
     const { world, bank } = await readyBankOn()
-    const tryPutBox = world.vaultDB.tryPutBox.bind(world.vaultDB)
-    vi.spyOn(world.vaultDB, 'tryPutBox').mockImplementationOnce((...args) => { world.advance(10); return tryPutBox(...args) })
+    const tryPutBox = world.bankDB.tryPutBox.bind(world.bankDB)
+    vi.spyOn(world.bankDB, 'tryPutBox').mockImplementationOnce((...args) => { world.advance(10); return tryPutBox(...args) })
     const report = await TH.expectGood(bank.tryProbe())
     expect(report.put.timestamp).to.eq(report.timely.timestamp + 10)
     expect(report.fetch.timestamp).to.be.at.least(report.put.timestamp)
@@ -50,14 +50,14 @@ describe("bank.tryProbe", () => {
 
   it("surfaces no whisper, ciphertext or wrapped key in its report", async () => {
     const { world, bank } = await readyBankOn()
-    const put = vi.spyOn(world.vaultDB, 'tryPutBox')
+    const put = vi.spyOn(world.bankDB, 'tryPutBox')
     const report = await TH.expectGood(bank.tryProbe({ whisper: { token: 'sk-test-0000' } }))
     const said = JSON.stringify(report)
     expect(said).to.not.include('sk-test-0000')
-    const sent = await put.mock.results[0]?.value as { val: { whisper_ciphered: { ciphertext_b64: string }, box_key_wrapped: { ciphertext_b64: string } }, world: { gate: { passphrase_wayin: { vault_key_wayin_wrapped: { ciphertext_b64: string } } } } }
+    const sent = await put.mock.results[0]?.value as { val: { whisper_ciphered: { ciphertext_b64: string }, box_key_wrapped: { ciphertext_b64: string } } }
     expect(said).to.not.include(sent.val.whisper_ciphered.ciphertext_b64)
     expect(said).to.not.include(sent.val.box_key_wrapped.ciphertext_b64)
-    expect(said).to.not.include(sent.world.gate.passphrase_wayin.vault_key_wayin_wrapped.ciphertext_b64)
+    expect(said).to.not.include(bank.maingate.wayins.main.vault_key_wayin_wrapped.ciphertext_b64)
   })
 
   it("replaces an existing box rather than adding a second", async () => {
@@ -111,7 +111,7 @@ describe("bank.tryProbe", () => {
   it("returns a step's refusal as a bad Outcome naming the call", async () => {
     const { world, bank } = await readyBankOn()
     await TH.expectGood(bank.tryProbe())
-    vi.spyOn(world.vaultDB as unknown as { doPutBox: () => unknown }, 'doPutBox').mockImplementationOnce(() => { throw new VaultError('storage_blocked', 'blocked for the test') })
+    vi.spyOn(world.bankDB as unknown as { doPutBox: () => unknown }, 'doPutBox').mockImplementationOnce(() => { throw new VaultError('storage_blocked', 'blocked for the test') })
     const err = await TH.expectBad(bank.tryProbe({ whisper: { note: 'refused' } }), 'storage_blocked')
     expect(err.meta?.oplabel).to.eq('putBox')
   })

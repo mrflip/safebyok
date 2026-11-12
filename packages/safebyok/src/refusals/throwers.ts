@@ -76,13 +76,10 @@ export function insecureContext(): VaultError { return new VaultError('insecure_
 export function deviceDisabled(): VaultError { return new VaultError('disabled', Phrases.DeviceLetGo) }
 // --
 
-// == [Vault Throwers]: needUnlocked, unlockFirst
+// == [Vault Throwers]: needUnlocked
 
-/** A `vault_locked` refusal: the vault is locked, and `ensureUnlocked()` will ask the user. */
-export function needUnlocked(): VaultError { return new VaultError('vault_locked', Phrases.VaultLocked) }
-
-/** A `vault_locked` refusal: the vault has no lease for a seal or unseal to use. */
-export function unlockFirst(): VaultError { return new VaultError('vault_locked', Phrases.UnlockFirst) }
+/** A `bank_locked` refusal: the bank is locked, so nothing was read or written, and `bank.ensureUnlocked()` will ask the user. */
+export function needUnlocked(): VaultError { return new VaultError('bank_locked', Phrases.BankLocked) }
 
 // --
 
@@ -95,10 +92,13 @@ export function delOfOtherLife(): VaultError { return new VaultError('vault_rebo
 export function vaultStoredDamaged({ vaultlabel }: SX.DamagedVault): VaultError { return new VaultError('damaged_row', Phrases.vaultStoredDamaged(vaultlabel)) }
 // --
 
-// == [Listing Throwers]: rowOfOtherVaultTok
+// == [Listing Throwers]: rowOfOtherWorld, writtenByOwnVerbs
 
-/** A `storage_issue` refusal: storage answered a row under another vault_tok than this listing's vault. */
-export function rowOfOtherVaultTok(received: unknown): VaultError { return new VaultError('storage_issue', Phrases.rowOfOtherAddress(['vault_tok']), { rows: { dbhas: received } }) }
+/** A `storage_issue` refusal: storage answered a row under another `tokname` than this listing's world: a box of another vault, a vault or a gate of another bank. */
+export function rowOfOtherWorld(received: unknown, tokname: 'bank_tok' | 'vault_tok'): VaultError { return new VaultError('storage_issue', Phrases.rowOfOtherAddress([tokname]), { rows: { dbhas: received } }) }
+
+/** A `bad_option` refusal: a bank's row or its gate's is written only by the bank's own verbs, never put or deleted through its listing. */
+export function writtenByOwnVerbs(): VaultError { return new VaultError('bad_option', Phrases.WrittenByOwnVerbs) }
 // --
 
 // == [Storable Throwers]: partialLoad, alreadyListed, instanceDisabled, boxAbsent, boxNotListed, vaultAbsent, deletedVault, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, nothingStoredWhereLive, deliveredNotAsSent
@@ -143,7 +143,7 @@ export function deliveredNotAsSent(fielding: 'as_sent' | 'as_got' | 'as_db', rec
 }
 
 /** The refusal met deciding how to deliver `answer`: a refusal as it came, anything else `unexpected_error`; its meta names the delivery and the answer's ask. */
-export function refusalOfDelivering(thrown: unknown, answer: { ask: SX.LoggableAsk }): VaultError {
+export function refusalOfDelivering(thrown: unknown, answer: { ask: BX.LoggableAsk }): VaultError {
   const refusal = isVaultError(thrown) ? thrown : unexpectedError(thrown)
   return Object.assign(refusal, { meta: { ...refusal.meta, oplabel: 'deliver', ask: answer.ask } })
 }
@@ -173,8 +173,8 @@ export function damagedLease(): VaultError { return new VaultError('damaged_leas
 /** A `damaged_whisper` refusal: the whisper would not decipher under this vault's key. */
 export function undecipheredWhisper(): VaultError { return new VaultError('damaged_whisper', Phrases.UndecipheredWhisper) }
 
-/** A `vault_locked` refusal: this lease is out of force. */
-export function leaseNotInForce(): VaultError { return new VaultError('vault_locked', Phrases.LeaseNotInForce) }
+/** A `bank_locked` refusal: this lease is out of force. */
+export function leaseNotInForce(): VaultError { return new VaultError('bank_locked', Phrases.LeaseNotInForce) }
 // --
 
 // == [Gating Throwers]: alreadyAsking, requestCleartextThrew, cleartextsThrew, samePassphrase, gateMadeElsewhere, gatingDismissed, gatingConcluded, attemptInFlight
@@ -350,7 +350,7 @@ export function bankGateIssue(parent: BX.BankRow, gate: BX.GateRecord, why: stri
 }
 
 /** A `damaged_row` refusal from a bankDB: the live bank `parent` is stored without its `main` gate row. */
-export function mainGateMissing(parent: BX.BankRecord): VaultError {
+export function mainGateMissing(parent: BX.BankSparse): VaultError {
   return new VaultError('damaged_row', Phrases.MainGateMissing, { rows: { parent } })
 }
 // --

@@ -34,7 +34,7 @@ export const InstantTooLate = "An instant is epoch milliseconds no later than 22
 export const DatabaseInVaultScope = "A vaultDB and a deviceDB go to Device.make, never in the scope naming a vault"
 // --
 
-// == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, VaultDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, DeviceExpected, VaultExpected, VaultErrorExpected
+// == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, BankDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, DeviceExpected, BankExpected, VaultExpected, VaultErrorExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
@@ -45,8 +45,8 @@ export const GuardedExpected = "Expected a host's function as Device.make wraps 
 /** A host's bare logger, or anything else, where a bank's world has its logger as the bank guards it. */
 export const GuardedLoggerExpected = "Expected a logger as Device.make guards it"
 
-/** Anything but a vaultDB branded by safebyok and answering each of its verbs, where a vaultDB is asked. */
-export const VaultDBExpected = "Expected a VaultDB: an adapter or client branded by safebyok, answering each of its verbs"
+/** Anything but a bankDB branded by safebyok and answering each of its verbs, where a bankDB is asked. */
+export const BankDBExpected = "Expected a BankDB: an adapter or client branded by safebyok, answering each of its verbs"
 
 /** Anything but an instance of a class extending safebyok's DeviceDB, where a deviceDB is asked. */
 export const DeviceDBExpected = "Expected a DeviceDB: an instance of a class extending safebyok's DeviceDB"
@@ -65,6 +65,7 @@ export const ListingExpected = "Expected a Listing"
 
 /** Anything but a Device, where one is named. */
 export const DeviceExpected = "Expected a Device"
+export const BankExpected = "Expected a Bank"
 export const VaultExpected = "Expected a Vault"
 
 /** Anything but a VaultError, where bad news is told. */
@@ -146,10 +147,10 @@ export const WhisperBagShape = "An object in a whisper or a sidecar is a plain o
 export const otherScope = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's, which serves one app and one signed-in user. Use the bank of the app and user it belongs to.`
 // --
 
-// == [Vault: lifecycle]: VaultLocked
+// == [Vault: lifecycle]: BankLocked
 
-/** Why a call that needs the vault unlocked does nothing while it is locked. */
-export const VaultLocked = "The vault locked mid-operation. Please unlock again to carry on."
+/** Why a call that needs the bank unlocked does nothing while it is locked. */
+export const BankLocked = "The bank is locked, so nothing was read or written: unlock it (bank.ensureUnlocked) and call again."
 
 // --
 
@@ -159,13 +160,16 @@ export const VaultLocked = "The vault locked mid-operation. Please unlock again 
 export const RecordForNewBox = "A create operation found a record already present."
 // --
 
-// == [Storables]: PartialLoad, AlreadyListed, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives
+// == [Storables]: PartialLoad, AlreadyListed, WrittenByOwnVerbs, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
 /** Why a birth makes nothing of a dna for a scope the listing already has alive. */
 export const AlreadyListed = "This listing already has an instance under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
+
+/** Why a bank or a gate is never put or deleted as a vault or a box is. */
+export const WrittenByOwnVerbs = "A bank's row and its gate's are written only by the bank's own verbs, so nothing was stored: build, change or delete the bank through its prompts."
 
 /** Why an update of a box naming neither its whisper nor its sidecar writes nothing. */
 export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to write."
@@ -208,7 +212,7 @@ export const AnswerNotAsSent = "Storage answered with a record other than the on
 
 // --
 
-// == [Models: provings]: CleartextMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, KeyDeriverThrew
+// == [Models: provings]: CleartextMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherGate, LeaseOfOtherGate, StampOfOtherVault, KeyDeriverThrew
 
 /** Why cleartexts that hand in neither a passphrase nor a passkey's answer are refused. */
 export const CleartextMissing = "An attempt hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
@@ -240,11 +244,11 @@ export const WayinNotMadeYet = "A proving was asked for the vaultKey before it m
 /** Why a proving that has a wayin already makes no other. */
 export const WayinMadeAlready = "This proving has a wayin already, and a proving has one: make a new proving for another wayin. A bug in the caller."
 
-/** Why a wayin is not made under the vaultKey of a proving of another vault. */
-export const ProvingOfOtherVault = "The source proving is of another vault: a wayin is made only under the vaultKey of the vault it lets into, so none was made. This is a bug in safebyok."
+/** Why a wayin is not made under the vaultKey of a proving of another gate. */
+export const ProvingOfOtherGate = "The source proving is of another bank or gate: a wayin is made only under the key of the bank it lets into, so none was made. This is a bug in safebyok."
 
-/** Why a lease is not granted to a vault other than the one a proving is of. */
-export const LeaseOfOtherVault = "This proving is of another vault: a lease is granted only to the vault whose stamp its wayin binds, so none was granted. This is a bug in safebyok."
+/** Why a lease is not granted to a bank or gate other than the one a proving is of. */
+export const LeaseOfOtherGate = "This proving is of another bank or gate: a lease is granted only to the bank and gate whose stamps its wayin binds, so none was granted. This is a bug in safebyok."
 
 /** Why a seal verb refuses a stamp of another vault, or another life of it. */
 export const StampOfOtherVault = "This stamp names another vault than this one, or another life of it, so nothing was sealed or opened. This is a bug in safebyok."
@@ -253,7 +257,7 @@ export const StampOfOtherVault = "This stamp names another vault than this one, 
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
 // --
 
-// == [Models: leases, vaults and boxes]: DamagedLease, UndecipheredWhisper, UndecodedWhisper, LeaseNotInForce, UnlockFirst, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, VaultDeleted
+// == [Models: leases, vaults and boxes]: DamagedLease, UndecipheredWhisper, UndecodedWhisper, LeaseNotInForce, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, VaultDeleted
 
 /** Why a lease on this device is no use: whether found so in the cache, or in force and failing to open. */
 export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
@@ -265,11 +269,7 @@ export const UndecipheredWhisper = "That whisper would not open under this vault
 export const UndecodedWhisper = "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or seal a whisper over it."
 
 /** Why a lease dropped opens nothing. */
-export const LeaseNotInForce = "This lease is out of force, as the vault locked or the lease would not open, so nothing was read or written: unlock the vault again."
-
-/** Why a call that needs the vault unlocked is refused while it is locked. */
-export const UnlockFirst = "The vault is locked, so nothing was read or written: unlock it (vault.ensureUnlocked) and call again."
-
+export const LeaseNotInForce = "This lease is out of force, as the bank locked or the lease would not open, so nothing was read or written: unlock the bank again."
 
 /** Why an instance past a sweep, a vacate or a delete answers nothing. */
 export const LetGoInstance = "This object was let go, by a sweep, a vacate or a delete, so it answers nothing more: ask the bank for the vault again."

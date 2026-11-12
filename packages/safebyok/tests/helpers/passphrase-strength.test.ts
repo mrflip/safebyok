@@ -2,13 +2,13 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { StrongVerdict, DefaultStrengthChecker, guardStrengthChecker, type StrengthChecker } from '../../src/helpers/passphrase-strength'
 import { isGuarded } from '../../src/helpers/consts'
-import type { VaultScope } from '../../src/shapes/shapes-core'
+import type { BankScope } from '../../src/shapes/shapes-core'
 import type { PassphraseVerdict } from '../../src/shapes/shapes-gateish'
 import { VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'
 
 /** The scope the tests hand a strength checker. */
-const scope: VaultScope = TH.scopeOf('u1')
+const scope: BankScope = TH.bankScope
 
 /** A test that finds every passphrase weak. */
 const neverStrong: StrengthChecker = () => ({ strong: false, reason: 'Pick a phrase nobody would guess.' })
@@ -63,7 +63,7 @@ describe("guardStrengthChecker", () => {
   })
 
   it("finds a blank passphrase weak without calling the checker", async () => {
-    const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
+    const checker = vi.fn((_passphrase: string, _scope: BankScope): PassphraseVerdict => StrongVerdict)
     for (const blank of ['', ' '.repeat(3), '\t\n']) {
       const verdict = await guardStrengthChecker(checker)(blank, scope)
       expect(verdict).to.have.property('strong', false)
@@ -73,7 +73,7 @@ describe("guardStrengthChecker", () => {
   })
 
   it("refuses a passphrase that is not a string, without calling the checker", async () => {
-    const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => StrongVerdict)
+    const checker = vi.fn((_passphrase: string, _scope: BankScope): PassphraseVerdict => StrongVerdict)
     const err = await TH.expectRefusal(guardStrengthChecker(checker)(42 as never, scope), 'bad_option')
     expect(err.message).to.match(/expected string/u)
     expect(checker).not.toHaveBeenCalled()
@@ -84,9 +84,9 @@ describe("guardStrengthChecker", () => {
   })
 
   it("returns StrongVerdict for a passphrase the checker accepts", async () => {
-    const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => ({ strong: true }))
+    const checker = vi.fn((_passphrase: string, _scope: BankScope): PassphraseVerdict => ({ strong: true }))
     expect(await guardStrengthChecker(checker)('  Spaced Out Phrase  ', scope)).to.eq(StrongVerdict)
-    expect(checker).toHaveBeenCalledWith('  Spaced Out Phrase  ', { user_id: 'u1', banklabel: 'acme', vaultlabel: 'main' })
+    expect(checker).toHaveBeenCalledWith('  Spaced Out Phrase  ', { user_id: 'u1', banklabel: 'acme' })
     const told = checker.mock.calls[0]?.[1]
     expect(told).to.not.eq(scope)
     expect(Object.isFrozen(told)).to.be.true

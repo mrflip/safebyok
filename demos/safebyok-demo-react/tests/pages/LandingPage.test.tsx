@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// Import fake-indexeddb first: it installs an indexedDB global before the demo's VaultDB and DeviceDB open their databases.
+// Import fake-indexeddb first: it installs an indexedDB global before the demo's BankDB and DeviceDB open their databases.
 import 'fake-indexeddb/auto'
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'

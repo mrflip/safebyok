@@ -14,11 +14,11 @@ const shownFor = async () => {
   await TH.addPasskeyTo(world, vault)
   const opened = await TH.openGatingOf(world, TH.revokingPasskey)
   render(<RevokePasskeyModal gating={TH.gatingOfKind(opened.gating, 'revoke_passkey')} />)
-  return { ...opened }
+  return { ...opened, bank: await opened.device.ensureBank() }
 }
 
-/** True when `bank`'s vault has a passkey. */
-const hasPasskey = (bank: Bank) => bank.vaultAt(TH.VaultScopeGiven)?.gate.toJSON().passkey_wayin != null
+/** True when `bank`'s gate has a passkey. */
+const hasPasskey = (bank: Bank) => bank.maingate.passkey0 !== null
 
 const alertText = () => screen.getByRole('alert').textContent
 
@@ -26,7 +26,7 @@ describe("RevokePasskeyModal", () => {
   it("removes the passkey on the passphrase, naming the user and the vault, and the gating concludes", async () => {
     const { bank, raising } = await shownFor()
     expect(screen.getByText(Messages.revokePasskeyTitle)).to.exist
-    expect(screen.getByDisplayValue('u1 (main vault)')).to.exist
+    expect(screen.getByDisplayValue('u1 (acme vault)')).to.exist
     TH.submitPasskeyRevoke(TH.Passphrase)
     expect(await raising).to.include({ ok: true })
     expect(hasPasskey(bank)).to.be.false

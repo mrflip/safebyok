@@ -153,7 +153,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...mw.world, extra: 1 },                true,  'passes a world with more than the base reaches into'],
       [null,                                     false, 'refuses null'],
       [{},                                       false, 'refuses an empty object'],
-      [{ ...mw.world, receiveWorld: undefined },    false, 'refuses a world that cannot receiveWorld'],
+      [{ ...mw.world, receiveParent: undefined },    false, 'refuses a world that cannot receiveParent'],
       [{ ...mw.world, ensureTimely: 5 },         false, 'refuses a world whose ensureTimely is no function'],
       [{ ...mw.world, isLocked: undefined },     false, 'refuses a world with no isLocked'],
       [{ ...mw.world, isLocked: 'locked' },      false, 'refuses a world whose isLocked is no boolean'],
@@ -161,11 +161,11 @@ describe("The checks of the world and the listing", () => {
   })
 
   describe("VX.listingOpts", () => {
-    const opts = { vaultDB: mw.vaultDB, maxMillisSinceRefresh: 1000, bankFriend: mw.bankFriend }
+    const opts = { bankDB: mw.bankDB, maxMillisSinceRefresh: 1000, bankFriend: mw.bankFriend }
     expectCases(VX.listingOpts, [
-      [opts,                                                     true,  'passes the test vaultDB, a horizon and the calls the bank branded'],
+      [opts,                                                     true,  'passes the test bankDB, a horizon and the calls the bank branded'],
       [{ ...opts, maxMillisSinceRefresh: Infinity },             true,  'passes a horizon of Infinity'],
-      [{ ...opts, vaultDB: { tryPutBox: () => null } },          false, 'refuses a vaultDB with no tryGetBox'],
+      [{ ...opts, bankDB: { tryPutBox: () => null } },           false, 'refuses a bankDB with no tryGetBox'],
       [{ ...opts, maxMillisSinceRefresh: -1 },                   false, 'refuses a negative horizon'],
       [{ ...opts, maxMillisSinceRefresh: undefined },            false, 'refuses a missing horizon'],
       [{ ...opts, bankFriend: { ...mw.bankFriend, panic: () => undefined } },               false, 'refuses a panic the bank did not brand'],
@@ -196,7 +196,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...args, listing: {} },                       false, 'refuses a listing with no listing modelkind'],
       [{ ...args, listing: undefined },                false, 'refuses a missing listing'],
       [{ ...args, world: null },                       false, 'refuses a null world'],
-      [{ ...args, world: { ...mw.world, receiveWorld: undefined } }, false, 'refuses a world that cannot receiveWorld'],
+      [{ ...args, world: { ...mw.world, receiveParent: undefined } }, false, 'refuses a world that cannot receiveParent'],
       [{ ...args, opts: { maxMillisSinceRefresh: 1000 } }, false, "refuses options, the horizon being the listing's"],
       [{ ...args, extra: 1 },                          false, 'refuses an argument it does not accept, being strict'],
     ])

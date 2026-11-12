@@ -4,17 +4,17 @@ import * as Phrases from '../../src/helpers/phrases'
 import { cipherCtx, deriveWrappingKey, fromB64, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { Gate } from '../../src/models/gate'
-import { vaultScope } from '../../src/shapes/shapes-core'
-import { type ProvingWorld, FirstGateEpoch, type PasskeyAnswer, passphraseCleartext } from '../../src/shapes/shapes-gateish'
+import { bankScope } from '../../src/shapes/shapes-core'
+import { type ProvingWorld, type PasskeyAnswer, type StampedGate, passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import { VaultError } from '../../src/refusals/errors'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
-import { _cheat_vaultKeyBytesOf, builtGateOf, DeviceTok, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampOf, T0, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
+import { _cheat_vaultKeyBytesOf, builtGateOf, listedGateOf, DeviceTok, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WorldBankStamp, WorldGate, WorldGateStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
-const WorldScope = vaultScope.parse(WorldStamp)
+const WorldScope = bankScope.parse(WorldBankStamp)
 
 /** A key deriver scripted to hand back anything at all, to try what a proving makes of it. */
 function deriverHanding(handBack: () => unknown): KeyDeriver {
@@ -26,7 +26,7 @@ function deriverHanding(handBack: () => unknown): KeyDeriver {
 }
 
 function novelPassphrase(world: ProvingWorld = provingWorldOf()): Promise<PassphraseProving> {
-  return PassphraseProving.buildNovel(WorldStamp, TestPassphrase, world)
+  return PassphraseProving.buildNovel(WorldBankStamp, WorldGateStamp, TestPassphrase, world)
 }
 
 function novelOverHanded(handBack: () => unknown): Promise<PassphraseProving> { return novelPassphrase(provingWorldOf({ keyDeriver: deriverHanding(handBack) })) }
@@ -38,17 +38,22 @@ async function novelWithWayin(): Promise<{ proving: PassphraseProving, wayin: Wa
 }
 
 function novelPasskey(answer = passkeyAnswerOf(), world: ProvingWorld = provingWorldOf()): Promise<PasskeyProving> {
-  return PasskeyProving.buildNovel(WorldStamp, answer, world)
+  return PasskeyProving.buildNovel(WorldBankStamp, WorldGateStamp, answer, world)
 }
 
 /** A gate with both wayins, beside a fresh copy of the answer that opens its passkey's: the gate's build spent the one it was handed. */
-async function gateWithBoth(epochs = 0): Promise<{ gate: Gate, answerOf: () => PasskeyAnswer }> {
+async function gateWithBoth(): Promise<{ gate: Gate, answerOf: () => PasskeyAnswer }> {
   const answer = passkeyAnswerOf()
   const { credential_id, prf_salt_b64 } = answer
   const prfBytes = new Uint8Array(answer.prfBytes)
   const { gate } = await builtGateOf(answer)
   const answerOf = (): PasskeyAnswer => ({ credential_id, prf_salt_b64, prfBytes: new Uint8Array(prfBytes) })
-  return { gate: epochs === 0 ? gate : new Gate(WorldStamp, { ...gate.pickle(), gate_epoch: FirstGateEpoch + epochs }), answerOf }
+  return { gate, answerOf }
+}
+
+/** What a proving of `gate` is handed, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be read under. */
+function movedGate(gate: Gate, moves: { bank?: object, gate?: object }): StampedGate {
+  return { bankStamp: { ...WorldBankStamp, ...moves.bank }, stamp: { ...WorldGateStamp, ...moves.gate }, wayins: gate.wayins }
 }
 
 /** What a vaultKey is unwrapped as only to see that a wrap opens. */
@@ -61,11 +66,11 @@ const findsStrongAsync = () => Promise.resolve({ strong: true as const })
 /** Whether `one`'s lease opens what `other`'s seals: whether both have one vaultKey. */
 async function expectOneVaultKey(one: Proving, other: Proving): Promise<void> {
   const friend = fakeLeaseFriendOf()
-  const stamp = sealStampOf('b1')
-  const sealer = await one.buildLease(friend)
-  const opener = await other.buildLease(friend)
-  const sealed = await sealer.sealWith('{"val":"sk-test-5678"}', stamp)
-  expect(await opener.unsealWith(sealed, stamp)).to.eq('{"val":"sk-test-5678"}')
+  const stamps = sealStampsOf('b1')
+  const sealer = await one.buildLease(friend, WorldGate)
+  const opener = await other.buildLease(friend, WorldGate)
+  const sealed = await sealer.sealWith('{"val":"sk-test-5678"}', stamps)
+  expect(await opener.unsealWith(sealed, stamps)).to.eq('{"val":"sk-test-5678"}')
 }
 
 /** A checker whose answer throws the passphrase it heard, when its verdict is read. */
@@ -115,7 +120,7 @@ describe("Proving.judgeStrength(passphraseClear, scope, world)", () => {
   })
 })
 
-describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
+describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, world)", () => {
   const ArgsCases = [
     [() => ({ world: TH.omitting(provingWorldOf(), 'keyDeriver') }),      'a world with no keyDeriver'],
     [() => ({ world: TH.omitting(provingWorldOf(), 'device_tok') }),      'a world with no device_tok'],
@@ -123,16 +128,19 @@ describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
     [() => ({ world: provingWorldOf({ device_tok: '' }) }),               'a world with an empty device_tok'],
     [() => ({ world: { ...provingWorldOf(), keyDeriver: TH.testDeriver } }), "a world with the host's bare keyDeriver"],
     [() => ({ world: { ...provingWorldOf(), strengthChecker: TH.anyStrengthChecker } }), "a world with the host's bare strengthChecker"],
-    [() => ({ stamp: { ...WorldStamp, vault_tok: undefined } }),          'a stamp with no vault_tok'],
-    [() => ({ stamp: { ...WorldStamp, registered_at: 'yesterday' } }),    'a stamp whose registered_at is not epoch millis'],
-    [() => ({ stamp: null }),                                             'no stamp at all'],
+    [() => ({ bank: { ...WorldBankStamp, bank_tok: undefined } }),        'a bank stamp with no bank_tok'],
+    [() => ({ bank: { ...WorldBankStamp, registered_at: 'yesterday' } }), 'a bank stamp whose registered_at is not epoch millis'],
+    [() => ({ bank: null }),                                              'no bank stamp at all'],
+    [() => ({ gate: { ...WorldGateStamp, gate_tok: undefined } }),        'a gate stamp with no gate_tok'],
+    [() => ({ gate: { ...WorldGateStamp, gatelabel: 'other' } }),         'a gate stamp of a gatelabel no gate has'],
+    [() => ({ gate: null }),                                              'no gate stamp at all'],
     [() => ({ passphraseClear: 42 }),                                     'a passphrase that is not a string'],
   ] as const
 
   for (const [argsOf, blurb] of ArgsCases) {
     it(`refuses ${blurb}`, async () => {
-      const { stamp = WorldStamp, passphraseClear = TestPassphrase, world = provingWorldOf() } = argsOf() as Record<string, unknown>
-      await TH.expectRefusal(PassphraseProving.buildNovel(stamp as never, passphraseClear as never, world as ProvingWorld))
+      const { bank = WorldBankStamp, gate = WorldGateStamp, passphraseClear = TestPassphrase, world = provingWorldOf() } = argsOf() as Record<string, unknown>
+      await TH.expectRefusal(PassphraseProving.buildNovel(bank as never, gate as never, passphraseClear as never, world as ProvingWorld))
     })
   }
 
@@ -143,10 +151,10 @@ describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
 
-  it("has the first gate epoch and the stamp given", async () => {
+  it("has the stamps given", async () => {
     const proving = await novelPassphrase()
-    expect(proving.gate_epoch).to.eq(FirstGateEpoch)
-    expect(proving.stamp).to.deep.equal(WorldStamp)
+    expect(proving.bankStamp).to.deep.equal(WorldBankStamp)
+    expect(proving.gateStamp).to.deep.equal(WorldGateStamp)
   })
 
   it("hands the keyDeriver the passphrase and a fresh salt of its salt_size, the salt the header carries", async () => {
@@ -205,11 +213,11 @@ describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
   })
 })
 
-describe("PasskeyProving.buildNovel(stamp, passkeyClear, world)", () => {
-  it("has the first gate epoch, and does not zero the answer", async () => {
+describe("PasskeyProving.buildNovel(bank, gate, passkeyClear, world)", () => {
+  it("has the stamps given, and does not zero the answer", async () => {
     const answer = passkeyAnswerOf()
     const proving = await novelPasskey(answer)
-    expect(proving.gate_epoch).to.eq(FirstGateEpoch)
+    expect(proving.gateStamp).to.deep.equal(WorldGateStamp)
     expect(isZeroed(answer.prfBytes)).to.be.false
   })
 
@@ -235,18 +243,18 @@ describe("PasskeyProving.buildNovel(stamp, passkeyClear, world)", () => {
 })
 
 describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
-  it("proves the gate's passphrase wayin, with the gate's stamp, epoch and vaultKey", async () => {
-    const { gate, answerOf } = await gateWithBoth(2)
+  it("proves the gate's passphrase wayin, with the gate's stamps and vaultKey", async () => {
+    const { gate, answerOf } = await gateWithBoth()
     const proving = await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf())
-    expect(proving.stamp).to.deep.equal(WorldStamp)
-    expect(proving.gate_epoch).to.eq(gate.gate_epoch)
-    expect(proving.header).to.deep.equal(gate.ppWayin.toJSON())
+    expect(proving.bankStamp).to.deep.equal(WorldBankStamp)
+    expect(proving.gateStamp).to.deep.equal(WorldGateStamp)
+    expect(proving.header).to.deep.equal(gate.main.toJSON())
     await expectOneVaultKey(proving, await PasskeyProving.buildStored(gate, answerOf()))
   })
 
   it("accepts a gate record as well as a Gate", async () => {
     const { gate } = await gateWithBoth()
-    const proving = await PassphraseProving.buildStored({ stamp: WorldStamp, ...gate.pickle() }, TestPassphrase, provingWorldOf())
+    const proving = await PassphraseProving.buildStored({ bankStamp: WorldBankStamp, stamp: WorldGateStamp, ...gate.pickle() }, TestPassphrase, provingWorldOf())
     expect(proving).to.be.instanceOf(PassphraseProving)
   })
 
@@ -269,10 +277,10 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
   it("refuses a stored salt that will not decode, without calling the deriver", async () => {
     const salt = `${"A".repeat(21)}B`
     const { gate } = await gateWithBoth()
-    const { passphrase_wayin } = gate.pickle()
+    const { main } = gate.wayins
     const deriveKeyBytes = vi.fn(() => Promise.resolve(randomBytes(32)))
-    const keyDeriver: KeyDeriver = { key_deriver_label: passphrase_wayin.key_deriver_label, salt_size: 16, deriveKeyBytes }
-    const damaged = { stamp: WorldStamp, ...gate.pickle(), passphrase_wayin: { ...passphrase_wayin, salt_b64: salt as never } }
+    const keyDeriver: KeyDeriver = { key_deriver_label: main.key_deriver_label, salt_size: 16, deriveKeyBytes }
+    const damaged = { bankStamp: WorldBankStamp, stamp: WorldGateStamp, wayins: { ...gate.wayins, main: { ...main, salt_b64: salt as never } } }
     const err = await TH.expectRefusal(PassphraseProving.buildStored(damaged, TestPassphrase, provingWorldOf({ keyDeriver })), 'bad_option')
     expect(TH.thrownText(err)).to.not.include(salt)
     expect(deriveKeyBytes).not.toHaveBeenCalled()
@@ -302,11 +310,11 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
 
 describe("PasskeyProving.buildStored(gate, passkeyClear)", () => {
   it("proves the gate's passkey wayin, and does not zero the answer", async () => {
-    const { gate, answerOf } = await gateWithBoth(1)
+    const { gate, answerOf } = await gateWithBoth()
     const answer = answerOf()
     const proving = await PasskeyProving.buildStored(gate, answer)
-    expect(proving.gate_epoch).to.eq(gate.gate_epoch)
-    expect(proving.header).to.deep.equal(gate.pkWayin!.toJSON())
+    expect(proving.gateStamp).to.deep.equal(WorldGateStamp)
+    expect(proving.header).to.deep.equal(gate.passkey0!.toJSON())
     expect(isZeroed(answer.prfBytes)).to.be.false
   })
 
@@ -405,8 +413,8 @@ describe("a proving's header", () => {
   it("of a passphrase proving: the deriver's label, a fresh salt, the world's device_tok, and registered_at from the time now", async () => {
     vi.setSystemTime(T0 + 5)
     const { header } = await novelPassphrase(provingWorldOf())
-    expect(header).to.deep.include({ wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', device_tok: DeviceTok, registered_at: T0 + 5 })
-    expect(Object.keys(header)).to.have.members(['wayinkind', 'key_deriver_label', 'salt_b64', 'device_tok', 'registered_at'])
+    expect(header).to.deep.include({ wayinkind: 'passphrase', wayinlabel: 'main', key_deriver_label: 'test_digest_v0', device_tok: DeviceTok, registered_at: T0 + 5 })
+    expect(Object.keys(header)).to.have.members(['wayinkind', 'wayinlabel', 'key_deriver_label', 'salt_b64', 'device_tok', 'registered_at'])
     expect(fromB64(header.salt_b64).length).to.eq(TH.testDeriver.salt_size)
     expect(Object.isFrozen(header)).to.be.true
   })
@@ -415,7 +423,7 @@ describe("a proving's header", () => {
     const answer = passkeyAnswerOf()
     const { credential_id, prf_salt_b64 } = answer
     const { header } = await novelPasskey(answer)
-    expect(header).to.deep.equal({ wayinkind: 'passkey', credential_id, prf_salt_b64, device_tok: DeviceTok, registered_at: T0 })
+    expect(header).to.deep.equal({ wayinkind: 'passkey', wayinlabel: 'passkey0', credential_id, prf_salt_b64, device_tok: DeviceTok, registered_at: T0 })
   })
 
   it("draws a fresh salt for each passphrase proving", async () => {
@@ -430,13 +438,13 @@ describe("proving.buildWayin(source)", () => {
     const { proving, wayin } = await novelWithWayin()
     expect(wayin).to.be.instanceOf(Wayin)
     expect(wayin.toJSON()).to.deep.equal(proving.header)
-    const vaultKeyBytes = await _cheat_vaultKeyBytesOf(WorldStamp, wayin, { passphrase: TestPassphrase })
+    const vaultKeyBytes = await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, wayin, { passphrase: TestPassphrase })
     expect(vaultKeyBytes.length).to.eq(32)
   })
 
   it("from NOVEL makes a wayin that another passphrase does not open", async () => {
     const { wayin } = await novelWithWayin()
-    await expect(_cheat_vaultKeyBytesOf(WorldStamp, wayin, { passphrase: `${TestPassphrase}, misremembered` })).rejects.toThrow()
+    await expect(_cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, wayin, { passphrase: `${TestPassphrase}, misremembered` })).rejects.toThrow()
   })
 
   it("from another proving wraps that proving's vaultKey", async () => {
@@ -446,8 +454,8 @@ describe("proving.buildWayin(source)", () => {
     const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
     const passkeyWayin = await passkeyProving.buildWayin(passphraseProving)
     expect(passkeyWayin.toJSON()).to.deep.equal(passkeyProving.header)
-    const viaPassphrase = await _cheat_vaultKeyBytesOf(WorldStamp, passphraseWayin, { passphrase: TestPassphrase })
-    const viaPasskey = await _cheat_vaultKeyBytesOf(WorldStamp, passkeyWayin, { prfBytes: answer.prfBytes })
+    const viaPassphrase = await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, passphraseWayin, { passphrase: TestPassphrase })
+    const viaPasskey = await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, passkeyWayin, { prfBytes: answer.prfBytes })
     expect(viaPasskey).to.deep.equal(viaPassphrase)
   })
 
@@ -456,21 +464,22 @@ describe("proving.buildWayin(source)", () => {
     const answer = passkeyAnswerOf()
     const novel = await novelPasskey(answer)
     const wayin = await novel.buildWayin(await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf()))
-    const viaStored = await _cheat_vaultKeyBytesOf(WorldStamp, gate.ppWayin, { passphrase: TestPassphrase })
-    expect(await _cheat_vaultKeyBytesOf(WorldStamp, wayin, { prfBytes: answer.prfBytes })).to.deep.equal(viaStored)
+    const viaStored = await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, gate.main, { passphrase: TestPassphrase })
+    expect(await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, wayin, { prfBytes: answer.prfBytes })).to.deep.equal(viaStored)
   })
 
   it("mints a different vaultKey for each NOVEL wayin of different provings", async () => {
     const { wayin: one } = await novelWithWayin()
     const { wayin: two } = await novelWithWayin()
-    const vaultKeyBytesOne = await _cheat_vaultKeyBytesOf(WorldStamp, one, { passphrase: TestPassphrase })
-    const vaultKeyBytesTwo = await _cheat_vaultKeyBytesOf(WorldStamp, two, { passphrase: TestPassphrase })
+    const vaultKeyBytesOne = await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, one, { passphrase: TestPassphrase })
+    const vaultKeyBytesTwo = await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, two, { passphrase: TestPassphrase })
     expect(vaultKeyBytesOne).to.not.deep.equal(vaultKeyBytesTwo)
   })
 
-  it("binds the wayin to its vault: under another vault's stamp it will not open", async () => {
+  it("binds the wayin to its bank and its gate: under another's stamp it will not open", async () => {
     const { wayin } = await novelWithWayin()
-    await expect(_cheat_vaultKeyBytesOf({ ...WorldStamp, vault_tok: 'vault-tok-other' }, wayin, { passphrase: TestPassphrase })).rejects.toThrow()
+    await expect(_cheat_vaultKeyBytesOf({ ...WorldBankStamp, bank_tok: 'bank-tok-other' }, WorldGateStamp, wayin, { passphrase: TestPassphrase })).rejects.toThrow()
+    await expect(_cheat_vaultKeyBytesOf(WorldBankStamp, { ...WorldGateStamp, gate_tok: 'gate-tok-other' }, wayin, { passphrase: TestPassphrase })).rejects.toThrow()
   })
 
   const SourceCases = [
@@ -492,13 +501,21 @@ describe("proving.buildWayin(source)", () => {
     await TH.expectRefusal(proving.buildWayin(await novelPassphrase()))
   })
 
-  it("refuses a source proving of another vault", async () => {
-    const theirs = await PassphraseProving.buildNovel({ ...WorldStamp, vault_tok: 'vault-tok-other' }, TestPassphrase, provingWorldOf())
-    await theirs.buildWayin(NOVEL)
-    const mine = await novelPassphrase()
-    const err = await TH.expectRefusal(mine.buildWayin(theirs))
-    expect(err.message).to.eq(Phrases.ProvingOfOtherVault)
-  })
+  const OtherSourceCases = [
+    [{ bank: { bank_tok: 'bank-tok-other' } }, 'another life of the bank'],
+    [{ gate: { gate_tok: 'gate-tok-other' } }, 'another life of the gate'],
+  ] as const
+
+  for (const [moves, blurb] of OtherSourceCases) {
+    it(`refuses a source proving of ${blurb}`, async () => {
+      const { bank = {}, gate = {} } = moves as { bank?: object, gate?: object }
+      const theirs = await PassphraseProving.buildNovel({ ...WorldBankStamp, ...bank }, { ...WorldGateStamp, ...gate }, TestPassphrase, provingWorldOf())
+      await theirs.buildWayin(NOVEL)
+      const mine = await novelPassphrase()
+      const err = await TH.expectRefusal(mine.buildWayin(theirs))
+      expect(err.message).to.eq(Phrases.ProvingOfOtherGate)
+    })
+  }
 
   it("refuses a second buildWayin on one proving", async () => {
     const proving = await novelPassphrase()
@@ -515,11 +532,12 @@ describe("proving.buildWayin(source)", () => {
 })
 
 const StampCases = [
-  [{ user_id: 'u2' },                'the stamp of another user'],
-  [{ banklabel: 'acme_other' },      'the stamp of another app'],
-  [{ vaultlabel: 'other' },          'the stamp of another vault label'],
-  [{ vault_tok: 'vault-tok-other' }, 'the stamp of another vault'],
-  [{ registered_at: T0 + 1 },        'a stamp whose registered_at moved'],
+  [{ bank: { user_id: 'u2' }, gate: { user_id: 'u2' } },                     'the stamps of another user'],
+  [{ bank: { banklabel: 'acme_other' }, gate: { banklabel: 'acme_other' } }, 'the stamps of another bank'],
+  [{ bank: { bank_tok: 'bank-tok-other' } },                                 'the stamp of another life of the bank'],
+  [{ bank: { registered_at: T0 + 1 } },                                      'a bank stamp whose registered_at moved'],
+  [{ gate: { gate_tok: 'gate-tok-other' } },                                 'the stamp of another life of the gate'],
+  [{ gate: { registered_at: T0 + 1 } },                                      'a gate stamp whose registered_at moved'],
 ] as const
 
 const HeaderCases = [
@@ -531,13 +549,13 @@ describe("the ctx a wayin is wrapped under", () => {
   for (const [altered, blurb] of StampCases) {
     it(`keeps a passphrase wayin shut under ${blurb}`, async () => {
       const { gate } = await builtGateOf()
-      const moved = new Gate({ ...WorldStamp, ...altered }, gate.pickle())
+      const moved = movedGate(gate, altered)
       await TH.expectRefusal(PassphraseProving.buildStored(moved, TestPassphrase, provingWorldOf()), 'wrong_passphrase')
     })
 
     it(`keeps a passkey wayin shut under ${blurb}`, async () => {
       const { gate, answerOf } = await gateWithBoth()
-      const moved = new Gate({ ...WorldStamp, ...altered }, gate.pickle())
+      const moved = movedGate(gate, altered)
       await TH.expectRefusal(PasskeyProving.buildStored(moved, answerOf()), 'wrong_passkey')
     })
   }
@@ -545,13 +563,13 @@ describe("the ctx a wayin is wrapped under", () => {
   for (const [altered, blurb] of HeaderCases) {
     it(`keeps a passphrase wayin shut under ${blurb}`, async () => {
       const { gate } = await builtGateOf()
-      const moved = new Gate(WorldStamp, { ...gate.pickle(), passphrase_wayin: { ...gate.passphrase_wayin, ...altered } })
+      const moved = await listedGateOf({ ...gate.pickle(), wayins: { main: { ...gate.wayins.main, ...altered } } })
       await TH.expectRefusal(PassphraseProving.buildStored(moved, TestPassphrase, provingWorldOf()), 'wrong_passphrase')
     })
 
     it(`keeps a passkey wayin shut under ${blurb}`, async () => {
       const { gate, answerOf } = await gateWithBoth()
-      const moved = new Gate(WorldStamp, { ...gate.pickle(), passkey_wayin: { ...gate.passkey_wayin!, ...altered } })
+      const moved = await listedGateOf({ ...gate.pickle(), wayins: { ...gate.wayins, passkey0: { ...gate.wayins.passkey0!, ...altered } } })
       await TH.expectRefusal(PasskeyProving.buildStored(moved, answerOf()), 'wrong_passkey')
     })
   }
@@ -563,44 +581,44 @@ describe("a passkey proving's key", () => {
     const prfBytes = new Uint8Array(answer.prfBytes)
     const proving = await novelPasskey(answer)
     const { vault_key_wayin_wrapped: wrapped } = await proving.buildWayin(NOVEL)
-    const ctx = cipherCtx(WorldStamp, 'vault_key_passkey_wrapped', proving.header)
+    const ctx = cipherCtx([WorldBankStamp, WorldGateStamp], 'vault_key_passkey_wrapped', proving.header)
     const passkeyKey = await deriveWrappingKey(prfBytes, ctx)
     expect(await unwrapKeyUnder(passkeyKey, wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
   })
 
-  it("binds the vault's stamp into the key itself, not only into the wrap's ctx", async () => {
+  it("binds the bank's and the gate's stamps into the key itself, not only into the wrap's ctx", async () => {
     const answer = passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)
     const proving = await novelPasskey(answer)
     const { vault_key_wayin_wrapped: wrapped } = await proving.buildWayin(NOVEL)
-    const ctx = cipherCtx(WorldStamp, 'vault_key_passkey_wrapped', proving.header)
-    const otherVaultInfo = cipherCtx({ ...WorldStamp, vault_tok: 'vault-tok-other' }, 'vault_key_passkey_wrapped', proving.header)
-    const passkeyKey = await deriveWrappingKey(prfBytes, otherVaultInfo)
+    const ctx = cipherCtx([WorldBankStamp, WorldGateStamp], 'vault_key_passkey_wrapped', proving.header)
+    const otherGateInfo = cipherCtx([WorldBankStamp, { ...WorldGateStamp, gate_tok: 'gate-tok-other' }], 'vault_key_passkey_wrapped', proving.header)
+    const passkeyKey = await deriveWrappingKey(prfBytes, otherGateInfo)
     await expect(unwrapKeyUnder(passkeyKey, wrapped, ctx, CheckUsage)).rejects.toThrow()
   })
 })
 
-describe("proving.buildLease(friend, gate_epoch?)", () => {
+describe("proving.buildLease(friend, gate)", () => {
   it("refuses before the proving has made a wayin", async () => {
     const proving = await novelPassphrase()
-    await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf()))
+    await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(), WorldGate))
   })
 
-  it("grants an uncached lease that records the epoch, the proof time and the wayinkind", async () => {
-    const { gate, answerOf } = await gateWithBoth(2)
+  it("grants an uncached lease that cites the gate, and records the proof time and the wayinkind", async () => {
+    const { gate, answerOf } = await gateWithBoth()
     const friend = fakeLeaseFriendOf()
     const proving = await PasskeyProving.buildStored(gate, answerOf())
-    const lease = await proving.buildLease(friend)
-    expect(lease.toJSON()).to.deep.include({ ...WorldStamp, gate_epoch: gate.gate_epoch, proved_at: T0, wayinkind: 'passkey' })
+    const lease = await proving.buildLease(friend, gate)
+    expect(lease.toJSON()).to.deep.include({ ...WorldBankStamp, gatelabel: 'main', gate_tok: gate.gate_tok, gate_revision_tok: gate.revision_tok, proved_at: T0, wayinkind: 'passkey' })
     expect(lease.isGranted).to.be.true
     expect(friend.tryCacheLease).not.toHaveBeenCalled()
   })
 
-  it("records the gate_epoch passed", async () => {
+  it("records the revision of the gate cited", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
-    const lease = await proving.buildLease(fakeLeaseFriendOf(), 5)
-    expect(lease.gate_epoch).to.eq(5)
+    const lease = await proving.buildLease(fakeLeaseFriendOf(), { ...WorldGate, revision_tok: 'gate-revision-tok-5' })
+    expect(lease.gate_revision_tok).to.eq('gate-revision-tok-5')
   })
 
   it("grants leases over one vaultKey from both provings", async () => {
@@ -612,37 +630,46 @@ describe("proving.buildLease(friend, gate_epoch?)", () => {
   })
 
   const OtherFriendCases = [
-    [{ vault_tok: 'vault-tok-other' }, 'another life of the vault'],
-    [{ user_id: 'u2' },                "another user's vault"],
-    [{ vaultlabel: 'work' },           'another vault of the same user'],
+    [{ bank_tok: 'bank-tok-other' },   'another life of the bank'],
+    [{ user_id: 'u2' },                "another user's bank"],
+    [{ banklabel: 'work' },            'another bank of the same user'],
   ] as const
 
   for (const [stamp, blurb] of OtherFriendCases) {
     it(`refuses a friend of ${blurb}`, async () => {
       const proving = await novelPassphrase()
       await proving.buildWayin(NOVEL)
-      await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(stamp)))
+      const err = await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(stamp), WorldGate))
+      expect(err.message).to.eq(Phrases.LeaseOfOtherGate)
     })
   }
 
-  it("refuses a friend whose vault_tok, read through its prototype, is another vault's", async () => {
+  it("refuses to cite another life of the gate proved", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
-    const { vault_tok: _vault_tok, ...ownFields } = fakeLeaseFriendOf()
-    const friend = Object.assign(Object.create({ get vault_tok() { return 'vault-tok-other' } }) as object, ownFields)
-    await TH.expectRefusal(proving.buildLease(friend as never))
+    const err = await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(), { ...WorldGate, gate_tok: 'gate-tok-other' }))
+    expect(err.message).to.eq(Phrases.LeaseOfOtherGate)
   })
 
-  it("refuses a gate_epoch out of range, and a friend with no tryCacheLease", async () => {
+  it("refuses a friend whose bank_tok, read through its prototype, is another bank's", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
-    await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(), 0))
-    await TH.expectRefusal(proving.buildLease({ ...fakeLeaseFriendOf(), tryCacheLease: undefined } as never))
+    const { bank_tok: _bank_tok, ...ownFields } = fakeLeaseFriendOf()
+    const friend = Object.assign(Object.create({ get bank_tok() { return 'bank-tok-other' } }) as object, ownFields)
+    await TH.expectRefusal(proving.buildLease(friend as never, WorldGate))
+  })
+
+  it("refuses a gate cited with no revision_tok, or none at all, and a friend with no tryCacheLease", async () => {
+    const proving = await novelPassphrase()
+    await proving.buildWayin(NOVEL)
+    await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(), TH.omitting(WorldGate, 'revision_tok')))
+    await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(), undefined as never))
+    await TH.expectRefusal(proving.buildLease({ ...fakeLeaseFriendOf(), tryCacheLease: undefined } as never, WorldGate))
   })
 })
 
 describe("what a proving shows", () => {
-  it("Object.keys shows its wayinkind and header alone: no key, no wayin, no stamp, no epoch", async () => {
+  it("Object.keys shows its wayinkind and header alone: no key, no wayin, no stamps", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
     expect(Object.keys(proving)).to.deep.equal(['wayinkind', 'header'])

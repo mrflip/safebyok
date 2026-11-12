@@ -3,7 +3,7 @@ import * as Phrases from './phrases'
 import { StrongVerdict, type StrengthChecker } from './passphrase-strength'
 import { objCheck } from './validator'
 import * as CX from '../shapes/shapes-core'
-import type { VaultScope } from '../shapes/shapes-core'
+import type { BankScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
 import type { PassphraseVerdict } from '../shapes/shapes-gateish'
 
@@ -18,8 +18,8 @@ export const MinZxcvbnScore = 3
 
 // == [The checker]: checkerArgs, graphemeCount, makeZxcvbnStrengthChecker, zxcvbnStrengthChecker
 
-/** What the checker is handed: the passphrase as typed, and the scope of its vault. */
-const checkerArgs = objCheck(({ passphraseCleartext, vaultScope }) => ({ typed: passphraseCleartext, scope: vaultScope }), 'bad_option', [GX, CX])
+/** What the checker is handed: the passphrase as typed, and the scope of its bank. */
+const checkerArgs = objCheck(({ passphraseCleartext, bankScope }) => ({ typed: passphraseCleartext, scope: bankScope }), 'bad_option', [GX, CX])
 
 // Intl.Segmenter is missing from browsers before 2024 and from React Native's Hermes; there each code point counts as one.
 /** How many characters `typed` contains, as its reader counts them. */
@@ -39,8 +39,8 @@ function makeZxcvbnStrengthChecker() {
     }
     return judgeLoaded
   }
-  const judgeStrength = async (passphrase: string, vaultScope: VaultScope): Promise<PassphraseVerdict> => {
-    const { typed, scope: { user_id, banklabel, vaultlabel } } = checkerArgs.parse({ typed: passphrase, scope: vaultScope })
+  const judgeStrength = async (passphrase: string, bankScope: BankScope): Promise<PassphraseVerdict> => {
+    const { typed, scope: { user_id, banklabel } } = checkerArgs.parse({ typed: passphrase, scope: bankScope })
     if (graphemeCount(typed) < MinPassphraseChars) { return { strong: false, reason: Phrases.passphraseTooShort(MinPassphraseChars) } }
     let judge: ZxcvbnFactory
     try {
@@ -48,7 +48,7 @@ function makeZxcvbnStrengthChecker() {
     } catch {
       return { strong: false, reason: Phrases.PassphraseUnjudged }
     }
-    const { score } = judge.check(typed, [user_id, banklabel, vaultlabel])
+    const { score } = judge.check(typed, [user_id, banklabel])
     return score >= MinZxcvbnScore ? StrongVerdict : { strong: false, reason: Phrases.PassphraseGuessable }
   }
   const load = async (): Promise<void> => { await loadJudge() }

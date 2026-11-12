@@ -25,7 +25,7 @@ describe("box.patchWhisper", () => {
 
     await box.expose()
     const was = box.whisper
-    const tryPutBox = vi.spyOn(world.mw.vaultDB, 'tryPutBox')
+    const tryPutBox = vi.spyOn(world.mw.bankDB, 'tryPutBox')
     expect(box.patchWhisper({ org: { seats: 4 }, tags: ['c'], added: true })).to.eq(box)
     expect(box.whisper).not.to.eq(was)
     expect(box.whisper).to.deep.equal({ apiKey: Stored.apiKey, org: { name: 'acme', seats: 4 }, tags: ['c'], added: true })
@@ -77,7 +77,7 @@ describe("box.patchWhisper", () => {
     lock()
     const told = vi.fn()
     box.subscribe(told)
-    const tryPutBox = vi.spyOn(world.mw.vaultDB, 'tryPutBox')
+    const tryPutBox = vi.spyOn(world.mw.bankDB, 'tryPutBox')
     expect(box.patchWhisper({ apiKey: 'sk-patched' }).whisper).to.eq(LOCKED)
     expect(told).toHaveBeenCalledOnce()
     expect(tryPutBox).not.toHaveBeenCalled()
