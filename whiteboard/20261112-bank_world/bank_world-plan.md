@@ -84,6 +84,8 @@ The deviceDB's bank row is the device row; `device_id` is `device_tok`. **Levels
 from `Bank.make`; here it is only renamed. `ctx-bytes.test.ts` changes on purpose (the header).
 **Size**: M, mechanical.
 
+*Review:* `fixed` (sonnet, low; [#658](https://github.com/mrflip/safebyok/pull/658)). Style realignment after the longer `device_tok`; the vacate's `#forgetOwnBank` is `#forgetOwnDevice`; VOCABULARY's deviceDB entry and the `device_tok` docs. Left, minor: the `useDeviceTok` and `infoOf` doc wording (a documentarian pass, if the Coach wants one); the old `bank-v001` IndexedDB database, as the changeset says (Cleanup).
+
 ### 3 `bankdb_shapes`
 
 Shapes, asks, answers (`parent`), classifier for bank, gate and vault asks, in the core beside
