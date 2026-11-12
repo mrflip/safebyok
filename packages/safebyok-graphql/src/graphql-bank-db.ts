@@ -5,7 +5,7 @@ import type {
   Answer, BadAnswer, BankListed, BankScope, BoxAnswer, BoxDelAsk, BoxesListed, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxTidyAsk, GateVerbOpts, GoodAnswer, ListAct, Notice, OkAct,
   Tidied, VaultAnswer, VaultDB, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultRecord, VaultRow, WatchScope,
 } from 'safebyok/storage'
-import { VaultOperations } from './vault-operations'
+import { VaultOperations } from './bank-operations'
 
 // == [Options]: GraphQLVaultClient, GraphQLVaultDBOpts, graphQLVaultDBOpts
 

@@ -46,7 +46,7 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
   sockets: `GraphQLVaultDB` over an urql Client posting to Yoga servers, each on its own port and
   hosting a `PostgresVaultDB` over the real Postgres above. It runs where the Postgres tests do, as
   `graphql` in `OnRealPostgres`.
-  * [graphql-vault-db.test.ts](tests/graphql/graphql-vault-db.test.ts) -- the `VaultDB` battery
+  * [graphql-bank-db.test.ts](tests/graphql/graphql-bank-db.test.ts) -- the `VaultDB` battery
     through the network, a browser on one server receiving what a browser on another server puts,
     the server's watch ending when the browser stops watching, and the refusal of a browser signed
     in as another user.

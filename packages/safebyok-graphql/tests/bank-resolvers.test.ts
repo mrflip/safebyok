@@ -10,7 +10,7 @@ import { PostgresVaultDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
 import { VaultSchemaSdl, vaultResolvers } from '../src/server'
 import { GraphQLVaultDB } from '../src/index'
-import { VaultOperations } from '../src/vault-operations'
+import { VaultOperations } from '../src/bank-operations'
 import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
