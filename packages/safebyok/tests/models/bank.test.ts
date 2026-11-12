@@ -1,6 +1,7 @@
 /** The bank of `src/models/` end to end, over a real bankDB and deviceDB: ensureVault, its device row and its snapshot. */
 
 import { describe, expect, it, vi } from 'vitest'
+import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
 import { BankScopeGiven, OtherScopeGiven, VaultScopeGiven, labelsOf, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, byPassphrase } from '../test-helpers/vault-world'
@@ -23,16 +24,27 @@ describe("bank.ensureVault", () => {
   it("puts a vault in a bank unlocked by asking, then returns the same vault without asking again", async () => {
     const { bank, vault } = await makeBankWithVault()
     expect(vault).to.include({ ...BankScopeGiven, ...VaultScopeGiven })
-    expect(vault.isUnlocked).to.be.true
+    expect(bank.isUnlocked).to.be.true
     expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
-    expect(bank.snapshot.vaults[0]?.isLocked).to.be.false
+    expect(bank.snapshot.isLocked).to.be.false
     const seen = vi.fn()
     bank.subscribe(seen)
-    vault.lock()
+    bank.lock()
     expect(seen).toHaveBeenCalled()
-    expect(bank.snapshot.vaults[0]?.isLocked).to.be.true
+    expect(bank.snapshot.isLocked).to.be.true
     expect(await bank.ensureVault(VaultScopeGiven)).to.equal(vault)
-    expect(vault.isLocked).to.be.true
+    expect(bank.isLocked).to.be.true
+  })
+
+  it("refuses 'bank_locked' a vault not yet stored in a locked bank, asking nobody and storing nothing", async () => {
+    const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
+    const { world, bank } = await makeBankWithVault(makeBankWorld(), { requestCleartext })
+    requestCleartext.mockClear()
+    bank.lock()
+    await TH.expectRefusal(bank.ensureVault(OtherScopeGiven), 'bank_locked')
+    expect(requestCleartext).not.toHaveBeenCalled()
+    expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
+    expect(world.bankDB._cheat_shelfOf(BankScopeGiven).vaultrows.size).to.eq(1)
   })
 
   it("refuses while an unlock's gating is open", async () => {
@@ -58,15 +70,15 @@ describe("bank.ensureVault", () => {
     await TH.expectBad(bank.tryEnsureVault(VaultScopeGiven), 'disabled')
   })
 
-  it("unlocks a fresh bank's vault with the device's cached lease, without asking", async () => {
+  it("returns a stored vault in a fresh bank still locked, which unlocks with the device's cached lease without asking", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     const requestCleartext = vi.fn()
     const fresh = await world.bankOn({ requestCleartext })
-    const vault = await fresh.ensureVault(VaultScopeGiven)
-    expect(vault.isLocked).to.be.true
-    await vault.ensureUnlocked()
-    expect(vault.isUnlocked).to.be.true
+    expect(await fresh.ensureVault(VaultScopeGiven)).to.include({ ...VaultScopeGiven, isPresent: true })
+    expect(fresh.isLocked).to.be.true
+    await fresh.ensureUnlocked()
+    expect(fresh.isUnlocked).to.be.true
     expect(requestCleartext).not.toHaveBeenCalled()
   })
 })

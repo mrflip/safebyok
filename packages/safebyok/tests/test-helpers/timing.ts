@@ -136,10 +136,10 @@ const originalOf = new WeakMap<object, AsyncFn>()
  * @returns The latch: await `reached`, then `release()`.
  *
  * @example
- *   const latch = TH.pendingNextCall(vaultDB, 'tryGetVault')
- *   const unlocking = TH.tryUnlock(vault, 'pw')   // now waiting at the latch
+ *   const latch = TH.pendingNextCall(deviceDB, 'peek')
+ *   const unlocking = bank.tryEnsureUnlocked()   // now waiting at the latch
  *   await latch.reached
- *   await vault.lock()                     // called mid-unlock: the unlock refuses, nothing unlocked
+ *   bank.lock()                                  // called while the cached lease is looked up
  *   latch.release()
  */
 export function pendingNextCall<Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) {
@@ -161,10 +161,10 @@ export function pendingNextCall<Target extends object>(target: Target, verb: Asy
  * @returns The latch: await `reached`, then `release()`.
  *
  * @example
- *   const written = TH.pendingNextAnswer(deviceDB, 'tryPutLease')
- *   const unlocking = TH.tryUnlock(vault, 'pw')   // the lease is in the deviceDB; the unlock has not heard
+ *   const written = TH.pendingNextAnswer(deviceDB, 'tryStow')
+ *   const unlocking = bank.tryUnlock()     // the lease is in the deviceDB; the unlock has not heard
  *   await written.reached
- *   await vault.lock()                     // its forget is called after the write
+ *   bank.lock()                            // its forget is called after the write
  *   written.release()
  */
 export function pendingNextAnswer<Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string) {

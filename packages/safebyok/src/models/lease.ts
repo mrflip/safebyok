@@ -108,6 +108,22 @@ export class Lease implements LeaseStamp {
   }
   // --
 
+  // == [Expiry]: expiresAt, tryExpiresAt
+
+  /** When the lease cached on this device is due for locking, in epoch milliseconds, or null where none is cached. */
+  static async expiresAt(friend: LeaseFriend): Promise<number | null> {
+    const checked = leaseFriend.parse(friend)
+    const peeked = await checked.peekLease()
+    if (peeked === null) { return null }
+    const row = leaseRecord.safeParse(peeked)
+    if (! row.success) { throw damagedLease() }
+    return expiryOf(row.data, checked)
+  }
+
+  /** Non-throwing form of {@link expiresAt}. */
+  static tryExpiresAt(friend: LeaseFriend): Promise<Outcome<number | null>> { return outcomeOf(() => this.expiresAt(friend)) }
+  // --
+
   // == [Ending one]: revoke, tryRevoke, forget, tryForget, evict
 
   /** Drop the keys and forget the cached record, so this device is locked. */
@@ -212,8 +228,11 @@ export class Lease implements LeaseStamp {
   get modelkind(): 'lease' { return 'lease' satisfies Modelkind }
 }
 
-// == [Judging the cached record]: isPastAutolock
+// == [Judging the cached record]: expiryOf, isPastAutolock
+
+/** When a row is due for locking: the autolock duration after it was proved. */
+function expiryOf({ proved_at }: LeaseStamp, { leaseMillis }: LeaseFriend): number { return proved_at + leaseMillis }
 
 /** True once a row was proved longer ago than the autolock duration: due for locking, as `bank.autolock` judges it. */
-function isPastAutolock({ proved_at }: LeaseStamp, { leaseMillis }: LeaseFriend): boolean { return nowMillis() - proved_at > leaseMillis }
+function isPastAutolock(row: LeaseStamp, friend: LeaseFriend): boolean { return expiryOf(row, friend) < nowMillis() }
 // --

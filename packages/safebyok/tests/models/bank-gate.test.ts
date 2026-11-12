@@ -14,7 +14,7 @@ import { Promptly } from '../../src/shapes/shapes-vaultish'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import * as TH from '../test-helpers'
 import { isZeroed } from '../test-helpers/proving-world'
-import { Dna, NewPassphrase, Passphrase, Sidecar, Whisper, addPasskeyTyping, bankTyping, bankUnlockTyping, boxlabel, byPasskey, byPassphrase, delTyping, makeBornVault, makeBornVaultWithPasskey, makeWorldWithBox, replaceTyping, revokeTyping, unlockTyping, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
+import { Dna, NewPassphrase, Passphrase, Sidecar, Whisper, addPasskeyTyping, bankTyping, boxlabel, byPasskey, byPassphrase, delTyping, makeBornVault, makeBornVaultWithPasskey, makeWorldWithBox, replaceTyping, revokeTyping, unlockTyping, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -225,16 +225,6 @@ describe("gate.replacePassphrasePrompt()", () => {
     await proveBy(made.bank, Passphrase)
   })
 
-  it("is reached through the Vault's replacePassphrasePrompt", async () => {
-    const born = await makeBornVault()
-    const { gatingAt } = dialogOf(born)
-    const replacing = born.vault.replacePassphrasePrompt()
-    const gating = await gatingAt<'replace_passphrase'>()
-    await TH.expectGood(gating.attempt({ antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }))
-    expect(await replacing).to.equal(born.vault)
-    await proveBy(born.bank, NewPassphrase)
-  })
-
   it("the try form returns the refusal", async () => {
     const born = await makeBornVault()
     born.dialog.requestCleartext = (gating) => { gating.dismiss() }
@@ -411,7 +401,7 @@ describe("bank.delPrompt()", () => {
     const { device, bank, anotherDevice } = await makeBornVault()
     const elsewhereDB = new MemoryDeviceDB()
     const theirs = await anotherDevice(elsewhereDB).ensureBank()
-    await bankUnlockTyping(theirs, byPassphrase(Passphrase))
+    await unlockTyping(theirs, byPassphrase(Passphrase))
     expect(elsewhereDB._cheat_leaseRows().size).to.eq(1)
     await delTyping(bank, Passphrase)
     await TH.eventually(() => ! theirs.isEnabled)
@@ -447,7 +437,7 @@ describe("vault.del()", () => {
     await vault.del(vault)
     const gone = listing.at(vault.scope)
     TH.expectSyncRefusal(() => gone?.demandPresent(), 'vault_gone')
-    expect(gone?.isLocked).to.eq(bank.isLocked)
+    expect(gone?.bank.isLocked).to.eq(bank.isLocked)
   })
 
   it("deletes the vault and its boxes, asking nobody, the bank's lease untouched, the vault standing on as its tombstone", async () => {
@@ -474,7 +464,7 @@ describe("vault.del()", () => {
     const { vault, storedNow } = born
     const ante = storedNow()
     const { shown } = dialogOf(born)
-    vault.lock()
+    vault.bank.lock()
     await TH.expectRefusal(vault.del(vault), 'bank_locked')
     expect(shown).to.have.lengthOf(0)
     expect(storedNow()).to.equal(ante)
@@ -498,7 +488,7 @@ describe("vault.del()", () => {
     const theirs = await anotherSession()
     const their = theirs.vaultAt(Dna)
     if (their === null) { throw new Error('the next session lists no vault') }
-    await their.ensureUnlocked()
+    await their.bank.ensureUnlocked()
     await their.del(their)
     const tombstone = storedNow()
     await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }))
@@ -586,39 +576,39 @@ describe("Changing the gate, with a box sealed before the change", () => {
     await replaceTyping(bank, Passphrase, NewPassphrase)
     expect(bank.isUnlocked).to.be.true
     await vault.putBox({ boxlabel, whisper: NewWhisper, sidecar: Sidecar })
-    vault.lock()
+    bank.lock()
     const second = await openNextSession()
-    await TH.expectRefusal(unlockTyping(second, byPassphrase(Passphrase)), 'wrong_passphrase')
-    await unlockTyping(second, byPassphrase(NewPassphrase))
+    await TH.expectRefusal(unlockTyping(second.bank, byPassphrase(Passphrase)), 'wrong_passphrase')
+    await unlockTyping(second.bank, byPassphrase(NewPassphrase))
     expect(await unsealIn(second)).to.deep.equal(NewWhisper)
-    second.lock()
+    second.bank.lock()
     const third = await openNextSession()
-    await unlockTyping(third, byPasskey('laptop'))
+    await unlockTyping(third.bank, byPasskey('laptop'))
     expect(await unsealIn(third)).to.deep.equal(NewWhisper)
   })
 
   // PasskeyAnswer @example
   it("an added passkey alone unlocks the next session and opens the box sealed before it", async () => {
-    const { bank, vault, unsealIn, openNextSession } = await makeVaultWithBox()
+    const { bank, unsealIn, openNextSession } = await makeVaultWithBox()
     await addPasskeyTyping(bank, Passphrase, 'laptop')
-    vault.lock()
+    bank.lock()
     const again = await openNextSession()
-    await unlockTyping(again, byPasskey('laptop'))
-    expect(again.isUnlocked).to.be.true
+    await unlockTyping(again.bank, byPasskey('laptop'))
+    expect(again.bank.isUnlocked).to.be.true
     expect(await unsealIn(again)).to.deep.equal(Whisper)
   })
 
   it("after the passkey is revoked, only the passphrase unlocks the next session", async () => {
     const { bank, vault, unsealIn, openNextSession } = await makeVaultWithBox(makeBornVaultWithPasskey())
-    vault.lock()
-    await unlockTyping(vault, byPasskey('laptop'))
+    bank.lock()
+    await unlockTyping(vault.bank, byPasskey('laptop'))
     await revokeTyping(bank, Passphrase)
     expect(bank.isUnlocked).to.be.true
     await vault.putBox({ boxlabel, whisper: NewWhisper, sidecar: Sidecar })
-    vault.lock()
+    bank.lock()
     const again = await openNextSession()
-    await TH.expectRefusal(unlockTyping(again, byPasskey('laptop')), 'absent_wayin')
-    await unlockTyping(again, byPassphrase(Passphrase))
+    await TH.expectRefusal(unlockTyping(again.bank, byPasskey('laptop')), 'absent_wayin')
+    await unlockTyping(again.bank, byPassphrase(Passphrase))
     expect(await unsealIn(again)).to.deep.equal(NewWhisper)
   })
 })
@@ -694,7 +684,7 @@ describe("The cached lease across a gate change", () => {
     const again = await anotherSession()
     await TH.expectRefusal(again.ensureUnlocked(), 'dismissed')
     expect(deviceDB.cachedNow()).to.be.null
-    await bankUnlockTyping(again, byPassphrase(NewPassphrase))
+    await unlockTyping(again, byPassphrase(NewPassphrase))
     expect(again.isUnlocked).to.be.true
   })
 
@@ -702,7 +692,7 @@ describe("The cached lease across a gate change", () => {
     const { bank, anotherDevice } = await makeBornVaultWithPasskey()
     const elsewhereDB = new MemoryDeviceDB()
     const theirs = await anotherDevice(elsewhereDB).ensureBank()
-    await bankUnlockTyping(theirs, byPasskey('laptop'))
+    await unlockTyping(theirs, byPasskey('laptop'))
     await revokeTyping(bank, Passphrase)
     const again = await anotherDevice(elsewhereDB).ensureBank()
     expect(elsewhereDB._cheat_leaseRows().size).to.eq(1)

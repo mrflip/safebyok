@@ -40,8 +40,8 @@ describe("A refused forget of the lease row", () => {
     const onLifecycle = vi.fn((told: { kind: string }) => (told.kind === 'lease_revoke_failed' ? Promise.reject(new Error('the host broke')) : undefined))
     const { bank, vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onLifecycle })
     deviceDB.forget.mockRejectedValueOnce(Refusal)
-    vault.lock()
-    expect(vault.isLocked).to.be.true
+    bank.lock()
+    expect(bank.isLocked).to.be.true
     await TH.eventually(() => reported.mock.calls.length === 1)
     expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', refusal: Refusal, bank, where: 'lock' }))
     expect(bank.isEnabled).to.be.true
@@ -54,7 +54,7 @@ describe("A refused forget of the lease row", () => {
       const spy = TH.spyLogger()
       const { bank, vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { logger: parseLogger(spy.logger) })
       deviceDB.forget.mockRejectedValue(Refusal)
-      vault.lock()
+      bank.lock()
       await TH.eventually(() => ! bank.isEnabled)
       expect(vault.isEnabled).to.be.false
       expect(deviceDB.forget).toHaveBeenCalledTimes(2)
@@ -67,7 +67,7 @@ describe("A refused forget of the lease row", () => {
     const spy = TH.spyLogger()
     const { bank, vault, listing, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { logger: parseLogger(spy.logger) })
     deviceDB.forget.mockRejectedValue(Refusal)
-    vault.lock()
+    bank.lock()
     await TH.eventually(() => reported.mock.calls.length === 2)
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error', 'error'])
     expect(reported).toHaveBeenCalledWith(Refusal)
@@ -97,7 +97,7 @@ describe("the device's sweep and vacate, as its bank, vault and boxes meet them"
     deviceDB.peek.mockClear()
     bank.device.sweep()
     expect(bank).to.include({ isLocked: true, isEnabled: false })
-    expect(vault).to.include({ isLocked: true, isEnabled: false })
+    expect(vault.isEnabled).to.be.false
     expect(box.isEnabled).to.be.false
     expect(box.whisper).to.equal(ENCRYPTED)
     expect(deviceDB.cachedNow()).not.to.be.null
@@ -106,10 +106,10 @@ describe("the device's sweep and vacate, as its bank, vault and boxes meet them"
   })
 
   it("the device's vacate also forgets the cached lease row, and leaves the bankDB untouched", async () => {
-    const { bank, vault, box, deviceDB, demandStored } = await makeVaultWithBox()
+    const { bank, box, deviceDB, demandStored } = await makeVaultWithBox()
     const stored = demandStored()
     void bank.device.vacate()
-    expect(vault.isLocked).to.be.true
+    expect(bank.isLocked).to.be.true
     expect(box.isEnabled).to.be.false
     await TH.eventually(() => deviceDB.cachedNow() === null)
     expect(demandStored()).to.eq(stored)
@@ -123,10 +123,9 @@ describe("the device's sweep and vacate, as its bank, vault and boxes meet them"
     TH.expectSyncRefusal(() => box.demandPuttable({ whisper: { apiKey: 'sk-test' } }))
     TH.expectSyncRefusal(() => box.demandUnsealable())
     TH.expectSyncRefusal(() => box.demandExposable())
-    await TH.expectRefusal(unlockTyping(vault, byPassphrase(Passphrase)))
+    await TH.expectRefusal(unlockTyping(bank, byPassphrase(Passphrase)))
     await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }))
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp))
-    expect(vault.lock()).to.equal(vault)
     expect(bank.lock()).to.equal(bank)
     expect(box.alignLock()).to.equal(box)
     expect(deviceDB.forget).not.toHaveBeenCalled()
@@ -167,8 +166,8 @@ describe("the device's sweep and vacate, as its bank, vault and boxes meet them"
   })
 
   it("ensureUnlocked refuses without showing a dialog when the device's sweep lands during its lease lookup", async () => {
-    const { bank, vault, dialog, deviceDB } = await makeBornVault()
-    vault.lock()
+    const { bank, dialog, deviceDB } = await makeBornVault()
+    bank.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
     const requestCleartext = vi.fn()
     dialog.requestCleartext = requestCleartext
@@ -176,7 +175,7 @@ describe("the device's sweep and vacate, as its bank, vault and boxes meet them"
       bank.device.sweep()
       return Promise.resolve(null)
     })
-    await TH.expectRefusal(vault.ensureUnlocked())
+    await TH.expectRefusal(bank.ensureUnlocked())
     expect(requestCleartext).not.toHaveBeenCalled()
   })
 
@@ -209,13 +208,13 @@ describe("the device's sweep and vacate, as its bank, vault and boxes meet them"
 
   it("a listener's throw goes to reportError, and the device's sweep still goes through", async () => {
     const reported = stubReportError()
-    const { vault } = await makeBornVault()
+    const { bank, vault } = await makeBornVault()
     vault.becomeNotifiable()
     const thrown = new Error('the listener threw')
     vault.subscribe(() => { throw thrown })
-    vault.lock()
+    bank.lock()
     expect(reported).toHaveBeenCalledWith(thrown)
-    vault.bank.device.sweep()
+    bank.device.sweep()
     expect(vault.isEnabled).to.be.false
   })
 })

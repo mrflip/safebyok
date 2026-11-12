@@ -271,7 +271,7 @@ describe("vault.putBox over a live box", () => {
 
   it("refuses opts before any guard", async () => {
     const { vault } = await makeWorldWithBox()
-    vault.lock()
+    vault.bank.lock()
     await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }, { ifPresent: 'shrug' } as never))
   })
 })
@@ -315,7 +315,7 @@ describe("a sidecar-only put", () => {
     expect(box.whisper).to.eq(ENCRYPTED)
     await TH.expectRefusal(box.put({ whisper: box.whisper, sidecar: {} }))
     await box.expose()
-    vault.lock()
+    vault.bank.lock()
     expect(box.whisper).to.eq(LOCKED)
     await TH.expectRefusal(box.put({ whisper: box.whisper, sidecar: {} }))
     expect(tryPutBox).not.toHaveBeenCalled()
@@ -324,10 +324,10 @@ describe("a sidecar-only put", () => {
   it("refuses box.whisper read while locked, even after the unlock", async () => {
     const { vault, box, tryPutBox } = await makeWorldWithBox()
     await box.expose()
-    vault.lock()
+    vault.bank.lock()
     const readWhileLocked = box.whisper
     expect(readWhileLocked).to.eq(LOCKED)
-    await unlockTyping(vault, byPassphrase(Passphrase))
+    await unlockTyping(vault.bank, byPassphrase(Passphrase))
     tryPutBox.mockClear()
     await TH.expectRefusal(box.put({ whisper: readWhileLocked }))
     await TH.expectRefusal(box.put({ whisper: { ...readWhileLocked } }))
@@ -340,8 +340,8 @@ describe("a sidecar-only put", () => {
     await box.put({ whisper: { apiKey: 'sk-test-0000' } })
     await box.expose()
     const kept = box.whisper as { apiKey: string }
-    vault.lock()
-    await unlockTyping(vault, byPassphrase(Passphrase))
+    vault.bank.lock()
+    await unlockTyping(vault.bank, byPassphrase(Passphrase))
     kept.apiKey = 'sk-test-edited'
     await box.put({ whisper: kept })
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-edited' })
@@ -363,7 +363,7 @@ describe("a sidecar-only put", () => {
 
   it("refuses 'bank_locked' while locked, putting nothing", async () => {
     const { vault, box, tryPutBox } = await makeWorldWithBox()
-    vault.lock()
+    vault.bank.lock()
     tryPutBox.mockClear()
     await TH.expectRefusal(box.put({ sidecar: { note: 'home' } }), 'bank_locked')
     expect(tryPutBox).not.toHaveBeenCalled()
@@ -383,7 +383,7 @@ describe("extractWhisper", () => {
 
   it("refuses 'bank_locked' once locked", async () => {
     const { vault, box } = await makeWorldWithBox()
-    vault.lock()
+    vault.bank.lock()
     await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
   })
 })

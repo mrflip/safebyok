@@ -79,12 +79,12 @@ describe("bank.tryProbe", () => {
     expect(await whisperIn(bank, 'main', 'trial')).to.deep.equal({ token: 'sk-test-0000' })
   })
 
-  it("asks the user for a vault that is locked, and opens it", async () => {
+  it("asks the user to unlock a locked bank, and unlocks it", async () => {
     const { bank } = await readyBankOn()
     await TH.expectGood(bank.tryProbe())
-    bank.vaultAt({ vaultlabel: 'home' })?.lock()
+    bank.lock()
     await TH.expectGood(bank.tryProbe())
-    expect(bank.vaultAt({ vaultlabel: 'home' })?.isUnlocked).to.be.true
+    expect(bank.isUnlocked).to.be.true
   })
 
   it("replaces a box another device changed, once its record is past maxMillisSinceRefresh", async () => {

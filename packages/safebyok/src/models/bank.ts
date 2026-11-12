@@ -204,13 +204,13 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     return this
   }
 
-  /** Lock the bank where the lease cached on this device was proved longer ago than autolock. Call it after `ensureBank` and on your own timer.
-   * A best-effort reminder, not a guarantee: a refused peek is told as bad news.
+  /** Lock the bank where the lease cached on this device has expired. Call it after `ensureBank` and on your own timer.
+   * A best-effort reminder, not a guarantee: a cache that refuses or a row that will not read is told as bad news.
    */
   async autolock(): Promise<void> {
-    const peeked = await this.deviceDB.tryPeek({ ...this.scope, bank_tok: this.bank_tok })
-    if (! peeked.ok) { this.device.tellBadNews([peeked.err]); return }
-    if ((peeked.val !== null) && (peeked.val.proved_at < nowMillis() - this.leaseMillis)) { this.lock() }
+    const expiring = await Lease.tryExpiresAt(this.#leaseFriendOf())
+    if (! expiring.ok) { this.device.tellBadNews([expiring.err]); return }
+    if ((expiring.val !== null) && (expiring.val < nowMillis())) { this.lock() }
   }
 
   /** Drops any lease granted and forgets the row cached on this device, announcing a failed revoke at `where`. */

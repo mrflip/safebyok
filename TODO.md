@@ -539,6 +539,21 @@ logging, key derivation and passkey recipes have no new home either, and describ
 `size-limit`, its `.size-limit.json` and `pnpm size:budget` were removed on 2026-11-09 as a distraction (the Coach: "we can add it later"). The removal
 also took out the CI step and the per-thread budget rule in `PROCESS.md`.
 
+### Gates visible to hosts, and things that stand for their scope while the Bank is remade
+
+After the bank_world sprint ([#677](https://github.com/mrflip/safebyok/pull/677)), a host reaches a Gate through `bank.maingate`, and a Vault, Box or
+Gate stands for its scope through its lives while the Device remakes the Bank. The Coach (2026-11-12): "with Bank now being a singleton owned by
+device, I hope to get rid of replacement altogether -- will evaluate and execute that after the sprint ... Don't rip out remake either way."
+Evaluate whether a Bank, one per device, needs replacing at all; until that is decided, the remake stays.
+
+### A bank-level vacate
+
+The Coach (2026-11-12): "bank should get vacate at some point; is there a reason it can't go on storable -- vacate myself, vacate my protected getter
+`children():Listing` -- now that bank vault and box look more alike?" The answer so far: thread 10 ([#677](https://github.com/mrflip/safebyok/pull/677))
+removed the per-thing vacate so that the device's enabled flag is the only one. A `bank.vacate()` could be the public name of the Bank's existing end
+path (its lease revoked, its vault listing let go), which would also clear an ended Bank's snapshot of its vaults (#677's other open row). Putting
+vacate on `Storable` with `children()` would bring back per-thing ended state; that is the cost to weigh.
+
 ## Potential Optimizations
 
 ### A storage read begun before a create can undo it

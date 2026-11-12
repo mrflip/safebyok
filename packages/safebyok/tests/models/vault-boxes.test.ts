@@ -38,7 +38,7 @@ describe("vault.beginWatch", () => {
     const world = await makeWorldWithBox()
     const nextBank = await world.anotherSession()
     const next = nextBank.vaultAt(Dna)!
-    expect(next.isLocked).to.be.true
+    expect(next.bank.isLocked).to.be.true
     await next.beginWatch()
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)
     const box = (await next.getBox(boxlabel))!
@@ -90,7 +90,7 @@ describe("the box methods refuse a locked or deleted vault", () => {
     if (refusesLocked) {
       it(`${verb} refuses 'bank_locked' while locked`, async () => {
         const { vault } = await makeWorld()
-        vault.lock()
+        vault.bank.lock()
         await TH.expectRefusal(call(vault), 'bank_locked')
       })
     }
@@ -104,30 +104,30 @@ describe("the box methods refuse a locked or deleted vault", () => {
 
   it("getBox and fetchBox return the box while locked", async () => {
     const { vault, box } = await makeWorldWithBox()
-    vault.lock()
+    vault.bank.lock()
     await expect(vault.getBox(boxlabel)).resolves.to.eq(box)
     await expect(vault.fetchBox(boxlabel)).resolves.to.eq(box)
   })
 
   it("a refused put's whisper does not appear in the refusal", async () => {
     const { vault } = await makeWorld()
-    vault.lock()
+    vault.bank.lock()
     const err = await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }), 'bank_locked')
     expect(JSON.stringify(err.meta ?? {})).not.to.include(Whisper)
     expect(err.message).not.to.include(Whisper)
   })
 })
 
-describe("a box listed, through its vault's lock and unlock", () => {
-  it("shows the vault's lock on its snapshot, notifying its listener once each way", async () => {
-    const { vault, box } = await makeWorldWithBox()
+describe("a box listed, through its bank's lock and unlock", () => {
+  it("shows the bank's lock on its snapshot, notifying its listener once each way", async () => {
+    const { bank, box } = await makeWorldWithBox()
     const listener = vi.fn()
     box.subscribe(listener)
     expect(box.getSnapshot().isLocked).to.be.false
-    vault.lock()
+    bank.lock()
     expect(box.getSnapshot().isLocked).to.be.true
     expect(listener).toHaveBeenCalledTimes(1)
-    await unlockTyping(vault, byPassphrase(Passphrase))
+    await unlockTyping(bank, byPassphrase(Passphrase))
     expect(box.getSnapshot().isLocked).to.be.false
     expect(listener).toHaveBeenCalledTimes(2)
   })

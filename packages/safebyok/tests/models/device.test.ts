@@ -22,7 +22,7 @@ const nothing = (): void => undefined
 
 /** `news`, told as bad news by `bank`: its autolock, whose peek at the cached lease `world`'s deviceDB refuses with it. */
 async function tellByAutolock(world: ReturnType<typeof makeBankWorld>, bank: Bank, news: VaultError): Promise<void> {
-  vi.spyOn(world.deviceDB, 'tryPeek').mockResolvedValueOnce({ ok: false, err: news })
+  vi.spyOn(world.deviceDB, 'peek').mockRejectedValueOnce(news)
   await bank.autolock()
 }
 
@@ -159,7 +159,7 @@ describe("device.ensureBank", () => {
     const bank = await world.bankOnAnotherDevice({ requestCleartext })
     expect(requestCleartext).not.toHaveBeenCalled()
     expect(labelsOf(bank.snapshot)).to.deep.equal([OtherScopeGiven.vaultlabel])
-    expect(bank.vaultAt(OtherScopeGiven)?.isLocked).to.be.true
+    expect(bank.isLocked).to.be.true
     expect(bank.vaultAt(VaultScopeGiven)?.isPresent).to.be.false
   })
 
@@ -265,7 +265,7 @@ describe("device.ensureBank", () => {
     const reborn = await bank.ensureVault(VaultScopeGiven)
     expect(reborn).to.equal(listed)
     expect(reborn.isPresent).to.be.true
-    expect(reborn.isUnlocked).to.be.true
+    expect(bank.isUnlocked).to.be.true
     expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
   })
 })
@@ -518,8 +518,8 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     vi.spyOn(world.deviceDB, 'peek').mockResolvedValueOnce({ ...cached, gate_revision_tok: 'rev-other' } as never)
     vi.spyOn(world.deviceDB, 'forget').mockRejectedValueOnce(new VaultError('storage_unavailable', 'the datastore is down'))
     const page = await world.bankOn({ logger })
-    const unlocked = await page.vaultAt(VaultScopeGiven)?.ensureUnlocked()
-    expect(unlocked?.isUnlocked).to.be.true
+    await page.ensureUnlocked()
+    expect(page.isUnlocked).to.be.true
     expect(warn).toHaveBeenCalledWith('the datastore is down', expect.objectContaining({ oplabel: 'Device.onLifecycle' }), undefined)
   })
 
@@ -530,9 +530,9 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     const { bank, vault } = await makeBankWithVault(world, { onBadNews, logger: spy.logger })
     const [news, revoked] = [new VaultError('storage_unavailable', 'the device database is down'), new VaultError('identity_revoked', 'the host says no')]
     for (const peekRefusal of [news, revoked]) {
-      vault.lock()
+      bank.lock()
       vi.spyOn(world.deviceDB, 'peek').mockRejectedValueOnce(peekRefusal)
-      await vault.ensureUnlocked()
+      await bank.ensureUnlocked()
       expect(onBadNews).toHaveBeenLastCalledWith({ news: peekRefusal, device: bank.device })
       expect(vault.isEnabled).to.be.true
     }
@@ -627,7 +627,7 @@ async function deviceWaitingOnUnlock() {
   const device = world.deviceOnAnotherDevice({ requestCleartext: undefined })
   const bank = await device.ensureBank()
   const vault = bank.vaultAt(VaultScopeGiven)!
-  const unlocking = vault.ensureUnlocked()
+  const unlocking = bank.ensureUnlocked()
   const gating = await vi.waitFor(() => device.snapshot.openGating ?? fail("no gating yet"), { interval: 1 })
   return { world, device, bank, vault, unlocking, gating }
 }
@@ -668,8 +668,7 @@ describe("the snapshot's open gating", () => {
     gating.dismiss()
     await TH.expectRefusal(unlocking, 'dismissed')
     expect(seen).to.deep.equal([null])
-    const bornOver = bank.vaultAt(VaultScopeGiven)!
-    const again = bornOver.ensureUnlocked()
+    const again = bank.ensureUnlocked()
     await vi.waitFor(() => device.snapshot.openGating ?? fail("no gating yet"), { interval: 1 })
     expect(seen).to.have.lengthOf(2)
     device.snapshot.openGating?.dismiss()
@@ -699,13 +698,9 @@ describe("the snapshot's open gating", () => {
     ["a vacate of the device",  ({ device }) => { void device.vacate() }],
   ]
 
-  // The gating asks for the bank, so an end of the vault waiting on it leaves it open.
-  it.each([
-    ["a lock of its vault",   ({ vault }: Made) => { vault.lock() }],
-    ["a lock of the bank",    ({ bank }: Made)  => { bank.lock() }],
-  ] as const)("keeps the gating through %s", async (_label, lockIt) => {
-    const { device, bank, vault, gating, unlocking } = await deviceWaitingOnUnlock()
-    lockIt({ device, bank, vault })
+  it("keeps the gating through a lock of the bank", async () => {
+    const { device, bank, gating, unlocking } = await deviceWaitingOnUnlock()
+    bank.lock()
     expect(device.snapshot.openGating).to.equal(gating)
     gating.dismiss()
     await TH.expectRefusal(unlocking)
@@ -739,7 +734,7 @@ describe("the snapshot's open gating", () => {
     const pending = pendingDeriver()
     const device = world.deviceOnAnotherDevice({ requestCleartext: undefined, keyDeriver: pending.deriver })
     const bank = await device.ensureBank()
-    const unlocking = (bank.vaultAt(VaultScopeGiven)!).ensureUnlocked()
+    const unlocking = bank.ensureUnlocked()
     const gating = await vi.waitFor(() => device.snapshot.openGating ?? fail("no gating yet"), { interval: 1 })
     const attempting = gating.attempt(byPassphrase(Passphrase))
     await vi.waitFor(() => pending.isAsked() || fail("not derived yet"), { interval: 1 })
@@ -756,8 +751,8 @@ describe("the snapshot's open gating", () => {
     await TH.wakeupAtNextTick()
     expect(gating.isOpen).to.be.true
     await TH.expectGood(gating.attempt(byPassphrase(Passphrase)))
-    const vault = await unlocking
-    expect(vault.isUnlocked).to.be.true
+    const unlocked = await unlocking
+    expect(unlocked.isUnlocked).to.be.true
     expect(device.snapshot.openGating).to.be.null
   })
 

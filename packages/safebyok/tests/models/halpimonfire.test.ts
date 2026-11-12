@@ -40,17 +40,17 @@ describe("a lock() called during a put", () => {
 describe("A lock called while an unlock proves", () => {
   it("leaves the vault unlocked", async () => {
     const { vault, deviceDB, dialog } = await makeBornVault()
-    vault.lock()
+    vault.bank.lock()
     dialog.requestCleartext = async (gating) => {
       const attempting = (gating as Gating<'unlock_bank'>).attempt({ passphraseClear: Passphrase })
-      vault.lock()
+      vault.bank.lock()
       await attempting
     }
-    await vault.ensureUnlocked()
-    expect(vault.isUnlocked).to.be.true
+    await vault.bank.ensureUnlocked()
+    expect(vault.bank.isUnlocked).to.be.true
     expect(deviceDB.tryStow).toHaveBeenCalledTimes(2)
-    vault.lock()
-    expect(vault.isUnlocked).to.be.false
+    vault.bank.lock()
+    expect(vault.bank.isUnlocked).to.be.false
   })
 })
 
@@ -58,7 +58,7 @@ describe("A lock called during a box verb", () => {
   it("during hello lets it resolve, and the next putBox refuses 'bank_locked'", async () => {
     const { vault, bankDB } = await makeBornVault()
     const tryListBoxes = bankDB.tryListBoxes.bind(bankDB)
-    vi.spyOn(bankDB, 'tryListBoxes').mockImplementationOnce((...args) => { vault.lock(); return tryListBoxes(...args) })
+    vi.spyOn(bankDB, 'tryListBoxes').mockImplementationOnce((...args) => { vault.bank.lock(); return tryListBoxes(...args) })
     await expect(vault.beginWatch()).resolves.to.eq(vault)
     await TH.expectRefusal(vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } }), 'bank_locked')
   })
@@ -67,7 +67,7 @@ describe("A lock called during a box verb", () => {
     const { vault, bankDB } = await makeBornVault()
     await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
     const tryGetBox = bankDB.tryGetBox.bind(bankDB)
-    vi.spyOn(bankDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.lock(); return tryGetBox(...args) })
+    vi.spyOn(bankDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.bank.lock(); return tryGetBox(...args) })
     const box = (await vault.fetchBox('anthropic_api_key'))!
     await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
   })
@@ -76,7 +76,7 @@ describe("A lock called during a box verb", () => {
     const { vault, bankDB } = await makeBornVault()
     const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
     const tryGetBox = bankDB.tryGetBox.bind(bankDB)
-    vi.spyOn(bankDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.lock(); return tryGetBox(...args) })
+    vi.spyOn(bankDB, 'tryGetBox').mockImplementationOnce((...args) => { vault.bank.lock(); return tryGetBox(...args) })
     await TH.expectRefusal(box.extractWhisper({ maxMillisSinceRefresh: 0 }), 'bank_locked')
   })
 
@@ -84,7 +84,7 @@ describe("A lock called during a box verb", () => {
     const { vault } = await makeBornVault()
     const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
     const decrypt = crypto.subtle.decrypt.bind(crypto.subtle)
-    vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce((...args) => { vault.lock(); return decrypt(...args) })
+    vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce((...args) => { vault.bank.lock(); return decrypt(...args) })
     await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
     vi.restoreAllMocks()
   })
@@ -93,10 +93,10 @@ describe("A lock called during a box verb", () => {
     const { vault, bankDB } = await makeBornVault()
     await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-test-0000' } })
     const tryDelBox = bankDB.tryDelBox.bind(bankDB)
-    vi.spyOn(bankDB, 'tryDelBox').mockImplementationOnce((...args) => { vault.lock(); return tryDelBox(...args) })
+    vi.spyOn(bankDB, 'tryDelBox').mockImplementationOnce((...args) => { vault.bank.lock(); return tryDelBox(...args) })
     const gone = await vault.delBox('anthropic_api_key')
     expect(gone?.isPresent).to.be.false
-    expect(vault.isLocked).to.be.true
+    expect(vault.bank.isLocked).to.be.true
   })
 })
 

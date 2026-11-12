@@ -73,14 +73,11 @@ async function askTyping<ValT>(device: Device, typing: Typing, ask: () => Promis
 /** `device.ensureBank()`, the user doing `typing` at the dialog, should the bank be built. */
 export function bankTyping(device: Device, typing: Typing): Promise<Bank> { return askTyping(device, typing, () => device.ensureBank()) }
 
-/** `vault.ensureUnlocked()`, the user doing `typing` at the dialog, should it be shown. */
-export function unlockTyping(vault: Vault, typing: Typing): Promise<Vault> { return askTyping(deviceOf(vault), typing, () => vault.ensureUnlocked()) }
-
-/** `vault.unlock()` itself, the user doing `typing` at the dialog. */
-export function unlockVerbTyping(vault: Vault, typing: Typing): Promise<Vault> { return askTyping(deviceOf(vault), typing, () => vault.unlock()) }
-
 /** `bank.ensureUnlocked()`, the user doing `typing` at the dialog, should it be shown. */
-export function bankUnlockTyping(bank: Bank, typing: Typing): Promise<Bank> { return askTyping(bank.device, typing, () => bank.ensureUnlocked()) }
+export function unlockTyping(bank: Bank, typing: Typing): Promise<Bank> { return askTyping(bank.device, typing, () => bank.ensureUnlocked()) }
+
+/** `bank.unlock()` itself, the user doing `typing` at the dialog. */
+export function unlockVerbTyping(bank: Bank, typing: Typing): Promise<Bank> { return askTyping(bank.device, typing, () => bank.unlock()) }
 
 /** `bank.maingate.replacePassphrasePrompt()`, the user typing `ante` as the passphrase it has and `next` as the new one. */
 export function replaceTyping(bank: Bank, ante: string, next: string): Promise<Gate> {
@@ -98,12 +95,9 @@ export function revokeTyping(bank: Bank, passphrase: string): Promise<Gate> { re
 /** `bank.delPrompt()`, the user typing `passphrase`. */
 export function delTyping(bank: Bank, passphrase: string): Promise<Bank> { return askTyping(bank.device, byPassphrase(passphrase), () => bank.delPrompt()) }
 
-/** The device whose bank `vault` is of. */
-function deviceOf(vault: Vault): Device { return vault.bank.device }
-
-/** `vault.del(vault)` once `ensureUnlocked` has unlocked it, which these tests expect to do by the lease cached on this device. */
+/** `vault.del(vault)` once its bank's `ensureUnlocked` has unlocked it, which these tests expect to do by the lease cached on this device. */
 export async function delUnlocked(vault: Vault): Promise<Vault> {
-  await vault.ensureUnlocked()
+  await vault.bank.ensureUnlocked()
   return vault.del(vault)
 }
 
@@ -286,7 +280,7 @@ export async function makeWorld(worldOverrides: VaultWorldGiven = {}) {
     const bank = await world.anotherSession()
     const vault = bank.vaultAt(Dna)
     if (vault === null) { throw new Error('the next session lists no vault') }
-    await unlockTyping(vault, byPassphrase(Passphrase))
+    await unlockTyping(bank, byPassphrase(Passphrase))
     return vault
   }
   return { ...world, boxrows, tryListBoxes, tryPutBox, tryGetBox, openNextSession }

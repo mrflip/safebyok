@@ -117,7 +117,8 @@ describe("a box answer carrying a vault row of a later life as its parent", () =
     await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }), 'disabled')
     expect(boxes.isEnabled).to.be.false
     expect(listing.at(Dna)).to.eq(vault)
-    expect(vault).to.include({ vault_tok: anew.vault_tok, isPresent: true, isLocked: true, isEnabled: true })
+    expect(vault).to.include({ vault_tok: anew.vault_tok, isPresent: true, isEnabled: true })
+    expect(vault.bank.isLocked).to.be.true
     expect(vault.boxListing).to.not.eq(boxes)
     expect(badnews).to.deep.equal([])
   })
@@ -327,10 +328,10 @@ describe("the entrypoints, given malformed input", () => {
 describe("lock() with a forget that throws synchronously", () => {
   it("locks without throwing, and reports the refused forget to onLifecycle", async () => {
     const onLifecycle = vi.fn<(told: { kind: string }) => void>()
-    const { bank, vault, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onLifecycle })
+    const { bank, deviceDB } = await makeBornVault(byPassphrase(Passphrase), { onLifecycle })
     deviceDB.forget.mockImplementationOnce(() => { throw new Error('the duck is broken') })
-    expect(() => vault.lock()).to.not.throw()
-    expect(vault.isLocked).to.be.true
+    expect(() => bank.lock()).to.not.throw()
+    expect(bank.isLocked).to.be.true
     await forgotten()
     expect(onLifecycle.mock.calls.filter(([told]) => told.kind === 'lease_revoke_failed')).to.have.lengthOf(1)
     expect(onLifecycle).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lease_revoke_failed', bank, where: 'lock' }))
@@ -344,7 +345,7 @@ describe("a damaged row", () => {
     await TH.expectRefusal(listing.get(Dna, { maxMillisSinceRefresh: 0 }), 'damaged_row')
     expect(listing.at(Dna)).to.eq(vault)
     expect(vault.isPresent).to.be.true
-    expect(vault.isLocked).to.be.false
+    expect(vault.bank.isLocked).to.be.false
   })
 })
 
@@ -395,7 +396,7 @@ describe("the listing's methods return the bankDB's answer", () => {
 
   it("tryDel returns the del's act, with the vault listed under its tombstone as its val", async () => {
     const { vault, listing } = await makeBornVault()
-    vault.lock()
+    vault.bank.lock()
     const ante = vault.sparse
     const answer = await listing.tryDel(ante)
     expect(answer).to.deep.include({ ok: true, act: 'deleted', val: vault })
