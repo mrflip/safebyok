@@ -2,7 +2,7 @@
 
 import { isEqual } from 'es-toolkit'
 import { UNANSWERED } from '../helpers/consts'
-import { checkedConsistent } from '../helpers/validator'
+import { isConsistent } from '../helpers/validator'
 import { oneAtATime } from '../helpers/one-at-a-time'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { type Notice as VaultDBNotice, type VaultDB, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
@@ -11,9 +11,8 @@ import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingDelOpts, ListingListAnswer, ListingPutAnswer, ListingPutOpts, ListingOpts, ListingWorld, ListingGetAnswer, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
-import { instanceDisabled, oneRevisionTwoFates, oneRevisionTwoLives, otherVaultTok, rowOfOtherVaultTok, storageIssue, unexpectedError } from '../refusals/throwers'
-import * as Phrases from '../helpers/phrases'
-import { outcomeOf, valOf } from '../refusals/outcome'
+import { deliveredNotAsSent, instanceDisabled, nothingStoredWhereLive, oneRevisionTwoFates, oneRevisionTwoLives, otherVaultTok, refusalOfDelivering, rowOfOtherVaultTok, storageIssue } from '../refusals/throwers'
+import { valOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
 import { type Storable, cmpRevisions } from './storable'
 
@@ -311,13 +310,16 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected deliver(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null
   protected deliver(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null {
     this.demandEnabled()
-    if (answer.world !== null) { this.world.receiveWorld(answer.world) }
-    if (answer.ok) { return this.#carryOut(this.#deliveringOf(answer, sent)) }
-    // A refusal's stored record is received for what it tells; whatever receiving it meets is bad news, and the refusal is thrown.
-    // All of it runs before the next await, so a revoked identity panics before any other answer is delivered.
+    if (answer.ok) {
+      if (answer.world !== null) { this.world.receiveWorld(answer.world) }
+      return this.#carryOut(this.#deliveringOf(answer, sent))
+    }
+    // A refusal's world and stored record are received for what they tell; whatever receiving them meets is bad news, and
+    // the refusal is thrown. All of it runs before the next await, so a revoked identity panics before any other answer is delivered.
     try {
+      if (answer.world !== null) { this.world.receiveWorld(answer.world) }
       this.#carryOut(this.#deliveringOf(answer, sent))
-    } catch (err) { this.bankFriend.tellBadNews([isVaultError(err) ? err : unexpectedError(err)]) }
+    } catch (err) { this.bankFriend.tellBadNews([err]) }
     this.panicIfRevoked(answer.err)
     throw answer.err
   }
@@ -328,19 +330,21 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    * nothing is stored where a live instance is listed.
    */
   #deliveringOf(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Delivering<Fetched<RecordT, SparseT>, ThingT> {
-    const fielding = deliverableFieldingTagOf[answer.act]
-    if (fielding === 'none') { return { making: 'none' } }
-    const scope    = this.scopeOf(sent)
-    const listed   = this.at(scope)
-    if (fielding === 'void') {
-      if (listed === null)  { return { making: 'none' } }
-      if (listed.isPresent) { throw oneRevisionTwoFates() }
-      return { making: 'listed', listed, mod: 'same' }
-    }
-    const record = (answer.ok ? answer.val : answer.dbhas) as Fetched<RecordT, SparseT>
-    const pins   = (fielding === 'as_sent') ? { ...scope, ...SX.revisionPins.parse(sent) } : scope
-    checkedConsistent(record, pins, { kind: 'storage_issue', message: (fielding === 'as_db') ? Phrases.RecordOfOtherScope : Phrases.AnswerNotAsSent })
-    return this.#deliveringOfRecord(record)
+    try {
+      const fielding = deliverableFieldingTagOf[answer.act]
+      if (fielding === 'none') { return { making: 'none' } }
+      const scope    = this.scopeOf(sent)
+      const listed   = this.at(scope)
+      if (fielding === 'void') {
+        if (listed === null)  { return { making: 'none' } }
+        if (listed.isPresent) { throw nothingStoredWhereLive() }
+        return { making: 'listed', listed, mod: 'same' }
+      }
+      const record = (answer.ok ? answer.val : answer.dbhas) as Fetched<RecordT, SparseT>
+      const pins   = (fielding === 'as_sent') ? { ...scope, ...SX.revisionPins.parse(sent) } : scope
+      if (! isConsistent(record, pins)) { throw deliveredNotAsSent(fielding, record, pins) }
+      return this.#deliveringOfRecord(record)
+    } catch (err) { throw refusalOfDelivering(err, answer) }
   }
 
   // The receive table of `notes/receive-contract.md`, read once: the first row that matches wins. A vault listing makes
@@ -352,7 +356,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    */
   #deliveringOfRecord(record: Fetched<RecordT, SparseT>): Delivering<Fetched<RecordT, SparseT>, ThingT> {
     const vault_tok = this.vaultTokOfWorld()
-    if ((vault_tok !== null) && (record.vault_tok !== vault_tok)) { throw rowOfOtherVaultTok() }
+    if ((vault_tok !== null) && (record.vault_tok !== vault_tok)) { throw rowOfOtherVaultTok(record) }
     const listed     = this.at(this.scopeOf(record))
     if (listed === null) { return { making: 'make', mod: 'adopt', record } }
     const age        = cmpRevisions(listed, record)
@@ -363,11 +367,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const isPerLife  = this.isOneLifePerInstance
     if (isPerLife && (age === 'older'))                                   { return { making: 'listed', listed, mod: 'older' } }
     if (isPerLife && (age === 'newer') && ((! isSameLife) || isRebirth)) { return { making: 'remake', listed, mod: 'adopt', record } }
-    if (record.vault_tok !== listed.vault_tok)                           { throw otherVaultTok() }
-    if ((age === 'same') && (! isSameLife))                              { throw oneRevisionTwoLives() }
+    if (record.vault_tok !== listed.vault_tok)                           { throw otherVaultTok(record) }
+    if ((age === 'same') && (! isSameLife))                              { throw oneRevisionTwoLives(record) }
     if (age === 'older')                                                 { return { making: 'listed', listed, mod: 'older' } }
     if (age === 'newer')                                                 { return { making: 'listed', listed, mod: 'adopt', record } }
-    if ((rcvdShape === 'gone') !== (heldShape === 'gone'))               { throw oneRevisionTwoFates() }
+    if ((rcvdShape === 'gone') !== (heldShape === 'gone'))               { throw oneRevisionTwoFates(record) }
     if ((rcvdShape === 'full') && (heldShape === 'sparse'))              { return { making: 'listed', listed, mod: 'adopt', record } }
     return { making: 'listed', listed, mod: 'same' }
   }
@@ -405,13 +409,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   readonly #onNotice = (notice: VaultDBNotice): void => {
     const { val, world } = notice
     if ((! this.#isEnabled) || (! this.isOwnRow(val))) { return }
-    void (async () => {
-      const { ok, err } = await outcomeOf(() => {
-        if (world !== null) { this.world.receiveWorld(world) }
-        return this.#isEnabled ? this.buildOrReceive(val) : null
-      })
-      if (! ok) { this.bankFriend.tellBadNews([err]) }
-    })()
+    try {
+      if (world !== null) { this.world.receiveWorld(world) }
+      this.buildOrReceive(val)
+    } catch (err) { this.bankFriend.tellBadNews([err]) }
   }
   // --
 

@@ -271,6 +271,9 @@ function framed(said: string, { where, advice }: Story): string {
  */
 export function isConsistent(bag: object, other: object): boolean { return disagreeing(bag, other).length === 0 }
 
+/** The names of the fields `bag` and `other` both define at different values: what {@link demandConsistent} names when it refuses. */
+export function disagreeingFieldnames(bag: object, other: object): readonly string[] { return disagreeing(bag, other) }
+
 /** True once `bag` is {@link isConsistent} with `other`: a VaultError of `refusal.kind` otherwise, naming the fields that disagree in `meta.fieldnames`, and in its message unless `refusal.message` says its own.
  * The kind is the caller's to choose, as the caller knows what a disagreement means: a scope of
  * another user, a record of another vault. A `refusal` that is none refuses.

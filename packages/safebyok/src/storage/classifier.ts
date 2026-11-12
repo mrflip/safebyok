@@ -227,9 +227,9 @@ function revokePasskeyActOf(record: VaultRecord, stored: VaultRecord): VaultAct 
   return 'replaced'
 }
 
-const GateActOfForVerb: Readonly<Record<EX.GateVerb, (record: VaultRecord, stored: VaultRecord) => VaultAct>> = {
+const GateActOfForVerb = {
   replacePassphrase: replacePassphraseActOf, addPasskey: addPasskeyActOf, revokePasskey: revokePasskeyActOf,
-}
+} as const satisfies Record<EX.GateVerb, (record: VaultRecord, stored: VaultRecord) => VaultAct>
 // --
 
 // == [Classifying]: RowOfVault, RowOfBox, VaultFetched, BoxFetched, BoxesFetched, VaultStored, BoxStored, VaultsStored, BoxesStored, classifyStoredVault, classifyStoredBox, classifyStoredVaults, classifyStoredBoxes, vaultActOf, boxActOf

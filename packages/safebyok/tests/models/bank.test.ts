@@ -5,7 +5,7 @@ import { DefaultLogger, setDefaultLogger } from '../../src/helpers/logger'
 import { ForeverMillis, isGuarded } from '../../src/helpers/consts'
 import { type Bank, DefaultOnLifecycle, guardOnLifecycle, guardRequestCleartext, tellBadNewsTo } from '../../src/models/bank'
 import { DefaultLeaseMillis, type Vault } from '../../src/models/vault'
-import type { BadNews, BankEvent } from '../../src/shapes/shapes-vaultish'
+import type { BadNews, BankEvent, BankFriend } from '../../src/shapes/shapes-vaultish'
 import { bankDisabled } from '../../src/refusals/throwers'
 import type { AnyGating } from '../../src/shapes/shapes-gateish'
 import { VaultError } from '../../src/refusals/errors'
@@ -627,6 +627,18 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     await tellByAutolock(world, bank, later)
     expect(onBadNews).toHaveBeenCalledTimes(2)
     expect(spy.calls.map(({ message }) => message)).to.include(later.message)
+  })
+})
+
+describe("the friend a bank's listings tell bad news through", () => {
+  it("tells a refusal as it is and anything else thrown as an unexpected error, and drops the news of a thing disabled", async () => {
+    const onBadNews = vi.fn()
+    const bank = makeBankWorld().bankOn({ onBadNews })
+    // The listing's friend is protected: the test reaches it as the listing's own code does.
+    const { bankFriend } = bank.vaultListing as unknown as { bankFriend: BankFriend }
+    bankFriend.tellBadNews([new VaultError('storage_unavailable', "Down."), new Error("Thrown."), new VaultError('disabled', "Gone.")])
+    await TH.eventually(() => onBadNews.mock.calls.length === 2)
+    expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['storage_unavailable', 'unexpected_error'])
   })
 })
 

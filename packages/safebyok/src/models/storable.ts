@@ -19,7 +19,7 @@ export function cmpRevisions(ante: Revision, post: Revision): Age {
   if (post.revision_seq < ante.revision_seq) { return 'older' }
   if (post.revision_seq > ante.revision_seq) { return 'newer' }
   if (post.revision_tok !== ante.revision_tok) {
-    throw oneRevisionTwoToks()
+    throw oneRevisionTwoToks(post)
   }
   return 'same'
 }

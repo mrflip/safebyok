@@ -3,7 +3,6 @@
 import { NEVER } from 'zod'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck, objStrict, objStrip } from '../helpers/validator'
-import type { VaultError } from '../refusals/errors'
 import type { Outcome } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { ForeverMillis, PasskeySaltSize, hasModelkind, isGuarded } from '../helpers/consts'
@@ -247,7 +246,7 @@ export const leaseFriend = objCheck(({ fn }) => ({
   /** Forget the lease this device has cached, telling the host of a failed revoke. */
   tryForgetLease:  fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
-  tellBadNews:     fn<(badnews: readonly VaultError[]) => unknown>(),
+  tellBadNews:     fn<(badnews: readonly unknown[]) => unknown>(),
 }), { refusalkind: 'bad_option', extras: 'strip' })
 
 /** All a lease or a proving hears of its vault, once {@link leaseFriend} has checked it. */

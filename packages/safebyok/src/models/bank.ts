@@ -19,7 +19,7 @@ import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gate
 import * as VX from '../shapes/shapes-vaultish'
 import type { BadNewsHandler, BankAnnouncement, BankEvent, BankOpts, BankSnapshot, BankStage, GuardedLifecycleHandler, LifecycleHandler, VacateStory } from '../shapes/shapes-vaultish'
 import type { DeviceDB } from '../storage/device-db'
-import { bankDisabled, helloFirst, insecureContext } from '../refusals/throwers'
+import { bankDisabled, helloFirst, insecureContext, unexpectedError } from '../refusals/throwers'
 import { DefaultLeaseMillis, type Vault } from './vault'
 import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
 import { VaultListing } from './vault-listing'
@@ -49,8 +49,14 @@ export class Bank {
   /** The host's `onLifecycle`, guarded, and its `onBadNews`, called while the bank is enabled and by its vacate. */
   readonly #hostHandlers: Handlers
 
-  /** Tell bad news no caller waits on to the host, its every listing and box coming straight here: the friend they tell it through. */
-  readonly #tellBadNews = brandGuarded((badnews: readonly VaultError[]): void => { tellBadNewsTo(this.#handlers.onBadNews, this, badnews) })
+  /** Tell bad news no caller waits on to the host, its every listing and box coming straight here: the friend they tell it through.
+   * A refusal is told as it is, anything else thrown as `unexpected_error`, and a `disabled` refusal not at all.
+   */
+  readonly #tellBadNews = brandGuarded((badnews: readonly unknown[]): void => {
+    const refusals = badnews.map((news) => (isVaultError(news) ? news : unexpectedError(news)))
+    // A thing disabled since is no news: the host swept or vacated it, or its vault went away.
+    tellBadNewsTo(this.#handlers.onBadNews, this, refusals.filter((refusal) => refusal.refusalkind !== 'disabled'))
+  })
   // Not awaited: an announcement is news of what happened, and nothing waits on the host's answer.
   /** Tell the host's `onLifecycle` what happened, its every listing and vault coming straight here: the friend they announce through. */
   readonly #announce = brandGuarded((announcement: BankAnnouncement): void => { void this.#handlers.onLifecycle({ ...announcement, bank: this }) })

@@ -21,7 +21,7 @@ import type { GotAct } from '../../src/shapes/shapes-enums'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { _cheat_clock } from '../../src/helpers/clock'
 import { brandGuarded } from '../../src/helpers/consts'
-import { VaultError } from '../../src/refusals/errors'
+import { VaultError, isVaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
 import { guardRequestCleartext } from '../../src/models/bank'
@@ -385,7 +385,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
     bankFriend: {
       panic:       brandGuarded((refusal: VaultError) => { panics.push(refusal) }),
       announce:    brandGuarded((announcement: BankAnnouncement) => { announced.push(announcement) }),
-      tellBadNews: brandGuarded((told: readonly VaultError[]) => { badnews.push(...told) }),
+      tellBadNews: brandGuarded((told: readonly unknown[]) => { badnews.push(...told.map((news) => (isVaultError(news) ? news : Refuse.unexpectedError(news)))) }),
       askUser:     guardRequestCleartext(() => undefined),
     },
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),

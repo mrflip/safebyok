@@ -8,7 +8,8 @@ import type { VaultScope } from '../../src/shapes/shapes-core'
 import type * as GX from '../../src/shapes/shapes-gateish'
 import { type RequestCleartext, passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import type { BankAnnouncement, BankFriend, BoxWorld, LifecycleHandler, ListingOpts, VaultWorld } from '../../src/shapes/shapes-vaultish'
-import type { VaultError } from '../../src/refusals/errors'
+import { type VaultError, isVaultError } from '../../src/refusals/errors'
+import * as Refuse from '../../src/refusals/throwers'
 import type { VaultTombstone, VaultRecord } from '../../src/shapes/shapes-storage'
 import { DefaultOnLifecycle, guardOnLifecycle, guardRequestCleartext } from '../../src/models/bank'
 import type { Vault } from '../../src/models/vault'
@@ -156,7 +157,7 @@ export function makeVaultWorld(stored0: VaultRecord | null = null, worldOverride
   const bankFriend: BankFriend = {
     panic:       brandGuarded(nothing),
     announce,
-    tellBadNews: brandGuarded((told: readonly VaultError[]) => { badnews.push(...told) }),
+    tellBadNews: brandGuarded((told: readonly unknown[]) => { badnews.push(...told.map((news) => (isVaultError(news) ? news : Refuse.unexpectedError(news)))) }),
     askUser:     guardRequestCleartext((gating) => fakeBank.requestCleartext(gating)),
   }
   const opts: ListingOpts = { vaultDB, maxMillisSinceRefresh: 10 * 60_000, bankFriend }
@@ -193,7 +194,7 @@ export type VaultTestWorld = ReturnType<typeof makeVaultWorld>
 export function hearingBadNews(opts: ListingOpts, onBadNews: (news: unknown) => unknown): ListingOpts {
   return {
     ...opts,
-    bankFriend: { ...opts.bankFriend, tellBadNews: brandGuarded((badnews: readonly VaultError[]) => { for (const news of badnews) { onBadNews(news) } }) },
+    bankFriend: { ...opts.bankFriend, tellBadNews: brandGuarded((badnews: readonly unknown[]) => { for (const news of badnews) { onBadNews(isVaultError(news) ? news : Refuse.unexpectedError(news)) } }) },
   }
 }
 
