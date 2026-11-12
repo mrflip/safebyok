@@ -338,9 +338,9 @@ Where the vault differs from the box table, and why:
 
 The bankDB keeps a bank row, its one `main` gate row and its vault rows above the box rows. Its
 classifier is `src/storage/bank-classifier.ts`. A vault row there is the vaultDB's without a gate,
-and with its bank's `bank_tok`; a box row is the vaultDB's, and a box op is classified by the box
-table above, with its vault row as `parent` in the place of `world`. A get, put or del of a bank,
-gate or vault row reads the tables above, with these differences:
+and with its bank's `bank_tok`; a box row is the vaultDB's with its bank's `bank_tok` too, and a box
+op is classified by the box table above, with its vault row as `parent` in the place of `world`. A
+get, put or del of a bank, gate or vault row reads the tables above, with these differences:
 
 - Every answer carries `parent`, the row above the one asked for: the bank row for a gate or vault
   verb, `buildBank` and `ensureBank`; the vault row for a box verb; none for `delBank`. The shell
@@ -348,6 +348,11 @@ gate or vault row reads the tables above, with these differences:
 - `bank_tok` and `gate_tok` are life toks as `vault_tok` and `box_tok` are. buildBank mints both, a
   gate verb keeps both, delBank stores a new `bank_tok` on the bank's tombstone.
 - A gate row is never tombstoned: it is put with its bank and deleted with it.
+- A box row's life is the pair of its `bank_tok` and `vault_tok`, `${bank_tok}/${vault_tok}` as one
+  string (`BX.vaultLifeOf`). Where it is not its vault row's, the box row is of an ended life: it
+  counts as no row, as C5 says of a box of an earlier vault life, and a box ask citing another pair
+  than the vault row's refuses `vault_reborn`. A datastore keys the box table by both toks, and
+  sets a predicate on each.
 
 ### The row above (P1–P4)
 
@@ -402,6 +407,25 @@ step (design.md, *The gate verbs' policy*):
 The other cells of the policy are held before the table is read. The ask's check (V2) holds every
 cell of `buildBank` and `delBank`, the empty `auth`, `sigs` and `meta`, and `revokePasskey`'s record
 having no `passkey0`. P4 and the revision rules hold `bank_tok` and `gate_tok` being the row's.
+
+### The bank adapter
+
+`AdapterBankDB` carries each verb to one `do*` call, which fetches, classifies and stores the whole
+verb in one atomic unit, so that a datastore can run the classifier and a gate verb's policy
+inside itself (a Postgres function, a Convex mutation). Each call is handed the parsed ask, runs
+the classifier (the `classify*` methods, which a datastore judging for itself overrides), and
+returns what the classifier returned:
+
+| call          | verbs                                              | atomic unit holds                                            |
+| ------------- | -------------------------------------------------- | ------------------------------------------------------------ |
+| `doEnsureBank`  | ensureBank                                       | the bank row, its gate rows and vault rows                   |
+| `doBuildBank`   | buildBank                                        | the bank row and its `main` gate row                         |
+| `doPutGate`     | replacePassphrase, addPasskey, revokePasskey     | the bank row and the gate row                                |
+| `doDelBank`     | delBank                                          | the bank row, and every gate, vault and box row under it     |
+| `doGetVault`, `doPutVault`, `doDelVault` | the vault verbs         | the bank row and the vault row; a del, that life's box rows  |
+| `doListBoxes`, `doGetBox`, `doPutBox`, `doDelBox` | the box verbs  | the vault row and the box rows of its life                   |
+| `doTidyGone`    | tidyGone                                         | none across its steps, as tidyBoxes                          |
+| `doWatch`       | watch                                            | none; a no-op unless the datastore can tell of writes        |
 
 ## Roles
 

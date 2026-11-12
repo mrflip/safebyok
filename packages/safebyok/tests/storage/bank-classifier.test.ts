@@ -4,10 +4,10 @@ import * as SX from '../../src/shapes/shapes-storage'
 import { type VaultError, rowsOfRefusal } from '../../src/refusals/errors'
 import { classifyBuildBank, classifyDelBank, classifyEnsureBank, classifyStoredBox, classifyStoredBoxes, classifyStoredGate, classifyStoredVault } from '../../src/storage/bank-classifier'
 import {
-  bankAt, bankBuildAskOf, bankDelAskOf, bankEnsureAsk, bankScope, bankTombstoneOf, gateAt, gatePutAskOf, mainWayin, otherMainWayin, passkey0Wayin,
+  bankAt, bankBuildAskOf, bankDelAskOf, bankEnsureAsk, bankScope, bankTombstoneOf, boxAt, boxGetAskOf, boxListAsk, boxQuery, gateAt, gatePutAskOf, mainWayin, otherMainWayin, passkey0Wayin,
   vaultAt, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultScope, vaultTombstoneOf,
 } from '../test-helpers/bankdb-world'
-import { Now, boxAt, boxListAsk, boxQuery } from '../test-helpers/storage-world'
+import { Now } from '../test-helpers/storage-world'
 
 // The stored rows stand at this seq, so an ask can cite one below it and one above.
 const Seq = 5
@@ -229,12 +229,24 @@ describe("classifyEnsureBank, the bank with its gate and vaults", () => {
 
 describe("classifyStoredBox and classifyStoredBoxes, under a bank's vault row", () => {
   const boxVault = vaultAt(Seq, 'bank1', 'life1')
+  const get      = boxGetAskOf(boxQuery, 'nil')
 
   it("classifies a box ask as the vaultDB does, with its vault row as the parent", () => {
-    const get = { op: 'get' as const, ...boxQuery, ifAbsent: 'nil' as const, expected: SX.shellBoxOf(boxQuery, 'life1') }
     expect(classifyStoredBox(get, { parent: boxVault, box: boxAt(Seq) })).to.deep.include({ ok: true, act: 'gotlive', parent: boxVault, box: boxAt(Seq) })
     expect(classifyStoredBox(get, { parent: null, box: null })).to.deep.include({ ok: false, act: 'vault_void', parent: BX.shellVaultOf(vaultScope) })
     expect(classifyStoredBox(get, { parent: vaultAt(Seq, 'bank1', 'life2'), box: null })).to.deep.include({ ok: false, act: 'vault_reborn' })
+  })
+
+  it("refuses vault_reborn for a vault row of an ended life of the bank, whose vault_tok is the ask's", () => {
+    expect(classifyStoredBox(get, { parent: vaultAt(Seq, 'bank0', 'life1'), box: null })).to.deep.include({ ok: false, act: 'vault_reborn' })
+    expect(classifyStoredBoxes(boxListAsk, { parent: vaultAt(Seq, 'bank0', 'life1'), boxes: [] })).to.deep.include({ ok: false, act: 'vault_reborn' })
+  })
+
+  it("counts a box row under another life of its vault or its bank as no row", () => {
+    for (const box of [boxAt(Seq, 'bank0', 'life1'), boxAt(Seq, 'bank1', 'life0')]) {
+      expect(classifyStoredBox(get, { parent: boxVault, box })).to.deep.include({ ok: true, act: 'gotvoid', box: null })
+      expect(classifyStoredBoxes(boxListAsk, { parent: boxVault, boxes: [{ boxlabel: 'openai', box }] })).to.deep.include({ ok: true, act: 'gotvoid', listed: { boxes: [], damaged_rows: [] } })
+    }
   })
 
   it("lists a vault's boxes, with its vault row as the parent", () => {
@@ -244,7 +256,6 @@ describe("classifyStoredBox and classifyStoredBoxes, under a bank's vault row", 
   })
 
   it("refuses damaged_vault for a vault row that fails its checks", () => {
-    const get = { op: 'get' as const, ...boxQuery, ifAbsent: 'nil' as const, expected: SX.shellBoxOf(boxQuery, 'life1') }
     expect(refusalOf(() => classifyStoredBox(get, { parent: { ...boxVault, smuggled: 'field' }, box: null })).refusalkind).to.eq('damaged_vault')
   })
 })

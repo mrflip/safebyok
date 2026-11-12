@@ -275,16 +275,18 @@ const RefusalkindForBoxAct = {
   camped: 'camped',
   clash: 'record_conflict', forked: 'record_conflict', ahead: 'record_conflict',
   vault_void: 'absent_vault', vault_gone: 'absent_vault', vault_reborn: 'vault_reborn', vault_full: 'vault_full',
-} as const satisfies Record<EX.RefusedAct | EX.BoxVaultAct, Refusalkind>
+  // A bankDB's vault or gate verb under a bank that is not live: its rows are missing, as a box's are under a vault that is not.
+  bank_void: 'absent_vault', bank_gone: 'absent_vault', bank_reborn: 'vault_reborn',
+} as const satisfies Record<EX.RefusedAct | EX.BoxVaultAct | EX.ParentBankAct, Refusalkind>
 
 const RefusalkindForVaultAct = { ...RefusalkindForBoxAct, void: 'absent_vault', gone: 'absent_vault', dubdel: 'absent_vault' } as const satisfies Record<EX.RefusedAct, Refusalkind>
 
 // No rows go on this error: the rows the refusal found are in its answer, as `world` and `dbhas`.
 /** The refusal for a get, put or del whose `act` is a refusal. Its message is its kind, and `meta.act` is the act.
- * @param rowkind - Whose call it was: a `box`'s or a `vault`'s.
+ * @param rowkind - Whose call it was: a `box`'s, or a `vault`'s, which a bankDB's bank and gate verbs count as.
  * @param meta    - Extra context: the `oplabel`, its `ask`, and for `vault_full` the `capacity`.
  */
-export function actRefused(rowkind: 'box' | 'vault', act: EX.RefusedAct | EX.BoxVaultAct, meta: RefusalMeta = {}): VaultError {
+export function actRefused(rowkind: 'box' | 'vault', act: EX.RefusedAct | EX.BoxVaultAct | EX.ParentBankAct, meta: RefusalMeta = {}): VaultError {
   const refusalkind = ((rowkind === 'vault') ? RefusalkindForVaultAct : RefusalkindForBoxAct)[act]
   return new VaultError(refusalkind, refusalkind, { meta: { ...meta, act } })
 }

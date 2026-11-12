@@ -1,5 +1,5 @@
-/** What the bankDB writes and accepts: the bank, gate and vault rows, the asks of its verbs, and their helpers. Imported as `BX`.
- * A box row, and the asks of the box verbs, `tidyGone` and `watch`, are the vaultDB's, in `SX`.
+/** What the bankDB writes and accepts: the bank, gate, vault and box rows, the asks of its verbs, and their helpers. Imported as `BX`.
+ * The asks of `tidyGone` and `watch` are the vaultDB's, in `SX`.
  */
 
 import type * as Z from 'zod'
@@ -8,9 +8,9 @@ import * as Phrases from '../helpers/phrases'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import * as SX from './shapes-storage'
-import type { BankScope, VaultScope } from './shapes-core'
+import type { BankScope, Boxscope, VaultScope } from './shapes-core'
 
-// == [Formats]: BankFormat, GateFormat, VaultFormat
+// == [Formats]: BankFormat, GateFormat, VaultFormat, BoxFormat
 
 /** The `fmt` every bank row carries. */
 export const BankFormat = 3001
@@ -18,6 +18,8 @@ export const BankFormat = 3001
 export const GateFormat = 4001
 /** The `fmt` every vault row of a bank carries. */
 export const VaultFormat = 6003
+/** The `fmt` every box row of a bank carries. */
+export const BoxFormat = 5003
 // --
 
 // == [Bank forms]: bankSparse, bankRecord, bankTombstone, bankRow, BankSparse, BankRecord, BankTombstone, BankRow
@@ -92,17 +94,45 @@ export type VaultTombstone = Readonly<Z.infer<typeof vaultTombstone>>
 export type VaultRow       = VaultRecord | VaultTombstone
 // --
 
-// == [Rows stored]: storedBankRow, storedGateRow, storedVaultRow
+// == [Box forms]: boxSparse, boxRecord, boxTombstone, boxRow, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox
 
-/** A bank, gate or vault row as storage answers it: one failing its checks refuses 'damaged_row'. */
-export const { storedBankRow, storedGateRow, storedVaultRow } = Checkers('damaged_row', () => ({
+// A bank's box row is the vaultDB's, with its bank's `bank_tok` beside its vault's `vault_tok`: the two name the life of
+// the vault it is under (`vaultLifeOf`).
+/** The checks of a bank's box rows: its sparse fields, its live record, its tombstone, and a row of either. */
+export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_option', ({ lit, discrim, bank_tok }) => {
+  const banked       = { fmt: lit(BoxFormat), bank_tok }
+  const boxSparse    = SX.boxSparse.extend(banked)
+  const boxRecord    = SX.boxRecord.extend(banked).strict()
+  const boxTombstone = SX.boxTombstone.extend(banked).strict()
+  const boxRow       = discrim('am', [boxRecord, boxTombstone])
+  return { boxSparse, boxRecord, boxTombstone, boxRow }
+}, [CX])
+
+export type BoxSparse    = Readonly<Z.infer<typeof boxSparse>>
+export type BoxRecord    = Readonly<Z.infer<typeof boxRecord>>
+export type BoxTombstone = Readonly<Z.infer<typeof boxTombstone>>
+/** A bank's box row as stored: live, or a tombstone. */
+export type BoxRow       = BoxRecord | BoxTombstone
+/** A box row that failed validation, named by where it is stored: its scope, under whatever label storage has, the life of its vault, and `am` 'd'. */
+export type DamagedBox   = Readonly<{ user_id: string, banklabel: string, vaultlabel: string, boxlabel: string, bank_tok: string, vault_tok: string, am: 'd' }>
+// --
+
+// == [Rows stored]: storedBankRow, storedGateRow, storedVaultRow, storedBoxRow
+
+/** A bank, gate, vault or box row as storage answers it: one failing its checks refuses 'damaged_row'. */
+export const { storedBankRow, storedGateRow, storedVaultRow, storedBoxRow } = Checkers('damaged_row', () => ({
   storedBankRow:  bankRow,
   storedGateRow:  gateRecord,
   storedVaultRow: vaultRow,
+  storedBoxRow:   boxRow,
 }))
 // --
 
-// == [Row helpers]: shellBankOf, shellVaultOf
+// == [Row helpers]: vaultLifeOf, shellBankOf, shellVaultOf, shellBoxOf, damagedBoxOf
+
+// A vault is reborn under a new `vault_tok`, and its bank under a new `bank_tok`: a box row under either ended life is no row.
+/** The life of a vault, its bank's included, as one string: a vault row's own, and the one a box row or box ask is under. */
+export function vaultLifeOf({ bank_tok, vault_tok }: { bank_tok: string, vault_tok: string }): string { return `${bank_tok}/${vault_tok}` }
 
 const shellTimes = { registered_at: SX.VoidTime, written_at: SX.VoidTime }
 
@@ -115,9 +145,21 @@ export function shellBankOf({ user_id, banklabel }: BankScope): BankTombstone {
 export function shellVaultOf({ user_id, banklabel, vaultlabel }: VaultScope): VaultTombstone {
   return { user_id, banklabel, vaultlabel, fmt: VaultFormat, ...SX.VoidRevision, ...shellTimes, am: 'x', bank_tok: SX.VoidLifeTok, vault_tok: SX.VoidLifeTok }
 }
+
+/** The tombstone of a box row that is not stored, under the life of the vault `boxQuery` names. */
+export function shellBoxOf({ user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok }: BoxQuery): BoxTombstone {
+  return {
+    user_id, banklabel, vaultlabel, boxlabel, fmt: BoxFormat, ...SX.VoidRevision, ...shellTimes, am: 'x', bank_tok, vault_tok, box_tok: SX.VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
+  }
+}
+
+/** A listing's entry for a box row that failed validation, under the life of the vault `lived` names. Its label comes from storage, unchecked: it is part of what is reported. */
+export function damagedBoxOf({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, { bank_tok, vault_tok }: { bank_tok: string, vault_tok: string }): DamagedBox {
+  return { user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, am: 'd' }
+}
 // --
 
-// == [Asks]: bankEnsure, bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultAsk, BankEnsureAsk, BankBuildAsk, GatePutAsk, BankDelAsk, VaultAsk, VaultGetAsk, VaultPutAsk, VaultDelAsk, loggableAsk, LoggableAsk
+// == [Asks]: bankEnsure, bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultAsk, BankEnsureAsk, BankBuildAsk, GatePutAsk, BankDelAsk, VaultAsk, VaultGetAsk, VaultPutAsk, VaultDelAsk, GateVerbAsk, boxQuery, boxList, BoxQuery, BoxListAsk, boxGet, boxPut, boxDel, boxAsk, BoxAsk, BoxGetAsk, BoxPutAsk, BoxDelAsk, loggableAsk, LoggableAsk
 
 type Expecting = { expected: SX.Revision }
 type Cited     = Expecting & { record: SX.Revision }
@@ -234,6 +276,60 @@ export type VaultPutAsk  = Extract<VaultAsk, { op: 'put' }>
 /** A `delVault` ask: the vault's scope, its bank's `bank_tok`, the tombstone to store, and the expected row. */
 export type VaultDelAsk  = Extract<VaultAsk, { op: 'del' }>
 
+/** A gate verb's ask, as `replacePassphrase`, `addPasskey` and `revokePasskey` take it: a {@link GatePutAsk} without its `gateVerb`, which the verb supplies. */
+export type GateVerbAsk  = Omit<GatePutAsk, 'gateVerb'>
+
+/** The checks of a box's scope under the life of its vault, and of a `listBoxes` ask. */
+export const { boxQuery, boxList } = Checkers('bad_scope', ({ lit, bank_tok, vault_tok, vaultScope, boxscope }) => ({
+  boxQuery: boxscope.unwrap().extend({ bank_tok, vault_tok }),
+  boxList:  vaultScope.unwrap().extend({ bank_tok, vault_tok, op: lit('list') }),
+}), [CX])
+
+/** A box's scope, with the `bank_tok` and `vault_tok` of the vault's life it is asked under. */
+export type BoxQuery   = Readonly<Z.infer<typeof boxQuery>>
+/** A `listBoxes` ask: the vault's scope, and the `bank_tok` and `vault_tok` of the life whose boxes are listed. */
+export type BoxListAsk = Readonly<Z.output<typeof boxList>>
+
+const isExpectedInLife = ({ expected, ...asked }: { bank_tok: string, vault_tok: string, expected: { bank_tok: string, vault_tok: string } }): boolean => vaultLifeOf(expected) === vaultLifeOf(asked)
+
+// A box ask cites the life of its vault, `bank_tok` and `vault_tok`, as a vault ask cites its bank's `bank_tok`.
+/** Validators of a bankDB box ask: a get, put or del. `expected` is parsed as a row's meta, as a vault ask's is. */
+export const { boxGet, boxPut, boxDel, boxAsk } = Checkers('bad_record', ({ lit, discrim, bank_tok, box_tok }) => {
+  const boxExpected = SX.rowMeta.extend({ bank_tok, box_tok })
+
+  const boxGet = boxQuery.extend({
+    op: lit('get'), ifAbsent: SX.ifAbsent, expected: boxExpected,
+  }).refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
+    .refine(isExpectedInLife, Phrases.ExpectedOfOtherVaultLife)
+  const boxPut = boxQuery.extend({
+    op: lit('put'), ifAbsent: SX.putIfAbsent, ifPresent: SX.ifPresent, expected: boxExpected, record: boxRecord,
+  }).refine(isSeqNext,        Phrases.SeqNotNext)
+    .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
+    .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
+    .refine(isExpectedInLife, Phrases.ExpectedOfOtherVaultLife)
+    .refine(isRecordAtAsk,    Phrases.RecordOfOtherAddress)
+    .refine(({ record, expected }) => isLifeTokPlaced(record.box_tok, expected.box_tok, expected.am, record.am), Phrases.LifeTokMisplaced)
+  const boxDel = boxQuery.extend({
+    op: lit('del'), expected: boxExpected, record: boxTombstone,
+  }).refine(isSeqNext,        Phrases.SeqNotNext)
+    .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
+    .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
+    .refine(isExpectedInLife, Phrases.ExpectedOfOtherVaultLife)
+    .refine(isRecordAtAsk,    Phrases.RecordOfOtherAddress)
+    .refine(({ record, expected }) => isLifeTokPlaced(record.box_tok, expected.box_tok, expected.am, record.am), Phrases.LifeTokMisplaced)
+
+  return { boxGet, boxPut, boxDel, boxAsk: discrim('op', [boxGet, boxPut, boxDel]) }
+}, [CX])
+
+/** A box get, put or del ask under a bank, as the bankDB receives it and passes it to its adapter and the classifier. */
+export type BoxAsk    = Readonly<Z.output<typeof boxAsk>>
+/** A `getBox` ask: the box's scope under its vault's life, the expected row (or shell), and the `ifAbsent` option. */
+export type BoxGetAsk = Extract<BoxAsk, { op: 'get' }>
+/** A `putBox` ask: the box's scope under its vault's life, the record to store, the expected row (or shell), and the `ifPresent` and `ifAbsent` options. */
+export type BoxPutAsk = Extract<BoxAsk, { op: 'put' }>
+/** A `delBox` ask: the box's scope under its vault's life, the tombstone to store, and the expected row. */
+export type BoxDelAsk = Extract<BoxAsk, { op: 'del' }>
+
 // A record is a stored row, payload and all: an answer and a refusal carry only its meta, as they may reach a log.
 /** The check of what a bankDB answer and its refusal carry of an ask: any of its fields but a record's payload.
  * Each field is optional, so a refusal made before the ask was whole carries what of it was sound.
@@ -260,4 +356,24 @@ export const loggableAsk = objStrip(({ obj, oneof, lit, user_id, banklabel, vaul
 
 /** What a bankDB answer and its refusal carry of their ask: its `op`, address, policies, and the revisions of its rows. */
 export type LoggableAsk = Readonly<Z.output<typeof loggableAsk>>
+// --
+
+// == [Adapters]: adapterBankDBOpts, memoryBankDBOpts, AdapterBankDBOpts, MemoryBankDBOpts, noticedRow, noticedParent
+
+/** The check of an `AdapterBankDB`'s options: the same as an `AdapterVaultDB`'s. */
+export const adapterBankDBOpts = SX.adapterVaultDBOpts
+/** The check of a `MemoryBankDB`'s options: the same as a `MemoryVaultDB`'s. */
+export const memoryBankDBOpts  = SX.memoryVaultDBOpts
+
+/** An `AdapterBankDB`'s options: `maxRecordSizeEst`, the most bytes one stored box record may weigh. */
+export type AdapterBankDBOpts = SX.AdapterVaultDBOpts
+/** A `MemoryBankDB`'s options: an `AdapterBankDB`'s, and `maxBoxes`, a soft cap on the box rows of one vault life. */
+export type MemoryBankDBOpts  = SX.MemoryVaultDBOpts
+
+// Each row's `fmt` is its own, so no row passes two of these checks.
+/** The checks of what a watch hears: a bank, gate, vault or box row, and the row above it, a bank row or a vault row. */
+export const { noticedRow, noticedParent } = Checkers('damaged_row', ({ union }) => ({
+  noticedRow:    union([bankRow, gateRecord, vaultRow, boxRow]),
+  noticedParent: union([bankRow, vaultRow]),
+}))
 // --

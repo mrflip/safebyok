@@ -373,7 +373,7 @@ export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed: c
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed: check your package and build settings."
 // --
 
-// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultReborn, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, GateEpochNotNext, OtherWayinMoved, boxTooLarge, VaultFull, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVault, GateVerbRecordMismatch, RecordOfOtherAddress, BankTokNotNew, GateOfOtherBank, GateNotBorn, MainGateMissing, deviceDBFailed, thrownNamed
+// == [Refusals: vaultDB and deviceDB]: rowOfOtherAddress, VaultEmpty, VaultReborn, VaultGone, StaleWrite, Camped, AbsentBox, gateIssue, RegisteredAtNotStored, GateEpochNotNext, OtherWayinMoved, boxTooLarge, VaultFull, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVault, ExpectedOfOtherVaultLife, GateVerbRecordMismatch, RecordOfOtherAddress, BankTokNotNew, GateOfOtherBank, GateNotBorn, MainGateMissing, deviceDBFailed, thrownNamed
 
 /** A well-formed row out of storage, whose own `fieldnames` are not the address it was asked for at. */
 export const rowOfOtherAddress = (fieldnames: readonly string[]): string => `The vault's storage answered with a row naming another ${fieldnames.join(' and ')} than the one asked for: the database or its storage adapter has filed it under the wrong address.`
@@ -431,6 +431,9 @@ export const LifeTokMisplaced = "A record keeps the life tok of the live row it 
 
 /** Why a box request is refused for the row it expects: both must be in the same vault life. */
 export const ExpectedOfOtherVault = "A box's ask and the row it expects name the same vault_tok."
+
+/** Why a bankDB's box request is refused for the row it expects: both must be in the same life of the vault and of its bank. */
+export const ExpectedOfOtherVaultLife = "A box's ask and the row it expects name the same bank_tok and vault_tok."
 
 /** Why a gate verb's put is refused for its record: `addPasskey` adds a passkey wayin, and `revokePasskey` removes it. */
 export const GateVerbRecordMismatch = "addPasskey's record has a passkey wayin, and revokePasskey's has none."

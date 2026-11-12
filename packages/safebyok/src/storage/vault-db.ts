@@ -5,7 +5,7 @@ import { IsVaultDB, UNANSWERED } from '../helpers/consts'
 import { type VaultError, isVaultError, rowsOfRefusal } from '../refusals/errors'
 import type { BadOutcome, GoodOutcome } from '../refusals/outcome'
 import type { BankScope } from '../shapes/shapes-core'
-import type { BadAct, GoodAct, OkAct, ListAct } from '../shapes/shapes-enums'
+import type { BankBadAct, GoodAct, OkAct, ListAct } from '../shapes/shapes-enums'
 import type {
   BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxTidyAsk, BoxSparse, DamagedBox, DamagedVault,
   GateVerbOpts, LoggableAsk, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultRecord, VaultRow, VaultTombstone, WatchScope,
@@ -19,7 +19,7 @@ export type GoodAnswer<ValT, ActT extends string, WorldT = VaultRow> = GoodOutco
 
 // A refusal met while delivering a good answer keeps that answer's act: storage did what the act says (`refusedAnswerOf`).
 /** A vaultDB verb's refused answer: its `err`, with the `act`, `world` and `dbhas` the refusal carries, and what it carries of its `ask`. */
-export type BadAnswer = BadOutcome & { ask: LoggableAsk, act: BadAct | GoodAct, world: unknown, dbhas?: unknown }
+export type BadAnswer = BadOutcome & { ask: LoggableAsk, act: BankBadAct | GoodAct, world: unknown, dbhas?: unknown }
 
 /** A `try*` verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. */
 export type Answer<ValT, ActT extends string, WorldT = VaultRow> = GoodAnswer<ValT, ActT, WorldT> | BadAnswer

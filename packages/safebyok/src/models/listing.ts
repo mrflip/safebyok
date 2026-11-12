@@ -6,7 +6,7 @@ import { isConsistent } from '../helpers/validator'
 import { oneAtATime } from '../helpers/one-at-a-time'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { type Notice as VaultDBNotice, type VaultDB, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
-import type { BadAct, DeliveryFielding, GoodAct, IfAbsent } from '../shapes/shapes-enums'
+import type { BankBadAct, DeliveryFielding, GoodAct, IfAbsent } from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
@@ -508,7 +508,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
 // == [Helpers]: deliveryFieldingOf, Delivering, Joined, putAnswerOf
 
-// The acts are the classifier's and the gate verbs': `notes/answer-contract.md`. A box's `vault_*` act, an unclassified_storing
+// The acts are the classifier's and the gate verbs': `notes/answer-contract.md`. A box's `vault_*` act, a bankDB's `bank_*` act, an unclassified_storing
 // refusal, and the acts of a list or a housekeeping verb carry no record of this listing.
 /** Where an answer's record is, by its act: see {@link DeliveryFielding}. */
 const deliveryFieldingOf = {
@@ -516,8 +516,9 @@ const deliveryFieldingOf = {
   gotlive: 'as_got',  gotgone: 'as_got',  passed:   'as_got',  gotvoid: 'as_got',
   stale:   'as_db',   camped:  'as_db',   gone:     'as_db',   dubdel:  'as_db',   retcon: 'as_db', clash: 'as_db', forked: 'as_db', ahead: 'as_db',
   void:    'as_db',   vault_void: 'none', vault_gone: 'none',  vault_reborn: 'none', vault_full: 'none', unclassified_storing: 'none',
+  bank_void: 'none',  bank_gone: 'none',  bank_reborn: 'none',
   got:     'none',    tidied:  'none',    timely:   'none',
-} as const satisfies Record<GoodAct | BadAct, DeliveryFielding>
+} as const satisfies Record<GoodAct | BankBadAct, DeliveryFielding>
 
 // Every form has every field, null where it has none, so the plan destructures and narrows on its tags.
 /** What delivering does, decided before anything changes: which instance receives (its `making`), and what becomes of its record (its `mod`), as the `DeliveryMaking` and `DeliveryModification` tags say. */

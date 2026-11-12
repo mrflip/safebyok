@@ -1,5 +1,5 @@
 // Kept out of the main entry (`safebyok`), so a host's autocomplete never shows the adapter contract, and an adapter imports from one place.
-/** `safebyok/storage`: what a storage adapter is written against, the AdapterVaultDB and the DeviceDB. */
+/** `safebyok/storage`: what a storage adapter is written against, the AdapterVaultDB, the AdapterBankDB and the DeviceDB. */
 
 // == [The databases]: AdapterVaultDB, VaultDB, DeviceDB, their brands, and the two in memory
 export { AdapterVaultDB } from './adapter-vault-db'
@@ -11,7 +11,7 @@ export type { BoxesFetched, BoxesStored, BoxFetched, BoxStored, Presence, RowOfB
 export type { BoxAsk, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, LoggableAsk, VaultAsk, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk } from '../shapes/shapes-storage'
 export { askOpVals, badActVals, boxVaultActVals, gateActVals, goodActVals, foundActVals, gateVerbVals, ifAbsentVals, refusedActVals, writeActVals } from '../shapes/shapes-enums'
 export { boxAsk, boxDel, boxGet, boxList, boxPut, boxTidy, gateVerbAskOf, loggableAsk, vaultAsk, vaultDel, vaultGet, vaultList, vaultPut } from '../shapes/shapes-storage'
-export type { AskOp, BadAct, BoxAct, GateAct, GoodAct, GateVerb, VaultAct, WriteAct } from '../shapes/shapes-enums'
+export type { AskOp, BadAct, BankBadAct, BoxAct, GateAct, GoodAct, GateVerb, ParentBankAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
 export { VaultDBVerbnames, badAnswerOf } from './vault-db'
 export { IsAdapterVaultDB, IsVaultDB, isAdapterVaultDB, isVaultDB } from '../helpers/consts'
 export { DeviceDB } from './device-db'
@@ -20,6 +20,15 @@ export { MemoryVaultDB } from './memory-vault-db'
 export { MemoryDeviceDB } from './memory-device-db'
 export type { Awaitable } from '../helpers/helpers'
 export { ckeyOf } from '../helpers/helpers'
+// --
+
+// == [The bankDB]: AdapterBankDB, BankDB, their brands, the one in memory, and the rest of its contract as BX
+export { AdapterBankDB } from './adapter-bank-db'
+export { MemoryBankDB } from './memory-bank-db'
+export type { BankDB } from './bank-db'
+export { BankDBVerbnames } from './bank-db'
+export { IsAdapterBankDB, IsBankDB, isAdapterBankDB, isBankDB } from '../helpers/consts'
+export * as BX from './bankdb'
 // --
 
 // == [IndexedDB]: the single transaction of each IndexedDB call, the row at a scopepath within it, and the versioned shelf

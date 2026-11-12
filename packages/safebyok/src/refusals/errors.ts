@@ -4,7 +4,7 @@
  */
 
 import { IsVaultError, brandOf } from '../helpers/consts'
-import type { BadAct } from '../shapes/shapes-enums'
+import type { BankBadAct } from '../shapes/shapes-enums'
 import type { Capacity } from '../shapes/shapes-storage'
 
 // == [Kinds and families]: refusalkindVals, Refusalkind, refusalFamilyVals, RefusalFamily, RefusalFamilyForKind
@@ -143,7 +143,7 @@ export type RefusalMeta = {
   /** A vaultDB's refusal: the verb that refused. */
   oplabel?:      string
   /** A vaultDB's refusal: what happened, when it is not said by the refusalkind alone. */
-  act?:          BadAct
+  act?:          BankBadAct
   /** A vaultDB's refusal: what it carries of its ask, a `LoggableAsk`: its address, policies and revisions, never a record's payload. */
   ask?:          Readonly<Record<string, unknown>>
 }

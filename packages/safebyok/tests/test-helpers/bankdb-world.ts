@@ -1,10 +1,13 @@
-/** The scopes, rows and asks a bankDB's tests share: a bank, its `main` gate and a vault at a revision, their tombstones, and an ask of each verb. */
+/** The scopes, rows and asks a bankDB's tests share: a bank, its `main` gate, a vault and a box at a revision, their tombstones, and an ask of each verb. */
 
 import * as BX from '../../src/shapes/shapes-bankdb'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { GateVerb, IfAbsent } from '../../src/shapes/shapes-enums'
-import type { BankBuildAsk, BankDelAsk, BankRecord, BankRow, BankTombstone, GatePutAsk, GateRecord, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultRecord, VaultRow, VaultTombstone, Wayins } from '../../src/shapes/shapes-bankdb'
-import { Now, passkeyWayin, passphraseWayin } from './storage-world'
+import type {
+  BankBuildAsk, BankDelAsk, BankRecord, BankRow, BankTombstone, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxQuery, BoxRecord, BoxRow, BoxTombstone,
+  GatePutAsk, GateRecord, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultRecord, VaultRow, VaultTombstone, Wayins,
+} from '../../src/shapes/shapes-bankdb'
+import { Now, boxAt as vaultdbBoxAt, passkeyWayin, passphraseWayin } from './storage-world'
 
 /** The bank the rows stand in. */
 export const bankScope  = { user_id: 'u1', banklabel: 'acme' }
@@ -12,6 +15,14 @@ export const bankScope  = { user_id: 'u1', banklabel: 'acme' }
 export const gateScope  = { ...bankScope, gatelabel: 'main' as const }
 /** The scope of the vault the rows stand in. */
 export const vaultScope = { ...bankScope, vaultlabel: 'main' }
+/** The scope of the box the rows stand in. */
+export const boxscope   = { ...vaultScope, boxlabel: 'openai' }
+/** The query for the box the rows stand in, in the vault life `life1` of the bank life `bank1`. */
+export const boxQuery: BoxQuery = { ...boxscope, bank_tok: 'bank1', vault_tok: 'life1' }
+/** The `listBoxes` ask of the vault the rows stand in, in the vault life `life1` of the bank life `bank1`. */
+export const boxListAsk: BoxListAsk = { op: 'list', ...vaultScope, bank_tok: 'bank1', vault_tok: 'life1' }
+/** The `tidyGone` ask of the bank the rows stand in. */
+export const boxTidyAsk = { op: 'tidy_gone' as const, ...bankScope }
 /** The `ensureBank` ask of the bank the rows stand in. */
 export const bankEnsureAsk = { op: 'ensure' as const, ...bankScope, gates: ['main'] as ['main'] }
 
@@ -79,4 +90,29 @@ export function vaultPutAskOf(record: VaultRecord, expected: VaultRow | null = n
 /** The del of the vault row `expected`, storing its tombstone, under its own bank life. */
 export function vaultDelAskOf(expected: VaultRow): VaultDelAsk {
   return { op: 'del', ...vaultScope, bank_tok: expected.bank_tok, expected, record: vaultTombstoneOf(expected) }
+}
+
+/** The box record `boxlabel` at `revision_seq`, in the vault life `vault_tok` of the bank life `bank_tok`. */
+export function boxAt(revision_seq = 0, bank_tok = 'bank1', vault_tok = 'life1', boxlabel = 'openai'): BoxRecord {
+  return BX.boxRecord.parse({ ...vaultdbBoxAt(revision_seq, vault_tok), fmt: BX.BoxFormat, boxlabel, bank_tok })
+}
+
+/** The tombstone that deletes the box row `record`, one revision on, under a box_tok of its own. */
+export function boxTombstoneOf(record: BoxRow): BoxTombstone { return BX.boxTombstone.parse({ ...BX.boxSparse.parse(record), ...tombstoneFieldsOf(record), box_tok: `${record.box_tok}x` }) }
+
+function boxQueryOf({ user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok }: BoxQuery): BoxQuery { return { user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok } }
+
+/** The get of the box at `asked`, by a caller that holds no row of it. */
+export function boxGetAskOf(asked: BoxQuery = boxQuery, ifAbsent: IfAbsent = 'fail'): BoxGetAsk {
+  return { op: 'get', ...boxQueryOf(asked), ifAbsent, expected: BX.shellBoxOf(asked) }
+}
+
+/** The put of the box `record` over the row `expected`, or over none for null, in its own vault life. It adds and replaces. */
+export function boxPutAskOf(record: BoxRecord, expected: BoxRow | null = null): BoxPutAsk {
+  return { op: 'put', ...boxQueryOf(record), ifAbsent: 'add', ifPresent: 'repl', expected: expected ?? BX.shellBoxOf(record), record }
+}
+
+/** The del of the box row `expected`, storing its tombstone, in its own vault life. */
+export function boxDelAskOf(expected: BoxRow): BoxDelAsk {
+  return { op: 'del', ...boxQueryOf(expected), expected, record: boxTombstoneOf(expected) }
 }

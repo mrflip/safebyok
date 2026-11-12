@@ -3,7 +3,7 @@ import { UNANSWERED } from '../../src/helpers/consts'
 import * as Refuse from '../../src/refusals/throwers'
 import { VaultError } from '../../src/refusals/errors'
 import { answerWithVal, badAnswerOf, refusedAnswerOf } from '../../src/storage/bank-db'
-import type { BuildBankAnswer } from '../../src/storage/bank-db'
+import type { GateAnswer } from '../../src/storage/bank-db'
 import { bankAt, gateAt } from '../test-helpers/bankdb-world'
 
 const bank = bankAt(2)
@@ -11,7 +11,7 @@ const gate = gateAt(2)
 const ask  = { op: 'build' as const, user_id: 'u1', banklabel: 'acme' }
 
 describe("the bankDB's answer helpers, with the row above as parent", () => {
-  const passed: BuildBankAnswer = { ok: true, val: gate, act: 'passed', parent: bank, ask }
+  const passed: GateAnswer = { ok: true, val: gate, act: 'passed', parent: bank, ask }
 
   it("answerWithVal keeps the act, parent and ask of a good answer", () => {
     expect(answerWithVal(passed, 'other')).to.deep.equal({ ok: true, val: 'other', act: 'passed', parent: bank, ask })
