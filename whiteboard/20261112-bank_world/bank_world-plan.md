@@ -71,6 +71,11 @@ it. The Coach added four at the invocation, and the orchestrator one:
     being hypothesized." A finding, a test or a guard about a stored row that fails its own checks
     needs a verb that could have written it; otherwise it is not built, and a reviewer does not
     raise it.
+25. **The frequency ladder** (the Coach, 2026-11-12): "a bank create/delete ends everything, a
+    gate modification happens thousands of times less often than a vault modification, a vault
+    operation much less often than a box modification, and a box modification much less often
+    than a read." Keep reads cheap; let a gate verb be heavy (a full in-database re-check is
+    fine); let `buildBank`/`delBank` be blunt; add no work to the hot end for symmetry's sake.
 23. **Bank-world drafts of the contract notes** (the Coach suggested, 2026-11-12):
     `guarantees-bank.md` and `deliver-contract-bank.md` in this directory describe the target.
     A worker or reviewer judging bank-world code reads them beside today's `notes/`; the thread
