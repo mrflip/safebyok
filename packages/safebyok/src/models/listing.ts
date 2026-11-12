@@ -310,18 +310,30 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected deliver(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null
   protected deliver(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null {
     this.demandEnabled()
-    if (answer.ok) {
-      if (answer.world !== null) { this.world.receiveWorld(answer.world) }
-      return this.#carryOut(this.#deliveringOf(answer, sent))
-    }
-    // A refusal's world and stored record are received for what they tell; whatever receiving them meets is bad news, and
-    // the refusal is thrown. All of it runs before the next await, so a revoked identity panics before any other answer is delivered.
+    // no awaits: a revoked identity panics before any *other* answer is delivered.
     try {
       if (answer.world !== null) { this.world.receiveWorld(answer.world) }
-      this.#carryOut(this.#deliveringOf(answer, sent))
-    } catch (err) { this.bankFriend.tellBadNews([err]) }
+      const carried = this.#carryOut(answer, sent)
+      if (answer.ok) { return carried }
+    } catch (err) {
+      // throw the first-occurring error, report the others
+      if (answer.ok) { throw err }
+      this.bankFriend.tellBadNews([err])
+    }
     this.panicIfRevoked(answer.err)
     throw answer.err
+  }
+  /** gets the delivery plan and executes it */
+  #carryOut(record: RecordT): ThingT // see comment below (not mine) about "always returns if a record"
+  #carryOut(record: Fetched<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null
+  #carryOut(record: Fetched<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null {
+    const delivering = this.#deliveringOf(record, sent)
+    if (delivering.making === 'none') { return null }
+    const thing = this.#buildOrReceive2(delivering)
+    // I screwed up the logic or I have questions about vacating on remake into a new live instance and whose job it should be to call vacate -- is it ok to exist but risk not being vacated?
+    if (delivering.making === 'remake') { thing.vacate() }
+    this.#remakeSnapshot()
+    return thing
   }
 
   // The answer passed its verb's check, and is trusted: its act alone says where its record is (`deliverableFieldingTagOf`).
@@ -342,6 +354,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       }
       const record = (answer.ok ? answer.val : answer.dbhas) as Fetched<RecordT, SparseT>
       const pins   = (fielding === 'as_sent') ? { ...scope, ...SX.revisionPins.parse(sent) } : scope
+      // record consistency check
       if (! isConsistent(record, pins)) { throw deliveredNotAsSent(fielding, record, pins) }
       return this.#deliveringOfRecord(record)
     } catch (err) { throw refusalOfDelivering(err, answer) }
@@ -354,8 +367,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    * Throws `storage_issue` for a record of another vault_tok than the listing's, and `record_conflict` where storage
    * and the instance listed disagree on the history of one revision.
    */
-  #deliveringOfRecord(record: Fetched<RecordT, SparseT>): Delivering<Fetched<RecordT, SparseT>, ThingT> {
+  #deliveringOfRecord(record: Fetched<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Delivering<Fetched<RecordT, SparseT>, ThingT> {
     const vault_tok = this.vaultTokOfWorld()
+    // record consistency check
     if ((vault_tok !== null) && (record.vault_tok !== vault_tok)) { throw rowOfOtherVaultTok(record) }
     const listed     = this.at(this.scopeOf(record))
     if (listed === null) { return { making: 'make', mod: 'adopt', record } }
@@ -365,8 +379,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const heldShape  = listed.shape
     const isRebirth  = (heldShape === 'gone') && (rcvdShape !== 'gone')
     const isPerLife  = this.isOneLifePerInstance
-    if (isPerLife && (age === 'older'))                                   { return { making: 'listed', listed, mod: 'older' } }
+    if (isPerLife && (age === 'older'))                                  { return { making: 'listed', listed, mod: 'older' } }
     if (isPerLife && (age === 'newer') && ((! isSameLife) || isRebirth)) { return { making: 'remake', listed, mod: 'adopt', record } }
+    // there's a lot of code spread across deliveringOfRecord and deliveringOf to ensure that the records are consistent. There might be good reasons for that! (the ordering being  more dependent than I see at a casual glance, or certain tags not  being available). So this is just an  observation not a directive
     if (record.vault_tok !== listed.vault_tok)                           { throw otherVaultTok(record) }
     if ((age === 'same') && (! isSameLife))                              { throw oneRevisionTwoLives(record) }
     if (age === 'older')                                                 { return { making: 'listed', listed, mod: 'older' } }
@@ -376,30 +391,23 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return { making: 'listed', listed, mod: 'same' }
   }
 
-  // The one place an instance is made and enlisted: `makeThing` is called from here alone, at the void revision.
-  /** Do what `delivering` says, and answer the instance it leaves listed, or null for none. */
-  #carryOut(delivering: Delivering<Fetched<RecordT, SparseT>, ThingT>): ThingT | null {
-    if (delivering.making === 'none') { return null }
-    this.demandEnabled()
-    if (delivering.making === 'listed') {
-      if (delivering.mod === 'adopt') { delivering.listed.receiveRecord(delivering.record) } else if (delivering.mod === 'same') { delivering.listed.markRefreshed() }
-      this.#remakeSnapshot()
-      return delivering.listed
+  // make Delivering tagged on 'none' or (my preference) supply dummy mod, listed, null
+  #buildOrReceive2({ making, mod, listed, record }: Delivering<RecordT, ThingT>): ThingT {
+    if (making === 'listed') {
+      if (mod === 'adopt') { return listed.receiveRecord(record) }
+      if (mod === 'same') { return listed.markRefreshed() }
     }
-    const thing = this.makeThing({ ...this.sparseOf(delivering.record), ...SX.VoidRevision, am: 'x' })
-    thing.receiveRecord(delivering.record)
+    // If we can just make it directly, that would be better
+    const thing = this.makeThing({ ...this.sparseOf(record), ...SX.VoidRevision, am: 'x' })
+    thing.receiveRecord(record)
     this.#enlist(thing)
-    if (delivering.making === 'remake') { delivering.listed.vacate() }
-    this.#remakeSnapshot()
     return thing
   }
-
   /** The instance under the scope of `record`: made, brought up to it, or remade, as delivering it decides. */
   protected buildOrReceive(record: Fetched<RecordT, SparseT>): ThingT {
     this.demandEnabled()
-    const delivering = this.#deliveringOfRecord(record)
     // A record's delivering always leaves an instance listed: it never makes `none`.
-    return this.#carryOut(delivering)!
+    return this.#carryOut(record) // should this just call deliver?
   }
   // --
 
