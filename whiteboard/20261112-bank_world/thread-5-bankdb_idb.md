@@ -1,6 +1,6 @@
 # Thread 5: bankdb_idb (2026-11-12)
 
-Branch `20261112-bankdb_idb`, PR #TBD, stacked on [#666](https://github.com/mrflip/safebyok/pull/666) (thread 4b). Justify: green.
+Branch `20261112-bankdb_idb`, PR [#668](https://github.com/mrflip/safebyok/pull/668), stacked on [#666](https://github.com/mrflip/safebyok/pull/666) (thread 4b). Justify: green.
 
 * **Built**: `IdbBankDB` and `idbBankDB()` in `packages/safebyok-indexeddb/src/idb-bank-db.ts`, its shelf and scopepaths in
   `bank-shelf.ts`, tests in `tests/idb-bank-db.test.ts`. Both src files and the test began as verbatim copies of
