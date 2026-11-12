@@ -227,14 +227,14 @@ export abstract class AdapterVaultDB implements VaultDB {
   async revokePasskey(record: VaultRecord, opts: GateVerbOpts) { return goodOrThrow(await this.tryRevokePasskey(record, opts)) }
 
   /** Non-throwing form of {@link revokePasskey}. */
-  async tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked'>> {
+  async tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked' | 'passed'>> {
     try {
       const vaultRecord = SX.passkeyRevokeRecord.parse(record)
       const answer = await this.tryPutVault(gateAskOf('revokePasskey', vaultRecord, opts))
       if (! answer.ok) { return answer }
       // `passed`: the stored vault has no passkey wayin to revoke, so its row is returned as stored.
-      const val = (answer.act === 'passed') ? liveVaultOf(answer.world, vaultRecord) : vaultRecord
-      return { ...answer, act: 'revoked', val, world: val }
+      if (answer.act === 'passed') { return { ...answer, act: 'passed', val: liveVaultOf(answer.world, vaultRecord) } }
+      return { ...answer, act: 'revoked', val: vaultRecord, world: vaultRecord }
     } catch (err) { return this.answerForRefusal(err, 'revokePasskey', { op: 'put', gateVerb: 'revokePasskey', ...record, record }) }
   }
   // --
