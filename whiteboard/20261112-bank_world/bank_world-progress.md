@@ -15,6 +15,8 @@ What the threads have taught, newer than the plan where they disagree. Kept by t
 
 * *Orchestrator:* `guarantees-bank.md` and `deliver-contract-bank.md` (opus, at the Coach's suggestion) are the targets for 8b and 10. Each opens with a *What moves* list whose open questions (autolock's peek through the Lease; vacate's forget with no Bank in hand; how `requestCleartext` reaches a bank gating; a live bank row under another `bank_tok` ending the Bank; names such as `receiveParent`) are thread 8's and 10's to settle by ground rule 4 and report, not the Coach's. Where a draft and design.md disagree, design.md wins and the draft is corrected.
 
+* *Coach, 2026-11-12:* a box row carries `bank_tok` beside `vault_tok`; its parent life is `${bank_tok}/${vault_tok}`, one string to the classifier, two predicates in SQL. BankDB's box row is BX's own, `fmt` 5003. Sent to thread 4 as a directive mid-build. It closes thread 3's "box verbs see only the vault row".
+
 ## The BankDB `do*` list
 
 (thread 4 fills this in)

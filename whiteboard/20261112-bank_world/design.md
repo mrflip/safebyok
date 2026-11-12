@@ -52,7 +52,7 @@ and 7002, and a shape changed after that moves once more.
 | bank | 3001 | none | `bank_tok` | nothing |
 | gate | 4001 | bank | `bank_tok`, `gate_tok` | `wayins`, `auth`, `sigs`, `meta` |
 | vault | 6003 | bank | `bank_tok`, `vault_tok` | nothing |
-| box | 5002 | vault | `vault_tok`, `box_tok` | `whisper_codec`, `whisper_schema_version`, `sidecar`, `box_key_wrapped`, `whisper_ciphered` |
+| box | 5003 | vault, and the bank | `bank_tok`, `vault_tok`, `box_tok` | `whisper_codec`, `whisper_schema_version`, `sidecar`, `box_key_wrapped`, `whisper_ciphered` |
 | lease (device) | 7003 | | `bank_tok`, `gate_tok`, `gate_revision_tok` | the bank's `registered_at`, `gatelabel`, `proved_at`, `wayinkind`, `lease_key`, `bank_key_lease_wrapped` |
 | device row (device; today its "bank row") | none | | | `device_tok` (today `device_id`) |
 
@@ -62,6 +62,10 @@ and 7002, and a shape changed after that moves once more.
   with it.
 * **A live bank row has a live `main` gate row.** `buildBank` puts both in one step, and nothing
   deletes the `main` gate but `delBank`. A bank row without one is damage, not a state.
+* **A box row carries `bank_tok` as well as `vault_tok`** (the Coach, 2026-11-12): "treat their
+  concatenation as a virtual parent_tok life token (join with '/' to use as a string; in SQL
+  you'll set separate predicates)". A box's parent life is `${bank_tok}/${vault_tok}`, compared with
+  the vault row's own, so a box verb also sees a vault row left from an ended bank.
 * **A tombstone** keeps the row's sparse fields under a new life tok of its own, as now. Only the
   bank row leaves one at `delBank`: its gate, vault and box rows are deleted in that step.
 * **A gate's wayins are a bag by `wayinlabel`** (ruled): `wayins: { main, passkey0? }`, `main` a
