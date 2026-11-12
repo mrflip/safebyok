@@ -1,6 +1,7 @@
 import * as CX from '../../src/shapes/shapes-core'
 import type { Ciphered, BoxKeyWrapped, VaultKeyLeaseWrapped, VaultKeyWayinWrapped, WhisperCiphered, VaultScope } from '../../src/shapes/shapes-core'
-import type { PasskeyAnswer, PassphraseWayinRecord } from '../../src/shapes/shapes-gateish'
+import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
+import type { Gate as VaultGate } from '../../src/shapes/shapes-storage'
 import      { toB64 }                               from '../../src/helpers/crypto'
 import type { KeyDeriver }                          from '../../src/deriver/basederiver'
 import      { type StrengthChecker, StrongVerdict } from '../../src/helpers/passphrase-strength'
@@ -47,10 +48,10 @@ export function fakeCiphered(tag: string): FakeCiphered {
  */
 export function scopeOf(user_id: string, vaultlabel = 'main'): VaultScope { return { user_id, banklabel: 'acme', vaultlabel } }
 
-/** A shape-valid passphrase wayin, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
+/** A shape-valid passphrase wayin of a vault record's gate, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
  * never decrypt. It wraps the vault's first vaultKey, and was sealed by the bank world's first device.
  */
-export function wayinOf(tag: string, overrides: Partial<PassphraseWayinRecord> = {}): PassphraseWayinRecord {
+export function wayinOf(tag: string, overrides: Partial<VaultGate['passphrase_wayin']> = {}): VaultGate['passphrase_wayin'] {
   return {
     wayinkind:               'passphrase',
     key_deriver_label:       'test_digest_v0',

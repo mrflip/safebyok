@@ -4,19 +4,19 @@ import { describe, expect, it } from 'vitest'
 import { makeLeaseKey } from '../../src/helpers/crypto'
 import { objCheck } from '../../src/helpers/validator'
 import type { Awaitable } from '../../src/helpers/helpers'
-import type { BankScope, VaultScope } from '../../src/shapes/shapes-core'
+import type { BankScope } from '../../src/shapes/shapes-core'
 import * as CX from '../../src/shapes/shapes-core'
 import type { LeaseRow, LeaseScopepath } from '../../src/shapes/shapes-storage'
 import type { DeviceDB } from '../../src/storage/device-db'
 import { expectBad, expectGood, expectRefusal } from './refusals'
-import { bankScope, vaultScope, vaultScopeOf } from './storage-world'
+import { bankScope, vaultScope } from './storage-world'
 
 // == [The hooks a DeviceDB hands the battery]: DeviceDBRowCheats, DeviceDBBatteryOpts
 
 /** A DeviceDB's raw lease and device rows, past its verbs: the test backdoor the battery plants a row by, damaged or not, and reads the rows back by. */
 export type DeviceDBRowCheats = {
   /** Writes `row` as the lease row at `scope`, unchecked. */
-  plantLeaseRow:  (scope: VaultScope, row: unknown) => Awaitable<void>
+  plantLeaseRow:  (scope: BankScope, row: unknown) => Awaitable<void>
   /** Every lease row as stored, in any order. */
   leaseRowsOf:    () => Awaitable<unknown[]>
   /** Writes `row` as the device row at `scope`, unchecked. */
@@ -43,17 +43,20 @@ const batteryOpts = objCheck(({ fn }) => ({
   _cheat_failNextCall: fn<NonNullable<DeviceDBBatteryOpts['_cheat_failNextCall']>>().optional(),
 }), 'bad_option')
 
-// == [The rows the cases share]: T0, Hour, asked, leaseRowOf, scopepathOf, bagOf
+// == [The rows the cases share]: T0, Hour, asked, bankScopeOf, leaseRowOf, scopepathOf, bagOf
 
 const T0 = Date.UTC(2026, 10, 3)
 const Hour = 3_600_000
-const asked = { ...vaultScope, vault_tok: 'tok_one' }
+const asked = { ...bankScope, bank_tok: 'tok_one' }
 
-/** A lease row of the vault `asked` names, its leaseKey a real handle, its other fields opaque. */
+/** The bank scope of `banklabel`, for the user of {@link bankScope}. */
+function bankScopeOf(banklabel: string): BankScope { return { ...bankScope, banklabel } }
+
+/** A lease row of the bank `asked` names, its leaseKey a real handle, its other fields opaque. */
 async function leaseRowOf(over: Partial<LeaseRow> = {}): Promise<LeaseRow> { return { ...asked, proved_at: T0, lease_key: await makeLeaseKey(), wrapped: 'opaque', ...over } }
 
 /** The scopepath a DeviceDB files the lease row of `scope` under. */
-function scopepathOf({ user_id, banklabel, vaultlabel }: VaultScope): LeaseScopepath { return [user_id, banklabel, vaultlabel] }
+function scopepathOf({ user_id, banklabel }: BankScope): LeaseScopepath { return [user_id, banklabel] }
 
 /** A raw row, as the bag a case reads a field of. */
 function bagOf(row: unknown): Record<string, unknown> { return row as Record<string, unknown> }
@@ -76,7 +79,7 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
 
   describe(label, () => {
     describe("stow(row), peek(asked)", () => {
-      it("peeks the row stowed for the vault, its lease_key handle and its opaque fields as stowed", async () => {
+      it("peeks the row stowed for the bank, its lease_key handle and its opaque fields as stowed", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         const peeked = await deviceDB.peek(asked)
@@ -86,30 +89,30 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
         expect((leaseKey as CryptoKey).extractable).to.be.false
       })
 
-      it("peeks null for a vault with nothing stowed", async () => {
+      it("peeks null for a bank with nothing stowed", async () => {
         const deviceDB = await fresh()
         expect(await deviceDB.peek(asked)).to.be.null
       })
 
-      it("peeks null under another vault_tok", async () => {
+      it("peeks null under another bank_tok", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
-        expect(await deviceDB.peek({ ...asked, vault_tok: 'tok_two' })).to.be.null
+        expect(await deviceDB.peek({ ...asked, bank_tok: 'tok_two' })).to.be.null
       })
 
-      it("keeps each vault scope apart", async () => {
+      it("keeps each bank scope apart", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
-        expect(await deviceDB.peek({ ...asked, vaultlabel: 'other' })).to.be.null
+        expect(await deviceDB.peek({ ...asked, banklabel: 'other' })).to.be.null
         expect(await deviceDB.peek({ ...asked, user_id: 'u2' })).to.be.null
       })
 
-      it("stows a new vault_tok over the old row of the scope", async () => {
+      it("stows a new bank_tok over the old row of the scope", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
-        await deviceDB.stow(await leaseRowOf({ vault_tok: 'tok_two' }))
+        await deviceDB.stow(await leaseRowOf({ bank_tok: 'tok_two' }))
         expect(await deviceDB.peek(asked)).to.be.null
-        expect(await deviceDB.peek({ ...asked, vault_tok: 'tok_two' })).to.not.be.null
+        expect(await deviceDB.peek({ ...asked, bank_tok: 'tok_two' })).to.not.be.null
       })
 
       it("hands back a copy of the row stowed", async () => {
@@ -123,15 +126,15 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
 
       it.skipIf(noRows)("refuses to peek a stored row that fails its check", async () => {
         const deviceDB = await fresh()
-        await rowsOf(deviceDB).plantLeaseRow(vaultScope, { ...asked, proved_at: 'yesterday' })
+        await rowsOf(deviceDB).plantLeaseRow(bankScope, { ...asked, proved_at: 'yesterday' })
         await expectRefusal(deviceDB.peek(asked), 'damaged_lease')
       })
 
       it("refuses a malformed row or query", async () => {
         const deviceDB = await fresh()
         await expectRefusal(deviceDB.stow({ ...asked, lease_key: await makeLeaseKey() } as unknown as LeaseRow))
-        await expectRefusal(deviceDB.peek({ ...asked, vaultlabel: 'No Good!' }))
-        await expectRefusal(deviceDB.peek({ ...vaultScope } as never))
+        await expectRefusal(deviceDB.peek({ ...asked, banklabel: 'No Good!' }))
+        await expectRefusal(deviceDB.peek({ ...bankScope } as never))
       })
 
       it("each try form returns an Outcome", async () => {
@@ -144,7 +147,7 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
     })
 
     describe("forget(asked)", () => {
-      it("forgets the row stowed under that vault_tok", async () => {
+      it("forgets the row stowed under that bank_tok", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         await deviceDB.forget(asked)
@@ -159,11 +162,11 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
         expect(await rowsOf(deviceDB).leaseRowsOf()).to.have.lengthOf(0)
       })
 
-      it("leaves a row of another vault_tok untouched", async () => {
+      it("leaves a row of another bank_tok untouched", async () => {
         const deviceDB = await fresh()
-        await deviceDB.stow(await leaseRowOf({ vault_tok: 'tok_two' }))
+        await deviceDB.stow(await leaseRowOf({ bank_tok: 'tok_two' }))
         await deviceDB.forget(asked)
-        expect(await deviceDB.peek({ ...asked, vault_tok: 'tok_two' })).to.not.be.null
+        expect(await deviceDB.peek({ ...asked, bank_tok: 'tok_two' })).to.not.be.null
       })
 
       it("is a no-op where nothing is stowed", async () => {
@@ -195,12 +198,12 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
     describe("listLeases()", () => {
       it("returns every stowed lease, oldest first, without its key", async () => {
         const deviceDB = await fresh()
-        await deviceDB.stow(await leaseRowOf({ vaultlabel: 'late', proved_at: T0 - Hour }))
-        await deviceDB.stow(await leaseRowOf({ vaultlabel: 'early', proved_at: T0 - (3 * Hour) }))
-        await deviceDB.stow(await leaseRowOf({ vaultlabel: 'fresh', proved_at: T0 }))
+        await deviceDB.stow(await leaseRowOf({ banklabel: 'late', proved_at: T0 - Hour }))
+        await deviceDB.stow(await leaseRowOf({ banklabel: 'early', proved_at: T0 - (3 * Hour) }))
+        await deviceDB.stow(await leaseRowOf({ banklabel: 'fresh', proved_at: T0 }))
         const found = await deviceDB.listLeases()
-        expect(found.map((row) => row.vaultlabel)).to.deep.equal(['early', 'late', 'fresh'])
-        expect(found[0]).to.deep.equal({ ...asked, vaultlabel: 'early', proved_at: T0 - (3 * Hour) })
+        expect(found.map((row) => row.banklabel)).to.deep.equal(['early', 'late', 'fresh'])
+        expect(found[0]).to.deep.equal({ ...asked, banklabel: 'early', proved_at: T0 - (3 * Hour) })
       })
 
       it("finds the leases of every bank on the device", async () => {
@@ -213,15 +216,15 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
       it("leaves out a forgotten lease", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
-        await deviceDB.stow(await leaseRowOf({ vaultlabel: 'gone' }))
-        await deviceDB.forget({ ...asked, vaultlabel: 'gone' })
+        await deviceDB.stow(await leaseRowOf({ banklabel: 'gone' }))
+        await deviceDB.forget({ ...asked, banklabel: 'gone' })
         const found = await deviceDB.listLeases()
-        expect(found.map((row) => row.vaultlabel)).to.deep.equal(['main'])
+        expect(found.map((row) => row.banklabel)).to.deep.equal(['acme'])
       })
 
       it.skipIf(noRows)("leaves out a stored row that fails its check", async () => {
         const deviceDB = await fresh()
-        await rowsOf(deviceDB).plantLeaseRow(vaultScopeOf('damaged'), { proved_at: 5 })
+        await rowsOf(deviceDB).plantLeaseRow(bankScopeOf('damaged'), { proved_at: 5 })
         expect(await deviceDB.listLeases()).to.deep.equal([])
       })
 
@@ -237,7 +240,7 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
         await deviceDB.stow(await leaseRowOf())
         const [raw, ...more] = await expectGood(deviceDB.tryListRawLeases())
         expect(more).to.deep.equal([])
-        expect(raw?.scopepath).to.deep.equal(scopepathOf(vaultScope))
+        expect(raw?.scopepath).to.deep.equal(scopepathOf(bankScope))
         expect(raw?.row).to.include({ ...asked, proved_at: T0, wrapped: 'opaque' })
         expect(bagOf(raw?.row)['lease_key']).to.be.instanceOf(CryptoKey)
       })
@@ -245,22 +248,22 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
       it.skipIf(noRows)("includes a stored row that fails its check", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
-        await rowsOf(deviceDB).plantLeaseRow(vaultScopeOf('damaged'), { proved_at: 5 })
-        expect(await deviceDB.listRawLeases()).to.deep.include({ scopepath: scopepathOf(vaultScopeOf('damaged')), row: { proved_at: 5 } })
+        await rowsOf(deviceDB).plantLeaseRow(bankScopeOf('damaged'), { proved_at: 5 })
+        expect(await deviceDB.listRawLeases()).to.deep.include({ scopepath: scopepathOf(bankScopeOf('damaged')), row: { proved_at: 5 } })
         const found = await deviceDB.listLeases()
-        expect(found.map((row) => row.vaultlabel)).to.deep.equal(['main'])
+        expect(found.map((row) => row.banklabel)).to.deep.equal(['acme'])
       })
 
       it("hands back a copy of each row stowed and its scopepath", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
         const [raw] = await deviceDB.listRawLeases()
-        bagOf(raw?.row)['vault_tok'] = 'tok_changed'
-        raw!.scopepath[2] = 'changed'
+        bagOf(raw?.row)['bank_tok'] = 'tok_changed'
+        raw!.scopepath[1] = 'changed'
         const peeked = await deviceDB.peek(asked)
-        expect(peeked?.vault_tok).to.eq(asked.vault_tok)
+        expect(peeked?.bank_tok).to.eq(asked.bank_tok)
         const [again] = await deviceDB.listRawLeases()
-        expect(again?.scopepath).to.deep.equal(scopepathOf(vaultScope))
+        expect(again?.scopepath).to.deep.equal(scopepathOf(bankScope))
       })
 
       it("returns an empty list for an empty DeviceDB", async () => {
@@ -273,7 +276,7 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
       it.skipIf(noRows)("deletes a stored row that fails its check, by its scopepath", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
-        await rowsOf(deviceDB).plantLeaseRow(vaultScopeOf('damaged'), { proved_at: 5 })
+        await rowsOf(deviceDB).plantLeaseRow(bankScopeOf('damaged'), { proved_at: 5 })
         const listed = await deviceDB.listRawLeases()
         const damaged = listed.find(({ row }) => bagOf(row)['proved_at'] === 5)
         await deviceDB.forgetRawLease(damaged!.scopepath)
@@ -284,35 +287,35 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
       it.skipIf(noRows)("deletes a row stored under invalid labels, by its scopepath", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
-        const badLabel = vaultScopeOf('Bad Label')
+        const badLabel = bankScopeOf('Bad Label')
         await rowsOf(deviceDB).plantLeaseRow(badLabel, await leaseRowOf(badLabel))
         const listed = await deviceDB.listRawLeases()
-        const doomed = listed.find(({ scopepath }) => scopepath[2] === badLabel.vaultlabel)
+        const doomed = listed.find(({ scopepath }) => scopepath[1] === badLabel.banklabel)
         expect(doomed?.scopepath).to.deep.equal(scopepathOf(badLabel))
         await deviceDB.forgetRawLease(doomed!.scopepath)
         const left = await deviceDB.listRawLeases()
-        expect(left.map(({ scopepath }) => scopepath)).to.deep.equal([scopepathOf(vaultScope)])
+        expect(left.map(({ scopepath }) => scopepath)).to.deep.equal([scopepathOf(bankScope)])
         expect(await deviceDB.listLeases()).to.have.lengthOf(1)
       })
 
       it.skipIf(noRows)("deletes a row that lost its scope, by its scopepath", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
-        const stripped = vaultScopeOf('stripped')
+        const stripped = bankScopeOf('stripped')
         await rowsOf(deviceDB).plantLeaseRow(stripped, { proved_at: T0, wrapped: 'opaque' })
         const listed = await deviceDB.listRawLeases()
-        const doomed = listed.find(({ scopepath }) => scopepath[2] === stripped.vaultlabel)
+        const doomed = listed.find(({ scopepath }) => scopepath[1] === stripped.banklabel)
         expect(doomed?.scopepath).to.deep.equal(scopepathOf(stripped))
         await deviceDB.forgetRawLease(doomed!.scopepath)
         const left = await deviceDB.listRawLeases()
-        expect(left.map(({ scopepath }) => scopepath)).to.deep.equal([scopepathOf(vaultScope)])
+        expect(left.map(({ scopepath }) => scopepath)).to.deep.equal([scopepathOf(bankScope)])
         expect(await deviceDB.listLeases()).to.have.lengthOf(1)
       })
 
-      it("deletes a lease row whatever its vault_tok", async () => {
+      it("deletes a lease row whatever its bank_tok", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
-        await deviceDB.forgetRawLease(scopepathOf(vaultScope))
+        await deviceDB.forgetRawLease(scopepathOf(bankScope))
         expect(await deviceDB.peek(asked)).to.be.null
         expect(await deviceDB.listRawLeases()).to.deep.equal([])
       })
@@ -320,18 +323,19 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
       it("is a no-op where there is no row", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf())
-        const absent = scopepathOf(vaultScopeOf('absent'))
+        const absent = scopepathOf(bankScopeOf('absent'))
         await deviceDB.forgetRawLease(absent)
         const deleted = await deviceDB.tryForgetRawLease(absent)
         expect(deleted.ok).to.be.true
         expect(await deviceDB.listRawLeases()).to.have.lengthOf(1)
       })
 
-      it("refuses what is not three strings", async () => {
+      it("refuses what is not two strings", async () => {
         const deviceDB = await fresh()
-        await expectRefusal(deviceDB.forgetRawLease(vaultScope as never))
-        await expectBad(deviceDB.tryForgetRawLease(['u1', 'acme'] as never))
-        await expectBad(deviceDB.tryForgetRawLease(['u1', 'acme', 5] as never))
+        await expectRefusal(deviceDB.forgetRawLease(bankScope as never))
+        await expectBad(deviceDB.tryForgetRawLease(['u1'] as never))
+        await expectBad(deviceDB.tryForgetRawLease(['u1', 5] as never))
+        await expectBad(deviceDB.tryForgetRawLease(['u1', 'acme', 'main'] as never))
       })
     })
 
@@ -392,7 +396,7 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
         expect(await deviceDB.listRawLeases()).to.have.lengthOf(1)
         expect(await deviceDB.listLeases()).to.have.lengthOf(1)
         expect(await deviceDB.listRawDevices()).to.have.lengthOf(1)
-        await deviceDB.forgetRawLease(scopepathOf(vaultScope))
+        await deviceDB.forgetRawLease(scopepathOf(bankScope))
         expect(await deviceDB.listRawDevices()).to.have.lengthOf(1)
       })
 
@@ -482,7 +486,7 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
         const deviceDB = await fresh()
         const row = await leaseRowOf()
         const verbs = [
-          () => deviceDB.tryStow(row), () => deviceDB.tryPeek(asked), () => deviceDB.tryForget(asked), () => deviceDB.tryListLeases(), () => deviceDB.tryListRawLeases(), () => deviceDB.tryForgetRawLease(scopepathOf(vaultScope)),
+          () => deviceDB.tryStow(row), () => deviceDB.tryPeek(asked), () => deviceDB.tryForget(asked), () => deviceDB.tryListLeases(), () => deviceDB.tryListRawLeases(), () => deviceDB.tryForgetRawLease(scopepathOf(bankScope)),
           () => deviceDB.tryEnsureCachedDevice(bankScope), () => deviceDB.tryForgetDevice(bankScope), () => deviceDB.tryListRawDevices(),
         ]
         for (const verb of verbs) {

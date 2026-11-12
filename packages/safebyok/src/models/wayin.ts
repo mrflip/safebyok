@@ -3,7 +3,7 @@ import { cipherCtx } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
 import type { Wayinkind } from '../shapes/shapes-enums'
 import type * as CX from '../shapes/shapes-core'
-import { type VaultStamp, type WayinHeader, type WayinRecord, vaultStamp, wayinHeader, wayinRecord } from '../shapes/shapes-gateish'
+import { type BankStamp, type GateStamp, type WayinHeader, type WayinRecord, bankStamp, gateStamp, wayinHeader, wayinRecord } from '../shapes/shapes-gateish'
 
 // == [The ctx]: PurposeForWayinkind, wayinCtxOf
 
@@ -13,21 +13,22 @@ export const PurposeForWayinkind = Object.freeze({
   passkey:    'vault_key_passkey_wrapped',
 } as const satisfies Readonly<Record<Wayinkind, string>>)
 
-/** Serialized name/value pairs bound into the wrapped value as cryptographic context.
+/** Serialized name/value pairs bound into the wrapped value as cryptographic context: the bank's stamp, the gate's, the purpose and the header.
  * The value cannot be unwrapped unless the same bytes, unchanged, are independently provided along with the wrapping
  * key. Any change to that associated data, another user_id or a forged registered_at, will not unwrap.
  */
-export function wayinCtxOf(stamp: VaultStamp, header: WayinHeader): Uint8Array {
+export function wayinCtxOf(bank: BankStamp, gate: GateStamp, header: WayinHeader): Uint8Array {
   const checked = wayinHeader.parse(header)
-  return cipherCtx(vaultStamp.parse(stamp), PurposeForWayinkind[checked.wayinkind], checked)
+  return cipherCtx([bankStamp.parse(bank), gateStamp.parse(gate)], PurposeForWayinkind[checked.wayinkind], checked)
 }
 // --
 
-/** One way into a vault: its passphrase or its passkey. */
+/** One way into a bank, kept in its gate: its passphrase or its passkey. */
 export class Wayin {
-  // == [Props]: wayinkind, device_tok, registered_at, vault_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, #pickle
+  // == [Props]: wayinkind, wayinlabel, device_tok, registered_at, vault_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, #pickle
 
   declare readonly wayinkind:               Wayinkind
+  declare readonly wayinlabel:              'main' | 'passkey0'
   declare readonly device_tok:              string
   declare readonly registered_at:           number
   declare readonly vault_key_wayin_wrapped: CX.VaultKeyWayinWrapped

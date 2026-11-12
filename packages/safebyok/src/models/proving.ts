@@ -8,9 +8,9 @@ import * as Phrases from '../helpers/phrases'
 import type { Wayinkind } from '../shapes/shapes-enums'
 import type { KeyDeriver } from '../deriver/basederiver'
 import * as CX from '../shapes/shapes-core'
-import type { VaultScope } from '../shapes/shapes-core'
+import type { BankScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
-import { type LeaseFriend, type Novel, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type VaultStamp, type WayinHeader, FirstGateEpoch, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs } from '../shapes/shapes-gateish'
+import { type BankStamp, type CitedGate, type GateStamp, type LeaseFriend, type Novel, type PasskeyWayinHeader, type PassphraseWayinHeader, type ProvingWorld, type StampedGate, type WayinHeader, passkeyNovelArgs, passkeyStoredArgs, passkeyWayinHeader, passphraseNovelArgs, passphraseStoredArgs, passphraseWayinHeader, provingLeaseArgs, strengthArgs } from '../shapes/shapes-gateish'
 import { keyDeriverLoadFailed, keyDeriverThrew, noPasskeyWayin, notKeyBytes, otherPasskey, otherPrfSalt, unknownKeyDeriver, wayinMadeAlready, wayinNotMadeYet, weakPassphrase, wrongPasskey, wrongPassphrase } from '../refusals/throwers'
 import { Lease } from './lease'
 import { Wayin, wayinCtxOf } from './wayin'
@@ -34,14 +34,14 @@ const Checks = Checkers('bad_option', ({ custom }) => ({
 
 /** The proving of a wayin: a strong key from birth, made by a subclass's static, and the one thing that can unwrap the vaultKey. Only the statics hear a clear, and they leave a passkeyClear unspent: spending it is their caller's. */
 export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
-  // == [Props]: wayinkind, header, stamp, gate_epoch, #wayinKey, #wayin, toJSON
+  // == [Props]: wayinkind, header, bankStamp, gateStamp, #wayinKey, #wayin, toJSON
 
   readonly wayinkind: HeaderT['wayinkind']
   readonly header:    HeaderT
-  /** The stamp of the vault this proving is of, as parsed: what every wayin ctx under it binds. */
-  declare readonly stamp: VaultStamp
-  /** The epoch of the gate proved, the first for a novel proving: what its lease is good for unless {@link Proving.buildLease} is told otherwise. */
-  declare readonly gate_epoch: number
+  /** The stamp of the bank this proving is of, as parsed: what every wayin ctx under it binds first. */
+  declare readonly bankStamp: BankStamp
+  /** The stamp of the gate this proving is of, as parsed: what every wayin ctx under it binds second. */
+  declare readonly gateStamp: GateStamp
 
   readonly #wayinKey: CryptoKey
   #wayin: Wayin | null = null
@@ -53,13 +53,13 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   // == [Construction]: constructor
 
   /** A proving of a stored wayin is born with it; a proving minted for a new wayin has none until `buildWayin`. */
-  protected constructor(stamp: VaultStamp, gate_epoch: number, header: HeaderT, wayinKey: CryptoKey, stored: Wayin | null = null) {
+  protected constructor(bank: BankStamp, gate: GateStamp, header: HeaderT, wayinKey: CryptoKey, stored: Wayin | null = null) {
     this.wayinkind = header.wayinkind
     this.header = Object.freeze(header)
     this.#wayinKey = wayinKey
     this.#wayin = stored
-    adorn(this, 'stamp', stamp)
-    adorn(this, 'gate_epoch', gate_epoch)
+    adorn(this, 'bankStamp', bank)
+    adorn(this, 'gateStamp', gate)
     Object.freeze(this)
   }
   // --
@@ -67,26 +67,30 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   // == [Methods]: judgeStrength, buildWayin, buildLease, wrapVaultKey, unwrapVaultKey, wayinCtx
 
   /** The strengthChecker's verdict. Anything it throws is replaced, to keep the passphrase it heard out of the error. */
-  static async judgeStrength(passphraseClear: GX.PassphraseCleartext, scope: VaultScope, world: ProvingWorld): Promise<GX.PassphraseVerdict> {
+  static async judgeStrength(passphraseClear: GX.PassphraseCleartext, scope: BankScope, world: ProvingWorld): Promise<GX.PassphraseVerdict> {
     const checked = strengthArgs.parse({ passphraseClear, scope, world })
     return checked.world.strengthChecker(checked.passphraseClear, checked.scope)
   }
 
-  /** This proving's wayin, made under a vaultKey new (`NOVEL`) or the `source` proving's of the same vault. A proving has one wayin. */
+  /** This proving's wayin, made under a vaultKey new (`NOVEL`) or the `source` proving's of the same gate. A proving has one wayin. */
   async buildWayin(source: Novel | Proving): Promise<Wayin> {
     if (this.#wayin !== null) { throw wayinMadeAlready() }
     const checked = Checks.wayinSource.parse(source)
-    if (checked !== NOVEL) { checkedConsistent(checked.stamp, this.stamp, { kind: 'unexpected_error', message: Phrases.ProvingOfOtherVault }) }
+    if (checked !== NOVEL) {
+      checkedConsistent(checked.bankStamp, this.bankStamp, { kind: 'unexpected_error', message: Phrases.ProvingOfOtherGate })
+      checkedConsistent(checked.gateStamp, this.gateStamp, { kind: 'unexpected_error', message: Phrases.ProvingOfOtherGate })
+    }
     const vaultKey = checked === NOVEL ? await makeVaultKey() : await checked.#unwrapVaultKey()
     return this.#wrapVaultKey(vaultKey)
   }
 
-  /** SLOPDOC: A lease on `friend`'s vault under the vaultKey its wayin has; granted and cached only once attached. */
-  async buildLease(friend: LeaseFriend, gate_epoch: number = this.gate_epoch): Promise<Lease> {
-    const checked = provingLeaseArgs.parse({ friend, gate_epoch })
-    checkedConsistent(checked.friend, this.stamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherVault })
+  /** A lease on `friend`'s bank under the vaultKey this proving's wayin wraps, citing `gate`, a revision of the gate proved; granted, not yet cached. */
+  async buildLease(friend: LeaseFriend, gate: CitedGate): Promise<Lease> {
+    const checked = provingLeaseArgs.parse({ friend, gate })
+    checkedConsistent(checked.friend, this.bankStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
+    checkedConsistent(checked.gate, this.gateStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
     const vaultKey = await this.#unwrapVaultKey()
-    return Lease.buildGranted(friend, vaultKey, { gate_epoch: checked.gate_epoch, wayinkind: this.wayinkind })
+    return Lease.buildGranted(friend, vaultKey, { gate: checked.gate, wayinkind: this.wayinkind })
   }
 
   async #wrapVaultKey(vaultKey: CryptoKey): Promise<Wayin> {
@@ -99,7 +103,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return unwrapKeyUnder(this.#wayinKey, this.#demandWayin().vault_key_wayin_wrapped, this.#wayinCtx(), RewrapUsage)
   }
 
-  #wayinCtx(): Uint8Array { return wayinCtxOf(this.stamp, this.header) }
+  #wayinCtx(): Uint8Array { return wayinCtxOf(this.bankStamp, this.gateStamp, this.header) }
   // --
 
   // == [Guards]: demandWayin
@@ -133,23 +137,24 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 export class PassphraseProving extends Proving<PassphraseWayinHeader> {
   // == [Construction]: buildNovel, buildStored
 
-  /** A proving for a new wayin, of the first gate's epoch. */
-  static async buildNovel(stamp: VaultStamp, passphraseClear: GX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
-    const { stamp: checked, passphraseClear: typed } = passphraseNovelArgs.parse({ stamp, passphraseClear, world })
-    const verdict = await super.judgeStrength(typed, checked, world)
+  /** A proving for a new passphrase wayin in the gate `gate` stamps, of the bank `bank` stamps. */
+  static async buildNovel(bank: BankStamp, gate: GateStamp, passphraseClear: GX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
+    const { bank: checkedBank, gate: checkedGate, passphraseClear: typed } = passphraseNovelArgs.parse({ bank, gate, passphraseClear, world })
+    const verdict = await super.judgeStrength(typed, checkedBank, world)
     if (! verdict.strong) { throw weakPassphrase(verdict.reason) }
     const header = mintPassphraseHeader(world)
     const passphraseKey = await passphraseKeyOf(world.keyDeriver, typed, fromB64(header.salt_b64))
-    return new PassphraseProving(checked, FirstGateEpoch, header, passphraseKey)
+    return new PassphraseProving(checkedBank, checkedGate, header, passphraseKey)
   }
 
   /** The proving of `gate`'s passphrase wayin, proved against the gate in hand. */
   static async buildStored(gate: StampedGate, passphraseClear: GX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
-    const { gate: { stamp, gate_epoch, passphrase_wayin }, passphraseClear: typed } = passphraseStoredArgs.parse({ gate, passphraseClear, world })
-    const { vault_key_wayin_wrapped: _wrapped, ...header } = passphrase_wayin
+    const { gate: { bankStamp, stamp, wayins }, passphraseClear: typed } = passphraseStoredArgs.parse({ gate, passphraseClear, world })
+    const { main } = wayins
+    const { vault_key_wayin_wrapped: _wrapped, ...header } = main
     if (header.key_deriver_label !== world.keyDeriver.key_deriver_label) { throw unknownKeyDeriver() }
     const passphraseKey = await passphraseKeyOf(world.keyDeriver, typed, fromB64(header.salt_b64))
-    const proving = new PassphraseProving(stamp, gate_epoch, header, passphraseKey, new Wayin(passphrase_wayin))
+    const proving = new PassphraseProving(bankStamp, stamp, header, passphraseKey, new Wayin(main))
     await proving.checkUnwraps(wrongPassphrase)
     return proving
   }
@@ -160,23 +165,24 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
 export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   // == [Construction]: buildNovel, buildStored
 
-  /** A proving for a new wayin, of the first gate's epoch. */
-  static async buildNovel(stamp: VaultStamp, passkeyClear: GX.PasskeyAnswer, world: ProvingWorld): Promise<PasskeyProving> {
-    const { stamp: checked, passkeyClear: answer } = passkeyNovelArgs.parse({ stamp, passkeyClear, world })
+  /** A proving for a new passkey wayin in the gate `gate` stamps, of the bank `bank` stamps. */
+  static async buildNovel(bank: BankStamp, gate: GateStamp, passkeyClear: GX.PasskeyAnswer, world: ProvingWorld): Promise<PasskeyProving> {
+    const { bank: checkedBank, gate: checkedGate, passkeyClear: answer } = passkeyNovelArgs.parse({ bank, gate, passkeyClear, world })
     const header = mintPasskeyHeader(world, answer)
-    const passkeyKey = await deriveWrappingKey(answer.prfBytes, wayinCtxOf(checked, header))
-    return new PasskeyProving(checked, FirstGateEpoch, header, passkeyKey)
+    const passkeyKey = await deriveWrappingKey(answer.prfBytes, wayinCtxOf(checkedBank, checkedGate, header))
+    return new PasskeyProving(checkedBank, checkedGate, header, passkeyKey)
   }
 
   /** The proving of `gate`'s passkey wayin, proved against the gate in hand. */
   static async buildStored(gate: StampedGate, passkeyClear: GX.PasskeyAnswer): Promise<PasskeyProving> {
-    const { gate: { stamp, gate_epoch, passkey_wayin }, passkeyClear: { credential_id, prf_salt_b64, prfBytes } } = passkeyStoredArgs.parse({ gate, passkeyClear })
-    if (passkey_wayin === null) { throw noPasskeyWayin() }
-    const { vault_key_wayin_wrapped: _wrapped, ...header } = passkey_wayin
+    const { gate: { bankStamp, stamp, wayins }, passkeyClear: { credential_id, prf_salt_b64, prfBytes } } = passkeyStoredArgs.parse({ gate, passkeyClear })
+    const { passkey0 } = wayins
+    if (passkey0 === undefined) { throw noPasskeyWayin() }
+    const { vault_key_wayin_wrapped: _wrapped, ...header } = passkey0
     if (credential_id !== header.credential_id) { throw otherPasskey() }
     if (prf_salt_b64 !== header.prf_salt_b64) { throw otherPrfSalt() }
-    const passkeyKey = await deriveWrappingKey(prfBytes, wayinCtxOf(stamp, header))
-    const proving = new PasskeyProving(stamp, gate_epoch, header, passkeyKey, new Wayin(passkey_wayin))
+    const passkeyKey = await deriveWrappingKey(prfBytes, wayinCtxOf(bankStamp, stamp, header))
+    const proving = new PasskeyProving(bankStamp, stamp, header, passkeyKey, new Wayin(passkey0))
     await proving.checkUnwraps(wrongPasskey)
     return proving
   }
@@ -188,6 +194,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
 function mintPassphraseHeader({ keyDeriver, device_tok }: ProvingWorld): PassphraseWayinHeader {
   return passphraseWayinHeader.parse({
     wayinkind:         'passphrase',
+    wayinlabel:        'main',
     key_deriver_label: keyDeriver.key_deriver_label,
     salt_b64:          toB64(randomBytes(keyDeriver.salt_size)),
     device_tok,
@@ -198,6 +205,7 @@ function mintPassphraseHeader({ keyDeriver, device_tok }: ProvingWorld): Passphr
 function mintPasskeyHeader({ device_tok }: ProvingWorld, { credential_id, prf_salt_b64 }: GX.PasskeyAnswer): PasskeyWayinHeader {
   return passkeyWayinHeader.parse({
     wayinkind:     'passkey',
+    wayinlabel:    'passkey0',
     credential_id,
     prf_salt_b64,
     device_tok,

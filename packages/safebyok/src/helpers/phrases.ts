@@ -208,7 +208,7 @@ export const AnswerNotAsSent = "Storage answered with a record other than the on
 
 // --
 
-// == [Models: provings]: CleartextMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, KeyDeriverThrew
+// == [Models: provings]: CleartextMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherGate, LeaseOfOtherGate, StampOfOtherVault, KeyDeriverThrew
 
 /** Why cleartexts that hand in neither a passphrase nor a passkey's answer are refused. */
 export const CleartextMissing = "An attempt hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
@@ -240,11 +240,11 @@ export const WayinNotMadeYet = "A proving was asked for the vaultKey before it m
 /** Why a proving that has a wayin already makes no other. */
 export const WayinMadeAlready = "This proving has a wayin already, and a proving has one: make a new proving for another wayin. A bug in the caller."
 
-/** Why a wayin is not made under the vaultKey of a proving of another vault. */
-export const ProvingOfOtherVault = "The source proving is of another vault: a wayin is made only under the vaultKey of the vault it lets into, so none was made. This is a bug in safebyok."
+/** Why a wayin is not made under the vaultKey of a proving of another gate. */
+export const ProvingOfOtherGate = "The source proving is of another bank or gate: a wayin is made only under the key of the bank it lets into, so none was made. This is a bug in safebyok."
 
-/** Why a lease is not granted to a vault other than the one a proving is of. */
-export const LeaseOfOtherVault = "This proving is of another vault: a lease is granted only to the vault whose stamp its wayin binds, so none was granted. This is a bug in safebyok."
+/** Why a lease is not granted to a bank or gate other than the one a proving is of. */
+export const LeaseOfOtherGate = "This proving is of another bank or gate: a lease is granted only to the bank and gate whose stamps its wayin binds, so none was granted. This is a bug in safebyok."
 
 /** Why a seal verb refuses a stamp of another vault, or another life of it. */
 export const StampOfOtherVault = "This stamp names another vault than this one, or another life of it, so nothing was sealed or opened. This is a bug in safebyok."

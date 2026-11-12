@@ -14,7 +14,7 @@ import { Lease } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving, guardKeyDeriver } from '../../src/models/proving'
 import { type StrengthChecker, guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import * as GX from '../../src/shapes/shapes-gateish'
-import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingWorld, type VaultStamp, FirstGateEpoch, vaultStamp } from '../../src/shapes/shapes-gateish'
+import { type BankStamp, type CitedGate, type GateStamp, type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingWorld, type VaultStamp } from '../../src/shapes/shapes-gateish'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/refusals/outcome'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
@@ -34,10 +34,19 @@ export function useFakeClock(): void {
 }
 // --
 
-// == [The vault]: WorldStamp
+// == [The stamps]: WorldBankStamp, WorldGateStamp, WorldVaultStamp, WorldGate
 
-/** The stamp of the vault every builder here makes things in: `u1`'s `main` vault of the app `acme`, registered at {@link T0}. */
-export const WorldStamp: VaultStamp = Object.freeze({ user_id: 'u1', banklabel: 'acme', vaultlabel: 'main', vault_tok: 'vault-tok-u1', registered_at: T0 })
+/** The stamp of the bank every builder here makes things in: `u1`'s bank `acme`, registered at {@link T0}. */
+export const WorldBankStamp: BankStamp = Object.freeze({ user_id: 'u1', banklabel: 'acme', bank_tok: 'bank-tok-u1', registered_at: T0 })
+
+/** The stamp of {@link WorldBankStamp}'s `main` gate, registered at {@link T0}. */
+export const WorldGateStamp: GateStamp = Object.freeze({ user_id: 'u1', banklabel: 'acme', gatelabel: 'main', gate_tok: 'gate-tok-u1', registered_at: T0 })
+
+/** The stamp of the `main` vault in {@link WorldBankStamp}'s bank, registered at {@link T0}: the first of the stamps a box hands a seal. */
+export const WorldVaultStamp: VaultStamp = Object.freeze({ user_id: 'u1', banklabel: 'acme', vaultlabel: 'main', vault_tok: 'vault-tok-u1', registered_at: T0 })
+
+/** The gate a lease cites when a test says nothing else: {@link WorldGateStamp}'s gate, at its first revision. */
+export const WorldGate: CitedGate = Object.freeze({ gatelabel: 'main', gate_tok: WorldGateStamp.gate_tok, revision_tok: 'gate-revision-tok-1' })
 // --
 
 // == [The friend]: FriendLeaseMillis, FakeLeaseFriend, fakeLeaseFriendOf
@@ -45,7 +54,7 @@ export const WorldStamp: VaultStamp = Object.freeze({ user_id: 'u1', banklabel: 
 /** The autolock duration of a {@link fakeLeaseFriendOf}: a day. */
 export const FriendLeaseMillis = 24 * 60 * 60_000
 
-/** A fake of a vault as a lease hears it: a {@link LeaseFriend} with a spy for `lock` and each deviceDB verb, over one scopepath. */
+/** A fake of a bank as a lease hears it: a {@link LeaseFriend} with a spy for `lock` and each deviceDB verb, over one scopepath. */
 export type FakeLeaseFriend = LeaseFriend & {
   lock:            Mock<() => void>
   peekLease:       Mock<LeaseFriend['peekLease']>
@@ -59,11 +68,11 @@ export type FakeLeaseFriend = LeaseFriend & {
   logged:          LoggedCall[]
 }
 
-/** A {@link FakeLeaseFriend} of {@link WorldStamp}, as `overrides` changes it, caching nothing yet, its verbs answering good. Script a refusal with the spy's `mockRejectedValueOnce(err)`, or `mockResolvedValueOnce(bad(err))` for a `try` verb. */
-export function fakeLeaseFriendOf(overrides: Partial<VaultStamp & Pick<LeaseFriend, 'leaseMillis'>> = {}): FakeLeaseFriend {
+/** A {@link FakeLeaseFriend} of {@link WorldBankStamp}, as `overrides` changes it, caching nothing yet, its verbs answering good. Script a refusal with the spy's `mockRejectedValueOnce(err)`, or `mockResolvedValueOnce(bad(err))` for a `try` verb. */
+export function fakeLeaseFriendOf(overrides: Partial<BankStamp & Pick<LeaseFriend, 'leaseMillis'>> = {}): FakeLeaseFriend {
   const { logger, calls } = spyLogger()
   const friend: FakeLeaseFriend = {
-    ...WorldStamp,
+    ...WorldBankStamp,
     leaseMillis:     FriendLeaseMillis,
     ...overrides,
     logger:          parseLogger(logger),
@@ -89,10 +98,10 @@ export function fakeLeaseFriendOf(overrides: Partial<VaultStamp & Pick<LeaseFrie
 }
 // --
 
-// == [Leases]: GrantedAs, makeGrantedLease, sealStampOf
+// == [Leases]: GrantedAs, makeGrantedLease, sealStampOf, sealStampsOf
 
-/** What {@link makeGrantedLease} records of a proving, unless told otherwise: the first gate, proved by passphrase. */
-export const GrantedAs: LeaseGrantOpts = Object.freeze({ gate_epoch: FirstGateEpoch, wayinkind: 'passphrase' })
+/** What {@link makeGrantedLease} records of a proving, unless told otherwise: {@link WorldGate}, proved by passphrase. */
+export const GrantedAs: LeaseGrantOpts = Object.freeze({ gate: WorldGate, wayinkind: 'passphrase' })
 
 /** A lease under a fresh vaultKey: no two share a key. Not cached. */
 export async function makeGrantedLease(friend: FakeLeaseFriend, opts: LeaseGrantOpts = GrantedAs): Promise<Lease> {
@@ -101,6 +110,9 @@ export async function makeGrantedLease(friend: FakeLeaseFriend, opts: LeaseGrant
 
 /** The two stamps a box hands the lease to seal its whisper under, its own fields, flat: `boxlabel` and `box_tok` for the boxKey's wrap, the same and `revision_seq` for the whisper's cipher. `overrides` lays fields over both. */
 export function sealStampOf(boxlabel: string, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord { return { boxlabel, box_tok: `box-tok-${boxlabel}`, revision_seq: 1, ...overrides } }
+
+/** The stamps a box hands the lease to seal under: {@link WorldVaultStamp}, then {@link sealStampOf} `boxlabel` and `overrides`. */
+export function sealStampsOf(boxlabel: string, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord[] { return [WorldVaultStamp, sealStampOf(boxlabel, overrides)] }
 // --
 
 // == [Provings]: TestPassphrase, DeviceTok, provingWorldOf, passkeyAnswerOf, builtGateOf
@@ -133,14 +145,14 @@ export function passkeyAnswerOf(overrides: Partial<GX.PasskeyAnswer> = {}): GX.P
   }
 }
 
-/** A first gate of {@link WorldStamp}, made as a birth makes it, of {@link TestPassphrase} and any passkey `answer`, which it leaves unspent, beside the passphrase's proving. */
+/** A gate of {@link WorldGateStamp}, made as a birth makes it, of {@link TestPassphrase} and any passkey `answer`, which it leaves unspent, beside the passphrase's proving. */
 export async function builtGateOf(answer?: GX.PasskeyAnswer): Promise<{ gate: Gate, proving: PassphraseProving }> {
   const world = provingWorldOf()
-  const proving = await PassphraseProving.buildNovel(WorldStamp, GX.passphraseCleartext.parse(TestPassphrase), world)
-  const passkeyProving = answer && await PasskeyProving.buildNovel(WorldStamp, answer, world)
+  const proving = await PassphraseProving.buildNovel(WorldBankStamp, WorldGateStamp, GX.passphraseCleartext.parse(TestPassphrase), world)
+  const passkeyProving = answer && await PasskeyProving.buildNovel(WorldBankStamp, WorldGateStamp, answer, world)
   const passphraseWayin = await proving.buildWayin(NOVEL)
   const passkeyWayin = await passkeyProving?.buildWayin(proving) ?? null
-  return { gate: Gate.make(WorldStamp, passphraseWayin, passkeyWayin), proving }
+  return { gate: Gate.make(WorldBankStamp, WorldGateStamp, passphraseWayin, passkeyWayin), proving }
 }
 // --
 
@@ -155,10 +167,10 @@ export function isZeroed(bytes: Uint8Array): boolean { return bytes.every((byte)
 /** What opens a wayin: the passphrase, for a passphrase wayin, or a copy of the PRF bytes taken before the proving zeroed them, for a passkey wayin. */
 export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
 
-/** A test backdoor: the raw bytes of the vaultKey `wayin` wraps, opened from outside the models as a later unlock would open it, from the secret, the wayin's header and the vault's stamp. It exists only so a test can show two wayins have one vaultKey, or that a wayin opens at all; no model hands out a vaultKey. Rejects with WebCrypto's error when the wayin will not open. */
-export async function _cheat_vaultKeyBytesOf(vault: VaultStamp, wayin: Wayin, secret: WayinSecret, keyDeriver: KeyDeriver = testDeriver): Promise<Uint8Array> {
+/** A test backdoor: the raw bytes of the vaultKey `wayin` wraps, opened from outside the models as a later unlock would open it, from the secret, the wayin's header and the bank's and gate's stamps. It exists only so a test can show two wayins have one vaultKey, or that a wayin opens at all; no model hands out a vaultKey. Rejects with WebCrypto's error when the wayin will not open. */
+export async function _cheat_vaultKeyBytesOf(bank: BankStamp, gate: GateStamp, wayin: Wayin, secret: WayinSecret, keyDeriver: KeyDeriver = testDeriver): Promise<Uint8Array> {
   const header = wayin.toJSON()
-  const ctx = wayinCtxOf(vaultStamp.parse(vault), header)
+  const ctx = wayinCtxOf(bank, gate, header)
   async function wayinKeyOf(): Promise<CryptoKey> {
     if ('prfBytes' in secret) {
       if (header.wayinkind !== 'passkey') { throw new Error('PRF bytes open a passkey wayin alone.') }

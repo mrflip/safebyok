@@ -10,7 +10,7 @@ import * as TH from '../test-helpers'
 const StorageCalls = ['doStow', 'doPeek', 'doForget', 'doListLeases', 'doForgetRawLease', 'doEnsureCachedDevice', 'doForgetDevice', 'doListDevices'] as const
 
 const memoryRowsOf = (deviceDB: MemoryDeviceDB): TH.DeviceDBRowCheats => ({
-  plantLeaseRow:  ({ user_id, banklabel, vaultlabel }, row) => { deviceDB._cheat_leaseRows().set(ckeyOf(user_id, banklabel, vaultlabel), { scopepath: [user_id, banklabel, vaultlabel], row }) },
+  plantLeaseRow:  ({ user_id, banklabel }, row) => { deviceDB._cheat_leaseRows().set(ckeyOf(user_id, banklabel), { scopepath: [user_id, banklabel], row }) },
   leaseRowsOf:    () => [...deviceDB._cheat_leaseRows().values()].map(({ row }) => row),
   plantDeviceRow: ({ user_id, banklabel }, row) => { deviceDB._cheat_deviceRows().set(ckeyOf(user_id, banklabel), row) },
   deviceRowsOf:   () => [...deviceDB._cheat_deviceRows().values()],

@@ -1,4 +1,4 @@
-/** The deviceDB, which caches on this device a lease for each vault and a device row for each bank. A subclass writes the `do*` calls. */
+/** The deviceDB, which caches on this device a lease and a device row for each bank. A subclass writes the `do*` calls. */
 
 import { IsDeviceDB } from '../helpers/consts'
 import { randomId } from '../helpers/crypto'
@@ -7,7 +7,7 @@ import { type VaultError, isVaultError } from '../refusals/errors'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import * as Refuse from '../refusals/throwers'
 import * as CX from '../shapes/shapes-core'
-import { type BankScope, type VaultScope, isPlainBag } from '../shapes/shapes-core'
+import { type BankScope, isPlainBag } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { DeviceRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 
@@ -22,7 +22,7 @@ export abstract class DeviceDB {
 
   // == [Lease verbs]: stow, tryStow, peek, tryPeek, forget, tryForget, listLeases, tryListLeases, listRawLeases, tryListRawLeases, forgetRawLease, tryForgetRawLease
 
-  /** Stow the lease row of its vault. */
+  /** Stow the lease row of its bank. */
   async stow(row: LeaseRow): Promise<void> {
     try {
       const leaseRow = SX.leaseRow.parse(row)
@@ -33,7 +33,7 @@ export abstract class DeviceDB {
   /** Non-throwing form of {@link stow}. */
   tryStow(row: LeaseRow): Promise<Outcome<void>> { return outcomeOf(() => this.stow(row)) }
 
-  /** The lease row stowed for this vault under this `vault_tok`, or null.
+  /** The lease row stowed for this bank under this `bank_tok`, or null.
    * Refuses `damaged_lease` when the stowed row fails its checks.
    */
   async peek(asked: LeaseQuery): Promise<LeaseRow | null> {
@@ -43,16 +43,16 @@ export abstract class DeviceDB {
       if (stored === null) { return null }
       const parsed = SX.leaseRow.safeParse(stored)
       if (! parsed.success) { throw Refuse.damagedLease() }
-      return (parsed.data.vault_tok === leaseQuery.vault_tok) ? parsed.data : null
+      return (parsed.data.bank_tok === leaseQuery.bank_tok) ? parsed.data : null
     } catch (err) { throw refusalOf(err, 'peek') }
   }
 
   /** Non-throwing form of {@link peek}. */
   tryPeek(asked: LeaseQuery): Promise<Outcome<LeaseRow | null>> { return outcomeOf(() => this.peek(asked)) }
 
-  // `peek` checks the `vault_tok` here in the base. `forget` leaves that check to the subclass, which must make it in one atomic
+  // `peek` checks the `bank_tok` here in the base. `forget` leaves that check to the subclass, which must make it in one atomic
   // step with the delete.
-  /** Forget the lease row stowed for this vault under this `vault_tok`. */
+  /** Forget the lease row stowed for this bank under this `bank_tok`. */
   async forget(asked: LeaseQuery): Promise<void> {
     try {
       const leaseQuery = SX.leaseQuery.parse(asked)
@@ -85,7 +85,7 @@ export abstract class DeviceDB {
   /** Non-throwing form of {@link listRawLeases}. */
   tryListRawLeases(): Promise<Outcome<RawLease[]>> { return outcomeOf(() => this.listRawLeases()) }
 
-  /** Forget the row filed under a scopepath from `listRawLeases`, damaged or not, without matching a `vault_tok`. */
+  /** Forget the row filed under a scopepath from `listRawLeases`, damaged or not, without matching a `bank_tok`. */
   async forgetRawLease(scopepath: LeaseScopepath): Promise<void> {
     try {
       const checked = SX.leaseScopepath.parse(scopepath)
@@ -138,11 +138,11 @@ export abstract class DeviceDB {
 
   // A device database must start each call's work in the order of the calls. Otherwise a `forget` made after a `stow` may
   // miss the row it stowed.
-  /** Stow `row` as the lease of its vault scope, replacing any row there. */
+  /** Stow `row` as the lease of its bank scope, replacing any row there. */
   protected abstract doStow(row: LeaseRow): Awaitable<void>
-  /** The row stored at this vault scope, whatever its `vault_tok`, or null. */
-  protected abstract doPeek(scope: VaultScope): Awaitable<unknown>
-  /** Delete the row at this vault scope if it has this `vault_tok`, in one step. */
+  /** The row stored at this bank scope, whatever its `bank_tok`, or null. */
+  protected abstract doPeek(scope: BankScope): Awaitable<unknown>
+  /** Delete the row at this bank scope if it has this `bank_tok`, in one step. */
   protected abstract doForget(asked: LeaseQuery): Awaitable<void>
   /** Every lease row stored, each beside the scopepath it is filed under, in any order and in one step. */
   protected abstract doListLeases(): Awaitable<RawLease[]>

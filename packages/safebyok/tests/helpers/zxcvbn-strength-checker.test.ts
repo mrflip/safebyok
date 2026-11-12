@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MinPassphraseChars, MinZxcvbnScore, zxcvbnStrengthChecker } from '../../src/helpers/zxcvbn-strength-checker'
 import { StrongVerdict, guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import * as Phrases from '../../src/helpers/phrases'
-import type { VaultScope } from '../../src/shapes/shapes-core'
+import type { BankScope } from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
 
 /** The scope the tests hand the checker. */
-const scope: VaultScope = Object.freeze({ user_id: 'u1', banklabel: 'acme', vaultlabel: 'keys' })
+const scope: BankScope = Object.freeze({ user_id: 'u1', banklabel: 'acme' })
 
 // A fresh module, so its StrongVerdict is its own: the tests below compare verdicts deeply.
 /** A checker made fresh, over a dictionary chunk that fails to load until `chunk.failing` is cleared. */
@@ -23,7 +23,7 @@ async function freshCheckerOverChunk() {
 }
 
 /** The checker's verdict, as a promise whether it answers at once or later. */
-async function judgedAsync(typed: string, vaultScope: VaultScope) { return zxcvbnStrengthChecker(typed, vaultScope) }
+async function judgedAsync(typed: string, bankScope: BankScope) { return zxcvbnStrengthChecker(typed, bankScope) }
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -81,10 +81,10 @@ describe("zxcvbnStrengthChecker", () => {
     expect(await zxcvbnStrengthChecker('mauve lantern quietly orbits', scope)).to.eq(StrongVerdict)
   })
 
-  it("finds a passphrase weak when it is one of the vault's own names", async () => {
+  it("finds a passphrase weak when it is one of the bank's own names", async () => {
     const typed = 'quokkavelodrome'
     expect(await zxcvbnStrengthChecker(typed, scope)).to.eq(StrongVerdict)
-    for (const named of [{ user_id: typed }, { banklabel: typed }, { vaultlabel: typed }]) {
+    for (const named of [{ user_id: typed }, { banklabel: typed }]) {
       expect(await zxcvbnStrengthChecker(typed, { ...scope, ...named })).to.deep.equal({ strong: false, reason: Phrases.PassphraseGuessable })
     }
   })

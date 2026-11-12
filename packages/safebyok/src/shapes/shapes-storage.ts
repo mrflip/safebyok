@@ -490,22 +490,24 @@ export type LoggableAsk = Readonly<Z.output<typeof loggableAsk>>
 // == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow, leaseScopepath, LeaseScopepath, RawLease, deviceRow, DeviceRow
 
 /** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */
-export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_option', ({ epochMillis }) => {
-  const leaseDated = vaultQuery.extend({ proved_at: epochMillis })
-  return { leaseQuery: vaultQuery, leaseDated, leaseRow: leaseDated.loose() }
-})
+export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_option', ({ epochMillis, bankScope, bank_tok }) => {
+  const leaseQuery = bankScope.unwrap().extend({ bank_tok })
+  const leaseDated = leaseQuery.extend({ proved_at: epochMillis })
+  return { leaseQuery, leaseDated, leaseRow: leaseDated.loose() }
+}, [CX])
 
+/** A bank scope under its `bank_tok`: which lease row a deviceDB verb means. */
 export type LeaseQuery   = Z.infer<typeof leaseQuery>
 /** A stowed lease as the deviceDB dates it: its query and its `proved_at`. */
 export type LeaseDated   = Z.infer<typeof leaseDated>
 export type LeaseRow     = Z.infer<typeof leaseRow>
 
-// Three strings, and no label rules: `forgetRawLease` is for reaching a row filed under labels today's checks refuse.
-/** The check of a lease scopepath, as `forgetRawLease` accepts one: three strings. */
-export const leaseScopepath = Checker(({ tuple, str }) => tuple([str, str, str]), 'bad_scope')
+// Two strings, and no label rules: `forgetRawLease` is for reaching a row filed under labels today's checks refuse.
+/** The check of a lease scopepath, as `forgetRawLease` accepts one: two strings. */
+export const leaseScopepath = Checker(({ tuple, str }) => tuple([str, str]), 'bad_scope')
 
-/** Where a device database files a vault's lease row: its user_id, banklabel and vaultlabel, as stored. */
-export type LeaseScopepath = [user_id: string, banklabel: string, vaultlabel: string]
+/** Where a device database files a bank's lease row: its user_id and banklabel, as stored. */
+export type LeaseScopepath = [user_id: string, banklabel: string]
 
 /** A lease row as stored, unchecked, beside the scopepath it is filed under. */
 export type RawLease = { scopepath: LeaseScopepath, row: unknown }

@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
-import * as GX from '../../src/shapes/shapes-gateish'
 import { LOCKED } from '../../src/helpers/consts'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
@@ -240,7 +239,7 @@ describe("SX.vaultRecord and SX.vaultSparse", () => {
   const { boxlabel: _boxlabel, ...vaultscope } = scope
   const sparseVault = { ...vaultscope, fmt: SX.VaultFormat, ...baseProps }
 
-  const gate = { gate_epoch: GX.FirstGateEpoch, passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
+  const gate = { gate_epoch: 1, passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
 
   expectCases(SX.vaultRecord, [
     [{ ...sparseVault, gate },       true,  'passes a record with its gate, a passphrase wayin and no passkey'],
