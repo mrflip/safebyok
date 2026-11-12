@@ -41,7 +41,7 @@ export const Kit = {
   /** A safe integer, 0 or more: an epoch or a count. */
   uint:    Zod.int().nonnegative(),
   bool:    Zod.boolean(),
-  label: PX.label, applabel: PX.label, vaultlabel: PX.label, boxlabel: PX.label, user_id: PX.user_id,
+  label: PX.label, banklabel: PX.label, vaultlabel: PX.label, boxlabel: PX.label, user_id: PX.user_id,
   epochMillis: PX.epochMillis,
 } as const
 
@@ -87,17 +87,17 @@ export type Merged<SourcesT extends readonly object[]> =
  *   name the kit gives wins. A bundler keeps or drops a call whole.
  *
  * @example
- *   export const { bankScope, vaultScope } = Checkers('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
- *     const bankScope  = obj({ applabel, user_id })
+ *   export const { bankScope, vaultScope } = Checkers('bad_scope', ({ obj, user_id, banklabel, vaultlabel }) => {
+ *     const bankScope  = obj({ user_id, banklabel })
  *     const vaultScope = bankScope.extend({ vaultlabel })
  *     return { bankScope, vaultScope }
  *   })
- *   vaultScope.parse({ applabel: 'acme', user_id: 'u1', vaultlabel: 'Main' })  // throws 'bad_scope', "vaultlabel: A label is ..."
+ *   vaultScope.parse({ user_id: 'u1', banklabel: 'acme', vaultlabel: 'Main' })  // throws 'bad_scope', "vaultlabel: A label is ..."
  *   vaultScope.parse(scope, { where: 'In the scope naming the vault', advice: 'Name it by its vaultlabel.' })  // throws 'bad_scope', "In the scope naming the vault: vaultlabel: A label is <...>. Name it by its vaultlabel."
  *   vaultScope.parseConsistent(box, bank.scope)  // box's scope, once it is the bank's app and user: 'bad_scope' otherwise
  * @example
- *   export const { vaultRecord } = Checkers('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, gateRecord }) => {
- *     const vaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
+ *   export const { vaultRecord } = Checkers('bad_record', ({ obj, uint, user_id, banklabel, vaultlabel, gateRecord }) => {
+ *     const vaultRecord = obj({ user_id, banklabel, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
  *     return { vaultRecord }
  *   }, [GateChecks])
  */
@@ -154,7 +154,7 @@ export function objCheck<ShapeT extends Z.ZodRawShape, const SourcesT extends re
  * {@link objCheck} under `extras: 'strict'`, and takes `build` and `sources` as one does.
  *
  * @example
- *   export const bankRow = objStrict(({ applabel, user_id, device_id }) => ({ applabel, user_id, device_id }), 'bad_record', [CX])
+ *   export const bankRow = objStrict(({ user_id, banklabel, device_id }) => ({ user_id, banklabel, device_id }), 'bad_record', [CX])
  *   bankRow.parse({ ...row, note: 'hi' })  // throws 'bad_record', "There is a field it does not accept ..."
  */
 export const objStrict = <ShapeT extends Z.ZodRawShape, const SourcesT extends readonly object[] = readonly []>(

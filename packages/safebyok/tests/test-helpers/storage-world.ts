@@ -9,7 +9,7 @@ import type {
 } from '../../src/shapes/shapes-storage'
 
 /** The bank the records stand in. */
-export const bankScope  = { applabel: 'acme', user_id: 'u1' }
+export const bankScope  = { user_id: 'u1', banklabel: 'acme' }
 /** The scope of the vault the records stand in. */
 export const vaultScope = { ...bankScope, vaultlabel: 'main' }
 /** The scope of the box the records stand in. */
@@ -84,7 +84,7 @@ const soundVault = vaultAt()
 const soundBox   = boxAt()
 
 /** The fields a vault row has beside its revision and its life. */
-const VaultFieldsBeyondRevision = ["applabel", "user_id", "vaultlabel", "fmt", "registered_at", "written_at", "gate"]
+const VaultFieldsBeyondRevision = ["user_id", "banklabel", "vaultlabel", "fmt", "registered_at", "written_at", "gate"]
 
 /** Vault rows the verbs must refuse, each filed at the world's vault and standing at its revision where it has one. */
 export const FlawedVaultRows: readonly FlawedRow[] = [
@@ -149,8 +149,8 @@ export const stale: Revision = { revision_tok: 'nope', revision_seq: 7 }
 type PutPolicies = Partial<Pick<VaultPutAsk, 'ifAbsent' | 'ifPresent'>>
 const AddOrReplace = { ifAbsent: 'add', ifPresent: 'repl' } as const
 
-function vaultScopeIn({ applabel, user_id, vaultlabel }: VaultScope): VaultScope { return { applabel, user_id, vaultlabel } }
-function boxQueryIn({ applabel, user_id, vaultlabel, boxlabel, vault_tok }: BoxQuery): BoxQuery { return { applabel, user_id, vaultlabel, boxlabel, vault_tok } }
+function vaultScopeIn({ user_id, banklabel, vaultlabel }: VaultScope): VaultScope { return { user_id, banklabel, vaultlabel } }
+function boxQueryIn({ user_id, banklabel, vaultlabel, boxlabel, vault_tok }: BoxQuery): BoxQuery { return { user_id, banklabel, vaultlabel, boxlabel, vault_tok } }
 
 /** The get of the vault at `scope`, by a caller that holds no row of it. */
 export function vaultGetAskOf(scope: VaultScope = vaultScope, ifAbsent: IfAbsent = 'fail'): VaultGetAsk {

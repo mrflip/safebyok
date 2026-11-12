@@ -3,7 +3,7 @@ import 'fake-indexeddb/auto'
 import { describe, expect, it } from 'vitest'
 import { OutageVaultDB } from '../../src/lib/outage-vault-db'
 
-const Scope = { applabel: 'acme', user_id: 'u1' }
+const Scope = { user_id: 'u1', banklabel: 'acme' }
 
 /** Make an OutageVaultDB on a fresh database. */
 const makeOutage = () => new OutageVaultDB({ dbName: `outage_${crypto.randomUUID()}` })

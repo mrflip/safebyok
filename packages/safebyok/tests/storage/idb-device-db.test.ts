@@ -30,9 +30,9 @@ const idbRowsOf = (deviceDB: IdbDeviceDB): TH.DeviceDBRowCheats => {
   const leaseShelf = createStore(`${dbNameOf.get(deviceDB)!}:device-v001-001-001`, 'leases')
   const bankShelf = createStore(`${dbNameOf.get(deviceDB)!}:bank-v001-001-001`, 'bank')
   return {
-    plantLeaseRow: async ({ applabel, user_id, vaultlabel }, row) => { await inOneStep(leaseShelf, 'readwrite', (store) => { store.put(row, [applabel, user_id, vaultlabel]) }) },
+    plantLeaseRow: async ({ user_id, banklabel, vaultlabel }, row) => { await inOneStep(leaseShelf, 'readwrite', (store) => { store.put(row, [user_id, banklabel, vaultlabel]) }) },
     leaseRowsOf:   async () => await inOneStep(leaseShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll())),
-    plantBankRow:  async ({ applabel, user_id }, row) => { await inOneStep(bankShelf, 'readwrite', (store) => { store.put(row, [applabel, user_id]) }) },
+    plantBankRow:  async ({ user_id, banklabel }, row) => { await inOneStep(bankShelf, 'readwrite', (store) => { store.put(row, [user_id, banklabel]) }) },
     bankRowsOf:    async () => await inOneStep(bankShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll())),
   }
 }

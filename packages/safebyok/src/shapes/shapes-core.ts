@@ -138,10 +138,10 @@ export type Sidecar = Z.infer<typeof sidecar>
  * A scope carrying more fields passes, the rest left out: a vault's record, or a Vault object,
  * passes as its scope. Being a copy, no one it is handed to can change it for everyone else.
  *
- * @example CX.vaultScope.parse(vault)  // { applabel, user_id, vaultlabel }, frozen
+ * @example CX.vaultScope.parse(vault)  // { user_id, banklabel, vaultlabel }, frozen
  */
-export const { bankScope, vaultScope, boxscope } = Checkers('bad_scope', ({ obj, applabel, user_id, vaultlabel, boxlabel }) => {
-  const bankScope  = obj({ applabel, user_id })
+export const { bankScope, vaultScope, boxscope } = Checkers('bad_scope', ({ obj, user_id, banklabel, vaultlabel, boxlabel }) => {
+  const bankScope  = obj({ user_id, banklabel })
   const vaultScope = bankScope.extend({ vaultlabel })
   const boxscope   = vaultScope.extend({ boxlabel })
 
@@ -155,18 +155,18 @@ export type VaultScope = Z.infer<typeof vaultScope>
 /** What names one box: its vault's scope and its boxlabel. */
 export type Boxscope = Z.infer<typeof boxscope>
 
-/** The scope naming one of a bank's vaults, as its calls are handed it: the `vaultlabel` required, the `applabel` and `user_id` invited, each name checked.
+/** The scope naming one of a bank's vaults, as its calls are handed it: the `vaultlabel` required, the `user_id` and `banklabel` invited, each name checked.
  * It accepts whatever carries the names, a plain bag, a Vault object, its snapshot or a
  * BankVault, and leaves the rest. A vaultDB or deviceDB in the scope refuses: each goes to `Bank.make`.
  *
  * @example bankedVaultScope.parse({ vaultlabel: 'main', vaultDB })  // throws: a vaultDB goes to Bank.make
  */
-export const bankedVaultScope = Checker(({ obj, applabel, user_id, vaultlabel }) => {
+export const bankedVaultScope = Checker(({ obj, user_id, banklabel, vaultlabel }) => {
   const database = never(Phrases.DatabaseInVaultScope).optional()
-  return obj({ applabel: applabel.optional(), user_id: user_id.optional(), vaultlabel, vaultDB: database, deviceDB: database })
+  return obj({ user_id: user_id.optional(), banklabel: banklabel.optional(), vaultlabel, vaultDB: database, deviceDB: database })
 }, 'bad_scope')
 
-/** The scope naming one of a bank's vaults, as {@link bankedVaultScope} checks it: its `vaultlabel`, and the bank's own `applabel` and `user_id` if you like.
+/** The scope naming one of a bank's vaults, as {@link bankedVaultScope} checks it: its `vaultlabel`, and the bank's own `user_id` and `banklabel` if you like.
  *
  * @example bank.ensureVault({ vaultlabel: 'main' })
  */

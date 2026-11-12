@@ -20,11 +20,11 @@ function textBytes(text: string): Uint8Array { return new TextEncoder().encode(t
 const WhisperText = '{"val":"sk-test-0000"}'
 
 /** The JSON text of {@link WorldStamp}, as every ctx under the vault holds it: its keys sorted. */
-const VaultStampText = `{"applabel":"acme","registered_at":${String(T0)},"user_id":"u1","vault_tok":"vault-tok-u1","vaultlabel":"main"}`
+const VaultStampText = `{"banklabel":"acme","registered_at":${String(T0)},"user_id":"u1","vault_tok":"vault-tok-u1","vaultlabel":"main"}`
 
-const VaultStampFields = ['applabel', 'user_id', 'vaultlabel', 'vault_tok', 'registered_at'] as const
+const VaultStampFields = ['user_id', 'banklabel', 'vaultlabel', 'vault_tok', 'registered_at'] as const
 const LeaseStampFields = ['fmt', ...VaultStampFields, 'gate_epoch', 'proved_at', 'wayinkind'] as const
-const BoxStampFields = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'fmt', 'vault_tok', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'box_tok', 'whisper_codec', 'whisper_schema_version'] as const
+const BoxStampFields = ['user_id', 'banklabel', 'vaultlabel', 'boxlabel', 'fmt', 'vault_tok', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'box_tok', 'whisper_codec', 'whisper_schema_version'] as const
 
 /** A lease of `stamp`'s vault over a vaultKey the test holds, its record cached on the friend. */
 async function leaseOver(vaultKey: CryptoKey, overrides: Partial<typeof WorldStamp> = {}) {
@@ -49,9 +49,9 @@ function changed(val: unknown): unknown { return ((typeof val === 'number') ? va
 
 describe("each ctx, byte for byte", () => {
   it("encodes a list of stamps, a purpose and a header, each record's keys sorted", () => {
-    const ctx = cipherCtx([{ vault_tok: 'vid', applabel: 'acme' }, { written_at: 2, boxlabel: 'anthropic', revision_tok: 'r1' }], 'whisper_ciphered', { wayinkind: 'passkey' })
-    expect(new TextDecoder().decode(ctx)).to.eq('[{"applabel":"acme","vault_tok":"vid"},{"boxlabel":"anthropic","revision_tok":"r1","written_at":2},"whisper_ciphered",{"wayinkind":"passkey"}]')
-    expect(hex.encode(ctx)).to.eq('5b7b226170706c6162656c223a2261636d65222c227661756c745f746f6b223a22766964227d2c7b22626f786c6162656c223a22616e7468726f706963222c227265766973696f6e5f746f6b223a227231222c227772697474656e5f6174223a327d2c22776869737065725f6369706865726564222c7b22776179696e6b696e64223a22706173736b6579227d5d')
+    const ctx = cipherCtx([{ vault_tok: 'vid', banklabel: 'acme' }, { written_at: 2, boxlabel: 'anthropic', revision_tok: 'r1' }], 'whisper_ciphered', { wayinkind: 'passkey' })
+    expect(new TextDecoder().decode(ctx)).to.eq('[{"banklabel":"acme","vault_tok":"vid"},{"boxlabel":"anthropic","revision_tok":"r1","written_at":2},"whisper_ciphered",{"wayinkind":"passkey"}]')
+    expect(hex.encode(ctx)).to.eq('5b7b2262616e6b6c6162656c223a2261636d65222c227661756c745f746f6b223a22766964227d2c7b22626f786c6162656c223a22616e7468726f706963222c227265766973696f6e5f746f6b223a227231222c227772697474656e5f6174223a327d2c22776869737065725f6369706865726564222c7b22776179696e6b696e64223a22706173736b6579227d5d')
   })
 
   it("binds a passphrase wayin's wrap to the vault's stamp, the purpose and its whole header", async () => {
@@ -74,7 +74,7 @@ describe("each ctx, byte for byte", () => {
 
   it("binds a lease's wrap of the vaultKey to the vault's stamp and its own", async () => {
     const { record } = await leaseOver(await makeVaultKey())
-    const leaseText = `{"applabel":"acme","fmt":${String(LeaseFormat)},"gate_epoch":${String(GrantedAs.gate_epoch)},"proved_at":${String(T0)},"registered_at":${String(T0)},"user_id":"u1","vault_tok":"vault-tok-u1","vaultlabel":"main","wayinkind":"passphrase"}`
+    const leaseText = `{"banklabel":"acme","fmt":${String(LeaseFormat)},"gate_epoch":${String(GrantedAs.gate_epoch)},"proved_at":${String(T0)},"registered_at":${String(T0)},"user_id":"u1","vault_tok":"vault-tok-u1","vaultlabel":"main","wayinkind":"passphrase"}`
     const ctx = textBytes(`[${VaultStampText},${leaseText},"vault_key_lease_wrapped"]`)
     expect(await unwrapKeyUnder(record.lease_key, record.vault_key_lease_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
@@ -86,7 +86,7 @@ describe("each ctx, byte for byte", () => {
     const sealed = await lease.sealWith(WhisperText, stamp)
     function field(fieldname: string): string { return JSON.stringify(stamp[fieldname]) }
     expect(stamp).to.not.have.property('sidecar')
-    const boxText = `{"am":${field('am')},"applabel":${field('applabel')},"box_tok":${field('box_tok')},"boxlabel":"anthropic","fmt":${field('fmt')},"registered_at":${field('registered_at')},"revision_seq":${field('revision_seq')},"revision_tok":${field('revision_tok')},"user_id":${field('user_id')},"vault_tok":${field('vault_tok')},"vaultlabel":${field('vaultlabel')},"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${field('written_at')}}`
+    const boxText = `{"am":${field('am')},"banklabel":${field('banklabel')},"box_tok":${field('box_tok')},"boxlabel":"anthropic","fmt":${field('fmt')},"registered_at":${field('registered_at')},"revision_seq":${field('revision_seq')},"revision_tok":${field('revision_tok')},"user_id":${field('user_id')},"vault_tok":${field('vault_tok')},"vaultlabel":${field('vaultlabel')},"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${field('written_at')}}`
     const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, textBytes(`[${VaultStampText},${boxText},"box_key_wrapped"]`), { extractable: false, usage: ['decrypt'] })
     const opened = await decipherBytes(boxKey, sealed.whisper_ciphered, textBytes(`[${VaultStampText},${boxText},"whisper_ciphered"]`))
     expect(new TextDecoder().decode(opened)).to.eq(WhisperText)

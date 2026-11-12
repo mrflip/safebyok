@@ -2,13 +2,13 @@ import type { ReactNode } from 'react'
 import { BankProvider } from 'safebyok-react'
 import { useSession } from '../hooks/useSession'
 import { createAuth } from '../lib/auth'
-import { Applabel, bankOpts, dbStorage, deviceStorage } from '../lib/storage'
+import { Banklabel, bankOpts, dbStorage, deviceStorage } from '../lib/storage'
 import { SessionBar } from './SessionBar'
 import { TroubleBoundary } from './TroubleBoundary'
 
 // The demo's fake auth. A real app has its own (Google, Clerk, Convex...). All the vault needs
 // from it is a stable user_id.
-const auth = createAuth({ applabel: Applabel, dbStorage, deviceStorage })
+const auth = createAuth({ banklabel: Banklabel, dbStorage, deviceStorage })
 
 /** Props for the DemoShell.
  * - `otherPage` -- a link to the demo's other page

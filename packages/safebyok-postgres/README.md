@@ -136,7 +136,7 @@ with this package for now.
 
 ## What is stored
 
-`safebyok_vaults` has a row per vault, keyed by `applabel`, `user_id` and `vaultlabel`.
+`safebyok_vaults` has a row per vault, keyed by `user_id`, `banklabel` and `vaultlabel`.
 `safebyok_boxes` has a row per box, keyed by those, the life of its vault (`vault_tok`) and its
 `boxlabel`. Each field of a row is a column of its own. The labels, the tokens and `am` are `text`.
 `fmt`, `revision_seq` and `whisper_schema_version` are `integer`. The times, `registered_at` and

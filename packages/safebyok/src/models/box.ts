@@ -19,11 +19,11 @@ import { refusedAnswerOf } from '../storage/vault-db'
 
 /** A box as this device has it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
-  // == [Props]: applabel, user_id, vaultlabel, boxlabel, world, listing, #exposed, #isVeiled
+  // == [Props]: user_id, banklabel, vaultlabel, boxlabel, world, listing, #exposed, #isVeiled
 
   /** The scope, tattooed on by Storable's constructor. */
-  declare readonly applabel:   string
   declare readonly user_id:    string
+  declare readonly banklabel:  string
   declare readonly vaultlabel: string
   declare readonly boxlabel:   string
 

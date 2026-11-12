@@ -8,13 +8,13 @@ import { OutageVaultDB } from './outage-vault-db'
 // live in IndexedDB too, so an unlocked vault stays unlocked through a reload until its lease ends.
 
 /** The app's name, which namespaces its storage and its vaults. */
-export const Applabel = 'safebyok_demo'
+export const Banklabel = 'safebyok_demo'
 
 /** The vault's storage: this browser's IndexedDB, behind the demo's outage switch. */
-export const vaultDB = new OutageVaultDB({ dbName: Applabel })
+export const vaultDB = new OutageVaultDB({ dbName: Banklabel })
 
 /** The BankProvider's options for every user, apart from `user_id`: the browser defaults and the vaultDB. */
-export const bankOpts = { ...browserOpts({ dbName: Applabel }), applabel: Applabel, vaultDB }
+export const bankOpts = { ...browserOpts({ dbName: Banklabel }), banklabel: Banklabel, vaultDB }
 
 /** Storage for the fake auth's account rows: scaffolding that stands in for a backend. */
 export const dbStorage: StringStorage = prefixedStorage('safebyok-demo:db:')

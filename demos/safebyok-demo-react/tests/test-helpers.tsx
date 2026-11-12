@@ -22,7 +22,7 @@ export const renderInBank = (ui: ReactNode, user_id: string | null = 'u1') => {
   const vaultDB = new MemoryVaultDB()
   render(
     <BankProvider
-      applabel="acme" user_id={user_id} vaultDB={vaultDB} deviceDB={new MemoryDeviceDB()}
+      user_id={user_id} banklabel="acme" vaultDB={vaultDB} deviceDB={new MemoryDeviceDB()}
       keyDeriver={testDeriver} strengthChecker={anyStrengthChecker} logger={quietLogger}
     >
       {ui}
@@ -42,7 +42,7 @@ export const memoryStorage = (): StringStorage => {
 }
 
 /** Make a fake auth over fresh in-memory storage. */
-export const makeAuth = (): Auth => createAuth({ applabel: 'acme', dbStorage: memoryStorage(), deviceStorage: memoryStorage() })
+export const makeAuth = (): Auth => createAuth({ banklabel: 'acme', dbStorage: memoryStorage(), deviceStorage: memoryStorage() })
 
 /** The SessionBar as a page renders it, given the live session from `auth`. */
 export const LiveSessionBar = ({ auth }: { auth: Auth }) => <SessionBar auth={auth} session={useSession(auth)} />

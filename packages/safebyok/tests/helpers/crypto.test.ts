@@ -43,7 +43,7 @@ describe("random material", () => {
 function ctxOf(purpose: string) { return cipherCtx({ test: 'crypto' }, purpose) }
 
 /** A vault's stamp, a box's and a wayin's header, as plain records: what the cipherCtx cases are built of. */
-const vaultStamp = { format: 'safebyok-vault-v6', applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'vid', registered_at: 1 }
+const vaultStamp = { format: 'safebyok-vault-v6', user_id: 'u1', banklabel: 'acme', vaultlabel: 'main', vault_tok: 'vid', registered_at: 1 }
 const boxStamp = { boxlabel: 'anthropic', revision_tok: 'r1', written_at: 2 }
 const header = { wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', salt_b64: 'c2FsdHNhbHRzYWx0c2FsdA', device_id: '00000000-0000-4000-8000-0000000000d1', registered_at: 3 }
 
@@ -62,7 +62,7 @@ describe("cipherCtx", () => {
   it("binds a list of stamps, each keeping its own field names", () => {
     const { format: _format, ...vaultButFormat } = vaultStamp
     const both = cipherCtx([vaultButFormat, { ...boxStamp, registered_at: 5 }], 'box_key_wrapped')
-    expect(new TextDecoder().decode(both)).to.eq('[{"applabel":"acme","registered_at":1,"user_id":"u1","vault_tok":"vid","vaultlabel":"main"},{"boxlabel":"anthropic","registered_at":5,"revision_tok":"r1","written_at":2},"box_key_wrapped"]')
+    expect(new TextDecoder().decode(both)).to.eq('[{"banklabel":"acme","registered_at":1,"user_id":"u1","vault_tok":"vid","vaultlabel":"main"},{"boxlabel":"anthropic","registered_at":5,"revision_tok":"r1","written_at":2},"box_key_wrapped"]')
     expect(toB64(cipherCtx([vaultButFormat, { ...boxStamp, registered_at: 6 }], 'box_key_wrapped')), 'the box\'s registered_at is its own').to.not.eq(toB64(both))
     expect(toB64(cipherCtx([{ ...vaultButFormat, registered_at: 6 }, { ...boxStamp, registered_at: 5 }], 'box_key_wrapped')), 'the vault\'s is the vault\'s').to.not.eq(toB64(both))
     expect(toB64(cipherCtx([{ ...boxStamp, registered_at: 5 }, vaultButFormat], 'box_key_wrapped')), 'the order of the list is bound').to.not.eq(toB64(both))

@@ -40,7 +40,7 @@ function makeZxcvbnStrengthChecker() {
     return judgeLoaded
   }
   const judgeStrength = async (passphrase: string, vaultScope: VaultScope): Promise<PassphraseVerdict> => {
-    const { typed, scope: { applabel, user_id, vaultlabel } } = checkerArgs.parse({ typed: passphrase, scope: vaultScope })
+    const { typed, scope: { user_id, banklabel, vaultlabel } } = checkerArgs.parse({ typed: passphrase, scope: vaultScope })
     if (graphemeCount(typed) < MinPassphraseChars) { return { strong: false, reason: Phrases.passphraseTooShort(MinPassphraseChars) } }
     let judge: ZxcvbnFactory
     try {
@@ -48,7 +48,7 @@ function makeZxcvbnStrengthChecker() {
     } catch {
       return { strong: false, reason: Phrases.PassphraseUnjudged }
     }
-    const { score } = judge.check(typed, [applabel, user_id, vaultlabel])
+    const { score } = judge.check(typed, [user_id, banklabel, vaultlabel])
     return score >= MinZxcvbnScore ? StrongVerdict : { strong: false, reason: Phrases.PassphraseGuessable }
   }
   const load = async (): Promise<void> => { await loadJudge() }

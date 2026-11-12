@@ -242,7 +242,7 @@ voids every box. Rotation adds an epoch back, with its own format bump, when it 
 
 The Coach (2026-10-21, sprint contract, on #216's row "Rollback check and del()"): "Add a todo
 "tombstone vaults; decide if the vault_tok is a check -- the labels are meant to be the primary
-key"". Today a deleted vault leaves nothing behind, and a vault is found by its labels (applabel,
+key"". Today a deleted vault leaves nothing behind, and a vault is found by its labels (banklabel,
 user id, vaultlabel) while `vault_tok` is checked against the device's mark and on each write.
 Decide whether a deleted vault leaves a tombstone, and whether `vault_tok`
 stays a check or the labels alone identify the vault.
@@ -310,7 +310,7 @@ without orphaning vaults.
 ### Changing a vault's scope means a new vault
 
 The Coach (2026-10-19, sprint contract): "changing scope requires a new vault from scratch:
-vault_tok, applabel, user_id, vaultlabel are immutable." A vault's scope fields are fixed for its
+vault_tok, user_id, banklabel, vaultlabel are immutable." A vault's scope fields are fixed for its
 life (a test checks that every field its snapshot shows is read-only), so renaming a vault, or
 moving it to a new `user_id` (because an auth provider changed, or accounts merged), means making a
 new vault and storing each whisper again, which needs the old vault's passphrase. Decide whether
@@ -470,7 +470,7 @@ listing rebuilt under the new `vault_tok`, with its device cache cleared.
 
 The Coach (2026-11-07, on the devicedb_verbs thread): "I've got concerns about the key structure
 (or I can put it more cheerfully: I believe that an extended key structure can ameliorate some
-problems) but I'll leave that for later". Today a lease row is keyed by its scope (applabel,
+problems) but I'll leave that for later". Today a lease row is keyed by its scope (banklabel,
 user id, vaultlabel) alone, and its `vault_tok` is a field checked against the query: `peek`
 checks it in the base, and `forget` leaves the check to the DeviceDB, which makes it in one atomic
 step with its delete. A key that also included the `vault_tok` would make `forget` a delete at a

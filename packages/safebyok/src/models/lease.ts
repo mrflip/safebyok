@@ -11,11 +11,11 @@ import { type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSpar
 
 /** A vault's vaultKey in force on this device, good for one `gate_epoch`. It has the key wrapped under a non-extractable leaseKey, unwraps it for a single call, and never hands it out. */
 export class Lease implements LeaseStamp {
-  // == [Props]: fmt, applabel, user_id, vaultlabel, vault_tok, registered_at, gate_epoch, proved_at, wayinkind, #vaultFriend, #record, #vaultStamp, #isFromCache, #leaseStamp, toJSON
+  // == [Props]: fmt, user_id, banklabel, vaultlabel, vault_tok, registered_at, gate_epoch, proved_at, wayinkind, #vaultFriend, #record, #vaultStamp, #isFromCache, #leaseStamp, toJSON
 
   declare readonly fmt:           typeof LeaseFormat
-  declare readonly applabel:      string
   declare readonly user_id:       string
+  declare readonly banklabel:     string
   declare readonly vaultlabel:    string
   declare readonly vault_tok:     string
   declare readonly registered_at: number

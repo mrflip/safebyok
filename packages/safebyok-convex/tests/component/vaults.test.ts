@@ -38,20 +38,20 @@ async function withVault(transactionLimits = false, record = vault): Promise<Bac
 }
 
 /** Read the tally row stored for `life`, or null. */
-function keptTally(backend: Backend, { applabel, user_id, vaultlabel, vault_tok }: Life = life1) {
+function keptTally(backend: Backend, { user_id, banklabel, vaultlabel, vault_tok }: Life = life1) {
   return backend.run(async ({ db }): Promise<Tally | null> => {
     const kept = await db.query('safebyok_tallies')
-      .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+      .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
       .unique()
     return kept && { all_count: kept.all_count, live_count: kept.live_count, all_size: kept.all_size, live_size: kept.live_size }
   })
 }
 
 /** Count and weigh the box rows of `life` directly, as Convex sizes them: every row, tombstones included, and the live rows alone. */
-function weighedTally(backend: Backend, { applabel, user_id, vaultlabel, vault_tok }: Life = life1) {
+function weighedTally(backend: Backend, { user_id, banklabel, vaultlabel, vault_tok }: Life = life1) {
   return backend.run(async ({ db }): Promise<Tally> => {
     const boxDocs = await db.query('safebyok_boxes')
-      .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+      .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
       .collect()
     const liveDocs = boxDocs.filter(({ box }) => DB.isLiveRow(box))
     function sizeOf(docs: typeof boxDocs) { return docs.reduce((total, boxDoc) => total + getDocumentSize(boxDoc), 0) }
@@ -71,8 +71,8 @@ function talliedLives(backend: Backend) {
 function plantBoxes(backend: Backend, boxes: (DB.BoxRecord | DB.BoxTombstone)[]) {
   return backend.run(async ({ db }) => {
     await Promise.all(boxes.map((box) => {
-      const { applabel, user_id, vaultlabel, vault_tok, boxlabel } = box
-      return db.insert('safebyok_boxes', { applabel, user_id, vaultlabel, vault_tok, boxlabel, box })
+      const { user_id, banklabel, vaultlabel, vault_tok, boxlabel } = box
+      return db.insert('safebyok_boxes', { user_id, banklabel, vaultlabel, vault_tok, boxlabel, box })
     }))
   })
 }
@@ -80,8 +80,8 @@ function plantBoxes(backend: Backend, boxes: (DB.BoxRecord | DB.BoxTombstone)[])
 /** Overwrite the stored vault row directly, so the previous life ends with its box rows left behind. */
 function plantVault(backend: Backend, vault: DB.VaultRecord) {
   return backend.run(async ({ db }) => {
-    const { applabel, user_id, vaultlabel } = vault
-    const doc = await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel)).unique()
+    const { user_id, banklabel, vaultlabel } = vault
+    const doc = await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel)).unique()
     if (doc === null) { throw new Error(`No vault row to plant over for ${user_id}/${vaultlabel}`) }
     await db.patch(doc._id, { vault })
   })

@@ -18,11 +18,11 @@ import { Listing } from './listing'
 
 /** One vault's boxes, by boxlabel. */
 export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnapshot, Box, DamagedBox> {
-  // == [Props]: applabel, user_id, vaultlabel, scope, world
+  // == [Props]: user_id, banklabel, vaultlabel, scope, world
 
   /** The scope of the vault listed, tattooed on by the constructor. */
-  declare readonly applabel:   string
   declare readonly user_id:    string
+  declare readonly banklabel:  string
   declare readonly vaultlabel: string
   readonly scope:              VaultScope
   declare readonly world:      BoxWorld
@@ -87,7 +87,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   protected get isOneLifePerInstance(): false { return false }
 
   protected scopepathOf(scope: Boxscope): string {
-    return ['box', scope.applabel, scope.user_id, scope.vaultlabel, scope.boxlabel].join('^')
+    return ['box', scope.user_id, scope.banklabel, scope.vaultlabel, scope.boxlabel].join('^')
   }
 
   protected makeThing(central: Fetched<BoxRecord, BoxSparse>): Box {
@@ -110,8 +110,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   protected doTryPut(record: BoxRecord, { expected, ifAbsent, ifPresent }: ListingPutOpts<BoxSparse>) {
-    const { applabel, user_id, vaultlabel, boxlabel, vault_tok } = record
-    return this.vaultDB.tryPutBox({ op: 'put', applabel, user_id, vaultlabel, boxlabel, vault_tok, ifAbsent, ifPresent, expected, record })
+    const { user_id, banklabel, vaultlabel, boxlabel, vault_tok } = record
+    return this.vaultDB.tryPutBox({ op: 'put', user_id, banklabel, vaultlabel, boxlabel, vault_tok, ifAbsent, ifPresent, expected, record })
   }
 
   protected tombstoneOver(expected: BoxSparse): DelTombstone<BoxSparse> {
@@ -119,8 +119,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   protected doTryDel(tombstone: DelTombstone<BoxSparse>, { expected }: ListingDelOpts<BoxSparse>) {
-    const { applabel, user_id, vaultlabel, boxlabel, vault_tok } = tombstone
-    return this.vaultDB.tryDelBox({ op: 'del', applabel, user_id, vaultlabel, boxlabel, vault_tok, expected, record: tombstone })
+    const { user_id, banklabel, vaultlabel, boxlabel, vault_tok } = tombstone
+    return this.vaultDB.tryDelBox({ op: 'del', user_id, banklabel, vaultlabel, boxlabel, vault_tok, expected, record: tombstone })
   }
 
   protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.vaultDB.watch(this.scope, onNotice, onBadNews) }

@@ -142,7 +142,7 @@ export const WhisperBagShape = "An object in a whisper or a sidecar is a plain o
 
 // == [Bank and vault]: otherScope
 
-/** Why a scope naming another applabel or user_id than the bank's refuses, `fieldnames` the ones that differ, never their values. */
+/** Why a scope naming another user_id or banklabel than the bank's refuses, `fieldnames` the ones that differ, never their values. */
 export const otherScope = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's, which serves one app and one signed-in user. Use the bank of the app and user it belongs to.`
 // --
 

@@ -31,13 +31,13 @@ export type Auth = {
  * @param opts.clock - stamps a new account's `registered_at`, in epoch milliseconds, rounded down (default: the wall clock)
  *
  * @example
- *   const auth = createAuth({ applabel: 'acme', dbStorage, deviceStorage })
+ *   const auth = createAuth({ banklabel: 'acme', dbStorage, deviceStorage })
  *   const session = await auth.signIn('margo')  // { user_id: 'user_3f...', userlabel: 'margo' }
  */
-export const createAuth = (opts: { applabel: string, dbStorage: StringStorage, deviceStorage: StringStorage, clock?: AuthClock | undefined }): Auth => {
-  const { applabel, dbStorage, deviceStorage, clock = WallClock } = opts
-  const accountCkey = (userlabel: string) => `account:${applabel}:${userlabel}`
-  const sessionCkey = `session:${applabel}`
+export const createAuth = (opts: { banklabel: string, dbStorage: StringStorage, deviceStorage: StringStorage, clock?: AuthClock | undefined }): Auth => {
+  const { banklabel, dbStorage, deviceStorage, clock = WallClock } = opts
+  const accountCkey = (userlabel: string) => `account:${banklabel}:${userlabel}`
+  const sessionCkey = `session:${banklabel}`
 
   /** The demo's account row, in the pretend-remote database beside the vault rows. */
   type Account = {

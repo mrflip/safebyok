@@ -93,7 +93,7 @@ describe("PostgresVaultDB's watch", () => {
     const vault = TH.vaultAt()
     const notices = watching(vaultDB)
     const db = await TH.database()
-    await db.query('SELECT pg_notify($1, $2), pg_notify($1, $3), pg_notify($1, $4)', [vaultChannelOf(TH.bankScope.user_id), 'not json', '{"applabel":"acme"}', '[1, 2, 3]'])
+    await db.query('SELECT pg_notify($1, $2), pg_notify($1, $3), pg_notify($1, $4)', [vaultChannelOf(TH.bankScope.user_id), 'not json', '{"banklabel":"acme"}', '[1, 2, 3]'])
     await vaultDB.putVault(TH.vaultPutAskOf(vault))
     await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'gotlive', val: vault, world: vault }]) })
   })

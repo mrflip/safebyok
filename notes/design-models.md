@@ -41,8 +41,8 @@ Removed from the interface, and so absent from every table: every `cleartexts` p
 * 📸 snapshot: frozen pojo with public props for subscribers
 * 🔑 wayin
 * *️⃣ any
-* 🗳️ box: has whisper, scoped by applabel/user_id/vaultlabel/boxlabel and for most things vault_tok
-* 🏦 vault, scoped by applabel/user_id/vaultlabel and for most things vault_tok, often gate_epoch
+* 🗳️ box: has whisper, scoped by user_id/banklabel/vaultlabel/boxlabel and for most things vault_tok
+* 🏦 vault, scoped by user_id/banklabel/vaultlabel and for most things vault_tok, often gate_epoch
 * 🫥 disabled:  every guard throws
 * 📱 deviceDB: this device's database of cached leases and the device record
 

@@ -98,8 +98,8 @@ describe("SX.boxRecord and SX.boxSparse", () => {
     })
   })
 
-  it("use box format 5001", () => {
-    expect(SX.BoxFormat).to.eq(5001)
+  it("use box format 5002", () => {
+    expect(SX.BoxFormat).to.eq(5002)
     expect(full.fmt).to.eq(SX.BoxFormat)
   })
 })
@@ -222,7 +222,7 @@ describe("VX.boxDna and VX.boxPatch", () => {
 
     it("hands back the whisper, the sidecar, and the scope's fields as given, stripping the rest", () => {
       expect(VX.boxPatch.parse({ ...full, whisper, sidecar: { note: 'new' } })).to.deep.equal({ ...scope, whisper, sidecar: { note: 'new' } })
-      expect(VX.boxPatch.parse({ whisper, sidecar: {} })).to.deep.equal({ whisper, sidecar: {}, applabel: undefined, user_id: undefined, vaultlabel: undefined, boxlabel: undefined })
+      expect(VX.boxPatch.parse({ whisper, sidecar: {} })).to.deep.equal({ whisper, sidecar: {}, user_id: undefined, banklabel: undefined, vaultlabel: undefined, boxlabel: undefined })
     })
 
     it("names the failing field, quoting nothing of a whisper or a field's name", () => {

@@ -255,9 +255,9 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
     expect(err.meta?.fieldnames).to.include('vault_tok')
   })
 
-  it("refuses a scope missing its applabel and user_id, naming scope.applabel", () => {
+  it("refuses a scope missing its user_id and banklabel, naming scope.banklabel", () => {
     const err = TH.expectSyncRefusal(() => new BoxListing(world.mw.world, { ...good(), scope: { vaultlabel: 'v' } } as never))
-    expect(err.meta?.fieldnames).to.include('scope.applabel')
+    expect(err.meta?.fieldnames).to.include('scope.banklabel')
   })
 
   it("shows the scope of the vault it lists", () => {

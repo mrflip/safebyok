@@ -62,25 +62,25 @@ describe("BankProvider's bank", () => {
     expect(second?.user_id).to.eq('u2')
   })
 
-  it("makes a new bank when the applabel changes", async () => {
+  it("makes a new bank when the banklabel changes", async () => {
     const { props, rerender } = provided()
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
-    rerender({ ...props, applabel: 'globex' })
+    rerender({ ...props, banklabel: 'globex' })
     await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(2) })
-    expect(TH.seenBanks.map(({ applabel }) => applabel)).to.deep.equal(['acme', 'globex'])
+    expect(TH.seenBanks.map(({ banklabel }) => banklabel)).to.deep.equal(['acme', 'globex'])
     expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
   })
 
   it("makes each bank with the device_id its deviceDB keeps for the bank's scope", async () => {
     const deviceDB = new MemoryDeviceDB()
-    const kept = await deviceDB.ensureCachedBank({ applabel: 'acme', user_id: 'u1' })
+    const kept = await deviceDB.ensureCachedBank({ user_id: 'u1', banklabel: 'acme' })
     const { props, rerender } = provided({ deviceDB })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
     rerender({ ...props, user_id: 'u2' })
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     const [first, second] = TH.seenBanks
     expect(first?.device_id).to.eq(kept.device_id)
-    const { device_id } = await deviceDB.ensureCachedBank({ applabel: 'acme', user_id: 'u2' })
+    const { device_id } = await deviceDB.ensureCachedBank({ user_id: 'u2', banklabel: 'acme' })
     expect(second?.device_id).to.eq(device_id)
     expect(second?.device_id).to.not.eq(kept.device_id)
   })
@@ -126,7 +126,7 @@ describe("BankProvider's bank", () => {
     expect(making).not.toHaveBeenCalled()
     answer()
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
-    const { device_id } = await deviceDB.ensureCachedBank({ applabel: 'acme', user_id: 'u2' })
+    const { device_id } = await deviceDB.ensureCachedBank({ user_id: 'u2', banklabel: 'acme' })
     expect(making.mock.calls.map(([opts]) => [opts.user_id, opts.device_id])).to.deep.equal([['u2', device_id]])
   })
 

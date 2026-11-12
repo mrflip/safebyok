@@ -29,7 +29,7 @@ bank.hello()                                         a forced reset; a host may 
 
 | Part                | Fields                          | Comes from                                           |
 |---------------------|---------------------------------|------------------------------------------------------|
-| Vault identity      | `applabel`, `user_id`           | Bank                                                 |
+| Vault identity      | `user_id`, `banklabel`           | Bank                                                 |
 |                     | `vaultlabel`                    | Caller's bag                                         |
 |                     | `vault_tok`, `revision_tok`     | Random                                               |
 |                     | `registered_at`, `written_at`   | Clock                                                |

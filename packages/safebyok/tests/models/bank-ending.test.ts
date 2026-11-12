@@ -148,7 +148,7 @@ describe("bank.autolock", () => {
   it("leaves another user's and another app's old leases alone", async () => {
     const world = makeBankWorld()
     const { bank: ours } = await makeBankWithVault(world)
-    const others = [world.bankOn({ user_id: 'u2' }), world.bankOn({ applabel: 'other_app' })]
+    const others = [world.bankOn({ user_id: 'u2' }), world.bankOn({ banklabel: 'other_app' })]
     for (const other of others) {
       await other.hello()
       await other.ensureVault(VaultScopeGiven)
@@ -157,7 +157,7 @@ describe("bank.autolock", () => {
     world.advance(AutolockMillis + 1)
     await ours.autolock()
     await TH.eventually(() => world.leaseRows().length === 2)
-    expect(world.leaseRows().map((row) => (row as { user_id: string, applabel: string }).user_id + (row as { applabel: string }).applabel)).to.have.members(['u2acme', 'u1other_app'])
+    expect(world.leaseRows().map((row) => (row as { user_id: string, banklabel: string }).user_id + (row as { banklabel: string }).banklabel)).to.have.members(['u2acme', 'u1other_app'])
     for (const other of others) { expect(other.vaultAt(VaultScopeGiven)?.isUnlocked).to.be.true }
     expect(ours.vaultAt(VaultScopeGiven)?.isLocked).to.be.true
   })

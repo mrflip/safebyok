@@ -32,10 +32,10 @@ export const DefaultRefreshMillis = 5 * MinuteMillis
 
 /** The signed-in user's vaults in the app, one Vault object per scope, and what they share. */
 export class Bank {
-  // == [Props]: applabel, user_id, scope, device_id, keyDeriver, deviceDB, logger, strengthChecker, leaseMillis, boxRefreshMillis, #hostHandlers, #tellBadNews, #listeners, #vaultListing, #endCause, #vacating, #lastHello, #snapshot, #getSnapshot, #subscribe
+  // == [Props]: user_id, banklabel, scope, device_id, keyDeriver, deviceDB, logger, strengthChecker, leaseMillis, boxRefreshMillis, #hostHandlers, #tellBadNews, #listeners, #vaultListing, #endCause, #vacating, #lastHello, #snapshot, #getSnapshot, #subscribe
 
-  declare readonly applabel: string
-  declare readonly user_id:  string
+  declare readonly user_id:   string
+  declare readonly banklabel: string
   readonly scope:            BankScope
   readonly device_id:        string
   readonly keyDeriver:       GuardedKeyDeriver
@@ -106,8 +106,8 @@ export class Bank {
 
   constructor(opts: BankOpts) {
     checkSecureContext()
-    const { applabel, user_id, device_id, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews = DefaultOnBadNews, onLifecycle = DefaultOnLifecycle } = VX.bankOpts.parse(opts)
-    this.scope = bankScope.parse({ applabel, user_id })
+    const { user_id, banklabel, device_id, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews = DefaultOnBadNews, onLifecycle = DefaultOnLifecycle } = VX.bankOpts.parse(opts)
+    this.scope = bankScope.parse({ user_id, banklabel })
     tattoo(this, this.scope)
     this.device_id = device_id
     this.keyDeriver = guardKeyDeriver(keyDeriver)
@@ -339,7 +339,7 @@ export class Bank {
   /** The host's handlers while the bank is enabled, and handlers that only report once it is disabled. */
   get #handlers(): Handlers { return this.isEnabled ? this.#hostHandlers : DefaultHandlers }
 
-  #isOwnLease({ applabel, user_id }: LeaseDated): boolean { return (applabel === this.applabel) && (user_id === this.user_id) }
+  #isOwnLease({ user_id, banklabel }: LeaseDated): boolean { return (user_id === this.user_id) && (banklabel === this.banklabel) }
 
   #demandReady(): void {
     this.demandEnabled()

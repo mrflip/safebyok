@@ -53,8 +53,8 @@ Hand it to the core wherever a `VaultDB` is asked for.
 ## What is stored
 
 One object store, `rows`, keyed by array. A vault row is filed at
-`['vault', applabel, user_id, vaultlabel]`, and a box row under its vault's life at
-`['box', applabel, user_id, vaultlabel, vault_tok, boxlabel]`, so one key range fetches a bank's
+`['vault', user_id, banklabel, vaultlabel]`, and a box row under its vault's life at
+`['box', user_id, banklabel, vaultlabel, vault_tok, boxlabel]`, so one key range fetches a bank's
 vaults or a vault life's boxes. A deleted vault or box stays as a tombstone. `tidyGone` deletes the
 box rows of any vault life that is over.
 

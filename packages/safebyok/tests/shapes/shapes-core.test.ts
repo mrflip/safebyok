@@ -156,7 +156,7 @@ describe("sidecar", () => {
   })
 })
 
-const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
+const scope = { user_id: 'u1', banklabel: 'acme', vaultlabel: 'main' }
 
 describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
   // CX.vaultScope @example
@@ -165,7 +165,7 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
     const parsed = CX.vaultScope.parse(vault)
     expect(parsed).to.deep.equal(scope)
     expect(Object.isFrozen(parsed)).to.be.true
-    expect(CX.bankScope.parse(vault)).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
+    expect(CX.bankScope.parse(vault)).to.deep.equal({ user_id: 'u1', banklabel: 'acme' })
     expect(CX.boxscope.parse({ ...vault, boxlabel: 'openai' })).to.deep.equal({ ...scope, boxlabel: 'openai' })
   })
 
@@ -178,10 +178,10 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
 
   it("read a scope's names through a getter", () => {
     class Wrapper {
-      readonly #applabel = 'acme'
       readonly user_id = 'u1'
+      readonly #banklabel = 'acme'
       readonly vaultlabel = 'main'
-      get applabel(): string { return this.#applabel }
+      get banklabel(): string { return this.#banklabel }
     }
     expect(CX.vaultScope.parse(new Wrapper())).to.deep.equal(scope)
   })
@@ -193,14 +193,14 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
   })
 
   it("refuse a name missing, or not text, naming each", () => {
-    const err = TH.expectSyncRefusal(() => CX.vaultScope.parse({ applabel: 'acme', user_id: 42 }))
+    const err = TH.expectSyncRefusal(() => CX.vaultScope.parse({ user_id: 42, banklabel: 'acme' }))
     expect(err.meta?.fieldnames).to.deep.equal(['user_id', 'vaultlabel'])
     TH.expectSyncRefusal(() => CX.vaultScope.parse(null))
     TH.expectSyncRefusal(() => CX.bankScope.parse('acme'))
   })
 
   it("refuse a name containing the scopepath delimiter, in every place a name goes", () => {
-    for (const fieldname of ['applabel', 'user_id', 'vaultlabel', 'boxlabel']) {
+    for (const fieldname of ['user_id', 'banklabel', 'vaultlabel', 'boxlabel']) {
       const err = TH.expectSyncRefusal(() => CX.boxscope.parse({ ...scope, boxlabel: 'openai', [fieldname]: 'a^b' }))
       expect(err.meta?.fieldnames).to.deep.equal([fieldname])
       expect(err.message).to.not.include('a^b')
@@ -210,18 +210,18 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
 
 const ScopeCases = [
   // regular usage:
-  [TH.scopeOf('u1'),                                  true,   'an applabel, a user_id and a vaultlabel'],
+  [TH.scopeOf('u1'),                                  true,   'a user_id, a banklabel and a vaultlabel'],
   [TH.scopeOf('user|2fJ8:google'),                    true,   'a user_id in whatever form the host app issues'],
   [TH.scopeOf('u'.repeat(100)),                       true,   'a user_id of a hundred characters, the most it has'],
   // refused, a name failing its check:
   [TH.scopeOf('u'.repeat(101)),                       false,  'a user_id over a hundred characters'],
-  [{ ...TH.scopeOf('u1'), applabel: 'Acme: Ünïcode' },  false,  'an applabel that is no label'],
+  [{ ...TH.scopeOf('u1'), banklabel: 'Acme: Ünïcode' },  false,  'an banklabel that is no label'],
   [{ ...TH.scopeOf('u1'), user_id: '' },              false,  'an empty user_id'],
   [{ ...TH.scopeOf('u1'), vaultlabel: 'tab\there' },  false,  'a vaultlabel containing a control character'],
-  [{ ...TH.scopeOf('u1'), applabel: 'cafe\u{301}' },  false,  'an applabel outside ASCII'],
+  [{ ...TH.scopeOf('u1'), banklabel: 'cafe\u{301}' },  false,  'an banklabel outside ASCII'],
   // refused:
-  [{ ...TH.scopeOf('u1'), applabel: 42 },             false,  'an applabel that is not text'],
-  [{ applabel: 'acme', user_id: 'u1' },              false,  'a scope missing its vaultlabel'],
+  [{ ...TH.scopeOf('u1'), banklabel: 42 },             false,  'an banklabel that is not text'],
+  [{ user_id: 'u1', banklabel: 'acme' },              false,  'a scope missing its vaultlabel'],
 ] as const
 
 describe("bankedVaultScope", () => {

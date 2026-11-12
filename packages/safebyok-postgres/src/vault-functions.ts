@@ -7,7 +7,7 @@ export const VaultFunctionsSql = `-- safebyok-postgres: the functions PostgresVa
 -- replaced, deleted or reborn), the rows as they are now, and what was stored before (presence: void, live or gone).
 -- The functions decide no policy: PostgresVaultDB calls one only when the record may replace the row it expects.
 -- A function never overwrites a row whose fmt differs from the record's, and never stores a box under a vault row
--- whose fmt is not 6001. A row in a later format is one this version of safebyok cannot read.
+-- whose fmt is not 6002. A row in a later format is one this version of safebyok cannot read.
 -- Each write function takes the record to store and the row the caller expects, both as JSON. The box functions
 -- also take the cap on box rows.
 --
@@ -41,7 +41,7 @@ LANGUAGE plpgsql AS $$
 DECLARE
   stored jsonb := COALESCE(box, vault);
   at     jsonb := safebyok_record(jsonb_build_object(
-    'applabel', stored->'applabel', 'user_id', stored->'user_id', 'vaultlabel', stored->'vaultlabel',
+    'user_id', stored->'user_id', 'banklabel', stored->'banklabel', 'vaultlabel', stored->'vaultlabel',
     'vault_tok', box->'vault_tok', 'boxlabel', box->'boxlabel'));
   notice text  := safebyok_record(jsonb_build_object('at', at, 'vault', vault, 'box', box))::text;
 BEGIN
@@ -60,7 +60,7 @@ BEGIN
   ok := false;  swept := 0;
   IF new_vault.am = 'a' AND new_vault.revision_seq = 0 THEN
     INSERT INTO safebyok_vaults VALUES (new_vault.*)
-    ON CONFLICT (applabel, user_id, vaultlabel) DO NOTHING;
+    ON CONFLICT (user_id, banklabel, vaultlabel) DO NOTHING;
     ok := FOUND;
   END IF;
 
@@ -71,7 +71,7 @@ BEGIN
   END IF;
 
   SELECT safebyok_record(to_jsonb(v)) INTO vault FROM safebyok_vaults AS v
-  WHERE  (v.applabel, v.user_id, v.vaultlabel) = (new_vault.applabel, new_vault.user_id, new_vault.vaultlabel);
+  WHERE  (v.user_id, v.banklabel, v.vaultlabel) = (new_vault.user_id, new_vault.banklabel, new_vault.vaultlabel);
   presence := CASE WHEN vault IS NULL THEN 'void' WHEN vault->>'am' = 'a' THEN 'live' ELSE 'gone' END;
   RETURN NEXT;
 END $$;
@@ -92,7 +92,7 @@ BEGIN
   UPDATE safebyok_vaults AS v
   SET    (fmt, am, revision_tok, revision_seq, registered_at, written_at, vault_tok, gate)
        = (new_vault.fmt, new_vault.am, new_vault.revision_tok, new_vault.revision_seq, new_vault.registered_at, new_vault.written_at, new_vault.vault_tok, new_vault.gate)
-  WHERE  (v.applabel, v.user_id, v.vaultlabel) = (new_vault.applabel, new_vault.user_id, new_vault.vaultlabel)
+  WHERE  (v.user_id, v.banklabel, v.vaultlabel) = (new_vault.user_id, new_vault.banklabel, new_vault.vaultlabel)
     AND  v.revision_tok = expected.revision_tok
     AND  v.am = expected.am
     AND  v.vault_tok = expected.vault_tok
@@ -104,14 +104,14 @@ BEGIN
   IF ok THEN
     DELETE FROM safebyok_boxes AS b
     USING (
-      SELECT d.applabel, d.user_id, d.vaultlabel, d.vault_tok, d.boxlabel
+      SELECT d.user_id, d.banklabel, d.vaultlabel, d.vault_tok, d.boxlabel
       FROM   safebyok_boxes AS d
-      WHERE  (d.applabel, d.user_id, d.vaultlabel) = (new_vault.applabel, new_vault.user_id, new_vault.vaultlabel)
+      WHERE  (d.user_id, d.banklabel, d.vaultlabel) = (new_vault.user_id, new_vault.banklabel, new_vault.vaultlabel)
         AND  d.vault_tok <> new_vault.vault_tok
       FOR UPDATE SKIP LOCKED
     ) AS doomed
-    WHERE  (b.applabel, b.user_id, b.vaultlabel, b.vault_tok, b.boxlabel)
-         = (doomed.applabel, doomed.user_id, doomed.vaultlabel, doomed.vault_tok, doomed.boxlabel);
+    WHERE  (b.user_id, b.banklabel, b.vaultlabel, b.vault_tok, b.boxlabel)
+         = (doomed.user_id, doomed.banklabel, doomed.vaultlabel, doomed.vault_tok, doomed.boxlabel);
     GET DIAGNOSTICS swept = ROW_COUNT;
     act      := CASE WHEN expected.am <> 'a' THEN 'reborn' WHEN new_vault.am = 'a' THEN 'replaced' ELSE 'deleted' END;
     presence := CASE WHEN expected.am = 'a' THEN 'live' ELSE 'gone' END;
@@ -121,7 +121,7 @@ BEGIN
   END IF;
 
   SELECT safebyok_record(to_jsonb(v)) INTO vault FROM safebyok_vaults AS v
-  WHERE  (v.applabel, v.user_id, v.vaultlabel) = (new_vault.applabel, new_vault.user_id, new_vault.vaultlabel);
+  WHERE  (v.user_id, v.banklabel, v.vaultlabel) = (new_vault.user_id, new_vault.banklabel, new_vault.vaultlabel);
   presence := CASE WHEN vault IS NULL THEN 'void' WHEN vault->>'am' = 'a' THEN 'live' ELSE 'gone' END;
   RETURN NEXT;
 END $$;
@@ -137,16 +137,16 @@ DECLARE
   its_vault safebyok_vaults;
 BEGIN
   SELECT v.* INTO its_vault FROM safebyok_vaults AS v
-  WHERE  (v.applabel, v.user_id, v.vaultlabel) = (new_box.applabel, new_box.user_id, new_box.vaultlabel);
+  WHERE  (v.user_id, v.banklabel, v.vaultlabel) = (new_box.user_id, new_box.banklabel, new_box.vaultlabel);
   SELECT count(*)::integer INTO boxcount FROM safebyok_boxes AS b
-  WHERE  (b.applabel, b.user_id, b.vaultlabel, b.vault_tok) = (new_box.applabel, new_box.user_id, new_box.vaultlabel, new_box.vault_tok);
+  WHERE  (b.user_id, b.banklabel, b.vaultlabel, b.vault_tok) = (new_box.user_id, new_box.banklabel, new_box.vaultlabel, new_box.vault_tok);
 
   ok := false;
-  IF its_vault.am = 'a' AND its_vault.vault_tok = new_box.vault_tok AND its_vault.fmt = 6001
+  IF its_vault.am = 'a' AND its_vault.vault_tok = new_box.vault_tok AND its_vault.fmt = 6002
      AND new_box.am = 'a' AND new_box.revision_seq = 0
      AND boxcount < maxboxes THEN
     INSERT INTO safebyok_boxes VALUES (new_box.*)
-    ON CONFLICT (applabel, user_id, vaultlabel, vault_tok, boxlabel) DO NOTHING;
+    ON CONFLICT (user_id, banklabel, vaultlabel, vault_tok, boxlabel) DO NOTHING;
     ok := FOUND;
   END IF;
 
@@ -159,10 +159,10 @@ BEGIN
 
   SELECT safebyok_record(to_jsonb(v)), (
     SELECT safebyok_record(to_jsonb(b)) FROM safebyok_boxes AS b
-    WHERE  (b.applabel, b.user_id, b.vaultlabel, b.vault_tok, b.boxlabel) = (new_box.applabel, new_box.user_id, new_box.vaultlabel, new_box.vault_tok, new_box.boxlabel)
+    WHERE  (b.user_id, b.banklabel, b.vaultlabel, b.vault_tok, b.boxlabel) = (new_box.user_id, new_box.banklabel, new_box.vaultlabel, new_box.vault_tok, new_box.boxlabel)
   ) INTO world, box
   FROM   (SELECT 1) AS one LEFT JOIN safebyok_vaults AS v
-    ON   (v.applabel, v.user_id, v.vaultlabel) = (new_box.applabel, new_box.user_id, new_box.vaultlabel);
+    ON   (v.user_id, v.banklabel, v.vaultlabel) = (new_box.user_id, new_box.banklabel, new_box.vaultlabel);
   presence := CASE WHEN box IS NULL THEN 'void' WHEN box->>'am' = 'a' THEN 'live' ELSE 'gone' END;
   RETURN NEXT;
 END $$;
@@ -181,16 +181,16 @@ DECLARE
   its_vault safebyok_vaults;
 BEGIN
   SELECT v.* INTO its_vault FROM safebyok_vaults AS v
-  WHERE  (v.applabel, v.user_id, v.vaultlabel) = (new_box.applabel, new_box.user_id, new_box.vaultlabel);
+  WHERE  (v.user_id, v.banklabel, v.vaultlabel) = (new_box.user_id, new_box.banklabel, new_box.vaultlabel);
 
   ok := false;
-  IF its_vault.am = 'a' AND its_vault.vault_tok = new_box.vault_tok AND its_vault.fmt = 6001 THEN
+  IF its_vault.am = 'a' AND its_vault.vault_tok = new_box.vault_tok AND its_vault.fmt = 6002 THEN
     UPDATE safebyok_boxes AS b
     SET    (fmt, am, revision_tok, revision_seq, registered_at, written_at, box_tok,
             whisper_codec, whisper_schema_version, sidecar, box_key_wrapped, whisper_ciphered)
          = (new_box.fmt, new_box.am, new_box.revision_tok, new_box.revision_seq, new_box.registered_at, new_box.written_at, new_box.box_tok,
             new_box.whisper_codec, new_box.whisper_schema_version, new_box.sidecar, new_box.box_key_wrapped, new_box.whisper_ciphered)
-    WHERE  (b.applabel, b.user_id, b.vaultlabel, b.vault_tok, b.boxlabel) = (new_box.applabel, new_box.user_id, new_box.vaultlabel, new_box.vault_tok, new_box.boxlabel)
+    WHERE  (b.user_id, b.banklabel, b.vaultlabel, b.vault_tok, b.boxlabel) = (new_box.user_id, new_box.banklabel, new_box.vaultlabel, new_box.vault_tok, new_box.boxlabel)
       AND  b.revision_tok = expected.revision_tok
       AND  b.am = expected.am
       AND  b.box_tok = expected.box_tok
@@ -210,10 +210,10 @@ BEGIN
 
   SELECT safebyok_record(to_jsonb(v)), (
     SELECT safebyok_record(to_jsonb(b)) FROM safebyok_boxes AS b
-    WHERE  (b.applabel, b.user_id, b.vaultlabel, b.vault_tok, b.boxlabel) = (new_box.applabel, new_box.user_id, new_box.vaultlabel, new_box.vault_tok, new_box.boxlabel)
+    WHERE  (b.user_id, b.banklabel, b.vaultlabel, b.vault_tok, b.boxlabel) = (new_box.user_id, new_box.banklabel, new_box.vaultlabel, new_box.vault_tok, new_box.boxlabel)
   ) INTO world, box
   FROM   (SELECT 1) AS one LEFT JOIN safebyok_vaults AS v
-    ON   (v.applabel, v.user_id, v.vaultlabel) = (new_box.applabel, new_box.user_id, new_box.vaultlabel);
+    ON   (v.user_id, v.banklabel, v.vaultlabel) = (new_box.user_id, new_box.banklabel, new_box.vaultlabel);
   presence := CASE WHEN box IS NULL THEN 'void' WHEN box->>'am' = 'a' THEN 'live' ELSE 'gone' END;
   RETURN NEXT;
 END $$;

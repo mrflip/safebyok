@@ -6,7 +6,7 @@ import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
 
-const VaultAddress = [TH.vaultScope.applabel, TH.vaultScope.user_id, TH.vaultScope.vaultlabel]
+const VaultAddress = [TH.vaultScope.user_id, TH.vaultScope.banklabel, TH.vaultScope.vaultlabel]
 const LifeAddress  = [...VaultAddress, 'life1']
 const BoxAddress   = [...LifeAddress, TH.boxscope.boxlabel]
 
@@ -38,7 +38,7 @@ async function storedBox(): Promise<unknown> {
 const StoreVaultSql = `
   INSERT INTO safebyok_vaults
   SELECT * FROM jsonb_populate_record(NULL::safebyok_vaults, $1::text::jsonb)
-  ON CONFLICT (applabel, user_id, vaultlabel)
+  ON CONFLICT (user_id, banklabel, vaultlabel)
   DO UPDATE SET
     fmt = EXCLUDED.fmt, am = EXCLUDED.am, revision_tok = EXCLUDED.revision_tok, revision_seq = EXCLUDED.revision_seq,
     registered_at = EXCLUDED.registered_at, written_at = EXCLUDED.written_at, vault_tok = EXCLUDED.vault_tok, gate = EXCLUDED.gate
@@ -46,7 +46,7 @@ const StoreVaultSql = `
 const StoreBoxSql = `
   INSERT INTO safebyok_boxes
   SELECT * FROM jsonb_populate_record(NULL::safebyok_boxes, $1::text::jsonb)
-  ON CONFLICT (applabel, user_id, vaultlabel, vault_tok, boxlabel)
+  ON CONFLICT (user_id, banklabel, vaultlabel, vault_tok, boxlabel)
   DO UPDATE SET
     fmt = EXCLUDED.fmt, am = EXCLUDED.am, revision_tok = EXCLUDED.revision_tok, revision_seq = EXCLUDED.revision_seq,
     registered_at = EXCLUDED.registered_at, written_at = EXCLUDED.written_at, box_tok = EXCLUDED.box_tok,
@@ -117,7 +117,7 @@ describe("a record stored in its table", () => {
 describe("the columns of a row", () => {
   it("each hold one field of a live vault", async () => {
     await storeVault(vault)
-    const columns = 'applabel, user_id, vaultlabel, fmt, am, revision_tok, revision_seq, registered_at::text AS registered_at, written_at::text AS written_at, vault_tok, gate'
+    const columns = 'user_id, banklabel, vaultlabel, fmt, am, revision_tok, revision_seq, registered_at::text AS registered_at, written_at::text AS written_at, vault_tok, gate'
     expect(await rowsFrom(`SELECT ${columns} FROM safebyok_vaults`)).to.deep.equal([
       { ...vault, registered_at: String(vault.registered_at), written_at: String(vault.written_at) },
     ])
@@ -126,7 +126,7 @@ describe("the columns of a row", () => {
   it("each hold one field of a live box", async () => {
     await storeVault(vault)
     await storeBox(box)
-    const columns = `applabel, user_id, vaultlabel, vault_tok, boxlabel, fmt, am, revision_tok, revision_seq, registered_at::text AS registered_at, written_at::text AS written_at,
+    const columns = `user_id, banklabel, vaultlabel, vault_tok, boxlabel, fmt, am, revision_tok, revision_seq, registered_at::text AS registered_at, written_at::text AS written_at,
       box_tok, whisper_codec, whisper_schema_version, sidecar, box_key_wrapped, whisper_ciphered`
     expect(await rowsFrom(`SELECT ${columns} FROM safebyok_boxes`)).to.deep.equal([
       { ...box, registered_at: String(box.registered_at), written_at: String(box.written_at) },
@@ -218,7 +218,7 @@ describe("a box row's foreign key to its vault row", () => {
   it("refuses a DELETE of a vault row while it has box rows", async () => {
     await storeVault(vault)
     await storeBox(box)
-    expect(await refusalCodeOf(() => rowsFrom('DELETE FROM safebyok_vaults WHERE applabel = $1 AND user_id = $2 AND vaultlabel = $3', VaultAddress))).to.equal('23503')
+    expect(await refusalCodeOf(() => rowsFrom('DELETE FROM safebyok_vaults WHERE user_id = $1 AND banklabel = $2 AND vaultlabel = $3', VaultAddress))).to.equal('23503')
     expect(await storedVault()).to.deep.equal(vault)
   })
 })

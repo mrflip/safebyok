@@ -33,7 +33,7 @@ describe("AddPasskeyModal", () => {
     expect(await raising).to.include({ ok: true })
     expect(passkeyOf(bank)).to.equal(authenticator.credentialIds()[0])
     const [call] = authenticator.calls.create
-    expect(call?.publicKey?.rp.name).to.equal(gating.applabel)
+    expect(call?.publicKey?.rp.name).to.equal(gating.banklabel)
     expect(call?.publicKey?.user).to.include({ name: 'u1 (main vault)' })
   })
 

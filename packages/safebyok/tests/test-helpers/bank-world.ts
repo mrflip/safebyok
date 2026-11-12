@@ -17,7 +17,7 @@ import { T0, Dna, Passphrase, byPassphrase } from './vault-world'
 export const AutolockMinutes = 60
 
 /** The bank scope these worlds hand `Bank.make`. */
-export const BankScopeGiven = Object.freeze({ applabel: Dna.applabel, user_id: Dna.user_id })
+export const BankScopeGiven = Object.freeze({ user_id: Dna.user_id, banklabel: Dna.banklabel })
 
 /** The vault scope a test hands `bank.ensureVault`. */
 export const VaultScopeGiven = Object.freeze({ vaultlabel: Dna.vaultlabel })

@@ -6,7 +6,7 @@ import { makeLeaseKey } from '../../src/helpers/crypto'
 import { DeviceDB } from '../../src/storage/device-db'
 import * as TH from '../test-helpers'
 
-const asked = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'tok_one' }
+const asked = { user_id: 'u1', banklabel: 'acme', vaultlabel: 'main', vault_tok: 'tok_one' }
 
 /** A DeviceDB whose every generic call throws what it is told. */
 class BrokenDeviceDB extends DeviceDB {
@@ -32,7 +32,7 @@ describe("a deviceDB whose generic call throws", () => {
       ['peek',       await TH.expectBad(deviceDB.tryPeek(asked), 'storage_unavailable')],
       ['forget',     await TH.expectBad(deviceDB.tryForget(asked), 'storage_unavailable')],
       ['listLeases', await TH.expectBad(deviceDB.tryListLeases(), 'storage_unavailable')],
-      ['forgetRawLease', await TH.expectBad(deviceDB.tryForgetRawLease(['acme', 'u1', 'main']), 'storage_unavailable')],
+      ['forgetRawLease', await TH.expectBad(deviceDB.tryForgetRawLease(['u1', 'acme', 'main']), 'storage_unavailable')],
       ['ensureCachedBank', await TH.expectBad(deviceDB.tryEnsureCachedBank(asked), 'storage_unavailable')],
       ['forgetBank', await TH.expectBad(deviceDB.tryForgetBank(asked), 'storage_unavailable')],
       ['listRawBanks', await TH.expectBad(deviceDB.tryListRawBanks(), 'storage_unavailable')],
@@ -55,7 +55,7 @@ describe("a deviceDB whose generic call throws", () => {
 describe("a deviceDB whose generic call returns an invalid bank row", () => {
   it("refuses ensureCachedBank", async () => {
     class GarbledDeviceDB extends BrokenDeviceDB {
-      protected override doEnsureCachedBank(): unknown { return { applabel: 'acme', user_id: 'u1', device_id: 'not-a-uuid' } }
+      protected override doEnsureCachedBank(): unknown { return { user_id: 'u1', banklabel: 'acme', device_id: 'not-a-uuid' } }
     }
     await TH.expectBad(new GarbledDeviceDB(null).tryEnsureCachedBank(asked), 'bad_record')
   })

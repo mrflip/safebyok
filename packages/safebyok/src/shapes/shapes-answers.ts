@@ -14,7 +14,7 @@ import type { LoggableAsk } from './shapes-storage'
 
 // A failed check here is a wire out of step with this copy of safebyok, never a damaged row: 'unexpected_error'.
 /** The checks of the parts of a vaultDB answer that cross the wire: a refusal, what the answer carries of its ask, and the damaged rows listed. */
-export const { crossedErr, crossedAsk, damagedVault, damagedBox } = Checkers('unexpected_error', ({ obj, arr, str, int, lit, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok, revision_tok }) => {
+export const { crossedErr, crossedAsk, damagedVault, damagedBox } = Checkers('unexpected_error', ({ obj, arr, str, int, lit, oneof, user_id, banklabel, vaultlabel, boxlabel, vault_tok, box_tok, revision_tok }) => {
   const crossedErr = obj({
     refusalkind: oneof(refusalkindVals),
     message:     str,
@@ -34,8 +34,8 @@ export const { crossedErr, crossedAsk, damagedVault, damagedBox } = Checkers('un
   }).strict()
   const crossedAsk = obj({
     op:         oneof(EX.askOpVals).nullable().default(null),
-    applabel:   applabel.nullable().default(null),
     user_id:    user_id.nullable().default(null),
+    banklabel:  banklabel.nullable().default(null),
     vaultlabel: vaultlabel.nullable().default(null),
     boxlabel:   boxlabel.nullable().default(null),
     vault_tok:  vault_tok.nullable().default(null),
@@ -46,8 +46,8 @@ export const { crossedErr, crossedAsk, damagedVault, damagedBox } = Checkers('un
     record:     crossedMeta.nullable().default(null),
   }).strict()
   // A damaged row's label is the one it is stored under, which may fail a label's check: a reason it is listed.
-  const damagedVault = obj({ applabel, user_id, vaultlabel: str, am: lit('d') }).strict()
-  const damagedBox   = obj({ applabel, user_id, vaultlabel, boxlabel: str, vault_tok, am: lit('d') }).strict()
+  const damagedVault = obj({ user_id, banklabel, vaultlabel: str, am: lit('d') }).strict()
+  const damagedBox   = obj({ user_id, banklabel, vaultlabel, boxlabel: str, vault_tok, am: lit('d') }).strict()
   return { crossedErr, crossedAsk, damagedVault, damagedBox }
 }, [CX])
 

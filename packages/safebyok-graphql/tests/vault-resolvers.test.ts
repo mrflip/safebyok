@@ -278,7 +278,7 @@ describe("vaultResolvers' watch", () => {
 
   it("ends a refused watch after one notice", async () => {
     const { listening, schema } = await watchedServer()
-    for (const [context, scope, refusalkind] of [[{ user_id: 'u2' }, TH.bankScope, 'identity_revoked'], [{ user_id: 'u1' }, { ...TH.bankScope, applabel: '' }, 'bad_scope']] as const) {
+    for (const [context, scope, refusalkind] of [[{ user_id: 'u2' }, TH.bankScope, 'identity_revoked'], [{ user_id: 'u1' }, { ...TH.bankScope, banklabel: '' }, 'bad_scope']] as const) {
       const { nextNotice } = await watching(schema, context, scope)
       expect(await nextNotice()).to.have.nested.property('err.refusalkind', refusalkind)
       expect(await nextNotice()).to.be.null

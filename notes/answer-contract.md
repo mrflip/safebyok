@@ -346,7 +346,7 @@ Three roles take part in every call, and each rule below names the one it binds.
 
 Two primary keys locate every row, and the datastore enforces them. Every other invariant below names the check it implies and the refusal when it fails.
 
-- **`vault_scope`**: an opaque identifier built from applabel, `user_id` and vaultlabel. Primary key of the vault table.
+- **`vault_scope`**: an opaque identifier built from `user_id`, banklabel and vaultlabel. Primary key of the vault table.
 - **`box_scope`**: `vault_scope` + boxlabel. With the `vault_tok` of its vault's life, the primary key of the box table: a box is filed under one life of its vault, and fetched by it.
 
 | #   | Invariant                                                                                            | Enforced by                                                            | Check                                                                                                                                                                                                                                                                            | On failure                                                                                                                         |

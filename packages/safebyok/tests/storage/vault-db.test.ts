@@ -42,7 +42,7 @@ describe("AdapterVaultDB", () => {
 
     it("watch refuses a scope failing its check, before it watches", () => {
       const vaultDB = new MemoryVaultDB()
-      expect(() => vaultDB.watch({ ...bankScope, applabel: '' }, () => undefined)).to.throw(VaultError).with.property('refusalkind', 'bad_scope')
+      expect(() => vaultDB.watch({ ...bankScope, banklabel: '' }, () => undefined)).to.throw(VaultError).with.property('refusalkind', 'bad_scope')
       expect(() => vaultDB.watch({ ...vaultScope, vaultlabel: 'No Good!' }, () => undefined)).to.throw(VaultError).with.property('refusalkind', 'bad_scope')
     })
   })

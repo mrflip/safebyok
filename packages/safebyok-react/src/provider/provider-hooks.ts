@@ -4,25 +4,25 @@ import type { ProviderBankOpts } from '../shapes'
 
 // == [Device]: useDeviceId
 
-/** device_id for `applabel` and `user_id`, cached createOrFind in DeviceDB */
-export const useDeviceId = (deviceDB: BankOpts['deviceDB'], applabel: string, user_id: string | null): string | null => {
-  const [found,   setFound]   = useState<{ applabel: string, user_id: string, device_id: string } | null>(null)
+/** device_id for `user_id` and `banklabel`, cached createOrFind in DeviceDB */
+export const useDeviceId = (deviceDB: BankOpts['deviceDB'], user_id: string | null, banklabel: string): string | null => {
+  const [found,   setFound]   = useState<{ user_id: string, banklabel: string, device_id: string } | null>(null)
   const [refused, setRefused] = useState<{ err: unknown } | null>(null)
 
   useEffect(() => {
     if (user_id === null) { return }
     // Drop answers to a cleaned-up run -- the standard React pattern for a fetch.
     let isCurrent = true
-    void deviceDB.ensureCachedBank({ applabel, user_id })
-      .then(({ device_id }) => { if (isCurrent) { setFound({ applabel, user_id, device_id }) } })
+    void deviceDB.ensureCachedBank({ user_id, banklabel })
+      .then(({ device_id }) => { if (isCurrent) { setFound({ user_id, banklabel, device_id }) } })
       .catch((err: unknown) => { if (isCurrent) { setRefused({ err }) } })
     return () => { isCurrent = false }
-  }, [deviceDB, applabel, user_id])
+  }, [deviceDB, user_id, banklabel])
 
   // Throw errors during render, so the nearest error boundary hears it.
   if (refused !== null) { throw refused.err }
   // Right after a new user signs in, state still has the previous user's device_id. Return null until the deviceDB responds for the new user.
-  return (found?.applabel === applabel && found.user_id === user_id) ? found.device_id : null
+  return (found !== null && found.user_id === user_id && found.banklabel === banklabel) ? found.device_id : null
 }
 // --
 
@@ -41,7 +41,7 @@ export const useWarnOfIgnoredOpts = (bank: Bank | null, wasOpts: ProviderBankOpt
     const changed = changedFieldnames(wasOpts, nowOpts)
     if (changed.length === 0) { return }
     toldOfIgnored.current = true
-    bank.logger.warn(`BankProvider ignored a change to its ${changed.join(' and ')}: it makes its bank once per applabel and user_id, from the props it has then. Define each prop once, outside the component, or memoize it.`, { oplabel: 'BankProvider', props: changed })
+    bank.logger.warn(`BankProvider ignored a change to its ${changed.join(' and ')}: it makes its bank once per user_id and banklabel, from the props it has then. Define each prop once, outside the component, or memoize it.`, { oplabel: 'BankProvider', props: changed })
   })
 }
 // --

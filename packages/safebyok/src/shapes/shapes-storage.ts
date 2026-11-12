@@ -19,9 +19,9 @@ export const VoidLifeTok = '00000000-0000-0000-0000-000000000000'
 /** The `registered_at` and `written_at` of a void row: 2008-08-08T08:08:08.777Z, plain on sight. */
 export const VoidTime = 1_218_182_888_777
 /** The `fmt` every box row carries. */
-export const BoxFormat = 5001
+export const BoxFormat = 5002
 /** The `fmt` every vault row carries. */
-export const VaultFormat = 6001
+export const VaultFormat = 6002
 /** The revision of a void row, and of a birth's prior. */
 export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidRevisionSeq } as const
 
@@ -110,7 +110,7 @@ export type VaultTombstone = Readonly<Z.infer<typeof vaultTombstone>>
 /** A vault row as stored: live, or a tombstone. */
 export type VaultRow       = VaultRecord | VaultTombstone
 /** A vault row that failed validation, named by where it is stored: its scope, under whatever label storage has, and `am` 'd'. */
-export type DamagedVault   = Readonly<{ applabel: string, user_id: string, vaultlabel: string, am: 'd' }>
+export type DamagedVault   = Readonly<{ user_id: string, banklabel: string, vaultlabel: string, am: 'd' }>
 /** A vault row or a box row that failed validation, named by where it is stored.
  * A damaged row never indicates format drift: it is thrown by the vaultDB tied to the datastore.
  */
@@ -150,7 +150,7 @@ export type BoxTombstone = Readonly<Z.infer<typeof boxTombstone>>
 /** A box row as stored: live, or a tombstone. */
 export type BoxRow       = BoxRecord | BoxTombstone
 /** A box row that failed validation, named by where it is stored: its scope, under whatever label storage has, its vault's `vault_tok`, and `am` 'd'. */
-export type DamagedBox   = Readonly<{ applabel: string, user_id: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>
+export type DamagedBox   = Readonly<{ user_id: string, banklabel: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>
 // --
 
 // == [Rows stored]: storedVaultRowOrNull, storedBoxRowOrNull, storedVaultRow, storedBoxRow
@@ -324,24 +324,24 @@ export function isTombstoneRow(raw: unknown): boolean { return (metaOf(raw)?.am 
 const shellTimes = { registered_at: VoidTime, written_at: VoidTime }
 
 /** The tombstone of a vault row that is not stored. */
-export function shellVaultOf({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone {
+export function shellVaultOf({ user_id, banklabel, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone {
   return {
-    applabel, user_id, vaultlabel, fmt: VaultFormat, ...VoidRevision, ...shellTimes, am: 'x', vault_tok,
+    user_id, banklabel, vaultlabel, fmt: VaultFormat, ...VoidRevision, ...shellTimes, am: 'x', vault_tok,
   }
 }
 
 /** The tombstone of a box row that is not stored. */
-export function shellBoxOf({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string): BoxTombstone {
+export function shellBoxOf({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, vault_tok: string): BoxTombstone {
   return {
-    applabel, user_id, vaultlabel, boxlabel, fmt: BoxFormat, ...VoidRevision, ...shellTimes, am: 'x', vault_tok, box_tok: VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
+    user_id, banklabel, vaultlabel, boxlabel, fmt: BoxFormat, ...VoidRevision, ...shellTimes, am: 'x', vault_tok, box_tok: VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
   }
 }
 
 /** A listing's entry for a vault row that failed validation. Its label comes from storage, unchecked: it is part of what is reported. */
-export function damagedVaultOf({ applabel, user_id, vaultlabel }: VaultScope): DamagedVault { return { applabel, user_id, vaultlabel, am: 'd' } }
+export function damagedVaultOf({ user_id, banklabel, vaultlabel }: VaultScope): DamagedVault { return { user_id, banklabel, vaultlabel, am: 'd' } }
 
 /** A listing's entry for a box row that failed validation. Its label comes from storage, unchecked: it is part of what is reported. */
-export function damagedBoxOf({ applabel, user_id, vaultlabel, boxlabel }: Boxscope, vault_tok: string): DamagedBox { return { applabel, user_id, vaultlabel, boxlabel, vault_tok, am: 'd' } }
+export function damagedBoxOf({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, vault_tok: string): DamagedBox { return { user_id, banklabel, vaultlabel, boxlabel, vault_tok, am: 'd' } }
 
 /** The tombstone a vault's deletion leaves for a box row, or null for a row already one or past reading. */
 export function boxTombstoneOf(raw: unknown, written_at: number): BoxTombstone | null {
@@ -466,12 +466,12 @@ export function gateVerbAskOf(gateVerb: EX.GateVerb, record: VaultRecord): Reado
 /** The check of what an answer and its refusal carry of an ask: any of its fields but a record's payload.
  * Each field is optional, so a refusal made before the ask was whole carries what of it was sound.
  */
-export const loggableAsk = objStrip(({ obj, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok }) => {
+export const loggableAsk = objStrip(({ obj, oneof, user_id, banklabel, vaultlabel, boxlabel, vault_tok, box_tok }) => {
   const meta = obj({ ...revision.shape, am, vault_tok, box_tok }).partial()
   return {
     op:         oneof(EX.askOpVals).optional(),
-    applabel:   applabel.optional(),
     user_id:    user_id.optional(),
+    banklabel:  banklabel.optional(),
     vaultlabel: vaultlabel.optional(),
     boxlabel:   boxlabel.optional(),
     vault_tok:  vault_tok.optional(),
@@ -504,8 +504,8 @@ export type LeaseRow     = Z.infer<typeof leaseRow>
 /** The check of a lease scopepath, as `forgetRawLease` accepts one: three strings. */
 export const leaseScopepath = Checker(({ tuple, str }) => tuple([str, str, str]), 'bad_scope')
 
-/** Where a device database files a vault's lease row: its applabel, user_id and vaultlabel, as stored. */
-export type LeaseScopepath = [applabel: string, user_id: string, vaultlabel: string]
+/** Where a device database files a vault's lease row: its user_id, banklabel and vaultlabel, as stored. */
+export type LeaseScopepath = [user_id: string, banklabel: string, vaultlabel: string]
 
 /** A lease row as stored, unchecked, beside the scopepath it is filed under. */
 export type RawLease = { scopepath: LeaseScopepath, row: unknown }
@@ -513,7 +513,7 @@ export type RawLease = { scopepath: LeaseScopepath, row: unknown }
 true satisfies Z.core.util.AssertEqual<LeaseScopepath, Z.infer<typeof leaseScopepath>>
 
 /** The bank row: the `device_id` this device goes by in one bank scope. */
-export const bankRow = objCheck(({ applabel, user_id, device_id }) => ({ applabel, user_id, device_id }), 'bad_record', [CX])
+export const bankRow = objCheck(({ user_id, banklabel, device_id }) => ({ user_id, banklabel, device_id }), 'bad_record', [CX])
 
 export type BankRow      = Z.infer<typeof bankRow>
 // --

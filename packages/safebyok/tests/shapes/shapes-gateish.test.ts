@@ -54,7 +54,7 @@ describe("gatingLaunchOnArgs", () => {
 
 describe("gatingLaunchBirthArgs", () => {
   const listing = { modelkind: 'vault_listing' }
-  const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
+  const scope = { user_id: 'u1', banklabel: 'acme', vaultlabel: 'main' }
   const unlockByProving = () => Promise.resolve(listing)
   const askUser = guardRequestCleartext(() => undefined)
   const args = { listing, scope, expected: shellVaultOf(scope), unlockByProving, askUser }
@@ -66,7 +66,7 @@ describe("gatingLaunchBirthArgs", () => {
 
   it("refuses what is no vault listing, a scope that is none, an expected that is no vault row, an unlock that is no function, and a dialog the bank did not wrap", () => {
     for (const bad of [
-      { ...args, listing: { modelkind: 'box_listing' } }, { ...args, scope: { applabel: 'acme' } }, { ...args, expected: { revision_seq: 'one' } },
+      { ...args, listing: { modelkind: 'box_listing' } }, { ...args, scope: { banklabel: 'acme' } }, { ...args, expected: { revision_seq: 'one' } },
       { ...args, unlockByProving: 'unlock' }, { ...args, askUser: () => Promise.resolve(true) },
     ]) {
       TH.expectSyncRefusal(() => GX.gatingLaunchBirthArgs.parse(bad), 'bad_option')

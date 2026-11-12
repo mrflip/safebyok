@@ -7,10 +7,10 @@ import * as SX from '../shapes/shapes-storage'
 import type { BankRow, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 
 /** The scopepath of the lease row at `scope`. */
-function leaseScopepathOf({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath { return [applabel, user_id, vaultlabel] }
+function leaseScopepathOf({ user_id, banklabel, vaultlabel }: VaultScope): LeaseScopepath { return [user_id, banklabel, vaultlabel] }
 /** The ckey of the lease row filed under `scopepath`. */
 function leaseCkeyOf(scopepath: LeaseScopepath): string { return ckeyOf(...scopepath) }
-function bankCkeyOf({ applabel, user_id }: BankScope): string { return ckeyOf(applabel, user_id) }
+function bankCkeyOf({ user_id, banklabel }: BankScope): string { return ckeyOf(user_id, banklabel) }
 
 /** A device database that keeps its rows in memory, for the page's life. */
 export class MemoryDeviceDB extends DeviceDB {

@@ -280,8 +280,8 @@ export abstract class AdapterVaultDB implements VaultDB {
       const checked     = SX.boxTidy.parse(ask)
       const loggableAsk = SX.loggableAsk.parse(checked)
       const val         = await this.doTidyGone(checked)
-      const { applabel, user_id } = checked
-      return { ok: true, ask: loggableAsk, act: 'tidied', val, world: { applabel, user_id } }
+      const { user_id, banklabel } = checked
+      return { ok: true, ask: loggableAsk, act: 'tidied', val, world: { user_id, banklabel } }
     } catch (err) { return this.answerForRefusal(err, 'tidyGone', ask) }
   }
   // --
@@ -355,8 +355,8 @@ function refusalOf(thrown: unknown, oplabel: string, ask: unknown): VaultError {
 /** The put ask of a gate verb: `record` over the live vault row at `opts.prior`, in the same life, tagged with the verb. */
 function gateAskOf(gateVerb: GateVerb, record: VaultRecord, opts: GateVerbOpts): VaultPutAsk {
   const { prior } = SX.gateVerbOpts.parse(opts)
-  const { applabel, user_id, vaultlabel, vault_tok } = record
-  return { op: 'put', applabel, user_id, vaultlabel, ifAbsent: 'fail', ifPresent: 'repl', gateVerb, expected: { ...prior, am: 'a', vault_tok }, record }
+  const { user_id, banklabel, vaultlabel, vault_tok } = record
+  return { op: 'put', user_id, banklabel, vaultlabel, ifAbsent: 'fail', ifPresent: 'repl', gateVerb, expected: { ...prior, am: 'a', vault_tok }, record }
 }
 
 /** Return the given `stored` vault, if live at `record`'s `vault_tok`. Otherwise throw

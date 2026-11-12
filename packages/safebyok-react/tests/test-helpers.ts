@@ -64,7 +64,7 @@ export const DeviceId = '00000000-0000-4000-8000-0000000000c1'
  *   render(<BankProvider {...TH.providerPropsOf(world)}><Shows /></BankProvider>)
  */
 export const providerPropsOf = (world: BankWorld, overrides: Partial<Omit<BankProviderProps, 'children'>> = {}): Omit<BankProviderProps, 'children'> => ({
-  applabel: 'acme', user_id: 'u1', vaultDB: world.vaultDB, deviceDB: new MemoryDeviceDB(),
+  user_id: 'u1', banklabel: 'acme', vaultDB: world.vaultDB, deviceDB: new MemoryDeviceDB(),
   keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, ...overrides,
 })
 

@@ -336,14 +336,14 @@ export function classifyStoredBox(ask: BoxAsk, fetched: BoxFetched): BoxStored {
 // never hides the rest. A row that is not an object, or is stored at another address, still throws.
 /** Classify a `listVaults` ask against the vault rows an adapter fetched for it: each row checked, a damaged one set aside. */
 export function classifyStoredVaults(ask: VaultListAsk, vaults: readonly RowOfVault[]): VaultsStored {
-  const { applabel, user_id } = ask
+  const { user_id, banklabel } = ask
   const listed: BankListed = { vaults: [], damaged_rows: [] }
   for (const { vaultlabel, vault } of vaults) {
-    const address = { applabel, user_id, vaultlabel }
+    const address = { user_id, banklabel, vaultlabel }
     const row     = listedRowOf(SX.vaultRow, vault, address)
     if (row === null) { listed.damaged_rows.push(SX.damagedVaultOf(address)) } else { listed.vaults.push(row) }
   }
-  return { ok: true, act: (vaults.length > 0) ? 'got' : 'gotvoid', world: { applabel, user_id }, listed }
+  return { ok: true, act: (vaults.length > 0) ? 'got' : 'gotvoid', world: { user_id, banklabel }, listed }
 }
 
 /** Classify a `listBoxes` ask against the rows an adapter fetched for it: the vault row first, then each box row, a damaged one set aside.
@@ -354,10 +354,10 @@ export function classifyStoredBoxes(ask: BoxListAsk, fetched: BoxesFetched): Box
   const vaultAct = boxVaultActOf(ask, world)
   if (vaultAct !== null) { return { ok: false, act: vaultAct, world, listed: null } }
 
-  const { applabel, user_id, vaultlabel, vault_tok } = ask
+  const { user_id, banklabel, vaultlabel, vault_tok } = ask
   const listed: BoxesListed = { boxes: [], damaged_rows: [] }
   for (const { boxlabel, box } of fetched.boxes) {
-    const address = { applabel, user_id, vaultlabel, boxlabel, vault_tok }
+    const address = { user_id, banklabel, vaultlabel, boxlabel, vault_tok }
     const row     = listedRowOf(SX.boxRow, box, address)
     if (row === null) { listed.damaged_rows.push(SX.damagedBoxOf(address, vault_tok)) } else { listed.boxes.push(SX.boxSparse.parse(row)) }
   }

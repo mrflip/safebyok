@@ -43,9 +43,9 @@ export function fakeCiphered(tag: string): FakeCiphered {
 
 /** The scope of `user_id`'s vault in the `acme` app.
  *
- * @example scopeOf('u1')           // => { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
+ * @example scopeOf('u1')           // => { user_id: 'u1', banklabel: 'acme', vaultlabel: 'main' }
  */
-export function scopeOf(user_id: string, vaultlabel = 'main'): VaultScope { return { applabel: 'acme', user_id, vaultlabel } }
+export function scopeOf(user_id: string, vaultlabel = 'main'): VaultScope { return { user_id, banklabel: 'acme', vaultlabel } }
 
 /** A shape-valid passphrase wayin, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
  * never decrypt. It wraps the vault's first vaultKey, and was sealed by the bank world's first device.
