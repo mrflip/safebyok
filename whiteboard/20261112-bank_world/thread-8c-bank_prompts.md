@@ -1,6 +1,6 @@
 # Thread 8c: bank_prompts (2026-11-12)
 
-Branch `20261112-bank_prompts`, PR #TBD, stacked on #667 (8b). Justify: every package green
+Branch `20261112-bank_prompts`, PR #673, stacked on #667 (8b). Justify: every package green
 (safebyok 3397, react 255, fastkey 43, indexeddb 376, postgres 433, convex 508, graphql 408,
 e2e 549, root 285). **Red: `demos/safebyok-demo-react`** (lint 7, typecheck 4, tests 67 of 98),
 left for thread 12, which threads.md gives "the `bankDB` prop and `IdbBankDB` in the demo".
