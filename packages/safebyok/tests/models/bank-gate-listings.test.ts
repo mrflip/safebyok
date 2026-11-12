@@ -88,7 +88,7 @@ describe("GateListing's entrypoints", () => {
     const { bank } = await makeBornVault()
     const ante = bank.maingate.pickle()
     const other = { ...ante, bank_tok: 'bank-tok-of-another-life' }
-    expect(() => bank.gateListing.deliverRecord(other)).toThrow(rowOfOtherWorld(other, 'bank_tok').message)
+    expect(() => bank.gateListing.deliverRecord(other)).to.throw(rowOfOtherWorld(other, 'bank_tok').message)
     expect(bank.maingate.pickle()).to.deep.equal(ante)
   })
 
