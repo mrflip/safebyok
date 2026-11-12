@@ -71,8 +71,8 @@ the diff.
    compacted at about 170k tokens, so the thread file is your own memory as well as the Coach's.
    A push need not wait on a proof; `ready` does. Once pushed, a commit is not rewritten
    except by a catch-up rebase.
-3. **Ready.** While you build, test what bears on the change: a file or a package, as you judge
-   (PROCESS.md, *Proving*). With everything committed, and the thread file finished and committed
+3. **Ready.** While you build, and for a mid-workstream rebase, test what bears on the change: a
+   file or a package, as you judge (PROCESS.md, *Proving*). With everything committed, and the thread file finished and committed
    (`plan:`) but not yet pushed:
    1. Once the packages you touched pass their tests and typecheck, add the label `ci`
       (`gh pr edit <n> --add-label ci`; CI reads it at each push, so it goes on before the push),
@@ -81,14 +81,16 @@ the diff.
       records `sprintbase`, and pushes under a lease. That push starts CI, and the unpushed
       `plan:` commit makes sure there is a push to make. On exit 3, resolve the conflict as
       *Picking up a built thread* says, then run it again.
-   2. Run `pnpm justify`: it is ready when that is green, CI running beside it. Red: fix and
-      commit. Run it again after any rebase.
+   2. Run `pnpm justify` after that rebase: it is ready when that is green, CI running beside it.
+      Red: fix and commit, then prove the fix with the tests that bear on it or with `pnpm justify`
+      again, as you judge.
 
    Then bring the PR's title and body up to date -- a **Tests:** line, *Open questions* -- and
-   report `ready`. Filing's `pnpm justify` is the gate. The PR stays a draft: `ready` is a report,
-   never `gh pr ready`; the orchestrator, or the Coach, takes it out of draft once it is filed and
-   the line below it is green. Finish the thread file for a fresh agent: rework after a review
-   goes to one, so name the approaches you set aside and why, as well as the one you took.
+   report `ready`. `pnpm justify` runs again before the PR leaves draft (`scripts/file-thread` runs
+   it). The PR stays a draft: `ready` is a report, never `gh pr ready`; the orchestrator, or the
+   Coach, takes it out of draft once it is filed and the line below it is green. Finish the
+   thread file for a fresh agent: rework after a review goes to one, so name the approaches you
+   set aside and why, as well as the one you took.
 
 ## Picking up a built thread
 
@@ -108,8 +110,9 @@ those and `git log`, not from the build's history, for one of two jobs.
 Then run `scripts/file-thread <root>` again, and report `filed` or `blocked`.
 
 **Rework after a review.** You are also handed the reviewer's PR comment and the finding to act
-on, as a directive. Build on the branch as it now stands, the reviewer's commits included; bring
-the thread file and the PR body up to date with what changed and why; and report `ready` again.
+on, as a directive. Build on the branch as it now stands, the reviewer's commits included; prove
+your fixes with the tests that bear on them, not `pnpm justify`; bring the thread file and the PR
+body up to date with what changed and why; and report `ready` again.
 
 ## Significant questions
 

@@ -48,6 +48,14 @@ sprint's numbered threads. Proved: every package at the build; `justify:root` (2
   `thread-T-base-sync.md`, beside this file; for whoever changes `.claude/agents/base-sync.md`.
 
 * **Decisions taken**:
+  - The readiness thresholds, the Coach's ruling (2026-11-12), verbatim: "1. while building, or
+    for mid-workstream rebasing, or reviewer's fixes: the tests that bear on the change (a file
+    or a package) 2. push and add ci once the touched packages pass tests and typecheck 3. ready
+    (ask for review) on a green pnpm justify 4. justify again after the rebase in preparation to
+    file. If there are issues, revert to (1) selective tests, or justify, based on how lucky you
+    feel 5. justify before taking out of draft mode (file-thread runs it); reviewers prove what
+    their fixes touch". Stated in the worker bodies' *Ready* step and rework paragraph, CLAUDE.md's
+    justify line and PROCESS.md *Proving*. This supersedes item 6's "run again after any rebase".
   - Workers and documentarian stay unpinned: their models are the orchestrator's per-thread
     call (worker) or the Coach's (documentarian); a pin would only be overridden.
   - Mergify's batch PRs are drafts on `mergify/merge-queue/` and the queue waits on their

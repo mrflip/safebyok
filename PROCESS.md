@@ -28,8 +28,11 @@ typecheck (`pnpm --filter <pkg> typecheck`): CI's run then goes alongside your l
 **Ready**, the ask for review, is `pnpm justify` green (the first run in a
 fresh worktree adds the eslint cold start). It is stated in the thread-worker's *Ready* step
 (`.claude/agents/thread-worker.md`) and in a line of CLAUDE.md's *Commands*; a session outside a
-sprint holds itself to the same. Run it again after any rebase, and at filing, where
-`scripts/file-thread` runs it as the gate.
+sprint holds itself to the same. The selective tests, not `pnpm justify`, serve a mid-workstream
+rebase and a reviewer's fixes (a reviewer proves what its fixes touch). Run `pnpm justify` after
+the rebase that prepares filing; if that turns up trouble, go back to the selective tests or to
+`pnpm justify`, as you judge the odds. Run it before a PR leaves draft: `scripts/file-thread`
+runs it as the gate.
 
 Do not select by change with pnpm's `...[<base>]` filter: it selects the root when a root file
 changed, whose `test` runs every package again, and its packages run one at a time, each
