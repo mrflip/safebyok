@@ -28,6 +28,7 @@ What the threads have taught, newer than the plan where they disagree. Kept by t
 
 * *Coach, 2026-11-12, for 8b:* "have device be its world, that's smart": until thread 10 removes `world`, the Bank's world is the Device (answering the three members a listing world needs), not a private adapter.
 * *Coach, 2026-11-12:* `tidyGone`'s ask carries the scope only; the store judges by the bank row it finds there (confirmed: `BoxTidyAsk`, no `bank_tok`). Thread 4's review guard for a damaged bank row in `doTidyGone` is reverted in 4b under ground rule 24.
+* *Coach, 2026-11-12 (row c8):* an older client's `tidyGone` under a later-`fmt` or mutilated bank row is not a path to guard: "Postgres, convex (and graphql) will be running functions (or calling nested vaultDB) controlled by the app, not on the device, and so they can never get out of sync. ... it's fair to run tidy gone after having mutilated the bank row, but remember that it can't read anything ever at that point so its contract is vicariously satisfied either way." No guard, check or test for it in any adapter; told 4b's reviewer, 5 and 13.
 
 ## The BankDB `do*` list
 
