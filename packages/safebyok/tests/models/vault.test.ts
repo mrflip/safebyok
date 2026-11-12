@@ -42,7 +42,7 @@ describe("VaultListing.build of a record, and its constructor", () => {
   it("builds the vault with the gate its record carries", async () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
-    const vault = await listing.build(record)
+    const vault = listing.deliverRecord(record)
     expect(vault.gate.pickle()).to.deep.equal(record.gate)
     expect(vault.gate).to.equal(vault.gate)
   })
@@ -50,14 +50,14 @@ describe("VaultListing.build of a record, and its constructor", () => {
   it("listing.recordOf(vault) returns the record the vault was built from", async () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
-    const vault = await listing.build(record)
+    const vault = listing.deliverRecord(record)
     expect(listing.recordOf(vault)).to.deep.equal(record)
   })
 
   it("builds a sparse vault whose gate refuses until it is hydrated", async () => {
     const record = await storedVaultRecord()
     const { listing } = makeVaultWorld(record)
-    const vault = await listing.build(listing.sparseOf(record))
+    const vault = listing.deliverRecord(listing.sparseOf(record))
     TH.expectSyncRefusal(() => vault.gate)
     await vault.hydrate()
     expect(vault.gate.pickle()).to.deep.equal(record.gate)

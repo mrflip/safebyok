@@ -76,7 +76,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
   /** A void box listed under `scope`. */
-  #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.shellBoxOf(scope, this.world.vault_tok)) }
+  #shellFor(scope: Boxscope): Box { return this.deliverRecord(SX.shellBoxOf(scope, this.world.vault_tok)) }
   // --
 
   // == [Defined by the box listing]: vaultTokOfWorld, isOneLifePerInstance, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow

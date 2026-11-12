@@ -61,7 +61,7 @@ function carriedOf<ActT extends string>({ ask, act, world, dbhas }: { ask: Logga
 
 /** Make a bad answer of `err`, with the act, ask and rows it carries, if it has them. */
 export function badAnswerOf(err: VaultError): BadAnswer {
-  const { act = 'unclassified', ask = {} } = err.meta ?? {}
+  const { act = 'unclassified_storing', ask = {} } = err.meta ?? {}
   const { world = null, dbhas } = rowsOfRefusal(err)
   return { ok: false, err, act, world, ask, ...((dbhas !== undefined) && { dbhas }) }
 }

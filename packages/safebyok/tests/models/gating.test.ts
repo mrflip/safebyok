@@ -451,7 +451,7 @@ describe("an unlock through a gating", () => {
     const world = await makeBornVault()
     const dialog = makeDialog()
     const session = makeVaultWorld(world.demandStored(), { requestCleartext: dialog.requestCleartext, deviceDB: world.fakeBank.deviceDB })
-    const again = await session.listing.build(world.demandStored())
+    const again = session.listing.deliverRecord(world.demandStored())
     await again.ensureUnlocked()
     expect(again.isUnlocked).to.be.true
     expect(session.listing.openGating).to.be.null

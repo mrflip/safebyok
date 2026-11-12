@@ -11,7 +11,7 @@ import * as SX from '../shapes/shapes-storage'
 import type { BoxRow, PutOpts, VaultRow } from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingDelOpts, ListingListAnswer, ListingPutAnswer, ListingPutOpts, ListingOpts, ListingWorld, ListingGetAnswer, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
-import { deliveredNotAsSent, instanceDisabled, nothingStoredWhereLive, oneRevisionTwoFates, oneRevisionTwoLives, otherVaultTok, refusalOfDelivering, rowOfOtherVaultTok, storageIssue } from '../refusals/throwers'
+import { deliveredNotAsSent, instanceDisabled, nothingStoredWhereLive, oneRevisionTwoFates, oneRevisionTwoLives, refusalOfDelivering, rowOfOtherVaultTok, storageIssue } from '../refusals/throwers'
 import { valOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
 import { type Storable, cmpRevisions } from './storable'
@@ -70,7 +70,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   // --
 
-  // == [Construction]: constructor, build
+  // == [Construction]: constructor
 
   constructor(world: ListingWorld, opts: ListingOpts) {
     VX.listingWorld.parse(world)
@@ -80,14 +80,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.bankFriend = bankFriend
     this.maxMillisSinceRefresh = maxMillisSinceRefresh
   }
-
-  /** The instance of `record`, built or brought up to it, and enlisted. Writes nothing. */
-  async build(record: Fetched<RecordT, SparseT>): Promise<ThingT> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
-    return this.buildOrReceive(record)
-  }
-
-  /** {@link build}, synchronously, for a row that came with another listing's answer. Throws if `build` would reject. */
-  receiveRow(record: Fetched<RecordT, SparseT>): ThingT { return this.buildOrReceive(record) }
   // --
 
   // == [Its world]: isLocked, ensureTimelyWorld
@@ -176,13 +168,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async #listRows(): Promise<Joined<ListingListAnswer<RecordT, SparseT, DamagedT>, readonly ThingT[]>> {
     const answer = await this.doTryList()
     try {
-      return { answer, val: await this.#deliverListing(answer) }
+      return { answer, val: this.#deliverListing(answer) }
     } catch (err) { return { answer, err } }
   }
 
-  // A row set aside as damaged takes down the instance listed in its slot, as a tombstone would, and is told as bad news.
-  /** The instances `answer` lists, built or brought up to their rows, its damaged rows set aside. */
-  async #deliverListing(answer: ListingListAnswer<RecordT, SparseT, DamagedT>): Promise<readonly ThingT[]> {
+  // A row set aside as damaged takes down the instance listed at its scope, as a tombstone would, and is told as bad news.
+  /** The instances `answer` lists, made or brought up to their records, its damaged rows set aside. */
+  #deliverListing(answer: ListingListAnswer<RecordT, SparseT, DamagedT>): readonly ThingT[] {
     this.demandEnabled()
     if (answer.world !== null) { this.world.receiveWorld(answer.world) }
     if (! answer.ok) {
@@ -195,7 +187,17 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     for (const damaged of damaged_rows) { this.#listedAt(damaged)?.vacate() }
     this.bankFriend.tellBadNews(damaged_rows.map((damaged) => this.damagedStoredError(damaged)))
     if (isDamageNews) { this.tellListeners() }
-    return Promise.all(listed.map((row) => this.build(row)))
+    // Every row is delivered: the first refusal met is thrown, any after it told as bad news.
+    const things: ThingT[] = []
+    const refusals: unknown[] = []
+    for (const row of listed) {
+      try { things.push(this.deliverRecord(row)) } catch (err) { refusals.push(err) }
+    }
+    if (refusals.length > 0) {
+      this.bankFriend.tellBadNews(refusals.slice(1))
+      throw refusals[0]
+    }
+    return things
   }
 
   // A damaged row's address is storage's, under whatever labels it holds, so it is looked up as it is, never checked as a scope.
@@ -293,7 +295,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // --
 
-  // == [Delivering an answer]: deliver, deliveringOf, deliveringOfRecord, carryOut, buildOrReceive
+  // == [Delivering an answer]: deliver, deliveringOf, deliveringOfRecord, carryOut, deliverRecord
 
   /** The pipeline every storage answer follows, from its world through the instance listed to the caller.
    * Delivers updated records to: (! = unconventional practice)
@@ -310,35 +312,36 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   protected deliver(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null
   protected deliver(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null {
     this.demandEnabled()
-    if (answer.ok) {
-      if (answer.world !== null) { this.world.receiveWorld(answer.world) }
-      return this.#carryOut(this.#deliveringOf(answer, sent))
-    }
-    // A refusal's world and stored record are received for what they tell; whatever receiving them meets is bad news, and
-    // the refusal is thrown. All of it runs before the next await, so a revoked identity panics before any other answer is delivered.
+    // No awaits: a revoked identity panics before any other answer is delivered. The first refusal met is thrown, any
+    // after it told as bad news: a refusal's own err comes first.
     try {
       if (answer.world !== null) { this.world.receiveWorld(answer.world) }
-      this.#carryOut(this.#deliveringOf(answer, sent))
-    } catch (err) { this.bankFriend.tellBadNews([err]) }
+      const delivering = this.#deliveringOf(answer, sent)
+      const thing = (delivering === null) ? null : this.#carryOut(delivering)
+      if (answer.ok) { return thing }
+    } catch (err) {
+      if (answer.ok) { throw err }
+      this.bankFriend.tellBadNews([err])
+    }
     this.panicIfRevoked(answer.err)
     throw answer.err
   }
 
-  // The answer passed its verb's check, and is trusted: its act alone says where its record is (`deliverableFieldingTagOf`).
-  /** What delivering `answer` to the instance listed at `sent`'s scope will do, decided before anything changes.
+  // The answer passed its verb's check, and is trusted: its act alone says where its record is (`deliveryFieldingOf`).
+  /** What delivering `answer` to the instance listed at `sent`'s scope will do, decided before anything changes; null for nothing.
    * Throws `storage_issue` for a record of another scope or revision than `sent`, and `record_conflict` for news that
    * nothing is stored where a live instance is listed.
    */
-  #deliveringOf(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Delivering<Fetched<RecordT, SparseT>, ThingT> {
+  #deliveringOf(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Delivering<Fetched<RecordT, SparseT>, ThingT> | null {
     try {
-      const fielding = deliverableFieldingTagOf[answer.act]
-      if (fielding === 'none') { return { making: 'none' } }
+      const fielding = deliveryFieldingOf[answer.act]
+      if (fielding === 'none') { return null }
       const scope    = this.scopeOf(sent)
       const listed   = this.at(scope)
       if (fielding === 'void') {
-        if (listed === null)  { return { making: 'none' } }
+        if (listed === null)  { return null }
         if (listed.isPresent) { throw nothingStoredWhereLive() }
-        return { making: 'listed', listed, mod: 'same' }
+        return { making: 'listed', mod: 'same', listed, record: null }
       }
       const record = (answer.ok ? answer.val : answer.dbhas) as Fetched<RecordT, SparseT>
       const pins   = (fielding === 'as_sent') ? { ...scope, ...SX.revisionPins.parse(sent) } : scope
@@ -349,7 +352,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // The receive table of `notes/receive-contract.md`, read once: the first row that matches wins. A vault listing makes
   // an instance of each life (`isOneLifePerInstance`): a newer record of another life, or one alive over a tombstone,
-  // remakes it, and an older one of any life leaves it as it is.
+  // remakes it, and an older one of any life leaves it as it is. A box listed has its world's vault_tok, so the first
+  // row covers a box of another vault; a vault of another vault_tok is of another life.
   /** What receiving `record` will do: which instance receives it, and what becomes of that instance's record.
    * Throws `storage_issue` for a record of another vault_tok than the listing's, and `record_conflict` where storage
    * and the instance listed disagree on the history of one revision.
@@ -358,60 +362,59 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const vault_tok = this.vaultTokOfWorld()
     if ((vault_tok !== null) && (record.vault_tok !== vault_tok)) { throw rowOfOtherVaultTok(record) }
     const listed     = this.at(this.scopeOf(record))
-    if (listed === null) { return { making: 'make', mod: 'adopt', record } }
+    if (listed === null) { return { making: 'make', mod: 'adopt', listed: null, record } }
     const age        = cmpRevisions(listed, record)
     const isSameLife = listed.isOfLife(record)
     const rcvdShape  = listed.shapeOf(record)
     const heldShape  = listed.shape
     const isRebirth  = (heldShape === 'gone') && (rcvdShape !== 'gone')
     const isPerLife  = this.isOneLifePerInstance
-    if (isPerLife && (age === 'older'))                                   { return { making: 'listed', listed, mod: 'older' } }
-    if (isPerLife && (age === 'newer') && ((! isSameLife) || isRebirth)) { return { making: 'remake', listed, mod: 'adopt', record } }
-    if (record.vault_tok !== listed.vault_tok)                           { throw otherVaultTok(record) }
+    if (isPerLife && (age === 'older'))                                  { return { making: 'listed', mod: 'older', listed, record } }
+    if (isPerLife && (age === 'newer') && ((! isSameLife) || isRebirth)) { return { making: 'remake', mod: 'adopt', listed, record } }
     if ((age === 'same') && (! isSameLife))                              { throw oneRevisionTwoLives(record) }
-    if (age === 'older')                                                 { return { making: 'listed', listed, mod: 'older' } }
-    if (age === 'newer')                                                 { return { making: 'listed', listed, mod: 'adopt', record } }
+    if (age === 'older')                                                 { return { making: 'listed', mod: 'older', listed, record } }
+    if (age === 'newer')                                                 { return { making: 'listed', mod: 'adopt', listed, record } }
     if ((rcvdShape === 'gone') !== (heldShape === 'gone'))               { throw oneRevisionTwoFates(record) }
-    if ((rcvdShape === 'full') && (heldShape === 'sparse'))              { return { making: 'listed', listed, mod: 'adopt', record } }
-    return { making: 'listed', listed, mod: 'same' }
+    if ((rcvdShape === 'full') && (heldShape === 'sparse'))              { return { making: 'listed', mod: 'adopt', listed, record } }
+    return { making: 'listed', mod: 'same', listed, record }
   }
 
-  // The one place an instance is made and enlisted: `makeThing` is called from here alone, at the void revision.
-  /** Do what `delivering` says, and answer the instance it leaves listed, or null for none. */
-  #carryOut(delivering: Delivering<Fetched<RecordT, SparseT>, ThingT>): ThingT | null {
-    if (delivering.making === 'none') { return null }
+  // The one place an instance is made and enlisted. It is made at the void revision and handed its record as a listed one
+  // is, so that receiving runs for it too: a vault made from a tombstone forgets the lease cached on this device. What
+  // can throw (`makeThing`, `receiveRecord`) runs before the listing changes; an instance never enlisted holds nothing.
+  /** Do what `delivering` says, and answer the instance it leaves listed. */
+  #carryOut({ making, mod, listed, record }: Delivering<Fetched<RecordT, SparseT>, ThingT>): ThingT {
     this.demandEnabled()
-    if (delivering.making === 'listed') {
-      if (delivering.mod === 'adopt') { delivering.listed.receiveRecord(delivering.record) } else if (delivering.mod === 'same') { delivering.listed.markRefreshed() }
+    if (making === 'listed') {
+      if (mod === 'adopt') { listed.receiveRecord(record) } else if (mod === 'same') { listed.markRefreshed() }
       this.#remakeSnapshot()
-      return delivering.listed
+      return listed
     }
-    const thing = this.makeThing({ ...this.sparseOf(delivering.record), ...SX.VoidRevision, am: 'x' })
-    thing.receiveRecord(delivering.record)
+    const thing = this.makeThing({ ...this.sparseOf(record), ...SX.VoidRevision, am: 'x' })
+    thing.receiveRecord(record)
     this.#enlist(thing)
-    if (delivering.making === 'remake') { delivering.listed.vacate() }
+    if (making === 'remake') { listed.vacate() }
     this.#remakeSnapshot()
     return thing
   }
 
-  /** The instance under the scope of `record`: made, brought up to it, or remade, as delivering it decides. */
-  protected buildOrReceive(record: Fetched<RecordT, SparseT>): ThingT {
+  /** The instance of `record`, made, brought up to it, or remade, and listed. Writes nothing. */
+  deliverRecord(record: Fetched<RecordT, SparseT>): ThingT {
     this.demandEnabled()
-    const delivering = this.#deliveringOfRecord(record)
-    // A record's delivering always leaves an instance listed: it never makes `none`.
-    return this.#carryOut(delivering)!
+    return this.#carryOut(this.#deliveringOfRecord(record))
   }
   // --
 
   // == [The watch]: onNotice
 
-  /** SLOPDOC: Delivers a watch notice of this listing's kind like a good answer, making any refusal bad news. */
+  // A notice is not an answer: it has no ask and no sent, and its record is the claim, as a listed row's is.
+  /** Delivers a watch notice of this listing's kind: its world, then its record, any refusal told as bad news. */
   readonly #onNotice = (notice: VaultDBNotice): void => {
     const { val, world } = notice
     if ((! this.#isEnabled) || (! this.isOwnRow(val))) { return }
     try {
       if (world !== null) { this.world.receiveWorld(world) }
-      this.buildOrReceive(val)
+      this.deliverRecord(val)
     } catch (err) { this.bankFriend.tellBadNews([err]) }
   }
   // --
@@ -492,27 +495,27 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // --
 }
 
-// == [Helpers]: deliverableFieldingTagOf, Delivering, Joined, putAnswerOf
+// == [Helpers]: deliveryFieldingOf, Delivering, Joined, putAnswerOf
 
-// The acts are the classifier's and the gate verbs': `notes/answer-contract.md`. A box's `vault_*` act, an unclassified
+// The acts are the classifier's and the gate verbs': `notes/answer-contract.md`. A box's `vault_*` act, an unclassified_storing
 // refusal, and the acts of a list or a housekeeping verb carry no record of this listing.
 /** Where an answer's record is, by its act: see {@link DeliveryFielding}. */
-const deliverableFieldingTagOf = {
+const deliveryFieldingOf = {
   born:    'as_sent', reborn:  'as_sent', replaced: 'as_sent', deleted: 'as_sent', added: 'as_sent', revoked: 'as_sent',
   gotlive: 'as_got',  gotgone: 'as_got',  passed:   'as_got',
   gotvoid: 'void',
   stale:   'as_db',   camped:  'as_db',   gone:     'as_db',   dubdel:  'as_db',   retcon: 'as_db', clash: 'as_db', forked: 'as_db', ahead: 'as_db',
-  void:    'none',    vault_void: 'none', vault_gone: 'none',  vault_reborn: 'none', vault_full: 'none', unclassified: 'none',
+  void:    'none',    vault_void: 'none', vault_gone: 'none',  vault_reborn: 'none', vault_full: 'none', unclassified_storing: 'none',
   got:     'none',    tidied:  'none',    timely:   'none',
 } as const satisfies Record<GoodAct | BadAct, DeliveryFielding>
 
+// Every form has every field, null where it has none, so the plan destructures and narrows on its tags.
 /** What delivering does, decided before anything changes: which instance receives (its `making`), and what becomes of its record (its `mod`), as the `DeliveryMaking` and `DeliveryModification` tags say. */
 type Delivering<RecordT, ThingT> = Readonly<
-  | { making: 'none' }
-  | { making: 'listed', listed: ThingT, mod: 'older' | 'same' }
-  | { making: 'listed', listed: ThingT, mod: 'adopt', record: RecordT }
-  | { making: 'make', mod: 'adopt', record: RecordT }
-  | { making: 'remake', listed: ThingT, mod: 'adopt', record: RecordT }
+  | { making: 'listed', mod: 'older' | 'same', listed: ThingT, record: RecordT | null }
+  | { making: 'listed', mod: 'adopt',          listed: ThingT, record: RecordT }
+  | { making: 'make',   mod: 'adopt',          listed: null,   record: RecordT }
+  | { making: 'remake', mod: 'adopt',          listed: ThingT, record: RecordT }
 >
 
 /** A joined storage call's answer, with what delivering it made, or the refusal delivering met. */

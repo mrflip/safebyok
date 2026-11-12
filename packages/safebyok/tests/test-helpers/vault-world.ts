@@ -271,7 +271,7 @@ export async function makeWorld(worldOverrides: VaultWorldGiven = {}) {
   const tryGetBox    = vi.spyOn(world.vaultDB, 'tryGetBox')
   /** The next session on this device: a vault of the record stored, its boxes not yet listed, unlocked by the passphrase, sealing under the vaultKey the first has. */
   const openNextSession = async () => {
-    const vault = await world.anotherSession().build(world.demandStored())
+    const vault = world.anotherSession().deliverRecord(world.demandStored())
     await unlockTyping(vault, byPassphrase(Passphrase))
     return vault
   }

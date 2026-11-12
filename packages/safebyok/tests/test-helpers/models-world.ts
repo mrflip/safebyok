@@ -323,7 +323,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
   const stored = vaultDB._cheat_boxRowsOf(WorldVault.scope, WorldVault.vault_tok)
   const ensureTimelyScript = new Script<number | undefined>()
   const scopeFor = (boxlabel: string): Boxscope => CX.boxscope.parse({ ...WorldVault.scope, boxlabel })
-  const refusalOf = (scope: Boxscope, err: VaultError, world: unknown = null, dbhas?: unknown): BoxAnswer => ({ ok: false, err, world, act: err.meta?.act ?? 'unclassified', ...factsOf(scope), ...((dbhas !== undefined) && { dbhas }) })
+  const refusalOf = (scope: Boxscope, err: VaultError, world: unknown = null, dbhas?: unknown): BoxAnswer => ({ ok: false, err, world, act: err.meta?.act ?? 'unclassified_storing', ...factsOf(scope), ...((dbhas !== undefined) && { dbhas }) })
 
   // The fake seal: the text sealed, by the stamp it was sealed under.
   const sealedTexts = new Map<string, string>()
@@ -463,14 +463,14 @@ export class TestableBox extends Box {
 
 }
 
-/** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `build`, `create`, `fetch`, `put`, `del` and `at` give a `TestableBox`. */
+/** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `deliverRecord`, `create`, `fetch`, `put`, `del` and `at` give a `TestableBox`. */
 export class TestableBoxListing extends BoxListing {
   protected override makeThing(central: Fetched<BoxRecord, BoxSparse>): TestableBox {
     return new TestableBox(this.world, this, central)
   }
 
-  /** {@link BoxListing.build}, answering a {@link TestableBox}. */
-  override async build(...args: Parameters<BoxListing['build']>): Promise<TestableBox> { return testableOf(await super.build(...args)) }
+  /** {@link BoxListing.deliverRecord}, answering a {@link TestableBox}. */
+  override deliverRecord(...args: Parameters<BoxListing['deliverRecord']>): TestableBox { return testableOf(super.deliverRecord(...args)) }
 
   /** {@link BoxListing.puttable}, answering a {@link TestableBox}. */
   override puttable(...args: Parameters<BoxListing['puttable']>): TestableBox { return testableOf(super.puttable(...args)) }

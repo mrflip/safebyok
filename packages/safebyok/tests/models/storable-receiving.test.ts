@@ -39,7 +39,7 @@ function rcvdOf(shape: RecordShape, rev: Partial<BoxSparse>): Rec {
 function listedBoxOf(central: Rec): { listing: TestableBoxListing, box: TestableBox } {
   world.mw.setNow(T0)
   const listing = boxListingOf(world.mw)
-  const box = listing.receiveRow(central) as TestableBox
+  const box = listing.deliverRecord(central)
   world.mw.setNow(Later)
   return { listing, box }
 }
@@ -58,7 +58,7 @@ function stateOf(box: TestableBox) {
 function expectReceived(central: Rec, rcvd: Rec, mod: DeliveryModification): TestableBox {
   const { listing, box } = listedBoxOf(central)
   const before = stateOf(box)
-  expect(listing.receiveRow(rcvd)).to.equal(box)
+  expect(listing.deliverRecord(rcvd)).to.equal(box)
   if (mod === 'adopt') { expect(box._cheat_central).to.deep.equal(rcvd) } else { expect(stateOf(box)).to.deep.equal(before) }
   if (mod === 'older') { expect(box.isTimely).to.be.false }
   return box
@@ -68,7 +68,7 @@ function expectReceived(central: Rec, rcvd: Rec, mod: DeliveryModification): Tes
 function expectReceiveConflict(central: Rec, rcvd: Rec): Error {
   const { listing, box } = listedBoxOf(central)
   const before = stateOf(box)
-  const err = TH.expectSyncRefusal(() => listing.receiveRow(rcvd))
+  const err = TH.expectSyncRefusal(() => listing.deliverRecord(rcvd))
   expect(stateOf(box)).to.deep.equal(before)
   return err
 }
@@ -76,7 +76,7 @@ function expectReceiveConflict(central: Rec, rcvd: Rec): Error {
 const ShapesAll: readonly RecordShape[] = ['full', 'sparse', 'gone']
 const ShapesAlive: readonly RecordShape[] = ['full', 'sparse']
 
-describe("listing.receiveRow(rcvd): the receive table, through a box listing", () => {
+describe("listing.deliverRecord(rcvd): the receive table, through a box listing", () => {
   describe("an older rcvd", () => {
     for (const centralShape of ShapesAll) {
       for (const rcvdShape of ShapesAll) {

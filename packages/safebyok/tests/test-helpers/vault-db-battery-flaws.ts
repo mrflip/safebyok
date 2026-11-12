@@ -47,7 +47,7 @@ async function actsOf(...calls: (() => Promise<{ ok: boolean, act: string, err?:
 
 /** What `answer` says happened: its act, or for a refusal the classifier never saw, the refusalkind. */
 function refusedWithOf(answer: { ok: boolean, act: string, err?: VaultError }): string {
-  return ((answer.act === 'unclassified') && (answer.err !== undefined)) ? answer.err.refusalkind : answer.act
+  return ((answer.act === 'unclassified_storing') && (answer.err !== undefined)) ? answer.err.refusalkind : answer.act
 }
 
 /** The box row `boxlabel` under the life `vault_tok` of the vault at `scope`, as stored. */

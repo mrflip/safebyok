@@ -22,7 +22,7 @@ export type Age = typeof ageVals[number]
  * - `as_got`  -- in `val`, and it must be of the scope sent
  * - `as_db`   -- in `dbhas`, and it must be of the scope sent
  * - `void`    -- nowhere: storage answered that nothing is stored at the scope
- * - `none`    -- nowhere: the answer says nothing of the record, as a box's `vault_*` act or an unclassified refusal
+ * - `none`    -- nowhere: the answer says nothing of the record, as a box's `vault_*` act or an unclassified_storing refusal
  */
 export const deliveryFieldingVals = ['as_sent', 'as_got', 'as_db', 'void', 'none'] as const
 export type DeliveryFielding = typeof deliveryFieldingVals[number]
@@ -155,7 +155,7 @@ export type GateAct = typeof gateActVals[number]
 export const goodActVals = [...writeActVals, ...foundActVals, ...gateActVals, 'got', 'tidied', 'timely'] as const
 export type GoodAct = typeof goodActVals[number]
 
-/** Every act a refused answer carries; `unclassified` for a refusal the classifier never saw: a bad ask, storage out of reach, a revoked identity. */
-export const badActVals = [...refusedActVals, ...boxVaultActVals, 'unclassified'] as const
+/** Every act a refused answer carries; `unclassified_storing` for a refusal the classifier never saw: a bad ask, storage out of reach, a revoked identity. */
+export const badActVals = [...refusedActVals, ...boxVaultActVals, 'unclassified_storing'] as const
 export type BadAct = typeof badActVals[number]
 // --

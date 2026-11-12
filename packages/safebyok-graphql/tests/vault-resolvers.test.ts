@@ -115,7 +115,7 @@ describe("vaultResolvers", () => {
     for (const user_id of ['u2', null]) {
       for (const [source, variableValues, answerCheck] of asked) {
         const answer = answerCheck.parse(await sent(schema, source, variableValues, user_id)) as DB.BadAnswer
-        expect(answer, source).to.deep.include({ ok: false, act: 'unclassified', world: null }).and.to.have.nested.property('err.refusalkind', 'identity_revoked')
+        expect(answer, source).to.deep.include({ ok: false, act: 'unclassified_storing', world: null }).and.to.have.nested.property('err.refusalkind', 'identity_revoked')
         expect(answer.err.refusalkind, source).to.eq('identity_revoked')
         expect(answer.ask, source).to.include(TH.bankScope)
       }
@@ -126,7 +126,7 @@ describe("vaultResolvers", () => {
   it("refuses a malformed request signed in as another user for what is malformed", async () => {
     const schema = TH.schemaOver(await TH.serverOver())
     const answer = DB.getBoxAnswer.parse(await sent(schema, VaultOperations.getBox, { ask: { ...askVarsOf(boxGetAsk).ask, vault_tok: '' } }, 'u2')) as DB.BadAnswer
-    expect(answer).to.deep.include({ ok: false, act: 'unclassified', world: null }).and.to.have.nested.property('err.refusalkind', 'bad_option')
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', world: null }).and.to.have.nested.property('err.refusalkind', 'bad_option')
   })
 
   it("returns for each verb what the VaultDB's own try* verb returns", async () => {
@@ -166,7 +166,7 @@ describe("vaultResolvers", () => {
     const schema = TH.schemaOver(await TH.serverOver())
     const ask = DB.vaultPut.parse(vaultBorn)
     const elsewhere = DB.putVaultAnswer.parse(await sent(schema, VaultOperations.putVault, { ask: { ...ask, record: { ...ask.record, user_id: 'u2' } } })) as DB.BadAnswer
-    expect(elsewhere).to.deep.include({ ok: false, act: 'unclassified' }).and.to.have.nested.property('err.refusalkind', 'bad_record')
+    expect(elsewhere).to.deep.include({ ok: false, act: 'unclassified_storing' }).and.to.have.nested.property('err.refusalkind', 'bad_record')
     expect(await TH.rowsOf().vaultRowOf({ ...TH.vaultScope, user_id: 'u2' })).to.be.null
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })

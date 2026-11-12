@@ -13,14 +13,14 @@ const world = useModelsWorld()
 const Exposed = { apiKey: 'sk-test-0000' }
 
 /** A box built of `record`, with the same record in storage. */
-function builtOf(record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> {
+function builtOf(record: Fetched<BoxRecord, BoxSparse>): TestableBox {
   world.mw.seedPut(record)
-  return boxListingOf(world.mw).build(record)
+  return boxListingOf(world.mw).deliverRecord(record)
 }
 
 /** A box whose whisper is {@link Exposed}, none of it exposed. */
 const unexposedOf = async (): Promise<TestableBox> => {
-  const box = await builtOf(fullBoxRecord())
+  const box = builtOf(fullBoxRecord())
   await box.put({ whisper: Exposed })
   return box
 }
@@ -223,7 +223,7 @@ describe("the endings of a box exposed", () => {
 
   it("a tombstone received clears the value and the veil", async () => {
     const box = await veiledOf()
-    box.listing.receiveRow(world.mw.tombstoneBoxRecord({ box_tok: box.box_tok, revision_seq: box.revision_seq + 1, revision_tok: 'rev-gone' }))
+    box.listing.deliverRecord(world.mw.tombstoneBoxRecord({ box_tok: box.box_tok, revision_seq: box.revision_seq + 1, revision_tok: 'rev-gone' }))
     expect(box.isPresent).to.be.false
     expect(box.whisper).to.eq(ENCRYPTED)
     expect(box.isVeiled).to.be.false
@@ -361,7 +361,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
 
   it("keeps a listener on one box when it unsubscribes from the other", async () => {
     const one = await unexposedOf()
-    const other = await builtOf(fullBoxRecord({ boxlabel: 'openai_api_key' }))
+    const other = builtOf(fullBoxRecord({ boxlabel: 'openai_api_key' }))
     const listener = vi.fn()
     const unsubscribeOne = one.subscribe(listener)
     other.subscribe(listener)

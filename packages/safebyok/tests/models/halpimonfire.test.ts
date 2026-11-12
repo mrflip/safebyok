@@ -18,7 +18,7 @@ describe("a lock() called during a put", () => {
     const listing = fakeSealBoxListingOf(world.mw, {}, () => { if (lock.during) { world.mw.setLocked(true) } })
     const record = fullBoxRecord()
     world.mw.seedPut(record)
-    const box = await listing.build(record)
+    const box = listing.deliverRecord(record)
     lock.during = true
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sealed while locking' } }), 'vault_locked')
     expect(world.mw.callsOf('put')).to.deep.equal([])
@@ -27,7 +27,7 @@ describe("a lock() called during a put", () => {
   it("during the put still writes the record", async () => {
     const record = fullBoxRecord()
     world.mw.seedPut(record)
-    const box = await boxListingOf(world.mw).build(record)
+    const box = boxListingOf(world.mw).deliverRecord(record)
     world.mw.willPut(({ record: sent }) => {
       world.mw.setLocked(true)
       return world.mw.answerOf(box.scope, sent)

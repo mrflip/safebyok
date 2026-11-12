@@ -159,7 +159,7 @@ export const VaultLocked = "The vault locked mid-operation. Please unlock again 
 export const RecordForNewBox = "A create operation found a record already present."
 // --
 
-// == [Storables]: PartialLoad, AlreadyListed, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok
+// == [Storables]: PartialLoad, AlreadyListed, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
@@ -196,9 +196,6 @@ export const OneRevisionTwoFates = "Storage and this device disagree about a rec
 
 /** Why a record stored under the revision in hand, but of another life of the thing, is not adopted. */
 export const OneRevisionTwoLives = "Storage and this device disagree about a record's history (it has been deleted and recreated). This should not happen: report this as a bug."
-
-/** Why a record under another vault_tok than the instance has is not adopted. */
-export const OtherVaultTok = "Storage delivered a record from a deleted vault. This should not happen: report this as a bug."
 
 /** Why a record delivered under one scope that names another is not adopted. */
 export const RecordOfOtherScope = "Storage delivered a misnamed record. This should not happen: report this as a bug."

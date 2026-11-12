@@ -19,7 +19,7 @@ describe("a lease cache that refuses", () => {
   it("leaves the passphrase replaced and the vault unlocked, and reports to onBadNews", async () => {
     const onBadNews = vi.fn()
     const { fakeBank, opts, deviceDB, demandStored } = await makeBornVault()
-    const vault = await new VaultListing(fakeBank, hearingBadNews(opts, onBadNews)).build(demandStored())
+    const vault = new VaultListing(fakeBank, hearingBadNews(opts, onBadNews)).deliverRecord(demandStored())
     await unlockTyping(vault, byPassphrase(Passphrase))
     const refusal = new VaultError('storage_unavailable', "the disk is full")
     deviceDB.tryStow.mockResolvedValueOnce(TH.bad(refusal))
@@ -34,14 +34,14 @@ describe("a gate changed on another device", () => {
   it("taken from a received record leaves this vault unlocked, its lease still sealing", async () => {
     const record = await storedVaultRecord()
     const { listing, putBehindOurBack } = makeVaultWorld(record)
-    const vault = await listing.build(record)
+    const vault = listing.deliverRecord(record)
     await unlockTyping(vault, byPassphrase(Passphrase))
     const other = makeVaultWorld(record, { device_id: '00000000-0000-4000-8000-000000000002' })
-    const theirs = await other.listing.build(record)
+    const theirs = other.listing.deliverRecord(record)
     await unlockTyping(theirs, byPassphrase(Passphrase))
     await replaceTyping(theirs, Passphrase, NewPassphrase)
     const received = putBehindOurBack(other.demandStored())
-    vault.listing.receiveRow(received)
+    vault.listing.deliverRecord(received)
     expect(vault.gate.pickle()).to.deep.equal(received.gate)
     expect(received.gate.passphrase_wayin).not.to.deep.equal(record.gate.passphrase_wayin)
     expect(vault.isUnlocked).to.be.true
@@ -51,7 +51,7 @@ describe("a gate changed on another device", () => {
   it("taken from a fetch leaves this vault unlocked, its lease in force", async () => {
     const { vault, demandStored } = await makeBornVaultWithPasskey()
     const other = makeVaultWorld(demandStored(), { device_id: '00000000-0000-4000-8000-000000000002' })
-    const theirs = await other.listing.build(demandStored())
+    const theirs = other.listing.deliverRecord(demandStored())
     await unlockTyping(theirs, byPassphrase(Passphrase))
     await replaceTyping(vault, Passphrase, NewPassphrase)
     other.putBehindOurBack(demandStored())
@@ -66,7 +66,7 @@ describe("a vault record stored without its gate", () => {
   it("refuses 'damaged_row' at hydrate, and writes nothing", async () => {
     const { gate: _gate, ...gateless } = await storedVaultRecord()
     const { listing, storedNow } = makeVaultWorld(gateless as VaultRecord)
-    const vault = await listing.build(listing.sparseOf(gateless))
+    const vault = listing.deliverRecord(listing.sparseOf(gateless))
     await TH.expectRefusal(vault.hydrate(), 'damaged_row')
     expect(vault.isFull).to.be.false
     expect(storedNow()).to.equal(gateless)
@@ -96,7 +96,7 @@ describe("a passkey wayin stored damaged", () => {
   it("refuses 'damaged_row' at hydrate for a salt that is too short", async () => {
     const damaged = await damagedOf()
     const { listing, storedNow } = makeVaultWorld(damaged)
-    const vault = await listing.build(listing.sparseOf(damaged))
+    const vault = listing.deliverRecord(listing.sparseOf(damaged))
     await TH.expectRefusal(vault.hydrate(), 'damaged_row')
     expect(vault.isFull).to.be.false
     expect(storedNow()).to.equal(damaged)
@@ -222,7 +222,7 @@ describe("vault.replacePassphrasePrompt()", () => {
 
   it("refuses a vault deleted since the last fetch, its tombstone listed in its slot before the refusal is thrown", async () => {
     const { vault, listing, demandStored, anotherSession } = await makeBornVault()
-    await delTyping(await anotherSession().build(demandStored()))
+    await delTyping(anotherSession().deliverRecord(demandStored()))
     expect(vault.isPresent).to.be.true
     await TH.expectRefusal(replaceTyping(vault, Passphrase, NewPassphrase))
     expect(vault.isEnabled).to.be.false
@@ -360,7 +360,7 @@ describe("vault.revokePasskeyPrompt()", () => {
 
   it("revokes a passkey that another session added since the last fetch", async () => {
     const { vault, demandStored, anotherSession, advance } = await makeBornVault()
-    await addPasskeyTyping(await anotherSession().build(demandStored()), Passphrase, 'laptop')
+    await addPasskeyTyping(anotherSession().deliverRecord(demandStored()), Passphrase, 'laptop')
     advance(Promptly)
     expect(vault.gate.pkWayin).to.be.null
     await revokeTyping(vault, Passphrase)
@@ -384,7 +384,7 @@ describe("vault.revokePasskeyPrompt()", () => {
 describe("a gate change on other sessions", () => {
   it("leaves another session unlocked as it fetches the new gate", async () => {
     const { vault, demandStored, anotherSession } = await makeBornVault()
-    const theirs = await anotherSession().build(demandStored())
+    const theirs = anotherSession().deliverRecord(demandStored())
     await unlockTyping(theirs, { passphraseClear: Passphrase })
     await replaceTyping(vault, Passphrase, NewPassphrase)
     await theirs.fetch()
@@ -485,7 +485,7 @@ describe("vault.delVaultPrompt()", () => {
   it("refuses a deleted vault without showing a dialog", async () => {
     const born = await makeBornVault()
     const { vault, demandStored, anotherSession } = born
-    await delTyping(await anotherSession().build(demandStored()))
+    await delTyping(anotherSession().deliverRecord(demandStored()))
     const { shown } = dialogOf(born)
     await TH.expectRefusal(vault.fetch())
     await TH.expectRefusal(vault.delVaultPrompt())

@@ -12,16 +12,16 @@ import { type TestableBox, boxListingOf, fullBoxRecord, tombstoneBoxRecord, useM
 const world = useModelsWorld()
 
 /** A box built of `record`, with the same record in storage. */
-function builtOf(record: Fetched<BoxRecord, BoxSparse>): Promise<TestableBox> {
+function builtOf(record: Fetched<BoxRecord, BoxSparse>): TestableBox {
   world.mw.seedPut(record)
-  return boxListingOf(world.mw).build(record)
+  return boxListingOf(world.mw).deliverRecord(record)
 }
 
 const TestWhisper = { apiKey: 'sk-test-0000' }
 
 /** A box whose whisper is `whisper`, that whisper exposed. */
 async function exposedOf(whisper: Whisper = TestWhisper): Promise<TestableBox> {
-  const box = await builtOf(fullBoxRecord())
+  const box = builtOf(fullBoxRecord())
   await box.put({ whisper })
   return box.expose()
 }
@@ -40,7 +40,7 @@ describe("box.extractWhisper(): refused from its guard", () => {
   ] as const
   for (const [recordOf, isLocked, refusalkind, blurb] of RefusedCases) {
     it(`refuses '${refusalkind}' for ${blurb}`, async () => {
-      const box = await boxListingOf(world.mw).build(recordOf())
+      const box = boxListingOf(world.mw).deliverRecord(recordOf())
       world.mw.setLocked(isLocked)
       await TH.expectRefusal(box.extractWhisper(), refusalkind)
     })
@@ -61,7 +61,7 @@ describe("box.extractWhisper(): a decrypted value that is not a valid whisper", 
     it(`refuses 'damaged_whisper' for ${blurb}, quoting none of it`, async () => {
       const base = world.mw.world
       const leasedWorld: BoxWorld = { vault_tok: base.vault_tok, get isLocked() { return base.isLocked }, receiveWorld: (taken) => { base.receiveWorld(taken) }, ensureTimely: (maxMillis) => base.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text), subscribe: (listener) => base.subscribe(listener) }
-      const box = await boxListingOf(world.mw, { world: leasedWorld }).build(fullBoxRecord())
+      const box = boxListingOf(world.mw, { world: leasedWorld }).deliverRecord(fullBoxRecord())
       const err = await TH.expectRefusal(box.extractWhisper(), 'damaged_whisper')
       expect(err.message).to.eq(Phrases.UndecodedWhisper)
       expect(JSON.stringify({ meta: err.meta, cause: String(err.cause) })).to.not.include('SECRET')
@@ -187,7 +187,7 @@ describe("box.whisper and box.put: what a whisper may be", () => {
 
   for (const [whisper, blurb] of BadWhisperCases) {
     it(`refuses a put of ${blurb}, putting nothing and quoting nothing`, async () => {
-      const box = await builtOf(fullBoxRecord())
+      const box = builtOf(fullBoxRecord())
       world.mw.clearCalls()
       const err = await TH.expectRefusal(box.put({ whisper: whisper as never, sidecar: {} }))
       expect(TH.thrownText(err)).to.not.include('SECRET')
@@ -197,13 +197,13 @@ describe("box.whisper and box.put: what a whisper may be", () => {
   }
 
   it("refuses a whisper JSON would mangle, even while the vault is locked", async () => {
-    const box = await builtOf(fullBoxRecord())
+    const box = builtOf(fullBoxRecord())
     world.mw.setLocked(true)
     await TH.expectRefusal(box.put({ whisper: new Date(T0), sidecar: {} }))
   })
 
   it("exposes a copy of the whisper put, not the host's object", async () => {
-    const box = await builtOf(fullBoxRecord())
+    const box = builtOf(fullBoxRecord())
     const given = { apiKey: 'sk-test-0000', deep: { orgId: 'org-0000' } }
     await box.put({ whisper: given })
     given.apiKey = 'sk-test-changed'
@@ -224,7 +224,7 @@ describe("box.whisper and box.put: what a whisper may be", () => {
 
   for (const [whisper, blurb] of [[{}, 'an empty object'], [{ val: null }, 'an object whose val is null']] as const) {
     it(`puts and opens ${blurb} unchanged`, async () => {
-      const box = await builtOf(fullBoxRecord())
+      const box = builtOf(fullBoxRecord())
       await box.put({ whisper })
       expect(await box.extractWhisper()).to.deep.equal(whisper)
       await box.expose()
@@ -236,7 +236,7 @@ describe("box.whisper and box.put: what a whisper may be", () => {
   }
 
   it("opens a box sealed as { val } in the old form as the whisper { val }", async () => {
-    const box = await builtOf(fullBoxRecord())
+    const box = builtOf(fullBoxRecord())
     await box.put({ whisper: { val: 'sk-test-0000' } })
     expect(await box.extractWhisper()).to.deep.equal({ val: 'sk-test-0000' })
   })

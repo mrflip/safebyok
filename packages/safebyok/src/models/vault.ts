@@ -266,7 +266,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // a gate changed on another device comes with it, and a newer row from another life
   // replaces this Vault in the listing.
   /** Deliver the vault row a box answer carries. */
-  receiveWorld(world: unknown): void { this.listing.receiveRow(SX.vaultRow.refusingAs('record_conflict').parse(world)) }
+  receiveWorld(world: unknown): void { this.listing.deliverRecord(SX.vaultRow.refusingAs('record_conflict').parse(world)) }
   // --
 
   // == [Box verbs]: hello, bringUp, getBox, fetchBox, putBox, delBox, each with its try form

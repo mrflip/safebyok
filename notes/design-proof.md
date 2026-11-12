@@ -13,7 +13,7 @@ bank.hello()                                         a forced reset; a host may 
    ├─ keyDeriver.load, strengthChecker.load
    ├─ vaultListing.fetchBank()                       vaultDB.tryGetBank: full vaults, no boxes, gone_vault tombstones (does not fetch or sync with DeviceDB)
    │  │    refused → tellIfRevoked, then thrown;  damaged_records → bad news
-   │  └─ each vault or gone_vault, by scope: vaultListing.build(record) → #buildOrReceive
+   │  └─ each vault or gone_vault, by scope: vaultListing.deliverRecord(record) → #deliveringOfRecord → #carryOut
    │       none listed                               → build, enlisted
    │       older than the one listed                 → ignored
    │       new vault_tok, or alive over a tombstone  → build, enlisted; old_vault.vacate, delist

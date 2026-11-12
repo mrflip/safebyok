@@ -95,8 +95,8 @@ describe("The checks of a record's base fields", () => {
       expect(SX.sparseBase.parse(full)).to.deep.equal(baseProps)
     })
 
-    it("takes the six props from a box", async () => {
-      const box = await boxListingOf(mw).build(full)
+    it("takes the six props from a box", () => {
+      const box = boxListingOf(mw).deliverRecord(full)
       expect(SX.sparseBase.parse(box)).to.deep.equal(baseProps)
     })
 

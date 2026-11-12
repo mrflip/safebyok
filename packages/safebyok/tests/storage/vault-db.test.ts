@@ -20,8 +20,8 @@ describe("AdapterVaultDB", () => {
   describe("a scope failing its check", () => {
     it("listBoxes refuses a query without its vault_tok, or under a vaultlabel failing its check", async () => {
       const vaultDB = new MemoryVaultDB()
-      expect(await vaultDB.tryListBoxes(vaultScope as never)).to.deep.include({ ok: false, act: 'unclassified' }).and.to.have.nested.property('err.refusalkind', 'bad_scope')
-      expect(await vaultDB.tryListBoxes({ op: 'list', ...vaultScope, vault_tok: 'life1', vaultlabel: 'No Good!' })).to.deep.include({ ok: false, act: 'unclassified' }).and.to.have.nested.property('err.refusalkind', 'bad_scope')
+      expect(await vaultDB.tryListBoxes(vaultScope as never)).to.deep.include({ ok: false, act: 'unclassified_storing' }).and.to.have.nested.property('err.refusalkind', 'bad_scope')
+      expect(await vaultDB.tryListBoxes({ op: 'list', ...vaultScope, vault_tok: 'life1', vaultlabel: 'No Good!' })).to.deep.include({ ok: false, act: 'unclassified_storing' }).and.to.have.nested.property('err.refusalkind', 'bad_scope')
     })
 
     it("getBox refuses an ask without its vault_tok, or under a boxlabel failing its check, naming the field", async () => {
@@ -56,7 +56,7 @@ describe("AdapterVaultDB", () => {
       const vaultDB = new FailingVaultDB()
       await expect(vaultDB.listVaults(vaultListAsk)).rejects.toSatisfy((err) => isVaultError(err, 'storage_unavailable'))
       const answer = await vaultDB.tryListVaults(vaultListAsk)
-      expect(answer).to.deep.include({ ok: false, act: 'unclassified', world: null, ask: vaultListAsk }).and.to.have.nested.property('err.refusalkind', 'storage_unavailable')
+      expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', world: null, ask: vaultListAsk }).and.to.have.nested.property('err.refusalkind', 'storage_unavailable')
       expect(answer.err?.meta).to.deep.include({ oplabel: 'listVaults' })
       expect((answer.err?.cause as Error).message).to.eq('socket closed')
     })
@@ -65,7 +65,7 @@ describe("AdapterVaultDB", () => {
       class RefusingVaultDB extends MemoryVaultDB {
         protected override doListVaults(): never { throw new VaultError('storage_unavailable', 'Storage is down.') }
       }
-      expect(await new RefusingVaultDB().tryListVaults(vaultListAsk)).to.deep.include({ ok: false, act: 'unclassified', ask: vaultListAsk }).and.to.have.nested.property('err.refusalkind', 'storage_unavailable')
+      expect(await new RefusingVaultDB().tryListVaults(vaultListAsk)).to.deep.include({ ok: false, act: 'unclassified_storing', ask: vaultListAsk }).and.to.have.nested.property('err.refusalkind', 'storage_unavailable')
     })
   })
 

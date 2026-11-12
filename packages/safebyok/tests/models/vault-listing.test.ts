@@ -145,13 +145,26 @@ describe("a tombstone over a live vault", () => {
     expect(vault.boxListing).to.eq(boxes)
   })
 
+  it("forgets the lease cached on this device when the vault is first listed as a tombstone", async () => {
+    const { fakeBank, opts, deviceDB, demandStored, restoreRow, listing: born } = makeVaultWorld()
+    await buildTyping(born, Dna, byPassphrase(Passphrase))
+    restoreRow(tombstoneOver(demandStored()))
+    const listing = new VaultListing(fakeBank, opts)
+    deviceDB.forget.mockClear()
+    await listing.fetch(Dna, { ifAbsent: 'nil' })
+    await forgotten()
+    expect(listing.at(Dna)?.isPresent).to.be.false
+    expect(deviceDB.forget).toHaveBeenCalledOnce()
+    listing.goodbye()
+  })
+
   it("reports a refused forget to onLifecycle, not as bad news", async () => {
     const onLifecycle = vi.fn()
     const onBadNews = vi.fn()
     const { fakeBank, opts, deviceDB, demandStored, restoreRow, listing: born } = makeVaultWorld(null, { onLifecycle })
     await buildTyping(born, Dna, byPassphrase(Passphrase))
     const listing = new VaultListing(fakeBank, hearingBadNews(opts, onBadNews))
-    const vault = await listing.build(demandStored())
+    const vault = listing.deliverRecord(demandStored())
     const refusal = new VaultError('storage_unavailable', 'the disk is full')
     deviceDB.forget.mockRejectedValueOnce(refusal)
     restoreRow(tombstoneOver(demandStored()))
@@ -172,7 +185,7 @@ describe("a box answer carrying a vault row of a later life as its world", () =>
     const bornVault = await buildTyping(born, Dna, byPassphrase(Passphrase))
     await bornVault.boxListing.create(BoxDna)
     const listing = new VaultListing(fakeBank, hearingBadNews(opts, onBadNews))
-    const vault = await listing.build(demandStored())
+    const vault = listing.deliverRecord(demandStored())
     const boxes = vault.boxListing
     await boxes.hello()
     await delTyping(bornVault)
@@ -192,7 +205,7 @@ describe("a box answer carrying a vault row of a later life as its world", () =>
     const bornVault = await buildTyping(born, Dna, byPassphrase(Passphrase))
     await bornVault.boxListing.create(BoxDna)
     const listing = new VaultListing(fakeBank, hearingBadNews(opts, onBadNews))
-    const vault = await listing.build(demandStored())
+    const vault = listing.deliverRecord(demandStored())
     const boxes = vault.boxListing
     await boxes.hello()
     await delTyping(bornVault)

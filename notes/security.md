@@ -52,7 +52,7 @@ added or folded into through the subagent, and no other entry changes.
 
 * 2026-11-11 (vaultdb_classifier, PR #639, package `safebyok`): **A box call's answer that carries the vault's row as its `world` can vacate the Vault of an ended life.**
   When the answer to a box get, put, del or listing, or a watch notice, carries the vault's row as its `world`, `Vault.receiveWorld` (`models/vault.ts`) hands that row to the bank's vault listing
-  (`Listing.receiveRow`, `models/listing.ts`), which treats it as it treats any vault row (`notes/receive-contract.md`, row W2). A newer row of another life (another `vault_tok`: the vault was deleted,
+  (`Listing.deliverRecord`, `models/listing.ts`; amended 2026-11-12 (vaultdb_asks): it was `Listing.receiveRow`), which treats it as it treats any vault row (`notes/receive-contract.md`, row W2). A newer row of another life (another `vault_tok`: the vault was deleted,
   or deleted and made anew, on another device) vacates the Vault of the ended life at once, which disables and locks it and empties its box listing, and lists a new Vault in its place: one that reads as deleted
   for a tombstone, or a new locked vault for a live row. So an unlocked Vault of an ended life no longer stays unlocked until the vault listing next fetches its own row. The caller hears the answer's own
   refusal (`absent_vault` or `vault_reborn`); before, the Vault refused the row with `record_conflict` and stayed as it was. An older row is dropped; a newer row of the same life is adopted as before, and a
@@ -369,7 +369,10 @@ added or folded into through the subagent, and no other entry changes.
   the row this device has cached of the lease, box listing vacated, the vault staying in its slot. A forget refused on this path goes to
   `onBadNews` and is not a panic, as the tombstone stands, so the cached row can outlive the vault's deletion on this device until a
   later forget. It is bound to the old `vault_tok`, which a new life of the vault reads as none, and it remains usable only by a holder
-  of the old vault's stamp. (Models are not yet exported from the package.)
+  of the old vault's stamp. Amended 2026-11-12 (vaultdb_asks): a vault first made from a tombstone takes it in the same way: the listing makes the
+  instance at the void revision and hands it its record through `receiveRecord`, as it does for an instance already listed, so with no lease held
+  the tombstone handling calls `Lease.tryForget`, which forgets any lease cached on this device from an earlier session (pinned by
+  `vault-listing.test.ts`, "forgets the lease cached on this device when the vault is first listed as a tombstone"). (Models are not yet exported from the package.)
 * 2026-11-03 (vault_slot, branch `20261103-vault_slot`): **A stored row that fails its checks is removed only by the customer naming
   it.** Such a row is never delivered to an instance and nothing acts on it. `delVault` / `delBox` land only where the tombstone's
   `prior` matches the row as `damaged_records` lists it (its revision and `vault_tok`, or the sentinels where the row cannot be read);

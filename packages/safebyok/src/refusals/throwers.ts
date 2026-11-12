@@ -103,7 +103,7 @@ export function vaultStoredDamaged({ vaultlabel }: SX.DamagedVault): VaultError 
 export function rowOfOtherVaultTok(received: unknown): VaultError { return new VaultError('storage_issue', Phrases.rowOfOtherAddress(['vault_tok']), { rows: { dbhas: received } }) }
 // --
 
-// == [Storable Throwers]: partialLoad, alreadyListed, instanceDisabled, boxAbsent, boxNotListed, vaultAbsent, deletedVault, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, nothingStoredWhereLive, deliveredNotAsSent, otherVaultTok
+// == [Storable Throwers]: partialLoad, alreadyListed, instanceDisabled, boxAbsent, boxNotListed, vaultAbsent, deletedVault, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, nothingStoredWhereLive, deliveredNotAsSent
 
 /** A `bad_option` refusal: the record in hand is not full, and needs hydrating first. */
 export function partialLoad(): VaultError { return new VaultError('bad_option', Phrases.PartialLoad) }
@@ -149,9 +149,6 @@ export function refusalOfDelivering(thrown: unknown, answer: { ask: SX.LoggableA
   const refusal = isVaultError(thrown) ? thrown : unexpectedError(thrown)
   return Object.assign(refusal, { meta: { ...refusal.meta, oplabel: 'deliver', ask: answer.ask } })
 }
-
-/** A `record_conflict` refusal: this record is stored under another vault_tok than this device does. */
-export function otherVaultTok(received: unknown): VaultError { return new VaultError('record_conflict', Phrases.OtherVaultTok, { rows: { dbhas: received } }) }
 
 // --
 

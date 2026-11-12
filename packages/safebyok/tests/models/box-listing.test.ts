@@ -48,7 +48,7 @@ describe("BoxListing", () => {
     }
   })
 
-  describe("listing.build(record)", () => {
+  describe("listing.deliverRecord(record)", () => {
     const records = {
       full:    fullBoxRecord(),
       sparse:  sparseBoxRecord(),
@@ -62,32 +62,32 @@ describe("BoxListing", () => {
         const fetchingListing = boxListingOf(world.mw)
         await fetchingListing.fetch(scope, { ifAbsent: 'nil' })
         const fetched = fetchingListing.at(scope)
-        const built   = await boxListingOf(world.mw).build(record)
+        const built   = boxListingOf(world.mw).deliverRecord(record)
         expect(fetched).to.not.be.null
         expect(built._cheat_central).to.deep.equal(fetched?._cheat_central)
         expect(built._cheat_central).to.deep.equal(record)
       })
     }
 
-    it("lists the box, and shows it in the snapshot", async () => {
+    it("lists the box, and shows it in the snapshot", () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.build(fullBoxRecord())
+      const box = listing.deliverRecord(fullBoxRecord())
       expect(listing.at(box.scope)).to.eq(box)
       expect(box.isFull).to.be.true
       expect(listing.snapshot).to.have.lengthOf(1)
     })
 
-    it("refuses a dna in place of a record", async () => {
+    it("refuses a dna in place of a record", () => {
       const listing = boxListingOf(world.mw)
-      await TH.expectRefusal(listing.build(dna() as never))
+      TH.expectSyncRefusal(() => listing.deliverRecord(dna() as never))
       expect(listing.things).to.deep.equal([])
       expect(world.mw.calls).to.deep.equal([])
     })
 
-    it("delivers a newer record to the box already listed", async () => {
+    it("delivers a newer record to the box already listed", () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.build(fullBoxRecord())
-      const again = await listing.build(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
+      const box = listing.deliverRecord(fullBoxRecord())
+      const again = listing.deliverRecord(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
       expect(again).to.eq(box)
       expect(box.revision_seq).to.eq(2)
     })
@@ -97,7 +97,7 @@ describe("BoxListing", () => {
 describe("boxListing.get(scoped, opts)", () => {
   it("hydrates a listed box and returns it", async () => {
     const listing = boxListingOf(world.mw)
-    const box = await listing.build(sparseBoxRecord())
+    const box = listing.deliverRecord(sparseBoxRecord())
     world.mw.seedPut(fullBoxRecord())
     world.mw.clearCalls()
     await expect(listing.get(box.scope)).resolves.to.eq(box)
@@ -107,7 +107,7 @@ describe("boxListing.get(scoped, opts)", () => {
 
   it("asks storage nothing for a full listed box within its horizon, and fetches under a horizon of 0", async () => {
     const listing = boxListingOf(world.mw)
-    const box = await listing.build(fullBoxRecord())
+    const box = listing.deliverRecord(fullBoxRecord())
     world.mw.seedPut(fullBoxRecord())
     world.mw.clearCalls()
     await listing.get(box.scope)
@@ -132,7 +132,7 @@ describe("boxListing.get(scoped, opts)", () => {
 
   it("refuses a box whose stored row is a tombstone as absent, or returns null under 'nil'", async () => {
     const listing = boxListingOf(world.mw)
-    const box = await listing.build(tombstoneBoxRecord())
+    const box = listing.deliverRecord(tombstoneBoxRecord())
     world.mw.seedPut(tombstoneBoxRecord())
     await TH.expectRefusal(listing.get(box.scope), 'absent_box')
     expect(await listing.get(box.scope, { ifAbsent: 'nil' })).to.be.null
@@ -173,18 +173,18 @@ describe("boxListing.puttable(scoped, opts)", () => {
     expect(world.mw.calls).to.deep.equal([])
   })
 
-  it("returns the listed box, alive or deleted", async () => {
+  it("returns the listed box, alive or deleted", () => {
     const listing = boxListingOf(world.mw)
-    const alive = await listing.build(fullBoxRecord({ boxlabel: 'alive_one' }))
-    const gone  = await listing.build(tombstoneBoxRecord({ boxlabel: 'gone_one' }))
+    const alive = listing.deliverRecord(fullBoxRecord({ boxlabel: 'alive_one' }))
+    const gone  = listing.deliverRecord(tombstoneBoxRecord({ boxlabel: 'gone_one' }))
     expect(listing.puttable(alive.scope)).to.eq(alive)
     expect(listing.puttable(gone.scope)).to.eq(gone)
   })
 
-  it("under ifAbsent 'fail', refuses an empty slot with 'absent_box'", async () => {
+  it("under ifAbsent 'fail', refuses an empty slot with 'absent_box'", () => {
     const listing = boxListingOf(world.mw)
-    const alive = await listing.build(fullBoxRecord({ boxlabel: 'alive_one' }))
-    const gone  = await listing.build(tombstoneBoxRecord({ boxlabel: 'gone_one' }))
+    const alive = listing.deliverRecord(fullBoxRecord({ boxlabel: 'alive_one' }))
+    const gone  = listing.deliverRecord(tombstoneBoxRecord({ boxlabel: 'gone_one' }))
     expect(listing.puttable(alive.scope, { ifAbsent: 'fail' })).to.eq(alive)
     expect(listing.puttable(gone.scope, { ifAbsent: 'fail' })).to.eq(gone)
     const scope = world.mw.boxscope('void_one')

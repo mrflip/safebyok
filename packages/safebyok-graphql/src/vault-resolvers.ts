@@ -111,7 +111,7 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
     if (refusal === null) { return crossingOf(await verb()) }
     const loggableAsk = await DB.outcomeOf(() => DB.loggableAsk.parse(ask))
     if (! loggableAsk.ok) { return crossingOf(DB.badAnswerOf(loggableAsk.err)) }
-    return crossingOf({ ok: false, err: refusal, act: 'unclassified', world: null, ask: loggableAsk.val })
+    return crossingOf({ ok: false, err: refusal, act: 'unclassified_storing', world: null, ask: loggableAsk.val })
   }
 
   /** Watch `scope` and yield its notices in wire form, for as long as the request stays signed in as that user. */
@@ -240,7 +240,7 @@ function crossedErrOf({ refusalkind, message, meta }: DB.VaultError): DB.Crossed
 }
 
 /** Make the notice that ends a watch, carrying `refusal`. */
-function badNoticeOf(refusal: DB.VaultError): CrossingNotice { return { ok: false, act: 'unclassified', val: null, world: null, err: crossedErrOf(refusal) } }
+function badNoticeOf(refusal: DB.VaultError): CrossingNotice { return { ok: false, act: 'unclassified_storing', val: null, world: null, err: crossedErrOf(refusal) } }
 
 /** Make the iterator for a watch refused before it started: it yields one notice carrying the refusal, then ends. */
 function endingWith(refusal: DB.VaultError): AsyncIterableIterator<CrossingNotice> {

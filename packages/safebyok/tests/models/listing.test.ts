@@ -13,14 +13,14 @@ function scopeOf(boxlabel = 'anthropic_api_key') { return world.mw.boxscope(boxl
 function dnaOf(boxlabel = 'anthropic_api_key') { return boxDnaOf(scopeOf(boxlabel)) }
 
 /** A listing with a full box and a deleted one, each of a record storage has stored too, with no call made yet. */
-async function seededListing() {
+function seededListing() {
   const listing = boxListingOf(world.mw)
   const full = fullBoxRecord({ boxlabel: 'full_box' })
   const gone = tombstoneBoxRecord({ boxlabel: 'gone_box', revision_seq: 2 })
   world.mw.seedPut(full)
   world.mw.seedPut(gone)
-  await listing.build(full)
-  await listing.build(gone)
+  listing.deliverRecord(full)
+  listing.deliverRecord(gone)
   world.mw.setNow(T0 + 660_000)
   world.mw.clearCalls()
   return listing
@@ -45,7 +45,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     })
 
     it("fetches nothing for instances already listed", async () => {
-      const listing = await seededListing()
+      const listing = seededListing()
       world.mw.clearCalls()
       await listing.hello()
       expect(world.mw.callsOf('get')).to.deep.equal([])
@@ -86,7 +86,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     it("ends the watch once, and leaves the instances as they are", async () => {
       const listing = boxListingOf(world.mw)
       await listing.hello()
-      const box = await listing.build(fullBoxRecord())
+      const box = listing.deliverRecord(fullBoxRecord())
       listing.goodbye()
       listing.goodbye()
       expect(world.mw.callsOf('unwatch')).to.have.lengthOf(1)
@@ -116,7 +116,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     it("hands a notice to the listed box", async () => {
       const listing = boxListingOf(world.mw)
       await listing.hello()
-      const box = await listing.build(fullBoxRecord())
+      const box = listing.deliverRecord(fullBoxRecord())
       await world.mw.notify(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2, sidecar: { note: 'pushed' } }))
       expect(listing.at(scopeOf())).to.eq(box)
       expect(box.revision_seq).to.eq(2)
@@ -126,7 +126,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     it("delivers a notice of a deletion, and the listed box is no longer present", async () => {
       const listing = boxListingOf(world.mw)
       await listing.hello()
-      const box = await listing.build(fullBoxRecord())
+      const box = listing.deliverRecord(fullBoxRecord())
       await world.mw.notify(tombstoneBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
       expect(box.isPresent).to.be.false
       expect(listing.snapshot).to.deep.equal([])
@@ -136,7 +136,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     it("reports a refusal from a notice as bad news instead of throwing it", async () => {
       const listing = boxListingOf(world.mw)
       await listing.hello()
-      await listing.build(fullBoxRecord())
+      listing.deliverRecord(fullBoxRecord())
       await world.mw.notify(fullBoxRecord({ revision_tok: 'rev-other' }))
       expect(world.mw.badnews).to.have.length(1)
     })
@@ -152,9 +152,9 @@ describe("Listing's pipeline: what every answer goes through", () => {
 
     it("has present things only, each as the thing's own snapshot", async () => {
       const listing = boxListingOf(world.mw)
-      const full  = await listing.build(fullBoxRecord({ boxlabel: 'full_box' }))
+      const full  = listing.deliverRecord(fullBoxRecord({ boxlabel: 'full_box' }))
       const draft = await listing.create(dnaOf('draft_box'))
-      await listing.build(tombstoneBoxRecord({ boxlabel: 'gone_box', revision_seq: 2 }))
+      listing.deliverRecord(tombstoneBoxRecord({ boxlabel: 'gone_box', revision_seq: 2 }))
       expect(listing.things).to.have.lengthOf(3)
       expect(listing.snapshot).to.have.lengthOf(2)
       expect(listing.snapshot[0]).to.eq(full.getSnapshot())
@@ -166,7 +166,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       const listing = boxListingOf(world.mw)
       let told = 0
       listing.subscribe(() => { told += 1 })
-      await listing.build(fullBoxRecord())
+      listing.deliverRecord(fullBoxRecord())
       expect(told).to.eq(1)
       const before = listing.snapshot
 
@@ -185,7 +185,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     it("follows a change made by a box's own put, notifying once", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.seedPut(fullBoxRecord())
-      const box = await listing.build(fullBoxRecord())
+      const box = listing.deliverRecord(fullBoxRecord())
       let told = 0
       listing.subscribe(() => { told += 1 })
       await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'edited' } })
@@ -196,7 +196,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
 
     it("includes a box once it is reborn, and drops it once it is deleted", async () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.build(tombstoneBoxRecord({ revision_seq: 2 }))
+      const box = listing.deliverRecord(tombstoneBoxRecord({ revision_seq: 2 }))
       expect(listing.snapshot).to.deep.equal([])
       world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
       await listing.fetch(scopeOf())

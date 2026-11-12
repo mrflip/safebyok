@@ -41,20 +41,20 @@ describe("SX.boxRecord and SX.boxSparse", () => {
       expect(parsed).to.not.eq(full)
     })
 
-    it("passes a Box instance, and returns a plain object of its fields", async () => {
-      const box = await boxListingOf(mw).build(full)
+    it("passes a Box instance, and returns a plain object of its fields", () => {
+      const box = boxListingOf(mw).deliverRecord(full)
       const parsed = SX.boxRecord.parse(box)
       expect(parsed).to.deep.equal(full)
       expect(parsed).to.not.be.instanceOf(Box)
     })
 
-    it("refuses a plain object with a field a Box does not have", async () => {
-      const box = await boxListingOf(mw).build(full)
+    it("refuses a plain object with a field a Box does not have", () => {
+      const box = boxListingOf(mw).deliverRecord(full)
       TH.expectSyncRefusal(() => SX.boxRecord.parse({ ...SX.boxRecord.parse(box), extra: 1 }))
     })
 
-    it("refuses a Box that is not full", async () => {
-      const box = await boxListingOf(mw).build(sparse)
+    it("refuses a Box that is not full", () => {
+      const box = boxListingOf(mw).deliverRecord(sparse)
       TH.expectSyncRefusal(() => SX.boxRecord.parse(box))
     })
 
@@ -92,8 +92,8 @@ describe("SX.boxRecord and SX.boxSparse", () => {
       expect(SX.boxSparse.parse({ ...sparse, extra: 1 })).to.deep.equal(sparse)
     })
 
-    it("takes its fields from a Box", async () => {
-      const box = await boxListingOf(mw).build(full)
+    it("takes its fields from a Box", () => {
+      const box = boxListingOf(mw).deliverRecord(full)
       expect(SX.boxSparse.parse(box)).to.deep.equal(sparse)
     })
   })

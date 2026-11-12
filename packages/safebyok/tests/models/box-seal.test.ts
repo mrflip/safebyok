@@ -33,9 +33,9 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     const { boxes, boxesOf } = await sealWorld()
     const built = await boxes.create(BoxDna)
     const sealed = built._cheat_central
-    const intact = await boxesOf().build(sealed)
+    const intact = boxesOf().deliverRecord(sealed)
     expect(await intact.extractWhisper()).to.deep.equal(Whisper)
-    const altered = await boxesOf().build({ ...sealed, sidecar: { account: 'home' } } as BoxRecord)
+    const altered = boxesOf().deliverRecord({ ...sealed, sidecar: { account: 'home' } } as BoxRecord)
     expect(await altered.extractWhisper()).to.deep.equal(Whisper)
     expect(altered.sidecar).to.deep.equal({ account: 'home' })
   })
@@ -44,7 +44,7 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     const { boxes, boxesOf } = await sealWorld()
     const built = await boxes.create(BoxDna)
     const sealed = built._cheat_central
-    const altered = await boxesOf().build({ ...sealed, written_at: sealed.written_at + 1 })
+    const altered = boxesOf().deliverRecord({ ...sealed, written_at: sealed.written_at + 1 })
     await TH.expectRefusal(altered.extractWhisper(), 'damaged_whisper')
   })
 

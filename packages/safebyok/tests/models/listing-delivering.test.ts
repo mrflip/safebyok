@@ -22,7 +22,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
   describe("an answer refused or malformed", () => {
     it("passes a refusal through unchanged and delivers nothing", async () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.build(fullBoxRecord())
+      const box = listing.deliverRecord(fullBoxRecord())
       world.mw.clearCalls()
       const err = new VaultError('storage_unavailable', "Storage is down.")
       world.mw.willGet(world.mw.refusalOf(box.scope, err, 'a world'))
@@ -80,7 +80,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
   describe("a refusal met in delivering a record", () => {
     it("is thrown to a fetch, leaving the box unchanged", async () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.build(fullBoxRecord())
+      const box = listing.deliverRecord(fullBoxRecord())
       world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-other' }))
       world.mw.clearCalls()
       await TH.expectRefusal(listing.fetch(scopeOf()))
@@ -89,11 +89,11 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(world.mw.badnews).to.deep.equal([])
     })
 
-    it("is thrown to a build(record), leaving the listed box unchanged", async () => {
+    it("is thrown to a build(record), leaving the listed box unchanged", () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.build(fullBoxRecord())
+      const box = listing.deliverRecord(fullBoxRecord())
       world.mw.clearCalls()
-      await TH.expectRefusal(listing.build(fullBoxRecord({ revision_tok: 'rev-other' })))
+      TH.expectSyncRefusal(() => listing.deliverRecord(fullBoxRecord({ revision_tok: 'rev-other' })))
       expect(listing.at(scopeOf())).to.eq(box)
       expect(box.revision_tok).to.eq('rev-a1')
       expect(world.mw.badnews).to.deep.equal([])
@@ -101,7 +101,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
 
     it("is thrown to a put, leaving the box unchanged", async () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.build(fullBoxRecord())
+      const box = listing.deliverRecord(fullBoxRecord())
       world.mw.clearCalls()
       world.mw.willPut({ ...world.mw.answerOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })), act: 'replaced' })
       await TH.expectRefusal(listing.put(listing.recordOf(box), { expected: box.sparse }))
@@ -125,7 +125,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
 
     it("goes to onBadNews when a 'stale_write' carried the record, and the 'stale_write' is still thrown", async () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.build(fullBoxRecord())
+      const box = listing.deliverRecord(fullBoxRecord())
       world.mw.willPut(world.mw.staleWriteOf(box.scope, fullBoxRecord({ revision_tok: 'rev-other' })))
       const err = await TH.expectRefusal(listing.put(listing.recordOf(box), { expected: box.sparse }), 'stale_write')
       expect(err.meta ?? {}).to.not.have.property('dbhas')
@@ -143,18 +143,18 @@ describe("Listing's pipeline: what every answer goes through", () => {
   })
 
   describe("a void row, delivered", () => {
-    it("builds a listed instance that is not present and not in the snapshot", async () => {
+    it("builds a listed instance that is not present and not in the snapshot", () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.build(shell())
+      const box = listing.deliverRecord(shell())
       expect(listing.things).to.deep.equal([box])
       expect(box.isPresent).to.be.false
       expect(listing.snapshot).to.deep.equal([])
     })
 
-    it("builds the same instance at the void revision however often it arrives", async () => {
+    it("builds the same instance at the void revision however often it arrives", () => {
       const listing = boxListingOf(world.mw)
-      const box = await listing.build(shell())
-      expect(await listing.build(shell())).to.eq(box)
+      const box = listing.deliverRecord(shell())
+      expect(listing.deliverRecord(shell())).to.eq(box)
       expect(box.revision_tok).to.eq(SX.VoidRevisionTok)
       expect(box.revision_seq).to.eq(SX.VoidRevisionSeq)
     })
@@ -165,7 +165,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       const listing = boxListingOf(world.mw)
       const record = fullBoxRecord()
       world.mw.seedPut(record)
-      const box = await listing.build(record)
+      const box = listing.deliverRecord(record)
       await TH.expectRefusal(listing.create(dnaOf()), 'camped')
       expect(listing.at(scopeOf())).to.eq(box)
       expect(box.revision_seq).to.eq(record.revision_seq)
@@ -175,7 +175,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       const listing = boxListingOf(world.mw)
       const record = tombstoneBoxRecord({ revision_seq: 2 })
       world.mw.seedPut(record)
-      const box = await listing.build(record)
+      const box = listing.deliverRecord(record)
       await expect(listing.create(dnaOf())).resolves.to.eq(box)
       expect(listing.at(scopeOf())).to.eq(box)
       expect(box.isPresent).to.be.true
@@ -187,8 +187,8 @@ describe("Listing's pipeline: what every answer goes through", () => {
       try {
         const listing = boxListingOf(world.mw)
         await listing.hello()
-        const box = await listing.build(fullBoxRecord({ boxlabel: 'built' }))
-        await listing.build(fullBoxRecord({ boxlabel: 'built' }))
+        const box = listing.deliverRecord(fullBoxRecord({ boxlabel: 'built' }))
+        listing.deliverRecord(fullBoxRecord({ boxlabel: 'built' }))
         world.mw.seedPut(fullBoxRecord({ boxlabel: 'fetched' }))
         await listing.fetch(scopeOf('fetched'))
         await listing.fetch(scopeOf('fetched'))
@@ -240,7 +240,7 @@ describe("listing: a record of another vault_tok reaches no listed instance", ()
 
   it("refuses build(record) of a record of another vault_tok, and passes over a notice of one", async () => {
     const listing = boxListingOf(world.mw)
-    await TH.expectRefusal(listing.build(fullBoxRecord({ vault_tok: OtherVault })), 'storage_issue')
+    TH.expectSyncRefusal(() => listing.deliverRecord(fullBoxRecord({ vault_tok: OtherVault })), 'storage_issue')
     world.mw.seedPut(fullBoxRecord())
     await listing.hello()
     world.mw.clearCalls()
@@ -259,13 +259,13 @@ describe("listing: a record of another vault_tok reaches no listed instance", ()
 
   it("accepts a record of the vault's own vault_tok, and a dna", async () => {
     const listing = boxListingOf(world.mw)
-    await expect(listing.build(fullBoxRecord())).resolves.to.be.instanceOf(Box)
+    expect(listing.deliverRecord(fullBoxRecord())).to.be.instanceOf(Box)
     await expect(listing.create(dnaOf('draft_box'))).resolves.to.be.instanceOf(Box)
   })
 
   it("refuses storage_issue for a fetch of a listed box answered with a record of another vault_tok, leaving the box as it was", async () => {
     const listing = boxListingOf(world.mw)
-    const box = await listing.build(fullBoxRecord())
+    const box = listing.deliverRecord(fullBoxRecord())
     world.mw.willGet(world.mw.answerOf(box.scope, fullBoxRecord({ vault_tok: OtherVault, revision_seq: 2, revision_tok: 'rev-a2' })))
     const err = await TH.expectRefusal(listing.fetch(box.scope), 'storage_issue')
     expect(err.message).to.eq(Phrases.rowOfOtherAddress(['vault_tok']))
@@ -284,8 +284,8 @@ describe("listing: an answer names the scope of the record it carries", () => {
 
   it("leaves the listed instances of both scopes unchanged", async () => {
     const listing = boxListingOf(world.mw)
-    const asked = await listing.build(fullBoxRecord({ boxlabel: 'asked_box' }))
-    const other = await listing.build(fullBoxRecord({ boxlabel: 'other_box' }))
+    const asked = listing.deliverRecord(fullBoxRecord({ boxlabel: 'asked_box' }))
+    const other = listing.deliverRecord(fullBoxRecord({ boxlabel: 'other_box' }))
     const [askedBefore, otherBefore] = [asked._cheat_central, other._cheat_central]
     world.mw.willGet(world.mw.answerOf(asked.scope, fullBoxRecord({ boxlabel: 'other_box', revision_seq: 2, revision_tok: 'rev-a2' })))
     await TH.expectRefusal(listing.fetch(asked.scope))
