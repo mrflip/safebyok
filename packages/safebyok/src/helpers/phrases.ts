@@ -159,13 +159,16 @@ export const BankLocked = "The bank is locked, so nothing was read or written: u
 export const RecordForNewBox = "A create operation found a record already present."
 // --
 
-// == [Storables]: PartialLoad, AlreadyListed, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives
+// == [Storables]: PartialLoad, AlreadyListed, WrittenByOwnVerbs, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
 /** Why a birth makes nothing of a dna for a scope the listing already has alive. */
 export const AlreadyListed = "This listing already has an instance under the dna's scope, so nothing was made of the dna: listing.at(scope) answers it."
+
+/** Why a bank or a gate is never put or deleted as a vault or a box is. */
+export const WrittenByOwnVerbs = "A bank's row and its gate's are written only by the bank's own verbs, so nothing was stored: build, change or delete the bank through its prompts."
 
 /** Why an update of a box naming neither its whisper nor its sidecar writes nothing. */
 export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to write."

@@ -123,7 +123,7 @@ export type ProbeAsked = Z.input<typeof probeAsked>
 export type ProbeOpts = Z.input<typeof probeOpts>
 
 /** One storage verb's answer as `bank.tryProbe` reports it: sparse rows, no wrapped key or ciphertext, and when it came back. */
-export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: SX.LoggableAsk, val: SX.BoxSparse, parent: BX.VaultRow, timestamp: number }>
+export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: BX.LoggableAsk, val: SX.BoxSparse, parent: BX.VaultRow, timestamp: number }>
 
 /** How `bank.tryProbe` went, step by step: the box and vault as found, the put, the fetch back, and that the box opened. */
 export type ProbeReport = Readonly<{
@@ -209,7 +209,7 @@ export const listingOpts = objCheck(() => ({
 /** The check of a storable's constructor arguments, as far as the base can tell. Checks only. */
 export const storableArgs = objCheck(({ custom }) => ({
   world:   listingWorld,
-  listing: custom<object>((val) => hasModelkind(val, 'vault_listing', 'box_listing'), Phrases.ListingExpected),
+  listing: custom<object>((val) => hasModelkind(val, 'bank_listing', 'gate_listing', 'vault_listing', 'box_listing'), Phrases.ListingExpected),
   central: storableBase,
 }), 'bad_option')
 
@@ -346,6 +346,28 @@ export type BoxListingOpts = ListingOpts & { scope: VaultScope }
 
 // --
 
+// == [The gate's forms]: GateSnapshot
+
+/** A gate as a dialog renders it: its scope, its life and revision, and each wayin's header, by `wayinlabel`. */
+export interface GateSnapshot extends CX.GateScope {
+  /** The life of the bank the gate is of. */
+  readonly bank_tok:      string
+  /** The life of the gate, kept by every gate verb. */
+  readonly gate_tok:      string
+  /** The token of the revision in hand, new at each gate verb. */
+  readonly revision_tok:  string
+  /** The count of the revision in hand, higher on the later one. */
+  readonly revision_seq:  number
+  /** When this life of the gate began. */
+  readonly registered_at: number
+  /** When the revision in hand was written. */
+  readonly written_at:    number
+  /** Each wayin's header, with no wrapped vaultKey: `main`, and `passkey0` where the gate has one. */
+  readonly wayins:        Readonly<{ main: GX.WayinHeader, passkey0?: GX.WayinHeader }>
+}
+
+// --
+
 // == [The vault's forms]: VaultSnapshot
 
 /** A vault as a host renders it: its scope, its life and revision, and whether it is locked. */
@@ -382,7 +404,7 @@ export const vaultWorld = Checker(({ bankScope, custom }) => listingWorld.extend
 /** The bank, as far as its vaults reach into it. */
 export type VaultWorld = Pick<Bank, keyof ListingWorld | keyof ProvingWorld | 'scope' | 'logger' | 'leaseMillis' | 'deviceDB' | 'boxRefreshMillis' | 'device'>
 
-/** The check of what a bank is made with, past its listing's options: the device that makes it, and the token of its device row. */
+/** The check of what a bank is made with, past its listing's options: the device that makes it, and the token of its device row, which the device has once its `ensureBank` has ensured the row. */
 export const bankArgs = objCheck(({ custom, device_tok }) => ({
   device: custom<Device>((val) => hasModelkind(val, 'device'), Phrases.DeviceExpected),
   device_tok,
@@ -478,12 +500,12 @@ export const tellBadNewsToArgs = objCheck(({ fn, custom, arr }) => ({
   badnews:   arr(custom<VaultError>(isVaultError, Phrases.VaultErrorExpected)),
 }), 'bad_option')
 
-/** Where a cached lease outlived its revoke: a vault's lock, tombstone or vacate, the device's vacate, or a row of another epoch or life met at an unlock. */
+/** Where a cached lease outlived its revoke: the bank's lock, tombstone or vacate, the device's vacate, or a row of another gate revision or life met at an unlock. */
 export type RevokeSite = 'lock' | 'tombstone' | 'vacate' | 'undeleted'
 
 /** What the device and its bank's listings and vaults announce through it: a {@link DeviceEvent} before the device names itself. */
 export type DeviceAnnouncement =
-  | { readonly kind: 'lease_revoke_failed', readonly refusal: VaultError, readonly vault: Vault | null, readonly where: RevokeSite }
+  | { readonly kind: 'lease_revoke_failed', readonly refusal: VaultError, readonly bank: Bank | null, readonly where: RevokeSite }
   | { readonly kind: 'vacated', readonly cause: VaultError, readonly unrevoked: number }
   | { readonly kind: 'helloed', readonly outcome: Outcome<void>, readonly vault: Vault | null }
 

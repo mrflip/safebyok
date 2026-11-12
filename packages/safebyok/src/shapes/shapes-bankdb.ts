@@ -48,11 +48,11 @@ export type BankRow       = BankRecord | BankTombstone
 export const BankTop = 'main'
 // --
 
-// == [Gate forms]: passphraseWayin, passkeyWayin, wayins, gateRecord, GateRecord, Wayins
+// == [Gate forms]: passphraseWayin, passkeyWayin, wayins, gateRecord, gateSparse, GateRecord, GateSparse, Wayins
 
 // A gate row is deleted with its bank, never tombstoned: a stored gate row is live.
-/** The checks of a gate's wayins, each with its `wayinlabel`, its bag of them, and its stored row. */
-export const { passphraseWayin, passkeyWayin, wayins, gateRecord } = Checkers('bad_option', ({ obj, lit, bank_tok, gate_tok }) => {
+/** The checks of a gate's wayins, each with its `wayinlabel`, its bag of them, its stored row, and its sparse form. */
+export const { passphraseWayin, passkeyWayin, wayins, gateRecord, gateSparse } = Checkers('bad_option', ({ obj, lit, bank_tok, gate_tok }) => {
   const passphraseWayin = SX.passphraseWayinRecord.extend({ wayinlabel: lit('main') }).strict()
   const passkeyWayin    = SX.passkeyWayinRecord.extend({ wayinlabel: lit('passkey0') }).strict()
   const wayins          = obj({ main: passphraseWayin, passkey0: passkeyWayin.optional() }).strict()
@@ -70,11 +70,15 @@ export const { passphraseWayin, passkeyWayin, wayins, gateRecord } = Checkers('b
     /** Kept for later, and read by nothing: always empty. */
     meta: emptyBag,
   }).strict()
-  return { passphraseWayin, passkeyWayin, wayins, gateRecord }
+  // A gate made in its listing starts as a tombstone at the void revision, as every listed thing does.
+  const gateSparse      = gateRecord.omit({ wayins: true }).extend({ am: SX.am }).strip()
+  return { passphraseWayin, passkeyWayin, wayins, gateRecord, gateSparse }
 }, [CX])
 
 /** A gate row as stored, always live. */
 export type GateRecord = Readonly<Z.infer<typeof gateRecord>>
+/** A gate row with its wayins left out, so that no wrapped vaultKey goes with it. */
+export type GateSparse = Readonly<Z.infer<typeof gateSparse>>
 /** A gate's wayins: `main`, its passphrase wayin, and `passkey0`, its passkey wayin, if it has one. */
 export type Wayins     = Readonly<Z.infer<typeof wayins>>
 // --
