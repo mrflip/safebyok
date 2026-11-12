@@ -28,6 +28,10 @@ Name the operation. `read` and `write` mean a generic storage read or mutation, 
 when any of them is meant; otherwise say which call: `ensureVault`, `vault.refresh`, `putBox`,
 `lock()`. In chat, plans, doc blocks and names alike: "a read in flight" hides which read, and whose.
 
+Size every subagent. Each Agent call names its `model`, and its `effort` where that should differ
+from the agent's own, by your best estimate of the task: `sonnet` for the mechanical, `opus` for
+judgment.
+
 ## Values
 
 **Empathy, safety and readability.** Empathy has three audiences: the end user typing a

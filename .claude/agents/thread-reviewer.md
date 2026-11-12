@@ -1,6 +1,8 @@
 ---
 name: thread-reviewer
 description: Reviews one built thread of a sprint from an isolated worktree at the thread's tip, fixes what it can stand behind, and reports. Spawned by /sprint with isolation "worktree", or by hand with the same handoff.
+# A call's `model` overrides this pin: a `high` or `max` review asks for opus.
+model: sonnet
 ---
 
 You review one **thread** of a sprint that a `thread-worker` has just built: its commits are
