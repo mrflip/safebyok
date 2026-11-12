@@ -155,7 +155,7 @@ export const provingWorld = objStrip(({ custom, device_tok }) => ({
   keyDeriver:      custom<GuardedKeyDeriver>(isGuarded, Phrases.GuardedExpected),
   /** The bank's strength checker, guarded: it judges a new passphrase. */
   strengthChecker: custom<GuardedStrengthChecker>(isGuarded, Phrases.GuardedExpected),
-  /** This device's id, written into the wayin header a proving mints. */
+  /** This device's token, written into the wayin header a proving mints. */
   device_tok,
 }), 'bad_option', [CX])
 

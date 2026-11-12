@@ -173,7 +173,7 @@ export class Bank {
   }
   // --
 
-  // == [Ending]: autolock, lock, vacate, sweep, letGo, listOwnLeases, vacateDevice, revokeOwnLeases, forgetOwnBank, tellHost
+  // == [Ending]: autolock, lock, vacate, sweep, letGo, listOwnLeases, vacateDevice, revokeOwnLeases, forgetOwnDevice, tellHost
 
   /** Lock each listed vault with a cached lease past autolock, forgetting it. Call it after `hello` and on your own timer.
    * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.buildFromCache` leaves such a row for it.
@@ -229,7 +229,7 @@ export class Bank {
   /** This bank's leases revoked and its device row forgotten on this device, then `vacated` told. */
   async #vacateDevice(cause: VaultError): Promise<void> {
     const unrevoked = await this.#revokeOwnLeases()
-    await this.#forgetOwnBank()
+    await this.#forgetOwnDevice()
     this.#tellHost({ kind: 'vacated', cause, unrevoked })
   }
 
@@ -247,8 +247,8 @@ export class Bank {
     return revoked.filter((isRevoked) => ! isRevoked).length
   }
 
-  /** A vacate's forget of this bank's row in the deviceDB, a refusal told as bad news. */
-  async #forgetOwnBank(): Promise<void> {
+  /** A vacate's forget of this bank's device row in the deviceDB, a refusal told as bad news. */
+  async #forgetOwnDevice(): Promise<void> {
     const forgot = await this.deviceDB.tryForgetDevice(this.scope)
     if (! forgot.ok) { tellBadNewsTo(this.#hostHandlers.onBadNews, this, [forgot.err]) }
   }

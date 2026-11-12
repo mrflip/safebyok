@@ -302,7 +302,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(onBadNews).toHaveBeenCalledExactlyOnceWith({ news: refusal, bank })
   })
 
-  it("a vacate forgets the bank's row in the deviceDB after its leases", async () => {
+  it("a vacate forgets the bank's device row in the deviceDB after its leases", async () => {
     const world = makeBankWorld()
     const { bank } = await makeBankWithVault(world)
     const made = await world.deviceDB.ensureCachedDevice(BankScopeGiven)
@@ -316,7 +316,7 @@ describe("bank.lock, bank.vacate, bank.sweep", () => {
     expect(remade.device_tok).to.not.eq(made.device_tok)
   })
 
-  it("a sweep leaves the bank's row", async () => {
+  it("a sweep leaves the bank's device row", async () => {
     const world = makeBankWorld()
     const { bank } = await makeBankWithVault(world)
     const made = await world.deviceDB.ensureCachedDevice(BankScopeGiven)
