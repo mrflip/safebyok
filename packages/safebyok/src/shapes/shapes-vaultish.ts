@@ -230,7 +230,7 @@ export const storableArgs = objCheck(({ custom }) => ({
 
 // --
 
-// == [Given to a listing]: Thing, ListingAnswer, ListingPutAnswer, ListingPutOpts, ListingDelOpts, DelTombstone, SlotFate, ListingOf
+// == [Given to a listing]: Thing, ListingAnswer, ListingPutAnswer, ListingPutOpts, ListingDelOpts, DelTombstone, SlotStep, ListingOf
 
 /** A vault or box in a listing. */
 export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
@@ -259,8 +259,8 @@ export type ThingAnswer<ValT> = Answer<ValT, string, unknown>
 /** The tombstone `listing.del` sends the vaultDB: at the revision after the row it replaces, with a life token of its own. */
 export type DelTombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
 
-/** The fate of a record meeting the thing in its slot: `receive` judges it, `lose` drops it unheard, and `replace` gives the slot a new instance of it. */
-export type SlotFate = 'receive' | 'lose' | 'replace'
+/** What a listing does with a record meeting the instance in its slot: the instance receives it, or keeps as it is, or the slot is remade of the record. */
+export type SlotStep = 'receive' | 'keep' | 'remake'
 
 /** The listing a storable is made in, as it sees it: its own kind of thing, whatever snapshot the concrete class makes. */
 export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> =

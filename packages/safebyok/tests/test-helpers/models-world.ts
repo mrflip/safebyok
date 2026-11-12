@@ -416,7 +416,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
     refusalOf,
     staleWriteOf: (scope, storedNow, worldNow = null) => {
       const err = Refuse.staleWrite(worldVaultRow(), (storedNow ?? null) as BoxRow | null)
-      return refusalOf(scope, err, worldNow, storedNow)
+      return { ...refusalOf(scope, err, worldNow, storedNow), act: 'stale' }
     },
 
     notify: async (record, worldNow = worldVaultRow()) => {
