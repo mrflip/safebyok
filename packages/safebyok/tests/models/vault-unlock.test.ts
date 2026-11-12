@@ -235,7 +235,7 @@ describe("The cached lease, used only by ensureUnlocked", () => {
 
   it("is not used when another device cached it before the gate changed", async () => {
     const { vault, demandStored } = await makeBornVaultWithPasskey()
-    const other = makeVaultWorld(demandStored(), { device_id: '00000000-0000-4000-8000-000000000002' })
+    const other = makeVaultWorld(demandStored(), { device_tok: '00000000-0000-4000-8000-000000000002' })
     const theirs = other.listing.deliverRecord(other.demandStored())
     await unlockTyping(theirs, byPasskey('laptop'))
     await revokeTyping(vault, Passphrase)

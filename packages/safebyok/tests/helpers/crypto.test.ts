@@ -45,7 +45,7 @@ function ctxOf(purpose: string) { return cipherCtx({ test: 'crypto' }, purpose) 
 /** A vault's stamp, a box's and a wayin's header, as plain records: what the cipherCtx cases are built of. */
 const vaultStamp = { format: 'safebyok-vault-v6', user_id: 'u1', banklabel: 'acme', vaultlabel: 'main', vault_tok: 'vid', registered_at: 1 }
 const boxStamp = { boxlabel: 'anthropic', revision_tok: 'r1', written_at: 2 }
-const header = { wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', salt_b64: 'c2FsdHNhbHRzYWx0c2FsdA', device_id: '00000000-0000-4000-8000-0000000000d1', registered_at: 3 }
+const header = { wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', salt_b64: 'c2FsdHNhbHRzYWx0c2FsdA', device_tok: '00000000-0000-4000-8000-0000000000d1', registered_at: 3 }
 
 describe("cipherCtx", () => {
   // cipherCtx @example 1
@@ -91,7 +91,7 @@ describe("cipherCtx", () => {
       const withField = { ...vaultStamp, registered_at: null } as unknown as CipherCtxRecord
       TH.expectSyncRefusal(() => cipherCtx(withField, 'vault_key_passphrase_wrapped'))
       TH.expectSyncRefusal(() => cipherCtx([withField, boxStamp], 'box_key_wrapped'))
-      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { ...header, device_id: null } as unknown as CipherCtxRecord))
+      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { ...header, device_tok: null } as unknown as CipherCtxRecord))
     })
 
     it("a stamp, a purpose or a header that is undefined or null, rather than treating it as null", () => {
@@ -191,8 +191,8 @@ describe("wrap and unwrap", () => {
 /** Hex text to bytes, for a published test vector. */
 function hexBytes(hex: string) { return Uint8Array.from(hex.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16)) }
 
-/** The info of a passkey wayin's key, for the header of the device `device_id`. */
-function infoOf(device_id: string) { return cipherCtx(vaultStamp, 'vault_key_passkey_wrapped', { ...header, device_id }) }
+/** The info of a passkey wayin's key, for the header of the device `device_tok`. */
+function infoOf(device_tok: string) { return cipherCtx(vaultStamp, 'vault_key_passkey_wrapped', { ...header, device_tok }) }
 
 describe("deriveWrappingKey", () => {
   // deriveWrappingKey @example

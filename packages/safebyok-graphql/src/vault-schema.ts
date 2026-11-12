@@ -84,7 +84,7 @@ type SafebyokPassphraseWayin {
   wayinkind:               String!
   key_deriver_label:       String!
   salt_b64:                String!
-  device_id:               String!
+  device_tok:              String!
   registered_at:           SafebyokEpochMillis!
   vault_key_wayin_wrapped: SafebyokCiphered!
 }
@@ -94,7 +94,7 @@ type SafebyokPasskeyWayin {
   wayinkind:               String!
   credential_id:           String!
   prf_salt_b64:            String!
-  device_id:               String!
+  device_tok:              String!
   registered_at:           SafebyokEpochMillis!
   vault_key_wayin_wrapped: SafebyokCiphered!
 }
@@ -243,7 +243,7 @@ input SafebyokPassphraseWayinInput {
   wayinkind:               String!
   key_deriver_label:       String!
   salt_b64:                String!
-  device_id:               String!
+  device_tok:              String!
   registered_at:           SafebyokEpochMillis!
   vault_key_wayin_wrapped: SafebyokCipheredInput!
 }
@@ -252,7 +252,7 @@ input SafebyokPasskeyWayinInput {
   wayinkind:               String!
   credential_id:           String!
   prf_salt_b64:            String!
-  device_id:               String!
+  device_tok:              String!
   registered_at:           SafebyokEpochMillis!
   vault_key_wayin_wrapped: SafebyokCipheredInput!
 }

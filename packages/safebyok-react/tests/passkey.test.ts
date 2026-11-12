@@ -9,7 +9,7 @@ TH.sweepBankWorlds()
 
 /** Return the passkey header that a vault with the passkey `credential_id` has on its gate. */
 const headerOf = (credential_id: string, prf_salt_b64: string): WayinHeader => ({
-  wayinkind: 'passkey', credential_id, prf_salt_b64, device_id: TH.DeviceId, registered_at: 0,
+  wayinkind: 'passkey', credential_id, prf_salt_b64, device_tok: TH.DeviceTok, registered_at: 0,
 }) as WayinHeader
 
 /** Return the refusal that `promise` rejects with. */

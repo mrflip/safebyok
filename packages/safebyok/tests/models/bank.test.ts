@@ -58,7 +58,7 @@ describe("bank.hello", () => {
     expect(load).toHaveBeenCalledOnce()
     expect(listener).toHaveBeenCalledOnce()
     const snapshot = bank.getSnapshot()
-    expect(snapshot).to.include({ ...BankScopeGiven, stage: 'ready', err: null, device_id: bank.device_id })
+    expect(snapshot).to.include({ ...BankScopeGiven, stage: 'ready', err: null, device_tok: bank.device_tok })
     expect(snapshot.vaults).to.deep.equal([])
     await bank.hello()
     expect(bank.getSnapshot()).to.equal(snapshot)
@@ -246,15 +246,15 @@ describe("bank.hello", () => {
     expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['damaged_row'])
   })
 
-  it("keeps the device_id each bank was handed", async () => {
+  it("keeps the device_tok each bank was handed", async () => {
     const world = makeBankWorld()
     const [firstId, secondId] = [crypto.randomUUID(), crypto.randomUUID()]
-    const first = world.bankOn({ device_id: firstId })
+    const first = world.bankOn({ device_tok: firstId })
     await first.hello()
-    const second = world.bankOn({ device_id: secondId })
+    const second = world.bankOn({ device_tok: secondId })
     await second.hello()
-    expect([first.device_id, first.snapshot.device_id]).to.deep.equal([firstId, firstId])
-    expect([second.device_id, second.snapshot.device_id]).to.deep.equal([secondId, secondId])
+    expect([first.device_tok, first.snapshot.device_tok]).to.deep.equal([firstId, firstId])
+    expect([second.device_tok, second.snapshot.device_tok]).to.deep.equal([secondId, secondId])
   })
 
   it("lists a vault built on another device, through the watch it starts", async () => {
@@ -407,12 +407,12 @@ describe("bank.ensureVault", () => {
     ['no hyphens',                    "00000000000040008000000000000001"],
     ['a digit short',                 "00000000-0000-4000-8000-00000000001"],
     ['nothing in it',                 ""],
-  ])("refuses at Bank.make a device_id with %s", (_what, device_id) => {
-    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id }))
+  ])("refuses at Bank.make a device_tok with %s", (_what, device_tok) => {
+    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_tok }))
   })
 
-  it("refuses at Bank.make a missing device_id", () => {
-    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_id: undefined as never }))
+  it("refuses at Bank.make a missing device_tok", () => {
+    TH.expectSyncRefusal(() => makeBankWorld().bankOn({ device_tok: undefined as never }))
   })
 
   it("takes a fraction of a minute to the nearest millisecond, and Infinity as ForeverMillis", () => {

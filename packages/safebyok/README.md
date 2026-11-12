@@ -71,7 +71,7 @@ import { browserOpts } from 'safebyok/browser'
 const bank = Bank.make({
   ...browserOpts({ dbName: 'acme' }), // keyDeriver, deviceDB and strengthChecker; a field after it wins
   user_id: session.user_id, banklabel: 'acme',
-  device_id: deviceId, // a crypto.randomUUID() you keep for this device
+  device_tok: deviceTok, // a crypto.randomUUID() you keep for this device
   vaultDB, // see below
   requestCleartext: async (gating) => {
     if (gating.gatingkind !== 'build_vault' && gating.gatingkind !== 'unlock_vault') { return }
@@ -115,11 +115,11 @@ Easy to get wrong:
   `vault.boxListing` is empty and nothing is watched, so a change made on another device does not
   arrive until the next `vault.hello()`.
 * `bank.vacate()` is sign-out. It disables the bank, then removes this bank's cached leases and its
-  bank row from the deviceDB. It does not touch the vaultDB, and it resolves once each removal has
-  been tried. The next `deviceDB.ensureCachedBank` for that user mints a new `device_id`. Await it
+  device row from the deviceDB. It does not touch the vaultDB, and it resolves once each removal has
+  been tried. The next `deviceDB.ensureCachedDevice` for that user mints a new `device_tok`. Await it
   before the page unloads: a lease it could not remove is reported to your `onLifecycle` as
   `lease_revoke_failed`, and a `vacated` event follows once the removals have settled, with the
-  number of leases left behind (`unrevoked`). If listing the leases is refused, or the bank row
+  number of leases left behind (`unrevoked`). If listing the leases is refused, or the device row
   cannot be removed, that is reported to your `onBadNews`.
 * **A swept or vacated bank cannot be used again.** From the moment you call `sweep` or `vacate`,
   `bank.isEnabled` is permanently false, `hello`, `ensureVault` and `vaultAt` refuse with

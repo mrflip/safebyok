@@ -1,4 +1,4 @@
-/** The deviceDB, which caches on this device a lease for each vault and a bank row for each bank. A subclass writes the `do*` calls. */
+/** The deviceDB, which caches on this device a lease for each vault and a device row for each bank. A subclass writes the `do*` calls. */
 
 import { IsDeviceDB } from '../helpers/consts'
 import { randomId } from '../helpers/crypto'
@@ -9,7 +9,7 @@ import * as Refuse from '../refusals/throwers'
 import * as CX from '../shapes/shapes-core'
 import { type BankScope, type VaultScope, isPlainBag } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import type { BankRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
+import type { DeviceRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 
 /** The base class of a device database. A subclass writes only the generic `do*` calls, and each must be one atomic step. */
 export abstract class DeviceDB {
@@ -97,44 +97,44 @@ export abstract class DeviceDB {
   tryForgetRawLease(scopepath: LeaseScopepath): Promise<Outcome<void>> { return outcomeOf(() => this.forgetRawLease(scopepath)) }
   // --
 
-  // == [Bank verbs]: ensureCachedBank, tryEnsureCachedBank, forgetBank, tryForgetBank, listRawBanks, tryListRawBanks
+  // == [Device verbs]: ensureCachedDevice, tryEnsureCachedDevice, forgetDevice, tryForgetDevice, listRawDevices, tryListRawDevices
 
-  /** The bank row of this bank scope, made with a fresh random `device_id` on the first call. */
-  async ensureCachedBank(scope: BankScope): Promise<BankRow> {
+  /** The device row of this bank scope, made with a fresh random `device_tok` on the first call. */
+  async ensureCachedDevice(scope: BankScope): Promise<DeviceRow> {
     try {
       const { user_id, banklabel } = CX.bankScope.parse(scope)
-      const made = SX.bankRow.parse({ user_id, banklabel, device_id: randomId() })
-      return SX.bankRow.parse(await this.doEnsureCachedBank(made))
-    } catch (err) { throw refusalOf(err, 'ensureCachedBank') }
+      const made = SX.deviceRow.parse({ user_id, banklabel, device_tok: randomId() })
+      return SX.deviceRow.parse(await this.doEnsureCachedDevice(made))
+    } catch (err) { throw refusalOf(err, 'ensureCachedDevice') }
   }
 
-  /** Non-throwing form of {@link ensureCachedBank}. */
-  tryEnsureCachedBank(scope: BankScope): Promise<Outcome<BankRow>> { return outcomeOf(() => this.ensureCachedBank(scope)) }
+  /** Non-throwing form of {@link ensureCachedDevice}. */
+  tryEnsureCachedDevice(scope: BankScope): Promise<Outcome<DeviceRow>> { return outcomeOf(() => this.ensureCachedDevice(scope)) }
 
-  /** Forget the bank row of this bank scope, so the next `ensureCachedBank` mints a fresh `device_id`. */
-  async forgetBank(scope: BankScope): Promise<void> {
+  /** Forget the device row of this bank scope, so the next `ensureCachedDevice` mints a fresh `device_tok`. */
+  async forgetDevice(scope: BankScope): Promise<void> {
     try {
       const { user_id, banklabel } = CX.bankScope.parse(scope)
-      await this.doForgetBank({ user_id, banklabel })
-    } catch (err) { throw refusalOf(err, 'forgetBank') }
+      await this.doForgetDevice({ user_id, banklabel })
+    } catch (err) { throw refusalOf(err, 'forgetDevice') }
   }
 
-  /** Non-throwing form of {@link forgetBank}. */
-  tryForgetBank(scope: BankScope): Promise<Outcome<void>> { return outcomeOf(() => this.forgetBank(scope)) }
+  /** Non-throwing form of {@link forgetDevice}. */
+  tryForgetDevice(scope: BankScope): Promise<Outcome<void>> { return outcomeOf(() => this.forgetDevice(scope)) }
 
-  /** Every bank row stored on this device, as an unchecked bag, damaged ones included. */
-  async listRawBanks(): Promise<Record<string, unknown>[]> {
+  /** Every device row stored on this device, as an unchecked bag, damaged ones included. */
+  async listRawDevices(): Promise<Record<string, unknown>[]> {
     try {
-      const rows = await this.doListBanks()
+      const rows = await this.doListDevices()
       return rows.filter((row) => isPlainBag(row))
-    } catch (err) { throw refusalOf(err, 'listRawBanks') }
+    } catch (err) { throw refusalOf(err, 'listRawDevices') }
   }
 
-  /** Non-throwing form of {@link listRawBanks}. */
-  tryListRawBanks(): Promise<Outcome<Record<string, unknown>[]>> { return outcomeOf(() => this.listRawBanks()) }
+  /** Non-throwing form of {@link listRawDevices}. */
+  tryListRawDevices(): Promise<Outcome<Record<string, unknown>[]>> { return outcomeOf(() => this.listRawDevices()) }
   // --
 
-  // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureCachedBank, doForgetBank, doListBanks
+  // == [Protected, for a subclass to write]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureCachedDevice, doForgetDevice, doListDevices
 
   // A device database must start each call's work in the order of the calls. Otherwise a `forget` made after a `stow` may
   // miss the row it stowed.
@@ -148,12 +148,12 @@ export abstract class DeviceDB {
   protected abstract doListLeases(): Awaitable<RawLease[]>
   /** Delete whatever row is filed under `scopepath`, in one step. */
   protected abstract doForgetRawLease(scopepath: LeaseScopepath): Awaitable<void>
-  /** Return the bank row stored at `made`'s bank scope if it passes its check, else put `made` over it and return that, in one step. */
-  protected abstract doEnsureCachedBank(made: BankRow): Awaitable<unknown>
+  /** Return the device row stored at `made`'s bank scope if it passes its check, else put `made` over it and return that, in one step. */
+  protected abstract doEnsureCachedDevice(made: DeviceRow): Awaitable<unknown>
   /** Delete whatever row is stored at this bank scope, in one step. */
-  protected abstract doForgetBank(scope: BankScope): Awaitable<void>
-  /** Every bank row stored, in any order. */
-  protected abstract doListBanks(): Awaitable<unknown[]>
+  protected abstract doForgetDevice(scope: BankScope): Awaitable<void>
+  /** Every device row stored, in any order. */
+  protected abstract doListDevices(): Awaitable<unknown[]>
   // --
 }
 

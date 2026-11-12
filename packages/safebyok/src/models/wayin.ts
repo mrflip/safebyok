@@ -25,10 +25,10 @@ export function wayinCtxOf(stamp: VaultStamp, header: WayinHeader): Uint8Array {
 
 /** One way into a vault: its passphrase or its passkey. */
 export class Wayin {
-  // == [Props]: wayinkind, device_id, registered_at, vault_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, #pickle
+  // == [Props]: wayinkind, device_tok, registered_at, vault_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, #pickle
 
   declare readonly wayinkind:               Wayinkind
-  declare readonly device_id:               string
+  declare readonly device_tok:              string
   declare readonly registered_at:           number
   declare readonly vault_key_wayin_wrapped: CX.VaultKeyWayinWrapped
   declare readonly key_deriver_label?:      string

@@ -36,7 +36,7 @@ describe("a gate changed on another device", () => {
     const { listing, putBehindOurBack } = makeVaultWorld(record)
     const vault = listing.deliverRecord(record)
     await unlockTyping(vault, byPassphrase(Passphrase))
-    const other = makeVaultWorld(record, { device_id: '00000000-0000-4000-8000-000000000002' })
+    const other = makeVaultWorld(record, { device_tok: '00000000-0000-4000-8000-000000000002' })
     const theirs = other.listing.deliverRecord(record)
     await unlockTyping(theirs, byPassphrase(Passphrase))
     await replaceTyping(theirs, Passphrase, NewPassphrase)
@@ -50,7 +50,7 @@ describe("a gate changed on another device", () => {
 
   it("taken from a fetch leaves this vault unlocked, its lease in force", async () => {
     const { vault, demandStored } = await makeBornVaultWithPasskey()
-    const other = makeVaultWorld(demandStored(), { device_id: '00000000-0000-4000-8000-000000000002' })
+    const other = makeVaultWorld(demandStored(), { device_tok: '00000000-0000-4000-8000-000000000002' })
     const theirs = other.listing.deliverRecord(demandStored())
     await unlockTyping(theirs, byPassphrase(Passphrase))
     await replaceTyping(vault, Passphrase, NewPassphrase)

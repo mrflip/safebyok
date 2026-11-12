@@ -56,7 +56,7 @@ export function wayinOf(tag: string, overrides: Partial<PassphraseWayinRecord> =
     key_deriver_label:       'test_digest_v0',
     // base64 of the literal text 'saltsaltsaltsalt': a fake salt, public material anyway
     salt_b64:                CX.salt_b64.parse('c2FsdHNhbHRzYWx0c2FsdA'),
-    device_id:               '00000000-0000-4000-8000-0000000000b1',
+    device_tok:              '00000000-0000-4000-8000-0000000000b1',
     registered_at:           Date.UTC(2026, 9, 14),
     vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
     ...overrides,

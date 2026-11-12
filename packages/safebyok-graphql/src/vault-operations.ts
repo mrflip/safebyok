@@ -8,8 +8,8 @@ const ciphered = 'fragment SafebyokCipheredFields on SafebyokCiphered { cipher_i
 
 const gate = `fragment SafebyokGateFields on SafebyokGate {
   gate_epoch
-  passphrase_wayin { wayinkind key_deriver_label salt_b64 device_id registered_at vault_key_wayin_wrapped { ...SafebyokCipheredFields } }
-  passkey_wayin { wayinkind credential_id prf_salt_b64 device_id registered_at vault_key_wayin_wrapped { ...SafebyokCipheredFields } }
+  passphrase_wayin { wayinkind key_deriver_label salt_b64 device_tok registered_at vault_key_wayin_wrapped { ...SafebyokCipheredFields } }
+  passkey_wayin { wayinkind credential_id prf_salt_b64 device_tok registered_at vault_key_wayin_wrapped { ...SafebyokCipheredFields } }
 }`
 
 const vaultRow = `fragment SafebyokVaultRowFields on SafebyokVaultRow {

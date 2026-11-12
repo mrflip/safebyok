@@ -25,14 +25,14 @@ const provided = (overrides: Partial<Props> = {}, world = TH.makeBankWorld()) =>
   return { world, props, rerender: (given: Props) => { rendered.rerender(ui(given)) }, unmount: rendered.unmount }
 }
 
-/** Make a MemoryDeviceDB whose ensureCachedBank waits, for `user_id` only, until the test calls `answer`. Other users get their result at once. */
+/** Make a MemoryDeviceDB whose ensureCachedDevice waits, for `user_id` only, until the test calls `answer`. Other users get their result at once. */
 const deviceDBPending = (user_id: string) => {
   const deviceDB = new MemoryDeviceDB()
   const answering = TH.makePending()
-  const ensureCachedBank = deviceDB.ensureCachedBank.bind(deviceDB)
-  vi.spyOn(deviceDB, 'ensureCachedBank').mockImplementation(async (scope) => {
+  const ensureCachedDevice = deviceDB.ensureCachedDevice.bind(deviceDB)
+  vi.spyOn(deviceDB, 'ensureCachedDevice').mockImplementation(async (scope) => {
     if (scope.user_id === user_id) { await answering.promise }
-    return ensureCachedBank(scope)
+    return ensureCachedDevice(scope)
   })
   return { deviceDB, answer: () => { answering.resolve(undefined) } }
 }
@@ -71,18 +71,18 @@ describe("BankProvider's bank", () => {
     expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
   })
 
-  it("makes each bank with the device_id its deviceDB keeps for the bank's scope", async () => {
+  it("makes each bank with the device_tok its deviceDB keeps for the bank's scope", async () => {
     const deviceDB = new MemoryDeviceDB()
-    const kept = await deviceDB.ensureCachedBank({ user_id: 'u1', banklabel: 'acme' })
+    const kept = await deviceDB.ensureCachedDevice({ user_id: 'u1', banklabel: 'acme' })
     const { props, rerender } = provided({ deviceDB })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
     rerender({ ...props, user_id: 'u2' })
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
     const [first, second] = TH.seenBanks
-    expect(first?.device_id).to.eq(kept.device_id)
-    const { device_id } = await deviceDB.ensureCachedBank({ user_id: 'u2', banklabel: 'acme' })
-    expect(second?.device_id).to.eq(device_id)
-    expect(second?.device_id).to.not.eq(kept.device_id)
+    expect(first?.device_tok).to.eq(kept.device_tok)
+    const { device_tok } = await deviceDB.ensureCachedDevice({ user_id: 'u2', banklabel: 'acme' })
+    expect(second?.device_tok).to.eq(device_tok)
+    expect(second?.device_tok).to.not.eq(kept.device_tok)
   })
 
   it("sweeps its bank as it unmounts", async () => {
@@ -92,9 +92,9 @@ describe("BankProvider's bank", () => {
     expect(TH.seenBanks[0]?.isEnabled).to.eq(false)
   })
 
-  // StrictMode runs the effect twice at mount, before the device_id has arrived. The effect makes its bank
-  // only once, when the device_id arrives.
-  it("makes one bank under StrictMode, once the device_id lands", async () => {
+  // StrictMode runs the effect twice at mount, before the device_tok has arrived. The effect makes its bank
+  // only once, when the device_tok arrives.
+  it("makes one bank under StrictMode, once the device_tok lands", async () => {
     const making = vi.spyOn(Bank, 'make')
     render(<StrictMode><BankProvider {...TH.providerPropsOf(TH.makeBankWorld())}><TH.ShowsVault /></BankProvider></StrictMode>)
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
@@ -115,7 +115,7 @@ describe("BankProvider's bank", () => {
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
   })
 
-  it("waits for the next user's device_id before making their bank", async () => {
+  it("waits for the next user's device_tok before making their bank", async () => {
     const { deviceDB, answer } = deviceDBPending('u2')
     const { props, rerender } = provided({ deviceDB })
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
@@ -126,8 +126,8 @@ describe("BankProvider's bank", () => {
     expect(making).not.toHaveBeenCalled()
     answer()
     await waitFor(() => { expect(shown('bank')).to.eq('u2 ready') })
-    const { device_id } = await deviceDB.ensureCachedBank({ user_id: 'u2', banklabel: 'acme' })
-    expect(making.mock.calls.map(([opts]) => [opts.user_id, opts.device_id])).to.deep.equal([['u2', device_id]])
+    const { device_tok } = await deviceDB.ensureCachedDevice({ user_id: 'u2', banklabel: 'acme' })
+    expect(making.mock.calls.map(([opts]) => [opts.user_id, opts.device_tok])).to.deep.equal([['u2', device_tok]])
   })
 
   it("makes no bank when the user signs out before its deviceDB responds", async () => {
@@ -141,9 +141,9 @@ describe("BankProvider's bank", () => {
     expect(shown('bank')).to.eq('none')
   })
 
-  it("throws a refused ensureCachedBank to the nearest error boundary", async () => {
+  it("throws a refused ensureCachedDevice to the nearest error boundary", async () => {
     const deviceDB = new MemoryDeviceDB()
-    vi.spyOn(deviceDB, 'ensureCachedBank').mockRejectedValue(new VaultError('storage_unavailable', 'the disk is full'))
+    vi.spyOn(deviceDB, 'ensureCachedDevice').mockRejectedValue(new VaultError('storage_unavailable', 'the disk is full'))
     const props = TH.providerPropsOf(TH.makeBankWorld(), { deviceDB })
     const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
     await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
@@ -151,7 +151,7 @@ describe("BankProvider's bank", () => {
   })
 
   it("throws a deviceDB that is no DeviceDB to the nearest error boundary", async () => {
-    const props = TH.providerPropsOf(TH.makeBankWorld(), { deviceDB: { ensureCachedBank: vi.fn() } as unknown as MemoryDeviceDB })
+    const props = TH.providerPropsOf(TH.makeBankWorld(), { deviceDB: { ensureCachedDevice: vi.fn() } as unknown as MemoryDeviceDB })
     const { reported } = TH.renderReporting(<TH.Catcher><BankProvider {...props}><TH.ShowsVault /></BankProvider></TH.Catcher>)
     await waitFor(() => { expect(screen.getByText(/^caught: /)).to.exist })
     expect(reported[0]).to.include({ refusalkind: 'bad_option' })

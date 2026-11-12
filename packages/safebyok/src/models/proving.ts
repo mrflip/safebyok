@@ -185,22 +185,22 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
 
 // == [Headers]: mintPassphraseHeader, mintPasskeyHeader
 
-function mintPassphraseHeader({ keyDeriver, device_id }: ProvingWorld): PassphraseWayinHeader {
+function mintPassphraseHeader({ keyDeriver, device_tok }: ProvingWorld): PassphraseWayinHeader {
   return passphraseWayinHeader.parse({
     wayinkind:         'passphrase',
     key_deriver_label: keyDeriver.key_deriver_label,
     salt_b64:          toB64(randomBytes(keyDeriver.salt_size)),
-    device_id,
+    device_tok,
     registered_at:     nowMillis(),
   })
 }
 
-function mintPasskeyHeader({ device_id }: ProvingWorld, { credential_id, prf_salt_b64 }: GX.PasskeyAnswer): PasskeyWayinHeader {
+function mintPasskeyHeader({ device_tok }: ProvingWorld, { credential_id, prf_salt_b64 }: GX.PasskeyAnswer): PasskeyWayinHeader {
   return passkeyWayinHeader.parse({
     wayinkind:     'passkey',
     credential_id,
     prf_salt_b64,
-    device_id,
+    device_tok,
     registered_at: nowMillis(),
   })
 }

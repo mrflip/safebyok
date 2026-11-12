@@ -10,7 +10,7 @@ import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } fr
 import { VaultError } from '../../src/refusals/errors'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
-import { _cheat_vaultKeyBytesOf, builtGateOf, DeviceId, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampOf, T0, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
+import { _cheat_vaultKeyBytesOf, builtGateOf, DeviceTok, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampOf, T0, TestPassphrase, useFakeClock, WorldStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -118,9 +118,9 @@ describe("Proving.judgeStrength(passphraseClear, scope, world)", () => {
 describe("PassphraseProving.buildNovel(stamp, passphraseClear, world)", () => {
   const ArgsCases = [
     [() => ({ world: TH.omitting(provingWorldOf(), 'keyDeriver') }),      'a world with no keyDeriver'],
-    [() => ({ world: TH.omitting(provingWorldOf(), 'device_id') }),       'a world with no device_id'],
+    [() => ({ world: TH.omitting(provingWorldOf(), 'device_tok') }),      'a world with no device_tok'],
     [() => ({ world: TH.omitting(provingWorldOf(), 'strengthChecker') }), 'a world with no strengthChecker'],
-    [() => ({ world: provingWorldOf({ device_id: '' }) }),                'a world with an empty device_id'],
+    [() => ({ world: provingWorldOf({ device_tok: '' }) }),               'a world with an empty device_tok'],
     [() => ({ world: { ...provingWorldOf(), keyDeriver: TH.testDeriver } }), "a world with the host's bare keyDeriver"],
     [() => ({ world: { ...provingWorldOf(), strengthChecker: TH.anyStrengthChecker } }), "a world with the host's bare strengthChecker"],
     [() => ({ stamp: { ...WorldStamp, vault_tok: undefined } }),          'a stamp with no vault_tok'],
@@ -228,7 +228,7 @@ describe("PasskeyProving.buildNovel(stamp, passkeyClear, world)", () => {
 
   it("refuses a malformed world, and does not zero the answer", async () => {
     const answer = passkeyAnswerOf()
-    const world = TH.omitting(provingWorldOf(), 'device_id')
+    const world = TH.omitting(provingWorldOf(), 'device_tok')
     await TH.expectRefusal(novelPasskey(answer, world))
     expect(isZeroed(answer.prfBytes)).to.be.false
   })
@@ -402,20 +402,20 @@ describe("guardKeyDeriver(hostDeriver)", () => {
 })
 
 describe("a proving's header", () => {
-  it("of a passphrase proving: the deriver's label, a fresh salt, the world's device_id, and registered_at from the time now", async () => {
+  it("of a passphrase proving: the deriver's label, a fresh salt, the world's device_tok, and registered_at from the time now", async () => {
     vi.setSystemTime(T0 + 5)
     const { header } = await novelPassphrase(provingWorldOf())
-    expect(header).to.deep.include({ wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', device_id: DeviceId, registered_at: T0 + 5 })
-    expect(Object.keys(header)).to.have.members(['wayinkind', 'key_deriver_label', 'salt_b64', 'device_id', 'registered_at'])
+    expect(header).to.deep.include({ wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', device_tok: DeviceTok, registered_at: T0 + 5 })
+    expect(Object.keys(header)).to.have.members(['wayinkind', 'key_deriver_label', 'salt_b64', 'device_tok', 'registered_at'])
     expect(fromB64(header.salt_b64).length).to.eq(TH.testDeriver.salt_size)
     expect(Object.isFrozen(header)).to.be.true
   })
 
-  it("of a passkey proving: the answer's credential_id and salt, the world's device_id, and registered_at", async () => {
+  it("of a passkey proving: the answer's credential_id and salt, the world's device_tok, and registered_at", async () => {
     const answer = passkeyAnswerOf()
     const { credential_id, prf_salt_b64 } = answer
     const { header } = await novelPasskey(answer)
-    expect(header).to.deep.equal({ wayinkind: 'passkey', credential_id, prf_salt_b64, device_id: DeviceId, registered_at: T0 })
+    expect(header).to.deep.equal({ wayinkind: 'passkey', credential_id, prf_salt_b64, device_tok: DeviceTok, registered_at: T0 })
   })
 
   it("draws a fresh salt for each passphrase proving", async () => {
@@ -523,7 +523,7 @@ const StampCases = [
 ] as const
 
 const HeaderCases = [
-  [{ device_id: '00000000-0000-4000-8000-0000000000ee' }, 'a header whose device_id was swapped'],
+  [{ device_tok: '00000000-0000-4000-8000-0000000000ee' }, 'a header whose device_tok was swapped'],
   [{ registered_at: T0 + 1 },         'a header whose registered_at moved'],
 ] as const
 

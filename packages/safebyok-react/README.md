@@ -62,7 +62,7 @@ your function, keep the gating in state until it concludes:
 ## Signing out
 
 Call `bank.vacate()` when the user signs out, before you clear their `user_id`: it forgets the bank's cached leases and
-its bank row on this device, so the next person to use it starts fresh. `BankProvider` doesn't vacate when `user_id` turns `null`,
+its device row on this device, so the next person to use it starts fresh. `BankProvider` doesn't vacate when `user_id` turns `null`,
 because auth may briefly report `null` while it refreshes a token or reconnects, for instance after a laptop wakes. When a
 different user signs in, it vacates the last user's bank itself.
 

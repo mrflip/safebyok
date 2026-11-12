@@ -153,7 +153,7 @@ sidecar is public and unauthenticated.
 | whisper | the host's JSON object; then its JSON text, which passes from box to lease; and the UTF-8 bytes, which only the lease makes | the host's value, going in and coming out; the text, as a string in arguments and locals, which cannot be zeroed (G6); the bytes, as locals in the `Lease`, zeroed; the value, on a `Box` from `expose` until `unexpose`, a sweep, a vacate or a delete (a lock or a veil keeps it; *Open items*, 1) | one seal or open, except for that exposed value | `Box`, the Vault's seal verbs, `Lease` |
 
 Not secret, by design: every salt (`salt_b64`, `prf_salt_b64`), a passkey's `credential_id`,
-`device_id`, `key_deriver_label`, every label and `user_id` (a scope name; a host that treats its
+`device_tok`, `key_deriver_label`, every label and `user_id` (a scope name; a host that treats its
 user ids as sensitive digests them before they reach safebyok), `vault_tok`, every epoch,
 `registered_at` and `ask_passphrase_at`, a box's sidecar (unencrypted and unauthenticated, as
 *The construction* says), and every wrap and ciphertext. The snapshot shows no salt and no wrap, so an offline

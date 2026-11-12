@@ -391,10 +391,10 @@ export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num
 
 // The host's functions and logger are checked once, by the guard that wraps each; here they are only named.
 /** The check of the options handed to `Bank.make`. */
-export const bankOpts = objCheck(({ fn, custom, user_id, banklabel, device_id }) => ({
+export const bankOpts = objCheck(({ fn, custom, user_id, banklabel, device_tok }) => ({
   user_id,
   banklabel,
-  device_id,
+  device_tok,
   vaultDB:             brandedVaultDB,
   deviceDB:            brandedDeviceDB,
   keyDeriver:          custom<KeyDeriver>(),
@@ -414,8 +414,8 @@ export interface BankOpts {
   user_id:               string
   /** Your app's own label, so several apps can share one backend. */
   banklabel:             string
-  /** Your id for this device, a random UUID you keep per device. */
-  device_id:            string
+  /** Your token for this device, a random UUID you keep per device. */
+  device_tok:           string
   /** The VaultDB the vaults are synchronized through, from a storage adapter. */
   vaultDB:              VaultDB
   /** The device database that caches each vault's lease. */
@@ -502,8 +502,8 @@ export interface BankSnapshot extends BankScope {
   readonly stage:      BankStage
   /** Why the bank is disabled, or null. */
   readonly err:        VaultError | null
-  /** Your id for this device, as `Bank.make` was given it. */
-  readonly device_id:  string
+  /** Your token for this device, as `Bank.make` was given it. */
+  readonly device_tok: string
   /** A snapshot of each vault the bank lists. */
   readonly vaults:     readonly VaultSnapshot[]
   /** The gating open on this bank, live, for a dialog to answer; null with none. */

@@ -3,13 +3,13 @@ import { PasskeySaltSize } from '../../src/helpers/consts'
 import { randomBytes, toB64 } from '../../src/helpers/crypto'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
-import { DeviceId, T0 } from '../test-helpers/proving-world'
+import { DeviceTok, T0 } from '../test-helpers/proving-world'
 
 const passphraseRecord = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   wayinkind:               'passphrase',
   key_deriver_label:       'test_digest_v0',
   salt_b64:                toB64(randomBytes(16)),
-  device_id:               DeviceId,
+  device_tok:              DeviceTok,
   registered_at:           T0,
   vault_key_wayin_wrapped: TH.fakeCiphered('wayin-pp'),
   ...overrides,
@@ -19,7 +19,7 @@ const passkeyRecord = (overrides: Record<string, unknown> = {}): Record<string, 
   wayinkind:               'passkey',
   credential_id:           'cred-test-1',
   prf_salt_b64:            toB64(randomBytes(PasskeySaltSize)),
-  device_id:               DeviceId,
+  device_tok:              DeviceTok,
   registered_at:           T0,
   vault_key_wayin_wrapped: TH.fakeCiphered('wayin-pk'),
   ...overrides,
@@ -45,8 +45,8 @@ describe("new Wayin(record): the record check", () => {
     [() => passphraseRecord({ salt_b64: toB64(randomBytes(15)) }),              'refuses a passphrase salt of 15 bytes'],
     [() => passphraseRecord({ salt_b64: toB64(randomBytes(17)) }),              'refuses a passphrase salt of 17 bytes'],
     [() => passphraseRecord({ salt_b64: `${toB64(randomBytes(15))}=+` }),       'refuses a passphrase salt that is not base64url'],
-    [() => passphraseRecord({ device_id: undefined }),                          'refuses a record with no device_id'],
-    [() => passphraseRecord({ device_id: 'device_one' }),                       'refuses a record whose device_id is a label'],
+    [() => passphraseRecord({ device_tok: undefined }),                         'refuses a record with no device_tok'],
+    [() => passphraseRecord({ device_tok: 'device_one' }),                      'refuses a record whose device_tok is a label'],
     [() => passphraseRecord({ wayinkind: 'password' }),                         'refuses a wayinkind of no known kind'],
     [() => passphraseRecord({ registered_at: '2023-11-14T22:13:20.000Z' }),     'refuses a time written as an ISO string'],
     [() => passphraseRecord({ vault_key_wayin_wrapped: { ciphertext_b64: 'ct' } }), 'refuses a wrap with no cipherIv'],
@@ -96,15 +96,15 @@ describe("wayin.pickle(): the stored record", () => {
     const wayin = new Wayin(record)
     expect(Object.keys(wayin)).to.have.members(Object.keys(record))
     expect(wayin.salt_b64).to.eq(record['salt_b64'])
-    expect(() => { (wayin as { device_id: string }).device_id = 'device_other' }).to.throw(TypeError)
+    expect(() => { (wayin as { device_tok: string }).device_tok = 'device_other' }).to.throw(TypeError)
     expect(Object.isFrozen(wayin)).to.be.true
   })
 })
 
 describe("wayin.toJSON(): the header", () => {
   const HeaderCases = [
-    [passphraseRecord, ['wayinkind', 'key_deriver_label', 'salt_b64', 'device_id', 'registered_at'], 'a passphrase wayin'],
-    [passkeyRecord,    ['wayinkind', 'credential_id', 'prf_salt_b64', 'device_id', 'registered_at'],  'a passkey wayin'],
+    [passphraseRecord, ['wayinkind', 'key_deriver_label', 'salt_b64', 'device_tok', 'registered_at'], 'a passphrase wayin'],
+    [passkeyRecord,    ['wayinkind', 'credential_id', 'prf_salt_b64', 'device_tok', 'registered_at'], 'a passkey wayin'],
   ] as const
 
   for (const [recordOf, fieldnames, blurb] of HeaderCases) {

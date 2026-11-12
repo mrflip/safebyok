@@ -4,31 +4,31 @@ import { ckeyOf } from '../helpers/helpers'
 import { DeviceDB } from './device-db'
 import type { BankScope, VaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import type { BankRow, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
+import type { DeviceRow, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 
 /** The scopepath of the lease row at `scope`. */
 function leaseScopepathOf({ user_id, banklabel, vaultlabel }: VaultScope): LeaseScopepath { return [user_id, banklabel, vaultlabel] }
 /** The ckey of the lease row filed under `scopepath`. */
 function leaseCkeyOf(scopepath: LeaseScopepath): string { return ckeyOf(...scopepath) }
-function bankCkeyOf({ user_id, banklabel }: BankScope): string { return ckeyOf(user_id, banklabel) }
+function deviceRowCkeyOf({ user_id, banklabel }: BankScope): string { return ckeyOf(user_id, banklabel) }
 
 /** A device database that keeps its rows in memory, for the page's life. */
 export class MemoryDeviceDB extends DeviceDB {
-  // == [Props]: #leaserows, #bankrows
+  // == [Props]: #leaserows, #devicerows
 
   readonly #leaserows = new Map<string, RawLease>()
-  readonly #bankrows = new Map<string, unknown>()
+  readonly #devicerows = new Map<string, unknown>()
   // --
 
-  // == [Rows]: _cheat_leaseRows, _cheat_bankRows
+  // == [Rows]: _cheat_leaseRows, _cheat_deviceRows
 
   /** For tests: the map of lease rows, each with its scopepath, by scope. */
   _cheat_leaseRows(): Map<string, RawLease> { return this.#leaserows } // eslint-disable-line unicorn/prefer-private-class-fields
-  /** For tests: the map of bank rows, by bank scope. */
-  _cheat_bankRows(): Map<string, unknown> { return this.#bankrows } // eslint-disable-line unicorn/prefer-private-class-fields
+  /** For tests: the map of device rows, by bank scope. */
+  _cheat_deviceRows(): Map<string, unknown> { return this.#devicerows } // eslint-disable-line unicorn/prefer-private-class-fields
   // --
 
-  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureCachedBank, doForgetBank, doListBanks
+  // == [Protected, the generic calls of DeviceDB]: doStow, doPeek, doForget, doListLeases, doForgetRawLease, doEnsureCachedDevice, doForgetDevice, doListDevices
 
   protected doStow(row: LeaseRow): void {
     const scopepath = leaseScopepathOf(row)
@@ -54,19 +54,19 @@ export class MemoryDeviceDB extends DeviceDB {
     this.#leaserows.delete(leaseCkeyOf(scopepath))
   }
 
-  protected doEnsureCachedBank(made: BankRow): unknown {
-    const stored = this.#bankrows.get(bankCkeyOf(made))
-    if (SX.bankRow.safeParse(stored).success) { return structuredClone(stored) }
-    this.#bankrows.set(bankCkeyOf(made), structuredClone(made))
+  protected doEnsureCachedDevice(made: DeviceRow): unknown {
+    const stored = this.#devicerows.get(deviceRowCkeyOf(made))
+    if (SX.deviceRow.safeParse(stored).success) { return structuredClone(stored) }
+    this.#devicerows.set(deviceRowCkeyOf(made), structuredClone(made))
     return structuredClone(made)
   }
 
-  protected doForgetBank(scope: BankScope): void {
-    this.#bankrows.delete(bankCkeyOf(scope))
+  protected doForgetDevice(scope: BankScope): void {
+    this.#devicerows.delete(deviceRowCkeyOf(scope))
   }
 
-  protected doListBanks(): unknown[] {
-    return [...this.#bankrows.values()].map((row) => structuredClone(row))
+  protected doListDevices(): unknown[] {
+    return [...this.#devicerows.values()].map((row) => structuredClone(row))
   }
   // --
 }

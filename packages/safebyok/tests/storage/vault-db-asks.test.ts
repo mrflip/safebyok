@@ -130,7 +130,7 @@ describe("a vaultDB's get, put and del, each given one ask", () => {
   it("runs a gate verb's tests over the vault row stored: replaced, added and revoked, and stale_write, camped and gate_issue with nothing stored", async () => {
     const vaultDB = await vaultDBWithVault()
     const vault = vaultAt(0)
-    const otherPassphrase = { ...passphraseWayin, device_id: '00000000-0000-4000-8000-0000000000d2' }
+    const otherPassphrase = { ...passphraseWayin, device_tok: '00000000-0000-4000-8000-0000000000d2' }
 
     const [rekeyed] = gateMoveOf(vault, { passphrase_wayin: otherPassphrase })
     expect(await vaultDB.replacePassphrase(rekeyed, { prior: vault })).to.deep.include({ act: 'replaced', val: rekeyed })

@@ -10,7 +10,7 @@ const FakeApiKey = 'sk-ant-fake-saved-key'
 /** Make a bank on in-memory storage, with `hello()` already called. Its dialog answers at once with the right passphrase. */
 const makeBank = async () => {
   const bank = Bank.make({
-    user_id: 'u1', banklabel: 'acme', device_id: '00000000-0000-4000-8000-0000000000d1',
+    user_id: 'u1', banklabel: 'acme', device_tok: '00000000-0000-4000-8000-0000000000d1',
     vaultDB: new MemoryVaultDB(), deviceDB: new MemoryDeviceDB(),
     keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger,
     requestCleartext: async (gating) => { await gating.attempt({ passphraseClear: Passphrase }) },

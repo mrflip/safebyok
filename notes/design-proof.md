@@ -38,10 +38,10 @@ bank.hello()                                         a forced reset; a host may 
 | Passphrase wayin    | `wayinkind`                     | Fixed                                                |
 |                     | `key_deriver_label`             | Key deriver                                          |
 |                     | `salt_b64`                      | Random, of the deriver's `salt_size`                |
-|                     | `device_id`, `registered_at`    | Bank, clock                                          |
+|                     | `device_tok`, `registered_at`    | Bank, clock                                          |
 |                     | `vault_key_wayin_wrapped`       | New random vaultKey, wrapped under the passphraseKey |
 | Passkey wayin (opt) | `credential_id`, `prf_salt_b64` | `passkeyClear`                                       |
-|                     | `device_id`, `registered_at`    | Bank, clock                                          |
+|                     | `device_tok`, `registered_at`    | Bank, clock                                          |
 |                     | `vault_key_wayin_wrapped`       | Same vaultKey, wrapped under the passkeyKey          |
 
 The ordering rules:
@@ -63,11 +63,11 @@ variable and zeroes them. A stored wayin is read from the gate, which also suppl
 ```text
 PassphraseProving.buildNovel(stamp, passphraseClear, world)
 ├─ judgeStrength(passphraseClear, scope)     weak → 'weak_passphrase'
-├─ mintPassphraseHeader                      key_deriver_label, salt_b64, device_id, registered_at
+├─ mintPassphraseHeader                      key_deriver_label, salt_b64, device_tok, registered_at
 └─ passphraseKeyOf(keyDeriver, cleartext, salt)  bytes zeroed; non-extractable #wayinKey
 
 PasskeyProving.buildNovel(stamp, passkeyClear, world)
-├─ mintPasskeyHeader                         credential_id, prf_salt_b64, device_id, registered_at
+├─ mintPasskeyHeader                         credential_id, prf_salt_b64, device_tok, registered_at
 └─ deriveWrappingKey(prfBytes, ctx)          non-extractable #wayinKey
 
 PassphraseProving.buildStored(gate, passphraseClear, world)

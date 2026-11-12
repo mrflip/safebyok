@@ -17,9 +17,9 @@ class BrokenDeviceDB extends DeviceDB {
   protected doForget(): never { throw this.thrown }
   protected doListLeases(): never { throw this.thrown }
   protected doForgetRawLease(): never { throw this.thrown }
-  protected doEnsureCachedBank(): unknown { throw this.thrown }
-  protected doForgetBank(): never { throw this.thrown }
-  protected doListBanks(): never { throw this.thrown }
+  protected doEnsureCachedDevice(): unknown { throw this.thrown }
+  protected doForgetDevice(): never { throw this.thrown }
+  protected doListDevices(): never { throw this.thrown }
 }
 
 describe("a deviceDB whose generic call throws", () => {
@@ -33,9 +33,9 @@ describe("a deviceDB whose generic call throws", () => {
       ['forget',     await TH.expectBad(deviceDB.tryForget(asked), 'storage_unavailable')],
       ['listLeases', await TH.expectBad(deviceDB.tryListLeases(), 'storage_unavailable')],
       ['forgetRawLease', await TH.expectBad(deviceDB.tryForgetRawLease(['u1', 'acme', 'main']), 'storage_unavailable')],
-      ['ensureCachedBank', await TH.expectBad(deviceDB.tryEnsureCachedBank(asked), 'storage_unavailable')],
-      ['forgetBank', await TH.expectBad(deviceDB.tryForgetBank(asked), 'storage_unavailable')],
-      ['listRawBanks', await TH.expectBad(deviceDB.tryListRawBanks(), 'storage_unavailable')],
+      ['ensureCachedDevice', await TH.expectBad(deviceDB.tryEnsureCachedDevice(asked), 'storage_unavailable')],
+      ['forgetDevice', await TH.expectBad(deviceDB.tryForgetDevice(asked), 'storage_unavailable')],
+      ['listRawDevices', await TH.expectBad(deviceDB.tryListRawDevices(), 'storage_unavailable')],
     ] as const
     for (const [verb, err] of refused) {
       expect(err.message).to.include(verb)
@@ -52,11 +52,11 @@ describe("a deviceDB whose generic call throws", () => {
   })
 })
 
-describe("a deviceDB whose generic call returns an invalid bank row", () => {
-  it("refuses ensureCachedBank", async () => {
+describe("a deviceDB whose generic call returns an invalid device row", () => {
+  it("refuses ensureCachedDevice", async () => {
     class GarbledDeviceDB extends BrokenDeviceDB {
-      protected override doEnsureCachedBank(): unknown { return { user_id: 'u1', banklabel: 'acme', device_id: 'not-a-uuid' } }
+      protected override doEnsureCachedDevice(): unknown { return { user_id: 'u1', banklabel: 'acme', device_tok: 'not-a-uuid' } }
     }
-    await TH.expectBad(new GarbledDeviceDB(null).tryEnsureCachedBank(asked), 'bad_record')
+    await TH.expectBad(new GarbledDeviceDB(null).tryEnsureCachedDevice(asked), 'bad_record')
   })
 })

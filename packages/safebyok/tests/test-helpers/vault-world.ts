@@ -128,7 +128,7 @@ export type VaultWorldGiven = Partial<Omit<FakeBank, keyof ProvingWorldGiven>> &
 
 /** A vault listing over a vaultDB of one row, `stored0` to begin with, and the deviceDB and clock it shares with every other session `anotherSession` opens on this device. `worldOverrides` says otherwise of the world. */
 export function makeVaultWorld(stored0: VaultRecord | null = null, worldOverrides: VaultWorldGiven = {}) {
-  const { onLifecycle = DefaultOnLifecycle, keyDeriver, strengthChecker, device_id = '00000000-0000-4000-8000-000000000001', ...overrides } = worldOverrides
+  const { onLifecycle = DefaultOnLifecycle, keyDeriver, strengthChecker, device_tok = '00000000-0000-4000-8000-000000000001', ...overrides } = worldOverrides
   let now = T0
   _cheat_clock(() => now)
   const deviceDB = makeDeviceDB()
@@ -139,7 +139,7 @@ export function makeVaultWorld(stored0: VaultRecord | null = null, worldOverride
     receiveWorld:    nothing,
     scope:        { user_id: Dna.user_id, banklabel: Dna.banklabel },
     logger:       parseLogger(quietLogger),
-    ...provingWorldOf({ keyDeriver, strengthChecker, device_id }),
+    ...provingWorldOf({ keyDeriver, strengthChecker, device_tok }),
     leaseMillis:  LeaseMillis,
     deviceDB:     deviceDB.memoryDB,
     requestCleartext: nothing,
@@ -237,7 +237,7 @@ export async function vaultRoundTrip(sealer: Vault, opener: Vault): Promise<stri
 
 /** A passphrase proving of the vault `stamp` names, its wayin made, so it has a vaultKey to lease. */
 export async function makeProving({ vault_tok, registered_at }: { vault_tok: string, registered_at: number }) {
-  const proving = await PassphraseProving.buildNovel({ ...Dna, vault_tok, registered_at }, passphraseCleartext.parse(Passphrase), provingWorldOf({ device_id: '00000000-0000-4000-8000-000000000001' }))
+  const proving = await PassphraseProving.buildNovel({ ...Dna, vault_tok, registered_at }, passphraseCleartext.parse(Passphrase), provingWorldOf({ device_tok: '00000000-0000-4000-8000-000000000001' }))
   await proving.buildWayin(NOVEL)
   return proving
 }

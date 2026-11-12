@@ -27,7 +27,7 @@ export const ciphered = objCheck(({ str }) => ({
 export type Ciphered = Z.infer<typeof ciphered>
 // --
 
-// == [Record fields]: epochMillis, vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, prfSalt, EpochMillis, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, VaultKeyWayinWrapped, VaultKeyLeaseWrapped
+// == [Record fields]: epochMillis, vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, prfSalt, EpochMillis, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, VaultKeyWayinWrapped, VaultKeyLeaseWrapped
 
 export { epochMillis, type EpochMillis } from './primitives'
 
@@ -37,11 +37,11 @@ export { epochMillis, type EpochMillis } from './primitives'
  * branded for its role, since nothing but safebyok makes one. A passphrase's salt is base64url text of
  * {@link PassphraseSaltSize} bytes, judged by its characters, its length and decoding it; a passkey's is text, not empty, and {@link prfSalt} judges its length.
  */
-export const { vault_tok, box_tok, revision_tok, device_id, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
+export const { vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
   vault_tok:               str.min(1),
   box_tok:                 str.min(1),
   revision_tok:            str.min(1),
-  device_id:               uuid(Phrases.DeviceIdShape),
+  device_tok:              uuid(Phrases.DeviceTokShape),
   key_deriver_label:       str.min(1),
   credential_id:           str.min(1),
   salt_b64:                str.length(PassphraseSaltChars, { error: SaltShape, abort: true }).regex(Patterns.b64url, { error: SaltShape, abort: true }).refine((salt) => fromB64OrNull(salt) !== null, SaltShape).brand<'PassphraseSalt'>(),

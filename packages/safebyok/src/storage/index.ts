@@ -51,8 +51,8 @@ export { rowMeta, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
 export { makeLifeTok } from '../helpers/crypto'
 export { isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow } from '../shapes/shapes-storage'
 export { shellVaultOf, shellBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf } from '../shapes/shapes-storage'
-export { leaseQuery, leaseDated, leaseRow, leaseScopepath, bankRow } from '../shapes/shapes-storage'
-export type { BankRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
+export { leaseQuery, leaseDated, leaseRow, leaseScopepath, deviceRow } from '../shapes/shapes-storage'
+export type { DeviceRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 // --
 
 // == [Answers over a wire]: the validators a vaultDB client parses each answer with, which read an absent field as null

@@ -67,13 +67,13 @@ common dictionary of `@zxcvbn-ts/language-common`):
 `browserOpts()` gives it to `Bank.make` with the rest of what a browser app usually chooses:
 `argon2idWebV1Deriver` and an `idbDeviceDB` over the `dbName` you name. It returns the same frozen
 bag for the same `dbName`, so it is safe to call during render, and a field you pass after the
-spread wins. It supplies no `device_id`: keep your own, a `crypto.randomUUID()` per device.
+spread wins. It supplies no `device_tok`: keep your own, a `crypto.randomUUID()` per device.
 
 ```ts
 import { Bank } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 
-const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), user_id, banklabel: 'acme', device_id, vaultDB, requestCleartext })
+const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), user_id, banklabel: 'acme', device_tok, vaultDB, requestCleartext })
 ```
 
 Why these live in `safebyok/browser` rather than as `Bank.make`'s defaults is
@@ -93,7 +93,7 @@ const strengthChecker = Object.assign(async (typed: string, scope: VaultScope) =
   return zxcvbnStrengthChecker(typed, scope)
 }, { load: zxcvbnStrengthChecker.load })
 
-const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), strengthChecker, user_id, banklabel: 'acme', device_id, vaultDB, requestCleartext })
+const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), strengthChecker, user_id, banklabel: 'acme', device_tok, vaultDB, requestCleartext })
 ```
 
 ### Leaving it out: your own

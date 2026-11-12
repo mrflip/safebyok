@@ -1,0 +1,7 @@
+---
+"safebyok": minor
+"safebyok-react": minor
+"safebyok-graphql": minor
+---
+
+`device_id` is `device_tok`, and the deviceDB's "bank row" is the device row. **`device_tok`** is the `Bank.make` option, the `bank.device_tok` prop and snapshot field, the field of each wayin's header (the stored wayin, the GraphQL `device_tok` field and the `ciphertext` ctx it is bound into), and the field of the device row; `BankProvider` still takes no `device_tok`, and `useDeviceId` is `useDeviceTok`. **The device row:** `deviceDB.ensureCachedBank`, `forgetBank` and `listRawBanks` are `ensureCachedDevice`, `forgetDevice` and `listRawDevices` (each with its `try` form), the `BankRow` type and `bankRow` check are `DeviceRow` and `deviceRow`, a subclass's `doEnsureCachedBank`, `doForgetBank` and `doListBanks` are `doEnsureCachedDevice`, `doForgetDevice` and `doListDevices`, and `MemoryDeviceDB._cheat_bankRows` is `_cheat_deviceRows`. **Stored formats:** the `fmt` numbers stay at the renames' 5002, 6002 and 7002. A wayin written before has `device_id`, so its vault row reads as damaged (the wayin check is strict, and the field's name is in the wayin's ctx); a host with stored data wipes it or moves it by hand, renaming the field. An `IdbDeviceDB` keeps its device rows in the database `<dbName>:devicerow-v001-001-001` now, not `<dbName>:bank-v001-001-001`: a device row written before is not found, so the device mints a new `device_tok`, and the old database stays in the browser unread until the host deletes it. Its leases are untouched by this change.

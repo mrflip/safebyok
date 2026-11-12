@@ -154,8 +154,8 @@ export function objCheck<ShapeT extends Z.ZodRawShape, const SourcesT extends re
  * {@link objCheck} under `extras: 'strict'`, and takes `build` and `sources` as one does.
  *
  * @example
- *   export const bankRow = objStrict(({ user_id, banklabel, device_id }) => ({ user_id, banklabel, device_id }), 'bad_record', [CX])
- *   bankRow.parse({ ...row, note: 'hi' })  // throws 'bad_record', "There is a field it does not accept ..."
+ *   export const deviceRow = objStrict(({ user_id, banklabel, device_tok }) => ({ user_id, banklabel, device_tok }), 'bad_record', [CX])
+ *   deviceRow.parse({ ...row, note: 'hi' })  // throws 'bad_record', "There is a field it does not accept ..."
  */
 export const objStrict = <ShapeT extends Z.ZodRawShape, const SourcesT extends readonly object[] = readonly []>(
   build: (kit: KitWith<SourcesT>) => ShapeT, opts: Refusalkind | RefusalOpts = 'bad_record', sources?: SourcesT,

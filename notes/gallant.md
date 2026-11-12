@@ -752,7 +752,7 @@ of each duck, and a class instance's copy has lost its methods.
 
 ```ts
 MSX.bankOpts.parse(opts)
-const { user_id, banklabel, device_id = randomId(), vaultDB, deviceDB, keyDeriver, clock = wallClock, logger = DefaultLogger /* ... */ } = opts
+const { user_id, banklabel, device_tok = randomId(), vaultDB, deviceDB, keyDeriver, clock = wallClock, logger = DefaultLogger /* ... */ } = opts
 ```
 
 The listings' constructors do the same with `MSX.listingOpts`, `MSX.vaultListingOpts` and `MSX.boxListingOpts`.
@@ -777,14 +777,14 @@ return this.boxListing.puttable({ ...patch, ...this.scope }, opts).put(patch, op
 
 A placeholder that looks real gets read as real. If you don't have the value yet, get it first, or ask for it.
 
-**Goofus:** `bank.device_id` and the snapshot show a random id that was never stored, then change once `hello` resolves. A second
+**Goofus:** `bank.device_tok` and the snapshot show a random id that was never stored, then change once `hello` resolves. A second
 page's id is thrown away, and a host's own id silently loses to a stored one.
 
 ```ts
-const { device_id = randomId() /* ... */ } = opts
+const { device_tok = randomId() /* ... */ } = opts
 // later, in hello:
-const { act, record } = await this.deviceDB.cacheDeviceRecord({ ...this.scope, device_id: this.#device_id })
-this.#device_id = record.device_id
+const { act, record } = await this.deviceDB.cacheDeviceRecord({ ...this.scope, device_tok: this.#device_tok })
+this.#device_tok = record.device_tok
 ```
 
 **Gallant:** see `#ask-the-host`.
@@ -825,13 +825,13 @@ pull when a wayin is minted, and this async `Bank.build`.
 static async build(opts) {
   MSX.bankBuildOpts.parse(opts)
   const { act, record } = await opts.deviceDB.cacheBank(opts)
-  const bank = Bank.make({ ...opts, device_id: record.device_id })
+  const bank = Bank.make({ ...opts, device_tok: record.device_tok })
   if (act === 'rewrote') { bank.vaults.tellBadNews([bankRowRewritten()]) }
   return bank
 }
 ```
 
-**Gallant:** `device_id` is a required option of a synchronous `Bank.make`, and the deviceDB serves leases alone. The option's doc
+**Gallant:** `device_tok` is a required option of a synchronous `Bank.make`, and the deviceDB serves leases alone. The option's doc
 block carries what the mint used to guarantee: a random id, never drawn from anything about the device or the user, because it is
 stored unencrypted on every wayin.
 
