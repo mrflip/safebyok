@@ -76,11 +76,11 @@ the diff.
    proof:
    1. Add the label `ci` (`gh pr edit <n> --add-label ci`). CI reads it at each push; adding it
       starts nothing, so it goes on before the push.
-   2. `scripts/file-thread --catch-up <root>`: the rebase filing would do, onto your base's
-      current tip (the base thread's branch on origin, or origin/main once it has merged), with
-      `sprintbase` recorded, then a push under a lease, which starts CI: the unpushed `plan:`
-      commit makes sure there is one. On exit 3, resolve the conflict as *Picking up a built
-      thread* says, then run it again.
+   2. Run `scripts/file-thread --catch-up <root>`, which rebases as filing would, onto your
+      base's current tip (the base thread's branch on origin, or origin/main once it has merged),
+      records `sprintbase`, and pushes under a lease. That push starts CI, and the unpushed
+      `plan:` commit makes sure there is a push to make. On exit 3, resolve the conflict as
+      *Picking up a built thread* says, then run it again.
    3. Only then run your last `pnpm justify`, while CI runs. Red: fix, commit and push again.
 
    Green, bring the PR's title and body up to date -- a **Tests:** line, *Open questions* -- and
