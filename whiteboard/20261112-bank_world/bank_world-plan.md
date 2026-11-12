@@ -48,7 +48,8 @@ it. The Coach added four at the invocation, and the orchestrator one:
     matters* rather than into rework: a reviewer's worry does not set a builder chasing a case no
     caller reaches. Through threads 3 to 12 the tree carries two contracts and scaffolds on
     purpose; they are not findings.
-19. **Adapters wait for the contract to settle** (orchestrator). Threads 13 to 15 are cut once
+19. *Revised 2026-11-12 for thread 13:* the Coach: "doing the postgres adapter will likely be clarifying for some of the recent questions you had". The argument that moved it: a real database settles the contract questions now open (a cascade in one transaction, the gate policy as a stored function, `tidyGone` by scope, the life pair as two predicates) before 8b builds the models on that contract. Thread 13 starts from main now, reports as a contract probe too, and takes 4b's battery when it lands; 14 and 15 still wait as below.
+    **Adapters wait for the contract to settle** (orchestrator). Threads 13 to 15 are cut once
     thread 9 files, from the line's tip, so they are written once, against the contract thread 8
     proved and with thread 9's names, and run beside 10 to 12 in other files. This follows R7's own
     argument ("the models prove the contract before three adapters are written to it"), and spares
