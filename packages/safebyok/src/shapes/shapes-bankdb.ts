@@ -161,7 +161,7 @@ export function damagedBoxOf({ user_id, banklabel, vaultlabel, boxlabel }: Boxsc
   return { user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, am: 'd' }
 }
 
-/** The `parent` of a notice for the row `val`: `parent` if storage sent one, else {@link BankTop} for a bank row, else null for none sent. */
+/** The `parent` a notice carries: the one storage sent, or {@link BankTop} for a bank row that came with none. */
 export function noticeParentOf({ fmt }: { fmt: number }, parent: BankRow | VaultRow | typeof BankTop | null): BankRow | VaultRow | typeof BankTop | null {
   return parent ?? ((fmt === BankFormat) ? BankTop : null)
 }
