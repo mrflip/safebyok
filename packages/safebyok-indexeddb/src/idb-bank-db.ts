@@ -3,7 +3,7 @@
 import { promisifyRequest, type UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import { BX } from 'safebyok/storage'
-import type { BankScope, WatchScope } from 'safebyok/storage'
+import type { BankScope, VaultScope, WatchScope } from 'safebyok/storage'
 import { bankScopepathOf, boxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, gatesRangeOf, gateScopepathOf, lifeRangeOf, shelfOf, vaultlabelOf, vaultScopepathOf, vaultsRangeOf } from './bank-shelf'
 
 // == [Options]: IdbBankDBOpts, idbBankDBOpts
@@ -17,7 +17,7 @@ export type IdbBankDBOpts = BX.AdapterBankDBOpts & { dbName?: string | undefined
 const idbBankDBOpts = DB.objCheck(({ str, uint }) => ({ ...DB.adapterVaultDBOpts.shape, dbName: str.min(1).optional(), maxBoxes: uint.optional() }), 'bad_option')
 // --
 
-// == [Helpers]: Rung, isHeardBy, bankScopeOf
+// == [Helpers]: Rung, isHeardBy, bankScopeOf, vaultScopeOf
 
 /** A notice of one write, broadcast to every watch on the database: the scope written under, and the row written. A bank or gate row has no vaultlabel. */
 type Rung = { scope: BankScope & { vaultlabel?: string }, heard: BX.Heard }
@@ -29,6 +29,9 @@ function isHeardBy(watched: WatchScope, scope: Rung['scope']): boolean {
 
 /** The bank scope of an ask or a row, without its other fields. */
 function bankScopeOf({ user_id, banklabel }: BankScope): BankScope { return { user_id, banklabel } }
+
+/** The vault scope of an ask or a row, without its other fields. */
+function vaultScopeOf({ user_id, banklabel, vaultlabel }: VaultScope): VaultScope { return { user_id, banklabel, vaultlabel } }
 // --
 
 /** A bankDB stored in this browser's IndexedDB. Its watch reports writes from every tab. */
@@ -132,7 +135,7 @@ export class IdbBankDB extends DB.AdapterBankDB {
       if (BX.isWriteAct(stored.act)) { store.put(ask.record, vaultScopepathOf(ask)) }
       return stored
     })
-    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: ask, heard: { row: ask.record, parent: stored.parent } }]) }
+    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: vaultScopeOf(ask), heard: { row: ask.record, parent: stored.parent } }]) }
     return stored
   }
 
@@ -147,7 +150,7 @@ export class IdbBankDB extends DB.AdapterBankDB {
       }
       return stored
     })
-    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: ask, heard: { row: ask.record, parent: stored.parent } }]) }
+    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: vaultScopeOf(ask), heard: { row: ask.record, parent: stored.parent } }]) }
     return stored
   }
 
@@ -173,7 +176,7 @@ export class IdbBankDB extends DB.AdapterBankDB {
       if (BX.isWriteAct(stored.act)) { store.put(ask.record, boxScopepathOf(ask)) }
       return stored
     })
-    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: ask, heard: { row: ask.record, parent: stored.parent } }]) }
+    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: vaultScopeOf(ask), heard: { row: ask.record, parent: stored.parent } }]) }
     return stored
   }
 
@@ -184,7 +187,7 @@ export class IdbBankDB extends DB.AdapterBankDB {
       if (BX.isWriteAct(stored.act)) { store.put(ask.record, boxScopepathOf(ask)) }
       return stored
     })
-    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: ask, heard: { row: ask.record, parent: stored.parent } }]) }
+    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: vaultScopeOf(ask), heard: { row: ask.record, parent: stored.parent } }]) }
     return stored
   }
 
