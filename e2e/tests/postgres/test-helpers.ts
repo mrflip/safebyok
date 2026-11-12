@@ -72,7 +72,7 @@ const SqlOf = {
 } as const
 
 /** A database for this file alone, its tables made, created before its first test and dropped after its last: `const getDb = TH.useFileDatabase()`. */
-export const useFileDatabase = (tableset: Tableset = 'bank'): (() => FileDatabase) => {
+export function useFileDatabase(tableset: Tableset = 'bank'): () => FileDatabase {
   const url = postgresUrl()
   const made: { db?: FileDatabase, drop?: () => Promise<void> } = {}
   // A pool or client with no 'error' listener crashes the run when the server drops it; heard, the drop fails the test it fell in.

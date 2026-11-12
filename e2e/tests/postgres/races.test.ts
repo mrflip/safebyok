@@ -30,7 +30,7 @@ TH.describeOnPostgres('races', "PostgresBankDB's box cap, over a real Postgres",
       for (const boxlabel of ['one', 'two', 'three', 'four']) { await first.putBox(BW.boxPutAskOf(BW.boxAt(0, 'bank1', 'life1', { boxlabel }))) }
       const racers = await Promise.all(Array.from({ length: Racers }, async () => await TH.bankDBOver(db, { maxBoxes: Cap })))
 
-      const racerBox = (idx: number) => BW.boxAt(0, 'bank1', 'life1', { boxlabel: `racer_${String(idx)}` })
+      function racerBox(idx: number) { return BW.boxAt(0, 'bank1', 'life1', { boxlabel: `racer_${String(idx)}` }) }
       const answers = await Promise.all(racers.map(async (racer, idx) => await racer.tryPutBox(BW.boxPutAskOf(racerBox(idx)))))
 
       const written = answers.filter(({ ok }) => ok)
@@ -48,7 +48,7 @@ TH.describeOnPostgres('races', "PostgresBankDB's box cap, over a real Postgres",
     const first = await withVault()
     const writers = await Promise.all(Array.from({ length: Racers }, async () => await TH.bankDBOver(db)))
 
-    const writerBox = (idx: number) => BW.boxAt(0, 'bank1', 'life1', { boxlabel: `writer_${String(idx)}` })
+    function writerBox(idx: number) { return BW.boxAt(0, 'bank1', 'life1', { boxlabel: `writer_${String(idx)}` }) }
 
     const delAsk = BW.vaultDelAskOf(BW.vaultAt())
     await Promise.all([
