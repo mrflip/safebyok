@@ -34,7 +34,7 @@ export const InstantTooLate = "An instant is epoch milliseconds no later than 22
 export const DatabaseInVaultScope = "A vaultDB and a deviceDB go to Device.make, never in the scope naming a vault"
 // --
 
-// == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, BankDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, DeviceExpected, VaultExpected, VaultErrorExpected
+// == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, BankDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, DeviceExpected, BankExpected, VaultExpected, VaultErrorExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
@@ -65,6 +65,7 @@ export const ListingExpected = "Expected a Listing"
 
 /** Anything but a Device, where one is named. */
 export const DeviceExpected = "Expected a Device"
+export const BankExpected = "Expected a Bank"
 export const VaultExpected = "Expected a Vault"
 
 /** Anything but a VaultError, where bad news is told. */

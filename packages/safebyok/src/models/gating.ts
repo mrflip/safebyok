@@ -5,40 +5,40 @@ import { adorn, tattoo } from '../helpers/helpers'
 import { type Outcome, bad, outcomeOf, valOf } from '../refusals/outcome'
 import * as EX from '../shapes/shapes-enums'
 import type { Gatingkind } from '../shapes/shapes-enums'
-import type { VaultScope } from '../shapes/shapes-core'
+import type { BankScope } from '../shapes/shapes-core'
+import type { BankSparse } from '../shapes/shapes-bankdb'
 import * as GX from '../shapes/shapes-gateish'
-import type { AnyGating, AskUser, CleartextsForGatingkind, GatingSnapshot, UnlockByProving, VaultForGatingkind, VaultGatingkind, WayinHeader } from '../shapes/shapes-gateish'
+import type { AnyGating, AskUser, BankForGatingkind, BankGatingkind, CleartextsForGatingkind, GatingSnapshot, ProvingWorld, UnlockByProving, WayinHeader } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import * as SX from '../shapes/shapes-storage'
-import type { VaultRecord, VaultSparse } from '../shapes/shapes-storage'
-import { attemptInFlight, cleartextsThrew, gateMadeElsewhere, gatingDismissed, gatingConcluded, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
+import { attemptInFlight, cleartextsThrew, gateMadeElsewhere, gatingDismissed, gatingConcluded, requestCleartextThrew } from '../refusals/throwers'
+import type { Bank } from './bank'
+import type { BankListing } from './bank-listing'
+import type { Device } from './device'
 import { Gate } from './gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
-import type { Vault } from './vault'
-import type { VaultListing } from './vault-listing'
 
 /** What an attempt does with the user's cleartexts: prove them, and make the change its gating is for. */
-type Act = (cleartexts: unknown) => Promise<Vault>
+type Act = (cleartexts: unknown) => Promise<Bank>
 
 /** One ask of the user, one open per device. It has the cleartexts only for the length of an attempt, and concludes once: its launcher answers with that outcome. */
 export class Gating<KindT extends Gatingkind = Gatingkind> {
-  // == [Props]: gatingkind, gatingTok, user_id, banklabel, vaultlabel, vault, passkeyHeader, #listing, #act, #concluded, #conclude, #outcome, #isAttempting, #isLastAttempt
+  // == [Props]: gatingkind, gatingTok, user_id, banklabel, bank, passkeyHeader, #device, #act, #concluded, #conclude, #outcome, #isAttempting, #isLastAttempt
 
   declare readonly gatingkind:    KindT
   /** Unique to this gating, for a dialog to key on: the next gating's form starts empty, whatever was typed in this one. */
   declare readonly gatingTok:     string
   declare readonly user_id:       string
   declare readonly banklabel:     string
-  declare readonly vaultlabel:    string
-  declare readonly vault:         VaultForGatingkind[KindT]
+  declare readonly bank:          BankForGatingkind[KindT]
   /** The header of the passkey wayin in the gate at launch, for the dialog to ask that passkey; null with none. */
   declare readonly passkeyHeader: WayinHeader | null
 
-  readonly #listing:    VaultListing
+  /** The device the gating is open on, and the proving world of its acts. */
+  readonly #device:     Device
   readonly #act:        Act
-  readonly #concluded:  Promise<Outcome<Vault>>
-  #conclude:      (outcome: Outcome<Vault>) => void = () => undefined
-  #outcome:       Outcome<Vault> | null = null
+  readonly #concluded:  Promise<Outcome<Bank>>
+  #conclude:      (outcome: Outcome<Bank>) => void = () => undefined
+  #outcome:       Outcome<Bank> | null = null
   #isAttempting  = false
   #isLastAttempt = false
   // --
@@ -49,14 +49,14 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   get isOpen(): boolean { return this.#outcome === null }
 
   /** The outcome once concluded, a promise that never rejects: a dialog closes on it, as the package cannot close a host's dialog. */
-  get whenConcluded(): Promise<Outcome<Vault>> { return this.#concluded }
+  get whenConcluded(): Promise<Outcome<Bank>> { return this.#concluded }
 
-  get #scope(): VaultScope {
-    const { user_id, banklabel, vaultlabel } = this
-    return { user_id, banklabel, vaultlabel }
+  get #scope(): BankScope {
+    const { user_id, banklabel } = this
+    return { user_id, banklabel }
   }
 
-  /** This gating's {@link GatingSnapshot}: its kind, token and vault scope, never a cleartext. */
+  /** This gating's {@link GatingSnapshot}: its kind, token and bank scope, never a cleartext. */
   toJSON(): GatingSnapshot {
     const { gatingkind, gatingTok } = this
     return { gatingkind, gatingTok, ...this.#scope }
@@ -65,39 +65,40 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   // == [Launching]: constructor, launchOn, launchBirth, callGatingByKind, launch, askHost
 
-  private constructor(gatingkind: KindT, listing: VaultListing, scope: VaultScope, vault: VaultForGatingkind[KindT], act: Act) {
-    tattoo(this, { gatingkind, gatingTok: randomId(), ...scope })
-    adorn(this, 'vault', vault)
-    adorn(this, 'passkeyHeader', vault?.gate.toJSON().passkey_wayin ?? null)
-    this.#listing   = listing
+  private constructor(gatingkind: KindT, device: Device, bank: BankForGatingkind[KindT], act: Act) {
+    tattoo(this, { gatingkind, gatingTok: randomId(), ...device.scope })
+    adorn(this, 'bank', bank)
+    adorn(this, 'passkeyHeader', bank?.maingate.passkey0?.toJSON() ?? null)
+    this.#device    = device
     this.#act       = act
     this.#concluded = new Promise((resolve) => { this.#conclude = resolve })
     Object.freeze(this)
   }
 
-  // The package exports Gating as a type only: these take the vault's unlockByProving, which a gating hands a proving.
-  /** Ask the user to prove they may make the change `gatingkind` names to `vault`, and answer the vault once it is made. */
-  static async launchOn(vault: Vault, gatingkind: VaultGatingkind, unlockByProving: UnlockByProving, askUser: AskUser | null): Promise<Vault> {
-    const checked = GX.gatingLaunchOnArgs.parse({ gatingkind, vault, unlockByProving, askUser })
-    const act: Act = (cleartexts) => Gating.#callGatingByKind(checked.gatingkind, checked.vault, cleartexts, checked.unlockByProving)
-    const gating = new Gating(checked.gatingkind, checked.vault.listing, checked.vault.scope, checked.vault, act)
+  // The package exports Gating as a type only: these take the bank's unlockByProving, which a gating hands a proving.
+  /** Ask the user to prove they may make the change `gatingkind` names to `bank`, and answer the bank once it is made. */
+  static async launchOn(bank: Bank, gatingkind: BankGatingkind, unlockByProving: UnlockByProving, askUser: AskUser | null): Promise<Bank> {
+    const checked = GX.gatingLaunchOnArgs.parse({ gatingkind, bank, unlockByProving, askUser })
+    const act: Act = (cleartexts) => Gating.#callGatingByKind(checked.gatingkind, checked.bank, cleartexts, checked.unlockByProving)
+    const gating = new Gating(checked.gatingkind, checked.bank.device, checked.bank, act)
     return gating.#launch(checked.askUser)
   }
 
-  /** Ask the user for a new vault's passphrase, build the vault under `scope` over the row `expected`, and return it unlocked. */
-  static async launchBirth(listing: VaultListing, scope: VaultScope, expected: VaultSparse, unlockByProving: UnlockByProving, askUser: AskUser | null): Promise<Vault> {
-    const checked = GX.gatingLaunchBirthArgs.parse({ listing, scope, expected, unlockByProving, askUser })
-    const act: Act = (cleartexts) => buildVault(checked.listing, checked.scope, checked.expected, cleartexts, checked.unlockByProving)
-    const gating = new Gating('build_vault', checked.listing, checked.scope, null, act)
+  /** Ask the user for a new bank's passphrase, build the bank over the row `expected`, and return it unlocked. */
+  static async launchBirth(listing: BankListing, expected: BankSparse, unlockByProving: UnlockByProving, askUser: AskUser | null): Promise<Bank> {
+    const checked = GX.gatingLaunchBirthArgs.parse({ listing, expected, unlockByProving, askUser })
+    const world = GX.provingWorld.parse(checked.listing.world)
+    const act: Act = (cleartexts) => buildBank(checked.listing, world, checked.expected, cleartexts, checked.unlockByProving)
+    const gating = new Gating('build_bank', checked.listing.world, null, act)
     return gating.#launch(checked.askUser)
   }
 
-  static #callGatingByKind(gatingkind: VaultGatingkind, vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> {
-    return ActOnVault[gatingkind](vault, cleartexts, unlockByProving)
+  static #callGatingByKind(gatingkind: BankGatingkind, bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
+    return ActOnBank[gatingkind](bank, cleartexts, unlockByProving)
   }
 
-  async #launch(askUser: AskUser | null): Promise<Vault> {
-    this.#listing.world.device.attachGating(this as unknown as AnyGating)
+  async #launch(askUser: AskUser | null): Promise<Bank> {
+    this.#device.attachGating(this as unknown as AnyGating)
     if (askUser !== null) { void this.#askHost(askUser) }
     return valOf(await this.#concluded)
   }
@@ -111,11 +112,11 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   /** The verdict on a passphrase, as the user types it. Nothing changes. */
   async judgeStrength(passphraseClear: string): Promise<GX.PassphraseVerdict> {
-    return Proving.judgeStrength(GX.passphraseCleartext.parse(passphraseClear), this.#scope, this.#listing.world)
+    return Proving.judgeStrength(GX.passphraseCleartext.parse(passphraseClear), this.#scope, GX.provingWorld.parse(this.#device))
   }
 
   /** SLOPDOC: The one door for a cleartext: tries what the user typed once, and answers how it went as an Outcome. */
-  attempt(cleartexts: CleartextsForGatingkind[Gatingkind]): Promise<Outcome<Vault>> {
+  attempt(cleartexts: CleartextsForGatingkind[Gatingkind]): Promise<Outcome<Bank>> {
     const refusal = this.#refusalOfAttempt()
     if (refusal !== null) {
       // A cleartext is spent even when refused at the door.
@@ -131,7 +132,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     return this.#isAttempting ? attemptInFlight() : null
   }
 
-  async #attemptOnce(cleartexts: CleartextsForGatingkind[Gatingkind]): Promise<Outcome<Vault>> {
+  async #attemptOnce(cleartexts: CleartextsForGatingkind[Gatingkind]): Promise<Outcome<Bank>> {
     const outcome = await outcomeOf(() => this.#act(cleartexts))
     this.#isAttempting = false
     // A correctable refusal, short of the last attempt, leaves the cleartexts unspent for the next.
@@ -157,10 +158,10 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     this.#concludeOnce(bad(refusal))
   }
 
-  #concludeOnce(outcome: Outcome<Vault>): void {
+  #concludeOnce(outcome: Outcome<Bank>): void {
     if (this.#outcome !== null) { return }
     this.#outcome = outcome
-    this.#listing.world.device.detachGating()
+    this.#device.detachGating()
     this.#conclude(outcome)
   }
   // --
@@ -169,92 +170,45 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   get modelkind(): 'gating' { return 'gating' satisfies Modelkind }
 }
 
-// == [The acts]: buildVault, unlockVault, replacePassphrase, addPasskey, revokePasskey, ActOnVault
+// == [The acts]: buildBank, unlockBank, ActOnBank
 
 // Each act proves the cleartexts, then makes its change. A cleartext goes only to checkedCleartexts and a Proving builder (G1); the
-// change hears provings, and comes to the vault's private unlock by unlockByProving (G9).
+// change hears provings, and comes to the bank's private unlock by unlockByProving (G9).
 
-/** Build a vault under `scope` using the passphrase and (if given) passkey; unlock once built. */
-async function buildVault(listing: VaultListing, scope: VaultScope, expected: VaultSparse, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> {
-  const { passphraseClear, passkeyClear } = checkedCleartexts(GX.vaultBuildCleartexts, cleartexts)
-  // A birth's stamp is minted here, one per attempt.
-  const stamp             = listing.stampOfBirth(scope)
-  const passphraseProving = await PassphraseProving.buildNovel(stamp, passphraseClear, listing.world)
-  const passkeyProving    = passkeyClear ? await PasskeyProving.buildNovel(stamp, passkeyClear, listing.world) : null
+/** Build a bank over `expected` using the passphrase and (if given) passkey, each proved in `world`; unlock once built. */
+async function buildBank(listing: BankListing, world: ProvingWorld, expected: BankSparse, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
+  const { passphraseClear, passkeyClear } = checkedCleartexts(GX.bankBuildCleartexts, cleartexts)
+  // A birth's stamps are minted here, one pair per attempt.
+  const { bank, gate }    = listing.stampsOfBirth()
+  const passphraseProving = await PassphraseProving.buildNovel(bank, gate, passphraseClear, world)
+  const passkeyProving    = passkeyClear ? await PasskeyProving.buildNovel(bank, gate, passkeyClear, world) : null
 
   const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
   const passkeyWayin    = await passkeyProving?.buildWayin(passphraseProving) ?? null
-  const gate   = Gate.make(passphraseProving.stamp, passphraseWayin, passkeyWayin)
-  const record = listing.recordOfBirth(gate, expected)
-  const vault  = await listing.put(record, { expected, ifAbsent: 'add', ifPresent: 'get' })
+  const gateRecord = Gate.recordOfBirth(bank, gate, passphraseWayin, passkeyWayin)
+  const built      = await listing.build(listing.recordOfBirth(bank, expected), gateRecord, expected)
 
-  // The row stored may be another's, born first: this proving unwraps only its own, and the user must hear that theirs was not set.
-  if (vault.vault_tok !== record.vault_tok) { throw gateMadeElsewhere() }
-  return unlockByProving(vault, passphraseProving)
+  // The bank stored may be another's, built first: this proving unwraps only its own, and the user must hear that theirs was not set.
+  if (built.bank_tok !== bank.bank_tok) { throw gateMadeElsewhere() }
+  return unlockByProving(built, passphraseProving)
 }
 
-/** Unlock `vault` by the passphrase or the passkey. */
-const unlockVault = async (vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> => {
-  const { passphraseClear, passkeyClear } = checkedCleartexts(GX.vaultUnlockCleartexts, cleartexts)
-  await vault.ensureTimely(VX.Promptly); vault.demandPromptable()
+/** Unlock `bank` by the passphrase or the passkey. */
+async function unlockBank(bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
+  const { passphraseClear, passkeyClear } = checkedCleartexts(GX.bankUnlockCleartexts, cleartexts)
+  const gate = await bank.maingate.ensureTimely(VX.Promptly); bank.demandPromptable()
   const proved = (passphraseClear === undefined)
-    ? await PasskeyProving.buildStored(vault.gate, passkeyClear)
-    : await PassphraseProving.buildStored(vault.gate, passphraseClear, vault.world)
-  return unlockByProving(vault, proved)
+    ? await PasskeyProving.buildStored(gate, passkeyClear)
+    : await PassphraseProving.buildStored(gate, passphraseClear, bank)
+  return unlockByProving(bank, proved)
 }
 
-// Each gate change grants a lease to the vault under the epoch it wrote. The old lease stays in force for the moments between: the vaultKey did not change.
-
-/** Replace the passphrase of `vault`, proved by the one it has. */
-const replacePassphrase = async (vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> => {
-  const { antePassphraseClear, nextPassphraseClear } = checkedCleartexts(GX.passphraseReplaceCleartexts, cleartexts)
-  if (antePassphraseClear === nextPassphraseClear) { throw samePassphrase() }
-  const { ante, gate } = await timelyAnte(vault)
-  const anteProving = await PassphraseProving.buildStored(gate, antePassphraseClear, vault.world)
-  const nextProving = await PassphraseProving.buildNovel(gate.stamp, nextPassphraseClear, vault.world)
-
-  const nextWayin = await nextProving.buildWayin(anteProving)
-  const stored    = await vault.listing.replacePassphrase(ante, SX.passphraseWayinRecord.parse(nextWayin.pickle()))
-  return unlockByProving(vault, anteProving, stored.gate.gate_epoch)
-}
-
-/** Add a passkey to `vault`, proved by its passphrase. */
-const addPasskey = async (vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> => {
-  const { passphraseClear, passkeyClear } = checkedCleartexts(GX.passkeyAddCleartexts, cleartexts)
-  const { ante, gate } = await timelyAnte(vault)
-  const proved         = await PassphraseProving.buildStored(gate, passphraseClear, vault.world)
-  const passkeyProving = await PasskeyProving.buildNovel(gate.stamp, passkeyClear, vault.world)
-
-  const passkeyWayin = await passkeyProving.buildWayin(proved)
-  const stored       = await vault.listing.addPasskey(ante, SX.passkeyWayinRecord.parse(passkeyWayin.pickle()))
-  return unlockByProving(vault, proved, stored.gate.gate_epoch)
-}
-
-/** Revoke the passkey of `vault`, proved by its passphrase. */
-const revokePasskey = async (vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Vault> => {
-  const { passphraseClear } = checkedCleartexts(GX.passkeyRevokeCleartexts, cleartexts)
-  const { ante, gate } = await timelyAnte(vault)
-  const proved = await PassphraseProving.buildStored(gate, passphraseClear, vault.world)
-
-  const stored = await vault.listing.revokePasskey(ante)
-  return unlockByProving(vault, proved, stored.gate.gate_epoch)
-}
-
-const ActOnVault: Record<VaultGatingkind, (vault: Vault, cleartexts: unknown, unlockByProving: UnlockByProving) => Promise<Vault>> = {
-  unlock_vault:       unlockVault,
-  replace_passphrase: replacePassphrase,
-  add_passkey:        addPasskey,
-  revoke_passkey:     revokePasskey,
+const ActOnBank: Record<BankGatingkind, (bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving) => Promise<Bank>> = {
+  unlock_bank: unlockBank,
 }
 // --
 
-// == [An act's helpers]: timelyAnte, checkedCleartexts, isCorrectable, spendCleartexts
-
-/** The hydrated vault's record (as a pojo, not instance) and its gate (as an instance) */
-async function timelyAnte(vault: Vault): Promise<{ ante: VaultRecord, gate: Gate }> {
-  await vault.ensureTimely(VX.Promptly); vault.demandPromptable()
-  return { ante: vault.fullRecord, gate: vault.gate }
-}
+// == [An act's helpers]: checkedCleartexts, isCorrectable, spendCleartexts
 
 /** The cleartexts through their checker. A throw that is not one of this library's is replaced whole, keeping nothing of it (G8). */
 function checkedCleartexts<CleartextsT>(checker: { parse: (cleartexts: unknown) => CleartextsT }, cleartexts: unknown): CleartextsT {

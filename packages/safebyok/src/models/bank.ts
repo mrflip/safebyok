@@ -13,7 +13,7 @@ import type { LeaseDated } from '../shapes/shapes-storage'
 import * as BX from '../shapes/shapes-bankdb'
 import type { BankRecord, BankSparse } from '../shapes/shapes-bankdb'
 import * as GX from '../shapes/shapes-gateish'
-import type { BankStamp, LeaseFriend, SealedWhisper, UnlockByProving } from '../shapes/shapes-gateish'
+import type { AskUser, BankStamp, LeaseFriend, SealedWhisper, UnlockByProving } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, BankSnapshot, Fetched, ListingOpts, RevokeSite } from '../shapes/shapes-vaultish'
 import type { GoodAnswer } from '../storage/bank-db'
@@ -104,7 +104,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   get vaultListing(): VaultListing { return this.#vaultListing }
   // --
 
-  // == [Construction]: constructor, assignInitialProps, vaultScopeOf
+  // == [Construction]: constructor, assignInitialProps, launchBirth, vaultScopeOf
 
   /** Construct the storable bank, with the device's private calls, and a listing for its gate and one for its vaults. */
   constructor(world: Device, listing: BankListing, central: Fetched<BankRecord, BankSparse>, opts: ListingOpts) {
@@ -121,6 +121,11 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   protected override assignInitialProps(central: Fetched<BankRecord, BankSparse>): void {
     tattoo(this, { bank_tok: central.bank_tok }, { configurable: false })
     super.assignInitialProps(central)
+  }
+
+  /** Builds a bank through a build_bank gating, over the row `expected`, a tombstone or none, and answers it unlocked. */
+  static launchBirth(listing: BankListing, expected: BankSparse, askUser: AskUser | null): Promise<Bank> {
+    return Gating.launchBirth(listing, expected, Bank.#unlockBankByProving, askUser)
   }
 
   /** The full {@link VaultScope} of `scope` in this bank, refusing a scope of another bank. */

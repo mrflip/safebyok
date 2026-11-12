@@ -11,12 +11,11 @@ import { type CipherCtxRecord, fromB64OrNull } from '../helpers/crypto'
 import type { GuardedStrengthChecker, StrengthChecker } from '../helpers/passphrase-strength'
 import type { Gating } from '../models/gating'
 import type { GuardedKeyDeriver, NOVEL, Proving } from '../models/proving'
-import type { Vault } from '../models/vault'
-import type { VaultListing } from '../models/vault-listing'
+import type { Bank } from '../models/bank'
+import type { BankListing } from '../models/bank-listing'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
-import { type VaultScope, bankScope, vaultScope } from './shapes-core'
-import * as SX from './shapes-storage'
+import { type BankScope, bankScope } from './shapes-core'
 import * as BX from './shapes-bankdb'
 
 // == [Wayin kinds]: wayinkind, isPrfSalt
@@ -293,13 +292,13 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
 
 // --
 
-// == [The gating's forms]: gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, gatingLaunchOnArgs, gatingLaunchBirthArgs, CleartextsForGatingkind
+// == [The gating's forms]: gatingkind, bankBuildCleartexts, bankUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, gatingLaunchOnArgs, gatingLaunchBirthArgs, CleartextsForGatingkind
 
 /** What the user hands an attempt, by the kind of gating; a cleartext is only ever checked here, in the attempt's own call. */
-export const { gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts } = Checkers('bad_option', ({ oneof, obj }) => ({
+export const { gatingkind, bankBuildCleartexts, bankUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts } = Checkers('bad_option', ({ oneof, obj }) => ({
   gatingkind:              oneof(EX.gatingkindVals),
-  vaultBuildCleartexts:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
-  vaultUnlockCleartexts:       obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
+  bankBuildCleartexts:         obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
+  bankUnlockCleartexts:        obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
     .transform(({ passphraseClear, passkeyClear }, ctx) => {
       if (passphraseClear !== undefined) { return { passphraseClear } }
       if (passkeyClear) { return { passkeyClear } }
@@ -311,33 +310,29 @@ export const { gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphra
   passkeyRevokeCleartexts:     obj({ passphraseClear: passphraseCleartext }).strict(),
 }))
 
-/** The arguments that launch a gating on a stored vault: its kind, the vault, the vault's `unlockByProving`, and the bank's dialog or null. */
+/** The arguments that launch a gating on a stored bank: its kind, the bank, the bank's `unlockByProving`, and the device's dialog or null. */
 export const gatingLaunchOnArgs = objStrict(({ oneof, custom, fn }) => ({
-  gatingkind:    oneof(EX.gatingkindVals).exclude(['build_bank']),
-  vault:         custom<Vault>((val) => hasModelkind(val, 'vault'), Phrases.VaultExpected),
+  gatingkind:      oneof(EX.gatingkindVals).exclude(['build_bank']),
+  bank:            custom<Bank>((val) => hasModelkind(val, 'bank'), Phrases.BankExpected),
   unlockByProving: fn<UnlockByProving>(),
-  askUser:       custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
+  askUser:         custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
 
-/** The arguments that launch a `build_vault` gating: the vault listing, the scope and the row the vault is put over, `unlockByProving`, and the bank's dialog or null. */
+/** The arguments that launch a `build_bank` gating: the bank listing, the row the bank is built over, `unlockByProving`, and the device's dialog or null. */
 export const gatingLaunchBirthArgs = objStrict(({ custom, fn }) => ({
-  listing:       custom<VaultListing>((val) => hasModelkind(val, 'vault_listing'), Phrases.ListingExpected),
-  scope:         vaultScope,
-  expected:      SX.vaultSparse,
+  listing:         custom<BankListing>((val) => hasModelkind(val, 'bank_listing'), Phrases.ListingExpected),
+  expected:        BX.bankSparse,
   unlockByProving: fn<UnlockByProving>(),
-  askUser:       custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
+  askUser:         custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
 
 export type CleartextsForGatingkind = {
-  build_vault:        Z.input<typeof vaultBuildCleartexts>
-  unlock_vault:       Z.input<typeof vaultUnlockCleartexts>
-  replace_passphrase: Z.input<typeof passphraseReplaceCleartexts>
-  add_passkey:        Z.input<typeof passkeyAddCleartexts>
-  revoke_passkey:     Z.input<typeof passkeyRevokeCleartexts>
+  build_bank:  Z.input<typeof bankBuildCleartexts>
+  unlock_bank: Z.input<typeof bankUnlockCleartexts>
 }
 // --
 
-// == [Given to a gating]: RequestCleartext, AskUser, AnyGating, GatingSnapshot, VaultForGatingkind, VaultGatingkind, UnlockByProving
+// == [Given to a gating]: RequestCleartext, AskUser, AnyGating, GatingSnapshot, BankForGatingkind, BankGatingkind, UnlockByProving
 
 /** The host's dialog: shown with this gating, resolving once it closes. It hands the user's cleartexts to `gating.attempt`, and its returning with no attempt under way dismisses. */
 export type RequestCleartext = (gating: AnyGating) => unknown
@@ -348,20 +343,20 @@ export type AskUser = (gating: AnyGating) => Promise<boolean>
 /** A gating of any kind. */
 export type AnyGating = { [KindT in EX.Gatingkind]: Gating<KindT> }[EX.Gatingkind]
 
-/** A gating as a host's dialog renders it: the vault it asks for, and what it asks for. */
-export interface GatingSnapshot extends VaultScope {
-  /** What the gating does once the user's cleartext proves the gate: build or unlock the vault, or change its gate. */
+/** A gating as a host's dialog renders it: the bank it asks for, and what it asks for. */
+export interface GatingSnapshot extends BankScope {
+  /** What the gating does once the user's cleartext proves the gate: build or unlock the bank. */
   readonly gatingkind: EX.Gatingkind
   /** Unique to this gating, for a dialog to key on. */
   readonly gatingTok:  string
 }
 
-/** The vault each kind of gating acts on, null for a `build_vault` whose vault does not exist yet. */
-export type VaultForGatingkind = { build_vault: null, unlock_vault: Vault, replace_passphrase: Vault, add_passkey: Vault, revoke_passkey: Vault }
+/** The bank each kind of gating acts on, null for a `build_bank` whose bank does not exist yet. */
+export type BankForGatingkind = { build_bank: null, unlock_bank: Bank }
 
-/** A gating of a vault already born: every kind but `build_vault`. */
-export type VaultGatingkind = Exclude<EX.Gatingkind, 'build_vault'>
+/** A gating of a bank already built: every kind but `build_bank`. */
+export type BankGatingkind = Exclude<EX.Gatingkind, 'build_bank'>
 
-/** Unlock `vault` by what `proved` proved, leased under `gate_epoch` where a gate change just wrote one: the vault's private verb a gating calls. */
-export type UnlockByProving = (vault: Vault, proved: Proving, gate_epoch?: number) => Promise<Vault>
+/** Unlock `bank` by what `proved` proved, leased citing its main gate: the bank's private verb a gating calls. */
+export type UnlockByProving = (bank: Bank, proved: Proving) => Promise<Bank>
 // --

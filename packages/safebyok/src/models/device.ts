@@ -182,7 +182,7 @@ export class Device {
       if (isVaultError(answer.err, 'identity_revoked')) { this.#bankFriend.panic(answer.err) }
       throw answer.err
     }
-    if (answer.val === null) { return Bank.launchBirth(this, answer.parent, this.#bankFriend.askUser) }
+    if (answer.val === null) { return Bank.launchBirth(this.#bankListing, answer.parent, this.#bankFriend.askUser) }
     const bank = this.#bankListing.deliverRecord(answer.parent)
     bank.vaultListing.deliverEnsured(answer)
     return bank

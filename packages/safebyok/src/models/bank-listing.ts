@@ -1,9 +1,13 @@
 /** A device's bank as it has it: the stub listing a Bank is made in, whose row comes with every answer about its gate and vaults. */
 
 import type { Modelkind } from '../helpers/consts'
+import { nowMillis } from '../helpers/clock'
+import { makeLifeTok } from '../helpers/crypto'
 import * as Phrases from '../helpers/phrases'
 import type { VaultError } from '../refusals/errors'
 import { actRefused, writtenByOwnVerbs } from '../refusals/throwers'
+import { type BankStamp, type GateStamp, bankStamp, gateStamp } from '../shapes/shapes-gateish'
+import * as SX from '../shapes/shapes-storage'
 import { type BankScope, bankScope } from '../shapes/shapes-core'
 import * as BX from '../shapes/shapes-bankdb'
 import type { BankRecord, BankRow, BankSparse, BoxRow, GateRecord, VaultRow } from '../shapes/shapes-bankdb'
@@ -36,6 +40,37 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
 
   /** Parse `bankish` as a {@link BankRecord} of the device's scope. */
   recordOf(bankish: unknown): BankRecord { return BX.bankRecord.parseConsistent(bankish, this.world.scope, { message: Phrases.otherScope }) }
+  // --
+
+  // == [A birth]: stampsOfBirth, recordOfBirth, build
+
+  /** A new life's stamps, the bank's and its main gate's, one pair per attempt to build a bank. */
+  stampsOfBirth(): { bank: BankStamp, gate: GateStamp } {
+    const registered_at = nowMillis()
+    return {
+      bank: bankStamp.parse({ ...this.world.scope, bank_tok: makeLifeTok(), registered_at }),
+      gate: gateStamp.parse({ ...this.world.scope, gatelabel: 'main', gate_tok: makeLifeTok(), registered_at }),
+    }
+  }
+
+  /** The record of a birth under the stamp `bank`, at the revision after `expected`'s. */
+  recordOfBirth(bank: BankStamp, expected: SX.Revision): BankRecord {
+    return { ...bank, fmt: BX.BankFormat, ...SX.nextRevisionOf(expected, nowMillis()), am: 'a' }
+  }
+
+  // The bankDB answers the gate row put, the bank row put as its parent; under `passed`, the live ones it found.
+  /** Store `record` and its main gate `gate` over the bank row `expected`, and answer the bank listed: the one built, or the live one some other device built first. */
+  async build(record: BankRecord, gate: GateRecord, expected: BankSparse): Promise<Bank> {
+    this.demandEnabled()
+    const answer = await this.bankDB.tryBuildBank({ op: 'build', ...this.world.scope, expected, record, gate })
+    if (! answer.ok) {
+      this.panicIfRevoked(answer.err)
+      throw answer.err
+    }
+    const bank = this.deliverRecord(answer.parent)
+    bank.gateListing.deliverRecord(answer.val)
+    return bank
+  }
   // --
 
   // == [Defined by the bank listing]: isOneLifePerInstance, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
