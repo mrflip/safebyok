@@ -8,9 +8,10 @@
   the rest); worker `opus` (agent default effort); reviewer `sonnet`
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
-* **Status** (2026-11-12, 20:30Z): 8a to 10 merged. Ready to merge, out of draft: 8d #679 → 12 #681
-  (12 restacked onto 8d, green at 21e9cf444, core 3395; #681 the top). Building: 16 (from 12's old
-  ready tip; its filing rebases it). G #678 (draft, to the top at wrapup). T (tooling, on #676). Then
+* **Status** (2026-11-12, late): 8a to 10 merged. Ready to merge, out of draft: 8d #679 → 12 #681
+  (green at 21e9cf444, core 3395; #681 the top). In review: 16 #682 (stacked on #681, caught up
+  onto 21e9cf444, green at 30a070450; review raised to medium) and T #680 (tooling, on #676).
+  G #678 (draft, to the top at wrapup). Then the documentarian run, then
   17. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
@@ -283,7 +284,7 @@ battery. A refusal's null parent (no row fetched) stays. **Levels**: worker `son
 
 ### G `guarantees_bank` (added 2026-11-12)
 
-The Coach (Coach notes): the bank-* drafts are "for swapping in atop the notes/ versions when you wish. They were written prospectively, though, so I might have a sonnet merge them as you go, with the code overriding both." *Orchestrator:* `guarantees-bank.md` merged into `notes/guarantees.md` now, the code at 9's tip overriding both; what the draft anticipated of thread 10 is not claimed, and listed for 8d. Thread 10 leaves `notes/guarantees.md` alone and reports the lines it falsifies. `deliver-contract-bank.md` stays with 10. **Levels**: worker `sonnet`; review `medium` (sonnet), checking each claim against the code. **After**: 9 (stacked on #674), beside 10. **Size**: S-M, docs. *Orchestrator, on the Coach's word (2026-11-12):* G is the line's living guarantees note: it stays a draft, nothing stacks on it (the Coach: "if it is going to be at the end, other branches should not stack on it"), later threads report the lines they falsify instead of editing it, and at the wrapup it is updated once, squashed, and placed at the top of the line just below the squashed plan. *Orchestrator:* ready as #678 (docs only, so no review, per the skill); then rebased onto 10's ready tip (#677) and a second leg brings the note up to 10's lifecycle, so 8d edits no guarantees. Found: `Bank.autolock` holds the lease row (with its key handle) from `DeviceDB.tryPeek` (TOP row, Open Matters). The draft is promoted and removed from this directory, as is `deliver-contract-bank.md` (10 promoted it).
+The Coach (Coach notes): the bank-* drafts are "for swapping in atop the notes/ versions when you wish. They were written prospectively, though, so I might have a sonnet merge them as you go, with the code overriding both." *Orchestrator:* `guarantees-bank.md` merged into `notes/guarantees.md` now, the code at 9's tip overriding both; what the draft anticipated of thread 10 is not claimed, and listed for 8d. Thread 10 leaves `notes/guarantees.md` alone and reports the lines it falsifies. `deliver-contract-bank.md` stays with 10. **Levels**: worker `sonnet`; review `medium` (sonnet), checking each claim against the code. **After**: 9 (stacked on #674), beside 10. **Size**: S-M, docs. *Orchestrator, on the Coach's word (2026-11-12):* G is the line's living guarantees note: it stays a draft, nothing stacks on it (the Coach: "if it is going to be at the end, other branches should not stack on it"), later threads report the lines they falsify instead of editing it, and at the wrapup it is updated once, squashed, and placed at the top of the line just below the squashed plan. *Orchestrator:* ready as #678 (docs only, so no review, per the skill); then rebased onto 10's ready tip (#677) and a second leg brings the note up to 10's lifecycle, so 8d edits no guarantees. Found: `Bank.autolock` holds the lease row (with its key handle) from `DeviceDB.tryPeek` (TOP row, Open Matters). The draft is promoted and removed from this directory, as is `deliver-contract-bank.md` (10 promoted it). *Orchestrator:* lines later threads falsify, for the wrapup update: 12 reported `vault.lock` and `ensureUnlocked` still named; 16 reported line 124 ("not to the host's VaultDB") and line 206 ("`bank_key_wayin_wrapped` (VaultDB)"), both now BankDB.
 
 ### T `sprint_tools` (added 2026-11-12)
 
