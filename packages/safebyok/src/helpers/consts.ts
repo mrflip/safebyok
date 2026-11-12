@@ -28,7 +28,7 @@ export const MinuteMillis = 60_000
 /** The span from {@link FarPast} to {@link FarFuture}, in milliseconds: the longest that runs between two instants the package accepts. */
 export const ForeverMillis = FarFuture - FarPast
 
-// The version of this package, written to each device row. `pnpm release:version` rewrites this line (scripts/sync-package-version.ts), and a test holds it to package.json.
+// The version of this package, written to each device row. A release bumps it by hand, in the Version PR; a test holds it to package.json.
 /** The npm version of safebyok. */
 export const PackageVersion = '0.5.0'
 

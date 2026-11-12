@@ -30,7 +30,7 @@
     "demo:react": "SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-demo-react^...' build && pnpm --filter safebyok-demo-react dev",
     "newb": "scripts/newb",
     "changeset": "node scripts/changeset.ts",
-    "release:version": "changeset version && node scripts/sync-package-version.ts && pnpm install --lockfile-only",
+    "release:version": "changeset version && pnpm install --lockfile-only",
     "release:check": "node scripts/release.ts check",
     "release:stage": "node scripts/release.ts stage"
   },
