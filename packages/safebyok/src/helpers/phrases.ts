@@ -165,7 +165,6 @@ export const RecordForNewBox = "A create operation found a record already presen
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
-
 /** Why a bank or a gate is never put or deleted as a vault or a box is. */
 export const WrittenByOwnVerbs = "A bank's row and its gate's are written only by the bank's own verbs, so nothing was stored: build, change or delete the bank through its prompts."
 

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { refusalkindVals } from 'safebyok/storage'
 import { safebyokErrorKindVals, isSafebyokErrorData } from '../src/refusals'
 
-
 const ErrorDataCases = [
   [{ kind: "identity_revoked" },                     true,   'an identity_revoked refusal'],
   [{ kind: "identity_revoked", message: "Sign in" }, true,   'an identity_revoked refusal carrying more than its kind'],

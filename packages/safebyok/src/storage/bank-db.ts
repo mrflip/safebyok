@@ -13,7 +13,6 @@ import type {
 } from '../shapes/shapes-bankdb'
 import * as Refuse from '../refusals/throwers'
 
-
 // == [Answers]: GoodAnswer, BadAnswer, Answer, BankEnsured, BoxesListed, EnsureBankAnswer, GateAnswer, DelBankAnswer, VaultAnswer, BoxAnswer, ListBoxesAnswer, TidyGoneAnswer, Notice, answerWithVal, refusedAnswerOf, badAnswerOf
 
 /** A bankDB verb's good answer: its `val`, the `act` that says what happened, its `parent`, the row above the one asked for, and what it carries of its `ask`. */
@@ -31,7 +30,7 @@ export type BankEnsured = { gates: { main: GateRecord }, vaults: VaultRow[], dam
 /** A vault's boxes from `listBoxes`, sparse, and the rows that failed their checks. */
 export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
 /** The count of box rows left after `tidyGone`. */
-export type Tidied      = { totalCount: number }
+export type Tidied = { totalCount: number }
 
 /** The answer to `ensureBank`. Its `val` is null when no live bank is stored. */
 export type EnsureBankAnswer        = Answer<BankEnsured | null, GotAct>
