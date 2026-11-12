@@ -1,9 +1,9 @@
 # Thread 8d: bank_gate_tests (2026-11-12)
 
-Branch `20261112-bank_gate_tests`, PR #PR, stacked on #677 (10). Thread 11 (`bank_level_tests`)
-folded in. Justify: every package green (safebyok 3397, react 255, fastkey 43, indexeddb 376,
-postgres 433, convex 508, graphql 408, e2e 549, root 285, demo-react 98). No `src/` change; no
-safety hatches added. Tests: 21 files, +437 / -383.
+Branch `20261112-bank_gate_tests`, PR #679, stacked on #677 (10). Thread 11 (`bank_level_tests`)
+folded in. Justify: every package green (safebyok 3401, react 255, fastkey 43, indexeddb 376,
+postgres 433, convex 508, graphql 408, e2e 549, root 285, demo-react 98). No safety hatches added. Tests: 22 files, +475 / -387. `src/` +26 / -7,
+from the lease directive alone (lease.ts, bank.ts).
 
 * **Built**
   * **Renamed** (`git mv`): `tests/models/vault-unlock.test.ts` -> `bank-unlock.test.ts`,
@@ -50,7 +50,23 @@ safety hatches added. Tests: 21 files, +437 / -383.
     as a noun" entry name the bank's gatingkinds (`build_bank`, `unlock_bank`, ..., `del_bank`).
     `alignLock`, `BankFriend` and `world` (the bank's) appear nowhere in it: nothing to remove.
 
+  * **The lease reports its expiry** (the Coach's ruling, via the orchestrator, after the build):
+    `Lease.expiresAt(friend)` and `tryExpiresAt`, statics beside `Lease.forget`, read the row
+    cached on this device inside the Lease and answer `proved_at + leaseMillis`, or null for none,
+    refusing a row that will not read `damaged_lease`. `bank.autolock` asks `Lease.tryExpiresAt`
+    and compares with the clock; it no longer calls `deviceDB.tryPeek` or sees a `LeaseRow`.
+    `isPastAutolock` is written over the same `expiryOf`. Tests: lease.test "Lease.expiresAt(friend)
+    and tryExpiresAt(friend)" (3 cases); bank-ending "locks by the expiry its cached lease reports".
+    The bad-news tests that faked a refused `tryPeek` now fake a refused `peek`. Empty changeset
+    still: `Lease` is not exported and nothing a host sees changed.
+  * **TODO.md** (Soonish): "Gates visible to hosts, and things that stand for their scope while
+    the Bank is remade"; "A bank-level vacate", with the orchestrator's answer and its cost.
+
 * **Decisions taken**
+  * The expiry is read from the cached row, not the live lease, to keep autolock's behaviour:
+    another tab's re-proof, cached over the row, still holds off this tab's autolock, and a locked
+    bank's autolock still forgets a stale row. The Coach leans to the live lease as ground truth;
+    switching is a behaviour change left to the lease rework.
   * `readme-recipes.test.ts` still calls the scaffolds: it mirrors README lines ~93 and ~208, and
     the handoff said "no other doc". It moves with the README (thread 12 or 17).
   * `vault-world.ts` keeps its name: it builds vault worlds; only its unlock helpers changed.
@@ -67,6 +83,9 @@ safety hatches added. Tests: 21 files, +437 / -383.
     scope 'bank_locked' without launching a gating. Pinned; no defect found.
 
 * **For the Coach**
+  * guarantees G4 and G9 (thread G's) can now say: `bank.autolock` asks `Lease.tryExpiresAt`,
+    which reads the cached row inside the Lease; no Bank holds a lease row, and Open item 2
+    closes. "Who keeps the lease's expiry" in TODO.md's Soonish is partly answered: the Lease.
   * VOCABULARY still says *locked* of a Vault (`vault.isLocked`), and its *gating* row says
     `ensureUnlocked()` launches "on a locked vault". Those go with the scaffolds in thread 12.
   * safebyok-react's tests were not re-pointed: thread 12's.
