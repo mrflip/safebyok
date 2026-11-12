@@ -86,6 +86,21 @@ describe("PostgresBankDB's watch", () => {
     await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'gotlive', val: box, parent: BW.vaultAt() }]) })
   })
 
+  it("delivers a box and its tombstone as stored, each with its vault row", async () => {
+    const bankDB = await bankDBWithVault()
+    const notices = watching(bankDB)
+    const box = BW.boxAt(0, 'bank1', 'life1', { sidecar: { note: 'naïve ✓ "quoted" \\ [1, 2]', nested: { list: [null, true, 0] } } })
+    const tombstone = BW.boxTombstoneOf(box)
+    await bankDB.putBox(BW.boxPutAskOf(box))
+    await bankDB.delBox(BW.boxDelAskOf(box))
+    await vi.waitFor(() => {
+      expect(notices).to.deep.equal([
+        { act: 'gotlive', val: box, parent: BW.vaultAt() },
+        { act: 'gotgone', val: tombstone, parent: BW.vaultAt() },
+      ])
+    })
+  })
+
   it("passes over a notification on its channel that no write of ours sent", async () => {
     const bankDB = await BH.makeBankDB()
     await bankDB.buildBank(BW.bankBuildAskOf())
