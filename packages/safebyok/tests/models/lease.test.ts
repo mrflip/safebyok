@@ -162,6 +162,12 @@ describe("Lease.expiresAt(friend) and tryExpiresAt(friend)", () => {
     await TH.expectRefusal(Lease.expiresAt(friend), 'damaged_lease')
     expect(await Lease.tryExpiresAt(friend)).to.have.nested.property('err.refusalkind', 'damaged_lease')
   })
+
+  it("Lease.expiresAt refuses a malformed friend, peeking at nothing", async () => {
+    const friend = { ...fakeLeaseFriendOf(), leaseMillis: undefined } as unknown as FakeLeaseFriend
+    await TH.expectRefusal(Lease.expiresAt(friend))
+    expect(friend.peekLease).not.toHaveBeenCalled()
+  })
 })
 
 describe("Lease.buildFromCache(friend, gate)", () => {
