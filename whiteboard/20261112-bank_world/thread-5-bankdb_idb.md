@@ -4,7 +4,7 @@ Branch `20261112-bankdb_idb`, PR #TBD, stacked on [#666](https://github.com/mrfl
 
 * **Built**: `IdbBankDB` and `idbBankDB()` in `packages/safebyok-indexeddb/src/idb-bank-db.ts`, its shelf and scopepaths in
   `bank-shelf.ts`, tests in `tests/idb-bank-db.test.ts`. Both src files and the test began as verbatim copies of
-  `idb-vault-db.ts`, `shelf.ts` and `idb-vault-db.test.ts` (commit 105fbac7a), so `git diff 105fbac7a` shows the edit.
+  `idb-vault-db.ts`, `shelf.ts` and `idb-vault-db.test.ts` (commit 5bc2cd7d5), so `git diff 5bc2cd7d5` shows the edit.
   The 13 `do*` calls mirror `MemoryBankDB`, each one IndexedDB transaction (fetch, classify, store).
   It passes `describeBankDBBattery` with `makeTwin`, `makeCappedBankDB` and `_cheat_failNextCall` (no `makeBankDBFor`: no
   identity; no `_cheat_adapterOf`). A changeset (safebyok-indexeddb minor) and a README paragraph.
