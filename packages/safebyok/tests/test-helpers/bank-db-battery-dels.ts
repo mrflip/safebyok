@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 import * as BX from '../../src/shapes/shapes-bankdb'
+import * as SX from '../../src/shapes/shapes-storage'
 import type { BankDB } from '../../src/storage/bank-db'
 import {
   bankScope, gateScope, vaultScope, boxscope, boxQuery, boxListAsk, boxTidyAsk, bankEnsureAsk, vaultScopeOf,
@@ -113,6 +114,20 @@ export function describeDels({ fresh, putWith, rowsOf }: BatteryWorld): void {
       expect(await bankDB.tryGetBox(boxGetAskOf(boxQuery, 'nil'))).to.deep.include({ ok: false, act: 'vault_reborn', parent: reborn })
     })
 
+    it("a vault born again has none of the boxes an earlier life left, if its store could not delete them with the vault", async () => {
+      const { bankDB, vault, box } = await putWith({ box: true })
+      const tombstone = vaultTombstoneOf(vault)
+      await bankDB.delVault(vaultDelAskOf(vault))
+      await rowsOf(bankDB).plantBoxRow(boxscope, 'bank1', 'life1', box)
+      const reborn = vaultAt(2, 'bank1', 'life2')
+      await bankDB.putVault(vaultPutAskOf(reborn, tombstone))
+      const asked = { ...boxQuery, vault_tok: 'life2' }
+      expect(await bankDB.listBoxes({ ...boxListAsk, vault_tok: 'life2' })).to.deep.include({ act: 'gotvoid', parent: reborn })
+      expect(await bankDB.getBox(boxGetAskOf(asked, 'nil'))).to.deep.include({ ok: true, act: 'gotvoid', val: null, parent: reborn })
+      const newBox = boxAt(0, 'bank1', 'life2')
+      expect(await bankDB.putBox(boxPutAskOf(newBox))).to.deep.include({ ok: true, act: 'born', val: newBox, parent: reborn })
+    })
+
     it("refuses 'stale_write' over a live row moved past the one expected, with the row and deleting no box", async () => {
       const { bankDB, bank, vault, box } = await putWith({ box: true })
       const next = vaultAt(1)
@@ -168,6 +183,23 @@ export function describeDels({ fresh, putWith, rowsOf }: BatteryWorld): void {
       expect(await bankDB.ensureBank(bankEnsureAsk)).to.deep.include({ act: 'gotgone', val: null, parent: tombstone })
     })
 
+    it("deletes every vault of the life it ends, with the boxes of each, tombstones among them", async () => {
+      const { bankDB, bank } = await putWith({ box: true })
+      const other = vaultAt(0, 'bank1', 'life2', { vaultlabel: 'other' })
+      const otherBox = boxAt(0, 'bank1', 'life2', { vaultlabel: 'other' })
+      const deleted = vaultAt(0, 'bank1', 'life3', { vaultlabel: 'deleted' })
+      await bankDB.putVault(vaultPutAskOf(other))
+      await bankDB.putBox(boxPutAskOf(otherBox))
+      await bankDB.putVault(vaultPutAskOf(deleted))
+      await bankDB.delVault(vaultDelAskOf(deleted))
+      await bankDB.delBank(bankDelAskOf(bank))
+      for (const vaultlabel of ['main', 'other', 'deleted']) {
+        expect(await rowsOf(bankDB).vaultRowOf(vaultScopeOf(vaultlabel))).to.be.null
+      }
+      expect(await rowsOf(bankDB).boxRowsOf(vaultScope, 'bank1', 'life1')).to.have.property('size', 0)
+      expect(await rowsOf(bankDB).boxRowsOf(vaultScopeOf('other'), 'bank1', 'life2')).to.have.property('size', 0)
+    })
+
     it("leaves every other bank", async () => {
       const { bankDB } = await putWith({ box: true })
       const elsewhere = { banklabel: 'other' }
@@ -198,6 +230,22 @@ export function describeDels({ fresh, putWith, rowsOf }: BatteryWorld): void {
       expect(retcon).to.deep.include({ ok: false, act: 'retcon', dbhas: tombstone })
       expect(retcon.err?.refusalkind).to.eq('stale_write')
       expect(await rowsOf(deleted).bankRowOf(bankScope)).to.deep.equal(tombstone)
+    })
+
+    it("refuses a del that expects a later revision or another at its seq, or whose tombstone's bank_tok is not new, deleting nothing", async () => {
+      const { bankDB, bank, gate, vault, box } = await putWith({ box: true })
+      const tombstone = bankTombstoneOf(bank)
+      const asks = [
+        [{ ok: false, act: 'ahead', dbhas: bank }, bankDelAskOf(bankAt(7))],
+        [{ ok: false, act: 'forked', dbhas: bank }, bankDelAskOf({ ...bank, ...Rival })],
+        [{ ok: false, act: 'unclassified_storing' }, bankDelAskOf(bank, { ...tombstone, bank_tok: bank.bank_tok })],
+        [{ ok: false, act: 'unclassified_storing' }, bankDelAskOf(bank, { ...tombstone, bank_tok: SX.VoidLifeTok })],
+      ] as const
+      for (const [answered, ask] of asks) { expect(await bankDB.tryDelBank(ask)).to.deep.include(answered) }
+      expect(await rowsOf(bankDB).bankRowOf(bankScope)).to.deep.equal(bank)
+      expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(gate)
+      expect(await rowsOf(bankDB).vaultRowOf(vaultScope)).to.deep.equal(vault)
+      expect(await storedBoxOf(bankDB)).to.deep.equal(box)
     })
 
     it("refuses a del where the row expected has the stored revision_tok under another bank_tok, deleting nothing", async () => {
@@ -240,6 +288,16 @@ export function describeDels({ fresh, putWith, rowsOf }: BatteryWorld): void {
       await rowsOf(bankDB).plantVaultRow(vaultScope, vault)
       await bankDB.tidyGone(boxTidyAsk)
       expect(await rowsOf(bankDB).vaultRowOf(vaultScope)).to.be.null
+    })
+
+    it("tidies the bank it is asked of and no other", async () => {
+      const { bankDB } = await putWith()
+      const elsewhere = { banklabel: 'other' }
+      await bankDB.buildBank(bankBuildAskOf({ ...bankAt(), ...elsewhere }, { ...gateAt(), ...elsewhere }))
+      const ended = vaultAt(0, 'bank0', 'life1', elsewhere)
+      await rowsOf(bankDB).plantVaultRow({ ...vaultScope, ...elsewhere }, ended)
+      await bankDB.tidyGone(boxTidyAsk)
+      expect(await rowsOf(bankDB).vaultRowOf({ ...vaultScope, ...elsewhere })).to.deep.equal(ended)
     })
   })
 }
