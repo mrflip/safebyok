@@ -1,18 +1,16 @@
-/** The vaultDB adapter for Convex. */
+/** The bankDB adapter for Convex. */
 
 import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import * as DB from 'safebyok/storage'
-import type {
-  AdapterVaultDBOpts, BoxDelAsk, BoxesStored, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, BoxStored, Heard, Tidied,
-  VaultDelAsk, VaultError, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultsStored, VaultStored, WatchScope,
-} from 'safebyok/storage'
+import { BX } from 'safebyok/storage'
+import type { BoxTidyAsk, Tidied, VaultError, WatchScope } from 'safebyok/storage'
 import * as Phrases from './phrases'
 import { isSafebyokErrorData, safebyokErrorData } from './refusals'
-import type { SafebyokApi } from './server'
+import type { SafebyokBankApi } from './bank-server'
 
-// == [Clients]: ConvexCalls, ConvexWatchingClient, ConvexReactWatchingClient, ConvexVaultClient, ConvexVaultDBOpts
+// == [Clients]: ConvexCalls, ConvexWatchingClient, ConvexReactWatchingClient, ConvexBankClient, ConvexBankDBOpts
 
 /** The `query` and `mutation` calls that `ConvexClient` and `ConvexReactClient` share. */
 export type ConvexCalls = {
@@ -41,43 +39,44 @@ export type ConvexReactWatchingClient = ConvexCalls & {
 }
 
 /** A Convex client the adapter accepts: a `ConvexClient`, or the app's own `ConvexReactClient`. */
-export type ConvexVaultClient = ConvexWatchingClient | ConvexReactWatchingClient
+export type ConvexBankClient = ConvexWatchingClient | ConvexReactWatchingClient
 
-/** Options for {@link ConvexVaultDB}. */
-export type ConvexVaultDBOpts = AdapterVaultDBOpts & {
+/** Options for {@link ConvexBankDB}. */
+export type ConvexBankDBOpts = BX.AdapterBankDBOpts & {
   /** The app's Convex client. */
-  client: ConvexVaultClient
-  /** The app's safebyok functions: `api.safebyok`, not the whole `api`. */
-  api: SafebyokApi
+  client: ConvexBankClient
+  /** The app's safebyok bankDB functions: `api.safebyokBank`, not the whole `api`. */
+  api: SafebyokBankApi
   /** A soft cap on a vault life's box rows, tombstones included. A put of a new boxlabel past it refuses `vault_full`.
    * Defaults to `DefaultMaxBoxes`, and never exceeds the component's own limit. This adapter currently enforces it exactly.
    */
   maxBoxes?: number | undefined
 }
 
-/** Every vault row and box row in a watch's scope, as `watchRows` returns them. */
+/** The bank row, and every gate row, vault row and box row of a live vault in a watch's scope, as `watchRows` returns them. */
 type RowsWatched = {
+  bank:   unknown,
+  gates:  { gatelabel: string, gate: unknown }[],
   vaults: { vaultlabel: string, vault: unknown }[],
-  boxes:  { vaultlabel: string, vault_tok: string, boxlabel: string, box: unknown }[],
+  boxes:  { vaultlabel: string, boxlabel: string, box: unknown }[],
 }
-
 // --
 
-// == [The vaultDB]: ConvexVaultDB
+// == [The bankDB]: ConvexBankDB
 
-/** A VaultDB that stores its rows in the host's Convex deployment, through the app's Convex client. */
-export class ConvexVaultDB extends DB.AdapterVaultDB {
+/** A BankDB that stores its rows in the host's Convex deployment, through the app's Convex client. */
+export class ConvexBankDB extends DB.AdapterBankDB {
   // == [Props]: #client, #api, #maxBoxes
 
-  readonly #client: ConvexVaultClient
-  readonly #api: SafebyokApi
+  readonly #client: ConvexBankClient
+  readonly #api: SafebyokBankApi
   readonly #maxBoxes: number
   // --
 
   // == [Construction]: constructor
 
-  constructor(opts: ConvexVaultDBOpts) {
-    const { client, api, maxBoxes = DB.DefaultMaxBoxes, maxRecordSizeEst = DB.DefaultMaxRecordSizeEst } = convexVaultDBOpts.parse(opts, { where: 'ConvexVaultDB', advice: Phrases.ConvexVaultDBAdvice })
+  constructor(opts: ConvexBankDBOpts) {
+    const { client, api, maxBoxes = DB.DefaultMaxBoxes, maxRecordSizeEst = DB.DefaultMaxRecordSizeEst } = convexBankDBOpts.parse(opts, { where: 'ConvexBankDB', advice: Phrases.ConvexBankDBAdvice })
     super({ maxRecordSizeEst: Math.min(maxRecordSizeEst, ConvexDocumentSize) })
     this.#client = client
     this.#api = api
@@ -85,49 +84,70 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
+  // == [Protected, the generic calls of AdapterBankDB]: doEnsureBank, doBuildBank, doPutGate, doDelBank, doGetVault, doPutVault, doDelVault, doListBoxes, doGetBox, doPutBox, doDelBox, doTidyGone, doWatch
+  // A get is one query, and the rows it fetched are classified here. A write is one mutation, so one transaction: the component
+  // fetches the rows, classifies the ask with the same classifier, and stores the record if the act is a write. It returns the
+  // rows as it fetched them, which are classified here to the same outcome, and whether it wrote, which is checked against it.
 
-  protected async doListVaults(ask: VaultListAsk): Promise<VaultsStored> {
-    const vaults = await runOrRefuse('doListVaults', () => this.#client.query(this.#api.listVaults, { ask }))
-    return this.classifyStoredVaults(ask, vaults)
+  protected async doEnsureBank(ask: BX.BankEnsureAsk): Promise<BX.BankEnsureStored> {
+    const fetched = await runOrRefuse('doEnsureBank', () => this.#client.query(this.#api.ensureBank, { ask }))
+    return this.classifyEnsureBank(ask, fetched)
   }
 
-  // A get or list reads its rows in one query, from one snapshot, and the client classifies them: it stores nothing, so it needs no mutation.
-  protected async doGetVault(ask: VaultGetAsk): Promise<VaultStored> {
-    const vault: unknown = await runOrRefuse('doGetVault', () => this.#client.query(this.#api.getVault, { ask }))
-    return this.classifyStoredVault(ask, { vault })
+  protected async doBuildBank(ask: BX.BankBuildAsk): Promise<BX.BankBuildStored> {
+    const { wrote, ...fetched } = await runOrRefuse('doBuildBank', () => this.#client.mutation(this.#api.buildBank, { ask }))
+    return storedAsWritten(this.classifyBuildBank(ask, fetched), wrote)
   }
 
-  protected async doListBoxes(ask: BoxListAsk): Promise<BoxesStored> {
+  protected async doPutGate(ask: BX.GatePutAsk): Promise<BX.GateStored> {
+    const { wrote, ...fetched } = await runOrRefuse('doPutGate', () => this.#client.mutation(this.#api.putGate, { ask }))
+    return storedAsWritten(this.classifyStoredGate(ask, fetched), wrote)
+  }
+
+  protected async doDelBank(ask: BX.BankDelAsk): Promise<BX.BankDelStored> {
+    const { wrote, ...fetched } = await runOrRefuse('doDelBank', () => this.#client.mutation(this.#api.delBank, { ask }))
+    return storedAsWritten(this.classifyDelBank(ask, fetched), wrote)
+  }
+
+  protected async doGetVault(ask: BX.VaultGetAsk): Promise<BX.VaultStored> {
+    const fetched = await runOrRefuse('doGetVault', () => this.#client.query(this.#api.getVault, { ask }))
+    return this.classifyStoredVault(ask, fetched)
+  }
+
+  protected async doPutVault(ask: BX.VaultPutAsk): Promise<BX.VaultStored> {
+    const { wrote, ...fetched } = await runOrRefuse('doPutVault', () => this.#client.mutation(this.#api.putVault, { ask }))
+    return storedAsWritten(this.classifyStoredVault(ask, fetched), wrote)
+  }
+
+  protected async doDelVault(ask: BX.VaultDelAsk): Promise<BX.VaultStored> {
+    const { wrote, ...fetched } = await runOrRefuse('doDelVault', () => this.#client.mutation(this.#api.delVault, { ask }))
+    return storedAsWritten(this.classifyStoredVault(ask, fetched), wrote)
+  }
+
+  protected async doListBoxes(ask: BX.BoxListAsk): Promise<BX.BoxesStored> {
     const fetched = await runOrRefuse('doListBoxes', () => this.#client.query(this.#api.listBoxes, { ask }))
     return this.classifyStoredBoxes(ask, fetched)
   }
 
-  protected async doGetBox(ask: BoxGetAsk): Promise<BoxStored> {
+  protected async doGetBox(ask: BX.BoxGetAsk): Promise<BX.BoxStored> {
     const fetched = await runOrRefuse('doGetBox', () => this.#client.query(this.#api.getBox, { ask }))
     return this.classifyStoredBox(ask, fetched)
   }
 
-  // A put or del is one mutation, so one transaction: the component checks the ask, fetches the rows, classifies the ask,
-  // and stores the record if the act is a write. It returns the classifier's outcome, which is checked here.
-  protected async doPutVault(ask: VaultPutAsk): Promise<VaultStored> {
-    const stored = await runOrRefuse('doPutVault', () => this.#client.mutation(this.#api.putVault, { ask }))
-    return vaultStored.parse(stored)
+  // The component refuses a write that would take the life past one of its limits, where the classifier, which counts only the
+  // cap, found a write: that refusal is `vault_full`, with the box row stored.
+  protected async doPutBox(ask: BX.BoxPutAsk): Promise<BX.BoxStored> {
+    const { wrote, roomless, ...fetched } = await runOrRefuse('doPutBox', () => this.#client.mutation(this.#api.putBox, { ask, maxBoxes: this.#maxBoxes }))
+    const stored = this.classifyStoredBox(ask, fetched)
+    if (! roomless) { return storedAsWritten(stored, wrote) }
+    const { parent, presence } = storedAsWritten(stored, true)
+    const box = (fetched.box === null) ? null : BX.storedBoxRow.parse(fetched.box)
+    return { ok: false, act: 'vault_full', parent, box, presence, capacity: fetched.capacity }
   }
 
-  protected async doPutBox(ask: BoxPutAsk): Promise<BoxStored> {
-    const stored = await runOrRefuse('doPutBox', () => this.#client.mutation(this.#api.putBox, { ask, maxBoxes: this.#maxBoxes }))
-    return boxStored.parse(stored)
-  }
-
-  protected async doDelVault(ask: VaultDelAsk): Promise<VaultStored> {
-    const stored = await runOrRefuse('doDelVault', () => this.#client.mutation(this.#api.delVault, { ask }))
-    return vaultStored.parse(stored)
-  }
-
-  protected async doDelBox(ask: BoxDelAsk): Promise<BoxStored> {
-    const stored = await runOrRefuse('doDelBox', () => this.#client.mutation(this.#api.delBox, { ask }))
-    return boxStored.parse(stored)
+  protected async doDelBox(ask: BX.BoxDelAsk): Promise<BX.BoxStored> {
+    const { wrote, ...fetched } = await runOrRefuse('doDelBox', () => this.#client.mutation(this.#api.delBox, { ask }))
+    return storedAsWritten(this.classifyStoredBox(ask, fetched), wrote)
   }
 
   protected async doTidyGone(ask: BoxTidyAsk): Promise<Tidied> {
@@ -137,12 +157,12 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   // Convex re-sends a watched query's whole result each time it changes, so `hear` gets only the
   // rows that differ from the previous result. The first result is the starting state, and is not
   // reported.
-  protected override doWatch(scope: WatchScope, hear: (heard: Heard) => void, onBadNews: (news: VaultError) => void): () => void {
+  protected override doWatch(scope: WatchScope, hear: (heard: BX.Heard) => void, onBadNews: (news: VaultError) => void): () => void {
     let seen: RowsWatched | null = null
     let isWatching = true
     const hearRows = (rows: RowsWatched): void => {
       if (! isWatching) { return }
-      if (seen !== null) { for (const heard of changesOf(seen, rows)) { hear(heard) } }
+      if (seen !== null) { for (const heard of changesOf(scope, seen, rows)) { hear(heard) } }
       seen = rows
     }
     const fail = (thrown: unknown): void => {
@@ -182,7 +202,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, changesOf, latestOf, isConvexClient, isSafebyokApi, convexVaultDBOpts, vaultStored, boxStored
+// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, storedAsWritten, changesOf, heardOf, latestOf, isConvexClient, isSafebyokBankApi, convexBankDBOpts
 
 /** Convex's size limit for one document, in bytes. */
 const ConvexDocumentSize = 1_048_576
@@ -205,28 +225,44 @@ function refusalOf(oplabel: string, thrown: unknown): VaultError {
   return DB.storageFailed(oplabel, thrown)
 }
 
-/** Rebuild the VaultError a `ConvexError`'s `data` describes, with the core's message and, for a `gate_issue`, the stored vault row. */
+/** Rebuild the VaultError a `ConvexError`'s `data` describes, with the core's message. */
 function refusalOfCrossed(data: unknown): VaultError {
   const crossed = safebyokErrorData.parse(data)
   if (crossed.kind === 'identity_revoked') { return DB.identityRevoked() }
-  if (crossed.kind === 'gate_issue') { return new DB.VaultError('gate_issue', crossed.message, { rows: { world: crossed.world, dbhas: crossed.world } }) }
   return new DB.VaultError(crossed.kind, crossed.message)
 }
 
-// Both results come from Convex's own serializer, so an unchanged row serializes the same way twice.
-/** Return the vault rows and box rows in `rows` that are new or changed since `seen`. */
-function changesOf(seen: RowsWatched, rows: RowsWatched): Heard[] {
-  const seenVaults = new Map(seen.vaults.map(({ vaultlabel, vault }) => [vaultlabel, JSON.stringify(vault)]))
-  const seenBoxes = new Map(seen.boxes.map(({ vaultlabel, vault_tok, boxlabel, box }) => [DB.ckeyOf(vaultlabel, vault_tok, boxlabel), JSON.stringify(box)]))
-  const vaultOf = new Map(rows.vaults.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
-  const vaultsHeard = rows.vaults
-    .filter(({ vaultlabel, vault }) => seenVaults.get(vaultlabel) !== JSON.stringify(vault))
-    .map(({ vault }) => ({ vault }))
-  const boxesHeard = rows.boxes
-    .filter(({ vaultlabel, vault_tok, boxlabel, box }) => seenBoxes.get(DB.ckeyOf(vaultlabel, vault_tok, boxlabel)) !== JSON.stringify(box))
-    .map(({ vaultlabel, box }) => ({ vault: vaultOf.get(vaultlabel) ?? null, box }))
-  return [...vaultsHeard, ...boxesHeard]
+// A disagreement is a component out of step with this copy of safebyok, never a damaged row: the classifier checked the rows.
+/** `stored`, the outcome classified here, once it agrees with what the component did: a write act where it wrote, and none where it did not. */
+function storedAsWritten<StoredT extends { act: DB.BoxAct | DB.VaultAct | DB.ParentBankAct }>(stored: StoredT, wrote: boolean): StoredT {
+  if (BX.isWriteAct(stored.act) !== wrote) { throw DB.unexpectedError(new Error(Phrases.StoredOutOfStep)) }
+  return stored
 }
+
+// Both results come from Convex's own serializer, so an unchanged row serializes the same way twice. A bank or gate row has
+// no vaultlabel, so only a watch of the whole bank hears it.
+/** Return the rows in `rows` that are new or changed since `seen`, each with the row above it. */
+function changesOf({ vaultlabel }: WatchScope, seen: RowsWatched, rows: RowsWatched): BX.Heard[] {
+  const seenGates  = new Map(seen.gates.map(({ gatelabel, gate }) => [gatelabel, JSON.stringify(gate)]))
+  const seenVaults = new Map(seen.vaults.map(({ vaultlabel: label, vault }) => [label, JSON.stringify(vault)]))
+  const seenBoxes  = new Map(seen.boxes.map(({ vaultlabel: label, boxlabel, box }) => [DB.ckeyOf(label, boxlabel), JSON.stringify(box)]))
+  const vaultOf    = new Map(rows.vaults.map(({ vaultlabel: label, vault }) => [label, vault]))
+  const isBankwide = (vaultlabel === undefined)
+  const banksHeard = (isBankwide && (rows.bank !== null) && (JSON.stringify(seen.bank) !== JSON.stringify(rows.bank))) ? [{ row: rows.bank }] : []
+  const gatesHeard = rows.gates
+    .filter(({ gatelabel, gate }) => isBankwide && (seenGates.get(gatelabel) !== JSON.stringify(gate)))
+    .map(({ gate }) => heardOf(gate, rows.bank))
+  const vaultsHeard = rows.vaults
+    .filter(({ vaultlabel: label, vault }) => seenVaults.get(label) !== JSON.stringify(vault))
+    .map(({ vault }) => heardOf(vault, rows.bank))
+  const boxesHeard = rows.boxes
+    .filter(({ vaultlabel: label, boxlabel, box }) => seenBoxes.get(DB.ckeyOf(label, boxlabel)) !== JSON.stringify(box))
+    .map(({ vaultlabel: label, box }) => heardOf(box, vaultOf.get(label) ?? null))
+  return [...banksHeard, ...gatesHeard, ...vaultsHeard, ...boxesHeard]
+}
+
+/** The notice of `row`, with `parent` as the row above it unless that is null. */
+function heardOf(row: unknown, parent: unknown): BX.Heard { return (parent === null) ? { row } : { row, parent } }
 
 /** Return a React watch's latest result, or undefined while it has none or is failing, telling `fail` what it throws. */
 function latestOf(watch: { localQueryResult(): RowsWatched | undefined }, fail: (thrown: unknown) => void): RowsWatched | undefined {
@@ -239,23 +275,23 @@ function latestOf(watch: { localQueryResult(): RowsWatched | undefined }, fail: 
 }
 
 /** True when `candidate` has `query`, `mutation`, and either `onUpdate` or `watchQuery`. */
-function isConvexClient(candidate: unknown): candidate is ConvexVaultClient {
+function isConvexClient(candidate: unknown): candidate is ConvexBankClient {
   if ((typeof candidate !== 'object') || (candidate === null)) { return false }
   const calls = candidate as Partial<Record<'query' | 'mutation' | 'onUpdate' | 'watchQuery', unknown>>
   return (typeof calls.query === 'function') && (typeof calls.mutation === 'function') && ((typeof calls.onUpdate === 'function') || (typeof calls.watchQuery === 'function'))
 }
 
-/** The names of the safebyok functions the adapter calls. */
-const SafebyokFnnames = ['listVaults', 'getVault', 'listBoxes', 'getBox', 'putVault', 'putBox', 'delVault', 'delBox', 'tidyGone', 'watchRows'] as const
+/** The names of the safebyok bankDB functions the adapter calls. */
+const SafebyokBankFnnames = ['ensureBank', 'buildBank', 'putGate', 'delBank', 'getVault', 'putVault', 'delVault', 'listBoxes', 'getBox', 'putBox', 'delBox', 'tidyGone', 'watchRows'] as const
 
 // Each reference must have a name of the form `<module>:<function>`. The generated `api` returns a
 // reference for any property, so `api.getVault` exists, but it names no module and
 // `getFunctionName` throws on it.
-/** True when `candidate` is the module of safebyok functions (`api.safebyok`), not the whole `api`. */
-function isSafebyokApi(candidate: unknown): candidate is SafebyokApi {
+/** True when `candidate` is the module of safebyok bankDB functions (`api.safebyokBank`), not the whole `api`. */
+function isSafebyokBankApi(candidate: unknown): candidate is SafebyokBankApi {
   if ((typeof candidate !== 'object') || (candidate === null)) { return false }
   const fnRefs = candidate as Partial<Record<string, FunctionReference<'query' | 'mutation'>>>
-  return SafebyokFnnames.every((fnname) => {
+  return SafebyokBankFnnames.every((fnname) => {
     const fnRef = fnRefs[fnname]
     if (fnRef === undefined) { return false }
     try {
@@ -266,31 +302,11 @@ function isSafebyokApi(candidate: unknown): candidate is SafebyokApi {
   })
 }
 
-/** Validator for {@link ConvexVaultDBOpts}. */
-const convexVaultDBOpts = DB.objCheck(({ custom, int }) => ({
-  ...DB.adapterVaultDBOpts.shape,
-  client:   custom<ConvexVaultClient>(isConvexClient, Phrases.ClientExpected),
-  api:      custom<SafebyokApi>(isSafebyokApi, Phrases.ApiExpected),
+/** Validator for {@link ConvexBankDBOpts}. */
+const convexBankDBOpts = DB.objCheck(({ custom, int }) => ({
+  ...BX.adapterBankDBOpts.shape,
+  client:   custom<ConvexBankClient>(isConvexClient, Phrases.ClientExpected),
+  api:      custom<SafebyokBankApi>(isSafebyokBankApi, Phrases.ApiExpected),
   maxBoxes: int.positive().optional(),
 }), 'bad_option')
-
-const OkActVals = [...DB.writeActVals, ...DB.foundActVals] as const
-
-// A failed check here is a component out of step with this copy of safebyok, never a damaged row: the classifier checked the rows.
-/** Validators for the result of a put or del mutation: the classifier's outcome for a vault ask, and for a box ask. */
-const { vaultStored, boxStored } = DB.Checkers('unexpected_error', ({ obj, union, lit, oneof }) => {
-  const presence = oneof(DB.presenceVals)
-  const vaultParts = { world: DB.vaultRow, vault: DB.vaultRow.nullable(), presence }
-  const boxParts   = { world: DB.vaultRow, box: DB.boxRow.nullable(), presence: presence.nullable(), capacity: DB.capacity.nullable() }
-  return {
-    vaultStored: union([
-      obj({ ok: lit(true), act: oneof(OkActVals), ...vaultParts }),
-      obj({ ok: lit(false), act: oneof(DB.refusedActVals), ...vaultParts }),
-    ]),
-    boxStored: union([
-      obj({ ok: lit(true), act: oneof(OkActVals), ...boxParts }),
-      obj({ ok: lit(false), act: oneof([...DB.refusedActVals, ...DB.boxVaultActVals]), ...boxParts }),
-    ]),
-  }
-})
 // --

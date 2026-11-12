@@ -12,6 +12,8 @@ import type { SafebyokErrorData } from './refusals'
 export type { ComponentApi } from './component-api'
 export { safebyokErrorKindVals, safebyokErrorData, isSafebyokErrorData } from './refusals'
 export type { SafebyokErrorData, SafebyokErrorKind } from './refusals'
+export { SafebyokBankComponent } from './bank-server'
+export type { SafebyokBankApi } from './bank-server'
 
 // == [Options]: GetUserId, SafebyokApiOpts
 
