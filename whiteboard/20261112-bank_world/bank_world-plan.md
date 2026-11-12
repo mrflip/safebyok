@@ -205,6 +205,9 @@ and each handoff quotes it. The line is red from 8a's tip to 8c's (rule 20).
   plan: leg 1 steps 1 to 4 (shapes, Storable's `vault_tok`, Gate and Bank Storables, the lease to
   the bank, `ensureVault`); leg 2 steps 5 to 8 (`Device.ensureBank`, listing delivery, Vault
   stripped, gating); leg 3 steps 9 and 10 (fixtures, skips, React, VOCABULARY). One review at the end.
+  *Orchestrator, after leg 1 (steps 1 and 2 only, two compactions at 200k, +92/-70 src):* legs now
+  go to `thread-worker-400k` (the Coach's agent, a 400k window); leg 2 takes steps 3 to 5 as far as
+  it gets, and the legs continue until step 10, each from the thread file's *Next leg* note.
 * **8c `bank_prompts`**: the gate's prompts and verbs, `del_bank`, `autolock`, a bank tombstone
   delivered; unskips 8b's skips; React compiles. **Levels**: worker `opus`; review `medium`.
   **After**: 8b.
@@ -228,6 +231,8 @@ mechanical.
 
 **Levels**: worker `opus`; review `medium`. **After**: 9. **Look-ahead**: should remove more than
 it adds (the Coach). **Size**: L.
+*Orchestrator:* `Storable`'s `vault_tok` moving down to `Vault` and `Box` landed in 8b (dff295ea6);
+struck from this thread.
 
 ### 11 `bank_level_tests`
 
