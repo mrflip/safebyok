@@ -104,15 +104,12 @@ snapshot file in the sprint directory -- and the orchestrator moves the row to *
 the work is under way. Other agents send what belongs in the tab -- a new matter, a row they have
 settled -- to the session that keeps it, rather than writing it themselves.
 
-1. **A subagent reads the tab**, once per pass; the session never reads it whole. What the
-   session reads stays in its context, re-sent on every later turn, and a read costs about four
-   times the tab's text (*Keeping it cheap*). Spawn a `general-purpose` agent on `sonnet` to
-   `read` the tab and return, for each row of either table whose chip is not `drafting`: its
-   handle, its state, the Coach's answer word for word, and the *Matter* cell's text. For the
-   writes in step 3 it adds the read's rev, the `State` enum's id, the id and `h` of the row and
-   of each paragraph a write will replace, and the id of the matters table's last row, for
-   inserts. It returns nothing else: no `drafting` row, no table. The rev it returns is the
-   bookmark.
+1. **`open-matters-reader` reads the tab**, once per pass, given the doc's link; the session
+   never reads it whole. What the session reads stays in its context, re-sent on every later
+   turn, and a read costs about four times the tab's text (*Keeping it cheap*). The reader
+   returns only the flipped rows of either table, each with the Coach's answer and the matter
+   word for word, and the ids, hashes and rev step 3's writes need. The rev it returns is the
+   bookmark. A chip it lists as `unpicked` gets reset to `drafting` in the same pass.
 2. **Act on every flipped row** in that pass. Investigation goes to subagents, so the code they
    read stays out of the session's context and only their paragraph comes back; independent
    proceed work goes to workers or threads at once, carrying the row's text, not the doc.
@@ -174,8 +171,9 @@ has no other memory of it.
 A read comes back as XML with an id and a hash on every paragraph, cell and run of text, so it
 costs about four times the tab's visible text: 25 matters came to about 10,000 tokens. Read in the
 session that keeps the tab, those tokens ride along on every later turn: about fifty cents a pass
-on Opus, at 200 turns left in a sprint, where a subagent's read and its few hundred tokens of
-flipped rows cost about a tenth of that. That is why a subagent reads it, ruled rows move to
+on Opus, at 200 turns left in a sprint. The reader's own turn costs a few cents on `sonnet`, and
+the session carries only its few hundred tokens of flipped rows. That is why a subagent reads it,
+ruled rows move to
 *Resolved*, which nothing reads until the sweep, elevated matters move to their own tabs, and
 cells stay at three sentences.
 Still, the tab is small next to the session: what costs more is the session's own context,
