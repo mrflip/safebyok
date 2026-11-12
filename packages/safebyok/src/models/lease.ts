@@ -9,7 +9,10 @@ import { damagedLease, leaseNotInForce, undecipheredWhisper } from '../refusals/
 import type { Wayinkind } from '../shapes/shapes-enums'
 import { type BankStamp, type CitedGate, type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, LeaseFormat, bankStamp, leaseFriend, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper } from '../shapes/shapes-gateish'
 
-/** A bankKey in force on this device, good for one revision of its bank's gate. It has the key wrapped under a non-extractable leaseKey, unwraps it for a single call, and never hands it out. */
+/** A grant that lets this device seal and unseal whispers without asking the user, for one revision of its bank's gate.
+ * The bankKey stays wrapped under a non-extractable leaseKey. Each seal or unseal unwraps it for that call alone, and nothing hands it out.
+ * A lease whose bankKey will not unwrap refuses `damaged_lease`, and its bank locks.
+ */
 export class Lease implements LeaseStamp {
   // == [Props]: fmt, user_id, banklabel, bank_tok, registered_at, gatelabel, gate_tok, gate_revision_tok, proved_at, wayinkind, #bankFriend, #record, #bankStamp, #isFromCache, #leaseStamp, toJSON
 
@@ -24,16 +27,16 @@ export class Lease implements LeaseStamp {
   declare readonly proved_at:         number
   declare readonly wayinkind:         Wayinkind
 
-  /** All this lease hears of its bank. */
+  /** What this lease is given of its bank: see {@link LeaseFriend}. */
   readonly #bankFriend: LeaseFriend
 
-  /** The record with its keys, null once out of force. */
+  /** The record, with the leaseKey and the wrapped bankKey; null once evicted. */
   #record: LeaseRecord | null
 
-  /** The stamp of the bank this lease is of, parsed once: what every ctx under it binds first. */
+  /** The bank's stamp, which every ctx under this lease binds first. */
   readonly #bankStamp: BankStamp
 
-  /** True where this lease came from the cache, so caching it has nothing to do. */
+  /** True for a lease built from the row cached on this device. */
   readonly #isFromCache: boolean
 
   get #leaseStamp(): LeaseStamp { return leaseStamp.parse(this) }
@@ -53,9 +56,10 @@ export class Lease implements LeaseStamp {
     Object.freeze(this)
   }
 
-  /** The lease cached citing `gate`, or null so the bank asks the user to unlock. A row citing another `gate_tok` or `revision_tok`, or of another stamp, is forgotten;
-   * one past autolock stays, not loaded, for a later unlock's lease to write over or `bank.autolock` to forget.
-   * A device database that refuses, or a row that will not read, is bad news and null, the row left standing.
+  /** The lease cached on this device for `gate`'s current revision, or null: then ask the user.
+   * A row citing another gate or revision is forgotten. So is a row of another bank stamp, which is also told as bad news.
+   * A device database refusal or a damaged row is told as bad news. A row past autolock is not loaded, and stays on disk
+   * until the next lease is cached over it or `bank.autolock()` locks.
    */
   static async buildFromCache(friend: LeaseFriend, gate: CitedGate): Promise<Lease | null> {
     const { gate: cited } = leaseFromCacheArgs.parse({ friend, gate })
@@ -84,7 +88,9 @@ export class Lease implements LeaseStamp {
     }
   }
 
-  /** A new lease under a fresh leaseKey. */
+  /** Grant a new lease: `bankKey` wrapped under a fresh, non-extractable leaseKey, citing `opts.gate`.
+   * It is not cached until {@link cacheAsCacheCan}.
+   */
   static async buildGranted(friend: LeaseFriend, bankKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
     const { opts: { gate, wayinkind } } = leaseGrantedArgs.parse({ friend, bankKey, opts })
     const bankstamp = bankStamp.parse(friend)
@@ -100,7 +106,7 @@ export class Lease implements LeaseStamp {
   // == [Caching]: cacheAsCacheCan
 
   // A refusal costs the next session an unlock, not this one its lease.
-  /** Caches this lease if it can, telling the host of a refusal as bad news. */
+  /** Cache this lease on this device, unless it came from there. A device database refusal is told as bad news, not thrown. */
   async cacheAsCacheCan(): Promise<void> {
     if (this.#isFromCache) { return }
     const cached = await this.#bankFriend.tryCacheLease(this.#demandRecord())
@@ -110,7 +116,7 @@ export class Lease implements LeaseStamp {
 
   // == [Expiry]: expiresAt, tryExpiresAt
 
-  /** When the lease cached on this device is due for locking, in epoch milliseconds, or null where none is cached. */
+  /** When the lease cached on this device is due for locking, in epoch milliseconds; null if none is cached. */
   static async expiresAt(friend: LeaseFriend): Promise<number | null> {
     const checked = leaseFriend.parse(friend)
     const peeked = await checked.peekLease()
@@ -126,7 +132,7 @@ export class Lease implements LeaseStamp {
 
   // == [Ending one]: revoke, tryRevoke, forget, tryForget, evict
 
-  /** Drop the keys and forget the cached record, so this device is locked. */
+  /** Drop the keys and forget the cached row. Does nothing once evicted. */
   async revoke(): Promise<void> {
     if (this.#record === null) { return }
     this.evict()
@@ -136,7 +142,7 @@ export class Lease implements LeaseStamp {
   /** Non-throwing form of {@link revoke}. */
   tryRevoke(): Promise<Outcome<void>> { return outcomeOf(() => this.revoke()) }
 
-  /** Forget the cached record with no lease granted to {@link revoke}: one may stand from an earlier session. */
+  /** Forget the lease cached on this device, where there is no Lease object to {@link revoke}. */
   static async forget(friend: LeaseFriend): Promise<void> {
     await leaseFriend.parse(friend).forgetLease()
   }
@@ -144,13 +150,15 @@ export class Lease implements LeaseStamp {
   /** Non-throwing form of {@link forget}. */
   static tryForget(friend: LeaseFriend): Promise<Outcome<void>> { return outcomeOf(() => this.forget(friend)) }
 
-  /** Drop the keys, leaving the cached record for the next session. */
+  /** Drop the keys, leaving the cached row for the next session. */
   evict(): void { this.#record = null }
   // --
 
   // == [Whispers under the bankKey]: sealWith, unsealWith, opened, ctxOf, bankKey
 
-  /** `whisperText` sealed under a fresh boxKey, both bound to the bank's stamp and then `stamps`, in order. */
+  /** Seal `whisperText` under a fresh boxKey, bound to the bank's stamp and then `stamps`, in order.
+   * {@link unsealWith} needs the same stamps in the same order. The text's bytes are zeroed afterwards, sealed or refused.
+   */
   async sealWith(whisperText: string, stamps: readonly CipherCtxRecord[]): Promise<SealedWhisper> {
     const checked = leaseSealArgs.parse({ whisperText, stamps })
     const bankKey = await this.#bankKey('wrapKey')
@@ -166,7 +174,9 @@ export class Lease implements LeaseStamp {
     }
   }
 
-  /** The text `sealed` contains, bound to `stamps`: what `sealWith` sealed. */
+  /** The whisper text in `sealed`, given the stamps it was sealed with, in the same order.
+   * Unsealing authenticates `sealed` and `stamps` together: a change to either refuses as damaged.
+   */
   async unsealWith(sealed: SealedWhisper, stamps: readonly CipherCtxRecord[]): Promise<string> {
     const checked = leaseUnsealArgs.parse({ sealed, stamps })
     const bankKey = await this.#bankKey('unwrapKey')
@@ -191,12 +201,12 @@ export class Lease implements LeaseStamp {
     }
   }
 
-  /** The caller's stamps under the bank's, bound to one of the lease's purposes. */
+  /** The ctx for `purpose`: the bank's stamp, then `stamps`. */
   #ctxOf(stamps: readonly CipherCtxRecord[], purpose: 'box_key_wrapped' | 'whisper_ciphered'): Uint8Array {
     return cipherCtx([this.#bankStamp, ...stamps], purpose)
   }
 
-  /** The bankKey for this one call, non-extractable, with the one usage. Nothing keeps the key between calls. */
+  /** The bankKey for this call alone, non-extractable, with `usage` its only usage. Nothing keeps it between calls. */
   async #bankKey(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
     const { lease_key, bank_key_lease_wrapped } = this.#demandRecord()
     const ctx = cipherCtx([this.#bankStamp, this.#leaseStamp], 'bank_key_lease_wrapped')
@@ -214,25 +224,26 @@ export class Lease implements LeaseStamp {
 
   // == [Guards]: isGranted, demandRecord
 
-  /** The lease still has its record: it was granted and has not been dropped. */
+  /** True until this lease is evicted or revoked. */
   get isGranted(): boolean { return this.#record !== null }
 
-  /** The record, while the lease is in force. */
+  /** The record, or throw once this lease is evicted. */
   #demandRecord(): LeaseRecord {
     if (this.#record === null) { throw leaseNotInForce() }
     return this.#record
   }
   // --
 
-  /** Answers 'lease', which marks this model to a check: {@link Modelkind}. */
+  /** Always `'lease'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'lease' { return 'lease' satisfies Modelkind }
 }
 
 // == [Judging the cached record]: expiryOf, isPastAutolock
 
-/** When a row is due for locking: the autolock duration after it was proved. */
+/** When `row` is due for locking: the autolock duration after its `proved_at`. */
 function expiryOf({ proved_at }: LeaseStamp, { leaseMillis }: LeaseFriend): number { return proved_at + leaseMillis }
 
-/** True once a row was proved longer ago than the autolock duration: due for locking, as `bank.autolock` judges it. */
+// `bank.autolock` judges by the same expiry, through `Lease.expiresAt`.
+/** True once `row` was proved longer ago than the autolock duration. */
 function isPastAutolock(row: LeaseStamp, friend: LeaseFriend): boolean { return expiryOf(row, friend) < nowMillis() }
 // --
