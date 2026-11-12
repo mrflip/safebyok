@@ -76,7 +76,7 @@ const device = Device.make({
   gates: ['main'], // the only gates accepted for now
   vaultDB, // see below
   requestCleartext: async (gating) => {
-    if (gating.gatingkind !== 'build_vault' && gating.gatingkind !== 'unlock_vault') { return }
+    if (gating.gatingkind !== 'build_bank' && gating.gatingkind !== 'unlock_bank') { return }
     while (gating.isOpen) { // a wrong passphrase leaves it open
       const passphraseClear = await dialog.ask(gating.gatingkind)
       if (passphraseClear === null) { return } // returning with no attempt under way dismisses
@@ -86,12 +86,12 @@ const device = Device.make({
 })
 const bank = await device.ensureBank() // asks the deviceDB for this device's row, then lists the vaults
 
-const vault = await bank.ensureVault({ vaultlabel: 'main' }) // none yet: asks, build_vault
+const vault = await bank.ensureVault({ vaultlabel: 'main' }) // none yet: put in the bank just built, asking nobody
 const box = await vault.putBox({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-...' }, sidecar: { nickname: 'work' } })
 const whisper = await box.extractWhisper() // returns the whisper, and the box keeps no copy
 
-vault.lock()                 // every subscriber is told before this returns
-await vault.ensureUnlocked() // no lease now: asks, unlock_vault
+bank.lock()                 // every subscriber is told before this returns
+await bank.ensureUnlocked() // no lease now: asks, unlock_bank
 ```
 
 **Rendering the dialog from the snapshot.** If you leave `requestCleartext` out, a gating calls
@@ -205,8 +205,8 @@ await stripe.charge({ ...box.whisper, amount: 100 })
 box.whisper.org = 'acme'
 await box.putExposed()
 
-vault.lock()                 // box.whisper.apiKey is undefined
-await vault.ensureUnlocked() // and it is back, edit included
+bank.lock()                 // box.whisper.apiKey is undefined
+await bank.ensureUnlocked() // and it is back, edit included
 ```
 
 Read the whisper through `box.whisper` each time: a reference you kept to the object still has the

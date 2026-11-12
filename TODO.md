@@ -152,7 +152,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   `passphraseUntilText` ("in 2 days"); `askPassphraseAt`'s doc block already hints at them.
 * **A forgetful user's start over clears only this device's copy** (the Coach, on #261: "low
   priority, make it a TODO"): without a passphrase, a user may forget the vault on this device
-  (`vault.lock()` forgets the lease, which is all a device keeps), but may never delete it from the
+  (`bank.lock()` forgets the lease, which is all a device keeps), but may never delete it from the
   vaultDB: `vault.del()` needs the passphrase.
 
 * **After the restyle (#273 to #283): two later changes.** Each changes a signature or a

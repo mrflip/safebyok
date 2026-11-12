@@ -64,7 +64,6 @@ describe("safebyok", () => {
     expectTypeOf<Front.PassphraseWayinHeader>().toExtend<Front.WayinHeader>()
     expectTypeOf<Front.Vault['isLocked']>().toEqualTypeOf<boolean>()
     expectTypeOf<Front.Bank['isLocked']>().toEqualTypeOf<boolean>()
-    expectTypeOf<Front.VaultSnapshot['isLocked']>().toEqualTypeOf<boolean>()
     expectTypeOf<Front.DeviceSnapshot['stage']>().toEqualTypeOf<Front.DeviceStage>()
     expectTypeOf<Front.DamagedBox>().toEqualTypeOf<Readonly<{ user_id: string, banklabel: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>>()
   })

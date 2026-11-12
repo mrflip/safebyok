@@ -243,12 +243,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [The lock]: alignLock
+  // == [The lock]: lock
 
   // A thing's one duty at a lock and at its end: tell its listeners, and, once it no longer answers, drop what it has
   // of secrets. The base has none.
   /** Tell the listeners the bank's lock has moved. Never throws. */
-  alignLock(): this {
+  lock(): this {
     this.align()
     return this
   }
@@ -260,7 +260,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   get isEnabled(): boolean { return this.listing.isEnabled && this.listing.isListed(this) }
 
   /** Whether this thing's bank is locked, read live. */
-  abstract get isLocked(): boolean
+  protected abstract get isLocked(): boolean
 
   /** Whether the record in hand was refreshed within the thing's horizon: never before storage has answered. */
   get isTimely(): boolean { return this.#isRefreshedWithin(this.listing.maxMillisSinceRefresh) }

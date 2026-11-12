@@ -351,8 +351,6 @@ export interface VaultSnapshot extends VaultScope {
   readonly written_at:    number
   /** True unless the vault is deleted or damaged. */
   readonly isPresent:     boolean
-  /** True unless this device has a lease granted and in force. */
-  readonly isLocked:      boolean
 }
 
 // --

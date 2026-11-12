@@ -127,9 +127,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.#unwatch = null
   }
 
-  /** Bring each thing listed up to the lock: see {@link Storable.alignLock}. Never throws. */
+  /** Bring each thing listed up to the lock: see {@link Storable.lock}. Never throws. */
   lock(): this {
-    for (const thing of this.things) { thing.alignLock() }
+    for (const thing of this.things) { thing.lock() }
     return this
   }
   // --
@@ -397,7 +397,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   #takeDown(thing: ThingT | null): void {
     if (thing === null) { return }
     this.delist(thing)
-    thing.alignLock()
+    thing.lock()
   }
   // --
 

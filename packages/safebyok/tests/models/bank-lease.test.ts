@@ -127,7 +127,7 @@ describe("the device's sweep and vacate, as its bank, vault and boxes meet them"
     await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }))
     await TH.expectRefusal(vault.sealStampedString('sk-test', Stamp))
     expect(bank.lock()).to.equal(bank)
-    expect(box.alignLock()).to.equal(box)
+    expect(box.lock()).to.equal(box)
     expect(deviceDB.forget).not.toHaveBeenCalled()
   })
 
