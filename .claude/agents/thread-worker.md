@@ -83,8 +83,10 @@ those and `git log`, not from the build's history, for one of two jobs.
 **Filing, when the script stops.** The orchestrator files each thread with
 `scripts/file-thread <root>`. When it stops short, you are also handed the script's last lines:
 
-- **Exit 3, a conflict with main.** Rebase onto `origin/main` with `--no-update-refs` and resolve
-  per PROCESS.md, *Rebase conflicts*: repair the straightforward, and report `blocked` on one
+- **Exit 3, a conflict** with the ref the script's last line names (`origin/main`, or the base
+  thread's branch on origin). Rebase onto that ref from the recorded base, `git rebase
+  --no-update-refs --onto <ref> $(git config branch.<branch>.sprintbase)`, set the base to it
+  (`git config branch.<branch>.sprintbase <its SHA>`), and resolve per PROCESS.md, *Rebase conflicts*: repair the straightforward, and report `blocked` on one
   that takes judgment about which behaviour wins (tag the tip first, then resolve or abort).
 - **Exit 4, red.** Repair until `pnpm justify` is green, and commit the repair.
 

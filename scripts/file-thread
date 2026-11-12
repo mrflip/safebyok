@@ -6,8 +6,12 @@
 #
 # * Catch up: fetch, and when the branch was cut from main (its `branch.<branch>.sprintbase`,
 #   which scripts/cut-thread records, is on origin/main) and main has moved since, rebase it onto
-#   origin/main. A stacked branch stays on the thread it stands on. A conflict aborts the rebase,
-#   leaving the branch as it was, for a thread-worker (PROCESS.md, *Rebase conflicts*).
+#   origin/main. A stacked branch (cut-thread also records its base branch, as
+#   `branch.<branch>.sprintbasebranch`) is rebased with `--onto` from the base it was cut at: onto
+#   origin/main when origin's copy of the base branch has merged, else onto that copy when it is
+#   not behind where the branch was cut. Each rebase records the new sprintbase. A conflict
+#   aborts the rebase, leaving the branch as it was, for a thread-worker (PROCESS.md, *Rebase
+#   conflicts*).
 # * Prove: `pnpm justify`, or the command given with --prove, in the worktree. Its output goes to
 #   a log, of which only a failure prints the end.
 # * Push to origin's branch of the same name, with a lease on the SHA origin had, so a rebase
@@ -52,14 +56,30 @@ base="$(git -C "$root" config "branch.${branch}.sprintbase")" || fail "$branch r
 
 git -C "$root" fetch --quiet origin
 caught="as cut"
-if git -C "$root" merge-base --is-ancestor "$base" origin/main && ! git -C "$root" merge-base --is-ancestor origin/main HEAD; then
-  if ! git -C "$root" rebase --quiet --no-update-refs origin/main > /dev/null 2>&1; then
+onto=""
+rebase_args=()
+if git -C "$root" merge-base --is-ancestor "$base" origin/main; then
+  if ! git -C "$root" merge-base --is-ancestor origin/main HEAD; then
+    onto="origin/main"
+    rebase_args=(origin/main)
+  fi
+elif basebranch="$(git -C "$root" config "branch.${branch}.sprintbasebranch")"; then
+  basetip="$(git -C "$root" rev-parse --verify --quiet "refs/remotes/origin/${basebranch}^{commit}" || true)"
+  if [[ -n "$basetip" ]] && git -C "$root" merge-base --is-ancestor "$basetip" origin/main; then
+    onto="origin/main"
+  elif [[ -n "$basetip" ]] && ! git -C "$root" merge-base --is-ancestor "$basetip" "$base"; then
+    onto="origin/${basebranch}"
+  fi
+  rebase_args=(--onto "$onto" "$base")
+fi
+if [[ -n "$onto" ]]; then
+  if ! git -C "$root" rebase --quiet --no-update-refs "${rebase_args[@]}" > /dev/null 2>&1; then
     git -C "$root" rebase --abort
-    echo "file-thread: $branch conflicts with origin/main; the rebase is undone and nothing is pushed. A thread-worker resolves it (PROCESS.md, *Rebase conflicts*)." >&2
+    echo "file-thread: $branch conflicts with $onto; the rebase is undone and nothing is pushed. A thread-worker resolves it (PROCESS.md, *Rebase conflicts*)." >&2
     exit 3
   fi
-  git -C "$root" config "branch.${branch}.sprintbase" "$(git -C "$root" rev-parse origin/main)"
-  caught="rebased onto origin/main at $(git -C "$root" rev-parse --short origin/main)"
+  git -C "$root" config "branch.${branch}.sprintbase" "$(git -C "$root" rev-parse "$onto")"
+  caught="rebased onto $onto at $(git -C "$root" rev-parse --short "$onto")"
 fi
 
 log="$(mktemp -t file-thread.XXXXXX)"

@@ -77,6 +77,17 @@ describe('scripts/cut-thread', () => {
     const root = path.join(scratch, 'byok-deriver_shim')
     expect(git('-C', root, 'rev-parse', 'HEAD')).to.eq(tip)
     expect(git('config', `branch.${Today}-deriver_shim.sprintbase`)).to.eq(tip)
+    expect(git('config', `branch.${Today}-deriver_shim.sprintbasebranch`)).to.eq('vault_split')
+  })
+
+  it("records the name of a base branch given as origin/..., and none for main or a bare SHA", () => {
+    git('switch', '--quiet', '--create', 'vault_split')
+    git('push', '--quiet', 'origin', 'vault_split')
+    git('switch', '--quiet', 'main')
+    cut('deriver_shim', 'origin/vault_split')
+    cut('from_main')
+    cut('from_sha', git('rev-parse', 'HEAD'))
+    expect(git('config', '--get-regexp', 'sprintbasebranch')).to.eq(`branch.${Today}-deriver_shim.sprintbasebranch vault_split`)
   })
 
   it('refuses an invalid label, a base that names no commit, and a worktree that exists', () => {

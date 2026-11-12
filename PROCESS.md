@@ -19,7 +19,8 @@ commit mid-refactor or on a timer.
 
 Other agents share the main checkout, so a thread is built in a worktree of its own beside it:
 `scripts/cut-thread <label> [<base>]` makes `../byok-<label>` on a branch `YYYYMMDD-<label>`, cut
-from `origin/main` or the base given, records that base as `branch.<branch>.sprintbase`, and runs
+from `origin/main` or the base given, records that base as `branch.<branch>.sprintbase` (and its branch name, if it is one, as
+`branch.<branch>.sprintbasebranch`), and runs
 `pnpm install` there. It cuts with `--no-track`, as anyone cutting one by hand must: the
 container's git pushes a branch to its upstream, and a branch tracking `origin/main` would push to
 main. A thread built on another's unmerged work is cut from that branch's tip, and its PR says

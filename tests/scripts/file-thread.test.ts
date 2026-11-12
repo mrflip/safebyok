@@ -54,11 +54,30 @@ describe('scripts/file-thread', () => {
   })
 
   /** Cuts the thread's worktree from `base`, as scripts/cut-thread does, and commits and pushes its work */
-  const cutAndBuild = (base: string) => {
+  const cutAndBuild = (base: string, basebranch?: string) => {
     git('worktree', 'add', '--quiet', '--no-track', '-b', Branch, root, base)
     git('config', `branch.${Branch}.sprintbase`, git('rev-parse', base))
+    if (basebranch) { git('config', `branch.${Branch}.sprintbasebranch`, basebranch) }
     commit(root, 'shim.ts', 'export {}\n')
     git('-C', root, 'push', '--quiet', 'origin', `${Branch}:${Branch}`)
+  }
+
+  /** Commits on the base branch in the main checkout and pushes it, as the base's review does */
+  const baseGains = (filename = 'review.ts') => {
+    git('switch', '--quiet', 'vault_split')
+    const tip = commit(main, filename, 'export {}\n')
+    git('push', '--quiet', 'origin', 'vault_split')
+    git('switch', '--quiet', 'main')
+    return tip
+  }
+
+  /** Rebases the base branch onto origin/main and force-pushes it, as filing the base does */
+  const baseRebased = () => {
+    git('switch', '--quiet', 'vault_split')
+    git('rebase', '--quiet', '--no-update-refs', 'origin/main')
+    git('push', '--quiet', '--force', 'origin', 'vault_split')
+    git('switch', '--quiet', 'main')
+    return git('rev-parse', 'vault_split')
   }
 
   /** Moves origin/main on by a commit, as another PR's merge does */
@@ -87,7 +106,7 @@ describe('scripts/file-thread', () => {
     expect(git('rev-parse', `origin/${Branch}`)).to.eq(review)
   })
 
-  it('leaves a stacked thread on the thread it stands on', () => {
+  it("leaves a stacked thread that records no base branch on the thread it stands on", () => {
     git('switch', '--quiet', '--create', 'vault_split')
     const below = commit(main, 'vault.ts', 'export {}\n')
     git('switch', '--quiet', 'main')
@@ -97,6 +116,83 @@ describe('scripts/file-thread', () => {
     expect(result.status, String(result.stderr)).to.eq(0)
     expect(result.stdout).to.include(`${Branch} filed: as cut`)
     expect(git('rev-parse', `origin/${Branch}~1`)).to.eq(below)
+  })
+
+  describe("a thread stacked on a base branch that cut-thread recorded", () => {
+    let below: string
+    beforeEach(() => {
+      git('switch', '--quiet', '--create', 'vault_split')
+      below = commit(main, 'vault.ts', 'export {}\n')
+      git('push', '--quiet', 'origin', 'vault_split')
+      git('switch', '--quiet', 'main')
+      cutAndBuild('vault_split', 'vault_split')
+    })
+
+    it("rebases onto the base branch when it gained commits, and records the new base", () => {
+      const gained = baseGains()
+      const result = file('true')
+      expect(result.status, String(result.stderr)).to.eq(0)
+      expect(result.stdout).to.include(`${Branch} filed: rebased onto origin/vault_split at`)
+      expect(git('rev-parse', `origin/${Branch}~1`)).to.eq(gained)
+      expect(git('rev-parse', `origin/${Branch}~2`)).to.eq(below)
+      expect(git('config', `branch.${Branch}.sprintbase`)).to.eq(gained)
+    })
+
+    it("rebases onto the base branch when it was itself rebased onto main", () => {
+      mainMoves()
+      const rebased = baseRebased()
+      expect(rebased).not.to.eq(below)
+      const result = file('true')
+      expect(result.status, String(result.stderr)).to.eq(0)
+      expect(git('rev-parse', `origin/${Branch}~1`)).to.eq(rebased)
+      expect(git('rev-parse', `origin/${Branch}~2`)).to.eq(git('rev-parse', 'origin/main'))
+      expect(git('config', `branch.${Branch}.sprintbase`)).to.eq(rebased)
+    })
+
+    it("rebases onto main when the base branch, rebased onto main, has merged", () => {
+      mainMoves()
+      baseRebased()
+      git('merge', '--quiet', '--no-ff', '--message', 'Merge vault_split', 'vault_split')
+      const merged = git('rev-parse', 'HEAD')
+      git('push', '--quiet', 'origin', 'main')
+      const result = file('true')
+      expect(result.status, String(result.stderr)).to.eq(0)
+      expect(result.stdout).to.include(`${Branch} filed: rebased onto origin/main`)
+      expect(git('rev-parse', `origin/${Branch}~1`)).to.eq(merged)
+      expect(git('config', `branch.${Branch}.sprintbase`)).to.eq(merged)
+    })
+
+    it("rebases onto main when the base branch has merged as cut", () => {
+      git('merge', '--quiet', '--no-ff', '--message', 'Merge vault_split', 'vault_split')
+      const merged = git('rev-parse', 'HEAD')
+      git('push', '--quiet', 'origin', 'main')
+      const result = file('true')
+      expect(result.status, String(result.stderr)).to.eq(0)
+      expect(git('rev-parse', `origin/${Branch}~1`)).to.eq(merged)
+    })
+
+    it("files as cut when the base branch has not moved, and moves no other branch", () => {
+      const other = git('rev-parse', 'vault_split')
+      const result = file('true')
+      expect(result.status, String(result.stderr)).to.eq(0)
+      expect(result.stdout).to.include(`${Branch} filed: as cut`)
+      expect(git('rev-parse', `origin/${Branch}~1`)).to.eq(below)
+      expect(git('rev-parse', 'vault_split')).to.eq(other)
+    })
+
+    it("stops on a conflict with the base branch, undoing the rebase and pushing nothing", () => {
+      git('switch', '--quiet', 'vault_split')
+      commit(main, 'shim.ts', "the base's shim\n")
+      git('push', '--quiet', 'origin', 'vault_split')
+      git('switch', '--quiet', 'main')
+      const tip = git('-C', root, 'rev-parse', 'HEAD')
+      const result = file('true')
+      expect(result.status).to.eq(3)
+      expect(result.stderr).to.include('conflicts with origin/vault_split')
+      expect(git('-C', root, 'rev-parse', 'HEAD')).to.eq(tip)
+      expect(git('-C', root, 'status', '--porcelain')).to.eq('')
+      expect(git('rev-parse', `origin/${Branch}`)).to.eq(tip)
+    })
   })
 
   it('stops on a conflict with main, undoing the rebase and pushing nothing', () => {

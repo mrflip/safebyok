@@ -57,8 +57,9 @@ the two would rewrite the same lines; threads in different corners of the tree a
 A thread is cut:
 
 * from `origin/main`, when it depends on nothing unmerged;
-* from the tip of the one thread it depends on, once that thread is **filed**, and its PR says
-  "Stacked on #N";
+* from the tip of the one thread it depends on, once that thread is **filed** or ready (give
+  `scripts/cut-thread` the branch, which it records so `scripts/file-thread` can rebase the thread
+  onto that branch's later tip, or onto main once it merges), and its PR says "Stacked on #N";
 * while it would stand on two unmerged threads, from the top of the two once you have restacked
   them into a line (`wrapup.md`, *Restack*). Never merge thread branches together.
 
@@ -151,8 +152,9 @@ branch to its fixes, or gives you the SHA to do it with (`git -C <root> merge --
 Then remove the reviewer's worktree and branch, which its result names (`git worktree remove
 <path>`, `git branch -D <branch>`), and post its PR comment (`gh pr comment <n>`).
 
-**File.** Run `scripts/file-thread <root>` in the background: it catches the branch up, proves
-it, pushes it, and removes the worktree. When it exits 3 (a conflict with main) or 4 (red), spawn
+**File.** Run `scripts/file-thread <root>` in the background: it catches the branch up (a stacked
+one is rebased onto its base thread's new tip, or onto main once the base has merged, so never
+rebase it by hand), proves it, pushes it, and removes the worktree. When it exits 3 (a conflict with main, or with its base thread's new tip) or 4 (red), spawn
 a fresh `thread-worker`:
 
 ```
@@ -169,7 +171,7 @@ Act on: <the finding, as a directive>.
 ```
 
 Resuming the builder (SendMessage) is for the answer to its blocking question, which it needs
-mid-build. Once a thread files, one stacked on it may be cut. A `blocked` or `abandoned` worker
+mid-build. Once a thread is ready, one stacked on it may be cut. A `blocked` or `abandoned` worker
 gets no review: the review follows the resume that finishes it.
 
 ## 3. As each report comes in
