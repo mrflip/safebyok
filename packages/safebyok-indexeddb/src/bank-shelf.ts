@@ -1,7 +1,7 @@
 /** The shelf: the single object store of an IdbBankDB's database. Each row is keyed by an array scopepath. */
 
 import { promisifyRequest, type UseStore } from 'idb-keyval'
-import { versionedShelfOf } from 'safebyok/storage'
+import { dbprefixOf, versionedShelfOf } from 'safebyok/storage'
 import type { BankScope, BX, VaultScope } from 'safebyok/storage'
 
 // == [The database]: BankDBVersion, shelfOf, filedIn, Filed
@@ -9,10 +9,9 @@ import type { BankScope, BX, VaultScope } from 'safebyok/storage'
 /** The layout version of the bank database: three zero-padded parts, so that a name sorts as its version does. */
 export const BankDBVersion = '001-001-001'
 
-// Every database this library writes starts `safebyok-`, so a host can tell them from its own.
-/** The shelf of the bank database for the host's `dbName`, named `safebyok-<dbName>:bank-v<version>`. */
-export function shelfOf(dbName: string): UseStore {
-  return versionedShelfOf({ dbName: `safebyok-${dbName}`, dbstem: 'bank', version: BankDBVersion, storename: 'rows', oldnames: [] })
+/** The shelf of the bank database for the host's `dbName`, named `safebyok:bank-v<version>`, or `safebyok-<dbName>:bank-v<version>` with one. */
+export function shelfOf(dbName?: string): UseStore {
+  return versionedShelfOf({ dbprefix: dbprefixOf(dbName), dbstem: 'bank', version: BankDBVersion, storename: 'rows', oldnames: [] })
 }
 
 /** A stored row, with its scopepath. */

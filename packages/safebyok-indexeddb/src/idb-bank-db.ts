@@ -9,7 +9,7 @@ import { bankScopepathOf, boxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, gat
 // == [Options]: IdbBankDBOpts, idbBankDBOpts
 
 /** Options for an IdbBankDB: the AdapterBankDB's options, plus
- * - `dbName`   -- the name the IndexedDB database is made under, after `safebyok-` (default: `'safebyok'`)
+ * - `dbName`   -- scopes the database names: `safebyok-<dbName>:…`, or `safebyok:…` if left out
  * - `maxBoxes` -- a soft cap on the box rows of one vault life, live and deleted together (default: the core's `DefaultMaxBoxes`)
  */
 export type IdbBankDBOpts = BX.AdapterBankDBOpts & { dbName?: string | undefined, maxBoxes?: number | undefined }
@@ -46,11 +46,10 @@ export class IdbBankDB extends DB.AdapterBankDB {
   // == [Construction]: constructor
 
   constructor(opts: IdbBankDBOpts = {}) {
-    const { dbName = 'safebyok', maxBoxes = DB.DefaultMaxBoxes, ...adapterBankDBOpts } = idbBankDBOpts.parse(opts, { where: "In IdbBankDB's options" })
+    const { dbName, maxBoxes = DB.DefaultMaxBoxes, ...adapterBankDBOpts } = idbBankDBOpts.parse(opts, { where: "In IdbBankDB's options" })
     super(adapterBankDBOpts)
     this.#shelf = shelfOf(dbName)
-    // A name of its own: an IdbVaultDB over the same dbName rings on `safebyok-indexeddb:<dbName>`, with notices of another shape.
-    this.#bellname = `safebyok-indexeddb:${dbName}:bank`
+    this.#bellname = `${DB.dbprefixOf(dbName)}:bank`
     this.#maxBoxes = maxBoxes
   }
   // --

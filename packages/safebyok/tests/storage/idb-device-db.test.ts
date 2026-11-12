@@ -27,8 +27,8 @@ function makeDeviceDB(dbName = freshDbName()): IdbDeviceDB {
 
 /** The backdoor to a DeviceDB's lease and device rows, through connections of its own to the DeviceDB's databases. */
 const idbRowsOf = (deviceDB: IdbDeviceDB): TH.DeviceDBRowCheats => {
-  const leaseShelf = createStore(`${dbNameOf.get(deviceDB)!}:device-v002-001-001`, 'leases')
-  const deviceRowShelf = createStore(`${dbNameOf.get(deviceDB)!}:devicerow-v001-001-001`, 'devicerow')
+  const leaseShelf = createStore(`safebyok-${dbNameOf.get(deviceDB)!}:device-v002-001-001`, 'leases')
+  const deviceRowShelf = createStore(`safebyok-${dbNameOf.get(deviceDB)!}:devicerow-v002-001-001`, 'devicerow')
   return {
     plantLeaseRow:  async ({ user_id, banklabel }, row) => { await inOneStep(leaseShelf, 'readwrite', (store) => { store.put(row, [user_id, banklabel]) }) },
     leaseRowsOf:    async () => await inOneStep(leaseShelf, 'readonly', (store) => promisifyRequest<unknown[]>(store.getAll())),
@@ -96,7 +96,7 @@ describe("IdbDeviceDB's database", () => {
   it("names its database with its version", async () => {
     const dbName = freshDbName()
     await makeDeviceDB(dbName).listLeases()
-    expect(await dbNamesNow()).to.include(`${dbName}:device-v002-001-001`)
+    expect(await dbNamesNow()).to.include(`safebyok-${dbName}:device-v002-001-001`)
   })
 
   it("keeps its device rows in a database of their own, named with its version", async () => {
@@ -104,7 +104,14 @@ describe("IdbDeviceDB's database", () => {
     const deviceDB = makeDeviceDB(dbName)
     await deviceDB.stow({ ...TH.bankScope, bank_tok: 'tok_one', proved_at: Date.now(), lease_key: await makeLeaseKey() })
     await deviceDB.ensureCachedDevice(TH.bankScope)
-    expect(await dbNamesNow()).to.include.members([`${dbName}:device-v002-001-001`, `${dbName}:devicerow-v001-001-001`])
+    expect(await dbNamesNow()).to.include.members([`safebyok-${dbName}:device-v002-001-001`, `safebyok-${dbName}:devicerow-v002-001-001`])
+  })
+
+  it("names its databases `safebyok:…` when it has no dbName", async () => {
+    const deviceDB = new IdbDeviceDB()
+    await deviceDB.stow({ ...TH.bankScope, bank_tok: 'tok_one', proved_at: Date.now(), lease_key: await makeLeaseKey() })
+    await deviceDB.ensureCachedDevice(TH.bankScope)
+    expect(await dbNamesNow()).to.include.members(['safebyok:device-v002-001-001', 'safebyok:devicerow-v002-001-001'])
   })
 
   it("keeps the device rows of each dbName apart", async () => {
@@ -146,7 +153,7 @@ describe("IdbDeviceDB's database", () => {
 describe("IdbDeviceDB's wipe of the old databases", () => {
   it("deletes the old core's device database and each earlier version's, without reading them, on its first call", async () => {
     const dbName = freshDbName()
-    const oldnames = [`${dbName}:device_db`, `${dbName}:device-v0`, `${dbName}:device-v1`, `${dbName}:device-v001-001-001`, `${dbName}:device-v001-001-000`, `${dbName}:device-v000-009-009`]
+    const oldnames = [`safebyok-${dbName}:device_db`, `safebyok-${dbName}:device-v0`, `safebyok-${dbName}:device-v1`, `safebyok-${dbName}:device-v001-001-001`, `safebyok-${dbName}:device-v001-001-000`, `safebyok-${dbName}:device-v000-009-009`]
     await plantClosedDB(oldnames[0]!, 'records')
     for (const oldname of oldnames.slice(1)) { await plantClosedDB(oldname, 'leases') }
     expect(await dbNamesNow()).to.include.members(oldnames)
@@ -155,12 +162,12 @@ describe("IdbDeviceDB's wipe of the old databases", () => {
       const dbnames = await dbNamesNow()
       expect(dbnames.filter((dbname) => oldnames.includes(dbname))).to.deep.equal([])
     })
-    expect(await dbNamesNow()).to.include(`${dbName}:device-v002-001-001`)
+    expect(await dbNamesNow()).to.include(`safebyok-${dbName}:device-v002-001-001`)
   })
 
   it("deletes the old core's device database and the first version's by name, in a browser that cannot list its databases", async () => {
     const dbName = freshDbName()
-    const oldnames = [`${dbName}:device_db`, `${dbName}:device-v1`]
+    const oldnames = [`safebyok-${dbName}:device_db`, `safebyok-${dbName}:device-v1`]
     await plantClosedDB(oldnames[0]!, 'records')
     await plantClosedDB(oldnames[1]!, 'leases')
     vi.spyOn(indexedDB, 'databases').mockImplementationOnce(() => { throw new TypeError("indexedDB.databases is not a function") })
@@ -173,7 +180,7 @@ describe("IdbDeviceDB's wipe of the old databases", () => {
 
   it("leaves a newer version's database alone", async () => {
     const dbName = freshDbName()
-    const newername = `${dbName}:device-v002-002-000`
+    const newername = `safebyok-${dbName}:device-v002-002-000`
     await plantClosedDB(newername, 'leases')
     await makeDeviceDB(dbName).listLeases()
     await TH.aWhile()
@@ -182,20 +189,20 @@ describe("IdbDeviceDB's wipe of the old databases", () => {
 
   it("still works while another tab has an old database open", async () => {
     const dbName = freshDbName()
-    await set('lease', { wrapped: 'old' }, createStore(`${dbName}:device_db`, 'records'))
+    await set('lease', { wrapped: 'old' }, createStore(`safebyok-${dbName}:device_db`, 'records'))
     const deviceDB = makeDeviceDB(dbName)
     expect(await deviceDB.listLeases()).to.deep.equal([])
     await TH.aWhile()
-    expect(await dbNamesNow()).to.include(`${dbName}:device_db`)
+    expect(await dbNamesNow()).to.include(`safebyok-${dbName}:device_db`)
   })
 
   it("leaves another dbName's databases and the vault database untouched", async () => {
     const dbName = freshDbName()
     const otherName = freshDbName()
-    await plantClosedDB(`${otherName}:device_db`, 'records')
-    await plantClosedDB(`${dbName}:vaults`, 'rows')
+    await plantClosedDB(`safebyok-${otherName}:device_db`, 'records')
+    await plantClosedDB(`safebyok-${dbName}:vaults`, 'rows')
     await makeDeviceDB(dbName).listLeases()
     await TH.aWhile()
-    expect(await dbNamesNow()).to.include.members([`${otherName}:device_db`, `${dbName}:vaults`])
+    expect(await dbNamesNow()).to.include.members([`safebyok-${otherName}:device_db`, `safebyok-${dbName}:vaults`])
   })
 })

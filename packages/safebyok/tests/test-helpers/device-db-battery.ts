@@ -1,6 +1,7 @@
 /** The battery every DeviceDB runs: one call registers the cases a DeviceDB must pass, over a fresh DeviceDB for each. */
 
 import { describe, expect, it } from 'vitest'
+import { PackageVersion } from '../../src/helpers/consts'
 import { makeLeaseKey } from '../../src/helpers/crypto'
 import { objCheck } from '../../src/helpers/validator'
 import type { Awaitable } from '../../src/helpers/helpers'
@@ -344,7 +345,7 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
         const deviceDB = await fresh()
         const made = await deviceDB.ensureCachedDevice(bankScope)
         expect(CX.device_tok.safeParse(made.device_tok).success).to.be.true
-        expect(made).to.deep.equal({ ...bankScope, device_tok: made.device_tok })
+        expect(made).to.deep.equal({ ...bankScope, device_tok: made.device_tok, package_version: PackageVersion })
         expect(await deviceDB.listRawDevices()).to.deep.equal([made])
       })
 
@@ -376,8 +377,17 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
       it("takes a vault scope or any bag with a bank scope, keeping only the bank scope", async () => {
         const deviceDB = await fresh()
         const made = await deviceDB.ensureCachedDevice({ ...vaultScope, vault_tok: 'tok_one' } as never)
-        expect(made).to.have.keys(['user_id', 'banklabel', 'device_tok'])
+        expect(made).to.have.keys(['user_id', 'banklabel', 'device_tok', 'package_version'])
         expect(await deviceDB.ensureCachedDevice(bankScope)).to.deep.equal(made)
+      })
+
+      it.skipIf(noRows)("keeps the device_tok and writes this package_version over a stored row of another version", async () => {
+        const deviceDB = await fresh()
+        const made = await deviceDB.ensureCachedDevice(bankScope)
+        await rowsOf(deviceDB).plantDeviceRow(bankScope, { ...made, package_version: '0.0.1' })
+        const again = await deviceDB.ensureCachedDevice(bankScope)
+        expect(again).to.deep.equal(made)
+        expect(await rowsOf(deviceDB).deviceRowsOf()).to.deep.equal([made])
       })
 
       it("hands back a copy of the row stored", async () => {

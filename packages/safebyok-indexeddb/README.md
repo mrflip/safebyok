@@ -39,8 +39,9 @@ Hand it to the core wherever a `VaultDB` is asked for.
 ## The bankDB
 
 `idbBankDB({ dbName, maxRecordSizeEst, maxBoxes })` makes an `IdbBankDB`, the same adapter for a `BankDB`: it keeps a bank's
-bank, gate, vault and box rows in `safebyok-<dbName>:bank-v001-001-001`, so every database this library writes begins
-`safebyok-`. It reads nothing `IdbVaultDB` wrote. Its options are those above.
+bank, gate, vault and box rows in `safebyok:bank-v001-001-001`, or `safebyok-<dbName>:bank-v001-001-001` when you pass a
+`dbName`, so every database this library writes begins `safebyok`. One database holds every user's banks. It reads
+nothing `IdbVaultDB` wrote. Its options are those above, except that `dbName` is left out by default, not `'safebyok'`.
 
 ## What it promises
 

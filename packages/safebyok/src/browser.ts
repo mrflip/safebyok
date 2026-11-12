@@ -34,11 +34,11 @@ export interface BrowserOpts {
 // One bag per dbName, so a React host may call browserOpts() during render: a provider that reopens its bank whenever an
 // option changes identity would loop on a fresh deviceDB each render.
 /** The bag answered for each dbName so far. */
-const bagsByDbName = new Map<string, BrowserOpts>()
+const bagsByDbName = new Map<string | undefined, BrowserOpts>()
 
 /** A frozen bag of the browser's `keyDeriver`, `deviceDB` and `strengthChecker`, the same bag for the same `dbName`, to spread into `Device.make`. */
 export function browserOpts(opts: IdbDeviceDBOpts = {}): BrowserOpts {
-  const { dbName = 'safebyok' } = idbDeviceDBOpts.parse(opts, { where: "In browserOpts's options" })
+  const { dbName } = idbDeviceDBOpts.parse(opts, { where: "In browserOpts's options" })
   const kept = bagsByDbName.get(dbName)
   if (kept !== undefined) { return kept }
   const bag: BrowserOpts = Object.freeze({ keyDeriver: argon2idWebV1Deriver, deviceDB: idbDeviceDB({ dbName }), strengthChecker: zxcvbnStrengthChecker })

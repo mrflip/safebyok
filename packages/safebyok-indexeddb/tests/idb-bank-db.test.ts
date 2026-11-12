@@ -173,6 +173,22 @@ describe("IdbBankDB's watch", () => {
     vaultBell.close()
     expect(heardOnVaultChannel).to.be.empty
   })
+
+  it("rings on `safebyok-<dbName>:bank`, or `safebyok:bank` with no dbName", async () => {
+    const bankDB = makeBankDB()
+    const heard: unknown[] = []
+    const bell = new BroadcastChannel(`safebyok-${dbNameOf.get(bankDB)!}:bank`)
+    bell.addEventListener('message', ({ data }) => { heard.push(data) })
+    await bankDB.buildBank(TH.BW.bankBuildAskOf())
+    await vi.waitFor(() => { expect(heard).to.not.be.empty })
+    bell.close()
+    const heardDefault: unknown[] = []
+    const defaultBell = new BroadcastChannel('safebyok:bank')
+    defaultBell.addEventListener('message', ({ data }) => { heardDefault.push(data) })
+    await new IdbBankDB().buildBank(TH.BW.bankBuildAskOf())
+    await vi.waitFor(() => { expect(heardDefault).to.not.be.empty })
+    defaultBell.close()
+  })
 })
 
 describe("IdbBankDB's database name and wipe", () => {
@@ -183,6 +199,11 @@ describe("IdbBankDB's database name and wipe", () => {
     expect(names).to.include(databaseNameOf(dbNameOf.get(bankDB)!))
     expect(names.filter((dbname) => dbname.includes(dbNameOf.get(bankDB)!))).to.satisfy((own: string[]) => own.every((dbname) => dbname.startsWith('safebyok-')))
     expect(BankDBVersion).to.match(/^\d{3}-\d{3}-\d{3}$/)
+  })
+
+  it("names its database `safebyok:bank-v…` with no dbName", async () => {
+    await new IdbBankDB().ensureBank(TH.BW.bankEnsureAsk)
+    expect(await dbNamesNow()).to.include(`safebyok:bank-v${BankDBVersion}`)
   })
 
   it("deletes every older version's bank database, without reading them, on its first call", async () => {

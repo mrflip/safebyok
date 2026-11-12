@@ -50,7 +50,7 @@ export function bankBoxesRangeOf({ user_id, banklabel }: BankScope): IDBKeyRange
 /** The shelf of the vault database named `dbName`. */
 export function shelfOf(dbName: string): UseStore {
   return versionedShelfOf({
-    dbName, dbstem: 'vaults', version: VaultsDBVersion, storename: 'rows', oldnames: [`${dbName}:vaults`],
+    dbprefix: dbName, dbstem: 'vaults', version: VaultsDBVersion, storename: 'rows', oldnames: [`${dbName}:vaults`],
   })
 }
 

@@ -56,9 +56,10 @@ export class MemoryDeviceDB extends DeviceDB {
 
   protected doEnsureCachedDevice(made: DeviceRow): unknown {
     const stored = this.#devicerows.get(deviceRowCkeyOf(made))
-    if (SX.deviceRow.safeParse(stored).success) { return structuredClone(stored) }
-    this.#devicerows.set(deviceRowCkeyOf(made), structuredClone(made))
-    return structuredClone(made)
+    const kept = SX.deviceRow.safeParse(stored)
+    const row = kept.success ? { ...kept.data, package_version: made.package_version } : made
+    this.#devicerows.set(deviceRowCkeyOf(made), structuredClone(row))
+    return structuredClone(row)
   }
 
   protected doForgetDevice(scope: BankScope): void {

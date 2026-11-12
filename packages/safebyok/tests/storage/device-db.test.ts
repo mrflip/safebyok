@@ -55,7 +55,7 @@ describe("a deviceDB whose generic call throws", () => {
 describe("a deviceDB whose generic call returns an invalid device row", () => {
   it("refuses ensureCachedDevice", async () => {
     class GarbledDeviceDB extends BrokenDeviceDB {
-      protected override doEnsureCachedDevice(): unknown { return { user_id: 'u1', banklabel: 'acme', device_tok: 'not-a-uuid' } }
+      protected override doEnsureCachedDevice(): unknown { return { user_id: 'u1', banklabel: 'acme', device_tok: 'not-a-uuid', package_version: '0.5.0' } }
     }
     await TH.expectBad(new GarbledDeviceDB(null).tryEnsureCachedDevice(asked), 'bad_record')
   })

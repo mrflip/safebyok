@@ -514,8 +514,8 @@ export type RawLease = { scopepath: LeaseScopepath, row: unknown }
 
 true satisfies Z.core.util.AssertEqual<LeaseScopepath, Z.infer<typeof leaseScopepath>>
 
-/** The device row: the `device_tok` this device goes by in one bank scope. */
-export const deviceRow = objCheck(({ user_id, banklabel, device_tok }) => ({ user_id, banklabel, device_tok }), 'bad_record', [CX])
+/** The device row: the `device_tok` this device goes by in one bank scope, and the version of safebyok that last asked for it. */
+export const deviceRow = objCheck(({ str, user_id, banklabel, device_tok }) => ({ user_id, banklabel, device_tok, package_version: str.min(1) }), 'bad_record', [CX])
 
 export type DeviceRow = Z.infer<typeof deviceRow>
 // --
