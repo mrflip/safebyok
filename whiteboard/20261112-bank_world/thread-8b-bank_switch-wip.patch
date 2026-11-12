@@ -1,0 +1,155 @@
+diff --git a/packages/safebyok/src/models/listing.ts b/packages/safebyok/src/models/listing.ts
+index dbd669feb..f9d722cce 100644
+--- a/packages/safebyok/src/models/listing.ts
++++ b/packages/safebyok/src/models/listing.ts
+@@ -5,13 +5,14 @@ import { UNANSWERED } from '../helpers/consts'
+ import { isConsistent } from '../helpers/validator'
+ import { oneAtATime } from '../helpers/one-at-a-time'
+ import { VaultError, isVaultError } from '../refusals/errors'
+-import { type Notice as VaultDBNotice, type VaultDB, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
++import { type BankDB, type Notice as BankDBNotice, answerWithVal, refusedAnswerOf } from '../storage/bank-db'
+ import type { BankBadAct, DeliveryFielding, GoodAct, IfAbsent } from '../shapes/shapes-enums'
+ import * as SX from '../shapes/shapes-storage'
+-import type { BoxRow, PutOpts, VaultRow } from '../shapes/shapes-storage'
++import type { PutOpts } from '../shapes/shapes-storage'
++import type { BankRow, BoxRow, GateRecord, VaultRow } from '../shapes/shapes-bankdb'
+ import * as VX from '../shapes/shapes-vaultish'
+ import type { BankFriend, DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingDelOpts, ListingListAnswer, ListingPutAnswer, ListingPutOpts, ListingOpts, ListingWorld, ListingGetAnswer, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
+-import { deliveredNotAsSent, instanceDisabled, nothingStoredWhereLive, oneRevisionTwoFates, oneRevisionTwoLives, refusalOfDelivering, rowOfOtherVaultTok, storageIssue } from '../refusals/throwers'
++import { deliveredNotAsSent, instanceDisabled, nothingStoredWhereLive, oneRevisionTwoFates, oneRevisionTwoLives, refusalOfDelivering, storageIssue } from '../refusals/throwers'
+ import { valOf } from '../refusals/outcome'
+ import { reportToPlatform } from '../refusals/report-error'
+ import { type Storable, cmpRevisions } from './storable'
+@@ -21,12 +22,12 @@ import { type Storable, cmpRevisions } from './storable'
+  * listing, disabling, remaking, and delisting its storable instances.
+  */
+ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>, DamagedT extends ScopeT & SX.DamagedRow = ScopeT & SX.DamagedRow> {
+-  // == [Props]: world, maxMillisSinceRefresh, vaultDB, bankFriend, #things, #joinedGetOf, #doTryListJoined, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
++  // == [Props]: world, maxMillisSinceRefresh, bankDB, bankFriend, #things, #joinedGetOf, #doTryListJoined, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
+ 
+   readonly world: ListingWorld
+   /** The refresh horizon of each thing made here. */
+   readonly maxMillisSinceRefresh: number
+-  protected readonly vaultDB: VaultDB
++  protected readonly bankDB: BankDB
+   /** The bank's private calls, as this listing was handed them. */
+   protected readonly bankFriend: BankFriend
+ 
+@@ -72,9 +73,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
+ 
+   constructor(world: ListingWorld, opts: ListingOpts) {
+     VX.listingWorld.parse(world)
+-    const { vaultDB, maxMillisSinceRefresh, bankFriend } = VX.listingOpts.parse(opts)
++    const { bankDB, maxMillisSinceRefresh, bankFriend } = VX.listingOpts.parse(opts)
+     this.world = world
+-    this.vaultDB = vaultDB
++    this.bankDB = bankDB
+     this.bankFriend = bankFriend
+     this.maxMillisSinceRefresh = maxMillisSinceRefresh
+   }
+@@ -172,7 +173,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
+   readonly #doTryListJoined = oneAtATime(async (): Promise<Joined<ListingListAnswer<RecordT, SparseT, DamagedT>, readonly ThingT[]>> => {
+     const answer = await this.doTryList()
+     try {
+-      return { answer, val: this.#deliverListing(answer) }
++      return { answer, val: this.deliverListing(answer) }
+     } catch (err) { return { answer, err } }
+   })
+ 
+@@ -195,7 +196,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
+       await this.ensureTimelyWorld(maxWorldMillis)
+       const listed = this.at(scope)
+       if (listed?.isHydratedWithin(maxMillisSinceRefresh) === true) {
+-        return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), world: null, ask: SX.loggableAsk.parse({ op: 'get', ...scope }) }
++        return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), parent: null, ask: SX.loggableAsk.parse({ op: 'get', ...scope }) }
+       }
+       const got = await this.#doTryGetJoined(scope)
+       if ('err' in got) { return refusedAnswerOf(got.err, got.answer) }
+@@ -288,7 +289,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
+     // No awaits: a revoked identity panics before any other answer is delivered. The first refusal met is thrown, any
+     // after it told as bad news: a refusal's own err comes first.
+     try {
+-      if (answer.world !== null) { this.world.receiveWorld(answer.world) }
++      if (answer.parent !== null) { this.world.receiveParent(answer.parent) }
+       const delivering = this.#answerDeliveringOf(answer, sent)
+       const thing = (delivering === null) ? null : this.#doDeliverRecord(delivering)
+       if (answer.ok) { return thing }
+@@ -343,8 +344,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
+    * Chute: recordDeliveringOf → doDeliverRecord → thing.receiveRecord
+    */
+   #recordDeliveringOf(record: Fetched<RecordT, SparseT>): Delivering<Fetched<RecordT, SparseT>, ThingT> {
+-    const vault_tok = this.vaultTokOfWorld()
+-    if ((vault_tok !== null) && (record.vault_tok !== vault_tok)) { throw rowOfOtherVaultTok(record) }
++    this.demandOfWorld(record)
+     const listed     = this.at(this.scopeOf(record))
+     if (listed === null) { return { making: 'make', mod: 'adopt', listed: null, record } }
+     const age        = cmpRevisions(listed, record)
+@@ -387,9 +387,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
+   /** The instances `answer` lists, made or brought up to their records, its damaged rows set aside.
+    * Chute: deliverListing → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
+    */
+-  #deliverListing(answer: ListingListAnswer<RecordT, SparseT, DamagedT>): readonly ThingT[] {
++  protected deliverListing(answer: ListingListAnswer<RecordT, SparseT, DamagedT>): readonly ThingT[] {
+     this.demandEnabled()
+-    if (answer.world !== null) { this.world.receiveWorld(answer.world) }
++    if (answer.parent !== null) { this.world.receiveParent(answer.parent) }
+     if (! answer.ok) {
+       this.panicIfRevoked(answer.err)
+       throw answer.err
+@@ -420,11 +420,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
+   /** Delivers a watch notice of this listing's kind: its world, then its record, any refusal told as bad news.
+    * Chute: #onNotice → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
+    */
+-  readonly #onNotice = (notice: VaultDBNotice): void => {
+-    const { val, world } = notice
++  readonly #onNotice = (notice: BankDBNotice): void => {
++    const { val, parent } = notice
+     if ((! this.#isEnabled) || (! this.isOwnRow(val))) { return }
+     try {
+-      if (world !== null) { this.world.receiveWorld(world) }
++      if (parent !== null) { this.world.receiveParent(parent) }
+       this.deliverRecord(val)
+     } catch (err) { this.bankFriend.tellBadNews([err]) }
+   }
+@@ -470,13 +470,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
+   }
+   // --
+ 
+-  // == [Defined by the concrete listing]: isOneLifePerInstance, vaultTokOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
++  // == [Defined by the concrete listing]: isOneLifePerInstance, demandOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+ 
+   /** True where an instance is one life of its thing: a record of a newer life remakes it, rather than being received into it. */
+   protected abstract get isOneLifePerInstance(): boolean
+ 
+-  /** The `vault_tok` every record of this listing lies under, being the vault's own; null for a listing whose records make their own, as a vault's do. */
+-  protected abstract vaultTokOfWorld(): string | null
++  /** Throws `storage_issue` for a record that does not lie in this listing's world: a box of another vault, a vault or a gate of another bank. */
++  protected abstract demandOfWorld(record: Fetched<RecordT, SparseT>): void
+   protected abstract scopepathOf(scope: ScopeT): string
+   /** The scope of `recordish`, a record in any form or a thing ducking as one. */
+   abstract scopeOf(recordish: unknown): ScopeT
+@@ -500,9 +500,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
+   /** The vaultDB's del of this kind of thing. */
+   protected abstract doTryDel(tombstone: DelTombstone<SparseT>, opts: ListingDelOpts<SparseT>): Promise<ListingAnswer<RecordT, SparseT>>
+   /** Start the vaultDB's watch over this listing's scope, `onBadNews` hearing of trouble with it; returns how to stop. */
+-  protected abstract watchRows(onNotice: (notice: VaultDBNotice) => void, onBadNews: (news: VaultError) => void): () => void
++  protected abstract watchRows(onNotice: (notice: BankDBNotice) => void, onBadNews: (news: VaultError) => void): () => void
+   /** True for a row this listing has: the vaultDB's watch tells of a vault's rows and its boxes' alike. */
+-  protected abstract isOwnRow(row: VaultRow | BoxRow): row is (VaultRow | BoxRow) & Fetched<RecordT, SparseT>
++  protected abstract isOwnRow(row: BankRow | GateRecord | VaultRow | BoxRow): row is Fetched<RecordT, SparseT> & (BankRow | GateRecord | VaultRow | BoxRow)
+   // --
+ }
+ 
+diff --git a/packages/safebyok/src/shapes/shapes-enums.ts b/packages/safebyok/src/shapes/shapes-enums.ts
+index 42460defc..35c80ce01 100644
+--- a/packages/safebyok/src/shapes/shapes-enums.ts
++++ b/packages/safebyok/src/shapes/shapes-enums.ts
+@@ -84,7 +84,7 @@ export const wayinkindVals = ['passphrase', 'passkey'] as const
+ export type Wayinkind = typeof wayinkindVals[number]
+ 
+ /** The kinds of gating, each named for the change the user's cleartext allows. */
+-export const gatingkindVals = ['build_vault', 'unlock_vault', 'replace_passphrase', 'add_passkey', 'revoke_passkey'] as const
++export const gatingkindVals = ['build_bank', 'unlock_bank'] as const
+ export type Gatingkind = typeof gatingkindVals[number]
+ 
+ /** The refusals an attempt leaves its gating open under, for the user to try again. */
