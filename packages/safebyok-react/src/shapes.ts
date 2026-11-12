@@ -262,7 +262,7 @@ export type DelVaultModalProps = {
 }
 // --
 
-// == [Devmode]: DevBoxInspectorProps, DevDeviceDBInspectorProps, LastCall, Listing, ListedLease, LeaseRowLineProps
+// == [Devmode]: DevBoxInspectorProps, DevDeviceDBInspectorProps, LastCall, PanelListing, ListedLease, LeaseRowLineProps
 
 /** DevBoxInspector's props: the vaultlabel and boxlabel its fields start with. */
 export type DevBoxInspectorProps = { defaultVaultlabel?: string, defaultBoxlabel?: string }
@@ -274,7 +274,7 @@ export type DevDeviceDBInspectorProps = { deviceDB: DeviceDB }
 export type LastCall = { verbname: string, isOk: boolean, said: string }
 
 /** A panel's listed rows, and the error from its last attempt. */
-export type Listing<ValT> = {
+export type PanelListing<ValT> = {
   /** The rows from the last listing that succeeded, or null before the first. */
   val:     ValT | null
   /** The error text if the last attempt failed, else null. */
