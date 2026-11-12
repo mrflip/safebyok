@@ -271,7 +271,7 @@ describe("bankResolvers' watch", () => {
     await stream.return(undefined)
   })
 
-  it("reads a bank row's notice with the parent main, though it crosses with none: a GraphQL union cannot hold main", async () => {
+  it("reads a bank row's notice with the parent main, though it crosses with none", async () => {
     const { bankDB, schema } = await watchedServer()
     const { stream, nextNotice } = await watching(schema, { user_id: 'u1' }, BW.bankScope)
     await bankDB.delBank(BW.bankDelAskOf(BW.bankAt()))
