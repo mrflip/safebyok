@@ -10,6 +10,9 @@ What the threads have taught, newer than the plan where they disagree. Kept by t
 * *Coach, 2026-11-12:* "carry" on the hand edits in the base checkout: `coach-hand-edits.patch` here, applied by thread 6 as its first commit.
 * *Thread 2:* `fmt` stays 5002/6002/7002 through thread 2's `device_tok` (design: the renames of 1 and 2 move formats once); the vault row snapshot was rewritten under 6002. The device row's IndexedDB shelf is `<dbName>:devicerow-v001-001-001`; leases are untouched by the rename.
 
+* *Coach, 2026-11-12:* stale IndexedDB databases left by a rename are fine (no public release yet). But every IndexedDB database this library opens must be unambiguously its own by name (a `safebyok-` prefix, not only the host's `dbName`), and perhaps carry a version updated on write. Thread 5 takes this for every shelf the library opens.
+* *Coach, 2026-11-12:* `user_id` then `device_tok` in the options is right: multiple users on one device are not contemplated.
+
 ## The BankDB `do*` list
 
 (thread 4 fills this in)
