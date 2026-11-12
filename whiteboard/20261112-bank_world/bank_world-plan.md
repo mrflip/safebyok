@@ -65,6 +65,11 @@ it. The Coach added four at the invocation, and the orchestrator one:
 22. **A push need not wait on `pnpm justify`; `ready` does. A restack of more than two PRs goes
     through the `restacker` skill, justified once at the tip** (the Coach, 2026-11-12; now also
     in the `/sprint` skill, `wrapup.md` and `thread-worker.md`, on this sprint's branch).
+24. **Damaged rows inside the datastore are out of scope** (the Coach, 2026-11-12): "we can't
+    write code if we can't trust the datastore. make sure there's an actual path to the error
+    being hypothesized." A finding, a test or a guard about a stored row that fails its own checks
+    needs a verb that could have written it; otherwise it is not built, and a reviewer does not
+    raise it.
 23. **Bank-world drafts of the contract notes** (the Coach suggested, 2026-11-12):
     `guarantees-bank.md` and `deliver-contract-bank.md` in this directory describe the target.
     A worker or reviewer judging bank-world code reads them beside today's `notes/`; the thread

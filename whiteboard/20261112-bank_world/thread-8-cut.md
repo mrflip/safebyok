@@ -66,8 +66,8 @@ item 9: `guarantees-bank.md` promoted into `notes/guarantees.md` against the cod
 
 ## Where the design reads wrong against the code (ground rule 4)
 
-* `Storable` wants a `world` until thread 10; the Bank's would have to be the Device ducking as a
-  `ListingWorld`, which the design says it does not do. (Open Matters.)
+* `Storable` wants a `world` until thread 10. *Coach, ruled:* "have device be its world, that's
+  smart": the Device is the Bank's world until thread 10 removes `world`.
 * Device-side "policy checked before each call": the record is built from the ante, so the policy
   holds by construction. *Coach, ruled:* make the new code look like the current code; no added
   check on the device; the bastion adapters re-run the policy inside their databases.

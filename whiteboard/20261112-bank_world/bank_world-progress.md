@@ -26,6 +26,9 @@ What the threads have taught, newer than the plan where they disagree. Kept by t
 * *Coach, 2026-11-12, on R3's device-side check (for 8c):* "There are two notable security boundaries in the library: isUnlocked, and the bastion side of the bankDB's backing store -- a postgres stored function, a convex function, etc. The bankDB code, for all it feels like a remote server, is right there in the same page with all the iFrames and chrome extensions. So some datastores will re-run the basic checks internally as well: is the wayin that is authorizing a gate change identical? These are not terribly robust now but could be made more so later. tl;dr -- make the new code look like the current code -- the adapters already do this. No bold thinking". So 8c moves today's device-side gate code as it is, adding no check; the policy re-run belongs to the bastion adapters (13, 14), inside their databases.
 * *Coach, 2026-11-12:* "your rescheduling sounds smart" (8a cut early from 7; 4b and 5 beside the 8 line).
 
+* *Coach, 2026-11-12, for 8b:* "have device be its world, that's smart": until thread 10 removes `world`, the Bank's world is the Device (answering the three members a listing world needs), not a private adapter.
+* *Coach, 2026-11-12:* `tidyGone`'s ask carries the scope only; the store judges by the bank row it finds there (confirmed: `BoxTidyAsk`, no `bank_tok`). Thread 4's review guard for a damaged bank row in `doTidyGone` is reverted in 4b under ground rule 24.
+
 ## The BankDB `do*` list
 
 *Thread 4:* each `do*` call fetches, judges and stores its whole verb in one atomic unit; the `classify*` calls are protected methods of `AdapterBankDB`, so a store that judges in-database (Postgres, Convex) overrides them.
