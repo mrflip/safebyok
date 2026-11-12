@@ -91,7 +91,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
 
   /** Replace the passphrase through a replace_passphrase gating. The passkey stays, and the vaultKey does not change. */
   async replacePassphrasePrompt(): Promise<this> {
-    await this.ensureTimely(); this.world.demandPromptable()
+    await this.ensureTimely(VX.Promptly); this.world.demandPromptable()
     await this.world.prompt('replace_passphrase')
     return this
   }
