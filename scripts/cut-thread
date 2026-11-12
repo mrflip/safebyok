@@ -6,7 +6,10 @@
 #
 # The branch tracks nothing it was cut from: its upstream is origin's branch of the same name,
 # which its first push creates. A branch tracking origin/main would push to main. The base's SHA
-# is kept as `branch.<branch>.sprintbase`, where a reviewer and scripts/file-thread look for it.
+# is kept as `branch.<branch>.sprintbase`, where a reviewer and scripts/file-thread look for it;
+# when the base names a branch (local, or `origin/...`) other than main, its name is kept as
+# `branch.<branch>.sprintbasebranch`, so file-thread can rebase the thread onto that branch's
+# later tip, or onto main once it has merged.
 # Then it runs `pnpm install` in the new worktree, unless given --no-install.
 #
 # Usage: scripts/cut-thread [--no-install] <label> [<base>]
@@ -53,6 +56,15 @@ git worktree add --quiet --no-track -b "$branch" "$root" "$sha"
 git -C "$root" config "branch.${branch}.remote" origin
 git -C "$root" config "branch.${branch}.merge" "refs/heads/${branch}"
 git -C "$root" config "branch.${branch}.sprintbase" "$sha"
+basebranch=""
+if git show-ref --verify --quiet "refs/heads/${base}"; then
+  basebranch="$base"
+elif [[ "$base" == origin/* ]] && git show-ref --verify --quiet "refs/remotes/${base}"; then
+  basebranch="${base#origin/}"
+fi
+if [[ -n "$basebranch" && "$basebranch" != "main" ]]; then
+  git -C "$root" config "branch.${branch}.sprintbasebranch" "$basebranch"
+fi
 echo "cut-thread: $branch, from $base at ${sha:0:8}" >&2
 if [[ "$install" -eq 1 ]]; then
   (cd "$root" && pnpm install >&2)
