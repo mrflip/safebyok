@@ -75,7 +75,10 @@ export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'Add
 export type VaultStage = 'bankless' | 'absent' | 'present' | 'spent'
 
 /** What `useVault` returns: the vault's stage, the Vault object while `present`, and the reason the device ended once `spent`. */
-export type VaultLifecycle = { stage: 'bankless' | 'absent', vault: null } | { stage: 'present', vault: Vault } | { stage: 'spent', vault: null, cause: VaultError }
+export type VaultLifecycle =
+  | { stage: Extract<VaultStage, 'bankless' | 'absent'>, vault: null }
+  | { stage: Extract<VaultStage, 'present'>, vault: Vault }
+  | { stage: Extract<VaultStage, 'spent'>, vault: null, cause: VaultError }
 // --
 
 // == [Helpers]: CreatePasskeyOpts, AskPasskeyOpts, PasskeyChecks

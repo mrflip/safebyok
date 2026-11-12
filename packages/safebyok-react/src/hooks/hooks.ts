@@ -44,7 +44,7 @@ function useDeviceSnapshotFor(hookname: string): DeviceSnapshot | null {
 }
 // --
 
-// == [Vault hooks]: VaultStage, VaultLifecycle, useVault, useVaultFor, useVaultSnapshot, BanklessLifecycle, AbsentLifecycle, watchedLives
+// == [Vault hooks]: useVault, useVaultFor, useVaultSnapshot, BanklessLifecycle, AbsentLifecycle, watchedLives
 
 const BanklessLifecycle: VaultLifecycle = Object.freeze({ stage: 'bankless', vault: null })
 const AbsentLifecycle: VaultLifecycle = Object.freeze({ stage: 'absent', vault: null })
