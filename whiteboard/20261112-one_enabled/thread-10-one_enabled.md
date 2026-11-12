@@ -1,6 +1,6 @@
 # Thread 10: one_enabled (2026-11-12)
 
-Branch `20261112-one_enabled`, PR #TBD, stacked on #674 (thread 9). Justify: green (safebyok 3382 tests; every
+Branch `20261112-one_enabled`, PR #677, stacked on #674 (thread 9). Justify: green (safebyok 3382 tests; every
 package green). `src/`: 515 lines added, 517 removed (rule 16, barely). Tests: 413 added, 386 removed.
 
 * **Built**
