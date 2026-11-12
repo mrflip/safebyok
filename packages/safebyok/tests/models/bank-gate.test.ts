@@ -459,7 +459,7 @@ describe("vault.del()", () => {
     await TH.expectRefusal(boxes.get({ ...vault.scope, boxlabel }, { maxMillisSinceRefresh: 0 }), 'disabled')
   })
 
-  it("refuses 'bank_locked' in a locked bank, asking nobody and storing nothing", async () => {
+  it("refuses 'bank_locked' in a locked bank", async () => {
     const born = await makeBornVault()
     const { vault, storedNow } = born
     const ante = storedNow()
