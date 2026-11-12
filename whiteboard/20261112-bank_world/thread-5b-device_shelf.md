@@ -1,6 +1,6 @@
 # Thread 5b: device_shelf (2026-11-12)
 
-Branch `20261112-device_shelf`, PR to be filed, stacked on #673. Justify: green (core 3403, indexeddb 378, root 287, every package green).
+Branch `20261112-device_shelf`, PR #675, stacked on #673. Justify: green (core 3403, indexeddb 378, root 287, every package green).
 
 * **Built**:
   * `dbprefixOf(dbName?)` in `packages/safebyok/src/storage/idb-shelf.ts`, exported from `safebyok/storage`: `safebyok`, or `safebyok-<dbName>`. Every database name is `<prefix>:<store>-v<version>`.
