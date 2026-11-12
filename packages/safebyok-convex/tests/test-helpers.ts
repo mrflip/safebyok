@@ -4,8 +4,8 @@ import { convexTest, defineTestApp } from 'convex-test'
 import * as DB from 'safebyok/storage'
 import { boxDelAskOf, boxGetAskOf, boxPutAskOf, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultScope } from 'safebyok/testing'
 import type { ComponentApi } from '../src/component-api'
-import { SafebyokComponent } from '../src/server'
-import type { GetUserId, SafebyokApi, SafebyokErrorData } from '../src/server'
+import { SafebyokBankComponent, SafebyokComponent } from '../src/server'
+import type { GetUserId, SafebyokApi, SafebyokBankApi, SafebyokErrorData } from '../src/server'
 import { modules, register, schema } from '../src/test'
 
 // Re-export the core's test helpers, so a test here can star-import this one module as TH.
@@ -17,6 +17,9 @@ export const vaults = anyApi['vaults'] as unknown as ComponentApi['vaults']
 /** The same functions typed as a client calls them (`SafebyokApi`): no host wrapper and no auth. */
 export const rootApi = anyApi['vaults'] as unknown as SafebyokApi
 
+/** The component's bankDB functions typed as a client calls them (`SafebyokBankApi`), at the root: no host wrapper and no auth. */
+export const rootBankApi = anyApi['banks'] as unknown as SafebyokBankApi
+
 /** Make a fresh in-memory backend with only the component, its functions at the root. Pass true to enforce Convex's transaction limits. */
 export function componentTest(transactionLimits = false) { return convexTest({ schema, modules, transactionLimits }) }
 
@@ -27,6 +30,12 @@ export function componentHost() { return { api: anyApi, createTest: () => compon
 export function hostWith(getUserId: GetUserId) {
   const { app, component } = installedComponent()
   return app.defineModules({ safebyok: component.api({ getUserId }) })
+}
+
+/** Make a host app set up as the README shows for the bankDB: the component installed as `safebyok`, and its bankDB functions served from `convex/safebyokBank.ts` using `getUserId`. */
+export function bankHostWith(getUserId: GetUserId) {
+  const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
+  return app.defineModules({ safebyokBank: new SafebyokBankComponent(app.components.safebyok).api({ getUserId }) })
 }
 
 /** Make a host app with the component installed as `safebyok`, and the SafebyokComponent that wraps it. */

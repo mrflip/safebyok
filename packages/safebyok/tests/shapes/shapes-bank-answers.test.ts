@@ -65,6 +65,13 @@ describe("WX's answer checks", () => {
     }
   })
 
+  it("reads a delBank answer that leaves out its parent as having none", async () => {
+    const bankDB = await bankDBWithBox()
+    const deleted = await bankDB.tryDelBank(bankDelAskOf(bankAt()))
+    const { parent: _parent, ...sent } = crossed(deleted) as Record<string, unknown>
+    expect(WX.delBankAnswer.parse(sent)).to.deep.include({ ok: true, parent: null })
+  })
+
   it("parses a serialized refusal to a VaultError of its kind, with its parent", async () => {
     const answer = await new MemoryBankDB().tryPutVault(vaultPutAskOf(vaultAt()))
     expect(answer.ok).to.be.false

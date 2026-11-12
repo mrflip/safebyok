@@ -18,11 +18,11 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
 
 * [tests/convex/](tests/convex) -- `safebyok-convex` with `ConvexReactClient`, over the fake
   deployment `safebyok-convex/testing` ships:
-  * [convex-vault-db.test.ts](tests/convex/convex-vault-db.test.ts) -- the `VaultDB` battery, the
-    refusals, the subscriptions and sign-out, and a vault on two devices (one `ConvexClient`, one
-    `ConvexReactClient`), each run over the React client. Its loops are copies of the ones in
-    `packages/safebyok-convex/tests/convex-vault-db.test.ts`, which run over `ConvexClient`: a
-    change to a looped test is made in both.
+  * [convex-bank-db.test.ts](tests/convex/convex-bank-db.test.ts) -- the `BankDB` battery over
+    `ConvexBankDB`, and a host's own functions serving the user signed in, refusing anyone else,
+    and notifying a second watch on the same client. Its battery hooks are copies of the ones in
+    `packages/safebyok-convex/tests/convex-bank-db.test.ts`, which run over `ConvexClient`: a
+    change to one is made in both.
   * [test-helpers.ts](tests/convex/test-helpers.ts) -- a host app built from `safebyok-convex`'s
     published entries alone, as a host's own tests would.
 
@@ -39,19 +39,18 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
   * [test-helpers.ts](tests/postgres/test-helpers.ts) -- the file databases, the devices, and
     **`OnRealPostgres`, the list of suites that run against the server**. The rest of the
     Postgres tests stay in `packages/safebyok-postgres`, over a PGlite. To run one more suite on the
-    server, add it to the list. A file database holds the bankDB's tables, or, for
-    `tests/graphql/`, the vaultDB's: their functions share names.
+    server, add it to the list. A file database holds the bankDB's tables and functions.
 
 * [tests/graphql/](tests/graphql) -- `safebyok-graphql`'s README recipe, both halves, over real
-  sockets: `GraphQLVaultDB` over an urql Client posting to Yoga servers, each on its own port and
-  hosting a `PostgresVaultDB` over the real Postgres above. It runs where the Postgres tests do, as
+  sockets: `GraphQLBankDB` over an urql Client posting to Yoga servers, each on its own port and
+  hosting a `PostgresBankDB` over the real Postgres above. It runs where the Postgres tests do, as
   `graphql` in `OnRealPostgres`.
-  * [graphql-vault-db.test.ts](tests/graphql/graphql-vault-db.test.ts) -- the `VaultDB` battery
+  * [graphql-bank-db.test.ts](tests/graphql/graphql-bank-db.test.ts) -- the bankDB battery
     through the network, a browser on one server receiving what a browser on another server puts,
     the server's watch ending when the browser stops watching, and the refusal of a browser signed
     in as another user.
   * [test-helpers.ts](tests/graphql/test-helpers.ts) -- the servers and the browsers, over the
-    databases and `PostgresVaultDB`s that the Postgres directory's helpers make.
+    databases and `PostgresBankDB`s that the Postgres directory's helpers make.
 
 The packages are read as a consumer reads them: through their built `dist/`, which the `test`
 script builds first, except `safebyok-convex/test`, which ships as source.

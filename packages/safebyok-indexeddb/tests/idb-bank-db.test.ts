@@ -10,8 +10,6 @@ import { BankDBVersion, bankScopepathOf, boxPlaceOf, boxScopepathOf, filedIn, ga
 import { IdbBankDB, idbBankDB } from '../src/idb-bank-db'
 import type { IdbBankDBOpts } from '../src/idb-bank-db'
 
-const BW = TH.BankDBWorld
-
 // == [World]: databaseNameOf, makeBankDB, idbRowsOf, failNextCall, dbNamesNow, plantClosedDB
 
 /** The database name each BankDB under test was made with. */
@@ -36,7 +34,7 @@ const makeBankDB = (opts: IdbBankDBOpts = {}): IdbBankDB => {
 async function connectionOf(bankDB: IdbBankDB): Promise<unknown> {
   const transaction = vi.spyOn(IDBDatabase.prototype, 'transaction')
   try {
-    await bankDB.ensureBank(BW.bankEnsureAsk)
+    await bankDB.ensureBank(TH.BW.bankEnsureAsk)
     return transaction.mock.contexts[0]
   } finally {
     transaction.mockRestore()
@@ -131,10 +129,10 @@ describe("IdbBankDB's databases", () => {
   it("keeps the rows of each dbName apart", async () => {
     const bankDB = makeBankDB()
     const other = makeBankDB()
-    await bankDB.buildBank(BW.bankBuildAskOf())
-    const { val: otherEnsured } = await other.ensureBank(BW.bankEnsureAsk)
+    await bankDB.buildBank(TH.BW.bankBuildAskOf())
+    const { val: otherEnsured } = await other.ensureBank(TH.BW.bankEnsureAsk)
     const twin = await makeTwin(bankDB)
-    const { val: twinEnsured } = await twin.ensureBank(BW.bankEnsureAsk)
+    const { val: twinEnsured } = await twin.ensureBank(TH.BW.bankEnsureAsk)
     expect(otherEnsured).to.be.null
     expect(twinEnsured).to.not.be.null
   })
@@ -142,11 +140,11 @@ describe("IdbBankDB's databases", () => {
   it("keeps apart the rows of users whose ids share a beginning", async () => {
     const bankDB = makeBankDB()
     const longer = { ...TH.bankScope, user_id: `${TH.bankScope.user_id}0` }
-    await bankDB.buildBank(BW.bankBuildAskOf())
-    await bankDB.putVault(BW.vaultPutAskOf(BW.vaultAt()))
-    await bankDB.putBox(BW.boxPutAskOf(BW.boxAt()))
-    await bankDB.buildBank(BW.bankBuildAskOf({ ...BW.bankAt(), ...longer }, { ...BW.gateAt(), ...longer }))
-    const { val: ensured } = await bankDB.ensureBank({ ...BW.bankEnsureAsk, ...longer })
+    await bankDB.buildBank(TH.BW.bankBuildAskOf())
+    await bankDB.putVault(TH.BW.vaultPutAskOf(TH.BW.vaultAt()))
+    await bankDB.putBox(TH.BW.boxPutAskOf(TH.BW.boxAt()))
+    await bankDB.buildBank(TH.BW.bankBuildAskOf({ ...TH.BW.bankAt(), ...longer }, { ...TH.BW.gateAt(), ...longer }))
+    const { val: ensured } = await bankDB.ensureBank({ ...TH.BW.bankEnsureAsk, ...longer })
     const { val: tidied } = await bankDB.tidyGone({ ...TH.boxTidyAsk, ...longer })
     expect(ensured?.vaults).to.be.empty
     expect(tidied.totalCount).to.eq(0)
@@ -157,7 +155,7 @@ describe("IdbBankDB's databases", () => {
     const notices: unknown[] = []
     const unwatch = bankDB.watch(TH.bankScope, (notice) => { notices.push(notice) })
     const twin = await makeTwin(bankDB)
-    await twin.buildBank(BW.bankBuildAskOf())
+    await twin.buildBank(TH.BW.bankBuildAskOf())
     await TH.eventually(() => notices.length > 0)
     expect(notices.length).to.be.greaterThan(0)
     unwatch()
@@ -170,7 +168,7 @@ describe("IdbBankDB's watch", () => {
     const heardOnVaultChannel: unknown[] = []
     const vaultBell = new BroadcastChannel(`safebyok-indexeddb:${dbNameOf.get(bankDB)!}`)
     vaultBell.addEventListener('message', ({ data }) => { heardOnVaultChannel.push(data) })
-    await bankDB.buildBank(BW.bankBuildAskOf())
+    await bankDB.buildBank(TH.BW.bankBuildAskOf())
     await TH.aWhile()
     vaultBell.close()
     expect(heardOnVaultChannel).to.be.empty
@@ -180,7 +178,7 @@ describe("IdbBankDB's watch", () => {
 describe("IdbBankDB's database name and wipe", () => {
   it("names its database for this library and its version, whatever the host's dbName", async () => {
     const bankDB = makeBankDB()
-    await bankDB.ensureBank(BW.bankEnsureAsk)
+    await bankDB.ensureBank(TH.BW.bankEnsureAsk)
     const names = await dbNamesNow()
     expect(names).to.include(databaseNameOf(dbNameOf.get(bankDB)!))
     expect(names.filter((dbname) => dbname.includes(dbNameOf.get(bankDB)!))).to.satisfy((own: string[]) => own.every((dbname) => dbname.startsWith('safebyok-')))
@@ -192,7 +190,7 @@ describe("IdbBankDB's database name and wipe", () => {
     const oldnames = [`safebyok-${dbName}:bank-v1`, `safebyok-${dbName}:bank-v001-001-000`, `safebyok-${dbName}:bank-v000-009-009`]
     for (const oldname of oldnames) { await plantClosedDB(oldname) }
     expect(await dbNamesNow()).to.include.members(oldnames)
-    await new IdbBankDB({ dbName }).ensureBank(BW.bankEnsureAsk)
+    await new IdbBankDB({ dbName }).ensureBank(TH.BW.bankEnsureAsk)
     await vi.waitFor(async () => {
       const dbnames = await dbNamesNow()
       expect(dbnames.filter((dbname) => oldnames.includes(dbname))).to.deep.equal([])
@@ -203,7 +201,7 @@ describe("IdbBankDB's database name and wipe", () => {
     const dbName = `test-${crypto.randomUUID()}`
     const kept = [`safebyok-${dbName}:bank-v001-002-000`, `${dbName}:vaults-v001-001-001`, `${dbName}:device_db`, `${dbName}:device-v001-001-001`, `safebyok-other-${dbName}:bank-v000-000-001`]
     for (const keptname of kept) { await plantClosedDB(keptname) }
-    await new IdbBankDB({ dbName }).ensureBank(BW.bankEnsureAsk)
+    await new IdbBankDB({ dbName }).ensureBank(TH.BW.bankEnsureAsk)
     await TH.aWhile()
     expect(await dbNamesNow()).to.include.members(kept)
   })
@@ -221,7 +219,7 @@ describe("IdbBankDB's refusals", () => {
     it(blurb, async () => {
       const bankDB = makeBankDB()
       vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementationOnce(() => { throw new DOMException('IndexedDB says no.', errname) })
-      const building = bankDB.buildBank(BW.bankBuildAskOf())
+      const building = bankDB.buildBank(TH.BW.bankBuildAskOf())
       const refusal = await TH.expectRefusal(building, refusalkind)
       expect(refusal.message).to.match(said)
       expect(refusal.cause).to.have.property('name', errname)
@@ -234,7 +232,7 @@ describe("IdbBankDB's refusals", () => {
       this.transaction.abort()
       return undefined as never
     })
-    const building = bankDB.buildBank(BW.bankBuildAskOf())
+    const building = bankDB.buildBank(TH.BW.bankBuildAskOf())
     await TH.expectRefusal(building, 'storage_unavailable')
     expect(await idbRowsOf(bankDB).bankRowOf(TH.bankScope)).to.be.null
   })
@@ -248,7 +246,7 @@ describe("IdbBankDB's refusals", () => {
     it(blurb, async () => {
       const bankDB = makeBankDB()
       vi.stubGlobal('indexedDB', absent)
-      const refusal = await TH.expectRefusal(bankDB.ensureBank(BW.bankEnsureAsk), 'storage_blocked')
+      const refusal = await TH.expectRefusal(bankDB.ensureBank(TH.BW.bankEnsureAsk), 'storage_blocked')
       expect(refusal.message).to.match(/no IndexedDB/)
     })
   }

@@ -1,11 +1,11 @@
-/** VaultSchemaSdl compared with the core's checks: every schema type has exactly the fields its check expects. */
+/** BankSchemaSdl compared with the core's checks: every schema type has exactly the fields its check expects. */
 
 import { describe, expect, it } from 'vitest'
 import { buildSchema, getNamedType, isInputObjectType, isLeafType, isObjectType, isUnionType } from 'graphql'
 import type { GraphQLField, GraphQLInputObjectType, GraphQLInputType, GraphQLNamedType, GraphQLObjectType, GraphQLOutputType, GraphQLSchema } from 'graphql'
 import type * as Z from 'zod'
-import * as DB from 'safebyok/storage'
-import { VaultSchemaSdl } from '../src/server'
+import { BX } from 'safebyok/storage'
+import { BankSchemaSdl } from '../src/server'
 
 // == [The walk]: schemaDriftOf, driftOf
 
@@ -70,7 +70,7 @@ function driftOf(check: Check, gqltype: GraphQLOutputType | GraphQLInputType, pa
 /** List the mismatches between the check's `shape` and the one of `fieldedTypes` whose fields match it, at `path`. */
 function shapeDriftOf(shape: CheckShape, fieldedTypes: readonly FieldedType[], path: string): string[] {
   const fieldnames = Object.keys(shape)
-  // The schema may leave out a field that the check only ever allows to be null (such as listVaults' dbhas): the check's default fills it in.
+  // The schema may leave out a field that the check only ever allows to be null (such as listBoxes' dbhas): the check's default fills it in.
   const optional = new Set(fieldnames.filter((fieldname) => choicesOf(shape[fieldname]!).length === 0))
   function fits(gqlnames: string[]) {
     return gqlnames.every((gqlname) => fieldnames.includes(gqlname)) && fieldnames.every((fieldname) => gqlnames.includes(fieldname) || optional.has(fieldname))
@@ -110,82 +110,87 @@ function schemaDriftOf(schema: GraphQLSchema): string[] {
 }
 // --
 
-// == [The checks]: AnswerChecks, InputChecks
+// == [The checks]: AnswerChecks, InputChecks, gateVerbAsk
 
-// The check GraphQLVaultDB parses each root field's answer with.
+// The check GraphQLBankDB parses each root field's answer with.
 const AnswerChecks = [
-  ['safebyokListVaults',        DB.listVaultsAnswer],
-  ['safebyokGetVault',          DB.getVaultAnswer],
-  ['safebyokListBoxes',         DB.listBoxesAnswer],
-  ['safebyokGetBox',            DB.getBoxAnswer],
-  ['safebyokPutVault',          DB.putVaultAnswer],
-  ['safebyokPutBox',            DB.putBoxAnswer],
-  ['safebyokReplacePassphrase', DB.replacePassphraseAnswer],
-  ['safebyokAddPasskey',        DB.addPasskeyAnswer],
-  ['safebyokRevokePasskey',     DB.revokePasskeyAnswer],
-  ['safebyokDelBox',            DB.delBoxAnswer],
-  ['safebyokDelVault',          DB.delVaultAnswer],
-  ['safebyokTidyGone',          DB.tidyGoneAnswer],
-  ['safebyokWatch',             DB.crossedNotice],
+  ['safebyokEnsureBank',        BX.ensureBankAnswer],
+  ['safebyokGetVault',          BX.getVaultAnswer],
+  ['safebyokListBoxes',         BX.listBoxesAnswer],
+  ['safebyokGetBox',            BX.getBoxAnswer],
+  ['safebyokBuildBank',         BX.buildBankAnswer],
+  ['safebyokReplacePassphrase', BX.replacePassphraseAnswer],
+  ['safebyokAddPasskey',        BX.addPasskeyAnswer],
+  ['safebyokRevokePasskey',     BX.revokePasskeyAnswer],
+  ['safebyokDelBank',           BX.delBankAnswer],
+  ['safebyokPutVault',          BX.putVaultAnswer],
+  ['safebyokDelVault',          BX.delVaultAnswer],
+  ['safebyokPutBox',            BX.putBoxAnswer],
+  ['safebyokDelBox',            BX.delBoxAnswer],
+  ['safebyokTidyGone',          BX.tidyGoneAnswer],
+  ['safebyokWatch',             BX.crossedNotice],
 ] as const
 
-// The check GraphQLVaultDB parses each input object with before sending it, and the server's vaultDB parses it with again.
+// A gate verb's mutation names its verb, so its ask is the gate's put without `gateVerb`: the walk reads only a check's definition.
+const { gateVerb: _gateVerb, ...gateVerbShape } = defOf(BX.gatePut).shape!
+const gateVerbAsk = { _zod: { def: { type: 'object', shape: gateVerbShape } } } as unknown as Check
+
+// The check GraphQLBankDB parses each input object with before sending it, and the server's bankDB parses it with again.
 const InputChecks = [
-  ['safebyokGetVault',          'ask',    DB.vaultGet],
-  ['safebyokGetBox',            'ask',    DB.boxGet],
-  ['safebyokPutVault',          'ask',    DB.vaultPut],
-  ['safebyokPutBox',            'ask',    DB.boxPut],
-  ['safebyokReplacePassphrase', 'record', DB.vaultRecord],
-  ['safebyokReplacePassphrase', 'opts',   DB.gateVerbOpts],
-  ['safebyokAddPasskey',        'record', DB.vaultRecord],
-  ['safebyokAddPasskey',        'opts',   DB.gateVerbOpts],
-  ['safebyokRevokePasskey',     'record', DB.vaultRecord],
-  ['safebyokRevokePasskey',     'opts',   DB.gateVerbOpts],
-  ['safebyokDelBox',            'ask',    DB.boxDel],
-  ['safebyokDelVault',          'ask',    DB.vaultDel],
+  ['safebyokGetVault',          'ask', BX.vaultGet],
+  ['safebyokGetBox',            'ask', BX.boxGet],
+  ['safebyokBuildBank',         'ask', BX.bankBuild],
+  ['safebyokReplacePassphrase', 'ask', gateVerbAsk],
+  ['safebyokAddPasskey',        'ask', gateVerbAsk],
+  ['safebyokRevokePasskey',     'ask', gateVerbAsk],
+  ['safebyokDelBank',           'ask', BX.bankDel],
+  ['safebyokPutVault',          'ask', BX.vaultPut],
+  ['safebyokDelVault',          'ask', BX.vaultDel],
+  ['safebyokPutBox',            'ask', BX.boxPut],
+  ['safebyokDelBox',            'ask', BX.boxDel],
 ] as const
 // --
 
-describe("VaultSchemaSdl", () => {
+describe("BankSchemaSdl", () => {
   it("has each field the core's checks read, and no other", () => {
-    expect(schemaDriftOf(buildSchema(VaultSchemaSdl))).to.deep.equal([])
+    expect(schemaDriftOf(buildSchema(BankSchemaSdl))).to.deep.equal([])
   })
 
   it("fails the drift check when it lacks a field a check reads", () => {
-    const shorted = buildSchema(VaultSchemaSdl.replace('  cipher_iv_b64:  String!\n', ''))
+    const shorted = buildSchema(BankSchemaSdl.replace('  cipher_iv_b64:  String!\n', ''))
     const drift = schemaDriftOf(shorted)
     expect(drift).to.not.be.empty
     expect(drift.join('\n')).to.include('cipher_iv_b64')
   })
 
   it("fails the drift check when it has a field no check reads", () => {
-    const padded = buildSchema(VaultSchemaSdl.replace('  message:     String!\n', '  message:     String!\n  hint:        String\n'))
+    const padded = buildSchema(BankSchemaSdl.replace('  message:     String!\n', '  message:     String!\n  hint:        String\n'))
     expect(schemaDriftOf(padded).join('\n')).to.include('hint')
   })
 
   it("fails the drift check when it sends an object where a check reads a scalar", () => {
-    const deepened = buildSchema(VaultSchemaSdl.replace('  refusalkind: SafebyokRefusalkind!\n', '  refusalkind: SafebyokAskRow!\n'))
+    const deepened = buildSchema(BankSchemaSdl.replace('  refusalkind: SafebyokRefusalkind!\n', '  refusalkind: SafebyokAskRow!\n'))
     expect(schemaDriftOf(deepened).join('\n')).to.include('refusalkind')
   })
 
   it("fails the drift check when an ask lacks a field of the row it expects", () => {
-    const shorted = buildSchema(VaultSchemaSdl.replace(/(input SafebyokBoxExpectedInput \{[^}]*?)\n {2}box_tok: {6}String!/u, '$1'))
+    const shorted = buildSchema(BankSchemaSdl.replace(/(input SafebyokBoxExpectedInput \{[^}]*?)\n {2}box_tok: {6}String!/u, '$1'))
     expect(schemaDriftOf(shorted).join('\n')).to.include('safebyokPutBox(ask).expected')
   })
 })
 
 describe("the schema walk", () => {
   it("reads every root field and input object the schema has", () => {
-    const rootFields = rootFieldsOf(buildSchema(VaultSchemaSdl))
+    const rootFields = rootFieldsOf(buildSchema(BankSchemaSdl))
     expect(AnswerChecks.map(([fieldname]) => fieldname)).to.have.members(rootFields.map((field) => field.name))
     const inputArgs = rootFields.flatMap((field) => field.args.filter((arg) => isInputObjectType(getNamedType(arg.type))).map((arg) => `${field.name}(${arg.name})`))
     expect(InputChecks.map(([fieldname, argname]) => `${fieldname}(${argname})`)).to.have.members(inputArgs)
   })
 
   it("reaches past a union to each of its types", () => {
-    const schema = buildSchema(VaultSchemaSdl)
+    const schema = buildSchema(BankSchemaSdl)
     expect(isObjectType(schema.getType('SafebyokBoxRecord'))).to.be.true
-    const shorted = buildSchema(VaultSchemaSdl.replace(/(type SafebyokBoxRecord \{[^}]*?)\n {2}sidecar: {16}SafebyokJson!/u, '$1'))
+    const shorted = buildSchema(BankSchemaSdl.replace(/(type SafebyokBoxRecord \{[^}]*?)\n {2}sidecar: {16}SafebyokJson!/u, '$1'))
     expect(schemaDriftOf(shorted).join('\n')).to.include('sidecar')
   })
 })

@@ -1,37 +1,50 @@
-/** GraphQLVaultDB calling the resolvers in-process, backed by a PostgresVaultDB on PGlite: the battery every VaultDB runs. */
+/** GraphQLBankDB calling the resolvers in-process, backed by a PostgresBankDB on PGlite: the battery every bankDB runs. */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Client, CombinedError } from '@urql/core'
 import { GraphQLError } from 'graphql'
 import * as DB from 'safebyok/storage'
-import { GraphQLVaultDB } from '../src/index'
+import type { BX } from 'safebyok/storage'
+import { GraphQLBankDB } from '../src/index'
 import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
 
-describe("GraphQLVaultDB over the typed schema", () => {
-  TH.describeVaultDBBattery("GraphQLVaultDB", {
-    makeVaultDB:          async (opts) => await TH.makeVaultDB(opts),
-    makeCappedVaultDB:    async (maxBoxes) => await TH.makeVaultDB({}, maxBoxes),
-    makeTwin:             TH.makeTwin,
-    makeVaultDBFor:       async () => {
+describe("GraphQLBankDB over the typed schema", () => {
+  TH.describeBankDBBattery("GraphQLBankDB", {
+    makeBankDB:          async (opts) => await TH.makeBankDB(opts),
+    makeCappedBankDB:    async (maxBoxes) => await TH.makeBankDB({ maxBoxes }),
+    makeTwin:            TH.makeTwin,
+    makeBankDBFor:       async () => {
       await TH.emptyTables()
       const schema = TH.schemaOver(await TH.serverOver())
       return (user_id) => TH.browserOver(schema, TH.signedInAs(user_id))
     },
-    _cheat_rowsOf:        () => TH.rowsOf(),
-    _cheat_failNextCall:  (vaultDB) => { vaultDB.failNext() },
-    _cheat_adapterOf:     TH.adapterOf,
+    _cheat_rowsOf:       () => TH.rowsOf(),
+    _cheat_failNextCall: (bankDB) => { bankDB.failNext() },
+    _cheat_adapterOf:    TH.adapterOf,
   })
 
   it("keeps a sidecar's own __typename while dropping the ones urql's cache adds", async () => {
-    const vaultDB = await TH.makeVaultDB()
-    await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
+    const bankDB = await TH.makeBankDB()
+    await bankDB.buildBank(TH.BW.bankBuildAskOf())
+    await bankDB.putVault(TH.BW.vaultPutAskOf(TH.BW.vaultAt()))
     const sidecar = { __typename: 'Recipe', nested: { __typename: 'Step' } }
-    await vaultDB.putBox(TH.boxPutAskOf(TH.boxAt(0, 'life1', { sidecar })))
-    const { val, world } = await vaultDB.getBox(TH.boxGetAskOf())
+    await bankDB.putBox(TH.BW.boxPutAskOf(TH.BW.boxAt(0, 'bank1', 'life1', { sidecar })))
+    const { val, parent } = await bankDB.getBox(TH.BW.boxGetAskOf())
     expect(val).to.have.deep.property('sidecar', sidecar)
-    expect(world).to.deep.eq(TH.vaultAt())
+    expect(parent).to.deep.eq(TH.BW.vaultAt())
+  })
+
+  it("answers a gate with no passkey wayin without its passkey0, and one with it whole", async () => {
+    const bankDB = await TH.makeBankDB()
+    const { val: built } = await bankDB.buildBank(TH.BW.bankBuildAskOf())
+    expect(built).to.deep.eq(TH.BW.gateAt())
+    const wayins = { main: TH.BW.mainWayin, passkey0: TH.BW.passkey0Wayin }
+    const { val: added } = await bankDB.addPasskey(TH.BW.gatePutAskOf('addPasskey', built, wayins))
+    expect(added.wayins).to.deep.eq(wayins)
+    const { val: ensured } = await bankDB.ensureBank(TH.BW.bankEnsureAsk)
+    expect(ensured?.gates.main).to.deep.eq(added)
   })
 })
 
@@ -40,7 +53,7 @@ describe("GraphQLVaultDB over the typed schema", () => {
 /** The result one call of a fake client returns, shaped like urql's `OperationResult`. */
 type FakeResult = { data?: unknown, error?: CombinedError, hasNext?: boolean }
 
-/** Make a GraphQLVaultDB on a fake urql Client. Queries and mutations resolve `asked`.
+/** Make a GraphQLBankDB on a fake urql Client. Queries and mutations resolve `asked`.
  * Each subscription's callback is pushed to `streams` for the test to call, after first receiving `atOnce` if given.
  * `counts.unsubscribed` counts the unsubscribes.
  */
@@ -58,56 +71,56 @@ function fakeClient(asked: FakeResult = {}, atOnce?: FakeResult) {
       },
     }),
   }
-  return { vaultDB: new GraphQLVaultDB({ client: client as never }), streams, counts }
+  return { bankDB: new GraphQLBankDB({ client: client as never }), streams, counts }
 }
 
 /** Start a watch on a fake client, collecting its notices in `heard` and its bad news in `badnews`. */
 function watched(atOnce?: FakeResult) {
-  const { vaultDB, streams, counts } = fakeClient({}, atOnce)
-  const heard: DB.Notice[] = []
+  const { bankDB, streams, counts } = fakeClient({}, atOnce)
+  const heard: BX.Notice[] = []
   const badnews: DB.VaultError[] = []
-  const stop = vaultDB.watch(TH.bankScope, (notice) => { heard.push(notice) }, (news) => { badnews.push(news) })
+  const stop = bankDB.watch(TH.BW.bankScope, (notice) => { heard.push(notice) }, (news) => { badnews.push(news) })
   return { streams, counts, heard, badnews, stop }
 }
 
-const gotNotice = { safebyokWatch: { __typename: 'SafebyokNotice', ok: true, act: 'gotlive', val: { __typename: 'SafebyokVaultRecord', ...TH.vaultAt() }, world: null, err: null } }
-const revokedNotice = { safebyokWatch: { ok: false, act: 'unclassified_storing', val: null, world: null, err: { refusalkind: 'identity_revoked', message: 'Signed out', meta: null } } }
+const gotNotice = { safebyokWatch: { __typename: 'SafebyokNotice', ok: true, act: 'gotlive', val: { __typename: 'SafebyokVaultRow', ...TH.BW.vaultAt() }, parent: null, err: null } }
+const revokedNotice = { safebyokWatch: { ok: false, act: 'unclassified_storing', val: null, parent: null, err: { refusalkind: 'identity_revoked', message: 'Signed out', meta: null } } }
 // --
 
-describe("GraphQLVaultDB's constructor", () => {
+describe("GraphQLBankDB's constructor", () => {
   it("refuses a client it cannot use, or an option it does not accept", () => {
     const client = new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] })
     const unusable = [{}, { client: { query: () => client } }, { client: 'urql' }, { client, maxRecordSizeEst: 0 }]
-    for (const opts of unusable) { TH.expectSyncRefusal(() => new GraphQLVaultDB(opts as never), 'bad_option') }
+    for (const opts of unusable) { TH.expectSyncRefusal(() => new GraphQLBankDB(opts as never), 'bad_option') }
   })
 })
 
-describe("GraphQLVaultDB's brands", () => {
-  it("is a VaultDB and not an AdapterVaultDB", () => {
-    const vaultDB = new GraphQLVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] }) })
-    expect(DB.isVaultDB(vaultDB)).to.be.true
-    expect(DB.isAdapterVaultDB(vaultDB)).to.be.false
+describe("GraphQLBankDB's brands", () => {
+  it("is a bankDB and not an AdapterBankDB", () => {
+    const bankDB = new GraphQLBankDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] }) })
+    expect(DB.isBankDB(bankDB)).to.be.true
+    expect(DB.isAdapterBankDB(bankDB)).to.be.false
   })
 })
 
-describe("GraphQLVaultDB's answers off the wire", () => {
+describe("GraphQLBankDB's answers off the wire", () => {
   it("refuses a GraphQL error with no cause", async () => {
     const combined = new CombinedError({ graphQLErrors: [new GraphQLError('Cannot query field "safebyokGetVault" on type "Query".')] })
-    const { vaultDB } = fakeClient({ error: combined })
-    const answer = await vaultDB.tryGetVault(TH.vaultGetAskOf())
-    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', world: null }).and.to.have.nested.property('err.refusalkind', 'unexpected_error')
-    expect(answer.ask).to.deep.include(TH.vaultScope)
+    const { bankDB } = fakeClient({ error: combined })
+    const answer = await bankDB.tryGetVault(TH.BW.vaultGetAskOf())
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', parent: null }).and.to.have.nested.property('err.refusalkind', 'unexpected_error')
+    expect(answer.ask).to.deep.include(TH.BW.vaultScope)
     expect(DB.isVaultError(answer.err, 'unexpected_error')).to.be.true
     expect(answer.err?.cause).to.be.undefined
     expect(answer.err?.meta).to.deep.include({ oplabel: 'getVault' })
-    await TH.expectRefusal(vaultDB.getVault(TH.vaultGetAskOf()), 'unexpected_error')
+    await TH.expectRefusal(bankDB.getVault(TH.BW.vaultGetAskOf()), 'unexpected_error')
   })
 
   it("refuses a failed request with a cause that carries only the error's name, HTTP status and code", async () => {
     const networkError = new Error('{"whisper_ciphered":"the record sent"}', { cause: { code: 'ECONNRESET', detail: 'the record sent' } })
     const combined = new CombinedError({ networkError, response: { status: 502, body: 'the record sent' } })
-    const { vaultDB } = fakeClient({ error: combined })
-    const { err } = await vaultDB.tryGetVault(TH.vaultGetAskOf())
+    const { bankDB } = fakeClient({ error: combined })
+    const { err } = await bankDB.tryGetVault(TH.BW.vaultGetAskOf())
     expect(DB.isVaultError(err, 'storage_unavailable')).to.be.true
     const cause = err?.cause as Error
     expect(cause).not.to.be.instanceOf(CombinedError)
@@ -117,24 +130,24 @@ describe("GraphQLVaultDB's answers off the wire", () => {
   })
 
   it("names only the error a request failed on, where it has no status or code", async () => {
-    const { vaultDB } = fakeClient({ error: new CombinedError({ networkError: new TypeError('Failed to fetch') }) })
-    const { err } = await vaultDB.tryGetVault(TH.vaultGetAskOf())
+    const { bankDB } = fakeClient({ error: new CombinedError({ networkError: new TypeError('Failed to fetch') }) })
+    const { err } = await bankDB.tryGetVault(TH.BW.vaultGetAskOf())
     expect(err?.cause).to.deep.include({ thrownName: 'TypeError', message: 'A request to the GraphQL server failed: TypeError.' })
     expect(err?.cause).not.to.have.any.keys('status', 'code')
   })
 
   it("refuses a server serving some other schema", async () => {
-    const { vaultDB } = fakeClient({ data: { somethingElse: 1 } })
-    await TH.expectRefusal(vaultDB.listVaults(TH.vaultListAsk), 'unexpected_error')
+    const { bankDB } = fakeClient({ data: { somethingElse: 1 } })
+    await TH.expectRefusal(bankDB.ensureBank(TH.BW.bankEnsureAsk), 'unexpected_error')
   })
 
   it("refuses a malformed ask before sending it", async () => {
-    const { vaultDB } = fakeClient({ data: null })
-    await TH.expectRefusal(vaultDB.getVault({ ...TH.vaultGetAskOf(), vaultlabel: '' }), 'bad_record')
+    const { bankDB } = fakeClient({ data: null })
+    await TH.expectRefusal(bankDB.getVault({ ...TH.BW.vaultGetAskOf(), vaultlabel: '' }), 'bad_record')
   })
 })
 
-describe("GraphQLVaultDB's watch", () => {
+describe("GraphQLBankDB's watch", () => {
   beforeEach(() => { vi.useFakeTimers() })
   afterEach(() => { vi.useRealTimers() })
 
@@ -142,7 +155,7 @@ describe("GraphQLVaultDB's watch", () => {
     const { streams, heard, stop } = watched()
     streams[0]?.({ data: gotNotice, hasNext: true })
     streams[0]?.({ data: gotNotice, hasNext: false })
-    expect(heard).to.deep.eq([{ act: 'gotlive', val: TH.vaultAt(), world: null }])
+    expect(heard).to.deep.eq([{ act: 'gotlive', val: TH.BW.vaultAt(), parent: null }])
     stop()
   })
 
@@ -190,7 +203,7 @@ describe("GraphQLVaultDB's watch", () => {
 
   it("passes on unchanged the refusal that ends a stream", () => {
     const { streams, badnews } = watched()
-    const scopeNotice = { safebyokWatch: { ok: false, act: 'unclassified_storing', val: null, world: null, err: { refusalkind: 'bad_scope', message: 'No such scope', meta: null } } }
+    const scopeNotice = { safebyokWatch: { ok: false, act: 'unclassified_storing', val: null, parent: null, err: { refusalkind: 'bad_scope', message: 'No such scope', meta: null } } }
     streams[0]?.({ data: scopeNotice, hasNext: true })
     streams[0]?.({ data: scopeNotice, hasNext: false })
     expect(badnews).to.have.length(1)

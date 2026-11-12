@@ -6,7 +6,7 @@ import { defineConfig } from 'tsdown'
 // package as a consumer would see it, and fail the build on anything they find. There are two
 // entry points: `.` for the browser and `./server` for the server. `safebyok`, `graphql` and
 // `@urql/core` are peer dependencies and stay external, so this adapter uses the host's own copy
-// of safebyok (its VaultDB and VaultError) and of graphql (its GraphQLError).
+// of safebyok (its BankDB and VaultError) and of graphql (its GraphQLError).
 export default defineConfig({
   entry:      ['src/index.ts', 'src/server.ts'],
   format:     ['esm', 'cjs'],
