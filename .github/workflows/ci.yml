@@ -1,15 +1,13 @@
 name: CI
 
-# A draft pull request is held, its jobs skipped, so a worker can push a draft as often as it
-# likes without filling the queue, until it carries the label `ci` or is taken out of draft
-# (PROCESS.md, Pull requests). The label is read at each push, never listened for: adding it
-# starts nothing, so a worker adds it before the push it expects green, and it stays. A skipped
-# job's check reads as passed, and the ruleset reads a commit's latest run of each check, so a run
-# that skips beside a real one on the same commit would mask a red or running result: with a
-# `labeled` trigger, every other label (the Coach's `queue`, Dependabot's) made one. Mergify's
-# batch pull requests (.mergify.yml) are drafts on `mergify/merge-queue/` branches, and its merge
-# conditions wait on their checks, so they always run. A held draft cannot merge, and a skipped
-# matrix job reports no `node-compat (22)` at all, which the ruleset shows as expected.
+# A draft pull request is held, its jobs skipped, until it carries the label `ci` or is taken out
+# of draft (PROCESS.md, Pull requests), so a draft can be pushed often without filling the queue.
+# The label is read at each push, and no label event starts a run: a worker adds it before the push
+# it expects green, and it stays on. Add no `labeled` trigger: a run that skips on a commit would
+# mask that commit's real run (.claude/skills/sprint/DESIGN.md). Mergify's batch pull requests
+# (.mergify.yml) are drafts on `mergify/merge-queue/` branches, and its merge conditions wait on
+# their checks, so they always run. A held draft cannot merge; its skipped matrix job reports a
+# bare `node-compat`, so the ruleset shows `node-compat (22)` as expected.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
