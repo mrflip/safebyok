@@ -427,6 +427,11 @@ returns what the classifier returned:
 | `doTidyGone`    | tidyGone                                         | none across its steps, as tidyBoxes                          |
 | `doWatch`       | watch                                            | none; a no-op unless the datastore can tell of writes        |
 
+The rows a `delBank` or `delVault` cascade deletes notify no watcher: a host refetches on the
+tombstone it does hear. A box row under another life pair (`bank_tok`, `vault_tok`) is no row, so
+an adapter that keys box rows by scope alone must check the pair before an `ifAbsent` put
+overwrites one.
+
 ## Roles
 
 Three roles take part in every call, and each rule below names the one it binds.

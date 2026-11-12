@@ -19,6 +19,8 @@ export { expectRefusal, expectSyncRefusal, expectGood, expectingGood, expectBad,
 export type { ExpectingGood } from './test-helpers/refusals'
 export { describeVaultDBBattery } from './test-helpers/vault-db-battery'
 export type { VaultDBBatteryOpts, VaultDBRowCheats } from './test-helpers/vault-db-battery'
+export { describeBankDBBattery } from './test-helpers/bank-db-battery'
+export type { BankDBBatteryOpts, BankDBRowCheats } from './test-helpers/bank-db-battery'
 export { describeDeviceDBBattery } from './test-helpers/device-db-battery'
 export type { DeviceDBBatteryOpts, DeviceDBRowCheats } from './test-helpers/device-db-battery'
 export { bankScope, vaultScope, boxscope, vaultQuery, boxQuery, vaultListAsk, boxListAsk, boxTidyAsk, vaultScopeOf, boxscopeOf, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, gateMoveOf,

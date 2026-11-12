@@ -200,10 +200,7 @@ export class MemoryBankDB extends AdapterBankDB {
     const { bank, vaultrows } = this._cheat_shelfOf(ask)
     const liveBank = BX.bankRow.safeParse(bank)
     const bank_tok = (liveBank.success && (liveBank.data.am === 'a')) ? liveBank.data.bank_tok : null
-    // A bank row that fails its checks does not say which vault rows are of an ended life: they are all left alone.
-    const isBankDamaged = (bank !== null) && (! liveBank.success)
-    const sweepable     = isBankDamaged ? new Map<string, unknown>() : vaultrows
-    for (const [vaultlabel, raw] of sweepable) {
+    for (const [vaultlabel, raw] of vaultrows) {
       const vault = BX.vaultRow.safeParse(raw)
       if (vault.success && (vault.data.bank_tok !== bank_tok)) { vaultrows.delete(vaultlabel) }
     }
