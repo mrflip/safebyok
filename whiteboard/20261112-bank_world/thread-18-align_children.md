@@ -1,6 +1,6 @@
 # Thread 18: align_children (2026-11-12)
 
-Branch `20261112-align_children`, PR #TBD, stacked on #683 (the line #679 → #681 → #682 → #684 →
+Branch `20261112-align_children`, PR #685, stacked on #683 (the line #679 → #681 → #682 → #684 →
 #683, cut at 43a657d03). Justify: green: safebyok 2968, react 263, graphql 409, convex 304,
 postgres 213, indexeddb 197, fastkey 43, demo 99, scripts 285, e2e 549.
 
