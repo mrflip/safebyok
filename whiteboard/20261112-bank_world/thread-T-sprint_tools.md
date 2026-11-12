@@ -2,7 +2,8 @@
 
 Branch `20261112-sprint_tools`, PR #680 (base main), stacked on #676 (the Coach's `.claude`
 sweep). A tooling thread for the Coach, run by the bank_world orchestrator; not one of the
-sprint's numbered threads. Justify: green (every package at the build; root 287 tests and actionlint after the rework).
+sprint's numbered threads. Justify: green (every package at the build; root 287 tests and
+actionlint after the rework).
 
 * **Built** (one commit per item, plus a coordinator revision of 3):
   1. `tools:` CLAUDE.md, *Working relationship*: every Agent call names its `model` (and
@@ -56,7 +57,8 @@ sprint's numbered threads. Justify: green (every package at the build; root 287 
   (machinery the orchestrator ruled out); a gating job the others `needs:` instead of the
   copied `if:` (its dependents skip all the same, and GitHub has no workflow-level `if`);
   the `labeled` trigger with a concurrency group per non-`ci` label (the first build: it
-  cancelled nothing, but still made the skipped runs); hand-written rebase steps in the worker (duplicates file-thread);
+  cancelled nothing, but still made the skipped runs); hand-written rebase steps in the worker
+  (duplicates file-thread);
   `checkout --ours` on conflicted files (would drop the commit's clean hunks in them); aborting
   and leaving out a conflicting base commit whole (the first draft; superseded by the Coach's
   "stack wins" ruling); `%ct` for change times (a rebuild stamps the run time); trusting
