@@ -26,6 +26,8 @@ export type { DeviceDBBatteryOpts, DeviceDBRowCheats } from './test-helpers/devi
 export { bankScope, vaultScope, boxscope, vaultQuery, boxQuery, vaultListAsk, boxListAsk, boxTidyAsk, vaultScopeOf, boxscopeOf, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, gateMoveOf,
   FlawedVaultRows, FlawedBoxRows, vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf, boxDelAskOf } from './test-helpers/storage-world'
 export type { FlawRefusal, FlawedRow } from './test-helpers/storage-world'
+// The bankDB's scopes, records and asks, apart from the vaultDB's of the same names: `TH.BankDBWorld.bankAt()`.
+export * as BankDBWorld from './test-helpers/bankdb-world'
 export { makeBankWorld, makeBankWithVault, useBankWorlds, VaultScopeGiven } from './test-helpers/bank-world'
 export type { BankWorld } from './test-helpers/bank-world'
 export { Passphrase, byPassphrase } from './test-helpers/vault-world'
