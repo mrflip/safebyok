@@ -1,7 +1,7 @@
 # Thread 15: bankdb_graphql (2026-11-12)
 
 Branch `20261112-bankdb_graphql`, PR [#671](https://github.com/mrflip/safebyok/pull/671), stacked on [#669](https://github.com/mrflip/safebyok/pull/669) (thread 13).
-Justify: see the PR's **Tests:** line. e2e on a real Postgres (`SAFEBYOK_PG_URL` set here): graphql + postgres suites, 365 green.
+Justify: green (graphql 408, e2e 534 on a real Postgres, safebyok 3369, the rest unchanged). e2e on a real Postgres (`SAFEBYOK_PG_URL` set here): graphql + postgres suites, 365 green.
 
 * **Built**: `safebyok-graphql` carries a bankDB, in place. The vault adapter is gone from it.
   * Commit `storage: safebyok-graphql's sources and tests ... move to bank-named files unchanged` is a pure
