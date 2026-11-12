@@ -75,7 +75,7 @@ async function digestOf(text: string): Promise<Uint8Array> {
  * passkey asked with the same salt answers the same, and with another salt answers otherwise, as
  * a real PRF does. Worthless as a secret: never hand it to a vault that has a real one.
  *
- * @example await TH.unlock(vault, await passkeyOf('laptop'))
+ * @example await gating.attempt({ passkeyClear: await passkeyOf('laptop') })
  * @example await passkeyOf('laptop', otherSaltB64)  // the same credential, answering another salt
  */
 export async function passkeyOf(tag: string, prfSaltGiven?: string): Promise<PasskeyAnswer> {

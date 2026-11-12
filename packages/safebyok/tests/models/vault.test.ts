@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import * as Phrases from '../../src/helpers/phrases'
+import { Bank } from '../../src/models/bank'
+import { Gate } from '../../src/models/gate'
 import { Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
@@ -153,3 +155,42 @@ describe("vault.ensureTimely(maxMillis)", () => {
   })
 })
 
+
+// Thread 12 deletes the Vault's scaffold calls of its bank's lock and gate, and this describe with them.
+describe("a vault's scaffold calls of its bank's lock and gate", () => {
+  type Born = Awaited<ReturnType<typeof makeBornVault>>
+  const Calls = [
+    ["lock",                       'bank',     'lock',                    ({ vault }: Born) => vault.lock()],
+    ["ensureUnlocked",             'bank',     'ensureUnlocked',          ({ vault }: Born) => vault.ensureUnlocked()],
+    ["tryEnsureUnlocked",          'bank',     'ensureUnlocked',          ({ vault }: Born) => TH.expectGood(vault.tryEnsureUnlocked())],
+    ["unlock",                     'bank',     'unlock',                  ({ vault }: Born) => vault.unlock()],
+    ["tryUnlock",                  'bank',     'unlock',                  ({ vault }: Born) => TH.expectGood(vault.tryUnlock())],
+    ["replacePassphrasePrompt",    'maingate', 'replacePassphrasePrompt', ({ vault }: Born) => vault.replacePassphrasePrompt()],
+    ["tryReplacePassphrasePrompt", 'maingate', 'replacePassphrasePrompt', ({ vault }: Born) => TH.expectGood(vault.tryReplacePassphrasePrompt())],
+    ["addPasskeyPrompt",           'maingate', 'addPasskeyPrompt',        ({ vault }: Born) => vault.addPasskeyPrompt()],
+    ["tryAddPasskeyPrompt",        'maingate', 'addPasskeyPrompt',        ({ vault }: Born) => TH.expectGood(vault.tryAddPasskeyPrompt())],
+    ["revokePasskeyPrompt",        'maingate', 'revokePasskeyPrompt',     ({ vault }: Born) => vault.revokePasskeyPrompt()],
+    ["tryRevokePasskeyPrompt",     'maingate', 'revokePasskeyPrompt',     ({ vault }: Born) => TH.expectGood(vault.tryRevokePasskeyPrompt())],
+  ] as const
+
+  it.each(Calls)("vault.%s calls its %s's %s once, and answers the vault", async (_name, owner, verb, call) => {
+    const born = await makeBornVault()
+    const target = owner === 'bank' ? born.bank : born.bank.maingate
+    const proto = (owner === 'bank' ? Bank.prototype : Gate.prototype) as unknown as Record<string, () => unknown>
+    const called = vi.spyOn(proto, verb).mockReturnValue(verb === 'lock' ? target : Promise.resolve(target))
+    expect(await call(born)).to.equal(born.vault)
+    expect(called).toHaveBeenCalledOnce()
+    expect(called.mock.contexts[0]).to.equal(target)
+  })
+
+  it.each([
+    ["vault.isLocked",          (vault: Vault) => vault.isLocked,                [false, true]],
+    ["vault.isUnlocked",        (vault: Vault) => vault.isUnlocked,              [true, false]],
+    ["its snapshot's isLocked", (vault: Vault) => vault.getSnapshot().isLocked, [false, true]],
+  ] as const)("%s reads its bank's lock", async (_label, read, [unlocked, locked]) => {
+    const { bank, vault } = await makeBornVault()
+    expect(read(vault)).to.eq(unlocked)
+    bank.lock()
+    expect(read(vault)).to.eq(locked)
+  })
+})

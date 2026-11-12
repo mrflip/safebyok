@@ -51,7 +51,7 @@ describe("a box sealed and unsealed through the vault's lease", () => {
   it("refuses 'bank_locked' at the seal and the unseal once the vault locks", async () => {
     const { boxes, vault } = await sealWorld()
     const box = await boxes.create(BoxDna)
-    vault.lock()
+    vault.bank.lock()
     await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-1111' }, sidecar: { account: 'home' } }), 'bank_locked')
   })

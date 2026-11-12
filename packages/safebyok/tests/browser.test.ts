@@ -134,7 +134,7 @@ describe("browserOpts", () => {
 
   it("makes a bank whose vault is created under the zxcvbn checker and kept in IndexedDB", async () => {
     const { bank, vault } = await TH.makeBankWithVault(TH.makeBankWorld(), { ...browserOpts({ dbName: freshDbName() }), keyDeriver: TH.testDeriver })
-    expect(vault.isUnlocked).to.be.true
+    expect(bank.isUnlocked).to.be.true
     expect(await bank.strengthChecker('password1234', vault.scope)).to.deep.equal({ strong: false, reason: Phrases.PassphraseGuessable })
     expect(await bank.deviceDB.listLeases()).to.have.lengthOf(1)
   })
