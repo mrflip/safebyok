@@ -305,7 +305,7 @@ export class GraphQLBankDB implements BX.BankDB {
 // == [Asks and answers]: gateVerbAskOf, answerForRefusal, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, hearNotice
 
 // The mutation names the verb, so the ask sent leaves it out.
-/** `ask` checked as the gate verb `gateVerb`'s, without its `gateVerb`: what that verb's mutation sends. */
+/** Check `ask` as `gateVerb`'s and return it without `gateVerb`, as the verb's mutation sends it. */
 function gateVerbAskOf(gateVerb: GateVerb, ask: BX.GateVerbAsk): BX.GateVerbAsk {
   const { gateVerb: _gateVerb, ...sent } = BX.gatePut.parse({ ...ask, gateVerb })
   return sent
@@ -335,7 +335,7 @@ function fieldOf({ error: err, data }: OperationResult<unknown>, fieldname: stri
   return (data as Record<string, unknown>)[fieldname]
 }
 
-/** Convert a failed operation to a refusal: `storage_unavailable` for a network failure, `unexpected_error` for a GraphQL error. */
+/** Convert a failed operation to a refusal: a network failure reads as storage out of reach, a GraphQL error as a schema the server does not serve. */
 function troubleOf(err: CombinedError): DB.VaultError { return (err.networkError === undefined) ? schemaNotServed() : networkTroubleOf(err) }
 
 // A GraphQL error means the client and server disagree about the schema. A retry will not fix that, so it is never
