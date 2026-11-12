@@ -18,23 +18,30 @@ import type { Device } from './device'
 import { Gate } from './gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 
-/** What an attempt does with the user's cleartexts: prove them, and make the change its gating is for. */
+/** An attempt's work: prove the user's cleartexts, then make the change its gating is for. */
 type Act = (cleartexts: unknown) => Promise<Bank>
 
-/** One ask of the user, one open per device. It has the cleartexts only for the length of an attempt, and concludes once: its launcher answers with that outcome. */
+/** A request to the user for their passphrase or passkey, to build, unlock, change or delete a bank.
+ * A device has one open at a time. A dialog hands what the user typed to `attempt`, as often as the user corrects it,
+ * and closes when `whenConcluded` resolves. The gating keeps no cleartext between attempts.
+ */
 export class Gating<KindT extends Gatingkind = Gatingkind> {
   // == [Props]: gatingkind, gatingTok, user_id, banklabel, bank, passkeyHeader, #device, #act, #concluded, #conclude, #outcome, #isAttempting, #isLastAttempt
 
   declare readonly gatingkind:    KindT
-  /** Unique to this gating, for a dialog to key on: the next gating's form starts empty, whatever was typed in this one. */
+  /** A random token unique to this gating.
+   * Key the dialog on it, so that the next gating's form starts empty.
+   */
   declare readonly gatingTok:     string
   declare readonly user_id:       string
   declare readonly banklabel:     string
   declare readonly bank:          BankForGatingkind[KindT]
-  /** The header of the passkey wayin in the gate at launch, for the dialog to ask that passkey; null with none. */
+  /** The header of the gate's passkey wayin at launch, or null for none.
+   * The dialog asks for that passkey by its `credential_id` and `prf_salt_b64`.
+   */
   declare readonly passkeyHeader: WayinHeader | null
 
-  /** The device the gating is open on, and the proving world of its acts. */
+  /** The device this gating is open on, and the world `judgeStrength` asks */
   readonly #device:     Device
   readonly #act:        Act
   readonly #concluded:  Promise<Outcome<Bank>>
@@ -49,7 +56,9 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   /** True until this gating concludes. */
   get isOpen(): boolean { return this.#outcome === null }
 
-  /** The outcome once concluded, a promise that never rejects: a dialog closes on it, as the package cannot close a host's dialog. */
+  /** Resolves with the outcome once this gating concludes, and never rejects.
+   * Close the dialog when it resolves.
+   */
   get whenConcluded(): Promise<Outcome<Bank>> { return this.#concluded }
 
   get #scope(): BankScope {
@@ -57,7 +66,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     return { user_id, banklabel }
   }
 
-  /** This gating's {@link GatingSnapshot}: its kind, token and bank scope, never a cleartext. */
+  /** This gating's {@link GatingSnapshot}: its kind, token and bank scope. It never shows a cleartext. */
   toJSON(): GatingSnapshot {
     const { gatingkind, gatingTok } = this
     return { gatingkind, gatingTok, ...this.#scope }
@@ -77,7 +86,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   }
 
   // The package exports Gating as a type only: these take the bank's unlockByProving, which a gating hands a proving.
-  /** Ask the user to prove they may make the change `gatingkind` names to `bank`, and answer the bank once it is made. */
+  /** Ask the user to prove they may make the `gatingkind` change to `bank`, make it, and resolve the bank. */
   static async launchOn(bank: Bank, gatingkind: BankGatingkind, unlockByProving: UnlockByProving, askUser: AskUser | null): Promise<Bank> {
     const checked = GX.gatingLaunchOnArgs.parse({ gatingkind, bank, unlockByProving, askUser })
     const act: Act = (cleartexts) => Gating.#callGatingByKind(checked.gatingkind, checked.bank, cleartexts, checked.unlockByProving)
@@ -85,7 +94,9 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     return gating.#launch(checked.askUser)
   }
 
-  /** Ask the user for a new bank's passphrase, build the bank over the row `expected`, and return it unlocked. */
+  /** Ask the user for a new bank's passphrase and optional passkey, build the bank over `expected`, and resolve it unlocked.
+   * Throws `gate_made_elsewhere` when another device built the bank first: the user's passphrase was not set.
+   */
   static async launchBirth(listing: BankListing, expected: BankSparse, unlockByProving: UnlockByProving, askUser: AskUser | null): Promise<Bank> {
     const checked = GX.gatingLaunchBirthArgs.parse({ listing, expected, unlockByProving, askUser })
     const world = GX.provingWorld.parse(checked.listing.device)
@@ -111,12 +122,16 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   // == [The attempt]: judgeStrength, attempt, refusalOfAttempt, attemptOnce
 
-  /** The verdict on a passphrase, as the user types it. Nothing changes. */
+  /** The strength checker's verdict on `passphraseClear`, for a dialog to show as the user types. */
   async judgeStrength(passphraseClear: string): Promise<GX.PassphraseVerdict> {
     return Proving.judgeStrength(GX.passphraseCleartext.parse(passphraseClear), this.#scope, GX.provingWorld.parse(this.#device))
   }
 
-  /** SLOPDOC: The one door for a cleartext: tries what the user typed once, and answers how it went as an Outcome. */
+  /** Try what the user typed, resolving the outcome rather than throwing. Await one attempt before the next.
+   * A refusal the user can correct, such as `wrong_passphrase`, leaves the gating open for another attempt.
+   * Any other outcome concludes it. A passkey answer's PRF bytes are zeroed once handed in, except after a correctable
+   * refusal: then hand them in again, or zero them yourself.
+   */
   attempt(cleartexts: CleartextsForGatingkind[Gatingkind]): Promise<Outcome<Bank>> {
     const refusal = this.#refusalOfAttempt()
     if (refusal !== null) {
@@ -147,10 +162,12 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   // == [Concluding]: dismiss, endAsking, concludeOnce
 
-  /** End the asking with nothing proved: the gating concludes `dismissed`, or on the outcome of an attempt under way. */
+  /** Close this gating without a proof.
+   * It concludes `dismissed`, or, if an attempt is under way, with that attempt's outcome.
+   */
   dismiss(): void { this.#endAsking(gatingDismissed()) }
 
-  /** End the gating. If mid-attempt, let it continue but take no further attempt; otherwise, conclude using the given refusal. */
+  /** Conclude with `refusal`, or, mid-attempt, make that attempt the last */
   #endAsking(refusal: VaultError): void {
     if (this.#isAttempting) {
       this.#isLastAttempt = true
@@ -167,7 +184,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   }
   // --
 
-  /** Answers 'gating', which marks this model to a check: {@link Modelkind}. */
+  /** Always `'gating'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'gating' { return 'gating' satisfies Modelkind }
 }
 
@@ -176,7 +193,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 // Each act proves the cleartexts, then makes its change. A cleartext goes only to checkedCleartexts and a Proving builder (G1); the
 // change hears provings, and comes to the bank's private unlock by unlockByProving (G9).
 
-/** Build a bank over `expected` using the passphrase and (if given) passkey, each proved in `world`; unlock once built. */
+/** Build a bank over `expected` from the user's passphrase and optional passkey, and unlock it. */
 async function buildBank(listing: BankListing, world: ProvingWorld, expected: BankSparse, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
   const { passphraseClear, passkeyClear } = checkedCleartexts(GX.bankBuildCleartexts, cleartexts)
   // A birth's stamps are minted here, one pair per attempt.
@@ -207,7 +224,7 @@ async function unlockBank(bank: Bank, cleartexts: unknown, unlockByProving: Unlo
 // Each gate change grants a lease to the bank citing the gate row it wrote, not a newer one that arrived meanwhile. The
 // old lease stays in force for the moments between: the bankKey did not change.
 
-/** Replace the passphrase of `bank`, proved by the one it has. */
+/** Replace the passphrase of `bank`, proved by the current one. */
 async function replacePassphrase(bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
   const { antePassphraseClear, nextPassphraseClear } = checkedCleartexts(GX.passphraseReplaceCleartexts, cleartexts)
   if (antePassphraseClear === nextPassphraseClear) { throw samePassphrase() }
@@ -267,19 +284,21 @@ const ActOnBank: Record<BankGatingkind, (bank: Bank, cleartexts: unknown, unlock
 
 // == [An act's helpers]: timelyGate, timelyAnte, checkedCleartexts, isCorrectable, spendCleartexts
 
-/** The main gate of `bank`, refreshed promptly, the bank enabled and present. */
+/** The main gate of `bank`, refreshed promptly. Throws unless the bank is enabled and present. */
 async function timelyGate(bank: Bank): Promise<Gate> {
   const gate = await bank.maingate.ensureTimely(VX.Promptly); bank.demandPromptable()
   return gate
 }
 
-/** The main gate of `bank`, refreshed promptly, and its record as it stands then: what a gate verb expects to find. */
+/** The main gate of `bank`, refreshed promptly, and its current record as `ante`: the row a gate verb expects to replace. */
 async function timelyAnte(bank: Bank): Promise<{ ante: GateRecord, gate: Gate }> {
   const gate = await timelyGate(bank)
   return { ante: gate.pickle(), gate }
 }
 
-/** The cleartexts through their checker. A throw that is not one of this library's is replaced whole, keeping nothing of it (G8). */
+/** `cleartexts`, checked by `checker`.
+ * A throw that is not a VaultError, as from a host's getter, is replaced by one that keeps nothing of it (G8).
+ */
 function checkedCleartexts<CleartextsT>(checker: { parse: (cleartexts: unknown) => CleartextsT }, cleartexts: unknown): CleartextsT {
   try {
     return checker.parse(cleartexts)
@@ -290,7 +309,7 @@ function checkedCleartexts<CleartextsT>(checker: { parse: (cleartexts: unknown) 
 
 function isCorrectable(err: VaultError): boolean { return (EX.correctablekindVals as readonly string[]).includes(err.refusalkind) }
 
-/** Zero a passkey answer's PRF bytes wherever `cleartexts` carries them (G2). */
+/** Zero the PRF bytes of the passkey answer in `cleartexts`, if it has one (G2). */
 function spendCleartexts(cleartexts: unknown): void {
   // The reach-in may meet a getter or a proxy of the host's, which may throw: spending is best effort, and never replaces the outcome it follows.
   // The cleartexts may be unchecked, as at the door, so nothing about them is assumed. An answer is single-use: once zeroed, a
