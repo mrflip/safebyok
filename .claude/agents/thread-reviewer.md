@@ -84,8 +84,14 @@ about to make. Chain each onto the command it heralds.
    A finding you leave goes in your PR comment as *minor* (a note for the record) or
    *significant* (below). One that the files do not bear out is dropped, with a line in
    your report.
-3. **Prove it.** `pnpm justify`. A fix that turns it red and whose repair is not obvious is undone,
-   not repaired: note it. Never commit red. Stop only processes you started, by PID.
+3. **Prove it** with the suites of what your fixes touch, not the whole repository: for each
+   package, `pnpm --filter <pkg> lint`, then `typecheck`, then `test`; for `scripts/` or
+   `tests/scripts/`, `pnpm justify:root`; for a workflow, `pnpm lint:workflows`; for docs alone,
+   `pnpm lint`. `scripts/file-thread` runs the full `pnpm justify` before it pushes, and that is
+   the gate: a dependent package your fix breaks comes back from it as red, to a worker. A fix
+   that turns its suite red and whose repair is not obvious is undone, not repaired: note it.
+   Never commit red. Stop only processes you started, by PID. With no fixes, there is nothing to
+   prove.
 4. **Commit**, one commit per independent fix, in PROCESS.md's *Commit messages* style: the prefix
    of the part it mends, and a sentence saying what was wrong. Then put them on the thread's
    branch: `git -C <root> merge --ff-only <your HEAD's SHA>`. If that is refused, say so and give
@@ -103,14 +109,14 @@ your recommendation. The orchestrator decides what happens next.
 ## Report
 
 Lead with a status line: `clean` | `fixed` | `flagged` | `bailed`, branch, fixes kept / findings
-left, justify results, and the SHA the thread's branch now stands at (or should be fast-forwarded
-to). Then how the review ran, through the skill or by hand and why, and **what you could not
-check**, and why: a restriction that stopped part of the job is reported, never worked round, even
-when the rest is `clean`. Then **the PR comment**, ready to post, in a reviewer's voice: each fix
-in a line; each finding left, split **significant** and **minor**, with why; any suppression you
-added; or that the review found nothing to change. It is the report's only list of fixes and
-findings: don't repeat it. End with **Open matters**: each finding left for a decision, one line
-each, a bold handle and your recommendation.
+left, the suites you proved with and their results, and the SHA the thread's branch now stands at
+(or should be fast-forwarded to). Then how the review ran, through the skill or by hand and why, and
+**what you could not check**, and why: a restriction that stopped part of the job is reported, never
+worked round, even when the rest is `clean`. Then **the PR comment**, ready to post, in a reviewer's
+voice: each fix in a line; each finding left, split **significant** and **minor**, with why; any
+suppression you added; or that the review found nothing to change. It is the report's only list of
+fixes and findings: don't repeat it. End with **Open matters**: each finding left for a decision,
+one line each, a bold handle and your recommendation.
 
 ## Never
 

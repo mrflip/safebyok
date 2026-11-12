@@ -106,6 +106,11 @@ sprinting or not, which is why those are one sentence of when to use it.
 * **The reviewer re-checks only what `/code-review` did not verify.** Reviewers ran a median of
   32 turns, up to 97, most of them `grep` and `sed` re-checking findings that `/code-review`'s
   verify pass had already confirmed.
+* **The thread is proven once, at filing.** The reviewer ran a full `pnpm justify` and then
+  `scripts/file-thread` ran another before pushing, minutes apart on the same tree but for the
+  reviewer's fixes. The Coach agreed on 2026-11-12 that the reviewer proves only the suites its
+  fixes touch, and `file-thread`'s justify is the gate: a dependent package a fix breaks comes back
+  from it as exit 4, to a worker.
 * **Rulings live in turbochat's *Resolved* tab and the PR**, swept into the resolutions file at
   the end. They used to be written in five places as they came, with lines owed to filed threads'
   files until the restack.

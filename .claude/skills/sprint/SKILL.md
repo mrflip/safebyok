@@ -155,6 +155,8 @@ The tip is `git -C <root> rev-parse HEAD`; the base is `git config branch.<branc
 branch to its fixes, or gives you the SHA to do it with (`git -C <root> merge --ff-only <sha>`).
 Then remove the reviewer's worktree and branch, which its result names (`git worktree remove
 <path>`, `git branch -D <branch>`), and post its PR comment (`gh pr comment <n>`).
+The reviewer proves its fixes with the suites of the packages they touch, not a full `pnpm
+justify`: filing runs that, and is the gate.
 
 **File.** Run `scripts/file-thread <root>` in the background: it catches the branch up (a stacked
 one is rebased onto its base thread's new tip, or onto main once the base has merged, so never
