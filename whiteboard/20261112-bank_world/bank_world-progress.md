@@ -13,6 +13,8 @@ What the threads have taught, newer than the plan where they disagree. Kept by t
 * *Coach, 2026-11-12:* stale IndexedDB databases left by a rename are fine (no public release yet). But every IndexedDB database this library opens must be unambiguously its own by name (a `safebyok-` prefix, not only the host's `dbName`), and the device row records the npm package version: the Coach, clarifying, "on hello, when peekOrStow'ing the device id, to also write the npm package version" (`peekOrStow` is today's `ensureCachedDevice`, which thread 6 has `device.ensureBank()` call). Thread 5 takes both: the `safebyok-` prefix on every shelf, and the version on the device row, written when the row is minted and refreshed when an ensure finds another version; no browser API beyond today's, no Node built-ins (`src/` runs wherever the host does).
 * *Coach, 2026-11-12:* `user_id` then `device_tok` in the options is right: multiple users on one device are not contemplated.
 
+* *Orchestrator:* `guarantees-bank.md` and `deliver-contract-bank.md` (opus, at the Coach's suggestion) are the targets for 8b and 10. Each opens with a *What moves* list whose open questions (autolock's peek through the Lease; vacate's forget with no Bank in hand; how `requestCleartext` reaches a bank gating; a live bank row under another `bank_tok` ending the Bank; names such as `receiveParent`) are thread 8's and 10's to settle by ground rule 4 and report, not the Coach's. Where a draft and design.md disagree, design.md wins and the draft is corrected.
+
 ## The BankDB `do*` list
 
 (thread 4 fills this in)
