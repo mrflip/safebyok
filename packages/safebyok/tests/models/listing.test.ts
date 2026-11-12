@@ -171,12 +171,12 @@ describe("Listing's pipeline: what every answer goes through", () => {
       const before = listing.snapshot
 
       world.mw.seedPut(fullBoxRecord())
-      await listing.fetch(scopeOf())
+      await listing.get(scopeOf(), { maxMillisSinceRefresh: 0 })
       expect(listing.snapshot).to.eq(before)
       expect(told).to.eq(1)
 
       world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a2', revision_seq: 2 }))
-      await listing.fetch(scopeOf())
+      await listing.get(scopeOf(), { maxMillisSinceRefresh: 0 })
       expect(listing.snapshot).to.not.eq(before)
       expect(listing.snapshot[0]).to.include({ revision_seq: 2 })
       expect(told).to.eq(2)
@@ -199,7 +199,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       const box = listing.deliverRecord(tombstoneBoxRecord({ revision_seq: 2 }))
       expect(listing.snapshot).to.deep.equal([])
       world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-a3', revision_seq: 3 }))
-      await listing.fetch(scopeOf())
+      await listing.get(scopeOf(), { maxMillisSinceRefresh: 0 })
       expect(listing.snapshot).to.deep.equal([box.getSnapshot()])
       await listing.del(box.sparse)
       expect(listing.snapshot).to.deep.equal([])

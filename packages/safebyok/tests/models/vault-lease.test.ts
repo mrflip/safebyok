@@ -267,7 +267,7 @@ describe("sweep and vacate", () => {
     expect(vault.isEnabled).to.be.false
     expect(listing.things).to.have.lengthOf(0)
     await TH.expectRefusal(listing.hello())
-    await TH.expectRefusal(listing.fetch(vault.scope))
+    await TH.expectRefusal(listing.get(vault.scope, { maxMillisSinceRefresh: 0 }))
     TH.expectSyncRefusal(() => listing.deliverRecord(record))
     expect(listing.vacate()).to.equal(listing)
     expect(listing.things).to.have.lengthOf(0)

@@ -229,7 +229,7 @@ describe("a birth through a gating", () => {
     restoreRow(await storedVaultRecord(WinnersPassphrase))
     await TH.expectBad(gating.attempt({ passphraseClear }), 'gate_made_elsewhere')
     await launched
-    const vault = (await listing.fetch(Dna))!
+    const vault = (await listing.get(Dna, { maxMillisSinceRefresh: 0 }))!
     expect(vault.isLocked).to.be.true
     const unlocking = vault.ensureUnlocked()
     const asking = await gatingAt<'unlock_vault'>(1)
@@ -245,7 +245,7 @@ describe("a birth through a gating", () => {
     vi.spyOn(opts.vaultDB, 'tryPutVault').mockImplementationOnce(async (ask) => {
       const answer = await tryPutVault(ask)
       restoreRow({ ...theirs, revision_tok: 'rev-of-the-new-life', revision_seq: ask.record.revision_seq + 2 })
-      await listing.fetch(Dna)
+      await listing.get(Dna, { maxMillisSinceRefresh: 0 })
       return answer
     })
     const launched = TH.expectRefusal(listing.buildVault(Dna), 'gate_made_elsewhere')

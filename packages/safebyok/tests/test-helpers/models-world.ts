@@ -298,7 +298,7 @@ const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, wo
  *   afterEach(() => { mw.dispose() })
  *   mw.seedPut(mw.fullBoxRecord({ revision_seq: 2 }))
  *   const listing = boxListingOf(mw)
- *   const box = await listing.fetch(mw.boxscope('anthropic_api_key'))
+ *   const box = await listing.get(mw.boxscope('anthropic_api_key'))
  *   expect(mw.callsOf('get')).to.have.lengthOf(1)
  * @example mw.willPut((call) => mw.staleWriteOf(mw.boxscope(call.record.boxlabel), mw.fullBoxRecord({ revision_seq: 5 })))   // the next put loses a race
  */
@@ -437,7 +437,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
  *
  * @example
  *   const world = useModelsWorld()
- *   it('fetches', async () => { world.mw.seedPut(fullBoxRecord()); await boxListingOf(world.mw).fetch(world.mw.boxscope('anthropic_api_key')) })
+ *   it('fetches', async () => { world.mw.seedPut(fullBoxRecord()); await boxListingOf(world.mw).get(world.mw.boxscope('anthropic_api_key')) })
  */
 export function useModelsWorld(opts: ModelsWorldOpts = {}): { readonly mw: ModelsWorld } {
   let current: ModelsWorld | null = null
@@ -463,7 +463,7 @@ export class TestableBox extends Box {
 
 }
 
-/** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `deliverRecord`, `create`, `fetch`, `put`, `del` and `at` give a `TestableBox`. */
+/** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `deliverRecord`, `create`, `get`, `put`, `del` and `at` give a `TestableBox`. */
 export class TestableBoxListing extends BoxListing {
   protected override makeThing(central: Fetched<BoxRecord, BoxSparse>): TestableBox {
     return new TestableBox(this.world, this, central)
@@ -478,8 +478,6 @@ export class TestableBoxListing extends BoxListing {
   /** {@link BoxListing.create}, answering a {@link TestableBox}. */
   override async create(...args: Parameters<BoxListing['create']>): Promise<TestableBox> { return testableOf(await super.create(...args)) }
 
-  /** {@link BoxListing.fetch}, answering a {@link TestableBox} or null. */
-  override async fetch(...args: Parameters<BoxListing['fetch']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.fetch(...args)) }
 
   /** {@link BoxListing.get}, answering a {@link TestableBox} or null. */
   override async get(...args: Parameters<BoxListing['get']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.get(...args)) }

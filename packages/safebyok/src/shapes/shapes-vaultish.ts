@@ -122,6 +122,8 @@ export const { probeAsked, probeOpts } = Checkers('bad_option', ({ obj, vaultlab
   probeOpts: obj({
     /** How long ago, at most, the trial's vault and box were refreshed from the vaultDB; apart from the bank's own refresh settings. */
     maxMillisSinceRefresh: horizonMillis.default(1000),
+    /** How long ago, at most, the box got back after the put was refreshed: 0, the default, asks storage; more lets the listing answer from the box the put left. */
+    maxMillisAtGetBack:    horizonMillis.default(0),
   }),
 }))
 

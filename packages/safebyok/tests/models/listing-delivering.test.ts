@@ -26,7 +26,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       world.mw.clearCalls()
       const err = new VaultError('storage_unavailable', "Storage is down.")
       world.mw.willGet(world.mw.refusalOf(box.scope, err, 'a world'))
-      const outcome = await listing.tryFetch(box.scope)
+      const outcome = await listing.tryGet(box.scope, { maxMillisSinceRefresh: 0 })
       expect(outcome.err).to.eq(err)
       expect(world.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'a world' }])
       expect(box.revision_seq).to.eq(1)
@@ -36,31 +36,31 @@ describe("Listing's pipeline: what every answer goes through", () => {
       const listing = boxListingOf(world.mw)
       const err = new VaultError('unexpected_error', "A bug.")
       world.mw.willGet({ ...world.mw.refusalOf(scopeOf(), err), ask: {} })
-      const outcome = await listing.tryFetch(scopeOf())
+      const outcome = await listing.tryGet(scopeOf(), { maxMillisSinceRefresh: 0 })
       expect(outcome.err).to.eq(err)
     })
 
     it("takes the world of a good answer", async () => {
       world.mw.seedPut(fullBoxRecord())
       world.mw.willGet(world.mw.answerOf(scopeOf(), fullBoxRecord(), 'the world now'))
-      await boxListingOf(world.mw).fetch(scopeOf())
+      await boxListingOf(world.mw).get(scopeOf(), { maxMillisSinceRefresh: 0 })
       expect(world.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'the world now' }])
     })
     it("refuses a fetch of a malformed scope, before the world or storage is called", async () => {
       const listing = boxListingOf(world.mw)
-      await TH.expectRefusal(listing.fetch({ ...scopeOf(), boxlabel: 'Not A Label!' }))
+      await TH.expectRefusal(listing.get({ ...scopeOf(), boxlabel: 'Not A Label!' }, { maxMillisSinceRefresh: 0 }))
       expect(world.mw.calls).to.deep.equal([])
     })
 
-    it("refuses fetch options out of range, before the world or storage is called", async () => {
+    it("refuses get options out of range, before the world or storage is called", async () => {
       const listing = boxListingOf(world.mw)
-      await TH.expectRefusal(listing.fetch(scopeOf(), { ifAbsent: 'create' } as never))
+      await TH.expectRefusal(listing.get(scopeOf(), { ifAbsent: 'create' } as never))
       expect(world.mw.calls).to.deep.equal([])
     })
 
     it("hands the world its maxWorldMillis", async () => {
       world.mw.seedPut(fullBoxRecord())
-      await boxListingOf(world.mw).fetch(scopeOf(), { maxWorldMillis: 5, ifAbsent: 'nil' })
+      await boxListingOf(world.mw).get(scopeOf(), { maxMillisSinceRefresh: 0, maxWorldMillis: 5, ifAbsent: 'nil' })
       expect(world.mw.callsOf('ensureTimely')[0]?.maxMillis).to.eq(5)
     })
   })
@@ -72,7 +72,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
         listing.vacate()
         return world.mw.refusalOf(scopeOf(), new VaultError('storage_unavailable', "Storage is down."), 'a world')
       })
-      await TH.expectRefusal(listing.fetch(scopeOf()))
+      await TH.expectRefusal(listing.get(scopeOf(), { maxMillisSinceRefresh: 0 }))
       expect(world.mw.callsOf('receiveWorld')).to.deep.equal([])
     })
   })
@@ -83,7 +83,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       const box = listing.deliverRecord(fullBoxRecord())
       world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-other' }))
       world.mw.clearCalls()
-      await TH.expectRefusal(listing.fetch(scopeOf()))
+      await TH.expectRefusal(listing.get(scopeOf(), { maxMillisSinceRefresh: 0 }))
       expect(listing.at(scopeOf())).to.eq(box)
       expect(box.revision_tok).to.eq('rev-a1')
       expect(world.mw.badnews).to.deep.equal([])
@@ -114,7 +114,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       world.mw.seedPut(fullBoxRecord())
       const refused = vi.spyOn(Box.prototype, 'receiveRecord').mockImplementationOnce(() => { throw new VaultError('record_conflict', "Refused.") })
       try {
-        await TH.expectRefusal(listing.fetch(scopeOf()))
+        await TH.expectRefusal(listing.get(scopeOf(), { maxMillisSinceRefresh: 0 }))
       } finally {
         refused.mockRestore()
       }
@@ -135,8 +135,8 @@ describe("Listing's pipeline: what every answer goes through", () => {
     it("leaves the answer's own refusals to the caller", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.willGet(world.mw.refusalOf(scopeOf(), new VaultError('storage_unavailable', "Down."), null))
-      await TH.expectRefusal(listing.fetch(scopeOf()), 'storage_unavailable')
-      await TH.expectRefusal(listing.fetch(scopeOf()), 'absent_box')
+      await TH.expectRefusal(listing.get(scopeOf(), { maxMillisSinceRefresh: 0 }), 'storage_unavailable')
+      await TH.expectRefusal(listing.get(scopeOf(), { maxMillisSinceRefresh: 0 }), 'absent_box')
       expect(world.mw.badnews).to.deep.equal([])
     })
 
@@ -190,8 +190,8 @@ describe("Listing's pipeline: what every answer goes through", () => {
         const box = listing.deliverRecord(fullBoxRecord({ boxlabel: 'built' }))
         listing.deliverRecord(fullBoxRecord({ boxlabel: 'built' }))
         world.mw.seedPut(fullBoxRecord({ boxlabel: 'fetched' }))
-        await listing.fetch(scopeOf('fetched'))
-        await listing.fetch(scopeOf('fetched'))
+        await listing.get(scopeOf('fetched'), { maxMillisSinceRefresh: 0 })
+        await listing.get(scopeOf('fetched'), { maxMillisSinceRefresh: 0 })
         world.mw.seedPut(fullBoxRecord({ boxlabel: 'built' }))
         await listing.put(fullBoxRecord({ boxlabel: 'built', revision_tok: 'rev-a2', revision_seq: 2 }), { expected: fullBoxRecord({ boxlabel: 'built' }) })
         await listing.del(box.sparse)
@@ -225,7 +225,7 @@ describe("listing: a record of another vault_tok reaches no listed instance", ()
   it("refuses storage_issue for a fetch answered with a record of another vault_tok, making nothing", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willGet(world.mw.answerOf(scopeOf(), fullBoxRecord({ vault_tok: OtherVault })))
-    await TH.expectRefusal(listing.fetch(scopeOf()), 'storage_issue')
+    await TH.expectRefusal(listing.get(scopeOf(), { maxMillisSinceRefresh: 0 }), 'storage_issue')
     expect(listing.things).to.deep.equal([])
   })
 
@@ -233,7 +233,7 @@ describe("listing: a record of another vault_tok reaches no listed instance", ()
     const listing = boxListingOf(world.mw)
     for (const record of [tombstoneBoxRecord({ vault_tok: OtherVault, revision_seq: 2 }), sparseBoxRecord({ vault_tok: OtherVault })]) {
       world.mw.willGet(world.mw.answerOf(scopeOf(), record))
-      await TH.expectRefusal(listing.fetch(scopeOf()), 'storage_issue')
+      await TH.expectRefusal(listing.get(scopeOf(), { maxMillisSinceRefresh: 0 }), 'storage_issue')
     }
     expect(listing.things).to.deep.equal([])
   })
@@ -267,7 +267,7 @@ describe("listing: a record of another vault_tok reaches no listed instance", ()
     const listing = boxListingOf(world.mw)
     const box = listing.deliverRecord(fullBoxRecord())
     world.mw.willGet(world.mw.answerOf(box.scope, fullBoxRecord({ vault_tok: OtherVault, revision_seq: 2, revision_tok: 'rev-a2' })))
-    const err = await TH.expectRefusal(listing.fetch(box.scope), 'storage_issue')
+    const err = await TH.expectRefusal(listing.get(box.scope, { maxMillisSinceRefresh: 0 }), 'storage_issue')
     expect(err.message).to.eq(Phrases.rowOfOtherAddress(['vault_tok']))
     expect(listing.at(box.scope)).to.eq(box)
     expect(box.revision_seq).to.eq(1)
@@ -278,7 +278,7 @@ describe("listing: an answer names the scope of the record it carries", () => {
   it("refuses a fetch answered with a record of another scope, making nothing", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willGet(world.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
-    await TH.expectRefusal(listing.fetch(scopeOf('asked_box')))
+    await TH.expectRefusal(listing.get(scopeOf('asked_box'), { maxMillisSinceRefresh: 0 }))
     expect(listing.things).to.deep.equal([])
   })
 
@@ -288,7 +288,7 @@ describe("listing: an answer names the scope of the record it carries", () => {
     const other = listing.deliverRecord(fullBoxRecord({ boxlabel: 'other_box' }))
     const [askedBefore, otherBefore] = [asked._cheat_central, other._cheat_central]
     world.mw.willGet(world.mw.answerOf(asked.scope, fullBoxRecord({ boxlabel: 'other_box', revision_seq: 2, revision_tok: 'rev-a2' })))
-    await TH.expectRefusal(listing.fetch(asked.scope))
+    await TH.expectRefusal(listing.get(asked.scope, { maxMillisSinceRefresh: 0 }))
     expect(asked._cheat_central).to.deep.equal(askedBefore)
     expect(other._cheat_central).to.deep.equal(otherBefore)
   })
@@ -308,6 +308,6 @@ describe("listing: an answer names the scope of the record it carries", () => {
   it("takes a record of the scope asked, however the answer's scope object was made", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willGet(world.mw.answerOf({ ...scopeOf('asked_box') }, fullBoxRecord({ boxlabel: 'asked_box' })))
-    await expect(listing.fetch(scopeOf('asked_box'))).resolves.to.be.instanceOf(Box)
+    await expect(listing.get(scopeOf('asked_box'), { maxMillisSinceRefresh: 0 })).resolves.to.be.instanceOf(Box)
   })
 })

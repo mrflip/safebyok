@@ -284,7 +284,7 @@ export class Bank {
 
   async #probe(asked: VX.ProbeAsked, opts: VX.ProbeOpts): Promise<VX.ProbeReport> {
     const { vaultlabel, boxlabel, whisper, sidecar } = VX.probeAsked.parse(asked)
-    const { maxMillisSinceRefresh } = VX.probeOpts.parse(opts)
+    const { maxMillisSinceRefresh, maxMillisAtGetBack } = VX.probeOpts.parse(opts)
     const vault = await this.ensureVault({ vaultlabel })
     await vault.ensureUnlocked()
     const horizons = { maxMillisSinceRefresh, maxWorldMillis: maxMillisSinceRefresh }
@@ -295,7 +295,7 @@ export class Bank {
     const boxscope = { ...vault.scope, boxlabel }
     const replacing = { ifAbsent: 'add', ifPresent: 'repl' } as const
     const put = probeStepOf(demandGood(await vault.boxListing.puttable(boxscope, replacing).tryPut({ whisper, sidecar }, { ...horizons, ...replacing })))
-    const fetched = demandGood(await vault.boxListing.tryFetch(boxscope))
+    const fetched = demandGood(await vault.boxListing.tryGet(boxscope, { maxMillisSinceRefresh: maxMillisAtGetBack }))
     const fetch = probeStepOf(fetched)
     await fetched.val?.extractWhisper({ maxMillisSinceRefresh: Infinity })
     return { timely, put, fetch, unseal: { ok: true, timestamp: nowMillis() } }

@@ -137,11 +137,11 @@ describe("a tombstone over a live vault", () => {
     const boxes = vault.boxListing
     const box = await boxes.create(BoxDna)
     restoreRow(tombstoneOver(demandStored()))
-    expect(await listing.fetch(Dna, { ifAbsent: 'nil' })).to.be.null
+    expect(await listing.get(Dna, { maxMillisSinceRefresh: 0, ifAbsent: 'nil' })).to.be.null
     await expectLandedGone(vault, world)
-    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])))
+    await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }))
     expect(box.isEnabled).to.be.false
-    await TH.expectRefusal(listing.fetch(Dna))
+    await TH.expectRefusal(listing.get(Dna, { maxMillisSinceRefresh: 0 }))
     expect(vault.boxListing).to.eq(boxes)
   })
 
@@ -151,7 +151,7 @@ describe("a tombstone over a live vault", () => {
     restoreRow(tombstoneOver(demandStored()))
     const listing = new VaultListing(fakeBank, opts)
     deviceDB.forget.mockClear()
-    await listing.fetch(Dna, { ifAbsent: 'nil' })
+    await listing.get(Dna, { maxMillisSinceRefresh: 0, ifAbsent: 'nil' })
     await forgotten()
     expect(listing.at(Dna)?.isPresent).to.be.false
     expect(deviceDB.forget).toHaveBeenCalledOnce()
@@ -168,7 +168,7 @@ describe("a tombstone over a live vault", () => {
     const refusal = new VaultError('storage_unavailable', 'the disk is full')
     deviceDB.forget.mockRejectedValueOnce(refusal)
     restoreRow(tombstoneOver(demandStored()))
-    await listing.fetch(Dna, { ifAbsent: 'nil' })
+    await listing.get(Dna, { maxMillisSinceRefresh: 0, ifAbsent: 'nil' })
     await forgotten()
     expect(vault.isEnabled).to.be.false
     expect(listing.at(Dna)?.isPresent).to.be.false
@@ -190,7 +190,7 @@ describe("a box answer carrying a vault row of a later life as its world", () =>
     await boxes.hello()
     await delTyping(bornVault)
     const anew = await buildTyping(born, Dna, byPassphrase(Passphrase))
-    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'vault_reborn')
+    await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }), 'vault_reborn')
     expect(vault.isEnabled).to.be.false
     expect(boxes.things).to.deep.equal([])
     const listed = listing.at(Dna)
@@ -209,7 +209,7 @@ describe("a box answer carrying a vault row of a later life as its world", () =>
     const boxes = vault.boxListing
     await boxes.hello()
     await delTyping(bornVault)
-    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])), 'absent_vault')
+    await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }), 'absent_vault')
     expect(vault.isEnabled).to.be.false
     expect(boxes.things).to.deep.equal([])
     expect(listing.at(Dna)).to.not.eq(vault)
@@ -243,7 +243,7 @@ describe("vault.delVaultPrompt()", () => {
     const boxes = world.vault.boxListing
     await delTyping(world.vault)
     await expectLandedGone(world.vault, world)
-    await TH.expectRefusal(boxes.fetch(omit(BoxDna, ['whisper', 'sidecar'])))
+    await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }))
     expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
     await TH.expectRefusal(world.vault.ensureTimely(0), 'disabled')
     const gone = await world.listing.at(Dna)?.ensureTimely(0)
@@ -285,7 +285,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     const { vault, listing, deviceDB, restoreRow } = await makeBornVault()
     const other = await otherLifeAt(5)
     restoreRow(other)
-    const rebuilt = await listing.fetch(Dna)
+    const rebuilt = await listing.get(Dna, { maxMillisSinceRefresh: 0 })
     expect(rebuilt).to.not.eq(vault)
     expect(rebuilt?.vault_tok).to.eq(other.vault_tok)
     expect(rebuilt?.isLocked).to.be.true
@@ -300,7 +300,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     const { vault, listing, restoreRow } = await makeBornVault()
     const tombstone = tombstoneOver(await otherLifeAt(5))
     restoreRow(tombstone)
-    await TH.expectRefusal(listing.fetch(Dna))
+    await TH.expectRefusal(listing.get(Dna, { maxMillisSinceRefresh: 0 }))
     expect(listing.at(Dna)?.vault_tok).to.eq(tombstone.vault_tok)
     expect(listing.at(Dna)?.isPresent).to.be.false
     expect(vault.isEnabled).to.be.false
@@ -323,10 +323,10 @@ describe("an older record", () => {
   it("of another vault_tok loses to a live vault, changing nothing", async () => {
     const { vault, listing, demandStored, restoreRow, putBehindOurBack } = await makeBornVault()
     putBehindOurBack(demandStored())
-    await listing.fetch(Dna)
+    await listing.get(Dna, { maxMillisSinceRefresh: 0 })
     const { revision_seq } = vault
     restoreRow(await otherLifeAt(revision_seq - 1))
-    expect(await listing.fetch(Dna)).to.eq(vault)
+    expect(await listing.get(Dna, { maxMillisSinceRefresh: 0 })).to.eq(vault)
     expect(vault.revision_seq).to.eq(revision_seq)
     expect(vault.isLocked).to.be.false
   })
@@ -340,7 +340,7 @@ describe("an older record", () => {
     expect(gone).to.include({ revision_tok: tombstone.revision_tok, isPresent: false })
     for (const older of [born, await otherLifeAt(0)]) {
       restoreRow(older)
-      await TH.expectRefusal(listing.fetch(Dna))
+      await TH.expectRefusal(listing.get(Dna, { maxMillisSinceRefresh: 0 }))
       expect(listing.at(Dna)).to.eq(gone)
       expect(gone?.revision_tok).to.eq(tombstone.revision_tok)
     }
@@ -418,7 +418,7 @@ describe("building over a tombstone", () => {
   it("a session that fetched only the tombstone builds over it", async () => {
     const { anotherSession, storedNow } = await deleted()
     const session = anotherSession()
-    expect(await session.fetch(Dna, { ifAbsent: 'nil' })).to.be.null
+    expect(await session.get(Dna, { maxMillisSinceRefresh: 0, ifAbsent: 'nil' })).to.be.null
     const reborn = await buildTyping(session, Dna, byPassphrase(Passphrase))
     expect(storedNow()).to.include({ vault_tok: reborn.vault_tok, revision_seq: 2 })
   })
@@ -491,7 +491,7 @@ describe("a damaged row", () => {
   it("refuses a fetch 'damaged_row', leaving the listed vault as it was", async () => {
     const { vault, listing, restoreRow } = await makeBornVault()
     restoreRow({ garbage: true } as never)
-    await TH.expectRefusal(listing.fetch(Dna), 'damaged_row')
+    await TH.expectRefusal(listing.get(Dna, { maxMillisSinceRefresh: 0 }), 'damaged_row')
     expect(listing.at(Dna)).to.eq(vault)
     expect(vault.isPresent).to.be.true
     expect(vault.isLocked).to.be.false
@@ -619,7 +619,7 @@ describe("a listing shares one storage call among concurrent requests", () => {
   it("joins fetches of one slot made while one runs, the instance's own among them, into one get", async () => {
     const { vault, listing, opts } = await makeBornVault()
     const tryGetVault = vi.spyOn(opts.vaultDB, 'tryGetVault')
-    const [fetched, refetched, own] = await Promise.all([listing.fetch(Dna), listing.fetch(Dna), vault.fetch()])
+    const [fetched, refetched, own] = await Promise.all([listing.get(Dna, { maxMillisSinceRefresh: 0 }), listing.get(Dna, { maxMillisSinceRefresh: 0 }), vault.fetch()])
     expect([fetched, refetched, own]).to.deep.equal([vault, vault, vault])
     expect(tryGetVault).toHaveBeenCalledOnce()
   })
@@ -637,8 +637,8 @@ describe("a listing shares one storage call among concurrent requests", () => {
   it("starts a fresh get for a fetch asked once the last has settled", async () => {
     const { listing, opts } = await makeBornVault()
     const tryGetVault = vi.spyOn(opts.vaultDB, 'tryGetVault')
-    await listing.fetch(Dna)
-    await listing.fetch(Dna)
+    await listing.get(Dna, { maxMillisSinceRefresh: 0 })
+    await listing.get(Dna, { maxMillisSinceRefresh: 0 })
     expect(tryGetVault).toHaveBeenCalledTimes(2)
   })
 

@@ -289,7 +289,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link hello}. */
   tryHello(): Promise<Outcome<this>> { return outcomeOf(() => this.hello()) }
 
-  /** Hydrate and return the box listed at `boxlabel` (i.e. fetch if stale). A missing box is null for `ifAbsent: 'nil'`, or refused for `ifAbsent: 'fail'`. */
+  /** Hydrate and return the box listed at `boxlabel` (i.e. fetch if stale). A missing box is null for `ifAbsent: 'nil'`, or refused for `ifAbsent: 'fail'`.
+   * Chute: **vault.getBox** → listing.get → tryGet → (joined by scope) #doGet → deliverAnswer
+   */
   async getBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> {
     return this.boxListing.get({ ...this.scope, boxlabel }, opts)
   }

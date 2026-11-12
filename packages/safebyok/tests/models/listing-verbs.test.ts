@@ -29,7 +29,7 @@ describe("listing.fetch(scope): nothing stored for a live listed box", () => {
     const before = box._cheat_central
     world.mw.clearCalls()
     world.mw.willGet(world.mw.answerOf(box.scope, null))
-    await TH.expectRefusal(listing.fetch(box.scope))
+    await TH.expectRefusal(listing.get(box.scope, { maxMillisSinceRefresh: 0 }))
     expect(box._cheat_central).to.deep.equal(before)
     expect(listing.at(box.scope)).to.eq(box)
     expect(world.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely', 'get'])
@@ -40,8 +40,8 @@ describe("listing.fetch(scope): the row it says it expects", () => {
   it("expects the shell row for a box not listed, and the listed box's own row from then on", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(fullBoxRecord())
-    await listing.fetch(scopeOf())
-    await listing.fetch(scopeOf())
+    await listing.get(scopeOf(), { maxMillisSinceRefresh: 0 })
+    await listing.get(scopeOf(), { maxMillisSinceRefresh: 0 })
     expect(world.mw.callsOf('get').map(({ expectedRevisionTok }) => expectedRevisionTok)).to.deep.equal([null, 'rev-a1'])
   })
 })
@@ -188,7 +188,7 @@ describe("listing: an answer is for the scope the call asked about", () => {
   it("refuses a fetch answered with a record of another scope, making nothing", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willGet(world.mw.answerOf(scopeOf('asked_box'), fullBoxRecord({ boxlabel: 'other_box' })))
-    await TH.expectRefusal(listing.fetch(scopeOf('asked_box')))
+    await TH.expectRefusal(listing.get(scopeOf('asked_box'), { maxMillisSinceRefresh: 0 }))
     expect(listing.things).to.deep.equal([])
   })
 
@@ -367,7 +367,7 @@ describe("listing.tryPut and listing.tryFetch return the vaultDB's answer", () =
   it("returns a fetch's instance as val, with the vaultDB's act", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(fullBoxRecord())
-    const answer = await listing.tryFetch(scopeOf())
+    const answer = await listing.tryGet(scopeOf(), { maxMillisSinceRefresh: 0 })
     expect(answer.ok).to.be.true
     expect(answer.val).to.eq(listing.at(scopeOf()))
     expect(answer).to.have.property('act')

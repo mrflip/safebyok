@@ -187,7 +187,7 @@ async function fetchVoid(central: Rec) {
   const { listing, box } = listedBoxOf(central)
   const before = stateOf(box)
   world.mw.willGet(world.mw.answerOf(box.scope, null))
-  const answer = await listing.tryFetch(box.scope, { ifAbsent: 'nil' })
+  const answer = await listing.tryGet(box.scope, { maxMillisSinceRefresh: 0, ifAbsent: 'nil' })
   return { answer, box, before }
 }
 

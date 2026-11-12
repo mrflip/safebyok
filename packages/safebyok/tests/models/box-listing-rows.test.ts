@@ -26,13 +26,13 @@ describe("BoxListing: an absent box", () => {
   describe("listing.fetch(scope) of nothing stored", () => {
     it("refuses 'absent_box' for a box not listed", async () => {
       const listing = boxListingOf(world.mw)
-      await TH.expectRefusal(listing.fetch(scope()), 'absent_box')
+      await TH.expectRefusal(listing.get(scope(), { maxMillisSinceRefresh: 0 }), 'absent_box')
       expect(listing.at(scope())).to.be.null
     })
 
     it("resolves null under 'nil' for a box not listed", async () => {
       const listing = boxListingOf(world.mw)
-      expect(await listing.fetch(scope(), { ifAbsent: 'nil' })).to.be.null
+      expect(await listing.get(scope(), { maxMillisSinceRefresh: 0, ifAbsent: 'nil' })).to.be.null
       expect(listing.at(scope())).to.be.null
     })
 
@@ -40,7 +40,7 @@ describe("BoxListing: an absent box", () => {
       const listing = boxListingOf(world.mw)
       const box = listing.deliverRecord(gone())
       world.mw.clearCalls()
-      await TH.expectRefusal(listing.fetch(scope()), 'absent_box')
+      await TH.expectRefusal(listing.get(scope(), { maxMillisSinceRefresh: 0 }), 'absent_box')
       expect(listing.at(scope())).to.eq(box)
       expect(box.isPresent).to.be.false
     })
@@ -48,7 +48,7 @@ describe("BoxListing: an absent box", () => {
     it("resolves null under 'nil' for a listed tombstone, which stays listed", async () => {
       const listing = boxListingOf(world.mw)
       const box = listing.deliverRecord(gone())
-      expect(await listing.fetch(scope(), { ifAbsent: 'nil' })).to.be.null
+      expect(await listing.get(scope(), { maxMillisSinceRefresh: 0, ifAbsent: 'nil' })).to.be.null
       expect(listing.at(scope())).to.eq(box)
       expect(box.am).to.eq('x')
       expect(box._cheat_central).to.deep.equal(gone())
@@ -56,7 +56,7 @@ describe("BoxListing: an absent box", () => {
 
     it("takes the world of the answer before it refuses", async () => {
       world.mw.willGet(world.mw.answerOf(scope(), null, 'a world'))
-      await TH.expectRefusal(boxListingOf(world.mw).fetch(scope()), 'absent_box')
+      await TH.expectRefusal(boxListingOf(world.mw).get(scope(), { maxMillisSinceRefresh: 0 }), 'absent_box')
       expect(world.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'a world' }])
     })
   })
@@ -68,7 +68,7 @@ describe("BoxListing: an absent box", () => {
       it(`refuses 'absent_box' for a ${form} box, and lists its tombstone`, async () => {
         seedTombstone()
         const listing = boxListingOf(world.mw)
-        await TH.expectRefusal(listing.fetch(scope()), 'absent_box')
+        await TH.expectRefusal(listing.get(scope(), { maxMillisSinceRefresh: 0 }), 'absent_box')
         const box = listing.at(scope())
         expect(box).to.be.instanceOf(Box)
         expect(box?.am).to.eq(am)
@@ -79,7 +79,7 @@ describe("BoxListing: an absent box", () => {
       it(`resolves null under 'nil' for a ${form} box, and still lists its tombstone`, async () => {
         seedTombstone()
         const listing = boxListingOf(world.mw)
-        expect(await listing.fetch(scope(), { ifAbsent: 'nil' })).to.be.null
+        expect(await listing.get(scope(), { maxMillisSinceRefresh: 0, ifAbsent: 'nil' })).to.be.null
         expect(listing.at(scope())?.am).to.eq(am)
       })
 
@@ -87,7 +87,7 @@ describe("BoxListing: an absent box", () => {
         const listing = boxListingOf(world.mw)
         const box = listing.deliverRecord(fullBoxRecord())
         seedTombstone()
-        await TH.expectRefusal(listing.fetch(scope()), 'absent_box')
+        await TH.expectRefusal(listing.get(scope(), { maxMillisSinceRefresh: 0 }), 'absent_box')
         expect(listing.at(scope())).to.eq(box)
         expect(box.am).to.eq(am)
         expect(listing.snapshot).to.deep.equal([])
@@ -97,14 +97,14 @@ describe("BoxListing: an absent box", () => {
     it("resolves the box for a stored box, whichever the ifAbsent", async () => {
       world.mw.seedPut(fullBoxRecord())
       const listing = boxListingOf(world.mw)
-      const box = await listing.fetch(scope())
+      const box = await listing.get(scope(), { maxMillisSinceRefresh: 0 })
       expect(box?.isFull).to.be.true
-      expect(await listing.fetch(scope(), { ifAbsent: 'nil' })).to.eq(box)
+      expect(await listing.get(scope(), { maxMillisSinceRefresh: 0, ifAbsent: 'nil' })).to.eq(box)
     })
 
     it("resolves the box for a stored sparse record", async () => {
       world.mw.willGet(world.mw.answerOf(scope(), sparseBoxRecord()))
-      const fetched = await boxListingOf(world.mw).fetch(scope())
+      const fetched = await boxListingOf(world.mw).get(scope(), { maxMillisSinceRefresh: 0 })
       expect(fetched?.isFull).to.be.false
     })
 
@@ -228,7 +228,7 @@ describe("BoxListing: an absent box", () => {
       const listing = boxListingOf(world.mw)
       const stale = world.mw.staleWriteOf(scope(), fullBoxRecord(stored))
       world.mw.willGet(stale)
-      await TH.expectRefusal(listing.fetch(scope()), 'stale_write')
+      await TH.expectRefusal(listing.get(scope(), { maxMillisSinceRefresh: 0 }), 'stale_write')
       expect(listing.at(scope())?.revision_seq).to.eq(5)
     })
   })

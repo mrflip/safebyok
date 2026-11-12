@@ -82,7 +82,7 @@ describe("BoxListing", () => {
       const { whisper: _whisper, sidecar: _sidecar, ...scope } = dna()
       const mary = { ...scope, vaultlabel: 'mary' }
       TH.expectSyncRefusal(() => listing.at(mary))
-      await TH.expectRefusal(listing.fetch(mary))
+      await TH.expectRefusal(listing.get(mary, { maxMillisSinceRefresh: 0 }))
       expect(world.mw.callsOf('get')).to.deep.equal([])
     })
 

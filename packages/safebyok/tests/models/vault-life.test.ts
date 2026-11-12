@@ -20,7 +20,7 @@ async function makeVaultWithBox(born: ReturnType<typeof makeBornVault> = makeBor
   const world = await born
   const box = await new TestableBoxListing(boxWorldOf(world.vault), { ...world.opts, scope: world.vault.scope }).create(BoxDna)
   const boxIn = async (vault: Vault) => {
-    const found = await new TestableBoxListing(boxWorldOf(vault), { ...world.opts, scope: vault.scope }).fetch(box.scope)
+    const found = await new TestableBoxListing(boxWorldOf(vault), { ...world.opts, scope: vault.scope }).get(box.scope, { maxMillisSinceRefresh: 0 })
     if (found === null) { throw new Error('no box stored') }
     return found
   }

@@ -60,7 +60,7 @@ describe("BoxListing", () => {
         const scope = world.mw.boxscope(record.boxlabel)
         world.mw.willGet(world.mw.answerOf(scope, record))
         const fetchingListing = boxListingOf(world.mw)
-        await fetchingListing.fetch(scope, { ifAbsent: 'nil' })
+        await fetchingListing.get(scope, { maxMillisSinceRefresh: 0, ifAbsent: 'nil' })
         const fetched = fetchingListing.at(scope)
         const built   = boxListingOf(world.mw).deliverRecord(record)
         expect(fetched).to.not.be.null

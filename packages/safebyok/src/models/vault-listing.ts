@@ -80,7 +80,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** Lay a new passphrase wayin on the vault at `ante`, and answer the record stored. Nothing locks: the vaultKey does not change. */
   async replacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<VaultRecord> { return valOf(await this.tryReplacePassphrase(ante, passphrase_wayin)) }
 
-  /** {@link replacePassphrase}, answering the vaultDB's own answer. */
+  /** {@link replacePassphrase}, answering the vaultDB's own answer.
+   * Chute: replacePassphrase → **tryReplacePassphrase** → vaultDB.tryReplacePassphrase, then deliverAnswer
+   */
   async tryReplacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<ThingAnswer<VaultRecord>> {
     let answer: Answer<VaultRecord, OkAct | GateAct> | typeof UNANSWERED = UNANSWERED
     try {
@@ -94,7 +96,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** Lay a passkey wayin on the vault at `ante`, and answer the record stored. */
   async addPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<VaultRecord> { return valOf(await this.tryAddPasskey(ante, passkey_wayin)) }
 
-  /** {@link addPasskey}, answering the vaultDB's own answer. */
+  /** {@link addPasskey}, answering the vaultDB's own answer.
+   * Chute: addPasskey → **tryAddPasskey** → vaultDB.tryAddPasskey, then deliverAnswer
+   */
   async tryAddPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<ThingAnswer<VaultRecord>> {
     let answer: Answer<VaultRecord, OkAct | GateAct> | typeof UNANSWERED = UNANSWERED
     try {
@@ -108,7 +112,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   /** Null the passkey wayin of the vault at `ante`, and answer the record stored, or the row stored where it has no passkey wayin. */
   async revokePasskey(ante: VaultRecord): Promise<VaultRecord> { return valOf(await this.tryRevokePasskey(ante)) }
 
-  /** {@link revokePasskey}, answering the vaultDB's own answer. */
+  /** {@link revokePasskey}, answering the vaultDB's own answer.
+   * Chute: revokePasskey → **tryRevokePasskey** → vaultDB.tryRevokePasskey, then deliverAnswer
+   */
   async tryRevokePasskey(ante: VaultRecord): Promise<ThingAnswer<VaultRecord>> {
     let answer: Answer<VaultRecord, OkAct | GateAct> | typeof UNANSWERED = UNANSWERED
     try {
