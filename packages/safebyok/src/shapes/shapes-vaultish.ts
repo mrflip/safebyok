@@ -286,17 +286,17 @@ export type BoxHalves = { whisper: Whisper, sidecar: Sidecar }
 const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown }): boolean => (whisper !== undefined) || (sidecar !== undefined)
 
 /** The checks of what a caller hands `create` (`boxDna`) and `put` (`boxPatch`, and `boxPatchNew` where `ifPresent` is 'fail'). */
-export const { boxDna, boxPatch, boxPatchNew } = Checkers('bad_option', ({ lit, oneof, applabel, user_id, vaultlabel, boxlabel }) => {
+export const { boxDna, boxPatch, boxPatchNew } = Checkers('bad_option', ({ lit, oneof, user_id, banklabel, vaultlabel, boxlabel }) => {
   const factory = SX.boxSparse.pick({ fmt: true, am: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
-    applabel, user_id, vaultlabel, boxlabel,
+    user_id, banklabel, vaultlabel, boxlabel,
     whisper: whisper.default({}),
     sidecar: sidecar.default({}),
     whisper_codec:          lit('json_v1').default('json_v1'),
     whisper_schema_version: lit(1).default(1),
   }).strict().transform((dna) => omit(dna, factory.keyof().options))
   const patchFields = SX.boxRecord.omit({ sidecar: true }).partial().extend({ am: oneof(EX.amVals).optional(), whisper: whisper.optional(), sidecar: sidecar.optional() }).strict().refine(namesAHalf, Phrases.PatchNamesNeitherHalf)
-  const pickHalves  = ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel }: Z.output<typeof patchFields>) => ({ whisper, sidecar, applabel, user_id, vaultlabel, boxlabel })
+  const pickHalves  = ({ whisper, sidecar, user_id, banklabel, vaultlabel, boxlabel }: Z.output<typeof patchFields>) => ({ whisper, sidecar, user_id, banklabel, vaultlabel, boxlabel })
   const boxPatch    = patchFields.transform(pickHalves)
   // A whole record's whisper_ciphered is recycled, so a put told to only create refuses one, before pickHalves drops it.
   const boxPatchNew = patchFields.refine((patch) => ! ('whisper_ciphered' in patch), Phrases.RecordForNewBox).transform(pickHalves)
@@ -391,9 +391,9 @@ export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num
 
 // The host's functions and logger are checked once, by the guard that wraps each; here they are only named.
 /** The check of the options handed to `Bank.make`. */
-export const bankOpts = objCheck(({ fn, custom, applabel, user_id, device_id }) => ({
-  applabel,
+export const bankOpts = objCheck(({ fn, custom, user_id, banklabel, device_id }) => ({
   user_id,
+  banklabel,
   device_id,
   vaultDB:             brandedVaultDB,
   deviceDB:            brandedDeviceDB,
@@ -410,10 +410,10 @@ export const bankOpts = objCheck(({ fn, custom, applabel, user_id, device_id }) 
 
 /** What a host hands `Bank.make`: who the bank is for, where it writes, and the functions it calls back. */
 export interface BankOpts {
-  /** Your app's own label, so several apps can share one backend. */
-  applabel:             string
   /** The signed-in user's stable, opaque id from your own auth, hashed first if it contains anything sensitive. */
-  user_id:              string
+  user_id:               string
+  /** Your app's own label, so several apps can share one backend. */
+  banklabel:             string
   /** Your id for this device, a random UUID you keep per device. */
   device_id:            string
   /** The VaultDB the vaults are synchronized through, from a storage adapter. */

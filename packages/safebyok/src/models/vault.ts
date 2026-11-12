@@ -28,11 +28,11 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 
 /** SLOPDOC: A vault as this device has it: a storable that ducks as its record, and the world its boxes live in. */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> {
-  // == [Props]: applabel, user_id, vaultlabel, world, listing, #bankFriend, #lease, #vaultFriend, #boxListing, #gate
+  // == [Props]: user_id, banklabel, vaultlabel, world, listing, #bankFriend, #lease, #vaultFriend, #boxListing, #gate
 
   /** The scope, tattooed on by Storable's constructor. */
-  declare readonly applabel:   string
   declare readonly user_id:    string
+  declare readonly banklabel:  string
   declare readonly vaultlabel: string
   declare readonly world:      VaultWorld
   declare readonly listing:    VaultListing

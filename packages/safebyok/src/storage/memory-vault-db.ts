@@ -37,17 +37,17 @@ export class MemoryVaultDB extends AdapterVaultDB {
   // == [Rows]: _cheat_vaultRowsOf, _cheat_boxRowsOf, #vaultRowOf, #writeVaultRow, #writeBoxRow, #roomIn, #tell
 
   /** For tests: the bank's own map of vault rows, by vaultlabel. */
-  _cheat_vaultRowsOf({ applabel, user_id }: BankScope): Map<string, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
-    const ckey = ckeyOf(applabel, user_id)
+  _cheat_vaultRowsOf({ user_id, banklabel }: BankScope): Map<string, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
+    const ckey = ckeyOf(user_id, banklabel)
     const vaultrows = this.#vaultrowsOfBank.get(ckey) ?? new Map<string, unknown>()
     this.#vaultrowsOfBank.set(ckey, vaultrows)
     return vaultrows
   }
 
   /** For tests: the map of box rows of one life of a vault, by boxlabel. */
-  _cheat_boxRowsOf({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string): Map<string, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
-    const ckey = ckeyOf(applabel, user_id, vaultlabel, vault_tok)
-    const life = this.#boxLives.get(ckey) ?? { scope: { applabel, user_id, vaultlabel }, vault_tok, boxrows: new Map<string, unknown>() }
+  _cheat_boxRowsOf({ user_id, banklabel, vaultlabel }: VaultScope, vault_tok: string): Map<string, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
+    const ckey = ckeyOf(user_id, banklabel, vaultlabel, vault_tok)
+    const life = this.#boxLives.get(ckey) ?? { scope: { user_id, banklabel, vaultlabel }, vault_tok, boxrows: new Map<string, unknown>() }
     this.#boxLives.set(ckey, life)
     return life.boxrows
   }
@@ -79,7 +79,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   /** Notify each listener watching `scope` of `heard`. */
   #tell(scope: VaultScope, heard: Heard): void {
     for (const { scope: heardScope, hear } of this.#listeners) {
-      const isHeard = (heardScope.applabel === scope.applabel) && (heardScope.user_id === scope.user_id) && ((heardScope.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
+      const isHeard = (heardScope.user_id === scope.user_id) && (heardScope.banklabel === scope.banklabel) && ((heardScope.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
       if (isHeard) { queueMicrotask(() => { hear(structuredClone(heard)) }) }
     }
   }
@@ -149,7 +149,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   protected doTidyGone(ask: BoxTidyAsk): Tidied {
     let totalCount = 0
     for (const [ckey, { scope: vaultScope, vault_tok, boxrows }] of this.#boxLives) {
-      if ((vaultScope.applabel !== ask.applabel) || (vaultScope.user_id !== ask.user_id)) { continue }
+      if ((vaultScope.user_id !== ask.user_id) || (vaultScope.banklabel !== ask.banklabel)) { continue }
       if (SX.isLifeOver(this.#vaultRowOf(vaultScope), vault_tok)) { this.#boxLives.delete(ckey) } else { totalCount += boxrows.size }
     }
     return { totalCount }

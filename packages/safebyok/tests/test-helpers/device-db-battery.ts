@@ -53,7 +53,7 @@ const asked = { ...vaultScope, vault_tok: 'tok_one' }
 async function leaseRowOf(over: Partial<LeaseRow> = {}): Promise<LeaseRow> { return { ...asked, proved_at: T0, lease_key: await makeLeaseKey(), wrapped: 'opaque', ...over } }
 
 /** The scopepath a DeviceDB files the lease row of `scope` under. */
-function scopepathOf({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath { return [applabel, user_id, vaultlabel] }
+function scopepathOf({ user_id, banklabel, vaultlabel }: VaultScope): LeaseScopepath { return [user_id, banklabel, vaultlabel] }
 
 /** A raw row, as the bag a case reads a field of. */
 function bagOf(row: unknown): Record<string, unknown> { return row as Record<string, unknown> }
@@ -139,7 +139,7 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
         const stowed = await deviceDB.tryStow(await leaseRowOf())
         expect(stowed.ok).to.be.true
         expect(await expectGood(deviceDB.tryPeek(asked))).to.not.be.null
-        await expectBad(deviceDB.tryPeek({ ...asked, applabel: '' }))
+        await expectBad(deviceDB.tryPeek({ ...asked, banklabel: '' }))
       })
     })
 
@@ -330,8 +330,8 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
       it("refuses what is not three strings", async () => {
         const deviceDB = await fresh()
         await expectRefusal(deviceDB.forgetRawLease(vaultScope as never))
-        await expectBad(deviceDB.tryForgetRawLease(['acme', 'u1'] as never))
-        await expectBad(deviceDB.tryForgetRawLease(['acme', 'u1', 5] as never))
+        await expectBad(deviceDB.tryForgetRawLease(['u1', 'acme'] as never))
+        await expectBad(deviceDB.tryForgetRawLease(['u1', 'acme', 5] as never))
       })
     })
 
@@ -354,7 +354,7 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
       it("gives each bank scope a device_id of its own", async () => {
         const deviceDB = await fresh()
         const ids = new Set<string>()
-        for (const scope of [bankScope, { ...bankScope, user_id: 'u2' }, { ...bankScope, applabel: 'other' }]) {
+        for (const scope of [bankScope, { ...bankScope, user_id: 'u2' }, { ...bankScope, banklabel: 'other' }]) {
           const made = await deviceDB.ensureCachedBank(scope)
           ids.add(made.device_id)
         }
@@ -372,7 +372,7 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
       it("takes a vault scope or any bag with a bank scope, keeping only the bank scope", async () => {
         const deviceDB = await fresh()
         const made = await deviceDB.ensureCachedBank({ ...vaultScope, vault_tok: 'tok_one' } as never)
-        expect(made).to.have.keys(['applabel', 'user_id', 'device_id'])
+        expect(made).to.have.keys(['user_id', 'banklabel', 'device_id'])
         expect(await deviceDB.ensureCachedBank(bankScope)).to.deep.equal(made)
       })
 
@@ -407,8 +407,8 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
 
       it("refuses a malformed scope", async () => {
         const deviceDB = await fresh()
-        await expectRefusal(deviceDB.ensureCachedBank({ ...bankScope, applabel: 'No Good!' }), 'bad_scope')
-        await expectRefusal(deviceDB.ensureCachedBank({ applabel: 'acme' } as never), 'bad_scope')
+        await expectRefusal(deviceDB.ensureCachedBank({ ...bankScope, banklabel: 'No Good!' }), 'bad_scope')
+        await expectRefusal(deviceDB.ensureCachedBank({ banklabel: 'acme' } as never), 'bad_scope')
         await expectBad(deviceDB.tryEnsureCachedBank({ ...bankScope, user_id: '' }), 'bad_scope')
         expect(await deviceDB.listRawBanks()).to.deep.equal([])
       })
@@ -457,8 +457,8 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
       it("refuses a malformed scope", async () => {
         const deviceDB = await fresh()
         const made = await deviceDB.ensureCachedBank(bankScope)
-        await expectRefusal(deviceDB.forgetBank({ ...bankScope, applabel: 'No Good!' }), 'bad_scope')
-        await expectBad(deviceDB.tryForgetBank({ applabel: 'acme' } as never), 'bad_scope')
+        await expectRefusal(deviceDB.forgetBank({ ...bankScope, banklabel: 'No Good!' }), 'bad_scope')
+        await expectBad(deviceDB.tryForgetBank({ banklabel: 'acme' } as never), 'bad_scope')
         expect(await deviceDB.listRawBanks()).to.deep.equal([made])
       })
     })

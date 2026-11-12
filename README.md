@@ -35,14 +35,14 @@ The old design's sketch. The new design's calls are in [its README](packages/saf
 ### Backend (VaultDB)
 
 Facade over a backing database (convex, postgres, etc) or another vaultDB (graphQL, etc).
-Has vault​s and box​es scoped by applabel, user_id, vaultlabel and boxlabel.
+Has vault​s and box​es scoped by user_id, banklabel, vaultlabel and boxlabel.
 * A box has a sidecar under the app's control and an encrypted whisper​
 * verbs: vault: getVault (record and listing in one step), ensureVault (fetch or create; over a tombstone a new life), putVaultRecord, delVault (leaving a tombstone), subscribe; box: getBox, putBox, delBox.
 
 ### Browser
 
 * a vault​ object
-  - Bank.make({ applabel, user_id, vaultDB, deviceDB, keyDeriver, requestCleartext, ... })​: Bank, non-async, one per signed-in user
+  - Bank.make({ user_id, banklabel, vaultDB, deviceDB, keyDeriver, requestCleartext, ... })​: Bank, non-async, one per signed-in user
   - bank.ensureVault({ vaultlabel }, { vaultDB?, deviceDB? }?): Vault, born from one read of storage (never absent: `novel` until its passphrase is set)
   - vault.hello() (reads storage once its picture has aged; never asks the user)
   - ensureUnlocked, lock​, putWayin(slotlabel)​, delWayin(slotlabel)​, del(), getBox(boxlabel)​, getWhisper(boxlabel)​, putBox({ boxlabel, sidecar? }, whisper?)​, delBox(boxlabel)

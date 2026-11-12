@@ -37,7 +37,7 @@ export function useFakeClock(): void {
 // == [The vault]: WorldStamp
 
 /** The stamp of the vault every builder here makes things in: `u1`'s `main` vault of the app `acme`, registered at {@link T0}. */
-export const WorldStamp: VaultStamp = Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main', vault_tok: 'vault-tok-u1', registered_at: T0 })
+export const WorldStamp: VaultStamp = Object.freeze({ user_id: 'u1', banklabel: 'acme', vaultlabel: 'main', vault_tok: 'vault-tok-u1', registered_at: T0 })
 // --
 
 // == [The friend]: FriendLeaseMillis, FakeLeaseFriend, fakeLeaseFriendOf

@@ -49,24 +49,24 @@ describe("VaultTablesSql", () => {
 
   it("makes a vaults table keyed by bank and vaultlabel, a column to each field of a vault row, with only the gate nullable", async () => {
     expect(await columnsOf('safebyok_vaults')).to.deep.equal([
-      ['applabel', 'text', 'NO'], ['user_id', 'text', 'NO'], ['vaultlabel', 'text', 'NO'],
+      ['user_id', 'text', 'NO'], ['banklabel', 'text', 'NO'], ['vaultlabel', 'text', 'NO'],
       ['fmt', 'integer', 'NO'], ['am', 'text', 'NO'], ['revision_tok', 'text', 'NO'], ['revision_seq', 'integer', 'NO'],
       ['registered_at', 'bigint', 'NO'], ['written_at', 'bigint', 'NO'], ['vault_tok', 'text', 'NO'], ['gate', 'jsonb', 'YES'],
     ])
-    expect(await keysOf('safebyok_vaults')).to.deep.equal(['PRIMARY KEY (applabel, user_id, vaultlabel)'])
+    expect(await keysOf('safebyok_vaults')).to.deep.equal(['PRIMARY KEY (user_id, banklabel, vaultlabel)'])
   })
 
   it("makes a boxes table keyed by life and boxlabel, a column to each field of a box row, with only what a tombstone lacks nullable", async () => {
     expect(await columnsOf('safebyok_boxes')).to.deep.equal([
-      ['applabel', 'text', 'NO'], ['user_id', 'text', 'NO'], ['vaultlabel', 'text', 'NO'], ['vault_tok', 'text', 'NO'], ['boxlabel', 'text', 'NO'],
+      ['user_id', 'text', 'NO'], ['banklabel', 'text', 'NO'], ['vaultlabel', 'text', 'NO'], ['vault_tok', 'text', 'NO'], ['boxlabel', 'text', 'NO'],
       ['fmt', 'integer', 'NO'], ['am', 'text', 'NO'], ['revision_tok', 'text', 'NO'], ['revision_seq', 'integer', 'NO'],
       ['registered_at', 'bigint', 'NO'], ['written_at', 'bigint', 'NO'], ['box_tok', 'text', 'NO'],
       ['whisper_codec', 'text', 'NO'], ['whisper_schema_version', 'integer', 'NO'],
       ['sidecar', 'jsonb', 'YES'], ['box_key_wrapped', 'jsonb', 'YES'], ['whisper_ciphered', 'jsonb', 'YES'],
     ])
     expect(await keysOf('safebyok_boxes')).to.have.members([
-      'PRIMARY KEY (applabel, user_id, vaultlabel, vault_tok, boxlabel)',
-      'FOREIGN KEY (applabel, user_id, vaultlabel) REFERENCES safebyok_vaults(applabel, user_id, vaultlabel)',
+      'PRIMARY KEY (user_id, banklabel, vaultlabel, vault_tok, boxlabel)',
+      'FOREIGN KEY (user_id, banklabel, vaultlabel) REFERENCES safebyok_vaults(user_id, banklabel, vaultlabel)',
     ])
   })
 

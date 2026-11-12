@@ -67,7 +67,7 @@ describe("safebyok", () => {
     expectTypeOf<Front.Bank['isLocked']>().toEqualTypeOf<boolean>()
     expectTypeOf<Front.VaultSnapshot['isLocked']>().toEqualTypeOf<boolean>()
     expectTypeOf<Front.BankSnapshot['stage']>().toEqualTypeOf<Front.BankStage>()
-    expectTypeOf<Front.DamagedBox>().toEqualTypeOf<Readonly<{ applabel: string, user_id: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>>()
+    expectTypeOf<Front.DamagedBox>().toEqualTypeOf<Readonly<{ user_id: string, banklabel: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>>()
   })
 
   it("exports Gating as a type only: the published surface has no launcher that hands a gating an unlock", () => {

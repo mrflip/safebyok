@@ -6,7 +6,7 @@ import type { VaultScope } from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
 
 /** The scope the tests hand the checker. */
-const scope: VaultScope = Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'keys' })
+const scope: VaultScope = Object.freeze({ user_id: 'u1', banklabel: 'acme', vaultlabel: 'keys' })
 
 // A fresh module, so its StrongVerdict is its own: the tests below compare verdicts deeply.
 /** A checker made fresh, over a dictionary chunk that fails to load until `chunk.failing` is cleared. */
@@ -84,7 +84,7 @@ describe("zxcvbnStrengthChecker", () => {
   it("finds a passphrase weak when it is one of the vault's own names", async () => {
     const typed = 'quokkavelodrome'
     expect(await zxcvbnStrengthChecker(typed, scope)).to.eq(StrongVerdict)
-    for (const named of [{ applabel: typed }, { user_id: typed }, { vaultlabel: typed }]) {
+    for (const named of [{ user_id: typed }, { banklabel: typed }, { vaultlabel: typed }]) {
       expect(await zxcvbnStrengthChecker(typed, { ...scope, ...named })).to.deep.equal({ strong: false, reason: Phrases.PassphraseGuessable })
     }
   })
@@ -103,7 +103,7 @@ describe("zxcvbnStrengthChecker", () => {
 
   it("refuses a non-string passphrase or an invalid scope", async () => {
     await TH.expectRefusal(judgedAsync(42 as never, scope), 'bad_option')
-    await TH.expectRefusal(judgedAsync('mauve lantern quietly orbits', { applabel: 'acme' } as never), 'bad_option')
+    await TH.expectRefusal(judgedAsync('mauve lantern quietly orbits', { banklabel: 'acme' } as never), 'bad_option')
   })
 
   it("keeps to the strength checker contract under the bank's guard", async () => {

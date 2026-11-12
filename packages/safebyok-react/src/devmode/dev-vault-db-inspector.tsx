@@ -110,14 +110,14 @@ const getVaultRow = (vaultDB: VaultDB, scope: VaultScope) => (
   vaultDB.getVault({ op: 'get', ...scope, ifAbsent: 'nil', expected: shellVaultOf(scope) })
 )
 
-const getBoxRow = (vaultDB: VaultDB, { applabel, user_id, vaultlabel, boxlabel, vault_tok }: BoxSparse | DamagedBox) => (
-  vaultDB.getBox({ op: 'get', applabel, user_id, vaultlabel, boxlabel, vault_tok, ifAbsent: 'nil', expected: shellBoxOf({ applabel, user_id, vaultlabel, boxlabel }, vault_tok) })
+const getBoxRow = (vaultDB: VaultDB, { user_id, banklabel, vaultlabel, boxlabel, vault_tok }: BoxSparse | DamagedBox) => (
+  vaultDB.getBox({ op: 'get', user_id, banklabel, vaultlabel, boxlabel, vault_tok, ifAbsent: 'nil', expected: shellBoxOf({ user_id, banklabel, vaultlabel, boxlabel }, vault_tok) })
 )
 
 // The listed row is the one the del expects, and its tombstone carries a new life token.
 const delBoxRow = (vaultDB: VaultDB, boxRow: BoxSparse) => {
-  const { applabel, user_id, vaultlabel, boxlabel, vault_tok } = boxRow
+  const { user_id, banklabel, vaultlabel, boxlabel, vault_tok } = boxRow
   const record = { ...boxRow, ...nextRevisionOf(boxRow, Date.now()), am: 'x' as const, box_tok: makeLifeTok() }
-  return vaultDB.delBox({ op: 'del', applabel, user_id, vaultlabel, boxlabel, vault_tok, expected: boxRow, record })
+  return vaultDB.delBox({ op: 'del', user_id, banklabel, vaultlabel, boxlabel, vault_tok, expected: boxRow, record })
 }
 // --

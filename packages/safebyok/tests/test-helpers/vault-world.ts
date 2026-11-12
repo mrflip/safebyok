@@ -28,7 +28,7 @@ import { type ProvingWorldGiven, provingWorldOf } from './proving-world'
 export const T0 = Date.UTC(2026, 9, 31)
 
 /** The scope of the one vault these worlds have. */
-export const Dna = Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
+export const Dna = Object.freeze({ user_id: 'u1', banklabel: 'acme', vaultlabel: 'main' })
 
 /** The passphrase these worlds' vaults are made with. */
 export const Passphrase = 'correct horse battery staple'
@@ -137,7 +137,7 @@ export function makeVaultWorld(stored0: VaultRecord | null = null, worldOverride
     isLocked:     false,
     ensureTimely: () => Promise.resolve(),
     receiveWorld:    nothing,
-    scope:        { applabel: Dna.applabel, user_id: Dna.user_id },
+    scope:        { user_id: Dna.user_id, banklabel: Dna.banklabel },
     logger:       parseLogger(quietLogger),
     ...provingWorldOf({ keyDeriver, strengthChecker, device_id }),
     leaseMillis:  LeaseMillis,

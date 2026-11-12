@@ -191,7 +191,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   protected get isOneLifePerInstance(): true { return true }
 
   protected scopepathOf(scope: VaultScope): string {
-    return ['vault', scope.applabel, scope.user_id, scope.vaultlabel].join('^')
+    return ['vault', scope.user_id, scope.banklabel, scope.vaultlabel].join('^')
   }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>): Vault {
@@ -214,8 +214,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   protected doTryPut(record: VaultRecord, { expected, ifAbsent, ifPresent }: ListingPutOpts<VaultSparse>) {
-    const { applabel, user_id, vaultlabel } = record
-    return this.vaultDB.tryPutVault({ op: 'put', applabel, user_id, vaultlabel, ifAbsent, ifPresent, expected, record })
+    const { user_id, banklabel, vaultlabel } = record
+    return this.vaultDB.tryPutVault({ op: 'put', user_id, banklabel, vaultlabel, ifAbsent, ifPresent, expected, record })
   }
 
   protected tombstoneOver(expected: VaultSparse): DelTombstone<VaultSparse> {
@@ -223,8 +223,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
 
   protected doTryDel(tombstone: DelTombstone<VaultSparse>, { expected }: ListingDelOpts<VaultSparse>) {
-    const { applabel, user_id, vaultlabel } = tombstone
-    return this.vaultDB.tryDelVault({ op: 'del', applabel, user_id, vaultlabel, expected, record: tombstone })
+    const { user_id, banklabel, vaultlabel } = tombstone
+    return this.vaultDB.tryDelVault({ op: 'del', user_id, banklabel, vaultlabel, expected, record: tombstone })
   }
 
   protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.vaultDB.watch(this.world.scope, onNotice, onBadNews) }

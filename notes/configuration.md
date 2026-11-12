@@ -16,7 +16,7 @@ reason is the message your user sees. A passphrase already in use is never check
 
 ```ts
 type StrengthChecker = {
-  (passphrase: string, scope: { applabel: string, user_id: string, vaultlabel: string }):
+  (passphrase: string, scope: { user_id: string, banklabel: string, vaultlabel: string }):
     { strong: true } | { strong: false, reason: string } | Promise<...the same>
   load?: () => void | Promise<void>
 }
@@ -56,7 +56,7 @@ common dictionary of `@zxcvbn-ts/language-common`):
   then a zxcvbn score of `MinZxcvbnScore` (3, of 0 to 4) or more. There are no composition rules:
   it never asks for a digit, a capital or a symbol. A few words that don't usually go together
   pass. A common password with a capital and an exclamation mark on the end does not.
-* The vault's own names (`applabel`, `user_id`, `vaultlabel`) are among the words it tries first.
+* The vault's own names (`user_id`, `banklabel`, `vaultlabel`) are among the words it tries first.
 * Its reasons are its own, in English, and never quote the passphrase.
 * Its dictionary, most of its weight, is a separate chunk, which its `load` fetches when the
   bank's `hello()` runs, never at import. If the dictionary does not load, the hello fails, and the
@@ -73,7 +73,7 @@ spread wins. It supplies no `device_id`: keep your own, a `crypto.randomUUID()` 
 import { Bank } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 
-const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), applabel: 'acme', user_id, device_id, vaultDB, requestCleartext })
+const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), user_id, banklabel: 'acme', device_id, vaultDB, requestCleartext })
 ```
 
 Why these live in `safebyok/browser` rather than as `Bank.make`'s defaults is
@@ -93,7 +93,7 @@ const strengthChecker = Object.assign(async (typed: string, scope: VaultScope) =
   return zxcvbnStrengthChecker(typed, scope)
 }, { load: zxcvbnStrengthChecker.load })
 
-const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), strengthChecker, applabel: 'acme', user_id, device_id, vaultDB, requestCleartext })
+const bank = Bank.make({ ...browserOpts({ dbName: 'acme' }), strengthChecker, user_id, banklabel: 'acme', device_id, vaultDB, requestCleartext })
 ```
 
 ### Leaving it out: your own
@@ -128,7 +128,7 @@ blanks:
 > I'm building an app on safebyok (https://www.npmjs.com/package/safebyok), an end-to-end
 > encrypted vault for API keys and other small secrets. `Bank.make` takes a `strengthChecker`
 > option: a function `(passphrase, scope) => { strong: true } | { strong: false, reason }`, sync
-> or async, where `scope` is `{ applabel, user_id, vaultlabel }`, and an optional idempotent
+> or async, where `scope` is `{ user_id, banklabel, vaultlabel }`, and an optional idempotent
 > `load` the bank runs at `bank.hello()` for anything it must fetch first. Its contract, from the
 > repository's notes/configuration.md ("Pluggable Passphrase Strength Checker"): it returns a verdict for
 > every passphrase and never throws; the reason is shown to my

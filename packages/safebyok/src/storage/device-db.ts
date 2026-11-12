@@ -102,8 +102,8 @@ export abstract class DeviceDB {
   /** The bank row of this bank scope, made with a fresh random `device_id` on the first call. */
   async ensureCachedBank(scope: BankScope): Promise<BankRow> {
     try {
-      const { applabel, user_id } = CX.bankScope.parse(scope)
-      const made = SX.bankRow.parse({ applabel, user_id, device_id: randomId() })
+      const { user_id, banklabel } = CX.bankScope.parse(scope)
+      const made = SX.bankRow.parse({ user_id, banklabel, device_id: randomId() })
       return SX.bankRow.parse(await this.doEnsureCachedBank(made))
     } catch (err) { throw refusalOf(err, 'ensureCachedBank') }
   }
@@ -114,8 +114,8 @@ export abstract class DeviceDB {
   /** Forget the bank row of this bank scope, so the next `ensureCachedBank` mints a fresh `device_id`. */
   async forgetBank(scope: BankScope): Promise<void> {
     try {
-      const { applabel, user_id } = CX.bankScope.parse(scope)
-      await this.doForgetBank({ applabel, user_id })
+      const { user_id, banklabel } = CX.bankScope.parse(scope)
+      await this.doForgetBank({ user_id, banklabel })
     } catch (err) { throw refusalOf(err, 'forgetBank') }
   }
 

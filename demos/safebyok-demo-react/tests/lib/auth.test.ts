@@ -10,7 +10,7 @@ const makeWorld = () => {
   let nowMillis = Date.UTC(2026, 9, 15, 9, 30)
   const clock = { now: () => nowMillis }
   const advance = (byMillis: number) => { nowMillis += byMillis }
-  const auth = createAuth({ applabel: 'acme', dbStorage, deviceStorage, clock })
+  const auth = createAuth({ banklabel: 'acme', dbStorage, deviceStorage, clock })
   return { dbStorage, deviceStorage, advance, auth }
 }
 
@@ -50,7 +50,7 @@ describe("createAuth", () => {
 
   it("reads the wall clock when handed none", async () => {
     const dbStorage = memoryStorage()
-    const auth = createAuth({ applabel: 'acme', dbStorage, deviceStorage: memoryStorage() })
+    const auth = createAuth({ banklabel: 'acme', dbStorage, deviceStorage: memoryStorage() })
     vi.useFakeTimers({ now: Date.UTC(2026, 9, 15, 9, 30), toFake: ['Date'] })
     try {
       await auth.signIn('margo')
@@ -62,7 +62,7 @@ describe("createAuth", () => {
 
   it("rounds a clock's fraction down", async () => {
     const dbStorage = memoryStorage()
-    const auth = createAuth({ applabel: 'acme', dbStorage, deviceStorage: memoryStorage(), clock: { now: () => Date.UTC(2026, 9, 15) + 0.75 } })
+    const auth = createAuth({ banklabel: 'acme', dbStorage, deviceStorage: memoryStorage(), clock: { now: () => Date.UTC(2026, 9, 15) + 0.75 } })
     await auth.signIn('margo')
     expect(margosAccount(dbStorage)).to.have.property('registered_at', Date.UTC(2026, 9, 15))
   })
@@ -83,7 +83,7 @@ describe("createAuth", () => {
   it("the session survives a page reload", async () => {
     const { auth, dbStorage, deviceStorage } = makeWorld()
     const session = await auth.signIn('margo')
-    const reloaded = createAuth({ applabel: 'acme', dbStorage, deviceStorage })
+    const reloaded = createAuth({ banklabel: 'acme', dbStorage, deviceStorage })
     expect(reloaded.getSnapshot()).to.deep.equal(session)
   })
 
@@ -107,7 +107,7 @@ describe("createAuth", () => {
   it("a mangled device session reads as signed out, not as a crash", () => {
     const { dbStorage, deviceStorage } = makeWorld()
     deviceStorage.put('session:acme', 'not even json')
-    const reloaded = createAuth({ applabel: 'acme', dbStorage, deviceStorage })
+    const reloaded = createAuth({ banklabel: 'acme', dbStorage, deviceStorage })
     expect(reloaded.getSnapshot()).to.be.null
     expect(deviceStorage.get('session:acme')).to.be.null
   })

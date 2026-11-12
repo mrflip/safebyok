@@ -73,9 +73,9 @@ const useProviderBank = (opts: ProviderBankOpts, device_id: string | null, handl
  * It also shows the built-in passphrase and passkey dialogs, unless `requestCleartext` is given.
  */
 export const BankProvider = (props: BankProviderProps) => {
-  const { applabel, user_id, deviceDB } = bankProviderProps.parse(props, { where: 'BankProvider' })
-  const device_id = useDeviceId(deviceDB, applabel, user_id)
-  const userkey = JSON.stringify([applabel, user_id])
+  const { user_id, banklabel, deviceDB } = bankProviderProps.parse(props, { where: 'BankProvider' })
+  const device_id = useDeviceId(deviceDB, user_id, banklabel)
+  const userkey = JSON.stringify([user_id, banklabel])
 
   // When a different user signs in, the previous user's bank is vacated here. It is not done in the bank's
   // cleanup, because an unmount, a hot reload or a hidden Activity runs that cleanup too. A null user_id
@@ -83,7 +83,7 @@ export const BankProvider = (props: BankProviderProps) => {
   // The userkey tag makes sure the next user's own bank is not vacated by mistake.
   /** The last bank made, tagged with its user. */
   const lastBank = useRef<{ userkey: string, bank: Bank } | null>(null)
-  const onMade = useCallback((bank: Bank) => { lastBank.current = { userkey: JSON.stringify([bank.applabel, bank.user_id]), bank } }, [])
+  const onMade = useCallback((bank: Bank) => { lastBank.current = { userkey: JSON.stringify([bank.user_id, bank.banklabel]), bank } }, [])
   useEffect(() => {
     const last = lastBank.current
     if (user_id === null || last === null || last.userkey === userkey) { return }

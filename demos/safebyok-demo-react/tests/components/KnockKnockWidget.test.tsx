@@ -51,8 +51,8 @@ const knock = async () => {
 
 /** The box rows `vaultDB` has stored for the API key's vault, by boxlabel. */
 const storedBoxRows = (vaultDB: MemoryVaultDB) => {
-  const vaultrow = vaultDB._cheat_vaultRowsOf({ applabel: 'acme', user_id: 'u1' }).get(ApiKeyVaultlabel) as { vault_tok: string }
-  return vaultDB._cheat_boxRowsOf({ applabel: 'acme', user_id: 'u1', vaultlabel: ApiKeyVaultlabel }, vaultrow.vault_tok)
+  const vaultrow = vaultDB._cheat_vaultRowsOf({ user_id: 'u1', banklabel: 'acme' }).get(ApiKeyVaultlabel) as { vault_tok: string }
+  return vaultDB._cheat_boxRowsOf({ user_id: 'u1', banklabel: 'acme', vaultlabel: ApiKeyVaultlabel }, vaultrow.vault_tok)
 }
 
 describe("KnockKnockWidget", () => {

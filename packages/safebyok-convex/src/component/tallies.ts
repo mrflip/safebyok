@@ -37,7 +37,7 @@ export const MaxVaultBoxSize = (ConvexTransactionReadSize / 2) - ConvexDocumentS
 // == [Tallies]: Life, Tally, Reckoning, BoxDocGiven, weigh, tallyOf, growthOf, capacityOf, reckon, refuses, record, forget, drop
 
 /** The labels and token that name one life of one vault. */
-export type Life = { applabel: string, user_id: string, vaultlabel: string, vault_tok: string }
+export type Life = { user_id: string, banklabel: string, vaultlabel: string, vault_tok: string }
 
 /** A life's box rows counted and weighed: `all_*` of every row, tombstones included, and `live_*` of the live rows alone. */
 export type Tally = { all_count: number, live_count: number, all_size: number, live_size: number }
@@ -51,9 +51,9 @@ export type BoxDocGiven = Omit<WithoutSystemFields<Doc<'safebyok_boxes'>>, 'box'
 /** Return the bytes `boxDoc` counts toward its life's limit, by Convex's `getDocumentSize` with its allowance for system fields. Null counts 0. */
 export function weigh(boxDoc: BoxDocGiven | null): number {
   if (boxDoc === null) { return 0 }
-  const { applabel, user_id, vaultlabel, vault_tok, boxlabel, box } = boxDoc
+  const { user_id, banklabel, vaultlabel, vault_tok, boxlabel, box } = boxDoc
   // The box row came through a Convex validator or out of the table, so it is a Convex value.
-  return getDocumentSize({ applabel, user_id, vaultlabel, vault_tok, boxlabel, box: box as Value })
+  return getDocumentSize({ user_id, banklabel, vaultlabel, vault_tok, boxlabel, box: box as Value })
 }
 
 /** The tally of `boxDoc` alone, or an empty tally for null. */
@@ -128,19 +128,19 @@ function negated({ all_count, live_count, all_size, live_size }: Tally): Tally {
 
 // `.unique()` throws if it finds two rows. A tally is inserted only when none was found in the same
 // transaction, so two would mean damage, and that should fail loudly.
-function getTallyRow(db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life) {
+function getTallyRow(db: DatabaseReader, { user_id, banklabel, vaultlabel, vault_tok }: Life) {
   return (
     db.query('safebyok_tallies')
-      .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+      .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
       .unique()
   )
 }
 
 /** Query the box rows of one life, in boxlabel order. */
-export function lifeBoxQuery(db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life) {
+export function lifeBoxQuery(db: DatabaseReader, { user_id, banklabel, vaultlabel, vault_tok }: Life) {
   return (
     db.query('safebyok_boxes')
-      .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+      .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
   )
 }
 // --

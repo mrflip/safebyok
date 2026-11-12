@@ -37,7 +37,7 @@ types here do not have, trust the types.
 
 * **whisper**: the secret, always a plain JSON object, such as `{ apiKey: 'sk-...' }`. A **box**
   contains one whisper, encrypted, along with its `boxlabel` and sidecar.
-* **vault**: one user's boxes, named by `applabel`, `user_id` and `vaultlabel`. A vault that is
+* **vault**: one user's boxes, named by `user_id`, `banklabel` and `vaultlabel`. A vault that is
   deleted and made again is a new life, with a new `vault_tok` and a new `Vault` instance.
 * **bank**: a signed-in user's vaults and what they share. One per signed-in user.
 * **wayin**: one way into a vault: its passphrase or its passkey. A vault has one passphrase and at
@@ -70,7 +70,7 @@ import { browserOpts } from 'safebyok/browser'
 
 const bank = Bank.make({
   ...browserOpts({ dbName: 'acme' }), // keyDeriver, deviceDB and strengthChecker; a field after it wins
-  applabel: 'acme', user_id: session.user_id,
+  user_id: session.user_id, banklabel: 'acme',
   device_id: deviceId, // a crypto.randomUUID() you keep for this device
   vaultDB, // see below
   requestCleartext: async (gating) => {

@@ -26,11 +26,11 @@ type Rung = { scope: VaultScope, heard: Heard }
 
 /** True when a write under `scope` falls within the `watched` scope. */
 function isHeardBy(watched: WatchScope, scope: VaultScope): boolean {
-  return (watched.applabel === scope.applabel) && (watched.user_id === scope.user_id) && ((watched.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
+  return (watched.user_id === scope.user_id) && (watched.banklabel === scope.banklabel) && ((watched.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
 }
 
 /** The vault scope of an ask or a row, without its other fields. */
-function scopeOf({ applabel, user_id, vaultlabel }: VaultScope): VaultScope { return { applabel, user_id, vaultlabel } }
+function scopeOf({ user_id, banklabel, vaultlabel }: VaultScope): VaultScope { return { user_id, banklabel, vaultlabel } }
 // --
 
 /** A vaultDB stored in this browser's IndexedDB. Its watch reports writes from every tab. */

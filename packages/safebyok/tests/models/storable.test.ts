@@ -68,7 +68,7 @@ describe("Storable own props", () => {
 
     it("is copied onto the box as own props that cannot be assigned or deleted", () => {
       const box = builtBoxOf()
-      for (const ckey of ['applabel', 'user_id', 'vaultlabel', 'boxlabel'] as const) {
+      for (const ckey of ['user_id', 'banklabel', 'vaultlabel', 'boxlabel'] as const) {
         const descriptor = Object.getOwnPropertyDescriptor(box, ckey)
         expect(descriptor, ckey).to.include({ enumerable: true, writable: false, configurable: false })
         expect(descriptor?.value, ckey).to.eq(box.scope[ckey])

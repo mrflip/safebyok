@@ -149,13 +149,13 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
     SafebyokBoxRow:      { __resolveType: typenameOf },
     SafebyokRow:         { __resolveType: typenameOf },
     Query: {
-      safebyokListVaults: async (_parent, { applabel, user_id }, context) => {
-        const ask = { op: 'list', applabel, user_id } as const
+      safebyokListVaults: async (_parent, { user_id, banklabel }, context) => {
+        const ask = { op: 'list', user_id, banklabel } as const
         return await serveSignedIn(context, user_id, ask, async () => await vaultDB.tryListVaults(ask))
       },
       safebyokGetVault:   async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryGetVault(ask)),
-      safebyokListBoxes:  async (_parent, { applabel, user_id, vaultlabel, vault_tok }, context) => {
-        const ask = { op: 'list', applabel, user_id, vaultlabel, vault_tok } as const
+      safebyokListBoxes:  async (_parent, { user_id, banklabel, vaultlabel, vault_tok }, context) => {
+        const ask = { op: 'list', user_id, banklabel, vaultlabel, vault_tok } as const
         return await serveSignedIn(context, user_id, ask, async () => await vaultDB.tryListBoxes(ask))
       },
       safebyokGetBox:     async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryGetBox(ask)),
@@ -168,8 +168,8 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
       safebyokRevokePasskey:     async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, DB.gateVerbAskOf('revokePasskey', record), async () => await vaultDB.tryRevokePasskey(record, opts)),
       safebyokDelBox:            async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryDelBox(ask)),
       safebyokDelVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryDelVault(ask)),
-      safebyokTidyGone:          async (_parent, { applabel, user_id }, context) => {
-        const ask = { op: 'tidy_gone', applabel, user_id } as const
+      safebyokTidyGone:          async (_parent, { user_id, banklabel }, context) => {
+        const ask = { op: 'tidy_gone', user_id, banklabel } as const
         return await serveSignedIn(context, user_id, ask, async () => await vaultDB.tryTidyGone(ask))
       },
     },

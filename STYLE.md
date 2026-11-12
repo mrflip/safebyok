@@ -217,13 +217,13 @@ two apart, so this is kept by hand.
 
   ```ts
   export function box(scope: Boxscope): BoxScopepath {
-    const        { applabel, user_id, vaultlabel, boxlabel } = CX.boxscope.parse(scope)
-    return ['box', applabel, user_id, vaultlabel, boxlabel].join(ScopepathDelimiter)
+    const        { user_id, banklabel, vaultlabel, boxlabel } = CX.boxscope.parse(scope)
+    return ['box', user_id, banklabel, vaultlabel, boxlabel].join(ScopepathDelimiter)
   }
 
   export function boxscope(boxScopepath: BoxScopepath): Boxscope {
-    const [_scopepathkind, applabel, user_id, vaultlabel, boxlabel] = CX.boxScopepath.parse(boxScopepath)
-    return               { applabel, user_id, vaultlabel, boxlabel }
+    const [_scopepathkind, user_id, banklabel, vaultlabel, boxlabel] = CX.boxScopepath.parse(boxScopepath)
+    return               { user_id, banklabel, vaultlabel, boxlabel }
   }
   ```
 
@@ -231,7 +231,7 @@ two apart, so this is kept by hand.
   field-list helper gives no such check. A generic helper earns its place only when it is boring
   and longer than the bodies it serves.
 * **Name what you ignore.** A binding left unused on purpose gets a name starting with `_` that
-  says what it is (`_scopepathkind`), never a hole (`[, applabel]`) and never a bare `_`. The name
+  says what it is (`_scopepathkind`), never a hole (`[, banklabel]`) and never a bare `_`. The name
   records that the part exists, where it sits, and that skipping it is deliberate. The linter
   passes only a named ignore: `_` and a letter or digit.
 * **Write the crucial detail where it shows.** A prefix of every box in a vault ends in the
@@ -297,8 +297,8 @@ is a refusal with a `kind` the caller can branch on.
 `build` that calls it parsed them already: it is an entry point of its own.
 
 **For preconditions, one line is the norm.** A function pulls what it needs out of what it was
-handed, and checks it, in one parse: `const { applabel, user_id } = CX.bankScope.parse(thing)`.
-Where a validator exists, prefer that parse to a hand-pick (`{ applabel: x.applabel, ... }`), an
+handed, and checks it, in one parse: `const { user_id, banklabel } = CX.bankScope.parse(thing)`.
+Where a validator exists, prefer that parse to a hand-pick (`{ banklabel: x.banklabel, ... }`), an
 if-then precondition, or a `safeParse` followed by a sentence of its own: the kit's refusal names
 the failing field. A module-local variation is made at module level, not per call. Add a check
 beside the parse for a rule Zod does not express naturally, or a comparison with what the callee
@@ -343,7 +343,7 @@ validator splits it into its parts before checking them.
 ## Shapes and duck typing
 
 * **Duck typing is the design for data.** A thing that has a scope *is* one: it carries
-  `applabel`, `user_id` and `vaultlabel` as its own fields, never a nested `.scope`. A nested copy
+  `user_id`, `banklabel` and `vaultlabel` as its own fields, never a nested `.scope`. A nested copy
   poses the question of whether the thing and its scope agree; a duck-typed thing has one copy of
   each name, and a function accepting a scope accepts the thing itself. The more things duck type, the
   more a one-off case is plain `Pick`, `&` and `Omit` surgery. A bag between our modules, a test's
@@ -460,7 +460,7 @@ Zod's output order is undocumented, and JavaScript puts integer-like keys first.
 
 A **scopepath** is where a storage files a scope's record (VOCABULARY.md): the kind first, then the
 scope's names in order, joined on `ScopepathDelimiter` (`^`, from `consts.ts`), such as
-`box^acme^u1^main^openai`. `Scopepath` is a public module: a host's own key-value adapter files
+`box^u1^acme^main^openai`. `Scopepath` is a public module: a host's own key-value adapter files
 rows with it.
 
 * The kind goes first: a kind suffix sorts each scope before its children only while every segment
@@ -468,7 +468,7 @@ rows with it.
 * **Lookups go by key** (`Map.get`, a storage's get, an IndexedDB range), never by scanning. A
   listing is for showing; a lookup goes through a keyed map beside it.
 * **A prefix test goes through the module's predicate**, not a hand-written `.startsWith`: the
-  prefix must end in the delimiter, or `vault^acme^u1^main` matches `main2`'s rows.
+  prefix must end in the delimiter, or `vault^u1^acme^main` matches `main2`'s rows.
 
 ## Control flow and refusals
 

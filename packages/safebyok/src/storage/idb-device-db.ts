@@ -26,12 +26,12 @@ export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optio
 // == [The databases]: BankScopepath, leaseScopepathOf, bankScopepathOf, leaseShelfOf, bankShelfOf
 
 /** Where the bank shelf files a bank's row. */
-type BankScopepath = [applabel: string, user_id: string]
+type BankScopepath = [user_id: string, banklabel: string]
 
 /** The scopepath of the lease row at `scope`. */
-function leaseScopepathOf({ applabel, user_id, vaultlabel }: VaultScope): LeaseScopepath { return [applabel, user_id, vaultlabel] }
+function leaseScopepathOf({ user_id, banklabel, vaultlabel }: VaultScope): LeaseScopepath { return [user_id, banklabel, vaultlabel] }
 /** The scopepath of the bank row at `scope`. */
-function bankScopepathOf({ applabel, user_id }: BankScope): BankScopepath { return [applabel, user_id] }
+function bankScopepathOf({ user_id, banklabel }: BankScope): BankScopepath { return [user_id, banklabel] }
 
 /** The lease shelf: the device database of `dbName`, which has the leases. */
 function leaseShelfOf(dbName: string): UseStore {

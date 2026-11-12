@@ -15,7 +15,7 @@ export const DevDeviceDBInspector = ({ deviceDB }: DevDeviceDBInspectorProps) =>
 
 // == [Leases]: LeaseRowsTable, LeaseRowLine, LeaseColumns, ListedLease, listedOfRaw, cellOf
 
-const LeaseColumns = ['applabel', 'user_id', 'vaultlabel', 'vault_tok', 'proved_at'] as const
+const LeaseColumns = ['user_id', 'banklabel', 'vaultlabel', 'vault_tok', 'proved_at'] as const
 
 const listedOfRaw = ({ scopepath, row }: { scopepath: LeaseScopepath, row: unknown }): ListedLease => (
   { scopepath, row: ((typeof row === 'object') && (row !== null)) ? { ...row } : {} }

@@ -25,12 +25,12 @@ function snapshotOf(record: Fetched<BoxRecord, BoxSparse> = fullBoxRecord()): Bo
   return box.getSnapshot()
 }
 
-const SnapshotKeys = ['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'isFull', 'isPresent', 'isExposed', 'isVeiled', 'isLocked']
+const SnapshotKeys = ['user_id', 'banklabel', 'vaultlabel', 'boxlabel', 'revision_tok', 'revision_seq', 'registered_at', 'written_at', 'sidecar', 'isFull', 'isPresent', 'isExposed', 'isVeiled', 'isLocked']
 
 describe("Box own props", () => {
   it("are exactly nine: the four scope fields, registered_at, vault_tok and the three revision fields", () => {
     const box = boxOf()
-    expect(Object.keys(box)).to.have.members(['applabel', 'user_id', 'vaultlabel', 'boxlabel', 'registered_at', 'vault_tok', 'revision_tok', 'revision_seq', 'written_at'])
+    expect(Object.keys(box)).to.have.members(['user_id', 'banklabel', 'vaultlabel', 'boxlabel', 'registered_at', 'vault_tok', 'revision_tok', 'revision_seq', 'written_at'])
     expect(Object.keys(box)).to.have.lengthOf(9)
   })
 

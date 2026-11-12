@@ -9,24 +9,24 @@ import { v } from 'convex/values'
 /** The component's tables: ciphertext rows, the labels used to find them, and a tally per vault life. */
 export default defineSchema({
   safebyok_vaults: defineTable({
-    applabel:   v.string(),
     user_id:    v.string(),
+    banklabel:  v.string(),
     vaultlabel: v.string(),
     vault:      v.any(),
   })
-    .index('by_scope', ['user_id', 'applabel', 'vaultlabel']),
+    .index('by_scope', ['user_id', 'banklabel', 'vaultlabel']),
   safebyok_boxes: defineTable({
-    applabel:   v.string(),
     user_id:    v.string(),
+    banklabel:  v.string(),
     vaultlabel: v.string(),
     vault_tok:  v.string(),
     boxlabel:   v.string(),
     box:        v.any(),
   })
-    .index('by_box', ['user_id', 'applabel', 'vaultlabel', 'vault_tok', 'boxlabel']),
+    .index('by_box', ['user_id', 'banklabel', 'vaultlabel', 'vault_tok', 'boxlabel']),
   safebyok_tallies: defineTable({
-    applabel:   v.string(),
     user_id:    v.string(),
+    banklabel:  v.string(),
     vaultlabel: v.string(),
     vault_tok:  v.string(),
     all_count:  v.number(),
@@ -34,5 +34,5 @@ export default defineSchema({
     all_size:   v.number(),
     live_size:  v.number(),
   })
-    .index('by_life', ['user_id', 'applabel', 'vaultlabel', 'vault_tok']),
+    .index('by_life', ['user_id', 'banklabel', 'vaultlabel', 'vault_tok']),
 })

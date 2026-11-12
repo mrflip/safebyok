@@ -91,7 +91,7 @@ up a `limits` string) padded through a `notes` string to exactly that length, al
 
 ## The Postgres notice for a box write
 
-At the measured commit, `safebyok-postgres` sent `{applabel, user_id, vaultlabel, vault_tok, boxlabel, heard:
+At the measured commit, `safebyok-postgres` sent `{user_id, banklabel, vaultlabel, vault_tok, boxlabel, heard:
 {vault, box}}` through `pg_notify`. If that JSON was over `NoticeMaxBytes` (7,999), it sent the same header without
 `heard`, and each listener fetched the box again with `doGetBox` (`toldTextOf`, `#heardOrNull`). The adapter has
 changed since: today `safebyok_tell` in `vault-functions.sql` sends `{at, vault, box}`, and a notice of 8,000 bytes or
@@ -121,7 +121,7 @@ per box, each about 1 KB, in one transaction. A vault of 8,000 boxes would queue
 ## How many fit in one notification, 10% to spare
 
 Every box is in one vault, under distinct boxlabels of one length. *Full* is `{ boxes: [<box rows>] }`. *Hint* is
-`[applabel, user_id, vaultlabel, vault_tok, [[boxlabel, fmt, revision_tok, revision_seq, written_at, am, box_tok], …]]`.
+`[user_id, banklabel, vaultlabel, vault_tok, [[boxlabel, fmt, revision_tok, revision_seq, written_at, am, box_tok], …]]`.
 *Kept* is the same tuple with `registered_at`, `whisper_codec`, `whisper_schema_version`, the sidecar, and
 `box_key_wrapped` and `whisper_ciphered` each as `[iv, ciphertext]`.
 
@@ -296,7 +296,7 @@ it on real sealed rows.
 
 * **A vault notice** is the vault row as stored, a JSON object.
 * **A box notice** is one JSON array, `[...vault props, ...box props]`.
-  * The vault props are `applabel, user_id, vaultlabel, fmt, am, revision_tok, revision_seq, registered_at,
+  * The vault props are `user_id, banklabel, vaultlabel, fmt, am, revision_tok, revision_seq, registered_at,
     written_at, vault_tok, gate_epoch`, with `gate_epoch` null for a tombstone. That is the Coach's sparse vault
     (`vault_tok`, `revision_seq`, `revision_tok`, `gate_epoch`) plus the scope, `fmt`, `am` and the two times.
   * The box props are `boxlabel, am, fmt, revision_tok, revision_seq, registered_at, written_at, box_tok,

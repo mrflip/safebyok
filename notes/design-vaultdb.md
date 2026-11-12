@@ -6,7 +6,7 @@ Every verb of `AdapterVaultDB` is a `try*` form that parses its ask, calls its `
 
 ## Preconditions
 
-* all: each ask is validated on entry, as the validator for its verb (`vaultGet`, `vaultPut`, `vaultDel`, `boxGet`, `boxPut`, `boxDel`, `vaultList`, `boxList`) says. An ask is a tagged union on `op`: `get`, `put`, `del` or `list`. The list verbs take `{ op: 'list', ... }`, and `tidyGone` takes `{ op: 'tidy_gone', applabel, user_id }`. A get, put or del ask that fails its checks refuses `bad_record`, and a list ask refuses `bad_scope`
+* all: each ask is validated on entry, as the validator for its verb (`vaultGet`, `vaultPut`, `vaultDel`, `boxGet`, `boxPut`, `boxDel`, `vaultList`, `boxList`) says. An ask is a tagged union on `op`: `get`, `put`, `del` or `list`. The list verbs take `{ op: 'list', ... }`, and `tidyGone` takes `{ op: 'tidy_gone', user_id, banklabel }`. A get, put or del ask that fails its checks refuses `bad_record`, and a list ask refuses `bad_scope`
 * all: each stored row is checked by the classifier, once, when it is handed over. A row that fails its checks throws (see *Postcondition*), so past the classifier a row is sound and at the address asked for
 * **Expected revision**: a get, put or del ask carries `expected`, the row it expects to find: its revision (`revision_tok`, `revision_seq`), its `am` and its life token. For a box, the life token is the `box_tok` and `expected.vault_tok` must be the ask's own `vault_tok`. A mismatch between `expected` and the stored row is an act, never an error: see *Revisions* in `notes/answer-contract.md`
   - A put or del of a void (never-seen) row cites the shell row: a `revision_seq` of -1 and a `revision_tok` of `VoidRevisionTok`. The shell is cited whole or not at all
@@ -115,7 +115,7 @@ For every return value,
   | --- | ----------------- | ----- | ------------- | --- | --- | ---- | ------------------------------------------------------------------------------------------------------ |
   | V0  | `listVaults`      |       | got           | 👍   | 📌   | 🟰 📌  | `world` equals the bank scope; `val.vaults` has each stored vault row that passed its checks, simultaneous, live or tombstone |
   | V0  | `listVaults`      |       | got           | 👍   | 🌀   | 🟰 🌀  | `val.damaged_rows` has an entry (`am: 'd'`) for each vault row failing its checks; a row that is no object, or is at another address, throws `storage_issue` |
-  | V0  | `listVaults`      |       | gotvoid       | 👍   | 🔲   | 🟰 🔲  | no vaults for that applabel/user_id: `val.vaults` and `val.damaged_rows` are empty                    |
+  | V0  | `listVaults`      |       | gotvoid       | 👍   | 🔲   | 🟰 🔲  | no vaults for that user_id/banklabel: `val.vaults` and `val.damaged_rows` are empty                    |
   | ..  |                   |       |               | ◽️   | ◽️   | ◽️ ◽️  |                                                                                                        |
   | V2  | `listBoxes`       |       | got           | 👍   | 📌   | 🟰 📌  | `val.boxes` has the sparse box rows of the life `vault_tok`, read in the same step as `world`, the vault row |
   | V2  | `listBoxes`       |       | got           | 👍   | 🌀   | 🟰 🌀  | `val.damaged_rows` has an entry for each box row failing its checks                                    |

@@ -10,17 +10,17 @@ import type { BankScope, BoxQuery, VaultQuery, VaultScope } from 'safebyok/stora
 // IndexedDB sorts any array after every string, so `[...prefix, []]` is an upper bound for every scopepath that starts with `prefix`.
 
 /** The shelf key of a vault row. */
-export type VaultScopepath = [tag: 'vault', applabel: string, user_id: string, vaultlabel: string]
+export type VaultScopepath = [tag: 'vault', user_id: string, banklabel: string, vaultlabel: string]
 
 /** The shelf key of a box row. It includes the `vault_tok`, so each life of a vault has its own boxes. */
-export type BoxScopepath = [tag: 'box', applabel: string, user_id: string, vaultlabel: string, vault_tok: string, boxlabel: string]
+export type BoxScopepath = [tag: 'box', user_id: string, banklabel: string, vaultlabel: string, vault_tok: string, boxlabel: string]
 
 /** The scopepath of the vault row at `scope`. */
-export function vaultScopepathOf({ applabel, user_id, vaultlabel }: VaultScope): VaultScopepath { return ['vault', applabel, user_id, vaultlabel] }
+export function vaultScopepathOf({ user_id, banklabel, vaultlabel }: VaultScope): VaultScopepath { return ['vault', user_id, banklabel, vaultlabel] }
 
 /** The scopepath of the box row that `asked` names. */
-export function boxScopepathOf({ applabel, user_id, vaultlabel, vault_tok, boxlabel }: BoxQuery): BoxScopepath {
-  return ['box', applabel, user_id, vaultlabel, vault_tok, boxlabel]
+export function boxScopepathOf({ user_id, banklabel, vaultlabel, vault_tok, boxlabel }: BoxQuery): BoxScopepath {
+  return ['box', user_id, banklabel, vaultlabel, vault_tok, boxlabel]
 }
 
 /** The vaultlabel in a vault row's `scopepath`. */
@@ -36,13 +36,13 @@ export function boxPlaceOf(scopepath: IDBValidKey): { vaultlabel: string, vault_
 function rangeUnder(prefix: string[]): IDBKeyRange { return IDBKeyRange.bound(prefix, [...prefix, []]) }
 
 /** The key range of every vault row of the bank. */
-export function vaultsRangeOf({ applabel, user_id }: BankScope): IDBKeyRange { return rangeUnder(['vault', applabel, user_id]) }
+export function vaultsRangeOf({ user_id, banklabel }: BankScope): IDBKeyRange { return rangeUnder(['vault', user_id, banklabel]) }
 
 /** The key range of every box row under one life of a vault. */
-export function lifeRangeOf({ applabel, user_id, vaultlabel, vault_tok }: VaultQuery): IDBKeyRange { return rangeUnder(['box', applabel, user_id, vaultlabel, vault_tok]) }
+export function lifeRangeOf({ user_id, banklabel, vaultlabel, vault_tok }: VaultQuery): IDBKeyRange { return rangeUnder(['box', user_id, banklabel, vaultlabel, vault_tok]) }
 
 /** The key range of every box row of the bank, across all its vaults and their lives. */
-export function bankBoxesRangeOf({ applabel, user_id }: BankScope): IDBKeyRange { return rangeUnder(['box', applabel, user_id]) }
+export function bankBoxesRangeOf({ user_id, banklabel }: BankScope): IDBKeyRange { return rangeUnder(['box', user_id, banklabel]) }
 // --
 
 // == [The database]: shelfOf, filedIn, Filed

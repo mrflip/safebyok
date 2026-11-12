@@ -22,13 +22,13 @@ type Act = (cleartexts: unknown) => Promise<Vault>
 
 /** One ask of the user, one open per bank. It has the cleartexts only for the length of an attempt, and concludes once: its launcher answers with that outcome. */
 export class Gating<KindT extends Gatingkind = Gatingkind> {
-  // == [Props]: gatingkind, gatingTok, applabel, user_id, vaultlabel, vault, passkeyHeader, #listing, #act, #concluded, #conclude, #outcome, #isAttempting, #isLastAttempt
+  // == [Props]: gatingkind, gatingTok, user_id, banklabel, vaultlabel, vault, passkeyHeader, #listing, #act, #concluded, #conclude, #outcome, #isAttempting, #isLastAttempt
 
   declare readonly gatingkind:    KindT
   /** Unique to this gating, for a dialog to key on: the next gating's form starts empty, whatever was typed in this one. */
   declare readonly gatingTok:     string
-  declare readonly applabel:      string
   declare readonly user_id:       string
+  declare readonly banklabel:     string
   declare readonly vaultlabel:    string
   declare readonly vault:         VaultForGatingkind[KindT]
   /** The header of the passkey wayin in the gate at launch, for the dialog to ask that passkey; null with none. */
@@ -52,8 +52,8 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   get whenConcluded(): Promise<Outcome<Vault>> { return this.#concluded }
 
   get #scope(): VaultScope {
-    const { applabel, user_id, vaultlabel } = this
-    return { applabel, user_id, vaultlabel }
+    const { user_id, banklabel, vaultlabel } = this
+    return { user_id, banklabel, vaultlabel }
   }
 
   /** This gating's {@link GatingSnapshot}: its kind, token and vault scope, never a cleartext. */

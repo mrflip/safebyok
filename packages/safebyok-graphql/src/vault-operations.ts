@@ -1,8 +1,8 @@
 // Each document includes exactly the fragments it uses, as GraphQL validation requires. None asks for
 // `__typename`, so a response has only the fields the core's answer checkers expect.
 
-const vaultSparseFields = 'applabel user_id vaultlabel fmt revision_tok revision_seq registered_at written_at am vault_tok'
-const boxSparseFields = 'applabel user_id vaultlabel boxlabel fmt revision_tok revision_seq registered_at written_at am vault_tok box_tok whisper_codec whisper_schema_version'
+const vaultSparseFields = 'user_id banklabel vaultlabel fmt revision_tok revision_seq registered_at written_at am vault_tok'
+const boxSparseFields = 'user_id banklabel vaultlabel boxlabel fmt revision_tok revision_seq registered_at written_at am vault_tok box_tok whisper_codec whisper_schema_version'
 
 const ciphered = 'fragment SafebyokCipheredFields on SafebyokCiphered { cipher_iv_b64 ciphertext_b64 }'
 
@@ -25,7 +25,7 @@ const boxRow = `fragment SafebyokBoxRowFields on SafebyokBoxRow {
 const row = 'fragment SafebyokRowFields on SafebyokRow { ...SafebyokVaultRowFields ...SafebyokBoxRowFields }'
 
 const ask = `fragment SafebyokAskFields on SafebyokAsk {
-  op applabel user_id vaultlabel boxlabel vault_tok ifAbsent ifPresent gateVerb
+  op user_id banklabel vaultlabel boxlabel vault_tok ifAbsent ifPresent gateVerb
   expected { revision_tok revision_seq am vault_tok box_tok }
   record { revision_tok revision_seq am vault_tok box_tok }
 }`
@@ -56,11 +56,11 @@ const boxAnswerFragments = [boxAnswer, row, boxRow, vaultRow, gate, ciphered, as
 
 /** The GraphQL documents a client sends to `safebyok-graphql/server`: one per vaultDB verb, and one for the watch subscription. */
 export const VaultOperations = {
-  listVaults: `query SafebyokListVaults($applabel: String!, $user_id: String!) {
-  safebyokListVaults(applabel: $applabel, user_id: $user_id) {
+  listVaults: `query SafebyokListVaults($user_id: String!, $banklabel: String!) {
+  safebyokListVaults(user_id: $user_id, banklabel: $banklabel) {
     ok act
     val { vaults { ...SafebyokVaultRowFields } damaged_rows }
-    world { applabel user_id }
+    world { user_id banklabel }
     ask { ...SafebyokAskFields }
     err { ...SafebyokErrFields }
   }
@@ -72,8 +72,8 @@ ${[vaultRow, gate, ciphered, ask, err].join('\n')}`,
 }
 ${vaultAnswerFragments}`,
 
-  listBoxes: `query SafebyokListBoxes($applabel: String!, $user_id: String!, $vaultlabel: String!, $vault_tok: String!) {
-  safebyokListBoxes(applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel, vault_tok: $vault_tok) {
+  listBoxes: `query SafebyokListBoxes($user_id: String!, $banklabel: String!, $vaultlabel: String!, $vault_tok: String!) {
+  safebyokListBoxes(user_id: $user_id, banklabel: $banklabel, vaultlabel: $vaultlabel, vault_tok: $vault_tok) {
     ok act
     val { boxes { ${boxSparseFields} } damaged_rows }
     world { ...SafebyokVaultRowFields }
@@ -124,19 +124,19 @@ ${boxAnswerFragments}`,
 }
 ${vaultAnswerFragments}`,
 
-  tidyGone: `mutation SafebyokTidyGone($applabel: String!, $user_id: String!) {
-  safebyokTidyGone(applabel: $applabel, user_id: $user_id) {
+  tidyGone: `mutation SafebyokTidyGone($user_id: String!, $banklabel: String!) {
+  safebyokTidyGone(user_id: $user_id, banklabel: $banklabel) {
     ok act
     val { totalCount }
-    world { applabel user_id }
+    world { user_id banklabel }
     ask { ...SafebyokAskFields }
     err { ...SafebyokErrFields }
   }
 }
 ${[ask, err].join('\n')}`,
 
-  watch: `subscription SafebyokWatch($applabel: String!, $user_id: String!, $vaultlabel: String) {
-  safebyokWatch(applabel: $applabel, user_id: $user_id, vaultlabel: $vaultlabel) {
+  watch: `subscription SafebyokWatch($user_id: String!, $banklabel: String!, $vaultlabel: String) {
+  safebyokWatch(user_id: $user_id, banklabel: $banklabel, vaultlabel: $vaultlabel) {
     ok act
     val { ...SafebyokRowFields }
     world { ...SafebyokVaultRowFields }

@@ -63,8 +63,8 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link listVaults}. */
   async tryListVaults(ask: VaultListAsk): Promise<Answer<BankListed, ListAct, BankScope>> {
     try {
-      const { applabel, user_id } = DB.vaultList.parse(ask)
-      const crossed = await this.#runQuery(VaultOperations.listVaults, 'safebyokListVaults', { applabel, user_id })
+      const { user_id, banklabel } = DB.vaultList.parse(ask)
+      const crossed = await this.#runQuery(VaultOperations.listVaults, 'safebyokListVaults', { user_id, banklabel })
       return DB.listVaultsAnswer.parse(listedAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'listVaults', ask) }
   }
@@ -89,8 +89,8 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link listBoxes}. */
   async tryListBoxes(ask: BoxListAsk): Promise<Answer<BoxesListed, ListAct>> {
     try {
-      const { applabel, user_id, vaultlabel, vault_tok } = DB.boxList.parse(ask)
-      const crossed = await this.#runQuery(VaultOperations.listBoxes, 'safebyokListBoxes', { applabel, user_id, vaultlabel, vault_tok })
+      const { user_id, banklabel, vaultlabel, vault_tok } = DB.boxList.parse(ask)
+      const crossed = await this.#runQuery(VaultOperations.listBoxes, 'safebyokListBoxes', { user_id, banklabel, vaultlabel, vault_tok })
       return DB.listBoxesAnswer.parse(listedAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'listBoxes', ask) }
   }
@@ -217,8 +217,8 @@ export class GraphQLVaultDB implements VaultDB {
   /** Non-throwing form of {@link tidyGone}. */
   async tryTidyGone(ask: BoxTidyAsk): Promise<Answer<Tidied, 'tidied', BankScope>> {
     try {
-      const { applabel, user_id } = DB.boxTidy.parse(ask)
-      const crossed = await this.#runMutation(VaultOperations.tidyGone, 'safebyokTidyGone', { applabel, user_id })
+      const { user_id, banklabel } = DB.boxTidy.parse(ask)
+      const crossed = await this.#runMutation(VaultOperations.tidyGone, 'safebyokTidyGone', { user_id, banklabel })
       return DB.tidyGoneAnswer.parse(tidiedAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'tidyGone', ask) }
   }
@@ -231,8 +231,8 @@ export class GraphQLVaultDB implements VaultDB {
    * A watch that ends because the session is no longer signed in (`identity_revoked`) stops without calling it.
    */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: DB.VaultError) => void): () => void {
-    const { applabel, user_id, vaultlabel = null } = DB.watchScope.parse(scope)
-    const variables = { applabel, user_id, vaultlabel }
+    const { user_id, banklabel, vaultlabel = null } = DB.watchScope.parse(scope)
+    const variables = { user_id, banklabel, vaultlabel }
     const watching: { isOn: boolean, subscription?: { unsubscribe: () => void } } = { isOn: true }
     let heardData: unknown
     // Report an ended stream once and never resubscribe. The host decides what to do next.

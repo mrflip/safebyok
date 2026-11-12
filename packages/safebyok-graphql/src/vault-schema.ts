@@ -10,8 +10,8 @@ import { refusalkindVals } from 'safebyok/storage'
 
 // The fields every form of a vault row has, and the fields every form of a box row has.
 const vaultSparseFields = `
-  applabel:      String!
   user_id:       String!
+  banklabel:     String!
   vaultlabel:    String!
   fmt:           Int!
   revision_tok:  String!
@@ -22,8 +22,8 @@ const vaultSparseFields = `
   vault_tok:     String!`
 
 const boxSparseFields = `
-  applabel:               String!
   user_id:                String!
+  banklabel:              String!
   vaultlabel:             String!
   boxlabel:               String!
   fmt:                    Int!
@@ -136,8 +136,8 @@ union SafebyokRow      = SafebyokVaultRecord | SafebyokVaultTombstone | Safebyok
 
 """The scope of a bank: the app's label and the user's id."""
 type SafebyokBankScope {
-  applabel: String!
-  user_id:  String!
+  user_id:   String!
+  banklabel: String!
 }
 
 # Answers
@@ -145,8 +145,8 @@ type SafebyokBankScope {
 """What an answer carries of its ask: its op, address and policies, and the revisions of its rows, never a record's payload. A field is null when the ask did not have it."""
 type SafebyokAsk {
   op:         String
-  applabel:   String
   user_id:    String
+  banklabel:  String
   vaultlabel: String
   boxlabel:   String
   vault_tok:  String
@@ -309,8 +309,8 @@ input SafebyokBoxExpectedInput {
 """A getVault request: the vault's scope, what to return if no row is stored, and the row the caller expects to find."""
 input SafebyokVaultGetAskInput {
   op:         SafebyokOp!
-  applabel:   String!
   user_id:    String!
+  banklabel:  String!
   vaultlabel: String!
   ifAbsent:   SafebyokIfAbsent!
   expected:   SafebyokVaultExpectedInput!
@@ -319,8 +319,8 @@ input SafebyokVaultGetAskInput {
 """A putVault request: the vault's scope, its policies, the row it expects to find, the record to store, and the gate verb it is for, if any."""
 input SafebyokVaultPutAskInput {
   op:         SafebyokOp!
-  applabel:   String!
   user_id:    String!
+  banklabel:  String!
   vaultlabel: String!
   ifAbsent:   SafebyokPutIfAbsent!
   ifPresent:  SafebyokIfPresent!
@@ -332,8 +332,8 @@ input SafebyokVaultPutAskInput {
 """A delVault request: the vault's scope, the row it expects to find, and the tombstone to store."""
 input SafebyokVaultDelAskInput {
   op:         SafebyokOp!
-  applabel:   String!
   user_id:    String!
+  banklabel:  String!
   vaultlabel: String!
   expected:   SafebyokVaultExpectedInput!
   record:     SafebyokVaultTombstoneInput!
@@ -342,8 +342,8 @@ input SafebyokVaultDelAskInput {
 """A getBox request: the box's address, what to return if no row is stored, and the row the caller expects to find."""
 input SafebyokBoxGetAskInput {
   op:         SafebyokOp!
-  applabel:   String!
   user_id:    String!
+  banklabel:  String!
   vaultlabel: String!
   boxlabel:   String!
   vault_tok:  String!
@@ -354,8 +354,8 @@ input SafebyokBoxGetAskInput {
 """A putBox request: the box's address, its policies, the row it expects to find, and the record to store."""
 input SafebyokBoxPutAskInput {
   op:         SafebyokOp!
-  applabel:   String!
   user_id:    String!
+  banklabel:  String!
   vaultlabel: String!
   boxlabel:   String!
   vault_tok:  String!
@@ -368,8 +368,8 @@ input SafebyokBoxPutAskInput {
 """A delBox request: the box's address, the row it expects to find, and the tombstone to store."""
 input SafebyokBoxDelAskInput {
   op:         SafebyokOp!
-  applabel:   String!
   user_id:    String!
+  banklabel:  String!
   vaultlabel: String!
   boxlabel:   String!
   vault_tok:  String!
@@ -380,9 +380,9 @@ input SafebyokBoxDelAskInput {
 # Operations
 
 type Query {
-  safebyokListVaults(applabel: String!, user_id: String!): SafebyokBankListedAnswer!
+  safebyokListVaults(user_id: String!, banklabel: String!): SafebyokBankListedAnswer!
   safebyokGetVault(ask: SafebyokVaultGetAskInput!): SafebyokVaultAnswer!
-  safebyokListBoxes(applabel: String!, user_id: String!, vaultlabel: String!, vault_tok: String!): SafebyokBoxesListedAnswer!
+  safebyokListBoxes(user_id: String!, banklabel: String!, vaultlabel: String!, vault_tok: String!): SafebyokBoxesListedAnswer!
   safebyokGetBox(ask: SafebyokBoxGetAskInput!): SafebyokBoxAnswer!
 }
 
@@ -394,11 +394,11 @@ type Mutation {
   safebyokRevokePasskey(record: SafebyokVaultRecordInput!, opts: SafebyokGateVerbOptsInput!): SafebyokVaultAnswer!
   safebyokDelBox(ask: SafebyokBoxDelAskInput!): SafebyokBoxAnswer!
   safebyokDelVault(ask: SafebyokVaultDelAskInput!): SafebyokVaultAnswer!
-  safebyokTidyGone(applabel: String!, user_id: String!): SafebyokTidiedAnswer!
+  safebyokTidyGone(user_id: String!, banklabel: String!): SafebyokTidiedAnswer!
 }
 
 type Subscription {
   """Subscribe to row changes in a bank, or in one of its vaults when vaultlabel is given."""
-  safebyokWatch(applabel: String!, user_id: String!, vaultlabel: String): SafebyokNotice!
+  safebyokWatch(user_id: String!, banklabel: String!, vaultlabel: String): SafebyokNotice!
 }
 `

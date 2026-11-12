@@ -76,7 +76,7 @@ import { Bank } from 'safebyok'
 import { GraphQLVaultDB } from 'safebyok-graphql'
 
 const client = new Client({ url: '/api/graphql', exchanges: [fetchExchange], fetchSubscriptions: true })
-const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, vaultDB: new GraphQLVaultDB({ client }), ... })
+const bank = Bank.make({ user_id: session.user_id, banklabel: 'acme', vaultDB: new GraphQLVaultDB({ client }), ... })
 ```
 
 Your app's own Client works: `GraphQLVaultDB` sends every query `network-only`, so a document
@@ -111,7 +111,7 @@ one. On sign-out, or a sign-in as someone else, call `bank.vacate()` and make a 
 that is all they do about it.
 
 `tidyGone`, which removes the box rows of deleted vaults and counts those left, is an operation like
-the rest, behind the same sign-in check: a host calls `tidyGone({ applabel, user_id })` on its
+the rest, behind the same sign-in check: a host calls `tidyGone({ user_id, banklabel })` on its
 `GraphQLVaultDB`, and the vaultDB behind your resolvers tidies the signed-in user's bank.
 
 The vaultDB the resolvers call checks what it is sent, as the browser's vaultDB checks it before

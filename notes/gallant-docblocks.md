@@ -430,7 +430,7 @@ The first pairs (`create`, `demandUnsealable`) are in `notes/gallant.md`.
  * Refuses 'insecure_context' first, in a page the browser says is not a secure context. Then
  * 'bad_option' for anything but a bag, or for an option it does not take, of the wrong type or out
  * of range, every one it finds named in one refusal led by "In Bank.make's options"; then
- * 'bad_scope' for an `applabel` that is not a label or a `user_id` that fails its check; then
+ * 'bad_scope' for a `user_id` that fails its check or a `banklabel` that is not a label; then
  * 'bad_option' for a key deriver a vault does not keep, or a clock that throws or reads out of
  * bounds. The limits are held to the default `vaultDB`'s here, and to a vault's own at its birth.
  */
@@ -772,7 +772,7 @@ function isSafelyAllZero(bytes: Uint8Array): boolean {
 ```ts
 // storage/vault-db-shapes.ts
 /** The tombstone of a vault row nothing holds. A damaged listing's label comes from storage, and is not checked here: it is part of what is reported. */
-export function sentinelVaultOf({ applabel, user_id, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone {
+export function sentinelVaultOf({ user_id, banklabel, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone {
 ```
 
 A maintainer's note on what is not checked here, and why.
@@ -968,8 +968,8 @@ Gallant:
     // Without this handler, a dropped connection crashes the process. With it, every watch goes quiet until you listen again.
 
 Goofus: "behind the same gate": the sign-in check is not the Gate; gate means `Gate` and `vault.gate` only
-    the rest, behind the same gate: a host calls `tidyGone({ applabel, user_id })` on its
+    the rest, behind the same gate: a host calls `tidyGone({ user_id, banklabel })` on its
 Gallant:
-    the rest, behind the same sign-in check: a host calls `tidyGone({ applabel, user_id })` on its
+    the rest, behind the same sign-in check: a host calls `tidyGone({ user_id, banklabel })` on its
 
 ```

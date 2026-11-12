@@ -184,7 +184,7 @@ export type Novel = typeof NOVEL
 // == [The lease's forms]: LeaseFormat, isLeaseKey, leaseStamp, leaseRecord, LeaseStamp, LeaseSparse, LeaseRecord
 
 /** The `fmt` a lease carries, as `Lease` checks it. */
-export const LeaseFormat = 7001
+export const LeaseFormat = 7002
 
 /** True when `val` is a leaseKey as `makeLeaseKey` makes one: a non-extractable AES-GCM CryptoKey whose usages are within `wrapKey` and `unwrapKey`, among them `unwrapKey`.
  * A device database hands back what it kept by structured clone, so a key that is extractable, of

@@ -6,7 +6,7 @@ import { boxAt, boxFlaws, boxQuery, boxscope, boxTombstoneOf, priorOf, stale, va
 
 describe("SX.shellBoxOf and the void row", () => {
   it("passes the void row a shell makes, its zero toks and its 2008 date, as a tombstone of its kind", () => {
-    const scope = { applabel: 'testapp', user_id: 'u1', vaultlabel: 'default', boxlabel: 'anthropic_api_key' }
+    const scope = { user_id: 'u1', banklabel: 'testapp', vaultlabel: 'default', boxlabel: 'anthropic_api_key' }
     const shell = SX.shellBoxOf(scope, 'vault-tok-1')
     expect(SX.boxTombstone.parse(shell)).to.deep.include({ ...SX.VoidRevision, box_tok: SX.VoidLifeTok, registered_at: SX.VoidTime, written_at: SX.VoidTime, am: 'x' })
     expect(new Date(SX.VoidTime).toISOString()).to.eq('2008-08-08T08:08:08.777Z')

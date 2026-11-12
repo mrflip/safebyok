@@ -44,7 +44,7 @@ import { fakeCiphered } from './builders'
 export const T0 = 1_700_000_000_000
 
 /** The vault's scope and `vault_tok` that {@link makeModelsWorld} gives its world, and the builders below give their records. */
-export const WorldVault = Object.freeze({ scope: Object.freeze({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }), vault_tok: 'vault-tok-u1' })
+export const WorldVault = Object.freeze({ scope: Object.freeze({ user_id: 'u1', banklabel: 'acme', vaultlabel: 'main' }), vault_tok: 'vault-tok-u1' })
 
 /** The one live vault row of every world, which a box verb demands. */
 export function worldVaultRow(): VaultRecord {

@@ -235,17 +235,17 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       const vaults = NearUserIds.map((user_id, ii) => vaultAt(0, `life${String(ii)}`, { user_id }))
       await Promise.all(vaults.map(async (vault) => await vaultDB.putVault(vaultPutAskOf(vault))))
       for (const vault of vaults) {
-        const { val } = await vaultDB.listVaults({ op: 'list', applabel: vault.applabel, user_id: vault.user_id })
+        const { val } = await vaultDB.listVaults({ op: 'list', user_id: vault.user_id, banklabel: vault.banklabel })
         expect(val.vaults).to.deep.equal([vault])
       }
     })
 
-    it("keeps each vault's boxes to it, under a near vaultlabel or another applabel", async () => {
+    it("keeps each vault's boxes to it, under a near vaultlabel or another banklabel", async () => {
       const { vaultDB, box } = await putWith({ box: true })
-      const neighbours = [vaultAt(0, 'life2', { vaultlabel: 'main_2' }), vaultAt(0, 'life1', { applabel: 'acme_2' })]
+      const neighbours = [vaultAt(0, 'life2', { vaultlabel: 'main_2' }), vaultAt(0, 'life1', { banklabel: 'acme_2' })]
       await Promise.all(neighbours.map(async (vault) => await vaultDB.putVault(vaultPutAskOf(vault))))
-      for (const { applabel, vaultlabel, vault_tok } of neighbours) {
-        const { val } = await vaultDB.listBoxes({ op: 'list', ...vaultScope, applabel, vaultlabel, vault_tok })
+      for (const { banklabel, vaultlabel, vault_tok } of neighbours) {
+        const { val } = await vaultDB.listBoxes({ op: 'list', ...vaultScope, banklabel, vaultlabel, vault_tok })
         expect(val.boxes).to.deep.equal([])
       }
       const { val } = await vaultDB.listBoxes(boxListAsk)

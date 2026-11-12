@@ -752,7 +752,7 @@ of each duck, and a class instance's copy has lost its methods.
 
 ```ts
 MSX.bankOpts.parse(opts)
-const { applabel, user_id, device_id = randomId(), vaultDB, deviceDB, keyDeriver, clock = wallClock, logger = DefaultLogger /* ... */ } = opts
+const { user_id, banklabel, device_id = randomId(), vaultDB, deviceDB, keyDeriver, clock = wallClock, logger = DefaultLogger /* ... */ } = opts
 ```
 
 The listings' constructors do the same with `MSX.listingOpts`, `MSX.vaultListingOpts` and `MSX.boxListingOpts`.

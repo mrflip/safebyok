@@ -47,28 +47,28 @@ const convexRowsOf = (vaultDB: ConvexVaultDB): TH.VaultDBRowCheats => {
   const { deployment } = madeOf(vaultDB)
   // Plant through `arrange`, so the clients are notified of each planted change, as they would be of a write from elsewhere.
   const run: ComponentBackend['run'] = async (fn) => await deployment.arrange(async (backend) => await backend.run(fn))
-  async function getVaultDoc(db: Parameters<Parameters<ComponentBackend['run']>[0]>[0]['db'], { applabel, user_id, vaultlabel }: VaultScope) {
-    return await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel)).unique()
+  async function getVaultDoc(db: Parameters<Parameters<ComponentBackend['run']>[0]>[0]['db'], { user_id, banklabel, vaultlabel }: VaultScope) {
+    return await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel)).unique()
   }
   return {
     plantVaultRow: async (scope, row) => {
       await run(async ({ db }) => {
-        const { applabel, user_id, vaultlabel } = scope
+        const { user_id, banklabel, vaultlabel } = scope
         const vaultDoc = await getVaultDoc(db, scope)
-        if (vaultDoc) { await db.replace('safebyok_vaults', vaultDoc._id, { applabel, user_id, vaultlabel, vault: row }) } else { await db.insert('safebyok_vaults', { applabel, user_id, vaultlabel, vault: row }) }
+        if (vaultDoc) { await db.replace('safebyok_vaults', vaultDoc._id, { user_id, banklabel, vaultlabel, vault: row }) } else { await db.insert('safebyok_vaults', { user_id, banklabel, vaultlabel, vault: row }) }
       })
     },
     // A planted row is not tallied, so the life's tally is deleted and the next put recounts it.
     plantBoxRow: async (scope: Boxscope, vault_tok, row) => {
       await run(async ({ db }) => {
-        const { applabel, user_id, vaultlabel, boxlabel } = scope
+        const { user_id, banklabel, vaultlabel, boxlabel } = scope
         const boxDoc = await db.query('safebyok_boxes')
-          .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok).eq('boxlabel', boxlabel))
+          .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok).eq('boxlabel', boxlabel))
           .unique()
-        const planted = { applabel, user_id, vaultlabel, vault_tok, boxlabel, box: row }
+        const planted = { user_id, banklabel, vaultlabel, vault_tok, boxlabel, box: row }
         if (boxDoc) { await db.replace('safebyok_boxes', boxDoc._id, planted) } else { await db.insert('safebyok_boxes', planted) }
         const tallyDoc = await db.query('safebyok_tallies')
-          .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+          .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
           .unique()
         if (tallyDoc) { await db.delete('safebyok_tallies', tallyDoc._id) }
       })
@@ -77,9 +77,9 @@ const convexRowsOf = (vaultDB: ConvexVaultDB): TH.VaultDBRowCheats => {
       const vaultDoc = await getVaultDoc(db, scope)
       return (vaultDoc?.vault ?? null) as unknown
     }),
-    boxRowsOf: async ({ applabel, user_id, vaultlabel }, vault_tok) => {
+    boxRowsOf: async ({ user_id, banklabel, vaultlabel }, vault_tok) => {
       const boxDocs = await run(async ({ db }) => await db.query('safebyok_boxes')
-        .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+        .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
         .collect())
       return new Map(boxDocs.map(({ boxlabel, box }) => [boxlabel, box as unknown]))
     },

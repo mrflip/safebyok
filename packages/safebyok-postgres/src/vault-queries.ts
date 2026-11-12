@@ -9,14 +9,14 @@
 export const ListVaultsSql = `
   SELECT vaultlabel, safebyok_record(to_jsonb(vault)) AS vault
   FROM   safebyok_vaults AS vault
-  WHERE  (applabel, user_id) = ($1, $2)
+  WHERE  (user_id, banklabel) = ($1, $2)
   ORDER  BY vaultlabel
 `
 /** The vault row at a scope. */
 export const GetVaultSql = `
   SELECT safebyok_record(to_jsonb(vault)) AS vault
   FROM   safebyok_vaults AS vault
-  WHERE  (applabel, user_id, vaultlabel) = ($1, $2, $3)
+  WHERE  (user_id, banklabel, vaultlabel) = ($1, $2, $3)
 `
 // --
 
@@ -38,21 +38,21 @@ export const ReviseVaultSql = 'SELECT * FROM safebyok_revise_vault($1::text::jso
 export const GetBoxWithVaultSql = `
   SELECT (
     SELECT safebyok_record(to_jsonb(vault)) FROM safebyok_vaults AS vault
-    WHERE  (applabel, user_id, vaultlabel) = ($1, $2, $3)
+    WHERE  (user_id, banklabel, vaultlabel) = ($1, $2, $3)
   ) AS world, (
     SELECT safebyok_record(to_jsonb(box)) FROM safebyok_boxes AS box
-    WHERE  (applabel, user_id, vaultlabel, vault_tok, boxlabel) = ($1, $2, $3, $4, $5)
+    WHERE  (user_id, banklabel, vaultlabel, vault_tok, boxlabel) = ($1, $2, $3, $4, $5)
   ) AS box
 `
 /** The box rows of one life of a vault, by boxlabel, and its vault row as `world`. */
 export const ListBoxesWithVaultSql = `
   SELECT (
     SELECT safebyok_record(to_jsonb(vault)) FROM safebyok_vaults AS vault
-    WHERE  (applabel, user_id, vaultlabel) = ($1, $2, $3)
+    WHERE  (user_id, banklabel, vaultlabel) = ($1, $2, $3)
   ) AS world, COALESCE((
     SELECT jsonb_agg(jsonb_build_object('boxlabel', boxlabel, 'box', safebyok_record(to_jsonb(box))) ORDER BY boxlabel)
     FROM   safebyok_boxes AS box
-    WHERE  (applabel, user_id, vaultlabel, vault_tok) = ($1, $2, $3, $4)
+    WHERE  (user_id, banklabel, vaultlabel, vault_tok) = ($1, $2, $3, $4)
   ), '[]'::jsonb) AS boxes
 `
 // --
@@ -74,13 +74,13 @@ export const ReviseBoxSql = 'SELECT * FROM safebyok_revise_box($1::text::jsonb, 
 export const BoxLivesSql = `
   SELECT vaultlabel, vault_tok, count(*)::int AS boxcount
   FROM   safebyok_boxes
-  WHERE  (applabel, user_id) = ($1, $2)
+  WHERE  (user_id, banklabel) = ($1, $2)
   GROUP  BY vaultlabel, vault_tok
   ORDER  BY vaultlabel, vault_tok
 `
 /** Delete every box row of one vault life. */
 export const DeleteBoxLifeSql = `
   DELETE FROM safebyok_boxes
-  WHERE  (applabel, user_id, vaultlabel, vault_tok) = ($1, $2, $3, $4)
+  WHERE  (user_id, banklabel, vaultlabel, vault_tok) = ($1, $2, $3, $4)
 `
 // --

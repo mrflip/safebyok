@@ -86,7 +86,7 @@ describe("guardStrengthChecker", () => {
   it("returns StrongVerdict for a passphrase the checker accepts", async () => {
     const checker = vi.fn((_passphrase: string, _scope: VaultScope): PassphraseVerdict => ({ strong: true }))
     expect(await guardStrengthChecker(checker)('  Spaced Out Phrase  ', scope)).to.eq(StrongVerdict)
-    expect(checker).toHaveBeenCalledWith('  Spaced Out Phrase  ', { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' })
+    expect(checker).toHaveBeenCalledWith('  Spaced Out Phrase  ', { user_id: 'u1', banklabel: 'acme', vaultlabel: 'main' })
     const told = checker.mock.calls[0]?.[1]
     expect(told).to.not.eq(scope)
     expect(Object.isFrozen(told)).to.be.true

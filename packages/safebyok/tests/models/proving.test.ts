@@ -515,8 +515,8 @@ describe("proving.buildWayin(source)", () => {
 })
 
 const StampCases = [
-  [{ applabel: 'acme_other' },       'the stamp of another app'],
   [{ user_id: 'u2' },                'the stamp of another user'],
+  [{ banklabel: 'acme_other' },      'the stamp of another app'],
   [{ vaultlabel: 'other' },          'the stamp of another vault label'],
   [{ vault_tok: 'vault-tok-other' }, 'the stamp of another vault'],
   [{ registered_at: T0 + 1 },        'a stamp whose registered_at moved'],

@@ -4,16 +4,16 @@
     {
       "type": "object",
       "properties": {
-        "applabel": {
-          "type": "string",
-          "maxLength": 40,
-          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
-        },
         "user_id": {
           "type": "string",
           "minLength": 1,
           "maxLength": 100,
           "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+\\|%\\-]+$"
+        },
+        "banklabel": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
         },
         "vaultlabel": {
           "type": "string",
@@ -22,7 +22,7 @@
         },
         "fmt": {
           "type": "number",
-          "const": 6001
+          "const": 6002
         },
         "revision_tok": {
           "type": "string",
@@ -186,8 +186,8 @@
         }
       },
       "required": [
-        "applabel",
         "user_id",
+        "banklabel",
         "vaultlabel",
         "fmt",
         "revision_tok",
@@ -203,16 +203,16 @@
     {
       "type": "object",
       "properties": {
-        "applabel": {
-          "type": "string",
-          "maxLength": 40,
-          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
-        },
         "user_id": {
           "type": "string",
           "minLength": 1,
           "maxLength": 100,
           "pattern": "^(?!\\.+$)[A-Za-z0-9_.~:@+\\|%\\-]+$"
+        },
+        "banklabel": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^(?!.*__)[a-z][a-z0-9_]*[a-z0-9]$"
         },
         "vaultlabel": {
           "type": "string",
@@ -221,7 +221,7 @@
         },
         "fmt": {
           "type": "number",
-          "const": 6001
+          "const": 6002
         },
         "revision_tok": {
           "type": "string",
@@ -252,8 +252,8 @@
         }
       },
       "required": [
-        "applabel",
         "user_id",
+        "banklabel",
         "vaultlabel",
         "fmt",
         "revision_tok",

@@ -25,26 +25,26 @@ const GateChecks = Checkers('bad_option', ({ obj, str, uint }) => {
   return { passphraseWayinRecord, gateRecord }
 })
 
-const { bankScope, vaultScope } = Checkers('bad_scope', ({ obj, applabel, user_id, vaultlabel }) => {
-  const bankScope  = obj({ applabel, user_id })
+const { bankScope, vaultScope } = Checkers('bad_scope', ({ obj, user_id, banklabel, vaultlabel }) => {
+  const bankScope  = obj({ user_id, banklabel })
   const vaultScope = bankScope.extend({ vaultlabel })
   return { bankScope, vaultScope }
 })
 
-const { boxRecord, boxSparse } = Checkers('bad_record', ({ obj, str, uint, applabel, user_id, vaultlabel, boxlabel }) => {
-  const boxRecord = obj({ applabel, user_id, vaultlabel, boxlabel, written_at: uint, whisper_ciphered: str }).strict()
+const { boxRecord, boxSparse } = Checkers('bad_record', ({ obj, str, uint, user_id, banklabel, vaultlabel, boxlabel }) => {
+  const boxRecord = obj({ user_id, banklabel, vaultlabel, boxlabel, written_at: uint, whisper_ciphered: str }).strict()
   const boxSparse = boxRecord.omit({ whisper_ciphered: true })
   return { boxRecord, boxSparse }
 })
 
-const { vaultRecord } = Checkers('bad_record', ({ obj, uint, applabel, user_id, vaultlabel, gateRecord }) => {
-  const vaultRecord = obj({ applabel, user_id, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
+const { vaultRecord } = Checkers('bad_record', ({ obj, uint, user_id, banklabel, vaultlabel, gateRecord }) => {
+  const vaultRecord = obj({ user_id, banklabel, vaultlabel, gate_epoch: uint, gate: gateRecord.nullable() }).strict()
   return { vaultRecord }
 }, [GateChecks])
 
-const scope = { applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }
+const scope = { user_id: 'u1', banklabel: 'acme', vaultlabel: 'main' }
 /** An objCheck builder: a bank scope's fields. */
-const bankScopeOf = ({ applabel, user_id }: typeof Kit) => ({ applabel, user_id })
+const bankScopeOf = ({ user_id, banklabel }: typeof Kit) => ({ user_id, banklabel })
 const sparse = { ...scope, boxlabel: 'openai', written_at: 1 }
 const gate = { passphrase: { salt_b64: 'c2FsdA', memory_kib: 19_456 } }
 
@@ -65,7 +65,7 @@ describe("Checkers", () => {
   it("refuses an unknown field in a slice made in the call", () => {
     expect(boxSparse.parse(sparse)).to.deep.equal(sparse)
     const err = TH.expectSyncRefusal(() => boxSparse.parse({ ...sparse, note: 'hi' }), 'bad_record')
-    expect(err.message).to.eq("There is a field it does not accept (its name is not repeated): it accepts only applabel, user_id, vaultlabel, boxlabel, written_at. Check the spelling, or leave it out")
+    expect(err.message).to.eq("There is a field it does not accept (its name is not repeated): it accepts only user_id, banklabel, vaultlabel, boxlabel, written_at. Check the spelling, or leave it out")
     TH.expectSyncRefusal(() => boxRecord.parse(sparse), 'bad_record')
   })
 
@@ -89,9 +89,9 @@ describe("Checkers", () => {
   })
 
   it("names every failing field, each with its check's sentence, in the message and meta.fieldnames", () => {
-    const err = TH.expectSyncRefusal(() => boxRecord.parse({ applabel: 'Acme', user_id: 'a/b', vaultlabel: 'main', boxlabel: 'x', written_at: -1, whisper_ciphered: 'c' }), 'bad_record')
-    expect(err.message.split('; ').map((sentence) => sentence.split(':', 1)[0])).to.deep.equal(['applabel', 'user_id', 'boxlabel', 'written_at'])
-    expect(err.meta?.fieldnames).to.deep.equal(['applabel', 'user_id', 'boxlabel', 'written_at'])
+    const err = TH.expectSyncRefusal(() => boxRecord.parse({ user_id: 'a/b', banklabel: 'Acme', vaultlabel: 'main', boxlabel: 'x', written_at: -1, whisper_ciphered: 'c' }), 'bad_record')
+    expect(err.message.split('; ').map((sentence) => sentence.split(':', 1)[0])).to.deep.equal(['user_id', 'banklabel', 'boxlabel', 'written_at'])
+    expect(err.meta?.fieldnames).to.deep.equal(['user_id', 'banklabel', 'boxlabel', 'written_at'])
     expect(Object.isFrozen(err.meta?.fieldnames)).to.be.true
   })
 
@@ -109,18 +109,18 @@ describe("Checkers", () => {
   })
 
   it("says Zod's own sentence for an input that fails as a whole, and lists no fieldname", () => {
-    const err = TH.expectSyncRefusal(() => vaultScope.parse('acme^u1^main'), 'bad_scope')
+    const err = TH.expectSyncRefusal(() => vaultScope.parse('u1^acme^main'), 'bad_scope')
     expect(err.message).to.eq("Invalid input: expected object, received string")
     expect(err.meta?.fieldnames).to.deep.equal([])
   })
 
   it("quotes no refused value and names no unknown field", () => {
     const secret = 'sk-live-0xSECRET'
-    const err = TH.expectSyncRefusal(() => boxRecord.parse({ ...sparse, applabel: secret, user_id: `${secret} `, written_at: secret, whisper_ciphered: 7, vault_key: secret, [secret]: 1, 'sk live': 2 }), 'bad_record')
+    const err = TH.expectSyncRefusal(() => boxRecord.parse({ ...sparse, banklabel: secret, user_id: `${secret} `, written_at: secret, whisper_ciphered: 7, vault_key: secret, [secret]: 1, 'sk live': 2 }), 'bad_record')
     expect(err.message).to.not.include('SECRET')
     expect(err.message).to.not.include('sk live')
     expect(err.message).to.not.include('vault_key')
-    expect(err.message).to.include("There are 3 fields it does not accept (their names are not repeated): it accepts only applabel, user_id, vaultlabel, boxlabel, written_at, whisper_ciphered.")
+    expect(err.message).to.include("There are 3 fields it does not accept (their names are not repeated): it accepts only user_id, banklabel, vaultlabel, boxlabel, written_at, whisper_ciphered.")
     expect(JSON.stringify(err.meta)).to.not.include('SECRET')
     expect(err.cause).to.be.undefined
   })
@@ -172,30 +172,30 @@ describe("Checkers", () => {
   })
 
   it("makes each slice made in the call refuse: pick, omit, extend, partial, strict, strip and readonly", () => {
-    const slices = Checkers('bad_record', ({ obj, int, applabel, user_id, vaultlabel }) => {
-      const record = obj({ applabel, user_id, vaultlabel, gate_epoch: int }).strict()
+    const slices = Checkers('bad_record', ({ obj, int, user_id, banklabel, vaultlabel }) => {
+      const record = obj({ user_id, banklabel, vaultlabel, gate_epoch: int }).strict()
       return {
         record,
-        picked:   record.pick({ applabel: true, user_id: true, vaultlabel: true }).strip(),
+        picked:   record.pick({ user_id: true, banklabel: true, vaultlabel: true }).strip(),
         omitted:  record.omit({ gate_epoch: true }),
         extended: record.extend({ vault_epoch: int }),
         partial:  record.partial(),
-        frozen:   record.pick({ applabel: true, user_id: true, vaultlabel: true }).strip().readonly(),
+        frozen:   record.pick({ user_id: true, banklabel: true, vaultlabel: true }).strip().readonly(),
       }
     })
     expect(slices.picked.parse({ ...scope, gate_epoch: 'any', extra: 1 })).to.deep.equal(scope)
     TH.expectSyncRefusal(() => slices.picked.parse({ ...scope, user_id: '' }), 'bad_record')
     TH.expectSyncRefusal(() => slices.omitted.parse({ ...scope, gate_epoch: 1 }), 'bad_record')
     TH.expectSyncRefusal(() => slices.extended.parse({ ...scope, gate_epoch: 1 }), 'bad_record')
-    TH.expectSyncRefusal(() => slices.partial.parse({ applabel: 'Acme' }), 'bad_record')
+    TH.expectSyncRefusal(() => slices.partial.parse({ banklabel: 'Acme' }), 'bad_record')
     expect(Object.isFrozen(slices.frozen.parse(scope))).to.be.true
     TH.expectSyncRefusal(() => slices.frozen.parse({ ...scope, vaultlabel: '' }), 'bad_record')
   })
 
   it("leaves a slice made from a validator outside a call plain Zod, its parse throwing a ZodError", () => {
-    const outside = [bankScope.extend({ vaultlabel: Kit.vaultlabel }), boxRecord.pick({ applabel: true }), boxRecord.omit({ written_at: true }), vaultScope.strict(), vaultScope.optional()]
+    const outside = [bankScope.extend({ vaultlabel: Kit.vaultlabel }), boxRecord.pick({ banklabel: true }), boxRecord.omit({ written_at: true }), vaultScope.strict(), vaultScope.optional()]
     for (const slice of outside) {
-      expect(() => slice.parse({ applabel: 'Acme' })).to.throw(Zod.ZodError)
+      expect(() => slice.parse({ banklabel: 'Acme' })).to.throw(Zod.ZodError)
     }
   })
 
@@ -215,7 +215,7 @@ describe("Checkers", () => {
 
   // Checkers @example 1
   it("puts the story's where before the failures and its advice after", () => {
-    const bad = { applabel: 'acme', user_id: 'u1', vaultlabel: 'Main' }
+    const bad = { user_id: 'u1', banklabel: 'acme', vaultlabel: 'Main' }
     const plain = TH.expectSyncRefusal(() => vaultScope.parse(bad), 'bad_scope')
     const where = TH.expectSyncRefusal(() => vaultScope.parse(bad, { where: 'In the scope naming the vault' }), 'bad_scope')
     const advice = TH.expectSyncRefusal(() => vaultScope.parse(bad, { advice: 'Name it by its vaultlabel.' }), 'bad_scope')
@@ -300,8 +300,8 @@ describe("Checker", () => {
   })
 
   it("gives parseConsistent to a validator of an object, and refuses a disagreement as its kind", () => {
-    const checkedScope = Checker(({ obj, applabel, user_id }) => obj({ applabel, user_id }), 'bad_scope')
-    expectTypeOf(checkedScope.parseConsistent).returns.toEqualTypeOf<{ applabel: string, user_id: string }>()
+    const checkedScope = Checker(({ obj, user_id, banklabel }) => obj({ user_id, banklabel }), 'bad_scope')
+    expectTypeOf(checkedScope.parseConsistent).returns.toEqualTypeOf<{ user_id: string, banklabel: string }>()
     TH.expectSyncRefusal(() => checkedScope.parseConsistent(scope, { user_id: 'u2' }), 'bad_scope')
   })
 })
@@ -333,18 +333,18 @@ describe("objCheck", () => {
   // objCheck @example 1
   it("makes a strict validator of an object from its fields, with a default refusal kind", () => {
     const checkedScope = objCheck(bankScopeOf)
-    expect(checkedScope.parse({ applabel: 'acme', user_id: 'u1' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
-    const err = TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_record')
-    expect(err.meta?.fieldnames).to.deep.equal(['applabel'])
+    expect(checkedScope.parse({ user_id: 'u1', banklabel: 'acme' })).to.deep.equal({ user_id: 'u1', banklabel: 'acme' })
+    const err = TH.expectSyncRefusal(() => checkedScope.parse({ user_id: 'u1', banklabel: 'Acme' }), 'bad_record')
+    expect(err.meta?.fieldnames).to.deep.equal(['banklabel'])
     const extra = TH.expectSyncRefusal(() => checkedScope.parse({ ...scope, vault_tok: 'tok' }), 'bad_record')
-    expect(extra.message).to.eq("There are 2 fields it does not accept (their names are not repeated): it accepts only applabel, user_id. Check the spelling, or leave them out")
+    expect(extra.message).to.eq("There are 2 fields it does not accept (their names are not repeated): it accepts only user_id, banklabel. Check the spelling, or leave them out")
   })
 
   // objCheck @example 2
   it("drops a field it does not accept, unread, under extras 'strip'", () => {
     const checkedScope = objCheck(bankScopeOf, { refusalkind: 'bad_scope', extras: 'strip' })
-    expect(checkedScope.parse({ ...scope, vault_tok: 'tok' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
-    TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_scope')
+    expect(checkedScope.parse({ ...scope, vault_tok: 'tok' })).to.deep.equal({ user_id: 'u1', banklabel: 'acme' })
+    TH.expectSyncRefusal(() => checkedScope.parse({ user_id: 'u1', banklabel: 'Acme' }), 'bad_scope')
     TH.expectSyncRefusal(() => objCheck(bankScopeOf, { extras: 'strip' }).parse({}), 'bad_record')
   })
 
@@ -370,9 +370,9 @@ describe("objStrict", () => {
   // objStrict @example
   it("makes a validator of an object that refuses a field it does not accept, with a default refusal kind", () => {
     const checkedScope = objStrict(bankScopeOf)
-    expect(checkedScope.parse({ applabel: 'acme', user_id: 'u1' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
+    expect(checkedScope.parse({ user_id: 'u1', banklabel: 'acme' })).to.deep.equal({ user_id: 'u1', banklabel: 'acme' })
     const extra = TH.expectSyncRefusal(() => checkedScope.parse({ ...scope, vault_tok: 'tok' }), 'bad_record')
-    expect(extra.message).to.eq("There are 2 fields it does not accept (their names are not repeated): it accepts only applabel, user_id. Check the spelling, or leave them out")
+    expect(extra.message).to.eq("There are 2 fields it does not accept (their names are not repeated): it accepts only user_id, banklabel. Check the spelling, or leave them out")
   })
 
   it("refuses the kind it is told, given alone or as refusalkind", () => {
@@ -391,8 +391,8 @@ describe("objStrip", () => {
   // objStrip @example
   it("makes a validator of an object that drops a field it does not accept, unread, still refusing a bad one it does", () => {
     const checkedScope = objStrip(bankScopeOf, 'bad_scope')
-    expect(checkedScope.parse({ ...scope, vault_tok: 'tok' })).to.deep.equal({ applabel: 'acme', user_id: 'u1' })
-    TH.expectSyncRefusal(() => checkedScope.parse({ applabel: 'Acme', user_id: 'u1' }), 'bad_scope')
+    expect(checkedScope.parse({ ...scope, vault_tok: 'tok' })).to.deep.equal({ user_id: 'u1', banklabel: 'acme' })
+    TH.expectSyncRefusal(() => checkedScope.parse({ user_id: 'u1', banklabel: 'Acme' }), 'bad_scope')
     TH.expectSyncRefusal(() => objStrip(bankScopeOf).parse({}), 'bad_record')
   })
 })
@@ -415,7 +415,7 @@ describe("isConsistent", () => {
   it("is false when any one field both define differs", () => {
     expect(isConsistent(TH.scopeOf('u2'), TH.scopeOf('u1'))).to.be.false
     expect(isConsistent(TH.scopeOf('u1', 'spare'), TH.scopeOf('u1'))).to.be.false
-    expect(isConsistent({ ...TH.scopeOf('u1'), applabel: 'other' }, TH.scopeOf('u1'))).to.be.false
+    expect(isConsistent({ ...TH.scopeOf('u1'), banklabel: 'other' }, TH.scopeOf('u1'))).to.be.false
   })
 
   // isConsistent @example
@@ -493,7 +493,7 @@ describe("Kit", () => {
     expect(Kit.custom((candidate) => typeof candidate === 'function').safeParse(() => null).success).to.be.true
     expect(Kit.lit(null).safeParse(null).success).to.be.true
     expect(Kit.lazy(() => Kit.str).safeParse('text').success).to.be.true
-    expect(Kit.applabel).to.eq(Kit.label)
+    expect(Kit.banklabel).to.eq(Kit.label)
     expect(Kit.user_id.safeParse('auth0|x').success).to.be.true
   })
 

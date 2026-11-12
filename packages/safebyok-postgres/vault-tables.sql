@@ -8,8 +8,8 @@
 -- Each time is UTC epoch milliseconds. Every secret field of a record is ciphertext.
 
 CREATE TABLE IF NOT EXISTS safebyok_vaults (
-  applabel      text    NOT NULL,
   user_id       text    NOT NULL,
+  banklabel     text    NOT NULL,
   vaultlabel    text    NOT NULL,
   fmt           integer NOT NULL,
   am            text    NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
   written_at    bigint  NOT NULL,
   vault_tok     text    NOT NULL,
   gate          jsonb,
-  PRIMARY KEY (applabel, user_id, vaultlabel),
+  PRIMARY KEY (user_id, banklabel, vaultlabel),
   CHECK (am IN ('a', 'x')),
   CHECK ((am = 'a') = (gate IS NOT NULL)),
   CHECK (gate IS NULL OR COALESCE(
@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS safebyok_vaults (
 -- vault life are never read again, and stay until the vault's next write, or tidyGone, deletes them.
 -- The fillfactor leaves room in each page for a box's next revision to be stored beside the last.
 CREATE TABLE IF NOT EXISTS safebyok_boxes (
-  applabel               text    NOT NULL,
   user_id                text    NOT NULL,
+  banklabel              text    NOT NULL,
   vaultlabel             text    NOT NULL,
   vault_tok              text    NOT NULL,
   boxlabel               text    NOT NULL,
@@ -50,8 +50,8 @@ CREATE TABLE IF NOT EXISTS safebyok_boxes (
   sidecar                jsonb,
   box_key_wrapped        jsonb,
   whisper_ciphered       jsonb,
-  PRIMARY KEY (applabel, user_id, vaultlabel, vault_tok, boxlabel),
-  FOREIGN KEY (applabel, user_id, vaultlabel) REFERENCES safebyok_vaults,
+  PRIMARY KEY (user_id, banklabel, vaultlabel, vault_tok, boxlabel),
+  FOREIGN KEY (user_id, banklabel, vaultlabel) REFERENCES safebyok_vaults,
   CHECK (am IN ('a', 'x')),
   CHECK ((am = 'a') = (sidecar IS NOT NULL) AND (am = 'a') = (box_key_wrapped IS NOT NULL) AND (am = 'a') = (whisper_ciphered IS NOT NULL)),
   CHECK (sidecar IS NULL OR jsonb_typeof(sidecar) = 'object'),

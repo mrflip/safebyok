@@ -20,7 +20,7 @@ const AddPasskeyForm = ({ gating, passphraseUsername, passkeyRpId }: AddPasskeyM
     const passphraseClear = textOf(form, 'current-password')
     let made: PasskeyAnswer | null
     try {
-      made = await createPasskey({ rp: { name: gating.applabel, id: passkeyRpId }, user: { name: username, displayName: username } })
+      made = await createPasskey({ rp: { name: gating.banklabel, id: passkeyRpId }, user: { name: username, displayName: username } })
     } catch (err) {
       return { ok: false, err }
     }

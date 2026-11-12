@@ -26,7 +26,7 @@ Pass the deriver as `keyDeriver`:
 import { Bank } from 'safebyok'
 import { argon2idWasmWebV1Deriver } from 'safebyok-fastkey'
 
-const bank = Bank.make({ applabel: 'acme', user_id: session.user_id, device_id: deviceId, vaultDB, deviceDB, strengthChecker, requestCleartext, keyDeriver: argon2idWasmWebV1Deriver })
+const bank = Bank.make({ user_id: session.user_id, banklabel: 'acme', device_id: deviceId, vaultDB, deviceDB, strengthChecker, requestCleartext, keyDeriver: argon2idWasmWebV1Deriver })
 await bank.hello()
 const vault = await bank.ensureVault({ vaultlabel: 'main' })
 ```

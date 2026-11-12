@@ -102,9 +102,9 @@ Three tables, inside the component:
 
 | Table             | One row per        | Has                                                     | Index                                                              |
 | ----------------- | ------------------ | ------------------------------------------------------- | ------------------------------------------------------------------ |
-| `safebyok_vaults` | vault              | its scope and its vault row, live or a tombstone        | `by_scope`: `user_id`, `applabel`, `vaultlabel`                    |
-| `safebyok_boxes`  | box, in each life  | its scope, its life's `vault_tok`, and its box row      | `by_box`: `user_id`, `applabel`, `vaultlabel`, `vault_tok`, `boxlabel` |
-| `safebyok_tallies`| life of a vault    | count and size of its box rows: all, and live alone    | `by_life`: `user_id`, `applabel`, `vaultlabel`, `vault_tok`        |
+| `safebyok_vaults` | vault              | its scope and its vault row, live or a tombstone        | `by_scope`: `user_id`, `banklabel`, `vaultlabel`                    |
+| `safebyok_boxes`  | box, in each life  | its scope, its life's `vault_tok`, and its box row      | `by_box`: `user_id`, `banklabel`, `vaultlabel`, `vault_tok`, `boxlabel` |
+| `safebyok_tallies`| life of a vault    | count and size of its box rows: all, and live alone    | `by_life`: `user_id`, `banklabel`, `vaultlabel`, `vault_tok`        |
 
 `user_id` leads every index, so one user's rows are one range of each. Rows are stored as the core
 writes them. Each whisper, each box's boxKey, and the vaultKey (once for each wayin) are encrypted.

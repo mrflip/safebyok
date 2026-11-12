@@ -22,7 +22,7 @@ describe("DevDeviceDBInspector", () => {
   it("lists each lease by the fields listLeases answers", async () => {
     await renderOverLease()
     const cells = within(leaseRow('main')).getAllByRole('cell').map((cell) => cell.textContent)
-    expect(cells.slice(0, 3)).to.deep.equal(['acme', 'u1', 'main'])
+    expect(cells.slice(0, 3)).to.deep.equal(['u1', 'acme', 'main'])
     expect(cells[5]).to.eq('')
   })
 
@@ -53,7 +53,7 @@ describe("DevDeviceDBInspector", () => {
 
   it("lists a damaged row only with damaged rows, and deletes it by forgetRawLease", async () => {
     const { world } = await renderOverLease()
-    world.deviceDB._cheat_leaseRows().set(ckeyOf('acme', 'u1', 'mangled'), { scopepath: ['acme', 'u1', 'mangled'], row: { applabel: 'acme', user_id: 'u1', vaultlabel: 'mangled' } })
+    world.deviceDB._cheat_leaseRows().set(ckeyOf('u1', 'acme', 'mangled'), { scopepath: ['u1', 'acme', 'mangled'], row: { user_id: 'u1', banklabel: 'acme', vaultlabel: 'mangled' } })
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
     await waitFor(() => { expect(screen.getAllByRole('row')).to.have.lengthOf(2) })
     includingDamaged()
@@ -65,7 +65,7 @@ describe("DevDeviceDBInspector", () => {
 
   it("shows a damaged row's invalid proved_at as the raw number", async () => {
     const { world } = await renderOverLease()
-    world.deviceDB._cheat_leaseRows().set(ckeyOf('acme', 'u1', 'mangled'), { scopepath: ['acme', 'u1', 'mangled'], row: { applabel: 'acme', user_id: 'u1', vaultlabel: 'mangled', proved_at: NaN } })
+    world.deviceDB._cheat_leaseRows().set(ckeyOf('u1', 'acme', 'mangled'), { scopepath: ['u1', 'acme', 'mangled'], row: { user_id: 'u1', banklabel: 'acme', vaultlabel: 'mangled', proved_at: NaN } })
     includingDamaged()
     await waitFor(() => { expect(leaseRow('mangled')).to.exist })
     expect(within(leaseRow('mangled')).getByText('NaN')).to.exist

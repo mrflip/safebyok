@@ -59,8 +59,8 @@ function channelOf(user_id: string): string { return `safebyok_${user_id}` }
 /** A parsed notice: the stored row's address, and the rows that fit the byte-size limit. */
 type Told = VaultScope & { vault_tok?: string | undefined, boxlabel?: string | undefined, heard?: Heard | undefined }
 
-const toldWhere = DB.objCheck(({ applabel, user_id, vaultlabel, str }) => ({
-  applabel, user_id, vaultlabel, vault_tok: str.optional(), boxlabel: str.optional(),
+const toldWhere = DB.objCheck(({ user_id, banklabel, vaultlabel, str }) => ({
+  user_id, banklabel, vaultlabel, vault_tok: str.optional(), boxlabel: str.optional(),
 }), { refusalkind: 'bad_record', extras: 'strip' })
 
 /** Parse a notification's text into a {@link Told}, or return null if it is not one of our notices. */
@@ -80,7 +80,7 @@ function jsonOrNull(text: string): unknown {
 }
 
 function isHeardIn(scope: WatchScope, told: Told): boolean {
-  return (scope.applabel === told.applabel) && (scope.user_id === told.user_id) && ((scope.vaultlabel ?? told.vaultlabel) === told.vaultlabel)
+  return (scope.user_id === told.user_id) && (scope.banklabel === told.banklabel) && ((scope.vaultlabel ?? told.vaultlabel) === told.vaultlabel)
 }
 // --
 
@@ -163,13 +163,13 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   }
 
   /** The vault row stored at a scope, null for none. */
-  async #fetchVault({ applabel, user_id, vaultlabel }: VaultScope): Promise<VaultFetched> {
-    return { vault: vaultOf(await this.#query(GetVaultSql, [applabel, user_id, vaultlabel])) }
+  async #fetchVault({ user_id, banklabel, vaultlabel }: VaultScope): Promise<VaultFetched> {
+    return { vault: vaultOf(await this.#query(GetVaultSql, [user_id, banklabel, vaultlabel])) }
   }
 
   /** A box row and its vault row as `world`, each null for none, fetched in one statement. */
-  async #fetchBox({ applabel, user_id, vaultlabel, vault_tok, boxlabel }: BoxQuery): Promise<BoxFetched> {
-    const [fetched] = await this.#query(GetBoxWithVaultSql, [applabel, user_id, vaultlabel, vault_tok, boxlabel]) as BoxFetched[]
+  async #fetchBox({ user_id, banklabel, vaultlabel, vault_tok, boxlabel }: BoxQuery): Promise<BoxFetched> {
+    const [fetched] = await this.#query(GetBoxWithVaultSql, [user_id, banklabel, vaultlabel, vault_tok, boxlabel]) as BoxFetched[]
     return fetched ?? { world: null, box: null }
   }
 
@@ -220,7 +220,7 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
   protected async doListVaults(ask: VaultListAsk): Promise<VaultsStored> {
-    const vaults = await this.#query(ListVaultsSql, [ask.applabel, ask.user_id]) as RowOfVault[]
+    const vaults = await this.#query(ListVaultsSql, [ask.user_id, ask.banklabel]) as RowOfVault[]
     return this.classifyStoredVaults(ask, vaults)
   }
 
@@ -230,8 +230,8 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   }
 
   protected async doListBoxes(ask: BoxListAsk): Promise<BoxesStored> {
-    const { applabel, user_id, vaultlabel, vault_tok } = ask
-    const [fetched] = await this.#query(ListBoxesWithVaultSql, [applabel, user_id, vaultlabel, vault_tok]) as BoxesFetched[]
+    const { user_id, banklabel, vaultlabel, vault_tok } = ask
+    const [fetched] = await this.#query(ListBoxesWithVaultSql, [user_id, banklabel, vaultlabel, vault_tok]) as BoxesFetched[]
     return this.classifyStoredBoxes(ask, fetched ?? { world: null, boxes: [] })
   }
 
@@ -285,19 +285,19 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
     return await this.#writeBox(ask, ReviseBoxSql)
   }
 
-  protected async doTidyGone({ applabel, user_id }: BoxTidyAsk): Promise<Tidied> {
+  protected async doTidyGone({ user_id, banklabel }: BoxTidyAsk): Promise<Tidied> {
     return await this.#transact(async (tx) => {
       /** The number of box rows stored for one vault life. */
       type BoxLife = { vaultlabel: string, vault_tok: string, boxcount: number }
 
       // Query the box lives before the vaults. Each statement reads its own snapshot, so a vault row read second is at least as new as the boxes counted first.
-      const lives = await rowsFrom(tx, BoxLivesSql, [applabel, user_id]) as BoxLife[]
-      const vaultrows = await rowsFrom(tx, ListVaultsSql, [applabel, user_id]) as RowOfVault[]
+      const lives = await rowsFrom(tx, BoxLivesSql, [user_id, banklabel]) as BoxLife[]
+      const vaultrows = await rowsFrom(tx, ListVaultsSql, [user_id, banklabel]) as RowOfVault[]
       const vaults = new Map(vaultrows.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
       let totalCount = 0
       for (const { vaultlabel, vault_tok, boxcount } of lives) {
         if (DB.isLifeOver(vaults.get(vaultlabel) ?? null, vault_tok)) {
-          await tx.query(DeleteBoxLifeSql, [applabel, user_id, vaultlabel, vault_tok])
+          await tx.query(DeleteBoxLifeSql, [user_id, banklabel, vaultlabel, vault_tok])
         } else { totalCount += boxcount }
       }
       return { totalCount }

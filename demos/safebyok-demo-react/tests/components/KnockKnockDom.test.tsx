@@ -50,8 +50,8 @@ const knockAs = async (whosThere: string) => {
 
 /** The box rows `vaultDB` has stored for the 'main' vault, by boxlabel. */
 const storedBoxRows = (vaultDB: MemoryVaultDB) => {
-  const vaultrow = vaultDB._cheat_vaultRowsOf({ applabel: 'acme', user_id: 'u1' }).get('main') as { vault_tok: string }
-  return vaultDB._cheat_boxRowsOf({ applabel: 'acme', user_id: 'u1', vaultlabel: 'main' }, vaultrow.vault_tok)
+  const vaultrow = vaultDB._cheat_vaultRowsOf({ user_id: 'u1', banklabel: 'acme' }).get('main') as { vault_tok: string }
+  return vaultDB._cheat_boxRowsOf({ user_id: 'u1', banklabel: 'acme', vaultlabel: 'main' }, vaultrow.vault_tok)
 }
 
 describe("KnockKnockDom", () => {

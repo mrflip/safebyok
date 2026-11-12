@@ -230,25 +230,25 @@ function roomlessOf(stored: DB.BoxStored, anteDoc: BoxDoc | null, capacity: DB.C
 // == [Helpers]: lifeOf, getVaultDoc, getBoxDoc, writeVaultDoc, writeBoxDoc, deleteBoxes, listVaultDocs, listBoxDocs, listTallyDocs, VaultDoc, BoxDoc
 
 /** Return the life an ask or a record belongs to: its vault's scope and `vault_tok`. */
-function lifeOf({ applabel, user_id, vaultlabel, vault_tok }: Life): Life { return { applabel, user_id, vaultlabel, vault_tok } }
+function lifeOf({ user_id, banklabel, vaultlabel, vault_tok }: Life): Life { return { user_id, banklabel, vaultlabel, vault_tok } }
 
 // `.unique()` throws if it finds two documents. A document is inserted only when none was found in
 // the same transaction, so two would mean damage, and that should fail loudly.
-async function getVaultDoc(db: DatabaseReader, { applabel, user_id, vaultlabel }: VaultScope): Promise<VaultDoc | null> {
+async function getVaultDoc(db: DatabaseReader, { user_id, banklabel, vaultlabel }: VaultScope): Promise<VaultDoc | null> {
   return await db.query('safebyok_vaults')
-    .withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel))
+    .withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel))
     .unique()
 }
 
-async function getBoxDoc(db: DatabaseReader, { applabel, user_id, vaultlabel, vault_tok }: Life, boxlabel: string): Promise<BoxDoc | null> {
+async function getBoxDoc(db: DatabaseReader, { user_id, banklabel, vaultlabel, vault_tok }: Life, boxlabel: string): Promise<BoxDoc | null> {
   return await db.query('safebyok_boxes')
-    .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok).eq('boxlabel', boxlabel))
+    .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok).eq('boxlabel', boxlabel))
     .unique()
 }
 
 /** Write `vault` at `scope`, in place of `anteDoc`, or as a new document. */
-async function writeVaultDoc(db: DatabaseWriter, anteDoc: VaultDoc | null, { applabel, user_id, vaultlabel }: VaultScope, vault: DB.VaultRecord | DB.VaultTombstone): Promise<void> {
-  if (anteDoc) { await db.replace('safebyok_vaults', anteDoc._id, { applabel, user_id, vaultlabel, vault }) } else { await db.insert('safebyok_vaults', { applabel, user_id, vaultlabel, vault }) }
+async function writeVaultDoc(db: DatabaseWriter, anteDoc: VaultDoc | null, { user_id, banklabel, vaultlabel }: VaultScope, vault: DB.VaultRecord | DB.VaultTombstone): Promise<void> {
+  if (anteDoc) { await db.replace('safebyok_vaults', anteDoc._id, { user_id, banklabel, vaultlabel, vault }) } else { await db.insert('safebyok_vaults', { user_id, banklabel, vaultlabel, vault }) }
 }
 
 /** Write `boxDoc` in place of `anteDoc`, or as a new document. */
@@ -264,24 +264,24 @@ async function deleteBoxes(db: DatabaseWriter, life: Life): Promise<void> {
 }
 
 /** List the vault documents of a bank, or of one vault when the scope has a `vaultlabel`. */
-async function listVaultDocs(db: DatabaseReader, { applabel, user_id, vaultlabel }: WatchScope): Promise<VaultDoc[]> {
+async function listVaultDocs(db: DatabaseReader, { user_id, banklabel, vaultlabel }: WatchScope): Promise<VaultDoc[]> {
   return await db.query('safebyok_vaults').withIndex('by_scope', (idx) => {
-    const bank = idx.eq('user_id', user_id).eq('applabel', applabel)
+    const bank = idx.eq('user_id', user_id).eq('banklabel', banklabel)
     return (vaultlabel === undefined) ? bank : bank.eq('vaultlabel', vaultlabel)
   }).collect()
 }
 
 /** List the box documents of a bank, or of one vault when the scope has a `vaultlabel`, across every life. */
-async function listBoxDocs(db: DatabaseReader, { applabel, user_id, vaultlabel }: WatchScope): Promise<BoxDoc[]> {
+async function listBoxDocs(db: DatabaseReader, { user_id, banklabel, vaultlabel }: WatchScope): Promise<BoxDoc[]> {
   return await db.query('safebyok_boxes').withIndex('by_box', (idx) => {
-    const bank = idx.eq('user_id', user_id).eq('applabel', applabel)
+    const bank = idx.eq('user_id', user_id).eq('banklabel', banklabel)
     return (vaultlabel === undefined) ? bank : bank.eq('vaultlabel', vaultlabel)
   }).collect()
 }
 
 /** List the tally documents of a bank. */
-async function listTallyDocs(db: DatabaseReader, { applabel, user_id }: WatchScope): Promise<Doc<'safebyok_tallies'>[]> {
-  return await db.query('safebyok_tallies').withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('applabel', applabel)).collect()
+async function listTallyDocs(db: DatabaseReader, { user_id, banklabel }: WatchScope): Promise<Doc<'safebyok_tallies'>[]> {
+  return await db.query('safebyok_tallies').withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel)).collect()
 }
 
 /** A vault document. Its `vault` row is `unknown` until the core has checked it. */

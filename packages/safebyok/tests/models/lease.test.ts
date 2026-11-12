@@ -10,7 +10,7 @@ import { type FakeLeaseFriend, FriendLeaseMillis, GrantedAs, fakeLeaseFriendOf, 
 
 useFakeClock()
 
-const StampFieldnames = ['fmt', 'applabel', 'user_id', 'vaultlabel', 'vault_tok', 'registered_at', 'gate_epoch', 'proved_at', 'wayinkind']
+const StampFieldnames = ['fmt', 'user_id', 'banklabel', 'vaultlabel', 'vault_tok', 'registered_at', 'gate_epoch', 'proved_at', 'wayinkind']
 
 const Stamped = { ...WorldStamp, fmt: LeaseFormat, proved_at: T0, ...GrantedAs }
 
@@ -49,7 +49,7 @@ describe("a revoke whose forget is refused", () => {
 })
 
 describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
-  it("makes a record of the vault: fmt 7001, the vault's stamp, the epoch, proved_at and wayinkind, a leaseKey handle and the wrapped vaultKey", async () => {
+  it("makes a record of the vault: fmt 7002, the vault's stamp, the epoch, proved_at and wayinkind, a leaseKey handle and the wrapped vaultKey", async () => {
     const { friend } = await grantedWorld({ gate_epoch: 3, wayinkind: 'passkey' })
     const record = friend.cached as LeaseRecord
     expect(record).to.deep.include({ ...WorldStamp, fmt: LeaseFormat, gate_epoch: 3, proved_at: T0, wayinkind: 'passkey' })
