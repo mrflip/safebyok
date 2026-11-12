@@ -46,7 +46,8 @@ export class IdbBankDB extends DB.AdapterBankDB {
     const { dbName = 'safebyok', maxBoxes = DB.DefaultMaxBoxes, ...adapterBankDBOpts } = idbBankDBOpts.parse(opts, { where: "In IdbBankDB's options" })
     super(adapterBankDBOpts)
     this.#shelf = shelfOf(dbName)
-    this.#bellname = `safebyok-indexeddb:${dbName}`
+    // A name of its own: an IdbVaultDB over the same dbName rings on `safebyok-indexeddb:<dbName>`, with notices of another shape.
+    this.#bellname = `safebyok-indexeddb:${dbName}:bank`
     this.#maxBoxes = maxBoxes
   }
   // --

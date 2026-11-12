@@ -164,6 +164,19 @@ describe("IdbBankDB's databases", () => {
   })
 })
 
+describe("IdbBankDB's watch", () => {
+  it("rings on a channel of its own, apart from an IdbVaultDB's over the same dbName", async () => {
+    const bankDB = makeBankDB()
+    const heardOnVaultChannel: unknown[] = []
+    const vaultBell = new BroadcastChannel(`safebyok-indexeddb:${dbNameOf.get(bankDB)!}`)
+    vaultBell.addEventListener('message', ({ data }) => { heardOnVaultChannel.push(data) })
+    await bankDB.buildBank(BW.bankBuildAskOf())
+    await TH.aWhile()
+    vaultBell.close()
+    expect(heardOnVaultChannel).to.be.empty
+  })
+})
+
 describe("IdbBankDB's database name and wipe", () => {
   it("names its database for this library and its version, whatever the host's dbName", async () => {
     const bankDB = makeBankDB()
