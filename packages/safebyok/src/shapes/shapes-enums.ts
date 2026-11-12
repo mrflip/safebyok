@@ -30,9 +30,8 @@ export type DeliveryFielding = typeof deliveryFieldingVals[number]
  * - `none`   -- no instance: there is nothing to receive, or none is listed to tell
  * - `listed` -- the instance listed at the record's scope
  * - `make`   -- one made of the record, where none is listed
- * - `remake` -- one made of the record, and the one listed, of another life, vacated
  */
-export const deliveryMakingVals = ['none', 'listed', 'make', 'remake'] as const
+export const deliveryMakingVals = ['none', 'listed', 'make'] as const
 export type DeliveryMaking = typeof deliveryMakingVals[number]
 
 /** What becomes of the record of the instance that receives:

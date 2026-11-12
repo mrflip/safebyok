@@ -181,8 +181,7 @@ describe("fields.bind: into hiding and back", () => {
 
   const EndingCases = [
     ['box.unexpose()', (box: TestableBox) => { box.unexpose() }],
-    ['a sweep',        (box: TestableBox) => { box.sweep() }],
-    ['a vacate',       (box: TestableBox) => { box.vacate() }],
+    ["the device's end", () => { world.mw.disable() }],
   ] as const
   for (const [blurb, end] of EndingCases) {
     it(`goes blank at ${blurb}`, async () => {

@@ -70,7 +70,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     it("refuses without receiving its world, even when the answer is a refusal", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.willGet(() => {
-        listing.vacate()
+        world.mw.disable()
         return world.mw.refusalOf(scopeOf(), new VaultError('storage_unavailable', "Storage is down."), 'a world')
       })
       await TH.expectRefusal(listing.get(scopeOf(), { maxMillisSinceRefresh: 0 }))

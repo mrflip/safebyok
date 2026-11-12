@@ -4,14 +4,18 @@ import { describe, expect, it } from 'vitest'
 import { BoxListing } from '../../src/models/box-listing'
 import * as SX from '../../src/shapes/shapes-storage'
 import { LOCKED } from '../../src/helpers/consts'
-import type { BoxListingOpts } from '../../src/shapes/shapes-vaultish'
+import type { ListingOpts } from '../../src/shapes/shapes-vaultish'
+import type { Vault } from '../../src/models/vault'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { WorldVault, boxDnaOf, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
 
 const world = useModelsWorld()
 
-function good(): BoxListingOpts { return { scope: WorldVault.scope, bankDB: world.mw.bankDB, maxMillisSinceRefresh: 1000, bankFriend: world.mw.bankFriend } }
+function good(): ListingOpts { return { bankDB: world.mw.bankDB, maxMillisSinceRefresh: 1000 } }
+
+/** The models world's fake vault, as the listing is handed it. */
+function vault(): Vault { return world.mw.world as unknown as Vault }
 
 function dna() { return boxDnaOf(world.mw.boxscope('anthropic_api_key')) }
 
@@ -21,29 +25,29 @@ const Label = 'anthropic_api_key'
 function bankDBDuck() { return Object.fromEntries(['tryEnsureBank', 'tryGetVault', 'tryPutVault', 'tryDelVault', 'tryListBoxes', 'tryGetBox', 'tryPutBox', 'tryDelBox', 'watch'].map((verb) => [verb, () => null])) }
 
 describe("BoxListing", () => {
-  describe("new BoxListing(world, opts)", () => {
-    it("makes a listing from a world, a bankDB and a horizon without calling them", () => {
-      const listing = new BoxListing(world.mw.world, good())
+  describe("new BoxListing(vault, opts)", () => {
+    it("makes a listing from a vault, a bankDB and a horizon without calling them", () => {
+      const listing = new BoxListing(vault(), good())
       expect(listing).to.be.instanceOf(BoxListing)
       expect(listing.things).to.deep.equal([])
       expect(listing.snapshot).to.deep.equal([])
       expect(world.mw.calls).to.deep.equal([])
     })
 
-    const bads: readonly (readonly [blurb: string, args: () => readonly [world: unknown, opts: unknown]])[] = [
-      ['no world',                    () => [undefined, good()]],
-      ['no bankDB',                   () => [world.mw.world, { ...good(), bankDB: undefined }]],
-      ['an unbranded look-alike of a bankDB', () => [world.mw.world, { ...good(), bankDB: bankDBDuck() }]],
-      ['no horizon',                  () => [world.mw.world, { ...good(), maxMillisSinceRefresh: undefined }]],
-      ['a negative horizon',          () => [world.mw.world, { ...good(), maxMillisSinceRefresh: -1 }]],
-      ['a world among its options',   () => [world.mw.world, { ...good(), world: world.mw.world }]],
-      ['no scope',                    () => [world.mw.world, { ...good(), scope: undefined }]],
-      ['a bankFriend that cannot tell bad news', () => [world.mw.world, { ...good(), bankFriend: { ...world.mw.bankFriend, tellBadNews: 'tell me' } }]],
+    const bads: readonly (readonly [blurb: string, args: () => readonly [vault: unknown, opts: unknown]])[] = [
+      ['no vault',                    () => [undefined, good()]],
+      ['a bank in place of its vault', () => [world.mw.world.bank, good()]],
+      ['no bankDB',                   () => [vault(), { ...good(), bankDB: undefined }]],
+      ['an unbranded look-alike of a bankDB', () => [vault(), { ...good(), bankDB: bankDBDuck() }]],
+      ['no horizon',                  () => [vault(), { ...good(), maxMillisSinceRefresh: undefined }]],
+      ['a negative horizon',          () => [vault(), { ...good(), maxMillisSinceRefresh: -1 }]],
+      ['a vault among its options',   () => [vault(), { ...good(), world: world.mw.world }]],
+      ['a scope among its options',   () => [vault(), { ...good(), scope: WorldVault.scope }]],
     ]
     for (const [blurb, args] of bads) {
       it(`refuses ${blurb}`, () => {
-        const [world, opts] = args()
-        TH.expectSyncRefusal(() => new BoxListing(world as never, opts as never))
+        const [under, opts] = args()
+        TH.expectSyncRefusal(() => new BoxListing(under as never, opts as never))
       })
     }
   })
@@ -147,11 +151,11 @@ describe("boxListing.get(scoped, opts)", () => {
     expect(box?.isPresent).to.be.true
   })
 
-  it("refuses a put's ifAbsent, and refuses once vacated", async () => {
+  it("refuses a put's ifAbsent, and refuses once its device ends", async () => {
     const listing = boxListingOf(world.mw)
     await TH.expectRefusal(listing.get(world.mw.boxscope(Label), { ifAbsent: 'add' } as never))
-    listing.vacate()
-    await TH.expectRefusal(listing.get(world.mw.boxscope(Label)))
+    world.mw.disable()
+    await TH.expectRefusal(listing.get(world.mw.boxscope(Label)), 'disabled')
   })
 
   it("tryGet returns a refusal as an Outcome", async () => {
@@ -209,10 +213,10 @@ describe("boxListing.puttable(scoped, opts)", () => {
     expect(world.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
   })
 
-  it("refuses once vacated", () => {
+  it("refuses once its device ends", () => {
     const listing = boxListingOf(world.mw)
-    listing.vacate()
-    TH.expectSyncRefusal(() => listing.puttable(world.mw.boxscope(Label)))
+    world.mw.disable()
+    TH.expectSyncRefusal(() => listing.puttable(world.mw.boxscope(Label)), 'disabled')
   })
 })
 
@@ -248,16 +252,6 @@ describe("BoxListing and Listing entries: arguments checked before any demand", 
     const err = await TH.expectRefusal(boxListingOf(world.mw).create({ ...dna(), whisper: LOCKED }))
     expect(err.message).to.include(Phrases.WhisperedIsNoWhisper)
     expect(err.meta?.fieldnames).to.deep.equal(['whisper'])
-  })
-
-  it("refuses a world with no vault_tok, naming vault_tok", () => {
-    const err = TH.expectSyncRefusal(() => new BoxListing({ ...world.mw.world, vault_tok: undefined } as never, good()))
-    expect(err.meta?.fieldnames).to.include('vault_tok')
-  })
-
-  it("refuses a scope missing its user_id and banklabel, naming scope.banklabel", () => {
-    const err = TH.expectSyncRefusal(() => new BoxListing(world.mw.world, { ...good(), scope: { vaultlabel: 'v' } } as never))
-    expect(err.meta?.fieldnames).to.include('scope.banklabel')
   })
 
   it("shows the scope of the vault it lists", () => {

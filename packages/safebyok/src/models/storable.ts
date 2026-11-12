@@ -8,7 +8,7 @@ import { reportToPlatform } from '../refusals/report-error'
 import { instanceDisabled, needUnlocked, oneRevisionTwoToks, partialLoad } from '../refusals/throwers'
 import type { Age, Am, RecordShape } from '../shapes/shapes-enums'
 import * as VX from '../shapes/shapes-vaultish'
-import type { Fetched, FetchOpts, ListingOf, ListingWorld, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
+import type { Fetched, FetchOpts, ListingOf, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
 import * as SX from '../shapes/shapes-storage'
 import type { Revision } from '../shapes/shapes-storage'
 
@@ -25,12 +25,11 @@ export function cmpRevisions(ante: Revision, post: Revision): Age {
 }
 // --
 
-/** A vault or box in this tab, kept in step with its row in the bankDB. */
+/** A bank, gate, vault or box in this tab, kept in step with its row in the bankDB. */
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
-  // == [Props]: scope, world, listing, revision_tok, revision_seq, registered_at, written_at, #isEnabled, #central, #snapshot, #refreshedAt, #listeners, #getSnapshot, #subscribe
+  // == [Props]: scope, listing, revision_tok, revision_seq, registered_at, written_at, #central, #snapshot, #refreshedAt, #listeners, #getSnapshot, #subscribe
 
   /** Adorned in the constructor: readable, left out of enumeration and JSON. */
-  declare readonly world:   ListingWorld
   declare readonly listing: ListingOf<ScopeT, RecordT, SparseT>
 
   /** The revision and times of the record in hand, as plain own props, assigned before the seal by `assignInitialProps` and again by `assign` at each adopt: `registered_at` only at birth and for a record of another life. */
@@ -41,9 +40,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** The scope, set once and frozen: the listing keys and watches by it, and the verbs name it. Its props are also tattooed on, so the thing ducks as its record; a getter keeps `scope` itself off the duck. */
   readonly #scope: ScopeT
-
-  /** Set by a sweep or a vacate, and never cleared. */
-  #isEnabled = true
 
   /** The latest record this device knows is stored: full, sparse or a tombstone, void on a new instance. */
   #central: Fetched<RecordT, SparseT>
@@ -109,9 +105,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Construction]: constructor, assignInitialProps, assign
 
   /** A concrete class inscribes its own props in `assignInitialProps`; it needs no constructor. */
-  constructor(world: ListingWorld, listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>) {
-    VX.storableArgs.parse({ world, listing, central })
-    adorn(this, 'world', world)
+  constructor(listing: ListingOf<ScopeT, RecordT, SparseT>, central: Fetched<RecordT, SparseT>) {
+    VX.storableArgs.parse({ listing, central })
     adorn(this, 'listing', listing)
     this.#scope = Object.freeze(listing.scopeOf(central))
     this.#central = Object.freeze(central)
@@ -154,7 +149,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Non-throwing form of {@link get}. */
   tryGet(opts: FetchOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.get(opts)) }
 
-  // A swept thing answers from the record it has while that is timely: only a fetch needs it enabled.
+  // A thing let go answers from the record it has while that is timely: only a fetch needs it enabled.
   /** This thing, its world timely and its record fetched unless timely within `opts.maxMillisSinceRefresh`.
    * Chute: thing.hydrate → thing.get → listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
@@ -188,17 +183,16 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Receiving]: receiveRecord, markRefreshed, isOfLife, shapeOf
   // The listing decides what a record received does here (`Listing.#recordDeliveringOf`): an instance judges nothing.
 
-  /** Adopt `record`, mark this instance refreshed once whole, and tell the subscribers. A no-op past a discard. */
+  /** Adopt `record`, mark this instance refreshed once whole, and tell the subscribers. */
   receiveRecord(record: Fetched<RecordT, SparseT>): void {
-    if (! this.#isEnabled) { return }
     this.adopt(record)
     if (this.#isWhole) { this.#refreshedAt = nowMillis() }
     this.align()
   }
 
-  /** Mark this instance refreshed, once whole: storage answered the record in hand. A no-op past a discard. */
+  /** Mark this instance refreshed, once whole: storage answered the record in hand. */
   markRefreshed(): void {
-    if (this.#isEnabled && this.#isWhole) { this.#refreshedAt = nowMillis() }
+    if (this.#isWhole) { this.#refreshedAt = nowMillis() }
   }
 
   /** Whether `record` is of the life of the record in hand: the same `lifeTokPathOf`. */
@@ -249,26 +243,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Discards]: lock, sweep, vacate, disable
+  // == [The lock]: alignLock
 
-  /** Tell the listeners the lock has moved. A no-op past a discard; never throws. */
-  lock(): this {
-    if (this.#isEnabled) { this.align() }
-    return this
-  }
-
-  /** Drop what this instance has of secrets, leave what this device has cached, and answer nothing from here on, delisted. A repeat is a no-op. Never throws. */
-  sweep(): this { return this.#disable(() => { this.sweepContents() }) }
-
-  /** As `sweep`, and what this device has cached of it goes too. Storage is untouched. A repeat is a no-op. Never throws. */
-  vacate(): this { return this.#disable(() => { this.vacateContents() }) }
-
-  // Marked first, so that a repeat met on the way finds the work done.
-  #disable(dropContents: () => void): this {
-    if (! this.#isEnabled) { return this }
-    this.#isEnabled = false
-    dropContents()
-    this.listing.delist(this)
+  // A thing's one duty at a lock and at its end: tell its listeners, and, once it no longer answers, drop what it has
+  // of secrets. The base has none.
+  /** Tell the listeners the bank's lock has moved. Never throws. */
+  alignLock(): this {
     this.align()
     return this
   }
@@ -276,10 +256,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Guards]: isEnabled, isLocked, isTimely, isHydratedWithin, isRefreshedWithin, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, demandDeletable, demandUnlocked, demandEnabled, demandFull, demandWhole, demandFullProps, ensureDeletable
 
-  /** False past a sweep or a vacate, and from then on. */
-  get isEnabled(): boolean { return this.#isEnabled }
+  /** Whether this thing answers: its listing does, and it is the instance listed at its scope. */
+  get isEnabled(): boolean { return this.listing.isEnabled && this.listing.isListed(this) }
 
-  /** Whether this thing's vault is locked, read live. */
+  /** Whether this thing's bank is locked, read live. */
   abstract get isLocked(): boolean
 
   /** Whether the record in hand was refreshed within the thing's horizon: never before storage has answered. */
@@ -311,14 +291,18 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     return VX.isTombstone(record)
   }
 
-  /** Throw unless this thing is enabled and its vault is unlocked. */
+  /** Throw unless this thing is enabled and its bank is unlocked. */
   demandDeletable(): this { return this.demandEnabled().demandUnlocked() }
 
-  /** Demand that this thing's vault is unlocked. */
+  /** Demand that this thing's bank is unlocked. */
   demandUnlocked(): this { if (this.isLocked)    { throw needUnlocked() }                               return this }
 
-  /** Demand that this thing is still enabled. */
-  demandEnabled():  this { if (! this.#isEnabled) { throw instanceDisabled() }                            return this }
+  /** Demand that this thing answers: see {@link isEnabled}. */
+  demandEnabled():  this {
+    this.listing.demandEnabled()
+    if (! this.listing.isListed(this)) { throw instanceDisabled() }
+    return this
+  }
 
   /** Demand that the record in hand is full. */
   demandFull():     this { if (! this.isFull)    { throw partialLoad() }                          return this }
@@ -336,7 +320,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   ensureDeletable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
   // --
 
-  // == [Protected, for a subclass to override]: adopt, sweepContents, vacateContents, demandPresent, isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Protected, for a subclass to override]: adopt, demandPresent, isFullRecord, lifeTokPathOf, makeSnapshot
 
   // Every adopt is followed by an align, which the snapshot is made from: an adopt left unaligned would leave it behind.
   /** Assign the props of `central`, judged against the central adopted until now, then keep it, frozen; the snapshot waits for `align`. */
@@ -344,10 +328,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.assign(central)
     this.#central = Object.freeze(central)
   }
-
-  protected sweepContents(): void { /* a thing of no contents has none to drop */ }
-
-  protected vacateContents(): void { /* a thing of no contents has none to drop */ }
 
   abstract demandPresent(): this
 

@@ -383,6 +383,16 @@ new record, so the next open asks for the passphrase. The direction is safe, and
 refreshes does not cure it. The Coach (2026-10-16): into the TODO, beside the multiple-passphrases
 question. The fix, small: do not judge `outlived` against vault props this handle wrote itself.
 
+### A gate row landing between a gate verb's write and its lease grant
+
+From the bank_world sprint's thread 8c ([#673](https://github.com/mrflip/safebyok/pull/673)): a gate
+row that arrives after a gate verb has written its row and before the gating grants its lease leaves
+the lease citing a superseded `gate_revision_tok`, so the next unlock asks the user to prove again.
+The direction is safe. The Coach (2026-11-12): "yes TODO not this sprint", with two questions. If
+the lease is handled only during align, after the newest gate version has been adopted, is there an
+issue? (The Coach thinks so.) Should the lease row in the deviceDB be written by compare-and-set
+(probably), with some answer as well for several tabs on one device? Not for the bank_world sprint.
+
 ### Cross-device invalidation, by a token each device authenticates
 
 From the contract sprint's `a_sec2` ([#203](https://github.com/mrflip/safebyok/pull/203)'s second

@@ -211,7 +211,7 @@ describe("Storable snapshot and subscription", () => {
 
     it("notifies nobody of a change before its first call", () => {
       const { mw } = world
-      const box = new TestableBox(mw.world, boxListingOf(mw), mw.fullBoxRecord())
+      const box = new TestableBox(boxListingOf(mw), mw.fullBoxRecord())
       const listener = vi.fn()
       box.subscribe(listener)
       box.receiveRecord(world.mw.fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-a2' }))
@@ -221,7 +221,7 @@ describe("Storable snapshot and subscription", () => {
 
     it("returns the snapshot becomeNotifiable made, and the next change notifies", () => {
       const { mw } = world
-      const box = new TestableBox(mw.world, boxListingOf(mw), mw.fullBoxRecord())
+      const box = new TestableBox(boxListingOf(mw), mw.fullBoxRecord())
       const listener = vi.fn()
       box.subscribe(listener)
       expect(box.becomeNotifiable()).to.eq(box)
@@ -340,13 +340,13 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     TH.expectSyncRefusal(() => box.demandPuttable({ ...Patch, boxlabel: 'openai_api_key' }))
   })
 
-  it("demandPuttable refuses a vacated box before a locked vault, and a locked vault before a sparse record", () => {
+  it("demandPuttable refuses a box of an ended device before a locked vault, and a locked vault before a sparse record", () => {
     const box = boxListingOf(world.mw).deliverRecord(sparseBoxRecord())
     TH.expectSyncRefusal(() => box.demandPuttable(Patch))
     world.mw.setLocked(true)
     TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'bank_locked')
-    box.vacate()
-    TH.expectSyncRefusal(() => box.demandPuttable(Patch))
+    world.mw.disable()
+    TH.expectSyncRefusal(() => box.demandPuttable(Patch), 'disabled')
   })
 
   it("demandPuttable accepts a patch of both halves over a sparse record", () => {

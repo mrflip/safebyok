@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { ENCRYPTED, LOCKED, VEILED, Whispered, brandOf, isWhisperedBag } from '../../src/helpers/consts'
 import type { Whisper } from '../../src/shapes/shapes-core'
-import type { BoxWorld, Fetched } from '../../src/shapes/shapes-vaultish'
+import type { Fetched } from '../../src/shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../../src/shapes/shapes-bankdb'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
@@ -59,9 +59,8 @@ describe("box.extractWhisper(): a decrypted value that is not a valid whisper", 
   ] as const
   for (const [blurb, text] of OpenedCases) {
     it(`refuses 'damaged_whisper' for ${blurb}, quoting none of it`, async () => {
-      const base = world.mw.world
-      const leasedWorld: BoxWorld = { bank_tok: base.bank_tok, vault_tok: base.vault_tok, get isLocked() { return base.isLocked }, receiveParent: (taken) => { base.receiveParent(taken) }, ensureTimely: (maxMillis) => base.ensureTimely(maxMillis), sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text), subscribe: (listener) => base.subscribe(listener) }
-      const box = boxListingOf(world.mw, { world: leasedWorld }).deliverRecord(fullBoxRecord())
+      const opener = world.mw.worldWith({ sealStampedString: () => Promise.reject(new Error('nothing is sealed here')), unsealStampedString: () => Promise.resolve(text) })
+      const box = boxListingOf(world.mw, { world: opener }).deliverRecord(fullBoxRecord())
       const err = await TH.expectRefusal(box.extractWhisper(), 'damaged_whisper')
       expect(err.message).to.eq(Phrases.UndecodedWhisper)
       expect(JSON.stringify({ meta: err.meta, cause: String(err.cause) })).to.not.include('SECRET')

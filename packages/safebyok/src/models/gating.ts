@@ -88,9 +88,9 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   /** Ask the user for a new bank's passphrase, build the bank over the row `expected`, and return it unlocked. */
   static async launchBirth(listing: BankListing, expected: BankSparse, unlockByProving: UnlockByProving, askUser: AskUser | null): Promise<Bank> {
     const checked = GX.gatingLaunchBirthArgs.parse({ listing, expected, unlockByProving, askUser })
-    const world = GX.provingWorld.parse(checked.listing.world)
+    const world = GX.provingWorld.parse(checked.listing.device)
     const act: Act = (cleartexts) => buildBank(checked.listing, world, checked.expected, cleartexts, checked.unlockByProving)
-    const gating = new Gating('build_bank', checked.listing.world, null, act)
+    const gating = new Gating('build_bank', checked.listing.device, null, act)
     return gating.#launch(checked.askUser)
   }
 

@@ -10,6 +10,7 @@ import { type GateScope, gateScope } from '../shapes/shapes-core'
 import * as BX from '../shapes/shapes-bankdb'
 import type { BankRow, BoxRow, GateRecord, GateSparse, VaultRow, Wayins } from '../shapes/shapes-bankdb'
 import * as SX from '../shapes/shapes-storage'
+import * as VX from '../shapes/shapes-vaultish'
 import type { Fetched, GateSnapshot, ListingOpts, ThingAnswer } from '../shapes/shapes-vaultish'
 import { type GateAnswer, answerWithVal, refusedAnswerOf } from '../storage/bank-db'
 import type { Bank } from './bank'
@@ -20,26 +21,30 @@ import { Listing } from './listing'
 // row is delivered to its Gate, newer judged from older, as a vault's is.
 /** One bank's gate, by gatelabel: `main`, the only one. */
 export class GateListing extends Listing<GateScope, GateRecord, GateSparse, GateSnapshot, Gate> {
-  // == [Props]: world
+  // == [Props]: bank
 
-  declare readonly world: Bank
+  /** The bank whose gate this is. */
+  readonly bank: Bank
   // --
 
   // == [Construction]: constructor, scopeOf, sparseOf, recordOf
 
-  constructor(world: Bank, opts: ListingOpts) {
-    super(world, opts)
+  /** The listing of `bank`'s gate. */
+  constructor(bank: Bank, opts: ListingOpts) {
+    const checked = VX.listedUnder.bank.parse(bank)
+    super(checked.device, opts)
+    this.bank = checked
     Object.freeze(this)
   }
 
   /** The scope of `gateish`, which must be this bank's: no listing answers for another's. */
-  scopeOf(gateish: unknown):  GateScope  { return gateScope.parseConsistent(gateish, this.world.scope, { message: Phrases.otherScope }) }
+  scopeOf(gateish: unknown):  GateScope  { return gateScope.parseConsistent(gateish, this.bank.scope, { message: Phrases.otherScope }) }
 
   /** Parse `gateish` as a {@link GateSparse}. */
   sparseOf(gateish: unknown): GateSparse { return BX.gateSparse.parse(gateish) }
 
   /** Parse `gateish` as a {@link GateRecord} of this bank. */
-  recordOf(gateish: unknown): GateRecord { return BX.gateRecord.parseConsistent(gateish, this.world.scope, { message: Phrases.otherScope }) }
+  recordOf(gateish: unknown): GateRecord { return BX.gateRecord.parseConsistent(gateish, this.bank.scope, { message: Phrases.otherScope }) }
   // --
 
   // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form, gateMoveOf
@@ -103,35 +108,44 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   }
   // --
 
-  // == [Defined by the gate listing]: isOneLifePerInstance, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the gate listing]: isEnabled, demandEnabled, receiveParent, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
-  protected get isOneLifePerInstance(): true { return true }
+  /** Whether this listing answers: its bank does. */
+  get isEnabled(): boolean { return this.bank.isEnabled }
+
+  /** Demand that this listing's bank answers. */
+  demandEnabled(): this {
+    this.bank.demandEnabled()
+    return this
+  }
+
+  protected receiveParent(parent: unknown): void { this.bank.receiveParent(parent) }
 
   protected demandOfWorld(record: Fetched<GateRecord, GateSparse>): void {
-    if (record.bank_tok !== this.world.bank_tok) { throw rowOfOtherWorld(record, 'bank_tok') }
+    if (record.bank_tok !== this.bank.bank_tok) { throw rowOfOtherWorld(record, 'bank_tok') }
   }
 
   protected scopepathOf(scope: GateScope): string {
     return ['gate', scope.user_id, scope.banklabel, scope.gatelabel].join('^')
   }
 
-  protected makeThing(central: Fetched<GateRecord, GateSparse>): Gate { return new Gate(this.world, this, central) }
+  protected makeThing(central: Fetched<GateRecord, GateSparse>): Gate { return new Gate(this, central) }
 
-  protected nothingStoredError(): VaultError { return mainGateMissing(this.world.sparse) }
+  protected nothingStoredError(): VaultError { return mainGateMissing(this.bank.sparse) }
 
   // ensureBank answers the bank's main gate row with it, the bank row as its parent.
   protected async doTryList() {
-    const answer = await this.bankDB.tryEnsureBank({ op: 'ensure', ...this.world.scope, gates: ['main'] })
+    const answer = await this.bankDB.tryEnsureBank({ op: 'ensure', ...this.bank.scope, gates: ['main'] })
     if (! answer.ok) { return answer }
     const listed = (answer.val === null) ? [] : [answer.val.gates.main]
     return { ...answer, act: (answer.val === null) ? 'gotvoid' : 'got', val: { listed, damaged_rows: [] } } as const
   }
 
   // A gate row that fails its checks refuses its bank's ensureBank: no listing sets one aside.
-  protected damagedStoredError(): VaultError { return mainGateMissing(this.world.sparse) }
+  protected damagedStoredError(): VaultError { return mainGateMissing(this.bank.sparse) }
 
   protected async doTryGet() {
-    const answer = await this.bankDB.tryEnsureBank({ op: 'ensure', ...this.world.scope, gates: ['main'] })
+    const answer = await this.bankDB.tryEnsureBank({ op: 'ensure', ...this.bank.scope, gates: ['main'] })
     return answer.ok ? { ...answer, val: answer.val?.gates.main ?? null } : answer
   }
 

@@ -84,10 +84,12 @@ describe("the options a VaultDB's writes take", () => {
     expect(SX.putOpts.parse({ expected: box, ifAbsent: null, ifPresent: null })).to.deep.equal(filled)
   })
 
-  it("putOpts and delOpts keep the row expected whole, and refuse one that does not read as a row", () => {
+  it("putOpts and delOpts keep the row expected whole, with or without a vault_tok, and refuse one that does not read as a row", () => {
     const shell = SX.shellBoxOf(box, box.vault_tok)
     expect(SX.putOpts.parse({ expected: shell }).expected).to.deep.equal(shell)
     expect(SX.delOpts.parse({ expected: vault })).to.deep.equal({ expected: vault })
+    const { vault_tok: _vault_tok, ...bankish } = vault
+    expect(SX.putOpts.parse({ expected: bankish }).expected).to.deep.equal(bankish)
     expect(() => SX.putOpts.parse({ expected: SX.VoidRevision })).to.throw(VaultError).with.property('refusalkind', 'bad_option')
     expect(() => SX.delOpts.parse({})).to.throw(VaultError).with.property('refusalkind', 'bad_option')
   })

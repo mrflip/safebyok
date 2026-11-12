@@ -192,7 +192,8 @@ describe("gate.replacePassphrasePrompt()", () => {
     expect(bank.isPresent).to.be.true
     await TH.expectRefusal(replaceTyping(bank, Passphrase, NewPassphrase))
     expect(bank.isEnabled).to.be.false
-    expect(bank.listing.at(bank.scope)).to.include({ isPresent: false, bank_tok: storedBankNow()?.bank_tok, revision_seq: storedBankNow()?.revision_seq })
+    expect(bank.listing.at(bank.scope)).to.eq(bank)
+    expect(bank.sparse).to.include({ am: 'x', bank_tok: storedBankNow()?.bank_tok, revision_seq: storedBankNow()?.revision_seq })
     expect(device.bank).to.be.null
   })
 
@@ -203,7 +204,8 @@ describe("gate.replacePassphrasePrompt()", () => {
     await bankTyping(other, byPassphrase(NewPassphrase))
     await TH.expectRefusal(replaceTyping(bank, Passphrase, NewPassphrase))
     expect(bank.isEnabled).to.be.false
-    expect(bank.listing.at(bank.scope)?.bank_tok).to.eq(storedBankNow()?.bank_tok)
+    expect(bank.sparse.bank_tok).to.eq(storedBankNow()?.bank_tok)
+    expect(bank.bank_tok).to.not.eq(storedBankNow()?.bank_tok)
     expect(device.bank).to.be.null
     expect(await device.ensureBank()).to.include({ bank_tok: storedBankNow()?.bank_tok, isLocked: true })
   })
@@ -382,7 +384,7 @@ describe("bank.delPrompt()", () => {
     const { gaterows, vaultrows } = bankDB._cheat_shelfOf(Dna)
     expect([gaterows.size, vaultrows.size]).to.deep.equal([0, 0])
     expect(bank).to.include({ isEnabled: false, isLocked: true })
-    expect(bank.listing.at(bank.scope)).to.include({ isPresent: false, bank_tok: storedBankNow()?.bank_tok })
+    expect(bank.sparse).to.include({ am: 'x', bank_tok: storedBankNow()?.bank_tok })
     expect(vault.isEnabled).to.be.false
     expect(device.bank).to.be.null
     expect(device.snapshot.bank).to.be.null
@@ -448,21 +450,23 @@ describe("vault.del()", () => {
     expect(gone?.isLocked).to.eq(bank.isLocked)
   })
 
-  it("deletes the vault and its boxes, asking nobody, the bank's lease untouched", async () => {
+  it("deletes the vault and its boxes, asking nobody, the bank's lease untouched, the vault standing on as its tombstone", async () => {
     const born = await makeWorldWithBox()
     const { bank, vault, listing, storedNow, deviceDB } = born
     const { shown } = dialogOf(born)
     const boxes = vault.boxListing
+    const lived = vault.vault_tok
     expect(await vault.del(vault)).to.equal(vault)
     expect(shown).to.have.lengthOf(0)
     const tombstone = storedNow()
     expect(tombstone).to.include({ am: 'x' })
-    expect(tombstone?.vault_tok).to.not.eq(vault.vault_tok)
-    expect(vault.isEnabled).to.be.false
-    expect(listing.at(vault.scope)).to.include({ isPresent: false, vault_tok: tombstone?.vault_tok })
+    expect(tombstone?.vault_tok).to.not.eq(lived)
+    expect(listing.at(vault.scope)).to.eq(vault)
+    expect(vault).to.include({ isPresent: false, vault_tok: tombstone?.vault_tok })
     expect(bank.isUnlocked).to.be.true
     expect(deviceDB.cachedNow()).to.not.be.null
-    await TH.expectRefusal(boxes.get({ ...vault.scope, boxlabel }, { maxMillisSinceRefresh: 0 }))
+    expect(vault.boxListing).to.not.eq(boxes)
+    await TH.expectRefusal(boxes.get({ ...vault.scope, boxlabel }, { maxMillisSinceRefresh: 0 }), 'disabled')
   })
 
   it("refuses 'bank_locked' in a locked bank, asking nobody and storing nothing", async () => {
@@ -779,11 +783,11 @@ describe("the gate listing's gate verbs", () => {
     expect(answer.val).to.deep.include({ gate_tok: bank.maingate.gate_tok })
   })
 
-  it("returns a bad answer on a disabled listing, asking storage nothing", async () => {
+  it("returns a bad answer once its device is swept, asking storage nothing", async () => {
     const { bank, bankDB } = await makeBornVaultWithPasskey()
     const ante = bank.maingate.pickle()
     const tryRevokePasskey = vi.spyOn(bankDB, 'tryRevokePasskey')
-    bank.gateListing.sweep()
+    bank.device.sweep()
     const answer = await bank.gateListing.tryRevokePasskey(ante)
     expect(answer.err?.refusalkind).to.eq('disabled')
     expect(tryRevokePasskey).not.toHaveBeenCalled()

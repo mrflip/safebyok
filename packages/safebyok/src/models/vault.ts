@@ -10,8 +10,7 @@ import * as BX from '../shapes/shapes-bankdb'
 import type { VaultRecord, VaultSparse } from '../shapes/shapes-bankdb'
 import * as GX from '../shapes/shapes-gateish'
 import type { SealedWhisper } from '../shapes/shapes-gateish'
-import * as VX from '../shapes/shapes-vaultish'
-import type { BankFriend, BoxPut, BoxPutOpts, Fetched, FetchOpts, TimelyOpts, VaultSnapshot, VaultWorld } from '../shapes/shapes-vaultish'
+import type { BoxPut, BoxPutOpts, Fetched, FetchOpts, TimelyOpts, VaultSnapshot } from '../shapes/shapes-vaultish'
 import { deletedVault } from '../refusals/throwers'
 import type { Bank } from './bank'
 import type { Box } from './box'
@@ -20,9 +19,9 @@ import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 import type { VaultListing } from './vault-listing'
 
-/** A vault as this device has it: a storable that ducks as its record, and the world its boxes live in, sealed under its bank's lease. */
+/** A vault as this device has it: a storable that ducks as its record, standing for its scope through its lives, whose boxes are sealed under its bank's lease. */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> {
-  // == [Props]: user_id, banklabel, vaultlabel, bank_tok, vault_tok, world, listing, #bankFriend, #boxListing
+  // == [Props]: user_id, banklabel, vaultlabel, bank_tok, listing, #boxListing
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly user_id:    string
@@ -30,64 +29,68 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   declare readonly vaultlabel: string
   /** The life of the bank this vault is of, inscribed once by `assignInitialProps`. */
   declare readonly bank_tok:   string
-  /** This vault's life, inscribed once by `assignInitialProps` and never moved. */
-  declare readonly vault_tok:  string
-  declare readonly world:      VaultWorld
   declare readonly listing:    VaultListing
 
-  /** The bank's private calls, as the listing handed them. */
-  readonly #bankFriend: BankFriend
-
+  /** The listing of this vault's boxes under the life in hand; null until asked for, and again once a record of another life is received. */
   #boxListing: BoxListing | null = null
   // --
 
-  // == [Getters]: fmt, boxListing
+  // == [Getters]: bank, vault_tok, fmt, boxListing
+
+  /** The bank this vault is of. */
+  get bank(): Bank { return this.listing.bank }
+
+  /** This vault's life, as the record in hand has it: a vault deleted or made again for its scope has another. */
+  get vault_tok(): string { return this.central.vault_tok }
 
   /** The storage format of the record in hand. */
   get fmt(): number { return this.central.fmt }
 
-  /** The listing of this vault's boxes, made once, on first asking. */
+  /** The listing of this vault's boxes under the life in hand, made on first asking. */
   get boxListing(): BoxListing {
     this.#boxListing ??= this.listing.boxListingOf(this)
     return this.#boxListing
   }
   // --
 
-  // == [Construction]: constructor, assignInitialProps
+  // == [Construction]: assignInitialProps
 
-  /** Construct the storable vault, adopting its bank friend. */
-  constructor(world: VaultWorld, listing: VaultListing, central: Fetched<VaultRecord, VaultSparse>, bankFriend: BankFriend) {
-    super(world, listing, central)
-    this.#bankFriend = VX.bankFriend.parse(bankFriend)
-  }
-
-  /** Inscribes this vault's `bank_tok` and `vault_tok` beside what the base inscribes. */
+  /** Inscribes this vault's `bank_tok` beside what the base inscribes. */
   protected override assignInitialProps(central: Fetched<VaultRecord, VaultSparse>): void {
-    tattoo(this, { bank_tok: central.bank_tok, vault_tok: central.vault_tok }, { configurable: false })
+    tattoo(this, { bank_tok: central.bank_tok }, { configurable: false })
     super.assignInitialProps(central)
   }
   // --
 
-  // == [The bank's lock]: lock, alignLock, ensureUnlocked, unlock, each with its try form
+  // == [The bank's lock]: lock, alignLock, letBoxesGo, ensureUnlocked, unlock, each with its try form
 
   /** Lock the bank this vault is of: {@link Bank.lock}. */
-  override lock(): this { this.world.lock(); return this }
+  lock(): this { this.bank.lock(); return this }
 
-  /** Tell the listeners, this vault's and its boxes', the bank's lock has moved. A no-op past a discard; never throws. */
-  alignLock(): this {
-    super.lock()
-    this.#boxListing?.lock()
+  /** Tell the listeners, this vault's and its boxes', the bank's lock has moved; once this vault no longer answers, its boxes go. Never throws. */
+  override alignLock(): this {
+    super.alignLock()
+    if (this.isEnabled) { this.#boxListing?.lock() } else { this.#letBoxesGo() }
     return this
   }
 
+  // The box listing answers only under the life it was made under, so its boxes no longer answer, and drop their whispers.
+  /** End the boxes' watch, bring them up to the lock, and let go of their listing: the next asking makes another. */
+  #letBoxesGo(): void {
+    const boxListing = this.#boxListing
+    this.#boxListing = null
+    boxListing?.goodbye()
+    boxListing?.lock()
+  }
+
   /** The bank this vault is of unlocked: {@link Bank.ensureUnlocked}. */
-  async ensureUnlocked(): Promise<this> { await this.world.ensureUnlocked(); return this }
+  async ensureUnlocked(): Promise<this> { await this.bank.ensureUnlocked(); return this }
 
   /** Non-throwing form of {@link ensureUnlocked}. */
   tryEnsureUnlocked(): Promise<Outcome<this>> { return outcomeOf(() => this.ensureUnlocked()) }
 
   /** Unlock the bank this vault is of: {@link Bank.unlock}. */
-  async unlock(): Promise<this> { await this.world.unlock(); return this }
+  async unlock(): Promise<this> { await this.bank.unlock(); return this }
 
   /** Non-throwing form of {@link unlock}. */
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
@@ -96,34 +99,34 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, each with its try form
 
   /** Replace the bank's passphrase: {@link Gate.replacePassphrasePrompt}. */
-  async replacePassphrasePrompt(): Promise<this> { await this.world.maingate.replacePassphrasePrompt(); return this }
+  async replacePassphrasePrompt(): Promise<this> { await this.bank.maingate.replacePassphrasePrompt(); return this }
 
   /** Non-throwing form of {@link replacePassphrasePrompt}. */
   tryReplacePassphrasePrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrasePrompt()) }
 
   /** Add a passkey to the bank's gate: {@link Gate.addPasskeyPrompt}. */
-  async addPasskeyPrompt(): Promise<this> { await this.world.maingate.addPasskeyPrompt(); return this }
+  async addPasskeyPrompt(): Promise<this> { await this.bank.maingate.addPasskeyPrompt(); return this }
 
   /** Non-throwing form of {@link addPasskeyPrompt}. */
   tryAddPasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskeyPrompt()) }
 
   /** Revoke the passkey of the bank's gate: {@link Gate.revokePasskeyPrompt}. */
-  async revokePasskeyPrompt(): Promise<this> { await this.world.maingate.revokePasskeyPrompt(); return this }
+  async revokePasskeyPrompt(): Promise<this> { await this.bank.maingate.revokePasskeyPrompt(); return this }
 
   /** Non-throwing form of {@link revokePasskeyPrompt}. */
   tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
   // --
 
-  // == [The boxes' world]: sealStampedString, unsealStampedString, stampsOf, receiveParent
+  // == [Above the boxes]: sealStampedString, unsealStampedString, stampsOf, receiveParent
 
   /** `whisperText` sealed under a fresh boxKey under the bankKey, both bound to the bank, this vault and `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
-    return this.world.sealWith(whisperText, this.#stampsOf(stamp))
+    return this.bank.sealWith(whisperText, this.#stampsOf(stamp))
   }
 
   /** The text `sealed` contains, bound to the bank, this vault and `stamp`. */
   async unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
-    return this.world.unsealWith(sealed, this.#stampsOf(stamp))
+    return this.bank.unsealWith(sealed, this.#stampsOf(stamp))
   }
 
   /** This vault's stamp, then `stamp`, which must be of this vault's scope and life. */
@@ -134,8 +137,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return [GX.vaultStamp.parse(this), stamp]
   }
 
-  // The vault listing receives the parent as it would a row from any vault request: a newer row from another life
-  // replaces this Vault in the listing.
+  // The vault listing receives the parent as it would a row from any vault request: a newer row of another life is
+  // received into this Vault, and its boxes go.
   /** Deliver the vault row a box answer carries. */
   receiveParent(parent: unknown): void { this.listing.deliverRecord(BX.vaultRow.refusingAs('record_conflict').parse(parent)) }
   // --
@@ -146,7 +149,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   async beginWatch(): Promise<this> {
     this.demandWatchable()
     const brought = await outcomeOf(() => this.#bringUp())
-    this.#bankFriend.announce({ kind: 'helloed', outcome: brought, vault: this })
+    this.bank.device.announce({ kind: 'helloed', outcome: brought, vault: this })
     demandGood(brought)
     return this
   }
@@ -201,10 +204,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // == [Guards]: isLocked, isUnlocked, demandWatchable, demandPresent, ensureTimely
 
   /** Whether the bank is locked, read live: a vault has no lock of its own. */
-  get isLocked(): boolean { return this.world.isLocked }
+  get isLocked(): boolean { return this.bank.isLocked }
 
   /** Whether the bank is unlocked, read live. */
-  get isUnlocked(): boolean { return this.world.isUnlocked }
+  get isUnlocked(): boolean { return this.bank.isUnlocked }
 
   /** A watch needs the vault enabled and present. */
   demandWatchable(): this { return this.demandEnabled().demandPresent() }
@@ -219,20 +222,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   ensureTimely(maxMillis?: number): Promise<this> { return this.hydrate({ maxMillisSinceRefresh: maxMillis }) }
   // --
 
-  // == [Protected, overriding Storable's]: adopt, sweepContents, vacateContents, isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Protected, overriding Storable's]: adopt, isFullRecord, lifeTokPathOf, makeSnapshot
 
-  /** Adopt `central`. A tombstone vacates the boxes, the vault staying listed. */
+  /** Adopt `central`. A record of another life, a tombstone among them, lets the boxes of the life in hand go. */
   protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {
+    const isOtherLife = ! this.isOfLife(central)
     super.adopt(central)
-    if (this.isPresent) { return }
-    this.#boxListing?.vacate()
+    if (isOtherLife) { this.#letBoxesGo() }
   }
-
-  /** The boxes swept. */
-  protected override sweepContents(): void { this.#boxListing?.sweep() }
-
-  /** The boxes vacated. */
-  protected override vacateContents(): void { this.#boxListing?.vacate() }
 
   /** A vault row has nothing encrypted: a full one is one alive. */
   protected isFullRecord(fetched: VaultSparse): fetched is VaultRecord { return fetched.am === 'a' }

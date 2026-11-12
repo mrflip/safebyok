@@ -7,10 +7,8 @@ import type { Gate } from '../../src/models/gate'
 import type { Lease } from '../../src/models/lease'
 import type * as GX from '../../src/shapes/shapes-gateish'
 import { type RequestCleartext, vaultStamp } from '../../src/shapes/shapes-gateish'
-import type { BankFriend, BoxWorld, LifecycleHandler, ListingOpts } from '../../src/shapes/shapes-vaultish'
-import { type VaultError, isVaultError } from '../../src/refusals/errors'
-import * as Refuse from '../../src/refusals/throwers'
-import { brandGuarded } from '../../src/helpers/consts'
+import type { BankListingOpts, LifecycleHandler } from '../../src/shapes/shapes-vaultish'
+import type { VaultError } from '../../src/refusals/errors'
 import type { BankRow, GateRecord, VaultRecord, VaultRow } from '../../src/shapes/shapes-bankdb'
 import { DefaultOnLifecycle, Device } from '../../src/models/device'
 import type { Vault } from '../../src/models/vault'
@@ -100,8 +98,8 @@ export function revokeTyping(bank: Bank, passphrase: string): Promise<Gate> { re
 /** `bank.delPrompt()`, the user typing `passphrase`. */
 export function delTyping(bank: Bank, passphrase: string): Promise<Bank> { return askTyping(bank.device, byPassphrase(passphrase), () => bank.delPrompt()) }
 
-/** The device whose bank `vault` is of: a vault's world is its Bank. */
-function deviceOf(vault: Vault): Device { return (vault.world as Bank).device }
+/** The device whose bank `vault` is of. */
+function deviceOf(vault: Vault): Device { return vault.bank.device }
 
 /** `vault.del(vault)` once `ensureUnlocked` has unlocked it, which these tests expect to do by the lease cached on this device. */
 export async function delUnlocked(vault: Vault): Promise<Vault> {
@@ -113,7 +111,7 @@ export async function delUnlocked(vault: Vault): Promise<Vault> {
 export const LeaseMillis = 60 * 60_000
 
 /** How long these worlds' vaults and boxes stay timely: ten minutes. */
-const RefreshMinutes = 10
+export const RefreshMinutes = 10
 
 const nothing = (): void => undefined
 
@@ -226,15 +224,9 @@ export function makeVaultWorld(worldOverrides: VaultWorldGiven = {}) {
 }
 export type VaultTestWorld = ReturnType<typeof makeVaultWorld>
 
-/** The options a listing is made with in a world of these, as a bank hands them down: its bankDB, its horizon, and a friend whose bad news goes to the world's `badnews`. */
-export function listingOptsOf({ bankDB, badnews }: VaultTestWorld): ListingOpts {
-  const bankFriend: BankFriend = {
-    panic:       brandGuarded(nothing),
-    announce:    brandGuarded(nothing),
-    tellBadNews: brandGuarded((told: readonly unknown[]) => { badnews.push(...told.map((news) => (isVaultError(news) ? news : Refuse.unexpectedError(news)))) }),
-    askUser:     null,
-  }
-  return { bankDB, maxMillisSinceRefresh: RefreshMinutes * 60_000, bankFriend }
+/** The options a listing is made with in a world of these, as a device hands them down: its bankDB, its horizon, and no dialog. */
+export function listingOptsOf({ bankDB }: VaultTestWorld): BankListingOpts {
+  return { bankDB, maxMillisSinceRefresh: RefreshMinutes * 60_000, askUser: null }
 }
 
 /** The vault record of `Dna`, in a bank built under `passphrase`, as a bankDB has stored it. */
@@ -274,20 +266,6 @@ export async function roundTrip(sealer: Vault, opener: Lease): Promise<string> {
 
 /** {@link roundTrip} through the vaults' own seal verbs. */
 export async function vaultRoundTrip(sealer: Vault, opener: Vault): Promise<string> { return opener.unsealStampedString(await sealer.sealStampedString('sk-test', RoundTripStamp), RoundTripStamp) }
-
-/** `vault` as its boxes see it, but that it takes no world. */
-export function boxWorldOf(vault: Vault): BoxWorld {
-  return {
-    bank_tok:     vault.bank_tok,
-    vault_tok:    vault.vault_tok,
-    get isLocked() { return vault.isLocked },
-    ensureTimely: (opts) => vault.ensureTimely(opts),
-    receiveParent:    () => undefined,
-    subscribe:        (listener) => vault.subscribe(listener),
-    sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),
-    unsealStampedString: (sealed, stamp) => vault.unsealStampedString(sealed, stamp),
-  }
-}
 
 /** The boxlabel of the one box the box-verb worlds have. */
 export const boxlabel = 'anthropic_api_key'

@@ -4,18 +4,18 @@ import { describe, expect, it } from 'vitest'
 import type { BoxRecord } from '../../src/shapes/shapes-bankdb'
 import * as TH from '../test-helpers'
 import { TestableBoxListing } from '../test-helpers/models-world'
-import { Dna, boxWorldOf, listingOptsOf, makeBornVault, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, RefreshMinutes, makeBornVault, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
 const Whisper = { apiKey: 'sk-test-0000', orgId: null }
 const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: Whisper, sidecar: { account: 'work' } }
 
-/** Box listings whose world is a real vault, in a bank born unlocked under `Passphrase`, over its bankDB. */
+/** Box listings of a real vault, in a bank born unlocked under `Passphrase`, over its bankDB. */
 async function sealWorld() {
   const born = await makeBornVault()
   const { vault } = born
-  const boxesOf = () => new TestableBoxListing(boxWorldOf(vault), { ...listingOptsOf(born), scope: vault.scope })
+  const boxesOf = () => new TestableBoxListing(vault, { bankDB: born.bankDB, maxMillisSinceRefresh: RefreshMinutes * 60_000 })
   return { ...born, boxesOf, boxes: boxesOf() }
 }
 

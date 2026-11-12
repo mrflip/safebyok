@@ -146,37 +146,18 @@ describe("SX.ifPresent and VX.boxPutOpts", () => {
   })
 })
 
-describe("The checks of the world and the listing", () => {
-  describe("VX.listingWorld", () => {
-    expectCases(VX.listingWorld, [
-      [mw.world,                                 true,  'passes the test world'],
-      [{ ...mw.world, extra: 1 },                true,  'passes a world with more than the base reaches into'],
-      [null,                                     false, 'refuses null'],
-      [{},                                       false, 'refuses an empty object'],
-      [{ ...mw.world, receiveParent: undefined },    false, 'refuses a world that cannot receiveParent'],
-      [{ ...mw.world, ensureTimely: 5 },         false, 'refuses a world whose ensureTimely is no function'],
-      [{ ...mw.world, isLocked: undefined },     false, 'refuses a world with no isLocked'],
-      [{ ...mw.world, isLocked: 'locked' },      false, 'refuses a world whose isLocked is no boolean'],
-    ])
-  })
-
+describe("The checks of the listing's making", () => {
   describe("VX.listingOpts", () => {
-    const opts = { bankDB: mw.bankDB, maxMillisSinceRefresh: 1000, bankFriend: mw.bankFriend }
+    const opts = { bankDB: mw.bankDB, maxMillisSinceRefresh: 1000 }
     expectCases(VX.listingOpts, [
-      [opts,                                                     true,  'passes the test bankDB, a horizon and the calls the bank branded'],
-      [{ ...opts, maxMillisSinceRefresh: Infinity },             true,  'passes a horizon of Infinity'],
-      [{ ...opts, bankDB: { tryPutBox: () => null } },           false, 'refuses a bankDB with no tryGetBox'],
-      [{ ...opts, maxMillisSinceRefresh: -1 },                   false, 'refuses a negative horizon'],
-      [{ ...opts, maxMillisSinceRefresh: undefined },            false, 'refuses a missing horizon'],
-      [{ ...opts, bankFriend: { ...mw.bankFriend, panic: () => undefined } },               false, 'refuses a panic the bank did not brand'],
-      [{ ...opts, bankFriend: { ...mw.bankFriend, announce: () => undefined } },            false, 'refuses an announce the bank did not brand'],
-      [{ ...opts, bankFriend: { ...mw.bankFriend, tellBadNews: () => undefined } },         false, 'refuses a tellBadNews the bank did not brand'],
-      [{ ...opts, bankFriend: { ...mw.bankFriend, askUser: () => Promise.resolve(true) } }, false, 'refuses an askUser the bank did not brand'],
-      [{ ...opts, bankFriend: { ...mw.bankFriend, askUser: null } },                        true,  'passes a bank with no host dialog'],
-      [{ ...opts, bankFriend: undefined },                       false, 'refuses a missing bankFriend'],
-      [{ ...opts, world: mw.world },                             false, 'refuses a world, which the listing takes beside its options'],
-      [{ ...opts, onBadNews: () => null },                       false, 'refuses an onBadNews, which only a bank takes'],
-      [{ ...opts, extra: 1 },                                    false, 'refuses an option it does not accept, being strict'],
+      [opts,                                           true,  'passes the test bankDB and a horizon'],
+      [{ ...opts, maxMillisSinceRefresh: Infinity },   true,  'passes a horizon of Infinity'],
+      [{ ...opts, bankDB: { tryPutBox: () => null } }, false, 'refuses a bankDB with no tryGetBox'],
+      [{ ...opts, maxMillisSinceRefresh: -1 },         false, 'refuses a negative horizon'],
+      [{ ...opts, maxMillisSinceRefresh: undefined },  false, 'refuses a missing horizon'],
+      [{ ...opts, askUser: null },                     false, 'refuses an askUser, which only a bank listing takes'],
+      [{ ...opts, world: mw.world },                   false, 'refuses a world, which the listing takes beside its options'],
+      [{ ...opts, extra: 1 },                          false, 'refuses an option it does not accept, being strict'],
     ])
 
     it("names the failing field", () => {
@@ -185,18 +166,45 @@ describe("The checks of the world and the listing", () => {
     })
   })
 
+  describe("VX.bankListingOpts", () => {
+    const opts = { bankDB: mw.bankDB, maxMillisSinceRefresh: 1000, askUser: null }
+    expectCases(VX.bankListingOpts, [
+      [opts,                                                   true,  'passes a listing\'s options with no host dialog'],
+      [{ ...opts, askUser: () => Promise.resolve(true) },      false, 'refuses an askUser that guardRequestCleartext did not wrap'],
+      [{ ...opts, askUser: undefined },                        false, 'refuses a missing askUser'],
+      [{ ...opts, maxMillisSinceRefresh: -1 },                 false, 'refuses a negative horizon'],
+      [{ ...opts, extra: 1 },                                  false, 'refuses an option it does not accept, being strict'],
+    ])
+  })
+
+  describe("VX.listedUnder", () => {
+    expectCases(VX.listedUnder.vault, [
+      [mw.world,               true,  'passes the test vault'],
+      [mw.world.bank,          false, 'refuses a bank'],
+      [{},                     false, 'refuses an object with no modelkind'],
+      [null,                   false, 'refuses null'],
+    ])
+    expectCases(VX.listedUnder.bank, [
+      [mw.world.bank,          true,  'passes the test bank'],
+      [mw.world,               false, 'refuses a vault'],
+    ])
+    expectCases(VX.listedUnder.device, [
+      [mw.world.bank.device,   true,  'passes the test device'],
+      [mw.world.bank,          false, 'refuses a bank'],
+    ])
+  })
+
   describe("VX.storableArgs", () => {
     const listing = boxListingOf(mw)
-    const args = { world: mw.world, listing, central: sparse }
+    const args = { listing, central: sparse }
     expectCases(VX.storableArgs, [
-      [args,                                           true,  'passes a world, a listing and a central'],
+      [args,                                           true,  'passes a listing and a central'],
       [{ ...args, central: gone },                     true,  'passes a tombstone'],
       [{ ...args, central: null },                     false, 'refuses a null central'],
       [{ ...args, central: { am: 'a' } },              false, 'refuses a central that fails sparseBase'],
       [{ ...args, listing: {} },                       false, 'refuses a listing with no listing modelkind'],
       [{ ...args, listing: undefined },                false, 'refuses a missing listing'],
-      [{ ...args, world: null },                       false, 'refuses a null world'],
-      [{ ...args, world: { ...mw.world, receiveParent: undefined } }, false, 'refuses a world that cannot receiveParent'],
+      [{ ...args, world: mw.world },                   false, 'refuses a world, the listing being the thing above it'],
       [{ ...args, opts: { maxMillisSinceRefresh: 1000 } }, false, "refuses options, the horizon being the listing's"],
       [{ ...args, extra: 1 },                          false, 'refuses an argument it does not accept, being strict'],
     ])

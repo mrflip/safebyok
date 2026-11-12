@@ -5,7 +5,6 @@ import { makeLeaseKey } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
 import { VaultError } from '../../src/refusals/errors'
 import { passphraseCleartext } from '../../src/shapes/shapes-gateish'
-import type { Bank } from '../../src/models/bank'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
@@ -144,17 +143,16 @@ describe("An unlock, by proof or by the cached lease", () => {
     expect(deviceDB.cachedNow()).to.deep.include({ proved_at: bornRow.proved_at + 1 })
   })
 
-  it("refuses after the bank's sweep, leaving the vault locked and the cached row in place", async () => {
+  it("refuses after the device's sweep, leaving the vault locked and the cached row in place", async () => {
     const born = await makeBornVault()
     const { deviceDB } = born
     const vault = await nextVaultOf(born)
-    const bank = vault.world as Bank
     const kept = deviceDB.cachedNow()
     expect(kept).not.to.be.null
     const peeked = TH.pendingNextAnswer(deviceDB.memoryDB, 'peek')
     const ensuring = vault.ensureUnlocked()
     await peeked.reached
-    bank.sweep()
+    vault.bank.device.sweep()
     peeked.release()
     await TH.expectRefusal(ensuring)
     expect(vault.isLocked).to.be.true

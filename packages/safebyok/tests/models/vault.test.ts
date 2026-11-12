@@ -3,7 +3,7 @@ import * as Phrases from '../../src/helpers/phrases'
 import { Vault } from '../../src/models/vault'
 import { VaultListing } from '../../src/models/vault-listing'
 import * as TH from '../test-helpers'
-import { Dna, Passphrase, T0, byPassphrase, listingOptsOf, makeBornVault, makeBornVaultAndFriend, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
+import { Dna, T0, listingOptsOf, makeBornVault, makeBornVaultAndFriend, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -37,21 +37,19 @@ describe("VaultListing.build of a record, and its constructor", () => {
     expect(listing.recordOf(vault)).to.deep.equal(demandStored())
   })
 
-  it("refuses a host's bare function where the bank has it guarded", async () => {
+  it("refuses a device in place of its bank, and an option it does not take", async () => {
     const born = await makeBornVault()
     const { bank } = born
-    const opts = listingOptsOf(born)
-    TH.expectSyncRefusal(() => new VaultListing(bank, { ...opts, bankFriend: { ...opts.bankFriend, panic: vi.fn() as never } }))
-    TH.expectSyncRefusal(() => new VaultListing(bank, { ...opts, bankFriend: { ...opts.bankFriend, announce: vi.fn() as never } }))
-    TH.expectSyncRefusal(() => new VaultListing(bank, { ...opts, bankFriend: { ...opts.bankFriend, askUser: vi.fn() as never } }))
+    const { bankDB, maxMillisSinceRefresh } = listingOptsOf(born)
+    expect(new VaultListing(bank, { bankDB, maxMillisSinceRefresh })).to.be.instanceOf(VaultListing)
+    TH.expectSyncRefusal(() => new VaultListing(bank.device as never, { bankDB, maxMillisSinceRefresh }), 'bad_option')
+    TH.expectSyncRefusal(() => new VaultListing(bank, { bankDB, maxMillisSinceRefresh, askUser: null } as never), 'bad_option')
   })
 
-  it("refuses a panic the bank did not brand, where a vault is made", async () => {
-    const born = await makeBornVault(byPassphrase(Passphrase))
-    const { bank, vault, listing } = born
-    const { bankFriend } = listingOptsOf(born)
-    TH.expectSyncRefusal(() => new Vault(bank, listing, vault.toJSON(), vi.fn() as never), 'bad_option')
-    TH.expectSyncRefusal(() => new Vault(bank, listing, vault.toJSON(), { ...bankFriend, panic: vi.fn() as never }), 'bad_option')
+  it("refuses what is not a listing, and a central that fails its check, where a vault is made", async () => {
+    const { vault, listing } = await makeBornVault()
+    TH.expectSyncRefusal(() => new Vault(listing.bank as never, vault.toJSON()), 'bad_option')
+    TH.expectSyncRefusal(() => new Vault(listing, { am: 'a' } as never), 'bad_option')
   })
 })
 
