@@ -1,6 +1,6 @@
 # Thread 2: device_row (2026-11-12)
 
-Branch `20261112-device_row`, PR #TBD, stacked on #657. Justify: green, all packages (safebyok 3007, convex 318, postgres 237, graphql 376, react 259, indexeddb 180, fastkey 43, safebyok 278 in the root scripts, demo 97, e2e 504).
+Branch `20261112-device_row`, PR #658, stacked on #657. Justify: green, all packages (safebyok 3007, convex 318, postgres 237, graphql 376, react 259, indexeddb 180, fastkey 43, safebyok 278 in the root scripts, demo 97, e2e 504).
 
 * **Built**: `device_id` is `device_tok` (option, `bank.device_tok`, snapshot, wayin header and its stored field, the device row, `provingWorld`, the GraphQL field, React `useDeviceTok`; `DeviceIdShape` is `DeviceTokShape`). The deviceDB's "bank row" is the device row: `ensureCachedDevice`, `forgetDevice`, `listRawDevices` with their `try*` and `do*` forms (`doEnsureCachedDevice`, `doForgetDevice`, `doListDevices`), `DeviceRow` and `deviceRow`, `_cheat_deviceRows`, the battery's `plantDeviceRow` and `deviceRowsOf`. VOCABULARY.md: the *deviceTok* entry (was *deviceId*), the *device row* entry (was *device record*, *bank row*), and the `_id`/`_tok` paragraph, where `device_tok` is now an example of a `_tok` ("changes on every life of a device's row in a bank scope"). STYLE.md's `_id`/`_tok` bullet likewise. `notes/old_vocabulary.md` has two new rows. A changeset, `20261112-device_row.md` (safebyok, safebyok-react, safebyok-graphql, minor).
 * **Decisions taken**:
