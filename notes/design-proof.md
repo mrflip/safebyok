@@ -290,9 +290,9 @@ gating.attempt({ passphraseClear, passkeyClear? })           a second while one 
    ├─ record = listing.recordOfBirth(gate, prior)    sync pojo at the revision after prior; its gate is gate.pickle()
    ├─ vault = vaultListing.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' })
    │    ├─ vaultDB.tryPutVault(record, { prior, ifAbsent, ifPresent })    ← the commit
-   │    │    a live row → 'declined', the stored record its answer: another won
+   │    │    a live row → 'passed', the stored record its answer: another won
    │    │    a newer tombstone → 'stale_write', delivered, then thrown
-   │    └─ deliver(answer, record) → new Vault(what is stored), listed, locked    a declined put pins only the scope
+   │    └─ deliver(answer, record) → new Vault(what is stored), listed, locked    a 'passed' put is matched against its scope only
    ├─ vault's vault_tok is not the record's → another won: refused 'gate_made_elsewhere', its Vault listed, locked
    └─ vault.#unlockByProving(passphraseProving)
       ├─ lease = passphraseProving.buildLease(vault.#leaseFriend())    refused → the vault stays stored and listed, locked
@@ -304,7 +304,7 @@ host closes dialog → requestCleartext resolves → conclude is a no-op
 
 `prior` is carried across the dialog: it decides whether to ask, and the put needs it. It is always a value:
 the tombstone's revision, or `VoidRevision` (*Required of the parts not yet drawn*).
-A stale `prior` is safe: over a live row the put is declined, and that answer is the "another won"
+A stale `prior` is safe: over a live row the put answers 'passed', and that answer is the "another won"
 line above; over a newer tombstone the put refuses with 'stale_write'. A refused put leaves only what its answer delivered, and nothing on the device.
 The act tells its own birth from another's by comparing the record it sent with the one it got back, before attaching a lease. The new Vault reports locked between the
 put and the attach, with no listener yet to see it. A Bank's `lock` during the put or that await comes after
@@ -350,13 +350,12 @@ needs nothing that the vault does not already have:
 ```text
 each gate change's act, past its provings
 ├─ stored = await vaultListing.<gate verb>(ante, wayin)    ← the commit; ante, the record the attempt read
-│  └─ #gateVerbAnswered(ante, moved, call, { isScopePinned })
-│     ├─ record = ante at nextRevisionOf(prior), gate_epoch one up, the moved wayin laid on its gate
-│     ├─ call(record, { prior })                     the vaultDB's verb; prior is ante's revision; moved → 'stale_write', nothing stored
-│     │    the vaultDB checks registered_at unchanged, gate_epoch one up, only its own wayin moved, then puts the record whole
-│     │    and refuses what its row rules out, such as an addPasskey over a passkey already stored ('camped')
-│     └─ deliver(answer, record)                     checked against what it sent; a revoke pins only the scope
-│        no lock: adopt never locks on a move
+│  ├─ { record, prior } = #gateMoveOf(ante, moved)    record is ante at nextRevisionOf(prior), gate_epoch one up, the moved wayin laid on its gate
+│  ├─ the vaultDB's verb, called with (record, { prior })    prior is ante's revision; moved → 'stale_write', nothing stored
+│  │    the vaultDB checks registered_at unchanged, gate_epoch one up, only its own wayin moved, then puts the record whole
+│  │    and refuses what its row rules out, such as an addPasskey over a passkey already stored ('camped')
+│  └─ deliver(answer, record)                        checked against what it sent; a revokePasskey with no passkey answers 'passed', matched against its scope only
+│     no lock: adopt never locks on a move
 └─ vault.#unlockByProving(proved, stored.gate.gate_epoch)    a fresh lease of full term; a lock() crossing the change does not stay in effect
 ```
 
@@ -439,7 +438,7 @@ gating.attempt({ passphraseClear })
 └─ then the change, from { ante, proved }                             ── no cleartext is used past here ──
    └─ vaultListing.<gate verb>, then vault.#unlockByProving(proved, stored.gate.gate_epoch)
       commit: vaultListing.revokePasskey(ante)                              ← the commit
-           revoked before the attempt read ante → 'revoked', nothing moved; after it → 'stale_write'
+           revoked before the attempt read ante → 'passed', nothing moved; after it → 'stale_write'
 ```
 
 ### `del_vault`
@@ -513,7 +512,7 @@ A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or
 * `ifPresent` is customer-facing, and `putVault` and `putBox` take it alike in `PutOpts`, with `ifAbsent` ('add' or
   'fail'). Only `repl` saves, and only within the live row's own life: at its revision under another `vault_tok` or
   `box_tok` it refuses `camped`. `fail` refuses `camped` with the corpse (`dbhas`, the request), not as a `stale_write`;
-  `get` answers the live row in place of the request, `declined`. `isVaultPutAllowed(ante, record, opts)` and
+  `get` answers the live row in place of the request, `passed`. `isVaultPutAllowed(ante, record, opts)` and
   `isBoxPutAllowed(ante, record, opts)` decide inside each adapter's transaction.
 * Every box query names scope and `vault_tok`, and a box row under another `vault_tok` is treated as no row. Only a
   fetch of a vault record has a reason to go by scope alone.
