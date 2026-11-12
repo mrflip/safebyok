@@ -1,5 +1,6 @@
 import type { Modelkind } from '../helpers/consts'
 import { checkedConsistent } from '../helpers/validator'
+import { tattoo } from '../helpers/helpers'
 import * as Phrases from '../helpers/phrases'
 import type { CipherCtxRecord } from '../helpers/crypto'
 import { type Outcome, demandGood, outcomeOf } from '../refusals/outcome'
@@ -28,12 +29,14 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 
 /** SLOPDOC: A vault as this device has it: a storable that ducks as its record, and the world its boxes live in. */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> {
-  // == [Props]: user_id, banklabel, vaultlabel, world, listing, #bankFriend, #lease, #vaultFriend, #boxListing, #gate
+  // == [Props]: user_id, banklabel, vaultlabel, vault_tok, world, listing, #bankFriend, #lease, #vaultFriend, #boxListing, #gate
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly user_id:    string
   declare readonly banklabel:  string
   declare readonly vaultlabel: string
+  /** This vault's life, inscribed once by `assignInitialProps` and never moved. */
+  declare readonly vault_tok:  string
   declare readonly world:      VaultWorld
   declare readonly listing:    VaultListing
 
@@ -73,12 +76,18 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [Construction]: constructor, launchBirth
+  // == [Construction]: constructor, assignInitialProps, launchBirth
 
   /** Construct the storable vault, adopting its bank friend. */
   constructor(world: VaultWorld, listing: VaultListing, central: Fetched<VaultRecord, VaultSparse>, bankFriend: BankFriend) {
     super(world, listing, central)
     this.#bankFriend = VX.bankFriend.parse(bankFriend)
+  }
+
+  /** Inscribes this vault's `vault_tok` beside what the base inscribes. */
+  protected override assignInitialProps(central: Fetched<VaultRecord, VaultSparse>): void {
+    tattoo(this, { vault_tok: central.vault_tok }, { configurable: false })
+    super.assignInitialProps(central)
   }
 
   /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the tombstone listed, if one is. */

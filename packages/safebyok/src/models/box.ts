@@ -12,6 +12,7 @@ import * as VX from '../shapes/shapes-vaultish'
 import { type BoxExposedPatch, type BoxPatch, type BoxPatchParsed, type BoxPutOpts, type BoxSnapshot, type BoxWorld, type Fetched, type ThingAnswer, type TimelyOpts } from '../shapes/shapes-vaultish'
 import type { BoxRecord, BoxSparse } from '../shapes/shapes-storage'
 import { stableJsonify } from '../helpers/stable-jsonify'
+import { tattoo } from '../helpers/helpers'
 import { boxAbsent, notExposed, undecodedWhisper } from '../refusals/throwers'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
@@ -19,13 +20,15 @@ import { refusedAnswerOf } from '../storage/vault-db'
 
 /** A box as this device has it: a storable that ducks as its record, with its whisper openable while the vault is unlocked. */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
-  // == [Props]: user_id, banklabel, vaultlabel, boxlabel, world, listing, #exposed, #isVeiled
+  // == [Props]: user_id, banklabel, vaultlabel, boxlabel, vault_tok, world, listing, #exposed, #isVeiled
 
   /** The scope, tattooed on by Storable's constructor. */
   declare readonly user_id:    string
   declare readonly banklabel:  string
   declare readonly vaultlabel: string
   declare readonly boxlabel:   string
+  /** The vault this box lies in, inscribed once by `assignInitialProps` and never moved. */
+  declare readonly vault_tok:  string
 
   declare readonly world: BoxWorld
 
@@ -86,6 +89,15 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   /** Whether this box's vault is locked, read live. */
   get isLocked(): boolean { return this.listing.isLocked }
+  // --
+
+  // == [Construction]: assignInitialProps
+
+  /** Inscribes the `vault_tok` of the vault this box lies in, beside what the base inscribes. */
+  protected override assignInitialProps(central: Fetched<BoxRecord, BoxSparse>): void {
+    tattoo(this, { vault_tok: central.vault_tok }, { configurable: false })
+    super.assignInitialProps(central)
+  }
   // --
 
   // == [The whisper]: extractWhisper, tryExtractWhisper, expose, unexpose, #doUnexpose, veil, unveil, patchWhisper, replaceExposed, unseal
