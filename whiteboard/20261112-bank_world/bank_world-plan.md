@@ -219,7 +219,7 @@ and each handoff quotes it. The line is red from 8a's tip to 8c's (rule 20).
 * **8c `bank_prompts`**: the gate's prompts and verbs, `del_bank`, `autolock`, a bank tombstone
   delivered; unskips 8b's skips; React compiles. **Levels**: worker `opus`; review `medium`.
   **After**: 8b.
-* **8d `bank_gate_tests`**: the former 8b below. **After**: 8c. *Orchestrator:* after 9, so its new tests and the guarantees it promotes use the bank-key names (9 and 8d both edit `notes/guarantees.md` and VOCABULARY). *Orchestrator, 2026-11-12 (new session):* after 10, stacked on its ready tip, not beside it: 10 is the critical path (10, 11, 12, 16, 17), 8d's new bank tests are better written over 10's lifecycle than rebased across it, and the line needs no restack between them. 8d is judged then against 11: 8c already rewrote `vault-gate.test.ts` over the bank, so 11's re-pointing may fold into 8d. Owed here from 9's review: `notes/guarantees.md` G3 still says the wayins are stored only in the VaultDB; the promotion of `guarantees-bank.md` corrects it.
+* **8d `bank_gate_tests`**: the former 8b below. **After**: 8c. *Orchestrator:* after 9, so its new tests and the guarantees it promotes use the bank-key names (9 and 8d both edit `notes/guarantees.md` and VOCABULARY). *Orchestrator, 2026-11-12 (new session):* after 10, stacked on its ready tip, not beside it: 10 is the critical path (10, 11, 12, 16, 17), 8d's new bank tests are better written over 10's lifecycle than rebased across it, and the line needs no restack between them. 8d is judged then against 11: 8c already rewrote `vault-gate.test.ts` over the bank, so 11's re-pointing may fold into 8d. *Revised:* the promotion of `guarantees-bank.md` (and G3's "(VaultDB)") moved to thread G, now; 8d brings the note up to date with 10's lifecycle, from 10's and G's reports.
 
 ### 8b `bank_gate_tests` (now 8d)
 
@@ -275,6 +275,10 @@ answer or notice carries `parent: null` (delBank's answer, a bank or gate row's 
 battery. A refusal's null parent (no row fetched) stays. **Levels**: worker `sonnet`
 (`thread-worker`); review `medium`. **After**: 14, on top of the storage line. Models pick it up in 8b/8c.
 **Size**: S.
+
+### G `guarantees_bank` (added 2026-11-12)
+
+The Coach (Coach notes): the bank-* drafts are "for swapping in atop the notes/ versions when you wish. They were written prospectively, though, so I might have a sonnet merge them as you go, with the code overriding both." *Orchestrator:* `guarantees-bank.md` merged into `notes/guarantees.md` now, the code at 9's tip overriding both; what the draft anticipated of thread 10 is not claimed, and listed for 8d. Thread 10 leaves `notes/guarantees.md` alone and reports the lines it falsifies. `deliver-contract-bank.md` stays with 10. **Levels**: worker `sonnet`; review `medium` (sonnet), checking each claim against the code. **After**: 9 (stacked on #674), beside 10. **Size**: S-M, docs.
 
 ### 16 `vaultdb_out`
 
