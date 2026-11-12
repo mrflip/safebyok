@@ -1,4 +1,4 @@
-/** The checks and types of the gate: wayins, provings, leases and gatings, imported as `GX`. */
+/** The checks and types of the gate: its wayins, provings, leases and gatings. Imported as `GX`. */
 
 import { NEVER } from 'zod'
 import type * as Z from 'zod'
@@ -20,10 +20,10 @@ import * as BX from './shapes-bankdb'
 
 // == [Wayin kinds]: wayinkind, isPrfSalt
 
-/** The check of a wayin's kind, as a caller names the field of the gate it means: one of {@link EX.wayinkindVals}. */
+/** The check of a wayin's kind: one of {@link EX.wayinkindVals}. */
 export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinkindVals), 'bad_option')
 
-/** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltSize} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */
+/** True for base64url text of {@link PasskeySaltSize} bytes, as a passkey wayin's salt must be. */
 export function isPrfSalt(prf_salt_b64: string): boolean { return fromB64OrNull(prf_salt_b64)?.length === PasskeySaltSize }
 // --
 
@@ -41,30 +41,36 @@ export const { passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinReco
   }
 })
 
+/** A passphrase wayin without its wrapped bankKey. */
 export type PassphraseWayinHeader = Z.infer<typeof passphraseWayinHeader>
+/** A passkey wayin without its wrapped bankKey. */
 export type PasskeyWayinHeader    = Z.infer<typeof passkeyWayinHeader>
+/** A wayin without its wrapped bankKey: a tagged union on `wayinkind`. */
 export type WayinHeader           = Z.infer<typeof wayinHeader>
+/** A passphrase wayin as its gate row stores it, under `main`. */
 export type PassphraseWayinRecord = Z.infer<typeof BX.passphraseWayin>
+/** A passkey wayin as its gate row stores it, under `passkey0`. */
 export type PasskeyWayinRecord    = Z.infer<typeof BX.passkeyWayin>
+/** A stored wayin: a tagged union on `wayinkind` of {@link PassphraseWayinRecord} and {@link PasskeyWayinRecord}. */
 export type WayinRecord           = Z.infer<typeof wayinRecord>
 // --
 
 // == [Cleartexts]: passphraseCleartext, PassphraseCleartext, PrfAnswerSize, passkeyAnswer, PasskeyAnswer, freshPasskeyAnswer
 
-/** The check for a passphrase's cleartext, the text the user typed: any string, blank included. Its `parse` quotes none of it.
- * What a blank one means is the gating's to say.
+/** The check of a passphrase's cleartext, the text the user typed: any string, blank included. No refusal quotes it.
+ * Whether a blank one will do is the gating's call.
  */
 export const passphraseCleartext = Checker(({ str }) => str.brand<'PassphraseCleartext'>(), 'bad_option')
 
 /** A passphrase's cleartext once {@link passphraseCleartext} has parsed it: the only text the key deriver is handed. */
 export type PassphraseCleartext = Z.infer<typeof passphraseCleartext>
 
-/** How many bytes a passkey's PRF answers with: always 32, by the WebAuthn PRF extension. */
+/** The length in bytes of a passkey's PRF answer: always 32, by the WebAuthn PRF extension. */
 export const PrfAnswerSize = 32
 
-/** What a passkey's answer must carry: its credential's id, the salt it answered for, and its PRF bytes, judged by their tag, so bytes from an iframe pass. Its `parse` quotes none of it, as its bytes are secret.
- * An answer already used, its bytes zeroed by the proving sealed of it, is refused too: sealed
- * again, it would make a key anyone could rebuild.
+/** The check of a passkey's answer: its credential's id, the salt it answered for, and its PRF bytes. No refusal quotes it, as its bytes are secret.
+ * An answer already used is refused, as the gating that spent it zeroed its bytes: sealed again, it
+ * would make a key anyone could rebuild.
  *
  * @example passkeyAnswer.parse(usedAnswer)  // throws: its bytes were zeroed at its first use
  */
@@ -72,7 +78,7 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
   /** Base64url, as `PublicKeyCredential.id` gives it. */
   credential_id,
   prf_salt_b64:  str.min(1),
-  /** 32 bytes, as good as the passphrase for this vault: hand them to the gating, then drop them. */
+  /** 32 bytes, as good as the passphrase for this bank: hand them to the gating, then drop them. */
   prfBytes:      bytes(PrfAnswerSize).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
 }), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
 
@@ -84,7 +90,7 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
  */
 export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
 
-/** A new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a passkey's answer, over a fresh salt of {@link PasskeySaltSize} bytes as base64url text. Its `parse` quotes none of it.
+/** The check of a new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a {@link passkeyAnswer} over a fresh salt of {@link PasskeySaltSize} bytes.
  * A passkey wayin sealed over another salt would read as damaged at every later unlock.
  *
  * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })  // throws
@@ -101,7 +107,7 @@ const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => 
   typeof candidate === 'function' && ['undefined', 'function'].includes(typeof (candidate as { load?: unknown }).load)
 )
 
-/** The checks of a `strengthChecker` and of the verdict it answers. */
+/** The checks of a `strengthChecker` and of the verdict it returns. */
 export const { strengthChecker, passphraseVerdict } = Checkers('bad_option', ({ custom, union, obj, lit, str }) => ({
   strengthChecker: custom<StrengthChecker>(isStrengthChecker, Phrases.StrengthCheckerShape),
   passphraseVerdict: union([
@@ -110,65 +116,80 @@ export const { strengthChecker, passphraseVerdict } = Checkers('bad_option', ({ 
   ]),
 }))
 
-/** What a strength checker finds of one passphrase: strong enough, or weak with a `reason` for the user.
- * The reason is calm, says what to do, and never quotes the passphrase. A field shows it, and the
- * vault's 'weak_passphrase' refusal carries it as its message.
+/** A strength checker's verdict on a passphrase: strong enough, or weak with a `reason` for the user.
+ * Make the reason calm, say what to do, and never quote the passphrase. A dialog shows it, and the
+ * `weak_passphrase` refusal carries it as its message.
  */
 export type PassphraseVerdict = Z.infer<typeof passphraseVerdict>
 // --
 
 // == [The stamps]: bankStamp, gateStamp, vaultStamp, citedGate, BankStamp, GateStamp, VaultStamp, CitedGate
 
-/** The fields of a bank fixed for its life, which every ctx under it binds: the scope, `bank_tok` and `registered_at`. Its `parse` accepts them from whatever carries them, a bank record included, and strips the rest. */
+/** The check of a bank's stamp: its scope, `bank_tok` and `registered_at`, fixed for its life and bound into every ctx under it.
+ * Anything carrying those fields passes, such as a bank record, and the rest is dropped.
+ */
 export const bankStamp = objCheck(({ bankScope, bank_tok, epochMillis }) => ({
   ...bankScope.unwrap().shape,
   bank_tok,
   registered_at: epochMillis,
 }), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
 
-/** The fields of a gate fixed for its life, which the ctx of each of its wayins binds: the scope, `gate_tok` and `registered_at`. Its `parse` accepts them from whatever carries them, a Gate or its record included, and strips the rest. */
+/** The check of a gate's stamp: its scope, `gate_tok` and `registered_at`, fixed for its life and bound into the ctx of each of its wayins.
+ * Anything carrying those fields passes, such as a Gate or its record, and the rest is dropped.
+ */
 export const gateStamp = objCheck(({ gateScope, gate_tok, epochMillis }) => ({
   ...gateScope.unwrap().shape,
   gate_tok,
   registered_at: epochMillis,
 }), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
 
-/** The fields of a vault fixed for its life, which every ctx under it binds: the scope, `vault_tok` and `registered_at`. Its `parse` accepts them from whatever carries them, a Vault included, and strips the rest. */
+/** The check of a vault's stamp: its scope, `vault_tok` and `registered_at`, fixed for its life and bound into every ctx under it.
+ * Anything carrying those fields passes, such as a Vault, and the rest is dropped.
+ */
 export const vaultStamp = objCheck(({ vaultScope, vault_tok, epochMillis }) => ({
   ...vaultScope.unwrap().shape,
   vault_tok,
   registered_at: epochMillis,
 }), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
 
-/** What a lease cites of the gate it was granted under: the gate's label, its `gate_tok`, and its row's `revision_tok`. A Gate or its record passes; a gate verb puts a new `revision_tok`, so a lease citing the old one is forgotten. */
+/** The check of what a lease cites of the gate it was granted under: its label, its `gate_tok`, and its row's `revision_tok`.
+ * A Gate or its record passes. Every gate verb puts a new `revision_tok`, so a lease citing the old one is forgotten.
+ */
 export const citedGate = objCheck(({ gateScope, gate_tok, revision_tok }) => ({
   gatelabel: gateScope.unwrap().shape.gatelabel,
   gate_tok,
   revision_tok,
 }), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
 
+/** A bank's stamp, as {@link bankStamp} checks it. */
 export type BankStamp = Z.infer<typeof bankStamp>
+/** A gate's stamp, as {@link gateStamp} checks it. */
 export type GateStamp = Z.infer<typeof gateStamp>
+/** A vault's stamp, as {@link vaultStamp} checks it. */
 export type VaultStamp = Z.infer<typeof vaultStamp>
+/** What a lease cites of its gate, as {@link citedGate} checks it. */
 export type CitedGate = Z.infer<typeof citedGate>
 // --
 
 // == [What a proving is handed]: provingWorld, stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate, Novel
 
-/** The check of what a proving hears of the bank, refusing 'bad_option'. */
+/** The check of what a proving is given of its bank. */
 export const provingWorld = objStrip(({ custom, device_tok }) => ({
-  /** The bank's key deriver, guarded: it turns a passphrase into key bytes. */
+  /** The key deriver, as the core wraps it: it turns a passphrase into key bytes. */
   keyDeriver:      custom<GuardedKeyDeriver>(isGuarded, Phrases.GuardedExpected),
-  /** The bank's strength checker, guarded: it judges a new passphrase. */
+  /** The strength checker, as the core wraps it: it judges a new passphrase. */
   strengthChecker: custom<GuardedStrengthChecker>(isGuarded, Phrases.GuardedExpected),
   /** This device's token, written into the wayin header a proving mints. */
   device_tok,
 }), 'bad_option', [CX])
 
-/** What a proving hears of the bank: its two guarded host functions and this device's id. */
+/** What a proving is given of its bank: two wrapped host functions and this device's token. */
 export type ProvingWorld = Z.infer<typeof provingWorld>
 
-/** The arguments of the provings' statics. A `bank` or a novel `gate` is whatever carries its stamp, stripped to one; a stored `gate` is whatever carries a {@link bankStamp} as `bankStamp`, a {@link gateStamp} as `stamp`, and the gate row's `wayins`, as a `Gate` does. */
+/** The checks of the arguments of the provings' static builders.
+ * A `bank`, or a new wayin's `gate`, is anything carrying its stamp. A stored wayin's `gate` is anything carrying a
+ * {@link bankStamp} as `bankStamp`, a {@link gateStamp} as `stamp`, and the gate row's `wayins`, as a `Gate` does.
+ */
 export const { stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs } = Checkers('bad_option', ({ obj }) => {
   const stampedGate = obj({ bankStamp, stamp: gateStamp, wayins: BX.wayins })
   return {
@@ -181,6 +202,7 @@ export const { stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseSto
   }
 })
 
+/** A gate as a stored wayin's proving takes it: its bank's stamp, its own stamp, and its wayins. */
 export type StampedGate = Z.infer<typeof stampedGate>
 
 /** What `Proving.buildWayin` is passed for a wayin over a bankKey made new: the type of `NOVEL`. */
@@ -192,9 +214,8 @@ export type Novel = typeof NOVEL
 /** The `fmt` a lease carries, as `Lease` checks it. */
 export const LeaseFormat = 7003
 
-/** True when `val` is a leaseKey as `makeLeaseKey` makes one: a non-extractable AES-GCM CryptoKey whose usages are within `wrapKey` and `unwrapKey`, among them `unwrapKey`.
- * A device database hands back what it kept by structured clone, so a key that is extractable, of
- * another algorithm, or for another use was not written by this package: its record reads as none.
+/** True when `val` is a leaseKey as `makeLeaseKey` makes one: a non-extractable AES-GCM CryptoKey for `unwrapKey`, and at most `wrapKey` besides.
+ * A cached lease whose key fails this was not written by this package, and is treated as damaged.
  *
  * @example isLeaseKey(await makeBankKey())  // false: extractable
  */
@@ -206,7 +227,10 @@ export const isLeaseKey = (val: unknown): val is CryptoKey => (
     && val.usages.every((usage) => usage === 'wrapKey' || usage === 'unwrapKey')
 )
 
-/** `leaseStamp` is what the wrap of a lease's bankKey is bound to, citing the gate it was granted under; `leaseRecord` adds its keys. */
+/** The checks of a lease's stamp and its record.
+ * The stamp cites the gate the lease was granted under, and is bound into the wrap of its bankKey.
+ * The record adds the leaseKey and the bankKey wrapped under it.
+ */
 export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, custom, epochMillis, gate_tok, revision_tok, bank_key_lease_wrapped }) => {
   const leaseStamp  = obj({
     fmt: lit(LeaseFormat), ...bankStamp.shape,
@@ -220,9 +244,11 @@ export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, c
   return { leaseStamp, leaseRecord }
 }, [CX])
 
+/** A lease's stamp, as {@link leaseStamp} checks it. */
 export type LeaseStamp  = Z.infer<typeof leaseStamp>
 /** The parts of a lease that are safe to show: its {@link LeaseStamp}. */
 export type LeaseSparse = LeaseStamp
+/** A lease's record, as a device caches it: its stamp, its leaseKey handle, and the bankKey wrapped under it. */
 export type LeaseRecord = Z.infer<typeof leaseRecord>
 // --
 
@@ -231,21 +257,24 @@ export type LeaseRecord = Z.infer<typeof leaseRecord>
 /** The check of a box's sealed parts: its wrapped boxKey and ciphered whisper. */
 export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) => ({ box_key_wrapped, whisper_ciphered }), { refusalkind: 'bad_record', extras: 'strip' }, [CX])
 
+/** A box's sealed parts: its wrapped boxKey and ciphered whisper. */
 export type SealedWhisper = Z.infer<typeof sealedWhisper>
 
-/** The autolock duration in milliseconds, at most {@link ForeverMillis}. */
+/** The check of the autolock duration in milliseconds, at most {@link ForeverMillis}. */
 export const leaseMillis = Checker(({ int }) => int.positive().max(ForeverMillis), 'bad_option')
 
-/** The check of a logger as the bank hands its models one: guarded by `parseLogger`. */
+/** The check of a logger wrapped by `parseLogger`. */
 export const guardedLogger = Checker(({ custom }) => custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected), 'bad_option')
 
-/** All a lease or a proving hears of a bank, as a plain object: its stamp, and the deviceDB's lease verbs bound to its scope and `bank_tok`. It has no key, and reaches neither the rows nor the boxes. */
+/** The check of all a lease or a proving is given of its bank: the bank's stamp, and the deviceDB's lease verbs bound to its scope and `bank_tok`.
+ * It holds no key, and reaches neither the bankDB nor the boxes.
+ */
 export const leaseFriend = objCheck(({ fn }) => ({
   ...bankStamp.shape,
   logger:          guardedLogger,
   /** The autolock duration: a cached row proved longer ago than this is due for locking. */
   leaseMillis,
-  /** Lock the bank: a lease that will not unwrap the bankKey calls it, as what the bank has is no use. */
+  /** Lock the bank, as a lease does when it will not unwrap the bankKey. */
   lock:            fn<() => unknown>(),
   /** The record this device has cached, or null for none. */
   peekLease:       fn<() => Promise<unknown>>(),
@@ -259,7 +288,7 @@ export const leaseFriend = objCheck(({ fn }) => ({
   tellBadNews:     fn<(badnews: readonly unknown[]) => unknown>(),
 }), { refusalkind: 'bad_option', extras: 'strip' })
 
-/** All a lease or a proving hears of its bank, once {@link leaseFriend} has checked it. */
+/** All a lease or a proving is given of its bank, as {@link leaseFriend} checks it. */
 export type LeaseFriend = Z.infer<typeof leaseFriend>
 
 /** The check of the gate a lease is granted under, as it cites it, and the kind of wayin proved. */
@@ -268,6 +297,7 @@ export const leaseGrantOpts = objCheck(() => ({
   wayinkind: wayinkind,
 }), 'bad_option')
 
+/** The gate a lease is granted under, as it cites it, and the kind of wayin proved. */
 export type LeaseGrantOpts = Z.infer<typeof leaseGrantOpts>
 
 /** True for a stamp a caller hands the lease as additional data: a flat object of strings and finite numbers, at least one. */
@@ -276,7 +306,9 @@ const isCtxStamp = (val: unknown): boolean => (
     && Object.values(val).every((field) => typeof field === 'string' || Number.isFinite(field))
 )
 
-/** The arguments of each lease verb, and the check of one stamp a caller hands a seal: each ctx under the lease binds the bank's stamp, then the caller's, in order. */
+/** The checks of each lease verb's arguments, and of one stamp a caller hands a seal.
+ * Each ctx under the lease binds the bank's stamp, then the caller's stamps, in order.
+ */
 export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, str }) => {
   const cryptoKey = custom<CryptoKey>((val) => val instanceof CryptoKey, 'Expected a CryptoKey')
   const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, Phrases.CtxStampExpected)
@@ -294,7 +326,8 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
 
 // == [The gating's forms]: gatingkind, bankBuildCleartexts, bankUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, bankDelCleartexts, gatingLaunchOnArgs, gatingLaunchBirthArgs, CleartextsForGatingkind
 
-/** What the user hands an attempt, by the kind of gating; a cleartext is only ever checked here, in the attempt's own call. */
+// A cleartext is only ever checked here, in the attempt's own call.
+/** The checks of what the user hands an attempt, by the kind of gating. */
 export const { gatingkind, bankBuildCleartexts, bankUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, bankDelCleartexts } = Checkers('bad_option', ({ oneof, obj }) => ({
   gatingkind:              oneof(EX.gatingkindVals),
   bankBuildCleartexts:         obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
@@ -327,6 +360,7 @@ export const gatingLaunchBirthArgs = objStrict(({ custom, fn }) => ({
   askUser:         custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
 
+/** What an attempt takes, by the kind of gating. */
 export type CleartextsForGatingkind = {
   build_bank:         Z.input<typeof bankBuildCleartexts>
   unlock_bank:        Z.input<typeof bankUnlockCleartexts>
@@ -339,10 +373,12 @@ export type CleartextsForGatingkind = {
 
 // == [Given to a gating]: RequestCleartext, AskUser, AnyGating, GatingSnapshot, BankForGatingkind, BankGatingkind, UnlockByProving
 
-/** The host's dialog: shown with this gating, resolving once it closes. It hands the user's cleartexts to `gating.attempt`, and its returning with no attempt under way dismisses. */
+/** The host's dialog for `gating`: show it, and resolve once it closes.
+ * It hands the user's cleartexts to `gating.attempt`. Resolving with no attempt under way dismisses the gating.
+ */
 export type RequestCleartext = (gating: AnyGating) => unknown
 
-/** The host's dialog as a bank keeps it, wrapped by `guardRequestCleartext`: true once the dialog closes, false if it threw. Never throws. */
+/** The host's dialog as the core keeps it, wrapped by `guardRequestCleartext`: true once it closes, false if it threw. It never throws. */
 export type AskUser = (gating: AnyGating) => Promise<boolean>
 
 /** A gating of any kind. */
@@ -362,6 +398,6 @@ export type BankForGatingkind = { build_bank: null, unlock_bank: Bank, replace_p
 /** A gating of a bank already built: every kind but `build_bank`. */
 export type BankGatingkind = Exclude<EX.Gatingkind, 'build_bank'>
 
-/** Unlock `bank` by what `proved` proved, leased citing `cited`, by default its main gate as it stands: the bank's private verb a gating calls. */
+/** Unlock `bank` by what `proved` proved, with a lease citing `cited`, by default its main gate as it stands. */
 export type UnlockByProving = (bank: Bank, proved: Proving, cited?: CitedGate) => Promise<Bank>
 // --

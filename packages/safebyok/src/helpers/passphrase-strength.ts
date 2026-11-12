@@ -9,27 +9,24 @@ import type { BankScope } from '../shapes/shapes-core'
 import * as GX from '../shapes/shapes-gateish'
 import type { PassphraseVerdict } from '../shapes/shapes-gateish'
 
-/** `Device.make`'s `strengthChecker`: a check that a new passphrase is strong enough, answering a {@link PassphraseVerdict} and never throwing.
- * It is handed the passphrase as typed, and the bank's scope: words a guesser who knows the user
- * tries first. The vault runs it on each new passphrase before any key derivation: the one an
- * `initialize_gate` gating creates a vault with, and each one a `change_passphrase` gating sets.
- * It never runs when a vault unlocks, and never hears a blank passphrase. One that throws, or
- * answers no verdict, refuses its call.
+/** `Device.make`'s `strengthChecker`: judges whether a new passphrase is strong enough, returning a {@link PassphraseVerdict}.
+ * It is given the passphrase as typed, and the bank's scope: words a guesser who knows the user tries first.
+ * It runs on each new passphrase before any key is derived: the one a `build_bank` gating builds the bank
+ * with, and each one a `replace_passphrase` gating sets. It never runs on an unlock, and never hears a blank
+ * passphrase, which is judged weak without it. It should not throw: one that throws, or returns no verdict,
+ * refuses its call.
  *
- * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never
- * quote it.
+ * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never quote
+ * it, not even in its `reason`, which becomes the refusal's message.
  *
- * A checker that needs something fetched or built first, such as a dictionary, carries it as
- * `load`, which each device's `ensureBank()` runs. Make the checker once, before any device, and hand the
- * same one to each; make `load` cost nothing once it has succeeded, and forget a failure. Call
- * `load` yourself only to warm up. A `load` that fails refuses the `ensureBank()`, a `VaultError` it throws as
- * it came and anything else with what it threw as the cause, so a vault that cannot check a new passphrase never opens.
+ * A checker that needs something fetched or built first, such as a dictionary, carries it as `load`.
+ * Make the checker once, before any device, and pass the same one to each. Make `load` cost nothing once
+ * it has succeeded, and forget a failure. A `load` that fails refuses the `ensureBank()` that ran it, so
+ * a device that cannot judge a new passphrase never opens a bank.
  *
- * `safebyok/browser` ships `zxcvbnStrengthChecker`, or pass your own (notes/configuration.md). To ask it as the user types, call
- * `gating.judgeStrength(typed)`, which answers its verdict.
- *
- * - A blank passphrase is sent back as a weak passphrase, unconditionally, without consulting the checker.
- * - The default strength checker refuses everything: see notes/configuration.md for why we do this, and instructions to supply one.
+ * `safebyok/browser` ships `zxcvbnStrengthChecker`, or pass your own (notes/configuration.md). To judge as
+ * the user types, call `gating.judgeStrength(typed)`. With no checker, every new passphrase is judged weak
+ * ({@link DefaultStrengthChecker}).
  *
  * @example
  *   const strengthChecker = (typed: string) => (typed.length < 20 ? { strong: false, reason: 'Twenty characters or more, please.' } : { strong: true })
@@ -38,26 +35,26 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  */
 export type StrengthChecker = {
   (passphrase: string, scope: BankScope): PassphraseVerdict | Promise<PassphraseVerdict>
-  /** Fetch or build what the checker needs before it can judge; each device's `ensureBank()` runs it. */
+  /** Fetch or build what the checker needs before it can judge. Each device's `ensureBank()` runs it. */
   load?: (() => void | Promise<void>) | undefined
 }
 
-/** A strength checker as a bank keeps it: the host's, made to honor its contract by {@link guardStrengthChecker}. */
+/** The host's strength checker as a device keeps it, wrapped by {@link guardStrengthChecker}. */
 export type GuardedStrengthChecker = {
   (passphrase: string, scope: BankScope): Promise<PassphraseVerdict>
   readonly load: () => Promise<void>
 }
 
-/** A verdict that admits, frozen so that a checker may share it. */
+/** The verdict that a passphrase is strong, frozen so that any checker may return it. */
 export const StrongVerdict: PassphraseVerdict = Object.freeze({ strong: true })
 
-/** The verdict {@link DefaultStrengthChecker} answers of every passphrase: a word to the user, and one to the app's makers. */
+/** The verdict {@link DefaultStrengthChecker} returns for every passphrase, with a word to the user and one to the app's makers. */
 const DefaultVerdict: PassphraseVerdict = Object.freeze({
   strong: false,
   reason: "This app can't accept a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Device.make needs a strengthChecker, such as zxcvbnStrengthChecker from safebyok/browser, as notes/configuration.md in safebyok's repository says under Pluggable Passphrase Strength Checker.",
 })
 
-/** The strength checker of a vault whose host chose none: every passphrase is too weak, so no vault can be made, nor a passphrase changed.
+/** The strength checker of a device given none: it judges every passphrase weak, so no bank can be built and no passphrase replaced.
  * Its reason tells the app's makers where to look. It logs nothing.
  */
 export const DefaultStrengthChecker: StrengthChecker = () => DefaultVerdict
@@ -67,7 +64,9 @@ const BlankVerdict: PassphraseVerdict = Object.freeze({ strong: false, reason: "
 
 // A blank passphrase is weak before the host's checker hears it. A throw is replaced, as the checker heard the passphrase;
 // a failed `load` keeps its throw as the cause, as it heard nothing; a VaultError it throws passes as it came.
-/** `hostChecker`, made to honor its contract: the one way a vault, or a dialog checking as the user types, asks it. */
+/** Wrap `hostChecker` so that it keeps its contract, whatever it does.
+ * Anything the checker throws is replaced by a refusal that keeps nothing of the throw.
+ */
 export function guardStrengthChecker(hostChecker: StrengthChecker): GuardedStrengthChecker {
   const host = GX.strengthChecker.parse(hostChecker, { where: 'strengthChecker' })
   const check = async (passphrase: string, scope: BankScope): Promise<PassphraseVerdict> => {

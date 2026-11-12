@@ -1,4 +1,6 @@
-/** The checks of a bankDB's answers as a client receives them from a wire, where an absent field arrives as null: each parses to the answer its verb returns. Imported as `WX`. */
+/** The checks of a bankDB's answers as a client receives them over a wire, each parsing to the answer its verb returns.
+ * A field left out arrives as null. Imported as `WX`.
+ */
 
 import type * as Z from 'zod'
 import { Checkers } from '../helpers/validator'
@@ -66,7 +68,7 @@ export type CrossedAsk = Z.output<typeof crossedAsk>
 
 // == [Answers]: ensureBankAnswer, buildBankAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delBankAnswer, getVaultAnswer, putVaultAnswer, delVaultAnswer, listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer, crossedNotice
 
-/** The answer a verb returns, made from the one that crossed: its ask as the core has it, and its refusal a VaultError again. */
+/** The answer a verb returns, made from the one that crossed the wire, with its refusal a VaultError again. */
 function answerOfCrossed<ValT, ActT extends string, ParentT>(crossed: Crossed<ValT, ActT, ParentT>): Answer<ValT, ActT, ParentT> {
   const ask = askOfCrossed(crossed.ask)
   if (crossed.ok) { return { ok: true, act: crossed.act, val: crossed.val, parent: crossed.parent, dbhas: crossed.dbhas, ask } }
@@ -80,7 +82,7 @@ type Crossed<ValT, ActT extends string, ParentT> = { ask: CrossedAsk, dbhas: unk
   | { ok: false, act: EX.BadAct, val: null, parent: unknown, err: CrossedErr }
 )
 
-/** `crossed` as the core has an answer's ask, each null field left out, in its rows too. */
+/** `crossed` as the core has an answer's ask, with every null field left out, in its rows too. */
 function askOfCrossed({ expected, record, gate, ...crossed }: CrossedAsk): LoggableAsk {
   return {
     ...withoutNulls(crossed),
@@ -93,7 +95,7 @@ function askOfCrossed({ expected, record, gate, ...crossed }: CrossedAsk): Logga
 /** The fields of `crossed` that are not null. */
 function withoutNulls(crossed: object): Record<string, unknown> { return Object.fromEntries(Object.entries(crossed).filter(([, field]) => field !== null)) }
 
-/** The VaultError `crossed` stands for, its meta with what crossed and what the answer has. */
+/** The VaultError `crossed` stands for, its meta what crossed with `answered` laid over it. */
 function vaultErrorOfCrossed({ refusalkind, message, meta }: CrossedErr, answered: RefusalMeta, rows: RefusalRows): VaultError {
   const crossedMeta = withoutNulls(meta ?? {}) as RefusalMeta
   return new VaultError(refusalkind, message, { meta: { ...crossedMeta, ...answered }, rows })
@@ -104,10 +106,11 @@ export const {
   ensureBankAnswer, buildBankAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delBankAnswer,
   getVaultAnswer, putVaultAnswer, delVaultAnswer, listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer, crossedNotice,
 } = Checkers('unexpected_error', ({ obj, arr, uint, lit, oneof, union, discrim }) => {
-  /** What makes the check of one verb's answer: its `val`, its acts, and its `parent` and `dbhas`, good or refused. */
+  /** The parts of one verb's answer check: its `val`, its acts, and its `parent` and `dbhas`, good or refused. */
   type AnswerParts<ValT extends Z.ZodType, ActsT extends readonly [string, ...string[]], ParentT extends Z.ZodType> = {
     val: ValT, acts: ActsT, parent: ParentT, badParent: Z.ZodType, dbhas: Z.ZodType,
   }
+  /** The check of one verb's answer as it crosses the wire. */
   function answerCheck<ValT extends Z.ZodType, const ActsT extends readonly [string, ...string[]], ParentT extends Z.ZodType>(
     { val, acts, parent, badParent, dbhas }: AnswerParts<ValT, ActsT, ParentT>,
   ) {

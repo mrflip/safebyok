@@ -1,6 +1,8 @@
-/** What the checks say when input fails them, every such sentence in one place, and the sentences of device.ts's, bank.ts's and vault.ts's own refusals and a vault's bad news (a refusal they pass on from another module, refusals/throwers.ts or gating.ts, keeps its words there): so wording and tone are reviewed together, and so is the rule that none quotes the input.
+/** Every sentence safebyok says to a host or a user: the messages of its refusals, checks, notices and bad news.
  * The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts.
  */
+
+// In one file so that wording and tone are reviewed together, and so is the rule that no phrase quotes the input.
 
 import { PassphraseSaltSize } from './consts'
 
@@ -39,10 +41,10 @@ export const DatabaseInVaultScope = "A bankDB and a deviceDB go to Device.make, 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
 
-/** A host's bare function, or anything else, where a bank's world has that function as the bank wraps it. */
+/** A host's bare function, or anything else, where the core expects one `Device.make` has wrapped. */
 export const GuardedExpected = "Expected a host's function as Device.make wraps it"
 
-/** A host's bare logger, or anything else, where a bank's world has its logger as the bank guards it. */
+/** A host's bare logger, or anything else, where the core expects one `Device.make` has wrapped. */
 export const GuardedLoggerExpected = "Expected a logger as Device.make guards it"
 
 /** Anything but a bankDB branded by safebyok and answering each of its verbs, where a bankDB is asked. */
@@ -51,7 +53,7 @@ export const BankDBExpected = "Expected a BankDB: an adapter or client branded b
 /** Anything but an instance of a class extending safebyok's DeviceDB, where a deviceDB is asked. */
 export const DeviceDBExpected = "Expected a DeviceDB: an instance of a class extending safebyok's DeviceDB"
 
-/** Anything but bytes, a Uint8Array, `count` of them when that many are asked. */
+/** Anything but a Uint8Array, or one not `count` bytes long when a count is given. */
 export function bytesExpected(count?: number): string { return (count === undefined ? "Expected bytes, a Uint8Array" : `Expected ${String(count)} bytes, a Uint8Array`) }
 
 /** Anything but a leaseKey as `makeLeaseKey` makes one, where a lease record keeps its key. */
@@ -60,12 +62,14 @@ export const LeaseKeyExpected = "Expected a non-extractable AES-GCM CryptoKey fo
 /** Anything but a stamp a lease binds a seal to. */
 export const CtxStampExpected = "Expected a flat object of strings and numbers, with at least one field"
 
-/** The listing a storable is made in. */
+/** Anything but a listing, where a storable or a gating is given its listing. */
 export const ListingExpected = "Expected a Listing"
 
 /** Anything but a Device, where one is named. */
 export const DeviceExpected = "Expected a Device"
+/** Anything but a Bank, where one is named. */
 export const BankExpected = "Expected a Bank"
+/** Anything but a Vault, where one is named. */
 export const VaultExpected = "Expected a Vault"
 
 /** Anything but a VaultError, where bad news is told. */
@@ -89,7 +93,7 @@ export const PassphraseUnjudged = "This passphrase can't be checked just now: th
 
 // == [Passkeys]: PasskeyAnswerUsed, prfSaltShape
 
-/** A passkey's answer whose PRF bytes are zeroed: the vault zeroes an answer once it has used it. */
+/** A passkey's answer whose PRF bytes are all zero, as a gating leaves an answer it has used. */
 export const PasskeyAnswerUsed = "This passkey's answer was used already, and its bytes zeroed: ask the passkey again, as safebyok-react's askPasskey does, and hand in its fresh answer"
 
 /** A passkey's salt that is not `count` bytes of base64url text. */
@@ -98,7 +102,7 @@ export function prfSaltShape(count: number): string { return `A passkey's salt i
 
 // == [Options]: MinutesShape, KeyDeriverShape, LoggerShape, KeyDeriverSpecShape, memoryPerLane, StrengthCheckerShape
 
-/** A `staleMinutes` or `renewMinutes` that is no number of minutes. */
+/** A `vaultRefreshMinutes` or `boxRefreshMinutes` that is no number of minutes. */
 export const MinutesShape = "Expected a number of minutes, zero or more, fractions too (0.5 is thirty seconds), or Infinity"
 
 /** A `keyDeriver` left out, or no object. */
@@ -119,7 +123,9 @@ export const StrengthCheckerShape = "Expected a function from the passphrase, an
 
 // == [Refusals]: unknownFields, moreFailures, WhisperShape, fieldsDisagree, BagNotObject, WhisperBagShape
 
-/** An object with `count` fields it does not accept, never named, as a name may be the caller's data, and the `fieldnames` it accepts. */
+/** An object with `count` fields it does not accept, and the `fieldnames` it does.
+ * The refused fields are not named, as a name may be the caller's data.
+ */
 export function unknownFields(count: number, fieldnames: readonly string[]): string {
   const refused = count === 1 ? 'There is a field it does not accept (its name is not repeated)' : `There are ${String(count)} fields it does not accept (their names are not repeated)`
   const accepted = fieldnames.length === 0 ? 'it accepts no fields' : `it accepts only ${fieldnames.join(', ')}`
@@ -143,7 +149,7 @@ export const WhisperBagShape = "An object in a whisper or a sidecar is a plain o
 
 // == [Bank and vault]: otherScope
 
-/** Why a scope naming another user_id or banklabel than the bank's refuses, `fieldnames` the ones that differ, never their values. */
+/** Why a scope naming another user_id or banklabel than the bank's is refused. It names the `fieldnames` that differ, never their values. */
 export const otherScope = (fieldnames: readonly string[]): string => `This names another ${fieldnames.join(' and ')} than the bank's, which serves one app and one signed-in user. Use the bank of the app and user it belongs to.`
 // --
 
@@ -156,7 +162,7 @@ export const BankLocked = "The bank is locked, so nothing was read or written: u
 
 // == [Vault: boxes]: RecordForNewBox
 
-/** Why a put told to only create refuses a whole record: what it would put is recycled. */
+/** Why a create refuses a whole record, whose ciphertext it would otherwise reuse. */
 export const RecordForNewBox = "A create operation found a record already present."
 // --
 
@@ -174,7 +180,7 @@ export const PatchNamesNeitherHalf = "This update names neither a whisper nor a 
 /** Why an update of a box whose patch names another's scope writes nothing. */
 export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was written: update the one it names, which listing.at(scope) answers.`
 
-/** Why a bag marked `Whispered`, which a box answers for a whisper it will not show, is refused where a whisper is wanted. */
+/** Why the stand-in a box returns for a whisper it will not show is refused where a whisper is wanted. */
 export const WhisperedIsNoWhisper = "That is what a box shows for a whisper it will not show, as it is encrypted, locked or veiled. It is not a whisper: expose and unlock one first, or call box.putExposed()."
 
 /** Why a call that works on the exposed whisper is refused on a box with none. */
@@ -192,7 +198,7 @@ export const NoFieldsBound = "This box has no field bound, so there is nothing t
 /** Why a record stored under the revision_seq in hand, but another revision_tok, is not adopted. */
 export const OneRevisionTwoToks = "Storage and this device disagree about a record's history (the expected revision sequence matched, but its confirming token did not). Report this as a bug."
 
-/** Why a record stored deleted, at a revision the instance has alive, or the other way round, is not adopted. */
+/** Why a record stored deleted at a revision this device has live, or the other way round, is not adopted. */
 export const OneRevisionTwoFates = "Storage and this device disagree about a record's history (one records a deleted record, the other a live one). Report this as a bug."
 
 /** Why a record stored under the revision in hand, but of another life of the thing, is not adopted. */
@@ -201,10 +207,10 @@ export const OneRevisionTwoLives = "Storage and this device disagree about a rec
 /** Why a record delivered under one scope that names another is not adopted. */
 export const RecordOfOtherScope = "Storage delivered a misnamed record. This should not happen: report this as a bug."
 
-/** Why a good answer whose record differs from what was sent in scope, life or revision is not adopted. */
-/** Storage answered that nothing is stored where this device holds a live record. */
+/** Why storage's answer that nothing is stored is not adopted where this device has a live record. */
 export const NothingStoredWhereLive = "Storage answered that nothing is stored where this device has a live record. This should not happen: report this as a bug."
 
+/** Why a good answer whose record differs from what was sent in scope, life or revision is not adopted. */
 export const AnswerNotAsSent = "Storage answered with a record other than the one it was asked about. This should not happen: report this as a bug."
 
 // --
@@ -229,13 +235,13 @@ export const OtherPasskey = "That passkey is not this vault's: it may have been 
 /** Why a passkey's answer over another PRF salt than the vault's passkey wayin keeps is refused. */
 export const OtherPrfSalt = "The passkey answered for a different salt than this vault keeps for it: ask it again with the prf_salt_b64 the vault's passkey wayin names."
 
-/** Why a passphrase wayin made under another key deriver than the world's is not tried. */
+/** Why a passphrase wayin made under another key deriver than the device's is not tried. */
 export const UnknownKeyDeriver = "This vault was made with a key deriver this package does not carry: update safebyok, or open the vault where it was made."
 
 /** Why what a keyDeriver hands back is refused when it is not `count` fresh key bytes. */
 export function notKeyBytes(count: number): string { return `The keyDeriver handed back something other than ${String(count)} fresh key bytes.` }
 
-/** Why a proving asked for the bankKey before it has a wayin refuses: a bug. */
+/** Why a proving asked for the bankKey before it has a wayin refuses, a bug in the caller. */
 export const WayinNotMadeYet = "A proving was asked for the bankKey before it made or opened a wayin: a bug in the caller."
 
 /** Why a proving that has a wayin already makes no other. */
@@ -256,7 +262,7 @@ export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key.
 
 // == [Models: leases, vaults and boxes]: DamagedLease, UndecipheredWhisper, UndecodedWhisper, LeaseNotInForce, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, VaultDeleted
 
-/** Why a lease on this device is no use: whether found so in the cache, or in force and failing to open. */
+/** Why this device's lease is not used, whether it was found damaged in the cache or failed to open while in force. */
 export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
 
 /** Why a whisper that will not open under the vault's key is refused. */
@@ -265,7 +271,7 @@ export const UndecipheredWhisper = "That whisper would not open under this vault
 /** Why a whisper that opened but is no whisper this package knows is refused. */
 export const UndecodedWhisper = "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or seal a whisper over it."
 
-/** Why a lease dropped opens nothing. */
+/** Why a lease no longer in force opens nothing. */
 export const LeaseNotInForce = "This lease is out of force, as the bank locked or the lease would not open, so nothing was read or written: unlock the bank again."
 
 /** Why an instance whose bank or vault ended, or whose row was found damaged, answers nothing. */
@@ -274,12 +280,13 @@ export const LetGoInstance = "This object was let go: its bank or its vault ende
 /** Why a vault absent from storage is refused, by its vaultlabel. */
 export function vaultAbsent(vaultlabel: string): string { return `No vault is stored under the label ${vaultlabel}.` }
 
+/** Why a box absent from storage is refused, by its boxlabel. */
 export function boxAbsent(boxlabel: string): string { return `No box is stored under the label ${boxlabel}.` }
 
 /** Why a put that must find a box refuses where none is listed, with nothing fetched. */
 export function boxNotListed(boxlabel: string): string { return `No box is listed under the label ${boxlabel}, though one may be stored: call vault.beginWatch() to list what is stored.` }
 
-
+/** Why a call on a vault that was deleted is refused. */
 export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."
 // --
 
@@ -288,47 +295,61 @@ export const VaultDeleted = "This vault was deleted. Ask the bank for the vault 
 /** Why a passkey is not added to a gate that has one. */
 export const PasskeyAlreadyAdded = "This vault has a passkey already, and may have only one, so nothing was asked or changed: revoke it first (bank.maingate.revokePasskeyPrompt), then add the new one."
 
-/** Why a stale Vault's delete does not reach the vault made since at its scope. */
+/** Why a delete naming another life or revision than the one in hand deletes nothing. */
 export const DelOfOtherRevision = "This thing is not at the life or revision the delete names, so nothing was deleted. Read it again and ask again."
 
+/** Why a vault's delete deletes nothing where the vault listed is of another life. */
 export const DelOfOtherLife = "The vault listed under this name is under another vault_tok than this Vault, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 
 // == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDismissed, AlreadyAsking, AttemptInFlight, GateMadeElsewhere, GatingConcluded, RequestCleartextThrew, CleartextsThrew, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, TestDeriverNotice
 
+/** Why a device is not made on a page that is not a secure context. */
 export const InsecureContext = "This page is not a secure context -- it was served over plain http -- so the browser withholds the cryptography the vault needs: serve the app over https (http://localhost counts as secure, for development)."
 
+/** An `autolockMinutes` that is not a number of minutes above zero. */
 export const PositiveMinutesShape = "Expected a number of minutes above zero, fractions too (0.5 is thirty seconds), or Infinity for never"
 
+/** Why a gating dismissed before an attempt succeeded refuses its waiters. */
 export const GatingDismissed = "The prompt was dismissed before an attempt succeeded, so nothing was unlocked or changed: ask again when the user wants the vault."
 
+/** Why a prompt is not opened while another is open on the bank. */
 export const AlreadyAsking = "A prompt is already open on this bank, so this one was not shown: the host owns the one dialog, and disables what opens it meanwhile."
 
-
+/** Why an attempt is not tried while another runs on the same prompt. */
 export const AttemptInFlight = "An attempt is already under way on this prompt, so this one was not tried: disable the submit button until it answers."
 
+/** Why a bank's first passphrase is not set where another device built the bank first. */
 export const GateMadeElsewhere = "This vault's passphrase was just set on another device, so the one you entered was not set here, and nothing was changed. Enter the passphrase chosen there to unlock it."
 
+/** Why an attempt on a prompt that has ended does nothing. */
 export const GatingConcluded = "This prompt has ended -- it was answered, dismissed, or refused for good -- so this attempt did nothing: ask again if the user still wants the vault."
 
+/** Why a `requestCleartext` throw is replaced: the prompt hears the passphrase. */
 export const RequestCleartextThrew = "The requestCleartext handed to Device.make threw rather than showing the prompt and resolving once it closed. What it threw is left out, as the prompt hears the passphrase."
 
+/** Why an attempt is not tried when reading what it was handed throws. */
 export const CleartextsThrew = "Reading what was handed to this attempt threw, so nothing was tried. What it threw is left out, as it may quote the passphrase: hand attempt a plain object."
 
-
+/** Why a `strengthChecker` throw is replaced: it heard the passphrase. */
 export const StrengthCheckerThrew = "The strengthChecker handed to Device.make threw, or answered a verdict that throws when read. What it threw is left out, as it heard the passphrase: have it catch its own failures."
 
+/** Why a passphrase replaced by itself changes nothing. */
 export const SamePassphrase = "The new passphrase is the one the vault has already, so nothing was changed: choose another."
 
+/** A key deriver's label beginning `prefix`, which is reserved for the specs safebyok supplies. */
 export function reservedDeriverLabel(prefix: string): string { return `Labels beginning ${prefix} are reserved for the specs safebyok supplies, present and future: choose a label of your own, naming your app, say.` }
 
+/** A key deriver under a supplied spec's `label` whose parameters differ from that spec's. */
 export function suppliedSpecChanged(label: string): string { return `A key deriver labelled ${label} must carry that spec's parameters exactly, or vaults made under it will not open elsewhere: spread the exported spec into yours, or choose a label of your own.` }
 
+/** The warning logged when a device is made with a test deriver, whose label begins `test_`. */
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault has real secrets, open it with argon2idWebV1Deriver (from safebyok/browser), or another vetted Argon2id deriver."
 // --
 
 // == [The models' device and bank]: DeviceLetGo, GatesShape, vaultStoredDamaged, boxStoredDamaged
 
+/** Why a device let go by a sweep or a vacate, and its bank, answer nothing. */
 export const DeviceLetGo = "This device was let go, by a sweep or a vacate, so it and its bank answer nothing more: make another with Device.make."
 
 /** A `gates` option other than `['main']`. */
@@ -349,19 +370,19 @@ export const NoErrorGiven = "What failed threw nothing: null or undefined, not a
 /** The cause's message where what failed threw a value that is neither an Error nor a string, `typeName` its typeof. */
 export function nonErrorThrown(typeName: string): string { return `What failed threw a value of type ${typeName}, not an Error; that value is this error's cause.` }
 
-/** The message of `storage_unavailable` where an adapter says no more exactly what failed. */
+/** The message of `storage_unavailable` where an adapter says no more of what failed. */
 export const StorageUnavailable = "The vault's storage could not be reached, or failed partway: try again shortly. The storage adapter's own error is this error's cause."
 
 /** A bug, in safebyok or in a function the app handed it. */
 export const UnexpectedError = "Something went wrong that safebyok did not expect: a bug, in safebyok or in a function the app handed it (a storage adapter, say). Nothing was retried, and a retry is unlikely to help; what was thrown is this error's cause."
 
-/** A cipher ctx handed no stamp, or a part or field that is undefined or null. */
+/** A cipher ctx given no stamp, or a part or field that is undefined or null. */
 export const UnboundCipherCtx = "A cipher ctx was handed no stamp, or a part or a field of one that is undefined or null, which would bind as if it were something else, so nothing was encrypted or opened. This is a bug in the code calling it."
 
-/** A value with no JSON text handed to be serialized. */
+/** A value with no JSON text given to be serialized. */
 export const NoJsonText = "A value with no JSON text (undefined, a function or a symbol) was handed to be serialized, so nothing was sealed or bound. This is a bug in the code calling it."
 
-/** The host's strengthChecker answering no verdict. */
+/** The host's strengthChecker returning no verdict. */
 export const StrengthCheckerMisanswered = "The strengthChecker handed to Device.make answered something other than a verdict: have it answer { strong: true }, or { strong: false, reason } with the reason as non-empty text."
 
 /** The strengthChecker's load() failing at device.ensureBank(). */
@@ -373,13 +394,13 @@ export const KeyDeriverLoadFailed = "The keyDeriver's load() failed: check your 
 
 // == [Refusals: bankDB and deviceDB]: rowOfOtherAddress, gateIssue, RegisteredAtNotStored, OtherWayinMoved, boxTooLarge, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVaultLife, GateVerbRecordMismatch, RecordOfOtherAddress, BankTokNotNew, GateOfOtherBank, GateNotBorn, MainGateMissing, deviceDBFailed, thrownNamed
 
-/** A well-formed row out of storage, whose own `fieldnames` are not the address it was asked for at. */
+/** A well-formed row from storage whose `fieldnames` name another address than the one asked for. */
 export const rowOfOtherAddress = (fieldnames: readonly string[]): string => `The vault's storage answered with a row naming another ${fieldnames.join(' and ')} than the one asked for: the database or its storage adapter has filed it under the wrong address.`
 
 /** A change of the gate refused, `why` saying which check it failed. */
 export function gateIssue(why: string): string { return `This change of the gate was refused: ${why}` }
 
-/** Why a gate verb naming a registered_at the stored vault does not have is refused, as {@link gateIssue}'s `why`. */
+/** Why a gate verb naming a registered_at the stored gate does not have is refused, as {@link gateIssue}'s `why`. */
 export const RegisteredAtNotStored = "its registered_at is not the stored one."
 
 /** Why a gate verb whose record moves a wayin the verb leaves alone is refused, as {@link gateIssue}'s `why`. */
@@ -424,7 +445,7 @@ export const GateNotBorn = "buildBank's gate record is a first revision: revisio
 /** A live bank row stored without its `main` gate row. */
 export const MainGateMissing = "This bank is stored without its main gate: the database or its storage adapter has lost a row."
 
-/** A device database's failure in `oplabel`, `named` the sentence naming what it threw, or blank. */
+/** A device database's failure in `oplabel`. `named` is the sentence naming what it threw, or blank. */
 export function deviceDBFailed(oplabel: string, named: string): string { return `This device's own storage failed in ${oplabel}: try again.${named}` }
 
 /** The sentence naming what a datastore threw, by its `name` alone. */
@@ -433,7 +454,7 @@ export function thrownNamed(thrownName: string): string { return ` It threw ${th
 
 // == [Refusals: storage backends]: storageFailed, StorageIssue, IdentityRevoked, NoBrowserDatastore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserDatadeviceDBFailed, SchemaNotServed, fetchFailed, WatchEnded
 
-/** A vault's storage backend failing in `oplabel`, `named` the sentence naming what it threw, or blank. */
+/** A bankDB's backend failing in `oplabel`. `named` is the sentence naming what it threw, or blank. */
 export function storageFailed(oplabel: string, named: string): string { return `The vault's storage could not be reached, or failed, in ${oplabel}: try again shortly.${named}` }
 
 /** A row out of storage that is not an object at all. */
@@ -448,7 +469,7 @@ export const NoBrowserDatastore = "This context has no IndexedDB, so the vault h
 /** A browser datastore's transaction aborted before it committed. */
 export const TransactionAborted = "An IndexedDB transaction was aborted before it committed, and wrote nothing: try again."
 
-/** A browser datastore closed under the vault. */
+/** A browser datastore closed while in use. */
 export const DatabaseClosed = "The vault's IndexedDB database was closed under it, by the browser or another tab upgrading it: reload the page."
 
 /** A browser datastore the page is not allowed to use. */
