@@ -209,9 +209,9 @@ describe("the device's sweep and vacate, as its bank, vault and boxes meet them"
   it("a listener's throw goes to reportError, and the device's sweep still goes through", async () => {
     const reported = stubReportError()
     const { bank, vault } = await makeBornVault()
-    vault.becomeNotifiable()
+    bank.becomeNotifiable()
     const thrown = new Error('the listener threw')
-    vault.subscribe(() => { throw thrown })
+    bank.subscribe(() => { throw thrown })
     bank.lock()
     expect(reported).toHaveBeenCalledWith(thrown)
     bank.device.sweep()

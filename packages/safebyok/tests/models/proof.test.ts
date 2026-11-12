@@ -59,6 +59,7 @@ const deviceStatus = ({ stage, openGating, bank }: DeviceSnapshot): string => {
   return `${stage}: ${rows.join(', ') || 'no vaults'}${asking}`
 }
 
+// A vault has no lock of its own: its component shows whether it stands, and the device's shows the bank's lock.
 const vaultStatus = ({ vaultlabel, isPresent }: VaultSnapshot): string => `${vaultlabel} ${isPresent ? 'present' : 'deleted'}`
 
 const boxList = (boxes: readonly BoxSnapshot[]): string => boxes.map(({ boxlabel }) => boxlabel).join(', ') || 'no boxes'
@@ -137,7 +138,7 @@ describe("the proof", () => {
     boxesUi.expectRenders(['anthropic_api_key'])
     const boxUi = mountComponent(box, boxRow)
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
-    // The whisper's component watches the box alone, whose snapshot shows its vault's lock.
+    // The whisper's component watches the box alone, whose snapshot shows its bank's lock.
     const revealUi = mountComponent(whisperStoreOf(box), whisperRevealOf(box))
     revealUi.expectRenders(['unexposed'])
     const boxRows = [...world.bankDB._cheat_boxRowsOf(vault.scope, vault.bank_tok, vault.vault_tok).values()]
@@ -154,11 +155,11 @@ describe("the proof", () => {
     const snapshots = [device.getSnapshot(), vault.getSnapshot(), vault.boxListing.getSnapshot(), box.getSnapshot()]
     expect(JSON.stringify(snapshots)).not.to.include(ApiKey.whisper.apiKey)
 
-    // Lock: every component watching the vault or its boxes is told before lock() returns, the whisper leaves the screen, and the box refuses.
-    // The device's is told once, the bank's lock and its vaults' together.
+    // Lock: every component watching the device or the boxes is told before lock() returns, the whisper leaves the screen, and the box refuses.
+    // The device's is told once, the bank's lock and its vaults' together; the vault's, which has no lock of its own, not at all.
     bank.lock()
     deviceUi.expectRenders(['ready: main locked'])
-    vaultUi.expectRenders(['main present'])
+    vaultUi.expectRenders([])
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     boxesUi.expectRenders(['anthropic_api_key'])
     revealUi.expectRenders(['locked'])
@@ -177,7 +178,7 @@ describe("the proof", () => {
     expect(dialog.refusals.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal(['wrong_passphrase'])
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_bank'])
     deviceUi.expectRenders(['ready: main locked (asking unlock_bank)', 'ready: main unlocked (asking unlock_bank)', 'ready: main unlocked'])
-    vaultUi.expectRenders(['main present'])
+    vaultUi.expectRenders([])
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     boxesUi.expectRenders(['anthropic_api_key'])
     revealUi.expectRenders([JSON.stringify(ApiKey.whisper)])
