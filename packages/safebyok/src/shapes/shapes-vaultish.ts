@@ -169,8 +169,8 @@ export interface BankFriend {
   readonly panic:       BankPanic
   /** Tell the host's `onLifecycle` what happened, through the bank, which names itself. Never throws. */
   readonly announce:    BankAnnounce
-  /** Tell the host's `onBadNews` each news no caller waits on. Never throws. */
-  readonly tellBadNews: (badnews: readonly VaultError[]) => void
+  /** Tell the host's `onBadNews` each news no caller waits on: a refusal as it is, anything else thrown as `unexpected_error`, a `disabled` refusal not at all. Never throws. */
+  readonly tellBadNews: (badnews: readonly unknown[]) => void
   /** Show the host's dialog, wrapped by `guardRequestCleartext`; null with none. */
   readonly askUser:     AskUser | null
 }

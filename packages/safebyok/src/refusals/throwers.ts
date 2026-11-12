@@ -15,8 +15,9 @@
  * depth two only; no arrays, which are kept as their JSON text; an object past depth two replaced by the string '{...}'.
  */
 
+import { disagreeingFieldnames } from '../helpers/validator'
 import { PassphraseKeySize } from '../helpers/consts'
-import { VaultError, thrownNameOf } from './errors'
+import { VaultError, isVaultError, thrownNameOf } from './errors'
 import type { Refusalkind, RefusalMeta, Thrown } from './errors'
 import type * as EX from '../shapes/shapes-enums'
 import * as Phrases   from '../helpers/phrases'
@@ -99,10 +100,10 @@ export function vaultStoredDamaged({ vaultlabel }: SX.DamagedVault): VaultError 
 // == [Listing Throwers]: rowOfOtherVaultTok
 
 /** A `storage_issue` refusal: storage answered a row under another vault_tok than this listing's vault. */
-export function rowOfOtherVaultTok(): VaultError { return new VaultError('storage_issue', Phrases.rowOfOtherAddress(['vault_tok'])) }
+export function rowOfOtherVaultTok(received: unknown): VaultError { return new VaultError('storage_issue', Phrases.rowOfOtherAddress(['vault_tok']), { rows: { dbhas: received } }) }
 // --
 
-// == [Storable Throwers]: partialLoad, alreadyListed, instanceDisabled, boxAbsent, boxNotListed, vaultAbsent, deletedVault, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, otherVaultTok
+// == [Storable Throwers]: partialLoad, alreadyListed, instanceDisabled, boxAbsent, boxNotListed, vaultAbsent, deletedVault, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, nothingStoredWhereLive, deliveredNotAsSent, otherVaultTok
 
 /** A `bad_option` refusal: the record in hand is not full, and needs hydrating first. */
 export function partialLoad(): VaultError { return new VaultError('bad_option', Phrases.PartialLoad) }
@@ -126,16 +127,31 @@ export function vaultAbsent({ vaultlabel }: { vaultlabel: string }): VaultError 
 export function deletedVault(): VaultError { return new VaultError('vault_gone', Phrases.VaultDeleted) }
 
 /** A `record_conflict` refusal: this revision_seq is stored under another revision_tok. */
-export function oneRevisionTwoToks(): VaultError { return new VaultError('record_conflict', Phrases.OneRevisionTwoToks) }
+export function oneRevisionTwoToks(received: unknown): VaultError { return new VaultError('record_conflict', Phrases.OneRevisionTwoToks, { rows: { dbhas: received } }) }
 
 /** A `record_conflict` refusal: this revision is stored as another life of the thing. */
-export function oneRevisionTwoLives(): VaultError { return new VaultError('record_conflict', Phrases.OneRevisionTwoLives) }
+export function oneRevisionTwoLives(received: unknown): VaultError { return new VaultError('record_conflict', Phrases.OneRevisionTwoLives, { rows: { dbhas: received } }) }
 
 /** A `record_conflict` refusal: storage and this device disagree on whether this revision is alive or deleted. */
-export function oneRevisionTwoFates(): VaultError { return new VaultError('record_conflict', Phrases.OneRevisionTwoFates) }
+export function oneRevisionTwoFates(received: unknown): VaultError { return new VaultError('record_conflict', Phrases.OneRevisionTwoFates, { rows: { dbhas: received } }) }
+
+/** A `record_conflict` refusal: storage answered that nothing is stored where this device has a live record. */
+export function nothingStoredWhereLive(): VaultError { return new VaultError('record_conflict', Phrases.NothingStoredWhereLive, { rows: { dbhas: null } }) }
+
+/** A `storage_issue` refusal: an answer delivered `received`, which disagrees with `pins`, what was sent: the record itself for a record stored (`as_sent`), else its scope. */
+export function deliveredNotAsSent(fielding: 'as_sent' | 'as_got' | 'as_db', received: object, pins: object): VaultError {
+  const message = (fielding === 'as_db') ? Phrases.RecordOfOtherScope : Phrases.AnswerNotAsSent
+  return new VaultError('storage_issue', message, { meta: { fieldnames: disagreeingFieldnames(received, pins) }, rows: { dbhas: received } })
+}
+
+/** The refusal met deciding how to deliver `answer`: a refusal as it came, anything else `unexpected_error`; its meta names the delivery and the answer's ask. */
+export function refusalOfDelivering(thrown: unknown, answer: { ask: SX.LoggableAsk }): VaultError {
+  const refusal = isVaultError(thrown) ? thrown : unexpectedError(thrown)
+  return Object.assign(refusal, { meta: { ...refusal.meta, oplabel: 'deliver', ask: answer.ask } })
+}
 
 /** A `record_conflict` refusal: this record is stored under another vault_tok than this device does. */
-export function otherVaultTok(): VaultError { return new VaultError('record_conflict', Phrases.OtherVaultTok) }
+export function otherVaultTok(received: unknown): VaultError { return new VaultError('record_conflict', Phrases.OtherVaultTok, { rows: { dbhas: received } }) }
 
 // --
 

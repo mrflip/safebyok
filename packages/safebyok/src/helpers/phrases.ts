@@ -204,6 +204,9 @@ export const OtherVaultTok = "Storage delivered a record from a deleted vault. T
 export const RecordOfOtherScope = "Storage delivered a misnamed record. This should not happen: report this as a bug."
 
 /** Why a good answer whose record differs from what was sent in scope, life or revision is not adopted. */
+/** Storage answered that nothing is stored where this device holds a live record. */
+export const NothingStoredWhereLive = "Storage answered that nothing is stored where this device has a live record. This should not happen: report this as a bug."
+
 export const AnswerNotAsSent = "Storage answered with a record other than the one it was asked about. This should not happen: report this as a bug."
 
 // --
