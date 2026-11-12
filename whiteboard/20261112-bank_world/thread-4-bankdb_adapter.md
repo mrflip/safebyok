@@ -1,6 +1,6 @@
 # Thread 4: bankdb_adapter (2026-11-12)
 
-Branch `20261112-bankdb_adapter`, PR #TBD, stacked on #660. Justify: green, all packages (safebyok 3189, convex 318, postgres 237, graphql 376, react 259, indexeddb 180, fastkey 43, root scripts 278, demo 97, e2e 504).
+Branch `20261112-bankdb_adapter`, PR #663, on main: cut from thread 3 (#660), rebased onto main once #660 merged (one conflict, the row-formats table, resolved by keeping both rows). Justify: green, all packages (safebyok 3189, convex 318, postgres 237, graphql 376, react 259, indexeddb 180, fastkey 43, root scripts 278, demo 97, e2e 504).
 
 * **Built**: the bankDB's interface, adapter base, memory adapter, wire checks and exports. Nothing calls them yet; the vaultDB family stays exported (rule 11).
   * `src/storage/bank-db.ts`: the `BankDB` interface, each verb with its `try*` form; `BankDBVerbnames` (29 names); `GateAnswer`, `DelBankAnswer`, `BoxesListed`, `Notice`; re-exports `Tidied`. Brands `IsBankDB`, `IsAdapterBankDB` with `isBankDB`, `isAdapterBankDB` in `helpers/consts.ts`.
@@ -25,3 +25,4 @@ Branch `20261112-bankdb_adapter`, PR #TBD, stacked on #660. Justify: green, all 
 * **Discoveries**:
   * src lines vs c83af8fdb: +1087 / -57 over 15 files; vs the verbatim copies (2949fa56f): +752 / -402.
   * life_tok: the virtual pair needed one helper and a string compare; nothing strained. A real `life_tok` column would replace `vaultLifeOf` and the two-field box key; the in-memory key is the joined string already.
+* **For the Coach** (also the PR's *Open questions*): the refusal kinds of the row above; the gate verbs' wire acts; tidyGone's count; `Heard` as `{ row, parent }`; `BadAnswer.act` widened in vault-db and graphql; the name `WX`. Each has a recommendation in the PR.
