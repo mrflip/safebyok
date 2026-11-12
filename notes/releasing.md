@@ -16,8 +16,8 @@ Agents never tag, publish, or change a version number: a thread contributes a ch
   or *Run workflow* on the Actions tab). A push to main leaves the Version PR as it is, so a series of
   merges does not rebuild it, and rerun CI over it, after each one. The PR belongs to the bot: nobody
   but the Coach rebases, edits or merges it. The release workflow writes it with the repository's
-  GitHub App, so CI runs on it as on any PR: held while it is a draft, and run when it is labelled
-  `ci` or marked ready.
+  GitHub App, so CI runs on it as on any PR: held while it is a draft, and run when it is marked
+  ready, or at its next rebuild once it is labelled `ci`.
 * **It opens as a draft.** The Coach marks it ready when they mean to release it, after the by-hand
   checks in `notes/release-checklist.md` (real authenticators, real browsers, the Convex README walk,
   Supabase). A Version PR leaves out whatever merged after it was built, so if main has moved since,
