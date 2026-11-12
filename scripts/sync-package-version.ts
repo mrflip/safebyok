@@ -10,10 +10,7 @@ const ConstsPath = 'packages/safebyok/src/helpers/consts.ts'
 const ManifestPath = 'packages/safebyok/package.json'
 
 /** `source` with its `PackageVersion` line set to `version`.
- *
- * @param source - The text of `helpers/consts.ts`.
- * @param version - The version to write.
- * @returns The new text; throws when `source` has no `PackageVersion` line.
+ * Throws when `source` has no `PackageVersion` line.
  *
  * @example withPackageVersion("export const PackageVersion = '0.5.0'", '0.6.0')  // => "export const PackageVersion = '0.6.0'"
  */
