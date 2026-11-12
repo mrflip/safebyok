@@ -72,12 +72,15 @@ the diff.
    A push need not wait on `pnpm justify`; `ready` does. Once pushed, a commit is not rewritten
    except by a catch-up rebase.
 3. **Ready.** When you expect green -- everything committed, the thread file finished and
-   committed (`plan:`) -- catch up and let CI run beside your last proof:
-   1. `scripts/file-thread --catch-up <root>`: the rebase filing would do, onto your base's
+   committed (`plan:`) but not yet pushed -- label, catch up, and let CI run beside your last
+   proof:
+   1. Add the label `ci` (`gh pr edit <n> --add-label ci`). CI reads it at each push; adding it
+      starts nothing, so it goes on before the push.
+   2. `scripts/file-thread --catch-up <root>`: the rebase filing would do, onto your base's
       current tip (the base thread's branch on origin, or origin/main once it has merged), with
-      `sprintbase` recorded, then a push under a lease. On exit 3, resolve the conflict as
-      *Picking up a built thread* says, then run it again.
-   2. Add the label `ci` (`gh pr edit <n> --add-label ci`), which starts CI on the draft.
+      `sprintbase` recorded, then a push under a lease, which starts CI: the unpushed `plan:`
+      commit makes sure there is one. On exit 3, resolve the conflict as *Picking up a built
+      thread* says, then run it again.
    3. Only then run your last `pnpm justify`, while CI runs. Red: fix, commit and push again.
 
    Green, bring the PR's title and body up to date -- a **Tests:** line, *Open questions* -- and

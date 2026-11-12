@@ -111,6 +111,13 @@ sprinting or not, which is why those are one sentence of when to use it.
   reviewer's fixes. The Coach agreed on 2026-11-12 that the reviewer proves only the suites its
   fixes touch, and `file-thread`'s justify is the gate: a dependent package a fix breaks comes back
   from it as exit 4, to a worker.
+* **CI holds a draft until it carries `ci`, and reads the label only at a push.** Workers push
+  drafts often, and a run on each filled the queue. A `labeled` trigger started CI the moment a
+  worker labelled its PR, but it fired on every label (the Coach's `queue`, Dependabot's), and a
+  run whose jobs all skip reports them as passing on the PR's head, where it could mask a red or
+  running real run. So the worker labels before the push it expects green, and a draft labelled
+  after its last push runs at its next push or when taken out of draft. A dispatching workflow
+  could start CI on the label alone; it was not worth the machinery.
 * **Rulings live in turbochat's *Resolved* tab and the PR**, swept into the resolutions file at
   the end. They used to be written in five places as they came, with lines owed to filed threads'
   files until the restack.

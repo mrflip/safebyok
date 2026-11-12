@@ -130,9 +130,10 @@ Read: <what this handoff does not already carry, by section>.
 ```
 
 The worker's PR stays a draft, and CI holds a draft until it carries the label `ci`, so the worker
-pushes freely; when it expects green it catches up onto its base (`scripts/file-thread
---catch-up`), adds the label, which starts CI, and runs its last `pnpm justify` while CI runs.
-It never takes the PR out of draft: that is yours (*File*, below).
+pushes freely; when it expects green it adds the label, then catches up onto its base and pushes
+(`scripts/file-thread --catch-up`), which starts CI, and runs its last `pnpm justify` while CI
+runs. CI reads the label at a push and never on its own (`notes/ci.md`): a label added after the
+last push runs nothing. It never takes the PR out of draft: that is yours (*File*, below).
 
 Every worker and reviewer sings out what it has turned to (`scripts/ohai`), and a hook logs each
 compaction with its best guess at the agent, by that `description`. To see where each agent
@@ -196,9 +197,11 @@ gets no review: the review follows the resume that finishes it.
 ## 3. As each report comes in
 
 1. **Verify, cheaply.** For `ready`: the worker's commits are in its worktree
-   (`git -C <root> log --oneline -5`), its tree is clean, and its PR carries `ci` and is pushed
-   (`gh pr view <branch> --json labels,headRefOid` against the worktree's HEAD). Trust the
-   reports for the rest.
+   (`git -C <root> log --oneline -5`), its tree is clean, its PR carries `ci` and is pushed
+   (`gh pr view <branch> --json labels,headRefOid` against the worktree's HEAD), and CI ran on
+   that head (`gh pr checks <branch>` shows its jobs, not skipping). Where the label came after
+   the last push, the head's jobs skipped: its run comes with its next push (the reviewer's fix,
+   or filing's rebase), or when you take it out of draft. Trust the reports for the rest.
 2. **Tell the Coach.** A line in chat -- thread, verdict, PR link -- and the thread's status
    line in the plan. Each item of the report's *Open matters*, and each YOLO decision, becomes a
    `drafting` row of its own in *Open Matters* in the same pass -- one item, one row, never
