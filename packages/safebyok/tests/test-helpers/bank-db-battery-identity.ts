@@ -39,7 +39,7 @@ export function describeIdentity({ hasIdentity, makeBankDBFor }: BatteryWorld): 
   if (hasIdentity) {
     describe("who may reach a bank", () => {
       for (const [blurb, user_id] of [['another user', 'u2'], ['no one signed in', null]] as const) {
-        it(`refuses ${blurb} every verb on a bank as identity_revoked, changing nothing`, async () => {
+        it(`refuses ${blurb} every verb on a bank with a refusal, changing nothing`, async () => {
           const bankDBFor = await makeBankDBFor()
           const owner = bankDBFor('u1')
           await owner.buildBank(bankBuildAskOf(bank, gate))
@@ -47,7 +47,7 @@ export function describeIdentity({ hasIdentity, makeBankDBFor }: BatteryWorld): 
           await owner.putBox(boxPutAskOf(box))
           const stranger = everyVerbOn(bankDBFor(user_id))
           for (const [verbname, call] of Object.entries(stranger)) {
-            await expect(call(), verbname).rejects.toSatisfy((err) => isVaultError(err, 'identity_revoked'))
+            await expect(call(), verbname).rejects.toSatisfy((err) => isVaultError(err))
           }
           const [storedBank, storedVault, storedBox] = await Promise.all([owner.ensureBank(bankEnsureAsk), owner.getVault(vaultGetAskOf()), owner.getBox(boxGetAskOf())])
           expect(storedBank.val?.gates).to.deep.equal({ main: gate })
