@@ -154,7 +154,7 @@ Then remove the reviewer's worktree and branch, which its result names (`git wor
 
 **File.** Run `scripts/file-thread <root>` in the background: it catches the branch up (a stacked
 one is rebased onto its base thread's new tip, or onto main once the base has merged, so never
-rebase it by hand), proves it, pushes it, and removes the worktree. When it exits 3 (a conflict with main) or 4 (red), spawn
+rebase it by hand), proves it, pushes it, and removes the worktree. When it exits 3 (a conflict with main, or with its base thread's new tip) or 4 (red), spawn
 a fresh `thread-worker`:
 
 ```
