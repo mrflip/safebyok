@@ -54,12 +54,12 @@ context, not by fine-tuning each of these.
 
 ## A gate change rejecting after its record is stored
 
-The vaultDB is the ground truth. In each of these, the verb's caller gets a refusal although the record was stored. The
+The bankDB is the ground truth. In each of these, the verb's caller gets a refusal although the record was stored. The
 next fetch brings this device up to date, and nothing guards against them. When this was written, each had a test in
 `tests/models/halpimonfire.test.ts`. That file's *A gate change after its record is stored* now has one case: a `lock()`
 called while the new lease is made.
 
-* A `sweep` or `vacate` of the listing while the vaultDB's answer is on its way back: delivering the answer refuses with
+* A `sweep` or `vacate` of the listing while the bankDB's answer is on its way back: delivering the answer refuses with
   `disabled`. From then on the new passphrase unlocks the vault, and the next `hello` lists the row.
 * A crypto failure in `proved.buildLease`, which the test stages with a mock: the verb rejects with the failure. The vault has
   the new gate and the old lease, and it stays unlocked and able to seal. Its cached row is of the old epoch, so the next
@@ -78,7 +78,7 @@ Copied from `unrace-progress.md` at the sprint's end. The names are as they were
 
 * A lock during `listing.put` does not stop it: the put is written anyway (thread 1).
 * A `box.del` checks the lock only at entry (thread 1).
-* A vaultDB watch stopped in the same tick still receives a queued notice (thread 2).
+* A bankDB watch stopped in the same tick still receives a queued notice (thread 2).
 * A `lock()` called while `vault.ensureUnlocked` is proving leaves the vault unlocked, with its lease cached. The ruling
   is in `noted.md` (thread 3).
 * `uncacheForgotten` deletes by scope outside the lease's chores, so its delete can be written after an unlock's put, and the

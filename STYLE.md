@@ -155,7 +155,7 @@ thing states that fact: `demandUnlocked`, `demandPresent`.
 **`put` resolves what is stored.** On success, `putFoo` resolves the foo as storage now has it,
 not what was sent: not the argument it was handed, not `this`, not a boolean. Where the stored foo has
 key material, a model's verb resolves its summary: `vault.putWayin()` resolves the vault, whose
-`vault.snapshot.gate` then shows the way in as stored; `VaultDB.putBox()` resolves the record.
+`vault.snapshot.gate` then shows the way in as stored; `BankDB.putBox()` resolves the record.
 
 **Stored fields are underbar_case** (`salt_b64`, `written_at`): they are written to someone
 else's database, and stay one spelling from the wire to the code. **One name for one thing,

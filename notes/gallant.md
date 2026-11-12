@@ -134,7 +134,7 @@ async hello() {
 }
 ```
 
-**Gallant:** the box listing gets its own list, and the vault's row arrives as `world`, as on every other box answer.
+**Gallant:** the box listing gets its own list, and the vault's row arrives as `parent`, as on every other box answer.
 
 ```ts
 // Vault
@@ -165,10 +165,10 @@ protected async delOver(sparse) {
 ```
 
 **Gallant:** nothing upstream writes a next revision or an `am`. A tombstone has no seal, so nothing has to be chosen before
-it reaches the vaultDB. The duck's revision is the prior, and any duck will do.
+it reaches the bankDB. The duck's revision is the prior, and any duck will do.
 
 ```ts
-vaultDB.delBox(duck)   // an instance, a record, or { ...scope, vault_tok, ...revision }
+bankDB.delBox(duck)   // an instance, a record, or { ...scope, vault_tok, ...revision }
 ```
 
 `put` can't do this: the stamp binds the revision to the ciphertext, so the sealer has to choose the next revision itself.
@@ -361,7 +361,7 @@ try {
 before the critical call. When an awaited promise resolves, other waiters can run first, a `lock()` among them, so a demand
 inside the `ensure` is stale by the time the caller resumes.
 
-**Goofus:** a probe stepping `lock()` through the microtask ticks found the delete reaching the vaultDB after the lock, at
+**Goofus:** a probe stepping `lock()` through the microtask ticks found the delete reaching the bankDB after the lock, at
 tick 3.
 
 ```ts
@@ -418,12 +418,12 @@ demandPuttable(patch, choices) { /* parses the patch, then demands enabled, vaul
 
 **Enabled is a special guard:** one check is enough. The code that ends a listing is synchronous: it disables the
 listing, disables every thing in it, and removes them, so nothing crosses it halfway. The only check after storage answers is at
-the top of `deliver`, before it takes the answer's world.
+the top of `deliver`, before it takes the answer's parent.
 
 ```ts
 protected async deliver(answer) {
   this.demandEnabled()
-  if (answer.world !== null) { this.world.receiveWorld(answer.world) }
+  if (answer.parent !== null) { this.world.receiveWorld(answer.parent) }
 ```
 
 **Not this fault:** guards and ensures with the same body. `ensurePuttable`, `ensureUnsealable` and `ensureDeletable` all call
@@ -461,7 +461,7 @@ nothing, and the only cost is that a caller's looser `maxWorldMillis` can still 
 
 ## The backend judges `#the-backend-judges`
 
-In a revisioned CAS model the vaultDB is the ground truth. A local check that repeats its judgment adds a second, staler
+In a revisioned CAS model the bankDB is the ground truth. A local check that repeats its judgment adds a second, staler
 opinion, with a refusal that doesn't carry the frontier.
 
 **Goofus:**
@@ -475,14 +475,14 @@ protected demandNotListed(scope) {
 **Gallant:** delete it. A `create` over a live box refuses `camped`, and over a stored, unlisted box `stale_write`, each with
 the row that was in the way.
 
-**Goofus again:** `demandPuttable` refused over a local tombstone under `ifAbsent: 'fail'`, though the vaultDB is told `ifAbsent` too. Over a
-box reborn elsewhere, the local check said absent, where the vaultDB's `stale_write` delivers the frontier.
+**Goofus again:** `demandPuttable` refused over a local tombstone under `ifAbsent: 'fail'`, though the bankDB is told `ifAbsent` too. Over a
+box reborn elsewhere, the local check said absent, where the bankDB's `stale_write` delivers the frontier.
 
 ```ts
 if (ifAbsent === 'fail') { this.demandPresent() }
 ```
 
-**Gallant again:** delete it, and the vaultDB's `absent_box` or `stale_write` answers.
+**Gallant again:** delete it, and the bankDB's `absent_box` or `stale_write` answers.
 
 **Not this fault:** a birth's refusal of a vault the bank already has. No backend has been asked yet, and the refusal spares the user a
 passphrase dialog and a KDF that could only fail.
@@ -492,7 +492,7 @@ passphrase dialog and a KDF that could only fail.
 ## The impossible is one line `#impossible-is-a-crash`
 
 A branch the types force and only a broken system reaches is one line: `throw`. If it wants a second line, stop and flag it.
-Never `!` or a cast, which is what a host's own vaultDB adapter gets to crash through. No row, no FIXME, and no reviewer asking
+Never `!` or a cast, which is what a host's own bankDB adapter gets to crash through. No row, no FIXME, and no reviewer asking
 for more. What makes this safe is failing closed before anything changes, not proving the branch never runs. The test: if you
 can name a *correct* system that reaches the state, it isn't this case.
 
@@ -752,7 +752,7 @@ of each duck, and a class instance's copy has lost its methods.
 
 ```ts
 MSX.bankOpts.parse(opts)
-const { user_id, banklabel, device_tok = randomId(), vaultDB, deviceDB, keyDeriver, clock = wallClock, logger = DefaultLogger /* ... */ } = opts
+const { user_id, banklabel, device_tok = randomId(), bankDB, deviceDB, keyDeriver, clock = wallClock, logger = DefaultLogger /* ... */ } = opts
 ```
 
 The listings' constructors do the same with `MSX.listingOpts`, `MSX.vaultListingOpts` and `MSX.boxListingOpts`.
@@ -971,7 +971,7 @@ report it.
 | Goofus | Gallant |
 |---|---|
 | A void box held under `scope`, timely as it received its own void revision, so a put on it fetches nothing. | A timely tombstoned box listed at `scope`. |
-| The instance held under `scope`, once it hears that storage holds nothing there; null where none is held, as nothing is made of an absence. | Handle an impossible situation: VaultDB reports an empty row whereas we have an instance at `scope`.\nPass the null to held.receive, share the bad news and settle |
+| The instance held under `scope`, once it hears that storage holds nothing there; null where none is held, as nothing is made of an absence. | Handle an impossible situation: BankDB reports an empty row whereas we have an instance at `scope`.\nPass the null to held.receive, share the bad news and settle |
 | The next record `patch` makes of the record in hand on entry, sealed and not yet stored, with that revision it was sealed over. | A sealed uncommitted record for the `patch`, with the `prior` revision bag proving it is next in sequence. |
 
 *Status, both: Fixed on the blocks #470 changed and the ones its review named. The rest of `models/` hasn't had a pass.*

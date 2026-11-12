@@ -31,8 +31,8 @@ STYLE.md's rules. The doc-block pairs are in `notes/gallant-docblocks.md`.
 
 * **An interface a host implements is typed as what belongs there**, never `unknown`, with its doc
   block saying what is checked and by whom. The check keeps damage out, not the type.
-* **A DB handed across the package boundary carries a brand, not a duck.** An AdapterVaultDB or
-  DeviceDB extends our base class, and any VaultDB, a client too, is known by its `Symbol.for` brand:
+* **A DB handed across the package boundary carries a brand, not a duck.** An AdapterBankDB or
+  DeviceDB extends our base class, and any BankDB, a client too, is known by its `Symbol.for` brand:
   a duck check passes anything with the right method names, and `instanceof` fails the second copy
   of safebyok an adapter package may bundle.
 * **A brand is a `Symbol.for('@safebyok/<name>')` key, never a `Symbol()`**, so every copy of the
@@ -52,10 +52,10 @@ STYLE.md's rules. The doc-block pairs are in `notes/gallant-docblocks.md`.
   record it is sent that it will use. It may accept a server's word that a record is damaged: the
   worst a lying server does with that is offer to delete what it could delete anyway. It still
   parses the word itself (a damaged box's label, its kind of damage, its token).
-* **A wire sharpens an interface.** A VaultDB's client implements the same `VaultDB` as the
+* **A wire sharpens an interface.** A BankDB's client implements the same `BankDB` as the
   adapter behind it, and each GraphQL operation returns what its verb's `try*` form returns, so a browser's
   adapter checks the server's answer with the core's answer checks and passes it on. Where the two
-  would differ, change the VaultDB.
+  would differ, change the BankDB.
 
 ## Tree-shaking
 

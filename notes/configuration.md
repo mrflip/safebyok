@@ -73,7 +73,7 @@ spread wins.
 import { Device } from 'safebyok'
 import { browserOpts } from 'safebyok/browser'
 
-const device = Device.make({ ...browserOpts({ dbName: 'acme' }), user_id, banklabel: 'acme', gates: ['main'], vaultDB, requestCleartext })
+const device = Device.make({ ...browserOpts({ dbName: 'acme' }), user_id, banklabel: 'acme', gates: ['main'], bankDB, requestCleartext })
 ```
 
 Why these live in `safebyok/browser` rather than as `Device.make`'s defaults is
@@ -93,7 +93,7 @@ const strengthChecker = Object.assign(async (typed: string, scope: VaultScope) =
   return zxcvbnStrengthChecker(typed, scope)
 }, { load: zxcvbnStrengthChecker.load })
 
-const device = Device.make({ ...browserOpts({ dbName: 'acme' }), strengthChecker, user_id, banklabel: 'acme', gates: ['main'], vaultDB, requestCleartext })
+const device = Device.make({ ...browserOpts({ dbName: 'acme' }), strengthChecker, user_id, banklabel: 'acme', gates: ['main'], bankDB, requestCleartext })
 ```
 
 ### Leaving it out: your own

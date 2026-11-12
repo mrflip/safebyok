@@ -39,7 +39,7 @@ not as a settled ruling, and check it against the current design before relying 
   vault's box calls.** `getBox`, `putBox` and `delBox` calls in flight together on one vault, for
   different boxes or the same `boxlabel`, settle in no promised order. The vault joins concurrent
   calls in two places only: its storage refresh (a `beginWatch()` during a refresh joins it rather than
-  waiting behind it) and its gating (one prompt at a time). Nothing queues the box calls. A vaultDB's
+  waiting behind it) and its gating (one prompt at a time). Nothing queues the box calls. A bankDB's
   expectation (`vault_tok`, `gate_epoch`, a box's `revision_tok`) prevents a lost update, not a
   reordering. A host that needs an order awaits each call before making the next.
 * 2026-10-31 (the Coach, newvault sprint, thread 2): **a refused forget of a cached lease is not
@@ -60,8 +60,8 @@ not as a settled ruling, and check it against the current design before relying 
   retrying a refused forget.
 * 2026-11-02 (the Coach, unrace, `unrace-new_vault.md` at commit e135d0352, since deleted; not yet built):
   **a failed delete still locks the vault on this device.** `del_vault` locks first, because a lock
-  is synchronous and safe, then removes the vault from the vaultDB and the deviceDB, then vacates. So
-  a delete the vaultDB refuses still logs the user out of this device, and they log back in to try
+  is synchronous and safe, then removes the vault from the bankDB and the deviceDB, then vacates. So
+  a delete the bankDB refuses still logs the user out of this device, and they log back in to try
   the delete again. That is unpleasant, and could leave them thinking the vault is gone from their other
   devices when it is not. The verb does refuse, so a host can say so. The Coach: "Still: WONTFIX."
   Superseded 2026-11-12 (bank_world, plain_del, ruling R5): `vault.del()` no longer locks first, so a
@@ -82,7 +82,7 @@ not as a settled ruling, and check it against the current design before relying 
   delists the vault, so `ensureVault` then asks for a passphrase for a vault that exists. The Coach: "If the
   host has no on panic they've given their opinion, wontfix."
 * 2026-11-03 (the Coach, unrace): **a delete whose forget is refused, with no `onPanic`, still succeeds.** The vault
-  is tombstoned in the vaultDB and the delete succeeds, whatever happened to the forget of the cached lease. The same
+  is tombstoned in the bankDB and the delete succeeds, whatever happened to the forget of the cached lease. The same
   ruling: a host with no `onPanic` has given its opinion.
 * 2026-11-03 (the Coach, unrace): **a host's own getter that throws a `VaultError` quoting the passphrase passes
   the gating's check whole.** The gating replaces any other throw from a getter with `unexpected_error`, keeping nothing of it.
@@ -146,7 +146,7 @@ not as a settled ruling, and check it against the current design before relying 
   disable, we won't do either"): **a new passphrase leaves the passkey in place.** Replacing the passphrase changes only the passphrase wayin. The passkey
   wayin stays as stored and still unlocks the vault, and no later use of the passkey demands the passphrase. Someone who knew the old passphrase and added a
   passkey keeps that access until the passkey is revoked, which is a separate gate change. Recorded as a decision in `notes/security.md`.
-* 2026-11-09 (the Coach, closing out the old design): **a vault uses its bank's storage.** `ensureVault` takes no `vaultDB` or `deviceDB` of its own, as it did in
+* 2026-11-09 (the Coach, closing out the old design): **a vault uses its bank's storage.** `ensureVault` takes no `bankDB` or `deviceDB` of its own, as it did in
   the old design. A host wanting a vault in other storage makes a second `Bank` over it.
 * 2026-11-10 (the Coach, on the review of #618: "If you set maxWorldMillis to zero you get what you asked for"): **a get with `maxWorldMillis: 0`
   may fetch the vault twice.** When a listing's `get` falls through to its `fetch`, each of the two makes sure its world is timely, so a horizon of
@@ -154,6 +154,6 @@ not as a settled ruling, and check it against the current design before relying 
 * 2026-11-10 (the Coach, on the review of #618: "an eventual gc mechanism"): **a listing's joined fetches are never collected.** For each slot a listing
   has fetched, absent slots included, it keeps a small entry that joins its fetches, for the listing's life. Collecting them waits on a gc mechanism.
 * 2026-11-11 (the Coach, on #639: "This is paranoiac coding, you have validated the record correctness before writing it"): **a row garbled
-  outside the vaultDB may be overwritten.** Postgres runs a put or del as one call that compares the stored row's revision, state, life token
+  outside the bankDB may be overwritten.** Postgres runs a put or del as one call that compares the stored row's revision, state, life token
   and `fmt`, and reads nothing else of it. Its tables refuse a flawed row one level into each `jsonb` field. If a direct write garbles a row
   deeper than that, every get throws it as damaged, and a put or del citing its exact revision overwrites it.
