@@ -12,7 +12,7 @@
 name: safebyok-e2e
 
 services:
-  # Postgres 17, for the VaultDB battery and the races of `safebyok-postgres`: SAFEBYOK_PG_URL for
+  # Postgres 17, for the bankDB battery and the races of `safebyok-postgres`: SAFEBYOK_PG_URL for
   # tests/postgres/ is postgres://postgres@127.0.0.1:54320/postgres. The role is a superuser, as
   # the tests make a database of their own for each file.
   postgres:

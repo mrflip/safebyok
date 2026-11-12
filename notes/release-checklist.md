@@ -59,9 +59,9 @@ the packages installed from the Version PR's packed tarballs (`pnpm pack`), not 
 
 `safebyok-postgres`'s README says it has not been run against Supabase. Until it has:
 
-* [ ] In a Supabase project, put `vault-tables.sql` and `vault-functions.sql` in a migration. Run
-  `PostgresVaultDB` from a server route and from an Edge Function over the project's connection
-  string, and run the vaultDB battery against it.
+* [ ] In a Supabase project, put `bank-tables.sql` and `bank-functions.sql` in a migration. Run
+  `PostgresBankDB` from a server route and from an Edge Function over the project's connection
+  string, and run the bankDB battery against it.
 * [ ] The Data API reaches nothing in the tables as `anon` or `authenticated`.
 * [ ] LISTEN over a direct or session-mode connection receives another device's write. Over the
   transaction-mode pooler, it refuses or degrades as the README says.
