@@ -3,6 +3,7 @@
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { isVaultError } from '../../src/refusals/errors'
 import type { WatchScope } from '../../src/shapes/shapes-storage'
+import * as BX from '../../src/shapes/shapes-bankdb'
 import type { VaultRow } from '../../src/shapes/shapes-bankdb'
 import type { BankDB, Notice } from '../../src/storage/bank-db'
 import type { AdapterBankDB } from '../../src/storage/adapter-bank-db'
@@ -177,7 +178,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         })
       })
 
-      it("notifies a bank's watch of its gate replaced and of the bank deleted, each as stored", async () => {
+      it("notifies a bank's watch of its gate replaced and of the bank deleted, each as stored, the bank's parent being main", async () => {
         const { bankDB, bank, gate } = await putWith()
         const { notices } = watching(bankDB, bankScope)
         const { val: replaced } = await bankDB.replacePassphrase(gatePutAskOf('replacePassphrase', gate, { main: otherMainWayin }))
@@ -185,6 +186,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         await bankDB.delBank(bankDelAskOf(bank))
         await vi.waitFor(() => {
           expect(notices.map(({ act, val }) => ({ act, val }))).to.deep.include.members([{ act: 'gotlive', val: replaced }, { act: 'gotgone', val: tombstone }])
+          expect(notices).to.deep.include({ act: 'gotgone', val: tombstone, parent: BX.BankTop })
         })
       })
 

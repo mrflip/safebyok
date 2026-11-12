@@ -84,7 +84,7 @@ export class GraphQLBankDB implements BX.BankDB {
   }
 
   /** Store the tombstone `ask.record` over the live bank row `ask.expected`, and delete every gate, vault and box row under the bank. */
-  async delBank(ask: BX.BankDelAsk): Promise<BX.GoodAnswer<BX.BankRow | null, OkAct, null>> { return goodAnswerOf(await this.tryDelBank(ask)) }
+  async delBank(ask: BX.BankDelAsk): Promise<BX.GoodAnswer<BX.BankRow | null, OkAct, typeof BX.BankTop>> { return goodAnswerOf(await this.tryDelBank(ask)) }
 
   /** Non-throwing form of {@link delBank}. */
   async tryDelBank(ask: BX.BankDelAsk): Promise<BX.DelBankAnswer> {

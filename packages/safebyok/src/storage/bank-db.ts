@@ -8,7 +8,7 @@ import type { BankScope } from '../shapes/shapes-core'
 import type { BankBadAct, GoodAct, GotAct, ListAct, OkAct } from '../shapes/shapes-enums'
 import type { BoxTidyAsk, DamagedVault, WatchScope } from '../shapes/shapes-storage'
 import type {
-  BankBuildAsk, BankDelAsk, BankEnsureAsk, BankRow, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxSparse, DamagedBox,
+  BankBuildAsk, BankDelAsk, BankEnsureAsk, BankRow, BankTop, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxSparse, DamagedBox,
   GateRecord, GateVerbAsk, LoggableAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultRow,
 } from '../shapes/shapes-bankdb'
 import type { Tidied } from './vault-db'
@@ -37,8 +37,8 @@ export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
 export type EnsureBankAnswer        = Answer<BankEnsured | null, GotAct>
 /** The answer to `buildBank` or a gate verb: the gate row put, or under `passed` the live one found. */
 export type GateAnswer              = Answer<GateRecord, OkAct>
-/** The answer to `delBank`: the bank's tombstone, or the bank row found. A bank has no row above it. */
-export type DelBankAnswer           = Answer<BankRow | null, OkAct, null>
+/** The answer to `delBank`: the bank's tombstone, or the bank row found. Its `parent` is `main`: a bank has no row above it. */
+export type DelBankAnswer           = Answer<BankRow | null, OkAct, typeof BankTop>
 /** The answer to a vault get, put or del. Its `val` is the stored row after the call, or null for none. */
 export type VaultAnswer             = Answer<VaultRow | null, OkAct>
 /** The answer to a box get, put or del, with its vault row as `parent`. Its `val` is the stored row after the call, or null for none. */
@@ -48,8 +48,8 @@ export type ListBoxesAnswer         = Answer<BoxesListed, ListAct, VaultRow>
 /** The answer to `tidyGone`, with the bank's scope as `parent`. */
 export type TidyGoneAnswer          = Answer<Tidied, 'tidied', BankScope>
 
-/** A changed row reported by a watch, with the row above it if storage sent one. */
-export type Notice = { act: 'gotlive' | 'gotgone', val: BankRow | GateRecord | VaultRow | BoxRow, parent: BankRow | VaultRow | null }
+/** A changed row reported by a watch, with its `parent`. A bank row's parent is `main`; another row's is the row above it, or null if storage sent none. */
+export type Notice = { act: 'gotlive' | 'gotgone', val: BankRow | GateRecord | VaultRow | BoxRow, parent: BankRow | VaultRow | typeof BankTop | null }
 
 /** A good answer with `val`, keeping `answer`'s act, parent and ask. Throws the refusal of a bad `answer`. */
 export function answerWithVal<ValT, ActT extends GoodAct>(answer: Answer<unknown, ActT, unknown>, val: ValT): GoodAnswer<ValT, ActT, unknown> {
@@ -112,7 +112,7 @@ export interface BankDB {
   /** Non-throwing form of {@link BankDB.revokePasskey}. */
   tryRevokePasskey(ask: GateVerbAsk): Promise<GateAnswer>
   /** Store the tombstone `ask.record` over the live bank row `ask.expected`, and delete every gate, vault and box row under the bank. */
-  delBank(ask: BankDelAsk): Promise<GoodAnswer<BankRow | null, OkAct, null>>
+  delBank(ask: BankDelAsk): Promise<GoodAnswer<BankRow | null, OkAct, typeof BankTop>>
   /** Non-throwing form of {@link BankDB.delBank}. */
   tryDelBank(ask: BankDelAsk): Promise<DelBankAnswer>
   /** Get the vault row at a scope, whatever its life, in a bank live under `bank_tok`.

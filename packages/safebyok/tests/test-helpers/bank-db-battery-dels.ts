@@ -175,7 +175,7 @@ export function describeDels({ fresh, putWith, rowsOf }: BatteryWorld): void {
     it("stores the tombstone at its revision, and deletes the gate, the vaults and the boxes of the life it ends", async () => {
       const { bankDB, bank } = await putWith({ box: true })
       const tombstone = bankTombstoneOf(bank)
-      expect(await bankDB.delBank(bankDelAskOf(bank))).to.deep.include({ ok: true, act: 'deleted', val: tombstone, parent: null })
+      expect(await bankDB.delBank(bankDelAskOf(bank))).to.deep.include({ ok: true, act: 'deleted', val: tombstone, parent: BX.BankTop })
       expect(await rowsOf(bankDB).bankRowOf(bankScope)).to.deep.equal(tombstone)
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.be.null
       expect(await rowsOf(bankDB).vaultRowOf(vaultScope)).to.be.null
@@ -220,7 +220,7 @@ export function describeDels({ fresh, putWith, rowsOf }: BatteryWorld): void {
     it("refuses over no bank row, and over its tombstone, at its revision or with its own tombstone", async () => {
       const bankDB = await fresh()
       const ask = bankDelAskOf(BX.shellBankOf(bankScope))
-      expect(await bankDB.tryDelBank(ask)).to.deep.include({ ok: false, act: 'void', dbhas: null, parent: null })
+      expect(await bankDB.tryDelBank(ask)).to.deep.include({ ok: false, act: 'void', dbhas: null, parent: BX.BankTop })
 
       const { bankDB: deleted, bank } = await putWith()
       const tombstone = bankTombstoneOf(bank)

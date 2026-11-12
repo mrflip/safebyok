@@ -22,7 +22,7 @@ export const VaultFormat = 6003
 export const BoxFormat = 5003
 // --
 
-// == [Bank forms]: bankSparse, bankRecord, bankTombstone, bankRow, BankSparse, BankRecord, BankTombstone, BankRow
+// == [Bank forms]: bankSparse, bankRecord, bankTombstone, bankRow, BankSparse, BankRecord, BankTombstone, BankRow, BankTop
 
 // A bank row has nothing encrypted, so its record and its tombstone have the same fields.
 /** The checks of a bank's stored forms: its sparse fields, its live record, its tombstone, and a row of either. */
@@ -43,6 +43,9 @@ export type BankRecord    = Readonly<Z.infer<typeof bankRecord>>
 export type BankTombstone = Readonly<Z.infer<typeof bankTombstone>>
 /** A bank row as stored: live, or a tombstone. */
 export type BankRow       = BankRecord | BankTombstone
+
+/** The `parent` an answer or notice gives for a bank: a bank is at the top, with no row above it. */
+export const BankTop = 'main'
 // --
 
 // == [Gate forms]: passphraseWayin, passkeyWayin, wayins, gateRecord, GateRecord, Wayins
@@ -128,7 +131,7 @@ export const { storedBankRow, storedGateRow, storedVaultRow, storedBoxRow } = Ch
 }))
 // --
 
-// == [Row helpers]: vaultLifeOf, shellBankOf, shellVaultOf, shellBoxOf, damagedBoxOf
+// == [Row helpers]: vaultLifeOf, shellBankOf, shellVaultOf, shellBoxOf, damagedBoxOf, noticeParentOf
 
 // A vault is reborn under a new `vault_tok`, and its bank under a new `bank_tok`: a box row under either ended life is no row.
 /** The life of a vault, its bank's included, as one string: a vault row's own, and the one a box row or box ask is under. */
@@ -156,6 +159,11 @@ export function shellBoxOf({ user_id, banklabel, vaultlabel, boxlabel, bank_tok,
 /** A listing's entry for a box row that failed validation, under the life of the vault its second parameter names. Its label comes from storage, unchecked: it is part of what is reported. */
 export function damagedBoxOf({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, { bank_tok, vault_tok }: { bank_tok: string, vault_tok: string }): DamagedBox {
   return { user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, am: 'd' }
+}
+
+/** The `parent` a notice carries: the one storage sent, or {@link BankTop} for a bank row that came with none. */
+export function noticeParentOf({ fmt }: { fmt: number }, parent: BankRow | VaultRow | typeof BankTop | null): BankRow | VaultRow | typeof BankTop | null {
+  return parent ?? ((fmt === BankFormat) ? BankTop : null)
 }
 // --
 

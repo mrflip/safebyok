@@ -113,14 +113,18 @@ export const {
   const boxesListed = obj({ boxes: arr(BX.boxSparse.strict()), damaged_rows: arr(damagedBox) }).strict()
   const tidied      = obj({ totalCount: uint }).strict()
 
+  const noticedAbove = union([BX.bankRow, BX.vaultRow, lit(BX.BankTop)])
   const crossedNotice = discrim('ok', [
     obj({
       ok: lit(true), act: oneof(['gotlive', 'gotgone']), val: union([BX.bankRow, BX.gateRecord, BX.vaultRow, BX.boxRow]),
-      parent: union([BX.bankRow, BX.vaultRow]).nullable().default(null), err: lit(null).default(null),
+      parent: noticedAbove.nullable().default(null), err: lit(null).default(null),
     }).strict(),
     obj({ ok: lit(false), act: oneof(EX.bankBadActVals), val: lit(null).default(null), parent: lit(null).default(null), err: AX.crossedErr }).strict(),
   ]).transform((crossed): Outcome<Notice> => {
-    if (crossed.ok) { return { ok: true, val: { act: crossed.act, val: crossed.val, parent: crossed.parent } } }
+    if (crossed.ok) {
+      const parent = BX.noticeParentOf(crossed.val, crossed.parent)
+      return { ok: true, val: { act: crossed.act, val: crossed.val, parent } }
+    }
     return { ok: false, err: vaultErrorOfCrossed(crossed.err, { act: crossed.act }, {}) }
   })
 
@@ -130,7 +134,7 @@ export const {
     replacePassphraseAnswer: answerCheck({ val: BX.gateRecord, acts: gateActs, ...gateish }),
     addPasskeyAnswer:        answerCheck({ val: BX.gateRecord, acts: gateActs, ...gateish }),
     revokePasskeyAnswer:     answerCheck({ val: BX.gateRecord, acts: gateActs, ...gateish }),
-    delBankAnswer:           answerCheck({ val: BX.bankTombstone, acts: EX.delActVals, parent: lit(null).default(null), badParent: lit(null), dbhas: BX.bankRow }),
+    delBankAnswer:           answerCheck({ val: BX.bankTombstone, acts: EX.delActVals, parent: lit(BX.BankTop), badParent: lit(BX.BankTop), dbhas: BX.bankRow }),
     getVaultAnswer:          answerCheck({ val: BX.vaultRow.nullable(), acts: EX.gotActVals, ...vaultish }),
     putVaultAnswer:          answerCheck({ val: BX.vaultRow, acts: EX.putActVals, ...vaultish }),
     delVaultAnswer:          answerCheck({ val: BX.vaultTombstone, acts: EX.delActVals, ...vaultish }),

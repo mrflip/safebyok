@@ -251,9 +251,10 @@ type SafebyokGateAnswer {${answerFields}
   dbhas:      SafebyokGateRecord
 }
 
-"""The answer to delBank: the bank's tombstone on success, err on a refusal. A bank has no row above it."""
+"""The answer to delBank: the bank's tombstone on success, err on a refusal. A bank has no row above it, so its parent is the string main."""
 type SafebyokDelBankAnswer {${answerFields}
   val:        SafebyokBankRow
+  parent:     String
   dbhas:      SafebyokBankRow
 }
 
