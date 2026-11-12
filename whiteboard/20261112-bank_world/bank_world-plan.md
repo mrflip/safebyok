@@ -147,6 +147,8 @@ gating lives on the Device from here. A move, not a redesign (the Coach). **Size
 `vault.del()` asks nobody; `vault.hello()` is `vault.beginWatch()`. **Levels**: worker `opus`;
 review `low`. **After**: 6. **Size**: S. Net removal expected.
 
+*Review:* `fixed` (sonnet, low; [#662](https://github.com/mrflip/safebyok/pull/662)). Three words-and-whitespace fixes; nothing significant. Left: the plain confirm focuses Delete first (thread 12); doc blocks for the documentarian pass; carried edges (Cleanup). Filed at `e19e54483`, on #661 at `682c0bdce`.
+
 ### 8 `bank_gate`
 
 The switch, items 1 to 7 of `threads.md` § 8. **Split** (`threads.md` asks for a green cut if the
