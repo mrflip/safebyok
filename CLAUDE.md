@@ -137,7 +137,7 @@ with `rg -l` first, then open the hits that matter.
 STYLE.md *Naming* is the source; these few shape code too deeply to fix in review.
 
 * The cast keeps VOCABULARY.md's names (whisper, box, vault), never `data` or `payload`. A
-  cryptographic key is named for its role (`vaultKey`, `boxKey`); a map key is a `ckey`.
+  cryptographic key is named for its role (`bankKey`, `boxKey`); a map key is a `ckey`.
 * Smush the tags `name`, `kind`, `label`, `path` and `bag` into one word: `vaultlabel`,
   `woodkind`. `type` is only a datatype; a menu choice is a `kind` or a `flavor`.
 * Stored fields are underbar_case (`salt_b64`), and so is a host-facing field containing one

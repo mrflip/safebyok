@@ -53,7 +53,7 @@ or `payload` for a variable or field we control: it is a whisper, or a whisperCi
 **Never bare `key`.** In this package a key is cryptographic until proven otherwise, so:
 
 * a **cryptographic key** is named for its role, as VOCABULARY.md has it: `passphraseKey`,
-  `vaultKey`, `boxKey`, `leaseKey`. Not `kek` or `dek`. A WebCrypto `CryptoKey` and its
+  `bankKey`, `boxKey`, `leaseKey`. Not `kek` or `dek`. A WebCrypto `CryptoKey` and its
   raw bytes are told apart by a tag: `boxKey` is the `CryptoKey`, `boxKeyBytes` the
   `Uint8Array`.
 * a **map key** is a `ckey` (see *Tags*).

@@ -50,7 +50,7 @@ Every field is ASCII, except a host's sidecar, which may not be.
 
 Typical labels are `acme_chat`, `auth0|` plus 24 hex characters, `main`, and a 26-character `device_tok`.
 
-* **Reading "a slightly larger key".** The vaultKey and boxKey are already AES-256, the largest key AES has, so the
+* **Reading "a slightly larger key".** The bankKey and boxKey are already AES-256, the largest key AES has, so the
   *Larger* row grows in two other ways. Each wrapped key is 512 bits, as an AES-256-SIV or HMAC-SHA-512 key would be:
   +43 bytes per wayin. The passphraseSalt is 32 bytes: +21 bytes. Both are overkill: RFC 9106 recommends a 16-byte
   Argon2 salt.

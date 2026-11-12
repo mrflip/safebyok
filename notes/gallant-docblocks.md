@@ -338,8 +338,8 @@ The first sentence describes an event in the past tense, not the act the method 
 
 ```ts
 // proving.ts
-  /** `vaultKey` wrapped under the wayinKey, bound to `visible`, a wayin's header in this vault: the wrap a wayin stores. */
-  async wrappedWith(vaultKey: CryptoKey, visible: WayinHeader): Promise<VaultKeyWayinWrapped> {
+  /** `bankKey` wrapped under the wayinKey, bound to `visible`, a wayin's header in this vault: the wrap a wayin stores. */
+  async wrappedWith(bankKey: CryptoKey, visible: WayinHeader): Promise<BankKeyWayinWrapped> {
 ```
 
 Wraps a key, but opens with a participle phrase.
@@ -347,7 +347,7 @@ Wraps a key, but opens with a participle phrase.
 **Gallant:**
 
 ```ts
-/** Wrap `vaultKey` under the wayinKey, bound to `visible`: the wrap a wayin stores. */
+/** Wrap `bankKey` under the wayinKey, bound to `visible`: the wrap a wayin stores. */
 ```
 
 **Goofus:**

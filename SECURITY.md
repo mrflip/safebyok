@@ -29,7 +29,7 @@ safebyok's promise is that **whoever holds the application's database, server co
 cannot read a user's secrets**, and cannot alter them without the change being detected. Anything
 that breaks that promise is in scope, for example:
 
-* recovering a whisper, a vaultKey or a passphraseKey from what is stored (VOCABULARY.md names
+* recovering a whisper, a bankKey or a passphraseKey from what is stored (VOCABULARY.md names
   each);
 * tampering with stored records in a way that goes undetected, or that rolls a vault back to an
   older passphrase or a weaker keyDeriverSpec;

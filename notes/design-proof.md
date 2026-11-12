@@ -39,19 +39,19 @@ bank.hello()                                         a forced reset; a host may 
 |                     | `key_deriver_label`             | Key deriver                                          |
 |                     | `salt_b64`                      | Random, of the deriver's `salt_size`                |
 |                     | `device_tok`, `registered_at`    | Bank, clock                                          |
-|                     | `vault_key_wayin_wrapped`       | New random vaultKey, wrapped under the passphraseKey |
+|                     | `bank_key_wayin_wrapped`       | New random bankKey, wrapped under the passphraseKey |
 | Passkey wayin (opt) | `credential_id`, `prf_salt_b64` | `passkeyClear`                                       |
 |                     | `device_tok`, `registered_at`    | Bank, clock                                          |
-|                     | `vault_key_wayin_wrapped`       | Same vaultKey, wrapped under the passkeyKey          |
+|                     | `bank_key_wayin_wrapped`       | Same bankKey, wrapped under the passkeyKey          |
 
 The ordering rules:
 
 1. The stamp (scope, `vault_tok`, `registered_at`) comes before any key: a wayin's ctx binds
    `[stamp, purpose, header]`, and a passkeyKey's HKDF `info` is that same ctx.
 2. A header comes before its key: a passphraseKey is derived from the header's salt.
-3. The passphrase wayin comes before the passkey wayin: it is where the vaultKey comes from.
+3. The passphrase wayin comes before the passkey wayin: it is where the bankKey comes from.
 
-The lease is not an input. It is a second output of the same vaultKey.
+The lease is not an input. It is a second output of the same bankKey.
 
 ## The provings
 
@@ -81,7 +81,7 @@ PasskeyProving.buildStored(gate, passkeyClear)
 ├─ deriveWrappingKey(prfBytes, ctx)
 └─ the wrap opens                            else 'wrong_passkey'
 
-proving.buildWayin(NOVEL | sourceProving)    a Wayin; the vaultKey made or unwrapped, wrapped, dropped
+proving.buildWayin(NOVEL | sourceProving)    a Wayin; the bankKey made or unwrapped, wrapped, dropped
 proving.buildLease(friend, gate_epoch?)      a Lease on friend's vault, under the epoch it proved or the one passed
 ```
 
@@ -92,7 +92,7 @@ no key, and gives access to neither the record nor the boxes. `buildLease` refus
 proving's.
 
 A caller always needs the proving of the current gate itself, not only whether it succeeded: it is the only
-thing that can unwrap the vaultKey, for the next wayin and for the next lease. So there is no `demandMatch`.
+thing that can unwrap the bankKey, for the next wayin and for the next lease. So there is no `demandMatch`.
 
 `gating.judgeStrength`, for the live check as the user types, calls the same `judgeStrength`.
 
@@ -284,7 +284,7 @@ gating.attempt({ passphraseClear, passkeyClear? })           a second while one 
 ├─ PasskeyProving.buildNovel(stamp, passkeyClear, world)            where a passkeyClear is handed
 └─ then the change, from { passphraseProving, passkeyProving | null }   ── no cleartext is used past here ──
    the build_vault act's change
-   ├─ passphraseProving.buildWayin(NOVEL)            makeVaultKey; wrap; vaultKey dropped
+   ├─ passphraseProving.buildWayin(NOVEL)            makeBankKey; wrap; bankKey dropped
    ├─ passkeyProving?.buildWayin(passphraseProving)  unwrap from the source; wrap; dropped
    ├─ gate = Gate.make(stamp, passphraseWayin, passkeyWayin | null)
    ├─ record = listing.recordOfBirth(gate, prior)    sync pojo at the revision after prior; its gate is gate.pickle()
@@ -361,7 +361,7 @@ each gate change's act, past its provings
 
 * **The lease comes after the put**, so its `gate_epoch` is the one that was written, and a refused put
   has nothing to clean up. The old lease stays in force in between, so the vault does
-  not report locked. That is safe, because the vaultKey did not change. A crash between the two leaves a cached
+  not report locked. That is safe, because the bankKey did not change. A crash between the two leaves a cached
   lease under the old epoch, which `Lease.buildFromCache` forgets, so the next session asks for a passphrase: a normal state.
 * **One record through the attempt.** The attempt reads `ante`, the vault's record, after its timeliness request, and
   proves against `ante`'s gate. The next record is minted from `ante`, not the live vault, so `ante`'s revision is the put's prior.
@@ -374,7 +374,7 @@ each gate change's act, past its provings
   cached lease, of the older `gate_epoch`, is forgotten at its next session (Decided).
 * **The vaultDB checks what it can see, and no more.** It refuses a record whose `registered_at` moved, whose `gate_epoch`
   is not one up, or that moves the other wayin (`gate_issue`), and an `addPasskey` over a passkey already stored (`camped`).
-  It cannot tell whether a wrap opens, so a bad `vault_key_wayin_wrapped` is still written.
+  It cannot tell whether a wrap opens, so a bad `bank_key_wayin_wrapped` is still written.
 
 ### `replace_passphrase`
 
@@ -392,7 +392,7 @@ gating.attempt({ antePassphraseClear, nextPassphraseClear })
 ├─ nextProving = PassphraseProving.buildNovel(gate.stamp, nextPassphraseClear, world)
 │    weak → may re-enter
 └─ then the change, from { ante, anteProving, nextProving }           ── no cleartext is used past here ──
-   ├─ nextWayin = nextProving.buildWayin(anteProving)    unwrap the vaultKey; wrap; dropped
+   ├─ nextWayin = nextProving.buildWayin(anteProving)    unwrap the bankKey; wrap; dropped
    └─ vaultListing.<gate verb>, then vault.#unlockByProving(anteProving, stored.gate.gate_epoch)
       commit: vaultListing.replacePassphrase(ante, passphrase_wayin)    ← the commit; passphrase_wayin is nextWayin.pickle()
 ```
@@ -416,7 +416,7 @@ gating.attempt({ passphraseClear, passkeyClear })
 │    wrong → may re-enter, passkeyClear unspent
 ├─ passkeyProving = PasskeyProving.buildNovel(gate.stamp, passkeyClear, world)
 └─ then the change, from { ante, proved, passkeyProving }             ── no cleartext is used past here ──
-   ├─ passkeyWayin = passkeyProving.buildWayin(proved)   unwrap the vaultKey; wrap; dropped
+   ├─ passkeyWayin = passkeyProving.buildWayin(proved)   unwrap the bankKey; wrap; dropped
    └─ vaultListing.<gate verb>, then vault.#unlockByProving(proved, stored.gate.gate_epoch)
       commit: vaultListing.addPasskey(ante, passkey_wayin)                  ← the commit; passkey_wayin is passkeyWayin.pickle()
            one added before the enter key → 'camped'; after the attempt read ante → 'stale_write'
