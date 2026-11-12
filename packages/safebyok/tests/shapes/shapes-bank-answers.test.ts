@@ -35,13 +35,13 @@ async function bankDBWithBox(): Promise<MemoryBankDB> {
 
 describe("WX's answer checks", () => {
   it("parse each serialized good answer back to what its verb returned", async () => {
-    const bankDB = await bankDBWithBox()
-    const keyed  = { main: mainWayin, passkey0: passkey0Wayin }
-    const added   = await bankDB.tryAddPasskey(gatePutAskOf('addPasskey', gateAt(), keyed))
-    const revoked = await bankDB.tryRevokePasskey(gatePutAskOf('revokePasskey', added.val ?? gateAt(), { main: mainWayin }))
-    const putBox  = await bankDB.tryPutBox(boxPutAskOf(boxAt(1), boxAt()))
+    const bankDB   = await bankDBWithBox()
+    const keyed    = { main: mainWayin, passkey0: passkey0Wayin }
+    const added    = await bankDB.tryAddPasskey(gatePutAskOf('addPasskey', gateAt(), keyed))
+    const revoked  = await bankDB.tryRevokePasskey(gatePutAskOf('revokePasskey', added.val ?? gateAt(), { main: mainWayin }))
+    const putBox   = await bankDB.tryPutBox(boxPutAskOf(boxAt(1), boxAt()))
     const putVault = await bankDB.tryPutVault(vaultPutAskOf(vaultAt(1), vaultAt()))
-    const answers = [
+    const answers  = [
       [WX.ensureBankAnswer,        await new MemoryBankDB().tryEnsureBank(bankEnsureAsk)],
       [WX.ensureBankAnswer,        await bankDB.tryEnsureBank(bankEnsureAsk)],
       [WX.buildBankAnswer,         await new MemoryBankDB().tryBuildBank(bankBuildAskOf())],
