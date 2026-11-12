@@ -153,7 +153,7 @@ export function shellBoxOf({ user_id, banklabel, vaultlabel, boxlabel, bank_tok,
   }
 }
 
-/** A listing's entry for a box row that failed validation, under the life of the vault `lived` names. Its label comes from storage, unchecked: it is part of what is reported. */
+/** A listing's entry for a box row that failed validation, under the life of the vault its second parameter names. Its label comes from storage, unchecked: it is part of what is reported. */
 export function damagedBoxOf({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, { bank_tok, vault_tok }: { bank_tok: string, vault_tok: string }): DamagedBox {
   return { user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, am: 'd' }
 }
