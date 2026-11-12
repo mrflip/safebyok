@@ -57,7 +57,7 @@ export const Hider = ({ hiding }: { hiding: Promise<unknown> | null }) => {
 /** A device_tok for tests that write one into a record by hand. */
 export const DeviceTok = '00000000-0000-4000-8000-0000000000c1'
 
-/** Return BankProvider props that use `world`'s vaultDB and user, with a new deviceDB. A vault the world's bank built is therefore locked for the provider's bank.
+/** Return BankProvider props that use `world`'s bankDB and user, with a new deviceDB. A vault the world's bank built is therefore locked for the provider's bank.
  *
  * @example
  *   const world = TH.makeBankWorld()

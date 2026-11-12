@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef, ComponentPropsWithRef, ReactNode, Ref } from 'react'
-import type { AnyGating, BadNewsHandler, Box, DeviceDB, DeviceOpts, Gating, LifecycleHandler, RequestCleartext, Vault, VaultDB, VaultError } from 'safebyok'
-import { Checker, Checkers, deviceOpts, type AssertEqual, type BoxesListed, type BoxSparse, type CheckerInput, type DamagedBox, type DamagedVault, type LeaseQuery, type LeaseScopepath, type VaultRow } from 'safebyok/storage'
+import type { AnyGating, BadNewsHandler, Box, DeviceDB, DeviceOpts, Gating, LifecycleHandler, RequestCleartext, Vault, VaultError } from 'safebyok'
+import { Checker, Checkers, deviceOpts, type AssertEqual, type CheckerInput, type LeaseQuery, type LeaseScopepath } from 'safebyok/storage'
 import { fromB64, type WhisperFieldAttributes } from 'safebyok/utils'
 
 // The types and checkers of safebyok-react, grouped by area. This file imports nothing from a component or
@@ -260,16 +260,13 @@ export type DelVaultModalProps = {
 }
 // --
 
-// == [Devmode]: DevBoxInspectorProps, DevDeviceDBInspectorProps, DevVaultDBInspectorProps, LastCall, Listing, ListedLease, LeaseRowLineProps, VaultRowLinesProps
+// == [Devmode]: DevBoxInspectorProps, DevDeviceDBInspectorProps, LastCall, Listing, ListedLease, LeaseRowLineProps
 
 /** DevBoxInspector's props: the vaultlabel and boxlabel its fields start with. */
 export type DevBoxInspectorProps = { defaultVaultlabel?: string, defaultBoxlabel?: string }
 
 /** DevDeviceDBInspector's props: the deviceDB whose rows it shows. */
 export type DevDeviceDBInspectorProps = { deviceDB: DeviceDB }
-
-/** DevVaultDBInspector's props: the vaultDB whose rows it shows. */
-export type DevVaultDBInspectorProps = { vaultDB: VaultDB }
 
 /** The result of a panel's last button press: the verb called, whether it succeeded, and the text to show. */
 export type LastCall = { verbname: string, isOk: boolean, said: string }
@@ -286,14 +283,5 @@ export type LeaseRowLineProps = {
   scopepath: LeaseScopepath | null
   onForget:  (asked: LeaseQuery) => Promise<void>
   onForgetRaw:  ((scopepath: LeaseScopepath) => Promise<void>) | null
-}
-
-/** Props for one vault's rows of the table: the vault row, its listed boxes, and the button handlers. */
-export type VaultRowLinesProps = {
-  vaultRow:   VaultRow | DamagedVault
-  boxes:      BoxesListed | null
-  onGetVault: () => Promise<void>
-  onGetBox:   (boxRow: BoxSparse | DamagedBox) => Promise<void>
-  onDelBox:   (boxRow: BoxSparse) => Promise<void>
 }
 // --
