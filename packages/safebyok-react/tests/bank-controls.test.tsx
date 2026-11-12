@@ -81,7 +81,7 @@ describe("BankLockControl", () => {
 })
 
 /** Wait until the bank stored in `world` lists the vault `main` as present. */
-const expectVaultStored = async (world: TH.BankWorld) => {
+async function expectVaultStored(world: TH.BankWorld) {
   await waitFor(async () => {
     const bank = await world.bankOnAnotherDevice()
     expect(bank.vaultAt({ vaultlabel: 'main' })?.isPresent).to.be.true

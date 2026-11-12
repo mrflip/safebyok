@@ -36,7 +36,7 @@ export const renderInBank = async (ui: ReactNode, { isBankBuilt = true }: { isBa
 }
 
 /** True when `bankDB` has u1's bank stored and live: a device that dismisses every dialog brings it up. */
-export const isBankStored = async (bankDB: MemoryBankDB): Promise<boolean> => {
+export async function isBankStored(bankDB: MemoryBankDB): Promise<boolean> {
   const device = Device.make({ user_id: 'u1', banklabel: 'acme', gates: ['main'], bankDB, deviceDB: new MemoryDeviceDB(), keyDeriver: testDeriver, logger: quietLogger, requestCleartext: () => undefined })
   const ensured = await device.tryEnsureBank()
   device.sweep()

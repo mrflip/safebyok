@@ -7,7 +7,7 @@ import * as TH from './test-helpers'
 TH.sweepBankWorlds()
 
 /** Open a del_bank gating on a bank built with {@link TH.Passphrase}, a vault in it, and render it in a DelBankModal. */
-const shownFor = async () => {
+async function shownFor() {
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)
   const opened = await TH.openGatingOf(world, TH.deleting)
@@ -16,12 +16,12 @@ const shownFor = async () => {
 }
 
 /** True when the world's bankDB still has a live bank: a device that dismisses every dialog brings it up. */
-const isBankStored = async (world: TH.BankWorld) => {
+async function isBankStored(world: TH.BankWorld) {
   const ensured = await world.deviceOnAnotherDevice({ requestCleartext: () => undefined }).tryEnsureBank()
   return ensured.ok
 }
 
-const alertText = () => screen.getByRole('alert').textContent
+function alertText() { return screen.getByRole('alert').textContent }
 
 describe("DelBankModal", () => {
   it("deletes the bank on the passphrase, naming the user and the bank, and the gating concludes", async () => {

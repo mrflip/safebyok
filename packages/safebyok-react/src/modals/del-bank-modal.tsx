@@ -4,13 +4,15 @@ import type { DelBankModalProps } from '../shapes'
 import { DialogBoundary, ModalForm, PassphraseField, UsernameField, textOf, useAttemptAction } from './modal-kit'
 
 /** Render the dialog for a `del_bank` gating: the user enters the passphrase to delete the bank, every vault in it and their boxes. */
-export const DelBankModal = (props: DelBankModalProps) => (
-  <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
-    <DelBankForm {...props} />
-  </DialogBoundary>
-)
+export function DelBankModal(props: Readonly<DelBankModalProps>) {
+  return (
+    <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
+      <DelBankForm {...props} />
+    </DialogBoundary>
+  )
+}
 
-const DelBankForm = ({ gating, passphraseUsername }: DelBankModalProps) => {
+function DelBankForm({ gating, passphraseUsername }: Readonly<DelBankModalProps>) {
   const fieldRef = useRef<HTMLInputElement>(null)
   const { gripe, gripeId, action } = useAttemptAction(
     gating,

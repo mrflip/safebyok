@@ -641,7 +641,7 @@ function UnlocksNearest({ testid }: Readonly<{ testid: string }>) {
 }
 
 /** The dialog open for the bank named `banklabel`, found by the username its passphrase is saved under. */
-const dialogOfBank = (banklabel: string): HTMLElement => {
+function dialogOfBank(banklabel: string): HTMLElement {
   const dialog = screen.getAllByRole('dialog').find((shown) => within(shown).queryByDisplayValue(`u1 (${banklabel} vault)`) !== null)
   if (dialog === undefined) { throw new Error(`no dialog open for ${banklabel}`) }
   return dialog

@@ -205,7 +205,7 @@ export const submitPasskeyAdd = (passphrase: string) => {
 }
 
 /** Type the passphrase into the delete-everything dialog and press Delete everything. */
-export const submitBankDeletion = (passphrase: string) => {
+export function submitBankDeletion(passphrase: string) {
   fireEvent.change(screen.getByPlaceholderText('vault passphrase'), { target: { value: passphrase } })
   fireEvent.click(screen.getByText('Delete everything'))
 }
