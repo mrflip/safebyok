@@ -14,13 +14,15 @@ if you don't know its parameters, call `guide` with `topic.index` once. Then `re
 
 The tab holds a **matters table** (`Coach answer | State | Matter`) and a **Coach notes** table
 (`Note | State`), each State cell a dropdown chip over the enum `State`: `drafting`, `proceed`,
-`explain`, `elevate`, `noted`. A row is **flipped** when its chip is anything but `drafting`. A
-chip with no option picked counts as `drafting`.
+`explain`, `elevate`, `noted`. A row is **flipped** when its chip is `proceed`, `explain` or
+`elevate`; `drafting` and `noted` rows are passed over, unquoted. A chip with no option picked
+counts as `drafting`.
 
 Return exactly this, ids and hashes copied character for character, and nothing more:
 
 ```
 rev: <the read's rev>
+node: <the tab's prose node id, the container every write names>
 State enum: <id>
 matters last row: <id> h=<h>        (the header row's, when the table has no rows)
 

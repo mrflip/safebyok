@@ -23,9 +23,11 @@ It lives in the doc the session already keeps (usually a sprint's), ordered firs
 tab that opens. With no doc in the session, birth one named for the work. To edit or interact
 with a doc, load the docs skill and the Docs guides `topic.index`, `topic.tabs`, and (if needed)
 `topic.editing` before the session's first write, because the docs tools change between sessions.
-To read only, spawn `doc-tab-reader`.
+To find the flipped rows, spawn `open-matters-reader` (*When to read it*); for a tab's text alone,
+`doc-tab-reader`.
 
-* **A lead**, a few lines long, saying what each state does.
+* **A lead** of one line: "Answer in *Coach answer*, then flip the chip." The Coach knows the
+  states, and every word of the tab is read again on every pass.
 * **The matters table**: `Coach answer | State | Matter`. *Coach Answer* is the Coach's and starts
   empty. *State* is a dropdown chip over one enum per doc, `State`, whose options are `drafting`,
   `proceed`, `explain`, `elevate`, and `noted`, in that order; every row is born `drafting`. *Matter* is the
@@ -59,7 +61,7 @@ below).
 
 When setting up, gather widely: TODO's open sections, the done and rulings notes in `human/`, the
 reviews' leftovers, PRs left open, flakes CI met, housekeeping. Leave out another session's open
-questions, and say so in the lead.
+questions.
 
 ## The states
 
