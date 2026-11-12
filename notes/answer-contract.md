@@ -334,6 +334,75 @@ Where the vault differs from the box table, and why:
 - VPG10 and VPL12 return `dbhas`: the caller needs the stored row to re-create or retry.
 - A vault put with `ifPresent=repl` replaces a live vault in place, as a box put does: a fresh `revision_tok`, seq + 1, the same `vault_tok` (C7). It touches no box, and it makes no box request stale, because a box request cites the vault's life token and never its revision.
 
+## The bankDB
+
+The bankDB keeps a bank row, its one `main` gate row and its vault rows above the box rows. Its
+classifier is `src/storage/bank-classifier.ts`. A vault row there is the vaultDB's without a gate,
+and with its bank's `bank_tok`; a box row is the vaultDB's, and a box op is classified by the box
+table above, with its vault row as `parent` in the place of `world`. A get, put or del of a bank,
+gate or vault row reads the tables above, with these differences:
+
+- Every answer carries `parent`, the row above the one asked for: the bank row for a gate or vault
+  verb, `buildBank` and `ensureBank`; the vault row for a box verb; none for `delBank`. The shell
+  stands in for none.
+- `bank_tok` and `gate_tok` are life toks as `vault_tok` and `box_tok` are. buildBank mints both, a
+  gate verb keeps both, delBank stores a new `bank_tok` on the bank's tombstone.
+- A gate row is never tombstoned: it is put with its bank and deleted with it.
+
+### The row above (P1–P4)
+
+Every gate and vault op passes these first, after the checks of its ask (V1–V2), as a box op
+passes G3–G6.
+
+| #  | `k_tok` | bank    | act                                                                | returning | result |
+| -- | :-----: | ------- | ------------------------------------------------------------------ | :-------: | :----: |
+| P1 |    @    | damaged | `damaged_row`                                                      |  thrown   |   🌀    |
+| P2 |    @    | void    | `bank_void`                                                        |    err    |   🌀    |
+| P3 |    @    | gone    | `bank_gone`    (the bank was deleted since)                        |    err    |   🔁    |
+| P4 |   neq   | live    | `bank_reborn`  (the bank was re-created since)                     |    err    |   🔁    |
+
+`k_tok` compares the ask's `bank_tok` with the stored bank row's. When the row above refuses,
+the row asked for goes unchecked, and `dbhas` is null. A gate or vault row whose `bank_tok` is not
+its live bank's is of an ended life: it counts as no row, and the op tables read it as void.
+
+### Bank ops
+
+| #   | op       | bank   | act                                                       | returning                         | result |
+| --- | -------- | ------ | --------------------------------------------------------- | --------------------------------- | :----: |
+| BE1 | ensure   | void   | `gotvoid`                                                 | **null**                          |   🔲    |
+| BE2 | ensure   | gone   | `gotgone`                                                 | **null**, the tombstone as parent |   🪦    |
+| BE3 | ensure   | live   | `gotlive`                                                 | **the main gate, the vaults**     |   🫱    |
+| BE4 | ensure, build | live, no main gate | `damaged_row` (a lost row)                    | thrown                            |   🌀    |
+| BB1 | build    | @      | the put table, with `ifAbsent: add` and `ifPresent: get`  |                                   |        |
+| BD1 | del      | @      | the del table                                             |                                   |        |
+
+- `ensureBank` answers a live bank's vault rows, tombstones among them, leaves out a vault row of an
+  ended life, and lists a vault row that fails its checks among `damaged_rows`.
+- `buildBank` puts the bank record and its gate record in one step: under `born` or `reborn` it
+  stores both, and answers both. Under `passed` it answers the live bank and its main gate row.
+  A gate row left by an ended life is put over.
+- `delBank` under `deleted` stores the bank's tombstone, and deletes every gate, vault and box row
+  under the bank's scope, in the same step.
+
+### Gate ops
+
+A gate verb is a put of the gate row, with `ifAbsent: fail` and `ifPresent: repl`, read by the put
+table. Where the table answers `replaced`, the verb's policy runs on the gate row fetched in that
+step (design.md, *The gate verbs' policy*):
+
+| #   | verb                | gate row                                           | act          | returning | result |
+| --- | ------------------- | -------------------------------------------------- | ------------ | :-------: | :----: |
+| GV1 | @                   | `registered_at` differs from the record's          | `gate_issue` |  thrown   |   🌀    |
+| GV2 | addPasskey          | has a `passkey0`                                   | `camped`     |   dbhas   |   🧨    |
+| GV3 | revokePasskey       | has no `passkey0`                                  | `passed`     | **same**  |   🟰    |
+| GV4 | replacePassphrase   | a wayin but `main` differs from the record's       | `gate_issue` |  thrown   |   🌀    |
+| GV5 | add-, revokePasskey | a wayin but `passkey0` differs from the record's   | `gate_issue` |  thrown   |   🌀    |
+| GV6 | @                   | anything else                                      | `replaced`   | **reqval** |  👍    |
+
+The other cells of the policy are held before the table is read. The ask's check (V2) holds every
+cell of `buildBank` and `delBank`, the empty `auth`, `sigs` and `meta`, and `revokePasskey`'s record
+having no `passkey0`. P4 and the revision rules hold `bank_tok` and `gate_tok` being the row's.
+
 ## Roles
 
 Three roles take part in every call, and each rule below names the one it binds.

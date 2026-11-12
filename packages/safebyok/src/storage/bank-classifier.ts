@@ -1,6 +1,6 @@
-/** Classify an ask against the stored rows, per the tables in `notes/answer-contract.md`. */
+/** Classify a bankDB ask against the stored rows, per the tables in `notes/answer-contract.md`. */
 
-import { isEqual } from 'es-toolkit'
+import { isEqual, omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { checkedConsistent } from '../helpers/validator'
 import * as Phrases from '../helpers/phrases'
@@ -8,18 +8,19 @@ import * as Refuse from '../refusals/throwers'
 import * as CX from '../shapes/shapes-core'
 import * as EX from '../shapes/shapes-enums'
 import * as SX from '../shapes/shapes-storage'
-import type { BankScope, VaultScope } from '../shapes/shapes-core'
-import type { BoxAct, BoxVaultAct, ListAct, OkAct, RefusedAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
-import type {
-  BoxAsk, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxQuery, BoxRow, BoxSparse, Capacity, VaultAsk, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultRecord, VaultRow,
-} from '../shapes/shapes-storage'
-import type { BankListed, BoxesListed } from './vault-db'
+import * as BX from '../shapes/shapes-bankdb'
+import type { BankScope, GateScope, VaultScope } from '../shapes/shapes-core'
+import type { BoxAct, BoxVaultAct, GotAct, IfAbsent, IfPresent, ListAct, OkAct, ParentBankAct, PutIfAbsent, RefusedAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
+import type { BoxAsk, BoxListAsk, BoxQuery, BoxRow, Capacity } from '../shapes/shapes-storage'
+import type { BankBuildAsk, BankDelAsk, BankEnsureAsk, BankRecord, BankRow, GatePutAsk, GateRecord, VaultAsk, VaultRow } from '../shapes/shapes-bankdb'
+import type { BankEnsured } from './bank-db'
+import type { BoxesListed } from './vault-db'
 
-// == [Rows and presence]: Meta, presenceVals, Presence, presenceOf, RecordAsk
+// == [Rows and presence]: Meta, presenceVals, Presence, presenceOf, RecordAsk, PutAsk
 // Each function below takes the ask first, and the row stored second, null for none.
 
-/** The fields of a row, stored or expected, that the tables compare. */
-type Meta = Readonly<Pick<BoxSparse, 'revision_tok' | 'revision_seq' | 'am' | 'vault_tok'> & Partial<Pick<BoxSparse, 'box_tok'>>>
+/** The fields of a row, stored or expected, that the tables compare: its revision, its liveness, and the life toks it carries. */
+type Meta = Readonly<{ revision_tok: string, revision_seq: number, am: EX.Am, bank_tok?: string, gate_tok?: string, vault_tok?: string, box_tok?: string }>
 
 /** What is stored at a scope: no row, a tombstone, or a live row. */
 export const presenceVals = ['void', 'gone', 'live'] as const
@@ -31,8 +32,10 @@ function presenceOf(row: Meta | null): Presence {
   return (row.am === 'a') ? 'live' : 'gone'
 }
 
-/** A put or del ask, box or vault: one that carries the row it expects and the record it would store. */
-type RecordAsk = VaultPutAsk | VaultDelAsk | BoxPutAsk | BoxDelAsk
+/** A put or del ask, of any row: one that carries the row it expects and the record it would store. */
+type RecordAsk = Readonly<{ expected: Meta, record: Meta }>
+/** A put ask, of any row, with the policies that apply over a live row and over a tombstone or none. */
+type PutAsk    = RecordAsk & Readonly<{ ifAbsent: PutIfAbsent, ifPresent: IfPresent }>
 // --
 
 // == [Columns]: RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, lifeTokOf, isLifeOff
@@ -69,8 +72,9 @@ function revseqCmpOf({ expected }: RecordAsk, row: Meta | null): RevseqCmp {
   return (expected.revision_seq < row.revision_seq) ? 'stale' : 'ahead'
 }
 
-// A box's life is named by its `box_tok`. A vault row has none, and its life is its `vault_tok`.
-function lifeTokOf({ box_tok, vault_tok }: Meta): string { return box_tok ?? vault_tok }
+// A row's life is named by its own life tok: a box's `box_tok`, a gate's `gate_tok`, a vault's `vault_tok`, a bank's
+// `bank_tok`. A row also carries the life tok of the row above it, so its own is the first of these it has.
+function lifeTokOf({ box_tok, gate_tok, vault_tok, bank_tok }: Meta): string | undefined { return box_tok ?? gate_tok ?? vault_tok ?? bank_tok }
 
 /** True when a row is stored, and the row expected differs from it in its life token or its liveness. */
 function isLifeOff({ expected }: RecordAsk, row: Meta | null): boolean {
@@ -79,10 +83,10 @@ function isLifeOff({ expected }: RecordAsk, row: Meta | null): boolean {
 // --
 
 // == [Tables]: getActOf, putActOf, delActOf, rowActOf
-// Each returns the act for the asked-for row, box or vault alike.
+// Each returns the act for the asked-for row, of whatever kind.
 
 /** Classify a get: see the get table in `notes/answer-contract.md`. */
-function getActOf({ ifAbsent }: VaultGetAsk | BoxGetAsk, row: Meta | null): VaultAct {
+function getActOf({ ifAbsent }: { ifAbsent: IfAbsent }, row: Meta | null): VaultAct {
   const presence = presenceOf(row)
   if (presence === 'live') { return 'gotlive' }
   if (presence === 'void') { return (ifAbsent === 'nil') ? 'gotvoid' : 'void' }
@@ -90,7 +94,7 @@ function getActOf({ ifAbsent }: VaultGetAsk | BoxGetAsk, row: Meta | null): Vaul
 }
 
 /** Classify a put: see the put table in `notes/answer-contract.md`. The first matching row wins. */
-function putActOf(ask: VaultPutAsk | BoxPutAsk, row: Meta | null): VaultAct {
+function putActOf(ask: PutAsk, row: Meta | null): VaultAct {
   const presence     = presenceOf(row)
   // The policy that applies: `ifPresent` over a live row, `ifAbsent` over a tombstone or void row.
   const opflag       = (presence === 'live') ? ask.ifPresent : ask.ifAbsent
@@ -108,7 +112,7 @@ function putActOf(ask: VaultPutAsk | BoxPutAsk, row: Meta | null): VaultAct {
 }
 
 /** Classify a del: see the del table in `notes/answer-contract.md`. The first matching row wins. */
-function delActOf(ask: VaultDelAsk | BoxDelAsk, row: Meta | null): VaultAct {
+function delActOf(ask: RecordAsk, row: Meta | null): VaultAct {
   const presence     = presenceOf(row)
   const revseqCmp    = revseqCmpOf(ask, row)
   const revtokCmp    = revtokCmpOf(ask, row)
@@ -121,7 +125,7 @@ function delActOf(ask: VaultDelAsk | BoxDelAsk, row: Meta | null): VaultAct {
   return (presence === 'gone') ? 'dubdel' : 'deleted'
 }
 
-/** Classify an ask against the row stored at its scope. */
+/** Classify a vault or box ask against the row stored at its scope. */
 function rowActOf(ask: VaultAsk | BoxAsk, row: Meta | null): VaultAct {
   if (ask.op === 'get') { return getActOf(ask, row) }
   if (ask.op === 'put') { return putActOf(ask, row) }
@@ -129,22 +133,47 @@ function rowActOf(ask: VaultAsk | BoxAsk, row: Meta | null): VaultAct {
 }
 // --
 
-// == [Rows stored]: boxVaultRow, RowOfOtherAddress, vaultRowOf, boxRowOf, boxWorldOf, boxVaultActOf, listedRowOf
+// == [Rows stored]: boxVaultRow, RowOfOtherAddress, bankRowOf, gateRowOf, mainGateOf, vaultRowOf, boxRowOf, boxParentOf, parentBankActOf, boxVaultActOf, listedRowOf
 
 // A faulty row throws, with the message of the check that failed. A row is damaged when it fails its own checks: the
-// asked-for row throws `damaged_row`, and the vault row of an asked-for box throws `damaged_vault`. A row that is not an
-// object, or a sound row stored at another address than the one asked for, means the datastore or its adapter is broken,
-// and throws `storage_issue`.
-const boxVaultRow = SX.storedVaultRow.refusingAs('damaged_vault')
+// asked-for row, and a bank row above, throw `damaged_row`, and the vault row of an asked-for box throws `damaged_vault`.
+// A row that is not an object, or a sound row stored at another address than the one asked for, means the datastore or
+// its adapter is broken, and throws `storage_issue`.
+const boxVaultRow = BX.storedVaultRow.refusingAs('damaged_vault')
 
 const RowOfOtherAddress = { kind: 'storage_issue', message: Phrases.rowOfOtherAddress } as const
 
-// Checked against its scope, not its vault_tok: a vault row from another life refuses `vault_gone` or `vault_reborn`, and is no fault of storage.
-/** The vault row stored at `vaultScope`, checked by `checker`, which throws for a row that fails its checks. */
-function vaultRowOf(vaultScope: VaultScope, vaultRaw: unknown, checker: typeof SX.storedVaultRow): VaultRow | null {
+/** The bank row stored at `bankScope`, checked, or null for none. Throws `damaged_row` for a row that fails its checks. */
+function bankRowOf(bankScope: BankScope, bankRaw: unknown): BankRow | null {
+  if (bankRaw === null)         { return null }
+  if (! CX.isPlainBag(bankRaw)) { throw Refuse.storageIssue() }
+  return BX.storedBankRow.parseConsistent(bankRaw, CX.bankScope.parse(bankScope), RowOfOtherAddress)
+}
+
+// A row under another `bank_tok` than its bank row's is of an ended life of the bank: it counts as no row, as a box row
+// under another `vault_tok` does.
+/** The gate row stored at `gateScope` under the bank row `parent`, checked, or null for none. Throws `damaged_row` for a row that fails its checks. */
+function gateRowOf(gateScope: GateScope, gateRaw: unknown, parent: BankRow): GateRecord | null {
+  if (gateRaw === null)         { return null }
+  if (! CX.isPlainBag(gateRaw)) { throw Refuse.storageIssue() }
+  const gate = BX.storedGateRow.parseConsistent(gateRaw, CX.gateScope.parse(gateScope), RowOfOtherAddress)
+  return (gate.bank_tok === parent.bank_tok) ? gate : null
+}
+
+// A live bank row has a live `main` gate row: one without is damage, not a state.
+/** The `main` gate row of the live bank `parent`. Throws `damaged_row` for none, or for a row that fails its checks. */
+function mainGateOf(bankScope: BankScope, gateRaw: unknown, parent: BankRecord): GateRecord {
+  const gate = gateRowOf({ ...bankScope, gatelabel: 'main' }, gateRaw, parent)
+  if (gate === null) { throw Refuse.mainGateMissing(parent) }
+  return gate
+}
+
+/** The vault row stored at `vaultScope` under the bank row `parent`, checked, or null for none. Throws `damaged_row` for a row that fails its checks. */
+function vaultRowOf(vaultScope: VaultScope, vaultRaw: unknown, parent: BankRow): VaultRow | null {
   if (vaultRaw === null)         { return null }
   if (! CX.isPlainBag(vaultRaw)) { throw Refuse.storageIssue() }
-  return checker.parseConsistent(vaultRaw, CX.vaultScope.parse(vaultScope), RowOfOtherAddress)
+  const vault = BX.storedVaultRow.parseConsistent(vaultRaw, CX.vaultScope.parse(vaultScope), RowOfOtherAddress)
+  return (vault.bank_tok === parent.bank_tok) ? vault : null
 }
 
 /** The box row stored at `boxQuery`, checked. Throws `damaged_row` for a row that fails its checks. */
@@ -154,18 +183,26 @@ function boxRowOf(boxQuery: BoxQuery, boxRaw: unknown): BoxRow | null {
   return SX.storedBoxRow.parseConsistent(boxRaw, SX.boxQuery.parse(boxQuery), RowOfOtherAddress)
 }
 
-/** The stored vault row of a box ask, or the shell row for none.
- * Throws `damaged_vault` for a row that fails its checks.
- */
-function boxWorldOf(vaultScope: VaultScope, vaultRaw: unknown): VaultRow {
-  return vaultRowOf(vaultScope, vaultRaw, boxVaultRow) ?? SX.shellVaultOf(vaultScope)
+// Checked against its scope, not its vault_tok: a vault row from another life refuses `vault_gone` or `vault_reborn`, and is no fault of storage.
+/** The vault row above a box ask, or the shell row for none. Throws `damaged_vault` for a row that fails its checks. */
+function boxParentOf(vaultScope: VaultScope, vaultRaw: unknown): VaultRow {
+  if (vaultRaw === null)         { return BX.shellVaultOf(vaultScope) }
+  if (! CX.isPlainBag(vaultRaw)) { throw Refuse.storageIssue() }
+  return boxVaultRow.parseConsistent(vaultRaw, CX.vaultScope.parse(vaultScope), RowOfOtherAddress)
 }
 
-/** Classify a box ask's vault row: the act it refuses with, or null when the vault is live in the asked-for life. */
-function boxVaultActOf({ vault_tok }: Pick<BoxQuery, 'vault_tok'>, world: VaultRow): BoxVaultAct | null {
-  if (world.revision_seq === SX.VoidRevisionSeq) { return 'vault_void' }
-  if (world.am !== 'a')                          { return 'vault_gone' }
-  return (world.vault_tok === vault_tok) ? null : 'vault_reborn'
+/** Classify the bank row above a gate or vault ask: the act it refuses with, or null when the bank is live in the asked-for life. */
+function parentBankActOf({ bank_tok }: { bank_tok: string }, parent: BankRow): ParentBankAct | null {
+  if (parent.revision_seq === SX.VoidRevisionSeq) { return 'bank_void' }
+  if (parent.am !== 'a')                          { return 'bank_gone' }
+  return (parent.bank_tok === bank_tok) ? null : 'bank_reborn'
+}
+
+/** Classify the vault row above a box ask: the act it refuses with, or null when the vault is live in the asked-for life. */
+function boxVaultActOf({ vault_tok }: Pick<BoxQuery, 'vault_tok'>, parent: VaultRow): BoxVaultAct | null {
+  if (parent.revision_seq === SX.VoidRevisionSeq) { return 'vault_void' }
+  if (parent.am !== 'a')                          { return 'vault_gone' }
+  return (parent.vault_tok === vault_tok) ? null : 'vault_reborn'
 }
 
 /** A listed row, checked, and stored at `address`; null for a row that fails its checks. Throws `storage_issue` for one that is not an object, or of another address. */
@@ -196,75 +233,134 @@ export function cappedActOf(act: BoxAct, capacity: Capacity): BoxAct {
 }
 // --
 
-// == [Gate verbs]: replacePassphraseActOf, addPasskeyActOf, revokePasskeyActOf, GateActOfForVerb
-// A gate verb is a put of the vault record over its live row, with checks of its own that compare the record's gate with
-// the stored one. They run on the row the adapter fetched in the same step that stores the record, never on a row a
-// caller fetched earlier. Each returns `replaced` when the record may be stored, or the act that stops it, and throws
-// `gate_issue` when the record changes more than its verb allows.
+// == [The gate verbs' policy]: BuildPolicies, GatePolicies, replacePassphraseActOf, addPasskeyActOf, revokePasskeyActOf, GateActOfForVerb
+// The rows of the policy table in design.md, *The gate verbs' policy*, that need the stored gate row: one function per
+// verb, and one line per cell. A gate verb is a put of the gate record over its live row, and these run on the row the
+// adapter fetched in the same step that stores the record, never on a row a caller fetched earlier. Each returns
+// `replaced` when the record may be stored, or the act that answers without putting, and throws `gate_issue` when the
+// record changes more than its verb allows.
+//
+// The other cells are held before these run. The ask's check holds every cell of `buildBank` and `delBank`, each gate
+// verb's empty `auth`, `sigs` and `meta`, and `revokePasskey`'s record having no `passkey0`. The row above and the
+// revision rules hold a gate verb's `bank_tok` and `gate_tok` being the row's: a gate row under another `bank_tok` counts
+// as none, and one under another `gate_tok` refuses as `clash` or `stale`.
 
-function replacePassphraseActOf(record: VaultRecord, stored: VaultRecord): VaultAct {
-  if (stored.registered_at !== record.registered_at)                      { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
-  if (record.gate.gate_epoch !== (stored.gate.gate_epoch + 1))            { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
-  if (! isEqual(record.gate.passkey_wayin, stored.gate.passkey_wayin))    { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
+// `buildBank` puts over a tombstone or nothing, and answers the live bank it finds; a gate verb replaces a live gate row.
+const BuildPolicies = { ifAbsent: 'add',  ifPresent: 'get'  } as const
+const GatePolicies  = { ifAbsent: 'fail', ifPresent: 'repl' } as const
+
+function replacePassphraseActOf(parent: BankRow, record: GateRecord, stored: GateRecord): VaultAct {
+  if (stored.registered_at !== record.registered_at)                                       { throw Refuse.bankGateIssue(parent, stored, Phrases.RegisteredAtNotStored) }
+  if (! isEqual(omit(record.wayins, ['main']), omit(stored.wayins, ['main'])))             { throw Refuse.bankGateIssue(parent, stored, Phrases.OtherWayinMoved) }
   return 'replaced'
 }
 
 // `camped`: a passkey wayin is already stored.
-function addPasskeyActOf(record: VaultRecord, stored: VaultRecord): VaultAct {
-  if (stored.registered_at !== record.registered_at)                           { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
-  if (stored.gate.passkey_wayin !== null)                                      { return 'camped' }
-  if (record.gate.gate_epoch !== (stored.gate.gate_epoch + 1))                 { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
-  if (! isEqual(record.gate.passphrase_wayin, stored.gate.passphrase_wayin))   { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
+function addPasskeyActOf(parent: BankRow, record: GateRecord, stored: GateRecord): VaultAct {
+  if (stored.registered_at !== record.registered_at)                                       { throw Refuse.bankGateIssue(parent, stored, Phrases.RegisteredAtNotStored) }
+  if (stored.wayins.passkey0 !== undefined)                                                { return 'camped' }
+  if (! isEqual(omit(record.wayins, ['passkey0']), omit(stored.wayins, ['passkey0'])))     { throw Refuse.bankGateIssue(parent, stored, Phrases.OtherWayinMoved) }
   return 'replaced'
 }
 
 // `passed`: no passkey wayin is stored, so the stored row is returned unchanged.
-function revokePasskeyActOf(record: VaultRecord, stored: VaultRecord): VaultAct {
-  if (stored.registered_at !== record.registered_at)                           { throw Refuse.gateIssue(stored, Phrases.RegisteredAtNotStored) }
-  if (stored.gate.passkey_wayin === null)                                      { return 'passed' }
-  if (record.gate.gate_epoch !== (stored.gate.gate_epoch + 1))                 { throw Refuse.gateIssue(stored, Phrases.GateEpochNotNext) }
-  if (! isEqual(record.gate.passphrase_wayin, stored.gate.passphrase_wayin))   { throw Refuse.gateIssue(stored, Phrases.OtherWayinMoved) }
+function revokePasskeyActOf(parent: BankRow, record: GateRecord, stored: GateRecord): VaultAct {
+  if (stored.registered_at !== record.registered_at)                                       { throw Refuse.bankGateIssue(parent, stored, Phrases.RegisteredAtNotStored) }
+  if (stored.wayins.passkey0 === undefined)                                                { return 'passed' }
+  if (! isEqual(omit(record.wayins, ['passkey0']), omit(stored.wayins, ['passkey0'])))     { throw Refuse.bankGateIssue(parent, stored, Phrases.OtherWayinMoved) }
   return 'replaced'
 }
 
 const GateActOfForVerb = {
   replacePassphrase: replacePassphraseActOf, addPasskey: addPasskeyActOf, revokePasskey: revokePasskeyActOf,
-} as const satisfies Record<EX.GateVerb, (record: VaultRecord, stored: VaultRecord) => VaultAct>
+} as const satisfies Record<EX.GateVerb, (parent: BankRow, record: GateRecord, stored: GateRecord) => VaultAct>
 // --
 
-// == [Classifying]: RowOfVault, RowOfBox, VaultFetched, BoxFetched, BoxesFetched, VaultStored, BoxStored, VaultsStored, BoxesStored, classifyStoredVault, classifyStoredBox, classifyStoredVaults, classifyStoredBoxes, vaultActOf, boxActOf
-// The classifier checks each stored row once, and returns everything it worked out on the way to the answer.
-// A row that fails its checks throws, and `AdapterVaultDB` turns the throw into a refused answer.
+// == [Classifying]: RowOfVault, RowOfBox, BankEnsureFetched, GateFetched, BankFetched, VaultFetched, BoxFetched, BoxesFetched, BankEnsureStored, BankBuildStored, GateStored, BankDelStored, VaultStored, BoxStored, BoxesStored, classifyEnsureBank, classifyBuildBank, classifyStoredGate, classifyDelBank, classifyStoredVault, classifyStoredBox, classifyStoredBoxes
+// The classifier checks each stored row once, and returns everything it worked out on the way to the answer. Each verb's
+// row above is judged first: when it refuses, the row asked for goes unchecked, whatever is stored there.
 
 /** A vault row from storage, unchecked, with its vaultlabel. */
 export type RowOfVault = { vaultlabel: string, vault: unknown }
 /** A box row from storage, unchecked, with its boxlabel. */
 export type RowOfBox   = { boxlabel: string, box: unknown }
 
-/** The vault row an adapter fetched for a vault ask, unchecked, or null for none. */
-export type VaultFetched = { vault: unknown }
+/** The rows an adapter fetched for an `ensureBank` ask in one step, unchecked: the bank row and its `main` gate row, each null for none, and the bank's vault rows. */
+export type BankEnsureFetched = Readonly<{ bank: unknown, gate: unknown, vaults: readonly RowOfVault[] }>
+
+/** The rows an adapter fetched for a `buildBank` ask or a gate verb's in one step, unchecked: the bank row and its `main` gate row, each null for none. */
+export type GateFetched = Readonly<{ bank: unknown, gate: unknown }>
+
+/** The bank row an adapter fetched for a `delBank` ask, unchecked, or null for none. */
+export type BankFetched = Readonly<{ bank: unknown }>
+
+/** The rows an adapter fetched for a vault ask in one step, unchecked: the bank row and the vault row, each null for none. */
+export type VaultFetched = Readonly<{ bank: unknown, vault: unknown }>
 
 /** The rows an adapter fetched for a box ask, unchecked:
  * - `box`      -- the stored box row, as fetched before any write (null for none)
- * - `world`    -- the vault row, fetched in the same step (null for none)
+ * - `parent`   -- the vault row, fetched in the same step (null for none)
  * - `capacity` -- the vault's {@link Capacity} stats, for adapters that return it
  */
-export type BoxFetched = Readonly<{ world: unknown, box: unknown, capacity?: Capacity | null }>
+export type BoxFetched = Readonly<{ parent: unknown, box: unknown, capacity?: Capacity | null }>
 
 /** The rows an adapter fetched for a `listBoxes` ask in one step, unchecked: the vault row (null for none) and the box rows of the asked-for life. */
-export type BoxesFetched = Readonly<{ world: unknown, boxes: readonly RowOfBox[] }>
+export type BoxesFetched = Readonly<{ parent: unknown, boxes: readonly RowOfBox[] }>
 
-/** A vault ask, classified against the stored row.
+/** An `ensureBank` ask, classified against the rows stored: `gotlive` with the bank's gate and vaults, or `gotvoid` or `gotgone` with none.
+ * - `parent`  -- the bank row stored, or the shell for none
+ * - `ensured` -- the good answer's `val`: the bank's `main` gate row, its vault rows and its damaged ones; null when the bank is not live
+ */
+export type BankEnsureStored = Readonly<{ ok: true, act: GotAct, parent: BankRow, ensured: BankEnsured | null }>
+
+/** A `buildBank` ask, classified against the bank and gate rows stored.
  * - `ok`  -- true for a good answer, false for a refusal
  * - `act` -- directs how to route and handle the answer
  */
-export type VaultStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct }) & {
-  /** The vault row after this ask: the record it stores, else the stored row, else the shell for none. */
-  world:    VaultRow
-  /** A good answer's `val`, or a refusal's `dbhas`: the record this ask stores, else the stored vault row, or null for none. */
-  vault:    VaultRow | null
-  /** What was stored at the vault's scope before any write. */
+export type BankBuildStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct }) & {
+  /** The bank row after this ask: the record it stores, else the stored row, else the shell for none. */
+  parent:   BankRow
+  /** A good answer's `val`: the gate record this ask stores, else the live bank's gate row; null when no live bank is stored. */
+  gate:     GateRecord | null
+  /** What was stored at the bank's scope before any write. */
   presence: Presence
+}>
+
+/** A gate verb's ask, classified against the bank and gate rows stored.
+ * - `ok`  -- true for a good answer, false for a refusal
+ * - `act` -- directs how to route and handle the answer
+ */
+export type GateStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct | ParentBankAct }) & {
+  /** The bank row stored, or the shell for none. */
+  parent:   BankRow
+  /** A good answer's `val`, or a refusal's `dbhas`: the record this ask stores, else the stored gate row, or null for none or when the bank row refused. */
+  gate:     GateRecord | null
+  /** What was stored at the gate's scope before any write, or null when the bank row refused and the gate row went unchecked. */
+  presence: Presence | null
+}>
+
+/** A `delBank` ask, classified against the bank row stored.
+ * - `ok`  -- true for a good answer, false for a refusal
+ * - `act` -- directs how to route and handle the answer
+ */
+export type BankDelStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct }) & {
+  /** A good answer's `val`, or a refusal's `dbhas`: the tombstone this ask stores, else the stored bank row, or null for none. */
+  bank:     BankRow | null
+  /** What was stored at the bank's scope before any write. */
+  presence: Presence
+}>
+
+/** A vault ask, classified against the bank and vault rows stored.
+ * - `ok`  -- true for a good answer, false for a refusal
+ * - `act` -- directs how to route and handle the answer
+ */
+export type VaultStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct | ParentBankAct }) & {
+  /** The bank row stored, or the shell for none. */
+  parent:   BankRow
+  /** A good answer's `val`, or a refusal's `dbhas`: the record this ask stores, else the stored vault row, or null for none or when the bank row refused. */
+  vault:    VaultRow | null
+  /** What was stored at the vault's scope before any write, or null when the bank row refused and the vault row went unchecked. */
+  presence: Presence | null
 }>
 
 /** A box ask, classified against the stored vault and box rows.
@@ -273,7 +369,7 @@ export type VaultStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act:
  */
 export type BoxStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct | BoxVaultAct }) & {
   /** The vault row stored, or the shell for none. */
-  world:    VaultRow
+  parent:   VaultRow
   /** A good answer's `val`, or a refusal's `dbhas`: the record this ask stores, else the stored box row, or null for none or when the vault row refused. */
   box:      BoxRow | null
   /** What was stored at the box's scope before any write, or null when the vault row refused and the box row went unchecked. */
@@ -282,33 +378,92 @@ export type BoxStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: R
   capacity: Capacity | null
 }>
 
-/** A `listVaults` ask, classified against the vault rows stored: `got` with rows, `gotvoid` with none, its world the bank's scope. */
-export type VaultsStored = Readonly<{ ok: true, act: ListAct, world: BankScope, listed: BankListed }>
-
 /** A `listBoxes` ask, classified against the stored vault row and box rows.
  * - `ok`     -- true for a good answer; false when the vault is not live in the asked-for life
- * - `world`  -- the vault row stored, or the shell for none
+ * - `parent` -- the vault row stored, or the shell for none
  * - `listed` -- the boxes, sparse, and the rows that failed their checks; null when the vault refused
  */
-export type BoxesStored = Readonly<({ ok: true, act: ListAct, listed: BoxesListed } | { ok: false, act: BoxVaultAct, listed: null }) & { world: VaultRow }>
+export type BoxesStored = Readonly<({ ok: true, act: ListAct, listed: BoxesListed } | { ok: false, act: BoxVaultAct, listed: null }) & { parent: VaultRow }>
 
-// A vault ask is classified entirely here, top to bottom.
-/** Classify a vault ask against the row an adapter fetched for it, per the tables in `notes/answer-contract.md`.
- * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the row.
- * Throws for a row that fails its checks or is stored at another scope, and `gate_issue` when a gate verb's record fails that verb's checks.
+// A vault row of an ended life of the bank counts as no row, and is left out; one that fails its checks is listed among
+// the damaged rows, under the label storage holds it by, so one bad row never hides the rest.
+/** Classify an `ensureBank` ask against the rows an adapter fetched for it: the bank row, then its `main` gate row and each vault row.
+ * Throws for a bank row that fails its checks, and `damaged_row` for a live bank whose `main` gate row is missing or fails its checks.
  */
-export function classifyStoredVault(ask: VaultAsk, { vault }: VaultFetched): VaultStored {
-  const row      = vaultRowOf(ask, vault, SX.storedVaultRow)
-  const presence = presenceOf(row)
-  const world    = row ?? SX.shellVaultOf(ask)
-  const tabled   = rowActOf(ask, row)
+export function classifyEnsureBank(ask: BankEnsureAsk, fetched: BankEnsureFetched): BankEnsureStored {
+  const bank = bankRowOf(ask, fetched.bank)
+  if (bank === null)  { return { ok: true, act: 'gotvoid', parent: BX.shellBankOf(ask), ensured: null } }
+  if (bank.am !== 'a') { return { ok: true, act: 'gotgone', parent: bank, ensured: null } }
 
-  // A gate verb's put also checks its record against the gate of the live row it would replace.
-  const isGatePut = (ask.op === 'put') && (ask.gateVerb !== undefined) && (tabled === 'replaced') && (row?.am === 'a')
-  const act      = isGatePut ? GateActOfForVerb[ask.gateVerb](ask.record, row) : tabled
+  const { user_id, banklabel } = ask
+  const ensured: BankEnsured = { gates: { main: mainGateOf(ask, fetched.gate, bank) }, vaults: [], damaged_rows: [] }
+  for (const { vaultlabel, vault } of fetched.vaults) {
+    const address = { user_id, banklabel, vaultlabel }
+    const row     = listedRowOf(BX.vaultRow, vault, address)
+    if (row === null) { ensured.damaged_rows.push(SX.damagedVaultOf(address)) } else if (row.bank_tok === bank.bank_tok) { ensured.vaults.push(row) }
+  }
+  return { ok: true, act: 'gotlive', parent: bank, ensured }
+}
 
-  if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, world: ask.record, vault: ask.record, presence } }
-  return isOkAct(act) ? { ok: true, act, world, vault: row, presence } : { ok: false, act, world, vault: row, presence }
+// A gate row under a bank that is not live is of an ended life, and goes unchecked: the gate record is put over it.
+/** Classify a `buildBank` ask against the rows an adapter fetched for it, per the put table in `notes/answer-contract.md`.
+ * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` and `ask.gate` in the same step that fetched the rows.
+ * Throws for a row that fails its checks, and `damaged_row` for a live bank whose `main` gate row is missing.
+ */
+export function classifyBuildBank(ask: BankBuildAsk, fetched: GateFetched): BankBuildStored {
+  const bank     = bankRowOf(ask, fetched.bank)
+  const presence = presenceOf(bank)
+  const act      = putActOf({ ...ask, ...BuildPolicies }, bank)
+  if (isWriteAct(act)) { return { ok: true, act, parent: ask.record, gate: ask.gate, presence } }
+
+  const parent = bank ?? BX.shellBankOf(ask)
+  const gate   = (bank?.am === 'a') ? mainGateOf(ask, fetched.gate, bank) : null
+  return isOkAct(act) ? { ok: true, act, parent, gate, presence } : { ok: false, act, parent, gate, presence }
+}
+
+/** Classify a gate verb's ask against the rows an adapter fetched for it: the bank row, then the gate row, then the verb's policy.
+ * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the rows.
+ * Throws for a row that fails its checks, and `gate_issue` when the record fails its verb's policy.
+ */
+export function classifyStoredGate(ask: GatePutAsk, fetched: GateFetched): GateStored {
+  const parent    = bankRowOf(ask, fetched.bank) ?? BX.shellBankOf(ask)
+  const parentAct = parentBankActOf(ask, parent)
+  if (parentAct !== null) { return { ok: false, act: parentAct, parent, gate: null, presence: null } }
+
+  const gate     = gateRowOf(ask, fetched.gate, parent)
+  const presence = presenceOf(gate)
+  const tabled   = putActOf({ ...ask, ...GatePolicies }, gate)
+  const act      = ((tabled === 'replaced') && (gate !== null)) ? GateActOfForVerb[ask.gateVerb](parent, ask.record, gate) : tabled
+  if (isWriteAct(act)) { return { ok: true, act, parent, gate: ask.record, presence } }
+  return isOkAct(act) ? { ok: true, act, parent, gate, presence } : { ok: false, act, parent, gate, presence }
+}
+
+/** Classify a `delBank` ask against the bank row an adapter fetched for it, per the del table in `notes/answer-contract.md`.
+ * Under `deleted`, the adapter stores `ask.record` and deletes every gate, vault and box row under the bank's scope, in the same step that fetched the row.
+ * Throws for a row that fails its checks.
+ */
+export function classifyDelBank(ask: BankDelAsk, fetched: BankFetched): BankDelStored {
+  const bank     = bankRowOf(ask, fetched.bank)
+  const presence = presenceOf(bank)
+  const act      = delActOf(ask, bank)
+  if (isWriteAct(act)) { return { ok: true, act, bank: ask.record, presence } }
+  return isOkAct(act) ? { ok: true, act, bank, presence } : { ok: false, act, bank, presence }
+}
+
+/** Classify a vault ask against the rows an adapter fetched for it, per the tables in `notes/answer-contract.md`: the bank row, then the vault row.
+ * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the rows.
+ * Throws for a row that fails its checks or is stored at another scope.
+ */
+export function classifyStoredVault(ask: VaultAsk, fetched: VaultFetched): VaultStored {
+  const parent    = bankRowOf(ask, fetched.bank) ?? BX.shellBankOf(ask)
+  const parentAct = parentBankActOf(ask, parent)
+  if (parentAct !== null) { return { ok: false, act: parentAct, parent, vault: null, presence: null } }
+
+  const vault    = vaultRowOf(ask, fetched.vault, parent)
+  const presence = presenceOf(vault)
+  const act      = rowActOf(ask, vault)
+  if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, parent, vault: ask.record, presence } }
+  return isOkAct(act) ? { ok: true, act, parent, vault, presence } : { ok: false, act, parent, vault, presence }
 }
 
 // A box ask is classified entirely here, top to bottom. Each fetched row is checked once, when first read, and is
@@ -317,42 +472,27 @@ export function classifyStoredVault(ask: VaultAsk, { vault }: VaultFetched): Vau
  * Throws for a row that fails its checks or is stored at another address.
  */
 export function classifyStoredBox(ask: BoxAsk, fetched: BoxFetched): BoxStored {
-  const world    = boxWorldOf(ask, fetched.world)
+  const parent   = boxParentOf(ask, fetched.parent)
   const capacity = fetched.capacity ?? null
 
-  // The vault first: when it is not live in the asked-for life, the box row goes unchecked, whatever is stored there.
-  const vaultAct = boxVaultActOf(ask, world)
-  if (vaultAct !== null) { return { ok: false, act: vaultAct, world, box: null, presence: null, capacity: null } }
+  const vaultAct = boxVaultActOf(ask, parent)
+  if (vaultAct !== null) { return { ok: false, act: vaultAct, parent, box: null, presence: null, capacity: null } }
 
   const box      = boxRowOf(ask, fetched.box)
   const presence = presenceOf(box)
   const uncapped = rowActOf(ask, box)
   const act      = (capacity === null) ? uncapped : cappedActOf(uncapped, capacity)
-  if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, world, box: ask.record, presence, capacity } }
-  return isOkAct(act) ? { ok: true, act, world, box, presence, capacity } : { ok: false, act, world, box, presence, capacity }
-}
-
-// A row that fails its checks is listed among the damaged rows, under the label storage holds it by, so one bad row
-// never hides the rest. A row that is not an object, or is stored at another address, still throws.
-/** Classify a `listVaults` ask against the vault rows an adapter fetched for it: each row checked, a damaged one set aside. */
-export function classifyStoredVaults(ask: VaultListAsk, vaults: readonly RowOfVault[]): VaultsStored {
-  const { user_id, banklabel } = ask
-  const listed: BankListed = { vaults: [], damaged_rows: [] }
-  for (const { vaultlabel, vault } of vaults) {
-    const address = { user_id, banklabel, vaultlabel }
-    const row     = listedRowOf(SX.vaultRow, vault, address)
-    if (row === null) { listed.damaged_rows.push(SX.damagedVaultOf(address)) } else { listed.vaults.push(row) }
-  }
-  return { ok: true, act: (vaults.length > 0) ? 'got' : 'gotvoid', world: { user_id, banklabel }, listed }
+  if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, parent, box: ask.record, presence, capacity } }
+  return isOkAct(act) ? { ok: true, act, parent, box, presence, capacity } : { ok: false, act, parent, box, presence, capacity }
 }
 
 /** Classify a `listBoxes` ask against the rows an adapter fetched for it: the vault row first, then each box row, a damaged one set aside.
  * Throws `damaged_vault` for a vault row that fails its checks.
  */
 export function classifyStoredBoxes(ask: BoxListAsk, fetched: BoxesFetched): BoxesStored {
-  const world    = boxWorldOf(ask, fetched.world)
-  const vaultAct = boxVaultActOf(ask, world)
-  if (vaultAct !== null) { return { ok: false, act: vaultAct, world, listed: null } }
+  const parent   = boxParentOf(ask, fetched.parent)
+  const vaultAct = boxVaultActOf(ask, parent)
+  if (vaultAct !== null) { return { ok: false, act: vaultAct, parent, listed: null } }
 
   const { user_id, banklabel, vaultlabel, vault_tok } = ask
   const listed: BoxesListed = { boxes: [], damaged_rows: [] }
@@ -361,16 +501,6 @@ export function classifyStoredBoxes(ask: BoxListAsk, fetched: BoxesFetched): Box
     const row     = listedRowOf(SX.boxRow, box, address)
     if (row === null) { listed.damaged_rows.push(SX.damagedBoxOf(address, vault_tok)) } else { listed.boxes.push(SX.boxSparse.parse(row)) }
   }
-  return { ok: true, act: (fetched.boxes.length > 0) ? 'got' : 'gotvoid', world, listed }
-}
-
-/** Classify a vault ask's outcome, based on the stored row. */
-export function vaultActOf(ask: VaultAsk, vaultRaw: unknown): VaultAct {
-  return classifyStoredVault(SX.vaultAsk.parse(ask), { vault: vaultRaw }).act
-}
-
-/** Classify a box ask's outcome, based on its stored vault and box rows. */
-export function boxActOf(ask: BoxAsk, vaultRaw: unknown, boxRaw: unknown): BoxAct {
-  return classifyStoredBox(SX.boxAsk.parse(ask), { world: vaultRaw, box: boxRaw }).act
+  return { ok: true, act: (fetched.boxes.length > 0) ? 'got' : 'gotvoid', parent, listed }
 }
 // --

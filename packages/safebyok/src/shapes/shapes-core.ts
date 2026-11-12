@@ -27,7 +27,7 @@ export const ciphered = objCheck(({ str }) => ({
 export type Ciphered = Z.infer<typeof ciphered>
 // --
 
-// == [Record fields]: epochMillis, vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, prfSalt, EpochMillis, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, VaultKeyWayinWrapped, VaultKeyLeaseWrapped
+// == [Record fields]: epochMillis, bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, prfSalt, EpochMillis, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, VaultKeyWayinWrapped, VaultKeyLeaseWrapped
 
 export { epochMillis, type EpochMillis } from './primitives'
 
@@ -37,7 +37,9 @@ export { epochMillis, type EpochMillis } from './primitives'
  * branded for its role, since nothing but safebyok makes one. A passphrase's salt is base64url text of
  * {@link PassphraseSaltSize} bytes, judged by its characters, its length and decoding it; a passkey's is text, not empty, and {@link prfSalt} judges its length.
  */
-export const { vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
+export const { bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
+  bank_tok:                str.min(1),
+  gate_tok:                str.min(1),
   vault_tok:               str.min(1),
   box_tok:                 str.min(1),
   revision_tok:            str.min(1),
@@ -132,7 +134,7 @@ export const sidecar = Checker(() => whisperBag, 'bad_option')
 export type Sidecar = Z.infer<typeof sidecar>
 // --
 
-// == [Scopes]: bankScope, vaultScope, boxscope, BankScope, VaultScope, Boxscope, bankedVaultScope, BankedVaultScope
+// == [Scopes]: bankScope, gateScope, vaultScope, boxscope, BankScope, GateScope, VaultScope, Boxscope, bankedVaultScope, BankedVaultScope
 
 /** A scope as a frozen copy.
  * A scope carrying more fields passes, the rest left out: a vault's record, or a Vault object,
@@ -140,16 +142,20 @@ export type Sidecar = Z.infer<typeof sidecar>
  *
  * @example CX.vaultScope.parse(vault)  // { user_id, banklabel, vaultlabel }, frozen
  */
-export const { bankScope, vaultScope, boxscope } = Checkers('bad_scope', ({ obj, user_id, banklabel, vaultlabel, boxlabel }) => {
+export const { bankScope, gateScope, vaultScope, boxscope } = Checkers('bad_scope', ({ obj, lit, user_id, banklabel, vaultlabel, boxlabel }) => {
   const bankScope  = obj({ user_id, banklabel })
+  // A bank's only gate is `main`.
+  const gateScope  = bankScope.extend({ gatelabel: lit('main') })
   const vaultScope = bankScope.extend({ vaultlabel })
   const boxscope   = vaultScope.extend({ boxlabel })
 
-  return { bankScope: bankScope.readonly(), vaultScope: vaultScope.readonly(), boxscope: boxscope.readonly() }
+  return { bankScope: bankScope.readonly(), gateScope: gateScope.readonly(), vaultScope: vaultScope.readonly(), boxscope: boxscope.readonly() }
 })
 
 /** What names a bank: the app's label and the signed-in user's id. */
 export type BankScope = Z.infer<typeof bankScope>
+/** What names one of a bank's gates: its bank's scope and the gate's own label, `main`. */
+export type GateScope = Z.infer<typeof gateScope>
 /** What names one vault: its bank's scope and the vault's own label. */
 export type VaultScope = Z.infer<typeof vaultScope>
 /** What names one box: its vault's scope and its boxlabel. */

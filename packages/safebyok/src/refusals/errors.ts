@@ -154,8 +154,8 @@ export function rowsOfRefusal(err: VaultError): RefusalRows { return (err as unk
 /** The options of a VaultError beside its refusalkind and message: the `cause` behind it, and its `meta`. */
 export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta, rows?: RefusalRows }
 
-/** The rows a vaultDB's refusal hands its answer: the vault row as read in the step that refused, and the row stored where the write was aimed, or null for none. */
-export type RefusalRows = { world?: unknown, dbhas?: unknown }
+/** The rows a vaultDB's or bankDB's refusal hands its answer: the vaultDB's vault row, or the bankDB's row above the one asked for, as read in the step that refused, and the row stored where the write was aimed, or null for none. */
+export type RefusalRows = { world?: unknown, parent?: unknown, dbhas?: unknown }
 
 // A Symbol.for and not enumerable, so the rows reach the answer from whichever copy of safebyok, and never a log: they hold wrapped keys.
 const RowsOfRefusal = Symbol.for('safebyok.refusal.rows')
