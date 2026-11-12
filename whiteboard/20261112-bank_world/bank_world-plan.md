@@ -159,6 +159,7 @@ worker `sonnet`; review `medium`. **After**: 8c (8a and 8b change these files). 
 once 8c was ready). It also takes the Coach's ruling on #668: nothing beyond the host's `dbName` scopes
 a database's name; `safebyok:<store>-v…` with no `dbName`, `safebyok-<dbName>:<store>-v…` with one, for
 the bank and device databases together.
+*Review:* `fixed` ([#675](https://github.com/mrflip/safebyok/pull/675), medium). The Coach's ruling carried out in review: `PackageVersion` is hand-kept, its drift test the tripwire, the sync script dropped. Fixed two tests that guarded nothing, a changeset overclaim, a name. Left: the device row is put on every ensure where the changeset says "when it finds another version" (17's one-note read); four nits gone at 16 (`IdbVaultDB`'s names and bell). In the line it goes between 8c and 9 at the restack (Cleanup, *Finally*).
 
 ### 6 `device_owner`
 
