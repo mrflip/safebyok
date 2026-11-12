@@ -1,20 +1,21 @@
 // @vitest-environment node
-/** GraphQLVaultDB over real sockets to Yoga servers, each hosting a PostgresVaultDB over a real Postgres: the battery, and a watch heard across servers. */
+/** GraphQLBankDB over real sockets to Yoga servers, each hosting a PostgresBankDB over a real Postgres: the battery, and a watch heard across servers. */
 
 import { expect, it, onTestFinished, vi } from 'vitest'
-import * as DB from 'safebyok/storage'
-import type { Notice } from 'safebyok/storage'
-import type { GraphQLVaultDB } from 'safebyok-graphql'
+import type * as DB from 'safebyok/storage'
+import type { BX } from 'safebyok/storage'
+import type { GraphQLBankDB } from 'safebyok-graphql'
 import * as TH from './test-helpers'
 
-const getDb = TH.useFileDatabase('vault')
+const { BW } = TH
+const getDb = TH.useFileDatabase()
 TH.useServers()
 
-const serverOf = new WeakMap<GraphQLVaultDB, TH.Server>()
-const optsOf = new WeakMap<GraphQLVaultDB, TH.VaultDBOverOpts>()
+const serverOf = new WeakMap<GraphQLBankDB, TH.Server>()
+const optsOf = new WeakMap<GraphQLBankDB, TH.BankDBOverOpts>()
 
-/** A browser of a fresh server, its VaultDB made with `opts`. */
-const freshBrowser = async (opts: TH.VaultDBOverOpts = {}): Promise<GraphQLVaultDB> => {
+/** A browser of a fresh server, its bankDB made with `opts`. */
+async function freshBrowser(opts: TH.BankDBOverOpts = {}): Promise<GraphQLBankDB> {
   const server = await TH.freshServer(getDb(), opts)
   const browser = TH.browserAt(server)
   serverOf.set(browser, server)
@@ -23,54 +24,55 @@ const freshBrowser = async (opts: TH.VaultDBOverOpts = {}): Promise<GraphQLVault
 }
 
 /** A browser of a second server over the same rows, as another device reaches through another instance of the app. */
-const twinOf = async (browser: GraphQLVaultDB): Promise<GraphQLVaultDB> => {
-  const server = await TH.serve(await TH.vaultDBOver(getDb(), optsOf.get(browser)))
+async function twinOf(browser: GraphQLBankDB): Promise<GraphQLBankDB> {
+  const server = await TH.serve(await TH.bankDBOver(getDb(), optsOf.get(browser)))
   const twin = TH.browserAt(server)
   serverOf.set(twin, server)
   return twin
 }
 
 /** The notices `browser` hears of `scope`, gathered until the test ends. */
-const watching = (browser: GraphQLVaultDB, scope: DB.WatchScope = TH.vaultScope): Notice[] => {
-  const notices: Notice[] = []
+function watching(browser: GraphQLBankDB, scope: DB.WatchScope = BW.vaultScope): BX.Notice[] {
+  const notices: BX.Notice[] = []
   const unwatch = browser.watch(scope, (notice) => { notices.push(notice) })
   onTestFinished(unwatch)
   return notices
 }
 
-TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Postgres", () => {
-  TH.describeVaultDBBattery("GraphQLVaultDB", {
-    makeVaultDB:          async (opts = {}) => await freshBrowser(opts),
-    makeCappedVaultDB:    async (maxBoxes) => await freshBrowser({ maxBoxes }),
-    makeTwin:             twinOf,
-    _cheat_rowsOf:        () => TH.vaultRowsOf(getDb()),
-    _cheat_adapterOf:     (browser) => serverOf.get(browser)!.vaultDB,
+TH.describeOnPostgres('graphql', "GraphQLBankDB over the network to a real Postgres", () => {
+  TH.describeBankDBBattery("GraphQLBankDB", {
+    makeBankDB:       async (opts = {}) => await freshBrowser(opts),
+    makeCappedBankDB: async (maxBoxes) => await freshBrowser({ maxBoxes }),
+    makeTwin:         twinOf,
+    _cheat_rowsOf:    () => TH.bankRowsOf(getDb()),
+    _cheat_adapterOf: (browser) => serverOf.get(browser)!.bankDB,
   })
 
   it("hears what a browser of another server puts, a box too large for a notice included", async () => {
     const db = getDb()
     const listening = { count: 0 }
     await TH.freshServer(db)
-    const watcher = TH.browserAt(await TH.serve(await TH.vaultDBListening(db, listening)))
-    const writer = TH.browserAt(await TH.serve(await TH.vaultDBOver(db, { maxRecordSizeEst: 20_000 })))
+    const watcher = TH.browserAt(await TH.serve(await TH.bankDBListening(db, listening)))
+    const writer = TH.browserAt(await TH.serve(await TH.bankDBOver(db, { maxRecordSizeEst: 20_000 })))
     const notices = watching(watcher)
     await expect.poll(() => listening.count).to.eq(1)
-    const vault = TH.vaultAt()
-    const box = TH.boxAt(0, 'life1', { sidecar: { padding: 'x'.repeat(9000) } })
+    const vault = BW.vaultAt()
+    const box = BW.boxAt(0, 'bank1', 'life1', { sidecar: { padding: 'x'.repeat(9000) } })
 
-    await writer.putVault(TH.vaultPutAskOf(vault))
-    await writer.putBox(TH.boxPutAskOf(box))
+    await writer.buildBank(BW.bankBuildAskOf())
+    await writer.putVault(BW.vaultPutAskOf(vault))
+    await writer.putBox(BW.boxPutAskOf(box))
 
     await vi.waitFor(() => { expect(notices).to.have.lengthOf(2) })
-    expect(notices.map(({ act, val }) => [act, val])).to.deep.equal([['gotlive', vault], ['gotlive', box]])
+    expect(notices.map(({ act, val, parent }) => [act, val, parent])).to.deep.equal([['gotlive', vault, BW.bankAt()], ['gotlive', box, vault]])
   })
 
   it("stops the server's watch once the browser stops watching", async () => {
     const db = getDb()
     const listening = { count: 0 }
     await TH.freshServer(db)
-    const browser = TH.browserAt(await TH.serve(await TH.vaultDBListening(db, listening)))
-    const unwatch = browser.watch(TH.bankScope, () => undefined)
+    const browser = TH.browserAt(await TH.serve(await TH.bankDBListening(db, listening)))
+    const unwatch = browser.watch(BW.bankScope, () => undefined)
     await expect.poll(() => listening.count).to.eq(1)
     unwatch()
     await expect.poll(() => listening.count).to.eq(0)
@@ -79,9 +81,8 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
   it("refuses a browser signed in as one user the bank of another", async () => {
     const server = await TH.freshServer(getDb())
     const intruder = TH.browserAt(server, () => 'u2')
-    const born = TH.vaultPutAskOf(TH.vaultAt())
-    await TH.expectRefusal(intruder.putVault(born), 'identity_revoked')
-    await TH.expectRefusal(TH.browserAt(server, () => null).listVaults(TH.vaultListAsk), 'identity_revoked')
-    expect(await TH.vaultRowsOf(getDb()).vaultRowOf(TH.vaultScope)).to.be.null
+    await TH.expectRefusal(intruder.buildBank(BW.bankBuildAskOf()), 'identity_revoked')
+    await TH.expectRefusal(TH.browserAt(server, () => null).ensureBank(BW.bankEnsureAsk), 'identity_revoked')
+    expect(await TH.bankRowsOf(getDb()).bankRowOf(BW.bankScope)).to.be.null
   })
 })

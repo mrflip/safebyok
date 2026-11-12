@@ -2,7 +2,7 @@
   "name": "safebyok-graphql",
   "private": false,
   "version": "0.5.0",
-  "description": "GraphQL storage for safebyok: the schema and resolvers that carry a server's VaultDB to the browser, and the VaultDB over an urql Client that calls them.",
+  "description": "GraphQL storage for safebyok: the schema and resolvers that carry a server's bankDB to the browser, and the bankDB over an urql Client that calls them.",
   "keywords": [
     "safebyok",
     "graphql",

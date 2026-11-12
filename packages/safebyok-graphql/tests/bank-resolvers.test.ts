@@ -1,32 +1,34 @@
-/** vaultResolvers and VaultSchemaSdl: which user can reach which bank, and what each answer contains on the wire. */
+/** bankResolvers and BankSchemaSdl: which user can reach which bank, and what each answer contains on the wire. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { Client } from '@urql/core'
 import { buildSchema, graphql, isObjectType, parse, subscribe, validate } from 'graphql'
 import type { GraphQLSchema } from 'graphql'
 import { makeExecutableSchema } from '@graphql-tools/schema'
-import * as DB from 'safebyok/storage'
-import { PostgresVaultDB } from 'safebyok-postgres'
+import { BX } from 'safebyok/storage'
+import { PostgresBankDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
-import { VaultSchemaSdl, vaultResolvers } from '../src/server'
-import { GraphQLVaultDB } from '../src/index'
-import { VaultOperations } from '../src/bank-operations'
+import { BankSchemaSdl, bankResolvers } from '../src/server'
+import { GraphQLBankDB } from '../src/index'
+import { BankOperations } from '../src/bank-operations'
 import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
 
-/** A VaultDB whose database is unreachable. Its driver's error contains text that must never reach a browser. */
+const { BW } = TH
+
+/** A bankDB whose database is unreachable. Its driver's error contains text that must never reach a browser. */
 function unreachable() {
-  return new PostgresVaultDB({ client: {
+  return new PostgresBankDB({ client: {
     query:       () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
     transaction: () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
   } })
 }
 
-/** Round-trip `val` through JSON, as the wire would. */
+/** Round-trip `val` through JSON, as the wire would, then leave out a null `passkey0`, as GraphQLBankDB does: a gate without a passkey wayin has none. */
 function overTheWire(val: unknown): unknown {
   const text = JSON.stringify(val)
-  return JSON.parse(text) as unknown
+  return JSON.parse(text, (fieldname, field: unknown) => (((fieldname === 'passkey0') && (field === null)) ? undefined : field)) as unknown
 }
 
 /** Run `source` against `schema` signed in as `user_id`, and return its one root field's answer after a JSON round trip. */
@@ -37,33 +39,39 @@ async function sent(schema: GraphQLSchema, source: string, variableValues: objec
   return answer
 }
 
-/** A get's, put's or del's variables: its ask as its checker hands it on, the form GraphQLVaultDB sends. */
-function askVarsOf(ask: DB.VaultAsk | DB.BoxAsk) {
-  return { ask: ('boxlabel' in ask) ? DB.boxAsk.parse(ask) : DB.vaultAsk.parse(ask) }
+/** An ask's variables: the ask as `check` hands it on, the form GraphQLBankDB sends. */
+function askVarsOf(check: { parse: (ask: unknown) => object }, ask: object) { return { ask: check.parse(ask) } }
+
+/** A gate verb's variables: its ask as GraphQLBankDB sends it, checked and without its `gateVerb`. */
+function gateVarsOf(ask: BX.GatePutAsk) {
+  const { gateVerb: _gateVerb, ...checked } = BX.gatePut.parse(ask)
+  return { ask: checked }
 }
 
-/** Send `ask` as the get, put or del `source` is, through `schema`, and return its answer as {@link sent} does. */
-async function sentAsk(schema: GraphQLSchema, source: string, ask: DB.VaultAsk | DB.BoxAsk): Promise<unknown> {
-  return await sent(schema, source, askVarsOf(ask))
+/** Send `ask`, checked by `check` as GraphQLBankDB sends it, as the verb `source` is, and return its answer as {@link sent} does. */
+async function sentAsk(schema: GraphQLSchema, source: string, check: { parse: (ask: unknown) => object }, ask: object): Promise<unknown> {
+  return await sent(schema, source, askVarsOf(check, ask))
 }
 
-// The asks of u1's vault and box that the cases send: a get by a caller that holds no row, and a put over none.
-const vaultGetAsk = TH.vaultGetAskOf()
-const boxGetAsk   = TH.boxGetAskOf()
-const vaultBorn   = TH.vaultPutAskOf(TH.vaultAt())
-const boxBorn     = TH.boxPutAskOf(TH.boxAt())
-
-/** A VaultDB's answer in wire form: `dbhas` is null when the answer has none. */
-function asCrossed(answer: DB.Answer<unknown, string, unknown>) { return { ...answer, dbhas: answer.dbhas ?? null } }
-
-/** Build a gate verb's arguments from `vault`: the next record, with `moved` merged into its gate and `gate_epoch` plus one, and `prior` set to the revision it replaces. */
-function gateArgsOf(vault: DB.VaultRecord, moved: object) {
-  const prior = DB.revisionOf(vault)
-  return { record: { ...vault, ...DB.nextRevisionOf(prior, vault.written_at + 1), gate: { ...vault.gate, gate_epoch: vault.gate.gate_epoch + 1, ...moved } }, opts: { prior } }
+/** Send a gate verb's `ask` as `source`, its verb's mutation, and return its answer as {@link sent} does. */
+async function sentGateAsk(schema: GraphQLSchema, source: string, ask: BX.GatePutAsk): Promise<unknown> {
+  return await sent(schema, source, gateVarsOf(ask))
 }
 
-/** Make a server and its VaultDB. `listening` holds the watch callbacks that are currently listening. */
+// The asks of u1's bank, vault and box that the cases send: a get by a caller that holds no row, and a put or build over none.
+const bankBuilt   = BW.bankBuildAskOf()
+const vaultGetAsk = BW.vaultGetAskOf()
+const boxGetAsk   = BW.boxGetAskOf()
+const vaultBorn   = BW.vaultPutAskOf(BW.vaultAt())
+const boxBorn     = BW.boxPutAskOf(BW.boxAt())
+const withPasskey = { main: BW.mainWayin, passkey0: BW.passkey0Wayin }
+
+/** A bankDB's answer in wire form: `dbhas` is null when the answer has none. */
+function asCrossed(answer: BX.Answer<unknown, string, unknown>) { return { ...answer, dbhas: answer.dbhas ?? null } }
+
+/** Make a server and its bankDB with the bank built. `listening` holds the watch callbacks that are currently listening. */
 async function watchedServer() {
+  await TH.emptyTables()
   const listening = new Set<unknown>()
   const listen: PostgresListen = async (channel, onNotify) => {
     const unlisten = await TH.listen(channel, onNotify)
@@ -73,13 +81,15 @@ async function watchedServer() {
       return unlisten()
     }
   }
-  const vaultDB = await TH.serverOver({ listen })
-  return { listening, vaultDB, schema: TH.schemaOver(vaultDB) }
+  const bankDB = await TH.serverOver({ listen })
+  await bankDB.buildBank(bankBuilt)
+  return { listening, bankDB, schema: TH.schemaOver(bankDB) }
 }
 
+// A vault's watch, so the bank and gate rows the case builds first are never heard.
 /** Subscribe to a watch of `scope` through `schema` as the session `context`. `nextNotice` returns the next notice parsed from the wire, or null when the stream ends. */
-async function watching(schema: GraphQLSchema, context: TH.TestContext, scope: object = TH.bankScope) {
-  const stream = await subscribe({ schema, document: parse(VaultOperations.watch), variableValues: { ...scope }, contextValue: context })
+async function watching(schema: GraphQLSchema, context: TH.TestContext, scope: object = BW.vaultScope) {
+  const stream = await subscribe({ schema, document: parse(BankOperations.watch), variableValues: { ...scope }, contextValue: context })
   if (! ('next' in stream)) { throw new Error(`Expected a subscription, got ${JSON.stringify(stream)}`) }
   return {
     stream,
@@ -87,93 +97,111 @@ async function watching(schema: GraphQLSchema, context: TH.TestContext, scope: o
       const next = await stream.next()
       if (next.done === true) { return null }
       expect(next.value.errors).to.be.undefined
-      return DB.crossedNotice.parse(overTheWire(next.value.data?.['safebyokWatch']))
+      return BX.crossedNotice.parse(overTheWire(next.value.data?.['safebyokWatch']))
     },
   }
 }
 
-describe("vaultResolvers", () => {
+describe("bankResolvers", () => {
   it("refuses every verb of a request signed in as another user, or signed out", async () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver())
-    const record = TH.vaultAt()
-    const box = TH.boxAt()
-    const asked: [string, object, { parse: (crossed: unknown) => DB.Answer<unknown, string, unknown> }][] = [
-      [VaultOperations.listVaults, TH.bankScope, DB.listVaultsAnswer],
-      [VaultOperations.getVault, askVarsOf(vaultGetAsk), DB.getVaultAnswer],
-      [VaultOperations.listBoxes, TH.vaultQuery, DB.listBoxesAnswer],
-      [VaultOperations.getBox, askVarsOf(boxGetAsk), DB.getBoxAnswer],
-      [VaultOperations.putVault, askVarsOf(TH.vaultPutAskOf(record)), DB.putVaultAnswer],
-      [VaultOperations.putBox, askVarsOf(TH.boxPutAskOf(box)), DB.putBoxAnswer],
-      [VaultOperations.replacePassphrase, gateArgsOf(record, { passphrase_wayin: TH.passphraseWayin }), DB.replacePassphraseAnswer],
-      [VaultOperations.addPasskey, gateArgsOf(record, { passkey_wayin: TH.passkeyWayin }), DB.addPasskeyAnswer],
-      [VaultOperations.revokePasskey, gateArgsOf(record, { passkey_wayin: null }), DB.revokePasskeyAnswer],
-      [VaultOperations.delBox, askVarsOf(TH.boxDelAskOf(box)), DB.delBoxAnswer],
-      [VaultOperations.delVault, askVarsOf(TH.vaultDelAskOf(record)), DB.delVaultAnswer],
-      [VaultOperations.tidyGone, TH.bankScope, DB.tidyGoneAnswer],
+    const gate = BW.gateAt()
+    const vault = BW.vaultAt()
+    const box = BW.boxAt()
+    const { op: _op, ...boxListed } = BW.boxListAsk
+    const asked: [string, object, { parse: (crossed: unknown) => BX.Answer<unknown, string, unknown> }][] = [
+      [BankOperations.ensureBank, BW.bankScope, BX.ensureBankAnswer],
+      [BankOperations.getVault, askVarsOf(BX.vaultGet, vaultGetAsk), BX.getVaultAnswer],
+      [BankOperations.listBoxes, boxListed, BX.listBoxesAnswer],
+      [BankOperations.getBox, askVarsOf(BX.boxGet, boxGetAsk), BX.getBoxAnswer],
+      [BankOperations.buildBank, askVarsOf(BX.bankBuild, bankBuilt), BX.buildBankAnswer],
+      [BankOperations.replacePassphrase, gateVarsOf(BW.gatePutAskOf('replacePassphrase', gate, { main: BW.otherMainWayin })), BX.replacePassphraseAnswer],
+      [BankOperations.addPasskey, gateVarsOf(BW.gatePutAskOf('addPasskey', gate, withPasskey)), BX.addPasskeyAnswer],
+      [BankOperations.revokePasskey, gateVarsOf(BW.gatePutAskOf('revokePasskey', gate, BW.MainOnly)), BX.revokePasskeyAnswer],
+      [BankOperations.delBank, askVarsOf(BX.bankDel, BW.bankDelAskOf(BW.bankAt())), BX.delBankAnswer],
+      [BankOperations.putVault, askVarsOf(BX.vaultPut, BW.vaultPutAskOf(vault)), BX.putVaultAnswer],
+      [BankOperations.delVault, askVarsOf(BX.vaultDel, BW.vaultDelAskOf(vault)), BX.delVaultAnswer],
+      [BankOperations.putBox, askVarsOf(BX.boxPut, BW.boxPutAskOf(box)), BX.putBoxAnswer],
+      [BankOperations.delBox, askVarsOf(BX.boxDel, BW.boxDelAskOf(box)), BX.delBoxAnswer],
+      [BankOperations.tidyGone, BW.bankScope, BX.tidyGoneAnswer],
     ]
     for (const user_id of ['u2', null]) {
       for (const [source, variableValues, answerCheck] of asked) {
-        const answer = answerCheck.parse(await sent(schema, source, variableValues, user_id)) as DB.BadAnswer
-        expect(answer, source).to.deep.include({ ok: false, act: 'unclassified_storing', world: null }).and.to.have.nested.property('err.refusalkind', 'identity_revoked')
+        const answer = answerCheck.parse(await sent(schema, source, variableValues, user_id)) as BX.BadAnswer
+        expect(answer, source).to.deep.include({ ok: false, act: 'unclassified_storing', parent: null }).and.to.have.nested.property('err.refusalkind', 'identity_revoked')
         expect(answer.err.refusalkind, source).to.eq('identity_revoked')
-        expect(answer.ask, source).to.include(TH.bankScope)
+        expect(answer.ask, source).to.include(BW.bankScope)
       }
     }
-    expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
+    expect(await TH.rowsOf().bankRowOf(BW.bankScope)).to.be.null
+  })
+
+  it("carries a gate verb's verb in the ask of its sign-in refusal", async () => {
+    const schema = TH.schemaOver(await TH.serverOver())
+    const variables = gateVarsOf(BW.gatePutAskOf('addPasskey', BW.gateAt(), withPasskey))
+    const answer = BX.addPasskeyAnswer.parse(await sent(schema, BankOperations.addPasskey, variables, 'u2'))
+    expect(answer.ask).to.include({ gatelabel: 'main', gateVerb: 'addPasskey' })
   })
 
   it("refuses a malformed request signed in as another user for what is malformed", async () => {
     const schema = TH.schemaOver(await TH.serverOver())
-    const answer = DB.getBoxAnswer.parse(await sent(schema, VaultOperations.getBox, { ask: { ...askVarsOf(boxGetAsk).ask, vault_tok: '' } }, 'u2')) as DB.BadAnswer
-    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', world: null }).and.to.have.nested.property('err.refusalkind', 'bad_option')
+    const answer = BX.getBoxAnswer.parse(await sent(schema, BankOperations.getBox, { ask: { ...BX.boxGet.parse(boxGetAsk), vault_tok: '' } }, 'u2')) as BX.BadAnswer
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', parent: null }).and.to.have.nested.property('err.refusalkind', 'bad_option')
   })
 
-  it("returns for each verb what the VaultDB's own try* verb returns", async () => {
+  it("returns for each verb what the bankDB's own try* verb returns", async () => {
     await TH.emptyTables()
-    const vaultDB = await TH.serverOver()
-    const schema = TH.schemaOver(vaultDB)
-    const record = TH.vaultAt()
-    const born = DB.putVaultAnswer.parse(await sentAsk(schema, VaultOperations.putVault, TH.vaultPutAskOf(record)))
-    expect(born).to.deep.include({ ok: true, act: 'born', val: record })
-    expect(DB.getVaultAnswer.parse(await sentAsk(schema, VaultOperations.getVault, vaultGetAsk))).to.deep.eq(asCrossed(await vaultDB.tryGetVault(vaultGetAsk)))
-    expect(DB.listVaultsAnswer.parse(await sent(schema, VaultOperations.listVaults, TH.bankScope))).to.deep.eq(asCrossed(await vaultDB.tryListVaults(TH.vaultListAsk)))
+    const bankDB = await TH.serverOver()
+    const schema = TH.schemaOver(bankDB)
+    const bank = BW.bankAt()
+    const built = BX.buildBankAnswer.parse(await sentAsk(schema, BankOperations.buildBank, BX.bankBuild, bankBuilt))
+    expect(built).to.deep.include({ ok: true, act: 'born', val: BW.gateAt(), parent: bank })
+    expect(BX.ensureBankAnswer.parse(await sent(schema, BankOperations.ensureBank, BW.bankScope))).to.deep.eq(asCrossed(await bankDB.tryEnsureBank(BW.bankEnsureAsk)))
 
-    const box = TH.boxAt(0, 'life1', { sidecar: { note: 'work', 'nested key': [1, { deep: null }] } })
-    const boxed = DB.putBoxAnswer.parse(await sentAsk(schema, VaultOperations.putBox, TH.boxPutAskOf(box)))
-    expect(boxed).to.deep.include({ ok: true, act: 'born', val: box, world: record })
-    expect(DB.getBoxAnswer.parse(await sentAsk(schema, VaultOperations.getBox, boxGetAsk))).to.deep.eq(asCrossed(await vaultDB.tryGetBox(boxGetAsk)))
-    expect(DB.listBoxesAnswer.parse(await sent(schema, VaultOperations.listBoxes, TH.vaultQuery))).to.deep.eq(asCrossed(await vaultDB.tryListBoxes(TH.boxListAsk)))
+    const vault = BW.vaultAt()
+    const born = BX.putVaultAnswer.parse(await sentAsk(schema, BankOperations.putVault, BX.vaultPut, BW.vaultPutAskOf(vault)))
+    expect(born).to.deep.include({ ok: true, act: 'born', val: vault, parent: bank })
+    expect(BX.getVaultAnswer.parse(await sentAsk(schema, BankOperations.getVault, BX.vaultGet, vaultGetAsk))).to.deep.eq(asCrossed(await bankDB.tryGetVault(vaultGetAsk)))
 
-    const replaced = DB.replacePassphraseAnswer.parse(await sent(schema, VaultOperations.replacePassphrase, gateArgsOf(record, { passphrase_wayin: { ...TH.passphraseWayin, key_deriver_label: 'moved' } })))
-    expect(replaced).to.deep.include({ ok: true, act: 'replaced' })
-    const added = DB.addPasskeyAnswer.parse(await sent(schema, VaultOperations.addPasskey, gateArgsOf(replaced.val as DB.VaultRecord, { passkey_wayin: TH.passkeyWayin })))
-    expect(added.val).to.have.nested.property('gate.passkey_wayin.credential_id', TH.passkeyWayin.credential_id)
-    const revoked = DB.revokePasskeyAnswer.parse(await sent(schema, VaultOperations.revokePasskey, gateArgsOf(added.val as DB.VaultRecord, { passkey_wayin: null })))
-    expect(revoked.val).to.have.nested.property('gate.passkey_wayin', null)
+    const box = BW.boxAt(0, 'bank1', 'life1', { sidecar: { note: 'work', 'nested key': [1, { deep: null }] } })
+    const boxed = BX.putBoxAnswer.parse(await sentAsk(schema, BankOperations.putBox, BX.boxPut, BW.boxPutAskOf(box)))
+    expect(boxed).to.deep.include({ ok: true, act: 'born', val: box, parent: vault })
+    expect(BX.getBoxAnswer.parse(await sentAsk(schema, BankOperations.getBox, BX.boxGet, boxGetAsk))).to.deep.eq(asCrossed(await bankDB.tryGetBox(boxGetAsk)))
+    const { op: _op, ...boxListed } = BW.boxListAsk
+    expect(BX.listBoxesAnswer.parse(await sent(schema, BankOperations.listBoxes, boxListed))).to.deep.eq(asCrossed(await bankDB.tryListBoxes(BW.boxListAsk)))
 
-    const goneBox = DB.delBoxAnswer.parse(await sentAsk(schema, VaultOperations.delBox, TH.boxDelAskOf(box)))
-    expect(goneBox).to.deep.include({ ok: true, val: TH.boxTombstoneOf(box) })
-    const vault = revoked.val as DB.VaultRecord
-    const goneVault = DB.delVaultAnswer.parse(await sentAsk(schema, VaultOperations.delVault, TH.vaultDelAskOf(vault)))
-    expect(goneVault).to.deep.include({ ok: true, val: TH.vaultTombstoneOf(vault) })
-    const tidied = DB.tidyGoneAnswer.parse(await sent(schema, VaultOperations.tidyGone, TH.bankScope))
-    expect(tidied).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 0 }, world: TH.bankScope })
+    const replaced = BX.replacePassphraseAnswer.parse(await sentGateAsk(schema, BankOperations.replacePassphrase, BW.gatePutAskOf('replacePassphrase', built.val as BX.GateRecord, { main: BW.otherMainWayin })))
+    expect(replaced).to.deep.include({ ok: true, act: 'replaced', parent: bank })
+    const added = BX.addPasskeyAnswer.parse(await sentGateAsk(schema, BankOperations.addPasskey, BW.gatePutAskOf('addPasskey', replaced.val as BX.GateRecord, { main: BW.otherMainWayin, passkey0: BW.passkey0Wayin })))
+    expect(added.val).to.have.nested.property('wayins.passkey0.credential_id', BW.passkey0Wayin.credential_id)
+    const revoked = BX.revokePasskeyAnswer.parse(await sentGateAsk(schema, BankOperations.revokePasskey, BW.gatePutAskOf('revokePasskey', added.val as BX.GateRecord, { main: BW.otherMainWayin })))
+    expect(revoked).to.deep.include({ ok: true, act: 'replaced' })
+    expect(revoked.val).not.to.have.nested.property('wayins.passkey0')
+
+    const goneBox = BX.delBoxAnswer.parse(await sentAsk(schema, BankOperations.delBox, BX.boxDel, BW.boxDelAskOf(box)))
+    expect(goneBox).to.deep.include({ ok: true, val: BW.boxTombstoneOf(box) })
+    const goneVault = BX.delVaultAnswer.parse(await sentAsk(schema, BankOperations.delVault, BX.vaultDel, BW.vaultDelAskOf(vault)))
+    expect(goneVault).to.deep.include({ ok: true, val: BW.vaultTombstoneOf(vault) })
+    const tidied = BX.tidyGoneAnswer.parse(await sent(schema, BankOperations.tidyGone, BW.bankScope))
+    expect(tidied).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 0 }, parent: BW.bankScope })
+    const goneBank = BX.delBankAnswer.parse(await sentAsk(schema, BankOperations.delBank, BX.bankDel, BW.bankDelAskOf(bank)))
+    expect(goneBank).to.deep.include({ ok: true, act: 'deleted', val: BW.bankTombstoneOf(bank), parent: null })
   })
 
   it("holds a request to the user its ask names, refusing a record filed under another user", async () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver())
-    const ask = DB.vaultPut.parse(vaultBorn)
-    const elsewhere = DB.putVaultAnswer.parse(await sent(schema, VaultOperations.putVault, { ask: { ...ask, record: { ...ask.record, user_id: 'u2' } } })) as DB.BadAnswer
+    const ask = BX.bankBuild.parse(bankBuilt)
+    const elsewhere = BX.buildBankAnswer.parse(await sent(schema, BankOperations.buildBank, { ask: { ...ask, record: { ...ask.record, user_id: 'u2' } } })) as BX.BadAnswer
     expect(elsewhere).to.deep.include({ ok: false, act: 'unclassified_storing' }).and.to.have.nested.property('err.refusalkind', 'bad_record')
-    expect(await TH.rowsOf().vaultRowOf({ ...TH.vaultScope, user_id: 'u2' })).to.be.null
-    expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
+    expect(await TH.rowsOf().bankRowOf({ ...BW.bankScope, user_id: 'u2' })).to.be.null
+    expect(await TH.rowsOf().bankRowOf(BW.bankScope)).to.be.null
   })
 
   it("sends a refusal as the answer's err, without the driver's own error", async () => {
-    const crossed = await sentAsk(TH.schemaOver(unreachable()), VaultOperations.getVault, vaultGetAsk)
-    const answer = DB.getVaultAnswer.parse(crossed) as DB.BadAnswer
+    const crossed = await sent(TH.schemaOver(unreachable()), BankOperations.getVault, askVarsOf(BX.vaultGet, vaultGetAsk))
+    const answer = BX.getVaultAnswer.parse(crossed) as BX.BadAnswer
     expect(answer.err.refusalkind).to.eq('storage_unavailable')
     expect(answer.err.cause).to.be.undefined
     expect(JSON.stringify(crossed)).not.to.include('hunter2')
@@ -181,64 +209,69 @@ describe("vaultResolvers", () => {
 
   it("sends nothing from the error a getUserId throws", async () => {
     const schema = makeExecutableSchema({
-      typeDefs:  VaultSchemaSdl,
-      resolvers: vaultResolvers({ vaultDB: await TH.serverOver(), getUserId: () => { throw new Error('session cookie s3cr3t-cookie is malformed') } }),
+      typeDefs:  BankSchemaSdl,
+      resolvers: bankResolvers({ bankDB: await TH.serverOver(), getUserId: () => { throw new Error('session cookie s3cr3t-cookie is malformed') } }),
     })
-    const crossed = await sentAsk(schema, VaultOperations.getVault, vaultGetAsk)
-    expect((DB.getVaultAnswer.parse(crossed) as DB.BadAnswer).err.refusalkind).to.eq('unexpected_error')
+    const crossed = await sentAsk(schema, BankOperations.getVault, BX.vaultGet, vaultGetAsk)
+    expect((BX.getVaultAnswer.parse(crossed) as BX.BadAnswer).err.refusalkind).to.eq('unexpected_error')
     expect(JSON.stringify(crossed)).not.to.include('s3cr3t')
   })
 
   it("refuses at the server what the browser's own checks would, for a browser that skipped them", async () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver({ maxRecordSizeEst: 200 }))
-    const born = DB.putVaultAnswer.parse(await sentAsk(schema, VaultOperations.putVault, vaultBorn))
+    await sentAsk(schema, BankOperations.buildBank, BX.bankBuild, bankBuilt)
+    const born = BX.putVaultAnswer.parse(await sentAsk(schema, BankOperations.putVault, BX.vaultPut, vaultBorn))
     expect(born).to.have.property('ok', true)
-    const heavy = DB.putBoxAnswer.parse(await sentAsk(schema, VaultOperations.putBox, boxBorn)) as DB.BadAnswer
+    const heavy = BX.putBoxAnswer.parse(await sentAsk(schema, BankOperations.putBox, BX.boxPut, boxBorn)) as BX.BadAnswer
     expect(heavy.err.refusalkind).to.eq('box_too_large')
-    const ask = DB.vaultPut.parse(TH.vaultPutAskOf(TH.vaultAt(1), TH.vaultAt()))
-    const malformed = DB.putVaultAnswer.parse(await sent(schema, VaultOperations.putVault, { ask: { ...ask, record: { ...ask.record, am: 'q' } } })) as DB.BadAnswer
+    const ask = BX.vaultPut.parse(BW.vaultPutAskOf(BW.vaultAt(1), BW.vaultAt()))
+    const malformed = BX.putVaultAnswer.parse(await sent(schema, BankOperations.putVault, { ask: { ...ask, record: { ...ask.record, am: 'q' } } })) as BX.BadAnswer
     expect(malformed.err.refusalkind).to.eq('bad_record')
     expect(malformed.err.meta?.fieldnames).to.deep.equal(['record.am'])
-    const misnamed = DB.getVaultAnswer.parse(await sent(schema, VaultOperations.getVault, { ask: { ...DB.vaultGet.parse(vaultGetAsk), op: 'put' } })) as DB.BadAnswer
+    const misnamed = BX.getVaultAnswer.parse(await sent(schema, BankOperations.getVault, { ask: { ...BX.vaultGet.parse(vaultGetAsk), op: 'put' } })) as BX.BadAnswer
     expect(misnamed.err.refusalkind).to.eq('bad_record')
-    expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.deep.equal(TH.vaultAt())
+    const gate = BW.gateAt()
+    const sneaky = gateVarsOf(BW.gatePutAskOf('replacePassphrase', gate, withPasskey))
+    const smuggled = BX.replacePassphraseAnswer.parse(await sent(schema, BankOperations.replacePassphrase, sneaky)) as BX.BadAnswer
+    expect(smuggled.err.refusalkind).to.eq('gate_issue')
+    expect(await TH.rowsOf().vaultRowOf(BW.vaultScope)).to.deep.equal(BW.vaultAt())
+    expect(await TH.rowsOf().gateRowOf(BW.gateScope)).to.deep.equal(gate)
   })
 
   it("sends a full vault's capacity in its err's meta", async () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver({ maxBoxes: 1 }))
-    await sentAsk(schema, VaultOperations.putVault, vaultBorn)
-    await sentAsk(schema, VaultOperations.putBox, boxBorn)
-    const second = TH.boxAt(0, 'life1', { boxlabel: 'anthropic', box_tok: 'box2' })
-    const full = DB.putBoxAnswer.parse(await sentAsk(schema, VaultOperations.putBox, TH.boxPutAskOf(second))) as DB.BadAnswer
+    await sentAsk(schema, BankOperations.buildBank, BX.bankBuild, bankBuilt)
+    await sentAsk(schema, BankOperations.putVault, BX.vaultPut, vaultBorn)
+    await sentAsk(schema, BankOperations.putBox, BX.boxPut, boxBorn)
+    const second = BW.boxAt(0, 'bank1', 'life1', { boxlabel: 'anthropic', box_tok: 'box2' })
+    const full = BX.putBoxAnswer.parse(await sentAsk(schema, BankOperations.putBox, BX.boxPut, BW.boxPutAskOf(second))) as BX.BadAnswer
     expect(full.err.refusalkind).to.eq('vault_full')
     expect(full.err.meta?.capacity).to.deep.eq({ boxes: { used: 1, max: 1 }, bytes: { used: 0, max: Number.MAX_SAFE_INTEGER } })
   })
 
-  it("refuses a vaultDB or getUserId it cannot use, including a browser-side GraphQLVaultDB", async () => {
-    const vaultDB = await TH.serverOver()
-    const client = new GraphQLVaultDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] }) })
-    const unusable = [{}, { vaultDB }, { vaultDB: {}, getUserId: () => 'u1' }, { vaultDB, getUserId: 'u1' }, { vaultDB: client, getUserId: () => 'u1' }]
-    for (const opts of unusable) { TH.expectSyncRefusal(() => vaultResolvers(opts as never), 'bad_option') }
+  it("refuses a bankDB or getUserId it cannot use, including a browser-side GraphQLBankDB", async () => {
+    const bankDB = await TH.serverOver()
+    const client = new GraphQLBankDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] }) })
+    const unusable = [{}, { bankDB }, { bankDB: {}, getUserId: () => 'u1' }, { bankDB, getUserId: 'u1' }, { bankDB: client, getUserId: () => 'u1' }]
+    for (const opts of unusable) { TH.expectSyncRefusal(() => bankResolvers(opts as never), 'bad_option') }
   })
 })
 
-describe("vaultResolvers' watch", () => {
+describe("bankResolvers' watch", () => {
   it("sends each row that changes while the session that subscribed stays signed in as its user", async () => {
-    await TH.emptyTables()
-    const { listening, vaultDB, schema } = await watchedServer()
+    const { listening, bankDB, schema } = await watchedServer()
     const { stream, nextNotice } = await watching(schema, { user_id: 'u1' })
-    await vaultDB.putVault(vaultBorn)
-    expect(await nextNotice()).to.deep.eq({ ok: true, val: { act: 'gotlive', val: TH.vaultAt(), world: TH.vaultAt() } })
-    await vaultDB.putBox(boxBorn)
-    expect(await nextNotice()).to.have.nested.property('val.val.boxlabel', TH.boxAt().boxlabel)
+    await bankDB.putVault(vaultBorn)
+    expect(await nextNotice()).to.deep.eq({ ok: true, val: { act: 'gotlive', val: BW.vaultAt(), parent: BW.bankAt() } })
+    await bankDB.putBox(boxBorn)
+    expect(await nextNotice()).to.have.nested.property('val.val.boxlabel', BW.boxAt().boxlabel)
     expect(listening.size).to.eq(1)
     await stream.return(undefined)
   })
 
   it("stops listening when ended", async () => {
-    await TH.emptyTables()
     const { listening, schema } = await watchedServer()
     const { stream } = await watching(schema, { user_id: 'u1' })
     await vi.waitFor(() => { expect(listening.size).to.eq(1) })
@@ -248,14 +281,13 @@ describe("vaultResolvers' watch", () => {
 
   it("ends once its session is signed out or in as another user", async () => {
     for (const revoked of ['u2', null]) {
-      await TH.emptyTables()
-      const { listening, vaultDB, schema } = await watchedServer()
+      const { listening, bankDB, schema } = await watchedServer()
       const session: TH.TestContext = { user_id: 'u1' }
       const { nextNotice } = await watching(schema, session)
-      await vaultDB.putVault(vaultBorn)
+      await bankDB.putVault(vaultBorn)
       expect(await nextNotice()).to.have.property('ok', true)
       session.user_id = revoked
-      await vaultDB.putBox(boxBorn)
+      await bankDB.putBox(boxBorn)
       expect(await nextNotice()).to.have.nested.property('err.refusalkind', 'identity_revoked')
       expect(await nextNotice()).to.be.null
       await vi.waitFor(() => { expect(listening.size).to.eq(0) })
@@ -263,22 +295,21 @@ describe("vaultResolvers' watch", () => {
   })
 
   it("ends with a refusal that carries nothing from the error its getUserId throws", async () => {
-    await TH.emptyTables()
-    const { listening, vaultDB, schema } = await watchedServer()
+    const { listening, bankDB, schema } = await watchedServer()
     const session: TH.TestContext = { user_id: 'u1' }
     const { stream } = await watching(schema, session)
     Object.defineProperty(session, 'user_id', { get: () => { throw new Error('session datastore s3cr3t-host is down') } })
-    await vaultDB.putVault(vaultBorn)
+    await bankDB.putVault(vaultBorn)
     const last = await stream.next()
     expect(JSON.stringify(last)).not.to.include('s3cr3t')
-    expect(DB.crossedNotice.parse(overTheWire(last.value?.data?.['safebyokWatch']))).to.have.nested.property('err.refusalkind', 'unexpected_error')
+    expect(BX.crossedNotice.parse(overTheWire(last.value?.data?.['safebyokWatch']))).to.have.nested.property('err.refusalkind', 'unexpected_error')
     expect(await stream.next()).to.have.property('done', true)
     await vi.waitFor(() => { expect(listening.size).to.eq(0) })
   })
 
   it("ends a refused watch after one notice", async () => {
     const { listening, schema } = await watchedServer()
-    for (const [context, scope, refusalkind] of [[{ user_id: 'u2' }, TH.bankScope, 'identity_revoked'], [{ user_id: 'u1' }, { ...TH.bankScope, banklabel: '' }, 'bad_scope']] as const) {
+    for (const [context, scope, refusalkind] of [[{ user_id: 'u2' }, BW.bankScope, 'identity_revoked'], [{ user_id: 'u1' }, { ...BW.bankScope, banklabel: '' }, 'bad_scope']] as const) {
       const { nextNotice } = await watching(schema, context, scope)
       expect(await nextNotice()).to.have.nested.property('err.refusalkind', refusalkind)
       expect(await nextNotice()).to.be.null
@@ -287,34 +318,34 @@ describe("vaultResolvers' watch", () => {
   })
 })
 
-describe("VaultSchemaSdl", () => {
-  const schema = buildSchema(VaultSchemaSdl)
+describe("BankSchemaSdl", () => {
+  const schema = buildSchema(BankSchemaSdl)
 
   it("builds on its own, with every root field it adds named safebyok...", () => {
     const rootFields = [schema.getQueryType(), schema.getMutationType(), schema.getSubscriptionType()]
       .flatMap((root) => (isObjectType(root) ? Object.keys(root.getFields()) : []))
-    expect(rootFields).to.have.lengthOf(13)
+    expect(rootFields).to.have.lengthOf(15)
     for (const fieldname of rootFields) { expect(fieldname).to.match(/^safebyok[A-Z]/) }
   })
 
   it("takes every operation a client sends", () => {
-    for (const document of Object.values(VaultOperations)) { expect(validate(schema, parse(document))).to.deep.eq([]) }
+    for (const document of Object.values(BankOperations)) { expect(validate(schema, parse(document))).to.deep.eq([]) }
   })
 
   it("carries a time past 32 bits", async () => {
     await TH.emptyTables()
     const executable = TH.schemaOver(await TH.serverOver())
-    const later = TH.vaultAt(0, 'life1', { registered_at: 2 ** 41, written_at: 2 ** 41 })
-    const born = DB.putVaultAnswer.parse(await sentAsk(executable, VaultOperations.putVault, TH.vaultPutAskOf(later)))
+    await sentAsk(executable, BankOperations.buildBank, BX.bankBuild, bankBuilt)
+    const later = BW.vaultAt(0, 'bank1', 'life1', { registered_at: 2 ** 41, written_at: 2 ** 41 })
+    const born = BX.putVaultAnswer.parse(await sentAsk(executable, BankOperations.putVault, BX.vaultPut, BW.vaultPutAskOf(later)))
     expect(born.val).to.have.property('written_at', 2 ** 41)
   })
 
   it("refuses a time that is not a safe integer", async () => {
-    await TH.emptyTables()
     const executable = TH.schemaOver(await TH.serverOver())
-    const later = TH.vaultAt(0, 'life1', { registered_at: 2 ** 41, written_at: 2 ** 41 })
-    const ask = DB.vaultPut.parse(TH.vaultPutAskOf(later))
-    const fractional = await graphql({ schema: executable, source: VaultOperations.putVault, variableValues: { ask: { ...ask, record: { ...ask.record, written_at: 1.5 } } }, contextValue: { user_id: 'u1' } })
+    const later = BW.vaultAt(0, 'bank1', 'life1', { registered_at: 2 ** 41, written_at: 2 ** 41 })
+    const ask = BX.vaultPut.parse(BW.vaultPutAskOf(later))
+    const fractional = await graphql({ schema: executable, source: BankOperations.putVault, variableValues: { ask: { ...ask, record: { ...ask.record, written_at: 1.5 } } }, contextValue: { user_id: 'u1' } })
     expect(fractional.errors).to.have.lengthOf(1)
   })
 })

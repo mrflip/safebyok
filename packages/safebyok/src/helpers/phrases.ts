@@ -488,7 +488,7 @@ export const StorageWithheld = "The browser withholds IndexedDB from this page (
 export const BrowserDatastoreFailed = "IndexedDB failed while the vault was reading or writing its rows: try again shortly. IndexedDB's own error is this error's cause."
 
 /** A GraphQL server whose answer lacks the field asked for. */
-export const SchemaNotServed = "The GraphQL server answered without what was asked of it: is it serving safebyok-graphql's VaultSchemaSdl?"
+export const SchemaNotServed = "The GraphQL server answered without what was asked of it: is it serving safebyok-graphql's BankSchemaSdl?"
 
 /** A request to a GraphQL server that failed, named by what it threw, its HTTP status and its code, where each is known. */
 export function fetchFailed(thrownName: string, status: number | null, code: string | null): string {

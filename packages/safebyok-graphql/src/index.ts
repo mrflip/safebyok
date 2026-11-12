@@ -1,4 +1,4 @@
-/** `safebyok-graphql`: `GraphQLVaultDB`, a browser-side VaultDB that calls your GraphQL server running `safebyok-graphql/server`. */
-export { GraphQLVaultDB } from './graphql-bank-db'
-export type { GraphQLVaultClient, GraphQLVaultDBOpts } from './graphql-bank-db'
-export { VaultOperations } from './bank-operations'
+/** `safebyok-graphql`: `GraphQLBankDB`, a browser-side bankDB that calls your GraphQL server running `safebyok-graphql/server`. */
+export { GraphQLBankDB } from './graphql-bank-db'
+export type { GraphQLBankClient, GraphQLBankDBOpts } from './graphql-bank-db'
+export { BankOperations } from './bank-operations'

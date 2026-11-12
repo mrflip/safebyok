@@ -1,24 +1,22 @@
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import type * as Z from 'zod'
 import * as DB from 'safebyok/storage'
-import type {
-  Answer, BadAnswer, BankListed, BankScope, BoxAnswer, BoxDelAsk, BoxesListed, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxTidyAsk, GateVerbOpts, GoodAnswer, ListAct, Notice, OkAct,
-  Tidied, VaultAnswer, VaultDB, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultRecord, VaultRow, WatchScope,
-} from 'safebyok/storage'
-import { VaultOperations } from './bank-operations'
+import { BX } from 'safebyok/storage'
+import type { BankScope, BoxTidyAsk, GateVerb, GoodAct, GotAct, ListAct, OkAct, Tidied, WatchScope } from 'safebyok/storage'
+import { BankOperations } from './bank-operations'
 
-// == [Options]: GraphQLVaultClient, GraphQLVaultDBOpts, graphQLVaultDBOpts
+// == [Options]: GraphQLBankClient, GraphQLBankDBOpts, graphQLBankDBOpts
 
-/** The part of an urql Client that {@link GraphQLVaultDB} uses. */
-export type GraphQLVaultClient = Pick<Client, 'query' | 'mutation' | 'subscription'>
+/** The part of an urql Client that {@link GraphQLBankDB} uses. */
+export type GraphQLBankClient = Pick<Client, 'query' | 'mutation' | 'subscription'>
 
-/** Options for `new GraphQLVaultDB(opts)`. */
-export interface GraphQLVaultDBOpts {
-  /** Your app's urql Client, pointed at a server that serves `vaultResolvers`. */
-  client: GraphQLVaultClient
+/** Options for `new GraphQLBankDB(opts)`. */
+export interface GraphQLBankDBOpts {
+  /** Your app's urql Client, pointed at a server that serves `bankResolvers`. */
+  client: GraphQLBankClient
 }
 
-const isGraphQLVaultClient = (candidate: unknown): candidate is GraphQLVaultClient => (
+const isGraphQLBankClient = (candidate: unknown): candidate is GraphQLBankClient => (
   (typeof candidate === 'object') && (candidate !== null)
   && ('query' in candidate) && (typeof candidate.query === 'function')
   && ('mutation' in candidate) && (typeof candidate.mutation === 'function')
@@ -26,200 +24,227 @@ const isGraphQLVaultClient = (candidate: unknown): candidate is GraphQLVaultClie
 )
 
 // `custom` returns the same client object it was given, so the client's methods keep their `this`.
-const graphQLVaultDBOpts = DB.objCheck(({ custom }) => ({
-  client: custom<GraphQLVaultClient>(isGraphQLVaultClient, 'Expected an urql Client, with query, mutation and subscription functions'),
+const graphQLBankDBOpts = DB.objCheck(({ custom }) => ({
+  client: custom<GraphQLBankClient>(isGraphQLBankClient, 'Expected an urql Client, with query, mutation and subscription functions'),
 }), 'bad_option')
 
-true satisfies Z.core.util.AssertEqual<GraphQLVaultDBOpts, Z.input<typeof graphQLVaultDBOpts>>
+true satisfies Z.core.util.AssertEqual<GraphQLBankDBOpts, Z.input<typeof graphQLBankDBOpts>>
 // --
 
-// == [The VaultDB]: GraphQLVaultDB
+// == [The BankDB]: GraphQLBankDB
 
-/** A browser-side vaultDB that sends each call to your GraphQL server: `new GraphQLVaultDB({ client })`. */
-export class GraphQLVaultDB implements VaultDB {
-  // == [Props]: #client, IsVaultDB
+/** A browser-side bankDB that sends each call to your GraphQL server: `new GraphQLBankDB({ client })`. */
+export class GraphQLBankDB implements BX.BankDB {
+  // == [Props]: #client, IsBankDB
 
-  readonly #client: GraphQLVaultClient
+  readonly #client: GraphQLBankClient
 
   // A class getter, not an own field, so the brand is left out of JSON and of object spreads.
-  /** The brand that marks this object as a vaultDB, recognized even across duplicate copies of safebyok. */
-  get [DB.IsVaultDB](): true { return true }
+  /** The brand that marks this object as a bankDB, recognized even across duplicate copies of safebyok. */
+  get [DB.IsBankDB](): true { return true }
   // --
 
   // == [Construction]: constructor
 
-  constructor(opts: GraphQLVaultDBOpts) {
-    const { client } = graphQLVaultDBOpts.parse(opts)
+  constructor(opts: GraphQLBankDBOpts) {
+    const { client } = graphQLBankDBOpts.parse(opts)
     this.#client = client
   }
   // --
 
-  // == [Gets]: listVaults, tryListVaults, getVault, tryGetVault, listBoxes, tryListBoxes, getBox, tryGetBox
+  // == [Bank verbs]: ensureBank, tryEnsureBank, buildBank, tryBuildBank, delBank, tryDelBank
   // Each verb checks its ask, sends it, and parses the answer that crosses back. An ask that fails its check is never sent.
 
-  /** List the bank's vaults, tombstones included. Rows that fail validation are returned in `damaged_rows`. */
-  async listVaults(ask: VaultListAsk): Promise<GoodAnswer<BankListed, ListAct, BankScope>> { return goodAnswerOf(await this.tryListVaults(ask)) }
-
-  /** Non-throwing form of {@link listVaults}. */
-  async tryListVaults(ask: VaultListAsk): Promise<Answer<BankListed, ListAct, BankScope>> {
-    try {
-      const { user_id, banklabel } = DB.vaultList.parse(ask)
-      const crossed = await this.#runQuery(VaultOperations.listVaults, 'safebyokListVaults', { user_id, banklabel })
-      return DB.listVaultsAnswer.parse(listedAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'listVaults', ask) }
-  }
-
-  /** Get the vault row at a scope, whatever its life.
-   * With `ifAbsent: 'nil'`, `val` is null if no row is stored, or the tombstone if one is. Otherwise both refuse.
+  /** Get the bank row, and for a live bank its `main` gate row and its vault rows.
+   * A vault row that fails its checks is listed in `damaged_rows`. `val` is null when no live bank is stored.
    */
-  async getVault(ask: VaultGetAsk): Promise<GoodAnswer<VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryGetVault(ask)) }
+  async ensureBank(ask: BX.BankEnsureAsk): Promise<BX.GoodAnswer<BX.BankEnsured | null, GotAct>> { return goodAnswerOf(await this.tryEnsureBank(ask)) }
 
-  /** Non-throwing form of {@link getVault}. */
-  async tryGetVault(ask: VaultGetAsk): Promise<VaultAnswer> {
+  /** Non-throwing form of {@link ensureBank}. */
+  async tryEnsureBank(ask: BX.BankEnsureAsk): Promise<BX.EnsureBankAnswer> {
     try {
-      const checked = DB.vaultGet.parse(ask)
-      const crossed = await this.#runQuery(VaultOperations.getVault, 'safebyokGetVault', { ask: checked })
-      return DB.getVaultAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'getVault', ask) }
+      const { user_id, banklabel } = BX.bankEnsure.parse(ask)
+      const crossed = await this.#runQuery(BankOperations.ensureBank, 'safebyokEnsureBank', { user_id, banklabel })
+      return BX.ensureBankAnswer.parse(ensuredAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'ensureBank', ask) }
   }
 
-  /** List the boxes of the vault life `vault_tok`, in sparse form. Rows that fail validation are returned in `damaged_rows`. */
-  async listBoxes(ask: BoxListAsk): Promise<GoodAnswer<BoxesListed, ListAct>> { return goodAnswerOf(await this.tryListBoxes(ask)) }
-
-  /** Non-throwing form of {@link listBoxes}. */
-  async tryListBoxes(ask: BoxListAsk): Promise<Answer<BoxesListed, ListAct>> {
-    try {
-      const { user_id, banklabel, vaultlabel, vault_tok } = DB.boxList.parse(ask)
-      const crossed = await this.#runQuery(VaultOperations.listBoxes, 'safebyokListBoxes', { user_id, banklabel, vaultlabel, vault_tok })
-      return DB.listBoxesAnswer.parse(listedAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'listBoxes', ask) }
-  }
-
-  /** Get the box row under this `vault_tok`, with its vault row as `world`.
-   * With `ifAbsent: 'nil'`, `val` is null if no row is stored, or the tombstone if one is. Otherwise both refuse.
+  /** Store the bank record `ask.record` and its `main` gate row `ask.gate` together, over no bank or its tombstone.
+   * Under the `passed` act, nothing is stored, and `val` is the live bank's gate row.
    */
-  async getBox(ask: BoxGetAsk): Promise<GoodAnswer<BoxRow | null, OkAct>> { return goodAnswerOf(await this.tryGetBox(ask)) }
+  async buildBank(ask: BX.BankBuildAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryBuildBank(ask)) }
 
-  /** Non-throwing form of {@link getBox}. */
-  async tryGetBox(ask: BoxGetAsk): Promise<BoxAnswer> {
+  /** Non-throwing form of {@link buildBank}. */
+  async tryBuildBank(ask: BX.BankBuildAsk): Promise<BX.GateAnswer> {
     try {
-      const checked = DB.boxGet.parse(ask)
-      const crossed = await this.#runQuery(VaultOperations.getBox, 'safebyokGetBox', { ask: checked })
-      return DB.getBoxAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'getBox', ask) }
-  }
-  // --
-
-  // == [Puts]: putVault, tryPutVault, putBox, tryPutBox
-
-  /** Store `ask.record` over the vault row `ask.expected`, as `ifPresent` and `ifAbsent` allow.
-   * Under the `passed` act, nothing is stored, and `val` is the live row found.
-   */
-  async putVault(ask: VaultPutAsk): Promise<GoodAnswer<VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryPutVault(ask)) }
-
-  /** Non-throwing form of {@link putVault}. */
-  async tryPutVault(ask: VaultPutAsk): Promise<VaultAnswer> {
-    try {
-      const checked = DB.vaultPut.parse(ask)
-      const crossed = await this.#runMutation(VaultOperations.putVault, 'safebyokPutVault', { ask: checked })
-      return DB.putVaultAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'putVault', ask) }
+      const checked = BX.bankBuild.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.buildBank, 'safebyokBuildBank', { ask: checked })
+      return BX.buildBankAnswer.parse(rowAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'buildBank', ask) }
   }
 
-  /** Store `ask.record` over the box row `ask.expected`, in a vault live under its `vault_tok`, as `ifPresent` and `ifAbsent` allow.
-   * Under the `passed` act, nothing is stored, and `val` is the live row found.
-   */
-  async putBox(ask: BoxPutAsk): Promise<GoodAnswer<BoxRow | null, OkAct>> { return goodAnswerOf(await this.tryPutBox(ask)) }
+  /** Store the tombstone `ask.record` over the live bank row `ask.expected`, and delete every gate, vault and box row under the bank. */
+  async delBank(ask: BX.BankDelAsk): Promise<BX.GoodAnswer<BX.BankRow | null, OkAct, null>> { return goodAnswerOf(await this.tryDelBank(ask)) }
 
-  /** Non-throwing form of {@link putBox}. */
-  async tryPutBox(ask: BoxPutAsk): Promise<BoxAnswer> {
+  /** Non-throwing form of {@link delBank}. */
+  async tryDelBank(ask: BX.BankDelAsk): Promise<BX.DelBankAnswer> {
     try {
-      const checked = DB.boxPut.parse(ask)
-      const crossed = await this.#runMutation(VaultOperations.putBox, 'safebyokPutBox', { ask: checked })
-      return DB.putBoxAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'putBox', ask) }
+      const checked = BX.bankDel.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.delBank, 'safebyokDelBank', { ask: checked })
+      return BX.delBankAnswer.parse(rowAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'delBank', ask) }
   }
   // --
 
   // == [Gate verbs]: replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey
 
-  /** Replace the vault's passphrase wayin. `record` is the vault row at `opts.prior` with the new wayin and its `gate_epoch` plus one. */
-  async replacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'replaced'>> { return goodAnswerOf(await this.tryReplacePassphrase(record, opts)) }
+  /** Store the gate record `ask.record`, whose only change is to replace the passphrase wayin. Refuses `gate_issue` for any other change. */
+  async replacePassphrase(ask: BX.GateVerbAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryReplacePassphrase(ask)) }
 
   /** Non-throwing form of {@link replacePassphrase}. */
-  async tryReplacePassphrase(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'replaced'>> {
+  async tryReplacePassphrase(ask: BX.GateVerbAsk): Promise<BX.GateAnswer> {
     try {
-      const vaultRecord  = DB.vaultRecord.parse(record)
-      const gateVerbOpts = DB.gateVerbOpts.parse(opts)
-      const crossed = await this.#runMutation(VaultOperations.replacePassphrase, 'safebyokReplacePassphrase', { record: vaultRecord, opts: gateVerbOpts })
-      return DB.replacePassphraseAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'replacePassphrase', DB.gateVerbAskOf('replacePassphrase', record)) }
+      const crossed = await this.#runMutation(BankOperations.replacePassphrase, 'safebyokReplacePassphrase', { ask: gateVerbAskOf('replacePassphrase', ask) })
+      return BX.replacePassphraseAnswer.parse(rowAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'replacePassphrase', { ...ask, gateVerb: 'replacePassphrase' }) }
   }
 
-  /** Add a passkey wayin to a vault that has none. `record` is the vault row at `opts.prior` with the passkey wayin and its `gate_epoch` plus one. */
-  async addPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'added'>> { return goodAnswerOf(await this.tryAddPasskey(record, opts)) }
+  /** Store the gate record `ask.record`, whose only change is to add a passkey wayin.
+   * Refuses `camped` when a passkey wayin is already stored, and `gate_issue` for any other change.
+   */
+  async addPasskey(ask: BX.GateVerbAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryAddPasskey(ask)) }
 
   /** Non-throwing form of {@link addPasskey}. */
-  async tryAddPasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'added'>> {
+  async tryAddPasskey(ask: BX.GateVerbAsk): Promise<BX.GateAnswer> {
     try {
-      const vaultRecord  = DB.passkeyAddRecord.parse(record)
-      const gateVerbOpts = DB.gateVerbOpts.parse(opts)
-      const crossed = await this.#runMutation(VaultOperations.addPasskey, 'safebyokAddPasskey', { record: vaultRecord, opts: gateVerbOpts })
-      return DB.addPasskeyAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'addPasskey', DB.gateVerbAskOf('addPasskey', record)) }
+      const crossed = await this.#runMutation(BankOperations.addPasskey, 'safebyokAddPasskey', { ask: gateVerbAskOf('addPasskey', ask) })
+      return BX.addPasskeyAnswer.parse(rowAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'addPasskey', { ...ask, gateVerb: 'addPasskey' }) }
   }
 
-  /** Remove the vault's passkey wayin. `record` is the vault row at `opts.prior` without it and its `gate_epoch` plus one.
-   * A stored row that already has no passkey is returned unchanged.
+  /** Store the gate record `ask.record`, whose only change is to remove the passkey wayin. Refuses `gate_issue` for any other change.
+   * Under the `passed` act, nothing is stored: the gate row has no passkey wayin, and `val` is that row.
    */
-  async revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked' | 'passed'>> { return goodAnswerOf(await this.tryRevokePasskey(record, opts)) }
+  async revokePasskey(ask: BX.GateVerbAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryRevokePasskey(ask)) }
 
   /** Non-throwing form of {@link revokePasskey}. */
-  async tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked' | 'passed'>> {
+  async tryRevokePasskey(ask: BX.GateVerbAsk): Promise<BX.GateAnswer> {
     try {
-      const vaultRecord  = DB.passkeyRevokeRecord.parse(record)
-      const gateVerbOpts = DB.gateVerbOpts.parse(opts)
-      const crossed = await this.#runMutation(VaultOperations.revokePasskey, 'safebyokRevokePasskey', { record: vaultRecord, opts: gateVerbOpts })
-      return DB.revokePasskeyAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'revokePasskey', DB.gateVerbAskOf('revokePasskey', record)) }
+      const crossed = await this.#runMutation(BankOperations.revokePasskey, 'safebyokRevokePasskey', { ask: gateVerbAskOf('revokePasskey', ask) })
+      return BX.revokePasskeyAnswer.parse(rowAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'revokePasskey', { ...ask, gateVerb: 'revokePasskey' }) }
   }
   // --
 
-  // == [Dels]: delBox, tryDelBox, delVault, tryDelVault, tidyGone, tryTidyGone
+  // == [Vault verbs]: getVault, tryGetVault, putVault, tryPutVault, delVault, tryDelVault
 
-  /** Store the tombstone `ask.record` over the live box row `ask.expected`. */
-  async delBox(ask: BoxDelAsk): Promise<GoodAnswer<BoxRow | null, OkAct>> { return goodAnswerOf(await this.tryDelBox(ask)) }
+  /** Get the vault row at a scope, whatever its life, in a bank live under `bank_tok`.
+   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone stored; otherwise both refuse.
+   */
+  async getVault(ask: BX.VaultGetAsk): Promise<BX.GoodAnswer<BX.VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryGetVault(ask)) }
 
-  /** Non-throwing form of {@link delBox}. */
-  async tryDelBox(ask: BoxDelAsk): Promise<BoxAnswer> {
+  /** Non-throwing form of {@link getVault}. */
+  async tryGetVault(ask: BX.VaultGetAsk): Promise<BX.VaultAnswer> {
     try {
-      const checked = DB.boxDel.parse(ask)
-      const crossed = await this.#runMutation(VaultOperations.delBox, 'safebyokDelBox', { ask: checked })
-      return DB.delBoxAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'delBox', ask) }
+      const checked = BX.vaultGet.parse(ask)
+      const crossed = await this.#runQuery(BankOperations.getVault, 'safebyokGetVault', { ask: checked })
+      return BX.getVaultAnswer.parse(rowAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'getVault', ask) }
+  }
+
+  /** Store `ask.record` over the vault row `ask.expected`, in a bank live under `bank_tok`, as `ifPresent` and `ifAbsent` allow.
+   * Under the `passed` act, nothing is stored, and `val` is the live row found.
+   */
+  async putVault(ask: BX.VaultPutAsk): Promise<BX.GoodAnswer<BX.VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryPutVault(ask)) }
+
+  /** Non-throwing form of {@link putVault}. */
+  async tryPutVault(ask: BX.VaultPutAsk): Promise<BX.VaultAnswer> {
+    try {
+      const checked = BX.vaultPut.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.putVault, 'safebyokPutVault', { ask: checked })
+      return BX.putVaultAnswer.parse(rowAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'putVault', ask) }
   }
 
   /** Store the tombstone `ask.record` over the live vault row `ask.expected`, and delete the boxes of that vault life. */
-  async delVault(ask: VaultDelAsk): Promise<GoodAnswer<VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryDelVault(ask)) }
+  async delVault(ask: BX.VaultDelAsk): Promise<BX.GoodAnswer<BX.VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryDelVault(ask)) }
 
   /** Non-throwing form of {@link delVault}. */
-  async tryDelVault(ask: VaultDelAsk): Promise<VaultAnswer> {
+  async tryDelVault(ask: BX.VaultDelAsk): Promise<BX.VaultAnswer> {
     try {
-      const checked = DB.vaultDel.parse(ask)
-      const crossed = await this.#runMutation(VaultOperations.delVault, 'safebyokDelVault', { ask: checked })
-      return DB.delVaultAnswer.parse(rowAnswerOf(crossed))
+      const checked = BX.vaultDel.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.delVault, 'safebyokDelVault', { ask: checked })
+      return BX.delVaultAnswer.parse(rowAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'delVault', ask) }
   }
+  // --
 
-  /** For hosts: remove the box rows left by vault lives that have ended, and count the box rows that remain. */
-  async tidyGone(ask: BoxTidyAsk): Promise<GoodAnswer<Tidied, 'tidied', BankScope>> { return goodAnswerOf(await this.tryTidyGone(ask)) }
+  // == [Box verbs]: listBoxes, tryListBoxes, getBox, tryGetBox, putBox, tryPutBox, delBox, tryDelBox
+
+  /** List a vault's boxes, sparse, with its vault row as `parent`. Refuses when the vault is not live under `bank_tok` and `vault_tok`. */
+  async listBoxes(ask: BX.BoxListAsk): Promise<BX.GoodAnswer<BX.BoxesListed, ListAct, BX.VaultRow>> { return goodAnswerOf(await this.tryListBoxes(ask)) }
+
+  /** Non-throwing form of {@link listBoxes}. When the vault row refuses, `parent` is that stored row. */
+  async tryListBoxes(ask: BX.BoxListAsk): Promise<BX.ListBoxesAnswer> {
+    try {
+      const { user_id, banklabel, vaultlabel, bank_tok, vault_tok } = BX.boxList.parse(ask)
+      const crossed = await this.#runQuery(BankOperations.listBoxes, 'safebyokListBoxes', { user_id, banklabel, vaultlabel, bank_tok, vault_tok })
+      return BX.listBoxesAnswer.parse(listedAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'listBoxes', ask) }
+  }
+
+  /** Get a box row, with its vault row as `parent`. Refuses when the vault is not live under `bank_tok` and `vault_tok`.
+   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone stored; otherwise both refuse.
+   */
+  async getBox(ask: BX.BoxGetAsk): Promise<BX.GoodAnswer<BX.BoxRow | null, OkAct, BX.VaultRow>> { return goodAnswerOf(await this.tryGetBox(ask)) }
+
+  /** Non-throwing form of {@link getBox}. */
+  async tryGetBox(ask: BX.BoxGetAsk): Promise<BX.BoxAnswer> {
+    try {
+      const checked = BX.boxGet.parse(ask)
+      const crossed = await this.#runQuery(BankOperations.getBox, 'safebyokGetBox', { ask: checked })
+      return BX.getBoxAnswer.parse(rowAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'getBox', ask) }
+  }
+
+  /** Store `ask.record` over the box row `ask.expected`, in a vault live under `bank_tok` and `vault_tok`, as `ifPresent` and `ifAbsent` allow.
+   * Under the `passed` act, nothing is stored, and `val` is the live row found.
+   */
+  async putBox(ask: BX.BoxPutAsk): Promise<BX.GoodAnswer<BX.BoxRow | null, OkAct, BX.VaultRow>> { return goodAnswerOf(await this.tryPutBox(ask)) }
+
+  /** Non-throwing form of {@link putBox}. */
+  async tryPutBox(ask: BX.BoxPutAsk): Promise<BX.BoxAnswer> {
+    try {
+      const checked = BX.boxPut.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.putBox, 'safebyokPutBox', { ask: checked })
+      return BX.putBoxAnswer.parse(rowAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'putBox', ask) }
+  }
+
+  /** Store the tombstone `ask.record` over the live box row `ask.expected`. */
+  async delBox(ask: BX.BoxDelAsk): Promise<BX.GoodAnswer<BX.BoxRow | null, OkAct, BX.VaultRow>> { return goodAnswerOf(await this.tryDelBox(ask)) }
+
+  /** Non-throwing form of {@link delBox}. */
+  async tryDelBox(ask: BX.BoxDelAsk): Promise<BX.BoxAnswer> {
+    try {
+      const checked = BX.boxDel.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.delBox, 'safebyokDelBox', { ask: checked })
+      return BX.delBoxAnswer.parse(rowAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'delBox', ask) }
+  }
+  // --
+
+  // == [Housekeeping]: tidyGone, tryTidyGone
+
+  /** For hosts: delete the vault and box rows of an ended life under the bank, and count the box rows left. */
+  async tidyGone(ask: BoxTidyAsk): Promise<BX.GoodAnswer<Tidied, 'tidied', BankScope>> { return goodAnswerOf(await this.tryTidyGone(ask)) }
 
   /** Non-throwing form of {@link tidyGone}. */
-  async tryTidyGone(ask: BoxTidyAsk): Promise<Answer<Tidied, 'tidied', BankScope>> {
+  async tryTidyGone(ask: BoxTidyAsk): Promise<BX.TidyGoneAnswer> {
     try {
       const { user_id, banklabel } = DB.boxTidy.parse(ask)
-      const crossed = await this.#runMutation(VaultOperations.tidyGone, 'safebyokTidyGone', { user_id, banklabel })
-      return DB.tidyGoneAnswer.parse(tidiedAnswerOf(crossed))
+      const crossed = await this.#runMutation(BankOperations.tidyGone, 'safebyokTidyGone', { user_id, banklabel })
+      return BX.tidyGoneAnswer.parse(tidiedAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'tidyGone', ask) }
   }
   // --
@@ -230,7 +255,7 @@ export class GraphQLVaultDB implements VaultDB {
    * If the stream fails or the server ends it, `onBadNews` is called once and the watch does not resubscribe.
    * A watch that ends because the session is no longer signed in (`identity_revoked`) stops without calling it.
    */
-  watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: DB.VaultError) => void): () => void {
+  watch(scope: WatchScope, onNotice: (notice: BX.Notice) => void, onBadNews?: (news: DB.VaultError) => void): () => void {
     const { user_id, banklabel, vaultlabel = null } = DB.watchScope.parse(scope)
     const variables = { user_id, banklabel, vaultlabel }
     const watching: { isOn: boolean, subscription?: { unsubscribe: () => void } } = { isOn: true }
@@ -241,7 +266,7 @@ export class GraphQLVaultDB implements VaultDB {
       watching.subscription?.unsubscribe()
       if (news !== null) { onBadNews?.(news) }
     }
-    watching.subscription = this.#client.subscription(VaultOperations.watch, variables).subscribe((result) => {
+    watching.subscription = this.#client.subscription(BankOperations.watch, variables).subscribe((result) => {
       if (! watching.isOn) { return }
       if (result.error !== undefined) {
         end(troubleOf(result.error))
@@ -277,21 +302,28 @@ export class GraphQLVaultDB implements VaultDB {
 }
 // --
 
-// == [Answers]: answerForRefusal, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, hearNotice
+// == [Asks and answers]: gateVerbAskOf, answerForRefusal, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, hearNotice
+
+// The mutation names the verb, so the ask sent leaves it out.
+/** `ask` checked as the gate verb `gateVerb`'s, without its `gateVerb`: what that verb's mutation sends. */
+function gateVerbAskOf(gateVerb: GateVerb, ask: BX.GateVerbAsk): BX.GateVerbAsk {
+  const { gateVerb: _gateVerb, ...sent } = BX.gatePut.parse({ ...ask, gateVerb })
+  return sent
+}
 
 // Every throw in a verb ends up here: an ask that fails its check, a server out of reach, or an answer that fails its own.
 /** The bad answer for a verb that threw: a refusal as it came, anything else `unexpected_error`.
  * Its meta names the `oplabel`, and carries what it may of the ask as `ask`.
  */
-function answerForRefusal(thrown: unknown, oplabel: string, ask: unknown): BadAnswer {
+function answerForRefusal(thrown: unknown, oplabel: string, ask: unknown): BX.BadAnswer {
   const refusal = DB.isVaultError(thrown) ? thrown : DB.unexpectedError(thrown)
   // An ask that failed its check has no metadata to trust: its refusal carries none.
-  const loggableAsk = DB.loggableAsk.safeParse(ask)
-  return DB.badAnswerOf(Object.assign(refusal, { meta: { ...refusal.meta, oplabel, ask: loggableAsk.success ? loggableAsk.data : {} } }))
+  const loggableAsk = BX.loggableAsk.safeParse(ask)
+  return BX.badAnswerOf(Object.assign(refusal, { meta: { ...refusal.meta, oplabel, ask: loggableAsk.success ? loggableAsk.data : {} } }))
 }
 
 /** Return a good answer, or throw a bad answer's refusal. */
-function goodAnswerOf<ValT, ActT extends string, WorldT>(answer: Answer<ValT, ActT, WorldT>): GoodAnswer<ValT, ActT, WorldT> {
+function goodAnswerOf<ValT, ActT extends GoodAct, ParentT>(answer: BX.Answer<ValT, ActT, ParentT>): BX.GoodAnswer<ValT, ActT, ParentT> {
   if (! answer.ok) { throw answer.err }
   return answer
 }
@@ -336,10 +368,10 @@ function codeOf(thrown: unknown): string | null {
 }
 
 /** Pass the notice in `result` to `onNotice`. Returns the refusal if the notice ends the watch, else null. */
-function hearNotice({ data }: OperationResult<unknown>, onNotice: (notice: Notice) => void): DB.VaultError | null {
+function hearNotice({ data }: OperationResult<unknown>, onNotice: (notice: BX.Notice) => void): DB.VaultError | null {
   // A notice is only a hint to fetch again, so a malformed notice is ignored.
   if ((typeof data !== 'object') || (data === null)) { return null }
-  const crossed = DB.crossedNotice.safeParse(rowAnswerOf((data as Record<string, unknown>)['safebyokWatch']))
+  const crossed = BX.crossedNotice.safeParse(rowAnswerOf((data as Record<string, unknown>)['safebyokWatch']))
   if (! crossed.success) { return null }
   if (crossed.data.ok) {
     onNotice(crossed.data.val)
@@ -349,7 +381,7 @@ function hearNotice({ data }: OperationResult<unknown>, onNotice: (notice: Notic
 }
 // --
 
-// == [Typenames]: Drop, dropTypename, wayinOf, gateOf, rowOf, rowsOf, listedOf, answerDrop, rowAnswerOf, listedAnswerOf, tidiedAnswerOf
+// == [Wire forms]: Drop, dropTypename, wayinOf, wayinsOf, rowOf, rowsOf, ensuredOf, listedOf, askOf, answerDrop, rowAnswerOf, ensuredAnswerOf, listedAnswerOf, tidiedAnswerOf
 
 // An exchange such as urql's cacheExchange adds `__typename` to every selection in a document. Remove it one selection
 // at a time, never with a deep strip: a sidecar, a meta or a damaged row may have a `__typename` field of its own.
@@ -368,23 +400,35 @@ const dropTypename = (bag: unknown, nested: Record<string, Drop> = {}): unknown 
 }
 
 const wayinOf: Drop = (val) => dropTypename(val, { vault_key_wayin_wrapped: dropTypename })
-const gateOf: Drop = (val) => dropTypename(val, { passphrase_wayin: wayinOf, passkey_wayin: wayinOf })
 
-/** The drop for a vault or box row, including a vault's gate and a box's ciphered fields. */
-const rowOf: Drop = (val) => dropTypename(val, { gate: gateOf, box_key_wrapped: dropTypename, whisper_ciphered: dropTypename })
+// GraphQL answers a gate that has no passkey wayin with `passkey0: null`, where the gate row leaves it out.
+/** The drop for a gate's wayins, which also leaves out a null `passkey0`. */
+const wayinsOf: Drop = (val) => {
+  const wayins = dropTypename(val, { main: wayinOf, passkey0: wayinOf })
+  if ((typeof wayins !== 'object') || (wayins === null) || ((wayins as Record<string, unknown>)['passkey0'] !== null)) { return wayins }
+  const { passkey0: _passkey0, ...main } = wayins as Record<string, unknown>
+  return main
+}
+
+/** The drop for a bank, gate, vault or box row, including a gate's wayins and a box's ciphered fields. */
+const rowOf: Drop = (val) => dropTypename(val, { wayins: wayinsOf, box_key_wrapped: dropTypename, whisper_ciphered: dropTypename })
 
 /** The drop for a list of rows. */
 const rowsOf: Drop = (val) => (Array.isArray(val) ? val.map((row) => rowOf(row)) : val)
 
-/** The drop for a listing: its rows, but not its `damaged_rows`. */
-const listedOf: Drop = (val) => dropTypename(val, { vaults: rowsOf, boxes: rowsOf })
+/** The drop for what ensureBank answers: its gates and its vaults, but not its `damaged_rows`. */
+const ensuredOf: Drop = (val) => dropTypename(val, { gates: (gates) => dropTypename(gates, { main: rowOf }), vaults: rowsOf })
 
-const askOf: Drop = (val) => dropTypename(val, { expected: dropTypename, record: dropTypename })
+/** The drop for a listing of boxes: its rows, but not its `damaged_rows`. */
+const listedOf: Drop = (val) => dropTypename(val, { boxes: rowsOf })
+
+const askOf: Drop = (val) => dropTypename(val, { expected: dropTypename, record: dropTypename, gate: dropTypename })
 
 /** Make the drop for an answer or a notice, using `valDrop` for its `val`. */
-function answerDrop(valDrop: Drop): Drop { return (val) => dropTypename(val, { val: valDrop, world: rowOf, dbhas: rowOf, ask: askOf, err: dropTypename }) }
+function answerDrop(valDrop: Drop): Drop { return (val) => dropTypename(val, { val: valDrop, parent: rowOf, dbhas: rowOf, ask: askOf, err: dropTypename }) }
 
 const rowAnswerOf = answerDrop(rowOf)
+const ensuredAnswerOf = answerDrop(ensuredOf)
 const listedAnswerOf = answerDrop(listedOf)
 const tidiedAnswerOf = answerDrop(dropTypename)
 // --

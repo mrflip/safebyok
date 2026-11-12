@@ -1,15 +1,15 @@
 # safebyok-graphql
 
-safebyok's vaultDB over [GraphQL](https://graphql.org), in two halves:
+safebyok's bankDB over [GraphQL](https://graphql.org), in two halves:
 
-* **On your server**, `safebyok-graphql/server`: **`VaultSchemaSdl`**, the schema as SDL, and
-  **`vaultResolvers({ vaultDB, getUserId })`**. Each operation is one of the vaultDB's own verbs,
-  called on the vaultDB your server hosts ([`safebyok-postgres`](../safebyok-postgres)'s, or your
+* **On your server**, `safebyok-graphql/server`: **`BankSchemaSdl`**, the schema as SDL, and
+  **`bankResolvers({ bankDB, getUserId })`**. Each operation is one of the bankDB's own verbs,
+  called on the bankDB your server hosts ([`safebyok-postgres`](../safebyok-postgres)'s, or your
   own), and returns that verb's answer, for the signed-in user's bank only.
-* **In the browser**, `safebyok-graphql`: **`new GraphQLVaultDB({ client })`**, the vaultDB over
-  your app's [urql](https://commerce.nearform.com/open-source/urql/) Client, to hand `Device.make`.
-  It takes the Client alone. Limits such as `maxBoxes` and `maxRecordSizeEst` are set on the vaultDB
-  your server hosts and hands to `vaultResolvers`. The browser half sets none.
+* **In the browser**, `safebyok-graphql`: **`new GraphQLBankDB({ client })`**, the bankDB over
+  your app's [urql](https://commerce.nearform.com/open-source/urql/) Client.
+  It takes the Client alone. Limits such as `maxBoxes` and `maxRecordSizeEst` are set on the bankDB
+  your server hosts and hands to `bankResolvers`. The browser half sets none.
 
 **Deploy the two halves together.** The browser half sends the documents the server half's schema
 serves, and checks each answer against its own copy of safebyok. An answer that fails those checks,
@@ -29,13 +29,13 @@ pnpm add @urql/core graphql      # if your app has neither already
 one copy of each. The browser half needs only `@urql/core`, the server half only `graphql`.
 
 **The server half and your GraphQL server must share one copy of `graphql`.** With two, the
-scalars `vaultResolvers` makes come from the other copy, and graphql refuses them as from "another
+scalars `bankResolvers` makes come from the other copy, and graphql refuses them as from "another
 module or realm". `pnpm why graphql` shows how many copies you have.
 
 ## The recipe: Yoga on Next.js, Postgres behind
 
 `tests/yoga-recipe.test.ts` runs this recipe, with Yoga's error masking on, through the battery
-every vaultDB passes. The workspace's `e2e/tests/graphql/` runs it again over real sockets and a
+every bankDB passes. The workspace's `e2e/tests/graphql/` runs it again over real sockets and a
 real Postgres.
 
 The route, `app/api/graphql/route.ts`:
@@ -43,22 +43,22 @@ The route, `app/api/graphql/route.ts`:
 ```ts
 import { createSchema, createYoga } from 'graphql-yoga'
 import { Pool } from 'pg'
-import { PostgresVaultDB, pgClientOf } from 'safebyok-postgres'
-import { VaultSchemaSdl, vaultResolvers } from 'safebyok-graphql/server'
+import { PostgresBankDB, pgClientOf } from 'safebyok-postgres'
+import { BankSchemaSdl, bankResolvers } from 'safebyok-graphql/server'
 import { listen } from './listen'                  // safebyok-postgres's README, "Hearing other writes"
 import { signedInUserId } from '@/auth'            // your own: the session's user, or null
 
-type VaultContext = { user_id: string | null }
+type BankContext = { user_id: string | null }
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-const vaultDB = new PostgresVaultDB({ client: pgClientOf(pool), listen })
+const bankDB = new PostgresBankDB({ client: pgClientOf(pool), listen })
 
-const schema = createSchema<VaultContext>({
-  typeDefs:  [VaultSchemaSdl],
-  resolvers: [vaultResolvers({ vaultDB, getUserId: ({ user_id }: VaultContext) => user_id })],
+const schema = createSchema<BankContext>({
+  typeDefs:  [BankSchemaSdl],
+  resolvers: [bankResolvers({ bankDB, getUserId: ({ user_id }: BankContext) => user_id })],
 })
 
-const { handleRequest } = createYoga<object, VaultContext>({
+const { handleRequest } = createYoga<object, BankContext>({
   schema,
   graphqlEndpoint: '/api/graphql',
   context:         async ({ request }) => ({ user_id: await signedInUserId(request) }),
@@ -72,14 +72,13 @@ The browser:
 
 ```ts
 import { Client, fetchExchange } from '@urql/core'
-import { Device } from 'safebyok'
-import { GraphQLVaultDB } from 'safebyok-graphql'
+import { GraphQLBankDB } from 'safebyok-graphql'
 
 const client = new Client({ url: '/api/graphql', exchanges: [fetchExchange], fetchSubscriptions: true })
-const device = Device.make({ user_id: session.user_id, banklabel: 'acme', gates: ['main'], vaultDB: new GraphQLVaultDB({ client }), ... })
+const bankDB = new GraphQLBankDB({ client })
 ```
 
-Your app's own Client works: `GraphQLVaultDB` sends every query `network-only`, so a document
+Your app's own Client works: `GraphQLBankDB` sends every query `network-only`, so a document
 cache in front of it changes nothing. `fetchSubscriptions: true` carries `watch` over server-sent
 events, and a Client with a WebSocket exchange for subscriptions works as well. When a watch's
 stream ends, by a closing result, an error or a refusal, the device's `onBadNews` is called once:
@@ -92,12 +91,12 @@ goes unreported.
 
 ## Who reaches which bank
 
-One vaultDB serves every request. **`getUserId(context)`** returns the user your own auth signed
-in for this request, or null. Each operation names the bank it reaches (its `user_id`, its ask's,
-or a gate verb's record's), and the resolvers serve it only when that is the signed-in user's bank.
-Any other request gets an answer refused as `identity_revoked`, and the vaultDB is not called. A
-put's or del's record must be at its ask's address, and the vaultDB's own check of the ask enforces
-that before anything is read.
+One bankDB serves every request. **`getUserId(context)`** returns the user your own auth signed
+in for this request, or null. Each operation names the bank it reaches (its `user_id`, or its ask's),
+and the resolvers serve it only when that is the signed-in user's bank.
+Any other request gets an answer refused as `identity_revoked`, and the bankDB is not called. A
+build's, put's or del's record must be at its ask's address, and the bankDB's own check of the ask
+enforces that before anything is read.
 A `watch` subscription calls `getUserId` again at each change it would send. Once it returns anyone
 other than the user it subscribed as, its last notice is the `identity_revoked` refusal, the stream
 ends, and the browser does not subscribe again. A `getUserId` that looks the session up live,
@@ -110,34 +109,41 @@ them to a new one. On sign-out, or a sign-in as someone else, call `device.vacat
 device with `Device.make` for the new user. The resolvers refuse the old bank's calls as
 `identity_revoked`, and that is all they do about it.
 
-`tidyGone`, which removes the box rows of deleted vaults and counts those left, is an operation like
-the rest, behind the same sign-in check: a host calls `tidyGone({ user_id, banklabel })` on its
-`GraphQLVaultDB`, and the vaultDB behind your resolvers tidies the signed-in user's bank.
+`tidyGone`, which removes the vault and box rows of ended lives and counts the box rows left, is an
+operation like the rest, behind the same sign-in check: a host calls
+`tidyGone({ op: 'tidy_gone', user_id, banklabel })` on its `GraphQLBankDB`, and the bankDB behind
+your resolvers tidies the signed-in user's bank.
 
-The vaultDB the resolvers call checks what it is sent, as the browser's vaultDB checks it before
+The bankDB the resolvers call checks what it is sent, as the browser's bankDB checks it before
 sending, so a caller that skips those checks, or is not a browser at all, is refused the same.
-A get, put or del hands the vaultDB's verb the ask as it came, and that verb's own check of the ask
-runs before anything is read.
+Each verb that takes an ask hands the bankDB's verb the ask as it came, and that verb's own check of
+the ask runs before anything is read. A gate verb's policy, what its new gate row may change, is
+judged by the bankDB behind your resolvers, in the same step that stores it.
 
 ## What crosses the wire
 
 Every operation returns a typed object with the same fields as its verb's `try*` answer: `ok`, `act`,
-`val`, `world`, `dbhas`, `ask` and `err`. `ask` carries the call's address, policies and row
-revisions, never a record's payload. Rows are typed: a live row and a tombstone are each a
-member of a union. A box's sidecar, a damaged row and a refusal's meta are `SafebyokJson`, carried
-whole. Times are `SafebyokEpochMillis`, integer UTC epoch milliseconds beyond the range of GraphQL's
-32-bit `Int`. A get, put or del takes one argument, `ask`: an input whose fields are those of the core's
-ask (`op`, the address, `ifAbsent` and `ifPresent`, the row it `expected`, read as that row's
-revision, `am` and tokens, the `record` to store, and a vault put's `gateVerb`). A listing takes
-its scope as typed arguments, and a gate verb its `record` and `opts`. So your logs and allowlists
-see whose bank each operation reaches. Every name the schema adds begins `safebyok` or `Safebyok`, to sit beside your own.
-`VaultOperations` has the documents `GraphQLVaultDB` sends, for a server that allows only the
-operations it knows.
+`val`, `parent` (the row above the one asked for), `dbhas`, `ask` and `err`. `ask` carries the
+call's address, policies and row revisions, never a record's payload. Rows are typed: a bank row, a
+gate row and a vault row each have a type of their own, and a live box row and a box tombstone are
+each a member of a union. A box's sidecar, a damaged row, a refusal's meta and a gate row's empty
+`auth`, `sigs` and `meta` are `SafebyokJson`, carried whole. A gate without a passkey wayin crosses
+with a null `passkey0`, which the browser half reads as none. Times are `SafebyokEpochMillis`,
+integer UTC epoch milliseconds beyond the range of GraphQL's 32-bit `Int`.
+
+A verb that stores a row, or gets one, takes one argument, `ask`: an input whose fields are those of
+the core's ask (`op`, the address, the `bank_tok` or `vault_tok` of the life it is made under,
+`ifAbsent` and `ifPresent`, the row it `expected`, read as that row's revision, `am` and tokens, the
+`record` to store, and a build's `gate`). Each gate verb is a mutation of its own, so its ask leaves
+out the verb. `ensureBank`, `listBoxes` and `tidyGone` take their scope as typed arguments. So your
+logs and allowlists see whose bank each operation reaches. Every name the schema adds begins
+`safebyok` or `Safebyok`, to sit beside your own. `BankOperations` has the documents
+`GraphQLBankDB` sends, for a server that allows only the operations it knows.
 
 **A refusal is the answer's `err` field, never a GraphQL error.** It carries its `refusalkind`, its
 message, and in `meta` the `capacity` of a `vault_full`, the `fieldnames` it names and the `oplabel` it
 refused. The browser rethrows it as a VaultError of that kind. The box cap is the `maxBoxes` of the
-vaultDB behind your resolvers, a best-effort limit: exact at moderate write rates, never a strict
+bankDB behind your resolvers, a best-effort limit: exact at moderate write rates, never a strict
 one. **Nothing else of a refusal is sent**, not even its cause, so a driver's message stays on your server.
 
 In the browser, a failed fetch is `storage_unavailable`, its cause naming only the error, the HTTP
@@ -148,7 +154,7 @@ checks refuse, is `unexpected_error`: a server out of step with this copy of saf
 
 `pnpm justify` here runs its lint, typecheck, tests and build, with publint and arethetypeswrong.
 The tests run in-process, with no database or GraphQL server to stand up. The battery runs over a
-`GraphQLVaultDB` whose urql Client executes against the resolvers, over a `PostgresVaultDB` on
+`GraphQLBankDB` whose urql Client executes against the resolvers, over a `PostgresBankDB` on
 [PGlite](https://pglite.dev), with a second Client as another device. It runs again through Yoga
 over fetch, as in the recipe. A drift test checks every type the schema sends or takes against the core check
 that reads it. Before running `vitest` by hand, run `pnpm build:deps`: the tests read

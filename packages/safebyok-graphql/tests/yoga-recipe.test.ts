@@ -1,32 +1,32 @@
-// Runs the README's recipe: the server route (Yoga with vaultResolvers and a PostgresVaultDB) and the
-// browser side (GraphQLVaultDB on an urql Client that posts to the route). Only the test wiring
+// Runs the README's recipe: the server route (Yoga with bankResolvers and a PostgresBankDB) and the
+// browser side (GraphQLBankDB on an urql Client that posts to the route). Only the test wiring
 // differs: the user comes from a header instead of a session cookie, the database is a PGlite, and
 // fetch calls the route in-process. If you change the recipe here, change the README to match.
 
 import { describe, expect, it } from 'vitest'
 import { Client, fetchExchange } from '@urql/core'
 import { createSchema, createYoga } from 'graphql-yoga'
-import * as DB from 'safebyok/storage'
-import { PostgresVaultDB } from 'safebyok-postgres'
+import { BX } from 'safebyok/storage'
+import { PostgresBankDB } from 'safebyok-postgres'
 import type { PostgresClient, PostgresListen } from 'safebyok-postgres'
-import { GraphQLVaultDB } from '../src/index'
-import { VaultSchemaSdl, vaultResolvers } from '../src/server'
-import { VaultOperations } from '../src/bank-operations'
+import { GraphQLBankDB } from '../src/index'
+import { BankSchemaSdl, bankResolvers } from '../src/server'
+import { BankOperations } from '../src/bank-operations'
 import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
 
-// == [The recipe]: vaultRoute, browserVaultDB
+// == [The recipe]: bankRoute, browserBankDB
 
-/** Build the README's route for `vaultDB`. `signedInUserId` returns each request's signed-in user. */
-function vaultRoute(vaultDB: PostgresVaultDB, signedInUserId: (request: Request) => Promise<string | null>, isDev = false) {
+/** Build the README's route for `bankDB`. `signedInUserId` returns each request's signed-in user. */
+function bankRoute(bankDB: PostgresBankDB, signedInUserId: (request: Request) => Promise<string | null>, isDev = false) {
   /** The per-request context the resolvers see: the user your own auth signed in, or null. */
-  type VaultContext = { user_id: string | null }
-  const schema = createSchema<VaultContext>({
-    typeDefs:  [VaultSchemaSdl],
-    resolvers: [vaultResolvers({ vaultDB, getUserId: ({ user_id }: VaultContext) => user_id })],
+  type BankContext = { user_id: string | null }
+  const schema = createSchema<BankContext>({
+    typeDefs:  [BankSchemaSdl],
+    resolvers: [bankResolvers({ bankDB, getUserId: ({ user_id }: BankContext) => user_id })],
   })
-  const { handleRequest } = createYoga<object, VaultContext>({
+  const { handleRequest } = createYoga<object, BankContext>({
     schema,
     graphqlEndpoint: '/api/graphql',
     context:         async ({ request }) => ({ user_id: await signedInUserId(request) }),
@@ -36,9 +36,9 @@ function vaultRoute(vaultDB: PostgresVaultDB, signedInUserId: (request: Request)
   return async (request: Request): Promise<Response> => await handleRequest(request, {})
 }
 
-/** Build the README's browser side: a GraphQLVaultDB on an urql Client that sends queries, mutations and subscriptions to the route by fetch. */
-function browserVaultDB(fetcher: typeof fetch) {
-  return new GraphQLVaultDB({ client: new Client({
+/** Build the README's browser side: a GraphQLBankDB on an urql Client that sends queries, mutations and subscriptions to the route by fetch. */
+function browserBankDB(fetcher: typeof fetch) {
+  return new GraphQLBankDB({ client: new Client({
     url:                'https://app.example.test/api/graphql',
     exchanges:          [fetchExchange],
     fetchSubscriptions: true,
@@ -47,7 +47,7 @@ function browserVaultDB(fetcher: typeof fetch) {
 }
 // --
 
-// == [Wiring]: Route, byHeader, overTheNetwork, browserFor, signedInAsAsked, makeVaultDB, makeTwin
+// == [Wiring]: Route, byHeader, overTheNetwork, browserFor, signedInAsAsked, makeBankDB, makeTwin
 
 type Route = (request: Request) => Promise<Response>
 
@@ -68,9 +68,9 @@ function overTheNetwork(request: Request, response: Response): Response {
   return new Response(received, response)
 }
 
-/** Make a browser-side VaultDB whose fetch calls `route` in-process. `signedInAs` picks each operation's user from its variables. */
+/** Make a browser-side bankDB whose fetch calls `route` in-process. `signedInAs` picks each operation's user from its variables. */
 function browserFor(route: Route, signedInAs: (variables: Record<string, unknown>) => string | null) {
-  return browserVaultDB(async (url, init) => {
+  return browserBankDB(async (url, init) => {
     const request = new Request(url, init)
     const user_id = signedInAs(await variablesOf(request.clone()))
     if (user_id !== null) { request.headers.set('x-test-user', user_id) }
@@ -90,28 +90,28 @@ const signedInAsAsked = (variables: Record<string, unknown>): string | null => (
   TH.signedInAsAsked({ variables } as unknown as Parameters<TH.Signing>[0]).user_id
 )
 
-const serversOf = new WeakMap<GraphQLVaultDB, { route: Route, adapter: PostgresVaultDB }>()
+const serversOf = new WeakMap<GraphQLBankDB, { route: Route, adapter: PostgresBankDB }>()
 
-/** Empty the tables and make a new browser-side VaultDB with its own route. Its server's VaultDB is made with `opts` and, if given, a cap of `maxBoxes` boxes per vault. */
-async function makeVaultDB(opts: DB.AdapterVaultDBOpts = {}, maxBoxes?: number): Promise<GraphQLVaultDB> {
+/** Empty the tables and make a new browser-side bankDB with its own route. Its server's bankDB is made with `opts`. */
+async function makeBankDB(opts: BX.AdapterBankDBOpts & { maxBoxes?: number } = {}): Promise<GraphQLBankDB> {
   await TH.emptyTables()
-  const adapter = await TH.serverOver({ ...opts, ...((maxBoxes !== undefined) && { maxBoxes }) })
-  const route = vaultRoute(adapter, byHeader)
-  const vaultDB = browserFor(route, signedInAsAsked)
-  serversOf.set(vaultDB, { route, adapter })
-  return vaultDB
+  const adapter = await TH.serverOver(opts)
+  const route = bankRoute(adapter, byHeader)
+  const bankDB = browserFor(route, signedInAsAsked)
+  serversOf.set(bankDB, { route, adapter })
+  return bankDB
 }
 
-/** Return the route and the server's VaultDB behind a browser that makeVaultDB or makeTwin made. */
-function serverOf(vaultDB: GraphQLVaultDB): { route: Route, adapter: PostgresVaultDB } {
-  const server = serversOf.get(vaultDB)
-  if (server === undefined) { throw new Error('This takes a browser makeVaultDB or makeTwin made') }
+/** Return the route and the server's bankDB behind a browser that makeBankDB or makeTwin made. */
+function serverOf(bankDB: GraphQLBankDB): { route: Route, adapter: PostgresBankDB } {
+  const server = serversOf.get(bankDB)
+  if (server === undefined) { throw new Error('This takes a browser makeBankDB or makeTwin made') }
   return server
 }
 
-/** Make a second browser-side VaultDB on the same route, to act as another device. */
-const makeTwin = (vaultDB: GraphQLVaultDB): GraphQLVaultDB => {
-  const server = serverOf(vaultDB)
+/** Make a second browser-side bankDB on the same route, to act as another device. */
+function makeTwin(bankDB: GraphQLBankDB): GraphQLBankDB {
+  const server = serverOf(bankDB)
   const twin = browserFor(server.route, signedInAsAsked)
   serversOf.set(twin, server)
   return twin
@@ -119,24 +119,23 @@ const makeTwin = (vaultDB: GraphQLVaultDB): GraphQLVaultDB => {
 // --
 
 describe("the README's Yoga recipe, its browser half", () => {
-  TH.describeVaultDBBattery("the README's Yoga recipe", {
-    makeVaultDB:          async (opts) => await makeVaultDB(opts),
-    makeCappedVaultDB:    async (maxBoxes) => await makeVaultDB({}, maxBoxes),
+  TH.describeBankDBBattery("the README's Yoga recipe", {
+    makeBankDB:       async (opts) => await makeBankDB(opts),
+    makeCappedBankDB: async (maxBoxes) => await makeBankDB({ maxBoxes }),
     makeTwin,
-    _cheat_rowsOf:        () => TH.rowsOf(),
-    _cheat_adapterOf:     (vaultDB) => serverOf(vaultDB).adapter,
+    _cheat_rowsOf:    () => TH.rowsOf(),
+    _cheat_adapterOf: (bankDB) => serverOf(bankDB).adapter,
   })
 })
 
 describe("the README's Yoga recipe", () => {
   it("refuses a browser that asks for another user's bank", async () => {
     await TH.emptyTables()
-    const route = vaultRoute(await TH.serverOver(), byHeader)
+    const route = bankRoute(await TH.serverOver(), byHeader)
     const intruder = browserFor(route, () => 'u2')
-    const born = TH.vaultPutAskOf(TH.vaultAt())
-    await TH.expectRefusal(intruder.putVault(born), 'identity_revoked')
-    await TH.expectRefusal(browserFor(route, () => null).listVaults(TH.vaultListAsk), 'identity_revoked')
-    expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
+    await TH.expectRefusal(intruder.buildBank(TH.BW.bankBuildAskOf()), 'identity_revoked')
+    await TH.expectRefusal(browserFor(route, () => null).ensureBank(TH.BW.bankEnsureAsk), 'identity_revoked')
+    expect(await TH.rowsOf().bankRowOf(TH.BW.bankScope)).to.be.null
   })
 
   it("stops the server's watch once the browser stops watching", async () => {
@@ -149,8 +148,8 @@ describe("the README's Yoga recipe", () => {
         return unlisten()
       }
     }
-    const browser = browserFor(vaultRoute(await TH.serverOver({ listen }), byHeader), signedInAsAsked)
-    const unwatch = browser.watch(TH.bankScope, () => undefined)
+    const browser = browserFor(bankRoute(await TH.serverOver({ listen }), byHeader), signedInAsAsked)
+    const unwatch = browser.watch(TH.BW.bankScope, () => undefined)
     await expect.poll(() => watching).to.eq(1)
     unwatch()
     await expect.poll(() => watching).to.eq(0)
@@ -159,12 +158,12 @@ describe("the README's Yoga recipe", () => {
   it("never sends the driver's own error to the browser, not even in Yoga's development mode", async () => {
     const driverError = new Error('password authentication failed for user "vault_owner"')
     const client: PostgresClient = { query: () => Promise.reject(driverError), transaction: () => Promise.reject(driverError) }
-    const route = vaultRoute(new PostgresVaultDB({ client }), () => Promise.resolve('u1'), true)
-    const variables = { ask: DB.vaultGet.parse(TH.vaultGetAskOf()) }
+    const route = bankRoute(new PostgresBankDB({ client }), () => Promise.resolve('u1'), true)
+    const variables = { ask: BX.vaultGet.parse(TH.BW.vaultGetAskOf()) }
     const response = await route(new Request('https://app.example.test/api/graphql', {
       method:  'POST',
       headers: { 'content-type': 'application/json' },
-      body:    JSON.stringify({ query: VaultOperations.getVault, variables }),
+      body:    JSON.stringify({ query: BankOperations.getVault, variables }),
     }))
     const sent = await response.text()
     expect(sent).to.include('storage_unavailable')

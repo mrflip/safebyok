@@ -16,7 +16,7 @@ This repository is a pnpm workspace. Its packages:
 * [`safebyok-postgres`](packages/safebyok-postgres) -- Postgres storage: the tables, and the
   server-side `VaultDB` over them, through the driver your app already has.
 * [`safebyok-graphql`](packages/safebyok-graphql) -- GraphQL storage: the schema and resolvers
-  your server runs over a `VaultDB` such as the Postgres one, and the `VaultDB` over an urql
+  your server runs over a bankDB such as the Postgres one, and the bankDB over an urql
   Client that calls them from the browser.
 * [`safebyok-fastkey`](packages/safebyok-fastkey) -- Argon2id through WebAssembly: a
   key deriver several times faster than the core's, deriving the same bytes under the same specs.

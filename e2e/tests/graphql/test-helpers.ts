@@ -5,19 +5,19 @@ import type { AddressInfo } from 'node:net'
 import { afterEach } from 'vitest'
 import { Client, fetchExchange } from '@urql/core'
 import { createSchema, createYoga } from 'graphql-yoga'
-import { GraphQLVaultDB } from 'safebyok-graphql'
-import { VaultSchemaSdl, vaultResolvers } from 'safebyok-graphql/server'
-import { PostgresVaultDB, pgClientOf } from 'safebyok-postgres'
+import { GraphQLBankDB } from 'safebyok-graphql'
+import { BankSchemaSdl, bankResolvers } from 'safebyok-graphql/server'
+import { PostgresBankDB, pgClientOf } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
 import * as TH from '../postgres/test-helpers'
 
 // Everything the Postgres tests use too, so a test here star-imports this one module as TH.
 export * from '../postgres/test-helpers'
 
-// == [Servers]: Server, useServers, serve, vaultDBListening
+// == [Servers]: Server, useServers, serve, bankDBListening
 
-/** One server: Yoga over the README's route, on a port of its own, and the VaultDB it hosts. */
-export type Server = { url: string, vaultDB: PostgresVaultDB }
+/** One server: Yoga over the README's route, on a port of its own, and the bankDB it hosts. */
+export type Server = { url: string, bankDB: PostgresBankDB }
 
 const closers: (() => Promise<void>)[] = []
 
@@ -29,14 +29,14 @@ export const useServers = (): void => {
 /** Closes every server open, cutting the watches still streaming from them. */
 const closeServers = async (): Promise<void> => { await Promise.all(closers.splice(0).map((close) => close())) }
 
-/** A server hosting `vaultDB` on a free port of this machine, its signed-in user the request's `x-test-user` header in place of a session. */
-export const serve = async (vaultDB: PostgresVaultDB): Promise<Server> => {
+/** A server hosting `bankDB` on a free port of this machine, its signed-in user the request's `x-test-user` header in place of a session. */
+export const serve = async (bankDB: PostgresBankDB): Promise<Server> => {
   /** What each request's resolvers know of it: the user its auth signed in, or null. */
-  type VaultContext = { user_id: string | null }
-  const yoga = createYoga<object, VaultContext>({
-    schema: createSchema<VaultContext>({
-      typeDefs:  [VaultSchemaSdl],
-      resolvers: [vaultResolvers({ vaultDB, getUserId: ({ user_id }: VaultContext) => user_id })],
+  type BankContext = { user_id: string | null }
+  const yoga = createYoga<object, BankContext>({
+    schema: createSchema<BankContext>({
+      typeDefs:  [BankSchemaSdl],
+      resolvers: [bankResolvers({ bankDB, getUserId: ({ user_id }: BankContext) => user_id })],
     }),
     graphqlEndpoint: '/api/graphql',
     context:         ({ request }) => ({ user_id: request.headers.get('x-test-user') }),
@@ -49,11 +49,11 @@ export const serve = async (vaultDB: PostgresVaultDB): Promise<Server> => {
     http.close(() => { resolve() })
   }))
   const { port } = http.address() as AddressInfo
-  return { url: `http://127.0.0.1:${String(port)}/api/graphql`, vaultDB }
+  return { url: `http://127.0.0.1:${String(port)}/api/graphql`, bankDB }
 }
 
-/** A PostgresVaultDB over `db` as one server has it, its listen counted in `listening` as each watch starts and stops. */
-export const vaultDBListening = async (db: TH.FileDatabase, listening: { count: number }): Promise<PostgresVaultDB> => {
+/** A PostgresBankDB over `db` as one server has it, its listen counted in `listening` as each watch starts and stops. */
+export const bankDBListening = async (db: TH.FileDatabase, listening: { count: number }): Promise<PostgresBankDB> => {
   const listen = await TH.listenOver(db)
   const counted: PostgresListen = async (channel, onNotify) => {
     const unlisten = await listen(channel, onNotify)
@@ -63,13 +63,13 @@ export const vaultDBListening = async (db: TH.FileDatabase, listening: { count: 
       return unlisten()
     }
   }
-  return new PostgresVaultDB({ client: pgClientOf(db.devicePool()), listen: counted })
+  return new PostgresBankDB({ client: pgClientOf(db.devicePool()), listen: counted })
 }
 
-/** A server over emptied tables, the last test's servers closed and their VaultDBs ended first. */
-export const freshServer = async (db: TH.FileDatabase, opts: TH.VaultDBOverOpts = {}): Promise<Server> => {
+/** A server over emptied tables, the last test's servers closed and their bankDBs ended first. */
+export const freshServer = async (db: TH.FileDatabase, opts: TH.BankDBOverOpts = {}): Promise<Server> => {
   await closeServers()
-  return await serve(await TH.freshVaultDB(db, opts))
+  return await serve(await TH.freshBankDB(db, opts))
 }
 // --
 
@@ -78,14 +78,14 @@ export const freshServer = async (db: TH.FileDatabase, opts: TH.VaultDBOverOpts 
 /** Who a browser signs each operation in as, from the variables it sends, or null for signed out. */
 export type Signing = (variables: Record<string, unknown>) => string | null
 
-/** Signs each operation in as the user it names, its scope's, its ask's or its record's, so the server's sign-in check stays on and lets the battery's users through. */
+/** Signs each operation in as the user it names, its scope's or its ask's, so the server's sign-in check stays on and lets the battery's users through. */
 export const signedInAsAsked: Signing = (variables) => {
-  const { user_id, ask, record } = variables as { user_id?: string } & Partial<Record<'ask' | 'record', { user_id?: string }>>
-  return user_id ?? ask?.user_id ?? record?.user_id ?? null
+  const { user_id, ask } = variables as { user_id?: string, ask?: { user_id?: string } }
+  return user_id ?? ask?.user_id ?? null
 }
 
-/** The README's browser half: a GraphQLVaultDB over an urql Client posting to `server` over the network, and subscribing there too. */
-export const browserAt = (server: Server, signing: Signing = signedInAsAsked): GraphQLVaultDB => new GraphQLVaultDB({ client: new Client({
+/** The README's browser half: a GraphQLBankDB over an urql Client posting to `server` over the network, and subscribing there too. */
+export const browserAt = (server: Server, signing: Signing = signedInAsAsked): GraphQLBankDB => new GraphQLBankDB({ client: new Client({
   url:                server.url,
   exchanges:          [fetchExchange],
   fetchSubscriptions: true,

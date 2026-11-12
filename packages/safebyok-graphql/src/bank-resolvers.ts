@@ -1,100 +1,108 @@
 import { GraphQLError, GraphQLScalarType, Kind, valueFromASTUntyped } from 'graphql'
 import * as DB from 'safebyok/storage'
+import { BX } from 'safebyok/storage'
 
-// == [Types]: VaultResolversOpts, VaultFieldArgs, CrossingAnswer, CrossingNotice, VaultFieldResolver, VaultResolvers
+// == [Types]: BankResolversOpts, BankFieldArgs, CrossingAnswer, CrossingNotice, BankFieldResolver, BankResolvers
 
-/** Options for {@link vaultResolvers}, which you call once when your server starts. */
-export type VaultResolversOpts<ContextT> = {
-  /** The vaultDB that serves every request, such as a `PostgresVaultDB`. */
-  vaultDB:  DB.AdapterVaultDB
+/** Options for {@link bankResolvers}, which you call once when your server starts. */
+export type BankResolversOpts<ContextT> = {
+  /** The bankDB that serves every request, such as a `PostgresBankDB`. */
+  bankDB:    DB.AdapterBankDB
   /** Return the `user_id` your own auth signed this request in as, or null when signed out. */
   getUserId: (context: ContextT) => DB.Awaitable<string | null>
 }
 
 /** Each root field's arguments, as GraphQL coerced them, keyed by the field's name. */
-export type VaultFieldArgs = {
-  safebyokListVaults:        DB.BankScope
-  safebyokGetVault:          { ask: DB.VaultGetAsk }
-  safebyokListBoxes:         DB.VaultQuery
-  safebyokGetBox:            { ask: DB.BoxGetAsk }
-  safebyokPutVault:          { ask: DB.VaultPutAsk }
-  safebyokPutBox:            { ask: DB.BoxPutAsk }
-  safebyokReplacePassphrase: { record: DB.VaultRecord, opts: DB.GateVerbOpts }
-  safebyokAddPasskey:        { record: DB.VaultRecord, opts: DB.GateVerbOpts }
-  safebyokRevokePasskey:     { record: DB.VaultRecord, opts: DB.GateVerbOpts }
-  safebyokDelBox:            { ask: DB.BoxDelAsk }
-  safebyokDelVault:          { ask: DB.VaultDelAsk }
+export type BankFieldArgs = {
+  safebyokEnsureBank:        DB.BankScope
+  safebyokGetVault:          { ask: BX.VaultGetAsk }
+  safebyokListBoxes:         Omit<BX.BoxListAsk, 'op'>
+  safebyokGetBox:            { ask: BX.BoxGetAsk }
+  safebyokBuildBank:         { ask: BX.BankBuildAsk }
+  safebyokReplacePassphrase: { ask: BX.GateVerbAsk }
+  safebyokAddPasskey:        { ask: BX.GateVerbAsk }
+  safebyokRevokePasskey:     { ask: BX.GateVerbAsk }
+  safebyokDelBank:           { ask: BX.BankDelAsk }
+  safebyokPutVault:          { ask: BX.VaultPutAsk }
+  safebyokDelVault:          { ask: BX.VaultDelAsk }
+  safebyokPutBox:            { ask: BX.BoxPutAsk }
+  safebyokDelBox:            { ask: BX.BoxDelAsk }
   safebyokTidyGone:          DB.BankScope
   safebyokWatch:             DB.BankScope & { vaultlabel?: string | null }
 }
 
-/** A vaultDB answer in wire form: every field of its schema type is present, and null where the answer has no value. */
+/** A bankDB answer in wire form: every field of its schema type is present, and null where the answer has no value. */
 export type CrossingAnswer = {
-  ok:         boolean
-  act:        DB.GoodAct | DB.BankBadAct
-  val:        unknown
-  world:      unknown
-  dbhas:      unknown
-  ask:        DB.LoggableAsk
-  err:        DB.CrossedErr | null
+  ok:     boolean
+  act:    DB.GoodAct | DB.BankBadAct
+  val:    unknown
+  parent: unknown
+  dbhas:  unknown
+  ask:    BX.LoggableAsk
+  err:    DB.CrossedErr | null
 }
 
 /** A watch notice in wire form, or the refusal that ends the watch. */
 export type CrossingNotice = {
-  ok:    boolean
-  act:   'gotlive' | 'gotgone' | DB.BadAct
-  val:   DB.VaultRow | DB.BoxRow | null
-  world: DB.VaultRow | null
-  err:   DB.CrossedErr | null
+  ok:     boolean
+  act:    'gotlive' | 'gotgone' | DB.BankBadAct
+  val:    BX.BankRow | BX.GateRecord | BX.VaultRow | BX.BoxRow | null
+  parent: BX.BankRow | BX.VaultRow | null
+  err:    DB.CrossedErr | null
 }
 
 /** The resolver for one query or mutation field, taking the standard GraphQL resolver arguments. */
-export type VaultFieldResolver<ContextT, FieldnameT extends keyof VaultFieldArgs> = (
-  parent: unknown, args: VaultFieldArgs[FieldnameT], context: ContextT,
+export type BankFieldResolver<ContextT, FieldnameT extends keyof BankFieldArgs> = (
+  parent: unknown, args: BankFieldArgs[FieldnameT], context: ContextT,
 ) => Promise<CrossingAnswer>
 
-/** The resolver map {@link vaultResolvers} returns, keyed by the type and root field names in `VaultSchemaSdl`. */
-export type VaultResolvers<ContextT> = {
+/** The resolver map {@link bankResolvers} returns, keyed by the type and root field names in `BankSchemaSdl`. */
+export type BankResolvers<ContextT> = {
   SafebyokJson:        GraphQLScalarType
   SafebyokEpochMillis: GraphQLScalarType<number, number>
-  SafebyokVaultRow:    { __resolveType: (row: DB.VaultRow) => string }
-  SafebyokBoxRow:      { __resolveType: (row: DB.BoxRow) => string }
-  SafebyokRow:         { __resolveType: (row: DB.VaultRow | DB.BoxRow) => string }
+  SafebyokBoxRow:      { __resolveType: (row: BX.BoxRow) => string }
+  SafebyokParentRow:   { __resolveType: (row: BX.BankRow | BX.VaultRow) => string }
+  SafebyokRow:         { __resolveType: (row: NoticedRow) => string }
   Query: {
-    safebyokListVaults: VaultFieldResolver<ContextT, 'safebyokListVaults'>
-    safebyokGetVault:   VaultFieldResolver<ContextT, 'safebyokGetVault'>
-    safebyokListBoxes:  VaultFieldResolver<ContextT, 'safebyokListBoxes'>
-    safebyokGetBox:     VaultFieldResolver<ContextT, 'safebyokGetBox'>
+    safebyokEnsureBank: BankFieldResolver<ContextT, 'safebyokEnsureBank'>
+    safebyokGetVault:   BankFieldResolver<ContextT, 'safebyokGetVault'>
+    safebyokListBoxes:  BankFieldResolver<ContextT, 'safebyokListBoxes'>
+    safebyokGetBox:     BankFieldResolver<ContextT, 'safebyokGetBox'>
   }
   Mutation: {
-    safebyokPutVault:          VaultFieldResolver<ContextT, 'safebyokPutVault'>
-    safebyokPutBox:            VaultFieldResolver<ContextT, 'safebyokPutBox'>
-    safebyokReplacePassphrase: VaultFieldResolver<ContextT, 'safebyokReplacePassphrase'>
-    safebyokAddPasskey:        VaultFieldResolver<ContextT, 'safebyokAddPasskey'>
-    safebyokRevokePasskey:     VaultFieldResolver<ContextT, 'safebyokRevokePasskey'>
-    safebyokDelBox:            VaultFieldResolver<ContextT, 'safebyokDelBox'>
-    safebyokDelVault:          VaultFieldResolver<ContextT, 'safebyokDelVault'>
-    safebyokTidyGone:          VaultFieldResolver<ContextT, 'safebyokTidyGone'>
+    safebyokBuildBank:         BankFieldResolver<ContextT, 'safebyokBuildBank'>
+    safebyokReplacePassphrase: BankFieldResolver<ContextT, 'safebyokReplacePassphrase'>
+    safebyokAddPasskey:        BankFieldResolver<ContextT, 'safebyokAddPasskey'>
+    safebyokRevokePasskey:     BankFieldResolver<ContextT, 'safebyokRevokePasskey'>
+    safebyokDelBank:           BankFieldResolver<ContextT, 'safebyokDelBank'>
+    safebyokPutVault:          BankFieldResolver<ContextT, 'safebyokPutVault'>
+    safebyokDelVault:          BankFieldResolver<ContextT, 'safebyokDelVault'>
+    safebyokPutBox:            BankFieldResolver<ContextT, 'safebyokPutBox'>
+    safebyokDelBox:            BankFieldResolver<ContextT, 'safebyokDelBox'>
+    safebyokTidyGone:          BankFieldResolver<ContextT, 'safebyokTidyGone'>
   }
   Subscription: {
     safebyokWatch: {
-      subscribe: (parent: unknown, args: VaultFieldArgs['safebyokWatch'], context: ContextT) => Promise<AsyncIterableIterator<CrossingNotice>>
+      subscribe: (parent: unknown, args: BankFieldArgs['safebyokWatch'], context: ContextT) => Promise<AsyncIterableIterator<CrossingNotice>>
       resolve:   (notice: CrossingNotice) => CrossingNotice
     }
   }
 }
+
+/** A row a watch hears: a bank, gate, vault or box row. */
+type NoticedRow = BX.BankRow | BX.GateRecord | BX.VaultRow | BX.BoxRow
 // --
 
-// == [Resolvers]: vaultResolvers
+// == [Resolvers]: bankResolvers
 
-const vaultResolversOpts = DB.objCheck(({ custom, fn }) => ({
-  vaultDB:  custom<DB.AdapterVaultDB>(DB.isAdapterVaultDB, 'Expected an AdapterVaultDB from safebyok/storage'),
-  getUserId: fn<VaultResolversOpts<unknown>['getUserId']>(),
+const bankResolversOpts = DB.objCheck(({ custom, fn }) => ({
+  bankDB:    custom<DB.AdapterBankDB>(DB.isAdapterBankDB, 'Expected an AdapterBankDB from safebyok/storage'),
+  getUserId: fn<BankResolversOpts<unknown>['getUserId']>(),
 }), 'bad_option')
 
-/** Make the resolvers for `VaultSchemaSdl`. A request can reach only the bank of the user it is signed in as. */
-export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): VaultResolvers<ContextT> {
-  const { vaultDB, getUserId } = vaultResolversOpts.parse(opts)
+/** Make the resolvers for `BankSchemaSdl`. A request can reach only the bank of the user it is signed in as. */
+export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): BankResolvers<ContextT> {
+  const { bankDB, getUserId } = bankResolversOpts.parse(opts)
 
   /** Return null if the request is signed in as `user_id`, else the refusal to send back. */
   async function signInRefusalOf(context: ContextT, user_id: string): Promise<DB.VaultError | null> {
@@ -106,20 +114,20 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
   /** Run `verb` if the request is signed in as `user_id`, and return its answer in wire form.
    * Otherwise return a bad answer in wire form: the refusal from checking `ask` if it fails, else the sign-in refusal.
    */
-  async function serveSignedIn(context: ContextT, user_id: string, ask: object, verb: () => Promise<DB.Answer<unknown, DB.GoodAct, unknown>>): Promise<CrossingAnswer> {
+  async function serveSignedIn(context: ContextT, user_id: string, ask: object, verb: () => Promise<BX.Answer<unknown, DB.GoodAct, unknown>>): Promise<CrossingAnswer> {
     const refusal = await signInRefusalOf(context, user_id)
     if (refusal === null) { return crossingOf(await verb()) }
-    const loggableAsk = await DB.outcomeOf(() => DB.loggableAsk.parse(ask))
-    if (! loggableAsk.ok) { return crossingOf(DB.badAnswerOf(loggableAsk.err)) }
-    return crossingOf({ ok: false, err: refusal, act: 'unclassified_storing', world: null, ask: loggableAsk.val })
+    const loggableAsk = await DB.outcomeOf(() => BX.loggableAsk.parse(ask))
+    if (! loggableAsk.ok) { return crossingOf(BX.badAnswerOf(loggableAsk.err)) }
+    return crossingOf({ ok: false, err: refusal, act: 'unclassified_storing', parent: null, ask: loggableAsk.val })
   }
 
   /** Watch `scope` and yield its notices in wire form, for as long as the request stays signed in as that user. */
   async function watchNotices(context: ContextT, scope: DB.WatchScope): Promise<AsyncIterableIterator<CrossingNotice>> {
     const refusal = await signInRefusalOf(context, scope.user_id)
     if (refusal !== null) { return endingWith(refusal) }
-    // vaultDB.watch throws `bad_scope` inside the stream's `start`, and the ReadableStream constructor rethrows it.
-    const watched = await DB.outcomeOf(() => openWatch(vaultDB, scope))
+    // bankDB.watch throws `bad_scope` inside the stream's `start`, and the ReadableStream constructor rethrows it.
+    const watched = await DB.outcomeOf(() => openWatch(bankDB, scope))
     if (! watched.ok) { return endingWith(watched.err) }
     const reader = watched.val
     const iterator: AsyncIterableIterator<CrossingNotice> = {
@@ -145,32 +153,34 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
   return {
     SafebyokJson:        safebyokJson,
     SafebyokEpochMillis: safebyokEpochMillis,
-    SafebyokVaultRow:    { __resolveType: typenameOf },
     SafebyokBoxRow:      { __resolveType: typenameOf },
+    SafebyokParentRow:   { __resolveType: typenameOf },
     SafebyokRow:         { __resolveType: typenameOf },
     Query: {
-      safebyokListVaults: async (_parent, { user_id, banklabel }, context) => {
-        const ask = { op: 'list', user_id, banklabel } as const
-        return await serveSignedIn(context, user_id, ask, async () => await vaultDB.tryListVaults(ask))
+      safebyokEnsureBank: async (_parent, { user_id, banklabel }, context) => {
+        const ask = { op: 'ensure', user_id, banklabel, gates: ['main'] } as const satisfies BX.BankEnsureAsk
+        return await serveSignedIn(context, user_id, ask, async () => await bankDB.tryEnsureBank(ask))
       },
-      safebyokGetVault:   async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryGetVault(ask)),
-      safebyokListBoxes:  async (_parent, { user_id, banklabel, vaultlabel, vault_tok }, context) => {
-        const ask = { op: 'list', user_id, banklabel, vaultlabel, vault_tok } as const
-        return await serveSignedIn(context, user_id, ask, async () => await vaultDB.tryListBoxes(ask))
+      safebyokGetVault:   async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryGetVault(ask)),
+      safebyokListBoxes:  async (_parent, { user_id, banklabel, vaultlabel, bank_tok, vault_tok }, context) => {
+        const ask = { op: 'list', user_id, banklabel, vaultlabel, bank_tok, vault_tok } as const
+        return await serveSignedIn(context, user_id, ask, async () => await bankDB.tryListBoxes(ask))
       },
-      safebyokGetBox:     async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryGetBox(ask)),
+      safebyokGetBox:     async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryGetBox(ask)),
     },
     Mutation: {
-      safebyokPutVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryPutVault(ask)),
-      safebyokPutBox:            async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryPutBox(ask)),
-      safebyokReplacePassphrase: async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, DB.gateVerbAskOf('replacePassphrase', record), async () => await vaultDB.tryReplacePassphrase(record, opts)),
-      safebyokAddPasskey:        async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, DB.gateVerbAskOf('addPasskey', record), async () => await vaultDB.tryAddPasskey(record, opts)),
-      safebyokRevokePasskey:     async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, DB.gateVerbAskOf('revokePasskey', record), async () => await vaultDB.tryRevokePasskey(record, opts)),
-      safebyokDelBox:            async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryDelBox(ask)),
-      safebyokDelVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryDelVault(ask)),
+      safebyokBuildBank:         async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryBuildBank(ask)),
+      safebyokReplacePassphrase: async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, { ...ask, gateVerb: 'replacePassphrase' }, async () => await bankDB.tryReplacePassphrase(ask)),
+      safebyokAddPasskey:        async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, { ...ask, gateVerb: 'addPasskey' }, async () => await bankDB.tryAddPasskey(ask)),
+      safebyokRevokePasskey:     async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, { ...ask, gateVerb: 'revokePasskey' }, async () => await bankDB.tryRevokePasskey(ask)),
+      safebyokDelBank:           async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryDelBank(ask)),
+      safebyokPutVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryPutVault(ask)),
+      safebyokDelVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryDelVault(ask)),
+      safebyokPutBox:            async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryPutBox(ask)),
+      safebyokDelBox:            async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryDelBox(ask)),
       safebyokTidyGone:          async (_parent, { user_id, banklabel }, context) => {
         const ask = { op: 'tidy_gone', user_id, banklabel } as const
-        return await serveSignedIn(context, user_id, ask, async () => await vaultDB.tryTidyGone(ask))
+        return await serveSignedIn(context, user_id, ask, async () => await bankDB.tryTidyGone(ask))
       },
     },
     Subscription: {
@@ -186,7 +196,7 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
 
 // == [Scalars]: safebyokJson, safebyokEpochMillis
 
-/** `SafebyokJson`: any JSON value, passed through unchanged. The vaultDB at each end validates it. */
+/** `SafebyokJson`: any JSON value, passed through unchanged. The bankDB at each end validates it. */
 const safebyokJson = new GraphQLScalarType({
   name:               'SafebyokJson',
   coerceOutputValue:  (val) => val,
@@ -212,15 +222,15 @@ const safebyokEpochMillis = new GraphQLScalarType<number, number>({
 // == [Helpers]: crossingOf, crossedErrOf, badNoticeOf, endingWith, openWatch, typenameOf
 
 /** Convert `answer` to wire form. */
-function crossingOf(answer: DB.Answer<unknown, DB.GoodAct, unknown>): CrossingAnswer {
+function crossingOf(answer: BX.Answer<unknown, DB.GoodAct, unknown>): CrossingAnswer {
   return {
-    ok:         answer.ok,
-    act:        answer.act,
-    val:        answer.ok ? answer.val : null,
-    world:      answer.world,
-    dbhas:      answer.dbhas ?? null,
-    ask:        answer.ask,
-    err:        answer.ok ? null : crossedErrOf(answer.err),
+    ok:     answer.ok,
+    act:    answer.act,
+    val:    answer.ok ? answer.val : null,
+    parent: answer.parent,
+    dbhas:  answer.dbhas ?? null,
+    ask:    answer.ask,
+    err:    answer.ok ? null : crossedErrOf(answer.err),
   }
 }
 
@@ -240,7 +250,7 @@ function crossedErrOf({ refusalkind, message, meta }: DB.VaultError): DB.Crossed
 }
 
 /** Make the notice that ends a watch, carrying `refusal`. */
-function badNoticeOf(refusal: DB.VaultError): CrossingNotice { return { ok: false, act: 'unclassified_storing', val: null, world: null, err: crossedErrOf(refusal) } }
+function badNoticeOf(refusal: DB.VaultError): CrossingNotice { return { ok: false, act: 'unclassified_storing', val: null, parent: null, err: crossedErrOf(refusal) } }
 
 /** Make the iterator for a watch refused before it started: it yields one notice carrying the refusal, then ends. */
 function endingWith(refusal: DB.VaultError): AsyncIterableIterator<CrossingNotice> {
@@ -253,15 +263,15 @@ function endingWith(refusal: DB.VaultError): AsyncIterableIterator<CrossingNotic
   return iterator
 }
 
-/** Start watching `scope` on `vaultDB` and return a stream reader. Cancelling the reader stops the watch. */
-function openWatch(vaultDB: DB.AdapterVaultDB, scope: DB.WatchScope): ReadableStreamDefaultReader<DB.Notice> {
+/** Start watching `scope` on `bankDB` and return a stream reader. Cancelling the reader stops the watch. */
+function openWatch(bankDB: DB.AdapterBankDB, scope: DB.WatchScope): ReadableStreamDefaultReader<BX.Notice> {
   // Use a reader, not the stream's own async iterator. The iterator's `return` waits for a pending
   // `next`, which on a quiet bank never resolves, so a subscriber that left would keep the watch
   // open. A reader's `cancel` ends the pending read immediately.
   let unwatch = noUnwatching
-  const notices = new ReadableStream<DB.Notice>({
+  const notices = new ReadableStream<BX.Notice>({
     start: (controller) => {
-      unwatch = vaultDB.watch(scope, (notice) => {
+      unwatch = bankDB.watch(scope, (notice) => {
         // Enqueue every notice while the stream is open, however many are unread. Drop notices once it has closed.
         if ((controller.desiredSize ?? 0) > 0) { controller.enqueue(notice) }
       })
@@ -273,9 +283,10 @@ function openWatch(vaultDB: DB.AdapterVaultDB, scope: DB.WatchScope): ReadableSt
 
 const noUnwatching = (): void => undefined
 
-/** The schema typename for a row: `SafebyokVaultRecord`, `SafebyokVaultTombstone`, `SafebyokBoxRecord` or `SafebyokBoxTombstone`. */
-const typenameOf = (row: DB.VaultRow | DB.BoxRow): string => {
-  const thing = ('boxlabel' in row) ? 'Box' : 'Vault'
-  return `Safebyok${thing}${(row.am === 'x') ? 'Tombstone' : 'Record'}`
+/** The schema typename for a row: `SafebyokBankRow`, `SafebyokGateRecord`, `SafebyokVaultRow`, `SafebyokBoxRecord` or `SafebyokBoxTombstone`. */
+function typenameOf(row: NoticedRow): string {
+  if ('gatelabel' in row) { return 'SafebyokGateRecord' }
+  if ('boxlabel' in row) { return (row.am === 'x') ? 'SafebyokBoxTombstone' : 'SafebyokBoxRecord' }
+  return ('vaultlabel' in row) ? 'SafebyokVaultRow' : 'SafebyokBankRow'
 }
 // --
