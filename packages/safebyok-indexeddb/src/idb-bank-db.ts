@@ -14,7 +14,7 @@ import { bankScopepathOf, boxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, gat
  */
 export type IdbBankDBOpts = BX.AdapterBankDBOpts & { dbName?: string | undefined, maxBoxes?: number | undefined }
 
-const idbBankDBOpts = DB.objCheck(({ str, uint }) => ({ ...DB.adapterVaultDBOpts.shape, dbName: str.min(1).optional(), maxBoxes: uint.optional() }), 'bad_option')
+const idbBankDBOpts = DB.objCheck(({ str, uint }) => ({ ...BX.adapterBankDBOpts.shape, dbName: str.min(1).optional(), maxBoxes: uint.optional() }), 'bad_option')
 // --
 
 // == [Helpers]: Rung, isHeardBy, bankScopeOf, vaultScopeOf
