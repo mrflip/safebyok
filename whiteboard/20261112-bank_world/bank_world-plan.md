@@ -9,9 +9,8 @@
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
 * **Status** (2026-11-12, 17:20Z, a new orchestrator session took over): 1 to 7, 4b, 5, 13 to 15
-  merged; 8a, 8b, 8c (#665, #667, #673, green at 8c) and BP (#672) filed, open; thread 9 building
-  (its first worker died with the old session mid-rename; a fresh one continues in its worktree);
-  8d and 10 wait on 9. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
+  merged; 8a, 8b, 8c (#665, #667, #673, green at 8c) and BP (#672) filed, open; thread 9 ready (#674),
+  in review; 5b and 10 building (10 on the 400k worker, from 9's ready tip); 8d waits on 10. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
 not copied again here. What follows is the gloss.
@@ -218,7 +217,7 @@ and each handoff quotes it. The line is red from 8a's tip to 8c's (rule 20).
 * **8c `bank_prompts`**: the gate's prompts and verbs, `del_bank`, `autolock`, a bank tombstone
   delivered; unskips 8b's skips; React compiles. **Levels**: worker `opus`; review `medium`.
   **After**: 8b.
-* **8d `bank_gate_tests`**: the former 8b below. **After**: 8c. *Orchestrator:* after 9, so its new tests and the guarantees it promotes use the bank-key names (9 and 8d both edit `notes/guarantees.md` and VOCABULARY).
+* **8d `bank_gate_tests`**: the former 8b below. **After**: 8c. *Orchestrator:* after 9, so its new tests and the guarantees it promotes use the bank-key names (9 and 8d both edit `notes/guarantees.md` and VOCABULARY). *Orchestrator, 2026-11-12 (new session):* after 10, stacked on its ready tip, not beside it: 10 is the critical path (10, 11, 12, 16, 17), 8d's new bank tests are better written over 10's lifecycle than rebased across it, and the line needs no restack between them. 8d is judged then against 11: 8c already rewrote `vault-gate.test.ts` over the bank, so 11's re-pointing may fold into 8d.
 
 ### 8b `bank_gate_tests` (now 8d)
 
@@ -230,7 +229,7 @@ table of files, G1, G3, G4, G9) and VOCABULARY.md. **Levels**: worker `opus`; re
 
 ### 9 `bankkey_rename`
 
-**Levels**: worker `sonnet`; review `medium`, reading each purpose string. **After**: 8b.
+**Levels**: worker `sonnet`; review `medium`, reading each purpose string. **After**: 8b. *Orchestrator:* ready as #674 (+89/−89 src in safebyok; only safebyok-graphql among the adapters spells the fields; no `fmt` moved, a YOLO call); in review.
 **Look-ahead**: 13 to 15 are cut after this, so it renames only what is in its base. **Size**: M,
 mechanical.
 
