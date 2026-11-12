@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-// Import fake-indexeddb first: it installs an indexedDB global before the demo's VaultDB and DeviceDB open their databases.
+// Import fake-indexeddb first: it installs an indexedDB global before the demo's BankDB and DeviceDB open their databases.
 import 'fake-indexeddb/auto'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LabsPage } from '../../src/pages/LabsPage'
-import { vaultDB } from '../../src/lib/storage'
+import { bankDB } from '../../src/lib/storage'
 import * as TH from '../test-helpers'
 
 // The real pages derive keys with the browser's Argon2id: 64 MiB for every passphrase typed, about a
@@ -18,7 +18,7 @@ vi.mock('safebyok/browser', async (importOriginal) => {
 })
 
 afterEach(() => {
-  vaultDB.setOnline(true)
+  bankDB.setOnline(true)
   localStorage.clear()
 })
 
@@ -45,6 +45,8 @@ describe("LabsPage", () => {
   it("says the backend is off while the outage switch is", async () => {
     render(<LabsPage />)
     TH.signInAs('margo')
+    // A new user's bankDB is empty: the provider opens its dialog to build the bank, which leaves it unlocked.
+    await TH.answerPassphraseDialog()
     const flow = within(await screen.findByRole('region', { name: 'DOM form' }))
     const adding = await flow.findByRole<HTMLButtonElement>('button', { name: 'Add key' })
     await waitFor(() => { expect(adding.disabled).to.be.false })
@@ -52,11 +54,9 @@ describe("LabsPage", () => {
     fireEvent.click(backend)
     expect(backend.checked).to.be.false
     fireEvent.click(adding)
-    await TH.answerPassphraseDialog()
     await screen.findByText(/backend is switched off/)
     fireEvent.click(backend)
     fireEvent.click(flow.getByRole('button', { name: 'Add key' }))
-    await TH.answerPassphraseDialog()
     await flow.findByRole('button', { name: 'Save' })
   })
 })

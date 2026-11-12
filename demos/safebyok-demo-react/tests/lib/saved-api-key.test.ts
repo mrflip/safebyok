@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Device, MemoryDeviceDB, type Vault } from 'safebyok'
-import { MemoryVaultDB } from 'safebyok/storage'
+import { MemoryBankDB } from 'safebyok/storage'
 import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok/testing'
 import { ApiKeyVaultlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../../src/lib/saved-api-key'
 
@@ -11,7 +11,7 @@ const FakeApiKey = 'sk-ant-fake-saved-key'
 const makeBank = async () => {
   const device = Device.make({
     user_id: 'u1', banklabel: 'acme', gates: ['main'],
-    vaultDB: new MemoryVaultDB(), deviceDB: new MemoryDeviceDB(),
+    bankDB: new MemoryBankDB(), deviceDB: new MemoryDeviceDB(),
     keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger,
     requestCleartext: async (gating) => { await gating.attempt({ passphraseClear: Passphrase }) },
   })

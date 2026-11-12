@@ -6,11 +6,11 @@ import * as TH from '../test-helpers'
 /** Render the session bar with a fresh fake auth beside the vault probe, in a bank for `u1`, and sign in as margo. */
 const renderSignedIn = async () => {
   const auth = TH.makeAuth()
-  const { vaultDB } = TH.renderInBank(<><TH.LiveSessionBar auth={auth} /><TH.VaultProbe /></>)
+  const { bankDB } = await TH.renderInBank(<><TH.LiveSessionBar auth={auth} /><TH.VaultProbe /></>)
   TH.signInAs('margo')
   await screen.findByText('margo')
   await TH.expectProbe('unborn none')
-  return { auth, vaultDB }
+  return { auth, bankDB }
 }
 
 /** Sign in as margo, then build and unlock her vault through the provider's dialog. */
@@ -23,11 +23,15 @@ const renderWithVault = async () => {
 }
 
 describe("AccountMenu", () => {
-  it("says who is signed in, and offers to create the vault never built", async () => {
-    const { auth } = await renderSignedIn()
+  it("says who is signed in, builds the bank never built from its dialog, then the vault from a click", async () => {
+    const auth = TH.makeAuth()
+    await TH.renderInBank(<><TH.LiveSessionBar auth={auth} /><TH.VaultProbe /></>, { isBankBuilt: false })
+    TH.signInAs('margo')
+    await screen.findByText('margo')
     expect(screen.getByText(`(${auth.getSnapshot()?.user_id ?? ''})`)).to.not.be.null
-    fireEvent.click(screen.getByRole('button', { name: 'Create vault' }))
     await TH.answerPassphraseDialog()
+    await TH.expectProbe('unborn none')
+    fireEvent.click(within(screen.getByRole('region', { name: 'Account' })).getByRole('button', { name: 'Create vault' }))
     await TH.expectProbe('present unlocked')
     expect(screen.getByText('Vault unlocked')).to.not.be.null
   })

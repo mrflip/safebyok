@@ -3,7 +3,7 @@ import { StrictMode } from 'react'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Bank } from 'safebyok'
-import type { MemoryVaultDB } from 'safebyok/storage'
+import type { MemoryBankDB } from 'safebyok/storage'
 import { useBox } from 'safebyok-react'
 import { ApiKeyVaultlabel, DomApiKeyBoxlabel } from '../../src/lib/saved-api-key'
 import { KnockKnockDom } from '../../src/components/KnockKnockDom'
@@ -48,15 +48,17 @@ const knockAs = async (whosThere: string) => {
   fireEvent.click(screen.getByRole('button', { name: 'Knock' }))
 }
 
-/** The box rows `vaultDB` has stored for the 'main' vault, by boxlabel. */
-const storedBoxRows = (vaultDB: MemoryVaultDB) => {
-  const vaultrow = vaultDB._cheat_vaultRowsOf({ user_id: 'u1', banklabel: 'acme' }).get('main') as { vault_tok: string }
-  return vaultDB._cheat_boxRowsOf({ user_id: 'u1', banklabel: 'acme', vaultlabel: 'main' }, vaultrow.vault_tok)
+/** The box rows `bankDB` has stored for the 'main' vault, by boxlabel. */
+const storedBoxRows = (bankDB: MemoryBankDB) => {
+  const { bank, vaultrows } = bankDB._cheat_shelfOf({ user_id: 'u1', banklabel: 'acme' })
+  const { bank_tok } = bank as { bank_tok: string }
+  const { vault_tok } = vaultrows.get('main') as { vault_tok: string }
+  return bankDB._cheat_boxRowsOf({ user_id: 'u1', banklabel: 'acme', vaultlabel: 'main' }, bank_tok, vault_tok)
 }
 
 describe("KnockKnockDom", () => {
   it("builds the vault and an empty box on Add key, and shows its field ready to type in", async () => {
-    renderFlow()
+    await renderFlow()
     expect(screen.getByText('No key saved yet.')).to.not.be.null
     const field = await addKey()
     await TH.expectProbe('present unlocked')
@@ -65,7 +67,7 @@ describe("KnockKnockDom", () => {
   })
 
   it("keeps the field showing after Add key under StrictMode", async () => {
-    TH.renderInBank(<StrictMode><KnockKnockDom /><TH.VaultProbe /></StrictMode>)
+    await TH.renderInBank(<StrictMode><KnockKnockDom /><TH.VaultProbe /></StrictMode>)
     const field = await addKey()
     fireEvent.change(field, { target: { value: FakeApiKey } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -73,16 +75,16 @@ describe("KnockKnockDom", () => {
   })
 
   it("saves what was typed, encrypted, never putting it in the page's markup", async () => {
-    const { vaultDB } = renderFlow()
+    const { bankDB } = await renderFlow()
     await saveKey()
     expect(document.body.outerHTML).to.not.contain(FakeApiKey)
-    const boxrows = storedBoxRows(vaultDB)
+    const boxrows = storedBoxRows(bankDB)
     expect([...boxrows.keys()]).to.deep.equal([DomApiKeyBoxlabel])
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
   it("hides the field on Done, and offers to edit the saved key", async () => {
-    renderFlow()
+    await renderFlow()
     const field = await saveKey()
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     await screen.findByRole('button', { name: 'Edit key' })
@@ -93,7 +95,7 @@ describe("KnockKnockDom", () => {
   })
 
   it("clears Saved. on Done", async () => {
-    renderFlow()
+    await renderFlow()
     const field = await saveKey()
     fireEvent.change(field, { target: { value: 'sk-ant-unsaved-edit' } })
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
@@ -104,7 +106,7 @@ describe("KnockKnockDom", () => {
   it("knocks with the saved key, and shows Claude's punchline", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
-    renderFlow()
+    await renderFlow()
     await saveKey()
     await knockAs('Banana')
     await screen.findByText(Punchline)
@@ -114,7 +116,7 @@ describe("KnockKnockDom", () => {
   it("knocks with the saved key after an unsaved edit and a lock", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
-    renderFlow()
+    await renderFlow()
     const field = await saveKey()
     fireEvent.change(field, { target: { value: 'sk-ant-unsaved-edit' } })
     fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
@@ -128,7 +130,7 @@ describe("KnockKnockDom", () => {
   it("knocks with the saved key while the box is veiled", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
-    TH.renderInBank(<><KnockKnockDom /><BoxVeiler /><TH.VaultProbe /></>)
+    await TH.renderInBank(<><KnockKnockDom /><BoxVeiler /><TH.VaultProbe /></>)
     await saveKey()
     fireEvent.click(screen.getByRole('button', { name: 'Veil' }))
     await screen.findByRole('button', { name: 'Edit key' })
@@ -140,7 +142,7 @@ describe("KnockKnockDom", () => {
   it("leaves a hidden field hidden at a knock", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
-    renderFlow()
+    await renderFlow()
     const field = await saveKey()
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     await screen.findByRole('button', { name: 'Edit key' })
@@ -153,7 +155,7 @@ describe("KnockKnockDom", () => {
   it("asks for the key at a knock before one is saved, sending nothing", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
-    renderFlow()
+    await renderFlow()
     await knockAs('Banana')
     await screen.findByText('Save your Anthropic API key first.')
     expect(anthropic.seen).to.have.lengthOf(0)
@@ -161,18 +163,18 @@ describe("KnockKnockDom", () => {
   })
 
   it("asks who's there before it knocks", async () => {
-    renderFlow()
+    await renderFlow()
     await knockAs('  ')
     expect(await screen.findByText("Say who's there first.")).to.not.be.null
   })
 
   it("says nothing when the user cancels the dialog, and builds no vault", async () => {
-    renderFlow()
-    const ensureVaultSpy = vi.spyOn(Bank.prototype, 'ensureVault')
+    await renderFlow()
+    const ensureUnlockedSpy = vi.spyOn(Bank.prototype, 'ensureUnlocked')
     fireEvent.click(await screen.findByRole('button', { name: 'Add key' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-    await waitFor(() => { expect(ensureVaultSpy).toHaveBeenCalled() })
-    await act(async () => { await Promise.allSettled(ensureVaultSpy.mock.results.map((result): unknown => result.value)) })
+    await waitFor(() => { expect(ensureUnlockedSpy).toHaveBeenCalled() })
+    await act(async () => { await Promise.allSettled(ensureUnlockedSpy.mock.results.map((result): unknown => result.value)) })
     expect(document.querySelector('.knock-knock .gripe')).to.be.null
     expect(screen.getByRole('button', { name: 'Add key' })).to.not.be.null
     await TH.expectProbe('unborn none')

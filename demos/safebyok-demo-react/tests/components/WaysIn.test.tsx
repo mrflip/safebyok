@@ -11,7 +11,7 @@ afterEach(() => { vi.restoreAllMocks() })
 
 /** Render WaysIn beside the vault probe in a bank for `u1`, then build and unlock the vault. */
 const renderBuilt = async () => {
-  TH.renderInBank(<><WaysIn /><TH.VaultProbe /></>)
+  await TH.renderInBank(<><WaysIn /><TH.VaultProbe /></>)
   await TH.expectProbe('unborn none')
   fireEvent.click(screen.getByRole('button', { name: 'Open' }))
   await TH.answerPassphraseDialog()
@@ -20,7 +20,7 @@ const renderBuilt = async () => {
 
 describe("WaysIn", () => {
   it("shows nothing while the vault is unborn", async () => {
-    TH.renderInBank(<><WaysIn /><TH.VaultProbe /></>)
+    await TH.renderInBank(<><WaysIn /><TH.VaultProbe /></>)
     await TH.expectProbe('unborn none')
     expect(screen.queryByText('Vault unlockers')).to.be.null
   })
