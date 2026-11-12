@@ -9,7 +9,7 @@ import { damagedLease, leaseNotInForce, undecipheredWhisper } from '../refusals/
 import type { Wayinkind } from '../shapes/shapes-enums'
 import { type BankStamp, type CitedGate, type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, LeaseFormat, bankStamp, leaseFriend, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper } from '../shapes/shapes-gateish'
 
-/** A bank's vaultKey in force on this device, good for one revision of its gate. It has the key wrapped under a non-extractable leaseKey, unwraps it for a single call, and never hands it out. */
+/** A bankKey in force on this device, good for one revision of its bank's gate. It has the key wrapped under a non-extractable leaseKey, unwraps it for a single call, and never hands it out. */
 export class Lease implements LeaseStamp {
   // == [Props]: fmt, user_id, banklabel, bank_tok, registered_at, gatelabel, gate_tok, gate_revision_tok, proved_at, wayinkind, #bankFriend, #record, #bankStamp, #isFromCache, #leaseStamp, toJSON
 
@@ -85,15 +85,15 @@ export class Lease implements LeaseStamp {
   }
 
   /** A new lease under a fresh leaseKey. */
-  static async buildGranted(friend: LeaseFriend, vaultKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
-    const { opts: { gate, wayinkind } } = leaseGrantedArgs.parse({ friend, vaultKey, opts })
+  static async buildGranted(friend: LeaseFriend, bankKey: CryptoKey, opts: LeaseGrantOpts): Promise<Lease> {
+    const { opts: { gate, wayinkind } } = leaseGrantedArgs.parse({ friend, bankKey, opts })
     const bankstamp = bankStamp.parse(friend)
     const granted  = leaseStamp.parse({
       fmt: LeaseFormat, ...bankstamp, gatelabel: gate.gatelabel, gate_tok: gate.gate_tok, gate_revision_tok: gate.revision_tok, proved_at: nowMillis(), wayinkind,
     })
     const leaseKey = await makeLeaseKey()
-    const vault_key_lease_wrapped = await wrapKeyUnder(leaseKey, vaultKey, cipherCtx([bankstamp, granted], 'vault_key_lease_wrapped'))
-    return new Lease(friend, leaseRecord.parse({ ...granted, lease_key: leaseKey, vault_key_lease_wrapped }), false)
+    const bank_key_lease_wrapped = await wrapKeyUnder(leaseKey, bankKey, cipherCtx([bankstamp, granted], 'bank_key_lease_wrapped'))
+    return new Lease(friend, leaseRecord.parse({ ...granted, lease_key: leaseKey, bank_key_lease_wrapped }), false)
   }
   // --
 
@@ -132,14 +132,14 @@ export class Lease implements LeaseStamp {
   evict(): void { this.#record = null }
   // --
 
-  // == [Whispers under the vaultKey]: sealWith, unsealWith, opened, ctxOf, vaultKey
+  // == [Whispers under the bankKey]: sealWith, unsealWith, opened, ctxOf, bankKey
 
   /** `whisperText` sealed under a fresh boxKey, both bound to the bank's stamp and then `stamps`, in order. */
   async sealWith(whisperText: string, stamps: readonly CipherCtxRecord[]): Promise<SealedWhisper> {
     const checked = leaseSealArgs.parse({ whisperText, stamps })
-    const vaultKey = await this.#vaultKey('wrapKey')
+    const bankKey = await this.#bankKey('wrapKey')
     const boxKey = await makeBoxKey()
-    const box_key_wrapped = await wrapKeyUnder(vaultKey, boxKey, this.#ctxOf(checked.stamps, 'box_key_wrapped'))
+    const box_key_wrapped = await wrapKeyUnder(bankKey, boxKey, this.#ctxOf(checked.stamps, 'box_key_wrapped'))
     const bytes = new TextEncoder().encode(checked.whisperText)
     try {
       const whisper_ciphered = await cipherBytes(boxKey, bytes, this.#ctxOf(checked.stamps, 'whisper_ciphered'))
@@ -153,8 +153,8 @@ export class Lease implements LeaseStamp {
   /** The text `sealed` contains, bound to `stamps`: what `sealWith` sealed. */
   async unsealWith(sealed: SealedWhisper, stamps: readonly CipherCtxRecord[]): Promise<string> {
     const checked = leaseUnsealArgs.parse({ sealed, stamps })
-    const vaultKey = await this.#vaultKey('unwrapKey')
-    const bytes = await this.#decipherSealed(vaultKey, checked.sealed, checked.stamps)
+    const bankKey = await this.#bankKey('unwrapKey')
+    const bytes = await this.#decipherSealed(bankKey, checked.sealed, checked.stamps)
     try {
       this.#demandRecord()
       return new TextDecoder().decode(bytes)
@@ -163,12 +163,12 @@ export class Lease implements LeaseStamp {
     }
   }
 
-  async #decipherSealed(vaultKey: CryptoKey, sealed: SealedWhisper, stamps: readonly CipherCtxRecord[]): Promise<Uint8Array> {
+  async #decipherSealed(bankKey: CryptoKey, sealed: SealedWhisper, stamps: readonly CipherCtxRecord[]): Promise<Uint8Array> {
     const boxKeyCtx  = this.#ctxOf(stamps, 'box_key_wrapped')
     const whisperCtx = this.#ctxOf(stamps, 'whisper_ciphered')
     // Only these two WebCrypto calls are trapped: their rejection is how a damaged whisper is learned. The calls above refuse as they are, or are bugs.
     try {
-      const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, boxKeyCtx, { extractable: false, usage: ['decrypt'] })
+      const boxKey = await unwrapKeyUnder(bankKey, sealed.box_key_wrapped, boxKeyCtx, { extractable: false, usage: ['decrypt'] })
       return await decipherBytes(boxKey, sealed.whisper_ciphered, whisperCtx)
     } catch {
       throw undecipheredWhisper()
@@ -180,13 +180,13 @@ export class Lease implements LeaseStamp {
     return cipherCtx([this.#bankStamp, ...stamps], purpose)
   }
 
-  /** The vaultKey for this one call, non-extractable, with the one usage. Nothing keeps the key between calls. */
-  async #vaultKey(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
-    const { lease_key, vault_key_lease_wrapped } = this.#demandRecord()
-    const ctx = cipherCtx([this.#bankStamp, this.#leaseStamp], 'vault_key_lease_wrapped')
+  /** The bankKey for this one call, non-extractable, with the one usage. Nothing keeps the key between calls. */
+  async #bankKey(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
+    const { lease_key, bank_key_lease_wrapped } = this.#demandRecord()
+    const ctx = cipherCtx([this.#bankStamp, this.#leaseStamp], 'bank_key_lease_wrapped')
     // Only this WebCrypto call is trapped: its rejection is how a damaged lease is learned.
     try {
-      return await unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
+      return await unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
     } catch {
       // Locking drops the bank's lease and forgets its row by scope; this one is evicted too, should the bank have another.
       this.#bankFriend.lock()

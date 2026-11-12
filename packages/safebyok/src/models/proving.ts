@@ -1,7 +1,7 @@
 import { Checkers, checkedConsistent } from '../helpers/validator'
 import { nowMillis } from '../helpers/clock'
 import { PassphraseKeySize, type Modelkind, type PassphraseSaltSize, brandGuarded, hasModelkind } from '../helpers/consts'
-import { deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
+import { deriveWrappingKey, fromB64, importWrappingKeyBytes, makeBankKey, randomBytes, toB64, unwrapKeyUnder, wrapKeyUnder } from '../helpers/crypto'
 import { VaultError, isVaultError } from '../refusals/errors'
 import { adorn } from '../helpers/helpers'
 import * as Phrases from '../helpers/phrases'
@@ -17,13 +17,13 @@ import { Wayin, wayinCtxOf } from './wayin'
 
 // == [NOVEL and the checks]: NOVEL, RewrapUsage, CheckUsage, Checks
 
-/** Pass to {@link Proving.buildWayin} for a wayin over a vaultKey made new. */
+/** Pass to {@link Proving.buildWayin} for a wayin over a bankKey made new. */
 export const NOVEL: unique symbol = Symbol.for('@safebyok/novel')
 
-/** What the vaultKey is unwrapped as, inside a proving: extractable only so it can be wrapped again, and dropped when the method ends. */
+/** What the bankKey is unwrapped as, inside a proving: extractable only so it can be wrapped again, and dropped when the method ends. */
 const RewrapUsage = Object.freeze({ extractable: true, usage: ['wrapKey'] as const })
 
-/** What the vaultKey is unwrapped as to prove a stored wayin unwraps: non-extractable, and dropped at once. */
+/** What the bankKey is unwrapped as to prove a stored wayin unwraps: non-extractable, and dropped at once. */
 const CheckUsage = Object.freeze({ extractable: false, usage: ['wrapKey'] as const })
 
 /** Stays here: it names the class. */
@@ -32,7 +32,7 @@ const Checks = Checkers('bad_option', ({ custom }) => ({
 }))
 // --
 
-/** The proving of a wayin: a strong key from birth, made by a subclass's static, and the one thing that can unwrap the vaultKey. Only the statics hear a clear, and they leave a passkeyClear unspent: spending it is their caller's. */
+/** The proving of a wayin: a strong key from birth, made by a subclass's static, and the one thing that can unwrap the bankKey. Only the statics hear a clear, and they leave a passkeyClear unspent: spending it is their caller's. */
 export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   // == [Props]: wayinkind, header, bankStamp, gateStamp, #wayinKey, #wayin, toJSON
 
@@ -64,7 +64,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   }
   // --
 
-  // == [Methods]: judgeStrength, buildWayin, buildLease, wrapVaultKey, unwrapVaultKey, wayinCtx
+  // == [Methods]: judgeStrength, buildWayin, buildLease, wrapBankKey, unwrapBankKey, wayinCtx
 
   /** The strengthChecker's verdict. Anything it throws is replaced, to keep the passphrase it heard out of the error. */
   static async judgeStrength(passphraseClear: GX.PassphraseCleartext, scope: BankScope, world: ProvingWorld): Promise<GX.PassphraseVerdict> {
@@ -72,7 +72,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return checked.world.strengthChecker(checked.passphraseClear, checked.scope)
   }
 
-  /** This proving's wayin, made under a vaultKey new (`NOVEL`) or the `source` proving's of the same gate. A proving has one wayin. */
+  /** This proving's wayin, made under a bankKey new (`NOVEL`) or the `source` proving's of the same gate. A proving has one wayin. */
   async buildWayin(source: Novel | Proving): Promise<Wayin> {
     if (this.#wayin !== null) { throw wayinMadeAlready() }
     const checked = Checks.wayinSource.parse(source)
@@ -80,27 +80,27 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
       checkedConsistent(checked.bankStamp, this.bankStamp, { kind: 'unexpected_error', message: Phrases.ProvingOfOtherGate })
       checkedConsistent(checked.gateStamp, this.gateStamp, { kind: 'unexpected_error', message: Phrases.ProvingOfOtherGate })
     }
-    const vaultKey = checked === NOVEL ? await makeVaultKey() : await checked.#unwrapVaultKey()
-    return this.#wrapVaultKey(vaultKey)
+    const bankKey = checked === NOVEL ? await makeBankKey() : await checked.#unwrapBankKey()
+    return this.#wrapBankKey(bankKey)
   }
 
-  /** A lease on `friend`'s bank under the vaultKey this proving's wayin wraps, citing `gate`, a revision of the gate proved; granted, not yet cached. */
+  /** A lease on `friend`'s bank under the bankKey this proving's wayin wraps, citing `gate`, a revision of the gate proved; granted, not yet cached. */
   async buildLease(friend: LeaseFriend, gate: CitedGate): Promise<Lease> {
     const checked = provingLeaseArgs.parse({ friend, gate })
     checkedConsistent(checked.friend, this.bankStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
     checkedConsistent(checked.gate, this.gateStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
-    const vaultKey = await this.#unwrapVaultKey()
-    return Lease.buildGranted(friend, vaultKey, { gate: checked.gate, wayinkind: this.wayinkind })
+    const bankKey = await this.#unwrapBankKey()
+    return Lease.buildGranted(friend, bankKey, { gate: checked.gate, wayinkind: this.wayinkind })
   }
 
-  async #wrapVaultKey(vaultKey: CryptoKey): Promise<Wayin> {
-    const vault_key_wayin_wrapped = await wrapKeyUnder(this.#wayinKey, vaultKey, this.#wayinCtx())
-    this.#wayin = new Wayin({ ...this.header, vault_key_wayin_wrapped })
+  async #wrapBankKey(bankKey: CryptoKey): Promise<Wayin> {
+    const bank_key_wayin_wrapped = await wrapKeyUnder(this.#wayinKey, bankKey, this.#wayinCtx())
+    this.#wayin = new Wayin({ ...this.header, bank_key_wayin_wrapped })
     return this.#wayin
   }
 
-  #unwrapVaultKey(): Promise<CryptoKey> {
-    return unwrapKeyUnder(this.#wayinKey, this.#demandWayin().vault_key_wayin_wrapped, this.#wayinCtx(), RewrapUsage)
+  #unwrapBankKey(): Promise<CryptoKey> {
+    return unwrapKeyUnder(this.#wayinKey, this.#demandWayin().bank_key_wayin_wrapped, this.#wayinCtx(), RewrapUsage)
   }
 
   #wayinCtx(): Uint8Array { return wayinCtxOf(this.bankStamp, this.gateStamp, this.header) }
@@ -116,13 +116,13 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   // == [Protected, for a subclass to call]: checkUnwraps
 
-  /** Unwrap the stored wayin's vaultKey and drop it, to learn that the key unwraps it (guarantees.md, G3). */
+  /** Unwrap the stored wayin's bankKey and drop it, to learn that the key unwraps it (guarantees.md, G3). */
   protected async checkUnwraps(wrongCleartext: () => VaultError): Promise<void> {
-    const { vault_key_wayin_wrapped } = this.#demandWayin()
+    const { bank_key_wayin_wrapped } = this.#demandWayin()
     const ctx = this.#wayinCtx()
     // Only this WebCrypto call is trapped: its rejection is how a wrong passphrase or passkey is learned.
     try {
-      await unwrapKeyUnder(this.#wayinKey, vault_key_wayin_wrapped, ctx, CheckUsage)
+      await unwrapKeyUnder(this.#wayinKey, bank_key_wayin_wrapped, ctx, CheckUsage)
     } catch {
       throw wrongCleartext()
     }
@@ -151,7 +151,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
   static async buildStored(gate: StampedGate, passphraseClear: GX.PassphraseCleartext, world: ProvingWorld): Promise<PassphraseProving> {
     const { gate: { bankStamp, stamp, wayins }, passphraseClear: typed } = passphraseStoredArgs.parse({ gate, passphraseClear, world })
     const { main } = wayins
-    const { vault_key_wayin_wrapped: _wrapped, ...header } = main
+    const { bank_key_wayin_wrapped: _wrapped, ...header } = main
     if (header.key_deriver_label !== world.keyDeriver.key_deriver_label) { throw unknownKeyDeriver() }
     const passphraseKey = await passphraseKeyOf(world.keyDeriver, typed, fromB64(header.salt_b64))
     const proving = new PassphraseProving(bankStamp, stamp, header, passphraseKey, new Wayin(main))
@@ -178,7 +178,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
     const { gate: { bankStamp, stamp, wayins }, passkeyClear: { credential_id, prf_salt_b64, prfBytes } } = passkeyStoredArgs.parse({ gate, passkeyClear })
     const { passkey0 } = wayins
     if (passkey0 === undefined) { throw noPasskeyWayin() }
-    const { vault_key_wayin_wrapped: _wrapped, ...header } = passkey0
+    const { bank_key_wayin_wrapped: _wrapped, ...header } = passkey0
     if (credential_id !== header.credential_id) { throw otherPasskey() }
     if (prf_salt_b64 !== header.prf_salt_b64) { throw otherPrfSalt() }
     const passkeyKey = await deriveWrappingKey(prfBytes, wayinCtxOf(bankStamp, stamp, header))

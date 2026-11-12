@@ -1,5 +1,5 @@
 import * as CX from '../../src/shapes/shapes-core'
-import type { Ciphered, BoxKeyWrapped, VaultKeyLeaseWrapped, VaultKeyWayinWrapped, WhisperCiphered, VaultScope } from '../../src/shapes/shapes-core'
+import type { Ciphered, BoxKeyWrapped, BankKeyLeaseWrapped, BankKeyWayinWrapped, WhisperCiphered, VaultScope } from '../../src/shapes/shapes-core'
 import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
 import type { Gate as VaultGate } from '../../src/shapes/shapes-storage'
 import      { toB64 }                               from '../../src/helpers/crypto'
@@ -29,7 +29,7 @@ export const testDeriver: KeyDeriver = {
 export const anyStrengthChecker: StrengthChecker = () => StrongVerdict
 
 /** A Ciphered that opens under no key, so it stands in any ciphered role: what {@link fakeCiphered} makes. */
-export type FakeCiphered = WhisperCiphered & BoxKeyWrapped & VaultKeyWayinWrapped & VaultKeyLeaseWrapped
+export type FakeCiphered = WhisperCiphered & BoxKeyWrapped & BankKeyWayinWrapped & BankKeyLeaseWrapped
 
 /** A shape-valid Ciphered that opens nothing, in any ciphered role: for storage-layer tests, which never decrypt.
  * Opening under no key, it is no more one role's than another's, so it fills any ciphered field (a
@@ -49,7 +49,7 @@ export function fakeCiphered(tag: string): FakeCiphered {
 export function scopeOf(user_id: string, vaultlabel = 'main'): VaultScope { return { user_id, banklabel: 'acme', vaultlabel } }
 
 /** A shape-valid passphrase wayin of a vault record's gate, its wrap fake (`wayin-<tag>`): for storage-layer tests, which
- * never decrypt. It wraps the vault's first vaultKey, and was sealed by the bank world's first device.
+ * never decrypt. It wraps the first bankKey, and was sealed by the bank world's first device.
  */
 export function wayinOf(tag: string, overrides: Partial<VaultGate['passphrase_wayin']> = {}): VaultGate['passphrase_wayin'] {
   return {
@@ -59,7 +59,7 @@ export function wayinOf(tag: string, overrides: Partial<VaultGate['passphrase_wa
     salt_b64:                CX.salt_b64.parse('c2FsdHNhbHRzYWx0c2FsdA'),
     device_tok:              '00000000-0000-4000-8000-0000000000b1',
     registered_at:           Date.UTC(2026, 9, 14),
-    vault_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
+    bank_key_wayin_wrapped: fakeCiphered(`wayin-${tag}`),
     ...overrides,
   }
 }

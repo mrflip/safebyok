@@ -26,7 +26,7 @@ memory, a vendor's forum, or a source file rather than docs.
 | Part                                | Bytes in JSON                  | Source   | Note                                                                                        |
 | ----------------------------------- | ------------------------------ | -------- | ------------------------------------------------------------------------------------------- |
 | A cipherIv, 12 bytes                | 16                             | Measured | base64url without padding, in every ciphered field                                          |
-| A wrapped 256-bit key               | 64                             | Measured | AES-GCM `wrapKey`, raw: 32 bytes and a 16-byte tag. Box keys and vault keys alike           |
+| A wrapped 256-bit key               | 64                             | Measured | AES-GCM `wrapKey`, raw: 32 bytes and a 16-byte tag. Box keys and bank keys alike            |
 | A wrapped 512-bit key               | 107                            | Measured | The same, wrapping a 64-byte key                                                            |
 | A whisper of W bytes of JSON        | ceil((W + 16) × 4 / 3)         | Measured | AES-GCM with a 16-byte tag, then base64url: about 1.33 × W                                  |
 | passphraseSalt, `salt_size` 16     | 22                             | Measured | `Argon2idWebV1.salt_size`; the spec allows 8 to 65,536                                     |
@@ -50,7 +50,7 @@ Every field is ASCII, except a host's sidecar, which may not be.
 
 Typical labels are `acme_chat`, `auth0|` plus 24 hex characters, `main`, and a 26-character `device_tok`.
 
-* **Reading "a slightly larger key".** The vaultKey and boxKey are already AES-256, the largest key AES has, so the
+* **Reading "a slightly larger key".** The bankKey and boxKey are already AES-256, the largest key AES has, so the
   *Larger* row grows in two other ways. Each wrapped key is 512 bits, as an AES-256-SIV or HMAC-SHA-512 key would be:
   +43 bytes per wayin. The passphraseSalt is 32 bytes: +21 bytes. Both are overkill: RFC 9106 recommends a 16-byte
   Argon2 salt.

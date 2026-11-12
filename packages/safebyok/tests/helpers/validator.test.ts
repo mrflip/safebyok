@@ -118,10 +118,10 @@ describe("Checkers", () => {
 
   it("quotes no refused value and names no unknown field", () => {
     const secret = 'sk-live-0xSECRET'
-    const err = TH.expectSyncRefusal(() => boxRecord.parse({ ...sparse, banklabel: secret, user_id: `${secret} `, written_at: secret, whisper_ciphered: 7, vault_key: secret, [secret]: 1, 'sk live': 2 }), 'bad_record')
+    const err = TH.expectSyncRefusal(() => boxRecord.parse({ ...sparse, banklabel: secret, user_id: `${secret} `, written_at: secret, whisper_ciphered: 7, bank_key: secret, [secret]: 1, 'sk live': 2 }), 'bad_record')
     expect(err.message).to.not.include('SECRET')
     expect(err.message).to.not.include('sk live')
-    expect(err.message).to.not.include('vault_key')
+    expect(err.message).to.not.include('bank_key')
     expect(err.message).to.include("There are 3 fields it does not accept (their names are not repeated): it accepts only user_id, banklabel, vaultlabel, boxlabel, written_at, whisper_ciphered.")
     expect(JSON.stringify(err.meta)).to.not.include('SECRET')
     expect(err.cause).to.be.undefined

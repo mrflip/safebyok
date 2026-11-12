@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ForeverMillis } from '../../src/helpers/consts'
-import { makeLeaseKey, makeVaultKey } from '../../src/helpers/crypto'
+import { makeLeaseKey, makeBankKey } from '../../src/helpers/crypto'
 import { VaultError } from '../../src/refusals/errors'
 import { Lease } from '../../src/models/lease'
 import { type BankStamp, type CitedGate, type LeaseGrantOpts, type LeaseRecord, LeaseFormat, isLeaseKey } from '../../src/shapes/shapes-gateish'
@@ -54,13 +54,13 @@ describe("a revoke whose forget is refused", () => {
   })
 })
 
-describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
-  it("makes a record of the bank: fmt 7003, the bank's stamp, the gate cited, proved_at and wayinkind, a leaseKey handle and the wrapped vaultKey", async () => {
+describe("Lease.buildGranted(friend, bankKey, opts)", () => {
+  it("makes a record of the bank: fmt 7003, the bank's stamp, the gate cited, proved_at and wayinkind, a leaseKey handle and the wrapped bankKey", async () => {
     const { friend } = await grantedWorld({ gate: NextGate, wayinkind: 'passkey' })
     const record = friend.cached as LeaseRecord
     expect(record).to.deep.include({ ...WorldBankStamp, fmt: 7003, gatelabel: 'main', gate_tok: WorldGate.gate_tok, gate_revision_tok: NextGate.revision_tok, proved_at: T0, wayinkind: 'passkey' })
-    expect(Object.keys(record)).to.have.members([...StampFieldnames, 'lease_key', 'vault_key_lease_wrapped'])
-    expect(Object.keys(record.vault_key_lease_wrapped)).to.have.members(['cipher_iv_b64', 'ciphertext_b64'])
+    expect(Object.keys(record)).to.have.members([...StampFieldnames, 'lease_key', 'bank_key_lease_wrapped'])
+    expect(Object.keys(record.bank_key_lease_wrapped)).to.have.members(['cipher_iv_b64', 'ciphertext_b64'])
   })
 
   it("caches nothing on its own", async () => {
@@ -84,8 +84,8 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
   })
 
   const GrantRefusalCases = [
-    [() => ({ vaultKey: makeLeaseKey() }),                                        'refuses a vaultKey that is not extractable'],
-    [() => ({ vaultKey: 'a vault key' }),                                         'refuses a vaultKey that is not a CryptoKey'],
+    [() => ({ bankKey: makeLeaseKey() }),                                        'refuses a bankKey that is not extractable'],
+    [() => ({ bankKey: 'a bank key' }),                                          'refuses a bankKey that is not a CryptoKey'],
     [() => ({ opts: { ...GrantedAs, gate: TH.omitting(WorldGate, 'revision_tok') } }), 'refuses a cited gate with no revision_tok'],
     [() => ({ opts: { ...GrantedAs, gate: { ...WorldGate, gatelabel: 'other' } } }), 'refuses a cited gate of a gatelabel no gate has'],
     [() => ({ opts: { ...GrantedAs, wayinkind: 'carrier pigeon' } }),             'refuses an unknown wayinkind'],
@@ -99,8 +99,8 @@ describe("Lease.buildGranted(friend, vaultKey, opts)", () => {
 
   for (const [argsOf, blurb] of GrantRefusalCases) {
     it(blurb, async () => {
-      const { friend = fakeLeaseFriendOf(), vaultKey = makeVaultKey(), opts = GrantedAs } = argsOf() as Record<string, unknown>
-      const handed = await (vaultKey as Promise<unknown>)
+      const { friend = fakeLeaseFriendOf(), bankKey = makeBankKey(), opts = GrantedAs } = argsOf() as Record<string, unknown>
+      const handed = await (bankKey as Promise<unknown>)
       await TH.expectRefusal(Lease.buildGranted(friend as FakeLeaseFriend, handed as CryptoKey, opts as LeaseGrantOpts))
     })
   }
@@ -275,9 +275,9 @@ describe("Lease.buildFromCache(friend, gate)", () => {
   })
 
   const MalformedCases = [
-    [(record: LeaseRecord, extractableVaultKey: CryptoKey) => ({ ...record, lease_key: extractableVaultKey }), 'whose leaseKey is extractable'],
+    [(record: LeaseRecord, extractableBankKey: CryptoKey) => ({ ...record, lease_key: extractableBankKey }), 'whose leaseKey is extractable'],
     [(record: LeaseRecord) => ({ ...record, fmt: 7000 }),                          'of another fmt'],
-    [(record: LeaseRecord) => ({ ...record, vault_key_lease_wrapped: undefined }), 'with no wrapped vaultKey'],
+    [(record: LeaseRecord) => ({ ...record, bank_key_lease_wrapped: undefined }), 'with no wrapped bankKey'],
     [(record: LeaseRecord) => ({ ...record, proved_at: undefined }),               'with no proved_at'],
     [(record: LeaseRecord) => ({ ...record, extra: 'field' }),                     'with a field no lease has'],
     [() => 'a lease',                                                              'that is not a record at all'],
@@ -286,14 +286,14 @@ describe("Lease.buildFromCache(friend, gate)", () => {
   for (const [tamper, blurb] of MalformedCases) {
     it(`reports a cached record ${blurb} as bad news without quoting it`, async () => {
       const { friend } = await grantedWorld()
-      const { vault_key_lease_wrapped } = friend.cached as LeaseRecord
-      const tampered = tamper(friend.cached as LeaseRecord, await makeVaultKey())
+      const { bank_key_lease_wrapped } = friend.cached as LeaseRecord
+      const tampered = tamper(friend.cached as LeaseRecord, await makeBankKey())
       friend.cached = tampered
       expect(await Lease.buildFromCache(friend, WorldGate)).to.be.null
       expect(friend.tellBadNews).toHaveBeenCalledOnce()
       const err = friend.tellBadNews.mock.calls[0]![0][0] as VaultError
       expect(err.refusalkind).to.eq('damaged_lease')
-      expect(TH.thrownText(err)).to.not.include(vault_key_lease_wrapped.ciphertext_b64)
+      expect(TH.thrownText(err)).to.not.include(bank_key_lease_wrapped.ciphertext_b64)
       expect(friend.cached).to.equal(tampered)
       expect(friend.tryForgetLease).not.toHaveBeenCalled()
     })
@@ -480,7 +480,7 @@ describe("a tampered lease record", () => {
     [(record: LeaseRecord) => ({ ...record, proved_at: record.proved_at + 1 }),                'its proved_at moved'],
     [(record: LeaseRecord) => ({ ...record, wayinkind: 'passkey' }),                           'its wayinkind changed'],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, lease_key: other.lease_key }), "another lease's leaseKey"],
-    [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, vault_key_lease_wrapped: other.vault_key_lease_wrapped }), "another lease's wrapped vaultKey"],
+    [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, bank_key_lease_wrapped: other.bank_key_lease_wrapped }), "another lease's wrapped bankKey"],
   ] as const
 
   for (const [tamper, blurb] of TamperCases) {
@@ -521,12 +521,12 @@ describe("a tampered lease record", () => {
     const got = await Lease.buildFromCache(friend, WorldGate)
     const stamps = sealStampsOf('b1')
     const err = await TH.expectRefusal(got!.sealWith(WhisperText, stamps), 'damaged_lease')
-    expect(TH.thrownText(err)).to.not.include((friend.cached as LeaseRecord).vault_key_lease_wrapped.ciphertext_b64)
+    expect(TH.thrownText(err)).to.not.include((friend.cached as LeaseRecord).bank_key_lease_wrapped.ciphertext_b64)
   })
 })
 
 describe("what a lease shows", () => {
-  it("Object.keys shows its stamp alone: no leaseKey, no wrapped vaultKey, no friend", async () => {
+  it("Object.keys shows its stamp alone: no leaseKey, no wrapped bankKey, no friend", async () => {
     const { lease } = await grantedWorld()
     expect(Object.keys(lease)).to.have.members(StampFieldnames)
   })
@@ -535,7 +535,7 @@ describe("what a lease shows", () => {
     const { friend, lease } = await grantedWorld()
     expect(TH.jsonOf(lease)).to.deep.equal(Stamped)
     expect(lease.toJSON()).to.deep.equal(TH.jsonOf(lease))
-    expect(JSON.stringify(lease)).to.not.include((friend.cached as LeaseRecord).vault_key_lease_wrapped.ciphertext_b64)
+    expect(JSON.stringify(lease)).to.not.include((friend.cached as LeaseRecord).bank_key_lease_wrapped.ciphertext_b64)
   })
 
   it("is frozen: its stamp cannot be changed", async () => {

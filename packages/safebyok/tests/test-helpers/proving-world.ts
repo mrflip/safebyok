@@ -8,7 +8,7 @@
 
 import { afterEach, beforeEach, type Mock, vi } from 'vitest'
 import { PasskeySaltSize } from '../../src/helpers/consts'
-import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
+import { type CipherCtxRecord, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeBankKey, randomBytes, toB64, unwrapKeyUnder } from '../../src/helpers/crypto'
 import { Device } from '../../src/models/device'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
@@ -108,9 +108,9 @@ export function fakeLeaseFriendOf(overrides: Partial<BankStamp & Pick<LeaseFrien
 /** What {@link makeGrantedLease} records of a proving, unless told otherwise: {@link WorldGate}, proved by passphrase. */
 export const GrantedAs: LeaseGrantOpts = Object.freeze({ gate: WorldGate, wayinkind: 'passphrase' })
 
-/** A lease under a fresh vaultKey: no two share a key. Not cached. */
+/** A lease under a fresh bankKey: no two share a key. Not cached. */
 export async function makeGrantedLease(friend: FakeLeaseFriend, opts: LeaseGrantOpts = GrantedAs): Promise<Lease> {
-  return Lease.buildGranted(friend, await makeVaultKey(), opts)
+  return Lease.buildGranted(friend, await makeBankKey(), opts)
 }
 
 /** The two stamps a box hands the lease to seal its whisper under, its own fields, flat: `boxlabel` and `box_tok` for the boxKey's wrap, the same and `revision_seq` for the whisper's cipher. `overrides` lays fields over both. */
@@ -178,13 +178,13 @@ export async function listedGateOf(record: GateRecord): Promise<Gate> {
 export function isZeroed(bytes: Uint8Array): boolean { return bytes.every((byte) => byte === 0) }
 // --
 
-// == [Backdoor]: WayinSecret, _cheat_vaultKeyBytesOf
+// == [Backdoor]: WayinSecret, _cheat_bankKeyBytesOf
 
 /** What opens a wayin: the passphrase, for a passphrase wayin, or a copy of the PRF bytes taken before the proving zeroed them, for a passkey wayin. */
 export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
 
-/** A test backdoor: the raw bytes of the vaultKey `wayin` wraps, opened from outside the models as a later unlock would open it, from the secret, the wayin's header and the bank's and gate's stamps. It exists only so a test can show two wayins have one vaultKey, or that a wayin opens at all; no model hands out a vaultKey. Rejects with WebCrypto's error when the wayin will not open. */
-export async function _cheat_vaultKeyBytesOf(bank: BankStamp, gate: GateStamp, wayin: Wayin, secret: WayinSecret, keyDeriver: KeyDeriver = testDeriver): Promise<Uint8Array> {
+/** A test backdoor: the raw bytes of the bankKey `wayin` wraps, opened from outside the models as a later unlock would open it, from the secret, the wayin's header and the bank's and gate's stamps. It exists only so a test can show two wayins have one bankKey, or that a wayin opens at all; no model hands out a bankKey. Rejects with WebCrypto's error when the wayin will not open. */
+export async function _cheat_bankKeyBytesOf(bank: BankStamp, gate: GateStamp, wayin: Wayin, secret: WayinSecret, keyDeriver: KeyDeriver = testDeriver): Promise<Uint8Array> {
   const header = wayin.toJSON()
   const ctx = wayinCtxOf(bank, gate, header)
   async function wayinKeyOf(): Promise<CryptoKey> {
@@ -196,7 +196,7 @@ export async function _cheat_vaultKeyBytesOf(bank: BankStamp, gate: GateStamp, w
     return importWrappingKeyBytes(await keyDeriver.deriveKeyBytes(GX.passphraseCleartext.parse(secret.passphrase), fromB64(header.salt_b64)))
   }
   const wayinKey = await wayinKeyOf()
-  const vaultKey = await unwrapKeyUnder(wayinKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: true, usage: ['wrapKey'] })
-  return new Uint8Array(await crypto.subtle.exportKey('raw', vaultKey))
+  const bankKey = await unwrapKeyUnder(wayinKey, wayin.bank_key_wayin_wrapped, ctx, { extractable: true, usage: ['wrapKey'] })
+  return new Uint8Array(await crypto.subtle.exportKey('raw', bankKey))
 }
 // --

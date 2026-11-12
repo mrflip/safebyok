@@ -12,7 +12,7 @@ const passphraseRecord = (overrides: Record<string, unknown> = {}): Record<strin
   salt_b64:                toB64(randomBytes(16)),
   device_tok:              DeviceTok,
   registered_at:           T0,
-  vault_key_wayin_wrapped: TH.fakeCiphered('wayin-pp'),
+  bank_key_wayin_wrapped: TH.fakeCiphered('wayin-pp'),
   ...overrides,
 })
 
@@ -23,7 +23,7 @@ const passkeyRecord = (overrides: Record<string, unknown> = {}): Record<string, 
   prf_salt_b64:            toB64(randomBytes(PasskeySaltSize)),
   device_tok:              DeviceTok,
   registered_at:           T0,
-  vault_key_wayin_wrapped: TH.fakeCiphered('wayin-pk'),
+  bank_key_wayin_wrapped: TH.fakeCiphered('wayin-pk'),
   ...overrides,
 })
 
@@ -41,7 +41,7 @@ describe("new Wayin(record): the record check", () => {
     // fields of the wrong kind, missing or extra:
     [() => passphraseRecord({ credential_id: 'cred-test-1' }),                  "refuses a passphrase record carrying a passkey's field"],
     [() => passkeyRecord({ key_deriver_label: 'test_digest_v0' }),              "refuses a passkey record carrying a passphrase's field"],
-    [() => passphraseRecord({ vault_key_wayin_wrapped: undefined }),            'refuses a record with no wrapped vaultKey'],
+    [() => passphraseRecord({ bank_key_wayin_wrapped: undefined }),            'refuses a record with no wrapped bankKey'],
     [() => passphraseRecord({ salt_b64: '' }),                                  'refuses an empty passphrase salt'],
     [() => passphraseRecord({ salt_b64: toB64(randomBytes(32)) }),              'refuses a passphrase salt of 32 bytes'],
     [() => passphraseRecord({ salt_b64: toB64(randomBytes(15)) }),              'refuses a passphrase salt of 15 bytes'],
@@ -54,7 +54,7 @@ describe("new Wayin(record): the record check", () => {
     [() => passphraseRecord({ wayinlabel: 'passkey0' }),                        "refuses a passphrase record under the passkey's wayinlabel"],
     [() => passkeyRecord({ wayinlabel: 'main' }),                               "refuses a passkey record under the passphrase's wayinlabel"],
     [() => passphraseRecord({ registered_at: '2023-11-14T22:13:20.000Z' }),     'refuses a time written as an ISO string'],
-    [() => passphraseRecord({ vault_key_wayin_wrapped: { ciphertext_b64: 'ct' } }), 'refuses a wrap with no cipherIv'],
+    [() => passphraseRecord({ bank_key_wayin_wrapped: { ciphertext_b64: 'ct' } }), 'refuses a wrap with no cipherIv'],
     // absurd:
     [() => null,                                                                'refuses null'],
     [() => 42,                                                                  'refuses a number'],
@@ -67,7 +67,7 @@ describe("new Wayin(record): the record check", () => {
   }
 
   it("quotes none of a refused record in its refusal: neither its ciphertext nor its salt", () => {
-    const record = passkeyRecord({ prf_salt_b64: 'c2hvcnQ', vault_key_wayin_wrapped: TH.fakeCiphered('SECRETWRAP') })
+    const record = passkeyRecord({ prf_salt_b64: 'c2hvcnQ', bank_key_wayin_wrapped: TH.fakeCiphered('SECRETWRAP') })
     const err = TH.expectSyncRefusal(() => new Wayin(record))
     expect(TH.thrownText(err)).to.not.include('SECRETWRAP')
     expect(TH.thrownText(err)).to.not.include('c2hvcnQ')
@@ -80,7 +80,7 @@ describe("wayin.pickle(): the stored record", () => {
     const pickle = new Wayin(record).pickle()
     expect(pickle).to.deep.equal(record)
     expect(Object.isFrozen(pickle)).to.be.true
-    expect(Object.isFrozen(pickle.vault_key_wayin_wrapped)).to.be.true
+    expect(Object.isFrozen(pickle.bank_key_wayin_wrapped)).to.be.true
   })
 
   it("is a copy: the record handed in is neither frozen nor kept", () => {
@@ -88,7 +88,7 @@ describe("wayin.pickle(): the stored record", () => {
     const pickle = new Wayin(record).pickle()
     expect(pickle).to.not.equal(record)
     expect(Object.isFrozen(record)).to.be.false
-    expect(Object.isFrozen(record['vault_key_wayin_wrapped'])).to.be.false
+    expect(Object.isFrozen(record['bank_key_wayin_wrapped'])).to.be.false
   })
 
   it("round-trips through new Wayin(wayin.pickle())", () => {
@@ -113,7 +113,7 @@ describe("wayin.toJSON(): the header", () => {
   ] as const
 
   for (const [recordOf, fieldnames, blurb] of HeaderCases) {
-    it(`is every field of ${blurb} but its wrapped vaultKey`, () => {
+    it(`is every field of ${blurb} but its wrapped bankKey`, () => {
       const wayin = new Wayin(recordOf())
       expect(Object.keys(wayin.toJSON())).to.have.members([...fieldnames])
       expect(JSON.stringify(wayin)).to.not.include('ciphertext_b64')
@@ -124,6 +124,6 @@ describe("wayin.toJSON(): the header", () => {
   it("leaves the pickle whole", () => {
     const wayin = new Wayin(passphraseRecord())
     wayin.toJSON()
-    expect(wayin.pickle()).to.have.property('vault_key_wayin_wrapped')
+    expect(wayin.pickle()).to.have.property('bank_key_wayin_wrapped')
   })
 })

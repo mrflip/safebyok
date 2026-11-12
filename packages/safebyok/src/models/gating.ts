@@ -205,7 +205,7 @@ async function unlockBank(bank: Bank, cleartexts: unknown, unlockByProving: Unlo
 }
 
 // Each gate change grants a lease to the bank citing the gate row it wrote, not a newer one that arrived meanwhile. The
-// old lease stays in force for the moments between: the vaultKey did not change.
+// old lease stays in force for the moments between: the bankKey did not change.
 
 /** Replace the passphrase of `bank`, proved by the one it has. */
 async function replacePassphrase(bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {

@@ -17,7 +17,7 @@ implementation.
   * **What is permitted to retain about devices -- open.** The Coach: are we allowed to store
     "Bob's Awesome iPhone 11" for the user to know which device `a213423bcf` is? A device list
     needs some label a person recognizes. Decide before building it: a label the user types (what
-    they chose to say, stored in the clear on the server, or encrypted under the vaultKey so the
+    they chose to say, stored in the clear on the server, or encrypted under the bankKey so the
     server never sees it), a label taken from the platform (model name, user agent: the kind of
     data the fingerprinting rules care about), or none (the device list shows when each was added
     and last used). Encrypting a user-typed label inside the vault is the likely answer; check it

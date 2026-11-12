@@ -45,7 +45,7 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form, gateMoveOf
   // The val is the record the verb wrote: the gate listed may have a newer one by the time the answer is delivered.
 
-  /** Lay a new passphrase wayin on the gate at `ante`, and answer the record stored. Nothing locks: the vaultKey does not change. */
+  /** Lay a new passphrase wayin on the gate at `ante`, and answer the record stored. Nothing locks: the bankKey does not change. */
   async replacePassphrase(ante: GateRecord, main: Wayins['main']): Promise<GateRecord> { return valOf(await this.tryReplacePassphrase(ante, main)) }
 
   /** {@link replacePassphrase}, answering the bankDB's own answer.

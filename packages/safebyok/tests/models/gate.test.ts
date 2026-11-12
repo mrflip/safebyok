@@ -62,7 +62,7 @@ describe("a gate row as a device's ensureBank lists it: the record check", () =>
     const record = gate.pickle()
     const { main, passkey0 } = record.wayins
     const err = await TH.expectRefusal(listedGateOf({ ...record, wayins: { main: passkey0, passkey0: main } } as never))
-    expect(TH.thrownText(err)).to.not.include(main.vault_key_wayin_wrapped.ciphertext_b64)
+    expect(TH.thrownText(err)).to.not.include(main.bank_key_wayin_wrapped.ciphertext_b64)
   })
 })
 
@@ -77,7 +77,7 @@ describe("gate.pickle() and gate.toJSON()", () => {
     expect(Object.isFrozen(pickle.wayins.main)).to.be.true
   })
 
-  it("toJSON() is the gate's sparse row: no wayin, no wrapped vaultKey", async () => {
+  it("toJSON() is the gate's sparse row: no wayin, no wrapped bankKey", async () => {
     const { gate } = await builtGate({ passkey: true })
     const sparse = gateSparse.parse(gate.pickle())
     expect(TH.jsonOf(gate)).to.deep.equal(TH.jsonOf(sparse))

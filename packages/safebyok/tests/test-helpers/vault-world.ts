@@ -269,7 +269,7 @@ export async function makeBornVaultWithPasskey() {
 
 const RoundTripStamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
 
-/** What the lease `opener` unseals of a whisper the vault `sealer` seals: the two have one vaultKey only if it comes back. */
+/** What the lease `opener` unseals of a whisper the vault `sealer` seals: the two have one bankKey only if it comes back. */
 export async function roundTrip(sealer: Vault, opener: Lease): Promise<string> { return opener.unsealWith(await sealer.sealStampedString('sk-test', RoundTripStamp), [vaultStamp.parse(sealer), RoundTripStamp]) }
 
 /** {@link roundTrip} through the vaults' own seal verbs. */
@@ -303,7 +303,7 @@ export async function makeWorld(worldOverrides: VaultWorldGiven = {}) {
   const tryListBoxes = vi.spyOn(world.bankDB, 'tryListBoxes')
   const tryPutBox    = vi.spyOn(world.bankDB, 'tryPutBox')
   const tryGetBox    = vi.spyOn(world.bankDB, 'tryGetBox')
-  /** The next session on this device: the vault its bank lists, its boxes not yet listed, unlocked by the passphrase, sealing under the vaultKey the first has. */
+  /** The next session on this device: the vault its bank lists, its boxes not yet listed, unlocked by the passphrase, sealing under the bankKey the first has. */
   const openNextSession = async () => {
     const bank = await world.anotherSession()
     const vault = bank.vaultAt(Dna)

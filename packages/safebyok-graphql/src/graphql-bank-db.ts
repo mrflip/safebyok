@@ -399,7 +399,7 @@ const dropTypename = (bag: unknown, nested: Record<string, Drop> = {}): unknown 
   return fields
 }
 
-const wayinOf: Drop = (val) => dropTypename(val, { vault_key_wayin_wrapped: dropTypename })
+const wayinOf: Drop = (val) => dropTypename(val, { bank_key_wayin_wrapped: dropTypename })
 
 // GraphQL answers a gate that has no passkey wayin with `passkey0: null`, where the gate row leaves it out.
 /** The drop for a gate's wayins, which also leaves out a null `passkey0`. */

@@ -167,7 +167,7 @@ export function notExposed(): VaultError { return new VaultError('bad_option', P
 
 // == [Lease Throwers]: damagedLease, undecipheredWhisper, leaseNotInForce
 
-/** A `damaged_lease` refusal: this device's lease will not unwrap the vaultKey. */
+/** A `damaged_lease` refusal: this device's lease will not unwrap the bankKey. */
 export function damagedLease(): VaultError { return new VaultError('damaged_lease', Phrases.DamagedLease) }
 
 /** A `damaged_whisper` refusal: the whisper would not decipher under this vault's key. */
@@ -216,7 +216,7 @@ export function passkeyAlreadyAdded(): VaultError { return new VaultError('bad_o
 /** A `bad_option` refusal: the key deriver handed back something other than fresh key bytes of the right length. */
 export function notKeyBytes(): VaultError { return new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeySize)) }
 
-/** An `unexpected_error` refusal: a proving was asked for the vaultKey before it made or opened a wayin. */
+/** An `unexpected_error` refusal: a proving was asked for the bankKey before it made or opened a wayin. */
 export function wayinNotMadeYet(): VaultError { return new VaultError('unexpected_error', Phrases.WayinNotMadeYet) }
 
 /** An `unexpected_error` refusal: this proving already has a wayin. */

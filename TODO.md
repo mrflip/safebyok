@@ -221,7 +221,7 @@ is shaped around it.
 From [#105](https://github.com/mrflip/safebyok/pull/105) (the rotation design, section 9). The
 first matter said rotation "re-wraps the remaining wayins", but it can't: each wayin's key
 comes from a passphrase or a passkey touch the vault never keeps, and any shortcut would hand the
-new vaultKey to the wayin being removed. So the design keeps only the wayins the user proves
+new bankKey to the wayin being removed. So the design keeps only the wayins the user proves
 during the rotation and removes the rest -- which is also what locks out a lost phone's passkey,
 and signs every other device out until it is asked again. The alternative, a key pair per wayin
 so rotation can re-wrap every wayin unasked (HPKE), is a new construction (the design's open
@@ -229,14 +229,14 @@ question 1). That design file is gone: the Coach (2026-10-18) removed it, "we wi
 plan", so the question remains open for the plan that replaces it.
 
 The Coach (2026-10-16): wants to understand this better; land the recommendation for now. **Landed
-as recommended**: thread 19 (`rotateVaultKey`, not yet built) keeps only the wayins proven during
+as recommended**: thread 19 (`rotateBankKey`, not yet built) keeps only the wayins proven during
 the rotation.
 Revisit before 1.0 if rotation signing every other device out is too blunt.
 
 `softlock_gone` (2026-10-19) removed the schema that rotation would have written: the vault props'
-`prior_vault_key` (the previous vaultKey, wrapped under the current one) and the check that its
+`prior_bank_key` (the previous bankKey, wrapped under the current one) and the check that its
 epoch was one below the vault props'. `trust_lines` (2026-10-21) removed `vault_key_epoch` from every record, and
-storage's comparison of a box's epoch against the vault props', on the Coach's ruling: the vaultKey
+storage's comparison of a box's epoch against the vault props', on the Coach's ruling: the bankKey
 never changes until rotation is built, and a vault made anew has a new `vault_tok`, which already
 voids every box. Rotation adds an epoch back, with its own format bump, when it is built.
 

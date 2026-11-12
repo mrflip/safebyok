@@ -238,13 +238,13 @@ export const UnknownKeyDeriver = "This vault was made with a key deriver this pa
 /** Why what a keyDeriver hands back is refused when it is not `count` fresh key bytes. */
 export function notKeyBytes(count: number): string { return `The keyDeriver handed back something other than ${String(count)} fresh key bytes.` }
 
-/** Why a proving asked for the vaultKey before it has a wayin refuses: a bug. */
-export const WayinNotMadeYet = "A proving was asked for the vaultKey before it made or opened a wayin: a bug in the caller."
+/** Why a proving asked for the bankKey before it has a wayin refuses: a bug. */
+export const WayinNotMadeYet = "A proving was asked for the bankKey before it made or opened a wayin: a bug in the caller."
 
 /** Why a proving that has a wayin already makes no other. */
 export const WayinMadeAlready = "This proving has a wayin already, and a proving has one: make a new proving for another wayin. A bug in the caller."
 
-/** Why a wayin is not made under the vaultKey of a proving of another gate. */
+/** Why a wayin is not made under the bankKey of a proving of another gate. */
 export const ProvingOfOtherGate = "The source proving is of another bank or gate: a wayin is made only under the key of the bank it lets into, so none was made. This is a bug in safebyok."
 
 /** Why a lease is not granted to a bank or gate other than the one a proving is of. */

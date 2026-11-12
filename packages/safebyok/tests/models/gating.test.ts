@@ -485,7 +485,7 @@ describe("an unlock through a gating", () => {
     const unlocking = vault.ensureUnlocked()
     const gating = await gatingAt<'unlock_bank'>()
     expect(gating.passkeyHeader).to.deep.include({ wayinkind: 'passkey', credential_id: passkey0?.credential_id })
-    expect(gating.passkeyHeader).to.not.have.property('vault_key_wayin_wrapped')
+    expect(gating.passkeyHeader).to.not.have.property('bank_key_wayin_wrapped')
     const passkeyClear = await TH.passkeyOf('laptop', passkey0?.prf_salt_b64)
     await TH.expectGood(gating.attempt({ passkeyClear }))
     await unlocking

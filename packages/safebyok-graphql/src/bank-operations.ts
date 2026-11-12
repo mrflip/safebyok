@@ -10,8 +10,8 @@ const ciphered = 'fragment SafebyokCipheredFields on SafebyokCiphered { cipher_i
 const gate = `fragment SafebyokGateFields on SafebyokGateRecord {
   user_id banklabel gatelabel fmt revision_tok revision_seq registered_at written_at am bank_tok gate_tok auth sigs meta
   wayins {
-    main { wayinlabel wayinkind key_deriver_label salt_b64 device_tok registered_at vault_key_wayin_wrapped { ...SafebyokCipheredFields } }
-    passkey0 { wayinlabel wayinkind credential_id prf_salt_b64 device_tok registered_at vault_key_wayin_wrapped { ...SafebyokCipheredFields } }
+    main { wayinlabel wayinkind key_deriver_label salt_b64 device_tok registered_at bank_key_wayin_wrapped { ...SafebyokCipheredFields } }
+    passkey0 { wayinlabel wayinkind credential_id prf_salt_b64 device_tok registered_at bank_key_wayin_wrapped { ...SafebyokCipheredFields } }
   }
 }`
 

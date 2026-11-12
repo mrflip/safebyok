@@ -77,7 +77,7 @@ export const { passphraseWayin, passkeyWayin, wayins, gateRecord, gateSparse } =
 
 /** A gate row as stored, always live. */
 export type GateRecord = Readonly<Z.infer<typeof gateRecord>>
-/** A gate row with its wayins left out, so that no wrapped vaultKey goes with it. */
+/** A gate row with its wayins left out, so that no wrapped bankKey goes with it. */
 export type GateSparse = Readonly<Z.infer<typeof gateSparse>>
 /** A gate's wayins: `main`, its passphrase wayin, and `passkey0`, its passkey wayin, if it has one. */
 export type Wayins     = Readonly<Z.infer<typeof wayins>>

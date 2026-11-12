@@ -29,10 +29,10 @@ export function isPrfSalt(prf_salt_b64: string): boolean { return fromB64OrNull(
 
 // == [The wayin's forms]: passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinRecord, PassphraseWayinHeader, PasskeyWayinHeader, WayinHeader, PassphraseWayinRecord, PasskeyWayinRecord, WayinRecord
 
-/** The checks of a wayin's forms, as a gate row keeps them: a header, which omits the wrapped vaultKey, and the full record. */
+/** The checks of a wayin's forms, as a gate row keeps them: a header, which omits the wrapped bankKey, and the full record. */
 export const { passphraseWayinHeader, passkeyWayinHeader, wayinHeader, wayinRecord } = Checkers('bad_record', ({ discrim }) => {
-  const passphraseWayinHeader = BX.passphraseWayin.omit({ vault_key_wayin_wrapped: true }).strip()
-  const passkeyWayinHeader    = BX.passkeyWayin.omit({ vault_key_wayin_wrapped: true }).strip()
+  const passphraseWayinHeader = BX.passphraseWayin.omit({ bank_key_wayin_wrapped: true }).strip()
+  const passkeyWayinHeader    = BX.passkeyWayin.omit({ bank_key_wayin_wrapped: true }).strip()
   return {
     passphraseWayinHeader,
     passkeyWayinHeader,
@@ -183,7 +183,7 @@ export const { stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseSto
 
 export type StampedGate = Z.infer<typeof stampedGate>
 
-/** What `Proving.buildWayin` is passed for a wayin over a vaultKey made new: the type of `NOVEL`. */
+/** What `Proving.buildWayin` is passed for a wayin over a bankKey made new: the type of `NOVEL`. */
 export type Novel = typeof NOVEL
 // --
 
@@ -196,7 +196,7 @@ export const LeaseFormat = 7003
  * A device database hands back what it kept by structured clone, so a key that is extractable, of
  * another algorithm, or for another use was not written by this package: its record reads as none.
  *
- * @example isLeaseKey(await makeVaultKey())  // false: extractable
+ * @example isLeaseKey(await makeBankKey())  // false: extractable
  */
 export const isLeaseKey = (val: unknown): val is CryptoKey => (
   val instanceof CryptoKey
@@ -206,8 +206,8 @@ export const isLeaseKey = (val: unknown): val is CryptoKey => (
     && val.usages.every((usage) => usage === 'wrapKey' || usage === 'unwrapKey')
 )
 
-/** `leaseStamp` is what the wrap of a lease's vaultKey is bound to, citing the gate it was granted under; `leaseRecord` adds its keys. */
-export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, custom, epochMillis, gate_tok, revision_tok, vault_key_lease_wrapped }) => {
+/** `leaseStamp` is what the wrap of a lease's bankKey is bound to, citing the gate it was granted under; `leaseRecord` adds its keys. */
+export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, custom, epochMillis, gate_tok, revision_tok, bank_key_lease_wrapped }) => {
   const leaseStamp  = obj({
     fmt: lit(LeaseFormat), ...bankStamp.shape,
     gatelabel: CX.gateScope.unwrap().shape.gatelabel, gate_tok, gate_revision_tok: revision_tok,
@@ -215,7 +215,7 @@ export const { leaseStamp, leaseRecord } = Checkers('bad_record', ({ obj, lit, c
   })
   const leaseRecord = leaseStamp.extend({
     lease_key:               custom<CryptoKey>(isLeaseKey, Phrases.LeaseKeyExpected),
-    vault_key_lease_wrapped: vault_key_lease_wrapped.readonly(),
+    bank_key_lease_wrapped: bank_key_lease_wrapped.readonly(),
   }).strict().readonly()
   return { leaseStamp, leaseRecord }
 }, [CX])
@@ -245,7 +245,7 @@ export const leaseFriend = objCheck(({ fn }) => ({
   logger:          guardedLogger,
   /** The autolock duration: a cached row proved longer ago than this is due for locking. */
   leaseMillis,
-  /** Lock the bank: a lease that will not unwrap the vaultKey calls it, as what the bank has is no use. */
+  /** Lock the bank: a lease that will not unwrap the bankKey calls it, as what the bank has is no use. */
   lock:            fn<() => unknown>(),
   /** The record this device has cached, or null for none. */
   peekLease:       fn<() => Promise<unknown>>(),
@@ -283,7 +283,7 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
   return {
     ctxStamp,
     leaseFromCacheArgs: obj({ friend: leaseFriend, gate: citedGate }),
-    leaseGrantedArgs:   obj({ friend: leaseFriend, vaultKey: cryptoKey.refine((val) => val.extractable, 'Expected an extractable CryptoKey'), opts: leaseGrantOpts }),
+    leaseGrantedArgs:   obj({ friend: leaseFriend, bankKey: cryptoKey.refine((val) => val.extractable, 'Expected an extractable CryptoKey'), opts: leaseGrantOpts }),
     provingLeaseArgs:   obj({ friend: leaseFriend, gate: citedGate }),
     leaseSealArgs:      obj({ whisperText: str, stamps: ctxStamp.array().min(1) }),
     leaseUnsealArgs:    obj({ sealed: sealedWhisper, stamps: ctxStamp.array().min(1) }),

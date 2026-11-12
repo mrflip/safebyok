@@ -10,7 +10,7 @@ import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } fr
 import { VaultError } from '../../src/refusals/errors'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
-import { _cheat_vaultKeyBytesOf, builtGateOf, listedGateOf, DeviceTok, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WorldBankStamp, WorldGate, WorldGateStamp } from '../test-helpers/proving-world'
+import { _cheat_bankKeyBytesOf, builtGateOf, listedGateOf, DeviceTok, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WorldBankStamp, WorldGate, WorldGateStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -31,7 +31,7 @@ function novelPassphrase(world: ProvingWorld = provingWorldOf()): Promise<Passph
 
 function novelOverHanded(handBack: () => unknown): Promise<PassphraseProving> { return novelPassphrase(provingWorldOf({ keyDeriver: deriverHanding(handBack) })) }
 
-/** A passphrase proving that has a wayin under a new vaultKey, beside that wayin. */
+/** A passphrase proving that has a wayin under a new bankKey, beside that wayin. */
 async function novelWithWayin(): Promise<{ proving: PassphraseProving, wayin: Wayin }> {
   const proving = await novelPassphrase()
   return { proving, wayin: await proving.buildWayin(NOVEL) }
@@ -56,15 +56,15 @@ function movedGate(gate: Gate, moves: { bank?: object, gate?: object }): Stamped
   return { bankStamp: { ...WorldBankStamp, ...moves.bank }, stamp: { ...WorldGateStamp, ...moves.gate }, wayins: gate.wayins }
 }
 
-/** What a vaultKey is unwrapped as only to see that a wrap opens. */
+/** What a bankKey is unwrapped as only to see that a wrap opens. */
 const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
 
 const findsWeak = () => ({ strong: false as const, reason: 'too short' })
 
 const findsStrongAsync = () => Promise.resolve({ strong: true as const })
 
-/** Whether `one`'s lease opens what `other`'s seals: whether both have one vaultKey. */
-async function expectOneVaultKey(one: Proving, other: Proving): Promise<void> {
+/** Whether `one`'s lease opens what `other`'s seals: whether both have one bankKey. */
+async function expectOneBankKey(one: Proving, other: Proving): Promise<void> {
   const friend = fakeLeaseFriendOf()
   const stamps = sealStampsOf('b1')
   const sealer = await one.buildLease(friend, WorldGate)
@@ -243,13 +243,13 @@ describe("PasskeyProving.buildNovel(bank, gate, passkeyClear, world)", () => {
 })
 
 describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
-  it("proves the gate's passphrase wayin, with the gate's stamps and vaultKey", async () => {
+  it("proves the gate's passphrase wayin, with the gate's stamps and bankKey", async () => {
     const { gate, answerOf } = await gateWithBoth()
     const proving = await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf())
     expect(proving.bankStamp).to.deep.equal(WorldBankStamp)
     expect(proving.gateStamp).to.deep.equal(WorldGateStamp)
     expect(proving.header).to.deep.equal(gate.main.toJSON())
-    await expectOneVaultKey(proving, await PasskeyProving.buildStored(gate, answerOf()))
+    await expectOneBankKey(proving, await PasskeyProving.buildStored(gate, answerOf()))
   })
 
   it("accepts a gate record as well as a Gate", async () => {
@@ -434,52 +434,52 @@ describe("a proving's header", () => {
 })
 
 describe("proving.buildWayin(source)", () => {
-  it("from NOVEL wraps a new vaultKey that the passphrase opens", async () => {
+  it("from NOVEL wraps a new bankKey that the passphrase opens", async () => {
     const { proving, wayin } = await novelWithWayin()
     expect(wayin).to.be.instanceOf(Wayin)
     expect(wayin.toJSON()).to.deep.equal(proving.header)
-    const vaultKeyBytes = await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, wayin, { passphrase: TestPassphrase })
-    expect(vaultKeyBytes.length).to.eq(32)
+    const bankKeyBytes = await _cheat_bankKeyBytesOf(WorldBankStamp, WorldGateStamp, wayin, { passphrase: TestPassphrase })
+    expect(bankKeyBytes.length).to.eq(32)
   })
 
   it("from NOVEL makes a wayin that another passphrase does not open", async () => {
     const { wayin } = await novelWithWayin()
-    await expect(_cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, wayin, { passphrase: `${TestPassphrase}, misremembered` })).rejects.toThrow()
+    await expect(_cheat_bankKeyBytesOf(WorldBankStamp, WorldGateStamp, wayin, { passphrase: `${TestPassphrase}, misremembered` })).rejects.toThrow()
   })
 
-  it("from another proving wraps that proving's vaultKey", async () => {
+  it("from another proving wraps that proving's bankKey", async () => {
     const answer = passkeyAnswerOf()
     const passphraseProving = await novelPassphrase()
     const passkeyProving = await novelPasskey(answer)
     const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
     const passkeyWayin = await passkeyProving.buildWayin(passphraseProving)
     expect(passkeyWayin.toJSON()).to.deep.equal(passkeyProving.header)
-    const viaPassphrase = await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, passphraseWayin, { passphrase: TestPassphrase })
-    const viaPasskey = await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, passkeyWayin, { prfBytes: answer.prfBytes })
+    const viaPassphrase = await _cheat_bankKeyBytesOf(WorldBankStamp, WorldGateStamp, passphraseWayin, { passphrase: TestPassphrase })
+    const viaPasskey = await _cheat_bankKeyBytesOf(WorldBankStamp, WorldGateStamp, passkeyWayin, { prfBytes: answer.prfBytes })
     expect(viaPasskey).to.deep.equal(viaPassphrase)
   })
 
-  it("from a stored proving wraps the vaultKey of the gate proved", async () => {
+  it("from a stored proving wraps the bankKey of the gate proved", async () => {
     const { gate } = await gateWithBoth()
     const answer = passkeyAnswerOf()
     const novel = await novelPasskey(answer)
     const wayin = await novel.buildWayin(await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf()))
-    const viaStored = await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, gate.main, { passphrase: TestPassphrase })
-    expect(await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, wayin, { prfBytes: answer.prfBytes })).to.deep.equal(viaStored)
+    const viaStored = await _cheat_bankKeyBytesOf(WorldBankStamp, WorldGateStamp, gate.main, { passphrase: TestPassphrase })
+    expect(await _cheat_bankKeyBytesOf(WorldBankStamp, WorldGateStamp, wayin, { prfBytes: answer.prfBytes })).to.deep.equal(viaStored)
   })
 
-  it("mints a different vaultKey for each NOVEL wayin of different provings", async () => {
+  it("mints a different bankKey for each NOVEL wayin of different provings", async () => {
     const { wayin: one } = await novelWithWayin()
     const { wayin: two } = await novelWithWayin()
-    const vaultKeyBytesOne = await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, one, { passphrase: TestPassphrase })
-    const vaultKeyBytesTwo = await _cheat_vaultKeyBytesOf(WorldBankStamp, WorldGateStamp, two, { passphrase: TestPassphrase })
-    expect(vaultKeyBytesOne).to.not.deep.equal(vaultKeyBytesTwo)
+    const bankKeyBytesOne = await _cheat_bankKeyBytesOf(WorldBankStamp, WorldGateStamp, one, { passphrase: TestPassphrase })
+    const bankKeyBytesTwo = await _cheat_bankKeyBytesOf(WorldBankStamp, WorldGateStamp, two, { passphrase: TestPassphrase })
+    expect(bankKeyBytesOne).to.not.deep.equal(bankKeyBytesTwo)
   })
 
   it("binds the wayin to its bank and its gate: under another's stamp it will not open", async () => {
     const { wayin } = await novelWithWayin()
-    await expect(_cheat_vaultKeyBytesOf({ ...WorldBankStamp, bank_tok: 'bank-tok-other' }, WorldGateStamp, wayin, { passphrase: TestPassphrase })).rejects.toThrow()
-    await expect(_cheat_vaultKeyBytesOf(WorldBankStamp, { ...WorldGateStamp, gate_tok: 'gate-tok-other' }, wayin, { passphrase: TestPassphrase })).rejects.toThrow()
+    await expect(_cheat_bankKeyBytesOf({ ...WorldBankStamp, bank_tok: 'bank-tok-other' }, WorldGateStamp, wayin, { passphrase: TestPassphrase })).rejects.toThrow()
+    await expect(_cheat_bankKeyBytesOf(WorldBankStamp, { ...WorldGateStamp, gate_tok: 'gate-tok-other' }, wayin, { passphrase: TestPassphrase })).rejects.toThrow()
   })
 
   const SourceCases = [
@@ -521,7 +521,7 @@ describe("proving.buildWayin(source)", () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
     await TH.expectRefusal(proving.buildWayin(NOVEL))
-    await expectOneVaultKey(proving, proving)
+    await expectOneBankKey(proving, proving)
   })
 
   it("refuses buildWayin on a stored proving", async () => {
@@ -580,8 +580,8 @@ describe("a passkey proving's key", () => {
     const answer = passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)
     const proving = await novelPasskey(answer)
-    const { vault_key_wayin_wrapped: wrapped } = await proving.buildWayin(NOVEL)
-    const ctx = cipherCtx([WorldBankStamp, WorldGateStamp], 'vault_key_passkey_wrapped', proving.header)
+    const { bank_key_wayin_wrapped: wrapped } = await proving.buildWayin(NOVEL)
+    const ctx = cipherCtx([WorldBankStamp, WorldGateStamp], 'bank_key_passkey_wrapped', proving.header)
     const passkeyKey = await deriveWrappingKey(prfBytes, ctx)
     expect(await unwrapKeyUnder(passkeyKey, wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
   })
@@ -590,9 +590,9 @@ describe("a passkey proving's key", () => {
     const answer = passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)
     const proving = await novelPasskey(answer)
-    const { vault_key_wayin_wrapped: wrapped } = await proving.buildWayin(NOVEL)
-    const ctx = cipherCtx([WorldBankStamp, WorldGateStamp], 'vault_key_passkey_wrapped', proving.header)
-    const otherGateInfo = cipherCtx([WorldBankStamp, { ...WorldGateStamp, gate_tok: 'gate-tok-other' }], 'vault_key_passkey_wrapped', proving.header)
+    const { bank_key_wayin_wrapped: wrapped } = await proving.buildWayin(NOVEL)
+    const ctx = cipherCtx([WorldBankStamp, WorldGateStamp], 'bank_key_passkey_wrapped', proving.header)
+    const otherGateInfo = cipherCtx([WorldBankStamp, { ...WorldGateStamp, gate_tok: 'gate-tok-other' }], 'bank_key_passkey_wrapped', proving.header)
     const passkeyKey = await deriveWrappingKey(prfBytes, otherGateInfo)
     await expect(unwrapKeyUnder(passkeyKey, wrapped, ctx, CheckUsage)).rejects.toThrow()
   })
@@ -621,12 +621,12 @@ describe("proving.buildLease(friend, gate)", () => {
     expect(lease.gate_revision_tok).to.eq('gate-revision-tok-5')
   })
 
-  it("grants leases over one vaultKey from both provings", async () => {
+  it("grants leases over one bankKey from both provings", async () => {
     const passphraseProving = await novelPassphrase()
     const passkeyProving = await novelPasskey()
     await passphraseProving.buildWayin(NOVEL)
     await passkeyProving.buildWayin(passphraseProving)
-    await expectOneVaultKey(passphraseProving, passkeyProving)
+    await expectOneBankKey(passphraseProving, passkeyProving)
   })
 
   const OtherFriendCases = [

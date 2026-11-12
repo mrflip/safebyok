@@ -60,8 +60,8 @@ export type CipherCtxRecord = Readonly<Record<string, string | number>>
  * a call with no stamp, or with a part or a record's field that is undefined or null: each
  * would bind the same as some other ctx.
  *
- * @example cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { wayinkind: 'passphrase', key_deriver_label, salt_b64, device_tok, registered_at })
- * @example cipherCtx([vaultStampButFormat, leaseStamp], 'vault_key_lease_wrapped')
+ * @example cipherCtx([bankStamp, gateStamp], 'bank_key_passphrase_wrapped', { wayinkind: 'passphrase', wayinlabel: 'main', key_deriver_label, salt_b64, device_tok, registered_at })
+ * @example cipherCtx([bankStamp, leaseStamp], 'bank_key_lease_wrapped')
  */
 export function cipherCtx(stamp: CipherCtxRecord | readonly CipherCtxRecord[], purpose: string, ...header: [] | [CipherCtxRecord]): Uint8Array {
   const stamps: readonly CipherCtxRecord[] = Array.isArray(stamp) ? stamp : [stamp as CipherCtxRecord]
@@ -88,14 +88,14 @@ function isBoundPart(part: CipherCtxRecord | string | null | undefined): boolean
 }
 // --
 
-// == [Making keys]: makeVaultKey, makeBoxKey, makeLeaseKey, importWrappingKeyBytes, deriveWrappingKey
+// == [Making keys]: makeBankKey, makeBoxKey, makeLeaseKey, importWrappingKeyBytes, deriveWrappingKey
 
-/** A fresh random 256-bit AES-GCM key for wrapping other keys: a brand-new vaultKey.
+/** A fresh random 256-bit AES-GCM key for wrapping other keys: a brand-new bankKey.
  * It is extractable, as a key must be to be wrapped, so keep it only inside the operation that
- * wraps it. Between operations nothing keeps a vaultKey unwrapped: each wayin and a lease keep it
+ * wraps it. Between operations nothing keeps a bankKey unwrapped: each wayin and a lease keep it
  * wrapped, and a lease unwraps it non-extractable, for one usage, at each cipher or decipher.
  */
-export function makeVaultKey(): Promise<CryptoKey> {
+export function makeBankKey(): Promise<CryptoKey> {
   return crypto.subtle.generateKey(AesGcm, true, ['wrapKey', 'unwrapKey'])
 }
 
@@ -123,7 +123,7 @@ export function importWrappingKeyBytes(keyBytes: Uint8Array): Promise<CryptoKey>
  * where, so the same bytes put to another use make another key. The bytes stay with the caller:
  * drop them promptly.
  *
- * @example await deriveWrappingKey(prfBytes, cipherCtx(vaultStamp, 'vault_key_passkey_wrapped', header))
+ * @example await deriveWrappingKey(prfBytes, cipherCtx([bankStamp, gateStamp], 'bank_key_passkey_wrapped', header))
  */
 export async function deriveWrappingKey(keyBytes: Uint8Array, info: Uint8Array): Promise<CryptoKey> {
   const inputKey = await crypto.subtle.importKey('raw', keyBytes as BufferSource, 'HKDF', false, ['deriveKey'])

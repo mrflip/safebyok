@@ -9,8 +9,8 @@ import { type BankStamp, type GateStamp, type WayinHeader, type WayinRecord, ban
 
 /** The purpose each kind of wayin binds into the ctx of its wrap. */
 export const PurposeForWayinkind = Object.freeze({
-  passphrase: 'vault_key_passphrase_wrapped',
-  passkey:    'vault_key_passkey_wrapped',
+  passphrase: 'bank_key_passphrase_wrapped',
+  passkey:    'bank_key_passkey_wrapped',
 } as const satisfies Readonly<Record<Wayinkind, string>>)
 
 /** Serialized name/value pairs bound into the wrapped value as cryptographic context: the bank's stamp, the gate's, the purpose and the header.
@@ -25,13 +25,13 @@ export function wayinCtxOf(bank: BankStamp, gate: GateStamp, header: WayinHeader
 
 /** One way into a bank, kept in its gate: its passphrase or its passkey. */
 export class Wayin {
-  // == [Props]: wayinkind, wayinlabel, device_tok, registered_at, vault_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, #pickle
+  // == [Props]: wayinkind, wayinlabel, device_tok, registered_at, bank_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, #pickle
 
   declare readonly wayinkind:               Wayinkind
   declare readonly wayinlabel:              'main' | 'passkey0'
   declare readonly device_tok:              string
   declare readonly registered_at:           number
-  declare readonly vault_key_wayin_wrapped: CX.VaultKeyWayinWrapped
+  declare readonly bank_key_wayin_wrapped: CX.BankKeyWayinWrapped
   declare readonly key_deriver_label?:      string
   declare readonly salt_b64?:               CX.PassphraseSalt
   declare readonly credential_id?:          string
@@ -44,7 +44,7 @@ export class Wayin {
 
   constructor(record: unknown) {
     const parsed = wayinRecord.parse(record)
-    Object.freeze(parsed.vault_key_wayin_wrapped)
+    Object.freeze(parsed.bank_key_wayin_wrapped)
     this.#pickle = Object.freeze(parsed)
     tattoo(this, this.#pickle)
     Object.freeze(this)
@@ -56,9 +56,9 @@ export class Wayin {
   /** This wayin as a plain {@link WayinRecord}. */
   pickle(): WayinRecord { return this.#pickle }
 
-  /** This wayin's {@link WayinHeader}, which leaves out the wrapped vaultKey. */
+  /** This wayin's {@link WayinHeader}, which leaves out the wrapped bankKey. */
   toJSON(): WayinHeader {
-    const { vault_key_wayin_wrapped: _wrapped, ...header } = this.#pickle
+    const { bank_key_wayin_wrapped: _wrapped, ...header } = this.#pickle
     return header
   }
   // --
