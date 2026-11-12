@@ -36,7 +36,9 @@ export interface BrowserOpts {
 /** The bag answered for each dbName so far. */
 const bagsByDbName = new Map<string | undefined, BrowserOpts>()
 
-/** A frozen bag of the browser's `keyDeriver`, `deviceDB` and `strengthChecker`, the same bag for the same `dbName`, to spread into `Device.make`. */
+/** The browser's `keyDeriver`, `deviceDB` and `strengthChecker` in a frozen bag, to spread into `Device.make`.
+ * The same `dbName` gets the same bag, so a React host may call it during render.
+ */
 export function browserOpts(opts: IdbDeviceDBOpts = {}): BrowserOpts {
   const { dbName } = idbDeviceDBOpts.parse(opts, { where: "In browserOpts's options" })
   const kept = bagsByDbName.get(dbName)

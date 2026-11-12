@@ -1,7 +1,8 @@
-/** The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts.
- * A new refusalkind goes in `refusalkindVals` and in `RefusalFamilyForKind`; if the core throws it inside the Convex
- * component, in safebyok-convex's `safebyokErrorKindVals` too. GraphQL's schema takes its enum from `refusalkindVals`.
- */
+/** `VaultError`, its refusalkinds and their families, and the guards that tell a refusal. */
+
+// The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts. A new refusalkind goes in
+// `refusalkindVals` and in `RefusalFamilyForKind`; if the core throws it inside the Convex component, in safebyok-convex's
+// `safebyokErrorKindVals` too. GraphQL's schema takes its enum from `refusalkindVals`.
 
 import { IsVaultError, brandOf } from '../helpers/consts'
 import type { BadAct } from '../shapes/shapes-enums'
@@ -27,16 +28,15 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   the user. `damaged_whisper`, `damaged_lease`, `newer_format`,
  *   `identity_revoked`, `damaged_row`, `damaged_vault`, `storage_issue`.
  *
- * A record that fails its checks is named for its direction. One read from storage that fails them
- * is `damaged_row`, on the way out. A damaged row never indicates format drift: it is thrown by the
- * bankDB tied to the datastore. One handed in is `bad_option`, on the way in; `bad_record` where one
- * check serves both ways. A whisper that will not decipher under the lease in hand, or deciphers to no
- * whisper, is `damaged_whisper`, Zod's own error its `cause` where a check failed. A storage
- * adapter's answer that cannot be, one revision under two toks or a parent row failing its checks
- * say, is `record_conflict`.
+ * A record that fails its checks is named for its direction: `damaged_row` for one read from
+ * storage, `bad_option` for one handed in, and `bad_record` where one check serves both ways. A
+ * damaged row is thrown by the bankDB that reads the datastore, and never stands for a newer format.
+ * A whisper that will not decipher under the lease in hand, or deciphers to no whisper, is
+ * `damaged_whisper`. A storage adapter's answer that cannot be, such as one revision under two toks,
+ * is `record_conflict`.
  *
- * `wrong_passphrase` and `wrong_passkey` are all a vault can tell even when the stored vault was
- * altered, since decryption fails alike; the message says so.
+ * An unlock refuses `wrong_passphrase` or `wrong_passkey` even when the stored wayin was altered:
+ * decryption fails alike either way, and the message says so.
  */
 export const refusalkindVals = [
   'bank_locked',         // a whisper was asked for before the bank was unlocked
@@ -78,10 +78,12 @@ export const refusalkindVals = [
   'gate_issue',          // a bankDB gate verb whose params disagree with the stored row: its registered_at
   'disabled',            // a call on a bank, a listing or a thing of theirs no longer enabled, since a sweep, a vacate or a delete: it answers nothing more
 ] as const
+/** A refusal's kind, one of {@link refusalkindVals}. */
 export type Refusalkind = typeof refusalkindVals[number]
 
 /** The three families a refusalkind belongs to, told apart by who handles it, as {@link refusalkindVals} describes them. */
 export const refusalFamilyVals = ['misuse', 'condition', 'bad_news'] as const
+/** Who handles a refusal, one of {@link refusalFamilyVals}. */
 export type RefusalFamily = typeof refusalFamilyVals[number]
 
 /** The family of each refusalkind in {@link refusalkindVals}, which a VaultError's `family` is read from. */
@@ -129,16 +131,13 @@ export const RefusalFamilyForKind = {
 
 // == [The error]: RefusalMeta, VaultErrorOpts, VaultError
 
-/** The facts a refusal learned, each under its own name, filled only by the refusals that name it.
- * Records are as stored, ciphertext and visible fields, never secret material.
+/** The facts a refusal learned, each field filled only by the refusals that learn it.
+ * It never holds secret material.
  */
 export type RefusalMeta = {
-  /** `vault_full` from storage: how full the vault is, read in the step that refused the write.
-   * Always there on storage's own `vault_full`. Never on the vault's, which refuses from
-   * `vault.snapshot.capacity` before storage is asked.
-   */
+  /** On a `vault_full` from a bankDB that counted the vault's boxes: how full the vault was, read in the step that refused the write. */
   capacity?:     Capacity
-  /** A refusal by a validator: the path of each failing field it names, so a form can mark each one. A step that may be the caller's data is not repeated. */
+  /** A refusal by a validator: the path of each failing field it names, so a form can mark each one. */
   fieldnames?:   readonly string[]
   /** A bankDB's refusal: the verb that refused. */
   oplabel?:      string
@@ -151,11 +150,16 @@ export type RefusalMeta = {
 /** The rows `err` hands a bankDB's answer, empty where it has none. */
 export function rowsOfRefusal(err: VaultError): RefusalRows { return (err as unknown as Record<symbol, RefusalRows | undefined>)[RowsOfRefusal] ?? {} }
 
-/** The options of a VaultError beside its refusalkind and message: the `cause` behind it, and its `meta`. */
+/** The options of a VaultError beside its refusalkind and message: the `cause` behind it, its `meta`, and the `rows` it hands a bankDB's answer. */
 export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta, rows?: RefusalRows }
 
-/** The rows a bankDB's refusal hands its answer, as read in the step that refused: the row above the one asked for, as `parent`, and the row stored where the write was aimed, as `dbhas`, or null for none. */
-export type RefusalRows = { parent?: unknown, dbhas?: unknown }
+/** The rows a bankDB's refusal hands its answer, as read in the step that refused. */
+export type RefusalRows = {
+  /** The row above the one asked for. */
+  parent?: unknown
+  /** The row stored where the call was aimed, or null for none. */
+  dbhas?:  unknown
+}
 
 // A Symbol.for and not enumerable, so the rows reach the answer from whichever copy of safebyok, and never a log: they hold wrapped keys.
 const RowsOfRefusal = Symbol.for('safebyok.refusal.rows')
@@ -178,7 +182,8 @@ export class VaultError extends Error {
 
   /** A refusal of `refusalkind`, its family read from {@link RefusalFamilyForKind}.
    * @param message - What went wrong and what to do, calmly, for a non-expert. Never quotes secret material.
-   * @param opts - `cause`, the lower-level failure kept for debugging, and `meta`. Neither may contain secret material.
+   * @param opts - `cause`, the lower-level failure kept for debugging; `meta`; and `rows`, which reach a bankDB's answer and never a log.
+   *   None may contain secret material.
    */
   constructor(refusalkind: Refusalkind, message: string, opts?: VaultErrorOpts) {
     const { meta, rows, ...errorOpts } = opts ?? {}
@@ -190,7 +195,7 @@ export class VaultError extends Error {
     if (rows !== undefined) { Object.defineProperty(this, RowsOfRefusal, { value: rows }) }
   }
 
-  /** Answers true, which marks a VaultError to {@link isVaultError}, from whichever copy of safebyok made it. */
+  /** Always true: marks a VaultError for {@link isVaultError}, from whichever copy of safebyok made it. */
   get [IsVaultError](): true { return true }
 }
 // --
@@ -200,8 +205,8 @@ export class VaultError extends Error {
 /** What a `catch` binds: anything at all, since JavaScript lets any value be thrown. */
 export type Thrown = unknown
 
-/** The refusalkind of `thrown` when it is a VaultError whose kind is one of {@link refusalkindVals}, or null: all a log may say of what a host function that heard the passphrase threw.
- * A kind off the list is the thrower's own text, and may quote what it heard.
+/** The refusalkind of `thrown`, or null unless it is a VaultError of a kind in {@link refusalkindVals}.
+ * It is all a log may say of what a host function that heard the passphrase threw: a kind off the list is the thrower's own text, and may quote the passphrase.
  *
  * @example listedKindOf(new Error('no luck with hunter2'))  // null
  */
@@ -209,8 +214,8 @@ export function listedKindOf(thrown: unknown): Refusalkind | null {
   return isVaultError(thrown) && (refusalkindVals as readonly string[]).includes(thrown.refusalkind) ? thrown.refusalkind : null
 }
 
-/** The string `name` of `thrown` when it is an object carrying one, else null: all a refusal keeps of an error it replaces.
- * An Error's or a DOMException's is its class name; a host's own error carries whatever name the
+/** The string `name` of `thrown`, or null: all a refusal keeps of an error it replaces.
+ * An Error's or a DOMException's is its class name. A host's own error carries whatever name the
  * host gave it, kept as it is.
  *
  * @example thrownNameOf(new DOMException('No room.', 'QuotaExceededError'))  // 'QuotaExceededError'
