@@ -69,7 +69,8 @@ item 9: `guarantees-bank.md` promoted into `notes/guarantees.md` against the cod
 * `Storable` wants a `world` until thread 10; the Bank's would have to be the Device ducking as a
   `ListingWorld`, which the design says it does not do. (Open Matters.)
 * Device-side "policy checked before each call": the record is built from the ante, so the policy
-  holds by construction; a separate runtime check would check our own output. (Open Matters: R3.)
+  holds by construction. *Coach, ruled:* make the new code look like the current code; no added
+  check on the device; the bastion adapters re-run the policy inside their databases.
 * `Bank` has two enabled flags in 8b (Storable's and the device's) until thread 10.
 * `ensureVault` refusing `bank_locked` "where it would have to put" judges by the listing: a vault
   stored but not yet listed is refused where a get would have found it. (Open matters, rule 2.)
