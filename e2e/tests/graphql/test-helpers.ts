@@ -30,7 +30,7 @@ export const useServers = (): void => {
 const closeServers = async (): Promise<void> => { await Promise.all(closers.splice(0).map((close) => close())) }
 
 /** A server hosting `bankDB` on a free port of this machine, its signed-in user the request's `x-test-user` header in place of a session. */
-export const serve = async (bankDB: PostgresBankDB): Promise<Server> => {
+export async function serve(bankDB: PostgresBankDB): Promise<Server> {
   /** What each request's resolvers know of it: the user its auth signed in, or null. */
   type BankContext = { user_id: string | null }
   const yoga = createYoga<object, BankContext>({
@@ -53,7 +53,7 @@ export const serve = async (bankDB: PostgresBankDB): Promise<Server> => {
 }
 
 /** A PostgresBankDB over `db` as one server has it, its listen counted in `listening` as each watch starts and stops. */
-export const bankDBListening = async (db: TH.FileDatabase, listening: { count: number }): Promise<PostgresBankDB> => {
+export async function bankDBListening(db: TH.FileDatabase, listening: { count: number }): Promise<PostgresBankDB> {
   const listen = await TH.listenOver(db)
   const counted: PostgresListen = async (channel, onNotify) => {
     const unlisten = await listen(channel, onNotify)
@@ -67,7 +67,7 @@ export const bankDBListening = async (db: TH.FileDatabase, listening: { count: n
 }
 
 /** A server over emptied tables, the last test's servers closed and their bankDBs ended first. */
-export const freshServer = async (db: TH.FileDatabase, opts: TH.BankDBOverOpts = {}): Promise<Server> => {
+export async function freshServer(db: TH.FileDatabase, opts: TH.BankDBOverOpts = {}): Promise<Server> {
   await closeServers()
   return await serve(await TH.freshBankDB(db, opts))
 }
@@ -85,17 +85,19 @@ export const signedInAsAsked: Signing = (variables) => {
 }
 
 /** The README's browser half: a GraphQLBankDB over an urql Client posting to `server` over the network, and subscribing there too. */
-export const browserAt = (server: Server, signing: Signing = signedInAsAsked): GraphQLBankDB => new GraphQLBankDB({ client: new Client({
-  url:                server.url,
-  exchanges:          [fetchExchange],
-  fetchSubscriptions: true,
-  fetch:              async (url, init) => {
-    const request = new Request(url, init)
-    const user_id = signing(await variablesOf(request.clone()))
-    if (user_id !== null) { request.headers.set('x-test-user', user_id) }
-    return await fetch(request)
-  },
-}) })
+export function browserAt(server: Server, signing: Signing = signedInAsAsked): GraphQLBankDB {
+  return new GraphQLBankDB({ client: new Client({
+    url:                server.url,
+    exchanges:          [fetchExchange],
+    fetchSubscriptions: true,
+    fetch:              async (url, init) => {
+      const request = new Request(url, init)
+      const user_id = signing(await variablesOf(request.clone()))
+      if (user_id !== null) { request.headers.set('x-test-user', user_id) }
+      return await fetch(request)
+    },
+  }) })
+}
 
 /** The variables an operation was sent with: in the URL, as urql sends a query by GET, or in the body. */
 const variablesOf = async (request: Request): Promise<Record<string, unknown>> => {

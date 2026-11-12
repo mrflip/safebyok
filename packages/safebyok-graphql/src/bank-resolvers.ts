@@ -284,7 +284,7 @@ function openWatch(bankDB: DB.AdapterBankDB, scope: DB.WatchScope): ReadableStre
 const noUnwatching = (): void => undefined
 
 /** The schema typename for a row: `SafebyokBankRow`, `SafebyokGateRecord`, `SafebyokVaultRow`, `SafebyokBoxRecord` or `SafebyokBoxTombstone`. */
-function typenameOf(row: NoticedRow): string {
+const typenameOf = (row: NoticedRow): string => {
   if ('gatelabel' in row) { return 'SafebyokGateRecord' }
   if ('boxlabel' in row) { return (row.am === 'x') ? 'SafebyokBoxTombstone' : 'SafebyokBoxRecord' }
   return ('vaultlabel' in row) ? 'SafebyokVaultRow' : 'SafebyokBankRow'
