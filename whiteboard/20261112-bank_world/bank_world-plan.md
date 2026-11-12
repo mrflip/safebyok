@@ -8,10 +8,10 @@
   the rest); worker `opus` (agent default effort); reviewer `sonnet`
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
-* **Status** (2026-11-12, 18:50Z): 1 to 7, 4b, 5, 13 to 15, BP merged. Filed, open: 8a #665, 8b #667,
-  8c #673, 5b #675, 9 #674 (green, #674 the top of that line), 10 #677 (b139df407). G #678 filing (a
-  one-line conflict with 5b being resolved). Building: 8d (tests, with 11) and 12 (React, 400k), both
-  from 10. Then 16 and 17. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
+* **Status** (2026-11-12, 19:40Z): the Coach merged 8a to 10 (#665 to #677). Open: 8d #679 (reviewed,
+  filing), 12 (building, 400k), G #678 (draft, the living guarantees note, to the top at wrapup), T
+  (tooling, on #676, building), #676 (the Coach's `.claude` sweep, squashed). Then 16 and 17. PRs stay
+  draft until the orchestrator judges them ready to merge (the Coach). Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
 not copied again here. What follows is the gloss.
@@ -283,7 +283,7 @@ battery. A refusal's null parent (no row fetched) stays. **Levels**: worker `son
 
 ### G `guarantees_bank` (added 2026-11-12)
 
-The Coach (Coach notes): the bank-* drafts are "for swapping in atop the notes/ versions when you wish. They were written prospectively, though, so I might have a sonnet merge them as you go, with the code overriding both." *Orchestrator:* `guarantees-bank.md` merged into `notes/guarantees.md` now, the code at 9's tip overriding both; what the draft anticipated of thread 10 is not claimed, and listed for 8d. Thread 10 leaves `notes/guarantees.md` alone and reports the lines it falsifies. `deliver-contract-bank.md` stays with 10. **Levels**: worker `sonnet`; review `medium` (sonnet), checking each claim against the code. **After**: 9 (stacked on #674), beside 10. **Size**: S-M, docs. *Orchestrator:* ready as #678 (docs only, so no review, per the skill); then rebased onto 10's ready tip (#677) and a second leg brings the note up to 10's lifecycle, so 8d edits no guarantees. Found: `Bank.autolock` holds the lease row (with its key handle) from `DeviceDB.tryPeek` (TOP row, Open Matters). The draft is promoted and removed from this directory, as is `deliver-contract-bank.md` (10 promoted it).
+The Coach (Coach notes): the bank-* drafts are "for swapping in atop the notes/ versions when you wish. They were written prospectively, though, so I might have a sonnet merge them as you go, with the code overriding both." *Orchestrator:* `guarantees-bank.md` merged into `notes/guarantees.md` now, the code at 9's tip overriding both; what the draft anticipated of thread 10 is not claimed, and listed for 8d. Thread 10 leaves `notes/guarantees.md` alone and reports the lines it falsifies. `deliver-contract-bank.md` stays with 10. **Levels**: worker `sonnet`; review `medium` (sonnet), checking each claim against the code. **After**: 9 (stacked on #674), beside 10. **Size**: S-M, docs. *Orchestrator, on the Coach's word (2026-11-12):* G is the line's living guarantees note: it stays a draft, nothing stacks on it (the Coach: "if it is going to be at the end, other branches should not stack on it"), later threads report the lines they falsify instead of editing it, and at the wrapup it is updated once, squashed, and placed at the top of the line just below the squashed plan. *Orchestrator:* ready as #678 (docs only, so no review, per the skill); then rebased onto 10's ready tip (#677) and a second leg brings the note up to 10's lifecycle, so 8d edits no guarantees. Found: `Bank.autolock` holds the lease row (with its key handle) from `DeviceDB.tryPeek` (TOP row, Open Matters). The draft is promoted and removed from this directory, as is `deliver-contract-bank.md` (10 promoted it).
 
 ### T `sprint_tools` (added 2026-11-12)
 
