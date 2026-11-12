@@ -20,9 +20,9 @@ import { anyStrengthChecker, testDeriver } from '../test-helpers/builders'
 useBankWorlds()
 const nothing = (): void => undefined
 
-/** `news`, told as bad news by `bank`: its autolock, whose listing of the cached leases `world`'s deviceDB refuses with it. */
+/** `news`, told as bad news by `bank`: its autolock, whose peek at the cached lease `world`'s deviceDB refuses with it. */
 async function tellByAutolock(world: ReturnType<typeof makeBankWorld>, bank: Bank, news: VaultError): Promise<void> {
-  vi.spyOn(world.deviceDB, 'tryListLeases').mockResolvedValueOnce({ ok: false, err: news })
+  vi.spyOn(world.deviceDB, 'tryPeek').mockResolvedValueOnce({ ok: false, err: news })
   await bank.autolock()
 }
 
@@ -87,17 +87,18 @@ describe("Device.make", () => {
 })
 
 describe("device.ensureBank", () => {
-  it("readies a bank over empty storage", async () => {
+  it("builds a bank over empty storage through a build_bank gating, and readies it", async () => {
     const world = makeBankWorld()
     const load = vi.fn()
     const device = world.deviceOn({ keyDeriver: Object.assign(Object.create(testDeriver) as typeof testDeriver, { load }) })
-    const listener = vi.fn()
-    device.subscribe(listener)
+    const seen: unknown[] = []
+    device.subscribe(() => { seen.push(device.snapshot.openGating?.gatingkind ?? device.snapshot.stage) })
     expect(device.getSnapshot().stage).to.eq('made')
     expect(device.bank).to.be.null
     const bank = await device.ensureBank()
     expect(load).toHaveBeenCalledOnce()
-    expect(listener).toHaveBeenCalledOnce()
+    expect(seen).to.include('build_bank')
+    expect(seen.at(-1)).to.eq('ready')
     expect(device.bank).to.equal(bank)
     const snapshot = device.getSnapshot()
     expect(snapshot).to.include({ ...BankScopeGiven, stage: 'ready', err: null, bank: bank.snapshot })
@@ -229,6 +230,7 @@ describe("device.ensureBank", () => {
 
   it("reports a damaged vault row as bad news, and readies the bank without it", async () => {
     const world = makeBankWorld()
+    await world.ensureBuilt()
     world.bankDB._cheat_shelfOf(BankScopeGiven).vaultrows.set('broken', { am: 'a', nonsense: true })
     const onBadNews = vi.fn()
     const device = world.deviceOn({ onBadNews })
@@ -236,17 +238,6 @@ describe("device.ensureBank", () => {
     expect(device.snapshot.stage).to.eq('ready')
     expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['damaged_row'])
     expect((onBadNews.mock.calls[0]?.[0] as BadNews).news.message).to.include('broken')
-  })
-
-  it("reports a vault whose stored passphrase salt will not decode as a damaged row", async () => {
-    const { world } = await makeBankWithVault()
-    const rows = world.bankDB._cheat_shelfOf(BankScopeGiven).vaultrows
-    const row = rows.get(Dna.vaultlabel) as { gate: { passphrase_wayin: object } }
-    rows.set(Dna.vaultlabel, { ...row, gate: { ...row.gate, passphrase_wayin: { ...row.gate.passphrase_wayin, salt_b64: `${'A'.repeat(21)}B` } } })
-    const onBadNews = vi.fn()
-    await world.bankOn({ onBadNews })
-    expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['damaged_row'])
-    expect((onBadNews.mock.calls[0]?.[0] as BadNews).news.message).to.include(Dna.vaultlabel)
   })
 
   it("lists a vault built on another device, through the watch it starts", async () => {
@@ -270,6 +261,7 @@ describe("device.ensureBank", () => {
     expect(gone?.isPresent).to.be.false
     expect(listed?.isEnabled).to.be.false
     expect(bank.snapshot.vaults).to.deep.equal([])
+    await bank.ensureUnlocked()
     const reborn = await bank.ensureVault(VaultScopeGiven)
     expect(reborn).not.to.equal(gone)
     expect(reborn.isUnlocked).to.be.true
@@ -335,8 +327,9 @@ describe("DefaultOnLifecycle", () => {
       const spy = TH.spyLogger()
       const [vacate, deviceVacate] = [vi.fn(), vi.fn()]
       const device = { vacate: deviceVacate, logger: spy.logger } as unknown as Device
-      const vault = { vacate } as unknown as Vault
-      DefaultOnLifecycle({ ...told, ...(told.kind !== 'vacated' && { vault }), device } as DeviceEvent)
+      const vacatable = { vacate } as unknown as Vault & Bank
+      const named = { lease_revoke_failed: { bank: vacatable }, helloed: { vault: vacatable }, vacated: {} }[told.kind]
+      DefaultOnLifecycle({ ...told, ...named, device } as DeviceEvent)
       expect(spy.calls.map((call) => call.level)).to.deep.equal(level === null ? [] : [level])
       expect(reported.mock.calls.length).to.eq(level === 'error' ? 1 : 0)
       expect(vacate.mock.calls.length).to.eq(isVacating ? 1 : 0)
@@ -507,8 +500,8 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
 
   it("with no strengthChecker, finds every new passphrase weak", async () => {
     const attempts: Outcome<unknown>[] = []
-    const bank = await makeBankWorld().bankOn({ strengthChecker: undefined, requestCleartext: async (gating) => { attempts.push(await gating.attempt(byPassphrase(Passphrase))) } })
-    await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'dismissed')
+    const device = makeBankWorld().deviceOn({ strengthChecker: undefined, requestCleartext: async (gating) => { attempts.push(await gating.attempt(byPassphrase(Passphrase))) } })
+    await TH.expectRefusal(device.ensureBank(), 'dismissed')
     const [attempted] = attempts
     expect(attempted?.err).to.include({ refusalkind: 'weak_passphrase' })
     expect(attempted?.err?.message).to.include('notes/configuration.md')
@@ -520,8 +513,8 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     const logger = { log: warn, warn, error: warn }
     await makeBankWithVault(world, { logger })
     expect(warn.mock.calls).to.have.length(1)
-    const [cached] = world.leaseRows() as [{ gate_epoch: number }]
-    vi.spyOn(world.deviceDB, 'peek').mockResolvedValueOnce({ ...cached, gate_epoch: cached.gate_epoch + 1 } as never)
+    const [cached] = world.leaseRows() as [object]
+    vi.spyOn(world.deviceDB, 'peek').mockResolvedValueOnce({ ...cached, gate_revision_tok: 'rev-other' } as never)
     vi.spyOn(world.deviceDB, 'forget').mockRejectedValueOnce(new VaultError('storage_unavailable', 'the datastore is down'))
     const page = await world.bankOn({ logger })
     const unlocked = await page.vaultAt(VaultScopeGiven)?.ensureUnlocked()
@@ -606,7 +599,9 @@ describe("tellBadNewsTo", () => {
 
 describe("the snapshot and its subscription", () => {
   it("notifies no unsubscribed listener, and reports a listener's throw to the platform", async () => {
-    const device = makeBankWorld().deviceOn()
+    const world = makeBankWorld()
+    await world.ensureBuilt()
+    const device = world.deviceOn()
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const broken = vi.fn(() => { throw new Error('listener broke') })
@@ -662,7 +657,7 @@ describe("the snapshot's open gating", () => {
     const { device, gating, unlocking } = await deviceWaitingOnUnlock()
     const text = JSON.stringify(device.snapshot)
     const { openGating } = JSON.parse(text) as { openGating: unknown }
-    expect(openGating).to.deep.equal({ ...VaultScopeGiven, ...BankScopeGiven, gatingkind: 'unlock_vault', gatingTok: gating.gatingTok })
+    expect(openGating).to.deep.equal({ ...BankScopeGiven, gatingkind: 'unlock_bank', gatingTok: gating.gatingTok })
     gating.dismiss()
     await TH.expectRefusal(unlocking, 'dismissed')
   })
@@ -701,21 +696,22 @@ describe("the snapshot's open gating", () => {
   })
 
   const Enders: readonly (readonly [string, (made: Made) => void])[] = [
-    ["a sweep of its vault",    ({ vault })  => { vault.sweep() }],
-    ["a vacate of its vault",   ({ vault })  => { vault.vacate() }],
     ["a sweep of the device",   ({ device }) => { device.sweep() }],
     ["a vacate of the device",  ({ device }) => { void device.vacate() }],
   ]
 
+  // The gating asks for the bank, so an end of the vault waiting on it leaves it open.
   it.each([
-    ["a lock of its vault", ({ vault }: Made) => { vault.lock() }],
-    ["a lock of the bank",  ({ bank }: Made)  => { bank.lock() }],
+    ["a lock of its vault",   ({ vault }: Made) => { vault.lock() }],
+    ["a lock of the bank",    ({ bank }: Made)  => { bank.lock() }],
+    ["a sweep of its vault",  ({ vault }: Made) => { vault.sweep() }],
+    ["a vacate of its vault", ({ vault }: Made) => { vault.vacate() }],
   ] as const)("keeps the gating through %s", async (_label, lockIt) => {
     const { device, bank, vault, gating, unlocking } = await deviceWaitingOnUnlock()
     lockIt({ device, bank, vault })
     expect(device.snapshot.openGating).to.equal(gating)
     gating.dismiss()
-    await TH.expectRefusal(unlocking, 'dismissed')
+    await TH.expectRefusal(unlocking)
   })
 
   it.each(Enders)("drops the gating at %s, before the call returns", async (_label, end) => {
@@ -726,18 +722,19 @@ describe("the snapshot's open gating", () => {
     expect(gating.isOpen).to.be.false
   })
 
-  it("drops a birth's gating at a sweep, after disabling the device", async () => {
+  it("drops a build's gating at a sweep, after disabling the device", async () => {
     const world = makeBankWorld()
     const device = world.deviceOn({ requestCleartext: undefined })
-    const bank = await device.ensureBank()
-    const asking = bank.ensureVault(VaultScopeGiven)
-    const heard: { isDeviceEnabled: boolean, isListingRefusing: boolean }[] = []
+    const building = device.ensureBank()
+    await vi.waitFor(() => device.snapshot.openGating ?? fail("no gating yet"), { interval: 1 })
+    const heard: boolean[] = []
     device.subscribe(() => {
-      if (device.snapshot.openGating === null) { heard.push({ isDeviceEnabled: device.isEnabled, isListingRefusing: isRefusing(() => bank.vaultListing.demandEnabled()) }) }
+      if (device.snapshot.openGating === null) { heard.push(device.isEnabled) }
     })
     device.sweep()
-    await TH.expectRefusal(asking)
-    expect(heard[0]).to.deep.equal({ isDeviceEnabled: false, isListingRefusing: true })
+    await TH.expectRefusal(building)
+    expect(heard[0]).to.be.false
+    expect(device.bank).to.be.null
   })
 
   it("keeps a gating whose attempt a sweep interrupts in the snapshot until the attempt concludes", async () => {
@@ -774,15 +771,6 @@ describe("the snapshot's open gating", () => {
     await TH.expectBad(gating.whenConcluded, 'dismissed')
   })
 })
-
-function isRefusing(call: () => unknown): boolean {
-  try {
-    call()
-    return false
-  } catch {
-    return true
-  }
-}
 
 /** A key deriver that has each derivation until the test calls `answer`. */
 function pendingDeriver() {

@@ -89,7 +89,7 @@ export function makeBankWorld() {
     return device.ensureBank()
   }
   return {
-    bankDB, deviceDB, dialog, deviceOn, deviceOnAnotherDevice,
+    bankDB, deviceDB, dialog, deviceOn, deviceOnAnotherDevice, ensureBuilt,
     /** The bank of a new {@link deviceOn}, ensured over the bank this world has stored, built elsewhere where none is. */
     bankOn:    (overrides: Partial<DeviceOpts> = {}): Promise<Bank> => bankOf(deviceOn(overrides)),
     /** The bank of a new {@link deviceOnAnotherDevice}, ensured as `bankOn` ensures it. */
