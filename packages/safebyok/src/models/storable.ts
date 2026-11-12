@@ -141,13 +141,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // == [Storable ops]: fetch, hydrate, del, each with its try form
 
-  /** SLOPDOC: Refreshes this thing from storage through the listing, which joins any fetch of its slot under way. */
+  /** This thing as it is stored now, through the listing, which joins any get of its scope under way. */
   async fetch(opts: FetchOpts = {}): Promise<this> {
     const { ifAbsent, maxWorldMillis } = VX.fetchOpts.parse(opts)
-    await this.listing.ensureTimelyWorld(maxWorldMillis)
-    this.demandEnabled()
-    await this.listing.fetch(this.scope, { ifAbsent: 'nil' })
-    this.demandEnabled()
+    await this.hydrate({ maxMillisSinceRefresh: 0, maxWorldMillis })
     if (ifAbsent === 'fail') { this.demandPresent() }
     return this
   }
@@ -159,8 +156,12 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const { maxMillisSinceRefresh = this.listing.maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)
     await this.listing.ensureTimelyWorld(maxWorldMillis)
+    // A swept thing answers from the record it holds while that is timely: only a fetch needs it enabled.
     if (this.isHydratedWithin(maxMillisSinceRefresh)) { return this }
-    return this.fetch({ ifAbsent: 'nil' })
+    this.demandEnabled()
+    await this.listing.fetch(this.scope, { ifAbsent: 'nil', maxWorldMillis })
+    this.demandEnabled()
+    return this
   }
 
   /** Non-throwing form of {@link hydrate}. */
@@ -184,7 +185,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // --
 
   // == [Receiving]: receiveRecord, markRefreshed, isOfLife, shapeOf
-  // The listing decides what a record received does here (`Listing.#deliveringOfRecord`): an instance judges nothing.
+  // The listing decides what a record received does here (`Listing.#recordDeliveringOf`): an instance judges nothing.
 
   /** Adopt `record`, mark this instance refreshed once whole, and tell the subscribers. A no-op past a discard. */
   receiveRecord(record: Fetched<RecordT, SparseT>): void {

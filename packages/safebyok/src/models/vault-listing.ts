@@ -86,7 +86,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     try {
       const { record, prior } = this.#gateMoveOf(ante, { passphrase_wayin })
       answer = await this.vaultDB.tryReplacePassphrase(record, { prior })
-      this.deliver(answer, record)
+      this.deliverAnswer(answer, record)
       return answerWithVal(answer, valOf(answer))
     } catch (err) { return refusedAnswerOf(err, answer) }
   }
@@ -100,7 +100,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     try {
       const { record, prior } = this.#gateMoveOf(ante, { passkey_wayin })
       answer = await this.vaultDB.tryAddPasskey(record, { prior })
-      this.deliver(answer, record)
+      this.deliverAnswer(answer, record)
       return answerWithVal(answer, valOf(answer))
     } catch (err) { return refusedAnswerOf(err, answer) }
   }
@@ -114,7 +114,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     try {
       const { record, prior } = this.#gateMoveOf(ante, { passkey_wayin: null })
       answer = await this.vaultDB.tryRevokePasskey(record, { prior })
-      this.deliver(answer, record)
+      this.deliverAnswer(answer, record)
       return answerWithVal(answer, valOf(answer))
     } catch (err) { return refusedAnswerOf(err, answer) }
   }

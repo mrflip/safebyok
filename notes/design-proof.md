@@ -13,7 +13,7 @@ bank.hello()                                         a forced reset; a host may 
    ├─ keyDeriver.load, strengthChecker.load
    ├─ vaultListing.fetchBank()                       vaultDB.tryGetBank: full vaults, no boxes, gone_vault tombstones (does not fetch or sync with DeviceDB)
    │  │    refused → tellIfRevoked, then thrown;  damaged_records → bad news
-   │  └─ each vault or gone_vault, by scope: vaultListing.deliverRecord(record) → #deliveringOfRecord → #carryOut
+   │  └─ each vault or gone_vault, by scope: vaultListing.deliverRecord(record) → #recordDeliveringOf → #doDeliverRecord
    │       none listed                               → build, enlisted
    │       older than the one listed                 → ignored
    │       new vault_tok, or alive over a tombstone  → build, enlisted; old_vault.vacate, delist
@@ -112,7 +112,7 @@ box.put(patch, opts)                                 vault.putBox comes here, th
       ├─ doTryPut(record, { prior, ifAbsent, ifPresent })
       │    moved → 'stale_write'; a live row and ifPresent 'fail', or a live row of another box_tok at prior → 'camped':
       │    the stored record delivered, then thrown
-      └─ deliver(answer, record) → receive → adopt, align      checked against what it sent; put resolves at the end of receive
+      └─ deliverAnswer(answer, record) → receiveRecord → adopt, align      checked against what it sent; put resolves at the end of receive
 ```
 
 Nothing is kept between `#edit` and the put: storage refuses a record built on a revision that has since
@@ -292,7 +292,7 @@ gating.attempt({ passphraseClear, passkeyClear? })           a second while one 
    │    ├─ vaultDB.tryPutVault(record, { prior, ifAbsent, ifPresent })    ← the commit
    │    │    a live row → 'passed', the stored record its answer: another won
    │    │    a newer tombstone → 'stale_write', delivered, then thrown
-   │    └─ deliver(answer, record) → new Vault(what is stored), listed, locked    a 'passed' put is matched against its scope only
+   │    └─ deliverAnswer(answer, record) → new Vault(what is stored), listed, locked    a 'passed' put is matched against its scope only
    ├─ vault's vault_tok is not the record's → another won: refused 'gate_made_elsewhere', its Vault listed, locked
    └─ vault.#unlockByProving(passphraseProving)
       ├─ lease = passphraseProving.buildLease(vault.#leaseFriend())    refused → the vault stays stored and listed, locked
@@ -354,7 +354,7 @@ each gate change's act, past its provings
 │  ├─ the vaultDB's verb, called with (record, { prior })    prior is ante's revision; moved → 'stale_write', nothing stored
 │  │    the vaultDB checks registered_at unchanged, gate_epoch one up, only its own wayin moved, then puts the record whole
 │  │    and refuses what its row rules out, such as an addPasskey over a passkey already stored ('camped')
-│  └─ deliver(answer, record)                        checked against what it sent; a revokePasskey with no passkey answers 'passed', matched against its scope only
+│  └─ deliverAnswer(answer, record)                      checked against what it sent; a revokePasskey with no passkey answers 'passed', matched against its scope only
 │     no lock: adopt never locks on a move
 └─ vault.#unlockByProving(proved, stored.gate.gate_epoch)    a fresh lease of full term; a lock() crossing the change does not stay in effect
 ```
@@ -464,7 +464,7 @@ gating.attempt({ passphraseClear })                  no lock check: a lock does 
          └─ Listing.tryDel: the tombstone at nextRevisionOf(the sparse record's revision)
             ├─ vaultDB.tryDelVault(tombstone, { prior })    ← the commit: a tombstone, its boxes cascading
             │    moved → 'stale_write', nothing stored
-            └─ deliver(answer, tombstone) → receive → adopt(tombstone)
+            └─ deliverAnswer(answer, tombstone) → receiveRecord → adopt(tombstone)
                ├─ vault.#revokeLease('tombstone')    refused → announced 'lease_revoke_failed'; the tombstone stays
                └─ boxListing.vacate()                boxes disabled and delisted, nothing deleted; the vault stays in its slot, tombstoned
 ```

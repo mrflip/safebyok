@@ -25,7 +25,7 @@ classifier returned; its `catch` makes the refusal (`answerForRefusal`). An adap
 | A6 | an answer's `ask`, a refusal's `meta.ask` | `LoggableAsk`: every field optional, a record cut to its meta | `loggableAsk` | generous, strips the payload | none: A2 refuses what A6 keeps |
 | A7 | an answer on the GraphQL wire | `CrossedAsk`: A6, null for each absent field | `crossedAsk` | strict, nulls | none |
 | A8 | GraphQL inputs | `SafebyokVaultGetAskInput` etc.; lists and `tidyGone` take separate arguments | the schema, then A2 | schema-strict | A2, behind the schema |
-| A9 | a listing's pins (`Storable.del`, `Listing.#deliveringOf`) | the revision and life tokens of a record | `revisionPins` | stripping | none: not an ask |
+| A9 | a listing's pins (`Storable.del`, `Listing.#answerDeliveringOf`) | the revision and life tokens of a record | `revisionPins` | stripping | none: not an ask |
 
 ### Rulings (the Coach, 2026-11-11)
 
@@ -40,20 +40,22 @@ classifier returned; its `catch` makes the refusal (`answerForRefusal`). An adap
 
 | step | where | decides from |
 |---|---|---|
-| 1. the world | `deliver`: `this.world.receiveWorld(answer.world)` | the answer's `world`; a vault deleted or made anew remakes the Vault, which vacates its boxes |
-| 2. where the record is | `#deliveringOf`, by `deliveryFieldingOf` (`as const satisfies` every act) | the act alone: `as_sent`, `as_got`, `as_db`, `void`, `none`; null for nothing to deliver |
-| 3. the receive table | `#deliveringOfRecord` | the record against the instance listed, read once: `making` (`listed`, `make`, `remake`) and `mod` (`older`, `same`, `adopt`), or a refusal |
-| 4. do it | `#carryOut({ making, mod, listed, record })` | the plan, every form with every field, null where none; the thing adopts (`receiveRecord`) or is marked refreshed (`markRefreshed`), and judges nothing |
+| 1. the world | `deliverAnswer`: `this.world.receiveWorld(answer.world)` | the answer's `world`; a vault deleted or made anew remakes the Vault, which vacates its boxes |
+| 2. where the record is | `#answerDeliveringOf`, by `deliveryFieldingOf` (`as const satisfies` every act) | the act alone: `as_sent`, `as_got`, `as_db`, `void`, `none`; null for nothing to deliver |
+| 3. the receive table | `#recordDeliveringOf` | the record against the instance listed, read once: `making` (`listed`, `make`, `remake`) and `mod` (`older`, `same`, `adopt`), or a refusal |
+| 4. do it | `#doDeliverRecord({ making, mod, listed, record })` | the plan, every form with every field, null where none; the thing adopts (`receiveRecord`) or is marked refreshed (`markRefreshed`), and judges nothing |
 
 The entries into the chute:
 
 | entry | enters at | why there |
 |---|---|---|
-| `deliver(answer, sent)`: get, put, del | step 1 | an answer has a world, an act, a sent, and maybe a refusal to throw |
+| `deliverAnswer(answer, sent)`: get, put, del | step 1 | an answer has a world, an act, a sent, and maybe a refusal to throw |
 | `#deliverListing(answer)`: list | step 1, then `deliverRecord` per row | a listing's world and damaged rows are its own; each row is a record |
 | `#onNotice(notice)`: watch | its world, then `deliverRecord` | a notice has no ask and no sent; its acts `got`/`gone` are not the classifier's |
 | `deliverRecord(record)`: `Vault.receiveWorld`, `BoxListing.#shellFor`, tests | step 3 | a bare record: no act, no sent, nothing to field |
 
+* The Coach's names of 2026-11-12: `deliverAnswer`, `answerDeliveringOf`, `deliverRecord`, `recordDeliveringOf`, `doDeliverRecord`, `deliverListing`, in that order in the file.
+* One get chute: `thing.fetch` → `thing.hydrate` (its own record, if timely, answers: a swept thing too) → `listing.fetch` = `listing.get` with no horizon → `tryGet` (opts, world, timely instance listed, then joined by scope) → `#doGet` (`doTryGet`, `deliverAnswer`).
 * Every refusal met is thrown first-come: a refusal's own err, then what delivering met, told as bad news; a list delivers every row, throws the first refusal and tells the rest.
 * A new instance is made at the void revision and handed its record by `receiveRecord`: a vault made from a tombstone forgets the lease cached on this device (pinned by a test).
 * `slotStepOf`, `SlotStep`, `reconcileCentral`, `receive`, `tombstoneFor`, `CentralPolicy`, `Reconciled`, `shapeUnreconciled`, `otherVaultTok`, `build`, `receiveRow`, `buildOrReceive` are gone.
@@ -63,7 +65,7 @@ The entries into the chute:
 
 ### Open with the Coach
 
-* Notices through `deliver`: not taken (cost above). "Slot" stays the word for the place at a scopepath (`#fetchOfSlot`, `fetchSlot`, phrases): not in VOCABULARY.md.
+* Notices through `deliverAnswer`: not taken (cost above). "Slot" stays the word for the place at a scopepath (doc comments, the phrase `DelOfOtherLife`): not in VOCABULARY.md.
 * The refused `void` act fields `none`; a gotvoid fields `void`.
 
 ## Leftovers
