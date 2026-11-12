@@ -153,7 +153,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...mw.world, extra: 1 },                true,  'passes a world with more than the base reaches into'],
       [null,                                     false, 'refuses null'],
       [{},                                       false, 'refuses an empty object'],
-      [{ ...mw.world, receiveWorld: undefined },    false, 'refuses a world that cannot receiveWorld'],
+      [{ ...mw.world, receiveParent: undefined },    false, 'refuses a world that cannot receiveParent'],
       [{ ...mw.world, ensureTimely: 5 },         false, 'refuses a world whose ensureTimely is no function'],
       [{ ...mw.world, isLocked: undefined },     false, 'refuses a world with no isLocked'],
       [{ ...mw.world, isLocked: 'locked' },      false, 'refuses a world whose isLocked is no boolean'],
@@ -196,7 +196,7 @@ describe("The checks of the world and the listing", () => {
       [{ ...args, listing: {} },                       false, 'refuses a listing with no listing modelkind'],
       [{ ...args, listing: undefined },                false, 'refuses a missing listing'],
       [{ ...args, world: null },                       false, 'refuses a null world'],
-      [{ ...args, world: { ...mw.world, receiveWorld: undefined } }, false, 'refuses a world that cannot receiveWorld'],
+      [{ ...args, world: { ...mw.world, receiveParent: undefined } }, false, 'refuses a world that cannot receiveParent'],
       [{ ...args, opts: { maxMillisSinceRefresh: 1000 } }, false, "refuses options, the horizon being the listing's"],
       [{ ...args, extra: 1 },                          false, 'refuses an argument it does not accept, being strict'],
     ])

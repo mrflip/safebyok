@@ -237,7 +237,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   #stampOfLife(): VaultScope & { vault_tok: string } { return { ...this.scope, vault_tok: this.vault_tok } }
   // --
 
-  // == [The boxes' world]: sealStampedString, unsealStampedString, receiveWorld
+  // == [The boxes' world]: sealStampedString, unsealStampedString, receiveParent
 
   /** `whisperText` sealed under a fresh boxKey under this vault's key, both bound to `stamp`. */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
@@ -255,7 +255,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // a gate changed on another device comes with it, and a newer row from another life
   // replaces this Vault in the listing.
   /** Deliver the vault row a box answer carries. */
-  receiveWorld(world: unknown): void { this.listing.deliverRecord(SX.vaultRow.refusingAs('record_conflict').parse(world)) }
+  receiveParent(parent: unknown): void { this.listing.deliverRecord(SX.vaultRow.refusingAs('record_conflict').parse(parent)) }
   // --
 
   // == [Box verbs]: beginWatch, bringUp, getBox, fetchBox, putBox, delBox, each with its try form

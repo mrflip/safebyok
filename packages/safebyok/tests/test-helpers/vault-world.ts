@@ -148,7 +148,7 @@ export function makeVaultWorld(stored0: VaultRecord | null = null, worldOverride
   const fakeBank: FakeBank = {
     isLocked:     false,
     ensureTimely: () => Promise.resolve(),
-    receiveWorld:    nothing,
+    receiveParent:    nothing,
     scope:        BankScope,
     device,
     logger,
@@ -259,7 +259,7 @@ export function boxWorldOf(vault: Vault): BoxWorld {
     vault_tok:    vault.vault_tok,
     get isLocked() { return vault.isLocked },
     ensureTimely: (opts) => vault.ensureTimely(opts),
-    receiveWorld:    () => undefined,
+    receiveParent:    () => undefined,
     subscribe:        (listener) => vault.subscribe(listener),
     sealStampedString:   (whisperText, stamp) => vault.sealStampedString(whisperText, stamp),
     unsealStampedString: (sealed, stamp) => vault.unsealStampedString(sealed, stamp),

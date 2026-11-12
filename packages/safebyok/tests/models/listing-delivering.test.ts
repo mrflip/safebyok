@@ -28,7 +28,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       world.mw.willGet(world.mw.refusalOf(box.scope, err, 'a world'))
       const outcome = await listing.tryGet(box.scope, { maxMillisSinceRefresh: 0 })
       expect(outcome.err).to.eq(err)
-      expect(world.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'a world' }])
+      expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', world: 'a world' }])
       expect(box.revision_seq).to.eq(1)
     })
 
@@ -44,7 +44,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       world.mw.seedPut(fullBoxRecord())
       world.mw.willGet(world.mw.answerOf(scopeOf(), fullBoxRecord(), 'the world now'))
       await boxListingOf(world.mw).get(scopeOf(), { maxMillisSinceRefresh: 0 })
-      expect(world.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'the world now' }])
+      expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', world: 'the world now' }])
     })
     it("refuses a fetch of a malformed scope, before the world or storage is called", async () => {
       const listing = boxListingOf(world.mw)
@@ -73,7 +73,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
         return world.mw.refusalOf(scopeOf(), new VaultError('storage_unavailable', "Storage is down."), 'a world')
       })
       await TH.expectRefusal(listing.get(scopeOf(), { maxMillisSinceRefresh: 0 }))
-      expect(world.mw.callsOf('receiveWorld')).to.deep.equal([])
+      expect(world.mw.callsOf('receiveParent')).to.deep.equal([])
     })
   })
 
@@ -230,7 +230,7 @@ describe("listing: a notice without its vault row", () => {
     await listing.hello()
     world.mw.clearCalls()
     await world.mw.notify(fullBoxRecord({ boxlabel: 'noticed' }), null)
-    expect(world.mw.callsOf('receiveWorld')).to.deep.equal([])
+    expect(world.mw.callsOf('receiveParent')).to.deep.equal([])
     expect(world.mw.badnews).to.deep.equal([])
     expect(listing.at(scopeOf('noticed'))?.isPresent).to.be.true
   })

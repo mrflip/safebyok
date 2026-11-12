@@ -34,7 +34,7 @@ export const InstantTooLate = "An instant is epoch milliseconds no later than 22
 export const DatabaseInVaultScope = "A vaultDB and a deviceDB go to Device.make, never in the scope naming a vault"
 // --
 
-// == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, VaultDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, DeviceExpected, VaultExpected, VaultErrorExpected
+// == [Values]: FunctionExpected, GuardedExpected, GuardedLoggerExpected, BankDBExpected, DeviceDBExpected, bytesExpected, LeaseKeyExpected, CtxStampExpected, ListingExpected, DeviceExpected, VaultExpected, VaultErrorExpected
 
 /** Anything but a function, where a host's verb or callback is asked. */
 export const FunctionExpected = "Expected a function"
@@ -45,8 +45,8 @@ export const GuardedExpected = "Expected a host's function as Device.make wraps 
 /** A host's bare logger, or anything else, where a bank's world has its logger as the bank guards it. */
 export const GuardedLoggerExpected = "Expected a logger as Device.make guards it"
 
-/** Anything but a vaultDB branded by safebyok and answering each of its verbs, where a vaultDB is asked. */
-export const VaultDBExpected = "Expected a VaultDB: an adapter or client branded by safebyok, answering each of its verbs"
+/** Anything but a bankDB branded by safebyok and answering each of its verbs, where a bankDB is asked. */
+export const BankDBExpected = "Expected a BankDB: an adapter or client branded by safebyok, answering each of its verbs"
 
 /** Anything but an instance of a class extending safebyok's DeviceDB, where a deviceDB is asked. */
 export const DeviceDBExpected = "Expected a DeviceDB: an instance of a class extending safebyok's DeviceDB"

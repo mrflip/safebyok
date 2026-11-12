@@ -122,10 +122,10 @@ describe("the friend a vault hands its leases", () => {
   })
 })
 
-describe("vault.receiveWorld(world)", () => {
+describe("vault.receiveParent(world)", () => {
   it("refuses a world that is no vault row", async () => {
     const { vault } = await makeBornVault()
-    TH.expectSyncRefusal(() => { vault.receiveWorld({ am: 'nope' }) }, 'record_conflict')
+    TH.expectSyncRefusal(() => { vault.receiveParent({ am: 'nope' }) }, 'record_conflict')
   })
 })
 

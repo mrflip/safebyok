@@ -109,7 +109,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       const box = listing.at(scopeOf())
       expect(box?.isFull).to.be.true
       expect(listing.snapshot).to.have.lengthOf(1)
-      expect(world.mw.callsOf('receiveWorld')).to.deep.equal([{ verb: 'receiveWorld', world: 'a world' }])
+      expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', world: 'a world' }])
       expect(world.mw.callsOf('get')).to.deep.equal([])
     })
 

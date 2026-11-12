@@ -102,7 +102,7 @@ export function shellBoxRecord(boxlabel = 'anthropic_api_key'): BoxTombstone { r
 /** One call made to the world or the vaultDB, in {@link ModelsWorld.calls}. `expectedRevisionTok` is that of the row the call expects to find, null for the shell's. */
 export type ModelsCall =
   | { verb: 'ensureTimely', maxMillis: number | undefined }
-  | { verb: 'receiveWorld',    world: unknown }
+  | { verb: 'receiveParent',    world: unknown }
   | { verb: 'get',          scope: Boxscope, expectedRevisionTok: string | null }
   | { verb: 'put',          record: BoxRecord, expectedRevisionTok: string | null, ifAbsent: BoxPutAsk['ifAbsent'], ifPresent: BoxPutAsk['ifPresent'] }
   | { verb: 'del',          scope: Boxscope, expectedRevisionTok: string | null }
@@ -350,7 +350,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
       if (whisperText === undefined) { throw Refuse.undecipheredWhisper() }
       return whisperText
     },
-    receiveWorld:    (taken) => { calls.push({ verb: 'receiveWorld', world: taken }) },
+    receiveParent:    (taken) => { calls.push({ verb: 'receiveParent', world: taken }) },
     ensureTimely: async (maxMillis) => {
       calls.push({ verb: 'ensureTimely', maxMillis })
       const { scripted, answer } = ensureTimelyScript.take(maxMillis)

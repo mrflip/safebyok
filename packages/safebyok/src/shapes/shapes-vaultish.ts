@@ -3,7 +3,7 @@
 import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck } from '../helpers/validator'
-import { ForeverMillis, hasModelkind, isDeviceDB, isGuarded, isVaultDB } from '../helpers/consts'
+import { ForeverMillis, hasModelkind, isBankDB, isDeviceDB, isGuarded } from '../helpers/consts'
 import { type VaultError, isVaultError } from '../refusals/errors'
 import * as Phrases from '../helpers/phrases'
 import type { KeyDeriver } from '../deriver/basederiver'
@@ -15,11 +15,12 @@ import type { Storable } from '../models/storable'
 import type { Vault } from '../models/vault'
 import type { DeviceDB } from '../storage/device-db'
 import type { Outcome } from '../refusals/outcome'
-import { type Answer, type GoodAnswer, type ListAct, type VaultDB, VaultDBVerbnames } from '../storage/vault-db'
+import { type Answer, type BankDB, type GoodAnswer, BankDBVerbnames } from '../storage/bank-db'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
+import type * as BX from './shapes-bankdb'
 import * as GX from './shapes-gateish'
 import type { AnyGating, AskUser, ProvingWorld, RequestCleartext } from './shapes-gateish'
 import type { StrengthChecker } from '../helpers/passphrase-strength'
@@ -33,27 +34,27 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 
 // --
 
-// == [Record forms]: liveness, tombstone, isTombstone, Liveness, Vaulted, SparseBase, Tombstone, Fetched, Dna
+// == [Record forms]: storableBase, liveness, tombstone, isTombstone, Liveness, SparseBase, Tombstone, Fetched, Dna
+
+/** The check of what every stored row has in common, whatever it is: its revision, its times and its `am`. */
+export const storableBase = Checker(({ obj }) => obj({ ...SX.revision.shape, ...SX.times.shape, am: SX.am }), 'bad_option')
 
 /** The checks of a record's `am`, and of a tombstone's fields. */
 export const { liveness, tombstone } = Checkers('bad_record', ({ obj, lit }) => ({
   liveness:  obj({ am: SX.am }),
-  tombstone: SX.sparseBase.extend({ am: lit('x') }),
+  tombstone: storableBase.extend({ am: lit('x') }),
 }))
 
 /** Whether a record is alive, damaged or gone: its `am`. */
 export type Liveness = Readonly<Z.infer<typeof liveness>>
 
-/** The `vault_tok` of the vault a record lies in, which every storable records and seals; a vault's is its own. */
-export type Vaulted = Readonly<Z.infer<typeof SX.vaulted>>
-
-/** The least a sparse form carries: the scope, and what {@link SX.sparseBase} checks, the revision, the times, whether it is alive and the vault it lies in. */
-export type SparseBase<ScopeT> = ScopeT & SX.Revision & SX.Times & Liveness & Vaulted
+/** The least a sparse form carries: the scope, and what {@link storableBase} checks, the revision, the times and whether it is alive. */
+export type SparseBase<ScopeT> = ScopeT & SX.Revision & SX.Times & Liveness
 
 /** The sparse form of a deleted thing: its sparse props stay, and the user's content is gone. */
 export type Tombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
 
-/** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link SX.sparseBase} checks what the base knows of any of the three. */
+/** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link storableBase} checks what the base knows of any of the three. */
 export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 
 /** The DNA of a storable, what a caller hands `listing.create`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
@@ -122,7 +123,7 @@ export type ProbeAsked = Z.input<typeof probeAsked>
 export type ProbeOpts = Z.input<typeof probeOpts>
 
 /** One storage verb's answer as `bank.tryProbe` reports it: sparse rows, no wrapped key or ciphertext, and when it came back. */
-export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: SX.LoggableAsk, val: SX.BoxSparse, world: SX.VaultSparse, timestamp: number }>
+export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: SX.LoggableAsk, val: SX.BoxSparse, parent: BX.VaultRow, timestamp: number }>
 
 /** How `bank.tryProbe` went, step by step: the box and vault as found, the put, the fetch back, and that the box opened. */
 export type ProbeReport = Readonly<{
@@ -146,13 +147,13 @@ export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 
 // --
 
-// == [The listing's world]: listingWorld, ListingWorld, BankFriend, ListingOpts, answersEachVerb, brandedVaultDB, bankPanic, bankFriend, listingOpts
+// == [The listing's world]: listingWorld, ListingWorld, BankFriend, ListingOpts, answersEachVerb, brandedBankDB, bankPanic, bankFriend, listingOpts
 
-/** The check of the world a listing lives in, the bank for vaults and the vault for boxes, as far as the base reaches into it. Checks only. */
-export const listingWorld = objCheck(({ fn, bool }) => ({ isLocked: bool, ensureTimely: fn(), receiveWorld: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
+/** The check of the world a listing lives in, the device for its bank, the bank for its gates and vaults, the vault for its boxes, as far as the base reaches into it. Checks only. */
+export const listingWorld = objCheck(({ fn, bool }) => ({ isLocked: bool, ensureTimely: fn(), receiveParent: fn() }), { refusalkind: 'bad_option', extras: 'strip' })
 
-/** The world a listing lives in, as far as the base reaches into it: the bank for vaults, the vault for boxes. */
-export type ListingWorld = Pick<Bank | Vault, 'isLocked' | 'ensureTimely' | 'receiveWorld'>
+/** The world a listing lives in, as far as the base reaches into it: the device for its bank, the bank for its gates and vaults, the vault for its boxes. */
+export type ListingWorld = Pick<Device | Bank | Vault, 'isLocked' | 'ensureTimely' | 'receiveParent'>
 
 /** The bank's private calls, handed down to each listing and vault as it is made. */
 export interface BankFriend {
@@ -168,20 +169,20 @@ export interface BankFriend {
 
 /** The options a listing is made with, after its world. */
 export type ListingOpts = {
-  vaultDB:               VaultDB
+  bankDB:                BankDB
   /** The refresh horizon of each thing the listing makes: how long after its last refresh the record in hand stays timely. */
   maxMillisSinceRefresh: number
   /** The bank's private calls, handed down to the listing as it is made. */
   bankFriend:            BankFriend
 }
 
-/** True for an object answering each of {@link VaultDBVerbnames} with a function. */
+/** True for an object answering each of {@link BankDBVerbnames} with a function. */
 function answersEachVerb(val: object): boolean {
-  return VaultDBVerbnames.every((verbname) => typeof (val as Partial<Record<string, unknown>>)[verbname] === 'function')
+  return BankDBVerbnames.every((verbname) => typeof (val as Partial<Record<string, unknown>>)[verbname] === 'function')
 }
 
-/** The check of a vaultDB as a model is handed one: branded, from whichever copy of safebyok, and answering each verb with a function. */
-export const brandedVaultDB = Checker(({ custom }) => custom<VaultDB>((val) => isVaultDB(val) && answersEachVerb(val), Phrases.VaultDBExpected), 'bad_option')
+/** The check of a bankDB as a model is handed one: branded, from whichever copy of safebyok, and answering each verb with a function. */
+export const brandedBankDB = Checker(({ custom }) => custom<BankDB>((val) => isBankDB(val) && answersEachVerb(val), Phrases.BankDBExpected), 'bad_option')
 
 /** The check of the bank's panic as a listing or a vault is handed it, by the brand the bank gave it. */
 export const bankPanic = Checker(({ custom }) => custom<DevicePanic>(isGuarded, Phrases.GuardedExpected), 'bad_option')
@@ -196,7 +197,7 @@ export const bankFriend = objCheck(({ custom }) => ({
 
 /** The check of a listing's options. Checks only. */
 export const listingOpts = objCheck(() => ({
-  vaultDB:               brandedVaultDB,
+  bankDB:                brandedBankDB,
   maxMillisSinceRefresh: horizonMillis,
   bankFriend,
 }), 'bad_option')
@@ -209,7 +210,7 @@ export const listingOpts = objCheck(() => ({
 export const storableArgs = objCheck(({ custom }) => ({
   world:   listingWorld,
   listing: custom<object>((val) => hasModelkind(val, 'vault_listing', 'box_listing'), Phrases.ListingExpected),
-  central: SX.sparseBase,
+  central: storableBase,
 }), 'bad_option')
 
 // --
@@ -232,7 +233,7 @@ export type ListingPutOpts<SparseT> = Readonly<{ expected: SparseT, ifAbsent: EX
 export type ListingDelOpts<SparseT> = Readonly<{ expected: SparseT }>
 
 /** A listing's answer from `listVaults` or `listBoxes`: the rows listed, and those set aside as damaged. */
-export type ListingListAnswer<RecordT, SparseT, DamagedT> = Answer<{ listed: readonly Fetched<RecordT, SparseT>[], damaged_rows: readonly DamagedT[] }, ListAct, unknown>
+export type ListingListAnswer<RecordT, SparseT, DamagedT> = Answer<{ listed: readonly Fetched<RecordT, SparseT>[], damaged_rows: readonly DamagedT[] }, EX.ListAct, unknown>
 
 /** What a listing's `tryGet` answers: the vaultDB's own answer where storage was asked, or the act `timely`, with no world, where the instance listed served it. */
 export type ListingGetAnswer<ValT> = ThingAnswer<ValT> | GoodAnswer<ValT, 'timely', null>
@@ -329,13 +330,13 @@ export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<Box
 
 // == [The box's world]: boxWorld, BoxWorld, boxListingOpts, BoxListingOpts
 
-/** The check of a box listing's world past {@link listingWorld}: the vault's `vault_tok`, its demand, and its seal verbs. Checks only. */
-export const boxWorld = Checker(({ fn, vault_tok }) => listingWorld.extend({
-  vault_tok, subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn(),
+/** The check of a box listing's world past {@link listingWorld}: the vault's `bank_tok` and `vault_tok`, its demand, and its seal verbs. Checks only. */
+export const boxWorld = Checker(({ fn, bank_tok, vault_tok }) => listingWorld.extend({
+  bank_tok, vault_tok, subscribe: fn(), sealStampedString: fn(), unsealStampedString: fn(),
 }), 'bad_option', [CX])
 
 /** The vault, as far as its boxes reach into it. */
-export type BoxWorld = Pick<Vault, keyof ListingWorld | 'vault_tok' | 'subscribe' | 'sealStampedString' | 'unsealStampedString'>
+export type BoxWorld = Pick<Vault, keyof ListingWorld | 'bank_tok' | 'vault_tok' | 'subscribe' | 'sealStampedString' | 'unsealStampedString'>
 
 /** The check of a box listing's options: a listing's, and the scope of the vault it lists. Checks only. */
 export const boxListingOpts = Checker(({ vaultScope }) => listingOpts.extend({ scope: vaultScope }), 'bad_option', [CX])
@@ -403,7 +404,7 @@ export const deviceOpts = objCheck(({ fn, custom, tuple, lit, user_id, banklabel
   user_id,
   banklabel,
   gates:               tuple([lit('main')], Phrases.GatesShape).readonly(),
-  vaultDB:             brandedVaultDB,
+  bankDB:              brandedBankDB,
   deviceDB:            brandedDeviceDB,
   keyDeriver:          custom<KeyDeriver>(),
   requestCleartext:    custom<RequestCleartext>().optional(),
@@ -424,8 +425,8 @@ export interface DeviceOpts {
   banklabel:            string
   /** The bank's gates: `['main']`, the only list accepted. */
   gates:                readonly ['main']
-  /** The VaultDB the vaults are synchronized through, from a storage adapter. */
-  vaultDB:              VaultDB
+  /** The BankDB the bank is synchronized through, from a storage adapter. */
+  bankDB:               BankDB
   /** The device database that caches each vault's lease. */
   deviceDB:             DeviceDB
   /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
@@ -516,10 +517,12 @@ export interface DeviceSnapshot extends BankScope {
   readonly bank:       BankSnapshot | null
 }
 
-/** A bank as a host renders it: its scope, the token of this device's row, and its vaults. */
+/** A bank as a host renders it: its scope, the token of this device's row, whether it is locked, and its vaults. */
 export interface BankSnapshot extends BankScope {
   /** The token of this device's row in the deviceDB, as the bank was made with it. */
   readonly device_tok: string
+  /** True unless this device has a lease granted and in force. */
+  readonly isLocked:   boolean
   /** A snapshot of each vault the bank lists. */
   readonly vaults:     readonly VaultSnapshot[]
 }

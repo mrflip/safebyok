@@ -313,7 +313,7 @@ export const { gatingkind, vaultBuildCleartexts, vaultUnlockCleartexts, passphra
 
 /** The arguments that launch a gating on a stored vault: its kind, the vault, the vault's `unlockByProving`, and the bank's dialog or null. */
 export const gatingLaunchOnArgs = objStrict(({ oneof, custom, fn }) => ({
-  gatingkind:    oneof(EX.gatingkindVals).exclude(['build_vault']),
+  gatingkind:    oneof(EX.gatingkindVals).exclude(['build_bank']),
   vault:         custom<Vault>((val) => hasModelkind(val, 'vault'), Phrases.VaultExpected),
   unlockByProving: fn<UnlockByProving>(),
   askUser:       custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
