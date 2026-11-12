@@ -39,28 +39,28 @@ deriver and the strength checker's wrapper. A change to one of them is a change 
 | `packages/safebyok/src/deriver/argon2id-webv1.ts` | `deriveKeyBytes`, which takes the passphrase as an argument and returns the passphraseKey bytes in a buffer of its own, which `passphraseKeyOf` imports and zeroes (G1, G2) |
 | `packages/safebyok/src/helpers/passphrase-strength.ts` | `guardStrengthChecker`, whose wrapper takes the new passphrase as an argument, parses the host checker's verdict inside the wrapper, and passes anything the checker throws to `HostErrorSanitizer.refusalFor` (G1, G8, G9) |
 
-Besides these files, three host functions handle the passphrase. Each is wrapped once, in `Bank`'s constructor, and from
+Besides these files, three host functions handle the passphrase. Each is wrapped once, in `Device`'s constructor, and from
 there on the core has the wrapper and never the host's own function. A proving's world, a bank's friend and a gating's
 launch (`GX.gatingLaunchOnArgs`, `gatingLaunchBirthArgs`) each refuse a function that lacks the wrapper's brand (`isGuarded`, `helpers/consts.ts`). The brand is a
 `Symbol.for`, which any code can set, so it catches mistakes in the core's own wiring and is not a security barrier:
-`Bank`'s constructor wraps every host function regardless. `keyDeriver` is wrapped by `guardKeyDeriver`
+`Device`'s constructor wraps every host function regardless. `keyDeriver` is wrapped by `guardKeyDeriver`
 (`models/proving.ts`), whose `deriveKeyBytes` replaces anything thrown with `keyDeriverThrew`. `strengthChecker` is
 wrapped by `guardStrengthChecker` (`helpers/passphrase-strength.ts`), which passes anything thrown to
 `HostErrorSanitizer.refusalFor` (`refusals/host-error-sanitizer.ts`); that is the only function that substitutes a
 refusal for a foreign throw, and it reads nothing from the throw. `requestCleartext` is wrapped by
-`guardRequestCleartext` (`models/bank.ts`), which discards anything thrown and returns false, so that `Gating.#askHost`
+`guardRequestCleartext` (`models/device.ts`), which discards anything thrown and returns false, so that `Gating.#askHost`
 refuses with `requestCleartextThrew`. A host may leave `requestCleartext` out: the friend's
 `askUser` is then null, no host function is called, and the gating waits, open, for its `attempt` or `dismiss`. Either
-way the bank's snapshot has the live gating as `openGating`, so that a dialog can respond to it. A gating keeps no
+way the device's snapshot has the live gating as `openGating`, so that a dialog can respond to it. A gating keeps no
 cleartext between attempts (G1), and its `toJSON` shows only its scope, kind and random `gatingTok`. The
-`requestCleartext` wrapper is passed along in the `BankFriend` that the bank gives its vault listing. The vault listing
+`requestCleartext` wrapper is passed along in the `BankFriend` that the device gives its bank's vault listing. The vault listing
 keeps it in a protected member and gives it to each vault, which keeps it private, and it reaches a gating only as an
-argument of `Gating.launchOn` or `launchBirth`. No public member of a bank or a vault returns it. A disabled bank never asks the user: every
+argument of `Gating.launchOn` or `launchBirth`. No public member of a device, a bank or a vault returns it. A disabled device never asks the user: every
 `Gating.launchOn` and `launchBirth` comes after a check, in the same tick, that its vault or vault listing is enabled, and a sweep or a
-vacate disables both before it returns. `onLifecycle` is wrapped in `Bank`'s constructor too, by `guardOnLifecycle`. It
-is given a `BankEvent`: a bag with what happened (a refusal, an outcome or a count), the live `Bank`, and the live
+vacate disables both before it returns. `onLifecycle` is wrapped in `Device`'s constructor too, by `guardOnLifecycle`. It
+is given a `DeviceEvent`: a bag with what happened (a refusal, an outcome or a count), the live `Device`, and the live
 `Vault` the event concerns, if there is one. It is given no secret material: neither instance hands out a key (G9). A
-revoked identity vacates the bank in the core, whatever that handler does. The `DeviceDB` (`storage/device-db.ts`,
+revoked identity vacates the device in the core, whatever that handler does. The `DeviceDB` (`storage/device-db.ts`,
 `storage/memory-device-db.ts`) stows the leaseKey as an opaque handle, and anything a device database throws is replaced
 by `deviceDBFailed` (`refusals/throwers.ts`, called from the catch in each `DeviceDB` verb), which keeps nothing of it
 (G8).
@@ -221,10 +221,10 @@ the `LeaseFriend`'s `tryCacheLease` (made in `Vault.#makeFriend`) → `DeviceDB.
 (`sweepContents`), and when the lease is found to be damaged (`Lease.#vaultKey`). Forgotten
 from the device database by `DeviceDB.forget`: through `lease.revoke` or `Lease.forget` (`forgetLease`) from the
 vault's `#revokeLease`, at `vault.lock()`, at a vacate and at a tombstone; through `tryForgetLease`, in
-`Lease.buildFromCache`, for a row of another epoch or stamp; and row by row from `bank.vacate`
-(`#forgetOwnLeases`). `bank.autolock` forgets a row by calling `vault.lock()`. The Bank's scan, `DeviceDB.listLeases`,
-returns rows without a `lease_key`. Only `peek` and `listRawLeases`, which no Vault or Bank calls, return a `lease_key`,
-to whoever has the deviceDB (G9). Neither the Vault nor the Bank has a record.
+`Lease.buildFromCache`, for a row of another epoch or stamp; and row by row from `device.vacate`
+(`#revokeOwnLeases`). `bank.autolock` forgets a row by calling `vault.lock()`. The scan the Bank and the Device make,
+`DeviceDB.listLeases`, returns rows without a `lease_key`. Only `peek` and `listRawLeases`, which no Vault, Bank or
+Device calls, return a `lease_key`, to whoever has the deviceDB (G9). No Vault, Bank or Device has a record.
 Operates: `Lease.#vaultKey` (`unwrapKeyUnder`) alone.
 
 **whisper.** Naked: the host → `vault.putBox`, `box.put`, `box.putExposed`, `vault.boxListing.create`, and
@@ -249,7 +249,7 @@ closure that outlives the call keeps it: no gate or vault is ever given a passph
 past its `Proving` builders an act uses only the provings. The only comparison of two
 passphrases is `antePassphraseClear === nextPassphraseClear` in the `replacePassphrase` act, both
 typed by the same user (`samePassphrase`). Three host functions handle it: the dialog that collects it (either
-`requestCleartext` or a dialog rendered from the bank's `openGating`), the `strengthChecker` and the `keyDeriver`.
+`requestCleartext` or a dialog rendered from the device's `openGating`), the `strengthChecker` and the `keyDeriver`.
 *Caveat:* a JavaScript string cannot be zeroed, so copies
 live until garbage-collected, and `safebyok-react`'s dialog, on the old core until the package moves, keeps what was
 typed in component state until it closes. Kept by: `models/gating.ts` (chains), `models/proving.ts`. Checked by: a
@@ -356,9 +356,9 @@ a schema keyed by its input in the refusal*). The test *every checker a shapes m
 parsed alone, and gives each a marked value: whole, in a list and in an object. It finds the marker in no refusal's
 message, stack, meta or cause. A check over a whole object runs only once its fields pass, so that test does not reach
 it. The three host functions that handle the passphrase have anything they throw replaced, never kept as a `cause`, by
-the wrappers `Bank`'s constructor makes for them: `guardKeyDeriver`'s
+the wrappers `Device`'s constructor makes for them: `guardKeyDeriver`'s
 `deriveKeyBytes` (`models/proving.ts`, `keyDeriverThrew`), `guardStrengthChecker` (`helpers/passphrase-strength.ts`)
-through `HostErrorSanitizer.refusalFor`, and `guardRequestCleartext` (`models/bank.ts`), which discards what was thrown
+through `HostErrorSanitizer.refusalFor`, and `guardRequestCleartext` (`models/device.ts`), which discards what was thrown
 and returns false, so that `Gating.#askHost` refuses with `requestCleartextThrew`, an `unexpected_error`. The gating's
 `checkedCleartexts` does the same for a getter or proxy of the host's that throws while an attempt's cleartexts are read:
 the refusal is `cleartextsThrew`, an `unexpected_error` with no cause. A `VaultError` that a getter throws passes through
@@ -391,7 +391,7 @@ as `cause` only where the code that threw was given no secret. Each Lease and Bo
 refusal (passed through as itself), the vault's demand, or a throw from a bug in this package's own lines. A throw from
 a host function or the device database never reaches it, as each is replaced first, and a
 WebCrypto error reaches it only from the seal, key, grant and wayin paths named above. The `try*` forms of the Vault,
-the Bank and the box listing are likewise each a single `outcomeOf` over the throwing form, and the throwing forms end
+the Device, the Bank and the box listing are likewise each a single `outcomeOf` over the throwing form, and the throwing forms end
 in no such catch. The logger is given messages, a story bag of kinds and calls, and `VaultError`s;
 `Proving.toJSON`, `Lease.toJSON` and `Wayin.toJSON` show no key material, and a lease that cannot be read is reported
 without its record (`Lease.buildFromCache` reports a `damagedLease()` to the friend as bad news, built from nothing of
@@ -404,7 +404,7 @@ Besides them a passphrase passes through the host functions of G1, through their
 `Proving.judgeStrength` on its way to one. `src/models/proving.ts` and `src/models/lease.ts` are the only modules
 that import `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes`, `decipherBytes` or a key maker. The wayinKey lives only
 in `Proving.#wayinKey`; the leaseKey only in `Lease.#record` and the row cached on the device. The Vault keeps its
-`Lease` private, in `#lease`, and neither the Vault nor the Bank has a lease record: `Proving.buildLease` makes the
+`Lease` private, in `#lease`, and no Vault, Bank or Device has a lease record: `Proving.buildLease` makes the
 Lease the vault has, and `Lease.buildFromCache` checks what `DeviceDB.peek` hands back and builds a Lease around
 it. A `Box` reaches the Lease only through the public `vault.sealStampedString` and `unsealStampedString`, which hand
 the lease a whisper's text and a stamp and hand back a sealed whisper or text, never a key. The `LeaseFriend` whose
@@ -443,7 +443,7 @@ the crypto imports.
   under another label with the reserved prefix `argon2id_web_`. These are the refines of `keyDeriverSpec`
   (`deriver/shapes.ts`), which only `makeArgon2idDeriver` reaches, through `parseKeyDeriverSpec`. A host's own deriver is
   checked once, by `keyDeriverShape`
-  (`shapes/shapes-core.ts`) in `guardKeyDeriver` as `Bank`'s constructor wraps it: by its interface, and by its
+  (`shapes/shapes-core.ts`) in `guardKeyDeriver` as `Device`'s constructor wraps it: by its interface, and by its
   `salt_size`, which every deriver's spec and every stored salt keep at 16 (`PassphraseSaltSize`, `helpers/consts.ts`),
   but not by its other parameters, as a host bent on weak ones would find a way (`#the-host-is-not-our-threat-model`, the Coach, 2026-11-06). `safebyok/browser`
   exports `makeArgon2idDeriver` and `argon2idWebV1Deriver` (the main entry point, `safebyok`, exports neither), and

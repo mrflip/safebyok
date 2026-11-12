@@ -42,7 +42,8 @@ Has vault​s and box​es scoped by user_id, banklabel, vaultlabel and boxlabel
 ### Browser
 
 * a vault​ object
-  - Bank.make({ user_id, banklabel, vaultDB, deviceDB, keyDeriver, requestCleartext, ... })​: Bank, non-async, one per signed-in user
+  - Device.make({ user_id, banklabel, gates: ['main'], vaultDB, deviceDB, keyDeriver, requestCleartext, ... })​: Device, non-async, one per signed-in user
+  - device.ensureBank(): Bank, once the deviceDB has this device's row and the vaults are listed; device.vacate() at sign-out
   - bank.ensureVault({ vaultlabel }, { vaultDB?, deviceDB? }?): Vault, born from one read of storage (never absent: `novel` until its passphrase is set)
   - vault.hello() (reads storage once its picture has aged; never asks the user)
   - ensureUnlocked, lock​, putWayin(slotlabel)​, delWayin(slotlabel)​, del(), getBox(boxlabel)​, getWhisper(boxlabel)​, putBox({ boxlabel, sidecar? }, whisper?)​, delBox(boxlabel)

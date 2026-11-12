@@ -1,6 +1,6 @@
-# The good Bank options are in `safebyok/browser`, on purpose
+# The good device options are in `safebyok/browser`, on purpose
 
-`Bank.make` takes its `keyDeriver`, `deviceDB` and `strengthChecker` from the host, and gives none
+`Device.make` takes its `keyDeriver`, `deviceDB` and `strengthChecker` from the host, and gives none
 of them a working default. The strength checker's default refuses every passphrase. Good choices
 for a browser (a pinned Argon2id deriver, an IndexedDB deviceDB and the zxcvbn checker) come from a
 subpath of the core, `safebyok/browser`, in one bag: `...browserOpts()`.
@@ -8,9 +8,9 @@ subpath of the core, `safebyok/browser`, in one bag: `...browserOpts()`.
 This looks like an oversight in three ways, and agents keep trying to "fix" it. It isn't one. Don't
 change it unless a Coach agrees.
 
-## Why not a default in `Bank.make`
+## Why not a default in `Device.make`
 
-A default is something `Bank.make` imports, so every app ships it, whether it uses it or not. A
+A default is something `Device.make` imports, so every app ships it, whether it uses it or not. A
 bundler drops only the code nothing imports. The deriver is about 15 kB minified. The zxcvbn
 checker's common-password list is about 214 kB minified and brotlied.
 
@@ -28,8 +28,8 @@ Three settings together make "what you never import never ships" true:
   never reach.
 
 The zxcvbn dictionary goes one step further. The checker's `load` fetches it with a dynamic
-`import()`, as a separate chunk, when the bank's `hello()` runs, never at import. If the chunk won't
-load, the hello fails loudly, and no vault is born until a later hello loads it.
+`import()`, as a separate chunk, when `device.ensureBank()` runs, never at import. If the chunk won't
+load, the `ensureBank` fails loudly, and no vault is born until a later `ensureBank` loads it.
 
 Breaking any of the three, for example importing a `safebyok/browser` module from the main entry
 "for convenience", puts the batteries in every bundle.
@@ -50,5 +50,5 @@ made, they stay in `safebyok/browser`.
 ## Before you change any of this
 
 Check the change against the three points above, and ask. A change that moves a default into
-`Bank.make`, merges `safebyok/browser` into the main entry, or gives the strength checker a
+`Device.make`, merges `safebyok/browser` into the main entry, or gives the strength checker a
 permissive default reverses a decision on purpose. It needs a Coach's yes before it exists.

@@ -171,6 +171,11 @@ To be deleted at 1.0.0.
 | `applabel` (a scope's first name, stored and in every option; the scopepath's `vault^acme^u1^main`) | `banklabel`, and `user_id` now comes first in a scope: `vault^u1^acme^main` (2026-11-12, bank_world thread 1) |
 | `ensureCachedBank`, `forgetBank`, `listRawBanks`, `BankRow`, `bankRow` (the deviceDB's bank row, and each `try*` and `do*` form of its verbs; the IndexedDB database `<dbName>:bank-v001-001-001`) | `ensureCachedDevice`, `forgetDevice`, `listRawDevices`, `DeviceRow`, `deviceRow` (the device row; `<dbName>:devicerow-v001-001-001`) (2026-11-12, bank_world thread 2) |
 | `device_id`, `deviceId`, `useDeviceId` (an option, a prop, a wayin's header field, the device row) | `device_tok`, `deviceTok`, `useDeviceTok` (2026-11-12, bank_world thread 2) |
+| `Bank.make(opts)`, `BankOpts`                          | `Device.make(opts)`, `DeviceOpts`; `device.ensureBank()` makes the bank (2026-11-12, device_owner) |
+| `bank.hello()`, `bank.tryHello()`                      | `device.ensureBank()`, `device.tryEnsureBank()`, resolving to the bank (2026-11-12, device_owner) |
+| `BankEvent`, `BankStage`; the bank snapshot's `stage`, `err` and `openGating` | `DeviceEvent`, `DeviceStage`; the device snapshot's (`DeviceSnapshot`) (2026-11-12, device_owner) |
+| `bank.vacate()`, `bank.sweep()`, `bank.isEnabled`, `bank.autolockMinutes` | `device.vacate()`, `device.sweep()`, `device.isEnabled`, `device.autolockMinutes`; the one gating open, `device.openGating` (2026-11-12, device_owner) |
+| `device_tok` (a `Bank.make` option); `useDeviceTok` (`safebyok-react`) | gone: the device asks the deviceDB for its row at `device.ensureBank()`; the bank has it as `bank.device_tok` (2026-11-12, device_owner) |
 
 ## The old design's names the new core does not have
 

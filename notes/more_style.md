@@ -44,8 +44,8 @@ STYLE.md's rules. The doc-block pairs are in `notes/gallant-docblocks.md`.
   A symbol key is UpperCamel (`IsGuarded`, `Whispered`); a sentinel is ALLCAP (`NOVEL`, `ENCRYPTED`).
   A model of a closed family is told by its string `modelkind`, a getter on the class
   (`hasModelkind(val, 'wayin')`), not by a brand or `instanceof`.
-* **A host's function is wrapped once, on its way in.** Each function a host hands `Bank.make`
-  (`requestCleartext`, the key deriver, the strength checker, `onLifecycle`, ...) is wrapped at `Bank`'s
+* **A host's function is wrapped once, on its way in.** Each function a host hands `Device.make`
+  (`requestCleartext`, the key deriver, the strength checker, `onLifecycle`, ...) is wrapped at `Device`'s
   constructor into a checked, branded thing that checks what the function returns (STYLE.md *Validation*).
   Past it nothing calls the bare function; a parameter accepts the branded thing.
 * **A browser checks what a server sends.** A server is not trusted, so a browser checks each

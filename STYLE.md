@@ -518,7 +518,7 @@ A member that will not describe in a line is a smell: report it.
   kinds, and a class or module doc may say in one sentence what misuse refuses. The only kind worth naming is a condition the
   caller branches on in normal use: `stale_write` on a put, `wrong_passphrase` on an unlock. Before naming one, taste it
   against those two from memory: a kind of lesser salience goes unnamed. Where a caller meets a refusal in normal use, say
-  what to do instead `#say-what-to-do`: `Precede with await bank.hello(), repeated to force a refresh`.
+  what to do instead `#say-what-to-do`: `Precede with await vault.hello(), repeated to force a refresh`.
 * **The guarantee is the line worth writing** `#say-the-guarantee`. What the call proves, or what a caller could get wrong about a secret, goes
   in: `Extracting the whisper authenticates that the object, all but its sidecar, has not been modified since it was sealed`.
 * **The lower-yield rules** (option lists, guards' predicates, the reason above, pointing instead of redefining,
