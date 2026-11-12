@@ -26,14 +26,18 @@ sprint's numbered threads. Proved: every package at the build; `justify:root` (2
   4. `tools:` `.claude/agents/base-sync.md` (`opus`; Bash, Read, Grep, Glob, Write), and a
      paragraph in the sprint skill's §3 *Tend the documents*: the orchestrator runs it after
      plan commits at milestones.
-  6. `tools:` (second rework, the Coach's ruling) a worker tests as it judges while building,
-     and is **ready** when lint, typecheck and test are green for the packages it changed and
-     their dependents, plus `justify:root` / `lint:workflows` for root files or a workflow; the
-     full justify is for confidence, and filing's is the gate. The threshold is stated once, in
-     the worker bodies' *Ready* step and a CLAUDE.md *Commands* line (the orchestrator's word:
-     timings are being measured, so no figures in files); PROCESS.md *Proving* has the commands.
-     The second review's minors: `ci.yml`'s header states only the present rule; `codeql.yml`'s
-     note and the worker's catch-up step in plain sentences.
+  6. `tools:` (second and third rework, the Coach's rulings) a worker tests as it judges while
+     building: a file (`pnpm --filter <pkg> exec vitest run <path>`) or a package. It pushes to the
+     draft and adds `ci` once the packages it touched pass their tests and typecheck, so CI runs
+     beside its last justify; it is **ready** when `pnpm justify` is green (run again after any
+     rebase, and at filing, where it is the gate). The timing table measured pnpm's
+     `...[<base>]` selection (102 s, selecting the root and running packages one at a time)
+     slower than the full justify (57 s warm), so the filter is gone from CLAUDE.md, the worker
+     bodies, PROCESS.md *Proving*, the sprint skill and DESIGN.md, which now say not to use it.
+     The threshold is stated in the worker bodies' *Ready* step (identical) and one CLAUDE.md
+     *Commands* line, the justify line, which holds the one figure (about a minute); PROCESS.md
+     *Proving* has the commands. The second review's minors: `ci.yml`'s header states only the
+     present rule; `codeql.yml`'s note and the worker's catch-up step in plain sentences.
   5. `skill:` the sprint doc's *Progress* tab is a lead plus a list of GitHub links (plan,
      progress, design, threads, rulings on the sprint branch; one line per thread file, added
      at cut); statuses live in the plan, so §3, the compaction note, pausing and wrapup point
@@ -65,13 +69,11 @@ sprint's numbered threads. Proved: every package at the build; `justify:root` (2
   (duplicates file-thread). base-sync's own: `thread-T-base-sync.md`.
 
 * **Discoveries**:
-  - `pnpm --filter "...[<ref>]"` selects the workspace root when a root file changed, and the
-    root's `lint`/`typecheck`/`test` run every package: hence `--filter '!{.}'` beside it (an
-    empty selection exits 0). Each selected package's `test` builds its own dependencies, one at
-    a time (the core twice for react plus the demo; correct). Probed with a stray
-    line in react's `index.ts`: react and the demo selected, all three tasks green.
-  - The root's `[ref]` blind spot: `tsconfig.base.json`, the lockfile and `pnpm-workspace.yaml`
-    belong to the root but bind every package, so a change to them takes the full justify.
+  - Timings (16 cores, warm, at 43f699a1e): `pnpm justify` 57 s; `pnpm test` 44 s; one package's
+    tests 2-6 s; `pnpm --filter "...safebyok" test` 66 s and `--filter "...[origin/main]" test`
+    102 s (the root is selected, and its `test` is every package, then each selected package runs
+    one at a time, rebuilding its dependencies). A cold eslint (a fresh worktree) adds about 40 s
+    to the first justify. Hence the `...[<base>]` filter is a trap, not a shortcut.
   - The `mainly main` ruleset requires `lint-typecheck`, `test-build`, `node-compat (22)`,
     `node-compat (26)`, `postgres` and CodeQL. ci.yml's comments and notes/ci.md said only the
     first two (and that `postgres` was not yet required); both now name all of them.
@@ -90,5 +92,5 @@ sprint's numbered threads. Proved: every package at the build; `justify:root` (2
   - A base-only *plan* commit that conflicts with the sprint's plan loses its conflicting hunks
     to the sprint's version too (reported, kept in the snapshot). Rare if your hand edits are
     swept as plan commits; say if plan paths should conflict instead.
-  - A root script (`pnpm justify:since <base>`, say) could run the three filtered readiness
-    tasks as one command. Worth adding?
+  - A `justify:since` script is no longer wanted (the Coach, 2026-11-12): the filtered
+    readiness run it would wrap is gone.
