@@ -24,7 +24,7 @@ async function grantedWorld(opts?: LeaseGrantOpts): Promise<{ friend: FakeLeaseF
   return { friend, lease }
 }
 
-/** A friend of {@link WorldStamp} whose slot has a record cached under `stamp`. */
+/** A friend of {@link WorldStamp} whose scopepath has a record cached under `stamp`. */
 async function friendWithRowOf(stamp: Partial<VaultStamp>): Promise<FakeLeaseFriend> {
   const elsewhere = fakeLeaseFriendOf(stamp)
   const lease = await makeGrantedLease(elsewhere)

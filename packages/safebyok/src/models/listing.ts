@@ -21,7 +21,7 @@ import { type Storable, cmpRevisions } from './storable'
  * listing, disabling, remaking, and delisting its storable instances.
  */
 export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>, DamagedT extends ScopeT & SX.DamagedRow = ScopeT & SX.DamagedRow> {
-  // == [Props]: world, maxMillisSinceRefresh, vaultDB, bankFriend, #things, #joinedGetOf, #listOnce, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
+  // == [Props]: world, maxMillisSinceRefresh, vaultDB, bankFriend, #things, #joinedGetOf, #doTryListJoined, #listeners, #snapshot, #unwatch, #isEnabled, #getSnapshot, #subscribe
 
   readonly world: ListingWorld
   /** The refresh horizon of each thing made here. */
@@ -34,8 +34,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // Keyed by scopepath, not by instance: a scope may have no instance listed to key on.
   /** The storage get of each scope, joined while one runs. */
   readonly #joinedGetOf = new Map<string, () => Promise<Joined<ListingAnswer<RecordT, SparseT>, ThingT | null>>>()
-  /** The listing of every row, joined while one runs. */
-  readonly #listOnce = oneAtATime(() => this.#listRows())
   /** The rows the vaultDB's last listing set aside as damaged. */
   #damagedRows: readonly DamagedT[] = Object.freeze([])
   readonly #listeners = new Set<() => void>()
@@ -98,7 +96,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return this.#things.get(this.scopepathOf(this.scopeOf(recordish))) ?? null
   }
 
-  /** Delist `thing`, as its own discard asks: the slot empties only for this very instance. */
+  /** Delist `thing`, as its own discard asks: the scope is left with none listed only for this very instance. */
   delist(thing: Thing<ScopeT, RecordT, SparseT>): void {
     const scopepath = this.scopepathOf(this.scopeOf(thing))
     const listed: Thing<ScopeT, RecordT, SparseT> | undefined = this.#things.get(scopepath)
@@ -150,52 +148,51 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Storage verbs]: list, tryList, listRows, listedAt, get, tryGet, doTryGetJoined, handleIfAbsent, put, tryPut, del, tryDel
+  // == [Storage verbs]: list, tryList, doTryListJoined, listedAt, get, tryGet, doTryGetJoined, handleIfAbsent, put, tryPut, del, tryDel
 
   /** Enlists every row the vaultDB lists here, sets aside the rows it found damaged, and answers the instances listed.
-   * Chute: bank and vault bring-up → **list** → tryList → (joined) #listRows → deliverListing
+   * Chute: list → tryList → #doTryListJoined → doTryList → deliverListing → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async list(): Promise<readonly ThingT[]> { return valOf(await this.tryList()) }
 
   /** {@link list}, answering the vaultDB's own answer with the instances listed as its `val`.
-   * Chute: list → **tryList** → (joined) #listRows → deliverListing
+   * Chute: tryList → #doTryListJoined → doTryList → deliverListing → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryList(): Promise<ThingAnswer<readonly ThingT[]>> {
     try {
       this.demandEnabled()
-      const listing = await this.#listOnce()
+      const listing = await this.#doTryListJoined()
       return ('err' in listing) ? refusedAnswerOf(listing.err, listing.answer) : answerWithVal(listing.answer, listing.val)
     } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
   }
 
-  /** One storage listing, delivered, never rejecting: what every list made while it runs shares.
-   * Chute: tryList → (joined) **#listRows** → doTryList, then deliverListing
+  /** The storage listing of every row, delivered, never rejecting: one at a time, joined by every list made while it runs.
+   * Chute: #doTryListJoined → doTryList → deliverListing → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
-  async #listRows(): Promise<Joined<ListingListAnswer<RecordT, SparseT, DamagedT>, readonly ThingT[]>> {
+  readonly #doTryListJoined = oneAtATime(async (): Promise<Joined<ListingListAnswer<RecordT, SparseT, DamagedT>, readonly ThingT[]>> => {
     const answer = await this.doTryList()
     try {
       return { answer, val: this.#deliverListing(answer) }
     } catch (err) { return { answer, err } }
-  }
+  })
 
   // A damaged row's address is storage's, under whatever labels it holds, so it is looked up as it is, never checked as a scope.
   /** The instance listed at a damaged row's address, or null. */
   #listedAt(damaged: DamagedT): ThingT | null { return this.#things.get(this.scopepathOf(damaged)) ?? null }
 
   /** The instance under `scoped`: the one listed, no older than `opts` allows, or fetched where none is; null under `ifAbsent: 'nil'`.
-   * Chute: thing.hydrate | vault.getBox → **listing.get** → tryGet → (joined by scope) #doTryGetJoined → doTryGet, then deliverAnswer
+   * Chute: listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async get(scoped: ScopeT, opts: FetchOpts = {}): Promise<ThingT | null> { return valOf(await this.tryGet(scoped, opts)) }
 
   /** {@link get}, answering the vaultDB's own answer where storage was asked, or the act `timely` where the instance listed served it.
-   * Chute: listing.get | bank.tryProbe → **tryGet** → (joined by scope) #doTryGetJoined → doTryGet, then deliverAnswer
+   * Chute: tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryGet(scoped: ScopeT, opts: FetchOpts = {}): Promise<ListingGetAnswer<ThingT | null>> {
     try {
       const { ifAbsent, maxMillisSinceRefresh = this.maxMillisSinceRefresh, maxWorldMillis } = VX.fetchOpts.parse(opts)
       const scope = this.scopeOf(scoped)
       await this.ensureTimelyWorld(maxWorldMillis)
-      this.demandEnabled()
       const listed = this.at(scope)
       if (listed?.isHydratedWithin(maxMillisSinceRefresh) === true) {
         return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), world: null, ask: SX.loggableAsk.parse({ op: 'get', ...scope }) }
@@ -209,7 +206,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // A get joins any get of the same scope under way: the storage get and its delivery are shared, each caller's
   // `ifAbsent` its own.
   /** The storage get of `scope`, delivered, never rejecting: one at a time, joined by every get of that scope made while it runs.
-   * Chute: tryGet → (joined by scope) **#doTryGetJoined** → doTryGet, then deliverAnswer
+   * Chute: #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   #doTryGetJoined(scope: ScopeT): Promise<Joined<ListingAnswer<RecordT, SparseT>, ThingT | null>> {
     const scopepath = this.scopepathOf(scope)
@@ -236,12 +233,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   /** Put `record` over the row `opts.expected`, and return the listed instance.
-   * Chute: a vault birth (gating) → **listing.put** → tryPut → doTryPut, then deliverAnswer
+   * Chute: listing.put → tryPut → doTryPut → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async put(record: RecordT, opts: PutOpts): Promise<ThingT> { return valOf(await this.tryPut(record, opts)) }
 
   /** {@link put}, answering the vaultDB's own answer with the instance listed as its `val`.
-   * Chute: listing.put | box.put → **tryPut** → doTryPut, then deliverAnswer
+   * Chute: tryPut → doTryPut → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryPut(record: RecordT, opts: PutOpts): Promise<ThingAnswer<ThingT>> {
     let answer: ListingPutAnswer<RecordT, SparseT> | typeof UNANSWERED = UNANSWERED
@@ -255,12 +252,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   /** SLOPDOC: Deletes the thing `record` names, over its revision, and delivers storage's answer: its tombstone, if anything was stored.
-   * Chute: thing.del → **listing.del** → tryDel → doTryDel, then deliverAnswer
+   * Chute: listing.del → tryDel → doTryDel → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async del(record: SparseT): Promise<ThingT | null> { return valOf(await this.tryDel(record)) }
 
   /** {@link del}, answering the vaultDB's own answer with the instance as its `val`.
-   * Chute: listing.del → **tryDel** → doTryDel, then deliverAnswer
+   * Chute: tryDel → doTryDel → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryDel(record: SparseT): Promise<ThingAnswer<ThingT | null>> {
     let answer: ListingAnswer<RecordT, SparseT> | typeof UNANSWERED = UNANSWERED
@@ -277,17 +274,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // == [Delivering]: deliverAnswer, answerDeliveringOf, deliverRecord, recordDeliveringOf, doDeliverRecord, deliverListing
 
-  /** The pipeline every storage answer follows, from its world through the instance listed to the caller.
-   * Delivers updated records to: (! = unconventional practice)
-   * - the vault that owns it (!),
-   *   - possibly replacing / deleting / vacating / disabling it (!) and by consequence itself (!),
-   * - in service of either:
-   *   - updating a record it has, or
-   *   - deleting it (!) by updating it (!) but not removing it (!) (except for vault(!), which it does(!))
-   *   - ~~or building a new instance from scratch with the props~~,
-   *   - or making a shell (!) and updating it (!)
-   * - and finally notifying listeners, sharing bad news, and returning the appropriate instance
-   * Chute: #doTryGetJoined | tryPut | tryDel | tryReplacePassphrase | tryAddPasskey | tryRevokePasskey → **deliverAnswer** → world.receiveWorld, then answerDeliveringOf → recordDeliveringOf → doDeliverRecord
+  /** Deliver storage's `answer`: its world first, then its record to the instance listed at `sent`'s scope, which is returned (null where the answer carries no record).
+   * Nothing is written to storage. A good answer throws whatever delivering it meets. A refused one tells that as bad news
+   * and throws its own refusal. The contract, table by table, is `notes/deliver-contract.md`.
+   * Chute: deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   protected deliverAnswer(answer: ListingPutAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT
   protected deliverAnswer(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): ThingT | null
@@ -310,9 +300,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // The answer passed its verb's check, and is trusted: its act alone says where its record is (`deliveryFieldingOf`).
   /** What delivering `answer` to the instance listed at `sent`'s scope will do, decided before anything changes; null for nothing.
-   * Throws `storage_issue` for a record of another scope or revision than `sent`, and `record_conflict` for news that
-   * nothing is stored where a live instance is listed.
-   * Chute: deliverAnswer → **answerDeliveringOf** → recordDeliveringOf
+   * Throws `storage_issue` for a record of another scope or revision than `sent`, and `record_conflict` where storage
+   * is certain nothing is stored and a live instance is listed.
+   * Chute: answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   #answerDeliveringOf(answer: ListingAnswer<RecordT, SparseT>, sent: ScopeT | Fetched<RecordT, SparseT>): Delivering<Fetched<RecordT, SparseT>, ThingT> | null {
     try {
@@ -320,12 +310,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       if (fielding === 'none') { return null }
       const scope    = this.scopeOf(sent)
       const listed   = this.at(scope)
-      if (fielding === 'void') {
+      // No record is storage's word that nothing is stored (`gotvoid`, a refused `void` or `ahead`): a live instance listed is impossible.
+      const record = ((answer.ok ? answer.val : answer.dbhas) ?? null) as Fetched<RecordT, SparseT> | null
+      if (record === null) {
         if (listed === null)  { return null }
         if (listed.isPresent) { throw nothingStoredWhereLive() }
         return { making: 'listed', mod: 'same', listed, record: null }
       }
-      const record = (answer.ok ? answer.val : answer.dbhas) as Fetched<RecordT, SparseT>
       const pins   = (fielding === 'as_sent') ? { ...scope, ...SX.revisionPins.parse(sent) } : scope
       if (! isConsistent(record, pins)) { throw deliveredNotAsSent(fielding, record, pins) }
       return this.#recordDeliveringOf(record)
@@ -333,21 +324,21 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   /** The instance of `record`, made, brought up to it, or remade, and listed. Writes nothing.
-   * Chute: deliverListing | #onNotice | vault.receiveWorld | BoxListing.#shellFor → **deliverRecord** → recordDeliveringOf → doDeliverRecord
+   * Chute: deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   deliverRecord(record: Fetched<RecordT, SparseT>): ThingT {
     this.demandEnabled()
     return this.#doDeliverRecord(this.#recordDeliveringOf(record))
   }
 
-  // The receive table of `notes/receive-contract.md`, read once: the first row that matches wins. A vault listing makes
+  // The receive table of `notes/deliver-contract.md`, read once: the first row that matches wins. A vault listing makes
   // an instance of each life (`isOneLifePerInstance`): a newer record of another life, or one alive over a tombstone,
   // remakes it, and an older one of any life leaves it as it is. A box listed has its world's vault_tok, so the first
   // row covers a box of another vault; a vault of another vault_tok is of another life.
   /** What receiving `record` will do: which instance receives it, and what becomes of that instance's record.
    * Throws `storage_issue` for a record of another vault_tok than the listing's, and `record_conflict` where storage
    * and the instance listed disagree on the history of one revision.
-   * Chute: answerDeliveringOf | deliverRecord → **recordDeliveringOf**
+   * Chute: recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   #recordDeliveringOf(record: Fetched<RecordT, SparseT>): Delivering<Fetched<RecordT, SparseT>, ThingT> {
     const vault_tok = this.vaultTokOfWorld()
@@ -360,7 +351,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     const heldShape  = listed.shape
     const isRebirth  = (heldShape === 'gone') && (rcvdShape !== 'gone')
     const isPerLife  = this.isOneLifePerInstance
-    if (isPerLife && (age === 'older'))                                  { return { making: 'listed', mod: 'older', listed, record } }
     if (isPerLife && (age === 'newer') && ((! isSameLife) || isRebirth)) { return { making: 'remake', mod: 'adopt', listed, record } }
     if ((age === 'same') && (! isSameLife))                              { throw oneRevisionTwoLives(record) }
     if (age === 'older')                                                 { return { making: 'listed', mod: 'older', listed, record } }
@@ -374,7 +364,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // is, so that receiving runs for it too: a vault made from a tombstone forgets the lease cached on this device. What
   // can throw (`makeThing`, `receiveRecord`) runs before the listing changes; an instance never enlisted holds nothing.
   /** Do what `delivering` says, and answer the instance it leaves listed.
-   * Chute: deliverAnswer | deliverRecord → **doDeliverRecord**
+   * Chute: doDeliverRecord → thing.receiveRecord
    */
   #doDeliverRecord({ making, mod, listed, record }: Delivering<Fetched<RecordT, SparseT>, ThingT>): ThingT {
     this.demandEnabled()
@@ -393,7 +383,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // A row set aside as damaged takes down the instance listed at its scope, as a tombstone would, and is told as bad news.
   /** The instances `answer` lists, made or brought up to their records, its damaged rows set aside.
-   * Chute: #listRows → **deliverListing** → world.receiveWorld, then deliverRecord for each row
+   * Chute: deliverListing → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   #deliverListing(answer: ListingListAnswer<RecordT, SparseT, DamagedT>): readonly ThingT[] {
     this.demandEnabled()
@@ -426,7 +416,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // A notice is not an answer: it has no ask and no sent, and its record is the claim, as a listed row's is.
   /** Delivers a watch notice of this listing's kind: its world, then its record, any refusal told as bad news.
-   * Chute: the vaultDB's watch → **#onNotice** → world.receiveWorld, then deliverRecord
+   * Chute: #onNotice → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   readonly #onNotice = (notice: VaultDBNotice): void => {
     const { val, world } = notice
@@ -521,10 +511,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 /** Where an answer's record is, by its act: see {@link DeliveryFielding}. */
 const deliveryFieldingOf = {
   born:    'as_sent', reborn:  'as_sent', replaced: 'as_sent', deleted: 'as_sent', added: 'as_sent', revoked: 'as_sent',
-  gotlive: 'as_got',  gotgone: 'as_got',  passed:   'as_got',
-  gotvoid: 'void',
+  gotlive: 'as_got',  gotgone: 'as_got',  passed:   'as_got',  gotvoid: 'as_got',
   stale:   'as_db',   camped:  'as_db',   gone:     'as_db',   dubdel:  'as_db',   retcon: 'as_db', clash: 'as_db', forked: 'as_db', ahead: 'as_db',
-  void:    'none',    vault_void: 'none', vault_gone: 'none',  vault_reborn: 'none', vault_full: 'none', unclassified_storing: 'none',
+  void:    'as_db',   vault_void: 'none', vault_gone: 'none',  vault_reborn: 'none', vault_full: 'none', unclassified_storing: 'none',
   got:     'none',    tidied:  'none',    timely:   'none',
 } as const satisfies Record<GoodAct | BadAct, DeliveryFielding>
 

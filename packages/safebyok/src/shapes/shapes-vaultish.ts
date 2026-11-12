@@ -248,7 +248,7 @@ export type ListingListAnswer<RecordT, SparseT, DamagedT> = Answer<{ listed: rea
 /** What a listing's `tryGet` answers: the vaultDB's own answer where storage was asked, or the act `timely`, with no world, where the instance listed served it. */
 export type ListingGetAnswer<ValT> = ThingAnswer<ValT> | GoodAnswer<ValT, 'timely', null>
 
-/** What a listing's `tryPut` and `tryFetch` answer: the vaultDB's own answer, with the instance listed as its `val`. */
+/** What a listing's `tryPut` and `tryDel` answer: the vaultDB's own answer, with the instance listed as its `val`. */
 export type ThingAnswer<ValT> = Answer<ValT, EX.GoodAct, unknown>
 
 /** The tombstone `listing.del` sends the vaultDB: at the revision after the row it replaces, with a life token of its own. */

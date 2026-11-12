@@ -39,7 +39,7 @@ export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
 export type Tidied      = { totalCount: number }
 
 /** A changed row reported by a watch, with its vault row if storage sent one. */
-export type Notice = { act: 'got' | 'gone', val: VaultRow | BoxRow, world: VaultRow | null }
+export type Notice = { act: 'gotlive' | 'gotgone', val: VaultRow | BoxRow, world: VaultRow | null }
 
 /** A good answer with `val`, keeping `answer`'s act, world and ask. Throws the refusal of a bad `answer`. */
 export function answerWithVal<ValT, ActT extends GoodAct>(answer: Answer<unknown, ActT, unknown>, val: ValT): GoodAnswer<ValT, ActT, unknown> {

@@ -20,7 +20,7 @@ import * as SX from './shapes-storage'
 
 // == [Wayin kinds]: wayinkind, isPrfSalt
 
-/** The check of a wayin's kind, as a caller names the slot of the gate it means: one of {@link EX.wayinkindVals}. */
+/** The check of a wayin's kind, as a caller names the field of the gate it means: one of {@link EX.wayinkindVals}. */
 export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinkindVals), 'bad_option')
 
 /** True for a passkey wayin's salt as its kind makes one: base64url text of {@link PasskeySaltSize} bytes. A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused. */

@@ -142,11 +142,13 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Storable ops]: get, hydrate, del, each with its try form
 
   /** This thing, its record fetched unless timely within `opts.maxMillisSinceRefresh`; refused if absent, unless `ifAbsent: 'nil'`.
-   * Chute: **thing.get** → thing.hydrate → listing.get → tryGet → (joined by scope) #doTryGetJoined → doTryGet, then deliverAnswer
+   * Chute: thing.get → listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async get(opts: FetchOpts = {}): Promise<this> {
     const { ifAbsent, maxMillisSinceRefresh, maxWorldMillis } = VX.fetchOpts.parse(opts)
-    await this.hydrate({ maxMillisSinceRefresh, maxWorldMillis })
+    this.demandEnabled()
+    await this.listing.get(this.scope, { ifAbsent: 'nil', maxMillisSinceRefresh, maxWorldMillis })
+    this.demandEnabled()
     if (ifAbsent === 'fail') { this.demandPresent() }
     return this
   }
@@ -154,17 +156,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Non-throwing form of {@link get}. */
   tryGet(opts: FetchOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.get(opts)) }
 
+  // A swept thing answers from the record it has while that is timely: only a fetch needs it enabled.
   /** This thing, its world timely and its record fetched unless timely within `opts.maxMillisSinceRefresh`.
-   * Chute: thing.get | thing.ensureDeletable | box.ensureUnsealable | box.ensurePuttable | vault.ensureTimely → **thing.hydrate** → listing.get → tryGet → (joined by scope) #doTryGetJoined → doTryGet, then deliverAnswer
+   * Chute: thing.hydrate → thing.get → listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
     const { maxMillisSinceRefresh = this.listing.maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)
+    if (! this.isHydratedWithin(maxMillisSinceRefresh)) { return this.get({ ifAbsent: 'nil', maxMillisSinceRefresh: 0, maxWorldMillis }) }
     await this.listing.ensureTimelyWorld(maxWorldMillis)
-    // A swept thing answers from the record it holds while that is timely: only a fetch needs it enabled.
-    if (this.isHydratedWithin(maxMillisSinceRefresh)) { return this }
-    this.demandEnabled()
-    await this.listing.get(this.scope, { ifAbsent: 'nil', maxMillisSinceRefresh: 0, maxWorldMillis })
-    this.demandEnabled()
     return this
   }
 

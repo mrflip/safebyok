@@ -42,7 +42,7 @@ export type CrossingAnswer = {
 /** A watch notice in wire form, or the refusal that ends the watch. */
 export type CrossingNotice = {
   ok:    boolean
-  act:   'got' | 'gone' | DB.BadAct
+  act:   'gotlive' | 'gotgone' | DB.BadAct
   val:   DB.VaultRow | DB.BoxRow | null
   world: DB.VaultRow | null
   err:   DB.CrossedErr | null

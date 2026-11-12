@@ -126,7 +126,7 @@ describe("bank.hello", () => {
     expect(listed?.isEnabled).to.be.false
   })
 
-  it("lists a deleted vault's tombstone in its slot, the vault of the life deleted vacated", async () => {
+  it("lists a deleted vault's tombstone at its scope, the vault of the life deleted vacated", async () => {
     const world = makeBankWorld()
     const { vault } = await makeBankWithVault(world)
     const bank = world.bankOnAnotherDevice()

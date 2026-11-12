@@ -35,8 +35,8 @@ describe("new Gate(stamp, props): the props check", () => {
 
   const PropsCases = [
     [(props: GateProps) => ({ ...props, passkey_wayin: undefined }),              'no passkey_wayin, where a gate with no passkey says null'],
-    [(props: GateProps) => ({ passphrase_wayin: props.passkey_wayin, passkey_wayin: props.passphrase_wayin }), "its two wayins in each other's slot"],
-    [(props: GateProps) => ({ ...props, passkey_wayin: props.passphrase_wayin }), 'a passphrase wayin in the passkey slot'],
+    [(props: GateProps) => ({ passphrase_wayin: props.passkey_wayin, passkey_wayin: props.passphrase_wayin }), "its two wayins in each other's field"],
+    [(props: GateProps) => ({ ...props, passkey_wayin: props.passphrase_wayin }), 'a passphrase wayin in the passkey field'],
     [(props: GateProps) => ({ ...props, passphrase_wayin: null }),                'no passphrase wayin'],
     [(props: GateProps) => ({ ...props, gate_epoch: 0 }),                         'gate_epoch 0'],
     [(props: GateProps) => ({ ...props, gate_epoch: undefined }),                 'no gate_epoch'],

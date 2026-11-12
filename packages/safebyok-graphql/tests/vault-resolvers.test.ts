@@ -230,7 +230,7 @@ describe("vaultResolvers' watch", () => {
     const { listening, vaultDB, schema } = await watchedServer()
     const { stream, nextNotice } = await watching(schema, { user_id: 'u1' })
     await vaultDB.putVault(vaultBorn)
-    expect(await nextNotice()).to.deep.eq({ ok: true, val: { act: 'got', val: TH.vaultAt(), world: TH.vaultAt() } })
+    expect(await nextNotice()).to.deep.eq({ ok: true, val: { act: 'gotlive', val: TH.vaultAt(), world: TH.vaultAt() } })
     await vaultDB.putBox(boxBorn)
     expect(await nextNotice()).to.have.nested.property('val.val.boxlabel', TH.boxAt().boxlabel)
     expect(listening.size).to.eq(1)

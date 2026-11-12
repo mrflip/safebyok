@@ -132,6 +132,23 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(world.mw.badnews).to.have.length(1)
     })
 
+    it("tells bad news when a refusal stores no row where a live box is listed, and the refusal is still thrown", async () => {
+      const listing = boxListingOf(world.mw)
+      const box = listing.deliverRecord(fullBoxRecord())
+      world.mw.willPut(world.mw.refusalOf(box.scope, new VaultError('stale_write', "Ahead.", { meta: { act: 'ahead' } }), null, null))
+      await TH.expectRefusal(listing.put(listing.recordOf(box), { expected: box.sparse }), 'stale_write')
+      expect(world.mw.badnews.map((news) => news.refusalkind)).to.deep.equal(['record_conflict'])
+      expect(box.isPresent).to.be.true
+    })
+
+    it("tells nothing when a refusal stores no row where a deleted box is listed", async () => {
+      const listing = boxListingOf(world.mw)
+      const box = listing.deliverRecord(tombstoneBoxRecord())
+      world.mw.willPut(world.mw.refusalOf(box.scope, new VaultError('stale_write', "Ahead.", { meta: { act: 'ahead' } }), null, null))
+      await TH.expectRefusal(listing.put(fullBoxRecord(), { expected: box.sparse }), 'stale_write')
+      expect(world.mw.badnews).to.deep.equal([])
+    })
+
     it("leaves the answer's own refusals to the caller", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.willGet(world.mw.refusalOf(scopeOf(), new VaultError('storage_unavailable', "Down."), null))

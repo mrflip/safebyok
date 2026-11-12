@@ -117,7 +117,7 @@ export const {
   const tidied      = obj({ totalCount: uint }).strict()
 
   const crossedNotice = discrim('ok', [
-    obj({ ok: lit(true), act: oneof(['got', 'gone']), val: union([SX.vaultRow, SX.boxRow]), world: SX.vaultRow.nullable().default(null), err: lit(null).default(null) }).strict(),
+    obj({ ok: lit(true), act: oneof(['gotlive', 'gotgone']), val: union([SX.vaultRow, SX.boxRow]), world: SX.vaultRow.nullable().default(null), err: lit(null).default(null) }).strict(),
     obj({ ok: lit(false), act: oneof(EX.badActVals), val: lit(null).default(null), world: lit(null).default(null), err: crossedErr }).strict(),
   ]).transform((crossed): Outcome<Notice> => {
     if (crossed.ok) { return { ok: true, val: { act: crossed.act, val: crossed.val, world: crossed.world } } }

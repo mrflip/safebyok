@@ -396,7 +396,7 @@ Each rule is one testable statement about what an adapter does. An atomic unit i
 - A write changes exactly one row, the one the classifier was handed, or inserts one where it was handed none.
 - born inserts: no row exists for the `box_scope` in this life of its vault. A box of an earlier life stands under its own key, untouched.
 - Every write stores the proposed revision: the proposed `revision_tok`, at seq = stored seq + 1. The seq at a scope therefore rises by exactly one at each write.
-- The seq goes on across a rebirth: a reborn row is stored at its tombstone's seq + 1. So the seq at a scope never falls, whatever the life, and a device can tell a row of an earlier life from a row of a later one by its seq (`notes/receive-contract.md`). Only delRaw, which returns a scope to void, ends this.
+- The seq goes on across a rebirth: a reborn row is stored at its tombstone's seq + 1. So the seq at a scope never falls, whatever the life, and a device can tell a row of an earlier life from a row of a later one by its seq (`notes/deliver-contract.md`). Only delRaw, which returns a scope to void, ends this.
 - born, reborn and delete store the proposed `box_tok`, which differs from the stored row's. Replace leaves `box_tok` unchanged.
 - delete stores a tombstone (state gone, no value, the proposed `revision_tok`, seq + 1, the proposed `box_tok`) and never removes the row. Only delRaw removes rows.
 - Every successful modification, delete included, writes a new revision. Deleting a tombstone refuses (`dubdel`) and leaves the revision unchanged.

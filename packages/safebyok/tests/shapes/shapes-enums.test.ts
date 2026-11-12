@@ -9,7 +9,7 @@ describe("EX.amVals", () => {
 
 describe("EX's delivering tags, EX.recordShapeVals and EX.ageVals", () => {
   it("list the kinds of the table", () => {
-    expect(EX.deliveryFieldingVals).to.deep.equal(['as_sent', 'as_got', 'as_db', 'void', 'none'])
+    expect(EX.deliveryFieldingVals).to.deep.equal(['as_sent', 'as_got', 'as_db', 'none'])
     expect(EX.deliveryMakingVals).to.deep.equal(['none', 'listed', 'make', 'remake'])
     expect(EX.deliveryModificationVals).to.deep.equal(['older', 'same', 'adopt'])
     expect(EX.recordShapeVals).to.deep.equal(['sparse', 'full', 'gone'])

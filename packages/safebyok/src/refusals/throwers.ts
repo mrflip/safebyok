@@ -90,7 +90,7 @@ export function unlockFirst(): VaultError { return new VaultError('vault_locked'
 
 // == [Vault Listing Throwers]: delOfOtherLife, vaultStoredDamaged
 
-/** A `vault_reborn` refusal: a delete named a different life of the vault than the life in its slot. */
+/** A `vault_reborn` refusal: a delete named a different life of the vault than the life listed. */
 export function delOfOtherLife(): VaultError { return new VaultError('vault_reborn', Phrases.DelOfOtherLife) }
 
 /** A `damaged_row` refusal: this vault is stored damaged and cannot be read. */

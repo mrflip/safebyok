@@ -53,7 +53,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Methods]: puttable, create, tryCreate, shellFor
 
-  /** The box a put of `scoped` goes through: the one listed, or a void one made for an empty slot. */
+  /** The box a put of `scoped` goes through: the one listed, or a void one made where none is listed. */
   puttable(scoped: unknown, opts: BoxPutOpts = {}): Box {
     const { ifAbsent } = VX.boxPutOpts.parse(opts)
     const scope = this.scopeOf(scoped)
@@ -62,7 +62,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return listed ?? this.#shellFor(scope)
   }
 
-  /** The box a delete of `scoped` goes through: the one listed, or a void one made for an empty slot. */
+  /** The box a delete of `scoped` goes through: the one listed, or a void one made where none is listed. */
   deletable(scoped: unknown): Box { return this.puttable(scoped) }
 
   /** Seals a new box and puts it where no live record stands, answering the box listed. */

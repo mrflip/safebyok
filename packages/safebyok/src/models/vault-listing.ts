@@ -40,7 +40,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     Object.freeze(this)
   }
 
-  /** SLOPDOC: A new vault for `scope`, asked of the user, put and unlocked; or, locked, the slot's winner. */
+  /** SLOPDOC: A new vault for `scope`, asked of the user, put and unlocked; or, locked, the vault some other device put first. */
   buildVault(scope: VaultScope): Promise<Vault> { return Vault.launchBirth(this, scope, this.bankFriend.askUser) }
 
   /** Non-throwing form of {@link buildVault}. */
@@ -81,7 +81,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   async replacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<VaultRecord> { return valOf(await this.tryReplacePassphrase(ante, passphrase_wayin)) }
 
   /** {@link replacePassphrase}, answering the vaultDB's own answer.
-   * Chute: replacePassphrase → **tryReplacePassphrase** → vaultDB.tryReplacePassphrase, then deliverAnswer
+   * Chute: tryReplacePassphrase → vaultDB.tryReplacePassphrase → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryReplacePassphrase(ante: VaultRecord, passphrase_wayin: SX.Gate['passphrase_wayin']): Promise<ThingAnswer<VaultRecord>> {
     let answer: Answer<VaultRecord, OkAct | GateAct> | typeof UNANSWERED = UNANSWERED
@@ -97,7 +97,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   async addPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<VaultRecord> { return valOf(await this.tryAddPasskey(ante, passkey_wayin)) }
 
   /** {@link addPasskey}, answering the vaultDB's own answer.
-   * Chute: addPasskey → **tryAddPasskey** → vaultDB.tryAddPasskey, then deliverAnswer
+   * Chute: tryAddPasskey → vaultDB.tryAddPasskey → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryAddPasskey(ante: VaultRecord, passkey_wayin: NonNullable<SX.Gate['passkey_wayin']>): Promise<ThingAnswer<VaultRecord>> {
     let answer: Answer<VaultRecord, OkAct | GateAct> | typeof UNANSWERED = UNANSWERED
@@ -113,7 +113,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   async revokePasskey(ante: VaultRecord): Promise<VaultRecord> { return valOf(await this.tryRevokePasskey(ante)) }
 
   /** {@link revokePasskey}, answering the vaultDB's own answer.
-   * Chute: revokePasskey → **tryRevokePasskey** → vaultDB.tryRevokePasskey, then deliverAnswer
+   * Chute: tryRevokePasskey → vaultDB.tryRevokePasskey → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryRevokePasskey(ante: VaultRecord): Promise<ThingAnswer<VaultRecord>> {
     let answer: Answer<VaultRecord, OkAct | GateAct> | typeof UNANSWERED = UNANSWERED
@@ -187,7 +187,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   protected vaultTokOfWorld(): null { return null }
 
-  // A Vault object is one life of its vault: a vault deleted, or made anew, is a new instance (`notes/receive-contract.md`, L2).
+  // A Vault object is one life of its vault: a vault deleted, or made anew, is a new instance (`notes/deliver-contract.md`, L2).
   protected get isOneLifePerInstance(): true { return true }
 
   protected scopepathOf(scope: VaultScope): string {

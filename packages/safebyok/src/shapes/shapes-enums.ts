@@ -19,12 +19,11 @@ export type Age = typeof ageVals[number]
 
 /** Where a listing finds the record an answer delivers, by its act:
  * - `as_sent` -- in `val`, and it must be the record sent, at its revision
- * - `as_got`  -- in `val`, and it must be of the scope sent
- * - `as_db`   -- in `dbhas`, and it must be of the scope sent
- * - `void`    -- nowhere: storage answered that nothing is stored at the scope
+ * - `as_got`  -- in `val`, and it must be of the scope sent; null where storage answered that nothing is stored
+ * - `as_db`   -- in `dbhas`, and it must be of the scope sent; null where nothing is stored
  * - `none`    -- nowhere: the answer says nothing of the record, as a box's `vault_*` act or an unclassified_storing refusal
  */
-export const deliveryFieldingVals = ['as_sent', 'as_got', 'as_db', 'void', 'none'] as const
+export const deliveryFieldingVals = ['as_sent', 'as_got', 'as_db', 'none'] as const
 export type DeliveryFielding = typeof deliveryFieldingVals[number]
 
 /** Which instance receives what a listing delivers:
@@ -76,7 +75,7 @@ export type BoxExposure = typeof boxExposureVals[number]
 
 // == [Wayins and gatings]: wayinkindVals, Wayinkind, gatingkindVals, Gatingkind, correctablekindVals
 
-/** The kinds of wayin, each with a record shape and a slot of the gate of its own: a `passphrase` the user types, or a `passkey` the user touches. */
+/** The kinds of wayin, each with a record shape and a field of the gate of its own: a `passphrase` the user types, or a `passkey` the user touches. */
 export const wayinkindVals = ['passphrase', 'passkey'] as const
 export type Wayinkind = typeof wayinkindVals[number]
 

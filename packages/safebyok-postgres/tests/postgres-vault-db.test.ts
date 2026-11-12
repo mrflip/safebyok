@@ -85,7 +85,7 @@ describe("PostgresVaultDB's watch", () => {
     const notices = watching(vaultDB)
     const box = TH.boxAt(0, 'life1', { sidecar: { note: 'x'.repeat(9000) } })
     await vaultDB.putBox(TH.boxPutAskOf(box))
-    await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'got', val: box, world: vault }]) })
+    await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'gotlive', val: box, world: vault }]) })
   })
 
   it("passes over a notification on its channel that no write of ours sent", async () => {
@@ -95,7 +95,7 @@ describe("PostgresVaultDB's watch", () => {
     const db = await TH.database()
     await db.query('SELECT pg_notify($1, $2), pg_notify($1, $3), pg_notify($1, $4)', [vaultChannelOf(TH.bankScope.user_id), 'not json', '{"applabel":"acme"}', '[1, 2, 3]'])
     await vaultDB.putVault(TH.vaultPutAskOf(vault))
-    await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'got', val: vault, world: vault }]) })
+    await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'gotlive', val: vault, world: vault }]) })
   })
 
   it("delivers nothing without a listen", async () => {
@@ -155,9 +155,9 @@ describe("PostgresVaultDB's notices", () => {
     await vaultDB.delBox(TH.boxDelAskOf(box))
     await vi.waitFor(() => {
       expect(notices).to.deep.equal([
-        { act: 'got', val: vault, world: vault },
-        { act: 'got', val: box, world: vault },
-        { act: 'gone', val: tombstone, world: vault },
+        { act: 'gotlive', val: vault, world: vault },
+        { act: 'gotlive', val: box, world: vault },
+        { act: 'gotgone', val: tombstone, world: vault },
       ])
     })
   })
@@ -218,7 +218,7 @@ describe("PostgresVaultDB's channels", () => {
     const notices = watching(vaultDB, { ...TH.bankScope, user_id })
     const vault = TH.vaultAt(0, 'life1', { user_id })
     await vaultDB.putVault(TH.vaultPutAskOf(vault))
-    await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'got', val: vault, world: vault }]) })
+    await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'gotlive', val: vault, world: vault }]) })
   })
 
   // The channel is 'safebyok_' (9 bytes) plus the user_id, and Postgres rejects a channel name longer than 63 bytes.

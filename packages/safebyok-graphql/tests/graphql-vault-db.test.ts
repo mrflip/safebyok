@@ -70,7 +70,7 @@ function watched(atOnce?: FakeResult) {
   return { streams, counts, heard, badnews, stop }
 }
 
-const gotNotice = { safebyokWatch: { __typename: 'SafebyokNotice', ok: true, act: 'got', val: { __typename: 'SafebyokVaultRecord', ...TH.vaultAt() }, world: null, err: null } }
+const gotNotice = { safebyokWatch: { __typename: 'SafebyokNotice', ok: true, act: 'gotlive', val: { __typename: 'SafebyokVaultRecord', ...TH.vaultAt() }, world: null, err: null } }
 const revokedNotice = { safebyokWatch: { ok: false, act: 'unclassified_storing', val: null, world: null, err: { refusalkind: 'identity_revoked', message: 'Signed out', meta: null } } }
 // --
 
@@ -142,7 +142,7 @@ describe("GraphQLVaultDB's watch", () => {
     const { streams, heard, stop } = watched()
     streams[0]?.({ data: gotNotice, hasNext: true })
     streams[0]?.({ data: gotNotice, hasNext: false })
-    expect(heard).to.deep.eq([{ act: 'got', val: TH.vaultAt(), world: null }])
+    expect(heard).to.deep.eq([{ act: 'gotlive', val: TH.vaultAt(), world: null }])
     stop()
   })
 

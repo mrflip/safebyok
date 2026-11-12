@@ -18,7 +18,7 @@ bank.hello()                                         a forced reset; a host may 
    │       older than the one listed                 → ignored
    │       new vault_tok, or alive over a tombstone  → build, enlisted; old_vault.vacate, delist
    │       same life                                 → vault.receive(record)
-   │       a tombstone of its own vault_tok          → the vault stays in its slot and adopts it (locked, row forgotten, boxes vacated)
+   │       a tombstone of its own vault_tok          → the vault stays listed at its scope and adopts it (locked, row forgotten, boxes vacated)
    ├─ bank.#cacheDeviceRecord                        a damaged record written over → bad news
    ├─ vaultListing.hello()                           subscribe to VaultDB
    └─ vaultListing.demandEnabled()                   a sweep crossing hello refuses here
@@ -128,12 +128,12 @@ own verbs (*Changing the gate*). The patch hooks belong to `Box`.
 
 * DeviceDB.cache/peek/vacate: directly keep/retrieve record by scope + vault_tok
 * Unlist: remove from the listing's list
-* A listing memoizes its children in a Map, and `deliver` has an instance in its slot before it yields, so
+* A listing memoizes its children in a Map, and `deliverAnswer` has an instance listed at its scope before it yields, so
   overlapping answers land on one instance. Subscriptions are not relied on: a fetch answer builds an instance where
   there is none, as a notice does
 * The Bank is durable: `bank.sweep` sweeps its listing and children, and the next hello builds fresh ones (ruled: a swept bank is done, a host makes a new Bank; not built yet)
 * A Vault instance is replaced only when vacated, swept, or created from gone or void. When a birth's
-  `vaultListing.put` is delivered, it replaces the object. Only a deleted vault stays in its slot, tombstoned, so a
+  `vaultListing.put` is delivered, it replaces the object. Only a deleted vault stays listed, tombstoned, so a
   late fetch answer loses to it. When the tombstone is delivered, it vacates the vault's box listing and boxes
 * No timers on a Storable or a lease: a JS timer on a page that may be suspended at any moment guarantees nothing.
   Refresh timers belong to the listing or the bank. Autolock is a best-effort reminder, not a guarantee. It has two
@@ -259,7 +259,7 @@ second field.
 | `ensureVault`    | A Vault listed, the only one of its scope: unlocked, or locked by a `lock()` after the attach                                                                                              | Nothing stored; has only what the answer delivered. Another won: `gate_made_elsewhere`, its Vault listed, locked |
 | `ensureUnlocked` | Unlocked, a lease in force at its attach                                                                                                                                                  | `dismissed`: no lease granted, none cached by this call                                       |
 | A gate change    | The record has the next gate, its epoch one up. Unlocked under that epoch, a fresh lease of full term, whatever lock came before or crossed                                                 | Nothing stored, unless the answer was lost; the lease as it was                                      |
-| `delVaultPrompt` | A tombstone stored and its box rows tombstoned; nothing of it on this device; the Vault tombstoned in its slot                                                                           | Nothing stored, unless the answer was lost; the Vault locked, and otherwise as it was                |
+| `delVaultPrompt` | A tombstone stored and its box rows tombstoned; nothing of it on this device; the Vault tombstoned, still listed                                                                           | Nothing stored, unless the answer was lost; the Vault locked, and otherwise as it was                |
 | `gating.attempt` | At most one under way; its gate read once; no cleartext kept                                                                                                                                  | The same; correctable: the gating still open; any other: settled                                     |
 
 ## `build_vault`
@@ -269,7 +269,7 @@ bank.ensureVault(bag)
 ├─ bank.#demandReady                                 hello's own error, where it failed; 'bad_option' before any hello
 ├─ vaultListing.at(scope)                            what hello loaded: a present vault → returned, without asking
 └─ vaultListing.buildVault(scope) → Vault.launchBirth(listing, scope)
-   ├─ prior = the slot's tombstone's revision, else VoidRevision     a present vault listed → 'bad_option'
+   ├─ prior = the tombstone listed's revision, else VoidRevision     a present vault listed → 'bad_option'
    └─ Gating.launchBirth(listing, scope, prior, Vault.#unlockVaultByProving, askUser)
       ├─ no requestCleartext                         → 'bad_option', without asking
       ├─ listing.attachGating                          one open on this bank → 'already_asking'
@@ -466,7 +466,7 @@ gating.attempt({ passphraseClear })                  no lock check: a lock does 
             │    moved → 'stale_write', nothing stored
             └─ deliverAnswer(answer, tombstone) → receiveRecord → adopt(tombstone)
                ├─ vault.#revokeLease('tombstone')    refused → announced 'lease_revoke_failed'; the tombstone stays
-               └─ boxListing.vacate()                boxes disabled and delisted, nothing deleted; the vault stays in its slot, tombstoned
+               └─ boxListing.vacate()                boxes disabled and delisted, nothing deleted; the vault stays listed, tombstoned
 ```
 
 The lock comes first because it is synchronous and safe: from then on no box can be unsealed under a lease while

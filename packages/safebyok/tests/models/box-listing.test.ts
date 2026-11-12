@@ -161,7 +161,7 @@ describe("boxListing.get(scoped, opts)", () => {
 })
 
 describe("boxListing.puttable(scoped, opts)", () => {
-  it("hands a void shell for an empty slot, asking storage nothing", () => {
+  it("hands a void shell where none is listed, asking storage nothing", () => {
     const listing = boxListingOf(world.mw)
     const shell = listing.puttable(world.mw.boxscope(Label))
     expect(shell.isPresent).to.be.false
@@ -181,7 +181,7 @@ describe("boxListing.puttable(scoped, opts)", () => {
     expect(listing.puttable(gone.scope)).to.eq(gone)
   })
 
-  it("under ifAbsent 'fail', refuses an empty slot with 'absent_box'", () => {
+  it("under ifAbsent 'fail', refuses where none is listed with 'absent_box'", () => {
     const listing = boxListingOf(world.mw)
     const alive = listing.deliverRecord(fullBoxRecord({ boxlabel: 'alive_one' }))
     const gone  = listing.deliverRecord(tombstoneBoxRecord({ boxlabel: 'gone_one' }))

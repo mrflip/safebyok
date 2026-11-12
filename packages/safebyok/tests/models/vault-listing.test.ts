@@ -1,4 +1,4 @@
-/** The vault listing's slot: what each record does to the vault listed under its scope, and the end state a delete lands on. */
+/** The vault listing at a scope: what each record does to the vault listed under its scope, and the end state a delete lands on. */
 
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
@@ -37,7 +37,7 @@ async function deleted() {
 /** The record of a vault's birth over the row `expected`, as a birth's `listing.put` is handed it. */
 async function birthOver(expected: SX.Revision): Promise<VaultRecord> { return { ...await storedVaultRecord(), ...SX.nextRevisionOf(expected, Date.now()) } }
 
-// A tombstone is of a life of its own, so the vault of the life deleted is vacated, and the tombstone's instance takes its slot.
+// A tombstone is of a life of its own, so the vault of the life deleted is vacated, and the tombstone's instance is listed in its place.
 async function expectLandedGone(vault: Vault, { listing, deviceDB }: Pick<Awaited<ReturnType<typeof makeBornVault>>, 'listing' | 'deviceDB'>) {
   await forgotten()
   const gone = listing.at(Dna)
@@ -360,7 +360,7 @@ describe("building over a tombstone", () => {
     expect(storedNow()).to.include({ am: 'a', vault_tok: reborn.vault_tok, revision_seq: 2 })
   })
 
-  it("listing.buildVault refuses a vault present in the slot, the dialog not shown", async () => {
+  it("listing.buildVault refuses a vault present at its scope, the dialog not shown", async () => {
     const { listing, fakeBank } = await makeBornVault()
     const dialog = vi.fn()
     fakeBank.requestCleartext = dialog
@@ -368,7 +368,7 @@ describe("building over a tombstone", () => {
     expect(dialog).not.toHaveBeenCalled()
   })
 
-  it("Vault.launchBirth refuses a vault present in the slot, no gating opened and no KDF run", async () => {
+  it("Vault.launchBirth refuses a vault present at its scope, no gating opened and no KDF run", async () => {
     const keyDeriver = { ...TH.testDeriver }
     const deriveKeyBytes = vi.spyOn(keyDeriver, 'deriveKeyBytes')
     const { listing, fakeBank, opts, storedNow } = await makeBornVault(byPassphrase(Passphrase), { keyDeriver })
@@ -616,7 +616,7 @@ describe("the gate methods return the vaultDB's answer", () => {
 })
 
 describe("a listing shares one storage call among concurrent requests", () => {
-  it("joins fetches of one slot made while one runs, the instance's own among them, into one get", async () => {
+  it("joins gets of one scope made while one runs, the instance's own among them, into one get", async () => {
     const { vault, listing, opts } = await makeBornVault()
     const tryGetVault = vi.spyOn(opts.vaultDB, 'tryGetVault')
     const [fetched, refetched, own] = await Promise.all([listing.get(Dna, { maxMillisSinceRefresh: 0 }), listing.get(Dna, { maxMillisSinceRefresh: 0 }), vault.get({ maxMillisSinceRefresh: 0 })])

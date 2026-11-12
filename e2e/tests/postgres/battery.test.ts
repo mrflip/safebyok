@@ -42,7 +42,7 @@ TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
     await other.putBox(TH.boxPutAskOf(box))
 
     await vi.waitFor(() => { expect(notices).to.have.lengthOf(2) })
-    expect(notices.map(({ act, val }) => [act, val])).to.deep.equal([['got', vault], ['got', box]])
+    expect(notices.map(({ act, val }) => [act, val])).to.deep.equal([['gotlive', vault], ['gotlive', box]])
   })
 
   it("hears another server's write for a user_id of capitals and punctuation", async () => {
@@ -53,6 +53,6 @@ TH.describeOnPostgres('battery', "PostgresVaultDB over a real Postgres", () => {
     const vault = TH.vaultAt(0, 'life1', { user_id })
     const other = await TH.vaultDBOver(db)
     await other.putVault(TH.vaultPutAskOf(vault))
-    await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'got', val: vault, world: vault }]) })
+    await vi.waitFor(() => { expect(notices).to.deep.equal([{ act: 'gotlive', val: vault, world: vault }]) })
   })
 })

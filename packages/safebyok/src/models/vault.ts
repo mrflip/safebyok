@@ -81,7 +81,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#bankFriend = VX.bankFriend.parse(bankFriend)
   }
 
-  /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the slot's tombstone if it has one. */
+  /** SLOPDOC: Builds a vault under `scope` through a build_vault gating, over the tombstone listed, if one is. */
   static async launchBirth(listing: VaultListing, scope: VaultScope, askUser: AskUser | null): Promise<Vault> {
     const checked = listing.scopeOf(scope)
     listing.demandEnabled()
@@ -126,7 +126,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link revokePasskeyPrompt}. */
   tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
 
-  /** Delete this vault through a del_vault gating, which asks for the passphrase, leaving a tombstone in its slot and nothing of it on this device. */
+  /** Delete this vault through a del_vault gating, which asks for the passphrase, leaving its tombstone listed and nothing of it on this device. */
   async delVaultPrompt(): Promise<this> {
     await this.ensureTimely(); this.demandPromptable()
     await Gating.launchOn(this, 'del_vault', Vault.#unlockVaultByProving, this.#bankFriend.askUser)
@@ -290,7 +290,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryHello(): Promise<Outcome<this>> { return outcomeOf(() => this.hello()) }
 
   /** Hydrate and return the box listed at `boxlabel` (i.e. fetch if stale). A missing box is null for `ifAbsent: 'nil'`, or refused for `ifAbsent: 'fail'`.
-   * Chute: **vault.getBox** → listing.get → tryGet → (joined by scope) #doTryGetJoined → doTryGet, then deliverAnswer
+   * Chute: vault.getBox → listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async getBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> {
     return this.boxListing.get({ ...this.scope, boxlabel }, opts)
@@ -367,7 +367,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Protected, overriding Storable's]: adopt, sweepContents, vacateContents, isFullRecord, lifeTokPathOf, makeSnapshot
 
-  /** Adopt `central`. A tombstone locks the vault, forgets the cached row and vacates the boxes, the vault keeping its slot.
+  /** Adopt `central`. A tombstone locks the vault, forgets the cached row and vacates the boxes, the vault staying listed.
    * A failed revoke is announced as `lease_revoke_failed`, and the tombstone stands.
    */
   protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {

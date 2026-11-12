@@ -421,7 +421,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
     },
 
     notify: async (record, worldNow = worldVaultRow()) => {
-      const notice = { act: VX.isTombstone(record) ? 'gone' : 'got', val: record, world: worldNow } as Notice
+      const notice = { act: VX.isTombstone(record) ? 'gotgone' : 'gotlive', val: record, world: worldNow } as Notice
       liveWatch().onNotice(notice)
       await settled()
     },

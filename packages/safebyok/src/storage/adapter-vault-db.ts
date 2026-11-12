@@ -296,11 +296,11 @@ export abstract class AdapterVaultDB implements VaultDB {
       const world = (vault === undefined) ? null : SX.vaultRow.safeParse(vault)
       if ((world !== null) && (! world.success)) { return }
       if (box === undefined) {
-        if (world !== null) { onNotice({ act: (world.data.am === 'x') ? 'gone' : 'got', val: world.data, world: world.data }) }
+        if (world !== null) { onNotice({ act: (world.data.am === 'x') ? 'gotgone' : 'gotlive', val: world.data, world: world.data }) }
         return
       }
       const val = SX.boxRow.safeParse(box)
-      if (val.success) { onNotice({ act: (val.data.am === 'x') ? 'gone' : 'got', val: val.data, world: world?.data ?? null }) }
+      if (val.success) { onNotice({ act: (val.data.am === 'x') ? 'gotgone' : 'gotlive', val: val.data, world: world?.data ?? null }) }
     }, onBadNews)
   }
   // --

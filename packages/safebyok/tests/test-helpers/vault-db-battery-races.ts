@@ -157,7 +157,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         const tombstone = vaultTombstoneOf(vault)
         await vaultDB.delVault(vaultDelAskOf(vault))
         await vi.waitFor(() => {
-          expect(notices).to.deep.include.members([{ act: 'got', val: box, world: boxWorld(vault) }, { act: 'gone', val: tombstone, world: tombstone }])
+          expect(notices).to.deep.include.members([{ act: 'gotlive', val: box, world: boxWorld(vault) }, { act: 'gotgone', val: tombstone, world: tombstone }])
         })
       })
 
@@ -166,7 +166,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         const twin = await twinOf(vaultDB)
         const { notices } = watching(vaultDB, vaultScope)
         await twin.putBox(boxPutAskOf(box))
-        await vi.waitFor(() => { expect(notices).to.deep.include({ act: 'got', val: box, world: boxWorld(vault) }) })
+        await vi.waitFor(() => { expect(notices).to.deep.include({ act: 'gotlive', val: box, world: boxWorld(vault) }) })
       })
 
       it("notifies of its own vault under a vault's scope, and of every vault of its bank under a bank's", async () => {

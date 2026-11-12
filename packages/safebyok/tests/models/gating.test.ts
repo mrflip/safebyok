@@ -255,7 +255,7 @@ describe("a birth through a gating", () => {
     expect(deviceDB.tryStow).not.toHaveBeenCalled()
   })
 
-  it("refuses a vault present in the slot, showing no dialog", async () => {
+  it("refuses a vault present at its scope, showing no dialog", async () => {
     const { listing, gatingAt } = birthWorld()
     const launched = listing.buildVault(Dna)
     const gating = await gatingAt<'build_vault'>()

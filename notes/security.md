@@ -52,13 +52,13 @@ added or folded into through the subagent, and no other entry changes.
 
 * 2026-11-11 (vaultdb_classifier, PR #639, package `safebyok`): **A box call's answer that carries the vault's row as its `world` can vacate the Vault of an ended life.**
   When the answer to a box get, put, del or listing, or a watch notice, carries the vault's row as its `world`, `Vault.receiveWorld` (`models/vault.ts`) hands that row to the bank's vault listing
-  (`Listing.deliverRecord`, `models/listing.ts`; amended 2026-11-12 (vaultdb_asks): it was `Listing.receiveRow`), which treats it as it treats any vault row (`notes/receive-contract.md`, row W2). A newer row of another life (another `vault_tok`: the vault was deleted,
+  (`Listing.deliverRecord`, `models/listing.ts`; amended 2026-11-12 (vaultdb_asks): it was `Listing.receiveRow`), which treats it as it treats any vault row (`notes/deliver-contract.md`, row W2). A newer row of another life (another `vault_tok`: the vault was deleted,
   or deleted and made anew, on another device) vacates the Vault of the ended life at once, which disables and locks it and empties its box listing, and lists a new Vault in its place: one that reads as deleted
   for a tombstone, or a new locked vault for a live row. So an unlocked Vault of an ended life no longer stays unlocked until the vault listing next fetches its own row. The caller hears the answer's own
   refusal (`absent_vault` or `vault_reborn`); before, the Vault refused the row with `record_conflict` and stayed as it was. An older row is dropped; a newer row of the same life is adopted as before, and a
   `gate` changed elsewhere arrives with it. The choosing is the vault listing's existing selection (`VaultListing.fateOver`; amended 2026-11-12 (vaultdb_asks): `VaultListing.slotStepOf`, answering `'receive'`, `'keep'` or `'remake'`,
   and `Listing.deliver` now plans from the answer's act first and then carries the plan out); no state, lock, retry or guard was added.
-  Where no vault row is stored at all, the answer's `world` is the sentinel row, which is older than any row held and is dropped silently; `notes/receive-contract.md` (F6, W1) says that finding should be
+  Where no vault row is stored at all, the answer's `world` is the sentinel row, which is older than any row held and is dropped silently; `notes/deliver-contract.md` (N2, W1) says that finding should be
   told to the host as bad news, and that is not built.
 
 * 2026-11-11 (vaultdb_classifier, package `safebyok`): **A gate verb's tests are made over the vault row the adapter fetched in the step that stores the record.**

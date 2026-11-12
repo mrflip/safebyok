@@ -220,7 +220,7 @@ describe("vault.replacePassphrasePrompt()", () => {
     expect(deviceDB.cachedNow()).to.include({ gate_epoch: landedEpoch })
   })
 
-  it("refuses a vault deleted since the last fetch, its tombstone listed in its slot before the refusal is thrown", async () => {
+  it("refuses a vault deleted since the last fetch, its tombstone listed before the refusal is thrown", async () => {
     const { vault, listing, demandStored, anotherSession } = await makeBornVault()
     await delTyping(anotherSession().deliverRecord(demandStored()))
     expect(vault.isPresent).to.be.true
@@ -229,7 +229,7 @@ describe("vault.replacePassphrasePrompt()", () => {
     expect(listing.at(vault.scope)).to.include({ isPresent: false, vault_tok: demandStored().vault_tok, revision_seq: demandStored().revision_seq })
   })
 
-  it("refuses a vault of another life stored since the last fetch, that life replacing the vault in its slot", async () => {
+  it("refuses a vault of another life stored since the last fetch, that life replacing the vault listed", async () => {
     const { vault, listing, restoreRow } = await makeBornVault()
     const other = { ...await storedVaultRecord(), revision_seq: 5, revision_tok: 'rev-other-5' }
     restoreRow(other)

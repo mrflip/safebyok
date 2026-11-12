@@ -11,7 +11,7 @@ import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
 
 describe("wayinkind", () => {
-  it("takes each kind of wayin, and refuses any other slot", () => {
+  it("takes each kind of wayin, and refuses any other", () => {
     expect(GX.wayinkind.safeParse('passkey').success).to.be.true
     expect(GX.wayinkind.parse('passphrase')).to.eq('passphrase')
     TH.expectSyncRefusal(() => GX.wayinkind.parse('hunter2'))

@@ -257,6 +257,8 @@ Use these only where the precise word does not apply:
 * **arrive**: adopt, receive.
 * **send**: deliver, notify, put.
 * **modify**: del, put, update, adopt, deliver.
+* **slot**: the scope a thing is listed at (scopepath for its address), or a propname, fieldname,
+  methodname, foolabel, fookind or fooTag.
 
 ## Words safebyok does not use
 
