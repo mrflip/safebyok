@@ -1,6 +1,6 @@
 /** The deviceDB, which caches on this device a lease and a device row for each bank. A subclass writes the `do*` calls. */
 
-import { IsDeviceDB } from '../helpers/consts'
+import { IsDeviceDB, PackageVersion } from '../helpers/consts'
 import { randomId } from '../helpers/crypto'
 import type { Awaitable } from '../helpers/helpers'
 import { type VaultError, isVaultError } from '../refusals/errors'
@@ -99,11 +99,11 @@ export abstract class DeviceDB {
 
   // == [Device verbs]: ensureCachedDevice, tryEnsureCachedDevice, forgetDevice, tryForgetDevice, listRawDevices, tryListRawDevices
 
-  /** The device row of this bank scope, made with a fresh random `device_tok` on the first call. */
+  /** The device row of this bank scope, made with a fresh random `device_tok` on the first call. Its `package_version` is this safebyok's, whatever an earlier call stored. */
   async ensureCachedDevice(scope: BankScope): Promise<DeviceRow> {
     try {
       const { user_id, banklabel } = CX.bankScope.parse(scope)
-      const made = SX.deviceRow.parse({ user_id, banklabel, device_tok: randomId() })
+      const made = SX.deviceRow.parse({ user_id, banklabel, device_tok: randomId(), package_version: PackageVersion })
       return SX.deviceRow.parse(await this.doEnsureCachedDevice(made))
     } catch (err) { throw refusalOf(err, 'ensureCachedDevice') }
   }

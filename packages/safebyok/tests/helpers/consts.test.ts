@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { DeviceDBVersion, FarFuture, FarPast, ForeverMillis, IsGuarded, VaultsDBVersion, brand, brandGuarded, brandOf, hasModelkind, isAdapterVaultDB, isDeviceDB, isGuarded, isVaultDB } from '../../src/helpers/consts'
+import { DeviceDBVersion, FarFuture, FarPast, ForeverMillis, IsGuarded, PackageVersion, VaultsDBVersion, brand, brandGuarded, brandOf, hasModelkind, isAdapterVaultDB, isDeviceDB, isGuarded, isVaultDB } from '../../src/helpers/consts'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { VaultDBVerbnames } from '../../src/storage/vault-db'
@@ -159,5 +161,12 @@ describe("isGuarded", () => {
     expect(isGuarded({ ...guarded })).to.be.false
     expect(isGuarded(brand(() => 3, IsGuarded, 'yes'))).to.be.false
     expect(isGuarded(null)).to.be.false
+  })
+})
+
+describe("PackageVersion", () => {
+  it("is the version in package.json, which `pnpm release:version` keeps it to", () => {
+    const manifest = JSON.parse(readFileSync(path.join(import.meta.dirname, '../../package.json'), 'utf8')) as { version: string }
+    expect(PackageVersion).to.eq(manifest.version)
   })
 })

@@ -115,7 +115,7 @@ describe("browserOpts", () => {
     const dbName = freshDbName()
     expect(browserOpts({ dbName })).to.eq(browserOpts({ dbName }))
     expect(browserOpts()).to.eq(browserOpts({}))
-    expect(browserOpts()).to.eq(browserOpts({ dbName: 'safebyok' }))
+    expect(browserOpts()).to.not.eq(browserOpts({ dbName: 'safebyok' }))
   })
 
   it("returns a separate DeviceDB for each dbName, sharing the deriver and checker", () => {

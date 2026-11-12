@@ -33,7 +33,7 @@ export * as BX from './bankdb'
 
 // == [IndexedDB]: the single transaction of each IndexedDB call, the row at a scopepath within it, and the versioned shelf
 export { inOneStep, rowAt } from './idb-transaction'
-export { versionedShelfOf } from './idb-shelf'
+export { dbprefixOf, versionedShelfOf } from './idb-shelf'
 export type { VersionedShelfSpec } from './idb-shelf'
 export { DefaultMaxBoxes, DefaultMaxRecordSizeEst, VaultsDBVersion } from '../helpers/consts'
 // --

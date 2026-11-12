@@ -2,14 +2,23 @@
 
 import { createStore, type UseStore } from 'idb-keyval'
 import type * as Z from 'zod'
-import { objCheck } from '../helpers/validator'
+import { Checker, objCheck } from '../helpers/validator'
 
-// == [The versioned shelf]: VersionedShelfSpec, VersionPattern, versionedShelfSpec, shelves, versionedShelfOf, isOlderDBName, wipeOlderDBs
+// == [The versioned shelf]: dbprefixOf, VersionedShelfSpec, VersionPattern, versionedShelfSpec, shelves, versionedShelfOf, isOlderDBName, wipeOlderDBs
 
-/** The parts of a versioned shelf's name: its host's `dbName`, the kind of database, and the layout version. */
+const optionalDbName = Checker(({ str }) => str.min(1).optional(), 'bad_option')
+
+// Every database this library writes starts `safebyok`, so a host can tell them from its own. Nothing else scopes a name: every row's key begins `user_id`, `banklabel`.
+/** The start of every IndexedDB database name for the host's `dbName`: `safebyok`, or `safebyok-<dbName>` when there is one. */
+export function dbprefixOf(dbName?: string): string {
+  const checked = optionalDbName.parse(dbName, { where: 'dbprefixOf' })
+  return (checked === undefined) ? 'safebyok' : `safebyok-${checked}`
+}
+
+/** The parts of a versioned shelf's name: its {@link dbprefixOf}, the kind of database, and the layout version. */
 export interface VersionedShelfSpec {
-  /** The host's `dbName`, which every database of the bank begins with. */
-  dbName:    string
+  /** The start of the name, up to its colon. */
+  dbprefix:  string
   /** The kind of database, `device`, `devicerow` or `vaults`: the part of the name before `-v` and the version. */
   dbstem:    string
   /** The layout version, three zero-padded parts (`001-001-001`), so that a name sorts as its version does. */
@@ -24,7 +33,7 @@ export interface VersionedShelfSpec {
 const VersionPattern = /^\d{3}-\d{3}-\d{3}$/
 
 const versionedShelfSpec = objCheck(({ str, arr }) => ({
-  dbName:    str.min(1),
+  dbprefix:  str.min(1),
   dbstem:    str.min(1),
   version:   str.regex(VersionPattern),
   storename: str.min(1),
@@ -35,10 +44,10 @@ const versionedShelfSpec = objCheck(({ str, arr }) => ({
 /** The shelf of each database this page has made one for, by the database's name. */
 const shelves = new Map<string, UseStore>()
 
-/** The page's shelf for the database `dbName:dbstem-v<version>`, made on the first call. */
+/** The page's shelf for the database `dbprefix:dbstem-v<version>`, made on the first call. */
 export function versionedShelfOf(spec: VersionedShelfSpec): UseStore {
   const checked = versionedShelfSpec.parse(spec, { where: 'versionedShelfOf' })
-  const dbname = `${checked.dbName}:${checked.dbstem}-v${checked.version}`
+  const dbname = `${checked.dbprefix}:${checked.dbstem}-v${checked.version}`
   const kept = shelves.get(dbname)
   if (kept !== undefined) { return kept }
   const shelf = createStore(dbname, checked.storename)
@@ -61,7 +70,7 @@ export function _cheat_forgetShelf(dbname: string): void { shelves.delete(dbname
 
 /** True for the name of a database of `spec`'s stem at an older version. */
 function isOlderDBName(spec: VersionedShelfSpec, dbname: string): boolean {
-  const stemmed = `${spec.dbName}:${spec.dbstem}-v`
+  const stemmed = `${spec.dbprefix}:${spec.dbstem}-v`
   if (! dbname.startsWith(stemmed)) { return false }
   const version = dbname.slice(stemmed.length)
   // A name whose version this code cannot parse is deleted, like an older one. A future change to the version format must use a new stem.

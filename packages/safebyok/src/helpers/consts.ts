@@ -28,12 +28,16 @@ export const MinuteMillis = 60_000
 /** The span from {@link FarPast} to {@link FarFuture}, in milliseconds: the longest that runs between two instants the package accepts. */
 export const ForeverMillis = FarFuture - FarPast
 
+// The version of this package, written to each device row. `pnpm release:version` rewrites this line (scripts/sync-package-version.ts), and a test holds it to package.json.
+/** The npm version of safebyok. */
+export const PackageVersion = '0.5.0'
+
 // A name carrying it marks a stored layout: increment a version when its layout changes, and every older database is deleted unread. Three zero-padded parts, so that names sort as versions do.
-/** The layout version in the name of the device database, `${dbName}:device-v002-001-001`. */
+/** The layout version in the name of the device database, `safebyok:device-v002-001-001`. */
 export const DeviceDBVersion = '002-001-001'
 
-/** The layout version in the name of the device row database, `${dbName}:devicerow-v001-001-001`. */
-export const DeviceRowDBVersion = '001-001-001'
+/** The layout version in the name of the device row database, `safebyok:devicerow-v002-001-001`. */
+export const DeviceRowDBVersion = '002-001-001'
 
 /** The layout version in the name of the IndexedDB vault database, `${dbName}:vaults-v001-001-001`. */
 export const VaultsDBVersion = '001-001-001'
