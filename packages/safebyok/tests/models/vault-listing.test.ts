@@ -379,7 +379,7 @@ describe("building over a tombstone", () => {
     fakeBank.requestCleartext = dialog
     await TH.expectRefusal(Vault.launchBirth(listing, Dna, opts.bankFriend.askUser))
     expect(dialog).not.toHaveBeenCalled()
-    expect(listing.openGating).to.be.null
+    expect(listing.world.device.openGating).to.be.null
     expect(deriveKeyBytes).not.toHaveBeenCalled()
     expect(storedNow()).to.deep.equal(before)
   })

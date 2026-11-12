@@ -1,6 +1,6 @@
 // Kept off the front door (`safebyok`) so an app that derives, writes or judges some other way never ships the Argon2id code,
 // idb-keyval or zxcvbn (notes/good_bank_opts_are_in_browser.md).
-/** `safebyok/browser`: the key derivers, device database and strength checker a browser app gives to `Bank.make`, and {@link browserOpts}, the three in one bag. */
+/** `safebyok/browser`: the key derivers, device database and strength checker a browser app gives to `Device.make`, and {@link browserOpts}, the three in one bag. */
 
 import { argon2idWebV1Deriver } from './deriver/argon2id-webv1'
 import type { KeyDeriver } from './deriver/basederiver'
@@ -21,7 +21,7 @@ export type { IdbDeviceDBOpts } from './storage/idb-device-db'
 
 // == [The bag]: BrowserOpts, bagsByDbName, browserOpts
 
-/** The `Bank.make` options {@link browserOpts} answers, to spread in beside your own. */
+/** The `Device.make` options {@link browserOpts} answers, to spread in beside your own. */
 export interface BrowserOpts {
   /** {@link argon2idWebV1Deriver}. */
   readonly keyDeriver:      KeyDeriver
@@ -36,7 +36,7 @@ export interface BrowserOpts {
 /** The bag answered for each dbName so far. */
 const bagsByDbName = new Map<string, BrowserOpts>()
 
-/** A frozen bag of the browser's `keyDeriver`, `deviceDB` and `strengthChecker`, the same bag for the same `dbName`, to spread into `Bank.make`. */
+/** A frozen bag of the browser's `keyDeriver`, `deviceDB` and `strengthChecker`, the same bag for the same `dbName`, to spread into `Device.make`. */
 export function browserOpts(opts: IdbDeviceDBOpts = {}): BrowserOpts {
   const { dbName = 'safebyok' } = idbDeviceDBOpts.parse(opts, { where: "In browserOpts's options" })
   const kept = bagsByDbName.get(dbName)

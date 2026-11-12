@@ -3,7 +3,7 @@ import { type KeyDeriverSpec, TestLabelPrefix, keyDeriverSpec } from './shapes'
 
 // == [KeyDeriver]: KeyDeriver, Argon2idKeyDeriver
 
-/** What `Bank.make` accepts to make a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
+/** What `Device.make` accepts to make a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
 export interface KeyDeriver {
   /** The name each wayin records for how its key was derived, so a later device derives it alike. */
   readonly key_deriver_label: string
@@ -13,7 +13,7 @@ export interface KeyDeriver {
   readonly algorithm?:        string | undefined
   /** Derive the key's bytes from the passphrase and the wayin's salt, the same bytes for the same two. */
   readonly deriveKeyBytes:    (passphrase: string, saltBytes: Uint8Array) => Promise<Uint8Array>
-  /** Get ready to derive, such as by fetching a WebAssembly module, at each bank's `hello()`. */
+  /** Get ready to derive, such as by fetching a WebAssembly module, at each device's `ensureBank()`. */
   readonly load?:             (() => void | Promise<void>) | undefined
 }
 

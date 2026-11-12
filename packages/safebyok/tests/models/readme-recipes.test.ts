@@ -20,8 +20,7 @@ function hookOf<ValT>(subscribe: (listener: () => void) => () => void, read: () 
 
 /** A box whose whisper is {@link Stored}, on a bank that asks as a dialog would, in a vault unlocked. */
 async function makeRecipeBox(): Promise<{ vault: Vault, box: Box }> {
-  const bank = makeBankWorld().bankOn()
-  await bank.hello()
+  const bank = await makeBankWorld().bankOn()
   const vault = await bank.ensureVault({ vaultlabel: 'main' })
   const box = await vault.putBox({ boxlabel: 'stripe', whisper: Stored })
   return { vault, box }
@@ -30,12 +29,12 @@ async function makeRecipeBox(): Promise<{ vault: Vault, box: Box }> {
 describe("the README's script", () => {
   it("runs as written", async () => {
     const doppler = { get: vi.fn(() => Promise.resolve('a passphrase from the container')) }
-    const bank = makeBankWorld().bankOn({
+    const device = makeBankWorld().deviceOn({
       requestCleartext: async (gating) => {
         await gating.attempt({ passphraseClear: await doppler.get() })
       },
     })
-    await bank.hello()
+    const bank = await device.ensureBank()
     const vault = await bank.ensureVault({ vaultlabel: 'main' })
     await vault.hello()
     await vault.putBox({ boxlabel: 'stripe', whisper: Stored })

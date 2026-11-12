@@ -50,7 +50,7 @@ export const refusalkindVals = [
   'bad_scope',           // a name in a scope -- a label, or the user_id -- that fails its check
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage allows in one record
   'vault_full',          // a new box in a vault already at its maxBoxes (a best-effort cap), or a write storage has no room for
-  'bad_option',          // an option, argument or record handed in that fails its check: Bank.make's, makeArgon2idDeriver's, a vaultDB verb's, a putBox()'s sidecar
+  'bad_option',          // an option, argument or record handed in that fails its check: Device.make's, makeArgon2idDeriver's, a vaultDB verb's, a putBox()'s sidecar
   'bad_record',          // a record that fails a check serving both ways, a record handed in and one read back
   'damaged_whisper',     // a box's whisper would not decipher under the vault's lease, or deciphered to no whisper this package knows
   'newer_format',        // a stored wayin naming a key deriver this handle was not built with: update safebyok

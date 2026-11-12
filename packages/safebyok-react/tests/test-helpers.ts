@@ -5,7 +5,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { expect, onTestFinished, vi } from 'vitest'
-import { MemoryDeviceDB, type AnyGating, type Bank, type BankOpts, type Gating, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok'
+import { MemoryDeviceDB, type AnyGating, type Bank, type DeviceOpts, type Gating, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok'
 import { Passphrase, VaultScopeGiven, anyStrengthChecker, passkeyOf, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok/testing'
 import { fromB64, toB64 } from 'safebyok/utils'
 import type { BankProviderProps, PassphraseGating } from '../src/shapes'
@@ -105,15 +105,14 @@ export const PasskeyMaking = { rp: { name: 'Acme' }, user: { name: 'u1 (main vau
  *   await TH.makeBankWithVault(world)
  *   const { gating, raising, close } = await TH.openGatingOf(world, TH.unlocking)
  */
-export const openGatingOf = async (world: BankWorld, raise: (bank: Bank) => Promise<Outcome<unknown>>, overrides: Partial<BankOpts> = {}) => {
+export const openGatingOf = async (world: BankWorld, raise: (bank: Bank) => Promise<Outcome<unknown>>, overrides: Partial<DeviceOpts> = {}) => {
   const handed = makePending<AnyGating>()
   const closing = makePending()
   const requestCleartext: RequestCleartext = async (gating) => {
     handed.resolve(gating)
     await Promise.race([gating.whenConcluded, closing.promise])
   }
-  const bank = world.bankOnAnotherDevice({ requestCleartext, ...overrides })
-  await bank.hello()
+  const bank = await world.bankOnAnotherDevice({ requestCleartext, ...overrides })
   const raising = raise(bank)
   const unasked = (async () => { throw new Error(`settled with nobody asked: ${JSON.stringify(await raising)}`) })()
   const gating = await Promise.race([handed.promise, unasked])

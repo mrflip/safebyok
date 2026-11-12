@@ -262,7 +262,7 @@ describe("a birth through a gating", () => {
     await TH.expectGood(gating.attempt({ passphraseClear }))
     await launched
     await TH.expectRefusal(listing.buildVault(Dna))
-    expect(listing.openGating).to.be.null
+    expect(listing.world.device.openGating).to.be.null
   })
 })
 
@@ -277,13 +277,13 @@ describe("a launcher reached through a live gating", () => {
     const launchers = gating.constructor as typeof Gating
     await TH.expectRefusal(launchers.launchOn({} as never, 'unlock_vault', neverUnlocks, null), 'bad_option')
     await TH.expectRefusal(launchers.launchBirth({} as never, Dna, SX.shellVaultOf(Dna), neverUnlocks, null), 'bad_option')
-    expect(listing.openGating).to.eq(gating)
+    expect(listing.world.device.openGating).to.eq(gating)
     gating.dismiss()
     await first
   })
 })
 
-describe("one gating open per bank", () => {
+describe("one gating open per device", () => {
   it("refuses a second gating while one is open", async () => {
     const { listing, gatingAt } = birthWorld()
     const first = TH.expectRefusal(listing.buildVault(Dna), 'dismissed')
@@ -292,7 +292,7 @@ describe("one gating open per bank", () => {
     expect(gating.isOpen).to.be.true
     gating.dismiss()
     await first
-    expect(listing.openGating).to.be.null
+    expect(listing.world.device.openGating).to.be.null
     const again = listing.buildVault(Dna)
     const asking = await gatingAt<'build_vault'>(1)
     await TH.expectGood(asking.attempt({ passphraseClear }))
@@ -454,7 +454,7 @@ describe("an unlock through a gating", () => {
     const again = session.listing.deliverRecord(world.demandStored())
     await again.ensureUnlocked()
     expect(again.isUnlocked).to.be.true
-    expect(session.listing.openGating).to.be.null
+    expect(session.listing.world.device.openGating).to.be.null
   })
 
   it("unlocks with the gate's passkey, and zeroes its answer", async () => {
@@ -543,11 +543,11 @@ describe("what ends a gating", () => {
     expect(born.isUnlocked).to.be.true
   })
 
-  it("concludes an open birth on a sweep", async () => {
+  it("concludes an open birth on a sweep of the device", async () => {
     const { listing, gatingAt } = birthWorld()
     const launched = TH.expectRefusal(listing.buildVault(Dna))
     const gating = await gatingAt<'build_vault'>()
-    listing.sweep()
+    listing.world.device.sweep()
     await launched
     expect(gating.isOpen).to.be.false
   })

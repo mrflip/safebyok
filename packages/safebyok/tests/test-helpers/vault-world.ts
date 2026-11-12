@@ -11,9 +11,8 @@ import type { BankAnnouncement, BankFriend, BoxWorld, LifecycleHandler, ListingO
 import { type VaultError, isVaultError } from '../../src/refusals/errors'
 import * as Refuse from '../../src/refusals/throwers'
 import type { VaultTombstone, VaultRecord } from '../../src/shapes/shapes-storage'
-import { DefaultOnLifecycle, guardOnLifecycle, guardRequestCleartext } from '../../src/models/bank'
+import { DefaultOnLifecycle, Device, guardOnLifecycle, guardRequestCleartext } from '../../src/models/device'
 import type { Vault } from '../../src/models/vault'
-import type { Bank } from '../../src/models/bank'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { Outcome } from '../../src/refusals/outcome'
 import { VaultListing } from '../../src/models/vault-listing'
@@ -21,7 +20,7 @@ import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { parseLogger } from '../../src/helpers/logger'
 import { quietLogger } from './logging'
-import { passkeyOf } from './builders'
+import { passkeyOf, testDeriver } from './builders'
 import { type ProvingWorldGiven, provingWorldOf } from './proving-world'
 
 /** The clock's first reading: 31 October 2026. */
@@ -92,13 +91,18 @@ export const LeaseMillis = 60 * 60_000
 
 const nothing = (): void => undefined
 
-/** Every listing made since the last test. */
+/** Every listing, and every device behind a fake bank, made since the last test. */
 const madeListings: VaultListing[] = []
+const madeDevices: Device[] = []
 
-/** Say goodbye to every listing a test made, after it, so nothing outlives its test: call it once at the top of a test file. */
+/** The bank scope of the fake bank, and of the device behind it. */
+const BankScope = Object.freeze({ user_id: Dna.user_id, banklabel: Dna.banklabel })
+
+/** Say goodbye to every listing a test made, and sweep every device, after it, so nothing outlives its test: call it once at the top of a test file. */
 export function useVaultWorlds(): void {
   afterEach(() => {
     for (const listing of madeListings.splice(0)) { listing.goodbye() }
+    for (const device of madeDevices.splice(0)) { device.sweep() }
   })
 }
 
@@ -133,12 +137,18 @@ export function makeVaultWorld(stored0: VaultRecord | null = null, worldOverride
   _cheat_clock(() => now)
   const deviceDB = makeDeviceDB()
   const hostLifecycle = guardOnLifecycle(onLifecycle)
+  const vaultDB = new MemoryVaultDB()
+  // The device logs what its default handlers hear: to the logger the test reads.
+  const logger = overrides.logger ?? parseLogger(quietLogger)
+  const device = Device.make({ ...BankScope, gates: ['main'], vaultDB, deviceDB: deviceDB.memoryDB, keyDeriver: testDeriver, logger })
+  madeDevices.push(device)
   const fakeBank: FakeBank = {
     isLocked:     false,
     ensureTimely: () => Promise.resolve(),
     receiveWorld:    nothing,
-    scope:        { user_id: Dna.user_id, banklabel: Dna.banklabel },
-    logger:       parseLogger(quietLogger),
+    scope:        BankScope,
+    device,
+    logger,
     ...provingWorldOf({ keyDeriver, strengthChecker, device_tok }),
     leaseMillis:  LeaseMillis,
     deviceDB:     deviceDB.memoryDB,
@@ -146,12 +156,10 @@ export function makeVaultWorld(stored0: VaultRecord | null = null, worldOverride
     boxRefreshMillis: 10 * 60_000,
     ...overrides,
   }
-  const vaultDB = new MemoryVaultDB()
   const vaultrows = vaultDB._cheat_vaultRowsOf(Dna)
   if (stored0 !== null) { vaultrows.set(Dna.vaultlabel, stored0) }
   const storedNow = (): VaultRecord | null => (vaultrows.get(Dna.vaultlabel) ?? null) as VaultRecord | null
-  // The fake stands in for the bank an event names.
-  const announce = brandGuarded((announcement: BankAnnouncement): void => { void hostLifecycle({ ...announcement, bank: fakeBank as unknown as Bank }) })
+  const announce = brandGuarded((announcement: BankAnnouncement): void => { void hostLifecycle({ ...announcement, device: fakeBank.device }) })
   /** The bad news the listings and vaults told, oldest first. A live array. */
   const badnews: VaultError[] = []
   const bankFriend: BankFriend = {

@@ -3,7 +3,7 @@
  */
 import { Activity, useEffect, type ReactNode } from 'react'
 import type { Bank, VaultSnapshot } from 'safebyok'
-import { useBank, useBankSnapshot, useVault, useVaultSnapshot } from '../src/hooks/hooks'
+import { useBank, useDeviceSnapshot, useVault, useVaultSnapshot } from '../src/hooks/hooks'
 
 /** Wrap `shown` in an Activity in `mode`, so a test can `rerender` to hide it and show it again.
  *
@@ -22,7 +22,7 @@ export const lockWordOf = (snapshot: VaultSnapshot | null): string => {
 /** Every bank a {@link ShowsVault} has rendered with, in order, each listed once. */
 export const seenBanks: Bank[] = []
 
-/** Render what the hooks report about the bank and the vault named `vaultlabel`, as text, with the buttons a host's page would have.
+/** Render what the hooks report about the device and the vault named `vaultlabel`, as text, with the buttons a host's page would have.
  * Open builds or unlocks the vault from a click, and Lock locks it.
  *
  * @example
@@ -31,7 +31,7 @@ export const seenBanks: Bank[] = []
  */
 export const ShowsVault = ({ vaultlabel = 'main' }: { vaultlabel?: string }) => {
   const bank = useBank()
-  const bankSnapshot = useBankSnapshot()
+  const deviceSnapshot = useDeviceSnapshot()
   const { stage, vault } = useVault(vaultlabel)
   const vaultSnapshot = useVaultSnapshot(vaultlabel)
   useEffect(() => { if (bank !== null && ! seenBanks.includes(bank)) { seenBanks.push(bank) } }, [bank])
@@ -42,7 +42,7 @@ export const ShowsVault = ({ vaultlabel = 'main' }: { vaultlabel?: string }) => 
   }
   return (
     <div>
-      <p data-testid="bank">{bankSnapshot === null ? 'none' : `${bankSnapshot.user_id} ${bankSnapshot.stage}`}</p>
+      <p data-testid="bank">{deviceSnapshot === null ? 'none' : `${deviceSnapshot.user_id} ${deviceSnapshot.stage}`}</p>
       <p data-testid="vault">{`${stage} ${lockWordOf(vaultSnapshot)}`}</p>
       <button type="button" onClick={() => { void open() }}>Open</button>
       <button type="button" onClick={() => { vault?.lock() }}>Lock</button>

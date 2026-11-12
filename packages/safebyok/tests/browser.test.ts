@@ -140,8 +140,7 @@ describe("browserOpts", () => {
   })
 
   it("gives way to a field passed after the spread", async () => {
-    const bank = TH.makeBankWorld().bankOn({ ...browserOpts({ dbName: freshDbName() }), keyDeriver: TH.testDeriver, strengthChecker: mine })
-    await bank.hello()
+    const bank = await TH.makeBankWorld().bankOn({ ...browserOpts({ dbName: freshDbName() }), keyDeriver: TH.testDeriver, strengthChecker: mine })
     expect(await bank.strengthChecker('mauve lantern quietly orbits', TH.scopeOf('u1'))).to.deep.equal({ strong: false, reason: 'Mine says no.' })
   })
 })

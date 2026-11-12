@@ -44,8 +44,8 @@ React's own documentation, are in [notes/expose_improves_security.md](https://gi
 
 ## Dialogs
 
-`BankProvider` shows its own dialog for each gating the bank has open. The dialog follows `openGating` in the bank's
-snapshot, and closes when the gating concludes, whether by the user's answer, a sweep or a vacate. A lock leaves it
+`BankProvider` shows its own dialog for each gating the device has open. The dialog follows `openGating` in the
+device's snapshot (`useDeviceSnapshot()`), and closes when the gating concludes, whether by the user's answer, a sweep or a vacate. A lock leaves it
 open. Its passkey button asks for the passkey from the user's click on it, so a gating opened from a timer or a fetch
 still shows the dialog, and the user's click supplies the gesture the browser needs.
 
@@ -55,26 +55,28 @@ focus inside and makes the page behind inert. Style the dimmed page with `.modal
 
 Pass `requestCleartext` to use a dialog of your own: the provider then renders none. The provider calls the function
 from its latest render with each gating, so an inline arrow is fine. Pass it from the first render, because whether
-your dialog or the provider's asks the user is fixed when the bank is made. To show one of this package's modals from
+your dialog or the provider's asks the user is fixed when the device is made. To show one of this package's modals from
 your function, keep the gating in state until it concludes:
 `setGating(gating); await gating.whenConcluded; setGating(null)`.
 
 ## Signing out
 
-Call `bank.vacate()` when the user signs out, before you clear their `user_id`: it forgets the bank's cached leases and
-its device row on this device, so the next person to use it starts fresh. `BankProvider` doesn't vacate when `user_id` turns `null`,
-because auth may briefly report `null` while it refreshes a token or reconnects, for instance after a laptop wakes. When a
-different user signs in, it vacates the last user's bank itself.
+Call `useDevice()`'s `vacate()` when the user signs out, before you clear their `user_id`, whether or not its bank is up:
+it forgets the bank's cached leases and its device row on this device, so the next person to use it starts fresh.
+`BankProvider` doesn't vacate when `user_id` turns `null`, because auth may briefly report `null` while it refreshes a
+token or reconnects, for instance after a laptop wakes. When a different user signs in, it vacates the last user's
+device itself.
 
-Once a bank is vacated, by your sign-out or by a revoked identity, `useVault` returns `{ stage: 'spent', vault: null,
-cause }` for each of its vaults, where `cause` says why the bank ended, and `useVaultSnapshot` returns null. Show a signed-out
-state there rather than a spinner: the bank never becomes ready again.
+Once a device is vacated, by your sign-out or by a revoked identity, `useBank` returns null, `useDeviceSnapshot` shows
+the stage `disabled` and why in its `err`, `useVault` returns `{ stage: 'spent', vault: null, cause }` for each of the
+bank's vaults, where `cause` says why the device ended, and `useVaultSnapshot` returns null. Show a signed-out state
+there rather than a spinner: the device never becomes ready again.
 
-## Hearing the bank
+## Hearing the device
 
-`BankProvider` takes `Bank.make`'s `onLifecycle` and `onBadNews`, and calls each as last rendered, so an inline arrow
-is fine. `onLifecycle` receives a `helloed` event, with its outcome, for each hello the provider and the hooks make,
-and the bank's other lifecycle events. `onBadNews` receives the refusals no caller is waiting on, including a failed
+`BankProvider` takes `Device.make`'s `onLifecycle` and `onBadNews`, and calls each as last rendered, so an inline arrow
+is fine. `onLifecycle` receives a `helloed` event, with its outcome, for each `ensureBank` and hello the provider and
+the hooks make, and the device's other lifecycle events. `onBadNews` receives the refusals no caller is waiting on, including a failed
 unlock from `VaultLockControl`. Leave either out for its default, described in the safebyok README.
 
 ## React version

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { BankOpts } from 'safebyok'
+import type { DeviceOpts } from 'safebyok'
 import { ReplacePassphraseModal } from '../src/modals/replace-passphrase-modal'
 import { Messages } from '../src/helpers/messages'
 import * as TH from './test-helpers'
@@ -13,7 +13,7 @@ const NextPassphrase = 'a whole new passphrase for the vault'
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
 /** Open a replace_passphrase gating on a vault built with {@link TH.Passphrase}, and render it in a ReplacePassphraseModal. */
-const shownFor = async (opts: { bankOpts?: Partial<BankOpts> } = {}) => {
+const shownFor = async (opts: { bankOpts?: Partial<DeviceOpts> } = {}) => {
   const world = TH.makeBankWorld()
   await TH.makeBankWithVault(world)
   const opened = await TH.openGatingOf(world, TH.replacing, opts.bankOpts)
@@ -23,8 +23,7 @@ const shownFor = async (opts: { bankOpts?: Partial<BankOpts> } = {}) => {
 
 /** True when `passphrase` unlocks the world's vault from a device that has no lease for it. */
 const unlocksWith = async (world: TH.BankWorld, passphrase: string): Promise<boolean> => {
-  const bank = world.bankOnAnotherDevice({ device_tok: '00000000-0000-4000-8000-0000000000b3', requestCleartext: async (gating) => { await gating.attempt({ passphraseClear: passphrase }) } })
-  await bank.hello()
+  const bank = await world.bankOnAnotherDevice({ requestCleartext: async (gating) => { await gating.attempt({ passphraseClear: passphrase }) } })
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
   const unlocked = await vault.tryEnsureUnlocked()
   return unlocked.ok

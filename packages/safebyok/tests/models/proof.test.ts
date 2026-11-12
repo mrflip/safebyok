@@ -1,4 +1,4 @@
-/** The sprint's proof, and how the package is used: a host drives a bank through a whole life, over a real in-memory VaultDB and DeviceDB,
+/** The sprint's proof, and how the package is used: a host drives a device and its bank through a whole life, over a real in-memory VaultDB and DeviceDB,
  * and every step asserts what its components render.
  */
 
@@ -8,7 +8,7 @@ import type { VaultError } from '../../src/refusals/errors'
 import type { Box } from '../../src/models/box'
 import type { Gatingkind } from '../../src/shapes/shapes-enums'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
-import type { BadNews, BankSnapshot, BoxSnapshot, VaultSnapshot } from '../../src/shapes/shapes-vaultish'
+import type { BadNews, BoxSnapshot, DeviceSnapshot, VaultSnapshot } from '../../src/shapes/shapes-vaultish'
 import type { Whisper } from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, VaultScopeGiven, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
@@ -23,7 +23,7 @@ const onBadNews = ({ news }: BadNews): void => { badNews.push(news) }
 const expectNoBadNews = (): void => { expect(badNews.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal([]) }
 afterEach(expectNoBadNews)
 
-// == [A React host, in miniature]: mountComponent, bankStatus, vaultStatus, boxList, boxRow, whisperStoreOf, whisperRevealOf, makeDialog
+// == [A React host, in miniature]: mountComponent, deviceStatus, vaultStatus, boxList, boxRow, whisperStoreOf, whisperRevealOf, makeDialog
 
 type Store<SnapshotT> = { subscribe: (listener: () => void) => () => void, getSnapshot: () => SnapshotT }
 
@@ -52,8 +52,8 @@ function mountComponent<SnapshotT>({ subscribe, getSnapshot }: Store<SnapshotT>,
 
 function lockWordOf(isLocked: boolean): string { return (isLocked ? 'locked' : 'unlocked') }
 
-const bankStatus = ({ stage, vaults, openGating }: BankSnapshot): string => {
-  const rows = vaults.map(({ vaultlabel, isLocked }) => `${vaultlabel} ${lockWordOf(isLocked)}`)
+const deviceStatus = ({ stage, openGating, bank }: DeviceSnapshot): string => {
+  const rows = (bank?.vaults ?? []).map(({ vaultlabel, isLocked }) => `${vaultlabel} ${lockWordOf(isLocked)}`)
   const asking = openGating === null ? '' : ` (asking ${openGating.gatingkind})`
   return `${stage}: ${rows.join(', ') || 'no vaults'}${asking}`
 }
@@ -88,15 +88,15 @@ function makeDialog() {
 }
 // --
 
-/** A bank past its `hello` with the vault of `VaultScopeGiven` built and unlocked, and the dialog that did it, cleared. */
+/** A device with its bank ensured and the vault of `VaultScopeGiven` built and unlocked, and the dialog that did it, cleared. */
 async function buildHost(logger?: VaultLogger) {
   const world = makeBankWorld()
   const dialog = makeDialog()
-  const bank = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews, ...(logger && { logger }) })
-  await bank.hello()
+  const device = world.deviceOn({ requestCleartext: dialog.requestCleartext, onBadNews, ...(logger && { logger }) })
+  const bank = await device.ensureBank()
   const vault = await bank.ensureVault(VaultScopeGiven)
   dialog.shown.length = 0
-  return { world, bank, vault, dialog }
+  return { world, device, bank, vault, dialog }
 }
 
 const AutolockMillis = AutolockMinutes * 60_000
@@ -107,22 +107,22 @@ const StaleMillis = 10 * 60_000
 const ApiKey = Object.freeze({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-not-a-real-key' }, sidecar: { nickname: 'work' } })
 
 describe("the proof", () => {
-  it("a bank's whole life, as its components see it", async () => {
+  it("a device's whole life, as its components see it", async () => {
     const world = makeBankWorld()
     const dialog = makeDialog()
 
-    // The page opens: the bank is made, and renders before its hello lands.
-    const bank = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
-    const bankUi = mountComponent(bank, bankStatus)
-    bankUi.expectRenders(['made: no vaults'])
+    // The page opens: Device.make makes the device, which renders before its ensureBank lands.
+    const device = world.deviceOn({ requestCleartext: dialog.requestCleartext, onBadNews })
+    const deviceUi = mountComponent(device, deviceStatus)
+    deviceUi.expectRenders(['made: no vaults'])
 
-    await bank.hello()
-    bankUi.expectRenders(['ready: no vaults'])
+    const bank = await device.ensureBank()
+    deviceUi.expectRenders(['ready: no vaults'])
 
     // Build: the first vault asks the user for a passphrase, and comes up unlocked.
     const vault = await bank.ensureVault(VaultScopeGiven)
     expect(dialog.shown.splice(0)).to.deep.equal(['build_vault'])
-    bankUi.expectRenders(['ready: no vaults (asking build_vault)', 'ready: main locked (asking build_vault)', 'ready: main unlocked (asking build_vault)', 'ready: main unlocked'])
+    deviceUi.expectRenders(['ready: no vaults (asking build_vault)', 'ready: main locked (asking build_vault)', 'ready: main unlocked (asking build_vault)', 'ready: main unlocked'])
     const vaultUi = mountComponent(vault, vaultStatus)
     vaultUi.expectRenders(['main unlocked'])
     const boxesUi = mountComponent(vault.boxListing, boxList)
@@ -147,12 +147,12 @@ describe("the proof", () => {
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     boxesUi.expectRenders(['anthropic_api_key'])
     revealUi.expectRenders([JSON.stringify(ApiKey.whisper)])
-    const snapshots = [bank.getSnapshot(), vault.getSnapshot(), vault.boxListing.getSnapshot(), box.getSnapshot()]
+    const snapshots = [device.getSnapshot(), vault.getSnapshot(), vault.boxListing.getSnapshot(), box.getSnapshot()]
     expect(JSON.stringify(snapshots)).not.to.include(ApiKey.whisper.apiKey)
 
     // Lock: every component watching the vault or its boxes is told before lock() returns, the whisper leaves the screen, and the box refuses.
     vault.lock()
-    bankUi.expectRenders(['ready: main locked'])
+    deviceUi.expectRenders(['ready: main locked'])
     vaultUi.expectRenders(['main locked'])
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     boxesUi.expectRenders(['anthropic_api_key'])
@@ -164,14 +164,14 @@ describe("the proof", () => {
     dialog.typing = []
     await TH.expectRefusal(vault.ensureUnlocked(), 'dismissed')
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
-    bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main locked'])
+    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main locked'])
 
     // Unlock: the lock forgotten the cached lease, so the user is asked, and the wrong passphrase leaves the dialog open.
     dialog.typing = [byPassphrase('not the passphrase'), byPassphrase(Passphrase)]
     await vault.ensureUnlocked()
     expect(dialog.refusals.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal(['wrong_passphrase'])
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
-    bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
+    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
     vaultUi.expectRenders(['main unlocked'])
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     boxesUi.expectRenders(['anthropic_api_key'])
@@ -182,7 +182,7 @@ describe("the proof", () => {
     dialog.typing = byPassphrase(Passphrase)
     await vault.delVaultPrompt()
     expect(dialog.shown.splice(0)).to.deep.equal(['del_vault'])
-    bankUi.expectRenders(['ready: main unlocked (asking del_vault)', 'ready: main locked (asking del_vault)', 'ready: no vaults (asking del_vault)', 'ready: no vaults'])
+    deviceUi.expectRenders(['ready: main unlocked (asking del_vault)', 'ready: main locked (asking del_vault)', 'ready: no vaults (asking del_vault)', 'ready: no vaults'])
     vaultUi.expectRenders(['main locked'])
     await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }), 'disabled')
     const gone = bank.vaultAt(VaultScopeGiven)
@@ -199,19 +199,19 @@ describe("the proof", () => {
     expect(dialog.shown.splice(0)).to.deep.equal(['build_vault'])
     expect(reborn).not.to.eq(vault)
     expect(reborn.vault_tok).not.to.eq(vault.vault_tok)
-    bankUi.expectRenders(['ready: no vaults (asking build_vault)', 'ready: main locked (asking build_vault)', 'ready: main unlocked (asking build_vault)', 'ready: main unlocked'])
+    deviceUi.expectRenders(['ready: no vaults (asking build_vault)', 'ready: main locked (asking build_vault)', 'ready: main unlocked (asking build_vault)', 'ready: main unlocked'])
     const rebornUi = mountComponent(reborn, vaultStatus)
     rebornUi.expectRenders(['main unlocked'])
     expect(await reborn.getBox(ApiKey.boxlabel, { ifAbsent: 'nil' })).to.be.null
     await reborn.putBox(ApiKey)
 
-    // A fresh Bank on the same VaultDB and DeviceDB: it lists the vault locked, and picks up the cached lease with nobody asked.
-    const nextPage = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
-    const nextPageUi = mountComponent(nextPage, bankStatus)
+    // The next page's Device on the same VaultDB and DeviceDB: its bank lists the vault locked, and picks up the cached lease with nobody asked.
+    const nextPage = world.deviceOn({ requestCleartext: dialog.requestCleartext, onBadNews })
+    const nextPageUi = mountComponent(nextPage, deviceStatus)
     nextPageUi.expectRenders(['made: no vaults'])
-    await nextPage.hello()
-    nextPageUi.expectRenders(['made: main locked', 'ready: main locked'])
-    const pickedUp = await nextPage.ensureVault(VaultScopeGiven)
+    const nextBank = await nextPage.ensureBank()
+    nextPageUi.expectRenders(['ready: main locked'])
+    const pickedUp = await nextBank.ensureVault(VaultScopeGiven)
     expect(pickedUp.vault_tok).to.eq(reborn.vault_tok)
     await pickedUp.ensureUnlocked()
     expect(dialog.shown).to.deep.equal([])
@@ -227,135 +227,134 @@ describe("the proof", () => {
   })
 
   it("replacing the passphrase: nothing locks, and from then on only the new one opens the vault", async () => {
-    const { bank, vault, dialog } = await buildHost()
-    const bankUi = mountComponent(bank, bankStatus)
-    bankUi.expectRenders(['ready: main unlocked'])
+    const { device, vault, dialog } = await buildHost()
+    const deviceUi = mountComponent(device, deviceStatus)
+    deviceUi.expectRenders(['ready: main unlocked'])
 
     dialog.typing = { antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }
     await vault.replacePassphrasePrompt()
     expect(dialog.shown.splice(0)).to.deep.equal(['replace_passphrase'])
-    bankUi.expectRenders(['ready: main unlocked (asking replace_passphrase)', 'ready: main unlocked (asking replace_passphrase)', 'ready: main unlocked'])
+    deviceUi.expectRenders(['ready: main unlocked (asking replace_passphrase)', 'ready: main unlocked (asking replace_passphrase)', 'ready: main unlocked'])
     expect(vault.isUnlocked).to.be.true
 
     vault.lock()
-    bankUi.expectRenders(['ready: main locked'])
+    deviceUi.expectRenders(['ready: main locked'])
     dialog.typing = [byPassphrase(Passphrase), byPassphrase(NewPassphrase)]
     await vault.ensureUnlocked()
     expect(dialog.refusals.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal(['wrong_passphrase'])
-    bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
+    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
   })
 
   it("adding and revoking a passkey: the passkey opens the vault until it is revoked", async () => {
-    const { bank, vault, dialog } = await buildHost()
-    const bankUi = mountComponent(bank, bankStatus)
-    bankUi.expectRenders(['ready: main unlocked'])
+    const { device, vault, dialog } = await buildHost()
+    const deviceUi = mountComponent(device, deviceStatus)
+    deviceUi.expectRenders(['ready: main unlocked'])
 
     dialog.typing = { ...byPassphrase(Passphrase), ...await byPasskey('laptop') }
     await vault.addPasskeyPrompt()
     expect(dialog.shown.splice(0)).to.deep.equal(['add_passkey'])
-    bankUi.expectRenders(['ready: main unlocked (asking add_passkey)', 'ready: main unlocked (asking add_passkey)', 'ready: main unlocked'])
+    deviceUi.expectRenders(['ready: main unlocked (asking add_passkey)', 'ready: main unlocked (asking add_passkey)', 'ready: main unlocked'])
     expect(vault.gate.toJSON().passkey_wayin).not.to.be.null
 
     vault.lock()
-    bankUi.expectRenders(['ready: main locked'])
+    deviceUi.expectRenders(['ready: main locked'])
     dialog.typing = await byPasskey('laptop')
     await vault.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
-    bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
+    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
 
     dialog.typing = byPassphrase(Passphrase)
     await vault.revokePasskeyPrompt()
     expect(dialog.shown.splice(0)).to.deep.equal(['revoke_passkey'])
     expect(vault.gate.toJSON().passkey_wayin).to.be.null
-    bankUi.expectRenders(['ready: main unlocked (asking revoke_passkey)', 'ready: main unlocked (asking revoke_passkey)', 'ready: main unlocked'])
+    deviceUi.expectRenders(['ready: main unlocked (asking revoke_passkey)', 'ready: main unlocked (asking revoke_passkey)', 'ready: main unlocked'])
 
     vault.lock()
-    bankUi.expectRenders(['ready: main locked'])
+    deviceUi.expectRenders(['ready: main locked'])
     dialog.typing = await byPasskey('laptop')
     await TH.expectRefusal(vault.ensureUnlocked(), 'absent_wayin')
-    bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main locked'])
+    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main locked'])
     dialog.typing = byPassphrase(Passphrase)
     await vault.ensureUnlocked()
-    bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
+    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
   })
 
   it("bank.autolock locks a vault past its autolock duration, and a page opened later asks for a proof", async () => {
-    const { world, bank, vault, dialog } = await buildHost()
-    const bankUi = mountComponent(bank, bankStatus)
-    bankUi.expectRenders(['ready: main unlocked'])
+    const { world, device, bank, vault, dialog } = await buildHost()
+    const deviceUi = mountComponent(device, deviceStatus)
+    deviceUi.expectRenders(['ready: main unlocked'])
 
     // Inside the autolock duration, autolock changes nothing.
     world.advance(AutolockMillis - 1)
     await bank.autolock()
-    bankUi.expectRenders([])
+    deviceUi.expectRenders([])
     expect(world.leaseRows()).to.have.lengthOf(1)
 
-    // Past it, the lease is forgotten and the vault reports locked; the bank stays ready.
+    // Past it, the lease is forgotten and the vault reports locked; the device stays ready.
     world.advance(2)
     await bank.autolock()
-    bankUi.expectRenders(['ready: main locked'])
+    deviceUi.expectRenders(['ready: main locked'])
     await TH.eventually(() => world.leaseRows().length === 0)
     expect(vault.isUnlocked).to.be.false
 
     // A page opened late whose host never calls autolock asks all the same: Lease.buildFromCache leaves the row and reads as no row.
     await vault.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
-    bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
+    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
     world.advance(AutolockMillis + 1)
-    const latePage = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
-    const lateUi = mountComponent(latePage, bankStatus)
-    await latePage.hello()
-    lateUi.expectRenders(['made: no vaults', 'made: main locked', 'ready: main locked'])
+    const latePage = world.deviceOn({ requestCleartext: dialog.requestCleartext, onBadNews })
+    const lateUi = mountComponent(latePage, deviceStatus)
+    const lateBank = await latePage.ensureBank()
+    lateUi.expectRenders(['made: no vaults', 'ready: main locked'])
     expect(world.leaseRows()).to.have.lengthOf(1)
     const expiredRow = world.leaseRows()[0]
-    await latePage.vaultAt(VaultScopeGiven)?.ensureUnlocked()
+    await lateBank.vaultAt(VaultScopeGiven)?.ensureUnlocked()
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_vault'])
     lateUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
     expect(world.leaseRows()).to.have.lengthOf(1)
     expect(world.leaseRows()[0]).to.not.deep.equal(expiredRow)
 
-    // Its host calling autolock after hello forgets the row before anyone asks.
+    // Its host calling autolock after ensureBank forgets the row before anyone asks.
     world.advance(AutolockMillis + 1)
-    const laterPage = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
-    const laterUi = mountComponent(laterPage, bankStatus)
-    await laterPage.hello()
-    laterUi.expectRenders(['made: no vaults', 'made: main locked', 'ready: main locked'])
-    await laterPage.autolock()
+    const laterPage = world.deviceOn({ requestCleartext: dialog.requestCleartext, onBadNews })
+    const laterUi = mountComponent(laterPage, deviceStatus)
+    const laterBank = await laterPage.ensureBank()
+    laterUi.expectRenders(['made: no vaults', 'ready: main locked'])
+    await laterBank.autolock()
     laterUi.expectRenders([])
     await TH.eventually(() => world.leaseRows().length === 0)
   })
 
   it("a lease row past autolock survives a late page's unanswered dialog, and the first page's bank.autolock then locks", async () => {
-    const { world, bank, vault } = await buildHost()
-    const bankUi = mountComponent(bank, bankStatus)
-    bankUi.expectRenders(['ready: main unlocked'])
+    const { world, device, bank, vault } = await buildHost()
+    const deviceUi = mountComponent(device, deviceStatus)
+    deviceUi.expectRenders(['ready: main unlocked'])
     world.advance(AutolockMillis + 1)
-    const latePage = world.bankOn({ requestCleartext: () => undefined, onBadNews })
-    await latePage.hello()
+    const latePage = await world.bankOn({ requestCleartext: () => undefined, onBadNews })
     await TH.expectRefusal(latePage.vaultAt(VaultScopeGiven)!.ensureUnlocked(), 'dismissed')
     expect(world.leaseRows()).to.have.lengthOf(1)
-    bankUi.expectRenders([])
+    deviceUi.expectRenders([])
     await bank.autolock()
-    bankUi.expectRenders(['ready: main locked'])
+    deviceUi.expectRenders(['ready: main locked'])
     expect(vault.isLocked).to.be.true
     await TH.eventually(() => world.leaseRows().length === 0)
   })
 
-  it("signing out: bank.vacate empties the screen and this device, and the next bank lists the vault again, locked", async () => {
-    const { world, bank, vault, dialog } = await buildHost()
-    const bankUi = mountComponent(bank, bankStatus)
-    bankUi.expectRenders(['ready: main unlocked'])
+  it("signing out: device.vacate empties the screen and this device, and the next device lists the vault again, locked", async () => {
+    const { world, device, bank, vault, dialog } = await buildHost()
+    const deviceUi = mountComponent(device, deviceStatus)
+    deviceUi.expectRenders(['ready: main unlocked'])
 
-    await bank.vacate()
-    bankUi.expectRenders(['disabled: main locked', 'disabled: no vaults'])
-    expect(bank.isEnabled).to.be.false
+    await device.vacate()
+    deviceUi.expectRenders(['disabled: no vaults'])
+    expect(device.isEnabled).to.be.false
+    expect(device.bank).to.be.null
     await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'disabled')
-    await TH.expectRefusal(bank.hello(), 'disabled')
+    await TH.expectRefusal(device.ensureBank(), 'disabled')
     expect(world.leaseRows()).to.have.lengthOf(0)
     await TH.expectRefusal(vault.ensureUnlocked())
 
-    const next = world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
-    await next.hello()
+    const next = await world.bankOn({ requestCleartext: dialog.requestCleartext, onBadNews })
     const again = await next.ensureVault(VaultScopeGiven)
     expect(again).not.to.eq(vault)
     expect(again.isLocked).to.be.true
@@ -364,42 +363,47 @@ describe("the proof", () => {
     expectNoBadNews()
   })
 
-  it("the VaultDB goes out of reach: an unlocked vault keeps its lease, a refused hello changes nothing on screen, and the next one recovers", async () => {
+  it("the VaultDB goes out of reach: an unlocked vault keeps its lease, a page's refused ensureBank changes nothing on its screen, and its next one recovers", async () => {
     const spy = TH.spyLogger()
-    const { world, bank, vault } = await buildHost(spy.logger)
-    const bankUi = mountComponent(bank, bankStatus)
-    bankUi.expectRenders(['ready: main unlocked'])
+    const { world, device, bank, vault, dialog } = await buildHost(spy.logger)
+    const deviceUi = mountComponent(device, deviceStatus)
+    deviceUi.expectRenders(['ready: main unlocked'])
 
     world.advance(StaleMillis)
     world.vaultDB._cheat_refuseGets('storage_unavailable')
     // A vault too stale to know whether it deserves its lease refuses the ask, and keeps the lease it has.
     await TH.expectRefusal(vault.ensureUnlocked(), 'storage_unavailable')
     expect(vault.isUnlocked).to.be.true
-    await TH.expectRefusal(bank.hello(), 'storage_unavailable')
+    deviceUi.expectRenders([])
+
+    // A page opened meanwhile cannot list the vaults: its ensureBank refuses, and the page stays as it was made.
+    const nextPage = world.deviceOn({ requestCleartext: dialog.requestCleartext, onBadNews, logger: spy.logger })
+    const nextPageUi = mountComponent(nextPage, deviceStatus)
+    await TH.expectRefusal(nextPage.ensureBank(), 'storage_unavailable')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
-    bankUi.expectRenders([])
-    expect(bank.snapshot.err).to.be.null
-    expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
+    nextPageUi.expectRenders(['made: no vaults'])
+    expect(nextPage.snapshot.err).to.be.null
+    expect(nextPage.bank).to.be.null
 
     world.vaultDB._cheat_refuseGets(null)
-    await bank.hello()
-    bankUi.expectRenders([])
+    await nextPage.ensureBank()
+    nextPageUi.expectRenders(['ready: main locked'])
+    deviceUi.expectRenders([])
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
   })
 
   it("a second device's changes reach this device's components through the watch", async () => {
-    const { world, bank, vault, dialog } = await buildHost()
+    const { world, device, vault, dialog } = await buildHost()
     const box = await vault.putBox(ApiKey)
     await vault.hello()
-    const bankUi = mountComponent(bank, bankStatus)
+    const deviceUi = mountComponent(device, deviceStatus)
     const boxesUi = mountComponent(vault.boxListing, boxList)
-    bankUi.expectRenders(['ready: main unlocked'])
+    deviceUi.expectRenders(['ready: main unlocked'])
     boxesUi.expectRenders(['anthropic_api_key'])
 
     // The second device has no lease cached, so its unlock asks; it then opens the box this one sealed.
     const phone = makeDialog()
-    const phoneBank = world.bankOnAnotherDevice({ requestCleartext: phone.requestCleartext, onBadNews })
-    await phoneBank.hello()
+    const phoneBank = await world.bankOnAnotherDevice({ requestCleartext: phone.requestCleartext, onBadNews })
     const phoneVault = await phoneBank.ensureVault(VaultScopeGiven)
     await phoneVault.ensureUnlocked()
     expect(phone.shown.splice(0)).to.deep.equal(['unlock_vault'])
@@ -423,22 +427,22 @@ describe("the proof", () => {
     phone.typing = { antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }
     await phoneVault.replacePassphrasePrompt()
     await ticks(1)
-    bankUi.expectRenders(['ready: main unlocked'])
+    deviceUi.expectRenders(['ready: main unlocked'])
     expect(vault.isUnlocked).to.be.true
     expect(vault.gate.toJSON().gate_epoch).to.eq(phoneVault.gate.toJSON().gate_epoch)
     expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
 
     vault.lock()
-    bankUi.expectRenders(['ready: main locked'])
+    deviceUi.expectRenders(['ready: main locked'])
     dialog.typing = byPassphrase(NewPassphrase)
     await vault.ensureUnlocked()
-    bankUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
+    deviceUi.expectRenders(['ready: main locked (asking unlock_vault)', 'ready: main unlocked (asking unlock_vault)', 'ready: main unlocked'])
 
     // It deletes the vault: this device locks, forgets its lease, and the vault leaves the list.
     phone.typing = byPassphrase(NewPassphrase)
     await phoneVault.delVaultPrompt()
     await ticks(1)
-    bankUi.expectRenders(['ready: no vaults'])
+    deviceUi.expectRenders(['ready: no vaults'])
     expect(vault.isUnlocked).to.be.false
     expect(world.leaseRows()).to.have.lengthOf(0)
     await TH.expectRefusal(vault.ensureUnlocked())
@@ -448,20 +452,20 @@ describe("the proof", () => {
     const { world, dialog } = await buildHost()
     const opts = { requestCleartext: dialog.requestCleartext, onBadNews }
 
-    // The effect makes a bank and calls hello, its cleanup sweeps it, and the effect runs again, as StrictMode does on mount.
-    const first = world.bankOn(opts)
-    const firstEffect = first.tryHello()
+    // The effect makes a device with Device.make and calls ensureBank, its cleanup sweeps the device, and the effect runs again, as StrictMode does on mount.
+    const first = world.deviceOn(opts)
+    const firstEffect = first.tryEnsureBank()
     first.sweep()
-    const second = world.bankOn(opts)
-    const bankUi = mountComponent(second, bankStatus)
-    await Promise.all([firstEffect, second.hello()])
-    await TH.expectBad(firstEffect)
-    bankUi.expectRenders(['made: no vaults', 'made: main locked', 'ready: main locked'])
+    const second = world.deviceOn(opts)
+    const deviceUi = mountComponent(second, deviceStatus)
+    const [, secondBank] = await Promise.all([firstEffect, second.ensureBank()])
+    await TH.expectBad(firstEffect, 'disabled')
+    deviceUi.expectRenders(['made: no vaults', 'ready: main locked'])
 
-    const vault = await second.ensureVault(VaultScopeGiven)
+    const vault = await secondBank.ensureVault(VaultScopeGiven)
     await vault.ensureUnlocked()
     expect(dialog.shown).to.deep.equal([])
-    bankUi.expectRenders(['ready: main unlocked'])
+    deviceUi.expectRenders(['ready: main unlocked'])
     expectNoBadNews()
   })
 })

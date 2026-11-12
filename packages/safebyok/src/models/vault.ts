@@ -382,14 +382,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     this.#lease?.evict()
     this.#lease = null
     this.#boxListing?.sweep()
-    this.listing.dismissGatingAtDiscard(this)
+    this.world.device.dismissGatingAtDiscard(this)
   }
 
   /** Locked, the row cached forgotten, and the boxes vacated. */
   protected override vacateContents(): void {
     void this.#revokeLease('vacate')
     this.#boxListing?.vacate()
-    this.listing.dismissGatingAtDiscard(this)
+    this.world.device.dismissGatingAtDiscard(this)
   }
 
   /** A full vault record is one alive that carries its `gate`; a sparse one or a tombstone is not. */

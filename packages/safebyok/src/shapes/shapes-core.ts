@@ -163,9 +163,9 @@ export type Boxscope = Z.infer<typeof boxscope>
 
 /** The scope naming one of a bank's vaults, as its calls are handed it: the `vaultlabel` required, the `user_id` and `banklabel` invited, each name checked.
  * It accepts whatever carries the names, a plain bag, a Vault object, its snapshot or a
- * BankVault, and leaves the rest. A vaultDB or deviceDB in the scope refuses: each goes to `Bank.make`.
+ * BankVault, and leaves the rest. A vaultDB or deviceDB in the scope refuses: each goes to `Device.make`.
  *
- * @example bankedVaultScope.parse({ vaultlabel: 'main', vaultDB })  // throws: a vaultDB goes to Bank.make
+ * @example bankedVaultScope.parse({ vaultlabel: 'main', vaultDB })  // throws: a vaultDB goes to Device.make
  */
 export const bankedVaultScope = Checker(({ obj, user_id, banklabel, vaultlabel }) => {
   const database = never(Phrases.DatabaseInVaultScope).optional()

@@ -20,7 +20,7 @@ import type { VaultListing } from './vault-listing'
 /** What an attempt does with the user's cleartexts: prove them, and make the change its gating is for. */
 type Act = (cleartexts: unknown) => Promise<Vault>
 
-/** One ask of the user, one open per bank. It has the cleartexts only for the length of an attempt, and concludes once: its launcher answers with that outcome. */
+/** One ask of the user, one open per device. It has the cleartexts only for the length of an attempt, and concludes once: its launcher answers with that outcome. */
 export class Gating<KindT extends Gatingkind = Gatingkind> {
   // == [Props]: gatingkind, gatingTok, user_id, banklabel, vaultlabel, vault, passkeyHeader, #listing, #act, #concluded, #conclude, #outcome, #isAttempting, #isLastAttempt
 
@@ -97,7 +97,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   }
 
   async #launch(askUser: AskUser | null): Promise<Vault> {
-    this.#listing.attachGating(this as unknown as AnyGating)
+    this.#listing.world.device.attachGating(this as unknown as AnyGating)
     if (askUser !== null) { void this.#askHost(askUser) }
     return valOf(await this.#concluded)
   }
@@ -160,7 +160,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   #concludeOnce(outcome: Outcome<Vault>): void {
     if (this.#outcome !== null) { return }
     this.#outcome = outcome
-    this.#listing.detachGating()
+    this.#listing.world.device.detachGating()
     this.#conclude(outcome)
   }
   // --

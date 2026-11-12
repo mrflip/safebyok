@@ -9,12 +9,12 @@ import { type Outcome, outcomeOf, valOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { type VaultScope, vaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
-import { type AnyGating, type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
+import { type VaultStamp, vaultStamp } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import { type DelTombstone, type Fetched, type ListingDelOpts, type ListingOpts, type ListingPutOpts, type ThingAnswer, type VaultSnapshot, type VaultWorld } from '../shapes/shapes-vaultish'
 import type { BoxRow, VaultRow, VaultRecord, VaultSparse } from '../shapes/shapes-storage'
 import { type Answer, type Notice, answerWithVal, refusedAnswerOf } from '../storage/vault-db'
-import { vaultAbsent, alreadyAsking, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
+import { vaultAbsent, delOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import { BoxListing } from './box-listing'
 import type { Gate } from './gate'
 import { Listing } from './listing'
@@ -22,14 +22,9 @@ import { Vault } from './vault'
 
 /** One bank's vaults, by vaultlabel. */
 export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, VaultSnapshot, Vault, SX.DamagedVault> {
-  // == [Props]: world, #openGating, openGating
+  // == [Props]: world
 
   declare readonly world: VaultWorld
-
-  #openGating: AnyGating | null = null
-
-  /** The gating open on this bank, or null. */
-  get openGating(): AnyGating | null { return this.#openGating }
   // --
 
   // == [Construction]: constructor, buildVault, tryBuildVault, boxListingOf, scopeOf, sparseOf, recordOf
@@ -142,45 +137,6 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
     } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
     return super.tryDel(ante)
   }
-  // --
-
-  // == [The one gating open]: attachGating, detachGating, dismissGatingAtDiscard, sweep, vacate, dismissGatingOfGoneListing
-
-  /** Attaches the one gating this bank may have open. */
-  attachGating(gating: AnyGating): void {
-    if (this.#openGating !== null) { throw alreadyAsking() }
-    this.#openGating = gating
-    this.tellListeners()
-  }
-
-  /** The open gating has concluded. */
-  detachGating(): void {
-    this.#openGating = null
-    this.tellListeners()
-  }
-
-  /** `vault` is going away: the open gating concludes, if it asks for that vault, whatever its kind. */
-  dismissGatingAtDiscard(vault: Vault): void {
-    if (this.#openGating?.vault === vault) { this.#openGating.dismiss() }
-  }
-
-  /** Sweep this listing's vaults, and dismiss the open gating whatever vault it asks for. */
-  override sweep(): this {
-    super.sweep()
-    this.#dismissGatingOfGoneListing()
-    return this
-  }
-
-  /** Vacate this listing's vaults, and dismiss the open gating whatever vault it asks for. */
-  override vacate(): this {
-    super.vacate()
-    this.#dismissGatingOfGoneListing()
-    return this
-  }
-
-  // Past the disable: the dismiss tells the listeners, who must meet the listing already disabled.
-  /** The open gating, whatever vault it asks for, concludes with the listing going away. */
-  #dismissGatingOfGoneListing(): void { this.#openGating?.dismiss() }
   // --
 
   // == [Defined by the vault listing]: vaultTokOfWorld, isOneLifePerInstance, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow

@@ -1,42 +1,35 @@
-import { ForeverMillis, MinuteMillis, brandGuarded, type Modelkind } from '../helpers/consts'
+import type { Modelkind } from '../helpers/consts'
 import type { GoodAct } from '../shapes/shapes-enums'
 import { nowMillis } from '../helpers/clock'
-import { Checkers } from '../helpers/validator'
-import { isTestDeriver } from '../deriver/basederiver'
-import { VaultError, isVaultError } from '../refusals/errors'
 import { tattoo } from '../helpers/helpers'
-import { type VaultLogger, parseLogger } from '../helpers/logger'
-import { DefaultStrengthChecker, type GuardedStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
+import type { VaultLogger } from '../helpers/logger'
+import type { GuardedStrengthChecker } from '../helpers/passphrase-strength'
 import { type Outcome, demandGood, good, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
 import { reportToPlatform } from '../refusals/report-error'
-import { type BankScope, type BankedVaultScope, type VaultScope, bankScope, bankedVaultScope } from '../shapes/shapes-core'
+import { type BankScope, type BankedVaultScope, type VaultScope, bankedVaultScope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { GoodAnswer } from '../storage/vault-db'
 import type { Box } from './box'
 import type { LeaseDated } from '../shapes/shapes-storage'
-import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BadNewsHandler, BankAnnouncement, BankEvent, BankOpts, BankSnapshot, BankStage, GuardedLifecycleHandler, LifecycleHandler, VacateStory } from '../shapes/shapes-vaultish'
+import type { BankFriend, BankSnapshot, ListingOpts } from '../shapes/shapes-vaultish'
 import type { DeviceDB } from '../storage/device-db'
-import { bankDisabled, helloFirst, insecureContext, unexpectedError } from '../refusals/throwers'
-import { DefaultLeaseMillis, type Vault } from './vault'
-import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
+import type { Device } from './device'
+import type { Vault } from './vault'
+import type { GuardedKeyDeriver } from './proving'
 import { VaultListing } from './vault-listing'
 
-// == [Given to a bank]: DefaultRefreshMillis
-
-/** How old a vault or box may grow before it is fetched again, unless the host's options say otherwise. */
-export const DefaultRefreshMillis = 5 * MinuteMillis
-// --
-
-/** The signed-in user's vaults in the app, one Vault object per scope, and what they share. */
+/** The signed-in user's vaults in the app, one Vault object per scope, and what they share: made by the {@link Device}, through `device.ensureBank()`. */
 export class Bank {
-  // == [Props]: user_id, banklabel, scope, device_tok, keyDeriver, deviceDB, logger, strengthChecker, leaseMillis, boxRefreshMillis, #hostHandlers, #tellBadNews, #listeners, #vaultListing, #endCause, #vacating, #lastHello, #snapshot, #getSnapshot, #subscribe
+  // == [Props]: user_id, banklabel, scope, device, device_tok, keyDeriver, deviceDB, logger, strengthChecker, leaseMillis, boxRefreshMillis, #tellBadNews, #listeners, #vaultListing, #snapshot, #getSnapshot, #subscribe
 
   declare readonly user_id:   string
   declare readonly banklabel: string
   readonly scope:            BankScope
+  /** The device that made this bank: its options, its host's functions, its open gating and its end. */
+  readonly device:           Device
+  /** The token of this device's row in the deviceDB, which each wayin records. */
   readonly device_tok:       string
   readonly keyDeriver:       GuardedKeyDeriver
   readonly deviceDB:         DeviceDB
@@ -46,28 +39,10 @@ export class Bank {
   /** The refresh horizon of each vault's boxes. */
   readonly boxRefreshMillis: number
 
-  /** The host's `onLifecycle`, guarded, and its `onBadNews`, called while the bank is enabled and by its vacate. */
-  readonly #hostHandlers: Handlers
-
-  /** Tell bad news no caller waits on to the host, its every listing and box coming straight here: the friend they tell it through.
-   * A refusal is told as it is, anything else thrown as `unexpected_error`, and a `disabled` refusal not at all.
-   */
-  readonly #tellBadNews = brandGuarded((badnews: readonly unknown[]): void => {
-    const refusals = badnews.map((news) => (isVaultError(news) ? news : unexpectedError(news)))
-    // A thing disabled since is no news: the host swept or vacated it, or its vault went away.
-    tellBadNewsTo(this.#handlers.onBadNews, this, refusals.filter((refusal) => refusal.refusalkind !== 'disabled'))
-  })
-  // Not awaited: an announcement is news of what happened, and nothing waits on the host's answer.
-  /** Tell the host's `onLifecycle` what happened, its every listing and vault coming straight here: the friend they announce through. */
-  readonly #announce = brandGuarded((announcement: BankAnnouncement): void => { void this.#handlers.onLifecycle({ ...announcement, bank: this }) })
+  /** The device's word to the host of bad news no caller waits on. */
+  readonly #tellBadNews:  BankFriend['tellBadNews']
   readonly #listeners = new Set<() => void>()
   readonly #vaultListing: VaultListing
-  /** Why a sweep or a vacate disabled the bank, its snapshot's refusal from then on; null while it is enabled. */
-  #endCause:              VaultError | null = null
-  /** The first vacate's promise, which a repeat answers; null until a vacate. */
-  #vacating:              Promise<void> | null = null
-  /** Whether a `hello` has succeeded. */
-  #isHelloed              = false
   #snapshot:              BankSnapshot
 
   readonly #getSnapshot = (): BankSnapshot => this.#snapshot
@@ -78,13 +53,10 @@ export class Bank {
   }
   // --
 
-  // == [Getters]: vaultListing, autolockMinutes, snapshot, getSnapshot, subscribe, toJSON
+  // == [Getters]: vaultListing, snapshot, getSnapshot, subscribe, toJSON
 
   /** The listing of this bank's vaults. */
   get vaultListing(): VaultListing { return this.#vaultListing }
-
-  /** The autolock duration in minutes, past which a cached lease no longer unlocks a vault. */
-  get autolockMinutes(): number { return this.leaseMillis / MinuteMillis }
 
   /** This bank's current {@link BankSnapshot}. */
   get snapshot(): BankSnapshot { return this.#snapshot }
@@ -99,34 +71,25 @@ export class Bank {
   toJSON(): BankSnapshot { return this.#snapshot }
   // --
 
-  // == [Construction]: make, constructor, vaultScopeOf
+  // == [Construction]: constructor, vaultScopeOf
 
-  /** Make a bank from the host's options, ready for {@link hello}. */
-  static make(opts: BankOpts): Bank { return new Bank(opts) }
-
-  constructor(opts: BankOpts) {
-    checkSecureContext()
-    const { user_id, banklabel, device_tok, vaultDB, deviceDB, keyDeriver, requestCleartext, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, vaultRefreshMinutes, boxRefreshMinutes, onBadNews = DefaultOnBadNews, onLifecycle = DefaultOnLifecycle } = VX.bankOpts.parse(opts)
-    this.scope = bankScope.parse({ user_id, banklabel })
+  // The device's options are its own: the bank keeps the ones its vaults reach for.
+  constructor(device: Device, device_tok: string, opts: ListingOpts) {
+    VX.bankArgs.parse({ device, device_tok })
+    this.scope = device.scope
     tattoo(this, this.scope)
+    this.device = device
     this.device_tok = device_tok
-    this.keyDeriver = guardKeyDeriver(keyDeriver)
-    this.deviceDB = deviceDB
-    // A disabled bank calls none of the host's functions, but in its vacate: the page may belong to the next user by then.
-    this.#hostHandlers = { onLifecycle: guardOnLifecycle(onLifecycle), onBadNews }
-    // A revoked identity vacates the bank whatever the host's onLifecycle does; the host hears of it as the vacate's `vacated`.
-    const panic = brandGuarded((refusal: VaultError): void => { void this.vacate({ cause: refusal }) })
-    // A disabled bank asks no one: every gating's launch follows an enabled check in the same tick.
-    const askUser = requestCleartext === undefined ? null : guardRequestCleartext(requestCleartext)
-    this.logger = parseLogger(logger)
-    this.strengthChecker = guardStrengthChecker(strengthChecker)
-    this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
-    this.boxRefreshMillis = millisOf(boxRefreshMinutes, DefaultRefreshMillis)
-    const maxMillisSinceRefresh = millisOf(vaultRefreshMinutes, DefaultRefreshMillis)
-    this.#vaultListing = new VaultListing(this, { vaultDB, maxMillisSinceRefresh, bankFriend: { panic, announce: this.#announce, tellBadNews: this.#tellBadNews, askUser } })
+    this.keyDeriver = device.keyDeriver
+    this.deviceDB = device.deviceDB
+    this.logger = device.logger
+    this.strengthChecker = device.strengthChecker
+    this.leaseMillis = device.leaseMillis
+    this.boxRefreshMillis = device.boxRefreshMillis
+    this.#vaultListing = new VaultListing(this, opts)
+    this.#tellBadNews = opts.bankFriend.tellBadNews
     this.#vaultListing.subscribe(this.#remakeSnapshot)
     this.#snapshot = this.#makeSnapshot()
-    if (isTestDeriver(keyDeriver)) { this.logger.warn(Phrases.TestDeriverNotice, { oplabel: 'Bank.make' }) }
     Object.freeze(this)
   }
 
@@ -149,38 +112,14 @@ export class Bank {
   receiveWorld(): void { /* no world sits above a bank */ }
   // --
 
-  // == [Starting]: hello, tryHello, bringUp
+  // == [Locks]: autolock, lock
 
-  /** SLOPDOC: Brings the bank up from the vaultDB, and again whenever the host calls it to force a reset. */
-  async hello(): Promise<void> {
-    this.demandEnabled()
-    const hello = await outcomeOf(() => this.#bringUp())
-    this.#isHelloed ||= hello.ok
-    this.#remakeSnapshot()
-    this.#announce({ kind: 'helloed', outcome: hello, vault: null })
-    demandGood(hello)
-  }
-
-  /** Non-throwing form of {@link hello}. */
-  tryHello(): Promise<Outcome<void>> { return outcomeOf(() => this.hello()) }
-
-  /** A sweep or a vacate crossing it leaves the listing disabled, which refuses. */
-  async #bringUp(): Promise<void> {
-    await this.keyDeriver.load()
-    await this.strengthChecker.load()
-    await this.#vaultListing.list()
-    await this.#vaultListing.hello()
-  }
-  // --
-
-  // == [Ending]: autolock, lock, vacate, sweep, letGo, listOwnLeases, vacateDevice, revokeOwnLeases, forgetOwnDevice, tellHost
-
-  /** Lock each listed vault with a cached lease past autolock, forgetting it. Call it after `hello` and on your own timer.
+  /** Lock each listed vault with a cached lease past autolock, forgetting it. Call it after `ensureBank` and on your own timer.
    * A best-effort reminder, not a guarantee: it finds leases only by row, and `Lease.buildFromCache` leaves such a row for it.
    */
   async autolock(): Promise<void> {
     const cutoff = nowMillis() - this.leaseMillis
-    const listed = await this.#listOwnLeases()
+    const listed = await listOwnLeases(this.deviceDB, this.scope)
     if (! listed.ok) { this.#tellBadNews([listed.err]); return }
     const oldRows = listed.val.filter((row) => row.proved_at < cutoff)
     for (const row of oldRows) {
@@ -194,84 +133,20 @@ export class Bank {
     this.#vaultListing.lock()
     return this
   }
-
-  /** Sign out on this device: disable the bank, and forget every lease of this bank cached here and its device row, settling once each forget has been tried. */
-  vacate(story: VacateStory = {}): Promise<void> {
-    const { cause = bankDisabled() } = VX.vacateStory.parse(story)
-    this.#disable(cause, () => { this.#vaultListing.vacate() })
-    // A vacate alone uses the host's handlers past the disable: a lease that outlives sign-out is the one the host most needs to hear of.
-    // A vacate after a sweep still forgets its rows, as sign-out may come after the page's cleanup.
-    this.#vacating ??= this.#vacateDevice(cause)
-    return this.#vacating
-  }
-
-  /** Cleanup while the page lives: disable the bank, leaving each cached lease for the next bank. Never throws. */
-  sweep(): this {
-    this.#disable(bankDisabled(), () => { this.#vaultListing.sweep() })
-    return this
-  }
-
-  /** The bank disabled, its snapshot saying `cause` and its listing let go by `discard`, for good; a repeat is a no-op. */
-  #disable(cause: VaultError, discard: () => void): void {
-    if (! this.isEnabled) { return }
-    this.#endCause = cause
-    discard()
-    this.#remakeSnapshot()
-  }
-
-  /** This bank's rows among the cached leases, oldest first. */
-  async #listOwnLeases(): Promise<Outcome<LeaseDated[]>> {
-    const listed = await this.deviceDB.tryListLeases()
-    return listed.ok ? good(listed.val.filter((row) => this.#isOwnLease(row))) : listed
-  }
-
-  // A fresh device has no device row: the next bank of this scope gets a new device_tok.
-  /** This bank's leases revoked and its device row forgotten on this device, then `vacated` told. */
-  async #vacateDevice(cause: VaultError): Promise<void> {
-    const unrevoked = await this.#revokeOwnLeases()
-    await this.#forgetOwnDevice()
-    this.#tellHost({ kind: 'vacated', cause, unrevoked })
-  }
-
-  /** A vacate's revoke of every lease of this bank, listed or not, as a fresh page told 'identity_revoked' has listed
-   * none; answers how many it could not revoke.
-   */
-  async #revokeOwnLeases(): Promise<number> {
-    const listed = await this.#listOwnLeases()
-    if (! listed.ok) { tellBadNewsTo(this.#hostHandlers.onBadNews, this, [listed.err]); return 0 }
-    const revoked = await Promise.all(listed.val.map(async (row) => {
-      const forgot = await this.deviceDB.tryForget(row)
-      if (! forgot.ok) { this.#tellHost({ kind: 'lease_revoke_failed', refusal: forgot.err, vault: null, where: 'vacate' }) }
-      return forgot.ok
-    }))
-    return revoked.filter((isRevoked) => ! isRevoked).length
-  }
-
-  /** A vacate's forget of this bank's device row in the deviceDB, a refusal told as bad news. */
-  async #forgetOwnDevice(): Promise<void> {
-    const forgot = await this.deviceDB.tryForgetDevice(this.scope)
-    if (! forgot.ok) { tellBadNewsTo(this.#hostHandlers.onBadNews, this, [forgot.err]) }
-  }
-
-  /** A vacate's word to the host's own `onLifecycle`, past the disable. */
-  #tellHost(announcement: BankAnnouncement): void {
-    // Not awaited: a host's onLifecycle that awaits bank.vacate() is handed this vacate, and each would wait on the other.
-    void this.#hostHandlers.onLifecycle({ ...announcement, bank: this })
-  }
   // --
 
   // == [Vaults]: vaultAt, ensureVault, tryEnsureVault, tryProbe, probe
 
   /** The vault listed for `scope`, a tombstone among them, or null. */
   vaultAt(scope: BankedVaultScope): Vault | null {
-    this.#demandReady()
+    this.device.demandEnabled()
     return this.#vaultListing.at(this.vaultScopeOf(scope))
   }
 
   /** SLOPDOC: The vault for `scope`, whether already listed or built now by asking the user. */
   async ensureVault(scope: BankedVaultScope): Promise<Vault> {
     const asked = this.vaultScopeOf(scope)
-    this.#demandReady()
+    this.device.demandEnabled()
     const listed = this.#vaultListing.at(asked)
     return (listed?.isPresent === true) ? listed : this.#vaultListing.buildVault(asked)
   }
@@ -304,11 +179,10 @@ export class Bank {
 
   // == [Snapshot]: remakeSnapshot, makeSnapshot
 
-  /** Make the snapshot again, and tell every listener where it differs. Bound, as each listing calls it. */
+  /** Make the snapshot again, and tell every listener where it differs. Bound, as its listing calls it. */
   readonly #remakeSnapshot = (): void => {
     const next = this.#makeSnapshot()
-    const prior = this.#snapshot
-    if ((next.stage === prior.stage) && (next.err === prior.err) && (next.vaults === prior.vaults) && (next.openGating === prior.openGating)) { return }
+    if (next.vaults === this.#snapshot.vaults) { return }
     this.#snapshot = next
     for (const listener of this.#listeners) {
       try {
@@ -320,30 +194,7 @@ export class Bank {
   }
 
   #makeSnapshot(): BankSnapshot {
-    const stage: BankStage = this.#isHelloed ? 'ready' : 'made'
-    return Object.freeze({ ...this.scope, stage: this.#endCause ? 'disabled' : stage, err: this.#endCause ?? null, device_tok: this.device_tok, vaults: this.#vaultListing.snapshot, openGating: this.#vaultListing.openGating })
-  }
-  // --
-
-  // == [Guards]: isEnabled, demandEnabled, handlers, isOwnLease, demandReady
-
-  /** True from `Bank.make` until a sweep or a vacate, and never again. */
-  get isEnabled(): boolean { return this.#endCause === null }
-
-  /** Demands that this bank be enabled. */
-  demandEnabled(): this {
-    if (! this.isEnabled) { throw bankDisabled() }
-    return this
-  }
-
-  /** The host's handlers while the bank is enabled, and handlers that only report once it is disabled. */
-  get #handlers(): Handlers { return this.isEnabled ? this.#hostHandlers : DefaultHandlers }
-
-  #isOwnLease({ user_id, banklabel }: LeaseDated): boolean { return (user_id === this.user_id) && (banklabel === this.banklabel) }
-
-  #demandReady(): void {
-    this.demandEnabled()
-    if (! this.#isHelloed) { throw helloFirst() }
+    return Object.freeze({ ...this.scope, device_tok: this.device_tok, vaults: this.#vaultListing.snapshot })
   }
   // --
 
@@ -351,118 +202,16 @@ export class Bank {
   get modelkind(): 'bank' { return 'bank' satisfies Modelkind }
 }
 
-// == [Host functions]: HostChecks, DefaultOnBadNews, tellBadNewsTo, reportAtError, heedRevokeFailed, DefaultOnLifecycle, guardRequestCleartext, guardOnLifecycle, Handlers, DefaultHandlers
+// == [Helpers]: listOwnLeases, probeStepOf
 
-const HostChecks = Checkers('bad_option', ({ fn }) => ({
-  requestCleartext: fn<RequestCleartext>(),
-  onLifecycle:      fn<LifecycleHandler>(),
-}))
-
-/** The `onBadNews` a bank has when given none: each news to the bank's logger. */
-export const DefaultOnBadNews: BadNewsHandler = ({ news, bank }) => {
-  bank.logger.warn(news.message, { oplabel: 'Bank.onBadNews', refusalkind: news.refusalkind })
+/** The leases cached in `deviceDB` for the bank scope `scope`, oldest first. */
+export async function listOwnLeases(deviceDB: DeviceDB, { user_id, banklabel }: BankScope): Promise<Outcome<LeaseDated[]>> {
+  const listed = await deviceDB.tryListLeases()
+  return listed.ok ? good(listed.val.filter((row) => (row.user_id === user_id) && (row.banklabel === banklabel))) : listed
 }
-
-/** Tell `onBadNews` each of `badnews` that reached `bank`, awaiting none: the handler's throw or rejection reaches only the platform. */
-export function tellBadNewsTo(onBadNews: BadNewsHandler, bank: Bank, badnews: readonly VaultError[]): void {
-  VX.tellBadNewsToArgs.parse({ onBadNews, bank, badnews })
-  for (const news of badnews) {
-    // Any answer is heard out, a thenable among them: none is awaited.
-    void (async () => {
-      try {
-        await onBadNews({ news, bank })
-      } catch (err) {
-        reportToPlatform(err)
-      }
-    })()
-  }
-}
-
-// The logger too, as a platform with no reportError (Node, SSR) would hear nothing of it.
-/** `refusal` to `bank`'s logger at error, and to the platform. */
-function reportAtError(refusal: VaultError, bank: Bank): void {
-  bank.logger.error(refusal.message, { oplabel: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
-  reportToPlatform(refusal)
-}
-
-// A lock or a vacate meant the lease gone; a tombstone's forget and an outdated row's are tried again by the next lease cached.
-/** The default's answer to a cached lease that outlived its revoke. */
-function heedRevokeFailed({ refusal, vault, where, bank }: Extract<BankEvent, { kind: 'lease_revoke_failed' }>): void {
-  if (where === 'tombstone' || where === 'undeleted') {
-    bank.logger.warn(refusal.message, { oplabel: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
-    return
-  }
-  reportAtError(refusal, bank)
-  vault?.vacate()
-}
-
-/** The `onLifecycle` a bank has when given none: a lease that outlived a lock or a vacate, and a vacate with a cause, to the logger at error and the platform, the vault vacated; a hello refused but by the bank's end to the logger. */
-export const DefaultOnLifecycle: LifecycleHandler = (event) => {
-  switch (event.kind) {
-  case 'lease_revoke_failed': {
-    heedRevokeFailed(event)
-    break
-  }
-  case 'vacated': {
-    if (! isVaultError(event.cause, 'disabled')) { reportAtError(event.cause, event.bank) }
-    break
-  }
-  case 'helloed': {
-    const { outcome, bank } = event
-    if (! outcome.ok && outcome.err.refusalkind !== 'disabled') { bank.logger.warn(outcome.err.message, { oplabel: 'Bank.onLifecycle', refusalkind: outcome.err.refusalkind }) }
-    break
-  }
-  }
-}
-
-// What the dialog throws is dropped: it may quote what the user typed.
-/** `requestCleartext`, made to honor its contract: the one way a gating asks the user. */
-export function guardRequestCleartext(requestCleartext: RequestCleartext): AskUser {
-  const host = HostChecks.requestCleartext.parse(requestCleartext, { where: 'requestCleartext' })
-  return brandGuarded(async (gating: AnyGating): Promise<boolean> => {
-    try {
-      await host(gating)
-      return true
-    } catch {
-      return false
-    }
-  })
-}
-
-/** `onLifecycle`, made to honor its contract: the one way the core tells the host what happened in the bank's life. */
-export function guardOnLifecycle(onLifecycle: LifecycleHandler): GuardedLifecycleHandler {
-  const host = HostChecks.onLifecycle.parse(onLifecycle, { where: 'onLifecycle' })
-  return brandGuarded(async (event: BankEvent): Promise<void> => {
-    try {
-      await host(event)
-    } catch (err) {
-      reportToPlatform(err)
-    }
-  })
-}
-
-/** What a bank tells of its life and of bad news: the host's `onLifecycle`, guarded, and its `onBadNews`, or the defaults a disabled bank tells. */
-interface Handlers {
-  readonly onLifecycle: GuardedLifecycleHandler
-  readonly onBadNews:   BadNewsHandler
-}
-
-// The defaults vacate only a vault, which a disabled bank has already let go: past the disable they only report.
-/** A disabled bank's reports: `DefaultOnLifecycle` and `DefaultOnBadNews`. */
-const DefaultHandlers: Handlers = { onLifecycle: guardOnLifecycle(DefaultOnLifecycle), onBadNews: DefaultOnBadNews }
-// --
-
-// == [Helpers]: millisOf, checkSecureContext, probeStepOf
 
 /** A storage verb's answer with no wrapped key or ciphertext left in it, and when it came back. */
 function probeStepOf({ act, ask, val, world }: GoodAnswer<Box | null, GoodAct, unknown>): VX.ProbeStep {
   return { ok: true, act, ask, val: SX.boxSparse.parse(val?.sparse), world: SX.vaultSparse.parse(world), timestamp: nowMillis() }
-}
-
-// A host's Infinity minutes, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
-function millisOf(minutes: number | undefined, fallback: number): number { return (minutes === undefined ? fallback : Math.min(Math.round(minutes * MinuteMillis), ForeverMillis)) }
-
-function checkSecureContext(): void {
-  if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw insecureContext() }
 }
 // --

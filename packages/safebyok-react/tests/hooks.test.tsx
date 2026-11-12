@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Vault, VaultError, type Box, type BoxSnapshot, type RequestCleartext, type Whisper, type BoxExposure, type LifecycleHandler } from 'safebyok'
 import { MemoryVaultDB, type BoxListAsk } from 'safebyok/storage'
 import { BankProvider } from '../src/provider/bank-provider'
-import { useBank, useBankSnapshot, useBox, useBoxIsShowing, useBoxSnapshot, useBoxExposure, useBoxes, useVault, useVaultSnapshot, useWhisper } from '../src/hooks/hooks'
+import { useBank, useBankSnapshot, useDevice, useDeviceSnapshot, useBox, useBoxIsShowing, useBoxSnapshot, useBoxExposure, useBoxes, useVault, useVaultSnapshot, useWhisper } from '../src/hooks/hooks'
 import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
@@ -29,10 +29,18 @@ const ShowsMain = () => {
 /** Call `hook` during render, and render nothing. */
 const Calls = ({ hook }: { hook: () => unknown }) => { hook(); return null }
 
+/** A sign-out button: the device's vacate, from useDevice. */
+function SignsOut() {
+  const device = useDevice()
+  return <button disabled={device === null} onClick={() => { void device?.vacate() }}>sign out</button>
+}
+
 describe("the hooks outside a BankProvider", () => {
   const HookCases = [
     ['useBank',          () => useBank()],
     ['useBankSnapshot',  () => useBankSnapshot()],
+    ['useDevice',        () => useDevice()],
+    ['useDeviceSnapshot', () => useDeviceSnapshot()],
     ['useVault',         () => useVault('main')],
     ['useVaultSnapshot', () => useVaultSnapshot('main')],
     ['useBoxes',         () => useBoxes('main')],
@@ -54,7 +62,7 @@ describe("useVault and useVaultSnapshot", () => {
     await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
   })
 
-  it("read waiting while the bank's hello is refused, its snapshot still made", async () => {
+  it("read waiting while the device's ensureBank is refused, its snapshot still made", async () => {
     const world = TH.makeBankWorld()
     const spy = TH.spyLogger()
     world.vaultDB._cheat_refuseGets('storage_unavailable')
@@ -64,28 +72,39 @@ describe("useVault and useVaultSnapshot", () => {
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
   })
 
-  it("read waiting while the bank's hello is still on its way", async () => {
+  it("read waiting while the device's ensureBank is still on its way", async () => {
     const world = TH.makeBankWorld()
     const listing = TH.makePending<never>()
     vi.spyOn(world.vaultDB, 'tryListVaults').mockReturnValue(listing.promise)
     render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsMain /></BankProvider>)
-    await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })
     await act(async () => { await TH.wakeupAtNextTick() })
+    expect(TH.seenBanks).to.deep.equal([])
     expect(shown('vault')).to.eq('waiting none')
     expect(screen.getByTestId("main").textContent).to.eq('waiting')
   })
 
-  it("read spent once the bank is vacated, carrying the cause, and useVaultSnapshot null", async () => {
+  it("give the device before its bank is up, and its vacate signs out", async () => {
     const world = TH.makeBankWorld()
-    const seeding = world.bankOn()
-    await seeding.hello()
+    world.vaultDB._cheat_refuseGets('storage_unavailable')
+    const spy = TH.spyLogger()
+    render(<BankProvider {...TH.providerPropsOf(world, { logger: spy.logger })}><TH.ShowsVault /><SignsOut /></BankProvider>)
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 made') })
+    fireEvent.click(screen.getByText('sign out'))
+    await waitFor(() => { expect(shown('bank')).to.eq('u1 disabled') })
+    expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
+  })
+
+  it("read spent once the device is vacated, carrying the cause, and useVaultSnapshot null", async () => {
+    const world = TH.makeBankWorld()
+    const seeding = await world.bankOn()
     await seeding.ensureVault(TH.VaultScopeGiven)
-    seeding.sweep()
+    seeding.device.sweep()
     const spy = TH.spyLogger()
     render(<BankProvider {...TH.providerPropsOf(world, { logger: spy.logger })}><TH.ShowsVault /><ShowsMain /></BankProvider>)
     await waitFor(() => { expect(screen.getByTestId("main").textContent).to.eq('present') })
     const cause = new VaultError('identity_revoked', 'signed out')
-    await act(async () => { await TH.seenBanks[0]?.vacate({ cause }) })
+    await act(async () => { await TH.seenBanks[0]?.device.vacate({ cause }) })
     expect(screen.getByTestId("main").textContent).to.eq('spent identity_revoked')
     expect(shown('vault')).to.eq('spent none')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
@@ -124,10 +143,9 @@ describe("useVault and useVaultSnapshot", () => {
   it("leave a refused vault hello to the bank, which tells the host's onLifecycle", async () => {
     const world = TH.makeBankWorld()
     const vaultDB = new BoxRefusingVaultDB()
-    const seeding = world.bankOn({ vaultDB })
-    await seeding.hello()
+    const seeding = await world.bankOn({ vaultDB })
     await seeding.ensureVault(TH.VaultScopeGiven)
-    seeding.sweep()
+    seeding.device.sweep()
     vaultDB.refusing = true
     const helloes: VaultError[] = []
     const onLifecycle: LifecycleHandler = (event) => { if (event.kind === 'helloed' && event.vault !== null && ! event.outcome.ok) { helloes.push(event.outcome.err) } }

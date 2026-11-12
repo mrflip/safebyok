@@ -1,6 +1,6 @@
 export { BankProvider } from './provider/bank-provider'
 export type { BankProviderProps } from './shapes'
-export { useBank, useBankSnapshot, useVault, useVaultSnapshot } from './hooks/hooks'
+export { useBank, useBankSnapshot, useDevice, useDeviceSnapshot, useVault, useVaultSnapshot } from './hooks/hooks'
 export { useBox, useBoxes, useBoxIsShowing, useBoxSnapshot, useBoxExposure, useWhisper } from './hooks/hooks'
 export type { VaultLifecycle, VaultStage } from './shapes'
 export { BoxWhisperField } from './components/box-whisper-field'

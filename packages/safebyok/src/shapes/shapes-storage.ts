@@ -238,7 +238,7 @@ export type MemoryVaultDBOpts = Readonly<Z.input<typeof memoryVaultDBOpts>>
  */
 export const capacity = objCheck(({ obj, union, int, uint, lit }) => {
   // A storage adapter's `Infinity`, its way of saying it sets no limit, is kept as the largest
-  // safe integer, as Bank.make keeps a declared limit: past this check, no limit is infinite.
+  // safe integer, as Device.make keeps a declared limit: past this check, no limit is infinite.
   const roomLimit = union([int.positive(), lit(Infinity)]).transform((most) => Math.min(most, Number.MAX_SAFE_INTEGER))
   const room      = obj({ used: uint, max: roomLimit })
   return { boxes: room, bytes: room }
