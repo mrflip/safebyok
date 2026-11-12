@@ -92,7 +92,7 @@ const LeaseRowLine = ({ row, scopepath, onForget, onForgetRaw }: LeaseRowLinePro
   )
 }
 
-// A raw row contains the leaseKey and the vaultKeyLeaseWrapped. For a field like these, show what kind of
+// A raw row contains the leaseKey and the bankKeyLeaseWrapped. For a field like these, show what kind of
 // value it is, never its content.
 const cellOf = (fieldname: string, val: unknown): string => {
   if (val === undefined) { return '–' }

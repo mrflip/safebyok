@@ -277,7 +277,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   // == [Sealing for the vaults]: sealWith, unsealWith
 
-  /** `whisperText` sealed under a fresh boxKey under the bank's vaultKey, each bound to the bank's stamp and then to `stamps`, in order. */
+  /** `whisperText` sealed under a fresh boxKey under the bank's bankKey, each bound to the bank's stamp and then to `stamps`, in order. */
   async sealWith(whisperText: string, stamps: readonly CipherCtxRecord[]): Promise<SealedWhisper> {
     const checked = GX.leaseSealArgs.parse({ whisperText, stamps })
     return this.#demandLease().sealWith(checked.whisperText, checked.stamps)

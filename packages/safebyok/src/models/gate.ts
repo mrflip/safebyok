@@ -89,7 +89,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
 
   // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, each with its try form
 
-  /** Replace the passphrase through a replace_passphrase gating. The passkey stays, and the vaultKey does not change. */
+  /** Replace the passphrase through a replace_passphrase gating. The passkey stays, and the bankKey does not change. */
   async replacePassphrasePrompt(): Promise<this> {
     await this.ensureTimely(VX.Promptly); this.world.demandPromptable()
     await this.world.prompt('replace_passphrase')
@@ -110,7 +110,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   /** Non-throwing form of {@link addPasskeyPrompt}. */
   tryAddPasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskeyPrompt()) }
 
-  /** Revoke the passkey through a revoke_passkey gating. With none it answers at once, nobody asked. The vaultKey does not change: a device that has it keeps it to its lock. */
+  /** Revoke the passkey through a revoke_passkey gating. With none it answers at once, nobody asked. The bankKey does not change: a device that has it keeps it to its lock. */
   async revokePasskeyPrompt(): Promise<this> {
     await this.ensureTimely(VX.Promptly); this.world.demandPromptable()
     if (this.passkey0 === null) { return this }

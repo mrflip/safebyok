@@ -2,7 +2,7 @@
 
 import { hex } from '@scure/base'
 import { describe, expect, it, vi } from 'vitest'
-import { type CipherCtxRecord, cipherCtx, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeVaultKey, unwrapKeyUnder } from '../../src/helpers/crypto'
+import { type CipherCtxRecord, cipherCtx, decipherBytes, deriveWrappingKey, fromB64, importWrappingKeyBytes, makeBankKey, unwrapKeyUnder } from '../../src/helpers/crypto'
 import { Lease } from '../../src/models/lease'
 import { wayinCtxOf } from '../../src/models/wayin'
 import { type BankStamp, type LeaseRecord, LeaseFormat, passphraseCleartext } from '../../src/shapes/shapes-gateish'
@@ -34,10 +34,10 @@ const BoxStampFields = ['user_id', 'banklabel', 'vaultlabel', 'boxlabel', 'fmt',
 /** The stamps a box hands a seal when no real vault is wanted: {@link WorldVaultStamp}, then a box's. */
 const SealStamps = [WorldVaultStamp, sealStampOf('anthropic')] as const
 
-/** A lease of the bank `overrides` moves {@link WorldBankStamp} to, over a vaultKey the test holds, its record cached on the friend. */
-async function leaseOver(vaultKey: CryptoKey, overrides: Partial<BankStamp> = {}) {
+/** A lease of the bank `overrides` moves {@link WorldBankStamp} to, over a bankKey the test holds, its record cached on the friend. */
+async function leaseOver(bankKey: CryptoKey, overrides: Partial<BankStamp> = {}) {
   const friend = fakeLeaseFriendOf(overrides)
-  const lease = await Lease.buildGranted(friend, vaultKey, GrantedAs)
+  const lease = await Lease.buildGranted(friend, bankKey, GrantedAs)
   await lease.cacheAsCacheCan()
   return { lease, record: friend.cached as LeaseRecord }
 }
@@ -56,9 +56,9 @@ async function realBoxStamps(): Promise<readonly [CipherCtxRecord, CipherCtxReco
 /** Whether a gate's passphrase wayin opens under the ctx of the stamps `bank` and `gateStamp`, built field for field without a check. */
 async function passphraseWayinOpens(bank: CipherCtxRecord, gateStamp: CipherCtxRecord): Promise<boolean> {
   const { gate } = await builtGateOf()
-  const { vault_key_wayin_wrapped: wrapped, ...header } = gate.wayins.main
+  const { bank_key_wayin_wrapped: wrapped, ...header } = gate.wayins.main
   const wayinKey = await importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes(passphraseCleartext.parse(TestPassphrase), fromB64(header.salt_b64)))
-  const ctx = cipherCtx([bank, gateStamp], 'vault_key_passphrase_wrapped', header)
+  const ctx = cipherCtx([bank, gateStamp], 'bank_key_passphrase_wrapped', header)
   try {
     await unwrapKeyUnder(wayinKey, wrapped, ctx, { extractable: false, usage: ['wrapKey'] })
     return true
@@ -78,9 +78,9 @@ describe("each ctx, byte for byte", () => {
   it("binds a passphrase wayin's wrap to the bank's stamp, the gate's, the purpose and its whole header", async () => {
     const { gate } = await builtGateOf()
     const wayin = gate.wayins.main
-    const ctx = textBytes(`[${BankStampText},${GateStampText},"vault_key_passphrase_wrapped",{"device_tok":"${wayin.device_tok}","key_deriver_label":"${wayin.key_deriver_label}","registered_at":${String(wayin.registered_at)},"salt_b64":"${wayin.salt_b64}","wayinkind":"passphrase","wayinlabel":"main"}]`)
+    const ctx = textBytes(`[${BankStampText},${GateStampText},"bank_key_passphrase_wrapped",{"device_tok":"${wayin.device_tok}","key_deriver_label":"${wayin.key_deriver_label}","registered_at":${String(wayin.registered_at)},"salt_b64":"${wayin.salt_b64}","wayinkind":"passphrase","wayinlabel":"main"}]`)
     const wayinKey = await importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes(passphraseCleartext.parse(TestPassphrase), fromB64(wayin.salt_b64)))
-    expect(await unwrapKeyUnder(wayinKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
+    expect(await unwrapKeyUnder(wayinKey, wayin.bank_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
 
   it("binds a passkey wayin's wrap and its key to the bank's stamp, the gate's, the purpose and its whole header", async () => {
@@ -88,29 +88,29 @@ describe("each ctx, byte for byte", () => {
     const prfBytes = new Uint8Array(answer.prfBytes)
     const { gate } = await builtGateOf(answer)
     const wayin = gate.wayins.passkey0!
-    const ctx = textBytes(`[${BankStampText},${GateStampText},"vault_key_passkey_wrapped",{"credential_id":"${wayin.credential_id}","device_tok":"${wayin.device_tok}","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(wayin.registered_at)},"wayinkind":"passkey","wayinlabel":"passkey0"}]`)
+    const ctx = textBytes(`[${BankStampText},${GateStampText},"bank_key_passkey_wrapped",{"credential_id":"${wayin.credential_id}","device_tok":"${wayin.device_tok}","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(wayin.registered_at)},"wayinkind":"passkey","wayinlabel":"passkey0"}]`)
     const passkeyKey = await deriveWrappingKey(prfBytes, ctx)
-    expect(await unwrapKeyUnder(passkeyKey, wayin.vault_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
+    expect(await unwrapKeyUnder(passkeyKey, wayin.bank_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
 
-  it("binds a lease's wrap of the vaultKey to the bank's stamp and its own", async () => {
-    const { record } = await leaseOver(await makeVaultKey())
+  it("binds a lease's wrap of the bankKey to the bank's stamp and its own", async () => {
+    const { record } = await leaseOver(await makeBankKey())
     const leaseText = `{"bank_tok":"bank-tok-u1","banklabel":"acme","fmt":${String(LeaseFormat)},"gate_revision_tok":"${WorldGate.revision_tok}","gate_tok":"gate-tok-u1","gatelabel":"main","proved_at":${String(T0)},"registered_at":${String(T0)},"user_id":"u1","wayinkind":"passphrase"}`
-    const ctx = textBytes(`[${BankStampText},${leaseText},"vault_key_lease_wrapped"]`)
-    expect(await unwrapKeyUnder(record.lease_key, record.vault_key_lease_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
+    const ctx = textBytes(`[${BankStampText},${leaseText},"bank_key_lease_wrapped"]`)
+    expect(await unwrapKeyUnder(record.lease_key, record.bank_key_lease_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
 
   it("binds each of a box's two seals to the bank's stamp, the vault's, the box's and its own purpose", async () => {
     const stamps = await realBoxStamps()
     const [vaultStamp, boxStamp] = stamps
-    const vaultKey = await makeVaultKey()
-    const { lease } = await leaseOver(vaultKey)
+    const bankKey = await makeBankKey()
+    const { lease } = await leaseOver(bankKey)
     const sealed = await lease.sealWith(WhisperText, stamps)
     function field(fieldname: string): string { return JSON.stringify(boxStamp[fieldname]) }
     expect(boxStamp).to.not.have.property('sidecar')
     const vaultText = `{"banklabel":"acme","registered_at":${JSON.stringify(vaultStamp['registered_at'])},"user_id":"u1","vault_tok":${JSON.stringify(vaultStamp['vault_tok'])},"vaultlabel":"main"}`
     const boxText = `{"am":${field('am')},"bank_tok":${field('bank_tok')},"banklabel":${field('banklabel')},"box_tok":${field('box_tok')},"boxlabel":"anthropic","fmt":${field('fmt')},"registered_at":${field('registered_at')},"revision_seq":${field('revision_seq')},"revision_tok":${field('revision_tok')},"user_id":${field('user_id')},"vault_tok":${field('vault_tok')},"vaultlabel":${field('vaultlabel')},"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${field('written_at')}}`
-    const boxKey = await unwrapKeyUnder(vaultKey, sealed.box_key_wrapped, textBytes(`[${BankStampText},${vaultText},${boxText},"box_key_wrapped"]`), { extractable: false, usage: ['decrypt'] })
+    const boxKey = await unwrapKeyUnder(bankKey, sealed.box_key_wrapped, textBytes(`[${BankStampText},${vaultText},${boxText},"box_key_wrapped"]`), { extractable: false, usage: ['decrypt'] })
     const opened = await decipherBytes(boxKey, sealed.whisper_ciphered, textBytes(`[${BankStampText},${vaultText},${boxText},"whisper_ciphered"]`))
     expect(new TextDecoder().decode(opened)).to.eq(WhisperText)
   })
@@ -124,8 +124,8 @@ describe("each ctx binds every field of its stamps", () => {
   })
 
   it("names every field of a lease's stamp below", async () => {
-    const { record } = await leaseOver(await makeVaultKey())
-    expect(Object.keys(record).filter((fieldname) => (fieldname !== 'lease_key') && (fieldname !== 'vault_key_lease_wrapped'))).to.have.members([...LeaseStampFields])
+    const { record } = await leaseOver(await makeBankKey())
+    expect(Object.keys(record).filter((fieldname) => (fieldname !== 'lease_key') && (fieldname !== 'bank_key_lease_wrapped'))).to.have.members([...LeaseStampFields])
   })
 
   it("names every field of a bank's and a gate's stamps below", () => {
@@ -136,7 +136,7 @@ describe("each ctx binds every field of its stamps", () => {
   for (const fieldname of BoxStampFields) {
     it(`keeps a box shut under a box stamp with another ${fieldname}`, async () => {
       const [vaultStamp, boxStamp] = await realBoxStamps()
-      const { lease } = await leaseOver(await makeVaultKey())
+      const { lease } = await leaseOver(await makeBankKey())
       const sealed = await lease.sealWith(WhisperText, [vaultStamp, boxStamp])
       await TH.expectRefusal(lease.unsealWith(sealed, [vaultStamp, { ...boxStamp, [fieldname]: changed(boxStamp[fieldname]) as string }]), 'damaged_whisper')
     })
@@ -145,18 +145,18 @@ describe("each ctx binds every field of its stamps", () => {
   for (const fieldname of VaultStampFields) {
     it(`keeps a box shut under a vault stamp with another ${fieldname}`, async () => {
       const [vaultStamp, boxStamp] = SealStamps
-      const { lease } = await leaseOver(await makeVaultKey())
+      const { lease } = await leaseOver(await makeBankKey())
       const sealed = await lease.sealWith(WhisperText, SealStamps)
       await TH.expectRefusal(lease.unsealWith(sealed, [{ ...vaultStamp, [fieldname]: changed(vaultStamp[fieldname]) as string }, boxStamp]), 'damaged_whisper')
     })
   }
 
   for (const fieldname of BankStampFields) {
-    it(`keeps a box shut under a lease of the same vaultKey whose bank has another ${fieldname}`, async () => {
-      const vaultKey = await makeVaultKey()
-      const { lease } = await leaseOver(vaultKey)
+    it(`keeps a box shut under a lease of the same bankKey whose bank has another ${fieldname}`, async () => {
+      const bankKey = await makeBankKey()
+      const { lease } = await leaseOver(bankKey)
       const sealed = await lease.sealWith(WhisperText, SealStamps)
-      const { lease: other } = await leaseOver(vaultKey, { [fieldname]: changed(WorldBankStamp[fieldname]) })
+      const { lease: other } = await leaseOver(bankKey, { [fieldname]: changed(WorldBankStamp[fieldname]) })
       await TH.expectRefusal(other.unsealWith(sealed, SealStamps), 'damaged_whisper')
     })
 
@@ -166,10 +166,10 @@ describe("each ctx binds every field of its stamps", () => {
     })
 
     it(`keeps a lease shut under a bank stamp with another ${fieldname}`, async () => {
-      const { record } = await leaseOver(await makeVaultKey())
-      const { lease_key, vault_key_lease_wrapped, ...stamp } = record
-      const ctx = cipherCtx([{ ...WorldBankStamp, [fieldname]: changed(WorldBankStamp[fieldname]) as string }, stamp], 'vault_key_lease_wrapped')
-      await expect(unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).rejects.toThrow()
+      const { record } = await leaseOver(await makeBankKey())
+      const { lease_key, bank_key_lease_wrapped, ...stamp } = record
+      const ctx = cipherCtx([{ ...WorldBankStamp, [fieldname]: changed(WorldBankStamp[fieldname]) as string }, stamp], 'bank_key_lease_wrapped')
+      await expect(unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).rejects.toThrow()
     })
   }
 
@@ -181,10 +181,10 @@ describe("each ctx binds every field of its stamps", () => {
 
   for (const fieldname of LeaseStampFields) {
     it(`keeps a lease shut under a lease stamp with another ${fieldname}`, async () => {
-      const { record } = await leaseOver(await makeVaultKey())
-      const { lease_key, vault_key_lease_wrapped, ...stamp } = record
-      const ctx = cipherCtx([WorldBankStamp, { ...stamp, [fieldname]: changed(stamp[fieldname]) as string }], 'vault_key_lease_wrapped')
-      await expect(unwrapKeyUnder(lease_key, vault_key_lease_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).rejects.toThrow()
+      const { record } = await leaseOver(await makeBankKey())
+      const { lease_key, bank_key_lease_wrapped, ...stamp } = record
+      const ctx = cipherCtx([WorldBankStamp, { ...stamp, [fieldname]: changed(stamp[fieldname]) as string }], 'bank_key_lease_wrapped')
+      await expect(unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).rejects.toThrow()
     })
   }
 
@@ -202,7 +202,7 @@ describe("each ctx binds every field of its stamps", () => {
   for (const [altered, blurb] of BadHeaderCases) {
     it(`refuses a wayin header ${blurb} before any ctx is made`, async () => {
       const { gate } = await builtGateOf()
-      const { vault_key_wayin_wrapped: _wrapped, ...header } = gate.wayins.main
+      const { bank_key_wayin_wrapped: _wrapped, ...header } = gate.wayins.main
       TH.expectSyncRefusal(() => wayinCtxOf(WorldBankStamp, WorldGateStamp, { ...header, ...altered } as never), 'bad_record')
     })
   }

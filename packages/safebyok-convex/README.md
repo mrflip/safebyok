@@ -113,7 +113,7 @@ Five tables, inside the component, for the bankDB:
 | `safebyok_bank_tallies` | life of a vault    | count and size of its box rows: all, and live alone         | `by_life`: `user_id`, `banklabel`, `vaultlabel`, `bank_tok`, `vault_tok`         |
 
 `user_id` leads every index, so one user's rows are one range of each. Rows are stored as the core
-writes them. Each whisper, each box's boxKey, and the vaultKey (once for each wayin) are encrypted.
+writes them. Each whisper, each box's boxKey, and the bankKey (once for each wayin) are encrypted.
 The labels, tokens, times, salts and sidecars are unencrypted. The vaultDB keeps its own three
 tables, `safebyok_vaults`, `safebyok_boxes` and `safebyok_tallies`, until it is removed.
 

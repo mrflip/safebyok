@@ -27,7 +27,7 @@ export const ciphered = objCheck(({ str }) => ({
 export type Ciphered = Z.infer<typeof ciphered>
 // --
 
-// == [Record fields]: epochMillis, bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped, prfSalt, EpochMillis, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, VaultKeyWayinWrapped, VaultKeyLeaseWrapped
+// == [Record fields]: epochMillis, bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, bank_key_wayin_wrapped, bank_key_lease_wrapped, prfSalt, EpochMillis, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, BankKeyWayinWrapped, BankKeyLeaseWrapped
 
 export { epochMillis, type EpochMillis } from './primitives'
 
@@ -37,7 +37,7 @@ export { epochMillis, type EpochMillis } from './primitives'
  * branded for its role, since nothing but safebyok makes one. A passphrase's salt is base64url text of
  * {@link PassphraseSaltSize} bytes, judged by its characters, its length and decoding it; a passkey's is text, not empty, and {@link prfSalt} judges its length.
  */
-export const { bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, vault_key_wayin_wrapped, vault_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
+export const { bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, bank_key_wayin_wrapped, bank_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
   bank_tok:                str.min(1),
   gate_tok:                str.min(1),
   vault_tok:               str.min(1),
@@ -50,8 +50,8 @@ export const { bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok,
   prf_salt_b64:            str.min(1).brand<'PrfSalt'>(),
   whisper_ciphered:        ciphered.brand<'WhisperCiphered'>(),
   box_key_wrapped:         ciphered.brand<'BoxKeyWrapped'>(),
-  vault_key_wayin_wrapped: ciphered.brand<'VaultKeyWayinWrapped'>(),
-  vault_key_lease_wrapped: ciphered.brand<'VaultKeyLeaseWrapped'>(),
+  bank_key_wayin_wrapped: ciphered.brand<'BankKeyWayinWrapped'>(),
+  bank_key_lease_wrapped: ciphered.brand<'BankKeyLeaseWrapped'>(),
 }))
 
 /** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltSize} bytes, as a wayin record has it: a stored row with any other refuses 'damaged_row'. */
@@ -66,14 +66,14 @@ export type PrfSalt = Z.infer<typeof prf_salt_b64>
 /** A box's whisperCiphered: the whisper, ciphered under the box's boxKey. */
 export type WhisperCiphered = Z.infer<typeof whisper_ciphered>
 
-/** A box's boxKeyWrapped: its boxKey, wrapped under the vaultKey. */
+/** A box's boxKeyWrapped: its boxKey, wrapped under the bankKey. */
 export type BoxKeyWrapped = Z.infer<typeof box_key_wrapped>
 
-/** A wayin's vaultKeyWayinWrapped: the vaultKey, wrapped under that wayin's wayinKey. */
-export type VaultKeyWayinWrapped = Z.infer<typeof vault_key_wayin_wrapped>
+/** A wayin's bankKeyWayinWrapped: the bankKey, wrapped under that wayin's wayinKey. */
+export type BankKeyWayinWrapped = Z.infer<typeof bank_key_wayin_wrapped>
 
-/** A lease's vaultKeyLeaseWrapped: the vaultKey, wrapped under this device's leaseKey. */
-export type VaultKeyLeaseWrapped = Z.infer<typeof vault_key_lease_wrapped>
+/** A lease's bankKeyLeaseWrapped: the bankKey, wrapped under this device's leaseKey. */
+export type BankKeyLeaseWrapped = Z.infer<typeof bank_key_lease_wrapped>
 // --
 
 // == [Whisper and sidecar]: WhisperJson, Whisper, isPlainBag, whisper, whisperBag, sidecar, Sidecar

@@ -76,7 +76,7 @@ describe("a lease cache that refuses", () => {
 })
 
 describe("a gate changed on another device", () => {
-  // The vaultKey did not change, so a lease in force stays in force.
+  // The bankKey did not change, so a lease in force stays in force.
   it("heard through the watch leaves this bank unlocked, its lease still sealing", async () => {
     const { bank, vault, anotherDevice } = await makeBornVault()
     const theirs = await anotherDevice().ensureBank()

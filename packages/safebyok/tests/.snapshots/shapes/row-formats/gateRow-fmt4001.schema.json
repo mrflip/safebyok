@@ -82,7 +82,7 @@
               "minimum": 347155200000,
               "maximum": 9007199254740
             },
-            "vault_key_wayin_wrapped": {
+            "bank_key_wayin_wrapped": {
               "type": "object",
               "properties": {
                 "cipher_iv_b64": {
@@ -111,7 +111,7 @@
             "salt_b64",
             "device_tok",
             "registered_at",
-            "vault_key_wayin_wrapped",
+            "bank_key_wayin_wrapped",
             "wayinlabel"
           ],
           "additionalProperties": false
@@ -141,7 +141,7 @@
               "minimum": 347155200000,
               "maximum": 9007199254740
             },
-            "vault_key_wayin_wrapped": {
+            "bank_key_wayin_wrapped": {
               "type": "object",
               "properties": {
                 "cipher_iv_b64": {
@@ -170,7 +170,7 @@
             "prf_salt_b64",
             "device_tok",
             "registered_at",
-            "vault_key_wayin_wrapped",
+            "bank_key_wayin_wrapped",
             "wayinlabel"
           ],
           "additionalProperties": false

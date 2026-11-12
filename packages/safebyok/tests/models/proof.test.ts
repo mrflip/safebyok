@@ -220,7 +220,7 @@ describe("the proof", () => {
     expect(dialog.shown).to.deep.equal([])
     nextPageUi.expectRenders(['ready: main locked', 'ready: main unlocked'])
 
-    // It opens what the page before it sealed: the lease it picked up has the same vaultKey.
+    // It opens what the page before it sealed: the lease it picked up has the same bankKey.
     await pickedUp.beginWatch()
     const nextBoxesUi = mountComponent(pickedUp.boxListing, boxList)
     nextBoxesUi.expectRenders(['anthropic_api_key'])

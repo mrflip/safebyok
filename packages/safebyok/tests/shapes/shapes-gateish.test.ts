@@ -1,6 +1,6 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { makeLeaseKey, makeVaultKey } from '../../src/helpers/crypto'
+import { makeLeaseKey, makeBankKey } from '../../src/helpers/crypto'
 import * as Phrases from '../../src/helpers/phrases'
 import { PasskeySaltSize } from '../../src/helpers/consts'
 import { parseLogger } from '../../src/helpers/logger'
@@ -149,6 +149,6 @@ describe("isLeaseKey", () => {
 
   // isLeaseKey @example
   it("is false for an extractable key", async () => {
-    expect(GX.isLeaseKey(await makeVaultKey())).to.be.false
+    expect(GX.isLeaseKey(await makeBankKey())).to.be.false
   })
 })

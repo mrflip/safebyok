@@ -57,7 +57,7 @@ describe("bank.tryProbe", () => {
     const sent = await put.mock.results[0]?.value as { val: { whisper_ciphered: { ciphertext_b64: string }, box_key_wrapped: { ciphertext_b64: string } } }
     expect(said).to.not.include(sent.val.whisper_ciphered.ciphertext_b64)
     expect(said).to.not.include(sent.val.box_key_wrapped.ciphertext_b64)
-    expect(said).to.not.include(bank.maingate.wayins.main.vault_key_wayin_wrapped.ciphertext_b64)
+    expect(said).to.not.include(bank.maingate.wayins.main.bank_key_wayin_wrapped.ciphertext_b64)
   })
 
   it("replaces an existing box rather than adding a second", async () => {

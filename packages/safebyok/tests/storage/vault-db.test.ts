@@ -78,7 +78,7 @@ describe("AdapterVaultDB", () => {
       expect(meta).to.deep.include({ ask: answer.ask, oplabel: 'putVault' })
       expect(meta).to.not.have.any.keys('world', 'dbhas')
       expect(answer).to.deep.include({ world: vault, dbhas: vault })
-      expect(JSON.stringify({ ...(thrown as object), meta })).to.not.include(vault.gate.passphrase_wayin.vault_key_wayin_wrapped.ciphertext_b64)
+      expect(JSON.stringify({ ...(thrown as object), meta })).to.not.include(vault.gate.passphrase_wayin.bank_key_wayin_wrapped.ciphertext_b64)
     })
   })
 

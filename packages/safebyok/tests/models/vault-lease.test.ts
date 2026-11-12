@@ -265,7 +265,7 @@ describe("a bank, a vault and a lease never reveal the lease friend or the lease
       expect(shown).to.not.include(row['lease_key'])
       expect(shown).to.not.include(row)
       const json = JSON.stringify(subject)
-      for (const named of ['friend', 'leaseFriend', 'peekLease', 'lease_key', 'vault_key_lease_wrapped']) {
+      for (const named of ['friend', 'leaseFriend', 'peekLease', 'lease_key', 'bank_key_lease_wrapped']) {
         expect(Object.keys(subject)).to.not.include(named)
         expect(json).to.not.include(named)
       }

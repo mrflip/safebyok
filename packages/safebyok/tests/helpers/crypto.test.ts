@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cipherCtx, cipherBytes, decipherBytes, deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeLeaseKey, makeBoxKey, makeLifeTok, makeVaultKey, randomBytes, randomId, toB64, unwrapKeyUnder, wrapKeyUnder, type CipherCtxRecord } from '../../src/helpers/crypto'
+import { cipherCtx, cipherBytes, decipherBytes, deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeLeaseKey, makeBoxKey, makeLifeTok, makeBankKey, randomBytes, randomId, toB64, unwrapKeyUnder, wrapKeyUnder, type CipherCtxRecord } from '../../src/helpers/crypto'
 import * as TH from '../test-helpers'
 import { vault_tok } from '../../src/shapes/shapes-core'
 
@@ -50,12 +50,12 @@ const header = { wayinkind: 'passphrase', key_deriver_label: 'test_digest_v0', s
 describe("cipherCtx", () => {
   // cipherCtx @example 1
   it("gives the same bytes for the same parts, and different bytes for different parts", () => {
-    const one = cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', header)
-    expect(toB64(cipherCtx({ ...vaultStamp }, 'vault_key_passphrase_wrapped', { ...header }))).to.eq(toB64(one))
-    expect(toB64(cipherCtx({ ...vaultStamp, user_id: 'u2' }, 'vault_key_passphrase_wrapped', header))).to.not.eq(toB64(one))
-    expect(toB64(cipherCtx(vaultStamp, 'vault_key_passkey_wrapped', header))).to.not.eq(toB64(one))
-    expect(toB64(cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { ...header, registered_at: 4 }))).to.not.eq(toB64(one))
-    expect(toB64(cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped'))).to.not.eq(toB64(one))
+    const one = cipherCtx(vaultStamp, 'bank_key_passphrase_wrapped', header)
+    expect(toB64(cipherCtx({ ...vaultStamp }, 'bank_key_passphrase_wrapped', { ...header }))).to.eq(toB64(one))
+    expect(toB64(cipherCtx({ ...vaultStamp, user_id: 'u2' }, 'bank_key_passphrase_wrapped', header))).to.not.eq(toB64(one))
+    expect(toB64(cipherCtx(vaultStamp, 'bank_key_passkey_wrapped', header))).to.not.eq(toB64(one))
+    expect(toB64(cipherCtx(vaultStamp, 'bank_key_passphrase_wrapped', { ...header, registered_at: 4 }))).to.not.eq(toB64(one))
+    expect(toB64(cipherCtx(vaultStamp, 'bank_key_passphrase_wrapped'))).to.not.eq(toB64(one))
   })
 
   // cipherCtx @example 2
@@ -89,24 +89,24 @@ describe("cipherCtx", () => {
 
     it("a record with a field set to null", () => {
       const withField = { ...vaultStamp, registered_at: null } as unknown as CipherCtxRecord
-      TH.expectSyncRefusal(() => cipherCtx(withField, 'vault_key_passphrase_wrapped'))
+      TH.expectSyncRefusal(() => cipherCtx(withField, 'bank_key_passphrase_wrapped'))
       TH.expectSyncRefusal(() => cipherCtx([withField, boxStamp], 'box_key_wrapped'))
-      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', { ...header, device_tok: null } as unknown as CipherCtxRecord))
+      TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'bank_key_passphrase_wrapped', { ...header, device_tok: null } as unknown as CipherCtxRecord))
     })
 
     it("a stamp, a purpose or a header that is undefined or null, rather than treating it as null", () => {
       for (const missing of [undefined, null]) {
         const part = missing as unknown as CipherCtxRecord
-        const err = TH.expectSyncRefusal(() => cipherCtx(part, 'vault_key_lease_wrapped'))
+        const err = TH.expectSyncRefusal(() => cipherCtx(part, 'bank_key_lease_wrapped'))
         expect(err.message).to.include('undefined or null')
-        TH.expectSyncRefusal(() => cipherCtx([vaultStamp, part], 'vault_key_lease_wrapped'))
+        TH.expectSyncRefusal(() => cipherCtx([vaultStamp, part], 'bank_key_lease_wrapped'))
         TH.expectSyncRefusal(() => cipherCtx(vaultStamp, missing as unknown as string))
-        TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'vault_key_passphrase_wrapped', part))
+        TH.expectSyncRefusal(() => cipherCtx(vaultStamp, 'bank_key_passphrase_wrapped', part))
       }
     })
 
     it("an empty list of stamps: a ctx binds at least one", () => {
-      TH.expectSyncRefusal(() => cipherCtx([], 'vault_key_lease_wrapped'))
+      TH.expectSyncRefusal(() => cipherCtx([], 'bank_key_lease_wrapped'))
     })
   })
 })
@@ -146,43 +146,43 @@ describe("cipher and decipher", () => {
 })
 
 describe("wrap and unwrap", () => {
-  it("round-trips a boxKey under a vaultKey, back as a working, non-extractable key", async () => {
-    const vaultKey = await makeVaultKey()
+  it("round-trips a boxKey under a bankKey, back as a working, non-extractable key", async () => {
+    const bankKey = await makeBankKey()
     const boxKey = await makeBoxKey()
     const ctx = ctxOf('box_key_wrapped')
     const whisperCtx = ctxOf('whisper_ciphered')
     const ciphered = await cipherBytes(boxKey, utf8('sk-ant-fake'), whisperCtx)
 
-    const wrapped = await wrapKeyUnder(vaultKey, boxKey, ctx)
-    const recovered = await unwrapKeyUnder(vaultKey, wrapped, ctx, { extractable: false, usage: ['decrypt'] })
+    const wrapped = await wrapKeyUnder(bankKey, boxKey, ctx)
+    const recovered = await unwrapKeyUnder(bankKey, wrapped, ctx, { extractable: false, usage: ['decrypt'] })
     expect(recovered.extractable).to.be.false
     expect(new TextDecoder().decode(await decipherBytes(recovered, ciphered, whisperCtx))).to.eq('sk-ant-fake')
   })
 
   it("refuses to unwrap under the wrong key or the wrong ctx", async () => {
-    const vaultKey = await makeVaultKey()
-    const otherKey = await makeVaultKey()
+    const bankKey = await makeBankKey()
+    const otherKey = await makeBankKey()
     const boxKey = await makeBoxKey()
-    const wrapped = await wrapKeyUnder(vaultKey, boxKey, ctxOf('right'))
+    const wrapped = await wrapKeyUnder(bankKey, boxKey, ctxOf('right'))
     await expect(unwrapKeyUnder(otherKey, wrapped, ctxOf('right'), { extractable: false, usage: ['decrypt'] })).rejects.toThrow()
-    await expect(unwrapKeyUnder(vaultKey, wrapped, ctxOf('wrong'), { extractable: false, usage: ['decrypt'] })).rejects.toThrow()
+    await expect(unwrapKeyUnder(bankKey, wrapped, ctxOf('wrong'), { extractable: false, usage: ['decrypt'] })).rejects.toThrow()
   })
 
   it("a non-extractable unwrapped key refuses exportKey", async () => {
-    const vaultKey = await makeVaultKey()
+    const bankKey = await makeBankKey()
     const boxKey = await makeBoxKey()
     const ctx = ctxOf('box_key_wrapped')
-    const wrapped = await wrapKeyUnder(vaultKey, boxKey, ctx)
-    const recovered = await unwrapKeyUnder(vaultKey, wrapped, ctx, { extractable: false, usage: ['decrypt'] })
+    const wrapped = await wrapKeyUnder(bankKey, boxKey, ctx)
+    const recovered = await unwrapKeyUnder(bankKey, wrapped, ctx, { extractable: false, usage: ['decrypt'] })
     await expect(crypto.subtle.exportKey('raw', recovered)).rejects.toThrow()
   })
 
   it("a leaseKey is born non-extractable, and still wraps and unwraps", async () => {
     const leaseKey = await makeLeaseKey()
     expect(leaseKey.extractable).to.be.false
-    const vaultKey = await makeVaultKey()
-    const ctx = ctxOf('vault_key_lease_wrapped')
-    const wrapped = await wrapKeyUnder(leaseKey, vaultKey, ctx)
+    const bankKey = await makeBankKey()
+    const ctx = ctxOf('bank_key_lease_wrapped')
+    const wrapped = await wrapKeyUnder(leaseKey, bankKey, ctx)
     const recovered = await unwrapKeyUnder(leaseKey, wrapped, ctx, { extractable: true, usage: ['wrapKey', 'unwrapKey'] })
     expect(recovered).to.be.instanceOf(CryptoKey)
   })
@@ -192,13 +192,13 @@ describe("wrap and unwrap", () => {
 function hexBytes(hex: string) { return Uint8Array.from(hex.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16)) }
 
 /** The info of a passkey wayin's key, for the header of the device `device_tok`. */
-function infoOf(device_tok: string) { return cipherCtx(vaultStamp, 'vault_key_passkey_wrapped', { ...header, device_tok }) }
+function infoOf(device_tok: string) { return cipherCtx(vaultStamp, 'bank_key_passkey_wrapped', { ...header, device_tok }) }
 
 describe("deriveWrappingKey", () => {
   // deriveWrappingKey @example
   it("derives different keys for different cipherCtx infos", async () => {
     const prfBytes = randomBytes(32)
-    const wrapped = await wrapKeyUnder(await deriveWrappingKey(prfBytes, infoOf('d1')), await makeVaultKey(), ctxOf('slot'))
+    const wrapped = await wrapKeyUnder(await deriveWrappingKey(prfBytes, infoOf('d1')), await makeBankKey(), ctxOf('slot'))
     const sameHeader = await deriveWrappingKey(prfBytes, infoOf('d1'))
     expect(await unwrapKeyUnder(sameHeader, wrapped, ctxOf('slot'), { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
     const otherHeader = await deriveWrappingKey(prfBytes, infoOf('d2'))
@@ -209,18 +209,18 @@ describe("deriveWrappingKey", () => {
     // RFC 5869, A.3: IKM 22 bytes of 0x0b, no salt, no info; the first 32 bytes of its OKM.
     const derived = await deriveWrappingKey(new Uint8Array(22).fill(0x0B), new Uint8Array(0))
     const expected = await importWrappingKeyBytes(hexBytes('8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d'))
-    const vaultKey = await makeVaultKey()
-    const wrapped = await wrapKeyUnder(derived, vaultKey, ctxOf('kat'))
+    const bankKey = await makeBankKey()
+    const wrapped = await wrapKeyUnder(derived, bankKey, ctxOf('kat'))
     const recovered = await unwrapKeyUnder(expected, wrapped, ctxOf('kat'), { extractable: true, usage: ['wrapKey'] })
     async function rawOf(handle: CryptoKey) { return toB64(new Uint8Array(await crypto.subtle.exportKey('raw', handle))) }
-    expect(await rawOf(recovered)).to.eq(await rawOf(vaultKey))
+    expect(await rawOf(recovered)).to.eq(await rawOf(bankKey))
   })
 
   it("makes another key for other info, from the same bytes", async () => {
     const keyBytes = randomBytes(32)
     const one = await deriveWrappingKey(keyBytes, utf8('one'))
     const two = await deriveWrappingKey(keyBytes, utf8('two'))
-    const wrapped = await wrapKeyUnder(one, await makeVaultKey(), ctxOf('slot'))
+    const wrapped = await wrapKeyUnder(one, await makeBankKey(), ctxOf('slot'))
     await expect(unwrapKeyUnder(two, wrapped, ctxOf('slot'), { extractable: false, usage: ['wrapKey'] })).rejects.toThrow()
     const again = await deriveWrappingKey(keyBytes, utf8('one'))
     expect(await unwrapKeyUnder(again, wrapped, ctxOf('slot'), { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)

@@ -109,7 +109,7 @@ type SafebyokCiphered {
   ciphertext_b64: String!
 }
 
-"""A passphrase wayin: its key deriver's label, its salt, and the vaultKey wrapped under the passphraseKey."""
+"""A passphrase wayin: its key deriver's label, its salt, and the bankKey wrapped under the passphraseKey."""
 type SafebyokPassphraseWayin {
   wayinlabel:              String!
   wayinkind:               String!
@@ -117,10 +117,10 @@ type SafebyokPassphraseWayin {
   salt_b64:                String!
   device_tok:              String!
   registered_at:           SafebyokEpochMillis!
-  vault_key_wayin_wrapped: SafebyokCiphered!
+  bank_key_wayin_wrapped: SafebyokCiphered!
 }
 
-"""A passkey wayin: its credential's id, its PRF salt, and the vaultKey wrapped under the passkeyKey."""
+"""A passkey wayin: its credential's id, its PRF salt, and the bankKey wrapped under the passkeyKey."""
 type SafebyokPasskeyWayin {
   wayinlabel:              String!
   wayinkind:               String!
@@ -128,7 +128,7 @@ type SafebyokPasskeyWayin {
   prf_salt_b64:            String!
   device_tok:              String!
   registered_at:           SafebyokEpochMillis!
-  vault_key_wayin_wrapped: SafebyokCiphered!
+  bank_key_wayin_wrapped: SafebyokCiphered!
 }
 
 """A gate's wayins: its passphrase wayin, and its passkey wayin if it has one."""
@@ -312,7 +312,7 @@ input SafebyokPassphraseWayinInput {
   salt_b64:                String!
   device_tok:              String!
   registered_at:           SafebyokEpochMillis!
-  vault_key_wayin_wrapped: SafebyokCipheredInput!
+  bank_key_wayin_wrapped: SafebyokCipheredInput!
 }
 
 input SafebyokPasskeyWayinInput {
@@ -322,7 +322,7 @@ input SafebyokPasskeyWayinInput {
   prf_salt_b64:            String!
   device_tok:              String!
   registered_at:           SafebyokEpochMillis!
-  vault_key_wayin_wrapped: SafebyokCipheredInput!
+  bank_key_wayin_wrapped: SafebyokCipheredInput!
 }
 
 input SafebyokWayinsInput {

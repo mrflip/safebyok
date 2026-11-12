@@ -83,9 +83,9 @@ export type BoxTidyAsk   = Readonly<Z.output<typeof boxTidy>>
 // == [Wayins and gate]: passphraseWayinRecord, passkeyWayinRecord, gate, Gate
 
 /** The checks of the wayins as stored, and of the gate that has them. */
-export const { passphraseWayinRecord, passkeyWayinRecord, gate } = Checkers('bad_option', ({ obj, lit, uint, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_tok, vault_key_wayin_wrapped }) => {
-  const passphraseWayinRecord = obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_tok, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
-  const passkeyWayinRecord    = obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_tok, registered_at: epochMillis, vault_key_wayin_wrapped }).strict()
+export const { passphraseWayinRecord, passkeyWayinRecord, gate } = Checkers('bad_option', ({ obj, lit, uint, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_tok, bank_key_wayin_wrapped }) => {
+  const passphraseWayinRecord = obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_tok, registered_at: epochMillis, bank_key_wayin_wrapped }).strict()
+  const passkeyWayinRecord    = obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_tok, registered_at: epochMillis, bank_key_wayin_wrapped }).strict()
   const gate                  = obj({ gate_epoch: uint.positive(), passphrase_wayin: passphraseWayinRecord, passkey_wayin: passkeyWayinRecord.nullable() }).strict()
   return { passphraseWayinRecord, passkeyWayinRecord, gate }
 }, [CX])
@@ -134,7 +134,7 @@ export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_opti
   const boxRecord = boxSparse.extend({
     am: lit('a'),
     sidecar,
-    /** This box's boxKey, wrapped under the vaultKey. */
+    /** This box's boxKey, wrapped under the bankKey. */
     box_key_wrapped,
     /** The whisper, ciphered under this box's boxKey. */
     whisper_ciphered,

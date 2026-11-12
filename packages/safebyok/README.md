@@ -13,7 +13,7 @@ devices through a storage layer the host plugs in.
   and change a sidecar, and the box still opens. Put no secret in a sidecar (*Whisper and sidecar*).
 * **Nothing is recoverable, and removal is not revocation.** Nobody can unlock a vault whose
   passphrase is forgotten and which has no working passkey. A replaced passphrase or revoked passkey
-  no longer unlocks the vault, but the vaultKey never changes, so a copy of the old record can still
+  no longer unlocks the vault, but the bankKey never changes, so a copy of the old record can still
   be unlocked with the old passphrase or passkey.
 * **State is framework-agnostic.** `Device`, `Bank`, `Vault`, `Box` and `vault.boxListing` each have
   `subscribe` and `getSnapshot`, which can be passed on their own, the way `useSyncExternalStore`

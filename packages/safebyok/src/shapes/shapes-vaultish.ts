@@ -362,7 +362,7 @@ export interface GateSnapshot extends CX.GateScope {
   readonly registered_at: number
   /** When the revision in hand was written. */
   readonly written_at:    number
-  /** Each wayin's header, with no wrapped vaultKey: `main`, and `passkey0` where the gate has one. */
+  /** Each wayin's header, with no wrapped bankKey: `main`, and `passkey0` where the gate has one. */
   readonly wayins:        Readonly<{ main: GX.WayinHeader, passkey0?: GX.WayinHeader }>
 }
 
