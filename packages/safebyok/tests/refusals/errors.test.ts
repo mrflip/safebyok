@@ -99,7 +99,7 @@ const FamilyCases = [
   ["insecure_context",    "misuse",    'serving the app over plain http is a deployment bug'],
   ["unexpected_error",    "misuse",    'a throw that is no refusal is a bug, in safebyok or in a function the app handed it'],
   // conditions: normal operation, which may reach the user; bad news: told to the user, nobody's bug
-  ["bank_locked",        "condition", 'a locked vault asks for the passphrase'],
+  ["bank_locked",         "condition", 'a locked vault asks for the passphrase'],
   ["wrong_passphrase",    "condition", 'a mistyped passphrase asks again'],
   ["weak_passphrase",     "condition", 'a passphrase too easy to guess asks the user for another'],
   ["wrong_passkey",       "condition", 'a passkey that does not open the vault asks again, or for a passphrase'],

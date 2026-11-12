@@ -86,7 +86,7 @@ export type RefusalFamily = typeof refusalFamilyVals[number]
 
 /** The family of each refusalkind in {@link refusalkindVals}, which a VaultError's `family` is read from. */
 export const RefusalFamilyForKind = {
-  bank_locked:        'condition',
+  bank_locked:         'condition',
   wrong_passphrase:    'condition',
   weak_passphrase:     'condition',
   wrong_passkey:       'condition',

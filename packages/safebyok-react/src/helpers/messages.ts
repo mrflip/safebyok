@@ -70,8 +70,8 @@ export const Messages = {
 
 /** A phrase for what each kind of gating does, to finish a sentence such as "Could not ...". */
 export const Doing: Record<Gatingkind, string> = {
-  build_bank:        'create your vault',
-  unlock_bank:       'unlock your vault',
+  build_bank:         'create your vault',
+  unlock_bank:        'unlock your vault',
   replace_passphrase: 'change your passphrase',
   add_passkey:        'add the passkey',
   revoke_passkey:     'remove the passkey',

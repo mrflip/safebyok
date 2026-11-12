@@ -9,8 +9,8 @@ import type { GatingModalProps } from '../shapes'
 type KindModalProps<KindT extends Gatingkind> = Omit<GatingModalProps, 'gating'> & { gating: Gating<KindT> }
 
 const DialogForGatingkind: { [KindT in Gatingkind]: ComponentType<KindModalProps<KindT>> } = {
-  build_bank:        PassphraseModal,
-  unlock_bank:       PassphraseModal,
+  build_bank:         PassphraseModal,
+  unlock_bank:        PassphraseModal,
   replace_passphrase: ReplacePassphraseModal,
   add_passkey:        AddPasskeyModal,
   revoke_passkey:     RevokePasskeyModal,
