@@ -145,6 +145,15 @@ review `low`. **After**: 4. **Look-ahead**: 5 and 13 to 15 run it. **Size**: M.
 database the library opens is named `safebyok-…`, and the device row records the npm package
 version when it is ensured. **Size**: S-M.
 
+### 5b `device_shelf`
+
+*Orchestrator, split from 5:* the core's device database (`packages/safebyok/src/storage/idb-device-db.ts`,
+`consts.ts`): its IndexedDB name starts `safebyok-` (the Coach); the device row records the npm
+package version when `device.ensureBank()` ensures it, refreshed when an ensure finds another (the
+Coach: "on hello, when peekOrStow'ing the device id, to also write the npm package version"); a
+layout version bumped wherever thread 1's key reorder left one naming an old shape. **Levels**:
+worker `sonnet`; review `medium`. **After**: 8c (8a and 8b change these files). **Size**: S.
+
 ### 6 `device_owner`
 
 `Device` split out of `Bank` on today's storage; `safebyok-react`'s provider makes a Device.
