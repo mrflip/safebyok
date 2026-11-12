@@ -1,4 +1,4 @@
-# 2026-11-12: Documentarian run over bank_world's core files -- groups 1 (models/) and 2 (storage/, refusals/, browser.ts) done; Chute, guarantees and stale-prose questions
+# 2026-11-12: Documentarian run over bank_world's core files -- groups 1 (models/), 2 (storage/, refusals/, browser.ts) and 3 (helpers/, shapes/) done; Chute, guarantees and stale-prose questions
 
 One PR for the core's share of the documentarian run the Coach asked for over the files sprint bank_world's line changed.
 Group 1 is `packages/safebyok/src/models/`; groups 2 (storage, refusals, browser.ts) and 3 (helpers, shapes) extend this
@@ -454,3 +454,302 @@ two fields). If the counts should come down, the memory-bank-db.ts phrases are t
     harmless; flagged only.
 39. **`AdapterBankDB.watch` drops a damaged noticed row silently**: no bad news is told
     (`if ((! val.success) || ...) { return }`). The block now says so. Intended, or should `onBadNews` hear it?
+
+# Group 3: helpers/, shapes/
+
+Twelve files: `helpers/` (`consts.ts`, `crypto.ts`, `logger.ts`, `passphrase-strength.ts`, `phrases.ts`, `validator.ts`)
+and `shapes/` (`shapes-bank-answers.ts`, `shapes-bankdb.ts`, `shapes-core.ts`, `shapes-gateish.ts`, `shapes-storage.ts`,
+`shapes-vaultish.ts`). One documentarian, one code commit. Only comment and blank lines changed (checked: `git diff -U0`
+has no other added or removed line); three blank lines in phrases.ts went with the blocks added there. Lint and
+typecheck clean; `pnpm justify` green at the tip. No safety hatch added. No `Chute:` line in these files.
+
+Checked against *The guarantees* (`crypto.ts`, `shapes-core.ts`'s `whisper`, `shapes-gateish.ts`'s `leaseRecord` and
+`isLeaseKey`, `passphrase-strength.ts`): none contradicted. Kept or now said: G2 (the passphraseKey and the passkeyKey
+are non-extractable, wrap and unwrap only; the bytes stay the caller's to zero), G3 (a bankKey is extractable only to be
+wrapped: keep it inside the operation), G4 (the leaseKey has no readable bytes: store the `CryptoKey` by structured
+clone; a cached key that fails `isLeaseKey` is treated as damaged), G5 (a boxKey is extractable only to be wrapped), G6
+(a whisper is returned as a copy), G8 (`guardStrengthChecker` replaces a throw with a refusal that keeps nothing of it;
+a checker's `reason` must not quote the passphrase), G10 (a fresh random IV per call, the ctx as additional data, no key
+compared). `passkeyAnswer` now says the gating zeroes a spent answer, as G2 has it (it said the proving did).
+
+## Doc-block lines and characters, before and after
+
+Counted as every line from a `/**` to its `*/`, characters trimmed.
+
+| File | Lines before | Lines after | Chars before | Chars after |
+|---|---|---|---|---|
+| `helpers/consts.ts` | 37 | 43 | 3581 | 3450 |
+| `helpers/crypto.ts` | 62 | 56 | 4670 | 3993 |
+| `helpers/logger.ts` | 51 | 46 | 3637 | 3131 |
+| `helpers/passphrase-strength.ts` | 36 | 35 | 2708 | 2500 |
+| `helpers/phrases.ts` | 122 | 144 | 9934 | 11235 |
+| `helpers/validator.ts` | 162 | 159 | 13258 | 10708 |
+| `shapes/shapes-bank-answers.ts` | 12 | 15 | 1274 | 1314 |
+| `shapes/shapes-bankdb.ts` | 66 | 77 | 6292 | 6385 |
+| `shapes/shapes-core.ts` | 65 | 73 | 5404 | 5462 |
+| `shapes/shapes-gateish.ts` | 81 | 116 | 7961 | 8673 |
+| `shapes/shapes-storage.ts` | 49 | 65 | 4282 | 5219 |
+| `shapes/shapes-vaultish.ts` | 127 | 150 | 12337 | 12299 |
+| **total** | **870** | **979** | **75338** | **74369** |
+
+Characters fell while lines rose by 109. Most of the new lines are blocks for exports that had none: 37 exported types
+in the shapes files (`BankSparse`, `BankRecord`, `BankTombstone` and their vault and box kin in `BX` and `SX`, the six
+wayin forms, the four stamps, `StampedGate`, `LeaseStamp`, `LeaseRecord`, `SealedWhisper`, `LeaseGrantOpts`,
+`CleartextsForGatingkind`, `Ciphered`, `Sidecar`, `Revision`, `Times`, `WatchScope`, `PutOpts`, `Capacity`, `LeaseRow`,
+`DeviceRow`), 20 phrases in phrases.ts, `VaultLoggerLevel`, and the private `tell`, `metaOf` and `answerCheck`. Option
+lists (`fetchOpts.ifAbsent`, `boxPutOpts`'s two policies, `RevokeSite`, `DeviceStage`) took the rest. If the counts should
+come down, the type blocks of the form "A bank's stamp, as {@link bankStamp} checks it" are the first to cut.
+
+## Changes, member by member
+
+### consts.ts
+
+* **The time constants**: `FarFuture`, `FarPast`, `ForeverMillis` say "the latest/earliest time the package accepts";
+  why 2255 is on its own line.
+* **The size constants**: "The length in bytes of ...". `PasskeySaltSize` says a new answer with another length is
+  refused and a stored one fails its check. `DefaultMaxRecordSizeEst`: "a box record's JSON" (it is `jsonSize`'s
+  estimate, not the stored bytes).
+* **`brand`**: opens with the act ("Mark `obj` ..., and return `obj`"). **`brandOf`**: "Safe to call on any value."
+* **`Whispered`, `WhisperedBag`, `ENCRYPTED`, `LOCKED`, `VEILED`**: "the stand-in that `box.whisper` returns", and "Ask
+  `box.exposure` instead of comparing with this bag". `LOCKED`: "the bank is locked" (was "the vault").
+* **The brand symbols** (`IsBankDB`, `IsAdapterBankDB`, `IsDeviceDB`, `IsGuarded`, `IsVaultError`): "The brand every X
+  carries, read by {@link isX}". Their guards: "True for an X made by any copy of safebyok."
+* **`brandGuarded`**: "Freeze `made` and brand it {@link IsGuarded}, then return it." **`UNANSWERED`**: "The stand-in
+  for an answer, passed to `refusedAnswerOf` when a refusal came before storage answered."
+
+### crypto.ts
+
+* **Header**: "Every call into WebCrypto: ..."; derivation is in `deriver/` (it named `key-deriver.ts`, open question 40).
+* **`randomId`**, **`makeLifeTok`**: the life toks are all four (open question 41).
+* **`cipherCtx`**: what is bound and why, in four sentences: the purpose is the stored field's name; pass a list of
+  stamps for a thing inside another; rebuilt, never stored, so ciphertext opens only where every bound field is the same;
+  the refusal of a missing stamp or an undefined or null part, and why. The encoding steps cut (dropped facts).
+* **`isBoundPart`**: the "type forbids it, a caller may still hand it in" reason moved to a `//` comment above.
+* **The key makers**: each says which key it makes and its extractability, and what the caller must do: a bankKey stays
+  inside the operation that wraps it; a leaseKey is stored as the `CryptoKey`, by structured clone.
+* **`importWrappingKeyBytes`**, **`deriveWrappingKey`**: open with the act ("Import", "Derive"); "The bytes stay the
+  caller's to zero" for both (one said "wipe or drop", the other "drop").
+* **`cipherBytes`**, **`wrapKeyUnder`**: "Encrypt ... with a fresh random IV each call". **`decipherBytes`**,
+  **`unwrapKeyUnder`**: "Decrypt"/"Unwrap ..., verifying it against `ctx`"; "catch that and throw a refusal of your own";
+  "no key is compared".
+
+### logger.ts
+
+* **`VaultLogger`**: only `Device.make` takes a logger (open question 42); "the vault" became "safebyok".
+* **`vaultLoggerLevelVals`**, **`VaultLoggerLevel`**: a line each (the type had none).
+* **`parseLogger`**: "The host's logger, checked and wrapped so that nothing it throws or rejects with reaches
+  safebyok", then null, the refusal, and identity, a sentence each.
+* **`DefaultLogger`**, **`setDefaultLogger`**: the storage adapter and `BankProvider` cut (neither takes a logger now);
+  "Passing it to `Device.make` is the same as passing no logger."
+* **`isGuardedLogger`**, **`guarded`**, **`GuardedConsole`**, **`defaults`**, **`forwarding`**, **`dropRejection`**,
+  **`asError`**: phrases. **`tell`**: given one.
+
+### passphrase-strength.ts
+
+* **`StrengthChecker`**: the gatings named `build_bank` and `replace_passphrase` (open question 43); the end bullets
+  (blank passphrase; no checker judges all weak) folded into the paragraphs they repeated; "not even in its `reason`,
+  which becomes the refusal's message" added, from G8's host obligation.
+* **`DefaultStrengthChecker`**: "no bank can be built and no passphrase replaced" (was "no vault can be made").
+* **`guardStrengthChecker`**: "Wrap `hostChecker` so that it keeps its contract, whatever it does. Anything the checker
+  throws is replaced by a refusal that keeps nothing of the throw." The `//` comment above it is unchanged.
+
+### phrases.ts
+
+* **Header**: "Every sentence safebyok says to a host or a user: the messages of its refusals, checks, notices and bad
+  news." The reason (wording reviewed together; no phrase quotes the input) moved to a `//` comment.
+* **20 phrases with no block** got one (`BankExpected`, `VaultExpected`, `boxAbsent`, `VaultDeleted`, `DelOfOtherLife`,
+  and the 15 in *Models: banks, gatings and derivers* and *The models' device and bank*).
+* **A displaced block** (open question 47): `AnswerNotAsSent`'s block sat stacked over `NothingStoredWhereLive`'s.
+* **Stale or wrong**: `MinutesShape` (open question 44), `PositiveMinutesShape` (`autolockMinutes`), `GateMadeElsewhere`
+  (another device built the bank first), `DelOfOtherRevision` (any storable's delete, not "a stale Vault's"),
+  `RegisteredAtNotStored` ("the stored gate", was "vault"), `UnknownKeyDeriver` ("the device's", was "the world's"),
+  `PasskeyAnswerUsed` (the gating zeroes it), `ListingExpected` (a storable or a gating), `storageFailed` ("a bankDB's
+  backend").
+* **`unknownFields`**, **`otherScope`**, **`deviceDBFailed`**, **`storageFailed`**: the trailing absolute ("`named` the
+  sentence ...") is a sentence of its own.
+
+### validator.ts
+
+* **Header**: the makers, then the bag comparisons, a sentence each.
+* **`Kit`** and its members: "Make an object strict with `obj({ ... }).strict()`"; `fn`: "Only that it is a function
+  is checked"; `bytes`: "A Uint8Array from any realm". `isBytes`'s reason (instanceof) moved to a `//` comment.
+* **`Checkers`**: 31 lines of prose to 17. The period rules, the "story that is none" refusal and the bundler line cut
+  (dropped facts); `refusingAs` and `parseConsistent` a sentence each.
+* **`Checker`**, **`objCheck`**, **`objStrict`**, **`objStrip`**: a headline each, the default kind in parentheses, and
+  the recap of `ObjCheckOpts` and of "it is an objCheck under extras: ..." cut.
+* **`Refusing`** and its members: `parse` is the bestiary's Gallant ("Parse `val`, or throw the call's kind with a
+  message framed by `story`"); `parseConsistent` opens with its act. **`refusing`**: the "every schema gets
+  parseConsistent" note moved to a `//` comment.
+* **`isConsistent`**: rewritten from the code (open question 48). **`demandConsistent`**: opens with "Demand that"
+  (was "True once"). **`checkedConsistent`**, **`disagreeing`**, **`disagreeingFieldnames`**: shorter.
+* **`Checks`**: a one-line list; "Made below Checkers ..." moved to a `//` comment; `bag` got its own block.
+
+### shapes-bank-answers.ts, shapes-bankdb.ts
+
+* **`WX` header**: split; "where an absent field arrives as null" is its second line.
+* **`answerOfCrossed`**, **`askOfCrossed`**, **`vaultErrorOfCrossed`**, **`AnswerParts`**: plainer. **`answerCheck`**:
+  given one.
+* **`BX` header**: "The rows a bankDB stores (bank, gate, vault and box), the asks of its verbs, and their helpers."
+* **`auth`, `sigs`, `meta`**: "Reserved: always empty, and read by nothing." (was "Kept for later", a future).
+* **`shellBankOf`, `shellVaultOf`, `shellBoxOf`**: "The shell for a ... row that is not stored", in VOCABULARY's word.
+* **`damagedBoxOf`**: the "label comes from storage unchecked" note moved to a `//` comment, as the bestiary's Gallant
+  does it for the vault's.
+* **The ask checks**: "Only the revision and life fields of `expected` are read, so pass the row in hand, or the shell
+  for none." **`VaultAsk`**, **`BoxAsk`**: "as the bankDB receives it" (the routing to adapter and classifier cut).
+* **`loggableAsk`**: "its fields, but of its rows only their revision, `am` and toks" (was "a record's payload").
+
+### shapes-core.ts
+
+* **Header**: "the host's key deriver and logger" (was "the shapes of the code a host hands in").
+* **The record-field checks**: a sentence per field family; "No refusal quotes the value."
+* **`prfSalt`**: "A stored row with a salt of any other length is damaged." (the kind cut).
+* **`whisper`**: "returned as a copy" added, from G6; `whisperBag`'s difference said plainly.
+* **`sidecar`**: "readable while the bank is locked" (was "vault"); "It is not authenticated: anyone who can write the
+  database can change it, and the whisper still opens"; `putBox()` "refuses only one that is not a plain JSON object".
+* **The scope checks**: "each returning a frozen copy. Other fields are dropped, so a record or a model passes as its
+  scope." **`bankedVaultScope`**: `BankVault` cut (open question 54).
+* **`keyDeriverShape`**: "by its interface"; its `salt_size` must be `PassphraseSaltSize`, and its other parameters are
+  the host's to choose (G10, `#the-host-is-not-our-threat-model`).
+
+### shapes-gateish.ts
+
+* **`isPrfSalt`**: one line; who calls it cut.
+* **`passkeyAnswer`**: the gating zeroes a spent answer (was "the proving sealed of it"); `prfBytes`: "for this bank".
+* **`PassphraseVerdict`**: "Make the reason calm, say what to do, and never quote the passphrase."
+* **The stamps**: "The check of a X's stamp: ..., fixed for its life and bound into every ctx under it. Anything
+  carrying those fields passes, ..., and the rest is dropped."
+* **`isLeaseKey`**: "a non-extractable AES-GCM CryptoKey for `unwrapKey`, and at most `wrapKey` besides. A cached
+  lease whose key fails this was not written by this package, and is treated as damaged." (G4; was "reads as none").
+* **`leaseStamp`, `leaseRecord`**: a headline and two sentences.
+* **The gating cleartexts**: "A cleartext is only ever checked here, in the attempt's own call" moved to a `//` comment.
+* **`RequestCleartext`**, **`AskUser`**, **`UnlockByProving`**: plainer; "the bank's private verb a gating calls" cut.
+
+### shapes-storage.ts
+
+* **Header** (flagged in 16's review, "the box rows a bank's extend"): "Storage shapes shared by the bankDB and the
+  deviceDB", then what is in it. The box-forms check reads "which `BX` extends into a bank's box rows".
+* **`VoidLifeTok`**: all four life toks. **`BoxFormat`**: the base form's (open question 49).
+* **`DamagedRow`**: its second sentence cut (open question 50). **`capacity`**: its `vault_full` sentence cut (open
+  question 51).
+* **`isRowAt`**: "An adapter's conditional put tests this in the same atomic step as its write." **`damagedVaultOf`**:
+  the unchecked-label note to a `//` comment. **`leaseQuery`**: "Only the fields a row is filed by are checked here".
+
+### shapes-vaultish.ts
+
+* **The two `SLOPDOC:` markers** (open question 57): the options' `Checkers` and `BoxDna`, rewritten.
+* **`Promptly`** (open question 52). **`Dna`**, **`SparseBase`**, **`Fetched`**: shorter, the `storableBase` cross-talk cut.
+* **`fetchOpts.ifAbsent`**, **`boxPutOpts`**, **`boxCreateOpts`**: option lists with the values the enums allow.
+* **`FetchOpts`**: "The options of a get (`listing.get`, `vault.getBox`)" (was "`fetch`'s", no such verb).
+* **`Thing`**: "a bank, gate, vault or box" (was "A vault or box").
+* **`BoxSnapshot.isLocked`**: "the box's bank". **`VaultSnapshot`**: "whether it is present" (open question 53).
+* **`DeviceOpts`**: `deviceDB` caches the bank's lease (open question 55); `strengthChecker` "before the bank accepts
+  it"; `onBadNews`, `onLifecycle`: "while the device is enabled or being vacated" (was "in its vacate's forget").
+* **`RevokeSite`**, **`DeviceStage`**: option lists, each value read from its call site.
+* **`DeviceAnnouncement`**: "a {@link DeviceEvent} without its `device`". **`LifecycleHandler`**: names the three kinds.
+
+## Dropped facts that STYLE.md does not plainly cut (group 3)
+
+* `FarFuture`, `FarPast`: "as `epochMillis` checks" (the check is in `primitives.ts`, and names them).
+* `IsBankDB`, `IsDeviceDB`: "so a model can tell one from a duck". `IsGuarded`: "so a world can tell it from the bare one".
+* crypto.ts header: "every primitive the platform's".
+* `makeLifeTok`: "random ... and only ever compared". `fromB64OrNull`: "for judging a salt's shape".
+* `cipherCtx`: "The ctx is the UTF-8 JSON of the parts in order, each stamp, the purpose, then the header where there is
+  one, each record's keys sorted" (`CipherCtxRecord` keeps "encoded with its keys sorted"); "each keeps its own field
+  names".
+* `makeBankKey`: "Between operations nothing keeps a bankKey unwrapped: each wayin and a lease keep it wrapped, and a
+  lease unwraps it non-extractable, for one usage, at each cipher or decipher." (G3 keeps it; it is lease.ts's promise.)
+* `makeBoxKey`: "made new on every put" (now "for one seal of a whisper").
+* `VaultLogger`: "Pass Device.make one of its own to keep them apart" (no adapter takes a logger now).
+* `parseLogger`: "A binding says what it has to say beside the vault through it."
+* `isGuardedLogger`: "what a bank's world and a lease's friend have".
+* `DefaultLogger`: "Pass it to Device.make or BankProvider to have the vault use the default whatever its storage
+  adapter was given." `setDefaultLogger`: "refused alike"; a logger handed to an adapter's factory or BankProvider wins.
+* `StrengthChecker`: "Call `load` yourself only to warm up"; a failed `load` refuses "a `VaultError` it throws as it came
+  and anything else with what it threw as the cause" (the `//` comment above `guardStrengthChecker` keeps it); "see
+  notes/configuration.md for why we do this".
+* `guardStrengthChecker`: "the one way a vault, or a dialog checking as the user types, asks it".
+* phrases.ts header: which modules' refusals it holds, and that one passed on from throwers.ts or gating.ts "keeps its
+  words there".
+* `Checkers`: "With either, the failures end in a period; with neither, the message is the failures alone"; "A story that
+  is none refuses, whatever the input"; a `refusal` "can also carry a `where` and `advice`, which frame a failed parse as
+  `parse`'s do"; "its `kind`, its `message`, or both"; "A bundler keeps or drops a call whole."
+* `objCheck`: "Any other `opts` refuses." `Refusing.parse`: "a story that is none refuses, whatever `val`".
+  `parseConsistent`: "A failed parse refuses as `parse` does." `framed`: the period rule.
+* `isConsistent`: "Either bag not an object refuses"; "a Vault object's getters included, each read by its name".
+  `demandConsistent`: "A `refusal` that is none refuses." `disagreeing`: "each bag checked to be an object first".
+* `VaultAsk`, `BoxAsk`: "and passes it to its adapter and the classifier".
+* `bankEnsure`'s siblings: none. `shapes-core` record fields: a salt "judged by its characters, its length and decoding
+  it". `prfSalt`: "refuses 'damaged_row'". The scopes: "Being a copy, no one it is handed to can change it for everyone
+  else." `bankedVaultScope`: "a plain bag, ... its snapshot or a BankVault".
+* `isPrfSalt`: "A stored one that is not marks the wayin damaged; a new passkey's answer over one that is not is refused."
+* `passkeyAnswer`: "judged by their tag, so bytes from an iframe pass" (the kit's `bytes` says it).
+  `freshPasskeyAnswer`: "Its `parse` quotes none of it" (`passkeyAnswer` says it).
+* `UnlockByProving`: "the bank's private verb a gating calls" (G9 keeps that no public method takes a proving).
+* `provingWorld`: "refusing 'bad_option'". `leaseQuery`: "the lease's own shape is the models'".
+* `SX.DamagedRow`: "A damaged row never indicates format drift: it is thrown by the bankDB tied to the datastore."
+* `SX.capacity`: "A `vault_full` refusal carries the bankDB's count in `meta.capacity`".
+* `Promptly`: "`ensureTimely(0)` accepts none: it fetches, or joins the fetch under way."
+* `Fetched`, `SparseBase`: what `storableBase` checks. `bankArgs`: "which the device has once its `ensureBank` has
+  ensured the row". `DeviceOpts.onBadNews`: the name `DefaultOnBadNews`. `LifecycleHandler`: "as a bring-up or a
+  vault's beginWatch".
+
+## Proposed renames (group 3)
+
+* `SX.boxTidy` and `BoxTidyAsk` to `bankTidy` and `BankTidyAsk`: the ask is the bank's scope with `op: 'tidy_gone'`, and
+  `tidyGone` deletes vault rows as well as box rows.
+* `VX.Tombstone` and `VX.DelTombstone` are the same type (`SparseT & Readonly<{ am: 'x' }>`). Keep one.
+* `VX.fetchOpts` and `FetchOpts`: the options of `get`, `getBox` and `fetchBox`; `getOpts` would match the verb most of
+  them serve. Weak; only if a pass over these names happens anyway.
+
+## Open questions (group 3)
+
+40. **crypto.ts named `key-deriver.ts`.** No such file; derivation is in `deriver/` (`basederiver.ts`,
+    `argon2id-webv1.ts`). Fixed in the header.
+41. **`makeLifeTok` mints four toks.** The block said `vault_tok` or `box_tok`; bank-listing.ts mints `bank_tok` and
+    `gate_tok` with it too. Fixed.
+42. **No storage adapter takes a logger, and the DefaultLogger example does not run.** `VaultLogger`, `DefaultLogger` and
+    `setDefaultLogger` said a storage adapter's factory takes `logger`, and that `BankProvider` does; only `Device.make`
+    does now. The prose is fixed, but `DefaultLogger`'s `@example`, whose code the brief leaves alone, still reads
+    `Device.make({ ...opts, bankDB: idbBankDB({ logger: storageLogger }), logger: DefaultLogger })`: there is no
+    `idbBankDB`, and no such option. Drop the example, or rewrite it as `Device.make({ ...opts, logger: DefaultLogger })`?
+43. **`StrengthChecker` named gatings that no longer exist** (`initialize_gate`, `change_passphrase`); the code's are
+    `build_bank` and `replace_passphrase`. Fixed.
+44. **`MinutesShape` named `staleMinutes` and `renewMinutes`.** It checks `refreshMinutes`, which `deviceOpts` uses for
+    `vaultRefreshMinutes` and `boxRefreshMinutes`. Fixed.
+45. **`RecordForNewBox`'s phrase does not say what refused.** It is the refine on `boxPatchNew` that refuses a patch
+    carrying `whisper_ciphered` under a create (a whole record, whose ciphertext would be reused), but the phrase reads
+    "A create operation found a record already present." The block now says what the code does; the phrase is code and is
+    left. Reword it?
+46. **A misspelt section banner in phrases.ts.** `// == [Refusals: storage backends]: ... BrowserDatadeviceDBFailed`
+    names `BrowserDatastoreFailed` (a find-and-replace of "store" with "deviceDB", by the look of it). A running comment,
+    so left; `rg BrowserDatastoreFailed` misses that banner.
+47. **A doc block on the wrong member.** In phrases.ts, `AnswerNotAsSent`'s block ("Why a good answer whose record
+    differs ...") sat stacked above `NothingStoredWhereLive`'s, and `AnswerNotAsSent` had none. Each now has its own.
+48. **`isConsistent`'s old prose said `other` decides what is compared** ("So `other` says what is compared: hand it only
+    the fields meant"). `disagreeing` walks `bag`'s own enumerable entries and reads `other` by name, so `bag` decides,
+    and `other` only needs the fields. Rewritten from the code.
+49. **Two box formats.** `SX.BoxFormat` (5002) said "The `fmt` every box row carries", but every bank box row carries
+    `BX.BoxFormat` (5003): `BX.boxSparse` extends `SX.boxSparse` with its own `fmt`. `SX`'s box forms are used only as
+    `BX`'s bases, and `SX.DamagedBox` (no `bank_tok`) sits beside `BX.DamagedBox` (with one). Fold `SX`'s box forms
+    into `BX`?
+50. **`SX.DamagedRow` said a damaged row "never indicates format drift: it is thrown by the bankDB".** Before 1.0 an old
+    stored shape fails today's checks and reads as damaged (CLAUDE.md), and a damaged row is listed beside the good ones,
+    not thrown. Sentence cut.
+51. **`SX.capacity`'s `vault_full` sentence** said the refusal carries the count in `meta.capacity`; as group 2's
+    question 28 found, a bankDB's `storageFull()` has none. Cut here; `RefusalMeta.capacity` says it.
+52. **`Promptly` is the gate's, not the vault's.** It is used only as `maingate.ensureTimely(VX.Promptly)` before a
+    prompt (bank.ts, gate.ts, gating.ts); the block said "a vault's record". Fixed. Should it be named for the prompt
+    (`PromptMillis`)?
+53. **"vault" where the bank is meant, again** (group 2's question 31). `VaultSnapshot` claimed to show "whether it is
+    locked" (it has no such field; `BankSnapshot.isLocked` does). `BoxSnapshot.isLocked`, `LOCKED`, `sidecar` and
+    `StrengthChecker` said "vault" for the bank's lock or passphrase. Fixed in these blocks. The phrases the user reads
+    still say "vault" (`WrongPassphrase`, `PasskeyAlreadyAdded`, `NoPasskeyWayin`, `SamePassphrase`,
+    `GateMadeElsewhere`); left with question 31.
+54. **`bankedVaultScope` named a `BankVault`.** No such type or class. Cut.
+55. **`DeviceOpts.deviceDB` "caches each vault's lease".** A lease is the bank's (`leaseQuery` is a bank scope and its
+    `bank_tok`). Now "caches the bank's lease and this device's row".
+56. **`passkeyAnswer` said the proving zeroes a used answer.** G2 says `spendCleartexts`, in the gating, does. Fixed.
+57. **Two `SLOPDOC:` markers** in shapes-vaultish.ts (the options' `Checkers` call and `BoxDna`), left by an earlier
+    pass for this one. Both blocks rewritten and the markers gone.
+58. **`vaultLoggerLevelVals` lives in logger.ts**, not `shapes/shapes-enums.ts` as STYLE.md's enumeration rule says
+    (like group 2's question 35, `presenceVals`).
