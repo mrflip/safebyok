@@ -116,6 +116,18 @@ export const IsAdapterVaultDB: unique symbol = Symbol.for('@safebyok/adaptervaul
 /** True for an AdapterVaultDB, made by whichever copy of safebyok: an object that answers true to {@link IsAdapterVaultDB}. */
 export const isAdapterVaultDB = (val: unknown): val is { [IsAdapterVaultDB]: true } => brandOf(val, IsAdapterVaultDB) === true
 
+/** The tag a BankDB answers true to, so a model can tell one from a duck. */
+export const IsBankDB: unique symbol = Symbol.for('@safebyok/bankdb')
+
+/** True for a BankDB, made by whichever copy of safebyok: an object that answers true to {@link IsBankDB}. */
+export function isBankDB(val: unknown): val is { [IsBankDB]: true } { return brandOf(val, IsBankDB) === true }
+
+/** The tag an AdapterBankDB answers true to, and no client of one. */
+export const IsAdapterBankDB: unique symbol = Symbol.for('@safebyok/adapterbankdb')
+
+/** True for an AdapterBankDB, made by whichever copy of safebyok: an object that answers true to {@link IsAdapterBankDB}. */
+export function isAdapterBankDB(val: unknown): val is { [IsAdapterBankDB]: true } { return brandOf(val, IsAdapterBankDB) === true }
+
 /** The tag a DeviceDB answers true to, so a model can tell one from a duck. */
 export const IsDeviceDB: unique symbol = Symbol.for('@safebyok/devicedb')
 

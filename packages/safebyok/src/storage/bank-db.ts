@@ -1,16 +1,22 @@
-/** The answers a bankDB's verbs return, and the helpers that make an answer. */
+/** The `BankDB` interface the models call, the answers its verbs return, and the helpers that make an answer. */
 
-import { UNANSWERED } from '../helpers/consts'
+import type * as Z from 'zod'
+import { IsBankDB, UNANSWERED } from '../helpers/consts'
 import { type VaultError, isVaultError, rowsOfRefusal } from '../refusals/errors'
 import type { BadOutcome, GoodOutcome } from '../refusals/outcome'
 import type { BankScope } from '../shapes/shapes-core'
-import type { BankBadAct, DelAct, GoodAct, GotAct, ListAct, OkAct } from '../shapes/shapes-enums'
-import type { BoxRow, DamagedVault } from '../shapes/shapes-storage'
-import type { BankRow, BankTombstone, GateRecord, LoggableAsk, VaultRow } from '../shapes/shapes-bankdb'
-import type { BoxesListed, Tidied } from './vault-db'
+import type { BankBadAct, GoodAct, GotAct, ListAct, OkAct } from '../shapes/shapes-enums'
+import type { BoxTidyAsk, DamagedVault, WatchScope } from '../shapes/shapes-storage'
+import type {
+  BankBuildAsk, BankDelAsk, BankEnsureAsk, BankRow, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxSparse, DamagedBox,
+  GateRecord, GateVerbAsk, LoggableAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultRow,
+} from '../shapes/shapes-bankdb'
+import type { Tidied } from './vault-db'
 import * as Refuse from '../refusals/throwers'
 
-// == [Answers]: GoodAnswer, BadAnswer, Answer, BankEnsured, EnsureBankAnswer, BuildBankAnswer, ReplacePassphraseAnswer, AddPasskeyAnswer, RevokePasskeyAnswer, DelBankAnswer, VaultAnswer, BoxAnswer, ListBoxesAnswer, TidyGoneAnswer, Notice, answerWithVal, refusedAnswerOf, badAnswerOf
+export type { Tidied } from './vault-db'
+
+// == [Answers]: GoodAnswer, BadAnswer, Answer, BankEnsured, BoxesListed, EnsureBankAnswer, GateAnswer, DelBankAnswer, VaultAnswer, BoxAnswer, ListBoxesAnswer, TidyGoneAnswer, Notice, answerWithVal, refusedAnswerOf, badAnswerOf
 
 /** A bankDB verb's good answer: its `val`, the `act` that says what happened, its `parent`, the row above the one asked for, and what it carries of its `ask`. */
 export type GoodAnswer<ValT, ActT extends string, ParentT = BankRow> = GoodOutcome<ValT> & { ask: LoggableAsk, act: ActT, parent: ParentT, dbhas?: unknown }
@@ -24,19 +30,15 @@ export type Answer<ValT, ActT extends string, ParentT = BankRow> = GoodAnswer<Va
 
 /** What `ensureBank` answers of a live bank: its `main` gate row, its vault rows, and the vault rows that failed their checks. */
 export type BankEnsured = { gates: { main: GateRecord }, vaults: VaultRow[], damaged_rows: DamagedVault[] }
+/** A vault's boxes from `listBoxes`, sparse, and the rows that failed their checks. */
+export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
 
 /** The answer to `ensureBank`. Its `val` is null when no live bank is stored. */
 export type EnsureBankAnswer        = Answer<BankEnsured | null, GotAct>
-/** The answer to `buildBank`: the gate row put, or under `passed` the live one found. */
-export type BuildBankAnswer         = Answer<GateRecord, 'born' | 'reborn' | 'passed'>
-/** The answer to `replacePassphrase`: the gate row put. */
-export type ReplacePassphraseAnswer = Answer<GateRecord, 'replaced'>
-/** The answer to `addPasskey`: the gate row put. */
-export type AddPasskeyAnswer        = Answer<GateRecord, 'added'>
-/** The answer to `revokePasskey`: the gate row put, or under `passed` the one found with no passkey wayin. */
-export type RevokePasskeyAnswer     = Answer<GateRecord, 'revoked' | 'passed'>
-/** The answer to `delBank`: the bank's tombstone. A bank has no row above it. */
-export type DelBankAnswer           = Answer<BankTombstone, DelAct, null>
+/** The answer to `buildBank` or a gate verb: the gate row put, or under `passed` the live one found. */
+export type GateAnswer              = Answer<GateRecord, OkAct>
+/** The answer to `delBank`: the bank's tombstone, or the bank row found. A bank has no row above it. */
+export type DelBankAnswer           = Answer<BankRow | null, OkAct, null>
 /** The answer to a vault get, put or del. Its `val` is the stored row after the call, or null for none. */
 export type VaultAnswer             = Answer<VaultRow | null, OkAct>
 /** The answer to a box get, put or del, with its vault row as `parent`. Its `val` is the stored row after the call, or null for none. */
@@ -73,4 +75,104 @@ export function badAnswerOf(err: VaultError): BadAnswer {
   const { parent = null, dbhas } = rowsOfRefusal(err)
   return { ok: false, err, act, parent, ask, ...((dbhas !== undefined) && { dbhas }) }
 }
+// --
+
+// == [Abstract interface]: BankDB, BankDBVerbnames
+
+/** The verbs a model calls on a bankDB, each with its `try*` form. */
+export interface BankDB {
+  /** Always true: marks a bankDB for safe branding. */
+  readonly [IsBankDB]: true
+  /** Get the bank row, and for a live bank its `main` gate row and its vault rows.
+   * A vault row that fails its checks is listed in `damaged_rows`. `val` is null when no live bank is stored.
+   */
+  ensureBank(ask: BankEnsureAsk): Promise<GoodAnswer<BankEnsured | null, GotAct>>
+  /** Non-throwing form of {@link BankDB.ensureBank}. */
+  tryEnsureBank(ask: BankEnsureAsk): Promise<EnsureBankAnswer>
+  /** Store the bank record `ask.record` and its `main` gate row `ask.gate` together, over no bank or its tombstone.
+   * Under the `passed` act, nothing is stored, and `val` is the live bank's gate row.
+   */
+  buildBank(ask: BankBuildAsk): Promise<GoodAnswer<GateRecord, OkAct>>
+  /** Non-throwing form of {@link BankDB.buildBank}. */
+  tryBuildBank(ask: BankBuildAsk): Promise<GateAnswer>
+  /** Store the gate record `ask.record`, whose only change is to replace the passphrase wayin. Refuses `gate_issue` for any other change. */
+  replacePassphrase(ask: GateVerbAsk): Promise<GoodAnswer<GateRecord, OkAct>>
+  /** Non-throwing form of {@link BankDB.replacePassphrase}. */
+  tryReplacePassphrase(ask: GateVerbAsk): Promise<GateAnswer>
+  /** Store the gate record `ask.record`, whose only change is to add a passkey wayin.
+   * Refuses `camped` when a passkey wayin is already stored, and `gate_issue` for any other change.
+   */
+  addPasskey(ask: GateVerbAsk): Promise<GoodAnswer<GateRecord, OkAct>>
+  /** Non-throwing form of {@link BankDB.addPasskey}. */
+  tryAddPasskey(ask: GateVerbAsk): Promise<GateAnswer>
+  /** Store the gate record `ask.record`, whose only change is to remove the passkey wayin. Refuses `gate_issue` for any other change.
+   * Under the `passed` act, nothing is stored: the gate row has no passkey wayin, and `val` is that row.
+   */
+  revokePasskey(ask: GateVerbAsk): Promise<GoodAnswer<GateRecord, OkAct>>
+  /** Non-throwing form of {@link BankDB.revokePasskey}. */
+  tryRevokePasskey(ask: GateVerbAsk): Promise<GateAnswer>
+  /** Store the tombstone `ask.record` over the live bank row `ask.expected`, and delete every gate, vault and box row under the bank. */
+  delBank(ask: BankDelAsk): Promise<GoodAnswer<BankRow | null, OkAct, null>>
+  /** Non-throwing form of {@link BankDB.delBank}. */
+  tryDelBank(ask: BankDelAsk): Promise<DelBankAnswer>
+  /** Get the vault row at a scope, whatever its life, in a bank live under `bank_tok`.
+   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone stored; otherwise both refuse.
+   */
+  getVault(ask: VaultGetAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
+  /** Non-throwing form of {@link BankDB.getVault}. */
+  tryGetVault(ask: VaultGetAsk): Promise<VaultAnswer>
+  /** Store `ask.record` over the vault row `ask.expected`, in a bank live under `bank_tok`, as `ifPresent` and `ifAbsent` allow.
+   * Under the `passed` act, nothing is stored, and `val` is the live row found.
+   */
+  putVault(ask: VaultPutAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
+  /** Non-throwing form of {@link BankDB.putVault}. */
+  tryPutVault(ask: VaultPutAsk): Promise<VaultAnswer>
+  /** Store the tombstone `ask.record` over the live vault row `ask.expected`, and delete the boxes of that vault life. */
+  delVault(ask: VaultDelAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
+  /** Non-throwing form of {@link BankDB.delVault}. */
+  tryDelVault(ask: VaultDelAsk): Promise<VaultAnswer>
+  /** List a vault's boxes, sparse, with its vault row as `parent`.
+   * Refuses when the vault is not live under `bank_tok` and `vault_tok`.
+   */
+  listBoxes(ask: BoxListAsk): Promise<GoodAnswer<BoxesListed, ListAct, VaultRow>>
+  /** Non-throwing form of {@link BankDB.listBoxes}. When the vault row refuses, `parent` is that stored row. */
+  tryListBoxes(ask: BoxListAsk): Promise<ListBoxesAnswer>
+  /** Get a box row, with its vault row as `parent`. Refuses when the vault is not live under `bank_tok` and `vault_tok`.
+   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone stored; otherwise both refuse.
+   */
+  getBox(ask: BoxGetAsk): Promise<GoodAnswer<BoxRow | null, OkAct, VaultRow>>
+  /** Non-throwing form of {@link BankDB.getBox}. */
+  tryGetBox(ask: BoxGetAsk): Promise<BoxAnswer>
+  /** Store `ask.record` over the box row `ask.expected`, in a vault live under `bank_tok` and `vault_tok`, as `ifPresent` and `ifAbsent` allow.
+   * Under the `passed` act, nothing is stored, and `val` is the live row found.
+   */
+  putBox(ask: BoxPutAsk): Promise<GoodAnswer<BoxRow | null, OkAct, VaultRow>>
+  /** Non-throwing form of {@link BankDB.putBox}. */
+  tryPutBox(ask: BoxPutAsk): Promise<BoxAnswer>
+  /** Store the tombstone `ask.record` over the live box row `ask.expected`. */
+  delBox(ask: BoxDelAsk): Promise<GoodAnswer<BoxRow | null, OkAct, VaultRow>>
+  /** Non-throwing form of {@link BankDB.delBox}. */
+  tryDelBox(ask: BoxDelAsk): Promise<BoxAnswer>
+  /** Housekeeping for hosts: delete the vault and box rows of an ended life under the bank, and count the box rows left. */
+  tidyGone(ask: BoxTidyAsk): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
+  /** Non-throwing form of {@link BankDB.tidyGone}. */
+  tryTidyGone(ask: BoxTidyAsk): Promise<TidyGoneAnswer>
+  /** Watch a bank or a vault: call `onNotice` with each changed row, and `onBadNews` with trouble in the watch.
+   * A bank's watch hears its bank, gate, vault and box rows; a vault's, its vault row and its box rows.
+   * Returns a function that stops the watch. Notices are best effort: never count on one arriving.
+   * After bad news, the watch may go on or may have ended.
+   */
+  watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: VaultError) => void): () => void
+}
+
+/** The name of each verb of {@link BankDB}. A duck check demands that a bankDB has a function under each name. */
+export const BankDBVerbnames = [
+  'ensureBank', 'tryEnsureBank', 'buildBank', 'tryBuildBank',
+  'replacePassphrase', 'tryReplacePassphrase', 'addPasskey', 'tryAddPasskey', 'revokePasskey', 'tryRevokePasskey',
+  'delBank', 'tryDelBank', 'getVault', 'tryGetVault', 'putVault', 'tryPutVault', 'delVault', 'tryDelVault',
+  'listBoxes', 'tryListBoxes', 'getBox', 'tryGetBox', 'putBox', 'tryPutBox', 'delBox', 'tryDelBox',
+  'tidyGone', 'tryTidyGone', 'watch',
+] as const satisfies readonly (keyof BankDB)[]
+
+true satisfies Z.core.util.AssertEqual<typeof BankDBVerbnames[number], Exclude<keyof BankDB, typeof IsBankDB>>
 // --

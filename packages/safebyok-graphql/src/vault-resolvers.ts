@@ -31,7 +31,7 @@ export type VaultFieldArgs = {
 /** A vaultDB answer in wire form: every field of its schema type is present, and null where the answer has no value. */
 export type CrossingAnswer = {
   ok:         boolean
-  act:        DB.GoodAct | DB.BadAct
+  act:        DB.GoodAct | DB.BankBadAct
   val:        unknown
   world:      unknown
   dbhas:      unknown

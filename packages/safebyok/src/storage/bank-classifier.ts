@@ -11,10 +11,9 @@ import * as SX from '../shapes/shapes-storage'
 import * as BX from '../shapes/shapes-bankdb'
 import type { BankScope, GateScope, VaultScope } from '../shapes/shapes-core'
 import type { BoxAct, BoxVaultAct, GotAct, IfAbsent, IfPresent, ListAct, OkAct, ParentBankAct, PutIfAbsent, RefusedAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
-import type { BoxAsk, BoxListAsk, BoxQuery, BoxRow, Capacity } from '../shapes/shapes-storage'
-import type { BankBuildAsk, BankDelAsk, BankEnsureAsk, BankRecord, BankRow, GatePutAsk, GateRecord, VaultAsk, VaultRow } from '../shapes/shapes-bankdb'
-import type { BankEnsured } from './bank-db'
-import type { BoxesListed } from './vault-db'
+import type { Capacity } from '../shapes/shapes-storage'
+import type { BankBuildAsk, BankDelAsk, BankEnsureAsk, BankRecord, BankRow, BoxAsk, BoxListAsk, BoxQuery, BoxRow, GatePutAsk, GateRecord, VaultAsk, VaultRow } from '../shapes/shapes-bankdb'
+import type { BankEnsured, BoxesListed } from './bank-db'
 
 // == [Rows and presence]: Meta, presenceVals, Presence, presenceOf, RecordAsk, PutAsk
 // Each function below takes the ask first, and the row stored second, null for none.
@@ -176,11 +175,12 @@ function vaultRowOf(vaultScope: VaultScope, vaultRaw: unknown, parent: BankRow):
   return (vault.bank_tok === parent.bank_tok) ? vault : null
 }
 
-/** The box row stored at `boxQuery`, checked. Throws `damaged_row` for a row that fails its checks. */
-function boxRowOf(boxQuery: BoxQuery, boxRaw: unknown): BoxRow | null {
+/** The box row stored at `boxQuery` under the vault row `parent`, checked, or null for none. Throws `damaged_row` for a row that fails its checks. */
+function boxRowOf(boxQuery: BoxQuery, boxRaw: unknown, parent: VaultRow): BoxRow | null {
   if (boxRaw === null)         { return null }
   if (! CX.isPlainBag(boxRaw)) { throw Refuse.storageIssue() }
-  return SX.storedBoxRow.parseConsistent(boxRaw, SX.boxQuery.parse(boxQuery), RowOfOtherAddress)
+  const box = BX.storedBoxRow.parseConsistent(boxRaw, CX.boxscope.parse(boxQuery), RowOfOtherAddress)
+  return (BX.vaultLifeOf(box) === BX.vaultLifeOf(parent)) ? box : null
 }
 
 // Checked against its scope, not its vault_tok: a vault row from another life refuses `vault_gone` or `vault_reborn`, and is no fault of storage.
@@ -198,11 +198,12 @@ function parentBankActOf({ bank_tok }: { bank_tok: string }, parent: BankRow): P
   return (parent.bank_tok === bank_tok) ? null : 'bank_reborn'
 }
 
-/** Classify the vault row above a box ask: the act it refuses with, or null when the vault is live in the asked-for life. */
-function boxVaultActOf({ vault_tok }: Pick<BoxQuery, 'vault_tok'>, parent: VaultRow): BoxVaultAct | null {
+// A vault row left from an ended life of its bank is under another `bank_tok` than the ask's, and refuses as reborn.
+/** Classify the vault row above a box ask: the act it refuses with, or null when the vault is live in the asked-for life, its bank's included. */
+function boxVaultActOf(ask: Pick<BoxQuery, 'bank_tok' | 'vault_tok'>, parent: VaultRow): BoxVaultAct | null {
   if (parent.revision_seq === SX.VoidRevisionSeq) { return 'vault_void' }
   if (parent.am !== 'a')                          { return 'vault_gone' }
-  return (parent.vault_tok === vault_tok) ? null : 'vault_reborn'
+  return (BX.vaultLifeOf(parent) === BX.vaultLifeOf(ask)) ? null : 'vault_reborn'
 }
 
 /** A listed row, checked, and stored at `address`; null for a row that fails its checks. Throws `storage_issue` for one that is not an object, or of another address. */
@@ -216,7 +217,7 @@ function listedRowOf<RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknow
 // == [Acts]: isWriteAct, isBirthAct, isOkAct, cappedActOf
 
 /** True when the act tells the caller to store the ask's record. */
-export function isWriteAct(act: BoxAct | VaultAct): act is WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
+export function isWriteAct(act: BoxAct | VaultAct | ParentBankAct): act is WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
 
 /** True when the act creates a row, or re-creates a deleted one. */
 export function isBirthAct(act: BoxAct | VaultAct): boolean { return (act === 'born') || (act === 'reborn') }
@@ -478,7 +479,7 @@ export function classifyStoredBox(ask: BoxAsk, fetched: BoxFetched): BoxStored {
   const vaultAct = boxVaultActOf(ask, parent)
   if (vaultAct !== null) { return { ok: false, act: vaultAct, parent, box: null, presence: null, capacity: null } }
 
-  const box      = boxRowOf(ask, fetched.box)
+  const box      = boxRowOf(ask, fetched.box, parent)
   const presence = presenceOf(box)
   const uncapped = rowActOf(ask, box)
   const act      = (capacity === null) ? uncapped : cappedActOf(uncapped, capacity)
@@ -494,13 +495,13 @@ export function classifyStoredBoxes(ask: BoxListAsk, fetched: BoxesFetched): Box
   const vaultAct = boxVaultActOf(ask, parent)
   if (vaultAct !== null) { return { ok: false, act: vaultAct, parent, listed: null } }
 
-  const { user_id, banklabel, vaultlabel, vault_tok } = ask
+  const { user_id, banklabel, vaultlabel } = ask
   const listed: BoxesListed = { boxes: [], damaged_rows: [] }
   for (const { boxlabel, box } of fetched.boxes) {
-    const address = { user_id, banklabel, vaultlabel, boxlabel, vault_tok }
-    const row     = listedRowOf(SX.boxRow, box, address)
-    if (row === null) { listed.damaged_rows.push(SX.damagedBoxOf(address, vault_tok)) } else { listed.boxes.push(SX.boxSparse.parse(row)) }
+    const address = { user_id, banklabel, vaultlabel, boxlabel }
+    const row     = listedRowOf(BX.boxRow, box, address)
+    if (row === null) { listed.damaged_rows.push(BX.damagedBoxOf(address, ask)) } else if (BX.vaultLifeOf(row) === BX.vaultLifeOf(parent)) { listed.boxes.push(BX.boxSparse.parse(row)) }
   }
-  return { ok: true, act: (fetched.boxes.length > 0) ? 'got' : 'gotvoid', parent, listed }
+  return { ok: true, act: ((listed.boxes.length + listed.damaged_rows.length) > 0) ? 'got' : 'gotvoid', parent, listed }
 }
 // --

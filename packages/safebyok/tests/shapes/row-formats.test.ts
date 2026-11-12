@@ -16,6 +16,7 @@ describe("the row validators against their format numbers", () => {
     ['bankRow',  BX.bankRow,    BX.BankFormat],
     ['gateRow',  BX.gateRecord, BX.GateFormat],
     ['vaultRow', BX.vaultRow,   BX.VaultFormat],
+    ['boxRow',   BX.boxRow,     BX.BoxFormat],
   ] as const)("%s is the shape its format number names", async (rowname, rowCheck, format) => {
     const schema = Zod.toJSONSchema(rowCheck, { unrepresentable: 'any' })
     await expect(`${JSON.stringify(schema, null, 2)}\n`).toMatchFileSnapshot(`../.snapshots/shapes/row-formats/${rowname}-fmt${String(format)}.schema.json`)
