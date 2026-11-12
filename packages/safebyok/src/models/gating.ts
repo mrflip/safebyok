@@ -7,7 +7,7 @@ import * as EX from '../shapes/shapes-enums'
 import type { Gatingkind } from '../shapes/shapes-enums'
 import type { BankScope } from '../shapes/shapes-core'
 import * as BX from '../shapes/shapes-bankdb'
-import type { BankSparse } from '../shapes/shapes-bankdb'
+import type { BankSparse, GateRecord } from '../shapes/shapes-bankdb'
 import * as GX from '../shapes/shapes-gateish'
 import type { AnyGating, AskUser, BankForGatingkind, BankGatingkind, CleartextsForGatingkind, GatingSnapshot, ProvingWorld, UnlockByProving, WayinHeader } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
@@ -204,53 +204,55 @@ async function unlockBank(bank: Bank, cleartexts: unknown, unlockByProving: Unlo
   return unlockByProving(bank, proved)
 }
 
-// Each gate change grants a lease to the bank citing the gate row it wrote. The old lease stays in force for the moments between: the vaultKey did not change.
+// Each gate change grants a lease to the bank citing the gate row it wrote, not a newer one that arrived meanwhile. The
+// old lease stays in force for the moments between: the vaultKey did not change.
 
 /** Replace the passphrase of `bank`, proved by the one it has. */
 async function replacePassphrase(bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
   const { antePassphraseClear, nextPassphraseClear } = checkedCleartexts(GX.passphraseReplaceCleartexts, cleartexts)
   if (antePassphraseClear === nextPassphraseClear) { throw samePassphrase() }
-  const gate        = await timelyGate(bank)
+  const { ante, gate } = await timelyAnte(bank)
   const anteProving = await PassphraseProving.buildStored(gate, antePassphraseClear, bank)
   const nextProving = await PassphraseProving.buildNovel(bank.stamp, gate.stamp, nextPassphraseClear, bank)
 
   const nextWayin = await nextProving.buildWayin(anteProving)
-  await bank.gateListing.replacePassphrase(gate.pickle(), BX.passphraseWayin.parse(nextWayin.pickle()))
-  return unlockByProving(bank, anteProving)
+  const written   = await bank.gateListing.replacePassphrase(ante, BX.passphraseWayin.parse(nextWayin.pickle()))
+  return unlockByProving(bank, anteProving, written)
 }
 
 /** Add a passkey to `bank`, proved by its passphrase. */
 async function addPasskey(bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
   const { passphraseClear, passkeyClear } = checkedCleartexts(GX.passkeyAddCleartexts, cleartexts)
-  const gate           = await timelyGate(bank)
+  const { ante, gate } = await timelyAnte(bank)
   const proved         = await PassphraseProving.buildStored(gate, passphraseClear, bank)
   const passkeyProving = await PasskeyProving.buildNovel(bank.stamp, gate.stamp, passkeyClear, bank)
 
   const passkeyWayin = await passkeyProving.buildWayin(proved)
-  await bank.gateListing.addPasskey(gate.pickle(), BX.passkeyWayin.parse(passkeyWayin.pickle()))
-  return unlockByProving(bank, proved)
+  const written      = await bank.gateListing.addPasskey(ante, BX.passkeyWayin.parse(passkeyWayin.pickle()))
+  return unlockByProving(bank, proved, written)
 }
 
 /** Revoke the passkey of `bank`, proved by its passphrase. */
 async function revokePasskey(bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
   const { passphraseClear } = checkedCleartexts(GX.passkeyRevokeCleartexts, cleartexts)
-  const gate   = await timelyGate(bank)
+  const { ante, gate } = await timelyAnte(bank)
   const proved = await PassphraseProving.buildStored(gate, passphraseClear, bank)
 
-  await bank.gateListing.revokePasskey(gate.pickle())
-  return unlockByProving(bank, proved)
+  const written = await bank.gateListing.revokePasskey(ante)
+  return unlockByProving(bank, proved, written)
 }
 
 /** Delete `bank`, proved by its passphrase. */
 async function delBank(bank: Bank, cleartexts: unknown): Promise<Bank> {
   const { passphraseClear } = checkedCleartexts(GX.bankDelCleartexts, cleartexts)
   const gate = await timelyGate(bank)
+  const ante = bank.sparse
   await PassphraseProving.buildStored(gate, passphraseClear, bank)
 
   // The lock first: no box unseals under a lease while the tombstone goes out. The delete goes over the bank row the
   // proving's gate came with, and the tombstone delivered vacates the gate and the vaults.
   bank.lock()
-  await bank.listing.delBank(bank.sparse)
+  await bank.listing.delBank(ante)
   return bank
 }
 
@@ -263,12 +265,18 @@ const ActOnBank: Record<BankGatingkind, (bank: Bank, cleartexts: unknown, unlock
 }
 // --
 
-// == [An act's helpers]: timelyGate, checkedCleartexts, isCorrectable, spendCleartexts
+// == [An act's helpers]: timelyGate, timelyAnte, checkedCleartexts, isCorrectable, spendCleartexts
 
 /** The main gate of `bank`, refreshed promptly, the bank enabled and present. */
 async function timelyGate(bank: Bank): Promise<Gate> {
   const gate = await bank.maingate.ensureTimely(VX.Promptly); bank.demandPromptable()
   return gate
+}
+
+/** The main gate of `bank`, refreshed promptly, and its record as it stands then: what a gate verb expects to find. */
+async function timelyAnte(bank: Bank): Promise<{ ante: GateRecord, gate: Gate }> {
+  const gate = await timelyGate(bank)
+  return { ante: gate.pickle(), gate }
 }
 
 /** The cleartexts through their checker. A throw that is not one of this library's is replaced whole, keeping nothing of it (G8). */

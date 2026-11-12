@@ -13,7 +13,7 @@ import type { LeaseDated } from '../shapes/shapes-storage'
 import * as BX from '../shapes/shapes-bankdb'
 import type { BankRecord, BankSparse } from '../shapes/shapes-bankdb'
 import * as GX from '../shapes/shapes-gateish'
-import type { AskUser, BankGatingkind, BankStamp, LeaseFriend, SealedWhisper, UnlockByProving } from '../shapes/shapes-gateish'
+import type { AskUser, BankGatingkind, BankStamp, CitedGate, LeaseFriend, SealedWhisper, UnlockByProving } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankFriend, BankSnapshot, Fetched, ListingOpts, RevokeSite } from '../shapes/shapes-vaultish'
 import type { GoodAnswer } from '../storage/bank-db'
@@ -218,9 +218,9 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     if (! revoked.ok) { this.#bankFriend.announce({ kind: 'lease_revoke_failed', refusal: revoked.err, bank: this, where }) }
   }
 
-  /** Attach the lease `proved` earns. A `lock()` made while the lease is being built is undone by it: the proving shows this user may unlock. */
-  async #unlockByProving(proved: Proving): Promise<this> {
-    const lease = await proved.buildLease(this.#leaseFriendOf(), this.maingate)
+  /** Attach the lease `proved` earns, citing `cited`. A `lock()` made while the lease is being built is undone by it: the proving shows this user may unlock. */
+  async #unlockByProving(proved: Proving, cited: CitedGate = this.maingate): Promise<this> {
+    const lease = await proved.buildLease(this.#leaseFriendOf(), cited)
     await this.#attachLease(lease)
     return this
   }
@@ -243,7 +243,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   // == [The gating's unlock]: unlockBankByProving
 
   // A gating comes to #unlockByProving by this, as no public method of a bank accepts a proving (G9).
-  static readonly #unlockBankByProving: UnlockByProving = (bank, proved) => bank.#unlockByProving(proved)
+  static readonly #unlockBankByProving: UnlockByProving = (bank, proved, cited) => bank.#unlockByProving(proved, cited)
   // --
 
   // == [The lease's friend]: leaseFriendOf, makeLeaseFriend

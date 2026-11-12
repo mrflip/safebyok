@@ -362,6 +362,6 @@ export type BankForGatingkind = { build_bank: null, unlock_bank: Bank, replace_p
 /** A gating of a bank already built: every kind but `build_bank`. */
 export type BankGatingkind = Exclude<EX.Gatingkind, 'build_bank'>
 
-/** Unlock `bank` by what `proved` proved, leased citing its main gate: the bank's private verb a gating calls. */
-export type UnlockByProving = (bank: Bank, proved: Proving) => Promise<Bank>
+/** Unlock `bank` by what `proved` proved, leased citing `cited`, by default its main gate as it stands: the bank's private verb a gating calls. */
+export type UnlockByProving = (bank: Bank, proved: Proving, cited?: CitedGate) => Promise<Bank>
 // --

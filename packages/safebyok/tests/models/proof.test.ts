@@ -12,7 +12,8 @@ import type { BadNews, BoxSnapshot, DeviceSnapshot, VaultSnapshot } from '../../
 import type { Whisper } from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, VaultScopeGiven, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
-import { Passphrase, byPassphrase } from '../test-helpers/vault-world'
+import { ticks } from '../test-helpers/timing'
+import { NewPassphrase, Passphrase, byPasskey, byPassphrase } from '../test-helpers/vault-world'
 
 useBankWorlds()
 
@@ -339,6 +340,116 @@ describe("the proof", () => {
     nextPageUi.expectRenders(['ready: main locked'])
     deviceUi.expectRenders([])
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
+  })
+
+  it("replacing the passphrase: nothing locks, and from then on only the new one opens the bank", async () => {
+    const { device, vault, dialog } = await buildHost()
+    const deviceUi = mountComponent(device, deviceStatus)
+    deviceUi.expectRenders(['ready: main unlocked'])
+
+    dialog.typing = { antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }
+    await vault.replacePassphrasePrompt()
+    expect(dialog.shown.splice(0)).to.deep.equal(['replace_passphrase'])
+    deviceUi.expectRenders(['ready: main unlocked (asking replace_passphrase)', 'ready: main unlocked (asking replace_passphrase)', 'ready: main unlocked'])
+    expect(vault.isUnlocked).to.be.true
+
+    vault.lock()
+    deviceUi.expectRenders(['ready: main unlocked', 'ready: main locked'])
+    dialog.typing = [byPassphrase(Passphrase), byPassphrase(NewPassphrase)]
+    await vault.ensureUnlocked()
+    expect(dialog.refusals.splice(0).map(({ refusalkind }) => refusalkind)).to.deep.equal(['wrong_passphrase'])
+    deviceUi.expectRenders(['ready: main locked (asking unlock_bank)', 'ready: main locked (asking unlock_bank)', 'ready: main unlocked (asking unlock_bank)', 'ready: main unlocked'])
+  })
+
+  it("adding and revoking a passkey: the passkey opens the bank until it is revoked", async () => {
+    const { device, bank, vault, dialog } = await buildHost()
+    const deviceUi = mountComponent(device, deviceStatus)
+    deviceUi.expectRenders(['ready: main unlocked'])
+
+    dialog.typing = { ...byPassphrase(Passphrase), ...await byPasskey('laptop') }
+    await vault.addPasskeyPrompt()
+    expect(dialog.shown.splice(0)).to.deep.equal(['add_passkey'])
+    deviceUi.expectRenders(['ready: main unlocked (asking add_passkey)', 'ready: main unlocked (asking add_passkey)', 'ready: main unlocked'])
+    expect(device.snapshot.bank?.maingate?.wayins.passkey0).not.to.be.undefined
+
+    vault.lock()
+    deviceUi.expectRenders(['ready: main unlocked', 'ready: main locked'])
+    dialog.typing = await byPasskey('laptop')
+    await vault.ensureUnlocked()
+    expect(dialog.shown.splice(0)).to.deep.equal(['unlock_bank'])
+    deviceUi.expectRenders(['ready: main locked (asking unlock_bank)', 'ready: main locked (asking unlock_bank)', 'ready: main unlocked (asking unlock_bank)', 'ready: main unlocked'])
+
+    dialog.typing = byPassphrase(Passphrase)
+    await vault.revokePasskeyPrompt()
+    expect(dialog.shown.splice(0)).to.deep.equal(['revoke_passkey'])
+    expect(bank.maingate.passkey0).to.be.null
+    deviceUi.expectRenders(['ready: main unlocked (asking revoke_passkey)', 'ready: main unlocked (asking revoke_passkey)', 'ready: main unlocked'])
+
+    vault.lock()
+    deviceUi.expectRenders(['ready: main unlocked', 'ready: main locked'])
+    dialog.typing = await byPasskey('laptop')
+    await TH.expectRefusal(vault.ensureUnlocked(), 'absent_wayin')
+    deviceUi.expectRenders(['ready: main locked (asking unlock_bank)', 'ready: main locked'])
+    dialog.typing = byPassphrase(Passphrase)
+    await vault.ensureUnlocked()
+    deviceUi.expectRenders(['ready: main locked (asking unlock_bank)', 'ready: main locked (asking unlock_bank)', 'ready: main unlocked (asking unlock_bank)', 'ready: main unlocked'])
+  })
+
+  it("a second device's changes reach this device's components through the watch", async () => {
+    const { world, device, bank, vault, dialog } = await buildHost()
+    const box = await vault.putBox(ApiKey)
+    await vault.beginWatch()
+    const deviceUi = mountComponent(device, deviceStatus)
+    const boxesUi = mountComponent(vault.boxListing, boxList)
+    deviceUi.expectRenders(['ready: main unlocked'])
+    boxesUi.expectRenders(['anthropic_api_key'])
+
+    // The second device has no lease cached, so its unlock asks; it then opens the box this one sealed.
+    const phone = makeDialog()
+    const phoneBank = await world.bankOnAnotherDevice({ requestCleartext: phone.requestCleartext, onBadNews })
+    const phoneVault = await phoneBank.ensureVault(VaultScopeGiven)
+    await phoneVault.ensureUnlocked()
+    expect(phone.shown.splice(0)).to.deep.equal(['unlock_bank'])
+    const phoneBox = await phoneVault.getBox(ApiKey.boxlabel)
+    expect(await phoneBox?.extractWhisper()).to.deep.equal(ApiKey.whisper)
+
+    // A box it adds is enlisted in this device's list.
+    await phoneVault.putBox({ ...ApiKey, boxlabel: 'openai_api_key' })
+    await ticks(1)
+    boxesUi.expectRenders(['anthropic_api_key, openai_api_key'])
+
+    // A BankDB with no watch, or a watch ended: nothing arrives until the host says hello to the vault again, on its own timer.
+    vault.boxListing.goodbye()
+    await phoneVault.putBox({ ...ApiKey, boxlabel: 'gemini_api_key' })
+    await ticks(1)
+    boxesUi.expectRenders([])
+    await vault.beginWatch()
+    boxesUi.expectRenders(['anthropic_api_key, openai_api_key, gemini_api_key'])
+
+    // It replaces the passphrase: this device stays unlocked and hears the new gate; a later unlock takes the new passphrase.
+    phone.typing = { antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }
+    await phoneVault.replacePassphrasePrompt()
+    await ticks(1)
+    deviceUi.expectRenders(['ready: main unlocked'])
+    expect(vault.isUnlocked).to.be.true
+    expect(bank.maingate.revision_tok).to.eq(phoneBank.maingate.revision_tok)
+    expect(await box.extractWhisper()).to.deep.equal(ApiKey.whisper)
+
+    vault.lock()
+    deviceUi.expectRenders(['ready: main unlocked', 'ready: main locked'])
+    dialog.typing = byPassphrase(NewPassphrase)
+    await vault.ensureUnlocked()
+    deviceUi.expectRenders(['ready: main locked (asking unlock_bank)', 'ready: main locked (asking unlock_bank)', 'ready: main unlocked (asking unlock_bank)', 'ready: main unlocked'])
+
+    // It deletes the bank: this device locks, forgets its lease, and has no bank until its next ensureBank.
+    phone.typing = byPassphrase(NewPassphrase)
+    await phoneBank.delPrompt()
+    await ticks(1)
+    deviceUi.expectRenders(['ready: no vaults'])
+    expect(vault.isUnlocked).to.be.false
+    expect(device.bank).to.be.null
+    await TH.eventually(() => world.leaseRows().length === 0)
+    await TH.expectRefusal(vault.ensureUnlocked())
   })
 
   it("under React StrictMode, the second effect's bank unlocks with the cached lease without asking", async () => {

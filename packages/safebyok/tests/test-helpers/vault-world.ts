@@ -3,6 +3,7 @@
 import { afterEach, vi } from 'vitest'
 import { _cheat_clock } from '../../src/helpers/clock'
 import type { Bank } from '../../src/models/bank'
+import type { Gate } from '../../src/models/gate'
 import type { Lease } from '../../src/models/lease'
 import type * as GX from '../../src/shapes/shapes-gateish'
 import { type RequestCleartext, vaultStamp } from '../../src/shapes/shapes-gateish'
@@ -10,7 +11,7 @@ import type { BankFriend, BoxWorld, LifecycleHandler, ListingOpts } from '../../
 import { type VaultError, isVaultError } from '../../src/refusals/errors'
 import * as Refuse from '../../src/refusals/throwers'
 import { brandGuarded } from '../../src/helpers/consts'
-import type { VaultRecord, VaultRow } from '../../src/shapes/shapes-bankdb'
+import type { BankRow, GateRecord, VaultRecord, VaultRow } from '../../src/shapes/shapes-bankdb'
 import { DefaultOnLifecycle, Device } from '../../src/models/device'
 import type { Vault } from '../../src/models/vault'
 import { Proving } from '../../src/models/proving'
@@ -79,6 +80,25 @@ export function unlockTyping(vault: Vault, typing: Typing): Promise<Vault> { ret
 
 /** `vault.unlock()` itself, the user doing `typing` at the dialog. */
 export function unlockVerbTyping(vault: Vault, typing: Typing): Promise<Vault> { return askTyping(deviceOf(vault), typing, () => vault.unlock()) }
+
+/** `bank.ensureUnlocked()`, the user doing `typing` at the dialog, should it be shown. */
+export function bankUnlockTyping(bank: Bank, typing: Typing): Promise<Bank> { return askTyping(bank.device, typing, () => bank.ensureUnlocked()) }
+
+/** `bank.maingate.replacePassphrasePrompt()`, the user typing `ante` as the passphrase it has and `next` as the new one. */
+export function replaceTyping(bank: Bank, ante: string, next: string): Promise<Gate> {
+  return askTyping(bank.device, { antePassphraseClear: ante, nextPassphraseClear: next }, () => bank.maingate.replacePassphrasePrompt())
+}
+
+/** `bank.maingate.addPasskeyPrompt()`, the user typing `passphrase` and touching the passkey `tag`. */
+export async function addPasskeyTyping(bank: Bank, passphrase: string, tag: string): Promise<Gate> {
+  return askTyping(bank.device, { passphraseClear: passphrase, passkeyClear: await passkeyOf(tag) }, () => bank.maingate.addPasskeyPrompt())
+}
+
+/** `bank.maingate.revokePasskeyPrompt()`, the user typing `passphrase`. */
+export function revokeTyping(bank: Bank, passphrase: string): Promise<Gate> { return askTyping(bank.device, byPassphrase(passphrase), () => bank.maingate.revokePasskeyPrompt()) }
+
+/** `bank.delPrompt()`, the user typing `passphrase`. */
+export function delTyping(bank: Bank, passphrase: string): Promise<Bank> { return askTyping(bank.device, byPassphrase(passphrase), () => bank.delPrompt()) }
 
 /** The device whose bank `vault` is of: a vault's world is its Bank. */
 function deviceOf(vault: Vault): Device { return (vault.world as Bank).device }
@@ -164,7 +184,8 @@ export function makeVaultWorld(worldOverrides: VaultWorldGiven = {}) {
   const device = deviceOn(deviceDB.memoryDB)
   /** The dialog of the world's own device, whose `requestCleartext` a test may swap. */
   const dialog = dialogs.get(device)!
-  const { vaultrows } = bankDB._cheat_shelfOf(BankScope)
+  const shelf = bankDB._cheat_shelfOf(BankScope)
+  const { vaultrows, gaterows } = shelf
   const storedNow = (): VaultRecord | null => (vaultrows.get(Dna.vaultlabel) ?? null) as VaultRecord | null
   /** Another device's put of `record`, written in the bankDB behind this one's back, at the next revision. */
   const putBehindOurBack = (record: VaultRecord): VaultRecord => {
@@ -179,8 +200,22 @@ export function makeVaultWorld(worldOverrides: VaultWorldGiven = {}) {
     if (stored === null) { throw new Error('nothing stored') }
     return stored
   }
+  /** The bank's main gate row as stored, refusing where none is. */
+  const demandStoredGate = (): GateRecord => {
+    const stored = gaterows.get('main')
+    if (stored === undefined) { throw new Error('no gate stored') }
+    return stored as GateRecord
+  }
+  /** Another device's put of `record`, the bank's main gate row, written in the bankDB behind this one's back, at the next revision; no watch hears it. */
+  const putGateBehindOurBack = (record: GateRecord): GateRecord => {
+    const stored = { ...record, revision_tok: `gate-rev-${String(record.revision_seq + 1)}`, revision_seq: record.revision_seq + 1, written_at: now }
+    gaterows.set('main', stored)
+    return stored
+  }
+  /** The bank row as stored, a tombstone among them, or null for none. */
+  const storedBankNow = (): BankRow | null => shelf.bank as BankRow | null
   return {
-    device, dialog, bankDB, deviceDB, badnews, putBehindOurBack, restoreRow, demandStored, storedNow,
+    device, dialog, bankDB, deviceDB, badnews, putBehindOurBack, restoreRow, demandStored, storedNow, demandStoredGate, putGateBehindOurBack, storedBankNow,
     /** The bank of the next session on this device: a new device over the same bankDB, deviceDB and clock, its bank ensured. */
     anotherSession: (): Promise<Bank> => deviceOn(deviceDB.memoryDB).ensureBank(),
     /** A device on another device: this world's bankDB, a deviceDB of its own (`onDeviceDB`, else a fresh one), its bank not yet ensured. */

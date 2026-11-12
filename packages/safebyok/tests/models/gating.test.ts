@@ -10,7 +10,7 @@ import { PassphraseProving } from '../../src/models/proving'
 import * as BX from '../../src/shapes/shapes-bankdb'
 import type { BankRecord, GateRecord } from '../../src/shapes/shapes-bankdb'
 import * as TH from '../test-helpers'
-import { type VaultWorldGiven, Dna, Passphrase, byPassphrase, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
+import { type VaultWorldGiven, Dna, Passphrase, byPassphrase, delTyping, makeBornVault, makeBornVaultWithPasskey, makeVaultWorld, useVaultWorlds, vaultRoundTrip } from '../test-helpers/vault-world'
 
 useVaultWorlds()
 
@@ -262,19 +262,20 @@ describe("a birth through a gating", () => {
     expect(unlocked.isUnlocked).to.be.true
   })
 
-  // 8c: a newer bank life met during a build reaches the bank listing as a parent, which remakes the Bank; until then this case is skipped.
-  it.skip("attaches no lease when another bank life is stored before the build's answer arrives", async () => { // eslint-disable-line vitest/no-disabled-tests -- 8c, as above
+  // The other ensureBank lists the newer life first, so the build's answer is older than the bank listed.
+  it("attaches no lease when another bank life is listed before the build's answer arrives", async () => {
     const theirs = await theirBankRows()
     const { device, bankDB, gatingAt, layRows, deviceDB } = birthWorld()
     const tryBuildBank = bankDB.tryBuildBank.bind(bankDB)
     vi.spyOn(bankDB, 'tryBuildBank').mockImplementationOnce(async (ask) => {
       const answer = await tryBuildBank(ask)
       layRows({ ...theirs, bank: { ...theirs.bank as BankRecord, revision_tok: 'rev-of-the-new-life', revision_seq: ask.record.revision_seq + 2 } })
+      await device.ensureBank()
       return answer
     })
-    const launched = TH.expectRefusal(device.ensureBank(), 'gate_made_elsewhere')
+    const launched = TH.expectRefusal(device.ensureBank())
     const gating = await gatingAt<'build_bank'>()
-    await TH.expectBad(gating.attempt({ passphraseClear }), 'gate_made_elsewhere')
+    await TH.expectBad(gating.attempt({ passphraseClear }))
     await launched
     expect(deviceDB.tryStow).not.toHaveBeenCalled()
   })
@@ -367,12 +368,11 @@ describe("gating.attempt", () => {
     expect(landed.isUnlocked).to.be.true
   })
 
-  // 8c: the gate verbs' gatingkinds come back with the Gate's prompts; until then no gating takes their cleartexts, and this case is skipped.
-  it.skip("refuses cleartext meant for another kind of gating, and concludes the gating", async () => { // eslint-disable-line vitest/no-disabled-tests -- 8c, as above
+  it("refuses cleartext meant for another kind of gating, and concludes the gating", async () => {
     const { device, gatingAt, shelf } = birthWorld()
     const launched = TH.expectRefusal(device.ensureBank())
     const gating = await gatingAt<'build_bank'>()
-    const err = await TH.expectBad(gating.attempt({ antePassphraseClear: Passphrase, nextPassphraseClear: Passphrase } as never))
+    const err = await TH.expectBad(gating.attempt({ antePassphraseClear: Passphrase, nextPassphraseClear: Passphrase }))
     await launched
     expect(gating.isOpen).to.be.false
     expect(shelf.bank).to.be.null
@@ -518,9 +518,14 @@ describe("an unlock through a gating", () => {
     expect(JSON.stringify(err)).to.not.include(Passphrase)
   })
 
-  // 8c: a bank deleted elsewhere arrives as its tombstone, which 8c delivers; until then this case is skipped.
-  it.skip("concludes with a refusal when the bank is deleted while the dialog is open", () => { // eslint-disable-line vitest/no-disabled-tests -- 8c, as above
-    expect.unreachable()
+  it("concludes with a refusal when the bank is deleted on another device while the dialog is open", async () => {
+    const { bank, anotherDevice, gatingAt } = await lockedVault()
+    const unlocking = TH.expectRefusal(bank.ensureUnlocked())
+    const gating = await gatingAt<'unlock_bank'>()
+    await delTyping(await anotherDevice().ensureBank(), Passphrase)
+    await TH.eventually(() => ! gating.isOpen)
+    await unlocking
+    expect(bank.isUnlocked).to.be.false
   })
 })
 
