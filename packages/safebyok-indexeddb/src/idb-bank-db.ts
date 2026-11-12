@@ -58,7 +58,7 @@ export class IdbBankDB extends DB.AdapterBankDB {
   // == [Room]: #roomIn
 
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** The capacity of the vault life `asked` names: its box rows, live and deleted, counted in the caller's transaction, against the soft cap `maxBoxes`. */
+  /** The capacity of the vault life `life` names, by its `bank_tok` and `vault_tok`: its box rows, live and deleted, counted in the caller's transaction, against the soft cap `maxBoxes`. */
   async #roomIn(store: IDBObjectStore, life: BX.BoxQuery): Promise<DB.Capacity> {
     const used = await promisifyRequest(store.count(lifeRangeOf(life)))
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }

@@ -52,7 +52,7 @@ export function gateScopepathOf({ user_id, banklabel, gatelabel }: BankScope & {
 /** The scopepath of the vault row at `scope`. */
 export function vaultScopepathOf({ user_id, banklabel, vaultlabel }: VaultScope): VaultScopepath { return ['vault', user_id, banklabel, vaultlabel] }
 
-/** The scopepath of the box row that `asked` names. */
+/** The scopepath of a box row, under the `bank_tok` and `vault_tok` of its vault's life. */
 export function boxScopepathOf({ user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel }: BX.BoxQuery): BoxScopepath {
   return ['box', user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel]
 }
