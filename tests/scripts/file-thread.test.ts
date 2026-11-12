@@ -211,8 +211,8 @@ describe('scripts/file-thread', () => {
     expect(git('rev-parse', `origin/${Branch}`)).to.eq(tip)
   })
 
-  describe('with --catch-up', () => {
-    it('rebases onto where main has moved and pushes, without proving or removing the worktree', () => {
+  describe("with --catch-up", () => {
+    it("rebases onto where main has moved and pushes, without proving or removing the worktree", () => {
       cutAndBuild('origin/main')
       const moved = mainMoves()
       const result = catchUp()
@@ -224,12 +224,12 @@ describe('scripts/file-thread', () => {
       expect(existsSync(root)).to.eq(true)
     })
 
-    it('stops on a conflict, undoing the rebase and pushing nothing', () => {
+    it("stops on a conflict, undoing the rebase and pushing nothing", () => {
       cutAndBuild('origin/main')
-      commit(root, 'README.md', 'the thread\'s start\n')
+      commit(root, 'README.md', "the thread's start\n")
       const pushed = git('rev-parse', `origin/${Branch}`)
       const tip = git('-C', root, 'rev-parse', 'HEAD')
-      mainMoves('README.md', 'main\'s start\n')
+      mainMoves('README.md', "main's start\n")
       const result = catchUp()
       expect(result.status).to.eq(3)
       expect(git('-C', root, 'rev-parse', 'HEAD')).to.eq(tip)
